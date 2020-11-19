@@ -1,7 +1,7 @@
 {
     "name": "cli",
-    "version": "0.0.2",
+    "version": "0.0.1",
     "dependencies": {
-        "@gxchain2/crypto": "^0.0.2"
+        "@gxchain2/crypto": "^0.0.1"
     }
 }

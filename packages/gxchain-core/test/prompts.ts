@@ -5,7 +5,7 @@ import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import uint8ArrayFromString from 'uint8arrays/from-string';
 
-import NodeImpl from '../src/node';
+import { NodeImpl } from '../src';
 import { stringToCID } from '@gxchain2/utils';
 import { constants } from '@gxchain2/common';
 

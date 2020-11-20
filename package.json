@@ -6,6 +6,7 @@
     "lerna": "^3.22.1"
   },
   "scripts": {
+    "bootstrap": "lerna bootstrap --ignore-scripts --include-dependencies --no-ci --hoist && npm run build",
     "build": "lerna run build",
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/package-lock.json"
   }

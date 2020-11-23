@@ -1,5 +1,9 @@
 {
-  "name": "root",
+  "name": "gxchain2",
+  "contributors": [
+    "David Lan <lanhaoxiang@qq.com> (https://github.com/lanhaoxiang/)",
+    "Samlior <samlior@foxmail.com> (https://github.com/samlior/)"
+  ],
   "version": "0.0.3",
   "private": true,
   "devDependencies": {

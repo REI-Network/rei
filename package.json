@@ -7,7 +7,9 @@
   "version": "0.0.3",
   "private": true,
   "devDependencies": {
-    "lerna": "^3.22.1"
+    "lerna": "^3.22.1",
+    "@commitlint/cli": "^11.0.0",
+    "@commitlint/config-angular": "^11.0.0"
   },
   "scripts": {
     "bootstrap": "lerna bootstrap --ignore-scripts --include-dependencies --no-ci --hoist && npm run build",

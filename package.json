@@ -9,10 +9,14 @@
   "devDependencies": {
     "@commitlint/cli": "^11.0.0",
     "@commitlint/config-angular": "^11.0.0",
+    "@typescript-eslint/parser": "^4.8.1",
     "eslint": "^7.14.0",
+    "eslint-config-prettier": "^6.15.0",
+    "eslint-plugin-prettier": "^3.1.4",
     "husky": "^4.3.0",
     "lerna": "^3.22.1",
-    "lint-staged": "^10.5.1"
+    "lint-staged": "^10.5.1",
+    "prettier": "^2.2.0"
   },
   "scripts": {
     "bootstrap": "lerna bootstrap --ignore-scripts --include-dependencies --no-ci --hoist && npm rebuild && npm run build",

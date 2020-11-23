@@ -5,8 +5,8 @@ import MPLEX from 'libp2p-mplex';
 import PeerId from 'peer-id';
 import KadDHT from 'libp2p-kad-dht';
 import GossipSub from 'libp2p-gossipsub';
-import MulticastDNS from 'libp2p-mdns';
 import TCP from 'libp2p-tcp';
+// import MulticastDNS from 'libp2p-mdns';
 // import Bootstrap from 'libp2p-bootstrap';
 
 import { constants } from '@gxchain2/common';

@@ -7,16 +7,30 @@
   "version": "0.0.3",
   "private": true,
   "devDependencies": {
-    "lerna": "^3.22.1",
     "@commitlint/cli": "^11.0.0",
-    "@commitlint/config-angular": "^11.0.0"
+    "@commitlint/config-angular": "^11.0.0",
+    "eslint": "^7.14.0",
+    "husky": "^4.3.0",
+    "lerna": "^3.22.1",
+    "lint-staged": "^10.5.1"
   },
   "scripts": {
     "bootstrap": "lerna bootstrap --ignore-scripts --include-dependencies --no-ci --hoist && npm run build",
     "build": "lerna run build --stream",
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/package-lock.json",
     "clean:build": "rm -rf packages/*/dist",
-    "publish:preview":"lerna version --conventional-commits --no-git-tag-version -y",
+    "publish:preview": "lerna version --conventional-commits --no-git-tag-version -y",
     "test:prompts": "node -r ts-node/register ./packages/gxchain-core/test/prompts.ts"
+  },
+  "lint-staged": {
+    "*.{js,ts}": [
+      "eslint --format=codeframe"
+    ]
+  },
+  "husky": {
+    "hooks": {
+      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS",
+      "pre-commit": "lint-staged"
+    }
   }
 }

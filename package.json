@@ -15,7 +15,7 @@
     "lint-staged": "^10.5.1"
   },
   "scripts": {
-    "bootstrap": "lerna bootstrap --ignore-scripts --include-dependencies --no-ci --hoist && npm run build",
+    "bootstrap": "lerna bootstrap --ignore-scripts --include-dependencies --no-ci --hoist && npm rebuild && npm run build",
     "build": "lerna run build --stream",
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/package-lock.json",
     "clean:build": "rm -rf packages/*/dist",

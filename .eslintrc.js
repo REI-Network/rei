@@ -1,4 +1,5 @@
 module.exports = {
+  parser: '@typescript-eslint/parser',
   root: true,
   env: {
     browser: true,
@@ -8,7 +9,6 @@ module.exports = {
   extends: ['prettier/@typescript-eslint', 'plugin:prettier/recommended'],
   parserOptions: {
     ecmaVersion: 2020,
-    parser: '@typescript-eslint/parser',
     sourceType: 'module'
     // ecmaFeatures: {
     //   experimentalObjectRestSpread: true

@@ -16,6 +16,7 @@
     "build": "lerna run build --stream",
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/package-lock.json",
     "clean:build": "rm -rf packages/*/dist",
+    "publish:preview":"lerna version --conventional-commits --no-git-tag-version -y",
     "test:prompts": "node -r ts-node/register ./packages/gxchain-core/test/prompts.ts"
   }
 }

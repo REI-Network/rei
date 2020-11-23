@@ -11,7 +11,7 @@ import { constants } from '@gxchain2/common';
 
 // tslint:disable-next-line: no-shadowed-variable
 const startPrompts = async (node: NodeImpl) => {
-    const p2pNode = node.p2p.node;
+    const p2pNode = node.p2p.libp2pNode;
     while (true) {
         const response = await prompts({
             type: 'text',

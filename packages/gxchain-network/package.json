@@ -15,6 +15,7 @@
     "dependencies": {
         "@gxchain2/common": "^0.0.1",
         "@gxchain2/interface": "^0.0.1",
+        "@gxchain2/utils": "^0.0.1",
         "it-pipe": "^1.1.0",
         "libp2p": "^0.29.3",
         "libp2p-gossipsub": "^0.7.0",
@@ -24,6 +25,7 @@
         "libp2p-noise": "^2.0.1",
         "libp2p-tcp": "^0.15.1",
         "libp2p-websockets": "^0.14.0",
-        "peer-id": "^0.14.2"
+        "peer-id": "^0.14.2",
+        "uint8arrays": "^1.1.0"
     }
 }

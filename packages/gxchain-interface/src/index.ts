@@ -22,7 +22,7 @@ export interface Peer {
 }
 
 export interface P2P {
-    node: any;
+    libp2pNode: any;
     getPeer(id: string): Peer | undefined;
     forEachPeer(fn: (value: Peer, key: string, map: Map<string, Peer>) => void): void;
     getLocalPeerId(): string;

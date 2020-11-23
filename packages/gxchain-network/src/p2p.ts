@@ -10,22 +10,21 @@ import TCP from 'libp2p-tcp';
 // import Bootstrap from 'libp2p-bootstrap';
 
 import { constants } from '@gxchain2/common';
-import { Peer, P2P } from '@gxchain2/interface';
+import { Node, Peer, P2P } from '@gxchain2/interface';
 
 import PeerImpl from './peer';
+import { handleJSONRPC, handleGossip } from './rpc';
 
 export default class P2PImpl implements P2P {
-    node: any;
+    libp2pNode: any;
     private peerId: PeerId | undefined;
     private peerInfoMap = new Map<string, Peer>();
     private handleJSONRPC: (peer: Peer, method: string, params?: any) => Promise<any> | any;
     private handleGossip: (topic: string, msg: { data: Uint8Array }) => Promise<void>;
 
-    constructor(handleJSONRPC: (peer: Peer, method: string, params?: any) => Promise<any> | any,
-        handleGossip: (topic: string, msg: { data: Uint8Array }) => Promise<void>,
-        peerId?: PeerId) {
-        this.handleJSONRPC = handleJSONRPC;
-        this.handleGossip = handleGossip;
+    constructor(node: Node, peerId?: PeerId) {
+        this.handleJSONRPC = handleJSONRPC.bind(undefined, node);
+        this.handleGossip = handleGossip.bind(undefined, node);
         this.peerId = peerId;
     }
 
@@ -44,7 +43,7 @@ export default class P2PImpl implements P2P {
     async init() {
         this.peerId = this.peerId || await PeerId.create({ bits: 1024, keyType: 'Ed25519' });
 
-        this.node = await Libp2p.create({
+        this.libp2pNode = await Libp2p.create({
             peerId: this.peerId,
             addresses: {
                 listen: ['/ip4/0.0.0.0/tcp/0', '/ip4/0.0.0.0/tcp/0/ws']
@@ -55,7 +54,7 @@ export default class P2PImpl implements P2P {
                 streamMuxer: [MPLEX],
                 dht: KadDHT,
                 pubsub: GossipSub,
-                peerDiscovery: [MulticastDNS]
+                // peerDiscovery: [MulticastDNS]
                 // peerDiscovery: [Bootstrap]
             },
             config:{
@@ -70,10 +69,10 @@ export default class P2PImpl implements P2P {
                 },
                 peerDiscovery: {
                     autoDial: true,
-                    [MulticastDNS.tag]: {
-                        interval: 1e3,
-                        enabled: true
-                    }
+                    // [MulticastDNS.tag]: {
+                    //     interval: 1e3,
+                    //     enabled: true
+                    // }
                     // bootstrap: {
                     //     interval: 60e3,
                     //     enabled: true,
@@ -94,15 +93,15 @@ export default class P2PImpl implements P2P {
             }
         });
 
-        this.node.on('peer:discovery', (peer) => {
+        this.libp2pNode.on('peer:discovery', (peer) => {
             console.log('\n$ Discovered', peer._idB58String); // Log discovered peer
         });
 
-        this.node.on('error', (err) => {
+        this.libp2pNode.on('error', (err) => {
             console.error('\n$ Error', err.message);
         });
 
-        this.node.connectionManager.on('peer:connect', (connection) => {
+        this.libp2pNode.connectionManager.on('peer:connect', (connection) => {
             const id = connection.remotePeer._idB58String;
             connection.newStream(constants.JSONRPCProtocol).then(({ stream }) => {
                 let peer = this.peerInfoMap.get(id);
@@ -121,7 +120,7 @@ export default class P2PImpl implements P2P {
             });
         });
 
-        this.node.connectionManager.on('peer:disconnect', (connection) => {
+        this.libp2pNode.connectionManager.on('peer:disconnect', (connection) => {
             const id = connection.remotePeer._idB58String;
             console.log('\n$ Disconnected to', id);
 
@@ -130,11 +129,11 @@ export default class P2PImpl implements P2P {
                 peer.abort();
                 this.peerInfoMap.delete(id);
             }
-            this.node.hangUp(connection.remotePeer).catch(err => console.error('\n$ Error, hangUp', err));
+            this.libp2pNode.hangUp(connection.remotePeer).catch(err => console.error('\n$ Error, hangUp', err));
         });
 
         // Handle messages for the protocol
-        await this.node.handle(constants.JSONRPCProtocol, ({ connection, stream, protocol }) => {
+        await this.libp2pNode.handle(constants.JSONRPCProtocol, ({ connection, stream, protocol }) => {
             const id = connection.remotePeer._idB58String;
             let peer = this.peerInfoMap.get(id);
             if (!peer || peer.isReading()) {
@@ -150,15 +149,15 @@ export default class P2PImpl implements P2P {
         });
 
         // start libp2p
-        await this.node.start();
+        await this.libp2pNode.start();
         console.log('Libp2p has started', this.peerId.toB58String());
-        this.node.multiaddrs.forEach((ma) => {
+        this.libp2pNode.multiaddrs.forEach((ma) => {
             console.log(ma.toString() + '/p2p/' + this.peerId!.toB58String());
         });
 
         for (const topic of constants.GossipTopics) {
-            this.node.pubsub.on(topic, this.handleGossip.bind(undefined, topic));
-            await this.node.pubsub.subscribe(topic);
+            this.libp2pNode.pubsub.on(topic, this.handleGossip.bind(undefined, topic));
+            await this.libp2pNode.pubsub.subscribe(topic);
         }
     }
 }

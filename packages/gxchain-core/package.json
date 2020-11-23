@@ -17,7 +17,6 @@
         "@gxchain2/database": "^0.0.1",
         "@gxchain2/interface": "^0.0.1",
         "@gxchain2/network": "^0.0.1",
-        "@gxchain2/rpc": "^0.0.1",
         "@gxchain2/utils": "^0.0.1",
         "multiaddr": "^8.1.1",
         "peer-id": "^0.14.2",

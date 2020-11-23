@@ -1,6 +1,5 @@
 import DatabaseImpl from '@gxchain2/database';
 import { P2PImpl } from '@gxchain2/network';
-import { handleJSONRPC, handleGossip } from '@gxchain2/rpc';
 import { Node, P2P, Database } from '@gxchain2/interface';
 
 export default class NodeImpl implements Node {
@@ -8,7 +7,7 @@ export default class NodeImpl implements Node {
     db: Database;
 
     constructor() {
-        this.p2p = new P2PImpl(handleJSONRPC.bind(undefined, this), handleGossip.bind(undefined, this));
+        this.p2p = new P2PImpl(this);
         this.db = new DatabaseImpl();
     }
 

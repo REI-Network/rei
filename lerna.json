@@ -2,5 +2,11 @@
   "packages": [
     "packages/*"
   ],
-  "version": "0.0.1"
+  "version": "0.0.1",
+  "command": {
+    "publish": {
+      "ignoreChanges": ["ignored-file", "*.md"],
+      "message": "gxchain2(release): publish version"
+    }
+  }
 }

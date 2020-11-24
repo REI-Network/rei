@@ -4,7 +4,7 @@
     "David Lan <lanhaoxiang@qq.com> (https://github.com/lanhaoxiang/)",
     "Samlior <samlior@foxmail.com> (https://github.com/samlior/)"
   ],
-  "version": "0.0.3",
+  "version": "0.0.0",
   "private": true,
   "devDependencies": {
     "@commitlint/cli": "^11.0.0",

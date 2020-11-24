@@ -5,6 +5,7 @@
     "Samlior <samlior@foxmail.com> (https://github.com/samlior/)"
   ],
   "version": "0.0.0",
+  "private": true,
   "devDependencies": {
     "@commitlint/cli": "^11.0.0",
     "@commitlint/config-angular": "^11.0.0",

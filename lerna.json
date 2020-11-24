@@ -9,7 +9,7 @@
         "ignored-file",
         "*.md"
       ],
-      "message": "gxchain2(release): publish version"
+      "message": "chore(release): publish version"
     }
   }
 }

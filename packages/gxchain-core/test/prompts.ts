@@ -4,6 +4,7 @@ import prompts from 'prompts';
 import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import uint8ArrayFromString from 'uint8arrays/from-string';
+import BN from 'bn.js';
 
 import { NodeImpl } from '../src';
 import { stringToCID } from '@gxchain2/utils';
@@ -99,6 +100,7 @@ const startPrompts = async (node: NodeImpl) => {
         console.warn('$ Can not find peer');
       }
     } else if (arr[0] === 'mine' || arr[0] === 'm') {
+      /*
       const block = {
         height: Number(arr[2]),
         blockHash: arr[1],
@@ -116,9 +118,34 @@ const startPrompts = async (node: NodeImpl) => {
       node.db.put(block.blockHash, block);
       await p2pNode.contentRouting.provide(await stringToCID(block.blockHash));
       await p2pNode.pubsub.publish(constants.NewBlockTopic, uint8ArrayFromString(JSON.stringify(publishBlockInfo)));
+      */
     } else if (arr[0] === 'lsblock') {
+      /*
       console.log('localBlockHeight', node.db.getLocalBlockHeight());
       node.db.forEach((block) => console.log(block));
+      */
+    } else if (arr[0] === 'vm') {
+      const STOP = '00';
+      const ADD = '01';
+      const PUSH1 = '60';
+
+      // Note that numbers added are hex values, so '20' would be '32' as decimal e.g.
+      const code = [PUSH1, '03', PUSH1, '05', ADD, STOP];
+
+      node.vm.on('step', function (data) {
+        console.log(`Opcode: ${data.opcode.name}\tStack: ${data.stack}`);
+      });
+
+      try {
+        const results = await node.vm.runCode({
+          code: Buffer.from(code.join(''), 'hex'),
+          gasLimit: new BN(0xffff)
+        });
+        console.log(`Returned: ${results.returnValue.toString('hex')}`);
+        console.log(`gasUsed : ${results.gasUsed.toString()}`);
+      } catch (err) {
+        console.error('vm runCode error', err);
+      }
     } else {
       console.warn('$ Invalid command');
       continue;
@@ -130,7 +157,9 @@ const node = new NodeImpl();
 node
   .init()
   .then(() => {
-    startPrompts(node);
+    startPrompts(node).catch((err) => {
+      console.error('Prompts error', err);
+    });
   })
   .catch((err) => {
     console.error('Node init error', err);

@@ -21,6 +21,7 @@
         "@gxchain2/state-manager": "^0.0.1-alpha.0",
         "@gxchain2/utils": "^0.0.1-alpha.0",
         "@gxchain2/vm": "^0.0.1-alpha.0",
+        "bn.js": "^5.1.3",
         "multiaddr": "^8.1.1",
         "peer-id": "^0.14.2",
         "prompts": "^2.4.0",

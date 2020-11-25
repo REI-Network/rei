@@ -35,5 +35,6 @@ export default class NodeImpl implements Node {
 
   async init() {
     await this.p2p.init();
+    await this.vm.init();
   }
 }

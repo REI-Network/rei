@@ -1,7 +1,21 @@
-import EthereumJSBlockchain from '@ethereumjs/blockchain';
+import EthereumJSBlockchain, { BlockchainOptions } from '@ethereumjs/blockchain';
 
-import { Blockchain } from '@gxchain2/interface';
+class BlockchainImpl extends EthereumJSBlockchain {
+  private static installBlockchain?: (blockchain: BlockchainImpl) => void;
+  static initBlockchainImpl(installBlockchain: (blockchain: BlockchainImpl) => void) {
+    if (BlockchainImpl.installBlockchain) {
+      throw new Error('Repeated init BlockchainImpl');
+    }
+    BlockchainImpl.installBlockchain = installBlockchain;
+  }
 
-class BlockchainImpl extends EthereumJSBlockchain implements Blockchain {}
+  constructor(opt: BlockchainOptions = {}) {
+    if (!BlockchainImpl.installBlockchain) {
+      throw new Error('You must init BlockchainImpl before create object');
+    }
+    super(opt);
+    BlockchainImpl.installBlockchain(this);
+  }
+}
 
 export { BlockchainImpl };

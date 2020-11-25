@@ -1,9 +1,7 @@
 import EthereumJSCommon from '@ethereumjs/common';
 
-import { Common } from '@gxchain2/interface';
-
 import * as constants from './constants';
 
-class CommonImpl extends EthereumJSCommon implements Common {}
+class CommonImpl extends EthereumJSCommon {}
 
 export { constants, CommonImpl };

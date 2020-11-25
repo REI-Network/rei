@@ -1,7 +1,10 @@
 // import { BN } from 'ethereumjs-util';
 // import Common from '@ethereumjs/common';
 import VM from '@ethereumjs/vm';
-export default VM;
+
+class VMImpl extends VM {}
+
+export { VMImpl };
 
 /*
 const common = new Common({ chain: 'mainnet' });

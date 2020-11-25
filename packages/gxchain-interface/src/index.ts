@@ -1,4 +1,6 @@
 import type BN from 'bn.js';
+import { BlockchainInterface } from '@ethereumjs/blockchain';
+import { StateManager, StorageDump } from '@ethereumjs/vm/dist/state/interface';
 
 export interface Peer {
   getPeerId(): string;
@@ -48,10 +50,4 @@ export interface Database {
   batch(ops: /*DBOp*/ any[]): Promise<void>;
 }
 
-// TODO: add interface...
-export interface Blockchain {
-  putBlock(block: /*Block*/ any): Promise<void>;
-  delBlock(blockHash: Buffer): Promise<void>;
-  getBlock(blockId: Buffer | number | BN): Promise</*Block*/ any | null>;
-  iterator(name: string, onBlock: /*OnBlock*/ any): Promise<void>;
-}
+export { StateManager, StorageDump, BlockchainInterface as Blockchain };

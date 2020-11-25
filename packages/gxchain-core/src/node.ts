@@ -1,7 +1,10 @@
+import { Node, P2P, Database } from '@gxchain2/interface';
 import { DatabaseImpl } from '@gxchain2/database';
 import { P2PImpl } from '@gxchain2/network';
-import { Node, P2P, Database } from '@gxchain2/interface';
 import { CommonImpl } from '@gxchain2/common';
+import { BlockchainImpl } from '@gxchain2/blockchain';
+import { VMImpl } from '@gxchain2/vm';
+import { StateManagerImpl } from '@gxchain2/state-manager';
 
 export default class NodeImpl implements Node {
   p2p: P2P;

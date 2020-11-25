@@ -1,10 +1,4 @@
-export interface Database {
-  put(key: string, val: any): void;
-  get(key: string): any;
-  forEach(fn: (value: any, key: string, map: Map<string, any>) => void): void;
-  updateLocalBlockHeight(height: number): void;
-  getLocalBlockHeight(): number;
-}
+import type BN from 'bn.js';
 
 export interface Peer {
   getPeerId(): string;
@@ -33,4 +27,31 @@ export interface Node {
   p2p: P2P;
   db: Database;
   init(): Promise<void>;
+}
+
+export interface Common {}
+
+// TODO: add interface...
+export interface Database {
+  getHeads(): Promise<{
+    [key: string]: Buffer;
+  }>;
+  getHeadHeader(): Promise<Buffer>;
+  getHeadBlock(): Promise<Buffer>;
+  getBlock(blockId: Buffer | BN | number): Promise</*Block*/ any>;
+  getBody(blockHash: Buffer, blockNumber: BN): Promise</*BlockBodyBuffer*/ any>;
+  getHeader(blockHash: Buffer, blockNumber: BN): Promise</*BlockHeader*/ any>;
+  getTotalDifficulty(blockHash: Buffer, blockNumber: BN): Promise<BN>;
+  hashToNumber(blockHash: Buffer): Promise<BN>;
+  numberToHash(blockNumber: BN): Promise<Buffer>;
+  get(dbOperationTarget: /*DBTarget*/ any, key?: /*DatabaseKey*/ any): Promise<any>;
+  batch(ops: /*DBOp*/ any[]): Promise<void>;
+}
+
+// TODO: add interface...
+export interface Blockchain {
+  putBlock(block: /*Block*/ any): Promise<void>;
+  delBlock(blockHash: Buffer): Promise<void>;
+  getBlock(blockId: Buffer | number | BN): Promise</*Block*/ any | null>;
+  iterator(name: string, onBlock: /*OnBlock*/ any): Promise<void>;
 }

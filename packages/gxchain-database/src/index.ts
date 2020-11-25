@@ -1,26 +1,18 @@
-import { Database } from '@gxchain2/interface';
+import { Database, Common } from '@gxchain2/interface';
 
-export default class DatabaseImpl implements Database {
-  private fakeDatabase = new Map<string, any>();
-  private localBlockHeight = 0;
+import levelUp from 'levelup';
+import levelDown from 'leveldown';
+import type { LevelUp } from 'levelup';
+import { DBManager } from '@ethereumjs/blockchain/dist/db/manager';
+import { DBOp, DBSetBlockOrHeader, DBSetTD, DBSetHashToNumber, DBSaveLookups } from '@ethereumjs/blockchain/dist/db/helpers';
+import { DBTarget } from '@ethereumjs/blockchain/dist/db/operation';
 
-  put(key: string, val: any) {
-    this.fakeDatabase.set(key, val);
-  }
-
-  get(key: string) {
-    return this.fakeDatabase.get(key);
-  }
-
-  forEach(fn: (value: any, key: string, map: Map<string, any>) => void) {
-    this.fakeDatabase.forEach(fn);
-  }
-
-  updateLocalBlockHeight(height: number) {
-    this.localBlockHeight = height;
-  }
-
-  getLocalBlockHeight() {
-    return this.localBlockHeight;
+class DatabaseImpl extends DBManager implements Database {
+  constructor(db: LevelUp, common: Common) {
+    super(db, common as any);
   }
 }
+
+const levelDB = levelUp(levelDown('./gxchaindb'));
+
+export { DatabaseImpl, levelDB, DBOp, DBSetBlockOrHeader, DBSetTD, DBSetHashToNumber, DBSaveLookups, DBTarget };

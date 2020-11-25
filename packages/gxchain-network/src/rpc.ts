@@ -10,6 +10,7 @@ const handleGossip = async (node: Node, topic: string, msg: { data: Uint8Array }
   switch (topic) {
     case constants.NewBlockTopic:
       try {
+        /*
         const publishBlockInfo = JSON.parse(uint8ArrayToString(msg.data));
         if (publishBlockInfo.height <= node.db.getLocalBlockHeight()) {
           console.warn('\n$ Gossip receive block height', publishBlockInfo.height, ', but less or equal than local block height', node.db.getLocalBlockHeight());
@@ -28,6 +29,7 @@ const handleGossip = async (node: Node, topic: string, msg: { data: Uint8Array }
             return;
           }
         }
+        */
       } catch (err) {
         console.error('\n$ Error, handle gossip msg', topic, err);
       }

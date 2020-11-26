@@ -153,7 +153,7 @@ const startPrompts = async (node: NodeImpl) => {
   }
 };
 
-const node = new NodeImpl();
+const node = new NodeImpl('../../../db');
 node
   .init()
   .then(() => {

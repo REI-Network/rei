@@ -4,6 +4,7 @@ import fs from 'fs';
 import type { LevelUp } from 'levelup';
 import BN from 'bn.js';
 import { Block } from '@ethereumjs/block';
+import { Account, Address, setLengthLeft } from 'ethereumjs-util';
 
 import { Node, P2P, Database } from '@gxchain2/interface';
 import { DatabaseImpl, createLevelDB } from '@gxchain2/database';
@@ -19,9 +20,9 @@ export default class NodeImpl implements Node {
   readonly common: CommonImpl;
   readonly levelDB: LevelUp;
   readonly databasePath: string;
+  readonly stateManager: StateManagerImpl;
 
   blockchain!: BlockchainImpl;
-  stateManager!: StateManagerImpl;
   vm!: VMImpl;
 
   constructor(databasePath: string) {
@@ -30,6 +31,33 @@ export default class NodeImpl implements Node {
     this.common = new CommonImpl({ chain: 'mainnet', hardfork: 'chainstart' });
     this.levelDB = createLevelDB(path.join(this.databasePath, 'chaindb'));
     this.db = new DatabaseImpl(this.levelDB, this.common);
+    this.stateManager = new StateManagerImpl({ common: this.common });
+  }
+
+  async setupAccountInfo(accountInfo: any) {
+    const stateManager = this.stateManager;
+    await stateManager.checkpoint();
+
+    for (const addr of Object.keys(accountInfo)) {
+      const { nonce, balance, storage, code } = accountInfo[addr];
+
+      const address = new Address(Buffer.from(addr.slice(2), 'hex'));
+      const account = Account.fromAccountData({ nonce, balance });
+      await stateManager.putAccount(address, account);
+
+      for (const hexStorageKey of Object.keys(storage)) {
+        const val = Buffer.from(storage[hexStorageKey], 'hex');
+        const storageKey = setLengthLeft(Buffer.from(hexStorageKey, 'hex'), 32);
+
+        await stateManager.putContractStorage(address, storageKey, val);
+      }
+
+      const codeBuf = Buffer.from(code.slice(2), 'hex');
+
+      await stateManager.putContractCode(address, codeBuf);
+    }
+
+    await stateManager.commit();
   }
 
   async init() {
@@ -48,6 +76,8 @@ export default class NodeImpl implements Node {
       let genesisBlockJSON = JSON.parse(fs.readFileSync(path.join(this.databasePath, 'genesisBlock.json')).toString());
       console.log('read genesis block from file', genesisBlockJSON.hash);
       genesisBlock = Block.genesis({ header: genesisBlockJSON }, { common: this.common });
+
+      await this.setupAccountInfo(JSON.parse(fs.readFileSync(path.join(this.databasePath, 'genesisAccount.json')).toString()));
     }
 
     BlockchainImpl.initBlockchainImpl((blockchain) => {
@@ -60,7 +90,6 @@ export default class NodeImpl implements Node {
       validateBlocks: false,
       genesisBlock
     });
-    this.stateManager = new StateManagerImpl({ common: this.common });
     this.vm = new VMImpl({
       common: this.common,
       stateManager: this.stateManager,

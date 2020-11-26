@@ -5,10 +5,20 @@ import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import uint8ArrayFromString from 'uint8arrays/from-string';
 import BN from 'bn.js';
+import { Transaction } from '@ethereumjs/tx';
+import { Block } from '@ethereumjs/block';
 
 import { NodeImpl } from '../src';
 import { stringToCID } from '@gxchain2/utils';
 import { constants } from '@gxchain2/common';
+
+const getPrivateKey = (address: string): Buffer => {
+  const keyPair = {
+    '0x3289621709f5b35d09b4335e129907ac367a0593': Buffer.from('d8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0', 'hex'),
+    '0xd1e52f6eacbb95f5f8512ff129cbd6360e549b0b': Buffer.from('db0558cc5f24dd09c390a25c7958a678e7efa0f286053da5df53dcecdba2a13c', 'hex')
+  };
+  return keyPair[address];
+};
 
 // tslint:disable-next-line: no-shadowed-variable
 const startPrompts = async (node: NodeImpl) => {
@@ -119,11 +129,50 @@ const startPrompts = async (node: NodeImpl) => {
       await p2pNode.contentRouting.provide(await stringToCID(block.blockHash));
       await p2pNode.pubsub.publish(constants.NewBlockTopic, uint8ArrayFromString(JSON.stringify(publishBlockInfo)));
       */
+      try {
+        const unsignedTx = Transaction.fromTxData(
+          {
+            gasLimit: '0x5208',
+            gasPrice: '0x01',
+            nonce: '0x00',
+            to: '0xd1e52f6eacbb95f5f8512ff129cbd6360e549b0b',
+            value: '0x01'
+          },
+          { common: node.common }
+        );
+        const block = Block.fromBlockData(
+          {
+            header: {
+              bloom:
+                '0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+              coinbase: '0x3289621709f5b35d09b4335e129907ac367a0593',
+              difficulty: '0x020000',
+              extraData: '0x42',
+              gasLimit: '0x2fefd8',
+              gasUsed: '0x00',
+              mixHash: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
+              nonce: '0x0102030405060708',
+              number: '0x01',
+              parentHash: '0x7285abd5b24742f184ad676e31f6054663b3529bc35ea2fcad8a3e0f642a46f7',
+              receiptTrie: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
+              stateRoot: '0xcafd881ab193703b83816c49ff6c2bf6ba6f464a1be560c42106128c8dbc35e7',
+              timestamp: '0x54c98c81',
+              transactionsTrie: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
+              uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347'
+            },
+            transactions: [unsignedTx.sign(getPrivateKey('0x3289621709f5b35d09b4335e129907ac367a0593'))]
+          },
+          { common: node.common }
+        );
+        await node.blockchain.putBlock(block);
+      } catch (err) {
+        console.error('Put block error', err);
+      }
     } else if (arr[0] === 'lsblock') {
-      /*
-      console.log('localBlockHeight', node.db.getLocalBlockHeight());
-      node.db.forEach((block) => console.log(block));
-      */
+      node.blockchain.iterator('vm', (block, reorg) => {
+        console.log('Block:', block.toJSON(), reorg);
+      });
+    } else if (arr[0] === 'newtx') {
     } else if (arr[0] === 'vm') {
       const STOP = '00';
       const ADD = '01';
@@ -153,14 +202,12 @@ const startPrompts = async (node: NodeImpl) => {
   }
 };
 
-const node = new NodeImpl('../../../db');
-node
-  .init()
-  .then(() => {
-    startPrompts(node).catch((err) => {
-      console.error('Prompts error', err);
-    });
-  })
-  .catch((err) => {
-    console.error('Node init error', err);
-  });
+(async () => {
+  try {
+    const node = new NodeImpl('../../../db');
+    await node.init();
+    await startPrompts(node);
+  } catch (err) {
+    console.error('Catch error', err);
+  }
+})();

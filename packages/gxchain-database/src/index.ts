@@ -15,6 +15,8 @@ class DatabaseImpl extends DBManager implements Database {
   }
 }
 
-const levelDB = levelUp(levelDown('./gxchaindb'));
+const createLevelDB = (path: string) => {
+  return levelUp(levelDown(path));
+};
 
-export { DatabaseImpl, levelDB, DBOp, DBSetBlockOrHeader, DBSetTD, DBSetHashToNumber, DBSaveLookups, DBTarget };
+export { DatabaseImpl, createLevelDB, DBOp, DBSetBlockOrHeader, DBSetTD, DBSetHashToNumber, DBSaveLookups, DBTarget };

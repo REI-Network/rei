@@ -4,7 +4,9 @@ import fs from 'fs';
 import type { LevelUp } from 'levelup';
 import BN from 'bn.js';
 import { Block } from '@ethereumjs/block';
-import { Account, Address, setLengthLeft } from 'ethereumjs-util';
+import type { RunBlockResult } from '@ethereumjs/vm/dist/runBlock';
+import { Account, Address, setLengthLeft, rlp, toBuffer } from 'ethereumjs-util';
+import { SecureTrie as Trie } from 'merkle-patricia-tree';
 
 import { Node, P2P, Database } from '@gxchain2/interface';
 import { DatabaseImpl, createLevelDB } from '@gxchain2/database';
@@ -13,6 +15,49 @@ import { CommonImpl } from '@gxchain2/common';
 import { BlockchainImpl } from '@gxchain2/blockchain';
 import { StateManagerImpl } from '@gxchain2/state-manager';
 import { VMImpl } from '@gxchain2/vm';
+
+function createReceipt(tx, block, logs, gasUsed, cumulativeGasUsed, contractAddress, status, logsBloom) {
+  var obj: any = {};
+  obj.tx = tx;
+  obj.block = block;
+  obj.logs = logs;
+  obj.gasUsed = gasUsed;
+  obj.cumulativeGasUsed = cumulativeGasUsed;
+  obj.contractAddress = contractAddress;
+  obj.status = status;
+  obj.logsBloom = logsBloom;
+
+  obj.transactionIndex = 0;
+
+  obj.txHash = tx.hash();
+
+  for (var i = 0; i < block.transactions.length; i++) {
+    var current = block.transactions[i];
+    if (current.hash().equals(obj.txHash)) {
+      obj.transactionIndex = i;
+      break;
+    }
+  }
+  return obj;
+}
+
+/*
+class Receipt {
+  tx;
+  block;
+  logs;
+  gasUsed;
+  cumulativeGasUsed;
+  contractAddress;
+  status;
+  logsBloom;
+
+  transactionIndex;
+
+  txHash;
+  constructor() {}
+}
+*/
 
 export default class NodeImpl implements Node {
   readonly p2p: P2P;
@@ -31,7 +76,7 @@ export default class NodeImpl implements Node {
     this.common = new CommonImpl({ chain: 'mainnet', hardfork: 'chainstart' });
     this.levelDB = createLevelDB(path.join(this.databasePath, 'chaindb'));
     this.db = new DatabaseImpl(this.levelDB, this.common);
-    this.stateManager = new StateManagerImpl({ common: this.common });
+    this.stateManager = new StateManagerImpl({ common: this.common, trie: new Trie(this.levelDB) });
   }
 
   async setupAccountInfo(accountInfo: any) {
@@ -97,6 +142,87 @@ export default class NodeImpl implements Node {
     });
 
     await this.vm.init();
+    await this.vm.runBlockchain(this.blockchain);
     await this.p2p.init();
+  }
+
+  async processBlock(block: Block) {
+    var results = await this.vm
+      .runBlock({
+        block,
+        generate: true,
+        skipBlockValidation: true
+      })
+      .catch((vmerr) => ({ vmerr }));
+    let vmerr = (results as { vmerr: any }).vmerr;
+    // This is a check that has been in there for awhile. I'm unsure if it's required, but it can't hurt.
+    if (vmerr && vmerr instanceof Error === false) {
+      throw new Error('VM error: ' + vmerr);
+    }
+    results = results as RunBlockResult;
+
+    // If no error, check for a runtime error. This can return null if no runtime error.
+    // vmerr = RuntimeError.fromResults(block.transactions, results);
+
+    // Note, even if we have an error, some transactions may still have succeeded.
+    // Process their logs if so, returning the error at the end.
+
+    var receipts: any[] = [];
+
+    var totalBlockGasUsage = new BN(0);
+
+    results.results.forEach(function (result) {
+      totalBlockGasUsage = totalBlockGasUsage.add(result.gasUsed);
+    });
+
+    const txTrie = new Trie();
+    const rcptTrie = new Trie();
+    const promises: Promise<void>[] = [];
+    const putInTrie = (trie: Trie, key: Buffer, val: Buffer) => trie.put.bind(trie)(key, val);
+
+    for (var v = 0; v < results.receipts.length; v++) {
+      var result = results.results[v];
+      var receipt: any = results.receipts[v];
+      var tx = block.transactions[v];
+      // var txHash = tx.hash();
+      var txLogs = [];
+
+      const rcpt = createReceipt(tx, block, txLogs, result.gasUsed.toArrayLike(Buffer), receipt.gasUsed, result.createdAddress, receipt.status, '0x' + receipt.bitvector.toString('hex'));
+      receipts.push(rcpt);
+
+      const rawReceipt = [receipt.status, receipt.gasUsed, receipt.bitvector, receipt.logs];
+      const rcptBuffer = rlp.encode(rawReceipt);
+      const key = rlp.encode(v);
+      promises.push(putInTrie(txTrie, key, tx.serialize()));
+      promises.push(putInTrie(rcptTrie, key, rcptBuffer));
+    }
+    await Promise.all(promises);
+
+    var newBlock = Block.fromBlockData(
+      {
+        header: {
+          parentHash: block.header.parentHash,
+          uncleHash: block.header.uncleHash,
+          coinbase: block.header.coinbase,
+          stateRoot: block.header.stateRoot,
+          transactionsTrie: txTrie.root,
+          receiptTrie: rcptTrie.root,
+          bloom: block.header.bloom,
+          difficulty: block.header.difficulty,
+          number: block.header.number,
+          gasLimit: block.header.gasLimit,
+          gasUsed: totalBlockGasUsage,
+          timestamp: block.header.timestamp,
+          extraData: block.header.extraData,
+          mixHash: block.header.mixHash,
+          nonce: block.header.nonce
+        },
+        transactions: block.transactions
+      },
+      { common: block._common }
+    );
+
+    // Put that block on the end of the chain
+    await this.blockchain.putBlock(newBlock);
   }
 }

@@ -7,6 +7,8 @@ import uint8ArrayFromString from 'uint8arrays/from-string';
 import BN from 'bn.js';
 import { Transaction } from '@ethereumjs/tx';
 import { Block } from '@ethereumjs/block';
+import streamToIterator from 'stream-to-iterator';
+import { Account } from 'ethereumjs-util';
 
 import { NodeImpl } from '../src';
 import { stringToCID } from '@gxchain2/utils';
@@ -68,7 +70,7 @@ const startPrompts = async (node: NodeImpl) => {
       } catch (err) {
         console.error('\n$ Error, dial', err);
       }
-    } else if (arr[0] === 'ls') {
+    } else if (arr[0] === 'lsp2p') {
       console.log('peers:');
       for (const [peerIdString] of p2pNode.peerStore.peers.entries()) {
         console.log(peerIdString);
@@ -143,36 +145,42 @@ const startPrompts = async (node: NodeImpl) => {
         const block = Block.fromBlockData(
           {
             header: {
-              bloom:
-                '0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+              // bloom:
+              //   '0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
               coinbase: '0x3289621709f5b35d09b4335e129907ac367a0593',
-              difficulty: '0x020000',
-              extraData: '0x42',
+              // difficulty: '0x020000',
+              // extraData: '0x42',
               gasLimit: '0x2fefd8',
-              gasUsed: '0x00',
-              mixHash: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
-              nonce: '0x0102030405060708',
+              // gasUsed: '0x00',
+              // mixHash: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
+              // nonce: '0x0102030405060708',
               number: '0x01',
-              parentHash: '0x7285abd5b24742f184ad676e31f6054663b3529bc35ea2fcad8a3e0f642a46f7',
-              receiptTrie: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
-              stateRoot: '0xcafd881ab193703b83816c49ff6c2bf6ba6f464a1be560c42106128c8dbc35e7',
-              timestamp: '0x54c98c81',
-              transactionsTrie: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
-              uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347'
+              parentHash: '0x7285abd5b24742f184ad676e31f6054663b3529bc35ea2fcad8a3e0f642a46f7'
+              // receiptTrie: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
+              // stateRoot: '0xcafd881ab193703b83816c49ff6c2bf6ba6f464a1be560c42106128c8dbc35e7',
+              // timestamp: '0x54c98c81',
+              // transactionsTrie: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
+              // uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347'
             },
             transactions: [unsignedTx.sign(getPrivateKey('0x3289621709f5b35d09b4335e129907ac367a0593'))]
           },
           { common: node.common }
         );
-        await node.blockchain.putBlock(block);
+        // const result = await node.vm.runBlock({ block, generate: true, skipBlockValidation: true });
+        // await node.blockchain.putBlock(block);
+        await node.processBlock(block);
       } catch (err) {
-        console.error('Put block error', err);
+        console.error('Run block error', err);
       }
     } else if (arr[0] === 'lsblock') {
       node.blockchain.iterator('vm', (block, reorg) => {
         console.log('Block:', block.toJSON(), reorg);
       });
-    } else if (arr[0] === 'newtx') {
+    } else if (arr[0] === 'lsaccount') {
+      const stream = node.stateManager._trie.createReadStream();
+      for await (let data of streamToIterator(stream as any)) {
+        console.log('key', '0x' + data.key.toString('hex'), '\nbalance', Account.fromRlpSerializedAccount(data.value).balance.toString());
+      }
     } else if (arr[0] === 'vm') {
       const STOP = '00';
       const ADD = '01';

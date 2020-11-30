@@ -174,7 +174,7 @@ const startPrompts = async (node: NodeImpl) => {
 
 (async () => {
   try {
-    const node = new NodeImpl('../../../db');
+    const node = new NodeImpl('../test/testdb');
     await node.init();
     await startPrompts(node);
   } catch (err) {

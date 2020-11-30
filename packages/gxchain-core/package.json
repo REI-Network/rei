@@ -24,6 +24,7 @@
         "@gxchain2/interface": "^0.0.1-alpha.0",
         "@gxchain2/network": "^0.0.1-alpha.0",
         "@gxchain2/state-manager": "^0.0.1-alpha.0",
+        "@gxchain2/tx-pool": "^0.0.1-alpha.0",
         "@gxchain2/utils": "^0.0.1-alpha.0",
         "@gxchain2/vm": "^0.0.1-alpha.0",
         "bn.js": "^5.1.3",

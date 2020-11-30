@@ -15,6 +15,7 @@ import { CommonImpl } from '@gxchain2/common';
 import { BlockchainImpl } from '@gxchain2/blockchain';
 import { StateManagerImpl } from '@gxchain2/state-manager';
 import { VMImpl } from '@gxchain2/vm';
+import { TransactionPool } from '@gxchain2/tx-pool';
 
 function createReceipt(tx, block, logs, gasUsed, cumulativeGasUsed, contractAddress, status, logsBloom) {
   var obj: any = {};
@@ -66,6 +67,7 @@ export default class NodeImpl implements Node {
   readonly levelDB: LevelUp;
   readonly databasePath: string;
   readonly stateManager: StateManagerImpl;
+  readonly txPool: TransactionPool;
 
   blockchain!: BlockchainImpl;
   vm!: VMImpl;
@@ -77,6 +79,7 @@ export default class NodeImpl implements Node {
     this.levelDB = createLevelDB(path.join(this.databasePath, 'chaindb'));
     this.db = new DatabaseImpl(this.levelDB, this.common);
     this.stateManager = new StateManagerImpl({ common: this.common, trie: new Trie(this.levelDB) });
+    this.txPool = new TransactionPool();
   }
 
   async setupAccountInfo(accountInfo: any) {

@@ -8,7 +8,7 @@ import BN from 'bn.js';
 import { Transaction } from '@ethereumjs/tx';
 import { Block } from '@ethereumjs/block';
 import streamToIterator from 'stream-to-iterator';
-import { Account } from 'ethereumjs-util';
+import { Account, Address } from 'ethereumjs-util';
 
 import { NodeImpl } from '../src';
 import { stringToCID } from '@gxchain2/utils';
@@ -114,16 +114,7 @@ const startPrompts = async (node: NodeImpl) => {
       }
     } else if (arr[0] === 'mine' || arr[0] === 'm') {
       try {
-        const unsignedTx = Transaction.fromTxData(
-          {
-            gasLimit: '0x5208',
-            gasPrice: '0x01',
-            nonce: '0x00',
-            to: '0xd1e52f6eacbb95f5f8512ff129cbd6360e549b0b',
-            value: '0x01'
-          },
-          { common: node.common }
-        );
+        const lastestHeader = (await node.blockchain.getHead()).header;
         const block = Block.fromBlockData(
           {
             header: {
@@ -136,15 +127,15 @@ const startPrompts = async (node: NodeImpl) => {
               // gasUsed: '0x00',
               // mixHash: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
               nonce: '0x0102030405060708',
-              number: '0x01',
-              parentHash: '0x7285abd5b24742f184ad676e31f6054663b3529bc35ea2fcad8a3e0f642a46f7',
+              number: lastestHeader.number.addn(1),
+              parentHash: lastestHeader.hash(),
               // receiptTrie: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
               // stateRoot: '0xcafd881ab193703b83816c49ff6c2bf6ba6f464a1be560c42106128c8dbc35e7',
               // timestamp: '0x54c98c81',
               // transactionsTrie: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
               uncleHash: '0x0'
             },
-            transactions: [unsignedTx.sign(getPrivateKey('0x3289621709f5b35d09b4335e129907ac367a0593'))]
+            transactions: node.txPool.get(1, new BN(21000))
           },
           { common: node.common }
         );
@@ -161,28 +152,19 @@ const startPrompts = async (node: NodeImpl) => {
       for await (let data of streamToIterator(stream as any)) {
         console.log('key', '0x' + data.key.toString('hex'), '\nbalance', Account.fromRlpSerializedAccount(data.value).balance.toString());
       }
-    } else if (arr[0] === 'vm') {
-      const STOP = '00';
-      const ADD = '01';
-      const PUSH1 = '60';
-
-      // Note that numbers added are hex values, so '20' would be '32' as decimal e.g.
-      const code = [PUSH1, '03', PUSH1, '05', ADD, STOP];
-
-      node.vm.on('step', function (data) {
-        console.log(`Opcode: ${data.opcode.name}\tStack: ${data.stack}`);
-      });
-
-      try {
-        const results = await node.vm.runCode({
-          code: Buffer.from(code.join(''), 'hex'),
-          gasLimit: new BN(0xffff)
-        });
-        console.log(`Returned: ${results.returnValue.toString('hex')}`);
-        console.log(`gasUsed : ${results.gasUsed.toString()}`);
-      } catch (err) {
-        console.error('vm runCode error', err);
-      }
+    } else if (arr[0] === 'puttx') {
+      const acc = await node.stateManager.getAccount(Address.fromString(arr[1]));
+      const unsignedTx = Transaction.fromTxData(
+        {
+          gasLimit: '0x5208',
+          gasPrice: '0x01',
+          nonce: acc.nonce,
+          to: arr[2],
+          value: arr[3]
+        },
+        { common: node.common }
+      );
+      node.txPool.put(unsignedTx.sign(getPrivateKey(arr[1])));
     } else {
       console.warn('$ Invalid command');
       continue;

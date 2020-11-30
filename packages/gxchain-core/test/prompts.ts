@@ -14,11 +14,12 @@ import { NodeImpl } from '../src';
 import { stringToCID } from '@gxchain2/utils';
 import { constants } from '@gxchain2/common';
 
+const keyPair = {
+  '0x3289621709f5b35d09b4335e129907ac367a0593': Buffer.from('d8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0', 'hex'),
+  '0xd1e52f6eacbb95f5f8512ff129cbd6360e549b0b': Buffer.from('db0558cc5f24dd09c390a25c7958a678e7efa0f286053da5df53dcecdba2a13c', 'hex')
+};
+
 const getPrivateKey = (address: string): Buffer => {
-  const keyPair = {
-    '0x3289621709f5b35d09b4335e129907ac367a0593': Buffer.from('d8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0', 'hex'),
-    '0xd1e52f6eacbb95f5f8512ff129cbd6360e549b0b': Buffer.from('db0558cc5f24dd09c390a25c7958a678e7efa0f286053da5df53dcecdba2a13c', 'hex')
-  };
   return keyPair[address];
 };
 
@@ -112,25 +113,6 @@ const startPrompts = async (node: NodeImpl) => {
         console.warn('$ Can not find peer');
       }
     } else if (arr[0] === 'mine' || arr[0] === 'm') {
-      /*
-      const block = {
-        height: Number(arr[2]),
-        blockHash: arr[1],
-        transactions: ['tx1', 'tx2', 'tx3']
-      };
-      if (block.height <= node.db.getLocalBlockHeight()) {
-        console.warn('$ New block must higher than local block');
-        continue;
-      }
-      const publishBlockInfo = {
-        height: block.height,
-        blockHash: block.blockHash
-      };
-      node.db.updateLocalBlockHeight(block.height);
-      node.db.put(block.blockHash, block);
-      await p2pNode.contentRouting.provide(await stringToCID(block.blockHash));
-      await p2pNode.pubsub.publish(constants.NewBlockTopic, uint8ArrayFromString(JSON.stringify(publishBlockInfo)));
-      */
       try {
         const unsignedTx = Transaction.fromTxData(
           {
@@ -146,28 +128,26 @@ const startPrompts = async (node: NodeImpl) => {
           {
             header: {
               // bloom:
-              //   '0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
+              //  '0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
               coinbase: '0x3289621709f5b35d09b4335e129907ac367a0593',
-              // difficulty: '0x020000',
+              difficulty: '0x1',
               // extraData: '0x42',
               gasLimit: '0x2fefd8',
               // gasUsed: '0x00',
               // mixHash: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
-              // nonce: '0x0102030405060708',
+              nonce: '0x0102030405060708',
               number: '0x01',
-              parentHash: '0x7285abd5b24742f184ad676e31f6054663b3529bc35ea2fcad8a3e0f642a46f7'
+              parentHash: '0x7285abd5b24742f184ad676e31f6054663b3529bc35ea2fcad8a3e0f642a46f7',
               // receiptTrie: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
               // stateRoot: '0xcafd881ab193703b83816c49ff6c2bf6ba6f464a1be560c42106128c8dbc35e7',
               // timestamp: '0x54c98c81',
               // transactionsTrie: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
-              // uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347'
+              uncleHash: '0x0'
             },
             transactions: [unsignedTx.sign(getPrivateKey('0x3289621709f5b35d09b4335e129907ac367a0593'))]
           },
           { common: node.common }
         );
-        // const result = await node.vm.runBlock({ block, generate: true, skipBlockValidation: true });
-        // await node.blockchain.putBlock(block);
         await node.processBlock(block);
       } catch (err) {
         console.error('Run block error', err);

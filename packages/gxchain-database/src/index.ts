@@ -1,6 +1,7 @@
 import levelUp from 'levelup';
 import levelDown from 'leveldown';
 import type { LevelUp } from 'levelup';
+import encoding from 'encoding-down';
 import { DBManager } from '@ethereumjs/blockchain/dist/db/manager';
 import { DBOp, DBSetBlockOrHeader, DBSetTD, DBSetHashToNumber, DBSaveLookups } from '@ethereumjs/blockchain/dist/db/helpers';
 import { DBTarget } from '@ethereumjs/blockchain/dist/db/operation';
@@ -16,7 +17,7 @@ class DatabaseImpl extends DBManager implements Database {
 }
 
 const createLevelDB = (path: string) => {
-  return levelUp(levelDown(path));
+  return levelUp(encoding(levelDown(path)));
 };
 
 export { DatabaseImpl, createLevelDB, DBOp, DBSetBlockOrHeader, DBSetTD, DBSetHashToNumber, DBSaveLookups, DBTarget };

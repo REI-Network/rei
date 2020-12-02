@@ -4,8 +4,7 @@ import fs from 'fs';
 import type { LevelUp } from 'levelup';
 import BN from 'bn.js';
 import { Block } from '@ethereumjs/block';
-import type { RunBlockResult } from '@ethereumjs/vm/dist/runBlock';
-import { Account, Address, setLengthLeft, rlp, toBuffer } from 'ethereumjs-util';
+import { Account, Address, setLengthLeft } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 
 import { Node, P2P, Database } from '@gxchain2/interface';
@@ -16,49 +15,6 @@ import { BlockchainImpl } from '@gxchain2/blockchain';
 import { StateManagerImpl } from '@gxchain2/state-manager';
 import { VMImpl } from '@gxchain2/vm';
 import { TransactionPool } from '@gxchain2/tx-pool';
-
-function createReceipt(tx, block, logs, gasUsed, cumulativeGasUsed, contractAddress, status, logsBloom) {
-  var obj: any = {};
-  obj.tx = tx;
-  obj.block = block;
-  obj.logs = logs;
-  obj.gasUsed = gasUsed;
-  obj.cumulativeGasUsed = cumulativeGasUsed;
-  obj.contractAddress = contractAddress;
-  obj.status = status;
-  obj.logsBloom = logsBloom;
-
-  obj.transactionIndex = 0;
-
-  obj.txHash = tx.hash();
-
-  for (var i = 0; i < block.transactions.length; i++) {
-    var current = block.transactions[i];
-    if (current.hash().equals(obj.txHash)) {
-      obj.transactionIndex = i;
-      break;
-    }
-  }
-  return obj;
-}
-
-/*
-class Receipt {
-  tx;
-  block;
-  logs;
-  gasUsed;
-  cumulativeGasUsed;
-  contractAddress;
-  status;
-  logsBloom;
-
-  transactionIndex;
-
-  txHash;
-  constructor() {}
-}
-*/
 
 export default class NodeImpl implements Node {
   readonly p2p: P2P;
@@ -80,13 +36,12 @@ export default class NodeImpl implements Node {
     this.chainDB = createLevelDB(path.join(this.databasePath, 'chaindb'));
     this.accountDB = createLevelDB(path.join(this.databasePath, 'accountdb'));
     this.db = new DatabaseImpl(this.chainDB, this.common);
-    this.stateManager = new StateManagerImpl({ common: this.common, trie: new Trie(this.accountDB /*, Buffer.from('e132066795abcca2e7c94f37db52bb376ba9e1bf25b73564f3207155a65d88c7', 'hex')*/) });
+    this.stateManager = new StateManagerImpl({ common: this.common, trie: new Trie(this.accountDB) });
     this.txPool = new TransactionPool();
   }
 
   async setupAccountInfo(accountInfo: any) {
     const stateManager = this.stateManager;
-    console.log('before: 0x' + (await stateManager.getStateRoot()).toString('hex'));
     await stateManager.checkpoint();
 
     for (const addr of Object.keys(accountInfo)) {
@@ -99,17 +54,14 @@ export default class NodeImpl implements Node {
       for (const hexStorageKey of Object.keys(storage)) {
         const val = Buffer.from(storage[hexStorageKey], 'hex');
         const storageKey = setLengthLeft(Buffer.from(hexStorageKey, 'hex'), 32);
-
         await stateManager.putContractStorage(address, storageKey, val);
       }
 
       const codeBuf = Buffer.from(code.slice(2), 'hex');
-
       await stateManager.putContractCode(address, codeBuf);
     }
 
     await stateManager.commit();
-    console.log('after: 0x' + (await stateManager.getStateRoot()).toString('hex'));
   }
 
   async init() {
@@ -150,22 +102,23 @@ export default class NodeImpl implements Node {
 
     await this.vm.init();
     await this.vm.runBlockchain();
-    // await this.p2p.init();
+    await this.p2p.init();
   }
 
   async processBlock(block: Block) {
     const last = (await this.blockchain.getHead()).header.stateRoot;
-    console.log('last: 0x' + last.toString('hex'));
-    const results = await this.vm.runBlock({
+
+    const opts = {
       block,
       root: last,
       generate: true,
       skipBlockValidation: true
-    });
+    };
+    const results = await this.vm.runBlock(opts);
 
+    block = opts.block;
     block = Block.fromBlockData({ header: { ...block.header, receiptTrie: results.receiptRoot }, transactions: block.transactions }, { common: this.common });
-    console.log('process block', block.toJSON());
-    // Put that block on the end of the chain
+
     await this.blockchain.putBlock(block);
   }
 }

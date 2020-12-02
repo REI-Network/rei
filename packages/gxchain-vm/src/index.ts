@@ -74,7 +74,7 @@ async function runBlockchain(this: VM, blockchain?: Blockchain) {
 async function runBlock(this: VM, opts: RunBlockOpts): ReturnType<typeof applyBlock> {
   const state = this.stateManager;
   const { root } = opts;
-  let { block } = opts;
+  let block = opts.block;
   const generateStateRoot = !!opts.generate;
 
   /**
@@ -123,7 +123,7 @@ async function runBlock(this: VM, opts: RunBlockOpts): ReturnType<typeof applyBl
   // header values against the current block.
   if (generateStateRoot) {
     const bloom = result.bloom.bitvector;
-    block = Block.fromBlockData({
+    opts.block = block = Block.fromBlockData({
       ...block,
       header: { ...block.header, stateRoot, bloom }
     });

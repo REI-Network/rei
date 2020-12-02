@@ -145,7 +145,12 @@ export default class NodeImpl implements Node {
     });
 
     await this.vm.init();
-    await this.vm.runBlockchain(this.blockchain);
+    const promises: Promise<RunBlockResult>[] = [];
+    this.blockchain.iterator('vm', (block) => {
+      promises.push(this.vm.runBlock({ block, generate: true, skipBlockValidation: true }));
+    });
+    await Promise.all(promises);
+
     await this.p2p.init();
   }
 

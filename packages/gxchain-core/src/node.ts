@@ -64,7 +64,8 @@ export default class NodeImpl implements Node {
   readonly p2p: P2P;
   readonly db: Database;
   readonly common: CommonImpl;
-  readonly levelDB: LevelUp;
+  readonly chainDB: LevelUp;
+  readonly accountDB: LevelUp;
   readonly databasePath: string;
   readonly stateManager: StateManagerImpl;
   readonly txPool: TransactionPool;
@@ -76,9 +77,10 @@ export default class NodeImpl implements Node {
     this.databasePath = databasePath[0] === '/' ? databasePath : path.join(__dirname, databasePath);
     this.p2p = new P2PImpl(this);
     this.common = new CommonImpl({ chain: 'mainnet', hardfork: 'chainstart' });
-    this.levelDB = createLevelDB(path.join(this.databasePath, 'chaindb'));
-    this.db = new DatabaseImpl(this.levelDB, this.common);
-    this.stateManager = new StateManagerImpl({ common: this.common, trie: new Trie(this.levelDB) });
+    this.chainDB = createLevelDB(path.join(this.databasePath, 'chaindb'));
+    this.accountDB = createLevelDB(path.join(this.databasePath, 'accountdb'));
+    this.db = new DatabaseImpl(this.chainDB, this.common);
+    this.stateManager = new StateManagerImpl({ common: this.common, trie: new Trie(this.accountDB) });
     this.txPool = new TransactionPool();
   }
 
@@ -132,7 +134,7 @@ export default class NodeImpl implements Node {
       blockchain.dbManager = this.db as any;
     });
     this.blockchain = new BlockchainImpl({
-      db: this.levelDB,
+      db: this.chainDB,
       common: this.common,
       validateConsensus: false,
       validateBlocks: false,

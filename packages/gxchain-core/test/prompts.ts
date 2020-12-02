@@ -144,9 +144,20 @@ const startPrompts = async (node: NodeImpl) => {
         console.error('Run block error', err);
       }
     } else if (arr[0] === 'lsblock') {
-      node.blockchain.iterator('vm', (block, reorg) => {
-        console.log('Block:', block.toJSON(), reorg);
-      });
+      // node.blockchain.iterator('vm', (block, reorg) => {
+      //   console.log('Block:', block.toJSON(), reorg);
+      // });
+      for (let h = 0; ; h++) {
+        try {
+          const block = await node.blockchain.dbManager.getBlock(h);
+          console.log('block on height', h, ':', block.toJSON());
+        } catch (err) {
+          if (err.type === 'NotFoundError') {
+            break;
+          }
+          throw err;
+        }
+      }
     } else if (arr[0] === 'lsaccount') {
       const stream = node.stateManager._trie.createReadStream();
       for await (let data of streamToIterator(stream as any)) {

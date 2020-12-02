@@ -118,21 +118,12 @@ const startPrompts = async (node: NodeImpl) => {
         const block = Block.fromBlockData(
           {
             header: {
-              // bloom:
-              //  '0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
               coinbase: '0x3289621709f5b35d09b4335e129907ac367a0593',
               difficulty: '0x1',
-              // extraData: '0x42',
               gasLimit: '0x2fefd8',
-              // gasUsed: '0x00',
-              // mixHash: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
               nonce: '0x0102030405060708',
               number: lastestHeader.number.addn(1),
               parentHash: lastestHeader.hash(),
-              // receiptTrie: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
-              // stateRoot: '0xcafd881ab193703b83816c49ff6c2bf6ba6f464a1be560c42106128c8dbc35e7',
-              // timestamp: '0x54c98c81',
-              // transactionsTrie: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
               uncleHash: '0x0'
             },
             transactions: node.txPool.get(1, new BN(21000))
@@ -144,9 +135,6 @@ const startPrompts = async (node: NodeImpl) => {
         console.error('Run block error', err);
       }
     } else if (arr[0] === 'lsblock') {
-      // node.blockchain.iterator('vm', (block, reorg) => {
-      //   console.log('Block:', block.toJSON(), reorg);
-      // });
       for (let h = 0; ; h++) {
         try {
           const block = await node.blockchain.dbManager.getBlock(h);

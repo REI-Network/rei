@@ -1,3 +1,3 @@
-import PeerImpl from './peer';
-import P2PImpl from './p2p';
-export { PeerImpl, P2PImpl };
+import { Peer } from './peer';
+import { Libp2pNode } from './p2p';
+export { Peer, Libp2pNode };

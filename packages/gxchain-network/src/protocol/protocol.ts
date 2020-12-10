@@ -1,4 +1,12 @@
-import type { Peer } from '../peer/peer';
+import type { Peer } from '../peer';
+
+export type Handler = {
+  name: string;
+  code: number;
+  response?: number;
+  encode: (data: any) => any;
+  decode: (data: any) => any;
+};
 
 export class Protocol {
   private _status: any;
@@ -12,6 +20,10 @@ export class Protocol {
   }
 
   get protocolString(): string {
+    throw new Error('Unimplemented');
+  }
+
+  findHandler(key: string | number): Handler {
     throw new Error('Unimplemented');
   }
 
@@ -42,10 +54,10 @@ export class Protocol {
           peer.once(`status:${this.name}`, (peer, message) => {
             if (timeout) {
               clearTimeout(timeout);
-              resolve((this._status = this.decodeStatus(message)));
+              resolve((this._status = message));
             }
           });
-          peer.send(this.encodeStatus(data));
+          peer.send(this.name, 'status', data);
         });
   }
 }

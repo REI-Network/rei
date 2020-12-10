@@ -9,15 +9,25 @@ import Bootstrap from 'libp2p-bootstrap';
 
 import { constants } from '@gxchain2/common';
 
-import Peer from './peer';
+import { Peer } from './peer';
+import { Protocol, ETHProtocol } from './protocol';
 
-export default class Libp2pNode extends Libp2p {
-  private peerId: PeerId | undefined;
-  private peerInfoMap = new Map<string, Peer>();
+// TODO: impl this.
+function parseProtocol(name: string) {
+  return new ETHProtocol();
+}
 
-  constructor(peerId: PeerId) {
+export class Libp2pNode extends Libp2p {
+  readonly peerId: PeerId;
+  private readonly peers = new Map<string, Peer>();
+  private readonly protocols: Protocol[];
+
+  constructor(peerId: PeerId, options: any) {
     super({
       peerInfo: peerId,
+      addresses: {
+        listen: ['/ip4/0.0.0.0/tcp/40404', '/ip4/0.0.0.0/tcp/40405/ws']
+      },
       modules: {
         transport: [TCP, WebSockets],
         streamMuxer: [MPLEX],
@@ -30,7 +40,7 @@ export default class Libp2pNode extends Libp2p {
           bootstrap: {
             interval: 2000,
             enabled: true,
-            list: []
+            list: options.bootnodes ?? []
           }
         },
         dht: {
@@ -44,21 +54,45 @@ export default class Libp2pNode extends Libp2p {
     });
 
     this.peerId = peerId;
+    this.protocols = options.protocols;
   }
 
   getPeer(id: string) {
-    return this.peerInfoMap.get(id);
+    return this.peers.get(id);
   }
 
   forEachPeer(fn: (value: Peer, key: string, map: Map<string, Peer>) => void) {
-    this.peerInfoMap.forEach(fn);
+    this.peers.forEach(fn);
   }
 
-  getLocalPeerId() {
-    return this.peerId!.toB58String();
+  getPeerInfo(connection: any) {
+    return new Promise<any>((resolve, reject) => {
+      connection.getPeerInfo((err: any, info: any) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(info);
+      });
+    });
   }
 
   async init() {
+    this.protocols.forEach((protocol) => {
+      this.handle(protocol.protocolString, async ({ connection, stream, protocol }) => {
+        try {
+          const peerInfo = await this.getPeerInfo(connection);
+          const id = peerInfo.id.toB58String();
+          const peer = this.peers.get(id);
+          if (peer) {
+            // TODO: impl this.
+            peer.acceptProtocol(stream, parseProtocol(protocol), undefined);
+            this.emit('connected', peer);
+          }
+        } catch (e) {
+          this.error(e);
+        }
+      });
+    });
     this.on('peer:discovery', (peer) => {});
 
     this.on('error', (err) => {});

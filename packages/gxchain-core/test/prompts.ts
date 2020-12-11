@@ -10,7 +10,7 @@ import { Block } from '@ethereumjs/block';
 import streamToIterator from 'stream-to-iterator';
 import { Account, Address } from 'ethereumjs-util';
 
-import { NodeImpl } from '../src';
+import { Node } from '../src';
 import { stringToCID } from '@gxchain2/utils';
 import { constants } from '@gxchain2/common';
 
@@ -24,7 +24,7 @@ const getPrivateKey = (address: string): Buffer => {
 };
 
 // tslint:disable-next-line: no-shadowed-variable
-const startPrompts = async (node: NodeImpl) => {
+const startPrompts = async (node: Node) => {
   const p2pNode = node.p2p.libp2pNode;
   while (true) {
     const response = await prompts({

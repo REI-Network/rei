@@ -1,2 +1,1 @@
-import NodeImpl from './node';
-export { NodeImpl };
+export * from './node';

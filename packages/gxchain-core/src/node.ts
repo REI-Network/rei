@@ -16,7 +16,7 @@ import { StateManager } from '@gxchain2/state-manager';
 import { VM } from '@gxchain2/vm';
 import { TransactionPool } from '@gxchain2/tx-pool';
 
-export default class Node implements INode {
+export class Node implements INode {
   readonly db: Database;
   readonly common: Common;
   readonly chainDB: LevelUp;

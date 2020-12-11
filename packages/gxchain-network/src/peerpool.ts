@@ -15,8 +15,8 @@ export declare interface PeerPool {
 
 export class PeerPool extends EventEmitter {
   private pool = new Map<string, Peer>();
-  private readonly maxSize: any;
-  private readonly nodes: Libp2pNode[];
+  private readonly _nodes: Libp2pNode[];
+  public readonly maxSize: number;
 
   constructor(options: { nodes: Libp2pNode[]; maxSize: number }) {
     super();
@@ -26,7 +26,7 @@ export class PeerPool extends EventEmitter {
       });
     });
     this.maxSize = options.maxSize;
-    this.nodes = options.nodes;
+    this._nodes = options.nodes;
   }
 
   get peers() {
@@ -35,6 +35,10 @@ export class PeerPool extends EventEmitter {
 
   get size() {
     return this.peers.length;
+  }
+
+  get nodes() {
+    return [...this._nodes];
   }
 
   idle(name: string) {

@@ -1,4 +1,5 @@
 import process from 'process';
+import path from 'path';
 
 import prompts from 'prompts';
 import PeerId from 'peer-id';
@@ -25,7 +26,6 @@ const getPrivateKey = (address: string): Buffer => {
 
 // tslint:disable-next-line: no-shadowed-variable
 const startPrompts = async (node: Node) => {
-  const p2pNode = node.p2p.libp2pNode;
   while (true) {
     const response = await prompts({
       type: 'text',
@@ -44,8 +44,10 @@ const startPrompts = async (node: Node) => {
     }
 
     if (arr[0] === 'add' || arr[0] === 'a') {
-      p2pNode.peerStore.addressBook.set(PeerId.createFromB58String(arr[1]), [new Multiaddr(arr[2])]);
-    } else if (arr[0] === 'find' || arr[0] === 'f') {
+      node.peerpool.nodes[0].peerStore.addressBook.set(PeerId.createFromB58String(arr[1]), [new Multiaddr(arr[2])]);
+    } else if (arr[0] === 'mine' || arr[0] === 'm') {
+      /*
+    else if (arr[0] === 'find' || arr[0] === 'f') {
       try {
         const peer = await p2pNode.peerRouting.findPeer(PeerId.createFromB58String(arr[1]));
 
@@ -112,7 +114,8 @@ const startPrompts = async (node: Node) => {
       } else {
         console.warn('$ Can not find peer');
       }
-    } else if (arr[0] === 'mine' || arr[0] === 'm') {
+    } 
+    */
       try {
         const lastestHeader = (await node.blockchain.getHead()).header;
         const block = Block.fromBlockData(
@@ -173,7 +176,7 @@ const startPrompts = async (node: Node) => {
 
 (async () => {
   try {
-    const node = new NodeImpl('../test/testdb');
+    const node = new Node(path.join(__dirname, './testdb'));
     await node.init();
     await startPrompts(node);
   } catch (err) {

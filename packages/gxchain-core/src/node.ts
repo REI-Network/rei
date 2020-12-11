@@ -18,26 +18,33 @@ import { VM } from '@gxchain2/vm';
 import { TransactionPool } from '@gxchain2/tx-pool';
 
 export class Node implements INode {
-  readonly db: Database;
-  readonly common: Common;
-  readonly chainDB: LevelUp;
-  readonly accountDB: LevelUp;
-  readonly databasePath: string;
-  readonly stateManager: StateManager;
-  readonly txPool: TransactionPool;
+  public readonly chainDB: LevelUp;
+  public readonly accountDB: LevelUp;
+  public readonly databasePath: string;
+  public readonly txPool: TransactionPool;
 
-  peerpool!: PeerPool;
-  blockchain!: Blockchain;
-  vm!: VM;
+  public db!: Database;
+  public common!: Common;
+  public stateManager!: StateManager;
+  public peerpool!: PeerPool;
+  public blockchain!: Blockchain;
+  public vm!: VM;
 
   constructor(databasePath: string) {
     this.databasePath = databasePath[0] === '/' ? databasePath : path.join(__dirname, databasePath);
-    this.common = new Common({ chain: 'mainnet', hardfork: 'chainstart' });
     this.chainDB = createLevelDB(path.join(this.databasePath, 'chaindb'));
     this.accountDB = createLevelDB(path.join(this.databasePath, 'accountdb'));
-    this.db = new Database(this.chainDB, this.common);
-    this.stateManager = new StateManager({ common: this.common, trie: new Trie(this.accountDB) });
     this.txPool = new TransactionPool();
+  }
+
+  get status() {
+    // TODO: impl this.
+    return {
+      networkId: this.common.networkId(),
+      height: undefined,
+      bestHash: undefined,
+      genesisHash: this.common.genesis().hash
+    };
   }
 
   async setupAccountInfo(accountInfo: any) {
@@ -65,6 +72,19 @@ export class Node implements INode {
   }
 
   async init() {
+    this.common = new Common({
+      chain: {
+        networkId: 12358,
+        genesis: undefined,
+        hardforks: [],
+        bootstrapNodes: []
+      },
+      hardfork: 'chainstart'
+    });
+
+    this.db = new Database(this.chainDB, this.common);
+    this.stateManager = new StateManager({ common: this.common, trie: new Trie(this.accountDB) });
+
     this.peerpool = new PeerPool({
       nodes: await Promise.all(
         [

@@ -32,7 +32,7 @@ const handlers: Handler[] = [
       return rlp.encode([111, data]);
     },
     decode: (data) => {
-      console.debug('Echo', data);
+      console.debug('Echo', (data as Buffer).toString());
       return data;
     }
   }

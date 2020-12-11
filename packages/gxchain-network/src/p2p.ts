@@ -1,4 +1,4 @@
-const Libp2p = require('libp2p');
+import Libp2pJS from 'libp2p';
 import WebSockets from 'libp2p-websockets';
 import MPLEX from 'libp2p-mplex';
 import PeerId from 'peer-id';
@@ -12,8 +12,10 @@ import { constants } from '@gxchain2/common';
 import { Peer } from './peer';
 import { Protocol, ETHProtocol } from './protocol';
 
+let Libp2p: any = Libp2pJS;
+
 // TODO: impl this.
-function parseProtocol(name: string) {
+function parseProtocol(name: string): Protocol {
   if (name === constants.GXC2_ETHWIRE) {
     return new ETHProtocol();
   }
@@ -77,7 +79,7 @@ export class Libp2pNode extends Libp2p {
     this.peers.forEach(fn);
   }
 
-  getPeerInfo(connection: any) {
+  private getPeerInfo(connection: any) {
     return new Promise<any>((resolve, reject) => {
       connection.getPeerInfo((err: any, info: any) => {
         if (err) {
@@ -88,7 +90,7 @@ export class Libp2pNode extends Libp2p {
     });
   }
 
-  createPeer(peerInfo: PeerId) {
+  private createPeer(peerInfo: PeerId) {
     const peer = new Peer({ peerId: peerInfo.toB58String(), node: this });
     this.peers.set(peer.peerId, peer);
     return peer;

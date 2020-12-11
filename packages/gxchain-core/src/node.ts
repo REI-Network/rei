@@ -9,7 +9,7 @@ import { SecureTrie as Trie } from 'merkle-patricia-tree';
 
 import { INode } from '@gxchain2/interface';
 import { Database, createLevelDB } from '@gxchain2/database';
-import { Libp2pNode } from '@gxchain2/network';
+import { Libp2pNode, PeerPool } from '@gxchain2/network';
 import { Common } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { StateManager } from '@gxchain2/state-manager';
@@ -25,7 +25,7 @@ export class Node implements INode {
   readonly stateManager: StateManager;
   readonly txPool: TransactionPool;
 
-  p2p!: Libp2pNode;
+  peerpool!: PeerPool;
   blockchain!: Blockchain;
   vm!: VM;
 
@@ -64,7 +64,10 @@ export class Node implements INode {
   }
 
   async init() {
-    this.p2p = new Libp2pNode(undefined as any);
+    this.peerpool = new PeerPool({
+      nodes: [new Libp2pNode(undefined as any)],
+      maxSize: 20
+    });
 
     let genesisBlock!: Block;
     try {

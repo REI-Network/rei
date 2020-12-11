@@ -8,13 +8,13 @@ import secio from 'libp2p-secio';
 import Bootstrap from 'libp2p-bootstrap';
 
 import { constants } from '@gxchain2/common';
+import { INode } from '@gxchain2/interface';
 
 import { Peer } from './peer';
 import { Protocol, ETHProtocol } from './protocol';
 
 let Libp2p: any = Libp2pJS;
 
-// TODO: impl this.
 function parseProtocol(name: string): Protocol {
   if (name === constants.GXC2_ETHWIRE) {
     return new ETHProtocol();
@@ -34,9 +34,10 @@ export class Libp2pNode extends Libp2p {
   private readonly peers = new Map<string, Peer>();
   private readonly protocols: Protocol[];
   private readonly banned = new Map<string, number>();
+  private readonly node: INode;
   private started: boolean = false;
 
-  constructor(options: { peerId: PeerId; bootnodes?: string[]; protocols: Set<string> }) {
+  constructor(options: { node: INode; peerId: PeerId; bootnodes?: string[]; protocols: Set<string> }) {
     super({
       peerInfo: options.peerId,
       addresses: {
@@ -67,6 +68,7 @@ export class Libp2pNode extends Libp2p {
       }
     });
 
+    this.node = options.node;
     this.peerId = options.peerId;
     this.protocols = Array.from(options.protocols).map((p) => parseProtocol(p));
   }

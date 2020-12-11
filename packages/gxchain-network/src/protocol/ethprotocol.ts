@@ -24,6 +24,17 @@ const handlers: Handler[] = [
         genesisHash: status.genesisHash
       };
     }
+  },
+  {
+    name: 'Echo',
+    code: 111,
+    encode: (data) => {
+      return rlp.encode([10, data]);
+    },
+    decode: (data) => {
+      console.debug('Echo', data);
+      return data;
+    }
   }
 ];
 

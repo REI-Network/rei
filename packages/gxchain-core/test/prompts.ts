@@ -44,7 +44,15 @@ const startPrompts = async (node: Node) => {
     }
 
     if (arr[0] === 'add' || arr[0] === 'a') {
-      node.peerpool.nodes[0].peerStore.addressBook.set(PeerId.createFromB58String(arr[1]), [new Multiaddr(arr[2])]);
+      const pos = arr[1].indexOf('/p2p/');
+      node.peerpool.nodes[0].peerStore.addressBook.set(PeerId.createFromB58String(arr[1].substr(pos + 5)), [new Multiaddr(arr[1].substr(0, pos))]);
+    } else if (arr[0] === 'send' || arr[0] === 's') {
+      const peer = node.peerpool.nodes[0].getPeer(arr[1]);
+      if (peer) {
+        peer.send(constants.GXC2_ETHWIRE, 'echo', arr[2]);
+      } else {
+        console.warn('$ Can not find peer');
+      }
     } else if (arr[0] === 'mine' || arr[0] === 'm') {
       /*
     else if (arr[0] === 'find' || arr[0] === 'f') {
@@ -107,14 +115,7 @@ const startPrompts = async (node: Node) => {
       } else {
         console.warn('$ Can not find peer');
       }
-    } else if (arr[0] === 'send' || arr[0] === 's') {
-      const peer = node.p2p.getPeer(arr[1]);
-      if (peer) {
-        peer.jsonRPCNotify('echo', arr[2]);
-      } else {
-        console.warn('$ Can not find peer');
-      }
-    } 
+    }
     */
       try {
         const lastestHeader = (await node.blockchain.getHead()).header;

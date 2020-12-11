@@ -49,7 +49,7 @@ const startPrompts = async (node: Node) => {
     } else if (arr[0] === 'send' || arr[0] === 's') {
       const peer = node.peerpool.nodes[0].getPeer(arr[1]);
       if (peer) {
-        peer.send(constants.GXC2_ETHWIRE, 'echo', arr[2]);
+        peer.send(constants.GXC2_ETHWIRE, 'Echo', arr[2]);
       } else {
         console.warn('$ Can not find peer');
       }

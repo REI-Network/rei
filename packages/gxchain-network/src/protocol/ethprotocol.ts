@@ -29,7 +29,7 @@ const handlers: Handler[] = [
     name: 'Echo',
     code: 111,
     encode: (data) => {
-      return rlp.encode([10, data]);
+      return rlp.encode([111, data]);
     },
     decode: (data) => {
       console.debug('Echo', data);

@@ -120,8 +120,11 @@ export class Libp2pNode extends Libp2p {
     });
     this.connectionManager.on('peer:connect', (connect) => {
       try {
-        const peer = this.createPeer(connect.remotePeer);
-        console.debug('Peer connected:', peer.peerId);
+        const id = connect.remotePeer.toB58String();
+        if (!this.peers.get(id)) {
+          this.createPeer(connect.remotePeer);
+        }
+        console.debug('Peer connected:', id);
       } catch (err) {
         this.emit('error', err);
       }

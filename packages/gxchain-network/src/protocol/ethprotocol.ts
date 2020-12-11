@@ -1,13 +1,29 @@
+import { bufferToInt, rlp } from 'ethereumjs-util';
+
 import { constants } from '@gxchain2/common';
 
 import { Protocol, Handler } from './protocol';
 
 const handlers: Handler[] = [
   {
-    name: 'Hellow',
+    name: 'Status',
     code: 0,
-    encode: () => '',
-    decode: () => ''
+    encode: (data) => {
+      const payload: any = Object.entries(data).map(([k, v]) => [k, v]);
+      return rlp.encode([0, payload]);
+    },
+    decode: (data) => {
+      const status: any = {};
+      data.forEach(([k, v]: any) => {
+        status[k.toString()] = v;
+      });
+      return {
+        networkId: bufferToInt(status.networkId),
+        height: bufferToInt(status.height),
+        bestHash: status.bestHash,
+        genesisHash: status.genesisHash
+      };
+    }
   }
 ];
 

@@ -92,13 +92,11 @@ export class Libp2pNode extends Libp2p {
     this.protocols.forEach((protocol) => {
       this.handle(protocol.protocolString, async ({ connection, stream }) => {
         try {
-          console.log('enter handle', connection);
           const peerId: PeerId = connection.remotePeer;
           const id = peerId.toB58String();
           const peer = this.peers.get(id);
           if (peer) {
-            // TODO: impl this.
-            await peer.acceptProtocol(stream, protocol.copy(), undefined);
+            await peer.acceptProtocol(stream, protocol.copy(), this.node.status);
             this.emit('connected', peer);
           }
         } catch (err) {
@@ -108,27 +106,22 @@ export class Libp2pNode extends Libp2p {
     });
     super.on('peer:discovery', async (peerId: PeerId) => {
       try {
-        console.log('enter disc', peerId);
         const id = peerId.toB58String();
         if (this.peers.get(id) || this.isBanned(id)) {
           return;
         }
         const peer = this.createPeer(peerId);
-        this.protocols.forEach((protocol) => {
-          // TODO: fix this.
-          peer.installProtocol(this, peerId, protocol.copy(), undefined);
-        });
-        console.debug(`Peer discovered: ${peer.peerId}`);
+        await Promise.all(this.protocols.map((protocol) => peer.installProtocol(this, peerId, protocol.copy(), this.node.status)));
+        console.debug('Peer discovered:', peer.peerId);
         this.emit('connected', peer);
       } catch (err) {
         this.emit('error', err);
       }
     });
-    super.on('peer:connect', (peerInfo) => {
+    this.connectionManager.on('peer:connect', (connect) => {
       try {
-        console.log('enter conn', peerInfo);
-        const peer = this.createPeer(peerInfo);
-        console.debug(`Peer connected: ${peer}`);
+        const peer = this.createPeer(connect.remotePeer);
+        console.debug('Peer connected:', peer.peerId);
       } catch (err) {
         this.emit('error', err);
       }

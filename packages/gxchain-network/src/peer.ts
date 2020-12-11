@@ -107,7 +107,8 @@ class MsgQueue extends EventEmitter {
         const { done, value } = result;
         if (done) break;
 
-        let [code, payload]: any = rlp.decode(value);
+        // TODO: fix _bufs.
+        let [code, payload]: any = rlp.decode(value._bufs[0]);
         code = bufferToInt(code);
         try {
           if (code === 0) {
@@ -213,6 +214,7 @@ export class Peer extends EventEmitter {
   }
 
   async acceptProtocol(stream: any, protocol: Protocol, status: any) {
+    console.log('enter acc');
     const queue = this.makeQueue(protocol);
     queue.pipeStream(stream);
     await protocol.handshake(this, status);

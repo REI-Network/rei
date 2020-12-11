@@ -18,8 +18,8 @@ import { VM } from '@gxchain2/vm';
 import { TransactionPool } from '@gxchain2/tx-pool';
 
 export class Node implements INode {
-  public readonly chainDB: LevelUp;
-  public readonly accountDB: LevelUp;
+  public readonly chainDB!: LevelUp;
+  public readonly accountDB!: LevelUp;
   public readonly databasePath: string;
   public readonly txPool: TransactionPool;
 
@@ -32,8 +32,8 @@ export class Node implements INode {
 
   constructor(databasePath: string) {
     this.databasePath = databasePath;
-    this.chainDB = createLevelDB(path.join(this.databasePath, 'chaindb'));
-    this.accountDB = createLevelDB(path.join(this.databasePath, 'accountdb'));
+    // this.chainDB = createLevelDB(path.join(this.databasePath, 'chaindb'));
+    // this.accountDB = createLevelDB(path.join(this.databasePath, 'accountdb'));
     this.txPool = new TransactionPool();
   }
 
@@ -78,8 +78,8 @@ export class Node implements INode {
       chain: genesisJSON.genesisInfo,
       hardfork: 'chainstart'
     });
-    this.db = new Database(this.chainDB, this.common);
-    this.stateManager = new StateManager({ common: this.common, trie: new Trie(this.accountDB) });
+    // this.db = new Database(this.chainDB, this.common);
+    // this.stateManager = new StateManager({ common: this.common, trie: new Trie(this.accountDB) });
     this.peerpool = new PeerPool({
       nodes: await Promise.all(
         [
@@ -95,7 +95,7 @@ export class Node implements INode {
       maxSize: 20
     });
 
-    let genesisBlock!: Block;
+    /*
     try {
       const genesisHash = await this.db.numberToHash(new BN(0));
       genesisBlock = await this.db.getBlock(genesisHash);
@@ -129,6 +129,7 @@ export class Node implements INode {
 
     await this.vm.init();
     await this.vm.runBlockchain();
+    */
   }
 
   async processBlock(block: Block) {

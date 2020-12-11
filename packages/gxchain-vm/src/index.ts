@@ -1,4 +1,4 @@
-import VM from '@ethereumjs/vm';
+import EthereumJSVM from '@ethereumjs/vm';
 import { encode } from 'rlp';
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { Account, Address, BN } from 'ethereumjs-util';
@@ -9,7 +9,7 @@ import type { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import Bloom from '@ethereumjs/vm/dist/bloom';
 import { StateManager } from '@ethereumjs/vm/dist/state/interface';
 
-class VMImpl extends VM {
+class VM extends EthereumJSVM {
   async runBlockchain(blockchain?: Blockchain): Promise<void> {
     await this.init();
     return runBlockchain.bind(this)(blockchain);
@@ -21,7 +21,7 @@ class VMImpl extends VM {
   }
 }
 
-export { VMImpl };
+export { VM };
 
 type PromisResultType<T> = T extends PromiseLike<infer U> ? U : T;
 

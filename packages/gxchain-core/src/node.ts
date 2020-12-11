@@ -7,36 +7,35 @@ import { Block } from '@ethereumjs/block';
 import { Account, Address, setLengthLeft } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 
-import { Node, P2P, Database } from '@gxchain2/interface';
-import { DatabaseImpl, createLevelDB } from '@gxchain2/database';
-import { P2PImpl } from '@gxchain2/network';
-import { CommonImpl } from '@gxchain2/common';
-import { BlockchainImpl } from '@gxchain2/blockchain';
-import { StateManagerImpl } from '@gxchain2/state-manager';
-import { VMImpl } from '@gxchain2/vm';
+import { INode } from '@gxchain2/interface';
+import { Database, createLevelDB } from '@gxchain2/database';
+import { Libp2pNode } from '@gxchain2/network';
+import { Common } from '@gxchain2/common';
+import { Blockchain } from '@gxchain2/blockchain';
+import { StateManager } from '@gxchain2/state-manager';
+import { VM } from '@gxchain2/vm';
 import { TransactionPool } from '@gxchain2/tx-pool';
 
-export default class NodeImpl implements Node {
-  readonly p2p: P2P;
+export default class Node implements INode {
   readonly db: Database;
-  readonly common: CommonImpl;
+  readonly common: Common;
   readonly chainDB: LevelUp;
   readonly accountDB: LevelUp;
   readonly databasePath: string;
-  readonly stateManager: StateManagerImpl;
+  readonly stateManager: StateManager;
   readonly txPool: TransactionPool;
 
-  blockchain!: BlockchainImpl;
-  vm!: VMImpl;
+  p2p!: Libp2pNode;
+  blockchain!: Blockchain;
+  vm!: VM;
 
   constructor(databasePath: string) {
     this.databasePath = databasePath[0] === '/' ? databasePath : path.join(__dirname, databasePath);
-    this.p2p = new P2PImpl(this);
-    this.common = new CommonImpl({ chain: 'mainnet', hardfork: 'chainstart' });
+    this.common = new Common({ chain: 'mainnet', hardfork: 'chainstart' });
     this.chainDB = createLevelDB(path.join(this.databasePath, 'chaindb'));
     this.accountDB = createLevelDB(path.join(this.databasePath, 'accountdb'));
-    this.db = new DatabaseImpl(this.chainDB, this.common);
-    this.stateManager = new StateManagerImpl({ common: this.common, trie: new Trie(this.accountDB) });
+    this.db = new Database(this.chainDB, this.common);
+    this.stateManager = new StateManager({ common: this.common, trie: new Trie(this.accountDB) });
     this.txPool = new TransactionPool();
   }
 
@@ -65,6 +64,8 @@ export default class NodeImpl implements Node {
   }
 
   async init() {
+    this.p2p = new Libp2pNode(undefined as any, undefined as any);
+
     let genesisBlock!: Block;
     try {
       const genesisHash = await this.db.numberToHash(new BN(0));
@@ -84,17 +85,17 @@ export default class NodeImpl implements Node {
       await this.setupAccountInfo(JSON.parse(fs.readFileSync(path.join(this.databasePath, 'genesisAccount.json')).toString()));
     }
 
-    BlockchainImpl.initBlockchainImpl((blockchain) => {
+    Blockchain.initBlockchainImpl((blockchain) => {
       blockchain.dbManager = this.db as any;
     });
-    this.blockchain = new BlockchainImpl({
+    this.blockchain = new Blockchain({
       db: this.chainDB,
       common: this.common,
       validateConsensus: false,
       validateBlocks: false,
       genesisBlock
     });
-    this.vm = new VMImpl({
+    this.vm = new VM({
       common: this.common,
       stateManager: this.stateManager,
       blockchain: this.blockchain

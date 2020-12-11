@@ -1,5 +1,5 @@
 import { DefaultStateManager } from '@ethereumjs/vm/dist/state';
 
-class StateManagerImpl extends DefaultStateManager {}
+class StateManager extends DefaultStateManager {}
 
-export { StateManagerImpl };
+export { StateManager };

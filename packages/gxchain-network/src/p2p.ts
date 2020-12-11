@@ -20,6 +20,13 @@ function parseProtocol(name: string) {
   throw new Error(`Unkonw protocol: ${name}`);
 }
 
+export declare interface Libp2pNode {
+  on(event: 'connected', listening: (peer: Peer) => void);
+  on(event: 'error', listening: (peer: Peer) => void);
+  once(event: 'connected', listening: (peer: Peer) => void);
+  once(event: 'error', listening: (peer: Peer) => void);
+}
+
 export class Libp2pNode extends Libp2p {
   readonly peerId: PeerId;
   private readonly peers = new Map<string, Peer>();
@@ -104,7 +111,7 @@ export class Libp2pNode extends Libp2p {
         }
       });
     });
-    this.on('peer:discovery', async (peerInfo) => {
+    super.on('peer:discovery', async (peerInfo) => {
       try {
         const id = peerInfo.id.toB58String();
         if (this.peers.get(id) || this.isBanned(id)) {
@@ -121,7 +128,7 @@ export class Libp2pNode extends Libp2p {
         this.emit('error', err);
       }
     });
-    this.on('peer:connect', (peerInfo) => {
+    super.on('peer:connect', (peerInfo) => {
       try {
         const peer = this.createPeer(peerInfo);
         console.debug(`Peer connected: ${peer}`);
@@ -129,7 +136,7 @@ export class Libp2pNode extends Libp2p {
         this.emit('error', err);
       }
     });
-    this.on('error', (err) => {
+    super.on('error', (err) => {
       this.emit('error', err);
     });
 

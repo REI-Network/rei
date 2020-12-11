@@ -147,12 +147,13 @@ class MsgQueue extends EventEmitter {
 }
 
 export declare interface Peer {
-  on(event: string, listener: (peer: Peer, message: any) => void): this;
-  once(event: string, listener: (peer: Peer, message: any) => void): this;
+  on(event: string, listener: (peer: Peer, message: any, protocol: Protocol) => void): this;
+  once(event: string, listener: (peer: Peer, message: any, protocol: Protocol) => void): this;
 }
 
 export class Peer extends EventEmitter {
   readonly peerId: string;
+  public idle: boolean = true;
   private queueMap = new Map<string, MsgQueue>();
 
   constructor(peerId: string) {
@@ -163,11 +164,10 @@ export class Peer extends EventEmitter {
   private makeQueue(protocol: Protocol) {
     const queue = new MsgQueue(protocol);
     queue.on('status', (q, message) => {
-      this.emit(`status:${q.name}`, this, message);
+      this.emit(`status:${q.name}`, this, message, protocol);
     });
     queue.on('message', (q, message) => {
-      this.emit('message', this, message);
-      this.emit(`message:${q.name}`, this, message);
+      this.emit('message', this, message, protocol);
     });
     this.queueMap.set(queue.name, queue);
     return queue;
@@ -188,7 +188,7 @@ export class Peer extends EventEmitter {
     this.queueMap.clear();
   }
 
-  best(name: string): number {
+  latest(name: string): number {
     const status = this.getQueue(name).protocol.status;
     if (!status || status.height === undefined) {
       throw new Error(`Peer invalid status, name: ${name}`);

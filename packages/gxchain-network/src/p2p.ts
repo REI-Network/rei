@@ -30,7 +30,6 @@ export declare interface Libp2pNode {
 }
 
 export class Libp2pNode extends Libp2p {
-  readonly peerId: PeerId;
   private readonly peers = new Map<string, Peer>();
   private readonly protocols: Protocol[];
   private readonly banned = new Map<string, number>();
@@ -39,9 +38,9 @@ export class Libp2pNode extends Libp2p {
 
   constructor(options: { node: INode; peerId: PeerId; bootnodes?: string[]; protocols: Set<string> }) {
     super({
-      peerInfo: options.peerId,
+      peerId: options.peerId,
       addresses: {
-        listen: ['/ip4/0.0.0.0/tcp/40404', '/ip4/0.0.0.0/tcp/40405/ws']
+        listen: ['/ip4/0.0.0.0/tcp/0', '/ip4/0.0.0.0/tcp/0/ws']
       },
       modules: {
         transport: [TCP, WebSockets],
@@ -55,7 +54,7 @@ export class Libp2pNode extends Libp2p {
           bootstrap: {
             interval: 2000,
             enabled: true,
-            list: options.bootnodes ?? []
+            list: options.bootnodes || []
           }
         },
         dht: {
@@ -69,8 +68,7 @@ export class Libp2pNode extends Libp2p {
     });
 
     this.node = options.node;
-    this.peerId = options.peerId;
-    this.protocols = Array.from(options.protocols).map((p) => parseProtocol(p));
+    this.protocols = Array.from(options.protocols.values()).map((p) => parseProtocol(p));
   }
 
   getPeer(peerId: string) {

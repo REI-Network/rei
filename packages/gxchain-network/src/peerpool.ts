@@ -62,6 +62,8 @@ export class PeerPool extends EventEmitter {
       if (this.pool.get(peer.peerId)) {
         console.warn(`Peerpool error: ${err} ${peer.peerId}`);
         this.ban(peer);
+      } else {
+        console.error('Peerpool error:', err);
       }
     });
     this.add(peer);

@@ -61,7 +61,7 @@ export class Protocol {
               resolve((this._status = message));
             }
           });
-          peer.send(this.name, 'status', data);
+          peer.send(this.name, 'Status', data);
         });
   }
 }

@@ -31,7 +31,7 @@ export class Node implements INode {
   public vm!: VM;
 
   constructor(databasePath: string) {
-    this.databasePath = databasePath[0] === '/' ? databasePath : path.join(__dirname, databasePath);
+    this.databasePath = databasePath;
     this.chainDB = createLevelDB(path.join(this.databasePath, 'chaindb'));
     this.accountDB = createLevelDB(path.join(this.databasePath, 'accountdb'));
     this.txPool = new TransactionPool();
@@ -41,8 +41,8 @@ export class Node implements INode {
     // TODO: impl this.
     return {
       networkId: this.common.networkId(),
-      height: undefined,
-      bestHash: undefined,
+      height: 100,
+      bestHash: '0x123',
       genesisHash: this.common.genesis().hash
     };
   }

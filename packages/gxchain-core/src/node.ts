@@ -113,9 +113,6 @@ export class Node implements INode {
       await this.setupAccountInfo(genesisJSON.accountInfo);
     }
 
-    Blockchain.initBlockchainImpl((blockchain) => {
-      blockchain.dbManager = this.db as any;
-    });
     this.blockchain = new Blockchain({
       db: this.chainDB,
       common: this.common,
@@ -123,6 +120,7 @@ export class Node implements INode {
       validateBlocks: false,
       genesisBlock
     });
+    this.blockchain.dbManager = this.db;
     this.vm = new VM({
       common: this.common,
       stateManager: this.stateManager,

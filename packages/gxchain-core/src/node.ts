@@ -64,7 +64,7 @@ export class Node implements INode {
   }
 
   async init() {
-    this.p2p = new Libp2pNode(undefined as any, undefined as any);
+    this.p2p = new Libp2pNode(undefined as any);
 
     let genesisBlock!: Block;
     try {

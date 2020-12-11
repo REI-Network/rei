@@ -5,6 +5,7 @@ import type PeerId from 'peer-id';
 import { bufferToInt, rlp } from 'ethereumjs-util';
 
 import { Protocol } from './protocol/protocol';
+import { Libp2pNode } from './p2p';
 
 declare interface MsgQueue {
   on(event: 'message' | 'status' | 'error', listener: (queue: MsgQueue, message: any) => void): this;
@@ -155,12 +156,14 @@ export declare interface Peer {
 
 export class Peer extends EventEmitter {
   readonly peerId: string;
+  readonly node: Libp2pNode;
   public idle: boolean = true;
   private queueMap = new Map<string, MsgQueue>();
 
-  constructor(peerId: string) {
+  constructor(options: { peerId: string; node: Libp2pNode }) {
     super();
-    this.peerId = peerId;
+    this.peerId = options.peerId;
+    this.node = options.node;
   }
 
   private makeQueue(protocol: Protocol) {

@@ -34,9 +34,9 @@ export class Libp2pNode extends Libp2p {
   private readonly banned = new Map<string, number>();
   private started: boolean = false;
 
-  constructor(peerId: PeerId, options: any) {
+  constructor(options: { peerId: PeerId; bootnodes?: string[]; protocols: Set<string> }) {
     super({
-      peerInfo: peerId,
+      peerInfo: options.peerId,
       addresses: {
         listen: ['/ip4/0.0.0.0/tcp/40404', '/ip4/0.0.0.0/tcp/40405/ws']
       },
@@ -65,8 +65,8 @@ export class Libp2pNode extends Libp2p {
       }
     });
 
-    this.peerId = peerId;
-    this.protocols = Array.from(options.protocols as Set<string>).map((p) => parseProtocol(p));
+    this.peerId = options.peerId;
+    this.protocols = Array.from(options.protocols).map((p) => parseProtocol(p));
   }
 
   getPeer(peerId: string) {
@@ -89,7 +89,7 @@ export class Libp2pNode extends Libp2p {
   }
 
   createPeer(peerInfo: PeerId) {
-    const peer = new Peer(peerInfo.toB58String());
+    const peer = new Peer({ peerId: peerInfo.toB58String(), node: this });
     this.peers.set(peer.peerId, peer);
     return peer;
   }

@@ -136,11 +136,6 @@ class MsgQueue extends EventEmitter {
       this.queueReject = undefined;
       this.queueResolve = undefined;
     }
-    for (const msgObject of this.queue) {
-      if (msgObject.reject) {
-        msgObject.reject(new Error('MsgQueue abort'));
-      }
-    }
     this.queue = [];
 
     for (const [response, request] of this.waitingRequests) {
@@ -176,6 +171,12 @@ export class Peer extends EventEmitter {
     });
     this.queueMap.set(queue.name, queue);
     return queue;
+  }
+
+  abort() {
+    for (const [name, queue] of this.queueMap) {
+      queue.abort();
+    }
   }
 
   send(name: string, method: string, message: any) {

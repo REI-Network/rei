@@ -21,6 +21,8 @@ export class Libp2pNode extends Libp2p {
   readonly peerId: PeerId;
   private readonly peers = new Map<string, Peer>();
   private readonly protocols: Protocol[];
+  private readonly banned = new Map<string, number>();
+  private started: boolean = false;
 
   constructor(peerId: PeerId, options: any) {
     super({
@@ -54,11 +56,11 @@ export class Libp2pNode extends Libp2p {
     });
 
     this.peerId = peerId;
-    this.protocols = options.protocols.map((p) => parseProtocol(p));
+    this.protocols = Array.from(options.protocols as Set<string>).map((p) => parseProtocol(p));
   }
 
-  getPeer(id: string) {
-    return this.peers.get(id);
+  getPeer(peerId: string) {
+    return this.peers.get(peerId);
   }
 
   forEachPeer(fn: (value: Peer, key: string, map: Map<string, Peer>) => void) {
@@ -110,19 +112,23 @@ export class Libp2pNode extends Libp2p {
           // TODO: fix this.
           peer.installProtocol(this, peerInfo.id, protocol.copy(), undefined);
         });
-        this.config.logger.debug(`Peer discovered: ${peer}`);
+        console.debug(`Peer discovered: ${peer}`);
         this.emit('connected', peer);
       } catch (err) {
         this.emit('error', err);
       }
     });
-
-    this.on('error', (err) => {});
-
-    this.on('peer:connect', (connection) => {});
-
-    // Handle messages for the protocol
-    await this.handle(constants.JSONRPCProtocol, ({ connection, stream, protocol }) => {});
+    this.on('peer:connect', (peerInfo) => {
+      try {
+        const peer = this.createPeer(peerInfo);
+        console.debug(`Peer connected: ${peer}`);
+      } catch (err) {
+        this.emit('error', err);
+      }
+    });
+    this.on('error', (err) => {
+      this.emit('error', err);
+    });
 
     // start libp2p
     await this.start();
@@ -130,5 +136,34 @@ export class Libp2pNode extends Libp2p {
     this.multiaddrs.forEach((ma) => {
       console.log(ma.toString() + '/p2p/' + this.peerId!.toB58String());
     });
+
+    this.started = true;
+  }
+
+  ban(peerId: string, maxAge = 60000): boolean {
+    if (!this.started) {
+      return false;
+    }
+    this.banned.set(peerId, Date.now() + maxAge);
+    return true;
+  }
+
+  isBanned(peerId: string): boolean {
+    const expireTime = this.banned.get(peerId);
+    if (expireTime && expireTime > Date.now()) {
+      return true;
+    }
+    this.banned.delete(peerId);
+    return false;
+  }
+
+  async abort() {
+    if (this.started) {
+      for (const [peerId, peer] of this.peers) {
+        peer.abort();
+      }
+      await this.stop();
+      this.started = false;
+    }
   }
 }

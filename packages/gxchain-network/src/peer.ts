@@ -185,6 +185,7 @@ export class Peer extends EventEmitter {
     for (const [name, queue] of this.queueMap) {
       queue.abort();
     }
+    this.queueMap.clear();
   }
 
   best(name: string): number {

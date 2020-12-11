@@ -54,7 +54,7 @@ export class Libp2pNode extends Libp2p {
     });
 
     this.peerId = peerId;
-    this.protocols = options.protocols;
+    this.protocols = options.protocols.map((p) => parseProtocol(p));
   }
 
   getPeer(id: string) {
@@ -84,14 +84,14 @@ export class Libp2pNode extends Libp2p {
 
   async init() {
     this.protocols.forEach((protocol) => {
-      this.handle(protocol.protocolString, async ({ connection, stream, protocol }) => {
+      this.handle(protocol.protocolString, async ({ connection, stream }) => {
         try {
           const peerInfo = await this.getPeerInfo(connection);
           const id = peerInfo.id.toB58String();
           const peer = this.peers.get(id);
           if (peer) {
             // TODO: impl this.
-            await peer.acceptProtocol(stream, parseProtocol(protocol), undefined);
+            await peer.acceptProtocol(stream, protocol.copy(), undefined);
             this.emit('connected', peer);
           }
         } catch (err) {
@@ -108,7 +108,7 @@ export class Libp2pNode extends Libp2p {
         const peer = this.createPeer(peerInfo.id);
         this.protocols.forEach((protocol) => {
           // TODO: fix this.
-          peer.installProtocol(this, peerInfo.id, new ETHProtocol(), undefined);
+          peer.installProtocol(this, peerInfo.id, protocol.copy(), undefined);
         });
         this.config.logger.debug(`Peer discovered: ${peer}`);
         this.emit('connected', peer);

@@ -18,6 +18,10 @@ export class ETHProtocol extends Protocol {
     return `/${this.name}/1`;
   }
 
+  copy(): Protocol {
+    return new ETHProtocol();
+  }
+
   findHandler(key: string | number): Handler {
     const handler = handlers.find((value) => (typeof key === 'string' ? value.name === key : value.code === key));
     if (!handler) {

@@ -23,6 +23,10 @@ export class Protocol {
     throw new Error('Unimplemented');
   }
 
+  copy(): Protocol {
+    throw new Error('Unimplemented');
+  }
+
   findHandler(key: string | number): Handler {
     throw new Error('Unimplemented');
   }

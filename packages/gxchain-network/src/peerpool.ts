@@ -2,11 +2,21 @@ import { EventEmitter } from 'events';
 
 import type { Peer } from './peer';
 import type { Libp2pNode } from './p2p';
-import { Protocol } from './protocol';
+import type { Protocol } from './protocol';
+
+export declare interface PeerPool {
+  on(event: 'error', listener: (err: any) => void): this;
+  on(event: 'added' | 'removed' | 'banned', listener: (peer: Peer) => void): this;
+  on(event: 'message', listener: (message: any, protocol: Protocol, peer: Peer) => void): this;
+  once(event: 'error', listener: (err: any) => void): this;
+  once(event: 'added' | 'removed' | 'banned', listener: (peer: Peer) => void): this;
+  once(event: 'message', listener: (message: any, protocol: Protocol, peer: Peer) => void): this;
+}
 
 export class PeerPool extends EventEmitter {
   private pool = new Map<string, Peer>();
   private readonly maxSize: any;
+  private readonly nodes: Libp2pNode[];
 
   constructor(options: { nodes: Libp2pNode[]; maxSize: number }) {
     super();
@@ -16,6 +26,7 @@ export class PeerPool extends EventEmitter {
       });
     });
     this.maxSize = options.maxSize;
+    this.nodes = options.nodes;
   }
 
   get peers() {
@@ -41,7 +52,6 @@ export class PeerPool extends EventEmitter {
     peer.on('message', (_, message: any, protocol: Protocol) => {
       if (this.pool.get(peer.peerId)) {
         this.emit('message', message, protocol, peer);
-        this.emit(`message:${protocol.name}`, message, peer);
       }
     });
     peer.on('error', (peer, err) => {

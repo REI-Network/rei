@@ -21,10 +21,10 @@ function parseProtocol(name: string) {
 }
 
 export declare interface Libp2pNode {
-  on(event: 'connected', listening: (peer: Peer) => void);
-  on(event: 'error', listening: (peer: Peer) => void);
-  once(event: 'connected', listening: (peer: Peer) => void);
-  once(event: 'error', listening: (peer: Peer) => void);
+  on(event: 'connected', listener: (peer: Peer) => void);
+  on(event: 'error', listener: (peer: Peer) => void);
+  once(event: 'connected', listener: (peer: Peer) => void);
+  once(event: 'error', listener: (peer: Peer) => void);
 }
 
 export class Libp2pNode extends Libp2p {

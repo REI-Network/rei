@@ -86,7 +86,7 @@ export class Node implements INode {
           new Libp2pNode({
             node: this,
             peerId: await PeerId.create({ bits: 1024, keyType: 'Ed25519' }),
-            protocols: new Set<string>(constants.GXC2_ETHWIRE)
+            protocols: new Set<string>([constants.GXC2_ETHWIRE])
           })
         ].map(
           (n) => new Promise<Libp2pNode>((resolve) => n.init().then(() => resolve(n)))

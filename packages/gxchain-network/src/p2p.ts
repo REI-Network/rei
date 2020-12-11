@@ -14,7 +14,10 @@ import { Protocol, ETHProtocol } from './protocol';
 
 // TODO: impl this.
 function parseProtocol(name: string) {
-  return new ETHProtocol();
+  if (name === constants.GXC2_ETHWIRE) {
+    return new ETHProtocol();
+  }
+  throw new Error(`Unkonw protocol: ${name}`);
 }
 
 export class Libp2pNode extends Libp2p {

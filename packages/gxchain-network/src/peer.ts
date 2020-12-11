@@ -173,26 +173,30 @@ export class Peer extends EventEmitter {
     return queue;
   }
 
+  private getQueue(name: string) {
+    const queue = this.queueMap.get(name);
+    if (!queue) {
+      throw new Error(`Peer unkonw name: ${name}`);
+    }
+    return queue;
+  }
+
   abort() {
     for (const [name, queue] of this.queueMap) {
       queue.abort();
     }
   }
 
+  best(name: string): number {
+    return this.getQueue(name).protocol.status.height;
+  }
+
   send(name: string, method: string, message: any) {
-    const queue = this.queueMap.get(name);
-    if (!queue) {
-      throw new Error(`Peer unkonw name: ${name}`);
-    }
-    queue.send(method, message);
+    this.getQueue(name).send(method, message);
   }
 
   request(name: string, method: string, message: any) {
-    const queue = this.queueMap.get(name);
-    if (!queue) {
-      throw new Error(`Peer unkonw name: ${name}`);
-    }
-    return queue.request(method, message);
+    return this.getQueue(name).request(method, message);
   }
 
   async acceptProtocol(stream: any, protocol: Protocol, status: any) {

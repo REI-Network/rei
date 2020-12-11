@@ -1,3 +1,5 @@
+import { constants } from '@gxchain2/common';
+
 import { Protocol, Handler } from './protocol';
 
 const handlers: Handler[] = [
@@ -11,7 +13,7 @@ const handlers: Handler[] = [
 
 export class ETHProtocol extends Protocol {
   get name() {
-    return 'gxc2-ethwire';
+    return constants.GXC2_ETHWIRE;
   }
 
   get protocolString(): string {

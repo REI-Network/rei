@@ -1,5 +1,5 @@
 {
-    "account": {
+    "accountInfo": {
         "0x3289621709f5b35d09b4335e129907ac367a0593" : {
             "balance" : "0x1111111",
             "code" : "",
@@ -16,7 +16,7 @@
         }
     },
     "genesisInfo": {
-        "name": "gxc2.0",
+        "name": "gxc2",
         "chainId": 12358,
         "networkId": 12358,
         "comment": "The gxchain2.0 main chain",
@@ -39,7 +39,11 @@
             "transactionsTrie" : "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
             "uncleHash" : "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"
         },
-        "hardforks": [],
+        "hardforks": [{
+            "name": "chainstart",
+            "block": 0,
+            "forkHash": "0xfc64ec04"
+        }],
         "bootstrapNodes": []
     }      
 }

@@ -72,19 +72,14 @@ export class Node implements INode {
   }
 
   async init() {
+    const genesisJSON = JSON.parse(fs.readFileSync(path.join(this.databasePath, 'genesis.json')).toString());
+
     this.common = new Common({
-      chain: {
-        networkId: 12358,
-        genesis: undefined,
-        hardforks: [],
-        bootstrapNodes: []
-      },
+      chain: genesisJSON.genesisInfo,
       hardfork: 'chainstart'
     });
-
     this.db = new Database(this.chainDB, this.common);
     this.stateManager = new StateManager({ common: this.common, trie: new Trie(this.accountDB) });
-
     this.peerpool = new PeerPool({
       nodes: await Promise.all(
         [
@@ -112,11 +107,10 @@ export class Node implements INode {
     }
 
     if (!genesisBlock) {
-      let genesisBlockJSON = JSON.parse(fs.readFileSync(path.join(this.databasePath, 'genesisBlock.json')).toString());
-      genesisBlock = Block.genesis({ header: genesisBlockJSON }, { common: this.common });
+      genesisBlock = Block.genesis({ header: genesisJSON.genesisInfo.genesis }, { common: this.common });
       console.log('read genesis block from file', '0x' + genesisBlock.hash().toString('hex'));
 
-      await this.setupAccountInfo(JSON.parse(fs.readFileSync(path.join(this.databasePath, 'genesisAccount.json')).toString()));
+      await this.setupAccountInfo(genesisJSON.accountInfo);
     }
 
     Blockchain.initBlockchainImpl((blockchain) => {

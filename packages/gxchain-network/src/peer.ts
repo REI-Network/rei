@@ -188,7 +188,11 @@ export class Peer extends EventEmitter {
   }
 
   best(name: string): number {
-    return this.getQueue(name).protocol.status.height;
+    const status = this.getQueue(name).protocol.status;
+    if (!status || status.height === undefined) {
+      throw new Error(`Peer invalid status, name: ${name}`);
+    }
+    return status.height;
   }
 
   send(name: string, method: string, message: any) {

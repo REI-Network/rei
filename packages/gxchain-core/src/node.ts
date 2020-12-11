@@ -6,11 +6,12 @@ import BN from 'bn.js';
 import { Block } from '@ethereumjs/block';
 import { Account, Address, setLengthLeft } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
+import PeerId from 'peer-id';
 
 import { INode } from '@gxchain2/interface';
 import { Database, createLevelDB } from '@gxchain2/database';
 import { Libp2pNode, PeerPool } from '@gxchain2/network';
-import { Common } from '@gxchain2/common';
+import { Common, constants } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { StateManager } from '@gxchain2/state-manager';
 import { VM } from '@gxchain2/vm';
@@ -65,7 +66,17 @@ export class Node implements INode {
 
   async init() {
     this.peerpool = new PeerPool({
-      nodes: [new Libp2pNode(undefined as any)],
+      nodes: await Promise.all(
+        [
+          new Libp2pNode({
+            node: this,
+            peerId: await PeerId.create({ bits: 1024, keyType: 'Ed25519' }),
+            protocols: new Set<string>(constants.GXC2_ETHWIRE)
+          })
+        ].map(
+          (n) => new Promise<Libp2pNode>((resolve) => n.init().then(() => resolve(n)))
+        )
+      ),
       maxSize: 20
     });
 
@@ -106,7 +117,6 @@ export class Node implements INode {
 
     await this.vm.init();
     await this.vm.runBlockchain();
-    await this.p2p.init();
   }
 
   async processBlock(block: Block) {

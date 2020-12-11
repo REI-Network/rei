@@ -7,8 +7,8 @@ import { bufferToInt, rlp } from 'ethereumjs-util';
 import { Protocol } from './protocol/protocol';
 
 declare interface MsgQueue {
-  on(event: 'message' | 'status', listener: (queue: MsgQueue, message: any) => void): this;
-  once(event: 'message' | 'status', listener: (queue: MsgQueue, message: any) => void): this;
+  on(event: 'message' | 'status' | 'error', listener: (queue: MsgQueue, message: any) => void): this;
+  once(event: 'message' | 'status' | 'error', listener: (queue: MsgQueue, message: any) => void): this;
 }
 
 class MsgQueue extends EventEmitter {
@@ -147,7 +147,9 @@ class MsgQueue extends EventEmitter {
 }
 
 export declare interface Peer {
+  on(event: 'error', listener: (peer: Peer, err: any) => void): this;
   on(event: string, listener: (peer: Peer, message: any, protocol: Protocol) => void): this;
+  once(event: 'error', listener: (peer: Peer, err: any) => void): this;
   once(event: string, listener: (peer: Peer, message: any, protocol: Protocol) => void): this;
 }
 
@@ -168,6 +170,9 @@ export class Peer extends EventEmitter {
     });
     queue.on('message', (q, message) => {
       this.emit('message', this, message, protocol);
+    });
+    queue.on('error', (q, err) => {
+      this.emit('error', this, err);
     });
     this.queueMap.set(queue.name, queue);
     return queue;

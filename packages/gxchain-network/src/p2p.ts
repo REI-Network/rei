@@ -46,10 +46,11 @@ export class Libp2pNode extends Libp2p {
         transport: [TCP, WebSockets],
         streamMuxer: [MPLEX],
         connEncryption: [secio],
-        peerDiscovery: [Bootstrap],
+        // peerDiscovery: [Bootstrap],
         dht: KadDHT
       },
       config: {
+        /*
         peerDiscovery: {
           bootstrap: {
             interval: 2000,
@@ -57,6 +58,7 @@ export class Libp2pNode extends Libp2p {
             list: options.bootnodes || []
           }
         },
+        */
         dht: {
           kBucketSize: 20
         },
@@ -137,9 +139,6 @@ export class Libp2pNode extends Libp2p {
       } catch (err) {
         this.emit('error', err);
       }
-    });
-    super.on('error', (err) => {
-      this.emit('error', err);
     });
 
     // start libp2p

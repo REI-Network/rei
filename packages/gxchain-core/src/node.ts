@@ -38,11 +38,10 @@ export class Node implements INode {
   }
 
   get status() {
-    // TODO: impl this.
     return {
       networkId: this.common.networkId(),
-      height: 100,
-      bestHash: '0x123',
+      height: this.blockchain.latestHeight,
+      bestHash: this.blockchain.latestHash,
       genesisHash: this.common.genesis().hash
     };
   }

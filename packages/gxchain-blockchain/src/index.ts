@@ -21,6 +21,14 @@ export class Blockchain extends mixin(EthereumJSBlockchain, EventEmitter) {
     return this._latestBlock;
   }
 
+  get latestHeight() {
+    return this?._latestBlock?.header?.number?.toNumber() || 0;
+  }
+
+  get latestHash() {
+    return '0x' + (this?._latestBlock?.header?.hash()?.toString('hex') || '00');
+  }
+
   private async updateLatest() {
     const latestBlock = await this.getLatestBlock();
     if (!this._latestBlock || !latestBlock.header.hash().equals(this._latestBlock.header.hash())) {

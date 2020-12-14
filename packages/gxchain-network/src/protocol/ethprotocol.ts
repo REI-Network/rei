@@ -72,12 +72,4 @@ export class ETHProtocol extends Protocol {
   decode(key: string | number, data: any): any {
     return this.findHandler(key).decode(data);
   }
-
-  encodeStatus(data: any): any {
-    return this.findHandler(0).encode(data);
-  }
-
-  decodeStatus(data: any): any {
-    return this.findHandler(0).decode(data);
-  }
 }

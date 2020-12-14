@@ -43,14 +43,6 @@ export class Protocol {
     throw new Error('Unimplemented');
   }
 
-  encodeStatus(data: any): any {
-    throw new Error('Unimplemented');
-  }
-
-  decodeStatus(data: any): any {
-    throw new Error('Unimplemented');
-  }
-
   handshake(peer: Peer, data: any) {
     return this._status
       ? Promise.resolve(this._status)

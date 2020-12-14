@@ -2,7 +2,6 @@ import { EventEmitter } from 'events';
 
 import pipe from 'it-pipe';
 import type PeerId from 'peer-id';
-import { bufferToInt, rlp } from 'ethereumjs-util';
 
 import { Protocol } from './protocol/protocol';
 import { Libp2pNode } from './p2p';
@@ -108,19 +107,18 @@ class MsgQueue extends EventEmitter {
         if (done) break;
 
         // TODO: fix _bufs.
-        let [code, payload]: any = rlp.decode(value._bufs[0]);
-        code = bufferToInt(code);
+        const [code, data] = this.protocol.handle(value._bufs[0]);
         try {
           if (code === 0) {
-            this.emit('status', this, this.protocol.decodeStatus(payload));
+            this.emit('status', this, data);
           } else {
             const request = this.waitingRequests.get(code);
             if (request) {
               clearTimeout(request.timeout);
               this.waitingRequests.delete(code);
-              request.resolve(this.protocol.decode(code, payload));
+              request.resolve(data);
             } else {
-              this.emit('message', this, this.protocol.decode(code, payload));
+              this.emit('message', this, data);
             }
           }
         } catch (err) {

@@ -31,6 +31,10 @@ export class Protocol {
     throw new Error('Unimplemented');
   }
 
+  handle(data: Buffer): [number, any] {
+    throw new Error('Unimplemented');
+  }
+
   encode(key: string | number, data: any): any {
     throw new Error('Unimplemented');
   }

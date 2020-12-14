@@ -47,7 +47,16 @@ export class Node implements INode {
     };
   }
 
-  async setupAccountInfo(accountInfo: any) {
+  async setupAccountInfo(accountInfo: {
+    [index: string]: {
+      nonce: string;
+      balance: string;
+      storage: {
+        [index: string]: string;
+      };
+      code: string;
+    };
+  }) {
     const stateManager = this.stateManager;
     await stateManager.checkpoint();
 

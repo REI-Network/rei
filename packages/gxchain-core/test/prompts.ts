@@ -24,7 +24,6 @@ const getPrivateKey = (address: string): Buffer => {
   return keyPair[address];
 };
 
-// tslint:disable-next-line: no-shadowed-variable
 const startPrompts = async (node: Node) => {
   while (true) {
     const response = await prompts({

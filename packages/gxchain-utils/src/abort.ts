@@ -18,7 +18,11 @@ export class Aborter {
     this.reset();
   }
 
-  async abortablePromise<T>(p: Promise<T>): Promise<T> {
+  async abortablePromise<T>(p: Promise<T>): Promise<T | undefined>;
+  async abortablePromise<T>(p: Promise<T>, throwAbortError: false): Promise<T | undefined>;
+  async abortablePromise<T>(p: Promise<T>, throwAbortError: true): Promise<T>;
+  async abortablePromise<T>(p: Promise<T>, throwAbortError: boolean): Promise<T | undefined>;
+  async abortablePromise<T>(p: Promise<T>, throwAbortError: boolean = false): Promise<T | undefined> {
     if (this._abort) {
       return Promise.reject(this._reason);
     }
@@ -30,8 +34,10 @@ export class Aborter {
     } catch (err) {
       if (!this.isAborted) {
         this._using--;
+        throw err;
+      } else if (throwAbortError) {
+        throw err;
       }
-      throw err;
     }
   }
 

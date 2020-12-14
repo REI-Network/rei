@@ -179,18 +179,12 @@ export class Peer extends EventEmitter {
       this.emit('error', this, err);
     });
     this.queueMap.set(queue.name, queue);
-    for (const [n, p] of this.queueMap) {
-      console.log('queue1', n, p);
-    }
     return queue;
   }
 
   private getQueue(name: string) {
     const queue = this.queueMap.get(name);
     if (!queue) {
-      for (const [n, p] of this.queueMap) {
-        console.log('queue2', n, p);
-      }
       throw new Error(`Peer unkonw name: ${name}`);
     }
     return queue;

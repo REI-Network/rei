@@ -6,3 +6,5 @@ export const stringToCID = async (str: string) => {
   const hash = await multihashing(bytes, 'sha2-256');
   return new CID(1, 'keccak-256', hash);
 };
+
+export * from './abort';

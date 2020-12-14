@@ -24,6 +24,9 @@ export class PeerPool extends EventEmitter {
       node.on('connected', (peer) => {
         this.connected(peer);
       });
+      node.on('error', (err) => {
+        console.error('Peerpool, p2p node error:', err);
+      });
     });
     this.maxSize = options.maxSize;
     this._nodes = options.nodes;
@@ -60,10 +63,10 @@ export class PeerPool extends EventEmitter {
     });
     peer.on('error', (peer, err) => {
       if (this.pool.get(peer.peerId)) {
-        console.warn(`Peerpool error: ${err} ${peer.peerId}`);
+        console.warn(`Peerpool, peer error: ${err} ${peer.peerId}`);
         this.ban(peer);
       } else {
-        console.error('Peerpool error:', err);
+        console.error('Peerpool, peer error:', err);
       }
     });
     this.add(peer);

@@ -24,9 +24,9 @@ function parseProtocol(name: string): Protocol {
 
 export declare interface Libp2pNode {
   on(event: 'connected', listener: (peer: Peer) => void);
-  on(event: 'error', listener: (peer: Peer) => void);
+  on(event: 'error', listener: (err: any) => void);
   once(event: 'connected', listener: (peer: Peer) => void);
-  once(event: 'error', listener: (peer: Peer) => void);
+  once(event: 'error', listener: (err: any) => void);
 }
 
 export class Libp2pNode extends Libp2p {

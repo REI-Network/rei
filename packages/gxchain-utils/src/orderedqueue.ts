@@ -17,14 +17,14 @@ export declare interface OrderedQueue {
 }
 
 export class OrderedQueue extends EventEmitter {
-  private readonly in = new Heap({ comparBefore: (a: Task, b: Task) => a.index < b.index });
-  private readonly out = new Heap({ comparBefore: (a: Task, b: Task) => a.index < b.index });
   private readonly limit: number;
-  private readonly processTask: (data: any) => Promise<any>;
+  private readonly processTask: (data: any) => Promise<any> | any;
+  private in!: Heap;
+  private out!: Heap;
   private total: number = 0;
   private processed: number = 0;
-  private running: boolean = false;
   private abortFlag: boolean = false;
+  private runningPromise?: Promise<void>;
   private taskResolve?: (task?: Task) => void;
   private limitResolve?: () => void;
 
@@ -35,6 +35,12 @@ export class OrderedQueue extends EventEmitter {
     if (options.taskData) {
       options.taskData.forEach((data) => this.insert(data));
     }
+    this.initHeap();
+  }
+
+  private initHeap() {
+    this.in = new Heap({ comparBefore: (a: Task, b: Task) => a.index < b.index });
+    this.out = new Heap({ comparBefore: (a: Task, b: Task) => a.index < b.index });
   }
 
   private enqueue(task: Task) {
@@ -50,13 +56,13 @@ export class OrderedQueue extends EventEmitter {
     let task = this.out.peek();
     while (task && task.index === this.processed) {
       task = this.out.remove();
+      this.processed++;
       this.emit('result', this, task.data, task.result);
       if (this.processed === this.total) {
         this.resolvePromise();
         return;
       }
 
-      this.processed++;
       task = this.out.peek();
     }
   }
@@ -90,9 +96,20 @@ export class OrderedQueue extends EventEmitter {
     }
   }
 
-  abort() {
+  async abort() {
     this.abortFlag = true;
     this.resolvePromise();
+    if (this.runningPromise) {
+      await this.runningPromise;
+    }
+    this.initHeap();
+  }
+
+  async reset() {
+    if (!this.abortFlag) {
+      await this.abort();
+    }
+    this.abortFlag = false;
   }
 
   insert(data: any) {
@@ -103,10 +120,13 @@ export class OrderedQueue extends EventEmitter {
   }
 
   async start() {
-    if (this.running) {
-      throw new Error('OrderedQueue already started');
+    if (this.runningPromise || this.abortFlag) {
+      throw new Error('OrderedQueue already started or aborted');
     }
-    this.running = true;
+    let runningResolve!: () => void;
+    this.runningPromise = new Promise((resolve) => {
+      runningResolve = resolve;
+    });
     let promiseArray: Promise<void>[] = [];
     const processOver = (p: Promise<void>) => {
       const index = promiseArray.indexOf(p);
@@ -142,6 +162,7 @@ export class OrderedQueue extends EventEmitter {
       promiseArray.push(p);
       await makePromise();
     }
-    this.running = false;
+    runningResolve();
+    this.runningPromise = undefined;
   }
 }

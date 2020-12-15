@@ -113,6 +113,9 @@ export class OrderedQueue extends EventEmitter {
   }
 
   insert(data: any) {
+    if (this.abortFlag) {
+      throw new Error('OrderedQueue already aborted');
+    }
     this.enqueue({
       data,
       index: this.total++

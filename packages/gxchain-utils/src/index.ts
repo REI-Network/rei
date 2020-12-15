@@ -8,3 +8,4 @@ export const stringToCID = async (str: string) => {
 };
 
 export * from './abort';
+export * from './orderedqueue';

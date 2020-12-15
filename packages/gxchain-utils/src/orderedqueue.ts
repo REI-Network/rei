@@ -104,8 +104,6 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
       await this.runningPromise;
     }
     this.initHeap();
-    this.total = 0;
-    this.processed = 0;
   }
 
   async reset() {
@@ -173,6 +171,8 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     if (promiseArray.length > 0) {
       await Promise.all(promiseArray);
     }
+    this.total = 0;
+    this.processed = 0;
     runningResolve();
     this.runningPromise = undefined;
   }

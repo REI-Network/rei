@@ -1,10 +1,11 @@
 import { EventEmitter } from 'events';
+import util from 'util';
 
 import Heap from 'qheap';
 
-type Task = {
-  data: any;
-  result?: any;
+type Task<TData, TResult> = {
+  data: TData;
+  result?: TResult;
   index: number;
 };
 
@@ -16,19 +17,19 @@ export declare interface OrderedQueue {
   once(event: 'error', listener: (queue: OrderedQueue, err: any) => void): this;
 }
 
-export class OrderedQueue extends EventEmitter {
+export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
   private readonly limit: number;
-  private readonly processTask: (data: any) => Promise<any> | any;
+  private readonly processTask: (data: TData) => Promise<TResult> | TResult;
   private in!: Heap;
   private out!: Heap;
   private total: number = 0;
   private processed: number = 0;
   private abortFlag: boolean = false;
   private runningPromise?: Promise<void>;
-  private taskResolve?: (task?: Task) => void;
+  private taskResolve?: (task?: Task<TData, TResult>) => void;
   private limitResolve?: () => void;
 
-  constructor(options: { limit: number; taskData?: any[]; processTask: (data: any) => Promise<any> }) {
+  constructor(options: { limit: number; taskData?: any[]; processTask: (data: TData) => Promise<TResult> | TResult }) {
     super();
     this.limit = options.limit;
     this.processTask = options.processTask;
@@ -39,11 +40,11 @@ export class OrderedQueue extends EventEmitter {
   }
 
   private initHeap() {
-    this.in = new Heap({ comparBefore: (a: Task, b: Task) => a.index < b.index });
-    this.out = new Heap({ comparBefore: (a: Task, b: Task) => a.index < b.index });
+    this.in = new Heap({ comparBefore: (a: Task<TData, TResult>, b: Task<TData, TResult>) => a.index < b.index });
+    this.out = new Heap({ comparBefore: (a: Task<TData, TResult>, b: Task<TData, TResult>) => a.index < b.index });
   }
 
-  private enqueue(task: Task) {
+  private enqueue(task: Task<TData, TResult>) {
     if (this.taskResolve) {
       this.taskResolve(task);
       this.taskResolve = undefined;
@@ -67,14 +68,14 @@ export class OrderedQueue extends EventEmitter {
     }
   }
 
-  private async *makeAsyncGenerator(): AsyncGenerator<Task> {
+  private async *makeAsyncGenerator(): AsyncGenerator<Task<TData, TResult>> {
     while (!this.abortFlag) {
       let task = this.in.remove();
       if (!task) {
         if (this.processed === this.total) {
           return;
         }
-        task = await new Promise<Task | undefined>((resolve) => {
+        task = await new Promise<Task<TData, TResult> | undefined>((resolve) => {
           this.taskResolve = resolve;
         });
         if (!task) {
@@ -103,6 +104,8 @@ export class OrderedQueue extends EventEmitter {
       await this.runningPromise;
     }
     this.initHeap();
+    this.total = 0;
+    this.processed = 0;
   }
 
   async reset() {
@@ -149,8 +152,10 @@ export class OrderedQueue extends EventEmitter {
           });
     };
     for await (const task of this.makeAsyncGenerator()) {
-      const p = this.processTask(task.data)
-        .then((result: any) => {
+      let result = this.processTask(task.data);
+      result = (util.types.isPromise(result) ? result : Promise.resolve(result)) as Promise<TResult>;
+      const p = result
+        .then((result: TResult) => {
           task.result = result;
           this.out.insert(task);
           this.dequeue();

@@ -162,6 +162,9 @@ export class OrderedQueue extends EventEmitter {
       promiseArray.push(p);
       await makePromise();
     }
+    if (promiseArray.length > 0) {
+      await Promise.all(promiseArray);
+    }
     runningResolve();
     this.runningPromise = undefined;
   }

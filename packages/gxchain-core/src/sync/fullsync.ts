@@ -34,7 +34,19 @@ export class FullSynchronizer extends Synchronizer {
       await new Promise((r) => setTimeout(r, 1000));
       throw new Error('can not find idle peer');
     }
-    return await peer.request(constants.GXC2_ETHWIRE, 'GetBlockHeaders', [task.start, task.count]);
+    peer.idle = false;
+    try {
+      const result = await peer.request(constants.GXC2_ETHWIRE, 'GetBlockHeaders', [task.start, task.count]);
+      peer.idle = true;
+      return result;
+    } catch (err) {
+      peer.idle = true;
+      // TODO: pretty this.
+      if (err.message && err.message.indexOf('timeout') !== -1) {
+        this.peerpool.ban(peer, 1);
+      }
+      throw err;
+    }
   }
 
   async sync(): Promise<boolean> {
@@ -62,6 +74,7 @@ export class FullSynchronizer extends Synchronizer {
       });
       totalCount -= this.count;
     }
+    await this.queue.start();
     return true;
   }
 

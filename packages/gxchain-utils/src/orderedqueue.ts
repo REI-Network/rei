@@ -32,10 +32,10 @@ export class OrderedQueue extends EventEmitter {
     super();
     this.limit = options.limit;
     this.processTask = options.processTask;
+    this.initHeap();
     if (options.taskData) {
       options.taskData.forEach((data) => this.insert(data));
     }
-    this.initHeap();
   }
 
   private initHeap() {

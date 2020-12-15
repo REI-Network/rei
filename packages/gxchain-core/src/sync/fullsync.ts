@@ -69,7 +69,7 @@ export class FullSynchronizer extends Synchronizer {
     let i = 0;
     while (totalCount > 0) {
       this.queue.insert({
-        start: i * this.count,
+        start: i * this.count + latestHeight + 1,
         count: totalCount > this.count ? this.count : totalCount - this.count
       });
       totalCount -= this.count;

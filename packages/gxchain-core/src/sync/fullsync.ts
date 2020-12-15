@@ -1,8 +1,8 @@
 import { OrderedQueue } from '@gxchain2/utils';
 import { constants } from '@gxchain2/common';
+import { Peer } from '@gxchain2/network';
 
 import { Synchronizer, SynchronizerOptions } from './sync';
-import { Peer } from '@gxchain2/network';
 
 export interface FullSynchronizerOptions extends SynchronizerOptions {
   limit: number;
@@ -73,6 +73,7 @@ export class FullSynchronizer extends Synchronizer {
         count: totalCount > this.count ? this.count : totalCount - this.count
       });
       totalCount -= this.count;
+      i++;
     }
     await this.queue.start();
     return true;

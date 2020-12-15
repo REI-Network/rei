@@ -46,7 +46,7 @@ export class PeerPool extends EventEmitter {
 
   idle(name: string) {
     try {
-      const peers = this.peers.filter((p) => p.idle && p.latest(name));
+      const peers = this.peers.filter((p) => p.idle && p.latestHeight(name));
       const index = Math.floor(Math.random() * peers.length);
       return peers[index];
     } catch (err) {

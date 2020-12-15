@@ -195,7 +195,7 @@ export class Peer extends EventEmitter {
     this.queueMap.clear();
   }
 
-  latest(name: string): number {
+  latestHeight(name: string): number {
     const status = this.getQueue(name).protocol.status;
     if (!status || status.height === undefined) {
       throw new Error(`Peer invalid status, name: ${name}`);

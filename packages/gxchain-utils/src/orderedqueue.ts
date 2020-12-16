@@ -35,7 +35,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     super();
     this.limit = options.limit;
     this.processTask = options.processTask;
-    this.initHeap();
+    this.resetHeap();
     this.taskQueue = new AsyncNext<Task<TData, TResult> | null>({
       push: (task: Task<TData, TResult>) => {
         this.in.insert(task);
@@ -48,9 +48,13 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     }
   }
 
-  private initHeap() {
-    this.in = new Heap({ comparBefore: (a: Task<TData, TResult>, b: Task<TData, TResult>) => a.index < b.index });
-    this.out = new Heap({ comparBefore: (a: Task<TData, TResult>, b: Task<TData, TResult>) => a.index < b.index });
+  private resetHeap() {
+    if (this.in === undefined || this.in.length > 0) {
+      this.in = new Heap({ comparBefore: (a: Task<TData, TResult>, b: Task<TData, TResult>) => a.index < b.index });
+    }
+    if (this.out === undefined || this.out.lenght > 0) {
+      this.out = new Heap({ comparBefore: (a: Task<TData, TResult>, b: Task<TData, TResult>) => a.index < b.index });
+    }
   }
 
   private enqueue(task: Task<TData, TResult>) {
@@ -97,7 +101,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     if (this.runningPromise) {
       await this.runningPromise;
     }
-    this.initHeap();
+    this.resetHeap();
   }
 
   async reset() {

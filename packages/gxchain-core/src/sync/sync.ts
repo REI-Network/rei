@@ -10,6 +10,14 @@ export interface SynchronizerOptions {
   interval: number;
 }
 
+export declare interface Synchronizer {
+  on(event: 'synchronized', lisener: () => void);
+  on(event: 'error', lisener: (err: any) => void);
+
+  once(event: 'synchronized', lisener: () => void);
+  once(event: 'error', lisener: (err: any) => void);
+}
+
 export class Synchronizer extends EventEmitter {
   protected readonly peerpool: PeerPool;
   protected readonly blockchain: Blockchain;

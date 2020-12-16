@@ -3,6 +3,8 @@ import util from 'util';
 
 import Heap from 'qheap';
 
+import { AsyncNext, AsyncNextArray } from './asyncnext';
+
 type Task<TData, TResult> = {
   data: TData;
   result?: TResult;
@@ -26,7 +28,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
   private processed: number = 0;
   private abortFlag: boolean = false;
   private runningPromise?: Promise<void>;
-  private taskResolve?: (task?: Task<TData, TResult>) => void;
+  private readonly taskQueue: AsyncNext<Task<TData, TResult> | undefined>;
   private limitResolve?: () => void;
 
   constructor(options: { limit: number; taskData?: any[]; processTask: (data: TData) => Promise<TResult> | TResult }) {
@@ -37,6 +39,13 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     if (options.taskData) {
       options.taskData.forEach((data) => this.insert(data));
     }
+    this.taskQueue = new AsyncNext<Task<TData, TResult> | undefined>({
+      push: (task?: Task<TData, TResult>) => {
+        this.in.insert(task);
+      },
+      hasNext: () => this.in.length > 0,
+      next: () => this.in.remove()
+    });
   }
 
   private initHeap() {
@@ -45,12 +54,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
   }
 
   private enqueue(task: Task<TData, TResult>) {
-    if (this.taskResolve) {
-      this.taskResolve(task);
-      this.taskResolve = undefined;
-    } else {
-      this.in.insert(task);
-    }
+    this.taskQueue.push(task);
   }
 
   private dequeue() {
@@ -70,6 +74,12 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
 
   private async *makeAsyncGenerator(): AsyncGenerator<Task<TData, TResult>> {
     while (!this.abortFlag) {
+      const task = await this.taskQueue.next();
+      if (this.abortFlag || !task) {
+        return;
+      }
+      yield task;
+      /*
       let task = this.in.remove();
       if (!task) {
         if (this.processed === this.total) {
@@ -83,13 +93,13 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
         }
       }
       yield task;
+      */
     }
   }
 
   private resolvePromise() {
-    if (this.taskResolve) {
-      this.taskResolve(undefined);
-      this.taskResolve = undefined;
+    if (this.taskQueue.isWaiting) {
+      this.taskQueue.push(undefined);
     }
     if (this.limitResolve) {
       this.limitResolve();

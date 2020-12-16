@@ -162,6 +162,7 @@ export class Libp2pNode extends Libp2p {
       for (const [peerId, peer] of this.peers) {
         await peer.abort();
       }
+      this.peers.clear();
       await this.stop();
       this.started = false;
     }

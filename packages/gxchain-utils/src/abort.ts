@@ -1,10 +1,12 @@
+import { promises } from 'fs';
+
 export class Aborter {
   private _reason: any;
-  private _using: number = 0;
   private _abort: boolean = true;
   private _abortPromise!: Promise<void>;
   private _resolve!: () => void;
   private _reject!: (reason?: any) => void;
+  private _waitingPromises: Promise<void>[] = [];
 
   get reason() {
     return this.reason;
@@ -26,14 +28,20 @@ export class Aborter {
     if (this._abort) {
       return Promise.reject(this._reason);
     }
+    let promiseResolve!: () => void;
+    const promise = new Promise<void>((resolve) => {
+      promiseResolve = resolve;
+    });
+    this._waitingPromises.push(promise);
     try {
-      this._using++;
-      const res = (await Promise.race([this._abortPromise, p])) as T;
-      this._using--;
-      return res;
+      const result = (await Promise.race([this._abortPromise, p])) as T;
+      promiseResolve();
+      this._waitingPromises.splice(this._waitingPromises.indexOf(promise), 1);
+      return result;
     } catch (err) {
+      promiseResolve();
+      this._waitingPromises.splice(this._waitingPromises.indexOf(promise), 1);
       if (!this.isAborted) {
-        this._using--;
         throw err;
       } else if (throwAbortError) {
         throw err;
@@ -41,13 +49,13 @@ export class Aborter {
     }
   }
 
-  abort(reason?: any) {
+  async abort(reason?: any) {
     if (!this._abort) {
       this._reason = reason;
       this._abort = true;
-      if (this._using > 0) {
-        this._using = 0;
+      if (this._waitingPromises.length > 0) {
         this._reject(reason);
+        await Promise.all(this._waitingPromises);
       } else {
         this._resolve();
       }
@@ -62,12 +70,14 @@ export class Aborter {
         this._resolve = resolve;
         this._reject = reject;
       });
+    } else {
+      throw new Error('Aboter should abort before reset');
     }
   }
 
   resolve() {
     if (!this._abort) {
-      if (this._using > 0) {
+      if (this._waitingPromises.length > 0) {
         throw new Error('Aborter is in using, can not resolve!');
       }
       this._abort = true;

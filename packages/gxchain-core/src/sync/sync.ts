@@ -60,7 +60,7 @@ export class Synchronizer extends EventEmitter {
   }
 
   async abort() {
-    this.aborter.abort(new Error('Synchronizer abort'));
+    await this.aborter.abort(new Error('Synchronizer abort'));
   }
 
   async reset() {

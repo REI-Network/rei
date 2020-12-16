@@ -3,7 +3,6 @@ import { EventEmitter } from 'events';
 import { PeerPool } from '@gxchain2/network';
 import { Blockchain } from '@gxchain2/blockchain';
 import { Aborter } from '@gxchain2/utils';
-import { INode } from '@gxchain2/interface';
 
 export interface SynchronizerOptions {
   peerpool: PeerPool;

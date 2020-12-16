@@ -17,6 +17,8 @@ import { StateManager } from '@gxchain2/state-manager';
 import { VM } from '@gxchain2/vm';
 import { TransactionPool } from '@gxchain2/tx-pool';
 
+import { FullSynchronizer, Synchronizer } from './sync';
+
 export class Node implements INode {
   public readonly chainDB!: LevelUp;
   public readonly accountDB!: LevelUp;
@@ -29,6 +31,7 @@ export class Node implements INode {
   public peerpool!: PeerPool;
   public blockchain!: Blockchain;
   public vm!: VM;
+  public sync!: Synchronizer;
 
   constructor(databasePath: string) {
     this.databasePath = databasePath;
@@ -88,6 +91,7 @@ export class Node implements INode {
     });
     this.db = new Database(this.chainDB, this.common);
     this.stateManager = new StateManager({ common: this.common, trie: new Trie(this.accountDB) });
+    // TODO: save the peer id.
     this.peerpool = new PeerPool({
       nodes: await Promise.all(
         [
@@ -99,8 +103,7 @@ export class Node implements INode {
         ].map(
           (n) => new Promise<Libp2pNode>((resolve) => n.init().then(() => resolve(n)))
         )
-      ),
-      maxSize: 20
+      )
     });
 
     let genesisBlock!: Block;
@@ -134,9 +137,16 @@ export class Node implements INode {
       stateManager: this.stateManager,
       blockchain: this.blockchain
     });
+    this.sync = new FullSynchronizer({
+      peerpool: this.peerpool,
+      blockchain: this.blockchain
+    });
 
     await this.vm.init();
     await this.vm.runBlockchain();
+    this.sync.start().catch((err) => {
+      console.error('Sync error:', err);
+    });
   }
 
   async processBlock(block: Block) {

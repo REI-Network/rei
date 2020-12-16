@@ -18,7 +18,7 @@ export class PeerPool extends EventEmitter {
   private readonly _nodes: Libp2pNode[];
   public readonly maxSize: number;
 
-  constructor(options: { nodes: Libp2pNode[]; maxSize: number }) {
+  constructor(options: { nodes: Libp2pNode[]; maxSize?: number }) {
     super();
     options.nodes.forEach((node) => {
       node.on('connected', (peer) => {
@@ -28,7 +28,7 @@ export class PeerPool extends EventEmitter {
         console.error('Peerpool, p2p node error:', err);
       });
     });
-    this.maxSize = options.maxSize;
+    this.maxSize = options.maxSize || 32;
     this._nodes = options.nodes;
   }
 

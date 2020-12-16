@@ -137,9 +137,11 @@ export class Node implements INode {
       stateManager: this.stateManager,
       blockchain: this.blockchain
     });
+    // TODO
     this.sync = new FullSynchronizer({
       peerpool: this.peerpool,
-      blockchain: this.blockchain
+      blockchain: this.blockchain,
+      common: this.common
     });
 
     await this.vm.init();

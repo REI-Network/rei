@@ -7,7 +7,7 @@ import { Aborter } from '@gxchain2/utils';
 export interface SynchronizerOptions {
   peerpool: PeerPool;
   blockchain: Blockchain;
-  interval: number;
+  interval?: number;
 }
 
 export declare interface Synchronizer {
@@ -30,7 +30,7 @@ export class Synchronizer extends EventEmitter {
     super();
     this.peerpool = options.peerpool;
     this.blockchain = options.blockchain;
-    this.interval = options.interval;
+    this.interval = options.interval || 1000;
   }
 
   async sync(): Promise<boolean> {

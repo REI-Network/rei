@@ -37,8 +37,10 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     this.processTask = options.processTask;
     this.resetHeap();
     this.taskQueue = new AsyncNext<Task<TData, TResult> | null>({
-      push: (task: Task<TData, TResult>) => {
-        this.in.insert(task);
+      push: (task: Task<TData, TResult> | null) => {
+        if (task !== null) {
+          this.in.insert(task);
+        }
       },
       hasNext: () => this.in.length > 0,
       next: () => this.in.remove()

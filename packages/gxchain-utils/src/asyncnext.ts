@@ -1,8 +1,8 @@
-interface QueueLike<T> {
-  push(data: T): void;
+type QueueLike<T> = {
+  push: (data: T) => void;
   hasNext: () => boolean;
   next: () => T;
-}
+};
 
 export class AsyncNext<T = any> {
   private readonly queue: QueueLike<T>;
@@ -34,16 +34,35 @@ export class AsyncNext<T = any> {
   }
 }
 
-export class AsyncNextArray<T = any> extends AsyncNext<T> {
-  private readonly arr: T[] = [];
+type OptionalQueueLike<T> = {
+  push?: (data: T) => void;
+  hasNext?: () => boolean;
+  next?: () => T;
+};
 
-  constructor() {
-    super({
-      push: (data: T) => {
-        this.arr.push(data);
-      },
-      hasNext: () => this.arr.length > 0,
-      next: () => this.arr.shift()!
-    });
+export class AsyncNextArray<T = any> extends AsyncNext<T> {
+  private arr: T[] = [];
+
+  constructor(options?: OptionalQueueLike<T>) {
+    super(
+      Object.assign(
+        {
+          push: (data: T) => {
+            this.arr.push(data);
+          },
+          hasNext: () => this.arr.length > 0,
+          next: () => this.arr.shift()!
+        },
+        options
+      )
+    );
+  }
+
+  get array() {
+    return this.arr;
+  }
+
+  clear() {
+    this.arr = [];
   }
 }

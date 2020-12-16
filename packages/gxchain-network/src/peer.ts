@@ -1,5 +1,7 @@
 import { EventEmitter } from 'events';
 
+import { AsyncNextArray, Aborter } from '@gxchain2/utils';
+
 import pipe from 'it-pipe';
 import type PeerId from 'peer-id';
 
@@ -12,16 +14,8 @@ declare interface MsgQueue {
 }
 
 class MsgQueue extends EventEmitter {
-  private abortResolve!: () => void;
-  private abortPromise = new Promise<void>((resolve) => {
-    this.abortResolve = resolve;
-  });
-  private abortFlag: boolean = false;
-
-  private queue: any[] = [];
-  private queueResolve?: (data: any) => void;
-  private queueReject?: (reason?: any) => void;
-
+  private readonly aborter = new Aborter();
+  private readonly queue: AsyncNextArray;
   readonly protocol: Protocol;
 
   private readonly waitingRequests = new Map<
@@ -36,27 +30,22 @@ class MsgQueue extends EventEmitter {
   constructor(protocol: Protocol) {
     super();
     this.protocol = protocol;
+    this.queue = new AsyncNextArray({
+      push: (data: any) => {
+        this.queue.push(data);
+        if (this.queue.array.length > 10) {
+          console.warn('MsgQueue drop message:', this.queue.array.shift());
+        }
+      }
+    });
   }
 
   get name() {
     return this.protocol.name;
   }
 
-  private _enqueue(data: any) {
-    if (this.queueResolve) {
-      this.queueResolve(data);
-      this.queueResolve = undefined;
-      this.queueReject = undefined;
-    } else {
-      this.queue.push(data);
-      if (this.queue.length > 10) {
-        console.warn('MsgQueue drop message:', this.queue.shift());
-      }
-    }
-  }
-
   send(method: string, data: any) {
-    return this._enqueue(this.protocol.encode(method, data));
+    return this.queue.push(this.protocol.encode(method, data));
   }
 
   request(method: string, data: any) {
@@ -76,22 +65,17 @@ class MsgQueue extends EventEmitter {
           reject(new Error(`MsgQueue timeout request: ${method}`));
         }, 8000)
       });
-      this._enqueue(handler.encode(data));
+      this.queue.push(handler.encode(data));
     });
   }
 
   private async *makeAsyncGenerator() {
-    while (!this.abortFlag) {
-      const p =
-        this.queue.length > 0
-          ? Promise.resolve(this.queue.shift()!)
-          : new Promise<any>((resolve, reject) => {
-              this.queueResolve = resolve;
-              this.queueReject = reject;
-            });
-      yield p.catch(() => {
+    while (!this.aborter.isAborted) {
+      const data = await this.queue.next();
+      if (data === null) {
         return { length: 0 };
-      });
+      }
+      yield data;
     }
   }
 
@@ -100,11 +84,15 @@ class MsgQueue extends EventEmitter {
 
     pipe(stream.source, async (source) => {
       const it = source[Symbol.asyncIterator]();
-      while (!this.abortFlag) {
-        const result = await Promise.race([this.abortPromise, it.next()]);
-        if (this.abortFlag) break;
+      while (!this.aborter.isAborted) {
+        const result: any = await this.aborter.abortablePromise(it.next());
+        if (this.aborter.isAborted) {
+          break;
+        }
         const { done, value } = result;
-        if (done) break;
+        if (done) {
+          break;
+        }
 
         // TODO: fix _bufs.
         const [code, data] = this.protocol.handle(value._bufs[0]);
@@ -128,15 +116,12 @@ class MsgQueue extends EventEmitter {
     });
   }
 
-  abort() {
-    this.abortFlag = true;
-    this.abortResolve();
-    if (this.queueReject) {
-      this.queueReject(new Error('MsgQueue abort'));
-      this.queueReject = undefined;
-      this.queueResolve = undefined;
+  async abort() {
+    await this.aborter.abort(new Error('MsgQueue abort'));
+    if (this.queue.isWaiting) {
+      this.queue.push(null);
     }
-    this.queue = [];
+    this.queue.clear();
 
     for (const [response, request] of this.waitingRequests) {
       clearTimeout(request.timeout);
@@ -188,9 +173,9 @@ export class Peer extends EventEmitter {
     return queue;
   }
 
-  abort() {
+  async abort() {
     for (const [name, queue] of this.queueMap) {
-      queue.abort();
+      await queue.abort();
     }
     this.queueMap.clear();
   }

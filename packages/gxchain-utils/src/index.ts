@@ -9,3 +9,4 @@ export const stringToCID = async (str: string) => {
 
 export * from './abort';
 export * from './orderedqueue';
+export * from './asyncnext';

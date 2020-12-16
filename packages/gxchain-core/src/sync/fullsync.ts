@@ -5,8 +5,10 @@ import { Peer } from '@gxchain2/network';
 import { Synchronizer, SynchronizerOptions } from './sync';
 
 export interface FullSynchronizerOptions extends SynchronizerOptions {
-  limit: number;
-  count: number;
+  limit?: number;
+  count?: number;
+  timeoutBanTime?: number;
+  errorBanTime?: number;
 }
 
 type Task = {
@@ -17,12 +19,16 @@ type Task = {
 export class FullSynchronizer extends Synchronizer {
   private readonly queue: OrderedQueue<Task>;
   private readonly count: number;
+  private readonly timeoutBanTime: number;
+  private readonly errorBanTime: number;
 
   constructor(options: FullSynchronizerOptions) {
     super(options);
-    this.count = options.count;
+    this.count = options.count || 128;
+    this.timeoutBanTime = options.timeoutBanTime || 300000;
+    this.errorBanTime = options.errorBanTime || 60000;
     this.queue = new OrderedQueue<Task>({
-      limit: options.limit,
+      limit: options.limit || 16,
       processTask: this.download.bind(this)
     });
     this.queue.on('error', (queue, err) => this.emit('error', err));
@@ -43,7 +49,9 @@ export class FullSynchronizer extends Synchronizer {
       peer.idle = true;
       // TODO: pretty this.
       if (err.message && err.message.indexOf('timeout') !== -1) {
-        this.peerpool.ban(peer, 1);
+        this.peerpool.ban(peer, this.timeoutBanTime);
+      } else {
+        this.peerpool.ban(peer, this.errorBanTime);
       }
       throw err;
     }
@@ -51,7 +59,7 @@ export class FullSynchronizer extends Synchronizer {
 
   async sync(): Promise<boolean> {
     await this.queue.reset();
-    let latestHeight = this.blockchain.latestHeight;
+    const latestHeight = this.blockchain.latestHeight;
     let bestHeight = latestHeight;
     let best: Peer | undefined;
     for (const peer of this.peerpool.peers) {

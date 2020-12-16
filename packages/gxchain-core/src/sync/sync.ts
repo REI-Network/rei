@@ -3,10 +3,12 @@ import { EventEmitter } from 'events';
 import { PeerPool } from '@gxchain2/network';
 import { Blockchain } from '@gxchain2/blockchain';
 import { Aborter } from '@gxchain2/utils';
+import { Common } from '@gxchain2/common';
 
 export interface SynchronizerOptions {
   peerpool: PeerPool;
   blockchain: Blockchain;
+  common: Common;
   interval?: number;
 }
 
@@ -21,15 +23,17 @@ export declare interface Synchronizer {
 export class Synchronizer extends EventEmitter {
   protected readonly peerpool: PeerPool;
   protected readonly blockchain: Blockchain;
+  protected readonly common: Common;
+  protected readonly interval: number;
   protected aborter = new Aborter();
   protected running: boolean = false;
   protected forceSync: boolean = false;
-  private readonly interval: number;
 
   constructor(options: SynchronizerOptions) {
     super();
     this.peerpool = options.peerpool;
     this.blockchain = options.blockchain;
+    this.common = options.common;
     this.interval = options.interval || 1000;
   }
 

@@ -45,10 +45,16 @@ class MsgQueue extends EventEmitter {
   }
 
   send(method: string, data: any) {
+    if (this.aborter.isAborted) {
+      throw new Error('MsgQueue already aborted');
+    }
     return this.queue.push(this.protocol.encode(method, data));
   }
 
   request(method: string, data: any) {
+    if (this.aborter.isAborted) {
+      throw new Error('MsgQueue already aborted');
+    }
     const handler = this.protocol.findHandler(method);
     if (!handler.response) {
       throw new Error(`MsgQueue invalid request: ${method}`);
@@ -80,6 +86,9 @@ class MsgQueue extends EventEmitter {
   }
 
   pipeStream(stream: any) {
+    if (this.aborter.isAborted) {
+      throw new Error('MsgQueue already aborted');
+    }
     pipe(this.makeAsyncGenerator(), stream.sink);
 
     pipe(stream.source, async (source) => {

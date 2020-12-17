@@ -87,40 +87,59 @@ export class FullSynchronizer extends Synchronizer {
   }
 
   async sync(): Promise<boolean> {
-    await this.downloadQueue.reset();
-    const processPromise = this.processResult().catch((err) => {
-      console.error('Sync process result error', err);
-      this.emit('error', err);
-    });
-    const latestHeight = this.node.blockchain.latestHeight;
-    let bestHeight = latestHeight;
-    let best: Peer | undefined;
-    for (const peer of this.node.peerpool.peers) {
-      const height = peer.latestHeight(constants.GXC2_ETHWIRE);
-      if (height > bestHeight) {
-        best = peer;
-        bestHeight = height;
-      }
-    }
-    if (!best) {
-      return false;
-    }
+    const results = await Promise.all([
+      new Promise<boolean>(async (resolve) => {
+        let result = false;
+        try {
+          await this.downloadQueue.reset();
+          const latestHeight = this.node.blockchain.latestHeight;
+          let bestHeight = latestHeight;
+          let best: Peer | undefined;
+          for (const peer of this.node.peerpool.peers) {
+            const height = peer.latestHeight(constants.GXC2_ETHWIRE);
+            if (height > bestHeight) {
+              best = peer;
+              bestHeight = height;
+            }
+          }
+          if (best) {
+            let totalCount = bestHeight - latestHeight;
+            let i = 0;
+            while (totalCount > 0) {
+              this.downloadQueue.insert({
+                start: i * this.count + latestHeight + 1,
+                count: totalCount > this.count ? this.count : totalCount - this.count
+              });
+              totalCount -= this.count;
+              i++;
+            }
+            await this.downloadQueue.start();
+            result = true;
+          }
+          // push null to result queue, exit the async generator loop.
+          this.resultQueue.push(null);
+        } catch (err) {
+          console.error('Sync download error', err);
+          this.emit('error', err);
+        } finally {
+          resolve(result);
+        }
+      }),
+      new Promise<boolean>(async (resolve) => {
+        let result = false;
+        try {
+          await this.processResult();
+          result = true;
+        } catch (err) {
+          console.error('Sync process result error', err);
+          this.emit('error', err);
+        } finally {
+          resolve(result);
+        }
+      })
+    ]);
 
-    let totalCount = bestHeight - latestHeight;
-    let i = 0;
-    while (totalCount > 0) {
-      this.downloadQueue.insert({
-        start: i * this.count + latestHeight + 1,
-        count: totalCount > this.count ? this.count : totalCount - this.count
-      });
-      totalCount -= this.count;
-      i++;
-    }
-    await this.downloadQueue.start();
-
-    this.resultQueue.push(null);
-    await processPromise;
-    return true;
+    return results.reduce((a, b) => a && b);
   }
 
   async abort() {

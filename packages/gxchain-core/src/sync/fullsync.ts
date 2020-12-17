@@ -139,7 +139,7 @@ export class FullSynchronizer extends Synchronizer {
       })
     ]);
 
-    return results.reduce((a, b) => a && b);
+    return results.reduce((a, b) => a && b, true);
   }
 
   async abort() {

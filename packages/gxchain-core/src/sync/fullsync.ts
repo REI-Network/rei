@@ -42,7 +42,7 @@ export class FullSynchronizer extends Synchronizer {
   }
 
   private async download(task: Task) {
-    const peer = this.peerpool.idle(constants.GXC2_ETHWIRE);
+    const peer = this.node.peerpool.idle(constants.GXC2_ETHWIRE);
     if (!peer) {
       await new Promise((r) => setTimeout(r, this.interval));
       throw new Error('can not find idle peer');
@@ -55,16 +55,16 @@ export class FullSynchronizer extends Synchronizer {
         'GetBlockBodies',
         headers.map((h: any) => h.hash())
       );
-      const blocks = bodies.map(([txsData, unclesData], i: number) => Block.fromValuesArray([headers[i].raw(), txsData, unclesData], { common: this.common }));
+      const blocks = bodies.map(([txsData, unclesData], i: number) => Block.fromValuesArray([headers[i].raw(), txsData, unclesData], { common: this.node.common }));
       peer.idle = true;
       return blocks;
     } catch (err) {
       peer.idle = true;
       // TODO: pretty this.
       if (err.message && err.message.indexOf('timeout') !== -1) {
-        this.peerpool.ban(peer, this.timeoutBanTime);
+        this.node.peerpool.ban(peer, this.timeoutBanTime);
       } else {
-        this.peerpool.ban(peer, this.errorBanTime);
+        this.node.peerpool.ban(peer, this.errorBanTime);
       }
       throw err;
     }
@@ -82,18 +82,20 @@ export class FullSynchronizer extends Synchronizer {
 
   private async processResult() {
     for await (const result of this.makeAsyncGenerator()) {
-      // TODO: run vm
-      await this.blockchain.putBlocks(result);
+      await this.node.processBlocks(result);
     }
   }
 
   async sync(): Promise<boolean> {
     await this.downloadQueue.reset();
-    const processPromise = this.processResult();
-    const latestHeight = this.blockchain.latestHeight;
+    const processPromise = this.processResult().catch((err) => {
+      console.error('Sync process result error', err);
+      this.emit('error', err);
+    });
+    const latestHeight = this.node.blockchain.latestHeight;
     let bestHeight = latestHeight;
     let best: Peer | undefined;
-    for (const peer of this.peerpool.peers) {
+    for (const peer of this.node.peerpool.peers) {
       const height = peer.latestHeight(constants.GXC2_ETHWIRE);
       if (height > bestHeight) {
         best = peer;

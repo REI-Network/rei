@@ -138,10 +138,9 @@ export class Node implements INode {
       blockchain: this.blockchain
     });
     // TODO
-    this.sync = new FullSynchronizer({
-      peerpool: this.peerpool,
-      blockchain: this.blockchain,
-      common: this.common
+    this.sync = new FullSynchronizer({ node: this });
+    this.sync.on('error', (err) => {
+      console.error('Sync error:', err);
     });
 
     await this.vm.init();
@@ -166,5 +165,9 @@ export class Node implements INode {
     block = Block.fromBlockData({ header: { ...block.header, receiptTrie: results.receiptRoot }, transactions: block.transactions }, { common: this.common });
 
     await this.blockchain.putBlock(block);
+  }
+
+  async processBlocks(blocks: Block[]) {
+    await Promise.all(blocks.map((block) => this.processBlock(block)));
   }
 }

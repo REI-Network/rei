@@ -3,12 +3,7 @@ import { EventEmitter } from 'events';
 import EthereumJSBlockchain from '@ethereumjs/blockchain';
 
 import { Block, BlockHeader } from '@gxchain2/block';
-
-interface Constructor<T = {}> {
-  new (...args: any[]): T;
-}
-
-declare function mixin<T1 extends Constructor, T2 extends Constructor>(mix1: T1, mix2: T2): new (...args) => InstanceType<T1> & InstanceType<T2>;
+import { mixin } from '@gxchain2/utils';
 
 export declare interface Blockchain {
   on(event: 'updated', listener: (block: Block) => void): this;

@@ -137,7 +137,6 @@ export class Node implements INode {
       stateManager: this.stateManager,
       blockchain: this.blockchain
     });
-    // TODO
     this.sync = new FullSynchronizer({ node: this });
     this.sync.on('error', (err) => {
       console.error('Sync error:', err);
@@ -145,9 +144,7 @@ export class Node implements INode {
 
     await this.vm.init();
     await this.vm.runBlockchain();
-    this.sync.start().catch((err) => {
-      console.error('Sync error:', err);
-    });
+    this.sync.start();
   }
 
   async processBlock(block: Block) {

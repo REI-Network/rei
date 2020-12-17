@@ -12,9 +12,11 @@ type Task<TData, TResult> = {
 };
 
 export declare interface OrderedQueue {
+  on(event: 'over', listener: (queue: OrderedQueue) => void): this;
   on(event: 'result', listener: (queue: OrderedQueue, data: any, result?: any) => void): this;
   on(event: 'error', listener: (queue: OrderedQueue, err: any) => void): this;
 
+  once(event: 'over', listener: (queue: OrderedQueue) => void): this;
   once(event: 'result', listener: (queue: OrderedQueue, data: any, result?: any) => void): this;
   once(event: 'error', listener: (queue: OrderedQueue, err: any) => void): this;
 }
@@ -168,5 +170,6 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     this.processed = 0;
     runningResolve();
     this.runningPromise = undefined;
+    this.emit('over', this);
   }
 }

@@ -35,8 +35,11 @@ export class FullSynchronizer extends Synchronizer {
       processTask: this.download.bind(this)
     });
     this.downloadQueue.on('error', (queue, err) => this.emit('error', err));
-    this.downloadQueue.on('result', (_, __, result: any) => {
+    this.downloadQueue.on('result', (queue, data, result: any) => {
       this.resultQueue.push(result);
+    });
+    this.downloadQueue.on('over', (queue) => {
+      this.resultQueue.push(null);
     });
     this.processResult();
   }
@@ -87,13 +90,14 @@ export class FullSynchronizer extends Synchronizer {
   }
 
   async sync(): Promise<boolean> {
+    let bestHeight = 0;
     const results = await Promise.all([
       new Promise<boolean>(async (resolve) => {
         let result = false;
         try {
           await this.downloadQueue.reset();
           const latestHeight = this.node.blockchain.latestHeight;
-          let bestHeight = latestHeight;
+          bestHeight = latestHeight;
           let best: Peer | undefined;
           for (const peer of this.node.peerpool.peers) {
             const height = peer.latestHeight(constants.GXC2_ETHWIRE);
@@ -116,8 +120,6 @@ export class FullSynchronizer extends Synchronizer {
             await this.downloadQueue.start();
             result = true;
           }
-          // push null to result queue, exit the async generator loop.
-          this.resultQueue.push(null);
         } catch (err) {
           console.error('Sync download error', err);
           this.emit('error', err);
@@ -139,7 +141,7 @@ export class FullSynchronizer extends Synchronizer {
       })
     ]);
 
-    return results.reduce((a, b) => a && b, true);
+    return results.reduce((a, b) => a && b, true) && bestHeight === this.node.blockchain.latestHeight;
   }
 
   async abort() {

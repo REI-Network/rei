@@ -32,7 +32,7 @@ class MsgQueue extends EventEmitter {
     this.protocol = protocol;
     this.queue = new AsyncNextArray({
       push: (data: any) => {
-        this.queue.push(data);
+        this.queue.array.push(data);
         if (this.queue.array.length > 10) {
           console.warn('MsgQueue drop message:', this.queue.array.shift());
         }

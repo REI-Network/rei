@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 
-import EthereumJSBlockchain from '@ethereumjs/blockchain';
+import EthereumJSBlockchain, { BlockchainOptions } from '@ethereumjs/blockchain';
 
 import { Block, BlockHeader } from '@gxchain2/block';
 import { mixin } from '@gxchain2/utils';
@@ -11,6 +11,13 @@ export declare interface Blockchain {
 
 export class Blockchain extends mixin(EthereumJSBlockchain, EventEmitter) {
   private _latestBlock!: Block;
+
+  constructor(opts: BlockchainOptions = {}) {
+    super(opts);
+
+    // TODO: pretty this.
+    this.updateLatest();
+  }
 
   get latestBlock() {
     return this._latestBlock;

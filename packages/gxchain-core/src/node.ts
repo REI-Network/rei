@@ -142,6 +142,7 @@ export class Node implements INode {
       console.error('Sync error:', err);
     });
 
+    await this.blockchain.init();
     await this.vm.init();
     await this.vm.runBlockchain();
     this.sync.start();

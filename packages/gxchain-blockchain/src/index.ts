@@ -12,13 +12,6 @@ export declare interface Blockchain {
 export class Blockchain extends mixin(EthereumJSBlockchain, EventEmitter) {
   private _latestBlock!: Block;
 
-  constructor(opts: BlockchainOptions = {}) {
-    super(opts);
-
-    // TODO: pretty this.
-    this.updateLatest();
-  }
-
   get latestBlock() {
     return this._latestBlock;
   }
@@ -37,6 +30,10 @@ export class Blockchain extends mixin(EthereumJSBlockchain, EventEmitter) {
       this._latestBlock = latestBlock;
       this.emit('updated', this._latestBlock);
     }
+  }
+
+  async init() {
+    await this.updateLatest();
   }
 
   async putBlock(block: Block) {

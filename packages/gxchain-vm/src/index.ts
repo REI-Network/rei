@@ -45,7 +45,8 @@ async function runBlockchain(this: VM, blockchain?: Blockchain) {
       // generate genesis state if we are at the genesis block
       // we don't have the genesis state
       if (!headBlock) {
-        await this.stateManager.generateCanonicalGenesis();
+        // It has been manually generated.
+        // await this.stateManager.generateCanonicalGenesis();
       } else {
         parentState = headBlock.header.stateRoot;
       }

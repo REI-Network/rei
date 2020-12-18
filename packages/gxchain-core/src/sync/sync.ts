@@ -10,11 +10,11 @@ export interface SynchronizerOptions {
 }
 
 export declare interface Synchronizer {
-  on(event: 'synchronized', lisener: () => void);
-  on(event: 'error', lisener: (err: any) => void);
+  on(event: 'synchronized', lisener: () => void): this;
+  on(event: 'error', lisener: (err: any) => void): this;
 
-  once(event: 'synchronized', lisener: () => void);
-  once(event: 'error', lisener: (err: any) => void);
+  once(event: 'synchronized', lisener: () => void): this;
+  once(event: 'error', lisener: (err: any) => void): this;
 }
 
 export class Synchronizer extends EventEmitter {

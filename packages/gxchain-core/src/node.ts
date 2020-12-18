@@ -80,6 +80,7 @@ export class Node implements INode {
     }
 
     await stateManager.commit();
+    return stateManager._trie.root;
   }
 
   async init() {
@@ -121,7 +122,11 @@ export class Node implements INode {
       genesisBlock = Block.genesis({ header: genesisJSON.genesisInfo.genesis }, { common: this.common });
       console.log('read genesis block from file', '0x' + genesisBlock.hash().toString('hex'));
 
-      await this.setupAccountInfo(genesisJSON.accountInfo);
+      const root = await this.setupAccountInfo(genesisJSON.accountInfo);
+      if (!root.equals(genesisBlock.header.stateRoot)) {
+        console.error('state root not equal', '0x' + root.toString('hex'), '0x' + genesisBlock.header.stateRoot.toString('hex'));
+        throw new Error('state root not equal');
+      }
     }
 
     this.blockchain = new Blockchain({

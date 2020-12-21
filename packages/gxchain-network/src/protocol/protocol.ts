@@ -31,7 +31,7 @@ export class Protocol {
     throw new Error('Unimplemented');
   }
 
-  handle(data: Buffer): [number, any] {
+  handle(data: Buffer): { code: number; name: string; data: any } {
     throw new Error('Unimplemented');
   }
 

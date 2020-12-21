@@ -104,7 +104,7 @@ class MsgQueue extends EventEmitter {
         }
 
         // TODO: fix _bufs.
-        const [code, data] = this.protocol.handle(value._bufs[0]);
+        const { code, name, data } = this.protocol.handle(value._bufs[0]);
         try {
           if (code === 0) {
             this.emit('status', this, data);
@@ -115,7 +115,7 @@ class MsgQueue extends EventEmitter {
               this.waitingRequests.delete(code);
               request.resolve(data);
             } else {
-              this.emit('message', this, data);
+              this.emit('message', this, { name, data });
             }
           }
         } catch (err) {

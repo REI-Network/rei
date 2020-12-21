@@ -77,10 +77,11 @@ export class ETHProtocol extends Protocol {
     return handler;
   }
 
-  handle(data: Buffer): [number, any] {
+  handle(data: Buffer): { code: number; name: string; data: any } {
     let [code, payload]: any = rlp.decode(data);
     code = bufferToInt(code);
-    return [code, this.decode(code, payload)];
+    const handler = this.findHandler(code);
+    return { code, name: handler.name, data: handler.decode(payload) };
   }
 
   encode(key: string | number, data: any): any {

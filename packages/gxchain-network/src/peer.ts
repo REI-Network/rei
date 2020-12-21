@@ -8,6 +8,8 @@ import type PeerId from 'peer-id';
 import { Protocol } from './protocol/protocol';
 import { Libp2pNode } from './p2p';
 
+export class PeerRequestTimeoutError extends Error {}
+
 declare interface MsgQueue {
   on(event: 'message' | 'status' | 'error', listener: (queue: MsgQueue, message: any) => void): this;
   once(event: 'message' | 'status' | 'error', listener: (queue: MsgQueue, message: any) => void): this;
@@ -68,7 +70,7 @@ class MsgQueue extends EventEmitter {
         resolve,
         timeout: setTimeout(() => {
           this.waitingRequests.delete(handler.response!);
-          reject(new Error(`MsgQueue timeout request: ${method}`));
+          reject(new PeerRequestTimeoutError(`MsgQueue timeout request: ${method}`));
         }, 8000)
       });
       this.queue.push(handler.encode(data));

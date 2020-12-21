@@ -1,6 +1,6 @@
 import { OrderedQueue, AsyncNextArray } from '@gxchain2/utils';
 import { constants } from '@gxchain2/common';
-import { Peer } from '@gxchain2/network';
+import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 import { Block, BlockHeader } from '@gxchain2/block';
 
 import { Synchronizer, SynchronizerOptions } from './sync';
@@ -73,8 +73,7 @@ export class FullSynchronizer extends Synchronizer {
       return blocks;
     } catch (err) {
       peer.idle = true;
-      // TODO: pretty this.
-      if (err.message && err.message.indexOf('timeout') !== -1) {
+      if (err instanceof PeerRequestTimeoutError) {
         this.node.peerpool.ban(peer, this.timeoutBanTime);
       } else {
         this.node.peerpool.ban(peer, this.errorBanTime);

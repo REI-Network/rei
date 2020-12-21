@@ -81,6 +81,32 @@ const startPrompts = async (node: Node) => {
       } catch (err) {
         console.error('Run block error', err);
       }
+    } else if (arr[0] === 'batchmine' || arr[0] === 'bm') {
+      try {
+        for (let i = 0; i < 10000; i++) {
+          const lastestHeader = (await node.blockchain.getHead()).header;
+          const block = Block.fromBlockData(
+            {
+              header: {
+                coinbase: '0x3289621709f5b35d09b4335e129907ac367a0593',
+                difficulty: '0x1',
+                gasLimit: '0x2fefd8',
+                nonce: '0x0102030405060708',
+                number: lastestHeader.number.addn(1),
+                parentHash: lastestHeader.hash(),
+                uncleHash: '0x0'
+              },
+              transactions: node.txPool.get(1, new BN(21000))
+            },
+            { common: node.common }
+          );
+          await node.processBlock(block);
+          console.log('new block', block.header.number.toString());
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+      } catch (err) {
+        console.error('Run block error', err);
+      }
     } else if (arr[0] === 'lsblock') {
       for (let h = 0; ; h++) {
         try {

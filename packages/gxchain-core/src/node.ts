@@ -17,7 +17,7 @@ import { StateManager } from '@gxchain2/state-manager';
 import { VM } from '@gxchain2/vm';
 import { TransactionPool } from '@gxchain2/tx-pool';
 
-import { FullSynchronizer, Synchronizer } from './sync';
+import { FullSynchronizer, Synchronizer, NoIdlePeerError } from './sync';
 
 export class Node implements INode {
   public readonly chainDB!: LevelUp;
@@ -165,7 +165,7 @@ export class Node implements INode {
     this.sync = new FullSynchronizer({ node: this });
     this.sync.on('error', (err) => {
       // TODO: pretty this.
-      if (err.message.indexOf('can not find') === -1) {
+      if (err instanceof NoIdlePeerError) {
         console.error('Sync error:', err);
       }
     });

@@ -5,6 +5,8 @@ import { Block, BlockHeader } from '@gxchain2/block';
 
 import { Synchronizer, SynchronizerOptions } from './sync';
 
+export class NoIdlePeerError extends Error {}
+
 export interface FullSynchronizerOptions extends SynchronizerOptions {
   limit?: number;
   count?: number;
@@ -48,7 +50,7 @@ export class FullSynchronizer extends Synchronizer {
     const peer = this.node.peerpool.idle(constants.GXC2_ETHWIRE);
     if (!peer) {
       await new Promise((r) => setTimeout(r, this.interval));
-      throw new Error('can not find idle peer');
+      throw new NoIdlePeerError('can not find idle peer');
     }
     peer.idle = false;
     try {

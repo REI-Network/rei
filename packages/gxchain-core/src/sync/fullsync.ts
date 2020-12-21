@@ -1,7 +1,7 @@
 import { OrderedQueue, AsyncNextArray } from '@gxchain2/utils';
 import { constants } from '@gxchain2/common';
 import { Peer } from '@gxchain2/network';
-import { Block } from '@gxchain2/block';
+import { Block, BlockHeader } from '@gxchain2/block';
 
 import { Synchronizer, SynchronizerOptions } from './sync';
 
@@ -39,7 +39,7 @@ export class FullSynchronizer extends Synchronizer {
       this.resultQueue.push(result);
     });
     this.downloadQueue.on('over', (queue) => {
-      this.resultQueue.push(null);
+      this.stopProcessResult();
     });
     this.processResult();
   }
@@ -52,13 +52,23 @@ export class FullSynchronizer extends Synchronizer {
     }
     peer.idle = false;
     try {
-      const headers: any[] = await peer.request(constants.GXC2_ETHWIRE, 'GetBlockHeaders', [task.start, task.count]);
+      const headers: BlockHeader[] = await peer.request(constants.GXC2_ETHWIRE, 'GetBlockHeaders', { start: task.start, count: task.count });
+      /*
       const bodies: any[] = await peer.request(
         constants.GXC2_ETHWIRE,
         'GetBlockBodies',
-        headers.map((h: any) => h.hash())
+        headers.map((h) => h.hash())
       );
       const blocks = bodies.map(([txsData, unclesData], i: number) => Block.fromValuesArray([headers[i].raw(), txsData, unclesData], { common: this.node.common }));
+      */
+      const blocks = headers.map((h) =>
+        Block.fromBlockData(
+          {
+            header: h
+          },
+          { common: this.node.common }
+        )
+      );
       peer.idle = true;
       return blocks;
     } catch (err) {
@@ -81,6 +91,10 @@ export class FullSynchronizer extends Synchronizer {
       }
       yield result;
     }
+  }
+
+  private stopProcessResult() {
+    this.resultQueue.push(null);
   }
 
   private async processResult() {
@@ -112,13 +126,15 @@ export class FullSynchronizer extends Synchronizer {
             while (totalCount > 0) {
               this.downloadQueue.insert({
                 start: i * this.count + latestHeight + 1,
-                count: totalCount > this.count ? this.count : totalCount - this.count
+                count: totalCount > this.count ? this.count : totalCount
               });
               totalCount -= this.count;
               i++;
             }
             await this.downloadQueue.start();
             result = true;
+          } else {
+            this.stopProcessResult();
           }
         } catch (err) {
           console.error('Sync download error', err);

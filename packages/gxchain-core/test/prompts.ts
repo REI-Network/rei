@@ -15,6 +15,8 @@ import { Node } from '../src';
 import { stringToCID } from '@gxchain2/utils';
 import { constants } from '@gxchain2/common';
 
+const args = process.argv.slice(2);
+
 const keyPair = {
   '0x3289621709f5b35d09b4335e129907ac367a0593': Buffer.from('d8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0', 'hex'),
   '0xd1e52f6eacbb95f5f8512ff129cbd6360e549b0b': Buffer.from('db0558cc5f24dd09c390a25c7958a678e7efa0f286053da5df53dcecdba2a13c', 'hex')
@@ -176,7 +178,7 @@ const startPrompts = async (node: Node) => {
 
 (async () => {
   try {
-    const node = new Node(path.join(__dirname, './testdb'));
+    const node = new Node(path.join(__dirname, args[0] || './testdb'));
     await node.init();
     await startPrompts(node);
   } catch (err) {

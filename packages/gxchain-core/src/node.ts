@@ -84,7 +84,7 @@ export class Node implements INode {
   }
 
   async init() {
-    const genesisJSON = JSON.parse(fs.readFileSync(path.join(this.databasePath, 'genesis.json')).toString());
+    const genesisJSON = JSON.parse(fs.readFileSync(path.join(this.databasePath, '../genesis.json')).toString());
 
     this.common = new Common({
       chain: genesisJSON.genesisInfo,
@@ -105,6 +105,19 @@ export class Node implements INode {
           (n) => new Promise<Libp2pNode>((resolve) => n.init().then(() => resolve(n)))
         )
       )
+    });
+    this.peerpool.on('message', async ({ name, data }, protocol, peer) => {
+      switch (name) {
+        case 'GetBlockHeaders':
+          const { start, count } = data;
+          const blocks = await this.blockchain.getBlocks(start, count, 0, false);
+          peer.send(
+            protocol.name,
+            'BlockHeaders',
+            blocks.map((b) => b.header)
+          );
+          break;
+      }
     });
 
     let genesisBlock!: Block;

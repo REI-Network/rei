@@ -31,7 +31,7 @@ const handlers: Handler[] = [
     code: 1,
     response: 2,
     encode: (data) => {
-      return rlp.encode([1, data.start, data.count]);
+      return rlp.encode([1, [data.start, data.count]]);
     },
     decode: ([start, count]: Buffer[]) => {
       return { start: bufferToInt(start), count: bufferToInt(count) };

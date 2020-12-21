@@ -1,5 +1,6 @@
 import process from 'process';
 import path from 'path';
+import fs from 'fs';
 
 import prompts from 'prompts';
 import PeerId from 'peer-id';
@@ -146,7 +147,11 @@ const startPrompts = async (node: Node) => {
 
 (async () => {
   try {
-    const node = new Node(path.join(__dirname, args[0] || './testdb'));
+    const dir = path.join(__dirname, args[0] || './testdb');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir);
+    }
+    const node = new Node(dir);
     await node.init();
     await startPrompts(node);
   } catch (err) {

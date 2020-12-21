@@ -122,6 +122,7 @@ export class FullSynchronizer extends Synchronizer {
             }
           }
           if (best) {
+            console.debug('start sync from:', best.peerId, 'best height:', bestHeight, 'local height:', latestHeight);
             let totalCount = bestHeight - latestHeight;
             let i = 0;
             while (totalCount > 0) {

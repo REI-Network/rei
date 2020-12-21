@@ -195,6 +195,7 @@ export class Node implements INode {
 
   async processBlocks(blocks: Block[]) {
     for (const block of blocks) {
+      console.debug('process block:', block.header.number.toString());
       await this.processBlock(block);
     }
   }

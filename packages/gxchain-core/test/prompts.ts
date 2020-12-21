@@ -54,70 +54,12 @@ const startPrompts = async (node: Node) => {
       } else {
         console.warn('$ Can not find peer');
       }
-    } else if (arr[0] === 'mine' || arr[0] === 'm') {
-      /*
-    else if (arr[0] === 'find' || arr[0] === 'f') {
-      try {
-        const peer = await p2pNode.peerRouting.findPeer(PeerId.createFromB58String(arr[1]));
-
-        console.log('Found it, multiaddrs are:');
-        peer.multiaddrs.forEach((ma) => console.log(`${ma.toString()}/p2p/${peer.id.toB58String()}`));
-      } catch (err) {
-        console.error('\n$ Error, findPeer', err);
-      }
-    } else if (arr[0] === 'connect' || arr[0] === 'c') {
-      const pos = arr[1].lastIndexOf('/');
-      if (pos === -1) {
-        console.warn('$ Invalid command');
-        continue;
-      }
-      const id = arr[1].substr(pos + 1);
-      if (id === undefined) {
-        console.warn('$ Invalid command');
-        continue;
-      }
-
-      try {
-        await p2pNode.dial(arr[1]);
-      } catch (err) {
-        console.error('\n$ Error, dial', err);
-      }
     } else if (arr[0] === 'lsp2p') {
       console.log('peers:');
-      for (const [peerIdString] of p2pNode.peerStore.peers.entries()) {
+      for (const [peerIdString] of node.peerpool.nodes[0].peerStore.peers.entries()) {
         console.log(peerIdString);
       }
-      console.log('connected peers:');
-      node.p2p.forEachPeer((val, id) => {
-        console.log(id);
-      });
-    } else if (arr[0] === 'fetch') {
-      const peer = node.p2p.getPeer(arr[1]);
-      if (peer) {
-        try {
-          const results = await peer.jsonRPCRequest('ls');
-          console.log('fetch result:', results);
-        } catch (err) {
-          console.error('$ Error, fetch', err);
-        }
-      } else {
-        console.warn('$ Can not find peer');
-      }
-    } else if (arr[0] === 'disconnect' || arr[0] === 'd') {
-      const peer = node.p2p.getPeer(arr[1]);
-      if (peer) {
-        try {
-          await peer.jsonRPCNotify('disconnect', [node.p2p.getLocalPeerId()], true);
-          await new Promise((r) => setTimeout(r, 500));
-          await p2pNode.hangUp(PeerId.createFromB58String(arr[1]));
-        } catch (err) {
-          console.error('$ Error, disconnect', err);
-        }
-      } else {
-        console.warn('$ Can not find peer');
-      }
-    }
-    */
+    } else if (arr[0] === 'mine' || arr[0] === 'm') {
       try {
         const lastestHeader = (await node.blockchain.getHead()).header;
         const block = Block.fromBlockData(

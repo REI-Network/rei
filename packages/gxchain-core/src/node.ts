@@ -124,6 +124,7 @@ export class Node implements INode {
     try {
       const genesisHash = await this.db.numberToHash(new BN(0));
       genesisBlock = await this.db.getBlock(genesisHash);
+      this.stateManager._trie.root = genesisBlock.header.stateRoot;
       console.log('find genesis block in db', '0x' + genesisHash.toString('hex'));
     } catch (error) {
       if (error.type !== 'NotFoundError') {

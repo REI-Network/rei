@@ -137,7 +137,6 @@ export class FullSynchronizer extends Synchronizer {
             this.stopProcessResult();
           }
         } catch (err) {
-          console.error('Sync download error', err);
           this.emit('error', err);
         } finally {
           resolve(result);
@@ -149,7 +148,6 @@ export class FullSynchronizer extends Synchronizer {
           await this.processResult();
           result = true;
         } catch (err) {
-          console.error('Sync process result error', err);
           this.emit('error', err);
         } finally {
           resolve(result);

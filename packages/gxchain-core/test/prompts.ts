@@ -83,7 +83,7 @@ const startPrompts = async (node: Node) => {
       }
     } else if (arr[0] === 'batchmine' || arr[0] === 'bm') {
       try {
-        for (let i = 0; i < 10000; i++) {
+        for (let i = 0; i < 1000; i++) {
           const lastestHeader = (await node.blockchain.getHead()).header;
           const block = Block.fromBlockData(
             {

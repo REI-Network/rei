@@ -194,6 +194,8 @@ export class Node implements INode {
   }
 
   async processBlocks(blocks: Block[]) {
-    await Promise.all(blocks.map((block) => this.processBlock(block)));
+    for (const block of blocks) {
+      await this.processBlock(block);
+    }
   }
 }

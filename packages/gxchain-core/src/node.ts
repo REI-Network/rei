@@ -157,7 +157,10 @@ export class Node implements INode {
     });
     this.sync = new FullSynchronizer({ node: this });
     this.sync.on('error', (err) => {
-      console.error('Sync error:', err);
+      // TODO: pretty this.
+      if (err.message.indexOf('can not find') === -1) {
+        console.error('Sync error:', err);
+      }
     });
 
     await this.blockchain.init();

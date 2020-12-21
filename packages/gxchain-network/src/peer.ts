@@ -103,9 +103,9 @@ class MsgQueue extends EventEmitter {
           break;
         }
 
-        // TODO: fix _bufs.
-        const { code, name, data } = this.protocol.handle(value._bufs[0]);
         try {
+          // TODO: fix _bufs.
+          const { code, name, data } = this.protocol.handle(value._bufs[0]);
           if (code === 0) {
             this.emit('status', this, data);
           } else {

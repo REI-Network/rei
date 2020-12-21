@@ -40,7 +40,7 @@ const handlers: Handler[] = [
   {
     name: 'BlockHeaders',
     code: 2,
-    encode: (headers: BlockHeader[]) => headers.map((h) => h.raw()),
+    encode: (headers: BlockHeader[]) => rlp.encode([2, headers.map((h) => h.raw())]),
     decode: (headers: BlockHeaderBuffer[]) => headers.map((h) => BlockHeader.fromValuesArray(h, {}))
   },
   {

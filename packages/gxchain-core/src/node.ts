@@ -86,7 +86,7 @@ export class Node implements INode {
   async init() {
     let genesisJSON;
     try {
-      genesisJSON = JSON.parse(fs.readFileSync(path.join(this.databasePath, '../genesis.json')).toString());
+      genesisJSON = JSON.parse(fs.readFileSync(path.join(this.databasePath, 'genesis.json')).toString());
     } catch (err) {
       console.error('Read genesis.json faild, use default genesis');
       genesisJSON = defaultGenesis;

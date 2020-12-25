@@ -1,7 +1,6 @@
 import EthereumJSCommon from '@ethereumjs/common';
-
 import * as constants from './constants';
 
-class Common extends EthereumJSCommon {}
-
-export { constants, Common };
+export class Common extends EthereumJSCommon {}
+export * from './genesis';
+export { constants };

@@ -11,7 +11,7 @@ import PeerId from 'peer-id';
 import { INode } from '@gxchain2/interface';
 import { Database, createLevelDB } from '@gxchain2/database';
 import { Libp2pNode, PeerPool } from '@gxchain2/network';
-import { Common, constants } from '@gxchain2/common';
+import { Common, constants, defaultGenesis } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { StateManager } from '@gxchain2/state-manager';
 import { VM } from '@gxchain2/vm';
@@ -84,7 +84,13 @@ export class Node implements INode {
   }
 
   async init() {
-    const genesisJSON = JSON.parse(fs.readFileSync(path.join(this.databasePath, '../genesis.json')).toString());
+    let genesisJSON;
+    try {
+      genesisJSON = JSON.parse(fs.readFileSync(path.join(this.databasePath, '../genesis.json')).toString());
+    } catch (err) {
+      console.error('Read genesis.json faild, use default genesis');
+      genesisJSON = defaultGenesis;
+    }
 
     this.common = new Common({
       chain: genesisJSON.genesisInfo,

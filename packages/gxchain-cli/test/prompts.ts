@@ -147,7 +147,11 @@ const startPrompts = async (node: Node) => {
 
 (async () => {
   try {
-    const dir = path.join(__dirname, args[0] || './testdb');
+    const testdir = path.join(__dirname, './test-dir');
+    if (!fs.existsSync(testdir)) {
+      fs.mkdirSync(testdir);
+    }
+    const dir = path.join(testdir, args[0] || 'test-node-01');
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir);
     }

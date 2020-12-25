@@ -16,6 +16,7 @@
         "@gxchain2/block": "^0.0.1-alpha.0",
         "@gxchain2/common": "^0.0.1-alpha.0",
         "@gxchain2/interface": "^0.0.1-alpha.0",
+        "@gxchain2/tx": "^0.0.1-alpha.0",
         "@gxchain2/utils": "^0.0.1-alpha.0",
         "it-pipe": "^1.1.0",
         "libp2p": "^0.29.3",

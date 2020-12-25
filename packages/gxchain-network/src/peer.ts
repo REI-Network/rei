@@ -1,12 +1,15 @@
 import { EventEmitter } from 'events';
 
 import { AsyncNextArray, Aborter } from '@gxchain2/utils';
+import { Block, BlockHeader } from '@gxchain2/block';
+import { Transaction } from '@gxchain2/tx';
 
 import pipe from 'it-pipe';
 import type PeerId from 'peer-id';
 
 import { Protocol } from './protocol/protocol';
 import { Libp2pNode } from './p2p';
+import { constants } from '@gxchain2/common';
 
 export class PeerRequestTimeoutError extends Error {}
 
@@ -154,6 +157,8 @@ export class Peer extends EventEmitter {
   readonly node: Libp2pNode;
   public idle: boolean = true;
   private queueMap = new Map<string, MsgQueue>();
+  private knowTxs = new Set<Buffer>();
+  private knowBlocks = new Set<Buffer>();
 
   constructor(options: { peerId: string; node: Libp2pNode }) {
     super();
@@ -222,5 +227,57 @@ export class Peer extends EventEmitter {
 
   async installProtocols(p2p: any, peerInfo: PeerId, protocols: Protocol[], status: any) {
     await Promise.all(protocols.map((p) => this.installProtocol(p2p, peerInfo, p, status)));
+  }
+
+  //////////// Protocol method ////////////
+  newBlock(block: Block) {
+    const hash = block.header.hash();
+    if (this.knowBlocks.has(hash)) {
+      return;
+    }
+    this.knowBlocks.add(hash);
+    // TODO: config this.
+    if (this.knowBlocks.size > 1024) {
+      const itr = this.knowBlocks.keys();
+      this.knowBlocks.delete(itr.next().value);
+    }
+    this.send(constants.GXC2_ETHWIRE, 'NewBlock', { block });
+  }
+
+  newBlockHashes(hashes: Buffer[]) {
+    const filteredHashes: Buffer[] = [];
+    for (const hash of hashes) {
+      if (!this.knowBlocks.has(hash)) {
+        filteredHashes.push(hash);
+        this.knowBlocks.add(hash);
+      }
+    }
+    // TODO: config this.
+    while (this.knowBlocks.size > 1024) {
+      const itr = this.knowBlocks.keys();
+      this.knowBlocks.delete(itr.next().value);
+    }
+    this.send(constants.GXC2_ETHWIRE, 'NewBlockHashes', { hashes: filteredHashes });
+  }
+
+  transactions(txs: Transaction[]) {
+    const filteredTxs: Transaction[] = [];
+    for (const tx of txs) {
+      const hash = tx.hash();
+      if (!this.knowTxs.has(hash)) {
+        filteredTxs.push(tx);
+        this.knowTxs.add(hash);
+      }
+    }
+    // TODO: config this.
+    while (this.knowTxs.size > 32768) {
+      const itr = this.knowTxs.keys();
+      this.knowTxs.delete(itr.next().value);
+    }
+    this.send(constants.GXC2_ETHWIRE, 'Transactions', { txs: filteredTxs });
+  }
+
+  getBlockHeader(start: number, count: number): Promise<BlockHeader> {
+    return this.request(constants.GXC2_ETHWIRE, 'GetBlockHeaders', { start, count });
   }
 }

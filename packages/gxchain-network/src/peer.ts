@@ -277,7 +277,7 @@ export class Peer extends EventEmitter {
     this.send(constants.GXC2_ETHWIRE, 'Transactions', { txs: filteredTxs });
   }
 
-  getBlockHeader(start: number, count: number): Promise<BlockHeader> {
+  getBlockHeaders(start: number, count: number): Promise<BlockHeader[]> {
     return this.request(constants.GXC2_ETHWIRE, 'GetBlockHeaders', { start, count });
   }
 }

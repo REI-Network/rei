@@ -29,11 +29,12 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
   private in!: Heap;
   private out!: Heap;
   private total: number = 0;
+  private currentTotal: number = 0;
   private processed: number = 0;
   private abortFlag: boolean = false;
   private runningPromise?: Promise<void>;
 
-  constructor(options: { limit: number; taskData?: any[]; processTask: (data: TData) => Promise<TResult> | TResult }) {
+  constructor(options: { limit: number; taskData?: TData[]; processTask: (data: TData) => Promise<TResult> | TResult }) {
     super();
     this.limit = options.limit;
     this.processTask = options.processTask;
@@ -115,17 +116,17 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     this.abortFlag = false;
   }
 
-  insert(data: any) {
+  insert(data: TData) {
     if (this.abortFlag) {
       throw new Error('OrderedQueue already aborted');
     }
     this.enqueue({
       data,
-      index: this.total++
+      index: this.currentTotal++
     });
   }
 
-  async start() {
+  async start(total: number) {
     if (this.runningPromise || this.abortFlag) {
       throw new Error('OrderedQueue already started or aborted');
     }
@@ -133,6 +134,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     this.runningPromise = new Promise((resolve) => {
       runningResolve = resolve;
     });
+    this.total = total;
     let promiseArray: Promise<void>[] = [];
     const processOver = (p: Promise<void>) => {
       const index = promiseArray.indexOf(p);
@@ -167,6 +169,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
       await Promise.all(promiseArray);
     }
     this.total = 0;
+    this.currentTotal = 0;
     this.processed = 0;
     runningResolve();
     this.runningPromise = undefined;

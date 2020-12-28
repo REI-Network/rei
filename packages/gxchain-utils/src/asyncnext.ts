@@ -90,6 +90,8 @@ export class AysncChannel<T = any> extends AsyncQueue<T> {
   }
 
   abort() {
-    this.push(null);
+    if (this.isWaiting) {
+      this.push(null);
+    }
   }
 }

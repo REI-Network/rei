@@ -5,8 +5,6 @@ import { Block, BlockHeader } from '@gxchain2/block';
 
 import { Synchronizer, SynchronizerOptions } from './sync';
 
-export class NoIdlePeerError extends Error {}
-
 export interface FullSynchronizerOptions extends SynchronizerOptions {
   limit?: number;
   count?: number;
@@ -17,11 +15,13 @@ export interface FullSynchronizerOptions extends SynchronizerOptions {
 type Task = {
   start: number;
   count: number;
+  peer: Peer;
 };
 
 export class FullSynchronizer extends Synchronizer {
   private readonly downloadQueue: OrderedQueue<Task>;
   private readonly resultQueue: AysncChannel<Block[]>;
+  private readonly idlePeerQueue: AysncChannel<Peer>;
   private readonly count: number;
   private readonly timeoutBanTime: number;
   private readonly errorBanTime: number;
@@ -35,6 +35,18 @@ export class FullSynchronizer extends Synchronizer {
     this.resultQueue = new AysncChannel<Block[]>({
       isAbort: () => this.abortFlag
     });
+    this.idlePeerQueue = new AysncChannel<Peer>({
+      hasNext: () => {
+        const peer = this.node.peerpool.idle(constants.GXC2_ETHWIRE);
+        if (!peer) {
+          return false;
+        }
+        peer.idle = false;
+        this.idlePeerQueue.array.push(peer);
+        return true;
+      },
+      isAbort: () => this.abortFlag
+    });
     this.downloadQueue = new OrderedQueue<Task, Block[]>({
       limit: options.limit || 16,
       processTask: this.download.bind(this)
@@ -46,16 +58,13 @@ export class FullSynchronizer extends Synchronizer {
     this.downloadQueue.on('over', (queue) => {
       this.resultQueue.abort();
     });
-    this.processResult();
   }
 
   private async download(task: Task) {
-    const peer = this.node.peerpool.idle(constants.GXC2_ETHWIRE);
-    if (!peer) {
-      await new Promise((r) => setTimeout(r, this.interval));
-      throw new NoIdlePeerError('can not find idle peer');
+    const peer = task.peer;
+    if (peer.idle) {
+      throw new Error('FullSynchronizer, invalid idle peer');
     }
-    peer.idle = false;
     try {
       const headers: BlockHeader[] = await peer.getBlockHeaders(task.start, task.count);
       /*
@@ -87,46 +96,43 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
-  private async processResult() {
-    for await (const result of this.resultQueue.generator()) {
-      await this.node.processBlocks(result);
-    }
-  }
-
   async sync(): Promise<boolean> {
     let bestHeight = 0;
+    const latestHeight = this.node.blockchain.latestHeight;
+    bestHeight = latestHeight;
+    let best: Peer | undefined;
+    for (const peer of this.node.peerpool.peers) {
+      const height = peer.latestHeight(constants.GXC2_ETHWIRE);
+      if (height > bestHeight) {
+        best = peer;
+        bestHeight = height;
+      }
+    }
+    if (!best) {
+      return false;
+    }
+    console.debug('start sync from:', best!.peerId, 'best height:', bestHeight, 'local height:', latestHeight);
+    let totalCount = bestHeight - latestHeight;
+    const totalTaskCount = Math.ceil(totalCount / this.count);
+
+    await this.downloadQueue.reset();
     const results = await Promise.all([
       new Promise<boolean>(async (resolve) => {
         let result = false;
         try {
-          await this.downloadQueue.reset();
-          const latestHeight = this.node.blockchain.latestHeight;
-          bestHeight = latestHeight;
-          let best: Peer | undefined;
-          for (const peer of this.node.peerpool.peers) {
-            const height = peer.latestHeight(constants.GXC2_ETHWIRE);
-            if (height > bestHeight) {
-              best = peer;
-              bestHeight = height;
+          let i = 0;
+          for await (const peer of this.idlePeerQueue.generator()) {
+            this.downloadQueue.insert({
+              peer,
+              start: i++ * this.count + latestHeight + 1,
+              count: totalCount > this.count ? this.count : totalCount
+            });
+            totalCount -= this.count;
+            if (totalCount <= 0) {
+              break;
             }
           }
-          if (best) {
-            console.debug('start sync from:', best.peerId, 'best height:', bestHeight, 'local height:', latestHeight);
-            let totalCount = bestHeight - latestHeight;
-            let i = 0;
-            while (totalCount > 0) {
-              this.downloadQueue.insert({
-                start: i * this.count + latestHeight + 1,
-                count: totalCount > this.count ? this.count : totalCount
-              });
-              totalCount -= this.count;
-              i++;
-            }
-            await this.downloadQueue.start();
-            result = true;
-          } else {
-            this.resultQueue.abort();
-          }
+          result = true;
         } catch (err) {
           this.emit('error', err);
         } finally {
@@ -136,7 +142,20 @@ export class FullSynchronizer extends Synchronizer {
       new Promise<boolean>(async (resolve) => {
         let result = false;
         try {
-          await this.processResult();
+          await this.downloadQueue.start(totalTaskCount);
+          result = true;
+        } catch (err) {
+          this.emit('error', err);
+        } finally {
+          resolve(result);
+        }
+      }),
+      new Promise<boolean>(async (resolve) => {
+        let result = false;
+        try {
+          for await (const result of this.resultQueue.generator()) {
+            await this.node.processBlocks(result);
+          }
           result = true;
         } catch (err) {
           this.emit('error', err);

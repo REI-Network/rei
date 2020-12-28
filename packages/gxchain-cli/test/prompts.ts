@@ -129,6 +129,13 @@ const startPrompts = async (node: Node) => {
       for await (let data of streamToIterator(stream as any)) {
         console.log('key', '0x' + data.key.toString('hex'), '\nbalance', Account.fromRlpSerializedAccount(data.value).balance.toString());
       }
+    } else if (arr[0] === 'getblock' || arr[0] === 'gb') {
+      try {
+        const block = await node.blockchain.getBlock(Number(arr[1]));
+        console.log('0x' + block.header.hash().toString('hex'), block.toJSON());
+      } catch (err) {
+        console.error('Get block error:', err);
+      }
     } else if (arr[0] === 'puttx') {
       const acc = await node.stateManager.getAccount(Address.fromString(arr[1]));
       const unsignedTx = Transaction.fromTxData(

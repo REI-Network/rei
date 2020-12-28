@@ -1,14 +1,14 @@
-type QueueLike<T> = {
+interface AsyncNextOption<T> {
   push: (data: T) => void;
   hasNext: () => boolean;
   next: () => T;
-};
+}
 
 export class AsyncNext<T = any> {
-  private readonly queue: QueueLike<T>;
+  private readonly queue: AsyncNextOption<T>;
   private resolve?: (data: T) => void;
 
-  constructor(queue: QueueLike<T>) {
+  constructor(queue: AsyncNextOption<T>) {
     this.queue = queue;
   }
 
@@ -34,16 +34,16 @@ export class AsyncNext<T = any> {
   }
 }
 
-type OptionalQueueLike<T> = {
+interface AsyncQueueOption<T> {
   push?: (data: T) => void;
   hasNext?: () => boolean;
   next?: () => T;
-};
+}
 
 export class AsyncQueue<T = any> extends AsyncNext<T> {
   private arr: T[] = [];
 
-  constructor(options?: OptionalQueueLike<T>) {
+  constructor(options?: AsyncQueueOption<T>) {
     super(
       Object.assign(
         {
@@ -64,5 +64,28 @@ export class AsyncQueue<T = any> extends AsyncNext<T> {
 
   clear() {
     this.arr = [];
+  }
+}
+
+interface AysncChannelOption<T> extends AsyncQueueOption<T> {
+  isAbort: () => boolean;
+}
+
+export class AysncChannel<T = any> extends AsyncQueue<T> {
+  private isAbort: () => boolean;
+
+  constructor(options: AysncChannelOption<T>) {
+    super(options);
+    this.isAbort = options.isAbort;
+  }
+
+  async *generator() {
+    while (!this.isAbort()) {
+      const result = await this.next();
+      if (this.isAbort() || result === null) {
+        return;
+      }
+      yield result;
+    }
   }
 }

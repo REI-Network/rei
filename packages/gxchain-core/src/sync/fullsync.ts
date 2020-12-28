@@ -169,6 +169,13 @@ export class FullSynchronizer extends Synchronizer {
   }
 
   async abort() {
+    this.idlePeerQueue.abort();
+    for (const peer of this.idlePeerQueue.array) {
+      if (peer) {
+        peer.idle = true;
+      }
+    }
+    this.idlePeerQueue.clear();
     await this.downloadQueue.abort();
     await super.abort();
   }

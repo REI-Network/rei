@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import { Aborter } from '@gxchain2/utils';
 
 import type { Node } from '../node';
+import { constants } from '@gxchain2/common';
 
 export interface SynchronizerOptions {
   node: Node;
@@ -45,6 +46,7 @@ export class Synchronizer extends EventEmitter {
     while (!this.aborter.isAborted) {
       try {
         if (await this.sync()) {
+          console.debug('synchronized');
           this.emit('synchronized');
         }
       } catch (err) {

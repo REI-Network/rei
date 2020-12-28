@@ -26,6 +26,7 @@ export class FullSynchronizer extends Synchronizer {
   private readonly timeoutBanTime: number;
   private readonly errorBanTime: number;
   private abortFlag: boolean = false;
+  private isSyncing: boolean = false;
 
   constructor(options: FullSynchronizerOptions) {
     super(options);
@@ -57,6 +58,12 @@ export class FullSynchronizer extends Synchronizer {
     });
     this.downloadQueue.on('over', (queue) => {
       this.resultQueue.abort();
+    });
+
+    this.node.peerpool.on('idle', (peer) => {
+      if (this.isSyncing && peer.idle && peer.latestHeight(constants.GXC2_ETHWIRE)) {
+        this.idlePeerQueue.push(peer);
+      }
     });
   }
 
@@ -112,15 +119,12 @@ export class FullSynchronizer extends Synchronizer {
       return false;
     }
 
-    // handle idle event.
-    const onPeelIdle = (peer: Peer) => {
-      if (peer.idle && peer.latestHeight(constants.GXC2_ETHWIRE)) {
-        this.idlePeerQueue.push(peer);
-      }
-    };
-    this.node.peerpool.on('idle', onPeelIdle);
+    if (this.isSyncing) {
+      throw new Error('FullSynchronizer already sync');
+    }
+    this.isSyncing = true;
 
-    console.debug('start sync from:', best!.peerId, 'best height:', bestHeight, 'local height:', latestHeight);
+    console.debug('get best height from:', best!.peerId, 'best height:', bestHeight, 'local height:', latestHeight);
     let totalCount = bestHeight - latestHeight;
     const totalTaskCount = Math.ceil(totalCount / this.count);
 
@@ -174,9 +178,7 @@ export class FullSynchronizer extends Synchronizer {
       })
     ]);
 
-    // remove idle event listener.
-    this.node.peerpool.removeListener('idle', onPeelIdle);
-
+    this.isSyncing = false;
     return results.reduce((a, b) => a && b, true) && bestHeight === this.node.blockchain.latestHeight;
   }
 

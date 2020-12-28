@@ -178,8 +178,8 @@ export class Peer extends EventEmitter {
 
   set idle(b: boolean) {
     if (this.idle !== b) {
-      this.emit(b ? 'idle' : 'busy', this);
       this._idle = b;
+      this.emit(b ? 'idle' : 'busy', this);
     }
   }
 

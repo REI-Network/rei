@@ -14,8 +14,11 @@ import { constants } from '@gxchain2/common';
 export class PeerRequestTimeoutError extends Error {}
 
 declare interface MsgQueue {
-  on(event: 'message' | 'status' | 'error', listener: (queue: MsgQueue, message: any) => void): this;
-  once(event: 'message' | 'status' | 'error', listener: (queue: MsgQueue, message: any) => void): this;
+  on(event: 'message' | 'status', listener: (queue: MsgQueue, message: any) => void): this;
+  on(event: 'error', listener: (queue: MsgQueue, error: any) => void): this;
+
+  once(event: 'message' | 'status', listener: (queue: MsgQueue, message: any) => void): this;
+  once(event: 'error', listener: (queue: MsgQueue, error: any) => void): this;
 }
 
 class MsgQueue extends EventEmitter {
@@ -146,8 +149,11 @@ class MsgQueue extends EventEmitter {
 }
 
 export declare interface Peer {
+  on(event: 'busy' | 'idle', listener: (peer: Peer) => void): this;
   on(event: 'error', listener: (peer: Peer, err: any) => void): this;
   on(event: string, listener: (peer: Peer, message: any, protocol: Protocol) => void): this;
+
+  once(event: 'busy' | 'idle', listener: (peer: Peer) => void): this;
   once(event: 'error', listener: (peer: Peer, err: any) => void): this;
   once(event: string, listener: (peer: Peer, message: any, protocol: Protocol) => void): this;
 }
@@ -155,7 +161,7 @@ export declare interface Peer {
 export class Peer extends EventEmitter {
   readonly peerId: string;
   readonly node: Libp2pNode;
-  public idle: boolean = true;
+  private _idle: boolean = true;
   private queueMap = new Map<string, MsgQueue>();
   private knowTxs = new Set<Buffer>();
   private knowBlocks = new Set<Buffer>();
@@ -164,6 +170,17 @@ export class Peer extends EventEmitter {
     super();
     this.peerId = options.peerId;
     this.node = options.node;
+  }
+
+  get idle() {
+    return this.idle;
+  }
+
+  set idle(b: boolean) {
+    if (this.idle !== b) {
+      this.emit(b ? 'idle' : 'busy', this);
+      this._idle = b;
+    }
   }
 
   private makeQueue(protocol: Protocol) {

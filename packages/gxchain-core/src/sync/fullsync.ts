@@ -97,8 +97,6 @@ export class FullSynchronizer extends Synchronizer {
   }
 
   async sync(): Promise<boolean> {
-    const onPeelIdle = () => {};
-    this.node.peerpool.on();
     let bestHeight = 0;
     const latestHeight = this.node.blockchain.latestHeight;
     bestHeight = latestHeight;
@@ -113,6 +111,15 @@ export class FullSynchronizer extends Synchronizer {
     if (!best) {
       return false;
     }
+
+    // handle idle event.
+    const onPeelIdle = (peer: Peer) => {
+      if (peer.idle && peer.latestHeight(constants.GXC2_ETHWIRE)) {
+        this.idlePeerQueue.push(peer);
+      }
+    };
+    this.node.peerpool.on('idle', onPeelIdle);
+
     console.debug('start sync from:', best!.peerId, 'best height:', bestHeight, 'local height:', latestHeight);
     let totalCount = bestHeight - latestHeight;
     const totalTaskCount = Math.ceil(totalCount / this.count);
@@ -166,6 +173,9 @@ export class FullSynchronizer extends Synchronizer {
         }
       })
     ]);
+
+    // remove idle event listener.
+    this.node.peerpool.removeListener('idle', onPeelIdle);
 
     return results.reduce((a, b) => a && b, true) && bestHeight === this.node.blockchain.latestHeight;
   }

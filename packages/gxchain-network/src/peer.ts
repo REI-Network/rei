@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 
-import { AsyncNextArray, Aborter } from '@gxchain2/utils';
+import { AsyncQueue, Aborter } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
 
@@ -20,7 +20,7 @@ declare interface MsgQueue {
 
 class MsgQueue extends EventEmitter {
   private readonly aborter = new Aborter();
-  private readonly queue: AsyncNextArray;
+  private readonly queue: AsyncQueue;
   readonly protocol: Protocol;
 
   private readonly waitingRequests = new Map<
@@ -35,7 +35,7 @@ class MsgQueue extends EventEmitter {
   constructor(protocol: Protocol) {
     super();
     this.protocol = protocol;
-    this.queue = new AsyncNextArray({
+    this.queue = new AsyncQueue({
       push: (data: any) => {
         this.queue.array.push(data);
         if (this.queue.array.length > 10) {

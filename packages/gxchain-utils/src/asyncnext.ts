@@ -40,7 +40,7 @@ type OptionalQueueLike<T> = {
   next?: () => T;
 };
 
-export class AsyncNextArray<T = any> extends AsyncNext<T> {
+export class AsyncQueue<T = any> extends AsyncNext<T> {
   private arr: T[] = [];
 
   constructor(options?: OptionalQueueLike<T>) {

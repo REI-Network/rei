@@ -3,7 +3,7 @@ import util from 'util';
 
 import Heap from 'qheap';
 
-import { AsyncNext, AsyncNextArray } from './asyncnext';
+import { AsyncNext, AsyncQueue } from './asyncnext';
 
 type Task<TData, TResult> = {
   data: TData;
@@ -25,7 +25,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
   private readonly limit: number;
   private readonly processTask: (data: TData) => Promise<TResult> | TResult;
   private readonly taskQueue: AsyncNext<Task<TData, TResult> | null>;
-  private readonly limitQueue = new AsyncNextArray<void>();
+  private readonly limitQueue = new AsyncQueue<void>();
   private in!: Heap;
   private out!: Heap;
   private total: number = 0;

@@ -1,4 +1,4 @@
-import { OrderedQueue, AsyncNextArray } from '@gxchain2/utils';
+import { OrderedQueue, AsyncQueue } from '@gxchain2/utils';
 import { constants } from '@gxchain2/common';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 import { Block, BlockHeader } from '@gxchain2/block';
@@ -21,7 +21,7 @@ type Task = {
 
 export class FullSynchronizer extends Synchronizer {
   private readonly downloadQueue: OrderedQueue<Task>;
-  private readonly resultQueue = new AsyncNextArray<Block[] | null>();
+  private readonly resultQueue = new AsyncQueue<Block[] | null>();
   private readonly count: number;
   private readonly timeoutBanTime: number;
   private readonly errorBanTime: number;

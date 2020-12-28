@@ -54,7 +54,7 @@ export class FullSynchronizer extends Synchronizer {
     }
     peer.idle = false;
     try {
-      const headers: BlockHeader[] = await peer.request(constants.GXC2_ETHWIRE, 'GetBlockHeaders', { start: task.start, count: task.count });
+      const headers: BlockHeader[] = await peer.getBlockHeaders(task.start, task.count);
       /*
       const bodies: any[] = await peer.request(
         constants.GXC2_ETHWIRE,

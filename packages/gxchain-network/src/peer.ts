@@ -80,10 +80,10 @@ class MsgQueue extends EventEmitter {
     });
   }
 
-  private async *makeAsyncGenerator() {
+  private async *generator() {
     while (!this.aborter.isAborted) {
       const data = await this.queue.next();
-      if (data === null) {
+      if (this.aborter.isAborted || data === null) {
         return { length: 0 };
       }
       yield data;
@@ -94,7 +94,7 @@ class MsgQueue extends EventEmitter {
     if (this.aborter.isAborted) {
       throw new Error('MsgQueue already aborted');
     }
-    pipe(this.makeAsyncGenerator(), stream.sink);
+    pipe(this.generator(), stream.sink);
 
     pipe(stream.source, async (source) => {
       const it = source[Symbol.asyncIterator]();

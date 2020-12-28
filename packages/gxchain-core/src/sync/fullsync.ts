@@ -1,4 +1,4 @@
-import { OrderedQueue, AsyncQueue } from '@gxchain2/utils';
+import { OrderedQueue, AysncChannel } from '@gxchain2/utils';
 import { constants } from '@gxchain2/common';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 import { Block, BlockHeader } from '@gxchain2/block';
@@ -21,7 +21,7 @@ type Task = {
 
 export class FullSynchronizer extends Synchronizer {
   private readonly downloadQueue: OrderedQueue<Task>;
-  private readonly resultQueue = new AsyncQueue<Block[] | null>();
+  private readonly resultQueue: AysncChannel<Block[]>;
   private readonly count: number;
   private readonly timeoutBanTime: number;
   private readonly errorBanTime: number;
@@ -32,6 +32,9 @@ export class FullSynchronizer extends Synchronizer {
     this.count = options.count || 128;
     this.timeoutBanTime = options.timeoutBanTime || 300000;
     this.errorBanTime = options.errorBanTime || 60000;
+    this.resultQueue = new AysncChannel<Block[]>({
+      isAbort: () => this.abortFlag
+    });
     this.downloadQueue = new OrderedQueue<Task, Block[]>({
       limit: options.limit || 16,
       processTask: this.download.bind(this)
@@ -41,7 +44,7 @@ export class FullSynchronizer extends Synchronizer {
       this.resultQueue.push(result);
     });
     this.downloadQueue.on('over', (queue) => {
-      this.stopProcessResult();
+      this.resultQueue.abort();
     });
     this.processResult();
   }
@@ -84,22 +87,8 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
-  private async *makeAsyncGenerator() {
-    while (!this.abortFlag) {
-      const result = await this.resultQueue.next();
-      if (result === null) {
-        return;
-      }
-      yield result;
-    }
-  }
-
-  private stopProcessResult() {
-    this.resultQueue.push(null);
-  }
-
   private async processResult() {
-    for await (const result of this.makeAsyncGenerator()) {
+    for await (const result of this.resultQueue.generator()) {
       await this.node.processBlocks(result);
     }
   }
@@ -136,7 +125,7 @@ export class FullSynchronizer extends Synchronizer {
             await this.downloadQueue.start();
             result = true;
           } else {
-            this.stopProcessResult();
+            this.resultQueue.abort();
           }
         } catch (err) {
           this.emit('error', err);

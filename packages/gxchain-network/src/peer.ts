@@ -173,7 +173,7 @@ export class Peer extends EventEmitter {
   }
 
   get idle() {
-    return this.idle;
+    return this._idle;
   }
 
   set idle(b: boolean) {

@@ -97,6 +97,8 @@ export class FullSynchronizer extends Synchronizer {
   }
 
   async sync(): Promise<boolean> {
+    const onPeelIdle = () => {};
+    this.node.peerpool.on();
     let bestHeight = 0;
     const latestHeight = this.node.blockchain.latestHeight;
     bestHeight = latestHeight;

@@ -24,7 +24,7 @@ export declare interface OrderedQueue {
 export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
   private readonly limit: number;
   private readonly processTask: (data: TData) => Promise<TResult> | TResult;
-  private readonly taskQueue: AsyncNext<Task<TData, TResult> | null>;
+  private readonly taskQueue: AsyncNext<Task<TData, TResult>>;
   private readonly limitQueue = new AsyncQueue<void>();
   private in!: Heap;
   private out!: Heap;
@@ -38,7 +38,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     this.limit = options.limit;
     this.processTask = options.processTask;
     this.resetHeap();
-    this.taskQueue = new AsyncNext<Task<TData, TResult> | null>({
+    this.taskQueue = new AsyncNext<Task<TData, TResult>>({
       push: (task: Task<TData, TResult> | null) => {
         if (task !== null) {
           this.in.insert(task);
@@ -80,7 +80,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     }
   }
 
-  private async *makeAsyncGenerator(): AsyncGenerator<Task<TData, TResult>> {
+  private async *generator(): AsyncGenerator<Task<TData, TResult>> {
     while (!this.abortFlag) {
       const task = await this.taskQueue.next();
       if (this.abortFlag || task === null) {
@@ -144,7 +144,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     const makePromise = () => {
       return promiseArray.length < this.limit ? Promise.resolve() : this.limitQueue.next();
     };
-    for await (const task of this.makeAsyncGenerator()) {
+    for await (const task of this.generator()) {
       let result = this.processTask(task.data);
       result = (util.types.isPromise(result) ? result : Promise.resolve(result)) as Promise<TResult>;
       const p = result

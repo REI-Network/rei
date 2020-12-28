@@ -1,12 +1,12 @@
 interface AsyncNextOption<T> {
-  push: (data: T) => void;
+  push: (data: T | null) => void;
   hasNext: () => boolean;
-  next: () => T;
+  next: () => T | null;
 }
 
 export class AsyncNext<T = any> {
   private readonly queue: AsyncNextOption<T>;
-  private resolve?: (data: T) => void;
+  private resolve?: (data: T | null) => void;
 
   constructor(queue: AsyncNextOption<T>) {
     this.queue = queue;
@@ -16,7 +16,7 @@ export class AsyncNext<T = any> {
     return !!this.resolve;
   }
 
-  push(data: T) {
+  push(data: T | null) {
     if (this.resolve) {
       this.resolve(data);
       this.resolve = undefined;
@@ -28,26 +28,26 @@ export class AsyncNext<T = any> {
   next() {
     return this.queue.hasNext()
       ? Promise.resolve(this.queue.next())
-      : new Promise<T>((resolve) => {
+      : new Promise<T | null>((resolve) => {
           this.resolve = resolve;
         });
   }
 }
 
 interface AsyncQueueOption<T> {
-  push?: (data: T) => void;
+  push?: (data: T | null) => void;
   hasNext?: () => boolean;
-  next?: () => T;
+  next?: () => T | null;
 }
 
 export class AsyncQueue<T = any> extends AsyncNext<T> {
-  private arr: T[] = [];
+  private arr: (T | null)[] = [];
 
   constructor(options?: AsyncQueueOption<T>) {
     super(
       Object.assign(
         {
-          push: (data: T) => {
+          push: (data: T | null) => {
             this.arr.push(data);
           },
           hasNext: () => this.arr.length > 0,
@@ -87,5 +87,9 @@ export class AysncChannel<T = any> extends AsyncQueue<T> {
       }
       yield result;
     }
+  }
+
+  abort() {
+    this.push(null);
   }
 }

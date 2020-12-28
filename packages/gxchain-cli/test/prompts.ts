@@ -120,6 +120,10 @@ const startPrompts = async (node: Node) => {
           throw err;
         }
       }
+    } else if (arr[0] === 'lsheight') {
+      const height = node.blockchain.latestHeight;
+      const hash = node.blockchain.latestHash;
+      console.log('local height:', height, 'hash:', hash);
     } else if (arr[0] === 'lsaccount') {
       const stream = node.stateManager._trie.createReadStream();
       for await (let data of streamToIterator(stream as any)) {

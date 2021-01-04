@@ -187,11 +187,12 @@ export class Node implements INode {
     const opts = {
       block: blockSkeleton,
       root: header.stateRoot,
-      generate: true,
+      generate: !!blockSkeleton.header.stateRoot,
       skipBlockValidation: true
     };
     const { result, block } = await this.vm.runOrGenerateBlock(opts);
-    await this.blockchain.putBlock(block!);
+    blockSkeleton = block || blockSkeleton;
+    await this.blockchain.putBlock(blockSkeleton);
   }
 
   async processBlocks(blocks: Block[]) {

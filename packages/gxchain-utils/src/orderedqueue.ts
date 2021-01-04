@@ -11,14 +11,14 @@ type Task<TData, TResult> = {
   index: number;
 };
 
-export declare interface OrderedQueue {
+export declare interface OrderedQueue<TData = any, TResult = any> {
   on(event: 'over', listener: (queue: OrderedQueue) => void): this;
-  on(event: 'result', listener: (queue: OrderedQueue, data: any, result?: any) => void): this;
-  on(event: 'error', listener: (queue: OrderedQueue, err: any) => void): this;
+  on(event: 'result', listener: (queue: OrderedQueue, data: TData, result?: TResult) => void): this;
+  on(event: 'error', listener: (queue: OrderedQueue, err: any, data: TData, index: number) => void): this;
 
   once(event: 'over', listener: (queue: OrderedQueue) => void): this;
-  once(event: 'result', listener: (queue: OrderedQueue, data: any, result?: any) => void): this;
-  once(event: 'error', listener: (queue: OrderedQueue, err: any) => void): this;
+  once(event: 'result', listener: (queue: OrderedQueue, data: TData, result?: TResult) => void): this;
+  once(event: 'error', listener: (queue: OrderedQueue, err: any, data: TData, index: number) => void): this;
 }
 
 export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
@@ -156,8 +156,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
           this.dequeue();
         })
         .catch((err) => {
-          this.emit('error', this, err);
-          this.enqueue(task);
+          this.emit('error', this, err, task.data, task.index);
         })
         .finally(() => {
           processOver(p);

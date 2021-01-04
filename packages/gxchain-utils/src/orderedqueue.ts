@@ -116,13 +116,13 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     this.abortFlag = false;
   }
 
-  insert(data: TData) {
+  insert(data: TData, index?: number) {
     if (this.abortFlag) {
       throw new Error('OrderedQueue already aborted');
     }
     this.enqueue({
       data,
-      index: this.currentTotal++
+      index: index || this.currentTotal++
     });
   }
 

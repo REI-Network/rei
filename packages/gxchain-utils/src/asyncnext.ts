@@ -65,6 +65,12 @@ export class AsyncQueue<T = any> extends AsyncNext<T> {
   clear() {
     this.arr = [];
   }
+
+  abort() {
+    if (this.isWaiting) {
+      this.push(null);
+    }
+  }
 }
 
 interface AysncChannelOption<T> extends AsyncQueueOption<T> {
@@ -86,12 +92,6 @@ export class AysncChannel<T = any> extends AsyncQueue<T> {
         return;
       }
       yield result;
-    }
-  }
-
-  abort() {
-    if (this.isWaiting) {
-      this.push(null);
     }
   }
 }

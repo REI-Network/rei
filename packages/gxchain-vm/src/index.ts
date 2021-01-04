@@ -10,12 +10,12 @@ import Bloom from '@ethereumjs/vm/dist/bloom';
 import { StateManager } from '@ethereumjs/vm/dist/state/interface';
 
 class VM extends EthereumJSVM {
-  async runBlockchain(blockchain?: Blockchain): Promise<void> {
+  async runOrGenerateBlockchain(blockchain?: Blockchain): Promise<void> {
     await this.init();
     return runBlockchain.bind(this)(blockchain);
   }
 
-  async runBlock(opts: RunBlockOpts): ReturnType<typeof runBlock> {
+  async runOrGenerateBlock(opts: RunBlockOpts): ReturnType<typeof runBlock> {
     await this.init();
     return runBlock.bind(this)(opts);
   }
@@ -54,7 +54,7 @@ async function runBlockchain(this: VM, blockchain?: Blockchain) {
 
     // run block, update head if valid
     try {
-      await this.runBlock({ block, root: parentState, skipBlockValidation: true, generate: true });
+      await this.runOrGenerateBlock({ block, root: parentState, skipBlockValidation: true, generate: true });
       // set as new head block
       headBlock = block;
     } catch (error) {
@@ -72,7 +72,7 @@ async function runBlockchain(this: VM, blockchain?: Blockchain) {
 /**
  * @ignore
  */
-async function runBlock(this: VM, opts: RunBlockOpts): ReturnType<typeof applyBlock> {
+async function runBlock(this: VM, opts: RunBlockOpts): Promise<{ result: PromisResultType<ReturnType<typeof applyBlock>>; block?: Block }> {
   const state = this.stateManager;
   const { root } = opts;
   let block = opts.block;
@@ -123,10 +123,15 @@ async function runBlock(this: VM, opts: RunBlockOpts): ReturnType<typeof applyBl
   // values to the current block, or validate the resulting
   // header values against the current block.
   if (generateStateRoot) {
-    const bloom = result.bloom.bitvector;
-    opts.block = block = Block.fromBlockData({
+    block = Block.fromBlockData({
       ...block,
-      header: { ...block.header, stateRoot, bloom }
+      header: {
+        ...block.header,
+        stateRoot,
+        receiptTrie: result.receiptRoot,
+        gasUsed: result.gasUsed,
+        bloom: result.bloom.bitvector
+      }
     });
   } else {
     if (result.receiptRoot && !result.receiptRoot.equals(block.header.receiptTrie)) {
@@ -154,7 +159,7 @@ async function runBlock(this: VM, opts: RunBlockOpts): ReturnType<typeof applyBl
    */
   await this._emit('afterBlock', { receipts, results });
 
-  return result;
+  return generateStateRoot ? { result, block } : { result };
 }
 
 /**

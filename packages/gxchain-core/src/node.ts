@@ -175,27 +175,23 @@ export class Node implements INode {
 
     await this.blockchain.init();
     await this.vm.init();
-    await this.vm.runBlockchain();
+    await this.vm.runOrGenerateBlockchain();
     this.sync.start();
   }
 
-  async processBlock(block: Block) {
+  async processBlock(blockSkeleton: Block) {
     const header = this.blockchain.latestBlock.header;
-    if (!block.header.parentHash.equals(header.hash())) {
-      throw new Error(`Node invalid block ${block.toJSON()}`);
+    if (!blockSkeleton.header.parentHash.equals(header.hash())) {
+      throw new Error(`Node invalid block ${blockSkeleton.toJSON()}`);
     }
     const opts = {
-      block,
+      block: blockSkeleton,
       root: header.stateRoot,
       generate: true,
       skipBlockValidation: true
     };
-    const results = await this.vm.runBlock(opts);
-
-    block = opts.block;
-    block = Block.fromBlockData({ header: { ...block.header, receiptTrie: results.receiptRoot }, transactions: block.transactions }, { common: this.common });
-
-    await this.blockchain.putBlock(block);
+    const { result, block } = await this.vm.runOrGenerateBlock(opts);
+    await this.blockchain.putBlock(block!);
   }
 
   async processBlocks(blocks: Block[]) {

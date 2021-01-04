@@ -11,14 +11,16 @@ type Task<TData, TResult> = {
   index: number;
 };
 
+export class OrderedQueueAbortError extends Error {}
+
 export declare interface OrderedQueue<TData = any, TResult = any> {
   on(event: 'over', listener: (queue: OrderedQueue) => void): this;
   on(event: 'result', listener: (queue: OrderedQueue, data: TData, result?: TResult) => void): this;
-  on(event: 'error', listener: (queue: OrderedQueue, err: any, data: TData, index: number) => void): this;
+  on(event: 'error', listener: (queue: OrderedQueue, err: any, data: TData, index: number, result?: TResult) => void): this;
 
   once(event: 'over', listener: (queue: OrderedQueue) => void): this;
   once(event: 'result', listener: (queue: OrderedQueue, data: TData, result?: TResult) => void): this;
-  once(event: 'error', listener: (queue: OrderedQueue, err: any, data: TData, index: number) => void): this;
+  once(event: 'error', listener: (queue: OrderedQueue, err: any, data: TData, index: number, result?: TResult) => void): this;
 }
 
 export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
@@ -54,11 +56,22 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
   }
 
   private resetHeap() {
-    if (this.in === undefined || this.in.length > 0) {
+    if (this.in === undefined) {
       this.in = new Heap({ comparBefore: (a: Task<TData, TResult>, b: Task<TData, TResult>) => a.index < b.index });
+    } else {
+      while (this.in.length > 0) {
+        const task = this.in.remove();
+        this.emit('error', this, new OrderedQueueAbortError('OrderedQueue abort'), task.data, task.index, task.result);
+      }
     }
-    if (this.out === undefined || this.out.lenght > 0) {
+
+    if (this.out === undefined) {
       this.out = new Heap({ comparBefore: (a: Task<TData, TResult>, b: Task<TData, TResult>) => a.index < b.index });
+    } else {
+      while (this.out.length > 0) {
+        const task = this.out.remove();
+        this.emit('error', this, new OrderedQueueAbortError('OrderedQueue abort'), task.data, task.index, task.result);
+      }
     }
   }
 

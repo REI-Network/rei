@@ -1,4 +1,4 @@
-import { OrderedQueue, AsyncQueue, AysncChannel } from '@gxchain2/utils';
+import { OrderedQueue, OrderedQueueAbortError, AsyncQueue, AysncChannel } from '@gxchain2/utils';
 import { constants } from '@gxchain2/common';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 import { Block, BlockHeader } from '@gxchain2/block';
@@ -57,8 +57,12 @@ export class FullSynchronizer extends Synchronizer {
       processTask: this.download.bind(this)
     });
     this.downloadQueue.on('error', (queue, err, task, index) => {
-      this.emit('error', err);
-      this.taskQueue.push({ task, index });
+      if (err instanceof OrderedQueueAbortError) {
+        task.peer!.idle = true;
+      } else {
+        this.emit('error', err);
+        this.taskQueue.push({ task, index });
+      }
     });
     this.downloadQueue.on('result', (queue, data, result: any) => {
       this.resultQueue.push(result);

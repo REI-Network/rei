@@ -89,12 +89,12 @@ export class FullSynchronizer extends Synchronizer {
       peer.idle = true;
       return blocks;
     } catch (err) {
-      peer.idle = true;
       if (err instanceof PeerRequestTimeoutError) {
         this.node.peerpool.ban(peer, this.timeoutBanTime);
       } else {
         this.node.peerpool.ban(peer, this.errorBanTime);
       }
+      peer.idle = true;
       throw err;
     }
   }

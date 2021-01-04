@@ -180,11 +180,14 @@ export class Node implements INode {
   }
 
   async processBlock(block: Block) {
-    const last = (await this.blockchain.getHead()).header.stateRoot;
+    const header = this.blockchain.latestBlock.header;
+    if (!block.header.parentHash.equals(header.hash())) {
+      throw new Error(`Node invalid block ${block.toJSON()}`);
+    }
 
     const opts = {
       block,
-      root: last,
+      root: header.stateRoot,
       generate: true,
       skipBlockValidation: true
     };

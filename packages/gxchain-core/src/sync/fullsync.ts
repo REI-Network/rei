@@ -42,7 +42,6 @@ export class FullSynchronizer extends Synchronizer {
         if (!peer) {
           return false;
         }
-        peer.idle = false;
         this.idlePeerQueue.array.push(peer);
         return true;
       },
@@ -69,9 +68,6 @@ export class FullSynchronizer extends Synchronizer {
 
   private async download(task: Task) {
     const peer = task.peer;
-    if (peer.idle) {
-      throw new Error('FullSynchronizer, invalid idle peer');
-    }
     try {
       const headers: BlockHeader[] = await peer.getBlockHeaders(task.start, task.count);
       /*
@@ -135,6 +131,7 @@ export class FullSynchronizer extends Synchronizer {
         try {
           let i = 0;
           for await (const peer of this.idlePeerQueue.generator()) {
+            peer.idle = false;
             this.downloadQueue.insert({
               peer,
               start: i++ * this.count + latestHeight + 1,
@@ -184,11 +181,6 @@ export class FullSynchronizer extends Synchronizer {
 
   async abort() {
     this.idlePeerQueue.abort();
-    for (const peer of this.idlePeerQueue.array) {
-      if (peer) {
-        peer.idle = true;
-      }
-    }
     this.idlePeerQueue.clear();
     await this.downloadQueue.abort();
     await super.abort();

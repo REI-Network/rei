@@ -150,6 +150,7 @@ export class FullSynchronizer extends Synchronizer {
             if (peer === null) {
               break;
             }
+            peer.idle = false;
             taskInfo.task.peer = peer;
             this.downloadQueue.insert(taskInfo.task, taskInfo?.index);
           }

@@ -5,7 +5,7 @@ import type { LevelUp } from 'levelup';
 import { Transaction } from '@gxchain2/tx';
 import { Block, BlockHeader, BlockBuffer, BlockHeaderBuffer, BlockBodyBuffer } from '@gxchain2/block';
 import { Common } from '@gxchain2/common';
-import { Receipt } from '@gxchain2/vm';
+import { Receipt } from '@gxchain2/receipt';
 
 import Cache from './cache';
 import { DatabaseKey, DBOp, DBTarget, DBOpData } from './operation';
@@ -199,6 +199,20 @@ export class Database {
     for (const tx of block.transactions) {
       if (tx.hash().equals(txHash)) {
         return tx;
+      }
+    }
+    throw new level.errors.NotFoundError();
+  }
+
+  async getReceipt(txHash: Buffer): Promise<Receipt> {
+    const blockHeightBuffer = await this.get(DBTarget.TxLookup, { txHash });
+    const blockHeihgt = new BN(blockHeightBuffer);
+    const block = await this.getBlock(blockHeihgt);
+    const rawArr: Buffer[][] = await this.get(DBTarget.Receipts, { blockHash: block.hash(), blockNumber: blockHeihgt });
+    for (let i = 0; i < block.transactions.length; i++) {
+      if (block.transactions[i].hash().equals(txHash)) {
+        const raw = rawArr[i];
+        return Receipt.fromValuesArray(raw);
       }
     }
     throw new level.errors.NotFoundError();

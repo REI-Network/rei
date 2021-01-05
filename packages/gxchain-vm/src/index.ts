@@ -22,7 +22,7 @@ class VM extends EthereumJSVM {
   }
 }
 
-export { VM };
+export { VM, Receipt };
 
 type PromisResultType<T> = T extends PromiseLike<infer U> ? U : T;
 

@@ -5,6 +5,7 @@ import type { LevelUp } from 'levelup';
 import { Transaction } from '@gxchain2/tx';
 import { Block, BlockHeader, BlockBuffer, BlockHeaderBuffer, BlockBodyBuffer } from '@gxchain2/block';
 import { Common } from '@gxchain2/common';
+import { Receipt } from '@gxchain2/vm';
 
 import Cache from './cache';
 import { DatabaseKey, DBOp, DBTarget, DBOpData } from './operation';

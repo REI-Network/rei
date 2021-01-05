@@ -2,6 +2,7 @@ import * as rlp from 'rlp';
 import { BN } from 'ethereumjs-util';
 import type { LevelUp } from 'levelup';
 
+import { Transaction } from '@gxchain2/tx';
 import { Block, BlockHeader, BlockBuffer, BlockHeaderBuffer, BlockBodyBuffer } from '@gxchain2/block';
 import { Common } from '@gxchain2/common';
 
@@ -188,4 +189,18 @@ export class Database {
 
     return this._db.batch(convertedOps as any);
   }
+
+  ////////////////////
+  async getTransaction(txHash: Buffer): Promise<Transaction> {
+    const blockHeightBuffer = await this.get(DBTarget.TxLookup, { txHash });
+    const blockHeihgt = new BN(blockHeightBuffer);
+    const block = await this.getBlock(blockHeihgt);
+    for (const tx of block.transactions) {
+      if (tx.hash().equals(txHash)) {
+        return tx;
+      }
+    }
+    throw new level.errors.NotFoundError();
+  }
+  ////////////////////
 }

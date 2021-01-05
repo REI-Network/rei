@@ -1,5 +1,5 @@
 import { DBOp, DBTarget } from './operation';
-import { BN, rlp } from 'ethereumjs-util';
+import { BN, rlp, toBuffer } from 'ethereumjs-util';
 import { Block, BlockHeader } from '@ethereumjs/block';
 import { bufBE8 } from './constants';
 
@@ -49,6 +49,16 @@ function DBSetBlockOrHeader(blockBody: Block | BlockHeader): DBOp[] {
     );
   }
 
+  if (blockBody instanceof Block) {
+    for (const tx of blockBody.transactions) {
+      dbOps.push(
+        DBOp.set(DBTarget.TxLookup, toBuffer(blockNumber), {
+          txHash: tx.hash()
+        })
+      );
+    }
+  }
+
   return dbOps;
 }
 
@@ -72,4 +82,19 @@ function DBSaveLookups(blockHash: Buffer, blockNumber: BN): DBOp[] {
   return ops;
 }
 
-export { DBOp, DBSetTD, DBSetBlockOrHeader, DBSetHashToNumber, DBSaveLookups };
+interface IReceipt {
+  raw(): Buffer[];
+}
+
+function DBSaveReceipts(receipts: IReceipt[], blockHash: Buffer, blockNumber: BN) {
+  const rawArr: Buffer[][] = [];
+  for (const r of receipts) {
+    rawArr.push(r.raw());
+  }
+  return DBOp.set(DBTarget.Receipts, rlp.encode(rawArr), {
+    blockHash: blockHash,
+    blockNumber
+  });
+}
+
+export { DBOp, DBSetTD, DBSetBlockOrHeader, DBSetHashToNumber, DBSaveLookups, DBSaveReceipts };

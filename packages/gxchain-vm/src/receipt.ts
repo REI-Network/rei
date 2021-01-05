@@ -29,7 +29,7 @@ export class Receipt {
     return new Receipt(gasUsed, bitvector, [], bufferToInt(status) === 0 ? 0 : 1);
   }
 
-  raw() {
+  raw(): Buffer[] {
     return [this.gasUsed, this.bitvector, unpadBuffer(toBuffer(this.status))];
   }
 

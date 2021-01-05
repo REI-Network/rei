@@ -1,13 +1,14 @@
 import EthereumJSVM from '@ethereumjs/vm';
-import { encode } from 'rlp';
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
-import { Account, Address, BN } from 'ethereumjs-util';
+import { toBuffer, Address, BN } from 'ethereumjs-util';
 import { Block } from '@ethereumjs/block';
 import Blockchain from '@ethereumjs/blockchain';
-import type { PreByzantiumTxReceipt, PostByzantiumTxReceipt, RunBlockOpts } from '@ethereumjs/vm/dist/runBlock';
+import type { RunBlockOpts } from '@ethereumjs/vm/dist/runBlock';
 import type { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import Bloom from '@ethereumjs/vm/dist/bloom';
 import { StateManager } from '@ethereumjs/vm/dist/state/interface';
+
+import { Receipt } from './receipt';
 
 class VM extends EthereumJSVM {
   async runOrGenerateBlockchain(blockchain?: Blockchain): Promise<void> {
@@ -99,11 +100,6 @@ async function runBlock(this: VM, opts: RunBlockOpts): Promise<{ result: PromisR
   if (root) {
     await state.setStateRoot(root);
   }
-
-  // check for DAO support and if we should apply the DAO fork
-  //   if (this._common.hardforkIsActiveOnChain('dao') && block.header.number.eq(new BN(this._common.hardforkBlock('dao')))) {
-  //     await _applyDAOHardfork(state);
-  //   }
 
   // Checkpoint state
   await state.checkpoint();
@@ -198,7 +194,7 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
   // the total amount of gas used processing these transactions
   let gasUsed = new BN(0);
   const receiptTrie = new Trie();
-  const receipts: (PostByzantiumTxReceipt | PreByzantiumTxReceipt)[] = [];
+  const receipts: Receipt[] = [];
   const txResults: RunTxResult[] = [];
 
   /*
@@ -227,29 +223,11 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
     // Combine blooms via bitwise OR
     bloom.or(txRes.bloom);
 
-    const abstractTxReceipt = {
-      gasUsed: gasUsed.toArrayLike(Buffer),
-      bitvector: txRes.bloom.bitvector,
-      logs: txRes.execResult.logs || []
-    };
-    let txReceipt;
-    if (this._common.gteHardfork('byzantium')) {
-      txReceipt = {
-        status: txRes.execResult.exceptionError ? 0 : 1, // Receipts have a 0 as status on error
-        ...abstractTxReceipt
-      } as PostByzantiumTxReceipt;
-    } else {
-      const stateRoot = await this.stateManager.getStateRoot(true);
-      txReceipt = {
-        stateRoot: stateRoot,
-        ...abstractTxReceipt
-      } as PreByzantiumTxReceipt;
-    }
-
+    const txReceipt = new Receipt(gasUsed.toArrayLike(Buffer), txRes.bloom.bitvector, txRes.execResult.logs || [], txRes.execResult.exceptionError ? 0 : 1);
     receipts.push(txReceipt);
 
     // Add receipt to trie to later calculate receipt root
-    await receiptTrie.put(encode(txIdx), encode(Object.values(txReceipt)));
+    await receiptTrie.put(toBuffer(txIdx), txReceipt.raw());
   }
 
   return {
@@ -301,27 +279,5 @@ async function rewardAccount(state: StateManager, address: Address, reward: BN):
   account.balance.iadd(reward);
   await state.putAccount(address, account);
 }
-
-// apply the DAO fork changes to the VM
-// async function _applyDAOHardfork(state: StateManager) {
-//   const DAORefundContractAddress = new Address(Buffer.from(DAORefundContract, 'hex'));
-//   if (!state.accountExists(DAORefundContractAddress)) {
-//     await state.putAccount(DAORefundContractAddress, new Account());
-//   }
-//   const DAORefundAccount = await state.getAccount(DAORefundContractAddress);
-
-//   for (const addr of DAOAccountList) {
-//     // retrieve the account and add it to the DAO's Refund accounts' balance.
-//     const address = new Address(Buffer.from(addr, 'hex'));
-//     const account = await state.getAccount(address);
-//     DAORefundAccount.balance.iadd(account.balance);
-//     // clear the accounts' balance
-//     account.balance = new BN(0);
-//     await state.putAccount(address, account);
-//   }
-
-//   // finally, put the Refund Account
-//   await state.putAccount(DAORefundContractAddress, DAORefundAccount);
-// }
 
 /////////// runBlock ////////////

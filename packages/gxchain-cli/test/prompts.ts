@@ -124,6 +124,21 @@ const startPrompts = async (node: Node) => {
       } catch (err) {
         console.error('Run block error', err);
       }
+    } else if (arr[0] === 'lsreceipt') {
+      try {
+        const receipt = await node.db.getReceipt(Buffer.from(arr[1]));
+        console.log('hash:', arr[1], 'gasUsed:', new BN(receipt.gasUsed).toString(), 'status:', receipt.status);
+      } catch (err) {
+        console.error('Get receipt error', err);
+      }
+    } else if (arr[0] === 'lstx') {
+      try {
+        const tx = await node.db.getTransaction(Buffer.from(arr[1]));
+        tx.to.toString();
+        console.log('hash:', arr[1], 'from', tx.getSenderAddress().toString(), 'to', tx?.to.toString(), 'value', tx.value.toString());
+      } catch (err) {
+        console.error('Get transaction error', err);
+      }
     } else if (arr[0] === 'lsblock') {
       for (let h = 0; ; h++) {
         try {

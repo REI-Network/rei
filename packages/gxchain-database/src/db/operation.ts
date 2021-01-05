@@ -1,5 +1,5 @@
 import { BN } from 'ethereumjs-util';
-import { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey } from './constants';
+import { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, receiptsKey } from './constants';
 
 import { CacheMap } from './manager';
 
@@ -11,7 +11,8 @@ export enum DBTarget {
   NumberToHash,
   TotalDifficulty,
   Body,
-  Header
+  Header,
+  Receipts
 }
 
 /**
@@ -86,6 +87,11 @@ export class DBOp {
       case DBTarget.Header: {
         this.baseDBOp.key = headerKey(key!.blockNumber!, key!.blockHash!);
         this.cacheString = 'header';
+        break;
+      }
+      case DBTarget.Receipts: {
+        this.baseDBOp.key = receiptsKey(key!.blockNumber!, key!.blockHash!);
+        this.cacheString = 'receipts';
         break;
       }
     }

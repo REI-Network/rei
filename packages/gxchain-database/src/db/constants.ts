@@ -39,7 +39,7 @@ const BLOCK_HASH_PEFIX = Buffer.from('H');
  */
 const BODY_PREFIX = Buffer.from('b');
 
-const RECEIPT_PREFIX = Buffer.from('b');
+const RECEIPTS_PREFIX = Buffer.from('b');
 
 // Utility functions
 
@@ -58,9 +58,9 @@ const numberToHashKey = (n: BN) => Buffer.concat([HEADER_PREFIX, bufBE8(n), NUM_
 
 const hashToNumberKey = (hash: Buffer) => Buffer.concat([BLOCK_HASH_PEFIX, hash]);
 
-const receiptKey = (n: BN, hash: Buffer) => Buffer.concat([RECEIPT_PREFIX, bufBE8(n), hash]);
+const receiptsKey = (n: BN, hash: Buffer) => Buffer.concat([RECEIPTS_PREFIX, bufBE8(n), hash]);
 
 /**
  * @hidden
  */
-export { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, bufBE8, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, receiptKey };
+export { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, bufBE8, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, receiptsKey };

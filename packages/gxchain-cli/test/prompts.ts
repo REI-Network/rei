@@ -35,7 +35,7 @@ const startPrompts = async (node: Node) => {
       message: '> '
     });
 
-    if (response.cmd === undefined) {
+    if (response.cmd === undefined || response.cmd === 'exit' || response.cmd === 'q' || response.cmd === 'quit') {
       process.exit(0);
     }
 
@@ -111,7 +111,7 @@ const startPrompts = async (node: Node) => {
     } else if (arr[0] === 'lsblock') {
       for (let h = 0; ; h++) {
         try {
-          const block = await node.blockchain.dbManager.getBlock(h);
+          const block = await node.db.getBlock(h);
           console.log('block on height', h, ':', block.toJSON());
         } catch (err) {
           if (err.type === 'NotFoundError') {

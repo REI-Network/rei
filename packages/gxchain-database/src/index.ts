@@ -4,6 +4,7 @@ import encoding from 'encoding-down';
 
 export { DBManager as Database } from './db/manager';
 export * from './db/helpers';
+export { DBTarget } from './db/operation';
 
 export const createLevelDB = (path: string) => {
   return levelUp(encoding(levelDown(path)));

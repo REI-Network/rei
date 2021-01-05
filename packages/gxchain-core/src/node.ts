@@ -157,17 +157,16 @@ export class Node implements INode {
 
     this.blockchain = new Blockchain({
       db: this.chainDB,
+      database: this.db,
       common: this.common,
       validateConsensus: false,
       validateBlocks: false,
       genesisBlock
     });
-    // TODO: fix any.
-    this.blockchain.dbManager = this.db as any;
     this.vm = new VM({
       common: this.common,
       stateManager: this.stateManager,
-      blockchain: this.blockchain
+      blockchain: this.blockchain as any
     });
     this.sync = new FullSynchronizer({ node: this });
     this.sync.on('error', (err) => {

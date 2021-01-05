@@ -1,5 +1,5 @@
 import { BN } from 'ethereumjs-util';
-import { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, receiptsKey } from './constants';
+import { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, receiptsKey, txLookupKey } from './constants';
 
 import { CacheMap } from './manager';
 
@@ -12,7 +12,8 @@ export enum DBTarget {
   TotalDifficulty,
   Body,
   Header,
-  Receipts
+  Receipts,
+  TxLookup
 }
 
 /**
@@ -31,6 +32,7 @@ export interface DBOpData {
 export type DatabaseKey = {
   blockNumber?: BN;
   blockHash?: Buffer;
+  txHash?: Buffer;
 };
 
 /**
@@ -92,6 +94,11 @@ export class DBOp {
       case DBTarget.Receipts: {
         this.baseDBOp.key = receiptsKey(key!.blockNumber!, key!.blockHash!);
         this.cacheString = 'receipts';
+        break;
+      }
+      case DBTarget.TxLookup: {
+        this.baseDBOp.key = txLookupKey(key!.txHash!);
+        this.cacheString = 'txLookup';
         break;
       }
     }

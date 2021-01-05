@@ -2,7 +2,7 @@ import levelUp from 'levelup';
 import levelDown from 'leveldown';
 import encoding from 'encoding-down';
 
-export { DBManager as Database } from './db/manager';
+export { Database } from './db/manager';
 export * from './db/helpers';
 export { DBTarget } from './db/operation';
 

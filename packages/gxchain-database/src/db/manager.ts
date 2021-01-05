@@ -1,11 +1,12 @@
 import * as rlp from 'rlp';
 import { BN } from 'ethereumjs-util';
-import { Block, BlockHeader, BlockBuffer, BlockHeaderBuffer, BlockBodyBuffer } from '@ethereumjs/block';
-import Common from '@ethereumjs/common';
+import type { LevelUp } from 'levelup';
+
+import { Block, BlockHeader, BlockBuffer, BlockHeaderBuffer, BlockBodyBuffer } from '@gxchain2/block';
+import { Common } from '@gxchain2/common';
+
 import Cache from './cache';
 import { DatabaseKey, DBOp, DBTarget, DBOpData } from './operation';
-
-import type { LevelUp } from 'levelup';
 
 const level = require('level-mem');
 
@@ -25,7 +26,7 @@ export type CacheMap = { [key: string]: Cache<Buffer> };
  * data, such as blocks and headers, indices, and the head block.
  * @hidden
  */
-export class DBManager {
+export class Database {
   private _cache: CacheMap;
   private _common: Common;
   private _db: LevelUp;

@@ -134,8 +134,7 @@ const startPrompts = async (node: Node) => {
     } else if (arr[0] === 'lstx') {
       try {
         const tx = await node.db.getTransaction(Buffer.from(arr[1]));
-        tx.to.toString();
-        console.log('hash:', arr[1], 'from', tx.getSenderAddress().toString(), 'to', tx?.to.toString(), 'value', tx.value.toString());
+        console.log('hash:', arr[1], 'from', tx.getSenderAddress().toString(), 'to', tx?.to?.toString(), 'value', tx.value.toString());
       } catch (err) {
         console.error('Get transaction error', err);
       }

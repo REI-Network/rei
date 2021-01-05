@@ -30,6 +30,10 @@ export class Receipt {
   }
 
   raw() {
-    return rlp.encode([this.gasUsed, this.bitvector, unpadBuffer(toBuffer(this.status))]);
+    return [this.gasUsed, this.bitvector, unpadBuffer(toBuffer(this.status))];
+  }
+
+  serialize(): Buffer {
+    return rlp.encode(this.raw());
   }
 }

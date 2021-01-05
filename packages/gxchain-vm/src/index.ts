@@ -227,7 +227,7 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
     receipts.push(txReceipt);
 
     // Add receipt to trie to later calculate receipt root
-    await receiptTrie.put(toBuffer(txIdx), txReceipt.raw());
+    await receiptTrie.put(toBuffer(txIdx), txReceipt.serialize());
   }
 
   return {

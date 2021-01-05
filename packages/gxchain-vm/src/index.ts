@@ -8,7 +8,7 @@ import type { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import Bloom from '@ethereumjs/vm/dist/bloom';
 import { StateManager } from '@ethereumjs/vm/dist/state/interface';
 
-import { Receipt } from './receipt';
+import { Receipt } from '@gxchain2/receipt';
 
 class VM extends EthereumJSVM {
   async runOrGenerateBlockchain(blockchain?: Blockchain): Promise<void> {

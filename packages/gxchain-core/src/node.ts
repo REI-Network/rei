@@ -9,7 +9,7 @@ import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
 
 import { INode } from '@gxchain2/interface';
-import { Database, createLevelDB } from '@gxchain2/database';
+import { Database, createLevelDB, DBSaveReceipts } from '@gxchain2/database';
 import { Libp2pNode, PeerPool } from '@gxchain2/network';
 import { Common, constants, defaultGenesis } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
@@ -193,6 +193,7 @@ export class Node implements INode {
     const { result, block } = await this.vm.runOrGenerateBlock(opts);
     blockSkeleton = block || blockSkeleton;
     await this.blockchain.putBlock(blockSkeleton);
+    await this.db.batch([DBSaveReceipts(result.receipts, blockSkeleton.hash(), blockSkeleton.header.number)]);
   }
 
   async processBlocks(blocks: Block[]) {

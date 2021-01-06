@@ -215,7 +215,7 @@ const startPrompts = async (node: Node) => {
     const node = new Node(dir);
     await node.init();
     const rpcServer = new RpcServer(12358, '::1', node);
-    rpcServer.start();
+    await rpcServer.start();
     await startPrompts(node);
   } catch (err) {
     console.error('Catch error', err);

@@ -5,6 +5,8 @@ import errors from './error-codes';
 
 type HookFunction = (params: any, result: any) => Promise<any> | any;
 
+type JsonRPCBody = { id: any; method: string; jsonrpc: string; params: any };
+
 export interface JsonMiddlewareOption {
   methods: {
     [name: string]: (params: any) => Promise<any> | any;
@@ -15,7 +17,7 @@ export interface JsonMiddlewareOption {
   afterMethods?: {
     [name: string]: HookFunction | HookFunction[];
   };
-  onError?: (err: any, body: { id: any; method: string; jsonrpc: string; params: any }) => void;
+  onError?: (err: any, body: JsonRPCBody) => void;
 }
 
 export class JsonRPCMiddleware {
@@ -33,7 +35,7 @@ export class JsonRPCMiddleware {
    * @param {object} body
    * @return {Promise}
    */
-  async handleSingleReq(body: { id: any; method: string; jsonrpc: string; params: any }): Promise<any> {
+  async handleSingleReq(body: JsonRPCBody): Promise<any> {
     const { id, method, jsonrpc, params } = body;
     try {
       helper.validateJsonRpcVersion(jsonrpc, this.VERSION);

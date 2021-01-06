@@ -5,12 +5,14 @@ import * as http from 'http';
 import * as helper from './helper';
 import { EventEmitter } from 'events';
 
+export type RpcController = { [name: string]: (params: any) => Promise<any> | any };
+
 export class RpcServer extends EventEmitter {
   protected readonly port: number;
   protected readonly host: string;
   protected running: boolean = false;
-  protected controller: any;
-  constructor(port: number, host: string, controller: { [name: string]: (params: any) => Promise<any> | any }) {
+  protected controller: RpcController;
+  constructor(port: number, host: string, controller: RpcController) {
     super();
     this.port = port;
     this.host = host;
@@ -30,7 +32,7 @@ export class RpcServer extends EventEmitter {
       const jsonmid = new JsonRPCMiddleware({ methods: this.controller });
 
       app.use(jsonmid.makeMiddleWare());
-      app.ws('/', (ws, msg) => {
+      app.ws('/', (ws) => {
         ws.on('message', (msg) => {
           try {
             jsonmid.rpcMiddleware(JSON.parse(msg), (res: any) => {

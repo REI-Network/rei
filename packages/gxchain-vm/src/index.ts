@@ -1,13 +1,14 @@
 import EthereumJSVM from '@ethereumjs/vm';
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { toBuffer, Address, BN } from 'ethereumjs-util';
-import { Block } from '@ethereumjs/block';
-import Blockchain from '@ethereumjs/blockchain';
+
 import type { RunBlockOpts } from '@ethereumjs/vm/dist/runBlock';
 import type { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import Bloom from '@ethereumjs/vm/dist/bloom';
 import { StateManager } from '@ethereumjs/vm/dist/state/interface';
 
+import { Blockchain } from '@gxchain2/blockchain';
+import { Block } from '@gxchain2/block';
 import { Receipt } from '@gxchain2/receipt';
 
 class VM extends EthereumJSVM {
@@ -35,7 +36,8 @@ async function runBlockchain(this: VM, blockchain?: Blockchain) {
   let headBlock: Block;
   let parentState: Buffer;
 
-  blockchain = blockchain || this.blockchain;
+  // TODO: fix this.
+  blockchain = blockchain || ((this.blockchain as any) as Blockchain);
 
   await blockchain.iterator('vm', async (block: Block, reorg: boolean) => {
     // determine starting state for block run

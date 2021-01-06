@@ -92,8 +92,8 @@ const startPrompts = async (node: Node) => {
               gasLimit: '0x5208',
               gasPrice: '0x01',
               nonce: account.nonce,
-              to: accounts[fromIndex],
-              value: accounts[toIndex]
+              to: accounts[toIndex],
+              value: '0x01'
             },
             { common: node.common }
           );

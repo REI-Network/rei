@@ -1,4 +1,4 @@
-import { Transaction as EthereumJSTransaction, TxOptions, TxData } from '@ethereumjs/tx';
+import { Transaction as EthereumJSTransaction, TxOptions, TxData, JsonTx } from '@ethereumjs/tx';
 import { Address, BN, rlp } from 'ethereumjs-util';
 
 export class Transaction extends EthereumJSTransaction {
@@ -39,4 +39,4 @@ export class Transaction extends EthereumJSTransaction {
     );
   }
 }
-export { TxData, TxOptions };
+export { TxData, TxOptions, JsonTx };

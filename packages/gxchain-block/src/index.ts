@@ -1,4 +1,4 @@
-import { Block as EthereumJSBlock, BlockHeader as EthereumJSBlockHeander, BlockBuffer, BlockHeaderBuffer, BlockBodyBuffer, BlockOptions, BlockData, HeaderData } from '@ethereumjs/block';
+import { Block as EthereumJSBlock, BlockHeader as EthereumJSBlockHeander, BlockBuffer, BlockHeaderBuffer, BlockBodyBuffer, BlockOptions, BlockData, HeaderData, JsonBlock, JsonHeader } from '@ethereumjs/block';
 import { Address, BN, KECCAK256_RLP_ARRAY, KECCAK256_RLP, rlp, toBuffer, zeros } from 'ethereumjs-util';
 
 import { Transaction, TxOptions } from '@gxchain2/tx';
@@ -134,4 +134,4 @@ export class BlockHeader extends EthereumJSBlockHeander {
   }
 }
 
-export { BlockBuffer, BlockHeaderBuffer, BlockBodyBuffer };
+export { BlockBuffer, BlockHeaderBuffer, BlockBodyBuffer, JsonBlock, JsonHeader };

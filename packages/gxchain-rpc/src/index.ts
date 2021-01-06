@@ -1,22 +1,22 @@
 import { JsonRPCMiddleware } from './jsonrpcmiddleware';
+import { Controller } from './controller';
 import express from 'express';
 import expressws from 'express-ws';
 import * as http from 'http';
-import * as helper from './helper';
 import { EventEmitter } from 'events';
 
-export type RpcController = { [name: string]: (params: any) => Promise<any> | any };
+import { Node } from '@gxchain2/core';
 
 export class RpcServer extends EventEmitter {
   protected readonly port: number;
   protected readonly host: string;
   protected running: boolean = false;
-  protected controller: RpcController;
-  constructor(port: number, host: string, controller: RpcController) {
+  protected controller: Controller;
+  constructor(port: number, host: string, node: Node) {
     super();
     this.port = port;
     this.host = host;
-    this.controller = controller;
+    this.controller = new Controller(node);
   }
 
   start() {
@@ -29,7 +29,7 @@ export class RpcServer extends EventEmitter {
       const enableWs = expressws(app, server);
       this.running = true;
       app.use(express.json());
-      const jsonmid = new JsonRPCMiddleware({ methods: this.controller });
+      const jsonmid = new JsonRPCMiddleware({ methods: this.controller as any });
 
       app.use(jsonmid.makeMiddleWare());
       app.ws('/', (ws) => {

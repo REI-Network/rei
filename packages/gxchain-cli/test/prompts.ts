@@ -10,6 +10,7 @@ import streamToIterator from 'stream-to-iterator';
 import { Account, Address } from 'ethereumjs-util';
 
 import { Node } from '@gxchain2/core';
+import { RpcServer } from '@gxchain2/rpc';
 import { constants } from '@gxchain2/common';
 import { Block } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
@@ -213,6 +214,8 @@ const startPrompts = async (node: Node) => {
     }
     const node = new Node(dir);
     await node.init();
+    const rpcServer = new RpcServer(12358, '::1', node);
+    rpcServer.start();
     await startPrompts(node);
   } catch (err) {
     console.error('Catch error', err);

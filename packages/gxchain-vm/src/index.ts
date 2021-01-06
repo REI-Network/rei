@@ -9,7 +9,7 @@ import { StateManager } from '@ethereumjs/vm/dist/state/interface';
 
 import { Blockchain } from '@gxchain2/blockchain';
 import { Block } from '@gxchain2/block';
-import { Receipt } from '@gxchain2/receipt';
+import { Receipt, Log } from '@gxchain2/receipt';
 
 class VM extends EthereumJSVM {
   async runOrGenerateBlockchain(blockchain?: Blockchain): Promise<void> {
@@ -228,7 +228,7 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
     // Combine blooms via bitwise OR
     bloom.or(txRes.bloom);
 
-    const txReceipt = new Receipt(gasUsed.toArrayLike(Buffer), txRes.bloom.bitvector, txRes.execResult.logs || [], txRes.execResult.exceptionError ? 0 : 1);
+    const txReceipt = new Receipt(gasUsed.toArrayLike(Buffer), txRes.bloom.bitvector, txRes.execResult?.logs?.map((log) => Log.fromValuesArray(log)) || [], txRes.execResult.exceptionError ? 0 : 1);
     receipts.push(txReceipt);
 
     // Add receipt to trie to later calculate receipt root

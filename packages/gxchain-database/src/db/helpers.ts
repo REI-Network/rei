@@ -3,7 +3,7 @@ import { BN, rlp, toBuffer } from 'ethereumjs-util';
 import { bufBE8 } from './constants';
 
 import { Block, BlockHeader } from '@gxchain2/block';
-import { Receipt } from '@gxchain2/receipt';
+import { Receipt, ReceiptRawValue } from '@gxchain2/receipt';
 
 /*
  * This extra helper file serves as an interface between the blockchain API functionality
@@ -85,11 +85,7 @@ function DBSaveLookups(blockHash: Buffer, blockNumber: BN): DBOp[] {
 }
 
 function DBSaveReceipts(receipts: Receipt[], blockHash: Buffer, blockNumber: BN) {
-  const rawArr: Buffer[][] = [];
-  for (const r of receipts) {
-    rawArr.push(r.raw());
-  }
-  return DBOp.set(DBTarget.Receipts, rlp.encode(rawArr), {
+  return DBOp.set(DBTarget.Receipts, rlp.encode(receipts.map((r) => r.raw())), {
     blockHash,
     blockNumber
   });

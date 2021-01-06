@@ -5,16 +5,14 @@ import fs from 'fs';
 import prompts from 'prompts';
 import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
-import uint8ArrayFromString from 'uint8arrays/from-string';
 import BN from 'bn.js';
-import { Transaction } from '@ethereumjs/tx';
-import { Block } from '@ethereumjs/block';
 import streamToIterator from 'stream-to-iterator';
 import { Account, Address } from 'ethereumjs-util';
 
 import { Node } from '@gxchain2/core';
-import { stringToCID } from '@gxchain2/utils';
 import { constants } from '@gxchain2/common';
+import { Block } from '@gxchain2/block';
+import { Transaction } from '@gxchain2/tx';
 
 const args = process.argv.slice(2);
 

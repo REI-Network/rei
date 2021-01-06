@@ -3,7 +3,6 @@ import fs from 'fs';
 
 import type { LevelUp } from 'levelup';
 import BN from 'bn.js';
-import { Block } from '@ethereumjs/block';
 import { Account, Address, setLengthLeft } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
@@ -16,6 +15,7 @@ import { Blockchain } from '@gxchain2/blockchain';
 import { StateManager } from '@gxchain2/state-manager';
 import { VM } from '@gxchain2/vm';
 import { TransactionPool } from '@gxchain2/tx-pool';
+import { Block } from '@gxchain2/block';
 
 import { FullSynchronizer, Synchronizer } from './sync';
 

@@ -26,6 +26,10 @@ const getPrivateKey = (address: string): Buffer => {
   return keyPair[address];
 };
 
+const hexStringToBuffer = (hex: string): Buffer => {
+  return hex.indexOf('0x') === 0 ? Buffer.from(hex.substr(2), 'hex') : Buffer.from(hex, 'hex');
+};
+
 const startPrompts = async (node: Node) => {
   while (true) {
     const response = await prompts({
@@ -124,28 +128,42 @@ const startPrompts = async (node: Node) => {
       }
     } else if (arr[0] === 'lsreceipt') {
       try {
-        const receipt = await node.db.getReceipt(Buffer.from(arr[1]));
-        console.log('hash:', arr[1], 'gasUsed:', new BN(receipt.gasUsed).toString(), 'status:', receipt.status);
+        const receipt = await node.db.getReceipt(hexStringToBuffer(arr[1]));
+        console.log('receipt hash:', arr[1], 'gasUsed:', new BN(receipt.gasUsed).toString(), 'status:', receipt.status);
       } catch (err) {
         console.error('Get receipt error', err);
       }
     } else if (arr[0] === 'lstx') {
       try {
-        const tx = await node.db.getTransaction(Buffer.from(arr[1]));
-        console.log('hash:', arr[1], 'from', tx.getSenderAddress().toString(), 'to', tx?.to?.toString(), 'value', tx.value.toString());
+        const tx = await node.db.getTransaction(hexStringToBuffer(arr[1]));
+        console.log(tx.toJSON());
       } catch (err) {
+        if (err.type === 'NotFoundError') {
+          continue;
+        }
         console.error('Get transaction error', err);
       }
     } else if (arr[0] === 'lsblock') {
-      for (let h = 0; ; h++) {
+      const printBlock = async (key: number | Buffer) => {
         try {
-          const block = await node.db.getBlock(h);
-          console.log('block on height', h, ':', block.toJSON());
+          const block = await node.db.getBlock(key);
+          console.log('block', '0x' + block.hash().toString('hex'), 'on height', block.header.number.toString(), ':', block.toJSON());
+          for (const tx of block.transactions) {
+            console.log('tx', '0x' + tx.hash().toString('hex'));
+          }
+          console.log('---------------');
         } catch (err) {
           if (err.type === 'NotFoundError') {
-            break;
+            return;
           }
           throw err;
+        }
+      };
+      if (arr[1]) {
+        await printBlock(arr[1].indexOf('0x') !== 0 ? Number(arr[1]) : hexStringToBuffer(arr[1]));
+      } else {
+        for (let h = 0; ; h++) {
+          await printBlock(h);
         }
       }
     } else if (arr[0] === 'lsheight') {

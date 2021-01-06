@@ -43,6 +43,15 @@ export class Receipt {
   serialize(): Buffer {
     return rlp.encode(this.raw());
   }
+
+  toJSON() {
+    return {
+      gasUsed: '0x' + this.gasUsed.toString('hex'),
+      bitvector: '0x' + this.bitvector.toString('hex'),
+      logs: this.logs.map((log) => log.toJSON()),
+      status: this.status
+    };
+  }
 }
 
 export type LogRawValue = Buffer | Buffer[];
@@ -81,5 +90,13 @@ export class Log {
 
   serialize(): Buffer {
     return rlp.encode(this.raw());
+  }
+
+  toJSON() {
+    return {
+      address: '0x' + this.address.toString('hex'),
+      topics: this.topics.map((topic) => '0x' + topic.toString('hex')),
+      data: '0x' + this.data.toString('hex')
+    };
   }
 }

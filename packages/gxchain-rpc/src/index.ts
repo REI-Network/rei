@@ -1,11 +1,12 @@
-import { JsonRPCMiddleware } from './jsonrpcmiddleware';
-import { Controller } from './controller';
 import express from 'express';
 import expressws from 'express-ws';
 import * as http from 'http';
 import { EventEmitter } from 'events';
 
 import { Node } from '@gxchain2/core';
+
+import { JsonRPCMiddleware } from './jsonrpcmiddleware';
+import { Controller } from './controller';
 
 export class RpcServer extends EventEmitter {
   protected readonly port: number;
@@ -33,19 +34,7 @@ export class RpcServer extends EventEmitter {
 
       app.use(jsonmid.makeMiddleWare());
       app.ws('/', (ws) => {
-        ws.on('message', (msg) => {
-          try {
-            jsonmid.rpcMiddleware(JSON.parse(msg), (res: any) => {
-              try {
-                ws.send(JSON.stringify(res));
-              } catch (err) {
-                this.emit('error', err);
-              }
-            });
-          } catch (err) {
-            this.emit('error', err);
-          }
-        });
+        jsonmid.wrapWs(ws, (err) => this.emit('error', err));
 
         ws.on('close', () => {
           console.log('WebSocket was closed');

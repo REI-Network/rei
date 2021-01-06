@@ -77,16 +77,34 @@ export class JsonRPCMiddleware {
     );
   }
 
-  async rpcMiddleware(rpcData: any, send: (res: any) => void, next?: any) {
+  async rpcMiddleware(rpcData: any, send: (res: any) => void, onParseError: () => void) {
     if (Array.isArray(rpcData)) {
       send(await this.handleBatchReq(rpcData));
     } else if (typeof rpcData === 'object') {
       send(await this.handleSingleReq(rpcData));
-    } else if (next !== undefined) {
-      next(new Error('JSON-RPC router error: req.body is required. Ensure that you install body-parser and apply it before json-router.'));
     } else {
-      send(new Error('JSON-RPC router error: req.body is required. Ensure that you install body-parser and apply it before json-router.'));
+      onParseError();
     }
+  }
+
+  wrapWs(ws: WebSocket, onError: (err: any) => void) {
+    ws.addEventListener('message', (msg) => {
+      try {
+        this.rpcMiddleware(
+          JSON.parse(msg.data),
+          (resps: any) => {
+            try {
+              ws.send(JSON.stringify(resps));
+            } catch (err) {
+              onError(err);
+            }
+          },
+          () => ws.send(JSON.stringify(errors.PARSE_ERROR))
+        );
+      } catch (err) {
+        onError(err);
+      }
+    });
   }
 
   makeMiddleWare() {
@@ -96,9 +114,11 @@ export class JsonRPCMiddleware {
       if (req.ws) {
         next();
       } else {
-        // let jsonmid = new jsonMiddleware({ methods: this.controller });
-        // console.log(typeof (req.body))
-        this.rpcMiddleware(req.body, (resquest: any) => res.send(resquest), next);
+        this.rpcMiddleware(
+          req.body,
+          (resps: any) => res.send(resps),
+          () => res.send(errors.PARSE_ERROR)
+        );
       }
     };
   }

@@ -279,15 +279,15 @@ export class Blockchain extends EventEmitter {
     try {
       const hash = await this.database.getHeadBlock();
       this._headBlockHash = hash;
-      ////////////////////
-      this._latestBlock = await this._getBlock(this._headBlockHash);
-      ////////////////////
     } catch (error) {
       if (error.type !== 'NotFoundError') {
         throw error;
       }
       this._headBlockHash = genesisHash;
     }
+    ////////////////////
+    this._latestBlock = await this._getBlock(this._headBlockHash);
+    ////////////////////
   }
 
   /**

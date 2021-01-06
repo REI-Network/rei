@@ -65,7 +65,7 @@ const startPrompts = async (node: Node) => {
       }
     } else if (arr[0] === 'mine' || arr[0] === 'm') {
       try {
-        const lastestHeader = (await node.blockchain.getHead()).header;
+        const lastestHeader = node.blockchain.latestBlock.header;
         const block = Block.fromBlockData(
           {
             header: {
@@ -103,7 +103,7 @@ const startPrompts = async (node: Node) => {
           );
           node.txPool.put(unsignedTx.sign(getPrivateKey(accounts[fromIndex])));
 
-          const lastestHeader = (await node.blockchain.getHead()).header;
+          const lastestHeader = node.blockchain.latestBlock.header;
           const block = Block.fromBlockData(
             {
               header: {
@@ -144,7 +144,7 @@ const startPrompts = async (node: Node) => {
         console.error('Get transaction error', err);
       }
     } else if (arr[0] === 'lsblock') {
-      const printBlock = async (key: number | Buffer) => {
+      const printBlock = async (key: number | Buffer): Promise<boolean> => {
         try {
           const block = await node.db.getBlock(key);
           console.log('block', '0x' + block.hash().toString('hex'), 'on height', block.header.number.toString(), ':', block.toJSON());
@@ -154,17 +154,16 @@ const startPrompts = async (node: Node) => {
           console.log('---------------');
         } catch (err) {
           if (err.type === 'NotFoundError') {
-            return;
+            return false;
           }
           throw err;
         }
+        return true;
       };
       if (arr[1]) {
         await printBlock(arr[1].indexOf('0x') !== 0 ? Number(arr[1]) : hexStringToBuffer(arr[1]));
       } else {
-        for (let h = 0; ; h++) {
-          await printBlock(h);
-        }
+        for (let h = 0; await printBlock(h); h++) {}
       }
     } else if (arr[0] === 'lsheight') {
       const height = node.blockchain.latestHeight;
@@ -190,7 +189,7 @@ const startPrompts = async (node: Node) => {
           gasPrice: '0x01',
           nonce: acc.nonce,
           to: arr[2],
-          value: arr[3]
+          value: '0x01'
         },
         { common: node.common }
       );

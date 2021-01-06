@@ -208,11 +208,11 @@ export class Database {
     const blockHeightBuffer = await this.get(DBTarget.TxLookup, { txHash });
     const blockHeihgt = new BN(blockHeightBuffer);
     const block = await this.getBlock(blockHeihgt);
-    const rawArr: Buffer[][] = await this.get(DBTarget.Receipts, { blockHash: block.hash(), blockNumber: blockHeihgt });
+    const rawArr = rlp.decode(await this.get(DBTarget.Receipts, { blockHash: block.hash(), blockNumber: blockHeihgt }));
     for (let i = 0; i < block.transactions.length; i++) {
       if (block.transactions[i].hash().equals(txHash)) {
         const raw = rawArr[i];
-        return Receipt.fromValuesArray(raw);
+        return Receipt.fromValuesArray((raw as any) as Buffer[]);
       }
     }
     throw new level.errors.NotFoundError();

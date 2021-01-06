@@ -121,16 +121,19 @@ async function runBlock(this: VM, opts: RunBlockOpts): Promise<{ result: PromisR
   // values to the current block, or validate the resulting
   // header values against the current block.
   if (generateStateRoot) {
-    block = Block.fromBlockData({
-      ...block,
-      header: {
-        ...block.header,
-        stateRoot,
-        receiptTrie: result.receiptRoot,
-        gasUsed: result.gasUsed,
-        bloom: result.bloom.bitvector
-      }
-    });
+    block = Block.fromBlockData(
+      {
+        ...block,
+        header: {
+          ...block.header,
+          stateRoot,
+          receiptTrie: result.receiptRoot,
+          gasUsed: result.gasUsed,
+          bloom: result.bloom.bitvector
+        }
+      },
+      { common: this._common }
+    );
   } else {
     if (result.receiptRoot && !result.receiptRoot.equals(block.header.receiptTrie)) {
       throw new Error('invalid receiptTrie');

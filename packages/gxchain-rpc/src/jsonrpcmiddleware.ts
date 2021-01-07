@@ -107,7 +107,7 @@ export class JsonRPCMiddleware {
     });
   }
 
-  makeMiddleWare() {
+  makeMiddleWare(onError: (err: any) => void) {
     return (req, res, next) => {
       let params = { ...req.query, ...req.body };
       console.log(req.url, 'in coming request parmas:', JSON.stringify(params, null, '  '));
@@ -118,7 +118,7 @@ export class JsonRPCMiddleware {
           req.body,
           (resps: any) => res.send(resps),
           () => res.send(errors.PARSE_ERROR)
-        );
+        ).catch(onError);
       }
     };
   }

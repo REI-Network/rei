@@ -32,10 +32,10 @@ export class RpcServer extends EventEmitter {
         const app = express();
         const server = http.createServer(app);
         const enableWs = expressws(app, server);
-        app.use(express.json({ type: '*/*' }));
         const jsonmid = new JsonRPCMiddleware({ methods: this.controller as any });
 
-        app.use(jsonmid.makeMiddleWare());
+        app.use(express.json({ type: '*/*' }));
+        app.use(jsonmid.makeMiddleWare((err) => this.emit('error', err)));
         app.ws('/', (ws) => {
           jsonmid.wrapWs(ws, (err) => this.emit('error', err));
 

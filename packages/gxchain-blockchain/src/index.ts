@@ -71,7 +71,7 @@ export class Blockchain extends EventEmitter {
   db: LevelUp;
   database: Database;
 
-  _ethash?: Ethash;
+  // _ethash?: Ethash;
 
   private _genesis?: Buffer; // the genesis hash of this blockchain
 
@@ -136,7 +136,7 @@ export class Blockchain extends EventEmitter {
         throw new Error('consensus validation only supported for pow ethash algorithm');
       }
 
-      this._ethash = new Ethash(this.db);
+      // this._ethash = new Ethash(this.db);
     }
 
     this._heads = {};
@@ -465,12 +465,12 @@ export class Blockchain extends EventEmitter {
       }
 
       if (this._validateConsensus) {
-        if (this._ethash) {
-          const valid = await this._ethash.verifyPOW(block);
-          if (!valid) {
-            throw new Error('invalid POW');
-          }
-        }
+        // if (this._ethash) {
+        //   const valid = await this._ethash.verifyPOW(block);
+        //   if (!valid) {
+        //     throw new Error('invalid POW');
+        //   }
+        // }
       }
 
       // set total difficulty in the current context scope

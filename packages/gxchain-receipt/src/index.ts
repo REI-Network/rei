@@ -1,8 +1,12 @@
-import { rlp, toBuffer, unpadBuffer, bufferToInt, BN, bufferToHex, bnToHex, intToHex } from 'ethereumjs-util';
+import { rlp, toBuffer, unpadBuffer, bufferToInt, BN, bufferToHex, bnToHex, intToHex, generateAddress } from 'ethereumjs-util';
+
+import { Block } from '@gxchain2/block';
+import { Transaction } from '@gxchain2/tx';
 
 export type ReceiptRawValue = (Buffer | LogRawValues[])[];
 
 export class Receipt {
+  // TODO: this should be cumulativeGasUsed.
   gasUsed: Buffer;
   bitvector: Buffer;
   logs: Log[];
@@ -51,6 +55,19 @@ export class Receipt {
 
   serialize(): Buffer {
     return rlp.encode(this.raw());
+  }
+
+  installProperties(block: Block, tx: Transaction, cumulativeGasUsed: BN, txIndex: number) {
+    this.blockHash = block.hash();
+    this.blockNumber = block.header.number;
+    this.from = tx.getSenderAddress().toBuffer();
+    this.contractAddress = generateAddress(this.from!, tx.nonce.toArrayLike(Buffer));
+    this.cumulativeGasUsed = cumulativeGasUsed;
+    this.to = tx?.to?.toBuffer();
+    this.transactionHash = tx.hash();
+    this.transactionIndex = txIndex;
+
+    this.logs.forEach((log, i) => log.installProperties(this, i));
   }
 
   toJSON() {
@@ -114,6 +131,14 @@ export class Log {
 
   serialize(): Buffer {
     return rlp.encode(this.raw());
+  }
+
+  installProperties(receipt: Receipt, logIndex: number) {
+    this.blockHash = receipt.blockHash;
+    this.blockNumber = receipt.blockNumber;
+    this.transactionHash = receipt.transactionHash;
+    this.transactionIndex = receipt.transactionIndex;
+    this.logIndex = logIndex;
   }
 
   toJSON() {

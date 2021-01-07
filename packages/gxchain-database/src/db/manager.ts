@@ -208,12 +208,16 @@ export class Database {
     const blockHeightBuffer = await this.get(DBTarget.TxLookup, { txHash });
     const blockHeihgt = new BN(blockHeightBuffer);
     const block = await this.getBlock(blockHeihgt);
-    const rawArr = rlp.decode(await this.get(DBTarget.Receipts, { blockHash: block.hash(), blockNumber: blockHeihgt }));
+    const rawArr = (rlp.decode(await this.get(DBTarget.Receipts, { blockHash: block.hash(), blockNumber: blockHeihgt })) as any) as Buffer[][];
+    const cumulativeGasUsed = new BN(0);
     for (let i = 0; i < block.transactions.length; i++) {
       const tx = block.transactions[i];
+      const raw = rawArr[i];
+      const receipt = Receipt.fromValuesArray(raw);
+      cumulativeGasUsed.iadd(new BN(receipt.gasUsed));
       if (tx.hash().equals(txHash)) {
-        const raw = rawArr[i];
-        return Receipt.fromValuesArray((raw as any) as Buffer[]);
+        receipt.installProperties(block, tx, cumulativeGasUsed, i);
+        return receipt;
       }
     }
     throw new level.errors.NotFoundError();

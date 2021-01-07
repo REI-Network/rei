@@ -130,7 +130,7 @@ const startPrompts = async (node: Node) => {
     } else if (arr[0] === 'lsreceipt') {
       try {
         const receipt = await node.db.getReceipt(hexStringToBuffer(arr[1]));
-        console.log(receipt.toJSON());
+        console.log(receipt.toRPCJSON());
       } catch (err) {
         console.error('Get receipt error', err);
       }

@@ -70,7 +70,7 @@ export class Receipt {
     this.logs.forEach((log, i) => log.installProperties(this, i));
   }
 
-  toJSON() {
+  toRPCJSON() {
     return {
       blockHash: this.blockHash ? bufferToHex(this.blockHash) : undefined,
       blockNumber: this.blockNumber ? bnToHex(this.blockNumber) : undefined,
@@ -78,7 +78,7 @@ export class Receipt {
       cumulativeGasUsed: this.cumulativeGasUsed ? bnToHex(this.cumulativeGasUsed) : undefined,
       from: this.from ? bufferToHex(this.from) : undefined,
       gasUsed: bufferToHex(this.gasUsed),
-      logs: this.logs.map((log) => log.toJSON()),
+      logs: this.logs.map((log) => log.toRPCJSON()),
       logsBloom: bufferToHex(this.bitvector),
       status: intToHex(this.status),
       to: this.to ? bufferToHex(this.to) : undefined,
@@ -141,7 +141,7 @@ export class Log {
     this.logIndex = logIndex;
   }
 
-  toJSON() {
+  toRPCJSON() {
     return {
       address: bufferToHex(this.address),
       blockHash: this.blockHash ? bufferToHex(this.blockHash) : undefined,

@@ -61,7 +61,7 @@ export class Receipt {
     this.blockHash = block.hash();
     this.blockNumber = block.header.number;
     this.from = tx.getSenderAddress().toBuffer();
-    this.contractAddress = generateAddress(this.from!, tx.nonce.toArrayLike(Buffer));
+    this.contractAddress = tx.to ? undefined : generateAddress(this.from!, tx.nonce.toArrayLike(Buffer));
     this.cumulativeGasUsed = cumulativeGasUsed;
     this.to = tx?.to?.toBuffer();
     this.transactionHash = tx.hash();

@@ -130,7 +130,7 @@ const startPrompts = async (node: Node) => {
     } else if (arr[0] === 'lsreceipt') {
       try {
         const receipt = await node.db.getReceipt(hexStringToBuffer(arr[1]));
-        console.log('receipt hash:', arr[1], 'gasUsed:', new BN(receipt.gasUsed).toString(), 'status:', receipt.status);
+        console.log(receipt.toJSON());
       } catch (err) {
         console.error('Get receipt error', err);
       }

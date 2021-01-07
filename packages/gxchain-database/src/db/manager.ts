@@ -210,7 +210,8 @@ export class Database {
     const block = await this.getBlock(blockHeihgt);
     const rawArr = rlp.decode(await this.get(DBTarget.Receipts, { blockHash: block.hash(), blockNumber: blockHeihgt }));
     for (let i = 0; i < block.transactions.length; i++) {
-      if (block.transactions[i].hash().equals(txHash)) {
+      const tx = block.transactions[i];
+      if (tx.hash().equals(txHash)) {
         const raw = rawArr[i];
         return Receipt.fromValuesArray((raw as any) as Buffer[]);
       }

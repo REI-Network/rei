@@ -1,4 +1,4 @@
-import { rlp, toBuffer, unpadBuffer, bufferToInt } from 'ethereumjs-util';
+import { rlp, toBuffer, unpadBuffer, bufferToInt, BN } from 'ethereumjs-util';
 
 export type ReceiptRawValue = (Buffer | LogRawValues[])[];
 
@@ -7,6 +7,15 @@ export class Receipt {
   bitvector: Buffer;
   logs: Log[];
   status: 0 | 1;
+
+  blockHash?: Buffer;
+  blockNumber?: BN;
+  contractAddress?: Buffer;
+  cumulativeGasUsed?: BN;
+  from?: Buffer;
+  to?: Buffer;
+  transactionHash?: Buffer;
+  transactionIndex?: number;
 
   constructor(gasUsed: Buffer, bitvector: Buffer, logs: Log[], status: 0 | 1) {
     this.gasUsed = gasUsed;
@@ -27,7 +36,7 @@ export class Receipt {
     if (values.length !== 4) {
       throw new Error('Invalid receipt. Only expecting 4 values.');
     }
-    const [gasUsed, bitvector, rawLogs, status] = values as [Buffer, Buffer, LogRawValues[], Buffer];
+    const [status, gasUsed, bitvector, rawLogs] = values as [Buffer, Buffer, Buffer, LogRawValues[]];
     return new Receipt(
       gasUsed,
       bitvector,
@@ -37,7 +46,7 @@ export class Receipt {
   }
 
   raw(): ReceiptRawValue {
-    return [this.gasUsed, this.bitvector, this.logs.map((l) => l.raw()), unpadBuffer(toBuffer(this.status))];
+    return [unpadBuffer(toBuffer(this.status)), this.gasUsed, this.bitvector, this.logs.map((l) => l.raw())];
   }
 
   serialize(): Buffer {
@@ -47,9 +56,9 @@ export class Receipt {
   toJSON() {
     return {
       gasUsed: '0x' + this.gasUsed.toString('hex'),
-      bitvector: '0x' + this.bitvector.toString('hex'),
+      logsBloom: '0x' + this.bitvector.toString('hex'),
       logs: this.logs.map((log) => log.toJSON()),
-      status: this.status
+      status: '0x' + new BN(this.status).toString('hex')
     };
   }
 }
@@ -61,6 +70,13 @@ export class Log {
   address: Buffer;
   topics: Buffer[];
   data: Buffer;
+
+  blockHash?: Buffer;
+  blockNumber?: BN;
+  logIndex?: number;
+  removed?: boolean;
+  transactionHash?: Buffer;
+  transactionIndex?: number;
 
   constructor(address: Buffer, topics: Buffer[], data: Buffer) {
     this.address = address;

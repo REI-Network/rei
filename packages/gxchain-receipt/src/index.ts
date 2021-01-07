@@ -1,4 +1,4 @@
-import { rlp, toBuffer, unpadBuffer, bufferToInt, BN } from 'ethereumjs-util';
+import { rlp, toBuffer, unpadBuffer, bufferToInt, BN, bufferToHex, bnToHex, intToHex } from 'ethereumjs-util';
 
 export type ReceiptRawValue = (Buffer | LogRawValues[])[];
 
@@ -55,10 +55,18 @@ export class Receipt {
 
   toJSON() {
     return {
-      gasUsed: '0x' + this.gasUsed.toString('hex'),
-      logsBloom: '0x' + this.bitvector.toString('hex'),
+      blockHash: this.blockHash ? bufferToHex(this.blockHash) : undefined,
+      blockNumber: this.blockNumber ? bnToHex(this.blockNumber) : undefined,
+      contractAddress: this.contractAddress ? bufferToHex(this.contractAddress) : null,
+      cumulativeGasUsed: this.cumulativeGasUsed ? bnToHex(this.cumulativeGasUsed) : undefined,
+      from: this.from ? bufferToHex(this.from) : undefined,
+      gasUsed: bufferToHex(this.gasUsed),
       logs: this.logs.map((log) => log.toJSON()),
-      status: '0x' + new BN(this.status).toString('hex')
+      logsBloom: bufferToHex(this.bitvector),
+      status: intToHex(this.status),
+      to: this.to ? bufferToHex(this.to) : undefined,
+      transactionHash: this.transactionHash ? bufferToHex(this.transactionHash) : undefined,
+      transactionIndex: this.transactionIndex !== undefined ? intToHex(this.transactionIndex) : undefined
     };
   }
 }
@@ -110,9 +118,15 @@ export class Log {
 
   toJSON() {
     return {
-      address: '0x' + this.address.toString('hex'),
-      topics: this.topics.map((topic) => '0x' + topic.toString('hex')),
-      data: '0x' + this.data.toString('hex')
+      address: bufferToHex(this.address),
+      blockHash: this.blockHash ? bufferToHex(this.blockHash) : undefined,
+      blockNumber: this.blockNumber ? bnToHex(this.blockNumber) : undefined,
+      data: bufferToHex(this.data),
+      logIndex: this.logIndex !== undefined ? intToHex(this.logIndex) : undefined,
+      removed: this.removed,
+      topics: this.topics.map((topic) => bufferToHex(topic)),
+      transactionHash: this.transactionHash ? bufferToHex(this.transactionHash) : undefined,
+      transactionIndex: this.transactionIndex !== undefined ? intToHex(this.transactionIndex) : undefined
     };
   }
 }

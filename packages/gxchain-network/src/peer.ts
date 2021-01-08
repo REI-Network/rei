@@ -14,10 +14,10 @@ import { constants } from '@gxchain2/common';
 export class PeerRequestTimeoutError extends Error {}
 
 declare interface MsgQueue {
-  on(event: 'message' | 'status', listener: (queue: MsgQueue, message: any) => void): this;
+  on(event: 'status', listener: (queue: MsgQueue, message: any) => void): this;
   on(event: 'error', listener: (queue: MsgQueue, error: any) => void): this;
 
-  once(event: 'message' | 'status', listener: (queue: MsgQueue, message: any) => void): this;
+  once(event: 'status', listener: (queue: MsgQueue, message: any) => void): this;
   once(event: 'error', listener: (queue: MsgQueue, error: any) => void): this;
 }
 
@@ -204,9 +204,6 @@ export class Peer extends EventEmitter {
     const queue = new MsgQueue(this, protocol);
     queue.on('status', (q, message) => {
       this.emit(`status:${q.name}`, this, message, protocol);
-    });
-    queue.on('message', (q, message) => {
-      this.emit('message', this, message, protocol);
     });
     queue.on('error', (q, err) => {
       this.emit('error', this, err);

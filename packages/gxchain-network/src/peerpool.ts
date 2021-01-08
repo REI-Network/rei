@@ -2,16 +2,13 @@ import { EventEmitter } from 'events';
 
 import type { Peer } from './peer';
 import type { Libp2pNode } from './p2p';
-import type { Protocol } from './protocol';
 
 export declare interface PeerPool {
   on(event: 'error', listener: (err: any) => void): this;
   on(event: 'added' | 'removed' | 'banned' | 'idle' | 'busy', listener: (peer: Peer) => void): this;
-  on(event: 'message', listener: (message: any, protocol: Protocol, peer: Peer) => void): this;
 
   once(event: 'error', listener: (err: any) => void): this;
   once(event: 'added' | 'removed' | 'banned' | 'idle' | 'busy', listener: (peer: Peer) => void): this;
-  once(event: 'message', listener: (message: any, protocol: Protocol, peer: Peer) => void): this;
 }
 
 export class PeerPool extends EventEmitter {
@@ -56,12 +53,9 @@ export class PeerPool extends EventEmitter {
   }
 
   connected(peer: Peer) {
-    if (this.size >= this.maxSize) return;
-    peer.on('message', (_, message: any, protocol: Protocol) => {
-      if (this.pool.get(peer.peerId)) {
-        this.emit('message', message, protocol, peer);
-      }
-    });
+    if (this.size >= this.maxSize) {
+      return;
+    }
     peer.on('idle', (peer) => {
       if (this.pool.get(peer.peerId)) {
         this.emit('idle', peer);

@@ -112,25 +112,6 @@ export class Node implements INode {
         )
       )
     });
-    this.peerpool.on('message', async ({ name, data }, protocol, peer) => {
-      try {
-        switch (name) {
-          case 'GetBlockHeaders':
-            const { start, count } = data;
-            const blocks = await this.blockchain.getBlocks(start, count, 0, false);
-            peer.send(
-              protocol.name,
-              'BlockHeaders',
-              blocks.map((b) => b.header)
-            );
-            break;
-          default:
-            throw new Error(`unkonw method name, ${name}`);
-        }
-      } catch (err) {
-        console.error('Node handle message error:', err);
-      }
-    });
 
     let genesisBlock!: Block;
     try {

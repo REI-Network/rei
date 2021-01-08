@@ -19,7 +19,7 @@ type Task = {
 };
 
 export class FullSynchronizer extends Synchronizer {
-  private readonly downloadQueue: OrderedQueue<Task>;
+  private readonly downloadQueue: OrderedQueue<Task, Block[]>;
   private readonly taskQueue: AysncHeapChannel<{ data: Task; index: number }>;
   private readonly resultQueue: AysncChannel<Block[]>;
   private readonly idlePeerQueue: AsyncQueue<Peer>;
@@ -57,21 +57,18 @@ export class FullSynchronizer extends Synchronizer {
       limit: options.limit || 16,
       processTask: this.download.bind(this)
     });
-    this.downloadQueue.on('error', (queue, err, task, index) => {
+    this.downloadQueue.on('error', (err, data, index) => {
       if (err instanceof OrderedQueueAbortError) {
-        if (task.peer) {
-          task.peer.idle = true;
+        if (data.peer) {
+          data.peer.idle = true;
         }
       } else {
         this.emit('error', err);
-        this.taskQueue.push({ data: task, index });
+        this.taskQueue.push({ data, index });
       }
     });
-    this.downloadQueue.on('result', (queue, data, result: any) => {
-      this.resultQueue.push(result);
-    });
-    this.downloadQueue.on('over', (queue) => {
-      this.resultQueue.abort();
+    this.downloadQueue.on('result', (data, result) => {
+      this.resultQueue.push(result!);
     });
 
     this.node.peerpool.on('idle', (peer) => {
@@ -167,6 +164,7 @@ export class FullSynchronizer extends Synchronizer {
         } catch (err) {
           this.emit('error', err);
         } finally {
+          this.resultQueue.abort();
           resolve(result);
         }
       }),

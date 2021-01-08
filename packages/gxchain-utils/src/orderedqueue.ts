@@ -14,13 +14,11 @@ type Task<TData, TResult> = {
 export class OrderedQueueAbortError extends Error {}
 
 export declare interface OrderedQueue<TData = any, TResult = any> {
-  on(event: 'over', listener: (queue: OrderedQueue) => void): this;
-  on(event: 'result', listener: (queue: OrderedQueue, data: TData, result?: TResult) => void): this;
-  on(event: 'error', listener: (queue: OrderedQueue, err: any, data: TData, index: number, result?: TResult) => void): this;
+  on(event: 'result', listener: (data: TData, result?: TResult) => void): this;
+  on(event: 'error', listener: (err: any, data: TData, index: number, result?: TResult) => void): this;
 
-  once(event: 'over', listener: (queue: OrderedQueue) => void): this;
-  once(event: 'result', listener: (queue: OrderedQueue, data: TData, result?: TResult) => void): this;
-  once(event: 'error', listener: (queue: OrderedQueue, err: any, data: TData, index: number, result?: TResult) => void): this;
+  once(event: 'result', listener: (data: TData, result?: TResult) => void): this;
+  once(event: 'error', listener: (err: any, data: TData, index: number, result?: TResult) => void): this;
 }
 
 export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
@@ -46,7 +44,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     } else {
       while (this.out.length > 0) {
         const task = this.out.remove();
-        this.emit('error', this, new OrderedQueueAbortError('OrderedQueue abort'), task.data, task.index, task.result);
+        this.emit('error', new OrderedQueueAbortError('OrderedQueue abort'), task.data, task.index, task.result);
       }
     }
   }
@@ -56,7 +54,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     while (task && task.index === this.processed) {
       task = this.out.remove();
       this.processed++;
-      this.emit('result', this, task.data, task.result);
+      this.emit('result', task.data, task.result);
       if (this.processed === this.total) {
         this.resolvePromise();
         return;
@@ -118,7 +116,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
           this.dequeue();
         })
         .catch((err) => {
-          this.emit('error', this, err, task.data, task.index, task.result);
+          this.emit('error', err, task.data, task.index, task.result);
         })
         .finally(() => {
           processOver(p);
@@ -133,6 +131,5 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     this.processed = 0;
     runningResolve();
     this.runningPromise = undefined;
-    this.emit('over', this);
   }
 }

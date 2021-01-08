@@ -204,17 +204,19 @@ const startPrompts = async (node: Node) => {
 
 (async () => {
   try {
+    const dirName = args[0] || 'test-node-01';
+    const rpcPort = Number(args[1]) || 12358;
     const testdir = path.join(__dirname, './test-dir');
     if (!fs.existsSync(testdir)) {
       fs.mkdirSync(testdir);
     }
-    const dir = path.join(testdir, args[0] || 'test-node-01');
+    const dir = path.join(testdir, dirName);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir);
     }
     const node = new Node(dir);
     await node.init();
-    const rpcServer = new RpcServer(12358, '::1', node).on('error', (err: any) => {
+    const rpcServer = new RpcServer(rpcPort, '::1', node).on('error', (err: any) => {
       console.error('rpc server error', err);
       process.exit(1);
     });

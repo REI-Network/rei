@@ -175,7 +175,6 @@ export class Node implements INode {
 
     await this.blockchain.init();
     await this.vm.init();
-    await this.vm.runOrGenerateBlockchain();
     this.sync.start();
   }
 
@@ -190,7 +189,7 @@ export class Node implements INode {
       generate: !!blockSkeleton.header.stateRoot,
       skipBlockValidation: true
     };
-    const { result, block } = await this.vm.runOrGenerateBlock(opts);
+    const { result, block } = await this.vm.runBlock(opts);
     blockSkeleton = block || blockSkeleton;
     await this.blockchain.putBlock(blockSkeleton);
     await this.db.batch([DBSaveReceipts(result.receipts, blockSkeleton.hash(), blockSkeleton.header.number)]);

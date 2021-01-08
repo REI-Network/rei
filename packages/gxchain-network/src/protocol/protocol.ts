@@ -1,4 +1,5 @@
 import type { Peer } from '../peer';
+import type { INode } from '../p2p';
 
 export type Handler = {
   name: string;
@@ -6,6 +7,7 @@ export type Handler = {
   response?: number;
   encode: (data: any) => any;
   decode: (data: any) => any;
+  process?: (node: INode, data: any) => Promise<[string, any]> | [string, any] | void;
 };
 
 export class Protocol {
@@ -31,7 +33,7 @@ export class Protocol {
     throw new Error('Unimplemented');
   }
 
-  handle(data: Buffer): { code: number; name: string; data: any } {
+  handle(data: Buffer): { code: number; handler: Handler; payload: any } {
     throw new Error('Unimplemented');
   }
 

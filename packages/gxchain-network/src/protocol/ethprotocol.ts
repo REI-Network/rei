@@ -4,6 +4,7 @@ import { constants } from '@gxchain2/common';
 import { BlockHeader, BlockHeaderBuffer } from '@gxchain2/block';
 
 import { Protocol, Handler } from './protocol';
+import type { INode } from '../p2p';
 
 const handlers: Handler[] = [
   {
@@ -35,6 +36,10 @@ const handlers: Handler[] = [
     },
     decode: ([start, count]: Buffer[]) => {
       return { start: bufferToInt(start), count: bufferToInt(count) };
+    },
+    async process(node: INode, { start, count }: { start: number; count: number }): Promise<[string, any]> {
+      const blocks = await node.blockchain.getBlocks(start, count, 0, false);
+      return ['BlockHeaders', blocks.map((b) => b.header)];
     }
   },
   {
@@ -77,11 +82,11 @@ export class ETHProtocol extends Protocol {
     return handler;
   }
 
-  handle(data: Buffer): { code: number; name: string; data: any } {
+  handle(data: Buffer): { code: number; handler: Handler; payload: any } {
     let [code, payload]: any = rlp.decode(data);
     code = bufferToInt(code);
     const handler = this.findHandler(code);
-    return { code, name: handler.name, data: handler.decode(payload) };
+    return { code, handler, payload };
   }
 
   encode(key: string | number, data: any): any {

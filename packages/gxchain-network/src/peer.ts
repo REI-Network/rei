@@ -22,6 +22,7 @@ declare interface MsgQueue {
 }
 
 class MsgQueue extends EventEmitter {
+  private readonly peer: Peer;
   private readonly aborter = new Aborter();
   private readonly queue: AsyncQueue;
   readonly protocol: Protocol;
@@ -35,8 +36,9 @@ class MsgQueue extends EventEmitter {
     }
   >();
 
-  constructor(protocol: Protocol) {
+  constructor(peer: Peer, protocol: Protocol) {
     super();
+    this.peer = peer;
     this.protocol = protocol;
     this.queue = new AsyncQueue({
       push: (data: any) => {
@@ -113,7 +115,8 @@ class MsgQueue extends EventEmitter {
 
         try {
           // TODO: fix _bufs.
-          const { code, name, data } = this.protocol.handle(value._bufs[0]);
+          const { code, handler, payload } = this.protocol.handle(value._bufs[0]);
+          const data = handler.decode(payload);
           if (code === 0) {
             this.emit('status', this, data);
           } else {
@@ -122,8 +125,22 @@ class MsgQueue extends EventEmitter {
               clearTimeout(request.timeout);
               this.waitingRequests.delete(code);
               request.resolve(data);
-            } else {
-              this.emit('message', this, { name, data });
+            } else if (handler.process) {
+              const result = handler.process(this.peer.node.node, data);
+              if (result) {
+                if (Array.isArray(result)) {
+                  const [method, resps] = result;
+                  this.send(method, resps);
+                } else {
+                  result
+                    .then(([method, resps]) => {
+                      this.send(method, resps);
+                    })
+                    .catch((err) => {
+                      console.error('MsgQueue handle failed', err);
+                    });
+                }
+              }
             }
           }
         } catch (err) {
@@ -184,7 +201,7 @@ export class Peer extends EventEmitter {
   }
 
   private makeQueue(protocol: Protocol) {
-    const queue = new MsgQueue(protocol);
+    const queue = new MsgQueue(this, protocol);
     queue.on('status', (q, message) => {
       this.emit(`status:${q.name}`, this, message, protocol);
     });

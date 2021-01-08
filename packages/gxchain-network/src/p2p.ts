@@ -8,7 +8,8 @@ import secio from 'libp2p-secio';
 import Bootstrap from 'libp2p-bootstrap';
 
 import { constants } from '@gxchain2/common';
-import { INode } from '@gxchain2/interface';
+import { Blockchain } from '@gxchain2/blockchain';
+import { Database } from '@gxchain2/database';
 
 import { Peer } from './peer';
 import { Protocol, ETHProtocol } from './protocol';
@@ -22,6 +23,12 @@ function parseProtocol(name: string): Protocol {
   throw new Error(`Unkonw protocol: ${name}`);
 }
 
+export interface INode {
+  db: Database;
+  blockchain: Blockchain;
+  status: any;
+}
+
 export declare interface Libp2pNode {
   on(event: 'connected', listener: (peer: Peer) => void);
   on(event: 'error', listener: (err: any) => void);
@@ -30,10 +37,10 @@ export declare interface Libp2pNode {
 }
 
 export class Libp2pNode extends Libp2p {
+  readonly node: INode;
   private readonly peers = new Map<string, Peer>();
   private readonly protocols: Protocol[];
   private readonly banned = new Map<string, number>();
-  private readonly node: INode;
   private started: boolean = false;
 
   constructor(options: { node: INode; peerId: PeerId; bootnodes?: string[]; protocols: Set<string> }) {

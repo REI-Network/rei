@@ -181,7 +181,7 @@ export class Node implements INode {
   async processBlock(blockSkeleton: Block) {
     const header = this.blockchain.latestBlock.header;
     if (!blockSkeleton.header.parentHash.equals(header.hash())) {
-      throw new Error(`Node invalid block ${blockSkeleton.toJSON()}`);
+      throw new Error(`Node invalid block ${JSON.stringify(blockSkeleton.toJSON(), null, '  ')}`);
     }
     const opts = {
       block: blockSkeleton,

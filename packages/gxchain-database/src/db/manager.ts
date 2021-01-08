@@ -196,8 +196,10 @@ export class Database {
     const blockHeightBuffer = await this.get(DBTarget.TxLookup, { txHash });
     const blockHeihgt = new BN(blockHeightBuffer);
     const block = await this.getBlock(blockHeihgt);
-    for (const tx of block.transactions) {
+    for (let i = 0; i < block.transactions.length; i++) {
+      const tx = block.transactions[i];
       if (tx.hash().equals(txHash)) {
+        tx.installProperties(block, i);
         return tx;
       }
     }

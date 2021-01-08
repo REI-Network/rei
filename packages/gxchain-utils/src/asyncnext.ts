@@ -78,7 +78,7 @@ export class AsyncQueue<T = any> extends AsyncNext<T> {
 }
 
 interface AsyncHeapOption<T> {
-  compare?: (a: T, b: T) => number;
+  compare?: (a: T, b: T) => boolean;
   push?: (data: T | null) => void;
   hasNext?: () => boolean;
   next?: () => T | null;
@@ -86,7 +86,7 @@ interface AsyncHeapOption<T> {
 
 export class AsyncHeap<T = any> extends AsyncNext<T> {
   private h: Heap;
-  private compare?: (a: T, b: T) => number;
+  private compare?: (a: T, b: T) => boolean;
 
   constructor(options?: AsyncHeapOption<T>) {
     super(

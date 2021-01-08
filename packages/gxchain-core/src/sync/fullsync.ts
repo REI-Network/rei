@@ -1,4 +1,4 @@
-import { OrderedQueue, OrderedQueueAbortError, AsyncQueue, AysncChannel } from '@gxchain2/utils';
+import { OrderedQueue, OrderedQueueAbortError, AsyncQueue, AysncChannel, AysncHeapChannel } from '@gxchain2/utils';
 import { constants } from '@gxchain2/common';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 import { Block, BlockHeader } from '@gxchain2/block';
@@ -20,7 +20,7 @@ type Task = {
 
 export class FullSynchronizer extends Synchronizer {
   private readonly downloadQueue: OrderedQueue<Task>;
-  private readonly taskQueue: AysncChannel<{ task: Task; index?: number }>;
+  private readonly taskQueue: AysncHeapChannel<{ data: Task; index: number }>;
   private readonly resultQueue: AysncChannel<Block[]>;
   private readonly idlePeerQueue: AsyncQueue<Peer>;
   private readonly count: number;
@@ -35,7 +35,8 @@ export class FullSynchronizer extends Synchronizer {
     this.timeoutBanTime = options.timeoutBanTime || 300000;
     this.errorBanTime = options.errorBanTime || 60000;
 
-    this.taskQueue = new AysncChannel<{ task: Task; index?: number }>({
+    this.taskQueue = new AysncHeapChannel<{ data: Task; index: number }>({
+      compare: (a, b) => a.index < b.index,
       isAbort: () => this.abortFlag
     });
     this.resultQueue = new AysncChannel<Block[]>({
@@ -58,10 +59,12 @@ export class FullSynchronizer extends Synchronizer {
     });
     this.downloadQueue.on('error', (queue, err, task, index) => {
       if (err instanceof OrderedQueueAbortError) {
-        task.peer!.idle = true;
+        if (task.peer) {
+          task.peer.idle = true;
+        }
       } else {
         this.emit('error', err);
-        this.taskQueue.push({ task, index });
+        this.taskQueue.push({ data: task, index });
       }
     });
     this.downloadQueue.on('result', (queue, data, result: any) => {
@@ -78,7 +81,7 @@ export class FullSynchronizer extends Synchronizer {
     });
   }
 
-  private async download(task: Task) {
+  private async download(task: Task): Promise<Block[]> {
     const peer = task.peer!;
     try {
       const headers: BlockHeader[] = await peer.getBlockHeaders(task.start, task.count);
@@ -90,14 +93,7 @@ export class FullSynchronizer extends Synchronizer {
       );
       const blocks = bodies.map(([txsData, unclesData], i: number) => Block.fromValuesArray([headers[i].raw(), txsData, unclesData], { common: this.node.common }));
       */
-      const blocks = headers.map((h) =>
-        Block.fromBlockData(
-          {
-            header: h
-          },
-          { common: this.node.common }
-        )
-      );
+      const blocks = headers.map((h) => Block.fromBlockData({ header: h }, { common: this.node.common }));
       peer.idle = true;
       return blocks;
     } catch (err) {
@@ -137,11 +133,13 @@ export class FullSynchronizer extends Synchronizer {
     let totalTaskCount = 0;
     while (totalCount > 0) {
       this.taskQueue.push({
-        task: {
-          start: totalTaskCount++ * this.count + latestHeight + 1,
+        data: {
+          start: totalTaskCount * this.count + latestHeight + 1,
           count: totalCount > this.count ? this.count : totalCount
-        }
+        },
+        index: totalTaskCount
       });
+      totalTaskCount++;
       totalCount -= this.count;
     }
 
@@ -149,26 +147,22 @@ export class FullSynchronizer extends Synchronizer {
       new Promise<boolean>(async (resolve) => {
         let result = false;
         try {
-          for await (const taskInfo of this.taskQueue.generator()) {
-            const peer = await this.idlePeerQueue.next();
-            if (peer === null) {
-              break;
-            }
-            peer.idle = false;
-            taskInfo.task.peer = peer;
-            this.downloadQueue.insert(taskInfo.task, taskInfo?.index);
-          }
-          result = true;
-        } catch (err) {
-          this.emit('error', err);
-        } finally {
-          resolve(result);
-        }
-      }),
-      new Promise<boolean>(async (resolve) => {
-        let result = false;
-        try {
-          await this.downloadQueue.start(totalTaskCount);
+          await this.downloadQueue.start(
+            totalTaskCount,
+            async function* (this: FullSynchronizer) {
+              for await (const taskInfo of this.taskQueue.generator()) {
+                if (!taskInfo.data.peer) {
+                  const peer = await this.idlePeerQueue.next();
+                  if (peer === null) {
+                    break;
+                  }
+                  peer.idle = false;
+                  taskInfo.data.peer = peer;
+                }
+                yield taskInfo;
+              }
+            }.bind(this)()
+          );
           result = true;
         } catch (err) {
           this.emit('error', err);

@@ -3,7 +3,7 @@ import util from 'util';
 
 import Heap from 'qheap';
 
-import { AsyncNext, AsyncQueue } from './asyncnext';
+import { AsyncQueue } from './asyncnext';
 
 type Task<TData, TResult> = {
   data: TData;
@@ -26,45 +26,21 @@ export declare interface OrderedQueue<TData = any, TResult = any> {
 export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
   private readonly limit: number;
   private readonly processTask: (data: TData) => Promise<TResult> | TResult;
-  private readonly taskQueue: AsyncNext<Task<TData, TResult>>;
   private readonly limitQueue = new AsyncQueue<void>();
-  private in!: Heap;
   private out!: Heap;
   private total: number = 0;
-  private currentTotal: number = 0;
   private processed: number = 0;
   private abortFlag: boolean = false;
   private runningPromise?: Promise<void>;
 
-  constructor(options: { limit: number; taskData?: TData[]; processTask: (data: TData) => Promise<TResult> | TResult }) {
+  constructor(options: { limit: number; processTask: (data: TData) => Promise<TResult> | TResult }) {
     super();
     this.limit = options.limit;
     this.processTask = options.processTask;
     this.resetHeap();
-    this.taskQueue = new AsyncNext<Task<TData, TResult>>({
-      push: (task: Task<TData, TResult> | null) => {
-        if (task !== null) {
-          this.in.insert(task);
-        }
-      },
-      hasNext: () => this.in.length > 0,
-      next: () => this.in.remove()
-    });
-    if (options.taskData) {
-      options.taskData.forEach((data) => this.insert(data));
-    }
   }
 
   private resetHeap() {
-    if (this.in === undefined) {
-      this.in = new Heap({ comparBefore: (a: Task<TData, TResult>, b: Task<TData, TResult>) => a.index < b.index });
-    } else {
-      while (this.in.length > 0) {
-        const task = this.in.remove();
-        this.emit('error', this, new OrderedQueueAbortError('OrderedQueue abort'), task.data, task.index, task.result);
-      }
-    }
-
     if (this.out === undefined) {
       this.out = new Heap({ comparBefore: (a: Task<TData, TResult>, b: Task<TData, TResult>) => a.index < b.index });
     } else {
@@ -73,10 +49,6 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
         this.emit('error', this, new OrderedQueueAbortError('OrderedQueue abort'), task.data, task.index, task.result);
       }
     }
-  }
-
-  private enqueue(task: Task<TData, TResult>) {
-    this.taskQueue.push(task);
   }
 
   private dequeue() {
@@ -94,20 +66,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     }
   }
 
-  private async *generator(): AsyncGenerator<Task<TData, TResult>> {
-    while (!this.abortFlag) {
-      const task = await this.taskQueue.next();
-      if (this.abortFlag || task === null) {
-        return;
-      }
-      yield task;
-    }
-  }
-
   private resolvePromise() {
-    if (this.taskQueue.isWaiting) {
-      this.taskQueue.push(null);
-    }
     if (this.limitQueue.isWaiting) {
       this.limitQueue.push();
     }
@@ -129,17 +88,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     this.abortFlag = false;
   }
 
-  insert(data: TData, index?: number) {
-    if (this.abortFlag) {
-      throw new Error('OrderedQueue already aborted');
-    }
-    this.enqueue({
-      data,
-      index: index || this.currentTotal++
-    });
-  }
-
-  async start(total: number) {
+  async start(total: number, generator: AsyncGenerator<Task<TData, TResult>>) {
     if (this.runningPromise || this.abortFlag) {
       throw new Error('OrderedQueue already started or aborted');
     }
@@ -159,7 +108,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
     const makePromise = () => {
       return promiseArray.length < this.limit ? Promise.resolve() : this.limitQueue.next();
     };
-    for await (const task of this.generator()) {
+    for await (const task of generator) {
       let result = this.processTask(task.data);
       result = (util.types.isPromise(result) ? result : Promise.resolve(result)) as Promise<TResult>;
       const p = result
@@ -169,7 +118,7 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
           this.dequeue();
         })
         .catch((err) => {
-          this.emit('error', this, err, task.data, task.index);
+          this.emit('error', this, err, task.data, task.index, task.result);
         })
         .finally(() => {
           processOver(p);
@@ -181,7 +130,6 @@ export class OrderedQueue<TData = any, TResult = any> extends EventEmitter {
       await Promise.all(promiseArray);
     }
     this.total = 0;
-    this.currentTotal = 0;
     this.processed = 0;
     runningResolve();
     this.runningPromise = undefined;

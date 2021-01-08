@@ -1,4 +1,4 @@
-import { Transaction } from '@ethereumjs/tx';
+import { Transaction } from '@gxchain2/tx';
 import BN from 'bn.js';
 
 class FakeTransactionPool {

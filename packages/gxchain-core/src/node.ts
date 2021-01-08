@@ -13,7 +13,7 @@ import { Libp2pNode, PeerPool } from '@gxchain2/network';
 import { Common, constants, defaultGenesis } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { StateManager } from '@gxchain2/state-manager';
-import { VM } from '@gxchain2/vm';
+import VM from '@gxchain2/vm';
 import { TransactionPool } from '@gxchain2/tx-pool';
 import { Block } from '@gxchain2/block';
 

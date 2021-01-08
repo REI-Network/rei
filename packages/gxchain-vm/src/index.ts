@@ -1,288 +1,333 @@
-import EthereumJSVM from '@ethereumjs/vm';
-import { BaseTrie as Trie } from 'merkle-patricia-tree';
-import { toBuffer, Address, BN } from 'ethereumjs-util';
-
-import type { RunBlockOpts } from '@ethereumjs/vm/dist/runBlock';
-import type { RunTxResult } from '@ethereumjs/vm/dist/runTx';
-import Bloom from '@ethereumjs/vm/dist/bloom';
-import { StateManager } from '@ethereumjs/vm/dist/state/interface';
+import { SecureTrie as Trie } from 'merkle-patricia-tree';
+import { Account, Address } from 'ethereumjs-util';
 
 import { Blockchain } from '@gxchain2/blockchain';
-import { Block } from '@gxchain2/block';
-import { Receipt, Log } from '@gxchain2/receipt';
+import { Common } from '@gxchain2/common';
 
-class VM extends EthereumJSVM {
-  async runOrGenerateBlockchain(blockchain?: Blockchain): Promise<void> {
+import { StateManager, DefaultStateManager } from './state/index';
+import { default as runCode, RunCodeOpts } from './runCode';
+import { default as runCall, RunCallOpts } from './runCall';
+import { default as runTx, RunTxOpts, RunTxResult } from './runTx';
+import { default as runBlock, RunBlockOpts, RunBlockResult } from './runBlock';
+import { EVMResult, ExecResult } from './evm/evm';
+import { OpcodeList, getOpcodesForHF } from './evm/opcodes';
+import { precompiles } from './evm/precompiles';
+import runBlockchain from './runBlockchain';
+const AsyncEventEmitter = require('async-eventemitter');
+const promisify = require('util.promisify');
+
+// eslint-disable-next-line no-undef
+const IS_BROWSER = typeof (<any>globalThis).window === 'object'; // very ugly way to detect if we are running in a browser
+let mcl: any;
+let mclInitPromise: any;
+
+if (!IS_BROWSER) {
+  mcl = require('mcl-wasm');
+  mclInitPromise = mcl.init(mcl.BLS12_381);
+}
+
+/**
+ * Options for instantiating a [[VM]].
+ */
+export interface VMOpts {
+  /**
+   * Use a [common](https://github.com/ethereumjs/ethereumjs-vm/packages/common) instance
+   * if you want to change the chain setup.
+   *
+   * ### Possible Values
+   *
+   * - `chain`: all chains supported by `Common` or a custom chain
+   * - `hardfork`: `mainnet` hardforks up to the `MuirGlacier` hardfork
+   * - `eips`: `2537` (usage e.g. `eips: [ 2537, ]`)
+   *
+   * ### Supported EIPs
+   *
+   * - [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537) (`experimental`) - BLS12-381 precompiles
+   * - [EIP-2929](https://eips.ethereum.org/EIPS/eip-2929) (`experimental`) - Gas cost increases for state access opcodes
+   *
+   * *Annotations:*
+   *
+   * - `experimental`: behaviour can change on patch versions
+   *
+   * ### Default Setup
+   *
+   * Default setup if no `Common` instance is provided:
+   *
+   * - `chain`: `mainnet`
+   * - `hardfork`: `istanbul`
+   * - `eips`: `[]`
+   */
+  common?: Common;
+  /**
+   * A [[StateManager]] instance to use as the state store (Beta API)
+   */
+  stateManager?: StateManager;
+  /**
+   * An [@ethereumjs/trie](https://github.com/ethereumjs/ethereumjs-vm/tree/master/packages/trie) instance for the state tree (ignored if stateManager is passed)
+   * @deprecated
+   */
+  state?: any; // TODO
+  /**
+   * A [blockchain](https://github.com/ethereumjs/ethereumjs-vm/packages/blockchain) object for storing/retrieving blocks
+   */
+  blockchain: Blockchain;
+  /**
+   * If true, create entries in the state tree for the precompiled contracts, saving some gas the
+   * first time each of them is called.
+   *
+   * If this parameter is false, the first call to each of them has to pay an extra 25000 gas
+   * for creating the account.
+   *
+   * Setting this to true has the effect of precompiled contracts' gas costs matching mainnet's from
+   * the very first call, which is intended for testing networks.
+   *
+   * Default: `false`
+   */
+  activatePrecompiles?: boolean;
+  /**
+   * Allows unlimited contract sizes while debugging. By setting this to `true`, the check for
+   * contract size limit of 24KB (see [EIP-170](https://git.io/vxZkK)) is bypassed.
+   *
+   * Default: `false` [ONLY set to `true` during debugging]
+   */
+  allowUnlimitedContractSize?: boolean;
+
+  /**
+   * Select hardfork based upon block number. This automatically switches to the right hard fork based upon the block number.
+   *
+   * Default: `false`
+   */
+  selectHardforkByBlockNumber?: boolean;
+}
+
+/**
+ * Execution engine which can be used to run a blockchain, individual
+ * blocks, individual transactions, or snippets of EVM bytecode.
+ *
+ * This class is an AsyncEventEmitter, please consult the README to learn how to use it.
+ */
+export default class VM extends AsyncEventEmitter {
+  /**
+   * The StateManager used by the VM
+   */
+  readonly stateManager: StateManager;
+  /**
+   * The blockchain the VM operates on
+   */
+  readonly blockchain: Blockchain;
+
+  readonly _common: Common;
+
+  protected readonly _opts: VMOpts;
+  protected _isInitialized: boolean = false;
+  protected readonly _allowUnlimitedContractSize: boolean;
+  protected _opcodes: OpcodeList;
+  protected readonly _selectHardforkByBlockNumber: boolean;
+
+  /**
+   * Cached emit() function, not for public usage
+   * set to public due to implementation internals
+   * @hidden
+   */
+  public readonly _emit: (topic: string, data: any) => Promise<void>;
+  /**
+   * Pointer to the mcl package, not for public usage
+   * set to public due to implementation internals
+   * @hidden
+   */
+  public readonly _mcl: any; //
+
+  /**
+   * VM async constructor. Creates engine instance and initializes it.
+   *
+   * @param opts VM engine constructor options
+   */
+  static async create(opts: VMOpts): Promise<VM> {
+    const vm = new this(opts);
+    await vm.init();
+    return vm;
+  }
+
+  /**
+   * Instantiates a new [[VM]] Object.
+   * @param opts
+   */
+  constructor(opts: VMOpts) {
+    super();
+
+    this._opts = opts;
+
+    // Throw on chain or hardfork options removed in latest major release
+    // to prevent implicit chain setup on a wrong chain
+    if ('chain' in opts || 'hardfork' in opts) {
+      throw new Error('Chain/hardfork options are not allowed any more on initialization');
+    }
+
+    if (opts.common) {
+      //EIPs
+      const supportedEIPs = [2537, 2565, 2929];
+      for (const eip of opts.common.eips()) {
+        if (!supportedEIPs.includes(eip)) {
+          throw new Error(`${eip} is not supported by the VM`);
+        }
+      }
+
+      this._common = opts.common;
+    } else {
+      const DEFAULT_CHAIN = 'mainnet';
+      const supportedHardforks = ['chainstart', 'homestead', 'dao', 'tangerineWhistle', 'spuriousDragon', 'byzantium', 'constantinople', 'petersburg', 'istanbul', 'muirGlacier', 'berlin'];
+
+      this._common = new Common({
+        chain: DEFAULT_CHAIN,
+        supportedHardforks
+      });
+    }
+
+    // Set list of opcodes based on HF
+    // TODO: make this EIP-friendly
+    this._opcodes = getOpcodesForHF(this._common);
+
+    if (opts.stateManager) {
+      this.stateManager = opts.stateManager;
+    } else {
+      const trie = opts.state || new Trie();
+      this.stateManager = new DefaultStateManager({
+        trie,
+        common: this._common
+      });
+    }
+
+    this.blockchain = opts.blockchain;
+
+    this._allowUnlimitedContractSize = opts.allowUnlimitedContractSize || false;
+
+    this._selectHardforkByBlockNumber = opts.selectHardforkByBlockNumber ?? false;
+
+    if (this._common.eips().includes(2537)) {
+      if (IS_BROWSER) {
+        throw new Error('EIP-2537 is currently not supported in browsers');
+      } else {
+        this._mcl = mcl;
+      }
+    }
+
+    // We cache this promisified function as it's called from the main execution loop, and
+    // promisifying each time has a huge performance impact.
+    this._emit = promisify(this.emit.bind(this));
+  }
+
+  _updateOpcodes() {
+    this._opcodes = getOpcodesForHF(this._common);
+  }
+
+  async init(): Promise<void> {
+    if (this._isInitialized) {
+      return;
+    }
+
+    await this.blockchain.initPromise;
+
+    if (this._opts.activatePrecompiles && !this._opts.stateManager) {
+      await this.stateManager.checkpoint();
+      // put 1 wei in each of the precompiles in order to make the accounts non-empty and thus not have them deduct `callNewAccount` gas.
+      await Promise.all(
+        Object.keys(precompiles)
+          .map((k: string): Address => new Address(Buffer.from(k, 'hex')))
+          .map(async (address: Address) => {
+            const account = Account.fromAccountData({ balance: 1 });
+            await this.stateManager.putAccount(address, account);
+          })
+      );
+      await this.stateManager.commit();
+    }
+
+    if (this._common.eips().includes(2537)) {
+      if (IS_BROWSER) {
+        throw new Error('EIP-2537 is currently not supported in browsers');
+      } else {
+        const mcl = this._mcl;
+        await mclInitPromise; // ensure that mcl is initialized.
+        mcl.setMapToMode(mcl.IRTF); // set the right map mode; otherwise mapToG2 will return wrong values.
+        mcl.verifyOrderG1(1); // subgroup checks for G1
+        mcl.verifyOrderG2(1); // subgroup checks for G2
+      }
+    }
+    this._isInitialized = true;
+  }
+
+  /**
+   * Processes blocks and adds them to the blockchain.
+   *
+   * This method modifies the state.
+   *
+   * @param blockchain -  An [@ethereumjs/blockchain](https://github.com/ethereumjs/ethereumjs-vm/tree/master/packages/blockchain) object to process
+   */
+  async runBlockchain(blockchain?: Blockchain): Promise<void> {
     await this.init();
     return runBlockchain.bind(this)(blockchain);
   }
 
-  async runOrGenerateBlock(opts: RunBlockOpts): ReturnType<typeof runBlock> {
+  /**
+   * Processes the `block` running all of the transactions it contains and updating the miner's account
+   *
+   * This method modifies the state. If `generate` is `true`, the state modifications will be
+   * reverted if an exception is raised. If it's `false`, it won't revert if the block's header is
+   * invalid. If an error is thrown from an event handler, the state may or may not be reverted.
+   *
+   * @param {RunBlockOpts} opts - Default values for options:
+   *  - `generate`: false
+   */
+  async runBlock(opts: RunBlockOpts): Promise<RunBlockResult> {
     await this.init();
     return runBlock.bind(this)(opts);
   }
-}
-
-export { VM, Receipt };
-
-type PromisResultType<T> = T extends PromiseLike<infer U> ? U : T;
-
-/////////// runBlockchain ////////////
-
-/**
- * @ignore
- */
-async function runBlockchain(this: VM, blockchain?: Blockchain) {
-  let headBlock: Block;
-  let parentState: Buffer;
-
-  // TODO: fix this.
-  blockchain = blockchain || ((this.blockchain as any) as Blockchain);
-
-  await blockchain.iterator('vm', async (block: Block, reorg: boolean) => {
-    // determine starting state for block run
-    // if we are just starting or if a chain re-org has happened
-    if (!headBlock || reorg) {
-      const parentBlock = await blockchain!.getBlock(block.header.parentHash);
-      parentState = parentBlock.header.stateRoot;
-      // generate genesis state if we are at the genesis block
-      // we don't have the genesis state
-      if (!headBlock) {
-        // It has been manually generated.
-        // await this.stateManager.generateCanonicalGenesis();
-      } else {
-        parentState = headBlock.header.stateRoot;
-      }
-    }
-
-    // run block, update head if valid
-    try {
-      await this.runOrGenerateBlock({ block, root: parentState, skipBlockValidation: true, generate: true });
-      // set as new head block
-      headBlock = block;
-    } catch (error) {
-      // remove invalid block
-      await blockchain!.delBlock(block.header.hash());
-      throw error;
-    }
-  });
-}
-
-/////////// runBlockchain ////////////
-
-/////////// runBlock ////////////
-
-/**
- * @ignore
- */
-async function runBlock(this: VM, opts: RunBlockOpts): Promise<{ result: PromisResultType<ReturnType<typeof applyBlock>>; block?: Block }> {
-  const state = this.stateManager;
-  const { root } = opts;
-  let block = opts.block;
-  const generateStateRoot = !!opts.generate;
 
   /**
-   * The `beforeBlock` event.
+   * Process a transaction. Run the vm. Transfers eth. Checks balances.
    *
-   * @event Event: beforeBlock
-   * @type {Object}
-   * @property {Block} block emits the block that is about to be processed
+   * This method modifies the state. If an error is thrown, the modifications are reverted, except
+   * when the error is thrown from an event handler. In the latter case the state may or may not be
+   * reverted.
+   *
+   * @param {RunTxOpts} opts
    */
-  await this._emit('beforeBlock', block);
-
-  if (this._selectHardforkByBlockNumber) {
-    const currentHf = this._common.hardfork();
-    this._common.setHardforkByBlockNumber(block.header.number.toNumber());
-    if (this._common.hardfork() != currentHf) {
-      this._updateOpcodes();
-    }
+  async runTx(opts: RunTxOpts): Promise<RunTxResult> {
+    await this.init();
+    return runTx.bind(this)(opts);
   }
-
-  // Set state root if provided
-  if (root) {
-    await state.setStateRoot(root);
-  }
-
-  // Checkpoint state
-  await state.checkpoint();
-  let result: PromisResultType<ReturnType<typeof applyBlock>>;
-  try {
-    result = await applyBlock.bind(this)(block, opts);
-  } catch (err) {
-    await state.revert();
-    throw err;
-  }
-
-  // Persist state
-  await state.commit();
-  const stateRoot = await state.getStateRoot(false);
-
-  // Given the generate option, either set resulting header
-  // values to the current block, or validate the resulting
-  // header values against the current block.
-  if (generateStateRoot) {
-    block = Block.fromBlockData(
-      {
-        ...block,
-        header: {
-          ...block.header,
-          stateRoot,
-          receiptTrie: result.receiptRoot,
-          gasUsed: result.gasUsed,
-          bloom: result.bloom.bitvector
-        }
-      },
-      { common: this._common }
-    );
-  } else {
-    if (result.receiptRoot && !result.receiptRoot.equals(block.header.receiptTrie)) {
-      throw new Error('invalid receiptTrie');
-    }
-    if (!result.bloom.bitvector.equals(block.header.bloom)) {
-      throw new Error('invalid bloom');
-    }
-    if (!result.gasUsed.eq(block.header.gasUsed)) {
-      throw new Error('invalid gasUsed');
-    }
-    if (!stateRoot.equals(block.header.stateRoot)) {
-      throw new Error('invalid block stateRoot');
-    }
-  }
-
-  const { receipts, results } = result;
 
   /**
-   * The `afterBlock` event
+   * runs a call (or create) operation.
    *
-   * @event Event: afterBlock
-   * @type {Object}
-   * @property {Object} result emits the results of processing a block
+   * This method modifies the state.
+   *
+   * @param {RunCallOpts} opts
    */
-  await this._emit('afterBlock', { receipts, results });
-
-  return generateStateRoot ? { result, block } : { result };
-}
-
-/**
- * Validates and applies a block, computing the results of
- * applying its transactions. This method doesn't modify the
- * block itself. It computes the block rewards and puts
- * them on state (but doesn't persist the changes).
- * @param {Block} block
- * @param {RunBlockOpts} opts
- */
-async function applyBlock(this: VM, block: Block, opts: RunBlockOpts) {
-  // Validate block
-  if (!opts.skipBlockValidation) {
-    if (block.header.gasLimit.gte(new BN('8000000000000000', 16))) {
-      throw new Error('Invalid block with gas limit greater than (2^63 - 1)');
-    } else {
-      await block.validate(this.blockchain);
-    }
+  async runCall(opts: RunCallOpts): Promise<EVMResult> {
+    await this.init();
+    return runCall.bind(this)(opts);
   }
-  // Apply transactions
-  const txResults = await applyTransactions.bind(this)(block, opts);
-  // Pay ommers and miners
-  await assignBlockRewards.bind(this)(block);
-  return txResults;
-}
 
-/**
- * Applies the transactions in a block, computing the receipts
- * as well as gas usage and some relevant data. This method is
- * side-effect free (it doesn't modify the block nor the state).
- * @param {Block} block
- * @param {RunBlockOpts} opts
- */
-async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
-  const bloom = new Bloom();
-  // the total amount of gas used processing these transactions
-  let gasUsed = new BN(0);
-  const receiptTrie = new Trie();
-  const receipts: Receipt[] = [];
-  const txResults: RunTxResult[] = [];
-
-  /*
-   * Process transactions
+  /**
+   * Runs EVM code.
+   *
+   * This method modifies the state.
+   *
+   * @param {RunCodeOpts} opts
    */
-  for (let txIdx = 0; txIdx < block.transactions.length; txIdx++) {
-    const tx = block.transactions[txIdx];
+  async runCode(opts: RunCodeOpts): Promise<ExecResult> {
+    await this.init();
+    return runCode.bind(this)(opts);
+  }
 
-    const gasLimitIsHigherThanBlock = block.header.gasLimit.lt(tx.gasLimit.add(gasUsed));
-    if (gasLimitIsHigherThanBlock) {
-      throw new Error('tx has a higher gas limit than the block');
-    }
-
-    // Run the tx through the VM
-    const { skipBalance, skipNonce } = opts;
-    const txRes = await this.runTx({
-      tx,
-      block,
-      skipBalance,
-      skipNonce
+  /**
+   * Returns a copy of the [[VM]] instance.
+   */
+  copy(): VM {
+    return new VM({
+      stateManager: this.stateManager.copy(),
+      blockchain: this.blockchain,
+      common: this._common
     });
-    txResults.push(txRes);
-
-    // Add to total block gas usage
-    gasUsed = gasUsed.add(txRes.gasUsed);
-    // Combine blooms via bitwise OR
-    bloom.or(txRes.bloom);
-
-    const txReceipt = new Receipt(gasUsed.toArrayLike(Buffer), txRes.bloom.bitvector, txRes.execResult?.logs?.map((log) => Log.fromValuesArray(log)) || [], txRes.execResult.exceptionError ? 0 : 1);
-    receipts.push(txReceipt);
-
-    // Add receipt to trie to later calculate receipt root
-    await receiptTrie.put(toBuffer(txIdx), txReceipt.serialize());
   }
-
-  return {
-    bloom,
-    gasUsed,
-    receiptRoot: receiptTrie.root,
-    receipts,
-    results: txResults
-  };
 }
-
-/**
- * Calculates block rewards for miner and ommers and puts
- * the updated balances of their accounts to state.
- */
-async function assignBlockRewards(this: VM, block: Block): Promise<void> {
-  const state = this.stateManager;
-  const minerReward = new BN(this._common.param('pow', 'minerReward'));
-  const ommers = block.uncleHeaders;
-  // Reward ommers
-  for (const ommer of ommers) {
-    const reward = calculateOmmerReward(ommer.number, block.header.number, minerReward);
-    await rewardAccount(state, ommer.coinbase, reward);
-  }
-  // Reward miner
-  const reward = calculateMinerReward(minerReward, ommers.length);
-  await rewardAccount(state, block.header.coinbase, reward);
-}
-
-function calculateOmmerReward(ommerBlockNumber: BN, blockNumber: BN, minerReward: BN): BN {
-  const heightDiff = blockNumber.sub(ommerBlockNumber);
-  let reward = new BN(8).sub(heightDiff).mul(minerReward.divn(8));
-  if (reward.ltn(0)) {
-    reward = new BN(0);
-  }
-  return reward;
-}
-
-function calculateMinerReward(minerReward: BN, ommersNum: number): BN {
-  // calculate nibling reward
-  const niblingReward = minerReward.divn(32);
-  const totalNiblingReward = niblingReward.muln(ommersNum);
-  const reward = minerReward.add(totalNiblingReward);
-  return reward;
-}
-
-async function rewardAccount(state: StateManager, address: Address, reward: BN): Promise<void> {
-  const account = await state.getAccount(address);
-  account.balance.iadd(reward);
-  await state.putAccount(address, account);
-}
-
-/////////// runBlock ////////////

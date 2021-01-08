@@ -385,20 +385,22 @@ export class Transaction {
   }
 
   ////////////////////
-  blockHash?: Buffer;
-  blockNumber?: BN;
-  transactionIndex?: number;
+  extension: {
+    blockHash?: Buffer;
+    blockNumber?: BN;
+    transactionIndex?: number;
+  } = {};
 
   installProperties(block: BlockLike, transactionIndex: number) {
-    this.blockHash = block.hash();
-    this.blockNumber = block.header.number;
-    this.transactionIndex = transactionIndex;
+    this.extension.blockHash = block.hash();
+    this.extension.blockNumber = block.header.number;
+    this.extension.transactionIndex = transactionIndex;
   }
 
   toRPCJSON() {
     return {
-      blockHash: this.blockHash ? bufferToHex(this.blockHash) : undefined,
-      blockNumber: this.blockNumber ? bnToHex(this.blockNumber) : undefined,
+      blockHash: this.extension.blockHash ? bufferToHex(this.extension.blockHash) : undefined,
+      blockNumber: this.extension.blockNumber ? bnToHex(this.extension.blockNumber) : undefined,
       from: bufferToHex(this.getSenderAddress().toBuffer()),
       gas: bnToHex(this.gasLimit),
       gasPrice: bnToHex(this.gasPrice),
@@ -406,7 +408,7 @@ export class Transaction {
       input: bufferToHex(this.data),
       nonce: bnToHex(this.nonce),
       to: this.to !== undefined ? this.to.toString() : undefined,
-      transactionIndex: this.transactionIndex !== undefined ? intToHex(this.transactionIndex) : undefined,
+      transactionIndex: this.extension.transactionIndex !== undefined ? intToHex(this.extension.transactionIndex) : undefined,
       value: bnToHex(this.value),
       v: this.v !== undefined ? bnToHex(this.v) : undefined,
       r: this.r !== undefined ? bnToHex(this.r) : undefined,

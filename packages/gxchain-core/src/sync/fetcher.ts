@@ -30,7 +30,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
   private readonly timeoutBanTime: number;
   private readonly errorBanTime: number;
   private abortFlag: boolean = false;
-  private isFetching: boolean = false;
+  private fetchingPromise?: Promise<boolean>;
 
   constructor(options: FetcherOptions) {
     super();
@@ -63,7 +63,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
     });
 
     this.node.peerpool.on('idle', (peer) => {
-      if (this.isFetching && peer.idle && peer.latestHeight(constants.GXC2_ETHWIRE)) {
+      if (this.fetchingPromise && peer.idle && peer.latestHeight(constants.GXC2_ETHWIRE)) {
         this.idlePeerQueue.push(peer);
       }
     });
@@ -140,82 +140,92 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
   }
 
   async fetch(tasks: Task<TData>[]): Promise<boolean> {
-    tasks.forEach((task, index) => this.taskQueue.push({ task, index }));
-    const results = await Promise.all([
-      new Promise<boolean>(async (resolve) => {
-        let result = false;
-        try {
-          const promiseArray: Promise<void>[] = [];
-          const processOver = (p: Promise<void>) => {
-            const index = promiseArray.indexOf(p);
-            if (index !== -1) {
-              promiseArray.splice(index, 1);
-              this.limitQueue.push();
-            }
-          };
-          const makePromise = () => {
-            return promiseArray.length < this.limit ? Promise.resolve() : this.limitQueue.next();
-          };
-          for await (const { task, index } of this.taskQueue.generator()) {
-            if (!task.peer) {
-              const peer = await this.idlePeerQueue.next();
-              if (peer === null) {
-                break;
+    if (this.fetchingPromise) {
+      throw new Error('fetcher is already fetching');
+    }
+    const fetchResult = await (this.fetchingPromise = new Promise<boolean>(async (fetchResolve) => {
+      tasks.forEach((task, index) => this.taskQueue.push({ task, index }));
+      const results = await Promise.all([
+        new Promise<boolean>(async (resolve) => {
+          let result = false;
+          try {
+            const promiseArray: Promise<void>[] = [];
+            const processOver = (p: Promise<void>) => {
+              const index = promiseArray.indexOf(p);
+              if (index !== -1) {
+                promiseArray.splice(index, 1);
+                this.limitQueue.push();
               }
-              peer.idle = false;
-              task.peer = peer;
-            }
+            };
+            const makePromise = () => {
+              return promiseArray.length < this.limit ? Promise.resolve() : this.limitQueue.next();
+            };
+            for await (const { task, index } of this.taskQueue.generator()) {
+              if (!task.peer) {
+                const peer = await this.idlePeerQueue.next();
+                if (peer === null) {
+                  break;
+                }
+                peer.idle = false;
+                task.peer = peer;
+              }
 
-            const p = this.safelyDownload(task)
-              .then((result) => {
-                this.priorityQueue.insert(result, index);
-              })
-              .catch((err) => {
-                this.taskQueue.push({ task, index });
-              })
-              .finally(() => {
-                processOver(p);
-              });
-            promiseArray.push(p);
-            await makePromise();
-          }
-          await Promise.all(promiseArray);
-          result = true;
-        } catch (err) {
-          this.taskOver();
-          this.emit('error', err);
-        } finally {
-          resolve(result);
-        }
-      }),
-      new Promise<boolean>(async (resolve) => {
-        let result = false;
-        try {
-          for await (const result of this.resultQueue.generator()) {
-            if (await this.process(result)) {
-              this.taskOver();
+              const p = this.safelyDownload(task)
+                .then((result) => {
+                  this.priorityQueue.insert(result, index);
+                })
+                .catch((err) => {
+                  this.taskQueue.push({ task, index });
+                })
+                .finally(() => {
+                  processOver(p);
+                });
+              promiseArray.push(p);
+              await makePromise();
             }
+            await Promise.all(promiseArray);
+            result = true;
+          } catch (err) {
+            this.taskOver();
+            this.emit('error', err);
+          } finally {
+            resolve(result);
           }
-          result = true;
-        } catch (err) {
-          this.taskOver();
-          this.emit('error', err);
-        } finally {
-          resolve(result);
-        }
-      })
-    ]);
+        }),
+        new Promise<boolean>(async (resolve) => {
+          let result = false;
+          try {
+            for await (const result of this.resultQueue.generator()) {
+              if (await this.process(result)) {
+                this.taskOver();
+              }
+            }
+            result = true;
+          } catch (err) {
+            this.taskOver();
+            this.emit('error', err);
+          } finally {
+            resolve(result);
+          }
+        })
+      ]);
 
-    this.isFetching = false;
-    return results.reduce((a, b) => a && b, true);
+      fetchResolve(results.reduce((a, b) => a && b, true));
+    }));
+    this.fetchingPromise = undefined;
+    return fetchResult;
   }
 
   async abort() {
-    this.abortFlag = true;
-    this.taskOver();
+    if (this.fetchingPromise) {
+      this.abortFlag = true;
+      this.taskOver();
+      await this.fetchingPromise;
+    }
   }
 
-  reset() {
+  async reset() {
+    await this.abort();
     this.abortFlag = false;
   }
 }

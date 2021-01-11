@@ -99,7 +99,9 @@ export class FullSynchronizer extends Synchronizer {
             }
           }
         })
-      );
+      ).on('error', (err) => {
+        console.error('bodiesFetcher error:', err);
+      });
 
       const headerFetcher = new Fetcher<HeadersFethcerTaskData, BlockHeader[]>(
         Object.assign(this.options, {
@@ -117,7 +119,9 @@ export class FullSynchronizer extends Synchronizer {
             return result[result.length - 1].number.toNumber() === bestHeight;
           }
         })
-      );
+      ).on('error', (err) => {
+        console.error('headerFetcher error:', err);
+      });
 
       this.abortFetchers = async () => {
         await Promise.all([headerFetcher.reset(), bodiesFetcher.reset()]);

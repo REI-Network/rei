@@ -3,7 +3,6 @@ import { EventEmitter } from 'events';
 import { Aborter } from '@gxchain2/utils';
 
 import type { Node } from '../node';
-import { constants } from '@gxchain2/common';
 
 export interface SynchronizerOptions {
   node: Node;
@@ -31,7 +30,15 @@ export class Synchronizer extends EventEmitter {
     this.interval = options.interval || 1000;
   }
 
+  get isSyncing(): boolean {
+    throw new Error('Unimplemented');
+  }
+
   async sync(): Promise<boolean> {
+    throw new Error('Unimplemented');
+  }
+
+  async syncAbort() {
     throw new Error('Unimplemented');
   }
 

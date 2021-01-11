@@ -5,12 +5,15 @@ import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 
 import { Node } from '../../node';
 
-export interface FetcherOptions {
+export interface FetcherOptions<TData = any, TResult = any> {
   node: Node;
   protocol: string;
   limit?: number;
   timeoutBanTime?: number;
   errorBanTime?: number;
+
+  download: (data: Task<TData>) => Promise<TResult>;
+  process: (result: TResult) => Promise<boolean>;
 }
 
 type Task<TData = any> = {
@@ -30,13 +33,17 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
   private readonly timeoutBanTime: number;
   private readonly errorBanTime: number;
   private readonly protocol: string;
+  private readonly download: (data: Task<TData>) => Promise<TResult>;
+  private readonly process: (result: TResult) => Promise<boolean>;
   private abortFlag: boolean = false;
   private fetchingPromise?: Promise<boolean>;
 
-  constructor(options: FetcherOptions) {
+  constructor(options: FetcherOptions<TData, TResult>) {
     super();
     this.node = options.node;
     this.protocol = options.protocol;
+    this.download = options.download;
+    this.process = options.process;
     this.limit = options.limit || 16;
     this.timeoutBanTime = options.timeoutBanTime || 300000;
     this.errorBanTime = options.errorBanTime || 60000;
@@ -89,8 +96,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
     }
   }
 
-  protected async download(task: Task<TData>): Promise<TResult> {
-    /*
+  /*
     const peer = task.peer!;
     try {
       const headers: BlockHeader[] = await peer.getBlockHeaders(task.start, task.count);
@@ -117,18 +123,13 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
       throw err;
     }
     */
-    throw new Error('Unimplemented');
-  }
 
-  protected async process(result: TResult): Promise<boolean> {
-    /*
+  /*
     await this.node.processBlocks(result);
     if (result[result.length - 1].header.number.toNumber() === bestHeight) {
         this.taskOver();
     }
     */
-    throw new Error('Unimplemented');
-  }
 
   private taskOver() {
     this.limitQueue.abort();
@@ -176,7 +177,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
                 .then((result) => {
                   this.priorityQueue.insert(result, index);
                 })
-                .catch((err) => {
+                .catch(() => {
                   this.taskQueue.push({ task, index });
                 })
                 .finally(() => {

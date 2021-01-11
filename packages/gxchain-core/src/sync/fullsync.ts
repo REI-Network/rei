@@ -47,7 +47,8 @@ export class FullSynchronizer extends Synchronizer {
         }
       }
       if (!best) {
-        return false;
+        syncResolve(false);
+        return;
       }
 
       console.debug('get best height from:', best!.peerId, 'best height:', bestHeight, 'local height:', latestHeight);

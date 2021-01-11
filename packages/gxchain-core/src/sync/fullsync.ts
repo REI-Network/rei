@@ -210,10 +210,12 @@ export class FullSynchronizer extends Synchronizer {
   }
 
   async abort() {
-    this.taskQueue.abort();
+    this.abortFlag = true;
+    this.taskOver();
+    this.priorityQueue.reset();
     this.taskQueue.clear();
-    this.idlePeerQueue.abort();
     this.idlePeerQueue.clear();
+    this.resultQueue.clear();
     await super.abort();
   }
 

@@ -112,6 +112,9 @@ export class Node implements INode {
         )
       )
     });
+    this.peerpool.on('error', (err) => {
+      console.error('Peer pool error:', err);
+    });
 
     let genesisBlock!: Block;
     try {

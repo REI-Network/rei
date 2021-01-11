@@ -4,7 +4,7 @@ import { PriorityQueue, AsyncQueue, AysncChannel, AysncHeapChannel } from '@gxch
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 import { constants } from '@gxchain2/common';
 
-import { Node } from '../node';
+import { Node } from '../../node';
 
 export interface FetcherOptions {
   node: Node;

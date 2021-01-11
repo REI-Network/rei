@@ -2,12 +2,12 @@ import { EventEmitter } from 'events';
 
 import { PriorityQueue, AsyncQueue, AysncChannel, AysncHeapChannel } from '@gxchain2/utils';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
-import { constants } from '@gxchain2/common';
 
 import { Node } from '../../node';
 
 export interface FetcherOptions {
   node: Node;
+  protocol: string;
   limit?: number;
   timeoutBanTime?: number;
   errorBanTime?: number;
@@ -29,12 +29,14 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
   private readonly limit: number;
   private readonly timeoutBanTime: number;
   private readonly errorBanTime: number;
+  private readonly protocol: string;
   private abortFlag: boolean = false;
   private fetchingPromise?: Promise<boolean>;
 
   constructor(options: FetcherOptions) {
     super();
     this.node = options.node;
+    this.protocol = options.protocol;
     this.limit = options.limit || 16;
     this.timeoutBanTime = options.timeoutBanTime || 300000;
     this.errorBanTime = options.errorBanTime || 60000;
@@ -53,7 +55,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
     });
     this.idlePeerQueue = new AsyncQueue<Peer>({
       hasNext: () => {
-        const peer = this.node.peerpool.idle(constants.GXC2_ETHWIRE);
+        const peer = this.node.peerpool.idle(this.protocol);
         if (!peer) {
           return false;
         }
@@ -63,7 +65,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
     });
 
     this.node.peerpool.on('idle', (peer) => {
-      if (this.fetchingPromise && peer.idle && peer.latestHeight(constants.GXC2_ETHWIRE)) {
+      if (this.fetchingPromise && peer.idle && peer.latestHeight(this.protocol)) {
         this.idlePeerQueue.push(peer);
       }
     });

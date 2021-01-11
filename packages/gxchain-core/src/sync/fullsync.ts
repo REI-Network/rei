@@ -1,4 +1,4 @@
-import { OrderedQueue, OrderedQueueAbortError, AsyncQueue, AysncChannel, AysncHeapChannel } from '@gxchain2/utils';
+import { PriorityQueue, AsyncQueue, AysncChannel, AysncHeapChannel } from '@gxchain2/utils';
 import { constants } from '@gxchain2/common';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 import { Block, BlockHeader } from '@gxchain2/block';
@@ -20,10 +20,13 @@ type Task = {
 };
 
 export class FullSynchronizer extends Synchronizer {
-  private readonly downloadQueue: OrderedQueue<Task, Block[]>;
-  private readonly taskQueue: AysncHeapChannel<{ data: Task; index: number }>;
+  private readonly priorityQueue = new PriorityQueue<Block[]>();
+  private readonly limitQueue = new AsyncQueue<void>();
+  private readonly taskQueue: AysncHeapChannel<{ task: Task; index: number }>;
   private readonly resultQueue: AysncChannel<Block[]>;
   private readonly idlePeerQueue: AsyncQueue<Peer>;
+
+  private readonly limit: number;
   private readonly count: number;
   private readonly timeoutBanTime: number;
   private readonly errorBanTime: number;
@@ -32,11 +35,17 @@ export class FullSynchronizer extends Synchronizer {
 
   constructor(options: FullSynchronizerOptions) {
     super(options);
+    this.limit = options.limit || 16;
     this.count = options.count || 128;
     this.timeoutBanTime = options.timeoutBanTime || 300000;
     this.errorBanTime = options.errorBanTime || 60000;
 
-    this.taskQueue = new AysncHeapChannel<{ data: Task; index: number }>({
+    this.priorityQueue.on('result', (result) => {
+      if (!this.abortFlag) {
+        this.resultQueue.push(result);
+      }
+    });
+    this.taskQueue = new AysncHeapChannel<{ task: Task; index: number }>({
       compare: (a, b) => a.index < b.index,
       isAbort: () => this.abortFlag
     });
@@ -52,24 +61,6 @@ export class FullSynchronizer extends Synchronizer {
         this.idlePeerQueue.array.push(peer);
         return true;
       }
-    });
-
-    this.downloadQueue = new OrderedQueue<Task, Block[]>({
-      limit: options.limit || 16,
-      processTask: this.download.bind(this)
-    });
-    this.downloadQueue.on('error', (err, data, index) => {
-      if (err instanceof OrderedQueueAbortError) {
-        if (data.peer) {
-          data.peer.idle = true;
-        }
-      } else {
-        this.emit('error', err);
-        this.taskQueue.push({ data, index });
-      }
-    });
-    this.downloadQueue.on('result', (data, result) => {
-      this.resultQueue.push(result!);
     });
 
     this.node.peerpool.on('idle', (peer) => {
@@ -106,6 +97,13 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
+  private taskOver() {
+    this.limitQueue.abort();
+    this.taskQueue.abort();
+    this.resultQueue.abort();
+    this.idlePeerQueue.abort();
+  }
+
   async sync(): Promise<boolean> {
     let bestHeight = 0;
     const latestHeight = this.node.blockchain.latestHeight;
@@ -132,7 +130,7 @@ export class FullSynchronizer extends Synchronizer {
     let totalTaskCount = 0;
     while (totalCount > 0) {
       this.taskQueue.push({
-        data: {
+        task: {
           start: totalTaskCount * this.count + latestHeight + 1,
           count: totalCount > this.count ? this.count : totalCount
         },
@@ -146,22 +144,41 @@ export class FullSynchronizer extends Synchronizer {
       new Promise<boolean>(async (resolve) => {
         let result = false;
         try {
-          await this.downloadQueue.start(
-            totalTaskCount,
-            async function* (this: FullSynchronizer) {
-              for await (const taskInfo of this.taskQueue.generator()) {
-                if (!taskInfo.data.peer) {
-                  const peer = await this.idlePeerQueue.next();
-                  if (peer === null) {
-                    break;
-                  }
-                  peer.idle = false;
-                  taskInfo.data.peer = peer;
-                }
-                yield taskInfo;
+          const promiseArray: Promise<void>[] = [];
+          const processOver = (p: Promise<void>) => {
+            const index = promiseArray.indexOf(p);
+            if (index !== -1) {
+              promiseArray.splice(index, 1);
+              this.limitQueue.push();
+            }
+          };
+          const makePromise = () => {
+            return promiseArray.length < this.limit ? Promise.resolve() : this.limitQueue.next();
+          };
+          for await (const { task, index } of this.taskQueue.generator()) {
+            if (!task.peer) {
+              const peer = await this.idlePeerQueue.next();
+              if (peer === null) {
+                break;
               }
-            }.bind(this)()
-          );
+              peer.idle = false;
+              task.peer = peer;
+            }
+
+            const p = this.download(task)
+              .then((result) => {
+                this.priorityQueue.insert(result, index);
+              })
+              .catch((err) => {
+                this.taskQueue.push({ task, index });
+              })
+              .finally(() => {
+                processOver(p);
+              });
+            promiseArray.push(p);
+            await makePromise();
+          }
+          await Promise.all(promiseArray);
           result = true;
         } catch (err) {
           this.emit('error', err);
@@ -175,6 +192,9 @@ export class FullSynchronizer extends Synchronizer {
         try {
           for await (const result of this.resultQueue.generator()) {
             await this.node.processBlocks(result);
+            if (result[result.length - 1].header.number.toNumber() === bestHeight) {
+              this.taskOver();
+            }
           }
           result = true;
         } catch (err) {
@@ -194,12 +214,10 @@ export class FullSynchronizer extends Synchronizer {
     this.taskQueue.clear();
     this.idlePeerQueue.abort();
     this.idlePeerQueue.clear();
-    await this.downloadQueue.abort();
     await super.abort();
   }
 
   async reset() {
-    await this.downloadQueue.reset();
     await super.reset();
   }
 }

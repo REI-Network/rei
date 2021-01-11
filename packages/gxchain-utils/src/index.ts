@@ -38,5 +38,5 @@ export function mixin<T1 extends Constructor, T2 extends Constructor>(mix1: T1, 
 }
 
 export * from './abort';
-export * from './orderedqueue';
+export * from './priorityqueue';
 export * from './asyncnext';

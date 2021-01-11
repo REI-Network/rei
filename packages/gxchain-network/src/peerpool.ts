@@ -56,17 +56,17 @@ export class PeerPool extends EventEmitter {
     if (this.size >= this.maxSize) {
       return;
     }
-    peer.on('idle', (peer) => {
+    peer.on('idle', () => {
       if (this.pool.get(peer.peerId)) {
         this.emit('idle', peer);
       }
     });
-    peer.on('busy', (peer) => {
+    peer.on('busy', () => {
       if (this.pool.get(peer.peerId)) {
         this.emit('busy', peer);
       }
     });
-    peer.on('error', (peer, err) => {
+    peer.on('error', (err) => {
       if (this.pool.get(peer.peerId)) {
         console.warn(`Peerpool, peer error: ${err} ${peer.peerId}`);
         this.ban(peer);

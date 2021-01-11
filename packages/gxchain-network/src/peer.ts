@@ -14,11 +14,11 @@ import { constants } from '@gxchain2/common';
 export class PeerRequestTimeoutError extends Error {}
 
 declare interface MsgQueue {
-  on(event: 'status', listener: (queue: MsgQueue, message: any) => void): this;
-  on(event: 'error', listener: (queue: MsgQueue, error: any) => void): this;
+  on(event: 'status', listener: (message: any) => void): this;
+  on(event: 'error', listener: (error: any) => void): this;
 
-  once(event: 'status', listener: (queue: MsgQueue, message: any) => void): this;
-  once(event: 'error', listener: (queue: MsgQueue, error: any) => void): this;
+  once(event: 'status', listener: (message: any) => void): this;
+  once(event: 'error', listener: (error: any) => void): this;
 }
 
 class MsgQueue extends EventEmitter {
@@ -118,7 +118,7 @@ class MsgQueue extends EventEmitter {
           const { code, handler, payload } = this.protocol.handle(value._bufs[0]);
           const data = handler.decode(payload);
           if (code === 0) {
-            this.emit('status', this, data);
+            this.emit('status', data);
           } else {
             const request = this.waitingRequests.get(code);
             if (request) {
@@ -138,13 +138,14 @@ class MsgQueue extends EventEmitter {
                     })
                     .catch((err) => {
                       console.error('MsgQueue handle failed', err);
+                      this.emit('error', err);
                     });
                 }
               }
             }
           }
         } catch (err) {
-          this.emit('error', this, err);
+          this.emit('error', err);
         }
       }
     });
@@ -166,13 +167,13 @@ class MsgQueue extends EventEmitter {
 }
 
 export declare interface Peer {
-  on(event: 'busy' | 'idle', listener: (peer: Peer) => void): this;
-  on(event: 'error', listener: (peer: Peer, err: any) => void): this;
-  on(event: string, listener: (peer: Peer, message: any, protocol: Protocol) => void): this;
+  on(event: 'busy' | 'idle', listener: () => void): this;
+  on(event: 'error', listener: (err: any) => void): this;
+  on(event: string, listener: (message: any, protocol: Protocol) => void): this;
 
-  once(event: 'busy' | 'idle', listener: (peer: Peer) => void): this;
-  once(event: 'error', listener: (peer: Peer, err: any) => void): this;
-  once(event: string, listener: (peer: Peer, message: any, protocol: Protocol) => void): this;
+  once(event: 'busy' | 'idle', listener: () => void): this;
+  once(event: 'error', listener: (err: any) => void): this;
+  once(event: string, listener: (message: any, protocol: Protocol) => void): this;
 }
 
 export class Peer extends EventEmitter {
@@ -196,17 +197,17 @@ export class Peer extends EventEmitter {
   set idle(b: boolean) {
     if (this.idle !== b) {
       this._idle = b;
-      this.emit(b ? 'idle' : 'busy', this);
+      this.emit(b ? 'idle' : 'busy');
     }
   }
 
   private makeQueue(protocol: Protocol) {
     const queue = new MsgQueue(this, protocol);
-    queue.on('status', (q, message) => {
-      this.emit(`status:${q.name}`, this, message, protocol);
+    queue.on('status', (message) => {
+      this.emit(`status:${queue.name}`, message, protocol);
     });
-    queue.on('error', (q, err) => {
-      this.emit('error', this, err);
+    queue.on('error', (err) => {
+      this.emit('error', err);
     });
     this.queueMap.set(queue.name, queue);
     return queue;

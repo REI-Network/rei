@@ -190,6 +190,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
             for await (const result of this.resultQueue.generator()) {
               if (await this.process(result)) {
                 this.taskOver();
+                break;
               }
             }
             result = true;

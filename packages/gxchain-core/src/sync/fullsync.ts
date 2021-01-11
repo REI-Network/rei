@@ -91,7 +91,7 @@ export class FullSynchronizer extends Synchronizer {
             );
             try {
               await this.node.processBlocks(blocks);
-              return blocks[blocks.length - 2].header.number.toNumber() === bestHeight;
+              return blocks[blocks.length - 1].header.number.toNumber() === bestHeight;
             } catch (err) {
               this.emit('error', err);
               this.syncAbort();

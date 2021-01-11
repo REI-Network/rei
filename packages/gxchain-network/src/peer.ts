@@ -58,7 +58,8 @@ class MsgQueue extends EventEmitter {
     if (this.aborter.isAborted) {
       throw new Error('MsgQueue already aborted');
     }
-    return this.queue.push(this.protocol.encode(method, data));
+    const handler = this.protocol.findHandler(method);
+    return this.queue.push(handler.encode(this.peer.node.node, data));
   }
 
   request(method: string, data: any) {
@@ -81,7 +82,7 @@ class MsgQueue extends EventEmitter {
           reject(new PeerRequestTimeoutError(`MsgQueue timeout request: ${method}`));
         }, 8000)
       });
-      this.queue.push(handler.encode(data));
+      this.queue.push(handler.encode(this.peer.node.node, data));
     });
   }
 
@@ -116,7 +117,7 @@ class MsgQueue extends EventEmitter {
         try {
           // TODO: fix _bufs.
           const { code, handler, payload } = this.protocol.handle(value._bufs[0]);
-          const data = handler.decode(payload);
+          const data = handler.decode(this.peer.node.node, payload);
           if (code === 0) {
             this.emit('status', data);
           } else {

@@ -2,6 +2,7 @@ import { OrderedQueue, OrderedQueueAbortError, AsyncQueue, AysncChannel, AysncHe
 import { constants } from '@gxchain2/common';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 import { Block, BlockHeader } from '@gxchain2/block';
+import { Transaction } from '@gxchain2/tx';
 
 import { Synchronizer, SynchronizerOptions } from './sync';
 
@@ -82,15 +83,16 @@ export class FullSynchronizer extends Synchronizer {
     const peer = task.peer!;
     try {
       const headers: BlockHeader[] = await peer.getBlockHeaders(task.start, task.count);
-      /*
-      const bodies: any[] = await peer.request(
-        constants.GXC2_ETHWIRE,
-        'GetBlockBodies',
-        headers.map((h) => h.hash())
+      const bodies: Transaction[][] = await peer.request(constants.GXC2_ETHWIRE, 'GetBlockBodies', headers);
+      const blocks = bodies.map((transactions, i: number) =>
+        Block.fromBlockData(
+          {
+            header: headers[i],
+            transactions
+          },
+          { common: this.node.common }
+        )
       );
-      const blocks = bodies.map(([txsData, unclesData], i: number) => Block.fromValuesArray([headers[i].raw(), txsData, unclesData], { common: this.node.common }));
-      */
-      const blocks = headers.map((h) => Block.fromBlockData({ header: h }, { common: this.node.common }));
       peer.idle = true;
       return blocks;
     } catch (err) {

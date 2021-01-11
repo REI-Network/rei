@@ -7,7 +7,7 @@ import TCP from 'libp2p-tcp';
 import secio from 'libp2p-secio';
 import Bootstrap from 'libp2p-bootstrap';
 
-import { constants } from '@gxchain2/common';
+import { constants, Common } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { Database } from '@gxchain2/database';
 
@@ -26,6 +26,7 @@ function parseProtocol(name: string): Protocol {
 export interface INode {
   db: Database;
   blockchain: Blockchain;
+  common: Common;
   status: any;
 }
 

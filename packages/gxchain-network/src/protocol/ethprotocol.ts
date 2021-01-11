@@ -11,11 +11,11 @@ const handlers: Handler[] = [
   {
     name: 'Status',
     code: 0,
-    encode: (data) => {
+    encode: (node: INode, data) => {
       const payload: any = Object.entries(data).map(([k, v]) => [k, v]);
       return rlp.encode([0, payload]);
     },
-    decode: (data) => {
+    decode: (node: INode, data) => {
       const status: any = {};
       data.forEach(([k, v]: any) => {
         status[k.toString()] = v;
@@ -32,8 +32,8 @@ const handlers: Handler[] = [
     name: 'GetBlockHeaders',
     code: 1,
     response: 2,
-    encode: ({ start, count }: { start: number; count: number }) => rlp.encode([1, [start, count]]),
-    decode: ([start, count]: Buffer[]) => {
+    encode: (node: INode, { start, count }: { start: number; count: number }) => rlp.encode([1, [start, count]]),
+    decode: (node: INode, [start, count]: Buffer[]) => {
       return { start: bufferToInt(start), count: bufferToInt(count) };
     },
     async process(node: INode, { start, count }: { start: number; count: number }): Promise<[string, BlockHeader[]]> {
@@ -44,22 +44,15 @@ const handlers: Handler[] = [
   {
     name: 'BlockHeaders',
     code: 2,
-    encode: (headers: BlockHeader[]) => rlp.encode([2, headers.map((h) => h.raw())]),
-    decode: (headers: BlockHeaderBuffer[]) => headers.map((h) => BlockHeader.fromValuesArray(h))
+    encode: (node: INode, headers: BlockHeader[]) => rlp.encode([2, headers.map((h) => h.raw())]),
+    decode: (node: INode, headers: BlockHeaderBuffer[]) => headers.map((h) => BlockHeader.fromValuesArray(h, { common: node.common }))
   },
   {
     name: 'GetBlockBodies',
     code: 3,
     response: 4,
-    encode: (headers: BlockHeader[]) => rlp.encode([3, headers.map((h) => h.hash())]),
-    decode: (headerHashs: Buffer[]) => headerHashs,
-    /*
-    decode: (bodies: BlockBodyBuffer[]): Transaction[][] =>
-      bodies.map((b) => {
-        const txsBuffer = b[0];
-        return txsBuffer.map((txBuffer) => Transaction.fromValuesArray(txBuffer));
-      }),
-      */
+    encode: (node: INode, headers: BlockHeader[]) => rlp.encode([3, headers.map((h) => h.hash())]),
+    decode: (node: INode, headerHashs: Buffer[]) => headerHashs,
     async process(node: INode, headerHashs: Buffer[]): Promise<[string, Transaction[][]]> {
       const bodies: Transaction[][] = [];
       for (const hash of headerHashs) {
@@ -78,25 +71,25 @@ const handlers: Handler[] = [
   {
     name: 'BlockBodies',
     code: 4,
-    encode: (bodies: Transaction[][]) =>
+    encode: (node: INode, bodies: Transaction[][]) =>
       rlp.encode([
         4,
         bodies.map((txs) => {
           return txs.map((tx) => tx.raw());
         })
       ]),
-    decode: (bodies: TransactionsBuffer[]): Transaction[][] =>
+    decode: (node: INode, bodies: TransactionsBuffer[]): Transaction[][] =>
       bodies.map((txs) => {
-        return txs.map((tx) => Transaction.fromValuesArray(tx));
+        return txs.map((tx) => Transaction.fromValuesArray(tx, { common: node.common }));
       })
   },
   {
     name: 'Echo',
     code: 111,
-    encode: (data) => {
+    encode: (node: INode, data) => {
       return rlp.encode([111, data]);
     },
-    decode: (data) => {
+    decode: (node: INode, data) => {
       console.debug('Echo', (data as Buffer).toString());
       return data;
     }
@@ -131,6 +124,7 @@ export class ETHProtocol extends Protocol {
     return { code, handler, payload };
   }
 
+  /*
   encode(key: string | number, data: any): any {
     return this.findHandler(key).encode(data);
   }
@@ -138,4 +132,5 @@ export class ETHProtocol extends Protocol {
   decode(key: string | number, data: any): any {
     return this.findHandler(key).decode(data);
   }
+  */
 }

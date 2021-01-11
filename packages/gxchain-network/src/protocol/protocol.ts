@@ -5,8 +5,8 @@ export type Handler = {
   name: string;
   code: number;
   response?: number;
-  encode: (data: any) => any;
-  decode: (data: any) => any;
+  encode: (node: INode, data: any) => any;
+  decode: (node: INode, data: any) => any;
   process?: (node: INode, data: any) => Promise<[string, any]> | [string, any] | void;
 };
 
@@ -37,14 +37,6 @@ export class Protocol {
     throw new Error('Unimplemented');
   }
 
-  encode(key: string | number, data: any): any {
-    throw new Error('Unimplemented');
-  }
-
-  decode(key: string | number, data: any): any {
-    throw new Error('Unimplemented');
-  }
-
   handshake(peer: Peer, data: any) {
     return this._status
       ? Promise.resolve(this._status)
@@ -53,7 +45,7 @@ export class Protocol {
             timeout = null;
             reject(new Error(`Protocol ${this.name} handshake timeout`));
           }, 8000);
-          peer.once(`status:${this.name}`, (peer, message) => {
+          peer.once(`status:${this.name}`, (message) => {
             if (timeout) {
               clearTimeout(timeout);
               resolve((this._status = message));

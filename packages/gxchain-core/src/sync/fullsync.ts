@@ -1,6 +1,5 @@
-import { PriorityQueue, AsyncQueue, AysncChannel, AysncHeapChannel } from '@gxchain2/utils';
 import { constants } from '@gxchain2/common';
-import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
+import { Peer } from '@gxchain2/network';
 import { Block, BlockHeader } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
 
@@ -35,93 +34,98 @@ export class FullSynchronizer extends Synchronizer {
     if (this.syncingPromise) {
       throw new Error('FullSynchronizer already sync');
     }
-    let bestHeight = 0;
-    const latestHeight = this.node.blockchain.latestHeight;
-    bestHeight = latestHeight;
-    let best: Peer | undefined;
-    for (const peer of this.node.peerpool.peers) {
-      const height = peer.latestHeight(constants.GXC2_ETHWIRE);
-      if (height > bestHeight) {
-        best = peer;
-        bestHeight = height;
+    const syncResult = await (this.syncingPromise = new Promise<boolean>(async (syncResolve) => {
+      let bestHeight = 0;
+      const latestHeight = this.node.blockchain.latestHeight;
+      bestHeight = latestHeight;
+      let best: Peer | undefined;
+      for (const peer of this.node.peerpool.peers) {
+        const height = peer.latestHeight(constants.GXC2_ETHWIRE);
+        if (height > bestHeight) {
+          best = peer;
+          bestHeight = height;
+        }
       }
-    }
-    if (!best) {
-      return false;
-    }
+      if (!best) {
+        return false;
+      }
 
-    console.debug('get best height from:', best!.peerId, 'best height:', bestHeight, 'local height:', latestHeight);
-    let totalCount = bestHeight - latestHeight;
-    let totalTaskCount = 0;
-    const headerFetcherTasks: HeadersFethcerTask[] = [];
-    while (totalCount > 0) {
-      headerFetcherTasks.push({
-        data: {
-          start: totalTaskCount * this.count + latestHeight + 1,
-          count: totalCount > this.count ? this.count : totalCount
-        },
-        peer: best,
-        index: totalTaskCount
-      });
-      totalTaskCount++;
-      totalCount -= this.count;
-    }
+      console.debug('get best height from:', best!.peerId, 'best height:', bestHeight, 'local height:', latestHeight);
+      let totalCount = bestHeight - latestHeight;
+      let totalTaskCount = 0;
+      const headerFetcherTasks: HeadersFethcerTask[] = [];
+      while (totalCount > 0) {
+        headerFetcherTasks.push({
+          data: {
+            start: totalTaskCount * this.count + latestHeight + 1,
+            count: totalCount > this.count ? this.count : totalCount
+          },
+          peer: best,
+          index: totalTaskCount
+        });
+        totalTaskCount++;
+        totalCount -= this.count;
+      }
 
-    const bodiesFetcher = new Fetcher<BodiesFetcherTaskData, Transaction[][]>(
-      Object.assign(this.options, {
-        node: this.node,
-        protocol: constants.GXC2_ETHWIRE,
-        download: async (task: BodiesFetcherTask) => {
-          const peer = task.peer!;
-          const bodies: Transaction[][] = await peer.request(constants.GXC2_ETHWIRE, 'GetBlockBodies', task.data);
-          // TODO: validate.
-          return bodies;
-        },
-        process: async (task: BodiesFetcherTask) => {
-          const result = task.result!;
-          const blocks = task.data.map((header, i) =>
-            Block.fromBlockData(
-              {
-                header,
-                transactions: result[i]
-              },
-              { common: this.node.common }
-            )
-          );
-          try {
-            await this.node.processBlocks(blocks);
-            return blocks[blocks.length - 2].header.number.toNumber() === bestHeight;
-          } catch (err) {
-            this.emit('error', err);
-            this.syncAbort();
-            return true;
+      const bodiesFetcher = new Fetcher<BodiesFetcherTaskData, Transaction[][]>(
+        Object.assign(this.options, {
+          node: this.node,
+          protocol: constants.GXC2_ETHWIRE,
+          download: async (task: BodiesFetcherTask) => {
+            const peer = task.peer!;
+            const bodies: Transaction[][] = await peer.request(constants.GXC2_ETHWIRE, 'GetBlockBodies', task.data);
+            // TODO: validate.
+            return bodies;
+          },
+          process: async (task: BodiesFetcherTask) => {
+            const result = task.result!;
+            const blocks = task.data.map((header, i) =>
+              Block.fromBlockData(
+                {
+                  header,
+                  transactions: result[i]
+                },
+                { common: this.node.common }
+              )
+            );
+            try {
+              await this.node.processBlocks(blocks);
+              return blocks[blocks.length - 2].header.number.toNumber() === bestHeight;
+            } catch (err) {
+              this.emit('error', err);
+              this.syncAbort();
+              return true;
+            }
           }
-        }
-      })
-    );
+        })
+      );
 
-    const headerFetcher = new Fetcher<HeadersFethcerTaskData, BlockHeader[]>(
-      Object.assign(this.options, {
-        node: this.node,
-        protocol: constants.GXC2_ETHWIRE,
-        download: async (task: HeadersFethcerTask) => {
-          const peer = task.peer!;
-          const headers: BlockHeader[] = await peer.getBlockHeaders(task.data.start, task.data.count);
-          // TODO: validate.
-          return headers;
-        },
-        process: async (task: HeadersFethcerTask) => {
-          const result = task.result!;
-          bodiesFetcher.insert({ data: result, index: task.index });
-          return result[result.length - 1].number.toNumber() === bestHeight;
-        }
-      })
-    );
+      const headerFetcher = new Fetcher<HeadersFethcerTaskData, BlockHeader[]>(
+        Object.assign(this.options, {
+          node: this.node,
+          protocol: constants.GXC2_ETHWIRE,
+          download: async (task: HeadersFethcerTask) => {
+            const peer = task.peer!;
+            const headers: BlockHeader[] = await peer.getBlockHeaders(task.data.start, task.data.count);
+            // TODO: validate.
+            return headers;
+          },
+          process: async (task: HeadersFethcerTask) => {
+            const result = task.result!;
+            bodiesFetcher.insert({ data: result, index: task.index });
+            return result[result.length - 1].number.toNumber() === bestHeight;
+          }
+        })
+      );
 
-    this.abortFetchers = async () => {
-      await Promise.all([headerFetcher.reset(), bodiesFetcher.reset()]);
-    };
-    return (await Promise.all([headerFetcher.fetch(), bodiesFetcher.fetch()])).reduce((a, b) => a && b, true);
+      this.abortFetchers = async () => {
+        await Promise.all([headerFetcher.reset(), bodiesFetcher.reset()]);
+      };
+      syncResolve((await Promise.all([headerFetcher.fetch(), bodiesFetcher.fetch()])).reduce((a, b) => a && b, true));
+    }));
+    this.abortFetchers = undefined;
+    this.syncingPromise = undefined;
+    return syncResult;
   }
 
   async syncAbort() {

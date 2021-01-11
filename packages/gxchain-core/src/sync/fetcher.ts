@@ -191,7 +191,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
         })
       ]);
 
-      fetchResolve(results.reduce((a, b) => a && b, true));
+      fetchResolve(!this.abortFlag && results.reduce((a, b) => a && b, true));
     }));
     this.fetchingPromise = undefined;
     return fetchResult;

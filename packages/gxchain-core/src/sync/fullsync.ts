@@ -122,7 +122,7 @@ export class FullSynchronizer extends Synchronizer {
       this.abortFetchers = async () => {
         await Promise.all([headerFetcher.reset(), bodiesFetcher.reset()]);
       };
-      syncResolve((await Promise.all([headerFetcher.fetch(), bodiesFetcher.fetch()])).reduce((a, b) => a && b, true));
+      syncResolve((await Promise.all([headerFetcher.fetch(headerFetcherTasks), bodiesFetcher.fetch()])).reduce((a, b) => a && b, true));
     }));
     this.abortFetchers = undefined;
     this.syncingPromise = undefined;

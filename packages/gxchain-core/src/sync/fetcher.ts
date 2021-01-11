@@ -21,6 +21,7 @@ export type Task<TData = any, TResult = any> = {
   result?: TResult;
   index: number;
   peer?: Peer;
+  parallelLock?: Promise<void>;
 };
 
 export class Fetcher<TData = any, TResult = any> extends EventEmitter {
@@ -140,6 +141,12 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
               return promiseArray.length < this.limit ? Promise.resolve() : this.limitQueue.next();
             };
             for await (const task of this.taskQueue.generator()) {
+              if (task.parallelLock) {
+                await task.parallelLock;
+                task.parallelLock = undefined;
+              }
+
+              const needLock = !!task.peer;
               if (!task.peer) {
                 const peer = await this.idlePeerQueue.next();
                 if (peer === null) {
@@ -161,6 +168,9 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
                 .finally(() => {
                   processOver(p);
                 });
+              if (needLock) {
+                task.parallelLock = p;
+              }
               promiseArray.push(p);
               await makePromise();
             }

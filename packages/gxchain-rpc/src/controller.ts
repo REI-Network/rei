@@ -51,4 +51,11 @@ export class Controller {
       codeHash: account.codeHash
     };
   }
+
+  async eth_getBalance([address]: [string]): Promise<any> {
+    let account = await this.node.stateManager.getAccount(Address.fromString(address));
+    return {
+      balance: account.balance
+    };
+  }
 }

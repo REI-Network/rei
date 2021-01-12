@@ -124,13 +124,7 @@ export class ETHProtocol extends Protocol {
     return { code, handler, payload };
   }
 
-  /*
-  encode(key: string | number, data: any): any {
-    return this.findHandler(key).encode(data);
+  protected isValidRemoteStatus(remoteStatus: any, localStatus: any): boolean {
+    return remoteStatus.networkId === localStatus.networkId && Buffer.from(localStatus.genesisHash.substr(2), 'hex').equals(remoteStatus.genesisHash);
   }
-
-  decode(key: string | number, data: any): any {
-    return this.findHandler(key).decode(data);
-  }
-  */
 }

@@ -37,7 +37,12 @@ export class Protocol {
     throw new Error('Unimplemented');
   }
 
-  handshake(peer: Peer, data: any) {
+  async handshake(peer: Peer, localStatus: any): Promise<boolean> {
+    const remoteStatus = await this._handshake(peer, localStatus);
+    return this.isValidRemoteStatus(remoteStatus, localStatus);
+  }
+
+  protected _handshake(peer: Peer, data: any) {
     return this._status
       ? Promise.resolve(this._status)
       : new Promise<any>((resolve, reject) => {
@@ -53,5 +58,9 @@ export class Protocol {
           });
           peer.send(this.name, 'Status', data);
         });
+  }
+
+  protected isValidRemoteStatus(remoteStatus: any, localStatus: any): boolean {
+    throw new Error('Unimplemented');
   }
 }

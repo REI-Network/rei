@@ -271,17 +271,17 @@ export class Peer extends EventEmitter {
     return this.getQueue(name).request(method, message);
   }
 
-  async acceptProtocol(stream: any, protocol: Protocol, status: any) {
+  async acceptProtocol(stream: any, protocol: Protocol, status: any): Promise<boolean> {
     const queue = this.makeQueue(protocol);
     queue.pipeStream(stream);
-    await protocol.handshake(this, status);
+    return await protocol.handshake(this, status);
   }
 
-  async installProtocol(p2p: any, peerInfo: PeerId, protocol: Protocol, status: any) {
+  async installProtocol(p2p: any, peerInfo: PeerId, protocol: Protocol, status: any): Promise<boolean> {
     const { stream } = await p2p.dialProtocol(peerInfo, protocol.protocolString);
     const queue = this.makeQueue(protocol);
     queue.pipeStream(stream);
-    await protocol.handshake(this, status);
+    return await protocol.handshake(this, status);
   }
 
   async installProtocols(p2p: any, peerInfo: PeerId, protocols: Protocol[], status: any) {

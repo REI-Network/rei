@@ -34,7 +34,7 @@ export class FullSynchronizer extends Synchronizer {
       const localStatus = this.node.status;
       for (const peer of this.node.peerpool.peers) {
         const remoteStatus = peer.getStatus(constants.GXC2_ETHWIRE);
-        if (!remoteStatus || remoteStatus.networkId !== localStatus.networkId || !Buffer.from(localStatus.genesisHash.substr(2), 'hex').equals(remoteStatus.genesisHash)) {
+        if (!remoteStatus) {
           continue;
         }
         const height = remoteStatus.height;

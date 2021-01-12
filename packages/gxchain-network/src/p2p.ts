@@ -103,8 +103,8 @@ export class Libp2pNode extends Libp2p {
           const peerId: PeerId = connection.remotePeer;
           const id = peerId.toB58String();
           const peer = this.peers.get(id);
-          if (peer) {
-            await peer.acceptProtocol(stream, protocol.copy(), this.node.status);
+          if (peer && (await peer.acceptProtocol(stream, protocol.copy(), this.node.status))) {
+            console.debug('Peer handled:', peer.peerId);
             this.emit('connected', peer);
           }
         } catch (err) {
@@ -119,9 +119,11 @@ export class Libp2pNode extends Libp2p {
           return;
         }
         const peer = this.createPeer(peerId);
-        await Promise.all(this.protocols.map((protocol) => peer.installProtocol(this, peerId, protocol.copy(), this.node.status)));
-        console.debug('Peer discovered:', peer.peerId);
-        this.emit('connected', peer);
+        const results = await Promise.all(this.protocols.map((protocol) => peer.installProtocol(this, peerId, protocol.copy(), this.node.status)));
+        if (results.reduce((a, b) => a || b, false)) {
+          console.debug('Peer discovered:', peer.peerId);
+          this.emit('connected', peer);
+        }
       } catch (err) {
         this.emit('error', err);
       }

@@ -121,7 +121,7 @@ export class FullSynchronizer extends Synchronizer {
       return 0;
     }
     while (latestHeight > 0) {
-      const count = latestHeight > 128 ? 128 : latestHeight;
+      const count = latestHeight >= this.count ? this.count : latestHeight;
       latestHeight -= count;
 
       let headers!: BlockHeader[];

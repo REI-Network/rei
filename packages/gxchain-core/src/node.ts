@@ -163,14 +163,11 @@ export class Node implements INode {
   }
 
   async processBlock(blockSkeleton: Block) {
-    const header = this.blockchain.latestBlock.header;
-    if (!blockSkeleton.header.parentHash.equals(header.hash())) {
-      throw new Error(`Node invalid block ${JSON.stringify(blockSkeleton.toJSON(), null, '  ')}`);
-    }
     console.debug('process block:', blockSkeleton.header.number.toString());
+    const lastHeader = await this.db.getHeader(blockSkeleton.header.parentHash, blockSkeleton.header.number.subn(1));
     const opts = {
       block: blockSkeleton,
-      root: header.stateRoot,
+      root: lastHeader.stateRoot,
       generate: !!blockSkeleton.header.stateRoot,
       skipBlockValidation: true
     };

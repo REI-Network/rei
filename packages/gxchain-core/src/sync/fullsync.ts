@@ -31,12 +31,13 @@ export class FullSynchronizer extends Synchronizer {
     const syncResult = await (this.syncingPromise = new Promise<boolean>(async (syncResolve) => {
       let bestHeight = this.node.blockchain.latestHeight;
       let best: Peer | undefined;
+      const localStatus = this.node.status;
       for (const peer of this.node.peerpool.peers) {
-        const status = peer.getStatus(constants.GXC2_ETHWIRE);
-        if (!status || status.genesisHash !== this.node.status.genesisHash) {
+        const remoteStatus = peer.getStatus(constants.GXC2_ETHWIRE);
+        if (!remoteStatus || remoteStatus.networkId !== localStatus.networkId || !Buffer.from(localStatus.genesisHash.substr(2), 'hex').equals(remoteStatus.genesisHash)) {
           continue;
         }
-        const height = status.height;
+        const height = remoteStatus.height;
         if (height > bestHeight) {
           best = peer;
           bestHeight = height;

@@ -1,5 +1,6 @@
 import { Node } from '@gxchain2/core';
-import { Block, JsonBlock } from '@gxchain2/block';
+import { Block, JsonBlock, BlockHeader, JsonHeader } from '@gxchain2/block';
+import { Account, Address } from 'ethereumjs-util';
 
 import * as helper from './helper';
 
@@ -23,5 +24,21 @@ export class Controller {
       helper.throwRpcErr('Invalid tag value');
     }
     return block.toJSON();
+  }
+
+  async eth_getBlockHeaderByNumber([tag, fullTransactions]: [string, boolean]): Promise<JsonHeader> {
+    let blockHeader!: BlockHeader;
+    if (tag === 'earliest') {
+      blockHeader = (await this.node.blockchain.getBlock(0)).header;
+    } else if (tag === 'latest') {
+      blockHeader = this.node.blockchain.latestBlock.header;
+    } else if (tag === 'pending') {
+      helper.throwRpcErr('Unsupport pending block');
+    } else if (Number.isInteger(Number(tag))) {
+      blockHeader = (await this.node.blockchain.getBlock(Number(tag))).header;
+    } else {
+      helper.throwRpcErr('Invalid tag value');
+    }
+    return blockHeader.toJSON();
   }
 }

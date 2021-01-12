@@ -10,6 +10,20 @@ export class Controller {
     this.node = node;
   }
 
+  //aysnc eth_clientVersion()
+  //aysnc eth_sha3()
+  //aysnc eth_net_version()
+  //aysnc eth_net_listenging()
+  //aysnc eth_netpeer_Count()
+  //aysnc eth_protocolVersion()
+  //aysnc eth_syncing()
+  //aysnc eth_coinbase()
+
+  async eth_blockNumber(): Promise<Number> {
+    let blockNumber = await Number(this.node.blockchain.latestBlock.header.number);
+    return blockNumber;
+  }
+
   async eth_getBlockByNumber([tag, fullTransactions]: [string, boolean]): Promise<JsonBlock> {
     let block!: Block;
     if (tag === 'earliest') {

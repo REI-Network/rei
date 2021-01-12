@@ -3,7 +3,7 @@ import { EventEmitter } from 'events';
 import { PriorityQueue, AsyncQueue, AysncChannel, AysncHeapChannel } from '@gxchain2/utils';
 import { Peer } from '@gxchain2/network';
 
-import { Node } from '../node';
+import { Node } from '../../node';
 
 export interface FetcherOptions<TData = any, TResult = any> {
   node: Node;

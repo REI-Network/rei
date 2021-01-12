@@ -4,7 +4,7 @@ import { Block, BlockHeader } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
 
 import { Synchronizer, SynchronizerOptions } from './sync';
-import { Task, Fetcher } from './fetcher';
+import { Task, Fetcher } from './fetcher/fetcher';
 import { GXC2_ETHWIRE } from '@gxchain2/common/dist/constants';
 
 export interface FullSynchronizerOptions extends SynchronizerOptions {

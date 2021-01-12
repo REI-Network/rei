@@ -138,7 +138,6 @@ class MsgQueue extends EventEmitter {
                       this.send(method, resps);
                     })
                     .catch((err) => {
-                      console.error('MsgQueue handle failed', err);
                       this.emit('error', err);
                     });
                 }
@@ -168,22 +167,25 @@ class MsgQueue extends EventEmitter {
 }
 
 export declare interface Peer {
-  on(event: 'busy' | 'idle', listener: () => void): this;
-  on(event: 'error', listener: (err: any) => void): this;
+  on(event: 'busy' | 'idle', listener: (type: 'headers' | 'bodies' | 'receipts') => void): this;
+  on(event: 'error', listener: (err: Error) => void): this;
   on(event: string, listener: (message: any, protocol: Protocol) => void): this;
 
-  once(event: 'busy' | 'idle', listener: () => void): this;
-  once(event: 'error', listener: (err: any) => void): this;
+  once(event: 'busy' | 'idle', listener: (type: 'headers' | 'bodies' | 'receipts') => void): this;
+  once(event: 'error', listener: (err: Error) => void): this;
   once(event: string, listener: (message: any, protocol: Protocol) => void): this;
 }
 
 export class Peer extends EventEmitter {
   readonly peerId: string;
   readonly node: Libp2pNode;
-  private _idle: boolean = true;
   private queueMap = new Map<string, MsgQueue>();
   private knowTxs = new Set<Buffer>();
   private knowBlocks = new Set<Buffer>();
+
+  private _headersIdle: boolean = true;
+  private _bodiesIdle: boolean = true;
+  private _receiptsIdle: boolean = true;
 
   constructor(options: { peerId: string; node: Libp2pNode }) {
     super();
@@ -191,14 +193,31 @@ export class Peer extends EventEmitter {
     this.node = options.node;
   }
 
-  get idle() {
-    return this._idle;
+  get headersIdle() {
+    return this._headersIdle;
   }
-
-  set idle(b: boolean) {
-    if (this.idle !== b) {
-      this._idle = b;
-      this.emit(b ? 'idle' : 'busy');
+  get bodiesIdle() {
+    return this._bodiesIdle;
+  }
+  get receiptsIdle() {
+    return this._receiptsIdle;
+  }
+  set headersIdle(b: boolean) {
+    if (this._headersIdle !== b) {
+      this._headersIdle = b;
+      this.emit(b ? 'idle' : 'busy', 'headers');
+    }
+  }
+  set bodiesIdle(b: boolean) {
+    if (this._bodiesIdle !== b) {
+      this._bodiesIdle = b;
+      this.emit(b ? 'idle' : 'busy', 'bodies');
+    }
+  }
+  set receiptsIdle(b: boolean) {
+    if (this._receiptsIdle !== b) {
+      this._receiptsIdle = b;
+      this.emit(b ? 'idle' : 'busy', 'receipts');
     }
   }
 
@@ -227,6 +246,15 @@ export class Peer extends EventEmitter {
       await queue.abort();
     }
     this.queueMap.clear();
+  }
+
+  isSupport(name: string): boolean {
+    try {
+      const status = this.getQueue(name).protocol.status;
+      return status !== undefined;
+    } catch (err) {
+      return false;
+    }
   }
 
   latestHeight(name: string): number {

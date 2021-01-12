@@ -5,10 +5,12 @@ import type { Libp2pNode } from './p2p';
 
 export declare interface PeerPool {
   on(event: 'error', listener: (err: any) => void): this;
-  on(event: 'added' | 'removed' | 'banned' | 'idle' | 'busy', listener: (peer: Peer) => void): this;
+  on(event: 'idle' | 'busy', listener: (peer: Peer, type: string) => void): this;
+  on(event: 'added' | 'removed' | 'banned', listener: (peer: Peer) => void): this;
 
   once(event: 'error', listener: (err: any) => void): this;
-  once(event: 'added' | 'removed' | 'banned' | 'idle' | 'busy', listener: (peer: Peer) => void): this;
+  once(event: 'idle' | 'busy', listener: (peer: Peer, type: string) => void): this;
+  once(event: 'added' | 'removed' | 'banned', listener: (peer: Peer) => void): this;
 }
 
 export class PeerPool extends EventEmitter {
@@ -42,9 +44,9 @@ export class PeerPool extends EventEmitter {
     return [...this._nodes];
   }
 
-  idle(name: string) {
+  idle(filter: (p: Peer) => boolean) {
     try {
-      const peers = this.peers.filter((p) => p.idle && p.latestHeight(name));
+      const peers = this.peers.filter(filter);
       const index = Math.floor(Math.random() * peers.length);
       return peers[index];
     } catch (err) {
@@ -56,14 +58,14 @@ export class PeerPool extends EventEmitter {
     if (this.size >= this.maxSize) {
       return;
     }
-    peer.on('idle', () => {
+    peer.on('idle', (type) => {
       if (this.pool.get(peer.peerId)) {
-        this.emit('idle', peer);
+        this.emit('idle', peer, type);
       }
     });
-    peer.on('busy', () => {
+    peer.on('busy', (type) => {
       if (this.pool.get(peer.peerId)) {
-        this.emit('busy', peer);
+        this.emit('busy', peer, type);
       }
     });
     peer.on('error', (err) => {

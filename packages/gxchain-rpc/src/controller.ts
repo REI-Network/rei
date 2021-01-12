@@ -24,6 +24,27 @@ export class Controller {
     return blockNumber;
   }
 
+  //eth_getStorageAt
+  //eth_getTransactionCount
+  //eth_getBlockTransactionCountByHash
+  //eth_getBlockTransactionCountByNumber
+  //eth_getUncleCountByBlockHash
+  //eth_getUncleCountByBlockNumber
+  //eth_getCode
+  //eth_sign
+  //eth_signTransaction
+  //eth_sendTransaction
+  //eth_sendRawTransaction
+  //eth_call
+  //eth_estimateGas
+  async eth_getBlockByHash([hash, fullTransactions]: [string, boolean]): Promise<JsonBlock> {
+    let block!: Block;
+    let hashBuffer: Buffer = hash.indexOf('0x') === 0 ? Buffer.from(hash.substr(2), 'hex') : Buffer.from(hash, 'hex');
+    let number = await this.node.db.hashToNumber(hashBuffer);
+    block = await this.node.db.getBlock(number);
+    return block.toJSON();
+  }
+
   async eth_getBlockByNumber([tag, fullTransactions]: [string, boolean]): Promise<JsonBlock> {
     let block!: Block;
     if (tag === 'earliest') {

@@ -31,6 +31,12 @@ const hexStringToBuffer = (hex: string): Buffer => {
   return hex.indexOf('0x') === 0 ? Buffer.from(hex.substr(2), 'hex') : Buffer.from(hex, 'hex');
 };
 
+function getRandomIntInclusive(min: number, max: number): number {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 const startPrompts = async (node: Node) => {
   while (true) {
     const response = await prompts({
@@ -90,8 +96,9 @@ const startPrompts = async (node: Node) => {
       try {
         const count = Number.isInteger(Number(arr[1])) ? Number(arr[1]) : 1000;
         for (let i = 0; i < count; i++) {
-          const fromIndex = i % 2 === 0 ? 0 : 1;
-          const toIndex = i % 2 !== 1 ? 0 : 1;
+          const flag = getRandomIntInclusive(1, 2) == 1;
+          const fromIndex = flag ? 0 : 1;
+          const toIndex = !flag ? 0 : 1;
           const account = await node.stateManager.getAccount(Address.fromString(accounts[fromIndex]));
           const unsignedTx = Transaction.fromTxData(
             {
@@ -122,7 +129,6 @@ const startPrompts = async (node: Node) => {
             { common: node.common }
           );
           await node.processBlock(block);
-          console.log('new block', block.header.number.toString());
           await new Promise((resolve) => setTimeout(resolve, 10));
         }
       } catch (err) {

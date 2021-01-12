@@ -1,17 +1,16 @@
 import { EventEmitter } from 'events';
 
 import { PriorityQueue, AsyncQueue, AysncChannel, AysncHeapChannel } from '@gxchain2/utils';
-import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
+import { Peer } from '@gxchain2/network';
 
 import { Node } from '../node';
 
 export interface FetcherOptions<TData = any, TResult = any> {
   node: Node;
-  protocol: string;
   limit?: number;
-  timeoutBanTime?: number;
-  errorBanTime?: number;
-
+  lockIdlePeer: (peer: Peer) => void;
+  findIdlePeer: () => Peer | undefined;
+  isValidPeer: (peer: Peer, type: string) => boolean;
   download: (data: Task<TData, TResult>) => Promise<TResult>;
   process: (result: Task<TData, TResult>) => Promise<boolean>;
 }
@@ -32,9 +31,9 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
 
   private readonly node: Node;
   private readonly limit: number;
-  private readonly timeoutBanTime: number;
-  private readonly errorBanTime: number;
-  private readonly protocol: string;
+  private readonly lockIdlePeer: (peer: Peer) => void;
+  private readonly findIdlePeer: () => Peer | undefined;
+  private readonly isValidPeer: (peer: Peer, type: string) => boolean;
   private readonly download: (data: Task<TData, TResult>) => Promise<TResult>;
   private readonly process: (result: Task<TData, TResult>) => Promise<boolean>;
   private abortFlag: boolean = false;
@@ -43,12 +42,12 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
   constructor(options: FetcherOptions<TData, TResult>) {
     super();
     this.node = options.node;
-    this.protocol = options.protocol;
+    this.limit = options.limit || 16;
+    this.lockIdlePeer = options.lockIdlePeer;
+    this.findIdlePeer = options.findIdlePeer;
+    this.isValidPeer = options.isValidPeer;
     this.download = options.download;
     this.process = options.process;
-    this.limit = options.limit || 16;
-    this.timeoutBanTime = options.timeoutBanTime || 300000;
-    this.errorBanTime = options.errorBanTime || 60000;
 
     this.priorityQueue.on('result', (result) => {
       if (!this.abortFlag) {
@@ -64,7 +63,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
     });
     this.idlePeerQueue = new AsyncQueue<Peer>({
       hasNext: () => {
-        const peer = this.node.peerpool.idle(this.protocol);
+        const peer = this.findIdlePeer();
         if (!peer) {
           return false;
         }
@@ -73,29 +72,11 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
       }
     });
 
-    this.node.peerpool.on('idle', (peer) => {
-      if (this.fetchingPromise && peer.idle && peer.latestHeight(this.protocol)) {
+    this.node.peerpool.on('idle', (peer, type) => {
+      if (this.fetchingPromise && this.isValidPeer(peer, type)) {
         this.idlePeerQueue.push(peer);
       }
     });
-  }
-
-  private async safelyDownload(task: Task<TData, TResult>): Promise<TResult> {
-    const peer = task.peer!;
-    try {
-      const result = await this.download(task);
-      peer.idle = true;
-      return result;
-    } catch (err) {
-      if (err instanceof PeerRequestTimeoutError) {
-        this.node.peerpool.ban(peer, this.timeoutBanTime);
-      } else {
-        this.node.peerpool.ban(peer, this.errorBanTime);
-      }
-      peer.idle = true;
-      task.peer = undefined;
-      throw err;
-    }
   }
 
   private taskOver() {
@@ -152,11 +133,11 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
                 if (peer === null) {
                   break;
                 }
-                peer.idle = false;
+                this.lockIdlePeer(peer);
                 task.peer = peer;
               }
 
-              const p = this.safelyDownload(task)
+              const p = this.download(task)
                 .then((result) => {
                   task.result = result;
                   this.priorityQueue.insert(task, task.index);

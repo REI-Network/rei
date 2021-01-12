@@ -5,14 +5,9 @@ import { Peer } from '@gxchain2/network';
 
 import { Node } from '../../node';
 
-export interface FetcherOptions<TData = any, TResult = any> {
+export interface FetcherOptions {
   node: Node;
   limit?: number;
-  lockIdlePeer: (peer: Peer) => void;
-  findIdlePeer: () => Peer | undefined;
-  isValidPeer: (peer: Peer, type: string) => boolean;
-  download: (data: Task<TData, TResult>) => Promise<TResult>;
-  process: (result: Task<TData, TResult>) => Promise<boolean>;
 }
 
 export type Task<TData = any, TResult = any> = {
@@ -22,6 +17,12 @@ export type Task<TData = any, TResult = any> = {
   peer?: Peer;
 };
 
+export declare interface Fetcher {
+  on(event: 'error', listener: (error: Error) => void): this;
+
+  once(event: 'error', listener: (error: Error) => void): this;
+}
+
 export class Fetcher<TData = any, TResult = any> extends EventEmitter {
   private readonly priorityQueue = new PriorityQueue<Task<TData, TResult>>();
   private readonly limitQueue = new AsyncQueue<void>();
@@ -29,25 +30,15 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
   private readonly resultQueue: AysncChannel<Task<TData, TResult>>;
   private readonly idlePeerQueue: AsyncQueue<Peer>;
 
-  private readonly node: Node;
+  protected readonly node: Node;
   private readonly limit: number;
-  private readonly lockIdlePeer: (peer: Peer) => void;
-  private readonly findIdlePeer: () => Peer | undefined;
-  private readonly isValidPeer: (peer: Peer, type: string) => boolean;
-  private readonly download: (data: Task<TData, TResult>) => Promise<TResult>;
-  private readonly process: (result: Task<TData, TResult>) => Promise<boolean>;
   private abortFlag: boolean = false;
   private fetchingPromise?: Promise<boolean>;
 
-  constructor(options: FetcherOptions<TData, TResult>) {
+  constructor(options: FetcherOptions) {
     super();
     this.node = options.node;
     this.limit = options.limit || 16;
-    this.lockIdlePeer = options.lockIdlePeer;
-    this.findIdlePeer = options.findIdlePeer;
-    this.isValidPeer = options.isValidPeer;
-    this.download = options.download;
-    this.process = options.process;
 
     this.priorityQueue.on('result', (result) => {
       if (!this.abortFlag) {
@@ -201,5 +192,21 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
   async reset() {
     await this.abort();
     this.abortFlag = false;
+  }
+
+  protected lockIdlePeer(peer: Peer) {
+    throw new Error('Unimplemented');
+  }
+  protected findIdlePeer(): Peer | undefined {
+    throw new Error('Unimplemented');
+  }
+  protected isValidPeer(peer: Peer, type: string): boolean {
+    throw new Error('Unimplemented');
+  }
+  protected async download(data: Task<TData, TResult>): Promise<TResult> {
+    throw new Error('Unimplemented');
+  }
+  protected async process(result: Task<TData, TResult>): Promise<boolean> {
+    throw new Error('Unimplemented');
   }
 }

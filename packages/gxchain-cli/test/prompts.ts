@@ -88,7 +88,8 @@ const startPrompts = async (node: Node) => {
       }
     } else if (arr[0] === 'batchmine' || arr[0] === 'bm') {
       try {
-        for (let i = 0; i < 1000; i++) {
+        const count = Number.isInteger(Number(arr[1])) ? Number(arr[1]) : 1000;
+        for (let i = 0; i < count; i++) {
           const fromIndex = i % 2 === 0 ? 0 : 1;
           const toIndex = i % 2 !== 1 ? 0 : 1;
           const account = await node.stateManager.getAccount(Address.fromString(accounts[fromIndex]));

@@ -41,4 +41,14 @@ export class Controller {
     }
     return blockHeader.toJSON();
   }
+
+  async eth_getAccount([address]: [string]): Promise<any> {
+    let account = await this.node.stateManager.getAccount(Address.fromString(address));
+    return {
+      nonce: account.nonce,
+      balance: account.balance,
+      stateRoot: account.stateRoot,
+      codeHash: account.codeHash
+    };
+  }
 }

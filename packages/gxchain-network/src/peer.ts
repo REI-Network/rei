@@ -257,12 +257,10 @@ export class Peer extends EventEmitter {
     }
   }
 
-  latestHeight(name: string): number {
-    const status = this.getQueue(name).protocol.status;
-    if (!status || status.height === undefined) {
-      throw new Error(`Peer invalid status, name: ${name}`);
-    }
-    return status.height;
+  getStatus(name: string): any {
+    try {
+      return this.getQueue(name).protocol.status;
+    } catch (err) {}
   }
 
   send(name: string, method: string, message: any) {

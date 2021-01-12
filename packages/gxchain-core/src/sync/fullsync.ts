@@ -1,5 +1,6 @@
 import { constants } from '@gxchain2/common';
-import { Peer } from '@gxchain2/network';
+import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
+import { BlockHeader } from '@gxchain2/block';
 
 import { Synchronizer, SynchronizerOptions } from './sync';
 import { HeadersFetcher, BodiesFetcher, HeadersFethcerTask } from './fetcher';
@@ -28,12 +29,14 @@ export class FullSynchronizer extends Synchronizer {
       throw new Error('FullSynchronizer already sync');
     }
     const syncResult = await (this.syncingPromise = new Promise<boolean>(async (syncResolve) => {
-      let bestHeight = 0;
-      const latestHeight = this.node.blockchain.latestHeight;
-      bestHeight = latestHeight;
+      let bestHeight = this.node.blockchain.latestHeight;
       let best: Peer | undefined;
       for (const peer of this.node.peerpool.peers) {
-        const height = peer.latestHeight(constants.GXC2_ETHWIRE);
+        const status = peer.getStatus(constants.GXC2_ETHWIRE);
+        if (!status || status.genesisHash !== this.node.status.genesisHash) {
+          continue;
+        }
+        const height = status.height;
         if (height > bestHeight) {
           best = peer;
           bestHeight = height;
@@ -44,14 +47,23 @@ export class FullSynchronizer extends Synchronizer {
         return;
       }
 
-      console.debug('get best height from:', best!.peerId, 'best height:', bestHeight, 'local height:', latestHeight);
-      let totalCount = bestHeight - latestHeight;
+      let localHeight = 0;
+      try {
+        localHeight = await this.findAncient(best, bestHeight);
+      } catch (err) {
+        this.emit('error', err);
+        syncResolve(false);
+        return;
+      }
+
+      console.debug('get best height from:', best!.peerId, 'best height:', bestHeight, 'local height:', localHeight);
+      let totalCount = bestHeight - localHeight;
       let totalTaskCount = 0;
       const headerFetcherTasks: HeadersFethcerTask[] = [];
       while (totalCount > 0) {
         headerFetcherTasks.push({
           data: {
-            start: totalTaskCount * this.count + latestHeight + 1,
+            start: totalTaskCount * this.count + localHeight + 1,
             count: totalCount > this.count ? this.count : totalCount
           },
           peer: best,
@@ -100,5 +112,39 @@ export class FullSynchronizer extends Synchronizer {
       await this.abortFetchers();
       this.abortFetchers = undefined;
     }
+  }
+
+  // TODO: binary search and rollback lock.
+  async findAncient(peer: Peer, bestHeight: number): Promise<number> {
+    while (bestHeight > 0) {
+      const count = bestHeight > 128 ? 128 : bestHeight;
+      bestHeight -= count;
+
+      let headers!: BlockHeader[];
+      try {
+        headers = await peer.getBlockHeaders(bestHeight, count);
+      } catch (err) {
+        if (err instanceof PeerRequestTimeoutError) {
+          this.node.peerpool.ban(peer, this.options.timeoutBanTime || 300000);
+        } else {
+          this.node.peerpool.ban(peer, this.options.errorBanTime || 60000);
+        }
+        throw err;
+      }
+
+      for (let i = headers.length - 1; i > 0; i--) {
+        try {
+          const remoteHeader = headers[i];
+          const localHeader = await this.node.db.getHeader(remoteHeader.hash(), remoteHeader.number);
+          return localHeader.number.toNumber();
+        } catch (err) {
+          if (err.type === 'NotFoundError') {
+            continue;
+          }
+          throw err;
+        }
+      }
+    }
+    throw new Error('find acient failed');
   }
 }

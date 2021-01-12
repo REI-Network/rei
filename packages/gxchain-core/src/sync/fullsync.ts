@@ -49,7 +49,7 @@ export class FullSynchronizer extends Synchronizer {
 
       let localHeight = 0;
       try {
-        localHeight = await this.findAncient(best, bestHeight);
+        localHeight = await this.findAncient(best);
       } catch (err) {
         this.emit('error', err);
         syncResolve(false);
@@ -115,14 +115,18 @@ export class FullSynchronizer extends Synchronizer {
   }
 
   // TODO: binary search and rollback lock.
-  async findAncient(peer: Peer, bestHeight: number): Promise<number> {
-    while (bestHeight > 0) {
-      const count = bestHeight > 128 ? 128 : bestHeight;
-      bestHeight -= count;
+  async findAncient(peer: Peer): Promise<number> {
+    let latestHeight = this.node.blockchain.latestHeight;
+    if (latestHeight === 0) {
+      return 0;
+    }
+    while (latestHeight > 0) {
+      const count = latestHeight > 128 ? 128 : latestHeight;
+      latestHeight -= count;
 
       let headers!: BlockHeader[];
       try {
-        headers = await peer.getBlockHeaders(bestHeight, count);
+        headers = await peer.getBlockHeaders(latestHeight, count);
       } catch (err) {
         if (err instanceof PeerRequestTimeoutError) {
           this.node.peerpool.ban(peer, this.options.timeoutBanTime || 300000);

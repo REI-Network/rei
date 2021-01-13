@@ -1,6 +1,7 @@
 import { Node } from '@gxchain2/core';
 import { Block, JsonBlock, BlockHeader, JsonHeader } from '@gxchain2/block';
 import { Account, Address } from 'ethereumjs-util';
+//import { Transaction } from '@gxchain2/tx';
 
 import * as helper from './helper';
 
@@ -9,7 +10,9 @@ export class Controller {
   constructor(node: Node) {
     this.node = node;
   }
-
+  hexStringToBuffer = (hex: string): Buffer => {
+    return hex.indexOf('0x') === 0 ? Buffer.from(hex.substr(2), 'hex') : Buffer.from(hex, 'hex');
+  };
   //aysnc eth_clientVersion()
   //aysnc eth_sha3()
   //aysnc eth_net_version()
@@ -38,11 +41,7 @@ export class Controller {
   //eth_call
   //eth_estimateGas
   async eth_getBlockByHash([hash, fullTransactions]: [string, boolean]): Promise<JsonBlock> {
-    let block!: Block;
-    let hashBuffer: Buffer = hash.indexOf('0x') === 0 ? Buffer.from(hash.substr(2), 'hex') : Buffer.from(hash, 'hex');
-    let number = await this.node.db.hashToNumber(hashBuffer);
-    block = await this.node.db.getBlock(number);
-    return block.toJSON();
+    return (await this.node.db.getBlock(this.hexStringToBuffer(hash))).toJSON();
   }
 
   async eth_getBlockByNumber([tag, fullTransactions]: [string, boolean]): Promise<JsonBlock> {
@@ -75,6 +74,10 @@ export class Controller {
       helper.throwRpcErr('Invalid tag value');
     }
     return blockHeader.toJSON();
+  }
+
+  async eth_getTransactionByHash([hash]: string): Promise<any> {
+    return (await this.node.db.getTransaction(this.hexStringToBuffer(hash))).toRPCJSON();
   }
 
   async eth_getAccount([address]: [string]): Promise<any> {

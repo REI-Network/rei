@@ -121,8 +121,6 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
-  private async downloadBlock(peer: Peer) {}
-
   // TODO: binary search and rollback lock.
   private async findAncient(peer: Peer): Promise<number> {
     let latestHeight = this.node.blockchain.latestHeight;

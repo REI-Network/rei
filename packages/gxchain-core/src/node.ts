@@ -112,9 +112,16 @@ export class Node implements INode {
         )
       )
     });
-    this.peerpool.on('error', (err) => {
-      console.error('Peer pool error:', err);
-    });
+    this.peerpool
+      .on('error', (err) => {
+        console.error('Peer pool error:', err);
+      })
+      .on('added', (peer) => {
+        const status = peer.getStatus(constants.GXC2_ETHWIRE);
+        if (status && status.height) {
+          this.sync.announce(peer, status.height);
+        }
+      });
 
     let genesisBlock!: Block;
     try {
@@ -150,7 +157,7 @@ export class Node implements INode {
     this.vm = new VM({
       common: this.common,
       stateManager: this.stateManager,
-      blockchain: this.blockchain as any
+      blockchain: this.blockchain
     });
     this.sync = new FullSynchronizer({ node: this });
     this.sync.on('error', (err) => {

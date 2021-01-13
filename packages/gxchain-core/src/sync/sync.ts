@@ -1,6 +1,8 @@
 import { EventEmitter } from 'events';
 
 import { Aborter } from '@gxchain2/utils';
+import { Peer } from '@gxchain2/network';
+import { Block } from '@gxchain2/block';
 
 import type { Node } from '../node';
 
@@ -39,6 +41,10 @@ export class Synchronizer extends EventEmitter {
   }
 
   async syncAbort() {
+    throw new Error('Unimplemented');
+  }
+
+  announce(peer: Peer, block: Block) {
     throw new Error('Unimplemented');
   }
 

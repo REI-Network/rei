@@ -1,6 +1,6 @@
 import { constants } from '@gxchain2/common';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
-import { BlockHeader } from '@gxchain2/block';
+import { Block, BlockHeader } from '@gxchain2/block';
 
 import { Synchronizer, SynchronizerOptions } from './sync';
 import { HeadersFetcher, BodiesFetcher, HeadersFethcerTask } from './fetcher';
@@ -15,6 +15,8 @@ export interface FullSynchronizerOptions extends SynchronizerOptions {
 export class FullSynchronizer extends Synchronizer {
   private readonly options: FullSynchronizerOptions;
   private readonly count: number;
+  private bestPeer?: Peer;
+  private bestHeight?: number;
   private syncingPromise?: Promise<boolean>;
   private abortFetchers?: () => Promise<void>;
 
@@ -24,84 +26,47 @@ export class FullSynchronizer extends Synchronizer {
     this.count = this.options.count || 128;
   }
 
+  announce(peer: Peer, block: Block) {
+    // TODO: validata block.
+  }
+
   async sync(): Promise<boolean> {
     if (this.syncingPromise) {
       throw new Error('FullSynchronizer already sync');
     }
     const syncResult = await (this.syncingPromise = new Promise<boolean>(async (syncResolve) => {
-      let bestHeight = this.node.blockchain.latestHeight;
-      let best: Peer | undefined;
-      const localStatus = this.node.status;
+      this.bestHeight = this.node.blockchain.latestHeight;
       for (const peer of this.node.peerpool.peers) {
         const remoteStatus = peer.getStatus(constants.GXC2_ETHWIRE);
         if (!remoteStatus) {
           continue;
         }
         const height = remoteStatus.height;
-        if (height > bestHeight) {
-          best = peer;
-          bestHeight = height;
+        if (height > this.bestHeight!) {
+          this.bestPeer = peer;
+          this.bestHeight = height;
         }
       }
-      if (!best) {
+      if (!this.bestPeer) {
         syncResolve(false);
+        this.bestHeight = undefined;
+        this.bestPeer = undefined;
         return;
       }
 
-      let localHeight = 0;
       try {
-        localHeight = await this.findAncient(best);
+        syncResolve(
+          await this.syncWithPeer(this.bestPeer, this.bestHeight!, (newAbort) => {
+            this.abortFetchers = newAbort;
+          })
+        );
       } catch (err) {
-        this.emit('error', err);
         syncResolve(false);
-        return;
+        this.emit('error', err);
+      } finally {
+        this.bestHeight = undefined;
+        this.bestPeer = undefined;
       }
-
-      console.debug('get best height from:', best!.peerId, 'best height:', bestHeight, 'local height:', localHeight);
-      let totalCount = bestHeight - localHeight;
-      let totalTaskCount = 0;
-      const headerFetcherTasks: HeadersFethcerTask[] = [];
-      while (totalCount > 0) {
-        headerFetcherTasks.push({
-          data: {
-            start: totalTaskCount * this.count + localHeight + 1,
-            count: totalCount > this.count ? this.count : totalCount
-          },
-          peer: best,
-          index: totalTaskCount
-        });
-        totalTaskCount++;
-        totalCount -= this.count;
-      }
-
-      const bodiesFetcher = new BodiesFetcher(
-        Object.assign(this.options, {
-          node: this.node,
-          bestHeight
-        })
-      ).on('error', (err) => {
-        console.error('bodiesFetcher error:', err);
-        this.syncAbort();
-      });
-
-      const headerFetcher = new HeadersFetcher(
-        Object.assign(this.options, {
-          node: this.node,
-          bestHeight
-        })
-      )
-        .on('error', (err) => {
-          console.error('headerFetcher error:', err);
-          this.syncAbort();
-        })
-        .on('result', (task) => {
-          bodiesFetcher.insert({ data: task.result!, index: task.index });
-        });
-
-      this.abortFetchers = async () => {
-        await Promise.all([headerFetcher.reset(), bodiesFetcher.reset()]);
-      };
-      syncResolve((await Promise.all([headerFetcher.fetch(headerFetcherTasks), bodiesFetcher.fetch()])).reduce((a, b) => a && b, true));
     }));
     this.abortFetchers = undefined;
     this.syncingPromise = undefined;
@@ -116,7 +81,7 @@ export class FullSynchronizer extends Synchronizer {
   }
 
   // TODO: binary search and rollback lock.
-  async findAncient(peer: Peer): Promise<number> {
+  private async findAncient(peer: Peer): Promise<number> {
     let latestHeight = this.node.blockchain.latestHeight;
     if (latestHeight === 0) {
       return 0;
@@ -151,5 +116,54 @@ export class FullSynchronizer extends Synchronizer {
       }
     }
     throw new Error('find acient failed');
+  }
+
+  private async syncWithPeer(peer: Peer, bestHeight: number, updateAbort: (newAbort: () => Promise<void>) => void): Promise<boolean> {
+    const localHeight = await this.findAncient(peer);
+    console.debug('get best height from:', peer.peerId, 'best height:', bestHeight, 'local height:', localHeight);
+    let totalCount = bestHeight - localHeight;
+    let totalTaskCount = 0;
+    const headerFetcherTasks: HeadersFethcerTask[] = [];
+    while (totalCount > 0) {
+      headerFetcherTasks.push({
+        data: {
+          start: totalTaskCount * this.count + localHeight + 1,
+          count: totalCount > this.count ? this.count : totalCount
+        },
+        peer: peer,
+        index: totalTaskCount
+      });
+      totalTaskCount++;
+      totalCount -= this.count;
+    }
+
+    const bodiesFetcher = new BodiesFetcher(
+      Object.assign(this.options, {
+        node: this.node,
+        bestHeight
+      })
+    ).on('error', (err) => {
+      console.error('bodiesFetcher error:', err);
+      this.syncAbort();
+    });
+
+    const headerFetcher = new HeadersFetcher(
+      Object.assign(this.options, {
+        node: this.node,
+        bestHeight
+      })
+    )
+      .on('error', (err) => {
+        console.error('headerFetcher error:', err);
+        this.syncAbort();
+      })
+      .on('result', (task) => {
+        bodiesFetcher.insert({ data: task.result!, index: task.index });
+      });
+
+    updateAbort(async () => {
+      await Promise.all([headerFetcher.reset(), bodiesFetcher.reset()]);
+    });
+    return (await Promise.all([headerFetcher.fetch(headerFetcherTasks), bodiesFetcher.fetch()])).reduce((a, b) => a && b, true);
   }
 }

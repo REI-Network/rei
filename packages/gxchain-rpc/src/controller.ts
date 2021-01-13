@@ -4,6 +4,7 @@ import { Account, Address } from 'ethereumjs-util';
 //import { Transaction } from '@gxchain2/tx';
 
 import * as helper from './helper';
+import { promises } from 'dns';
 
 export class Controller {
   node: Node;
@@ -76,8 +77,12 @@ export class Controller {
     return blockHeader.toJSON();
   }
 
-  async eth_getTransactionByHash([hash]: string): Promise<any> {
+  async eth_getTransactionByHash([hash]: [string]): Promise<any> {
     return (await this.node.db.getTransaction(this.hexStringToBuffer(hash))).toRPCJSON();
+  }
+
+  async eth_getTransactionByBlockHashAndIndex([hash, index]: [string, number]): Promise<any> {
+    return (await (await this.node.db.getBlock(this.hexStringToBuffer(hash))).transactions[index]).toRPCJSON;
   }
 
   async eth_getAccount([address]: [string]): Promise<any> {

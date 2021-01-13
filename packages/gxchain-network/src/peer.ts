@@ -3,13 +3,13 @@ import { EventEmitter } from 'events';
 import { AsyncQueue, Aborter } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
+import { constants } from '@gxchain2/common';
 
 import pipe from 'it-pipe';
 import type PeerId from 'peer-id';
 
-import { Protocol } from './protocol/protocol';
+import { Protocol, MessageInfo } from './protocol/protocol';
 import { Libp2pNode } from './p2p';
-import { constants } from '@gxchain2/common';
 
 export class PeerRequestTimeoutError extends Error {}
 
@@ -54,12 +54,19 @@ class MsgQueue extends EventEmitter {
     return this.protocol.name;
   }
 
+  private makeMessageInfo(): MessageInfo {
+    return {
+      node: this.peer.node.node,
+      peer: this.peer
+    };
+  }
+
   send(method: string, data: any) {
     if (this.aborter.isAborted) {
       throw new Error('MsgQueue already aborted');
     }
     const handler = this.protocol.findHandler(method);
-    return this.queue.push(handler.encode(this.peer.node.node, data));
+    return this.queue.push(handler.encode(this.makeMessageInfo(), data));
   }
 
   request(method: string, data: any) {
@@ -82,7 +89,7 @@ class MsgQueue extends EventEmitter {
           reject(new PeerRequestTimeoutError(`MsgQueue timeout request: ${method}`));
         }, 8000)
       });
-      this.queue.push(handler.encode(this.peer.node.node, data));
+      this.queue.push(handler.encode(this.makeMessageInfo(), data));
     });
   }
 
@@ -117,7 +124,7 @@ class MsgQueue extends EventEmitter {
         try {
           // TODO: fix _bufs.
           const { code, handler, payload } = this.protocol.handle(value._bufs[0]);
-          const data = handler.decode(this.peer.node.node, payload);
+          const data = handler.decode(this.makeMessageInfo(), payload);
           if (code === 0) {
             this.emit('status', data);
           } else {
@@ -127,7 +134,7 @@ class MsgQueue extends EventEmitter {
               this.waitingRequests.delete(code);
               request.resolve(data);
             } else if (handler.process) {
-              const result = handler.process(this.peer.node.node, data);
+              const result = handler.process(this.makeMessageInfo(), data);
               if (result) {
                 if (Array.isArray(result)) {
                   const [method, resps] = result;

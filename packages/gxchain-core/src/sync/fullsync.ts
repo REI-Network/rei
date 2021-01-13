@@ -33,23 +33,23 @@ export class FullSynchronizer extends Synchronizer {
     return !!this.syncingPromise;
   }
 
-  async announce(peer: Peer, block: Block) {
+  async announce(peer: Peer, height: number) {
     // TODO: validata block.
     if (!this.isSyncing) {
-      this.sync({ peer, block });
-    } else if (this.bestPeer && this.bestPeer !== peer && this.bestHeight !== undefined && block.header.number.toNumber() > this.bestHeight) {
+      this.sync({ peer, height });
+    } else if (this.bestPeer && this.bestPeer !== peer && this.bestHeight !== undefined && height > this.bestHeight) {
       await this.lock.acquire();
       if (!this.isSyncing) {
-        this.sync({ peer, block });
-      } else if (this.bestPeer && this.bestPeer !== peer && this.bestHeight !== undefined && block.header.number.toNumber() > this.bestHeight) {
+        this.sync({ peer, height });
+      } else if (this.bestPeer && this.bestPeer !== peer && this.bestHeight !== undefined && height > this.bestHeight) {
         await this.syncAbort();
-        this.sync({ peer, block });
+        this.sync({ peer, height });
       }
       this.lock.release();
     }
   }
 
-  protected async _sync(target?: { peer: Peer; block: Block }): Promise<boolean> {
+  protected async _sync(target?: { peer: Peer; height: number }): Promise<boolean> {
     if (this.syncingPromise) {
       throw new Error('FullSynchronizer already sync');
     }
@@ -61,7 +61,7 @@ export class FullSynchronizer extends Synchronizer {
       };
 
       if (target) {
-        this.bestHeight = target.block.header.number.toNumber();
+        this.bestHeight = target.height;
         this.bestPeer = target.peer;
         if (this.bestHeight <= this.node.blockchain.latestHeight) {
           syncFailed();

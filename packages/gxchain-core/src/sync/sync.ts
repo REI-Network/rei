@@ -2,7 +2,6 @@ import { EventEmitter } from 'events';
 
 import { Aborter } from '@gxchain2/utils';
 import { Peer } from '@gxchain2/network';
-import { Block } from '@gxchain2/block';
 
 import type { Node } from '../node';
 
@@ -36,11 +35,11 @@ export class Synchronizer extends EventEmitter {
     throw new Error('Unimplemented');
   }
 
-  protected async _sync(target?: { peer: Peer; block: Block }): Promise<boolean> {
+  protected async _sync(target?: { peer: Peer; height: number }): Promise<boolean> {
     throw new Error('Unimplemented');
   }
 
-  async sync(target?: { peer: Peer; block: Block }) {
+  async sync(target?: { peer: Peer; height: number }) {
     try {
       if (!this.isSyncing && (await this._sync(target))) {
         console.debug('synchronized');
@@ -55,7 +54,7 @@ export class Synchronizer extends EventEmitter {
     throw new Error('Unimplemented');
   }
 
-  async announce(peer: Peer, block: Block) {
+  async announce(peer: Peer, height: number) {
     throw new Error('Unimplemented');
   }
 

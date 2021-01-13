@@ -88,7 +88,7 @@ const handlers: Handler[] = [
     encode: (info: MessageInfo, block: Block) => rlp.encode([5, [block.header.raw(), block.transactions.map((tx) => tx.raw())]]),
     decode: (info: MessageInfo, blockRaw): Block => Block.fromValuesArray(blockRaw, { common: info.node.common }),
     process(info: MessageInfo, block: Block) {
-      (info.node as any).sync.announce(info.peer, block);
+      info.node.sync.announce(info.peer, block.header.number.toNumber());
     }
   },
   {

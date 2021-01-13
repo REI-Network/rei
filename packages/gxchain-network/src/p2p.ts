@@ -23,10 +23,15 @@ function parseProtocol(name: string): Protocol {
   throw new Error(`Unkonw protocol: ${name}`);
 }
 
+export interface ISync {
+  announce(peer: Peer, height: number): void;
+}
+
 export interface INode {
   db: Database;
   blockchain: Blockchain;
   common: Common;
+  sync: ISync;
   status: any;
 }
 

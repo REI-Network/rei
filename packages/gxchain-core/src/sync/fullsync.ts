@@ -34,23 +34,16 @@ export class FullSynchronizer extends Synchronizer {
   }
 
   async announce(peer: Peer, block: Block) {
-    const tryToSync = () => {
-      if (block.header.number.toNumber() > this.node.blockchain.latestHeight) {
-        this.sync({ peer, block });
-      }
-    };
     // TODO: validata block.
     if (!this.isSyncing) {
-      tryToSync();
+      this.sync({ peer, block });
     } else if (this.bestPeer && this.bestPeer !== peer && this.bestHeight !== undefined && block.header.number.toNumber() > this.bestHeight) {
       await this.lock.acquire();
       if (!this.isSyncing) {
-        tryToSync();
+        this.sync({ peer, block });
       } else if (this.bestPeer && this.bestPeer !== peer && this.bestHeight !== undefined && block.header.number.toNumber() > this.bestHeight) {
         await this.syncAbort();
-        if (!this.isSyncing) {
-          tryToSync();
-        }
+        this.sync({ peer, block });
       }
       this.lock.release();
     }

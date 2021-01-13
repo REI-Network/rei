@@ -42,7 +42,7 @@ export class Synchronizer extends EventEmitter {
 
   async sync(target?: { peer: Peer; block: Block }) {
     try {
-      if (!this.isSyncing && (await this._sync())) {
+      if (!this.isSyncing && (await this._sync(target))) {
         console.debug('synchronized');
         this.emit('synchronized');
       }

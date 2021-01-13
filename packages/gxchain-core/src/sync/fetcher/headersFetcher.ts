@@ -50,7 +50,6 @@ export class HeadersFetcher extends Fetcher<HeadersFethcerTaskData, BlockHeader[
     try {
       const headers: BlockHeader[] = await peer.getBlockHeaders(task.data.start, task.data.count);
       // TODO: validate.
-      peer.headersIdle = true;
       return headers;
     } catch (err) {
       if (err instanceof PeerRequestTimeoutError) {
@@ -58,7 +57,6 @@ export class HeadersFetcher extends Fetcher<HeadersFethcerTaskData, BlockHeader[
       } else {
         this.node.peerpool.ban(peer, this.errorBanTime);
       }
-      peer.headersIdle = true;
       task.peer = undefined;
       throw err;
     }

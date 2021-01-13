@@ -61,9 +61,19 @@ export class FullSynchronizer extends Synchronizer {
       throw new Error('FullSynchronizer already sync');
     }
     const syncResult = await (this.syncingPromise = new Promise<boolean>(async (syncResolve) => {
+      const syncFailed = () => {
+        syncResolve(false);
+        this.bestHeight = undefined;
+        this.bestPeer = undefined;
+      };
+
       if (target) {
         this.bestHeight = target.block.header.number.toNumber();
         this.bestPeer = target.peer;
+        if (this.bestHeight <= this.node.blockchain.latestHeight) {
+          syncFailed();
+          return;
+        }
       } else {
         this.bestHeight = this.node.blockchain.latestHeight;
         for (const peer of this.node.peerpool.peers) {
@@ -78,12 +88,16 @@ export class FullSynchronizer extends Synchronizer {
           }
         }
         if (!this.bestPeer) {
-          syncResolve(false);
-          this.bestHeight = undefined;
-          this.bestPeer = undefined;
+          syncFailed();
           return;
         }
       }
+
+      if (!this.bestPeer.headersIdle) {
+        syncFailed();
+        return;
+      }
+      this.bestPeer.headersIdle = false;
 
       try {
         syncResolve(
@@ -95,6 +109,7 @@ export class FullSynchronizer extends Synchronizer {
         syncResolve(false);
         this.emit('error', err);
       } finally {
+        this.bestPeer.headersIdle = true;
         this.abortFetchers = undefined;
         this.bestHeight = undefined;
         this.bestPeer = undefined;

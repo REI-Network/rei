@@ -41,7 +41,7 @@ export class BodiesFetcher extends Fetcher<BodiesFetcherTaskData, Transaction[][
   protected async download(task: BodiesFetcherTask): Promise<Transaction[][]> {
     const peer = task.peer!;
     try {
-      const bodies: Transaction[][] = await peer.request(GXC2_ETHWIRE, 'GetBlockBodies', task.data);
+      const bodies: Transaction[][] = await peer.getBlockBodies(task.data);
       // TODO: validate.
       peer.bodiesIdle = true;
       return bodies;

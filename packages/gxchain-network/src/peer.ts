@@ -346,4 +346,8 @@ export class Peer extends EventEmitter {
   getBlockHeaders(start: number, count: number): Promise<BlockHeader[]> {
     return this.request(constants.GXC2_ETHWIRE, 'GetBlockHeaders', { start, count });
   }
+
+  getBlockBodies(headers: BlockHeader[]): Promise<Transaction[][]> {
+    return this.request(constants.GXC2_ETHWIRE, 'GetBlockBodies', headers);
+  }
 }

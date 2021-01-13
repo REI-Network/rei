@@ -31,8 +31,8 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
   private readonly idlePeerQueue: AsyncQueue<Peer>;
 
   protected readonly node: Node;
+  protected abortFlag: boolean = false;
   private readonly limit: number;
-  private abortFlag: boolean = false;
   private fetchingPromise?: Promise<boolean>;
 
   constructor(options: FetcherOptions) {

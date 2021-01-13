@@ -98,6 +98,7 @@ export class FullSynchronizer extends Synchronizer {
             this.abortFetchers = newAbort;
           })
         );
+        console.debug('sync over best:', this.bestHeight, 'local:', this.node.blockchain.latestHeight);
       } catch (err) {
         syncResolve(false);
         this.emit('error', err);
@@ -185,7 +186,6 @@ export class FullSynchronizer extends Synchronizer {
       })
     ).on('error', (err) => {
       console.error('bodiesFetcher error:', err);
-      this.syncAbort();
     });
 
     const headerFetcher = new HeadersFetcher(
@@ -196,7 +196,6 @@ export class FullSynchronizer extends Synchronizer {
     )
       .on('error', (err) => {
         console.error('headerFetcher error:', err);
-        this.syncAbort();
       })
       .on('result', (task) => {
         bodiesFetcher.insert({ data: task.result!, index: task.index });

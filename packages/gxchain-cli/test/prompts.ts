@@ -58,12 +58,15 @@ const startPrompts = async (node: Node) => {
     if (arr[0] === 'add' || arr[0] === 'a') {
       const pos = arr[1].indexOf('/p2p/');
       node.peerpool.nodes[0].peerStore.addressBook.set(PeerId.createFromB58String(arr[1].substr(pos + 5)), [new Multiaddr(arr[1].substr(0, pos))]);
-    } else if (arr[0] === 'adds' || arr[0] === 'as') {
+    } else if (arr[0] === 'batchadd' || arr[0] === 'ba') {
       const add = (str: string) => {
         const pos = str.indexOf('/p2p/');
         node.peerpool.nodes[0].peerStore.addressBook.set(PeerId.createFromB58String(str.substr(pos + 5)), [new Multiaddr(str.substr(0, pos))]);
       };
-      arr[1].split(';').forEach(add);
+      for (const str of arr[1].split(';')) {
+        add(str);
+        await new Promise((r) => setTimeout(r, 1500));
+      }
     } else if (arr[0] === 'send' || arr[0] === 's') {
       const peer = node.peerpool.nodes[0].getPeer(arr[1]);
       if (peer) {

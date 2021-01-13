@@ -44,6 +44,9 @@ export class BodiesFetcher extends Fetcher<BodiesFetcherTaskData, Transaction[][
       const bodies: Transaction[][] = await peer.getBlockBodies(task.data);
       // TODO: validate.
       peer.bodiesIdle = true;
+      if (bodies.length !== task.data.length) {
+        throw new Error('invalid block bodies length');
+      }
       return bodies;
     } catch (err) {
       if (err instanceof PeerRequestTimeoutError) {
@@ -58,19 +61,20 @@ export class BodiesFetcher extends Fetcher<BodiesFetcherTaskData, Transaction[][
   }
 
   protected async process(task: BodiesFetcherTask): Promise<boolean> {
-    const result = task.result!;
-    const blocks = task.data.map((header, i) =>
-      Block.fromBlockData(
-        {
-          header,
-          transactions: result[i]
-        },
-        { common: this.node.common }
-      )
-    );
     try {
-      await this.node.processBlocks(blocks);
-      return blocks[blocks.length - 1].header.number.toNumber() === this.bestHeight;
+      const result = task.result!;
+      const headers = task.data;
+      for (let i = 0; i < task.data.length && !this.abortFlag; i++) {
+        const block = Block.fromBlockData(
+          {
+            header: task.data[i],
+            transactions: result[i]
+          },
+          { common: this.node.common }
+        );
+        await this.node.processBlock(block);
+      }
+      return this.abortFlag || headers[headers.length - 1].number.toNumber() === this.bestHeight;
     } catch (err) {
       this.emit('error', err);
       return true;

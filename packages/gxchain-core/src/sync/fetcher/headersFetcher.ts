@@ -49,6 +49,9 @@ export class HeadersFetcher extends Fetcher<HeadersFethcerTaskData, BlockHeader[
     const peer = task.peer!;
     try {
       const headers: BlockHeader[] = await peer.getBlockHeaders(task.data.start, task.data.count);
+      if (headers.length !== task.data.count) {
+        throw new Error('invalid headers length');
+      }
       // TODO: validate.
       return headers;
     } catch (err) {

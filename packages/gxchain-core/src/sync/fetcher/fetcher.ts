@@ -95,12 +95,12 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
       throw new Error('fetcher is already fetching');
     }
     this.clearQueue();
-    const handleIdelPeer = (peer, type) => {
+    const handleIdlePeer = (peer, type) => {
       if (this.fetchingPromise && !this.abortFlag && this.isValidPeer(peer, type)) {
         this.idlePeerQueue.push(peer);
       }
     };
-    this.node.peerpool.on('idle', handleIdelPeer);
+    this.node.peerpool.on('idle', handleIdlePeer);
     const fetchResult = await (this.fetchingPromise = new Promise<boolean>(async (fetchResolve) => {
       if (tasks) {
         tasks.forEach((task) => this.taskQueue.push(task));
@@ -188,7 +188,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
 
       fetchResolve(!this.abortFlag && results.reduce((a, b) => a && b, true));
     }));
-    this.node.peerpool.removeListener('idle', handleIdelPeer);
+    this.node.peerpool.removeListener('idle', handleIdlePeer);
     this.fetchingPromise = undefined;
     return fetchResult;
   }

@@ -66,23 +66,21 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
         return true;
       }
     });
-
-    this.node.peerpool.on('idle', (peer, type) => {
-      if (this.fetchingPromise && !this.abortFlag && this.isValidPeer(peer, type)) {
-        this.idlePeerQueue.push(peer);
-      }
-    });
   }
 
-  protected taskOver() {
-    this.limitQueue.abort();
-    this.taskQueue.abort();
+  private clearQueue() {
     this.taskQueue.clear();
-    this.resultQueue.abort();
     this.resultQueue.clear();
-    this.idlePeerQueue.abort();
     this.idlePeerQueue.clear();
     this.priorityQueue.reset();
+  }
+
+  private taskOver() {
+    this.clearQueue();
+    this.limitQueue.abort();
+    this.taskQueue.abort();
+    this.resultQueue.abort();
+    this.idlePeerQueue.abort();
   }
 
   insert(task: Task<TData>) {
@@ -96,6 +94,13 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
     if (this.fetchingPromise) {
       throw new Error('fetcher is already fetching');
     }
+    this.clearQueue();
+    const handleIdelPeer = (peer, type) => {
+      if (this.fetchingPromise && !this.abortFlag && this.isValidPeer(peer, type)) {
+        this.idlePeerQueue.push(peer);
+      }
+    };
+    this.node.peerpool.on('idle', handleIdelPeer);
     const fetchResult = await (this.fetchingPromise = new Promise<boolean>(async (fetchResolve) => {
       if (tasks) {
         tasks.forEach((task) => this.taskQueue.push(task));
@@ -183,6 +188,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
 
       fetchResolve(!this.abortFlag && results.reduce((a, b) => a && b, true));
     }));
+    this.node.peerpool.removeListener('idle', handleIdelPeer);
     this.fetchingPromise = undefined;
     return fetchResult;
   }

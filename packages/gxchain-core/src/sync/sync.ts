@@ -36,15 +36,26 @@ export class Synchronizer extends EventEmitter {
     throw new Error('Unimplemented');
   }
 
-  async sync(): Promise<boolean> {
+  protected async _sync(target?: { peer: Peer; block: Block }): Promise<boolean> {
     throw new Error('Unimplemented');
+  }
+
+  async sync(target?: { peer: Peer; block: Block }) {
+    try {
+      if (!this.isSyncing && (await this._sync())) {
+        console.debug('synchronized');
+        this.emit('synchronized');
+      }
+    } catch (err) {
+      this.emit('error', err);
+    }
   }
 
   async syncAbort() {
     throw new Error('Unimplemented');
   }
 
-  announce(peer: Peer, block: Block) {
+  async announce(peer: Peer, block: Block) {
     throw new Error('Unimplemented');
   }
 
@@ -57,14 +68,7 @@ export class Synchronizer extends EventEmitter {
       this.forceSync = true;
     }, this.interval * 30);
     while (!this.aborter.isAborted) {
-      try {
-        if (await this.sync()) {
-          console.debug('synchronized');
-          this.emit('synchronized');
-        }
-      } catch (err) {
-        this.emit('error', err);
-      }
+      await this.sync();
       await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.interval)));
     }
     this.running = false;

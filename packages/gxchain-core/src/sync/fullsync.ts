@@ -1,3 +1,5 @@
+import Semaphore from 'semaphore-async-await';
+
 import { constants } from '@gxchain2/common';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 import { Block, BlockHeader } from '@gxchain2/block';
@@ -19,6 +21,7 @@ export class FullSynchronizer extends Synchronizer {
   private bestHeight?: number;
   private syncingPromise?: Promise<boolean>;
   private abortFetchers?: () => Promise<void>;
+  private lock = new Semaphore(1);
 
   constructor(options: FullSynchronizerOptions) {
     super(options);
@@ -26,32 +29,60 @@ export class FullSynchronizer extends Synchronizer {
     this.count = this.options.count || 128;
   }
 
-  announce(peer: Peer, block: Block) {
-    // TODO: validata block.
+  get isSyncing(): boolean {
+    return !!this.syncingPromise;
   }
 
-  async sync(): Promise<boolean> {
+  async announce(peer: Peer, block: Block) {
+    const tryToSync = () => {
+      if (block.header.number.toNumber() > this.node.blockchain.latestHeight) {
+        this.sync({ peer, block });
+      }
+    };
+    // TODO: validata block.
+    if (!this.isSyncing) {
+      tryToSync();
+    } else if (this.bestPeer && this.bestPeer !== peer && this.bestHeight !== undefined && block.header.number.toNumber() > this.bestHeight) {
+      await this.lock.acquire();
+      if (!this.isSyncing) {
+        tryToSync();
+      } else if (this.bestPeer && this.bestPeer !== peer && this.bestHeight !== undefined && block.header.number.toNumber() > this.bestHeight) {
+        await this.syncAbort();
+        if (!this.isSyncing) {
+          tryToSync();
+        }
+      }
+      this.lock.release();
+    }
+  }
+
+  protected async _sync(target?: { peer: Peer; block: Block }): Promise<boolean> {
     if (this.syncingPromise) {
       throw new Error('FullSynchronizer already sync');
     }
     const syncResult = await (this.syncingPromise = new Promise<boolean>(async (syncResolve) => {
-      this.bestHeight = this.node.blockchain.latestHeight;
-      for (const peer of this.node.peerpool.peers) {
-        const remoteStatus = peer.getStatus(constants.GXC2_ETHWIRE);
-        if (!remoteStatus) {
-          continue;
+      if (target) {
+        this.bestHeight = target.block.header.number.toNumber();
+        this.bestPeer = target.peer;
+      } else {
+        this.bestHeight = this.node.blockchain.latestHeight;
+        for (const peer of this.node.peerpool.peers) {
+          const remoteStatus = peer.getStatus(constants.GXC2_ETHWIRE);
+          if (!remoteStatus) {
+            continue;
+          }
+          const height = remoteStatus.height;
+          if (height > this.bestHeight!) {
+            this.bestPeer = peer;
+            this.bestHeight = height;
+          }
         }
-        const height = remoteStatus.height;
-        if (height > this.bestHeight!) {
-          this.bestPeer = peer;
-          this.bestHeight = height;
+        if (!this.bestPeer) {
+          syncResolve(false);
+          this.bestHeight = undefined;
+          this.bestPeer = undefined;
+          return;
         }
-      }
-      if (!this.bestPeer) {
-        syncResolve(false);
-        this.bestHeight = undefined;
-        this.bestPeer = undefined;
-        return;
       }
 
       try {
@@ -64,11 +95,11 @@ export class FullSynchronizer extends Synchronizer {
         syncResolve(false);
         this.emit('error', err);
       } finally {
+        this.abortFetchers = undefined;
         this.bestHeight = undefined;
         this.bestPeer = undefined;
       }
     }));
-    this.abortFetchers = undefined;
     this.syncingPromise = undefined;
     return syncResult;
   }
@@ -76,7 +107,9 @@ export class FullSynchronizer extends Synchronizer {
   async syncAbort() {
     if (this.abortFetchers) {
       await this.abortFetchers();
-      this.abortFetchers = undefined;
+    }
+    if (this.syncingPromise) {
+      await this.syncingPromise;
     }
   }
 

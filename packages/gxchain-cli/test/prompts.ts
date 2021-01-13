@@ -98,6 +98,9 @@ const startPrompts = async (node: Node) => {
           { common: node.common }
         );
         await node.processBlock(block);
+        for (const peer of node.peerpool.peers) {
+          peer.newBlock(node.blockchain.latestBlock);
+        }
       } catch (err) {
         console.error('Run block error', err);
       }
@@ -139,6 +142,9 @@ const startPrompts = async (node: Node) => {
           );
           await node.processBlock(block);
           await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+        for (const peer of node.peerpool.peers) {
+          peer.newBlock(node.blockchain.latestBlock);
         }
       } catch (err) {
         console.error('Run block error', err);

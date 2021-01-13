@@ -57,7 +57,7 @@ export class HeadersFetcher extends Fetcher<HeadersFethcerTaskData, BlockHeader[
       } else {
         this.node.peerpool.ban(peer, this.errorBanTime);
       }
-      task.peer = undefined;
+      this.abort();
       throw err;
     }
   }

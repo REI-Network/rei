@@ -54,6 +54,10 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
     });
     this.idlePeerQueue = new AsyncQueue<Peer>({
       hasNext: () => {
+        if (this.abortFlag) {
+          this.idlePeerQueue.array.push(null);
+          return true;
+        }
         const peer = this.findIdlePeer();
         if (!peer) {
           return false;
@@ -64,13 +68,13 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
     });
 
     this.node.peerpool.on('idle', (peer, type) => {
-      if (this.fetchingPromise && this.isValidPeer(peer, type)) {
+      if (this.fetchingPromise && !this.abortFlag && this.isValidPeer(peer, type)) {
         this.idlePeerQueue.push(peer);
       }
     });
   }
 
-  private taskOver() {
+  protected taskOver() {
     this.limitQueue.abort();
     this.taskQueue.abort();
     this.taskQueue.clear();
@@ -135,7 +139,9 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
                 })
                 .catch((err) => {
                   task.result = undefined;
-                  this.taskQueue.push(task);
+                  if (!this.abortFlag) {
+                    this.taskQueue.push(task);
+                  }
                   this.emit('error', err);
                 })
                 .finally(() => {

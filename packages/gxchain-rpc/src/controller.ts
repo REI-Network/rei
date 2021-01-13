@@ -82,7 +82,11 @@ export class Controller {
   }
 
   async eth_getTransactionByBlockHashAndIndex([hash, index]: [string, number]): Promise<any> {
-    return (await (await this.node.db.getBlock(this.hexStringToBuffer(hash))).transactions[index]).toRPCJSON;
+    return (await this.node.db.getBlock(this.hexStringToBuffer(hash))).transactions[index].toRPCJSON();
+  }
+
+  async eth_getTransactionByBlockNumberAndIndex([number, index]: [number, number]): Promise<any> {
+    return (await this.node.db.getBlock(number)).transactions[index].toRPCJSON();
   }
 
   async eth_getAccount([address]: [string]): Promise<any> {

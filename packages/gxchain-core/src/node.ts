@@ -160,9 +160,15 @@ export class Node implements INode {
       blockchain: this.blockchain
     });
     this.sync = new FullSynchronizer({ node: this });
-    this.sync.on('error', (err) => {
-      console.error('Sync error:', err);
-    });
+    this.sync
+      .on('error', (err) => {
+        console.error('Sync error:', err);
+      })
+      .on('synchronized', async () => {
+        for (const peer of this.peerpool.peers) {
+          peer.newBlock(this.blockchain.latestBlock);
+        }
+      });
 
     await this.blockchain.init();
     await this.vm.init();

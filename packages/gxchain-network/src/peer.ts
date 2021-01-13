@@ -307,7 +307,7 @@ export class Peer extends EventEmitter {
       const itr = this.knowBlocks.keys();
       this.knowBlocks.delete(itr.next().value);
     }
-    this.send(constants.GXC2_ETHWIRE, 'NewBlock', { block });
+    this.send(constants.GXC2_ETHWIRE, 'NewBlock', block);
   }
 
   newBlockHashes(hashes: Buffer[]) {
@@ -323,7 +323,7 @@ export class Peer extends EventEmitter {
       const itr = this.knowBlocks.keys();
       this.knowBlocks.delete(itr.next().value);
     }
-    this.send(constants.GXC2_ETHWIRE, 'NewBlockHashes', { hashes: filteredHashes });
+    this.send(constants.GXC2_ETHWIRE, 'NewBlockHashes', filteredHashes);
   }
 
   transactions(txs: Transaction[]) {
@@ -340,7 +340,7 @@ export class Peer extends EventEmitter {
       const itr = this.knowTxs.keys();
       this.knowTxs.delete(itr.next().value);
     }
-    this.send(constants.GXC2_ETHWIRE, 'Transactions', { txs: filteredTxs });
+    this.send(constants.GXC2_ETHWIRE, 'Transactions', filteredTxs);
   }
 
   getBlockHeaders(start: number, count: number): Promise<BlockHeader[]> {

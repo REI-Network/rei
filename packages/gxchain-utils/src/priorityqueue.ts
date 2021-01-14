@@ -32,6 +32,8 @@ export class PriorityQueue<T = any> extends EventEmitter {
         this.emit('reset', data.data, data.index);
       }
     }
+    this.total = 0;
+    this.processed = 0;
   }
 
   insert(data: T, index?: number) {

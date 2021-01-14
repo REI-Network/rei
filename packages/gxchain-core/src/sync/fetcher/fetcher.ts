@@ -138,15 +138,15 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
               }
 
               const p = this.download(task)
-                .then((result) => {
-                  task.result = result;
-                  this.priorityQueue.insert(task, task.index);
+                .then((downloadResult) => {
+                  if (downloadResult.retry) {
+                    downloadResult.retry.forEach((t) => this.insert(t));
+                  }
+                  if (downloadResult.results) {
+                    downloadResult.results.forEach((t) => this.priorityQueue.insert(t));
+                  }
                 })
                 .catch((err) => {
-                  task.result = undefined;
-                  if (!this.abortFlag) {
-                    this.taskQueue.push(task);
-                  }
                   this.emit('error', err);
                 })
                 .finally(() => {
@@ -215,7 +215,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
   protected isValidPeer(peer: Peer, type: string): boolean {
     throw new Error('Unimplemented');
   }
-  protected async download(data: Task<TData, TResult>): Promise<TResult> {
+  protected async download(data: Task<TData, TResult>): Promise<{ retry?: Task<TData, TResult>[]; results?: Task<TData, TResult>[] }> {
     throw new Error('Unimplemented');
   }
   protected async process(result: Task<TData, TResult>): Promise<boolean> {

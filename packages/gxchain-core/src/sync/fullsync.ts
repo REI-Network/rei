@@ -182,7 +182,8 @@ export class FullSynchronizer extends Synchronizer {
     const bodiesFetcher = new BodiesFetcher(
       Object.assign(this.options, {
         node: this.node,
-        bestHeight
+        bestHeight,
+        localHeight
       })
     ).on('error', (err) => {
       console.error('bodiesFetcher error:', err);
@@ -198,7 +199,7 @@ export class FullSynchronizer extends Synchronizer {
         console.error('headerFetcher error:', err);
       })
       .on('result', (task) => {
-        bodiesFetcher.insert({ data: task.result!, index: task.index });
+        bodiesFetcher.insert({ data: task.result!, index: task.result![0].number.toNumber() });
       });
 
     updateAbort(async () => {

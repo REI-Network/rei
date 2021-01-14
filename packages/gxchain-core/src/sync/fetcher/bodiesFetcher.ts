@@ -5,22 +5,26 @@ import { Transaction } from '@gxchain2/tx';
 
 import { Fetcher, Task, FetcherOptions } from './fetcher';
 
-export type BodiesFetcherTaskData = BlockHeader[];
-export type BodiesFetcherTask = Task<BodiesFetcherTaskData, Transaction[][]>;
+export type BodiesFetcherTaskData = BlockHeader[] | undefined;
+export type BodiesFetcherTaskResult = Block;
+export type BodiesFetcherTask = Task<BodiesFetcherTaskData, BodiesFetcherTaskResult>;
 
 export interface BodiesFetcherOptions extends FetcherOptions {
   timeoutBanTime?: number;
   errorBanTime?: number;
+  localHeight: number;
   bestHeight: number;
 }
 
-export class BodiesFetcher extends Fetcher<BodiesFetcherTaskData, Transaction[][]> {
+export class BodiesFetcher extends Fetcher<BodiesFetcherTaskData, BodiesFetcherTaskResult> {
   private readonly timeoutBanTime: number;
   private readonly errorBanTime: number;
+  private readonly localHeight: number;
   private readonly bestHeight: number;
 
   constructor(options: BodiesFetcherOptions) {
     super(options);
+    this.localHeight = options.localHeight;
     this.bestHeight = options.bestHeight;
     this.timeoutBanTime = options.timeoutBanTime || 300000;
     this.errorBanTime = options.errorBanTime || 60000;
@@ -38,16 +42,55 @@ export class BodiesFetcher extends Fetcher<BodiesFetcherTaskData, Transaction[][
     return peer.isSupport(GXC2_ETHWIRE) && peer.bodiesIdle;
   }
 
-  protected async download(task: BodiesFetcherTask): Promise<Transaction[][]> {
+  protected async download(task: BodiesFetcherTask): Promise<{ retry?: BodiesFetcherTask[]; results?: BodiesFetcherTask[] }> {
     const peer = task.peer!;
     try {
-      const bodies: Transaction[][] = await peer.getBlockBodies(task.data);
-      // TODO: validate.
+      const headers = task.data!;
+      const bodies: Transaction[][] = await peer.getBlockBodies(headers);
       peer.bodiesIdle = true;
-      if (bodies.length !== task.data.length) {
+      if (bodies.length !== headers.length) {
         throw new Error('invalid block bodies length');
       }
-      return bodies;
+      const retryHeaders: BodiesFetcherTaskData = [];
+      const resultBlocks: Block[] = [];
+      for (let i = 0; i < headers.length; i++) {
+        try {
+          const block = Block.fromBlockData(
+            {
+              header: headers[i],
+              transactions: bodies[i]
+            },
+            { common: this.node.common }
+          );
+          await block.validateData();
+          resultBlocks.push(block);
+        } catch (err) {
+          retryHeaders.push(headers[i]);
+        }
+      }
+      return Object.assign(
+        retryHeaders.length > 0
+          ? {
+              retry: [
+                {
+                  data: retryHeaders,
+                  index: retryHeaders[0].number.toNumber()
+                }
+              ]
+            }
+          : {},
+        resultBlocks.length > 0
+          ? {
+              results: resultBlocks.map((b) => {
+                return {
+                  data: [b.header],
+                  result: b,
+                  index: b.header.number.toNumber() - this.localHeight - 1
+                };
+              })
+            }
+          : {}
+      );
     } catch (err) {
       if (err instanceof PeerRequestTimeoutError) {
         this.node.peerpool.ban(peer, this.timeoutBanTime);
@@ -56,25 +99,17 @@ export class BodiesFetcher extends Fetcher<BodiesFetcherTaskData, Transaction[][
       }
       peer.bodiesIdle = true;
       task.peer = undefined;
-      throw err;
+      return {
+        retry: [task]
+      };
     }
   }
 
   protected async process(task: BodiesFetcherTask): Promise<boolean> {
     try {
-      const result = task.result!;
-      const headers = task.data;
-      for (let i = 0; i < task.data.length && !this.abortFlag; i++) {
-        const block = Block.fromBlockData(
-          {
-            header: task.data[i],
-            transactions: result[i]
-          },
-          { common: this.node.common }
-        );
-        await this.node.processBlock(block);
-      }
-      return this.abortFlag || headers[headers.length - 1].number.toNumber() === this.bestHeight;
+      const block = task.result!;
+      await this.node.processBlock(block);
+      return this.abortFlag || block.header.number.toNumber() === this.bestHeight;
     } catch (err) {
       this.emit('error', err);
       return true;

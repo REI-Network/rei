@@ -45,7 +45,7 @@ export class HeadersFetcher extends Fetcher<HeadersFethcerTaskData, BlockHeader[
     return peer.isSupport(GXC2_ETHWIRE) && peer.headersIdle;
   }
 
-  protected async download(task: HeadersFethcerTask): Promise<BlockHeader[]> {
+  protected async download(task: HeadersFethcerTask): Promise<{ retry?: HeadersFethcerTask[]; results?: HeadersFethcerTask[] }> {
     const peer = task.peer!;
     try {
       const headers: BlockHeader[] = await peer.getBlockHeaders(task.data.start, task.data.count);
@@ -53,7 +53,15 @@ export class HeadersFetcher extends Fetcher<HeadersFethcerTaskData, BlockHeader[
         throw new Error('invalid headers length');
       }
       // TODO: validate.
-      return headers;
+      return {
+        results: [
+          {
+            data: task.data,
+            result: headers,
+            index: task.index
+          }
+        ]
+      };
     } catch (err) {
       if (err instanceof PeerRequestTimeoutError) {
         this.node.peerpool.ban(peer, this.timeoutBanTime);

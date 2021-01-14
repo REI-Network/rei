@@ -7,7 +7,8 @@ import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import BN from 'bn.js';
 import streamToIterator from 'stream-to-iterator';
-import { Account, Address } from 'ethereumjs-util';
+import { Account, Address, rlp } from 'ethereumjs-util';
+import { BaseTrie as Trie } from 'merkle-patricia-tree';
 
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
@@ -35,6 +36,17 @@ function getRandomIntInclusive(min: number, max: number): number {
   min = Math.ceil(min);
   max = Math.floor(max);
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+async function calculateTransactionTrie(transactions: Transaction[]): Promise<Buffer> {
+  const txTrie = new Trie();
+  for (let i = 0; i < transactions.length; i++) {
+    const tx = transactions[i];
+    const key = rlp.encode(i);
+    const value = tx.serialize();
+    await txTrie.put(key, value);
+  }
+  return txTrie.root;
 }
 
 const startPrompts = async (node: Node) => {
@@ -82,6 +94,7 @@ const startPrompts = async (node: Node) => {
     } else if (arr[0] === 'mine' || arr[0] === 'm') {
       try {
         const lastestHeader = node.blockchain.latestBlock.header;
+        const transactions = node.txPool.get(1, new BN(21000));
         const block = Block.fromBlockData(
           {
             header: {
@@ -91,9 +104,10 @@ const startPrompts = async (node: Node) => {
               nonce: '0x0102030405060708',
               number: lastestHeader.number.addn(1),
               parentHash: lastestHeader.hash(),
-              uncleHash: '0x0'
+              uncleHash: '0x0',
+              transactionsTrie: await calculateTransactionTrie(transactions)
             },
-            transactions: node.txPool.get(1, new BN(21000))
+            transactions
           },
           { common: node.common }
         );
@@ -124,6 +138,7 @@ const startPrompts = async (node: Node) => {
           );
           node.txPool.put(unsignedTx.sign(getPrivateKey(accounts[fromIndex])));
 
+          const transactions = node.txPool.get(1, new BN(21000));
           const lastestHeader = node.blockchain.latestBlock.header;
           const block = Block.fromBlockData(
             {
@@ -134,9 +149,10 @@ const startPrompts = async (node: Node) => {
                 nonce: '0x0102030405060708',
                 number: lastestHeader.number.addn(1),
                 parentHash: lastestHeader.hash(),
-                uncleHash: '0x0'
+                uncleHash: '0x0',
+                transactionsTrie: await calculateTransactionTrie(transactions)
               },
-              transactions: node.txPool.get(1, new BN(21000))
+              transactions
             },
             { common: node.common }
           );

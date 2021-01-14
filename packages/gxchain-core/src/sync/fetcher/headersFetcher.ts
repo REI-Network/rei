@@ -5,7 +5,8 @@ import { BlockHeader } from '@gxchain2/block';
 import { Fetcher, Task, FetcherOptions } from './fetcher';
 
 export type HeadersFethcerTaskData = { start: number; count: number };
-export type HeadersFethcerTask = Task<HeadersFethcerTaskData, BlockHeader[]>;
+export type HeadersFethcerTaskResult = BlockHeader[];
+export type HeadersFethcerTask = Task<HeadersFethcerTaskData, HeadersFethcerTaskResult>;
 
 export interface HeadersFetcherOptions extends FetcherOptions {
   timeoutBanTime?: number;
@@ -21,7 +22,7 @@ export declare interface HeadersFetcher {
   once(event: 'result', listener: (task: HeadersFethcerTask) => void): this;
 }
 
-export class HeadersFetcher extends Fetcher<HeadersFethcerTaskData, BlockHeader[]> {
+export class HeadersFetcher extends Fetcher<HeadersFethcerTaskData, HeadersFethcerTaskResult> {
   private readonly timeoutBanTime: number;
   private readonly errorBanTime: number;
   private readonly bestHeight: number;

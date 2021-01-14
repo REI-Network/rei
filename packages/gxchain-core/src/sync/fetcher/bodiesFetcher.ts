@@ -66,6 +66,7 @@ export class BodiesFetcher extends Fetcher<BodiesFetcherTaskData, BodiesFetcherT
           resultBlocks.push(block);
         } catch (err) {
           retryHeaders.push(headers[i]);
+          this.emit('error', err);
         }
       }
       return Object.assign(
@@ -83,7 +84,7 @@ export class BodiesFetcher extends Fetcher<BodiesFetcherTaskData, BodiesFetcherT
           ? {
               results: resultBlocks.map((b) => {
                 return {
-                  data: [b.header],
+                  data: undefined,
                   result: b,
                   index: b.header.number.toNumber() - this.localHeight - 1
                 };
@@ -99,6 +100,7 @@ export class BodiesFetcher extends Fetcher<BodiesFetcherTaskData, BodiesFetcherT
       }
       peer.bodiesIdle = true;
       task.peer = undefined;
+      this.emit('error', err);
       return {
         retry: [task]
       };
@@ -112,6 +114,7 @@ export class BodiesFetcher extends Fetcher<BodiesFetcherTaskData, BodiesFetcherT
       return this.abortFlag || block.header.number.toNumber() === this.bestHeight;
     } catch (err) {
       this.emit('error', err);
+      this.abort();
       return true;
     }
   }

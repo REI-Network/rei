@@ -62,6 +62,7 @@ const handlers: Handler[] = [
           if (err.type !== 'NotFoundError') {
             throw err;
           }
+          bodies.push([]);
         }
       }
       return ['BlockBodies', bodies];

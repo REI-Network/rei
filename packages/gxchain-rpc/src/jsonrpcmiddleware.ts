@@ -89,27 +89,23 @@ export class JsonRPCMiddleware {
 
   wrapWs(ws: WebSocket, onError: (err: any) => void) {
     ws.addEventListener('message', (msg) => {
-      try {
-        this.rpcMiddleware(
-          JSON.parse(msg.data),
-          (resps: any) => {
-            try {
-              ws.send(JSON.stringify(resps));
-            } catch (err) {
-              onError(err);
-            }
-          },
-          () => ws.send(JSON.stringify(errors.PARSE_ERROR))
-        );
-      } catch (err) {
-        onError(err);
-      }
+      this.rpcMiddleware(
+        JSON.parse(msg.data),
+        (resps: any) => {
+          try {
+            ws.send(JSON.stringify(resps));
+          } catch (err) {
+            onError(err);
+          }
+        },
+        () => ws.send(JSON.stringify(errors.PARSE_ERROR))
+      ).catch(onError);
     });
   }
 
   makeMiddleWare(onError: (err: any) => void) {
     return (req, res, next) => {
-      let params = { ...req.query, ...req.body };
+      const params = { ...req.query, ...req.body };
       console.log(req.url, 'in coming request parmas:', JSON.stringify(params, null, '  '));
       if (req.ws) {
         next();

@@ -112,9 +112,16 @@ export class Node implements INode {
         )
       )
     });
-    this.peerpool.on('error', (err) => {
-      console.error('Peer pool error:', err);
-    });
+    this.peerpool
+      .on('error', (err) => {
+        console.error('Peer pool error:', err);
+      })
+      .on('added', (peer) => {
+        const status = peer.getStatus(constants.GXC2_ETHWIRE);
+        if (status && status.height) {
+          this.sync.announce(peer, status.height);
+        }
+      });
 
     let genesisBlock!: Block;
     try {
@@ -150,12 +157,18 @@ export class Node implements INode {
     this.vm = new VM({
       common: this.common,
       stateManager: this.stateManager,
-      blockchain: this.blockchain as any
+      blockchain: this.blockchain
     });
     this.sync = new FullSynchronizer({ node: this });
-    this.sync.on('error', (err) => {
-      console.error('Sync error:', err);
-    });
+    this.sync
+      .on('error', (err) => {
+        console.error('Sync error:', err);
+      })
+      .on('synchronized', async () => {
+        for (const peer of this.peerpool.peers) {
+          peer.newBlock(this.blockchain.latestBlock);
+        }
+      });
 
     await this.blockchain.init();
     await this.vm.init();
@@ -163,13 +176,11 @@ export class Node implements INode {
   }
 
   async processBlock(blockSkeleton: Block) {
-    const header = this.blockchain.latestBlock.header;
-    if (!blockSkeleton.header.parentHash.equals(header.hash())) {
-      throw new Error(`Node invalid block ${JSON.stringify(blockSkeleton.toJSON(), null, '  ')}`);
-    }
+    console.debug('process block:', blockSkeleton.header.number.toString());
+    const lastHeader = await this.db.getHeader(blockSkeleton.header.parentHash, blockSkeleton.header.number.subn(1));
     const opts = {
       block: blockSkeleton,
-      root: header.stateRoot,
+      root: lastHeader.stateRoot,
       generate: !!blockSkeleton.header.stateRoot,
       skipBlockValidation: true
     };
@@ -181,7 +192,6 @@ export class Node implements INode {
 
   async processBlocks(blocks: Block[]) {
     for (const block of blocks) {
-      console.debug('process block:', block.header.number.toString());
       await this.processBlock(block);
     }
   }

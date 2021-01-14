@@ -3,13 +3,13 @@ import { EventEmitter } from 'events';
 import { AsyncQueue, Aborter } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
+import { constants } from '@gxchain2/common';
 
 import pipe from 'it-pipe';
 import type PeerId from 'peer-id';
 
-import { Protocol } from './protocol/protocol';
+import { Protocol, MessageInfo } from './protocol/protocol';
 import { Libp2pNode } from './p2p';
-import { constants } from '@gxchain2/common';
 
 export class PeerRequestTimeoutError extends Error {}
 
@@ -54,12 +54,19 @@ class MsgQueue extends EventEmitter {
     return this.protocol.name;
   }
 
+  private makeMessageInfo(): MessageInfo {
+    return {
+      node: this.peer.node.node,
+      peer: this.peer
+    };
+  }
+
   send(method: string, data: any) {
     if (this.aborter.isAborted) {
       throw new Error('MsgQueue already aborted');
     }
     const handler = this.protocol.findHandler(method);
-    return this.queue.push(handler.encode(this.peer.node.node, data));
+    return this.queue.push(handler.encode(this.makeMessageInfo(), data));
   }
 
   request(method: string, data: any) {
@@ -82,7 +89,7 @@ class MsgQueue extends EventEmitter {
           reject(new PeerRequestTimeoutError(`MsgQueue timeout request: ${method}`));
         }, 8000)
       });
-      this.queue.push(handler.encode(this.peer.node.node, data));
+      this.queue.push(handler.encode(this.makeMessageInfo(), data));
     });
   }
 
@@ -117,7 +124,7 @@ class MsgQueue extends EventEmitter {
         try {
           // TODO: fix _bufs.
           const { code, handler, payload } = this.protocol.handle(value._bufs[0]);
-          const data = handler.decode(this.peer.node.node, payload);
+          const data = handler.decode(this.makeMessageInfo(), payload);
           if (code === 0) {
             this.emit('status', data);
           } else {
@@ -127,7 +134,7 @@ class MsgQueue extends EventEmitter {
               this.waitingRequests.delete(code);
               request.resolve(data);
             } else if (handler.process) {
-              const result = handler.process(this.peer.node.node, data);
+              const result = handler.process(this.makeMessageInfo(), data);
               if (result) {
                 if (Array.isArray(result)) {
                   const [method, resps] = result;
@@ -138,7 +145,6 @@ class MsgQueue extends EventEmitter {
                       this.send(method, resps);
                     })
                     .catch((err) => {
-                      console.error('MsgQueue handle failed', err);
                       this.emit('error', err);
                     });
                 }
@@ -168,22 +174,25 @@ class MsgQueue extends EventEmitter {
 }
 
 export declare interface Peer {
-  on(event: 'busy' | 'idle', listener: () => void): this;
-  on(event: 'error', listener: (err: any) => void): this;
+  on(event: 'busy' | 'idle', listener: (type: 'headers' | 'bodies' | 'receipts') => void): this;
+  on(event: 'error', listener: (err: Error) => void): this;
   on(event: string, listener: (message: any, protocol: Protocol) => void): this;
 
-  once(event: 'busy' | 'idle', listener: () => void): this;
-  once(event: 'error', listener: (err: any) => void): this;
+  once(event: 'busy' | 'idle', listener: (type: 'headers' | 'bodies' | 'receipts') => void): this;
+  once(event: 'error', listener: (err: Error) => void): this;
   once(event: string, listener: (message: any, protocol: Protocol) => void): this;
 }
 
 export class Peer extends EventEmitter {
   readonly peerId: string;
   readonly node: Libp2pNode;
-  private _idle: boolean = true;
   private queueMap = new Map<string, MsgQueue>();
   private knowTxs = new Set<Buffer>();
   private knowBlocks = new Set<Buffer>();
+
+  private _headersIdle: boolean = true;
+  private _bodiesIdle: boolean = true;
+  private _receiptsIdle: boolean = true;
 
   constructor(options: { peerId: string; node: Libp2pNode }) {
     super();
@@ -191,14 +200,31 @@ export class Peer extends EventEmitter {
     this.node = options.node;
   }
 
-  get idle() {
-    return this._idle;
+  get headersIdle() {
+    return this._headersIdle;
   }
-
-  set idle(b: boolean) {
-    if (this.idle !== b) {
-      this._idle = b;
-      this.emit(b ? 'idle' : 'busy');
+  get bodiesIdle() {
+    return this._bodiesIdle;
+  }
+  get receiptsIdle() {
+    return this._receiptsIdle;
+  }
+  set headersIdle(b: boolean) {
+    if (this._headersIdle !== b) {
+      this._headersIdle = b;
+      this.emit(b ? 'idle' : 'busy', 'headers');
+    }
+  }
+  set bodiesIdle(b: boolean) {
+    if (this._bodiesIdle !== b) {
+      this._bodiesIdle = b;
+      this.emit(b ? 'idle' : 'busy', 'bodies');
+    }
+  }
+  set receiptsIdle(b: boolean) {
+    if (this._receiptsIdle !== b) {
+      this._receiptsIdle = b;
+      this.emit(b ? 'idle' : 'busy', 'receipts');
     }
   }
 
@@ -229,12 +255,19 @@ export class Peer extends EventEmitter {
     this.queueMap.clear();
   }
 
-  latestHeight(name: string): number {
-    const status = this.getQueue(name).protocol.status;
-    if (!status || status.height === undefined) {
-      throw new Error(`Peer invalid status, name: ${name}`);
+  isSupport(name: string): boolean {
+    try {
+      const status = this.getQueue(name).protocol.status;
+      return status !== undefined;
+    } catch (err) {
+      return false;
     }
-    return status.height;
+  }
+
+  getStatus(name: string): any {
+    try {
+      return this.getQueue(name).protocol.status;
+    } catch (err) {}
   }
 
   send(name: string, method: string, message: any) {
@@ -245,17 +278,17 @@ export class Peer extends EventEmitter {
     return this.getQueue(name).request(method, message);
   }
 
-  async acceptProtocol(stream: any, protocol: Protocol, status: any) {
+  async acceptProtocol(stream: any, protocol: Protocol, status: any): Promise<boolean> {
     const queue = this.makeQueue(protocol);
     queue.pipeStream(stream);
-    await protocol.handshake(this, status);
+    return await protocol.handshake(this, status);
   }
 
-  async installProtocol(p2p: any, peerInfo: PeerId, protocol: Protocol, status: any) {
+  async installProtocol(p2p: any, peerInfo: PeerId, protocol: Protocol, status: any): Promise<boolean> {
     const { stream } = await p2p.dialProtocol(peerInfo, protocol.protocolString);
     const queue = this.makeQueue(protocol);
     queue.pipeStream(stream);
-    await protocol.handshake(this, status);
+    return await protocol.handshake(this, status);
   }
 
   async installProtocols(p2p: any, peerInfo: PeerId, protocols: Protocol[], status: any) {
@@ -274,7 +307,7 @@ export class Peer extends EventEmitter {
       const itr = this.knowBlocks.keys();
       this.knowBlocks.delete(itr.next().value);
     }
-    this.send(constants.GXC2_ETHWIRE, 'NewBlock', { block });
+    this.send(constants.GXC2_ETHWIRE, 'NewBlock', block);
   }
 
   newBlockHashes(hashes: Buffer[]) {
@@ -290,7 +323,7 @@ export class Peer extends EventEmitter {
       const itr = this.knowBlocks.keys();
       this.knowBlocks.delete(itr.next().value);
     }
-    this.send(constants.GXC2_ETHWIRE, 'NewBlockHashes', { hashes: filteredHashes });
+    this.send(constants.GXC2_ETHWIRE, 'NewBlockHashes', filteredHashes);
   }
 
   transactions(txs: Transaction[]) {
@@ -307,10 +340,14 @@ export class Peer extends EventEmitter {
       const itr = this.knowTxs.keys();
       this.knowTxs.delete(itr.next().value);
     }
-    this.send(constants.GXC2_ETHWIRE, 'Transactions', { txs: filteredTxs });
+    this.send(constants.GXC2_ETHWIRE, 'Transactions', filteredTxs);
   }
 
   getBlockHeaders(start: number, count: number): Promise<BlockHeader[]> {
     return this.request(constants.GXC2_ETHWIRE, 'GetBlockHeaders', { start, count });
+  }
+
+  getBlockBodies(headers: BlockHeader[]): Promise<Transaction[][]> {
+    return this.request(constants.GXC2_ETHWIRE, 'GetBlockBodies', headers);
   }
 }

@@ -89,6 +89,10 @@ export class Controller {
     return (await this.node.db.getBlock(number)).transactions[index].toRPCJSON();
   }
 
+  async eth_getTransactionReceipt([hash]: [string]): Promise<any> {
+    return (await this.node.db.getReceipt(this.hexStringToBuffer(hash))).toRPCJSON;
+  }
+
   async eth_getAccount([address]: [string]): Promise<any> {
     let account = await this.node.stateManager.getAccount(Address.fromString(address));
     return {

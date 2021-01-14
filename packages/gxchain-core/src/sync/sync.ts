@@ -1,9 +1,9 @@
 import { EventEmitter } from 'events';
 
 import { Aborter } from '@gxchain2/utils';
+import { Peer } from '@gxchain2/network';
 
 import type { Node } from '../node';
-import { constants } from '@gxchain2/common';
 
 export interface SynchronizerOptions {
   node: Node;
@@ -31,7 +31,30 @@ export class Synchronizer extends EventEmitter {
     this.interval = options.interval || 1000;
   }
 
-  async sync(): Promise<boolean> {
+  get isSyncing(): boolean {
+    throw new Error('Unimplemented');
+  }
+
+  protected async _sync(target?: { peer: Peer; height: number }): Promise<boolean> {
+    throw new Error('Unimplemented');
+  }
+
+  async sync(target?: { peer: Peer; height: number }) {
+    try {
+      if (!this.isSyncing && (await this._sync(target))) {
+        console.debug('synchronized');
+        this.emit('synchronized');
+      }
+    } catch (err) {
+      this.emit('error', err);
+    }
+  }
+
+  async syncAbort() {
+    throw new Error('Unimplemented');
+  }
+
+  async announce(peer: Peer, height: number) {
     throw new Error('Unimplemented');
   }
 
@@ -44,14 +67,7 @@ export class Synchronizer extends EventEmitter {
       this.forceSync = true;
     }, this.interval * 30);
     while (!this.aborter.isAborted) {
-      try {
-        if (await this.sync()) {
-          console.debug('synchronized');
-          this.emit('synchronized');
-        }
-      } catch (err) {
-        this.emit('error', err);
-      }
+      await this.sync();
       await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.interval)));
     }
     this.running = false;

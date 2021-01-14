@@ -1,13 +1,18 @@
 import type { Peer } from '../peer';
 import type { INode } from '../p2p';
 
+export type MessageInfo = {
+  node: INode;
+  peer: Peer;
+};
+
 export type Handler = {
   name: string;
   code: number;
   response?: number;
-  encode: (node: INode, data: any) => any;
-  decode: (node: INode, data: any) => any;
-  process?: (node: INode, data: any) => Promise<[string, any]> | [string, any] | void;
+  encode: (info: MessageInfo, data: any) => any;
+  decode: (info: MessageInfo, data: any) => any;
+  process?: (info: MessageInfo, data: any) => Promise<[string, any]> | [string, any] | void;
 };
 
 export class Protocol {
@@ -37,7 +42,12 @@ export class Protocol {
     throw new Error('Unimplemented');
   }
 
-  handshake(peer: Peer, data: any) {
+  async handshake(peer: Peer, localStatus: any): Promise<boolean> {
+    const remoteStatus = await this._handshake(peer, localStatus);
+    return this.isValidRemoteStatus(remoteStatus, localStatus);
+  }
+
+  protected _handshake(peer: Peer, data: any) {
     return this._status
       ? Promise.resolve(this._status)
       : new Promise<any>((resolve, reject) => {
@@ -53,5 +63,9 @@ export class Protocol {
           });
           peer.send(this.name, 'Status', data);
         });
+  }
+
+  protected isValidRemoteStatus(remoteStatus: any, localStatus: any): boolean {
+    throw new Error('Unimplemented');
   }
 }

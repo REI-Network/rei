@@ -7,7 +7,8 @@ import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import BN from 'bn.js';
 import streamToIterator from 'stream-to-iterator';
-import { Account, Address } from 'ethereumjs-util';
+import { Account, Address, rlp } from 'ethereumjs-util';
+import { BaseTrie as Trie } from 'merkle-patricia-tree';
 
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
@@ -31,6 +32,23 @@ const hexStringToBuffer = (hex: string): Buffer => {
   return hex.indexOf('0x') === 0 ? Buffer.from(hex.substr(2), 'hex') : Buffer.from(hex, 'hex');
 };
 
+function getRandomIntInclusive(min: number, max: number): number {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+async function calculateTransactionTrie(transactions: Transaction[]): Promise<Buffer> {
+  const txTrie = new Trie();
+  for (let i = 0; i < transactions.length; i++) {
+    const tx = transactions[i];
+    const key = rlp.encode(i);
+    const value = tx.serialize();
+    await txTrie.put(key, value);
+  }
+  return txTrie.root;
+}
+
 const startPrompts = async (node: Node) => {
   while (true) {
     const response = await prompts({
@@ -52,6 +70,15 @@ const startPrompts = async (node: Node) => {
     if (arr[0] === 'add' || arr[0] === 'a') {
       const pos = arr[1].indexOf('/p2p/');
       node.peerpool.nodes[0].peerStore.addressBook.set(PeerId.createFromB58String(arr[1].substr(pos + 5)), [new Multiaddr(arr[1].substr(0, pos))]);
+    } else if (arr[0] === 'batchadd' || arr[0] === 'ba') {
+      const add = (str: string) => {
+        const pos = str.indexOf('/p2p/');
+        node.peerpool.nodes[0].peerStore.addressBook.set(PeerId.createFromB58String(str.substr(pos + 5)), [new Multiaddr(str.substr(0, pos))]);
+      };
+      for (const str of arr[1].split(';')) {
+        add(str);
+        await new Promise((r) => setTimeout(r, 1500));
+      }
     } else if (arr[0] === 'send' || arr[0] === 's') {
       const peer = node.peerpool.nodes[0].getPeer(arr[1]);
       if (peer) {
@@ -67,6 +94,7 @@ const startPrompts = async (node: Node) => {
     } else if (arr[0] === 'mine' || arr[0] === 'm') {
       try {
         const lastestHeader = node.blockchain.latestBlock.header;
+        const transactions = node.txPool.get(1, new BN(21000));
         const block = Block.fromBlockData(
           {
             header: {
@@ -76,21 +104,27 @@ const startPrompts = async (node: Node) => {
               nonce: '0x0102030405060708',
               number: lastestHeader.number.addn(1),
               parentHash: lastestHeader.hash(),
-              uncleHash: '0x0'
+              uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+              transactionsTrie: await calculateTransactionTrie(transactions)
             },
-            transactions: node.txPool.get(1, new BN(21000))
+            transactions
           },
           { common: node.common }
         );
         await node.processBlock(block);
+        for (const peer of node.peerpool.peers) {
+          peer.newBlock(node.blockchain.latestBlock);
+        }
       } catch (err) {
         console.error('Run block error', err);
       }
     } else if (arr[0] === 'batchmine' || arr[0] === 'bm') {
       try {
-        for (let i = 0; i < 1000; i++) {
-          const fromIndex = i % 2 === 0 ? 0 : 1;
-          const toIndex = i % 2 !== 1 ? 0 : 1;
+        const count = Number.isInteger(Number(arr[1])) ? Number(arr[1]) : 1000;
+        for (let i = 0; i < count; i++) {
+          const flag = getRandomIntInclusive(1, 2) == 1;
+          const fromIndex = flag ? 0 : 1;
+          const toIndex = !flag ? 0 : 1;
           const account = await node.stateManager.getAccount(Address.fromString(accounts[fromIndex]));
           const unsignedTx = Transaction.fromTxData(
             {
@@ -104,6 +138,7 @@ const startPrompts = async (node: Node) => {
           );
           node.txPool.put(unsignedTx.sign(getPrivateKey(accounts[fromIndex])));
 
+          const transactions = node.txPool.get(1, new BN(21000));
           const lastestHeader = node.blockchain.latestBlock.header;
           const block = Block.fromBlockData(
             {
@@ -114,15 +149,18 @@ const startPrompts = async (node: Node) => {
                 nonce: '0x0102030405060708',
                 number: lastestHeader.number.addn(1),
                 parentHash: lastestHeader.hash(),
-                uncleHash: '0x0'
+                uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+                transactionsTrie: await calculateTransactionTrie(transactions)
               },
-              transactions: node.txPool.get(1, new BN(21000))
+              transactions
             },
             { common: node.common }
           );
           await node.processBlock(block);
-          console.log('new block', block.header.number.toString());
           await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+        for (const peer of node.peerpool.peers) {
+          peer.newBlock(node.blockchain.latestBlock);
         }
       } catch (err) {
         console.error('Run block error', err);

@@ -35,10 +35,15 @@ export class BodiesFetcher extends Fetcher<BodiesFetcherTaskData, BodiesFetcherT
   }
 
   protected findIdlePeer(): Peer | undefined {
-    return this.node.peerpool.idle((peer) => peer.isSupport(GXC2_ETHWIRE) && peer.bodiesIdle);
+    return this.node.peerpool.idle((peer) => {
+      return this.isValidPeer(peer);
+    });
   }
 
-  protected isValidPeer(peer: Peer, type: string): boolean {
+  protected isValidPeer(peer: Peer): boolean {
+    if (this.waitingTask && this.waitingTask.blackList) {
+      return peer.isSupport(GXC2_ETHWIRE) && peer.bodiesIdle && !this.waitingTask.blackList.has(peer.peerId);
+    }
     return peer.isSupport(GXC2_ETHWIRE) && peer.bodiesIdle;
   }
 
@@ -75,7 +80,8 @@ export class BodiesFetcher extends Fetcher<BodiesFetcherTaskData, BodiesFetcherT
               retry: [
                 {
                   data: retryHeaders,
-                  index: retryHeaders[0].number.toNumber()
+                  index: retryHeaders[0].number.toNumber(),
+                  blackList: task.blackList ? task.blackList.add(peer.peerId) : new Set<string>([peer.peerId])
                 }
               ]
             }

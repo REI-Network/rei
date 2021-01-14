@@ -39,10 +39,10 @@ export class HeadersFetcher extends Fetcher<HeadersFethcerTaskData, HeadersFethc
   }
 
   protected findIdlePeer(): Peer | undefined {
-    return this.node.peerpool.idle((peer) => peer.isSupport(GXC2_ETHWIRE) && peer.headersIdle);
+    return this.node.peerpool.idle((peer) => this.isValidPeer(peer));
   }
 
-  protected isValidPeer(peer: Peer, type: string): boolean {
+  protected isValidPeer(peer: Peer): boolean {
     return peer.isSupport(GXC2_ETHWIRE) && peer.headersIdle;
   }
 

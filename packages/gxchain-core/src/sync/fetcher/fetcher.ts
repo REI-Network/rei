@@ -15,6 +15,7 @@ export type Task<TData = any, TResult = any> = {
   result?: TResult;
   index: number;
   peer?: Peer;
+  blackList?: Set<string>;
 };
 
 export declare interface Fetcher {
@@ -34,6 +35,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
   protected abortFlag: boolean = false;
   private readonly limit: number;
   private fetchingPromise?: Promise<boolean>;
+  protected waitingTask?: Task<TData, TResult>;
 
   constructor(options: FetcherOptions) {
     super();
@@ -96,7 +98,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
     }
     this.clearQueue();
     const handleIdlePeer = (peer, type) => {
-      if (this.fetchingPromise && !this.abortFlag && this.isValidPeer(peer, type)) {
+      if (this.fetchingPromise && !this.abortFlag && this.isValidPeer(peer)) {
         this.idlePeerQueue.push(peer);
       }
     };
@@ -129,7 +131,9 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
 
               const needLock = !!task.peer;
               if (!task.peer) {
+                this.waitingTask = task;
                 const peer = await this.idlePeerQueue.next();
+                this.waitingTask = undefined;
                 if (peer === null) {
                   break;
                 }
@@ -212,7 +216,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
   protected findIdlePeer(): Peer | undefined {
     throw new Error('Unimplemented');
   }
-  protected isValidPeer(peer: Peer, type: string): boolean {
+  protected isValidPeer(peer: Peer): boolean {
     throw new Error('Unimplemented');
   }
   protected async download(data: Task<TData, TResult>): Promise<{ retry?: Task<TData, TResult>[]; results?: Task<TData, TResult>[] }> {

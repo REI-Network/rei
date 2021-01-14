@@ -104,7 +104,7 @@ const startPrompts = async (node: Node) => {
               nonce: '0x0102030405060708',
               number: lastestHeader.number.addn(1),
               parentHash: lastestHeader.hash(),
-              uncleHash: '0x0',
+              uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
               transactionsTrie: await calculateTransactionTrie(transactions)
             },
             transactions
@@ -149,7 +149,7 @@ const startPrompts = async (node: Node) => {
                 nonce: '0x0102030405060708',
                 number: lastestHeader.number.addn(1),
                 parentHash: lastestHeader.hash(),
-                uncleHash: '0x0',
+                uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
                 transactionsTrie: await calculateTransactionTrie(transactions)
               },
               transactions

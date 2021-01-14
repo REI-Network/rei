@@ -143,7 +143,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
                     downloadResult.retry.forEach((t) => this.insert(t));
                   }
                   if (downloadResult.results) {
-                    downloadResult.results.forEach((t) => this.priorityQueue.insert(t));
+                    downloadResult.results.forEach((t) => this.priorityQueue.insert(t, t.index));
                   }
                 })
                 .catch((err) => {

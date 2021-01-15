@@ -1,10 +1,11 @@
 import process from 'process';
+import fs from 'fs';
 import { program } from 'commander';
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
 
 program.version('0.0.1');
-program.option('--rpc', 'open rpc server').option('--rpc-port <port>', 'rpc server port', '12358').option('--rpc-host <port>', 'rpc server host', '[::1]').option('--p2p-port <port>', 'p2p server port', '0').option('--bootnodes <bootnodes...>', 'bootnodes list').option('--datadir <path>', 'chain data dir path', './');
+program.option('--rpc', 'open rpc server').option('--rpc-port <port>', 'rpc server port', '12358').option('--rpc-host <port>', 'rpc server host', '::1').option('--p2p-port <port>', 'p2p server port', '0').option('--bootnodes <bootnodes...>', 'bootnodes list').option('--datadir <path>', 'chain data dir path', './gxchain2');
 program
   .command('start')
   .description('start gxchain2')
@@ -16,9 +17,12 @@ program
   .action((options) => {});
 program.parse(process.argv);
 
-const start = async () => {
+async function start() {
   try {
     const opts = program.opts();
+    if (!fs.existsSync(opts.datadir)) {
+      fs.mkdirSync(opts.datadir);
+    }
     const node = new Node(opts.datadir);
     await node.init();
     if (opts.rpc) {
@@ -32,4 +36,4 @@ const start = async () => {
     console.error('Start error', err);
     process.exit(1);
   }
-};
+}

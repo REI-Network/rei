@@ -64,7 +64,11 @@ export class Controller {
 
   //eth_getUncleCountByBlockHash
   //eth_getUncleCountByBlockNumber
-  //eth_getCode
+
+  async eth_getCode([data, tag]: [Address, string]): Promise<Buffer> {
+    return await this.node.vm.stateManager.getContractCode(data);
+  }
+
   //eth_sign
   //eth_signTransaction
   //eth_sendTransaction

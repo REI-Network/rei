@@ -128,16 +128,16 @@ export class Blockchain extends EventEmitter {
     this.db = opts.db ? opts.db : level();
     this.database = opts.database;
 
-    if (this._validateConsensus) {
-      if (this._common.consensusType() !== 'pow') {
-        throw new Error('consensus validation only supported for pow chains');
-      }
-      if (this._common.consensusAlgorithm() !== 'ethash') {
-        throw new Error('consensus validation only supported for pow ethash algorithm');
-      }
+    // if (this._validateConsensus) {
+    //   if (this._common.consensusType() !== 'pow') {
+    //     throw new Error('consensus validation only supported for pow chains');
+    //   }
+    //   if (this._common.consensusAlgorithm() !== 'ethash') {
+    //     throw new Error('consensus validation only supported for pow ethash algorithm');
+    //   }
 
-      // this._ethash = new Ethash(this.db);
-    }
+    //   this._ethash = new Ethash(this.db);
+    // }
 
     this._heads = {};
 
@@ -471,6 +471,9 @@ export class Blockchain extends EventEmitter {
         //     throw new Error('invalid POW');
         //   }
         // }
+        if (!this.validatePOA(block)) {
+          throw new Error('invalid POA');
+        }
       }
 
       // set total difficulty in the current context scope
@@ -985,6 +988,16 @@ export class Blockchain extends EventEmitter {
   }
 
   ////////////////////
-  private validatePOA() {}
+  private validatePOA(block: Block): boolean {
+    if (block.isGenesis()) {
+      return true;
+    }
+    const coinbase = block.header.coinbase.buf;
+    if (!this._common.isValidPOA(coinbase)) {
+      return false;
+    }
+    // TODO: validateSignature.
+    return true;
+  }
   ////////////////////
 }

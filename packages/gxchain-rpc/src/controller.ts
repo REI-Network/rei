@@ -1,6 +1,6 @@
 import { Node } from '@gxchain2/core';
 import { Block, JsonBlock, BlockHeader, JsonHeader } from '@gxchain2/block';
-import { Account, Address } from 'ethereumjs-util';
+import { Account, Address, keccakFromHexString } from 'ethereumjs-util';
 //import { Transaction } from '@gxchain2/tx';
 
 import * as helper from './helper';
@@ -15,7 +15,11 @@ export class Controller {
     return hex.indexOf('0x') === 0 ? Buffer.from(hex.substr(2), 'hex') : Buffer.from(hex, 'hex');
   };
   //web3_clientVersion
-  //aysnc web_sha3()
+
+  async web_sha3([data]: [string]): Promise<string> {
+    return '0x' + (await keccakFromHexString(data)).toString('hex');
+  }
+
   //aysnc eth_net_version()
   //aysnc eth_net_listenging()
   //aysnc eth_netpeer_Count()
@@ -25,9 +29,9 @@ export class Controller {
     return await '0x0000000000000000000000000000000000000000';
   }
 
-  async eth_blockNumber(): Promise<Number> {
+  async eth_blockNumber(): Promise<string> {
     let blockNumber = await Number(this.node.blockchain.latestBlock.header.number);
-    return blockNumber;
+    return '0x' + blockNumber.toString(16);
   }
 
   //eth_getStorageAt

@@ -31,12 +31,33 @@ export class Controller {
   }
 
   //eth_getStorageAt
+
   async eth_getTransactionCount([address]: [string]): Promise<string> {
     let nonce = Buffer.from((await this.node.stateManager.getAccount(Address.fromString(address))).nonce);
     return '0x' + nonce.toString('hex');
   }
-  //eth_getBlockTransactionCountByHash
-  //eth_getBlockTransactionCountByNumber
+
+  async eth_getBlockTransactionCountByHash([hash]: [string]): Promise<string> {
+    let number = (await this.node.db.getBlock(this.hexStringToBuffer(hash))).transactions.length;
+    return '0x' + Buffer.from(number.toString).toString('hex');
+  }
+
+  async eth_getBlockTransactionCountByNumber([tag]: [string]): Promise<string> {
+    let transactionNumber!: number;
+    if (tag === 'earliest') {
+      transactionNumber = await (await this.node.blockchain.getBlock(0)).transactions.length;
+    } else if (tag === 'latest') {
+      transactionNumber = this.node.blockchain.latestBlock.transactions.length;
+    } else if (tag === 'pending') {
+      helper.throwRpcErr('Unsupport pending block');
+    } else if (Number.isInteger(Number(tag))) {
+      transactionNumber = (await this.node.blockchain.getBlock(Number(tag))).transactions.length;
+    } else {
+      helper.throwRpcErr('Invalid tag value');
+    }
+    return '0x' + Buffer.from(transactionNumber.toString).toString('hex');
+  }
+
   //eth_getUncleCountByBlockHash
   //eth_getUncleCountByBlockNumber
   //eth_getCode

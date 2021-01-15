@@ -983,4 +983,8 @@ export class Blockchain extends EventEmitter {
       return false;
     }
   }
+
+  ////////////////////
+  private validatePOA() {}
+  ////////////////////
 }

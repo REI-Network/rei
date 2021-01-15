@@ -28,6 +28,10 @@ export function mixin<T1 extends Constructor, T2 extends Constructor>(mix1: T1, 
   return ctor;
 }
 
+export function hexStringToBuffer(hex: string): Buffer {
+  return hex.indexOf('0x') === 0 ? Buffer.from(hex.substr(2), 'hex') : Buffer.from(hex, 'hex');
+}
+
 export * from './abort';
 export * from './priorityqueue';
 export * from './asyncnext';

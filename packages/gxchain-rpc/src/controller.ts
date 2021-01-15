@@ -31,7 +31,10 @@ export class Controller {
   }
 
   //eth_getStorageAt
-  //eth_getTransactionCount
+  async eth_getTransactionCount([address]: [string]): Promise<string> {
+    let nonce = Buffer.from((await this.node.stateManager.getAccount(Address.fromString(address))).nonce);
+    return '0x' + nonce.toString('hex');
+  }
   //eth_getBlockTransactionCountByHash
   //eth_getBlockTransactionCountByNumber
   //eth_getUncleCountByBlockHash

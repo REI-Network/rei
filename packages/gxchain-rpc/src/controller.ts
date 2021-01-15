@@ -14,14 +14,16 @@ export class Controller {
   hexStringToBuffer = (hex: string): Buffer => {
     return hex.indexOf('0x') === 0 ? Buffer.from(hex.substr(2), 'hex') : Buffer.from(hex, 'hex');
   };
-  //aysnc eth_clientVersion()
-  //aysnc eth_sha3()
+  //web3_clientVersion
+  //aysnc web_sha3()
   //aysnc eth_net_version()
   //aysnc eth_net_listenging()
   //aysnc eth_netpeer_Count()
   //aysnc eth_protocolVersion()
   //aysnc eth_syncing()
-  //aysnc eth_coinbase()
+  async eth_coinbase(): Promise<string> {
+    return await '0x0000000000000000000000000000000000000000';
+  }
 
   async eth_blockNumber(): Promise<Number> {
     let blockNumber = await Number(this.node.blockchain.latestBlock.header.number);
@@ -92,6 +94,38 @@ export class Controller {
   async eth_getTransactionReceipt([hash]: [string]): Promise<any> {
     return (await this.node.db.getReceipt(this.hexStringToBuffer(hash))).toRPCJSON;
   }
+  //eth_getUncleByBlockHashAndIndex
+  //eth_getUncleByBlockNumberAndIndex
+  //eth_compileSolidity
+  //eth_compileLLL
+  //eth_compileSerpent
+
+  //eth_newFilter
+  //eth_newBlockFilter
+  //eth_newPendingTransactionFilter
+  //eth_uninstallFilter
+  //eth_getFilterChanges
+  //eth_getFilterLogs
+  //eth_getLogs
+
+  //eth_getWork
+  //eth_submitWork
+  //eth_submitHashrate
+
+  //db_putString
+  //db_getString
+  //db_putHex
+  //db_getHex
+  //shh_version
+  //shh_post
+  //shh_newIdentity
+  //shh_hasIdentity
+  //shh_newGroup(?)
+  //shh_addToGroup
+  //shh_newFilter
+  //shh_uninstallFilter
+  //shh_getFilterChanges
+  //shh_getMessages
 
   async eth_getAccount([address]: [string]): Promise<any> {
     let account = await this.node.stateManager.getAccount(Address.fromString(address));

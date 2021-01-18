@@ -5,7 +5,14 @@ import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
 
 program.version('0.0.1');
-program.option('--rpc', 'open rpc server').option('--rpc-port <port>', 'rpc server port', '12358').option('--rpc-host <port>', 'rpc server host', '::1').option('--p2p-port <port>', 'p2p server port', '0').option('--bootnodes <bootnodes...>', 'bootnodes list').option('--datadir <path>', 'chain data dir path', './gxchain2');
+program.option('--rpc', 'open rpc server');
+program.option('--rpc-port <port>', 'rpc server port', '12358');
+program.option('--rpc-host <port>', 'rpc server host', '::1');
+program.option('--p2p-port <port>', 'p2p server port', '0');
+program.option('--bootnodes <bootnodes...>', 'bootnodes list');
+program.option('--datadir <path>', 'chain data dir path', './gxchain2');
+program.option('--mine', 'mine block');
+
 program
   .command('start')
   .description('start gxchain2')

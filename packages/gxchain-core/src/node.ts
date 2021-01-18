@@ -7,7 +7,6 @@ import { Account, Address, setLengthLeft } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
 
-import { INode } from '@gxchain2/interface';
 import { Database, createLevelDB, DBSaveReceipts } from '@gxchain2/database';
 import { Libp2pNode, PeerPool } from '@gxchain2/network';
 import { Common, constants, defaultGenesis } from '@gxchain2/common';
@@ -16,10 +15,21 @@ import { StateManager } from '@gxchain2/state-manager';
 import VM from '@gxchain2/vm';
 import { TransactionPool } from '@gxchain2/tx-pool';
 import { Block } from '@gxchain2/block';
+import { Transaction } from '@gxchain2/tx';
+import { hexStringToBuffer } from '@gxchain2/utils';
 
 import { FullSynchronizer, Synchronizer } from './sync';
 
-export class Node implements INode {
+export interface NodeOptions {
+  databasePath: string;
+  mine?: {
+    coinbase: string;
+    mineInterval: number;
+    gasLimit: string;
+  };
+}
+
+export class Node {
   public readonly rawdb!: LevelUp;
   public readonly databasePath: string;
   public readonly txPool: TransactionPool;
@@ -32,10 +42,13 @@ export class Node implements INode {
   public vm!: VM;
   public sync!: Synchronizer;
 
-  constructor(databasePath: string) {
-    this.databasePath = databasePath;
+  private initPromise!: Promise<void>;
+
+  constructor(options: NodeOptions) {
+    this.databasePath = options.databasePath;
     this.rawdb = createLevelDB(path.join(this.databasePath, 'chaindb'));
     this.txPool = new TransactionPool();
+    this.initPromise = this.init(options);
   }
 
   get status() {
@@ -81,7 +94,12 @@ export class Node implements INode {
     return stateManager._trie.root;
   }
 
-  async init() {
+  async init(options: NodeOptions) {
+    if (this.initPromise) {
+      await this.initPromise;
+      return;
+    }
+
     let genesisJSON;
     try {
       genesisJSON = JSON.parse(fs.readFileSync(path.join(this.databasePath, 'genesis.json')).toString());
@@ -90,10 +108,22 @@ export class Node implements INode {
       genesisJSON = defaultGenesis;
     }
 
-    this.common = new Common({
-      chain: genesisJSON.genesisInfo,
-      hardfork: 'chainstart'
-    });
+    const poa: Buffer[] = [];
+    if (genesisJSON.POA && Array.isArray(genesisJSON.POA)) {
+      for (const address of genesisJSON.POA) {
+        if (typeof address === 'string') {
+          poa.push(hexStringToBuffer(address));
+        }
+      }
+    }
+
+    this.common = new Common(
+      {
+        chain: genesisJSON.genesisInfo,
+        hardfork: 'chainstart'
+      },
+      poa
+    );
     this.db = new Database(this.rawdb, this.common);
     this.stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
     // TODO: save the peer id.
@@ -171,6 +201,14 @@ export class Node implements INode {
     await this.blockchain.init();
     await this.vm.init();
     this.sync.start();
+
+    if (options.mine) {
+      this.mineLoop({
+        coinbase: options.mine.coinbase,
+        mineInterval: options.mine.mineInterval,
+        gasLimit: new BN(options.mine.gasLimit)
+      });
+    }
   }
 
   async processBlock(blockSkeleton: Block) {
@@ -190,6 +228,31 @@ export class Node implements INode {
 
   async processBlocks(blocks: Block[]) {
     for (const block of blocks) {
+      await this.processBlock(block);
+    }
+  }
+
+  private async mineLoop({ coinbase, mineInterval, gasLimit }: { coinbase: string; mineInterval: number; gasLimit: BN }) {
+    while (true) {
+      await new Promise((r) => setTimeout(r, mineInterval));
+      const transactions = this.txPool.get(100, gasLimit);
+      const lastestHeader = this.blockchain.latestBlock.header;
+      const block = Block.fromBlockData(
+        {
+          header: {
+            coinbase,
+            difficulty: '0x1',
+            gasLimit,
+            nonce: '0x0102030405060708',
+            number: lastestHeader.number.addn(1),
+            parentHash: lastestHeader.hash(),
+            uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+            transactionsTrie: await Transaction.calculateTransactionTrie(transactions)
+          },
+          transactions
+        },
+        { common: this.common }
+      );
       await this.processBlock(block);
     }
   }

@@ -1,5 +1,6 @@
 /* eslint-disable no-dupe-class-members */
 
+import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { Buffer } from 'buffer';
 import { Address, BN, bnToHex, bnToRlp, ecrecover, ecsign, rlp, rlphash, toBuffer, unpadBuffer, publicToAddress, MAX_INTEGER, bufferToHex, intToHex } from 'ethereumjs-util';
 
@@ -414,6 +415,17 @@ export class Transaction {
       r: this.r !== undefined ? bnToHex(this.r) : undefined,
       s: this.s !== undefined ? bnToHex(this.s) : undefined
     };
+  }
+
+  public static async calculateTransactionTrie(transactions: Transaction[]): Promise<Buffer> {
+    const txTrie = new Trie();
+    for (let i = 0; i < transactions.length; i++) {
+      const tx = transactions[i];
+      const key = rlp.encode(i);
+      const value = tx.serialize();
+      await txTrie.put(key, value);
+    }
+    return txTrie.root;
   }
   ////////////////////
 }

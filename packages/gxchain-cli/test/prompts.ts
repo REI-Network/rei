@@ -8,13 +8,13 @@ import Multiaddr from 'multiaddr';
 import BN from 'bn.js';
 import streamToIterator from 'stream-to-iterator';
 import { Account, Address, rlp } from 'ethereumjs-util';
-import { BaseTrie as Trie } from 'merkle-patricia-tree';
 
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
 import { constants } from '@gxchain2/common';
 import { Block } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
+import { hexStringToBuffer } from '@gxchain2/utils';
 
 const args = process.argv.slice(2);
 
@@ -28,25 +28,10 @@ const getPrivateKey = (address: string): Buffer => {
   return keyPair[address];
 };
 
-const hexStringToBuffer = (hex: string): Buffer => {
-  return hex.indexOf('0x') === 0 ? Buffer.from(hex.substr(2), 'hex') : Buffer.from(hex, 'hex');
-};
-
 function getRandomIntInclusive(min: number, max: number): number {
   min = Math.ceil(min);
   max = Math.floor(max);
   return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-async function calculateTransactionTrie(transactions: Transaction[]): Promise<Buffer> {
-  const txTrie = new Trie();
-  for (let i = 0; i < transactions.length; i++) {
-    const tx = transactions[i];
-    const key = rlp.encode(i);
-    const value = tx.serialize();
-    await txTrie.put(key, value);
-  }
-  return txTrie.root;
 }
 
 const startPrompts = async (node: Node) => {
@@ -105,7 +90,7 @@ const startPrompts = async (node: Node) => {
               number: lastestHeader.number.addn(1),
               parentHash: lastestHeader.hash(),
               uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
-              transactionsTrie: await calculateTransactionTrie(transactions)
+              transactionsTrie: await Transaction.calculateTransactionTrie(transactions)
             },
             transactions
           },
@@ -150,7 +135,7 @@ const startPrompts = async (node: Node) => {
                 number: lastestHeader.number.addn(1),
                 parentHash: lastestHeader.hash(),
                 uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
-                transactionsTrie: await calculateTransactionTrie(transactions)
+                transactionsTrie: await Transaction.calculateTransactionTrie(transactions)
               },
               transactions
             },
@@ -211,7 +196,8 @@ const startPrompts = async (node: Node) => {
     } else if (arr[0] === 'lsaccount') {
       const stream = node.stateManager._trie.createReadStream();
       for await (let data of streamToIterator(stream as any)) {
-        console.log('key', '0x' + data.key.toString('hex'), '\nbalance', Account.fromRlpSerializedAccount(data.value).balance.toString());
+        const account = Account.fromRlpSerializedAccount(data.value);
+        console.log('key', '0x' + data.key.toString('hex'), '\nbalance', account.balance.toString(), '\nstateRoot', '0x' + account.stateRoot.toString('hex'));
       }
     } else if (arr[0] === 'getblock' || arr[0] === 'gb') {
       try {

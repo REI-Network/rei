@@ -45,6 +45,7 @@ export const defaultGenesis = {
         forkHash: '0xfc64ec04'
       }
     ],
-    bootstrapNodes: []
+    bootstrapNodes: [],
+    poa: ['0x3289621709f5b35d09b4335e129907ac367a0593']
   }
 };

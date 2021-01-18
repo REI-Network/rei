@@ -149,9 +149,9 @@ export class BlockHeader {
     // Now we have set all the values of this Header, we possibly have set a dummy
     // `difficulty` value (defaults to 0). If we have a `calcDifficultyFromHeader`
     // block option parameter, we instead set difficulty to this value.
-    if (options.calcDifficultyFromHeader) {
-      this.difficulty = this.canonicalDifficulty(options.calcDifficultyFromHeader);
-    }
+    // if (options.calcDifficultyFromHeader) {
+    //   this.difficulty = this.canonicalDifficulty(options.calcDifficultyFromHeader);
+    // }
 
     const freeze = options?.freeze ?? true;
     if (freeze) {
@@ -189,94 +189,94 @@ export class BlockHeader {
    *
    * @param parentBlockHeader - the header from the parent `Block` of this header
    */
-  canonicalDifficulty(parentBlockHeader: BlockHeader): BN {
-    if (this._common.consensusType() !== 'pow') {
-      throw new Error('difficulty calculation is only supported on PoW chains');
-    }
-    if (this._common.consensusAlgorithm() !== 'ethash') {
-      throw new Error('difficulty calculation currently only supports the ethash algorithm');
-    }
-    const hardfork = this._getHardfork();
-    const blockTs = this.timestamp;
-    const { timestamp: parentTs, difficulty: parentDif } = parentBlockHeader;
-    const minimumDifficulty = new BN(this._common.paramByHardfork('pow', 'minimumDifficulty', hardfork));
-    const offset = parentDif.div(new BN(this._common.paramByHardfork('pow', 'difficultyBoundDivisor', hardfork)));
-    let num = this.number.clone();
+  // canonicalDifficulty(parentBlockHeader: BlockHeader): BN {
+  //   if (this._common.consensusType() !== 'pow') {
+  //     throw new Error('difficulty calculation is only supported on PoW chains');
+  //   }
+  //   if (this._common.consensusAlgorithm() !== 'ethash') {
+  //     throw new Error('difficulty calculation currently only supports the ethash algorithm');
+  //   }
+  //   const hardfork = this._getHardfork();
+  //   const blockTs = this.timestamp;
+  //   const { timestamp: parentTs, difficulty: parentDif } = parentBlockHeader;
+  //   const minimumDifficulty = new BN(this._common.paramByHardfork('pow', 'minimumDifficulty', hardfork));
+  //   const offset = parentDif.div(new BN(this._common.paramByHardfork('pow', 'difficultyBoundDivisor', hardfork)));
+  //   let num = this.number.clone();
 
-    // We use a ! here as TS cannot follow this hardfork-dependent logic, but it always gets assigned
-    let dif!: BN;
+  //   // We use a ! here as TS cannot follow this hardfork-dependent logic, but it always gets assigned
+  //   let dif!: BN;
 
-    if (this._common.hardforkGteHardfork(hardfork, 'byzantium')) {
-      // max((2 if len(parent.uncles) else 1) - ((timestamp - parent.timestamp) // 9), -99) (EIP100)
-      const uncleAddend = parentBlockHeader.uncleHash.equals(KECCAK256_RLP_ARRAY) ? 1 : 2;
-      let a = blockTs.sub(parentTs).idivn(9).ineg().iaddn(uncleAddend);
-      const cutoff = new BN(-99);
-      // MAX(cutoff, a)
-      if (cutoff.gt(a)) {
-        a = cutoff;
-      }
-      dif = parentDif.add(offset.mul(a));
-    }
+  //   if (this._common.hardforkGteHardfork(hardfork, 'byzantium')) {
+  //     // max((2 if len(parent.uncles) else 1) - ((timestamp - parent.timestamp) // 9), -99) (EIP100)
+  //     const uncleAddend = parentBlockHeader.uncleHash.equals(KECCAK256_RLP_ARRAY) ? 1 : 2;
+  //     let a = blockTs.sub(parentTs).idivn(9).ineg().iaddn(uncleAddend);
+  //     const cutoff = new BN(-99);
+  //     // MAX(cutoff, a)
+  //     if (cutoff.gt(a)) {
+  //       a = cutoff;
+  //     }
+  //     dif = parentDif.add(offset.mul(a));
+  //   }
 
-    if (this._common.hardforkGteHardfork(hardfork, 'muirGlacier')) {
-      // Istanbul/Berlin difficulty bomb delay (EIP2384)
-      num.isubn(9000000);
-      if (num.ltn(0)) {
-        num = new BN(0);
-      }
-    } else if (this._common.hardforkGteHardfork(hardfork, 'constantinople')) {
-      // Constantinople difficulty bomb delay (EIP1234)
-      num.isubn(5000000);
-      if (num.ltn(0)) {
-        num = new BN(0);
-      }
-    } else if (this._common.hardforkGteHardfork(hardfork, 'byzantium')) {
-      // Byzantium difficulty bomb delay (EIP649)
-      num.isubn(3000000);
-      if (num.ltn(0)) {
-        num = new BN(0);
-      }
-    } else if (this._common.hardforkGteHardfork(hardfork, 'homestead')) {
-      // 1 - (block_timestamp - parent_timestamp) // 10
-      let a = blockTs.sub(parentTs).idivn(10).ineg().iaddn(1);
-      const cutoff = new BN(-99);
-      // MAX(cutoff, a)
-      if (cutoff.gt(a)) {
-        a = cutoff;
-      }
-      dif = parentDif.add(offset.mul(a));
-    } else {
-      // pre-homestead
-      if (parentTs.addn(this._common.paramByHardfork('pow', 'durationLimit', hardfork)).gt(blockTs)) {
-        dif = offset.add(parentDif);
-      } else {
-        dif = parentDif.sub(offset);
-      }
-    }
+  //   if (this._common.hardforkGteHardfork(hardfork, 'muirGlacier')) {
+  //     // Istanbul/Berlin difficulty bomb delay (EIP2384)
+  //     num.isubn(9000000);
+  //     if (num.ltn(0)) {
+  //       num = new BN(0);
+  //     }
+  //   } else if (this._common.hardforkGteHardfork(hardfork, 'constantinople')) {
+  //     // Constantinople difficulty bomb delay (EIP1234)
+  //     num.isubn(5000000);
+  //     if (num.ltn(0)) {
+  //       num = new BN(0);
+  //     }
+  //   } else if (this._common.hardforkGteHardfork(hardfork, 'byzantium')) {
+  //     // Byzantium difficulty bomb delay (EIP649)
+  //     num.isubn(3000000);
+  //     if (num.ltn(0)) {
+  //       num = new BN(0);
+  //     }
+  //   } else if (this._common.hardforkGteHardfork(hardfork, 'homestead')) {
+  //     // 1 - (block_timestamp - parent_timestamp) // 10
+  //     let a = blockTs.sub(parentTs).idivn(10).ineg().iaddn(1);
+  //     const cutoff = new BN(-99);
+  //     // MAX(cutoff, a)
+  //     if (cutoff.gt(a)) {
+  //       a = cutoff;
+  //     }
+  //     dif = parentDif.add(offset.mul(a));
+  //   } else {
+  //     // pre-homestead
+  //     if (parentTs.addn(this._common.paramByHardfork('pow', 'durationLimit', hardfork)).gt(blockTs)) {
+  //       dif = offset.add(parentDif);
+  //     } else {
+  //       dif = parentDif.sub(offset);
+  //     }
+  //   }
 
-    const exp = num.divn(100000).isubn(2);
-    if (!exp.isNeg()) {
-      dif.iadd(new BN(2).pow(exp));
-    }
+  //   const exp = num.divn(100000).isubn(2);
+  //   if (!exp.isNeg()) {
+  //     dif.iadd(new BN(2).pow(exp));
+  //   }
 
-    if (dif.lt(minimumDifficulty)) {
-      dif = minimumDifficulty;
-    }
+  //   if (dif.lt(minimumDifficulty)) {
+  //     dif = minimumDifficulty;
+  //   }
 
-    return dif;
-  }
+  //   return dif;
+  // }
 
   /**
    * Checks that the block's `difficulty` matches the canonical difficulty.
    *
    * @param parentBlockHeader - the header from the parent `Block` of this header
    */
-  validateDifficulty(parentBlockHeader: BlockHeader): boolean {
-    if (this._common.consensusType() !== 'pow') {
-      throw new Error('difficulty validation is currently only supported on PoW chains');
-    }
-    return this.canonicalDifficulty(parentBlockHeader).eq(this.difficulty);
-  }
+  // validateDifficulty(parentBlockHeader: BlockHeader): boolean {
+  //   if (this._common.consensusType() !== 'pow') {
+  //     throw new Error('difficulty validation is currently only supported on PoW chains');
+  //   }
+  //   return this.canonicalDifficulty(parentBlockHeader).eq(this.difficulty);
+  // }
 
   /**
    * Validates if the block gasLimit remains in the
@@ -331,11 +331,11 @@ export class BlockHeader {
       throw new Error('invalid timestamp');
     }
 
-    if (this._common.consensusType() === 'pow') {
-      if (!this.validateDifficulty(header)) {
-        throw new Error('invalid difficulty');
-      }
-    }
+    // if (this._common.consensusType() === 'pow') {
+    // if (!this.validateDifficulty(header)) {
+    //   throw new Error('invalid difficulty');
+    // }
+    // }
 
     if (!this.validateGasLimit(header)) {
       throw new Error('invalid gas limit');

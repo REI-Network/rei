@@ -4,6 +4,9 @@
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "MIT",
+    "bin": {
+        "gxc2": "dist/index.js"
+    },
     "scripts": {
         "build": "tsc"
     },

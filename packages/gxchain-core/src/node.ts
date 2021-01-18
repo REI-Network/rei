@@ -182,13 +182,22 @@ export class Node {
     await this.blockchain.init();
     await this.vm.init();
 
-    // TODO: save the peer id.
+    let peerId!: PeerId;
+    try {
+      const key = fs.readFileSync(path.join(this.options.databasePath, 'peer-key'));
+      peerId = await PeerId.createFromPrivKey(key);
+    } catch (err) {
+      console.error('Read peer-key faild, generate new key');
+      peerId = await PeerId.create({ bits: 1024, keyType: 'Ed25519' });
+      fs.writeFileSync(path.join(this.options.databasePath, 'peer-key'), peerId.privKey.bytes);
+    }
+
     this.peerpool = new PeerPool({
       nodes: await Promise.all(
         [
           new Libp2pNode({
             node: this,
-            peerId: await PeerId.create({ bits: 1024, keyType: 'Ed25519' }),
+            peerId,
             protocols: new Set<string>([constants.GXC2_ETHWIRE]),
             tcpPort: this.options?.p2p?.tcpPort,
             wsPort: this.options?.p2p?.wsPort,

@@ -277,18 +277,18 @@ export class Block {
    *
    * @param parentBlock - the parent of this `Block`
    */
-  canonicalDifficulty(parentBlock: Block): BN {
-    return this.header.canonicalDifficulty(parentBlock.header);
-  }
+  // canonicalDifficulty(parentBlock: Block): BN {
+  //   return this.header.canonicalDifficulty(parentBlock.header);
+  // }
 
   /**
    * Checks that the block's `difficulty` matches the canonical difficulty.
    *
    * @param parentBlock - the parent of this `Block`
    */
-  validateDifficulty(parentBlock: Block): boolean {
-    return this.header.validateDifficulty(parentBlock.header);
-  }
+  // validateDifficulty(parentBlock: Block): boolean {
+  //   return this.header.validateDifficulty(parentBlock.header);
+  // }
 
   /**
    * Validates if the block gasLimit remains in the

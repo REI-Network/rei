@@ -1,12 +1,3 @@
-import CID from 'cids';
-import multihashing from 'multihashing-async';
-
-export const stringToCID = async (str: string) => {
-  const bytes = new TextEncoder().encode(str);
-  const hash = await multihashing(bytes, 'sha2-256');
-  return new CID(1, 'keccak-256', hash);
-};
-
 interface Constructor<T = {}> {
   new (...args: any[]): T;
 }
@@ -35,6 +26,10 @@ export function mixin<T1 extends Constructor, T2 extends Constructor>(mix1: T1, 
     ctor = class {};
   }
   return ctor;
+}
+
+export function hexStringToBuffer(hex: string): Buffer {
+  return hex.indexOf('0x') === 0 ? Buffer.from(hex.substr(2), 'hex') : Buffer.from(hex, 'hex');
 }
 
 export * from './abort';

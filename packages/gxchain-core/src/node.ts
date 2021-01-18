@@ -30,8 +30,7 @@ export interface NodeOptions {
 }
 
 export class Node {
-  public readonly rawdb!: LevelUp;
-  public readonly databasePath: string;
+  public readonly rawdb: LevelUp;
   public readonly txPool: TransactionPool;
 
   public db!: Database;
@@ -42,13 +41,14 @@ export class Node {
   public vm!: VM;
   public sync!: Synchronizer;
 
-  private initPromise!: Promise<void>;
+  private options: NodeOptions;
+  private initPromise: Promise<void>;
 
   constructor(options: NodeOptions) {
-    this.databasePath = options.databasePath;
-    this.rawdb = createLevelDB(path.join(this.databasePath, 'chaindb'));
+    this.options = options;
+    this.rawdb = createLevelDB(path.join(this.options.databasePath, 'chaindb'));
     this.txPool = new TransactionPool();
-    this.initPromise = this.init(options);
+    this.initPromise = this.init();
   }
 
   get status() {
@@ -94,7 +94,7 @@ export class Node {
     return stateManager._trie.root;
   }
 
-  async init(options: NodeOptions) {
+  async init() {
     if (this.initPromise) {
       await this.initPromise;
       return;
@@ -102,7 +102,7 @@ export class Node {
 
     let genesisJSON;
     try {
-      genesisJSON = JSON.parse(fs.readFileSync(path.join(this.databasePath, 'genesis.json')).toString());
+      genesisJSON = JSON.parse(fs.readFileSync(path.join(this.options.databasePath, 'genesis.json')).toString());
     } catch (err) {
       console.error('Read genesis.json faild, use default genesis');
       genesisJSON = defaultGenesis;
@@ -202,11 +202,11 @@ export class Node {
     await this.vm.init();
     this.sync.start();
 
-    if (options.mine) {
+    if (this.options.mine) {
       this.mineLoop({
-        coinbase: options.mine.coinbase,
-        mineInterval: options.mine.mineInterval,
-        gasLimit: new BN(options.mine.gasLimit)
+        coinbase: this.options.mine.coinbase,
+        mineInterval: this.options.mine.mineInterval,
+        gasLimit: new BN(this.options.mine.gasLimit)
       });
     }
   }

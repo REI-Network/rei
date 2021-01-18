@@ -238,7 +238,7 @@ const startPrompts = async (node: Node) => {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir);
     }
-    const node = new Node(dir);
+    const node = new Node({ databasePath: dir });
     await node.init();
     const rpcServer = new RpcServer(rpcPort, '::1', node).on('error', (err: any) => {
       console.error('rpc server error', err);

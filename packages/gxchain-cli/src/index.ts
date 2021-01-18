@@ -30,7 +30,7 @@ async function start() {
     if (!fs.existsSync(opts.datadir)) {
       fs.mkdirSync(opts.datadir);
     }
-    const node = new Node(opts.datadir);
+    const node = new Node({ databasePath: opts.datadir });
     await node.init();
     if (opts.rpc) {
       const rpcSever = new RpcServer(Number(opts.rpcPort), opts.rpcHost, node).on('error', (err) => {

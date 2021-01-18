@@ -264,6 +264,9 @@ export class Node {
         { common: this.common }
       );
       await this.processBlock(block);
+      for (const peer of this.peerpool.peers) {
+        peer.newBlock(this.blockchain.latestBlock);
+      }
     }
   }
 }

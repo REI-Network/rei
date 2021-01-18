@@ -27,6 +27,11 @@ export interface NodeOptions {
     mineInterval: number;
     gasLimit: string;
   };
+  p2p?: {
+    tcpPort?: number;
+    wsPort?: number;
+    bootnodes?: string[];
+  };
 }
 
 export class Node {
@@ -133,7 +138,10 @@ export class Node {
           new Libp2pNode({
             node: this,
             peerId: await PeerId.create({ bits: 1024, keyType: 'Ed25519' }),
-            protocols: new Set<string>([constants.GXC2_ETHWIRE])
+            protocols: new Set<string>([constants.GXC2_ETHWIRE]),
+            tcpPort: this.options?.p2p?.tcpPort,
+            wsPort: this.options?.p2p?.wsPort,
+            bootnodes: this.options?.p2p?.bootnodes
           })
         ].map(
           (n) => new Promise<Libp2pNode>((resolve) => n.init().then(() => resolve(n)))

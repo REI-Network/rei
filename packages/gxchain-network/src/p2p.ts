@@ -35,6 +35,15 @@ export interface INode {
   status: any;
 }
 
+export interface Libp2pNodeOptions {
+  node: INode;
+  peerId: PeerId;
+  protocols: Set<string>;
+  tcpPort?: number;
+  wsPort?: number;
+  bootnodes?: string[];
+}
+
 export declare interface Libp2pNode {
   on(event: 'connected', listener: (peer: Peer) => void);
   on(event: 'error', listener: (err: any) => void);
@@ -49,29 +58,27 @@ export class Libp2pNode extends Libp2p {
   private readonly banned = new Map<string, number>();
   private started: boolean = false;
 
-  constructor(options: { node: INode; peerId: PeerId; bootnodes?: string[]; protocols: Set<string> }) {
+  constructor(options: Libp2pNodeOptions) {
     super({
       peerId: options.peerId,
       addresses: {
-        listen: ['/ip4/0.0.0.0/tcp/0', '/ip4/0.0.0.0/tcp/0/ws']
+        listen: [`/ip4/0.0.0.0/tcp/${options.tcpPort || 0}`, `/ip4/0.0.0.0/tcp/${options.wsPort || 0}/ws`]
       },
       modules: {
         transport: [TCP, WebSockets],
         streamMuxer: [MPLEX],
         connEncryption: [secio],
-        // peerDiscovery: [Bootstrap],
+        peerDiscovery: [Bootstrap],
         dht: KadDHT
       },
       config: {
         peerDiscovery: {
-          autoDial: true
-          /*
+          autoDial: true,
           bootstrap: {
             interval: 2000,
             enabled: true,
             list: options.bootnodes || []
           }
-          */
         },
         dht: {
           kBucketSize: 20

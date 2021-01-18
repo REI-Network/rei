@@ -231,6 +231,7 @@ export class Node {
   }
 
   async processBlock(blockSkeleton: Block) {
+    await this.initPromise;
     console.debug('process block:', blockSkeleton.header.number.toString());
     const lastHeader = await this.db.getHeader(blockSkeleton.header.parentHash, blockSkeleton.header.number.subn(1));
     const opts = {
@@ -252,6 +253,7 @@ export class Node {
   }
 
   private async mineLoop({ coinbase, mineInterval, gasLimit }: { coinbase: string; mineInterval: number; gasLimit: BN }) {
+    await this.initPromise;
     while (true) {
       await new Promise((r) => setTimeout(r, mineInterval));
       const transactions = this.txPool.get(100, gasLimit);

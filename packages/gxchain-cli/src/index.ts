@@ -13,7 +13,7 @@ program.option('--bootnodes <bootnodes...>', 'bootnodes list');
 program.option('--datadir <path>', 'chain data dir path', './gxchain2');
 program.option('--mine', 'mine block');
 program.option('--coinbase <address>', 'miner address');
-program.option('--mine-interval <interval>', 'mine interval', '5');
+program.option('--mine-interval <interval>', 'mine interval', '5000');
 program.option('--block-gas-limit <gas>', 'block gas limit', '21000');
 
 program

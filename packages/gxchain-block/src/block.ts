@@ -2,7 +2,7 @@
 
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
 
-import { BN, rlp, keccak256, KECCAK256_RLP } from 'ethereumjs-util';
+import { BN, rlp, bnToHex, bufferToHex, keccak256, KECCAK256_RLP } from 'ethereumjs-util';
 
 import { Common } from '@gxchain2/common';
 import { Transaction, TxOptions } from '@gxchain2/tx';
@@ -403,5 +403,15 @@ export class Block {
         throw error;
       }
     }
+  }
+
+  toRPCJSON() {
+    return {
+      number: this.header.number ? bnToHex(this.header.number) : undefined,
+      hash: this.hash() ? bufferToHex(this.hash()) : undefined,
+      parentHash: bufferToHex(this.header.parentHash),
+      nonce: this.header.nonce ? bufferToHex(this.header.nonce) : undefined
+      //sha3Uncles:
+    };
   }
 }

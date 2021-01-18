@@ -12,6 +12,9 @@ program.option('--p2p-port <port>', 'p2p server port', '0');
 program.option('--bootnodes <bootnodes...>', 'bootnodes list');
 program.option('--datadir <path>', 'chain data dir path', './gxchain2');
 program.option('--mine', 'mine block');
+program.option('--coinbase <address>', 'miner address');
+program.option('--mine-interval <interval>', 'mine interval', '5');
+program.option('--block-gas-limit <gas>', 'block gas limit', '21000');
 
 program
   .command('start')
@@ -30,7 +33,26 @@ async function start() {
     if (!fs.existsSync(opts.datadir)) {
       fs.mkdirSync(opts.datadir);
     }
-    const node = new Node({ databasePath: opts.datadir });
+
+    let node!: Node;
+    if (opts.mine) {
+      if (typeof opts.coinbase !== 'string' || typeof opts.mineInterval !== 'string' || !Number.isInteger(Number(opts.mineInterval)) || typeof opts.blockGasLimit !== 'string') {
+        throw new Error('Invalid mine options');
+      }
+      node = new Node({
+        databasePath: opts.datadir,
+        mine: {
+          coinbase: opts.coinbase,
+          mineInterval: Number(opts.mineInterval),
+          gasLimit: opts.blockGasLimit
+        }
+      });
+    } else {
+      node = new Node({
+        databasePath: opts.datadir
+      });
+    }
+
     await node.init();
     if (opts.rpc) {
       const rpcSever = new RpcServer(Number(opts.rpcPort), opts.rpcHost, node).on('error', (err) => {

@@ -196,7 +196,8 @@ const startPrompts = async (node: Node) => {
     } else if (arr[0] === 'lsaccount') {
       const stream = node.stateManager._trie.createReadStream();
       for await (let data of streamToIterator(stream as any)) {
-        console.log('key', '0x' + data.key.toString('hex'), '\nbalance', Account.fromRlpSerializedAccount(data.value).balance.toString());
+        const account = Account.fromRlpSerializedAccount(data.value);
+        console.log('key', '0x' + data.key.toString('hex'), '\nbalance', account.balance.toString(), '\nstateRoot', '0x' + account.stateRoot.toString('hex'));
       }
     } else if (arr[0] === 'getblock' || arr[0] === 'gb') {
       try {

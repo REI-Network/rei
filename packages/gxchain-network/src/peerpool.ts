@@ -24,6 +24,9 @@ export class PeerPool extends EventEmitter {
       node.on('connected', (peer) => {
         this.connected(peer);
       });
+      node.on('disconnected', (peer) => {
+        this.disconnected(peer);
+      });
       node.on('error', (err) => {
         console.error('Peerpool, p2p node error:', err);
       });

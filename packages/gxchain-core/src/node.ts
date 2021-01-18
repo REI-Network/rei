@@ -265,7 +265,9 @@ export class Node {
       );
       await this.processBlock(block);
       for (const peer of this.peerpool.peers) {
-        peer.newBlock(this.blockchain.latestBlock);
+        if (peer.isSupport(constants.GXC2_ETHWIRE)) {
+          peer.newBlock(this.blockchain.latestBlock);
+        }
       }
     }
   }

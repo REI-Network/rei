@@ -45,10 +45,11 @@ export interface Libp2pNodeOptions {
 }
 
 export declare interface Libp2pNode {
-  on(event: 'connected', listener: (peer: Peer) => void);
-  on(event: 'error', listener: (err: any) => void);
-  once(event: 'connected', listener: (peer: Peer) => void);
-  once(event: 'error', listener: (err: any) => void);
+  on(event: 'connected' | 'disconnected', listener: (peer: Peer) => void);
+  on(event: 'error', listener: (err: Error) => void);
+
+  once(event: 'connected' | 'disconnected', listener: (peer: Peer) => void);
+  once(event: 'error', listener: (err: Error) => void);
 }
 
 export class Libp2pNode extends Libp2p {
@@ -118,6 +119,7 @@ export class Libp2pNode extends Libp2p {
     const peer = this.peers.get(peerId);
     if (peer) {
       this.peers.delete(peerId);
+      this.emit('disconnected', peer);
       await peer.abort();
     }
   }
@@ -162,6 +164,15 @@ export class Libp2pNode extends Libp2p {
           this.createPeer(connect.remotePeer);
         }
         console.debug('Peer connected:', id);
+      } catch (err) {
+        this.emit('error', err);
+      }
+    });
+    this.connectionManager.on('peer:disconnect', (connect) => {
+      try {
+        const id = connect.remotePeer.toB58String();
+        this.removePeer(id);
+        console.debug('Peer disconnected:', id);
       } catch (err) {
         this.emit('error', err);
       }

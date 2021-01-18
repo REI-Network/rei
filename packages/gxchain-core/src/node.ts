@@ -20,8 +20,7 @@ import { Block } from '@gxchain2/block';
 import { FullSynchronizer, Synchronizer } from './sync';
 
 export class Node implements INode {
-  public readonly chainDB!: LevelUp;
-  public readonly accountDB!: LevelUp;
+  public readonly rawdb!: LevelUp;
   public readonly databasePath: string;
   public readonly txPool: TransactionPool;
 
@@ -35,8 +34,7 @@ export class Node implements INode {
 
   constructor(databasePath: string) {
     this.databasePath = databasePath;
-    this.chainDB = createLevelDB(path.join(this.databasePath, 'chaindb'));
-    this.accountDB = createLevelDB(path.join(this.databasePath, 'accountdb'));
+    this.rawdb = createLevelDB(path.join(this.databasePath, 'chaindb'));
     this.txPool = new TransactionPool();
   }
 
@@ -96,8 +94,8 @@ export class Node implements INode {
       chain: genesisJSON.genesisInfo,
       hardfork: 'chainstart'
     });
-    this.db = new Database(this.chainDB, this.common);
-    this.stateManager = new StateManager({ common: this.common, trie: new Trie(this.accountDB) });
+    this.db = new Database(this.rawdb, this.common);
+    this.stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
     // TODO: save the peer id.
     this.peerpool = new PeerPool({
       nodes: await Promise.all(
@@ -147,7 +145,7 @@ export class Node implements INode {
     }
 
     this.blockchain = new Blockchain({
-      db: this.chainDB,
+      db: this.rawdb,
       database: this.db,
       common: this.common,
       validateConsensus: false,

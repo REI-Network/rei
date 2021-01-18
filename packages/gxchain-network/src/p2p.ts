@@ -68,7 +68,7 @@ export class Libp2pNode extends Libp2p {
         transport: [TCP, WebSockets],
         streamMuxer: [MPLEX],
         connEncryption: [secio],
-        peerDiscovery: [Bootstrap],
+        peerDiscovery: options.bootnodes !== undefined ? [Bootstrap] : [],
         dht: KadDHT
       },
       config: {
@@ -108,6 +108,14 @@ export class Libp2pNode extends Libp2p {
     return peer;
   }
 
+  private async removePeer(peerId: string) {
+    const peer = this.peers.get(peerId);
+    if (peer) {
+      this.peers.delete(peerId);
+      await peer.abort();
+    }
+  }
+
   async init() {
     this.protocols.forEach((protocol) => {
       this.handle(protocol.protocolString, async ({ connection, stream }) => {
@@ -125,8 +133,8 @@ export class Libp2pNode extends Libp2p {
       });
     });
     super.on('peer:discovery', async (peerId: PeerId) => {
+      const id = peerId.toB58String();
       try {
-        const id = peerId.toB58String();
         if (this.peers.get(id) || this.isBanned(id)) {
           return;
         }
@@ -137,6 +145,7 @@ export class Libp2pNode extends Libp2p {
           this.emit('connected', peer);
         }
       } catch (err) {
+        this.removePeer(id);
         this.emit('error', err);
       }
     });

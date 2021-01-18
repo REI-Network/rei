@@ -131,33 +131,6 @@ export class Node {
     );
     this.db = new Database(this.rawdb, this.common);
     this.stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
-    // TODO: save the peer id.
-    this.peerpool = new PeerPool({
-      nodes: await Promise.all(
-        [
-          new Libp2pNode({
-            node: this,
-            peerId: await PeerId.create({ bits: 1024, keyType: 'Ed25519' }),
-            protocols: new Set<string>([constants.GXC2_ETHWIRE]),
-            tcpPort: this.options?.p2p?.tcpPort,
-            wsPort: this.options?.p2p?.wsPort,
-            bootnodes: this.options?.p2p?.bootnodes
-          })
-        ].map(
-          (n) => new Promise<Libp2pNode>((resolve) => n.init().then(() => resolve(n)))
-        )
-      )
-    });
-    this.peerpool
-      .on('error', (err) => {
-        console.error('Peer pool error:', err);
-      })
-      .on('added', (peer) => {
-        const status = peer.getStatus(constants.GXC2_ETHWIRE);
-        if (status && status.height) {
-          this.sync.announce(peer, status.height);
-        }
-      });
 
     let genesisBlock!: Block;
     try {
@@ -208,6 +181,35 @@ export class Node {
 
     await this.blockchain.init();
     await this.vm.init();
+
+    // TODO: save the peer id.
+    this.peerpool = new PeerPool({
+      nodes: await Promise.all(
+        [
+          new Libp2pNode({
+            node: this,
+            peerId: await PeerId.create({ bits: 1024, keyType: 'Ed25519' }),
+            protocols: new Set<string>([constants.GXC2_ETHWIRE]),
+            tcpPort: this.options?.p2p?.tcpPort,
+            wsPort: this.options?.p2p?.wsPort,
+            bootnodes: this.options?.p2p?.bootnodes
+          })
+        ].map(
+          (n) => new Promise<Libp2pNode>((resolve) => n.init().then(() => resolve(n)))
+        )
+      )
+    });
+    this.peerpool
+      .on('error', (err) => {
+        console.error('Peer pool error:', err);
+      })
+      .on('added', (peer) => {
+        const status = peer.getStatus(constants.GXC2_ETHWIRE);
+        if (status && status.height) {
+          this.sync.announce(peer, status.height);
+        }
+      });
+
     this.sync.start();
 
     if (this.options.mine) {

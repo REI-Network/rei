@@ -1,10 +1,10 @@
 import { Node } from '@gxchain2/core';
 import { Block, JsonBlock, BlockHeader, JsonHeader } from '@gxchain2/block';
-import { Account, Address } from 'ethereumjs-util';
+import { Account, Address, bufferToHex } from 'ethereumjs-util';
 //import { Transaction } from '@gxchain2/tx';
 
 import * as helper from './helper';
-import { promises } from 'dns';
+import { hexStringToBuffer } from '../../gxchain-core/node_modules/@gxchain2/utils/dist';
 
 export class Controller {
   node: Node;
@@ -14,6 +14,23 @@ export class Controller {
   hexStringToBuffer = (hex: string): Buffer => {
     return hex.indexOf('0x') === 0 ? Buffer.from(hex.substr(2), 'hex') : Buffer.from(hex, 'hex');
   };
+
+  private async getBlockByTag(tag: string): Promise<Block> {
+    let block!: Block;
+    if (tag === 'earliest') {
+      block = await this.node.blockchain.getBlock(0);
+    } else if (tag === 'latest') {
+      block = this.node.blockchain.latestBlock;
+    } else if (tag === 'pending') {
+      helper.throwRpcErr('Unsupport pending block');
+    } else if (Number.isInteger(Number(tag))) {
+      block = await this.node.blockchain.getBlock(Number(tag));
+    } else {
+      helper.throwRpcErr('Invalid tag value');
+    }
+    return block;
+  }
+
   //web3_clientVersion
   //aysnc web_sha3()
   //aysnc eth_net_version()
@@ -30,7 +47,13 @@ export class Controller {
     return blockNumber;
   }
 
-  //eth_getStorageAt
+  async eth_getStorageAt([address, key, tag]: [string, string, string]): Promise<any> {
+    const blockHeader = (await this.getBlockByTag(tag)).header;
+    const stateManager = this.node.stateManager.copy();
+    await stateManager.setStateRoot(blockHeader.stateRoot);
+    return bufferToHex(await stateManager.getContractStorage(Address.fromString(address), hexStringToBuffer(key)));
+  }
+
   async eth_getTransactionCount([address]: [string]): Promise<string> {
     let nonce = Buffer.from((await this.node.stateManager.getAccount(Address.fromString(address))).nonce);
     return '0x' + nonce.toString('hex');
@@ -51,34 +74,12 @@ export class Controller {
   }
 
   async eth_getBlockByNumber([tag, fullTransactions]: [string, boolean]): Promise<JsonBlock> {
-    let block!: Block;
-    if (tag === 'earliest') {
-      block = await this.node.blockchain.getBlock(0);
-    } else if (tag === 'latest') {
-      block = this.node.blockchain.latestBlock;
-    } else if (tag === 'pending') {
-      helper.throwRpcErr('Unsupport pending block');
-    } else if (Number.isInteger(Number(tag))) {
-      block = await this.node.blockchain.getBlock(Number(tag));
-    } else {
-      helper.throwRpcErr('Invalid tag value');
-    }
+    const block = await this.getBlockByTag(tag);
     return block.toJSON();
   }
 
   async eth_getBlockHeaderByNumber([tag, fullTransactions]: [string, boolean]): Promise<JsonHeader> {
-    let blockHeader!: BlockHeader;
-    if (tag === 'earliest') {
-      blockHeader = (await this.node.blockchain.getBlock(0)).header;
-    } else if (tag === 'latest') {
-      blockHeader = this.node.blockchain.latestBlock.header;
-    } else if (tag === 'pending') {
-      helper.throwRpcErr('Unsupport pending block');
-    } else if (Number.isInteger(Number(tag))) {
-      blockHeader = (await this.node.blockchain.getBlock(Number(tag))).header;
-    } else {
-      helper.throwRpcErr('Invalid tag value');
-    }
+    const blockHeader = (await this.getBlockByTag(tag)).header;
     return blockHeader.toJSON();
   }
 

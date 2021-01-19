@@ -81,8 +81,13 @@ export class Controller {
     return bufferToHex(Buffer.from(transactionNumber.toString));
   }
 
-  //eth_getUncleCountByBlockHash
-  //eth_getUncleCountByBlockNumber
+  async eth_getUncleCountByBlockHash([data]: [string]): Promise<string> {
+    return '0x00';
+  } //0
+
+  async eth_getUncleCountByBlockNumber([tag]: [string]): Promise<string> {
+    return '0x00';
+  }
 
   async eth_getCode([data, tag]: [Address, string]): Promise<Buffer> {
     return await this.node.vm.stateManager.getContractCode(data);
@@ -137,14 +142,11 @@ export class Controller {
   //eth_getFilterLogs
   //eth_getLogs
 
-  //eth_getWork
-  //eth_submitWork
-  //eth_submitHashrate
-
-  //db_putString
+  //async db_putString() {}
   //db_getString
   //db_putHex
-  //db_getHex
+  //db_getHex  removed in geth 1.4
+
   //shh_version
   //shh_post
   //shh_newIdentity

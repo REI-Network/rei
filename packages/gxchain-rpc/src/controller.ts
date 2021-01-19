@@ -128,8 +128,15 @@ export class Controller {
   async eth_getTransactionReceipt([hash]: [string]): Promise<any> {
     return (await this.node.db.getReceipt(hexStringToBuffer(hash))).toRPCJSON;
   }
-  //eth_getUncleByBlockHashAndIndex
-  //eth_getUncleByBlockNumberAndIndex
+
+  async eth_getUncleByBlockHashAndIndex([data, quantity]: [string, string]): Promise<any> {
+    return {};
+  }
+
+  async eth_getUncleByBlockNumberAndIndex([tag, quantity]: [string, string]): Promise<any> {
+    return {};
+  }
+
   //eth_compileSolidity
   //eth_compileLLL
   //eth_compileSerpent

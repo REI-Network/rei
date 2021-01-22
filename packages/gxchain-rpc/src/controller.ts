@@ -149,11 +149,6 @@ export class Controller {
   //eth_getFilterLogs
   //eth_getLogs
 
-  //async db_putString() {}
-  //db_getString
-  //db_putHex
-  //db_getHex  removed in geth 1.4
-
   //shh_version
   //shh_post
   //shh_newIdentity

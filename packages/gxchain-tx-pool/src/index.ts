@@ -134,4 +134,18 @@ class TxSortedMap {
     }
     return { removed, invalids };
   }
+
+  ready(start: BN): Transaction[] {
+    const nonce = start.clone();
+    const readies: Transaction[] = [];
+    let nonceInHeap: BN = this.nonceHeap.peek();
+    while (nonceInHeap && nonceInHeap.eq(nonce)) {
+      readies.push(this.nonceToTx.get(nonceInHeap)!);
+      this.nonceToTx.delete(nonceInHeap);
+      this.nonceHeap.remove();
+      nonce.iaddn(1);
+      nonceInHeap = this.nonceHeap.peek();
+    }
+    return readies;
+  }
 }

@@ -1,31 +1,51 @@
+import { BN } from 'ethereumjs-util';
+import Heap from 'qheap';
 import { Transaction } from '@gxchain2/tx';
-import BN from 'bn.js';
+import { FunctionalMap } from '@gxchain2/utils';
 
-class FakeTransactionPool {
-  private pool: Transaction[] = [];
-  put(tx: Transaction) {
-    this.pool.push(tx);
-    this.pool = this.pool.sort((a, b) => a.gasPrice.sub(b.gasPrice).toNumber());
-  }
-  get(countLimit: number, totalGasLimit: BN): Transaction[] {
-    const arr: Transaction[] = [];
-    const gas = new BN(0);
-    while (arr.length < countLimit) {
-      const tx = this.pool[0];
-      if (!tx) {
-        break;
-      }
-      gas.iadd(tx.gasLimit);
-      if (gas.gt(totalGasLimit)) {
-        break;
-      }
-      arr.push(this.pool.shift()!);
+class TxSortedMap {
+  private readonly nonceToTx = new FunctionalMap<BN, Transaction>((a, b) => {
+    if (a.lt(b)) {
+      return -1;
     }
-    return arr;
+    if (a.gt(b)) {
+      return 1;
+    }
+    return 0;
+  });
+  private readonly nonceHeap = new Heap((a: BN, b: BN) => a.lt(b));
+  private sortedTxCache?: Transaction[];
+
+  removeForward(nonce: BN) {
+    const removed: Transaction[] = [];
+    let nonceInHeap: BN = this.nonceHeap.peek();
+    while (nonceInHeap && nonceInHeap.lt(nonce)) {
+      const tx = this.nonceToTx.get(nonceInHeap)!;
+      removed.push(tx);
+      this.nonceToTx.delete(nonceInHeap);
+      this.nonceHeap.remove();
+      nonceInHeap = this.nonceHeap.peek();
+    }
+    return removed;
   }
-  forEach(callback: (tx: Transaction, index: number) => void) {
-    this.pool.forEach(callback);
+
+  push(tx: Transaction): { inserted: boolean; old?: Transaction } {
+    const nonce = tx.nonce;
+    const old = this.nonceToTx.get(nonce);
+    if (old) {
+      // TODO: gasPrice
+      if (old.gasPrice.gt(tx.gasPrice)) {
+        return {
+          inserted: false
+        };
+      }
+    } else {
+      this.nonceHeap.push(nonce);
+    }
+    this.nonceToTx.set(nonce, tx);
+    return {
+      inserted: true,
+      old
+    };
   }
 }
-
-export { FakeTransactionPool as TransactionPool };

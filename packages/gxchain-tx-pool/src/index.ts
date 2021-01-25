@@ -31,6 +31,19 @@ class TxSortedMap {
     }
   }
 
+  private strictCheck(nonce: BN, invalids: Transaction[]) {
+    if (this.strict) {
+      for (const tx of this.nonceToTx.values()) {
+        if (tx.nonce.gt(nonce)) {
+          invalids.push(tx);
+        }
+      }
+      for (const tx of invalids) {
+        this.nonceToTx.delete(tx.nonce);
+      }
+    }
+  }
+
   get size() {
     return this.nonceToTx.size;
   }
@@ -88,18 +101,7 @@ class TxSortedMap {
     if (this.nonceToTx.has(nonce)) {
       this.nonceToTx.delete(nonce);
       const invalids: Transaction[] = [];
-      if (this.strict) {
-        const invalidKeys: BN[] = [];
-        for (const [key, value] of this.nonceToTx) {
-          if (key.gt(nonce)) {
-            invalidKeys.push(key);
-            invalids.push(value);
-          }
-        }
-        for (const key of invalidKeys) {
-          this.nonceToTx.delete(key);
-        }
-      }
+      this.strictCheck(nonce, invalids);
       this.resetNonceHeap(this.nonceToTx.keys());
       return {
         deleted: true,
@@ -109,5 +111,27 @@ class TxSortedMap {
     return {
       deleted: false
     };
+  }
+
+  filter(balance: BN, gasLimit: BN): { removed: Transaction[]; invalids: Transaction[] } {
+    const cost = (tx: Transaction) => {
+      return tx.value.add(tx.gasPrice.mul(tx.gasLimit));
+    };
+    let lowestNonce: BN | undefined;
+    const removed: Transaction[] = [];
+    for (const [key, value] of this.nonceToTx) {
+      if (cost(value).gt(balance) || value.gasLimit.gt(gasLimit)) {
+        lowestNonce = lowestNonce ? (lowestNonce.gt(key) ? key : lowestNonce) : key;
+        removed.push(value);
+      }
+    }
+    for (const tx of removed) {
+      this.nonceToTx.delete(tx.nonce);
+    }
+    const invalids: Transaction[] = [];
+    if (lowestNonce) {
+      this.strictCheck(lowestNonce, invalids);
+    }
+    return { removed, invalids };
   }
 }

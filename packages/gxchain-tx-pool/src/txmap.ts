@@ -3,7 +3,7 @@ import Heap from 'qheap';
 import { Transaction } from '@gxchain2/tx';
 import { FunctionalMap } from '@gxchain2/utils';
 
-class TxSortedMap {
+export class TxSortedMap {
   private readonly strict: boolean;
   private readonly nonceToTx = new FunctionalMap<BN, Transaction>((a, b) => {
     if (a.lt(b)) {

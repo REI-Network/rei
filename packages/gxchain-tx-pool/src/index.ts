@@ -13,10 +13,27 @@ class TxSortedMap {
     }
     return 0;
   });
-  private readonly nonceHeap = new Heap((a: BN, b: BN) => a.lt(b));
+  private nonceHeap: Heap;
   private sortedTxCache?: Transaction[];
 
-  removeForward(nonce: BN) {
+  constructor() {
+    this.resetNonceHeap();
+  }
+
+  private resetNonceHeap(nonce?: BN[]) {
+    this.nonceHeap = new Heap((a: BN, b: BN) => a.lt(b));
+    if (nonce) {
+      for (const n of nonce) {
+        this.nonceHeap.push(n);
+      }
+    }
+  }
+
+  get size() {
+    return this.nonceToTx.size;
+  }
+
+  forward(nonce: BN) {
     const removed: Transaction[] = [];
     let nonceInHeap: BN = this.nonceHeap.peek();
     while (nonceInHeap && nonceInHeap.lt(nonce)) {
@@ -26,6 +43,22 @@ class TxSortedMap {
       this.nonceHeap.remove();
       nonceInHeap = this.nonceHeap.peek();
     }
+    return removed;
+  }
+
+  resize(size: number) {
+    const removed: Transaction[] = [];
+    if (this.size <= size) {
+      return removed;
+    }
+    let keys = Array.from(this.nonceToTx.keys());
+    while (keys.length > size && keys.length > 0) {
+      const maxNonce = keys[keys.length - 1];
+      removed.push(this.nonceToTx.get(maxNonce)!);
+      this.nonceToTx.delete(maxNonce);
+      keys.splice(keys.length - 1, 1);
+    }
+    this.resetNonceHeap(keys);
     return removed;
   }
 

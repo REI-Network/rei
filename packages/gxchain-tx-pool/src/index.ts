@@ -111,7 +111,16 @@ export class TxPool {
     this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot);
   }
 
-  addTx(tx: Transaction) {
+  private getAccount(sender: Buffer): TxPoolAccount {
+    let account = this.accounts.get(sender);
+    if (!account) {
+      account = new TxPoolAccount();
+      this.accounts.set(sender, account);
+    }
+    return account;
+  }
+
+  async addTx(tx: Transaction) {
     // validateTx
     // drop tx if pool is full
     const account = this.getAccount(tx.getSenderAddress().buf);
@@ -119,6 +128,7 @@ export class TxPool {
       this.promoteTx(tx);
     } else {
       this.enqueueTx(tx);
+      await this.promoteExecutables([tx.getSenderAddress().buf]);
     }
   }
 
@@ -130,15 +140,6 @@ export class TxPool {
     } else {
       this.txs.delete(key.hash());
     }
-  }
-
-  private getAccount(sender: Buffer): TxPoolAccount {
-    let account = this.accounts.get(sender);
-    if (!account) {
-      account = new TxPoolAccount();
-      this.accounts.set(sender, account);
-    }
-    return account;
   }
 
   private enqueueTx(tx: Transaction): boolean {
@@ -162,30 +163,65 @@ export class TxPool {
   }
 
   private async promoteExecutables(dirtyAddrs?: Buffer[]) {
+    const promoteAccount = async (sender: Buffer, account: TxPoolAccount) => {
+      if (!account.hasQueue()) {
+        return;
+      }
+      const queue = account.queue;
+      const accountInDB = await this.currentStateManager.getAccount(new Address(sender));
+      const forwards = queue.forward(accountInDB.nonce);
+      this.removeTx(forwards);
+      const { removed: drops } = queue.filter(accountInDB.balance, this.currentHeader.gasLimit);
+      this.removeTx(drops);
+      const readies = queue.ready(account.pendingNonce);
+      for (const tx of readies) {
+        this.promoteTx(tx);
+      }
+      if (!this.locals.has(sender)) {
+        const resizes = queue.resize(this.options.accountQueue!);
+        this.removeTx(resizes);
+      }
+      // resize priced
+      if (!account.hasQueue() && !account.hasPending()) {
+        this.accounts.delete(sender);
+      }
+    };
+
     if (dirtyAddrs) {
       for (const sender of dirtyAddrs) {
         const account = this.getAccount(sender);
-        if (!account.hasQueue()) {
-          continue;
+        await promoteAccount(sender, account);
+      }
+    } else {
+      for (const [sender, account] of this.accounts) {
+        await promoteAccount(sender, account);
+      }
+    }
+  }
+
+  private async demoteUnexecutables() {
+    for (const [sender, account] of this.accounts) {
+      if (!account.hasPending()) {
+        continue;
+      }
+      const pending = account.pending;
+      const accountInDB = await this.currentStateManager.getAccount(new Address(sender));
+      const forwards = pending.forward(accountInDB.nonce);
+      this.removeTx(forwards);
+      const { removed: drops, invalids } = pending.filter(accountInDB.balance, this.currentHeader.gasLimit);
+      this.removeTx(drops);
+      // resize priced
+      for (const tx of invalids) {
+        this.enqueueTx(tx);
+      }
+      if (!pending.has(accountInDB.nonce) && pending.size > 0) {
+        const resizes = pending.resize(0);
+        for (const tx of resizes) {
+          this.enqueueTx(tx);
         }
-        const queue = account.queue;
-        const accountInDB = await this.currentStateManager.getAccount(new Address(sender));
-        const forwards = queue.forward(accountInDB.nonce);
-        this.removeTx(forwards);
-        const { removed: drops } = queue.filter(accountInDB.balance, this.currentHeader.gasLimit);
-        this.removeTx(drops);
-        const readies = queue.ready(account.pendingNonce);
-        for (const tx of readies) {
-          this.promoteTx(tx);
-        }
-        if (!this.locals.has(sender)) {
-          const resizes = queue.resize(this.options.accountQueue!);
-          this.removeTx(resizes);
-        }
-        // resize priced
-        if (!account.hasQueue() && !account.hasPending()) {
-          this.accounts.delete(sender);
-        }
+      }
+      if (!account.hasPending() && !account.hasQueue()) {
+        this.accounts.delete(sender);
       }
     }
   }

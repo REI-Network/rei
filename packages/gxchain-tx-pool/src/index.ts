@@ -1,4 +1,5 @@
 import { BN, Address } from 'ethereumjs-util';
+import Heap from 'qheap';
 import { FunctionalMap } from '@gxchain2/utils';
 import { Transaction } from '@gxchain2/tx';
 import { StateManager } from '@gxchain2/state-manager';
@@ -56,8 +57,8 @@ class TxPoolAccount {
     return !!this._pendingNonce;
   }
 
-  updatePendingNonce(nonce: BN, force: boolean = false) {
-    if (!this._pendingNonce || this._pendingNonce.lt(nonce) || force) {
+  updatePendingNonce(nonce: BN, lower: boolean = false) {
+    if (!this._pendingNonce || (lower ? this._pendingNonce.gt(nonce) : this._pendingNonce.lt(nonce))) {
       this._pendingNonce = nonce.clone();
     }
   }
@@ -263,6 +264,44 @@ export class TxPool {
       return;
     }
 
-    // const slotsHeap;
+    const heap = new Heap({ comparBefore: (a: TxPoolAccount, b: TxPoolAccount) => a.pending.size > b.pending.size });
+    for (const [sender, account] of this.accounts) {
+      if (account.hasPending() && account.pending.size > this.accountSlots) {
+        heap.push(account);
+      }
+    }
+
+    const removeSingleTx = (account: TxPoolAccount) => {
+      const pending = account.pending;
+      const resizes = pending.resize(pending.size - 1);
+      for (const tx of resizes) {
+        this.removeTxFromGlobal(tx);
+        account.updatePendingNonce(tx.nonce, true);
+      }
+      // resize priced
+      slots--;
+    };
+
+    const offenders: TxPoolAccount[] = [];
+    while (slots > this.globalSlots && heap.size > 0) {
+      const offender: TxPoolAccount = heap.remove();
+      offenders.push(offender);
+      if (offenders.length > 1) {
+        const threshold = offender.pending.size;
+        while (slots > this.globalSlots && offenders[offenders.length - 2].pending.size > threshold) {
+          for (let i = 0; i < offenders.length - 1; i++) {
+            removeSingleTx(offenders[i]);
+          }
+        }
+      }
+    }
+
+    if (slots > this.globalSlots && offenders.length > 0) {
+      while (slots > this.globalSlots && offenders[offenders.length - 1].pending.size > this.accountSlots) {
+        for (const offender of offenders) {
+          removeSingleTx(offender);
+        }
+      }
+    }
   }
 }

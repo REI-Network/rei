@@ -23,7 +23,7 @@ export class TxSortedMap {
   }
 
   private resetNonceHeap(nonce?: BN[] | IterableIterator<BN>) {
-    this.nonceHeap = new Heap((a: BN, b: BN) => a.lt(b));
+    this.nonceHeap = new Heap({ comparBefore: (a: BN, b: BN) => a.lt(b) });
     if (nonce) {
       for (const n of nonce) {
         this.nonceHeap.push(n);

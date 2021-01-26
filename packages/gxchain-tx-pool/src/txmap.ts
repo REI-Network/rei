@@ -152,4 +152,11 @@ export class TxSortedMap {
     }
     return readies;
   }
+
+  clear(): Transaction[] {
+    const removed = Array.from(this.nonceToTx.values());
+    this.nonceToTx.clear();
+    this.resetNonceHeap();
+    return removed;
+  }
 }

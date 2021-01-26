@@ -254,13 +254,13 @@ export class TxPool {
   }
 
   private truncatePending() {
-    let slots = 0;
+    let pendingSlots = 0;
     for (const [sender, account] of this.accounts) {
       if (account.hasPending()) {
-        slots += account.pending.size;
+        pendingSlots += account.pending.size;
       }
     }
-    if (slots <= this.globalSlots) {
+    if (pendingSlots <= this.globalSlots) {
       return;
     }
 
@@ -273,22 +273,20 @@ export class TxPool {
 
     const removeSingleTx = (account: TxPoolAccount) => {
       const pending = account.pending;
-      const resizes = pending.resize(pending.size - 1);
-      for (const tx of resizes) {
-        this.removeTxFromGlobal(tx);
-        account.updatePendingNonce(tx.nonce, true);
-      }
+      const [tx] = pending.resize(pending.size - 1);
+      this.removeTxFromGlobal(tx);
+      account.updatePendingNonce(tx.nonce, true);
       // resize priced
-      slots--;
+      pendingSlots--;
     };
 
     const offenders: TxPoolAccount[] = [];
-    while (slots > this.globalSlots && heap.size > 0) {
+    while (pendingSlots > this.globalSlots && heap.size > 0) {
       const offender: TxPoolAccount = heap.remove();
       offenders.push(offender);
       if (offenders.length > 1) {
         const threshold = offender.pending.size;
-        while (slots > this.globalSlots && offenders[offenders.length - 2].pending.size > threshold) {
+        while (pendingSlots > this.globalSlots && offenders[offenders.length - 2].pending.size > threshold) {
           for (let i = 0; i < offenders.length - 1; i++) {
             removeSingleTx(offenders[i]);
           }
@@ -296,12 +294,49 @@ export class TxPool {
       }
     }
 
-    if (slots > this.globalSlots && offenders.length > 0) {
-      while (slots > this.globalSlots && offenders[offenders.length - 1].pending.size > this.accountSlots) {
+    if (pendingSlots > this.globalSlots && offenders.length > 0) {
+      while (pendingSlots > this.globalSlots && offenders[offenders.length - 1].pending.size > this.accountSlots) {
         for (const offender of offenders) {
           removeSingleTx(offender);
         }
       }
+    }
+  }
+
+  private truncateQueue() {
+    let queueSlots = 0;
+    for (const [sender, account] of this.accounts) {
+      if (account.hasQueue()) {
+        queueSlots += account.queue.size;
+      }
+    }
+    if (queueSlots <= this.globalQueue) {
+      return;
+    }
+
+    const heap = new Heap({ comparBefore: (a: TxPoolAccount, b: TxPoolAccount) => a.timestamp < b.timestamp });
+    for (const [sender, account] of this.accounts) {
+      if (!this.locals.has(sender) && account.hasQueue()) {
+        heap.push(account);
+      }
+    }
+
+    let account: TxPoolAccount = heap.remove();
+    while (queueSlots > this.globalQueue && account) {
+      const queue = account.queue;
+      if (queueSlots - queue.size > this.globalQueue) {
+        queueSlots -= queue.size;
+        // resize priced
+        this.removeTxFromGlobal(queue.clear());
+      } else {
+        while (queueSlots > this.globalQueue) {
+          const [tx] = queue.resize(queue.size - 1);
+          this.removeTxFromGlobal(tx);
+          // resize priced
+          queueSlots--;
+        }
+      }
+      account = heap.remove();
     }
   }
 }

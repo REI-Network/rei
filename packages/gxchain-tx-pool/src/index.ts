@@ -68,15 +68,31 @@ export class TxPool {
   private readonly locals: FunctionalMap<Buffer, boolean>;
   private readonly txs: FunctionalMap<Buffer, Transaction>;
 
-  private readonly options: TxPoolOptions;
   private readonly node: INode;
   private initPromise: Promise<void>;
 
   private currentHeader!: BlockHeader;
   private currentStateManager!: StateManager;
 
+  private txMaxSize: number;
+
+  private priceLimit: number;
+  private priceBump: number;
+
+  private accountSlots: number;
+  private globalSlots: number;
+  private accountQueue: number;
+  private globalQueue: number;
+
   constructor(options: TxPoolOptions) {
-    this.options = options;
+    this.txMaxSize = options.txMaxSize || 1000;
+    this.priceLimit = options.priceLimit || 1;
+    this.priceBump = options.priceBump || 10;
+    this.accountSlots = options.accountSlots || 16;
+    this.globalSlots = options.globalSlots || 4096;
+    this.accountQueue = options.accountQueue || 64;
+    this.globalQueue = options.globalQueue || 1024;
+
     this.node = options.node;
     const bufferCompare = (a: Buffer, b: Buffer) => {
       if (a.length < b.length) {
@@ -130,9 +146,10 @@ export class TxPool {
       this.enqueueTx(tx);
       await this.promoteExecutables([tx.getSenderAddress().buf]);
     }
+    // journalTx
   }
 
-  private removeTx(key: Transaction | Transaction[]) {
+  private removeTxFromGlobal(key: Transaction | Transaction[]) {
     if (Array.isArray(key)) {
       for (const tx of key) {
         this.txs.delete(tx.hash());
@@ -145,8 +162,14 @@ export class TxPool {
   private enqueueTx(tx: Transaction): boolean {
     const account = this.getAccount(tx.getSenderAddress().buf);
     const { inserted, old } = account.queue.push(tx);
+    if (inserted) {
+      this.txs.set(tx.hash(), tx);
+    }
     if (old) {
-      this.removeTx(old);
+      this.removeTxFromGlobal(old);
+    }
+    if (account.timestamp === 0) {
+      account.timestamp = Date.now();
     }
     return inserted;
   }
@@ -154,8 +177,11 @@ export class TxPool {
   private promoteTx(tx: Transaction): boolean {
     const account = this.getAccount(tx.getSenderAddress().buf);
     const { inserted, old } = account.pending.push(tx);
+    if (inserted) {
+      this.txs.set(tx.hash(), tx);
+    }
     if (old) {
-      this.removeTx(old);
+      this.removeTxFromGlobal(old);
     }
     account.updatePendingNonce(tx.nonce);
     account.timestamp = Date.now();
@@ -170,16 +196,16 @@ export class TxPool {
       const queue = account.queue;
       const accountInDB = await this.currentStateManager.getAccount(new Address(sender));
       const forwards = queue.forward(accountInDB.nonce);
-      this.removeTx(forwards);
+      this.removeTxFromGlobal(forwards);
       const { removed: drops } = queue.filter(accountInDB.balance, this.currentHeader.gasLimit);
-      this.removeTx(drops);
+      this.removeTxFromGlobal(drops);
       const readies = queue.ready(account.pendingNonce);
       for (const tx of readies) {
         this.promoteTx(tx);
       }
       if (!this.locals.has(sender)) {
-        const resizes = queue.resize(this.options.accountQueue!);
-        this.removeTx(resizes);
+        const resizes = queue.resize(this.accountQueue);
+        this.removeTxFromGlobal(resizes);
       }
       // resize priced
       if (!account.hasQueue() && !account.hasPending()) {
@@ -207,9 +233,9 @@ export class TxPool {
       const pending = account.pending;
       const accountInDB = await this.currentStateManager.getAccount(new Address(sender));
       const forwards = pending.forward(accountInDB.nonce);
-      this.removeTx(forwards);
+      this.removeTxFromGlobal(forwards);
       const { removed: drops, invalids } = pending.filter(accountInDB.balance, this.currentHeader.gasLimit);
-      this.removeTx(drops);
+      this.removeTxFromGlobal(drops);
       // resize priced
       for (const tx of invalids) {
         this.enqueueTx(tx);
@@ -224,5 +250,19 @@ export class TxPool {
         this.accounts.delete(sender);
       }
     }
+  }
+
+  private truncatePending() {
+    let slots = 0;
+    for (const [sender, account] of this.accounts) {
+      if (account.hasPending()) {
+        slots += account.pending.size;
+      }
+    }
+    if (slots <= this.globalSlots) {
+      return;
+    }
+
+    // const slotsHeap;
   }
 }

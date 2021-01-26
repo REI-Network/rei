@@ -13,6 +13,9 @@
         "typescript": "^4.1.2"
     },
     "dependencies": {
+        "@gxchain2/block": "^0.0.1-alpha.0",
+        "@gxchain2/blockchain": "^0.0.1-alpha.0",
+        "@gxchain2/state-manager": "^0.0.1-alpha.0",
         "@gxchain2/tx": "^0.0.1-alpha.0",
         "@gxchain2/utils": "^0.0.1-alpha.0",
         "bn.js": "^5.1.3"

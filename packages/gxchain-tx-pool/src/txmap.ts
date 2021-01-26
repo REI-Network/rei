@@ -48,6 +48,10 @@ export class TxSortedMap {
     return this.nonceToTx.size;
   }
 
+  has(nonce: BN) {
+    return this.nonceToTx.has(nonce);
+  }
+
   forward(nonce: BN) {
     const removed: Transaction[] = [];
     let nonceInHeap: BN = this.nonceHeap.peek();
@@ -97,7 +101,7 @@ export class TxSortedMap {
     };
   }
 
-  remove(nonce: BN): { deleted: boolean; invalids?: Transaction[] } {
+  delete(nonce: BN): { deleted: boolean; invalids?: Transaction[] } {
     if (this.nonceToTx.has(nonce)) {
       this.nonceToTx.delete(nonce);
       const invalids: Transaction[] = [];

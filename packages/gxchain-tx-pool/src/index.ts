@@ -45,11 +45,11 @@ class TxPoolAccount {
   }
 
   hasPending() {
-    return !!this._pending;
+    return this._pending && this._pending.size > 0;
   }
 
   hasQueue() {
-    return !!this._queue;
+    return this._queue && this._queue.size > 0;
   }
 
   hasPendingNonce() {
@@ -65,7 +65,9 @@ class TxPoolAccount {
 
 export class TxPool {
   private readonly accounts: FunctionalMap<Buffer, TxPoolAccount>;
+  private readonly locals: FunctionalMap<Buffer, boolean>;
   private readonly txs: FunctionalMap<Buffer, Transaction>;
+
   private readonly options: TxPoolOptions;
   private readonly node: INode;
   private initPromise: Promise<void>;
@@ -95,6 +97,7 @@ export class TxPool {
     };
     this.accounts = new FunctionalMap<Buffer, TxPoolAccount>(bufferCompare);
     this.txs = new FunctionalMap<Buffer, Transaction>(bufferCompare);
+    this.locals = new FunctionalMap<Buffer, boolean>(bufferCompare);
 
     this.initPromise = this.init();
   }
@@ -119,6 +122,16 @@ export class TxPool {
     }
   }
 
+  private removeTx(key: Transaction | Transaction[]) {
+    if (Array.isArray(key)) {
+      for (const tx of key) {
+        this.txs.delete(tx.hash());
+      }
+    } else {
+      this.txs.delete(key.hash());
+    }
+  }
+
   private getAccount(sender: Buffer): TxPoolAccount {
     let account = this.accounts.get(sender);
     if (!account) {
@@ -132,7 +145,7 @@ export class TxPool {
     const account = this.getAccount(tx.getSenderAddress().buf);
     const { inserted, old } = account.queue.push(tx);
     if (old) {
-      // removeTx
+      this.removeTx(old);
     }
     return inserted;
   }
@@ -141,7 +154,7 @@ export class TxPool {
     const account = this.getAccount(tx.getSenderAddress().buf);
     const { inserted, old } = account.pending.push(tx);
     if (old) {
-      // removeTx
+      this.removeTx(old);
     }
     account.updatePendingNonce(tx.nonce);
     account.timestamp = Date.now();
@@ -152,10 +165,26 @@ export class TxPool {
     if (dirtyAddrs) {
       for (const sender of dirtyAddrs) {
         const account = this.getAccount(sender);
-        if (account.hasQueue()) {
-          const accountInDB = await this.currentStateManager.getAccount(new Address(sender));
-          const forwards = account.queue.forward(accountInDB.nonce);
-          // removeTx
+        if (!account.hasQueue()) {
+          continue;
+        }
+        const queue = account.queue;
+        const accountInDB = await this.currentStateManager.getAccount(new Address(sender));
+        const forwards = queue.forward(accountInDB.nonce);
+        this.removeTx(forwards);
+        const { removed: drops } = queue.filter(accountInDB.balance, this.currentHeader.gasLimit);
+        this.removeTx(drops);
+        const readies = queue.ready(account.pendingNonce);
+        for (const tx of readies) {
+          this.promoteTx(tx);
+        }
+        if (!this.locals.has(sender)) {
+          const resizes = queue.resize(this.options.accountQueue!);
+          this.removeTx(resizes);
+        }
+        // resize priced
+        if (!account.hasQueue() && !account.hasPending()) {
+          this.accounts.delete(sender);
         }
       }
     }

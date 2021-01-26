@@ -230,6 +230,12 @@ export class Node {
     }
   }
 
+  async getStateManager(root: Buffer) {
+    const stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
+    await stateManager.setStateRoot(root);
+    return stateManager;
+  }
+
   async processBlock(blockSkeleton: Block) {
     await this.initPromise;
     console.debug('process block:', blockSkeleton.header.number.toString());

@@ -20,10 +20,31 @@ export function txSlots(tx: Transaction) {
   return Math.ceil(tx.size / 32768);
 }
 
+export function txCost(tx: Transaction) {
+  return tx.value.add(tx.gasPrice.mul(tx.gasLimit));
+}
+
+export function checkTxIntrinsicGas(tx: Transaction) {
+  const gas = tx.toCreationAddress() ? new BN(53000) : new BN(21000);
+  const nz = new BN(0);
+  const z = new BN(0);
+  for (const b of tx.data) {
+    (b !== 0 ? nz : z).iaddn(1);
+  }
+  gas.iadd(nz.muln(16));
+  gas.iadd(z.muln(4));
+  if (gas.gt(uin64Max)) {
+    return false;
+  }
+  return gas.lte(tx.gasLimit);
+}
+
+const uin64Max = new BN(Buffer.from('ffffffffffffffff', 'hex'));
+
 export interface TxPoolOptions {
   txMaxSize?: number;
 
-  priceLimit?: number;
+  priceLimit?: BN;
   priceBump?: number;
 
   accountSlots?: number;
@@ -85,7 +106,7 @@ export class TxPool {
 
   private txMaxSize: number;
 
-  private priceLimit: number;
+  private priceLimit: BN;
   private priceBump: number;
 
   private accountSlots: number;
@@ -95,7 +116,7 @@ export class TxPool {
 
   constructor(options: TxPoolOptions) {
     this.txMaxSize = options.txMaxSize || 1000;
-    this.priceLimit = options.priceLimit || 1;
+    this.priceLimit = options.priceLimit || new BN(1);
     this.priceBump = options.priceBump || 10;
     this.accountSlots = options.accountSlots || 16;
     this.globalSlots = options.globalSlots || 4096;
@@ -198,7 +219,9 @@ export class TxPool {
     txs = txs instanceof Transaction ? [txs] : txs;
     const dirtyAddres: Buffer[] = [];
     for (const tx of txs) {
-      // validateTx
+      if (!(await this.validateTx(tx))) {
+        continue;
+      }
       // drop tx if pool is full
       const sender = tx.getSenderAddress().buf;
       const account = this.getAccount(sender);
@@ -224,6 +247,39 @@ export class TxPool {
       }
     } else {
       this.txs.delete(key.hash());
+    }
+  }
+
+  private async validateTx(tx: Transaction): Promise<boolean> {
+    // TODO: report error.
+    try {
+      if (tx.size > this.txMaxSize) {
+        return false;
+      }
+      if (!tx.isSigned()) {
+        return false;
+      }
+      if (this.currentHeader.gasLimit.lt(tx.gasLimit)) {
+        return false;
+      }
+      const senderAddr = tx.getSenderAddress();
+      const sender = senderAddr.buf;
+      if (!this.locals.has(sender) && tx.gasPrice.lt(this.priceLimit)) {
+        return false;
+      }
+      const accountInDB = await this.currentStateManager.getAccount(senderAddr);
+      if (accountInDB.nonce.gt(tx.nonce)) {
+        return false;
+      }
+      if (accountInDB.balance.lt(txCost(tx))) {
+        return false;
+      }
+      if (!checkTxIntrinsicGas(tx)) {
+        return false;
+      }
+      return true;
+    } catch (err) {
+      return false;
     }
   }
 

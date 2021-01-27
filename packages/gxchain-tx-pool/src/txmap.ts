@@ -2,7 +2,7 @@ import { BN } from 'ethereumjs-util';
 import Heap from 'qheap';
 import { Transaction } from '@gxchain2/tx';
 import { FunctionalMap } from '@gxchain2/utils';
-import { txSlots } from './index';
+import { txSlots, txCost } from './index';
 
 export class TxSortedMap {
   private readonly strict: boolean;
@@ -27,14 +27,14 @@ export class TxSortedMap {
   private increaseSlots(txs: Transaction | Transaction[]) {
     txs = txs instanceof Transaction ? [txs] : txs;
     for (const tx of txs) {
-      this._slots += tx.size;
+      this._slots += txSlots(tx);
     }
   }
 
   private decreaseSlots(txs: Transaction | Transaction[]) {
     txs = txs instanceof Transaction ? [txs] : txs;
     for (const tx of txs) {
-      this._slots -= tx.size;
+      this._slots -= txSlots(tx);
     }
     if (this._slots < 0) {
       this._slots = 0;
@@ -145,13 +145,10 @@ export class TxSortedMap {
   }
 
   filter(balance: BN, gasLimit: BN): { removed: Transaction[]; invalids: Transaction[] } {
-    const cost = (tx: Transaction) => {
-      return tx.value.add(tx.gasPrice.mul(tx.gasLimit));
-    };
     let lowestNonce: BN | undefined;
     const removed: Transaction[] = [];
     for (const [key, value] of this.nonceToTx) {
-      if (cost(value).gt(balance) || value.gasLimit.gt(gasLimit)) {
+      if (txCost(value).gt(balance) || value.gasLimit.gt(gasLimit)) {
         lowestNonce = lowestNonce ? (lowestNonce.gt(key) ? key : lowestNonce) : key;
         removed.push(value);
         this.nonceToTx.delete(key);

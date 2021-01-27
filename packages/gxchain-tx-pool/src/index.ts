@@ -115,7 +115,7 @@ export class TxPool {
   private globalQueue: number;
 
   constructor(options: TxPoolOptions) {
-    this.txMaxSize = options.txMaxSize || 1000;
+    this.txMaxSize = options.txMaxSize || 32768 * 4;
     this.priceLimit = options.priceLimit || new BN(1);
     this.priceBump = options.priceBump || 10;
     this.accountSlots = options.accountSlots || 16;
@@ -285,7 +285,7 @@ export class TxPool {
 
   private enqueueTx(tx: Transaction): boolean {
     const account = this.getAccount(tx.getSenderAddress().buf);
-    const { inserted, old } = account.queue.push(tx);
+    const { inserted, old } = account.queue.push(tx, this.priceBump);
     if (inserted) {
       this.txs.set(tx.hash(), tx);
     }
@@ -300,7 +300,7 @@ export class TxPool {
 
   private promoteTx(tx: Transaction): boolean {
     const account = this.getAccount(tx.getSenderAddress().buf);
-    const { inserted, old } = account.pending.push(tx);
+    const { inserted, old } = account.pending.push(tx, this.priceBump);
     if (inserted) {
       this.txs.set(tx.hash(), tx);
     }

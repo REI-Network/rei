@@ -104,12 +104,11 @@ export class TxSortedMap {
     return removed;
   }
 
-  push(tx: Transaction): { inserted: boolean; old?: Transaction } {
+  push(tx: Transaction, priceBump: number): { inserted: boolean; old?: Transaction } {
     const nonce = tx.nonce;
     const old = this.nonceToTx.get(nonce);
     if (old) {
-      // TODO: gasPrice
-      if (old.gasPrice.gt(tx.gasPrice)) {
+      if (tx.gasPrice.muln(100).lt(new BN(priceBump + 100).mul(old.gasPrice))) {
         return {
           inserted: false
         };

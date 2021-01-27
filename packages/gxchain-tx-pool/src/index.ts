@@ -33,13 +33,13 @@ export function checkTxIntrinsicGas(tx: Transaction) {
   }
   gas.iadd(nz.muln(16));
   gas.iadd(z.muln(4));
-  if (gas.gt(uin64Max)) {
+  if (gas.gt(uint64Max)) {
     return false;
   }
   return gas.lte(tx.gasLimit);
 }
 
-const uin64Max = new BN(Buffer.from('ffffffffffffffff', 'hex'));
+const uint64Max = new BN(Buffer.from('ffffffffffffffff', 'hex'));
 
 export interface TxPoolOptions {
   txMaxSize?: number;

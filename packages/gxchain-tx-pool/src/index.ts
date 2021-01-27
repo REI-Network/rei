@@ -16,6 +16,10 @@ interface INode {
   getStateManager(root: Buffer): Promise<StateManager>;
 }
 
+export function txSlots(tx: Transaction) {
+  return Math.ceil(tx.size / 32768);
+}
+
 export interface TxPoolOptions {
   txMaxSize?: number;
 

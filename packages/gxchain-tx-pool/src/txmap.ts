@@ -2,6 +2,7 @@ import { BN } from 'ethereumjs-util';
 import Heap from 'qheap';
 import { Transaction } from '@gxchain2/tx';
 import { FunctionalMap } from '@gxchain2/utils';
+import { txSlots } from './index';
 
 export class TxSortedMap {
   private readonly strict: boolean;
@@ -16,10 +17,28 @@ export class TxSortedMap {
   });
   private nonceHeap: Heap;
   private sortedTxCache?: Transaction[];
+  private _slots: number = 0;
 
   constructor(strict: boolean) {
     this.strict = strict;
     this.resetNonceHeap();
+  }
+
+  private increaseSlots(txs: Transaction | Transaction[]) {
+    txs = txs instanceof Transaction ? [txs] : txs;
+    for (const tx of txs) {
+      this._slots += tx.size;
+    }
+  }
+
+  private decreaseSlots(txs: Transaction | Transaction[]) {
+    txs = txs instanceof Transaction ? [txs] : txs;
+    for (const tx of txs) {
+      this._slots -= tx.size;
+    }
+    if (this._slots < 0) {
+      this._slots = 0;
+    }
   }
 
   private resetNonceHeap(nonce?: BN[] | IterableIterator<BN>) {
@@ -33,19 +52,21 @@ export class TxSortedMap {
 
   private strictCheck(nonce: BN, invalids: Transaction[]) {
     if (this.strict) {
-      for (const tx of this.nonceToTx.values()) {
-        if (tx.nonce.gt(nonce)) {
-          invalids.push(tx);
+      for (const [key, value] of this.nonceToTx) {
+        if (value.nonce.gt(nonce)) {
+          invalids.push(value);
+          this.nonceToTx.delete(key);
         }
-      }
-      for (const tx of invalids) {
-        this.nonceToTx.delete(tx.nonce);
       }
     }
   }
 
   get size() {
     return this.nonceToTx.size;
+  }
+
+  get slots() {
+    return this._slots;
   }
 
   has(nonce: BN) {
@@ -62,6 +83,7 @@ export class TxSortedMap {
       this.nonceHeap.remove();
       nonceInHeap = this.nonceHeap.peek();
     }
+    this.decreaseSlots(removed);
     return removed;
   }
 
@@ -78,6 +100,7 @@ export class TxSortedMap {
       keys.splice(keys.length - 1, 1);
     }
     this.resetNonceHeap(keys);
+    this.decreaseSlots(removed);
     return removed;
   }
 
@@ -91,10 +114,12 @@ export class TxSortedMap {
           inserted: false
         };
       }
+      this.decreaseSlots(old);
     } else {
       this.nonceHeap.push(nonce);
     }
     this.nonceToTx.set(nonce, tx);
+    this.increaseSlots(tx);
     return {
       inserted: true,
       old
@@ -102,11 +127,13 @@ export class TxSortedMap {
   }
 
   delete(nonce: BN): { deleted: boolean; invalids?: Transaction[] } {
-    if (this.nonceToTx.has(nonce)) {
+    const removedTx = this.nonceToTx.get(nonce);
+    if (removedTx) {
       this.nonceToTx.delete(nonce);
       const invalids: Transaction[] = [];
       this.strictCheck(nonce, invalids);
       this.resetNonceHeap(this.nonceToTx.keys());
+      this.decreaseSlots(invalids.concat(removedTx));
       return {
         deleted: true,
         invalids
@@ -127,15 +154,14 @@ export class TxSortedMap {
       if (cost(value).gt(balance) || value.gasLimit.gt(gasLimit)) {
         lowestNonce = lowestNonce ? (lowestNonce.gt(key) ? key : lowestNonce) : key;
         removed.push(value);
+        this.nonceToTx.delete(key);
       }
-    }
-    for (const tx of removed) {
-      this.nonceToTx.delete(tx.nonce);
     }
     const invalids: Transaction[] = [];
     if (lowestNonce) {
       this.strictCheck(lowestNonce, invalids);
     }
+    this.decreaseSlots(invalids.concat(removed));
     return { removed, invalids };
   }
 
@@ -150,6 +176,7 @@ export class TxSortedMap {
       nonce.iaddn(1);
       nonceInHeap = this.nonceHeap.peek();
     }
+    this.decreaseSlots(readies);
     return readies;
   }
 
@@ -157,6 +184,7 @@ export class TxSortedMap {
     const removed = Array.from(this.nonceToTx.values());
     this.nonceToTx.clear();
     this.resetNonceHeap();
+    this._slots = 0;
     return removed;
   }
 }

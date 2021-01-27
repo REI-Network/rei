@@ -185,6 +185,9 @@ export class TxPool {
     this.currentHeader = originalNewBlock.header;
     this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot);
     await this.addTx(reinject, true);
+    await this.demoteUnexecutables();
+    this.truncatePending();
+    this.truncateQueue();
   }
 
   async addTx(txs: Transaction | Transaction[], force: boolean = false) {

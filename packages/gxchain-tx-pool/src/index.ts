@@ -4,10 +4,14 @@ import { FunctionalMap } from '@gxchain2/utils';
 import { Transaction } from '@gxchain2/tx';
 import { StateManager } from '@gxchain2/state-manager';
 import { Blockchain } from '@gxchain2/blockchain';
-import { BlockHeader } from '@gxchain2/block';
+import { BlockHeader, Block } from '@gxchain2/block';
+import { Database } from '@gxchain2/database';
+import { Common } from '@gxchain2/common';
 import { TxSortedMap } from './txmap';
 
 interface INode {
+  db: Database;
+  common: Common;
   blockchain: Blockchain;
   getStateManager(root: Buffer): Promise<StateManager>;
 }
@@ -137,17 +141,73 @@ export class TxPool {
     return account;
   }
 
-  async addTx(tx: Transaction) {
-    // validateTx
-    // drop tx if pool is full
-    const account = this.getAccount(tx.getSenderAddress().buf);
-    if (account.hasPending() && account.pending.has(tx.nonce)) {
-      this.promoteTx(tx);
-    } else {
-      this.enqueueTx(tx);
-      await this.promoteExecutables([tx.getSenderAddress().buf]);
+  async newBlock(newBlock: Block) {
+    const getBlock = async (hash: Buffer, number: BN) => {
+      const header = await this.node.db.getHeader(hash, number);
+      const bodyBuffer = await this.node.db.getBody(hash, number);
+      return Block.fromBlockData(
+        {
+          header: header,
+          transactions: bodyBuffer[0].map((rawTx) => Transaction.fromValuesArray(rawTx, { common: this.node.common }))
+        },
+        { common: this.node.common }
+      );
+    };
+
+    const originalNewBlock = newBlock;
+    let oldBlock = await getBlock(this.currentHeader.hash(), this.currentHeader.number);
+    let discarded: Transaction[] = [];
+    const included = new FunctionalMap<Buffer, boolean>();
+    while (oldBlock.header.number.gt(newBlock.header.number)) {
+      discarded = discarded.concat(oldBlock.transactions);
+      oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
     }
-    // journalTx
+    while (newBlock.header.number.gt(oldBlock.header.number)) {
+      for (const tx of newBlock.transactions) {
+        included.set(tx.hash(), true);
+      }
+      newBlock = await getBlock(newBlock.header.parentHash, newBlock.header.number.subn(1));
+    }
+    while (!oldBlock.hash().equals(newBlock.hash())) {
+      discarded = discarded.concat(oldBlock.transactions);
+      oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
+      for (const tx of newBlock.transactions) {
+        included.set(tx.hash(), true);
+      }
+      newBlock = await getBlock(newBlock.header.parentHash, newBlock.header.number.subn(1));
+    }
+    const reinject: Transaction[] = [];
+    for (const tx of discarded) {
+      if (!included.has(tx.hash())) {
+        reinject.push(tx);
+      }
+    }
+    this.currentHeader = originalNewBlock.header;
+    this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot);
+    await this.addTx(reinject, true);
+  }
+
+  async addTx(txs: Transaction | Transaction[], force: boolean = false) {
+    txs = txs instanceof Transaction ? [txs] : txs;
+    const dirtyAddres: Buffer[] = [];
+    for (const tx of txs) {
+      // validateTx
+      // drop tx if pool is full
+      const sender = tx.getSenderAddress().buf;
+      const account = this.getAccount(sender);
+      if (account.hasPending() && account.pending.has(tx.nonce)) {
+        this.promoteTx(tx);
+      } else {
+        this.enqueueTx(tx);
+        dirtyAddres.push(sender);
+      }
+      // journalTx
+    }
+    if (!force && dirtyAddres.length > 0) {
+      await this.promoteExecutables(dirtyAddres);
+    } else if (force) {
+      await this.promoteExecutables();
+    }
   }
 
   private removeTxFromGlobal(key: Transaction | Transaction[]) {
@@ -324,7 +384,7 @@ export class TxPool {
     let account: TxPoolAccount = heap.remove();
     while (queueSlots > this.globalQueue && account) {
       const queue = account.queue;
-      if (queueSlots - queue.size > this.globalQueue) {
+      if (queueSlots - queue.size >= this.globalQueue) {
         queueSlots -= queue.size;
         // resize priced
         this.removeTxFromGlobal(queue.clear());
@@ -335,6 +395,7 @@ export class TxPool {
           // resize priced
           queueSlots--;
         }
+        break;
       }
       account = heap.remove();
     }

@@ -390,7 +390,20 @@ export class Transaction {
     blockHash?: Buffer;
     blockNumber?: BN;
     transactionIndex?: number;
+    size?: number;
   } = {};
+
+  get size() {
+    if (this.extension.size) {
+      return this.extension.size;
+    }
+    const raw = this.raw();
+    this.extension.size = 0;
+    for (const b of raw) {
+      this.extension.size += b.length;
+    }
+    return this.extension.size;
+  }
 
   installProperties(block: BlockLike, transactionIndex: number) {
     this.extension.blockHash = block.hash();

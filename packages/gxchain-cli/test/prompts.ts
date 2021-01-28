@@ -207,18 +207,19 @@ const startPrompts = async (node: Node) => {
         console.error('Get block error:', err);
       }
     } else if (arr[0] === 'puttx') {
-      const acc = await node.stateManager.getAccount(Address.fromString(arr[1]));
       const unsignedTx = Transaction.fromTxData(
         {
           gasLimit: '0x5208',
-          gasPrice: '0x01',
-          nonce: acc.nonce,
+          gasPrice: new BN(arr[4] || 1),
+          nonce: new BN(arr[3] || 0),
           to: arr[2],
           value: '0x01'
         },
         { common: node.common }
       );
-      node.txPool.addTxs(unsignedTx.sign(getPrivateKey(arr[1])));
+      const tx = unsignedTx.sign(getPrivateKey(arr[1]));
+      console.log('puttx 0x' + tx.hash().toString('hex'));
+      node.txPool.addTxs(tx);
     } else {
       console.warn('$ Invalid command');
       continue;

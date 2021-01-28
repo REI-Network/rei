@@ -82,10 +82,6 @@ class TxPoolAccount {
     return this._queue && this._queue.size > 0;
   }
 
-  hasPendingNonce() {
-    return !!this._pendingNonce;
-  }
-
   updatePendingNonce(nonce: BN, lower: boolean = false) {
     if (!this._pendingNonce || (lower ? this._pendingNonce.gt(nonce) : this._pendingNonce.lt(nonce))) {
       this._pendingNonce = nonce.clone();
@@ -209,32 +205,39 @@ export class TxPool {
     }
     this.currentHeader = originalNewBlock.header;
     this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot);
-    await this.addTx(reinject, true);
+    await this._addTxs(reinject, true);
     await this.demoteUnexecutables();
     this.truncatePending();
     this.truncateQueue();
   }
 
-  async addTx(txs: Transaction | Transaction[], force: boolean = false) {
+  async addTxs(txs: Transaction | Transaction[]) {
+    await this._addTxs(txs, false);
+    this.truncatePending();
+    this.truncateQueue();
+  }
+
+  private async _addTxs(txs: Transaction | Transaction[], force: boolean) {
     txs = txs instanceof Transaction ? [txs] : txs;
-    const dirtyAddres: Buffer[] = [];
+    const dirtyAddrs: Buffer[] = [];
     for (const tx of txs) {
+      const sender = tx.getSenderAddress().buf;
       if (!(await this.validateTx(tx))) {
-        continue;
+        return;
       }
       // drop tx if pool is full
-      const sender = tx.getSenderAddress().buf;
       const account = this.getAccount(sender);
       if (account.hasPending() && account.pending.has(tx.nonce)) {
         this.promoteTx(tx);
       } else {
-        this.enqueueTx(tx);
-        dirtyAddres.push(sender);
+        if (this.enqueueTx(tx)) {
+          dirtyAddrs.push(sender);
+        }
       }
       // journalTx
     }
-    if (!force && dirtyAddres.length > 0) {
-      await this.promoteExecutables(dirtyAddres);
+    if (!force && dirtyAddrs.length > 0) {
+      await this.promoteExecutables(dirtyAddrs);
     } else if (force) {
       await this.promoteExecutables();
     }
@@ -323,7 +326,7 @@ export class TxPool {
       this.removeTxFromGlobal(forwards);
       const { removed: drops } = queue.filter(accountInDB.balance, this.currentHeader.gasLimit);
       this.removeTxFromGlobal(drops);
-      const readies = queue.ready(account.pendingNonce);
+      const readies = queue.ready(account.pendingNonce.addn(1));
       for (const tx of readies) {
         this.promoteTx(tx);
       }

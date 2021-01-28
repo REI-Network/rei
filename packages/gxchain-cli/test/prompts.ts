@@ -7,7 +7,7 @@ import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import BN from 'bn.js';
 import streamToIterator from 'stream-to-iterator';
-import { Account, Address, rlp } from 'ethereumjs-util';
+import { Account, Address } from 'ethereumjs-util';
 
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
@@ -79,7 +79,7 @@ const startPrompts = async (node: Node) => {
     } else if (arr[0] === 'mine' || arr[0] === 'm') {
       try {
         const lastestHeader = node.blockchain.latestBlock.header;
-        const transactions = node.txPool.get(1, new BN(21000));
+        const transactions: Transaction[] = [];
         const block = Block.fromBlockData(
           {
             header: {
@@ -121,9 +121,9 @@ const startPrompts = async (node: Node) => {
             },
             { common: node.common }
           );
-          node.txPool.put(unsignedTx.sign(getPrivateKey(accounts[fromIndex])));
+          node.txPool.addTxs(unsignedTx.sign(getPrivateKey(accounts[fromIndex])));
 
-          const transactions = node.txPool.get(1, new BN(21000));
+          const transactions: Transaction[] = [];
           const lastestHeader = node.blockchain.latestBlock.header;
           const block = Block.fromBlockData(
             {
@@ -218,7 +218,7 @@ const startPrompts = async (node: Node) => {
         },
         { common: node.common }
       );
-      node.txPool.put(unsignedTx.sign(getPrivateKey(arr[1])));
+      node.txPool.addTxs(unsignedTx.sign(getPrivateKey(arr[1])));
     } else {
       console.warn('$ Invalid command');
       continue;

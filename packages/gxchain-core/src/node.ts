@@ -13,7 +13,7 @@ import { Common, constants, defaultGenesis } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { StateManager } from '@gxchain2/state-manager';
 import VM from '@gxchain2/vm';
-import { TransactionPool } from '@gxchain2/tx-pool';
+import { TxPool } from '@gxchain2/tx-pool';
 import { Block } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
 import { hexStringToBuffer } from '@gxchain2/utils';
@@ -36,7 +36,7 @@ export interface NodeOptions {
 
 export class Node {
   public readonly rawdb: LevelUp;
-  public readonly txPool: TransactionPool;
+  public readonly txPool: TxPool;
 
   public db!: Database;
   public common!: Common;
@@ -52,7 +52,7 @@ export class Node {
   constructor(options: NodeOptions) {
     this.options = options;
     this.rawdb = createLevelDB(path.join(this.options.databasePath, 'chaindb'));
-    this.txPool = new TransactionPool();
+    this.txPool = new TxPool({ node: this });
     this.initPromise = this.init();
   }
 
@@ -262,7 +262,7 @@ export class Node {
     await this.initPromise;
     while (true) {
       await new Promise((r) => setTimeout(r, mineInterval));
-      const transactions = this.txPool.get(100, gasLimit);
+      const transactions: Transaction[] = [];
       const lastestHeader = this.blockchain.latestBlock.header;
       const block = Block.fromBlockData(
         {

@@ -105,6 +105,7 @@ export class FunctionalMap<K, V> implements Map<K, V> {
   }
 
   set(key: K, value: V): this {
+    this.tree = this.tree.remove(key);
     this.tree = this.tree.insert(key, value);
     return this;
   }

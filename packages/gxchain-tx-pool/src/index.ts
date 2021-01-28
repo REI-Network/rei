@@ -53,10 +53,15 @@ export interface TxPoolOptions {
 }
 
 class TxPoolAccount {
+  private readonly getNonce: () => Promise<BN>;
   private _pending?: TxSortedMap;
   private _queue?: TxSortedMap;
   private _pendingNonce?: BN;
   timestamp: number = 0;
+
+  constructor(getNonce: () => Promise<BN>) {
+    this.getNonce = getNonce;
+  }
 
   get pending() {
     return this._pending ? this._pending : (this._pending = new TxSortedMap(true));
@@ -66,17 +71,19 @@ class TxPoolAccount {
     return this._queue ? this._queue : (this._queue = new TxSortedMap(false));
   }
 
-  get pendingNonce() {
-    const pn = this._pendingNonce ? this._pendingNonce : (this._pendingNonce = new BN(0));
-    return pn.clone();
-  }
-
   hasPending() {
     return this._pending && this._pending.size > 0;
   }
 
   hasQueue() {
     return this._queue && this._queue.size > 0;
+  }
+
+  async getPendingNonce() {
+    if (!this._pendingNonce) {
+      this._pendingNonce = await this.getNonce();
+    }
+    return this._pendingNonce.clone();
   }
 
   updatePendingNonce(nonce: BN, lower: boolean = false) {
@@ -150,10 +157,13 @@ export class TxPool {
     this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot);
   }
 
-  private getAccount(sender: Buffer): TxPoolAccount {
+  private getAccount(addr: Address): TxPoolAccount {
+    const sender = addr.buf;
     let account = this.accounts.get(sender);
     if (!account) {
-      account = new TxPoolAccount();
+      account = new TxPoolAccount(async () => {
+        return (await this.currentStateManager.getAccount(addr)).nonce;
+      });
       this.accounts.set(sender, account);
     }
     return account;
@@ -216,19 +226,19 @@ export class TxPool {
 
   private async _addTxs(txs: Transaction | Transaction[], force: boolean) {
     txs = txs instanceof Transaction ? [txs] : txs;
-    const dirtyAddrs: Buffer[] = [];
+    const dirtyAddrs: Address[] = [];
     for (const tx of txs) {
-      const sender = tx.getSenderAddress().buf;
+      const addr = tx.getSenderAddress();
       if (!(await this.validateTx(tx))) {
         return;
       }
       // drop tx if pool is full
-      const account = this.getAccount(sender);
+      const account = this.getAccount(addr);
       if (account.hasPending() && account.pending.has(tx.nonce)) {
         this.promoteTx(tx);
       } else {
         if (this.enqueueTx(tx)) {
-          dirtyAddrs.push(sender);
+          dirtyAddrs.push(addr);
         }
       }
       // journalTx
@@ -284,7 +294,7 @@ export class TxPool {
   }
 
   private enqueueTx(tx: Transaction): boolean {
-    const account = this.getAccount(tx.getSenderAddress().buf);
+    const account = this.getAccount(tx.getSenderAddress());
     const { inserted, old } = account.queue.push(tx, this.priceBump);
     if (inserted) {
       this.txs.set(tx.hash(), tx);
@@ -299,7 +309,7 @@ export class TxPool {
   }
 
   private promoteTx(tx: Transaction): boolean {
-    const account = this.getAccount(tx.getSenderAddress().buf);
+    const account = this.getAccount(tx.getSenderAddress());
     const { inserted, old } = account.pending.push(tx, this.priceBump);
     if (inserted) {
       this.txs.set(tx.hash(), tx);
@@ -312,7 +322,7 @@ export class TxPool {
     return inserted;
   }
 
-  private async promoteExecutables(dirtyAddrs?: Buffer[]) {
+  private async promoteExecutables(dirtyAddrs?: Address[]) {
     const promoteAccount = async (sender: Buffer, account: TxPoolAccount) => {
       if (!account.hasQueue()) {
         return;
@@ -323,7 +333,7 @@ export class TxPool {
       this.removeTxFromGlobal(forwards);
       const { removed: drops } = queue.filter(accountInDB.balance, this.currentHeader.gasLimit);
       this.removeTxFromGlobal(drops);
-      const readies = queue.ready(account.pendingNonce.addn(1));
+      const readies = queue.ready((await account.getPendingNonce()).addn(1));
       for (const tx of readies) {
         this.promoteTx(tx);
       }
@@ -338,9 +348,9 @@ export class TxPool {
     };
 
     if (dirtyAddrs) {
-      for (const sender of dirtyAddrs) {
-        const account = this.getAccount(sender);
-        await promoteAccount(sender, account);
+      for (const addr of dirtyAddrs) {
+        const account = this.getAccount(addr);
+        await promoteAccount(addr.buf, account);
       }
     } else {
       for (const [sender, account] of this.accounts) {

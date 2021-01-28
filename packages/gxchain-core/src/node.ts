@@ -181,6 +181,7 @@ export class Node {
 
     await this.blockchain.init();
     await this.vm.init();
+    await this.txPool.init();
 
     let peerId!: PeerId;
     try {

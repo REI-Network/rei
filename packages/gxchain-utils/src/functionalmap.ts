@@ -8,8 +8,8 @@ export class FunctionalMapIterator<T> implements IterableIterator<T> {
     this.rbtreeIt = rbtreeIt;
   }
 
-  protected value(): T {
-    throw new Error('');
+  protected value(): T | undefined {
+    throw new Error('Unimplemented');
   }
 
   next() {
@@ -46,20 +46,20 @@ export class FunctionalMapIterator<T> implements IterableIterator<T> {
 }
 
 class FunctionalMapKeyIterator<K> extends FunctionalMapIterator<K> {
-  protected value(): K {
+  protected value(): K | undefined {
     return this.rbtreeIt.key;
   }
 }
 
 class FunctionalMapValueIterator<V> extends FunctionalMapIterator<V> {
-  protected value(): V {
+  protected value(): V | undefined {
     return this.rbtreeIt.value;
   }
 }
 
 class FunctionalMapKeyValueIterator<K, V> extends FunctionalMapIterator<[K, V]> {
-  protected value(): [K, V] {
-    return [this.rbtreeIt.key, this.rbtreeIt.value];
+  protected value(): [K, V] | undefined {
+    return !this.rbtreeIt.key || !this.rbtreeIt.value ? undefined : [this.rbtreeIt.key, this.rbtreeIt.value];
   }
 }
 

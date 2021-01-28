@@ -20,10 +20,16 @@ export class FunctionalMapIterator<T> implements IterableIterator<T> {
       };
     } else if (!this.rbtreeIt.hasNext) {
       this.stop = true;
-      return {
-        done: false,
-        value: this.value()
-      };
+      const value = this.value();
+      return value
+        ? {
+            done: false,
+            value
+          }
+        : {
+            done: true,
+            value: undefined as any
+          };
     } else {
       const value = this.value();
       this.rbtreeIt.next();

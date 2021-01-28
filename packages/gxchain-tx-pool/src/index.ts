@@ -317,7 +317,7 @@ export class TxPool {
     if (old) {
       this.removeTxFromGlobal(old);
     }
-    account.updatePendingNonce(tx.nonce);
+    account.updatePendingNonce(tx.nonce.addn(1));
     account.timestamp = Date.now();
     return inserted;
   }
@@ -333,7 +333,7 @@ export class TxPool {
       this.removeTxFromGlobal(forwards);
       const { removed: drops } = queue.filter(accountInDB.balance, this.currentHeader.gasLimit);
       this.removeTxFromGlobal(drops);
-      const readies = queue.ready((await account.getPendingNonce()).addn(1));
+      const readies = queue.ready(await account.getPendingNonce());
       for (const tx of readies) {
         this.promoteTx(tx);
       }

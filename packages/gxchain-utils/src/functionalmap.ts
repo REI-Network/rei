@@ -103,7 +103,7 @@ export class FunctionalMap<K, V> implements Map<K, V> {
   }
 
   has(key: K): boolean {
-    return this.tree.find(key) !== null;
+    return !!this.tree.get(key);
   }
 
   get size(): number {

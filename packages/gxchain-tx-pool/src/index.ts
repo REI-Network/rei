@@ -414,7 +414,7 @@ export class TxPool {
     };
 
     const offenders: TxPoolAccount[] = [];
-    while (pendingSlots > this.globalSlots && heap.size > 0) {
+    while (pendingSlots > this.globalSlots && heap.length > 0) {
       const offender: TxPoolAccount = heap.remove();
       offenders.push(offender);
       if (offenders.length > 1) {

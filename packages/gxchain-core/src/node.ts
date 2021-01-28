@@ -36,7 +36,6 @@ export interface NodeOptions {
 
 export class Node {
   public readonly rawdb: LevelUp;
-  public readonly txPool: TxPool;
 
   public db!: Database;
   public common!: Common;
@@ -45,6 +44,7 @@ export class Node {
   public blockchain!: Blockchain;
   public vm!: VM;
   public sync!: Synchronizer;
+  public txPool!: TxPool;
 
   private options: NodeOptions;
   private initPromise: Promise<void>;
@@ -52,7 +52,6 @@ export class Node {
   constructor(options: NodeOptions) {
     this.options = options;
     this.rawdb = createLevelDB(path.join(this.options.databasePath, 'chaindb'));
-    this.txPool = new TxPool({ node: this });
     this.initPromise = this.init();
   }
 
@@ -181,6 +180,8 @@ export class Node {
 
     await this.blockchain.init();
     await this.vm.init();
+
+    this.txPool = new TxPool({ node: this });
     await this.txPool.init();
 
     let peerId!: PeerId;

@@ -33,10 +33,7 @@ export function checkTxIntrinsicGas(tx: Transaction) {
   }
   gas.iadd(nz.muln(16));
   gas.iadd(z.muln(4));
-  if (gas.gt(uint64Max)) {
-    return false;
-  }
-  return gas.lte(tx.gasLimit);
+  return gas.lte(uint64Max) && gas.lte(tx.gasLimit);
 }
 
 const uint64Max = new BN(Buffer.from('ffffffffffffffff', 'hex'));

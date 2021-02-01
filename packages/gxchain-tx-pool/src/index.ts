@@ -8,6 +8,7 @@ import { BlockHeader, Block } from '@gxchain2/block';
 import { Database } from '@gxchain2/database';
 import { Common } from '@gxchain2/common';
 import { TxSortedMap } from './txmap';
+import { PendingTxMap } from './pendingmap';
 
 interface INode {
   db: Database;
@@ -167,6 +168,18 @@ export class TxPool {
       this.accounts.set(sender, account);
     }
     return account;
+  }
+
+  async getPendingMap(): Promise<PendingTxMap> {
+    await this.initPromise;
+    const pendingMap = new PendingTxMap();
+    for (const [sender, account] of this.accounts) {
+      if (!account.hasPending()) {
+        continue;
+      }
+      pendingMap.push(sender, account.pending.toList());
+    }
+    return pendingMap;
   }
 
   async newBlock(newBlock: Block) {

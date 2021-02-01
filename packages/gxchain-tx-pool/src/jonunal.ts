@@ -4,6 +4,8 @@ import { Address, rlp } from 'ethereumjs-util';
 import readline from 'readline';
 import { EventEmitter } from 'events';
 import stream from 'stream';
+import { resolve } from 'path';
+import { rejects } from 'assert';
 
 export class jonunal extends EventEmitter {
   path: string;
@@ -14,7 +16,7 @@ export class jonunal extends EventEmitter {
     this.writer = fs.createWriteStream(this.path);
   }
 
-  async load(add: (transaction: Transaction) => void) {
+  load(add: (transaction: Transaction) => void) {
     try {
       fs.existsSync(this.path);
     } catch (err) {
@@ -45,77 +47,77 @@ export class jonunal extends EventEmitter {
 
     let batch: Transaction[] = [];
 
-    let buffersplit = Buffer.from('\r\n');
-    let bufferinput: Buffer = Buffer.from('');
+    let bufferSplit = Buffer.from('\r\n');
+    let bufferInput: Buffer = Buffer.from('');
     inputer.on('data', (chunk: Buffer) => {
       try {
-        bufferinput = Buffer.concat([bufferinput, chunk]);
-        let start = 0;
-        let end = bufferinput.length;
-        while (start < end) {
-          let i = bufferinput.indexOf(buffersplit);
+        bufferInput = Buffer.concat([bufferInput, chunk]);
+        let end = bufferInput.length;
+        while (true) {
+          let i = bufferInput.indexOf(bufferSplit);
           if (i == -1) {
             break;
           }
-          let tx = Transaction.fromRlpSerializedTx(bufferinput.slice());
+          let bufferTemp = Buffer.from(bufferInput);
+          try {
+            let tx = Transaction.fromRlpSerializedTx(bufferTemp.slice(0, i));
+            total++;
+            console.log(total);
+            console.log(tx);
+            if (batch.push(tx) > 1024) {
+              loadBath(batch);
+              batch = [];
+            }
+            //console.log(batch);
+          } catch (err) {
+            break;
+          }
+          bufferInput = bufferInput.slice(i + bufferSplit.length);
         }
-        total++;
-        if (batch.push(tx) > 1024) {
-          loadBath(batch);
-          batch = [];
-        }
+        resolve();
       } catch (err) {
         this.emit('error', err);
       }
     });
-    // for await (const line of Readline) {
-    //   let tx: Transaction = batch[0];
-    //   try {
-    //     tx = Transaction.fromRlpSerializedTx(Buffer.from(line));
-    //   } catch (err) {
-    //     this.emit('error', err);
-    //   }
 
-    //   total++;
-    //   if (batch.push(tx) > 1024) {
-    //     loadBath(batch);
-    //     batch = [];
-    //   }
-    // }
-    console.log('Loaded local transaction journal', 'transactions', total, 'dropped', dropped);
+    inputer.on('end', function () {
+      console.log('Loaded local transaction journal', 'transactions', total, 'dropped', dropped);
+    });
   }
 
   insert(tx: Transaction) {
-    if (this.writer == undefined) {
-      return new Error('no active journal');
+    if (!this.writer) {
+      throw new Error('no active journal');
     }
-    try {
-      this.writer = fs.createWriteStream(this.path);
-      this.writer.write(tx.serialize());
-      this.writer.write(Buffer.from('\r\n'));
-      this.writer.end();
-    } catch (err) {
-      this.emit('error', err);
-    }
+    return new Promise<void>((resolve) => {
+      this.writer.write(Buffer.concat([tx.serialize(), Buffer.from('\r\n')]), (err) => {
+        if (err) {
+          rejects;
+        }
+        resolve();
+      });
+    });
   }
 
   rotate(all: Map<Address, Transaction[]>) {
-    if (this.writer != undefined) {
-      return;
+    if (this.writer) {
+      this.writer.close();
     }
-    let output = new fs.WriteStream();
     try {
-      output = fs.createWriteStream(this.path + '.new');
+      let output = fs.createWriteStream(this.path + '.new');
     } catch (err) {
       this.emit('error', err);
     }
+    let output = fs.createWriteStream(this.path + '.new');
     let journaled = 0;
     all.forEach((val, key) => {
       for (let tx of val) {
         try {
-          let valbuffer = tx.serialize();
-          output.write(tx);
-          output.write('\r\n');
+          output.write(Buffer.concat([tx.serialize(), Buffer.from('\r\n')]), (err) => {
+            if (err) {
+              console.log(err);
+            }
+          });
         } catch (err) {
           output.end();
           this.emit('error', err);
@@ -139,7 +141,7 @@ export class jonunal extends EventEmitter {
   }
 
   close() {
-    this.writer == null;
+    this.writer.end();
     return;
   }
 }
@@ -178,9 +180,9 @@ const unsignedTx3 = Transaction.fromTxData(
 let address1 = Address.fromString('0x3289621709f5b35d09b4335e129907ac367a0593');
 let testmap = new Map([[address1, [unsignedTx1, unsignedTx2]]]);
 //txjonunal.rotate(testmap);
-txjonunal.insert(unsignedTx3);
-txjonunal.insert(unsignedTx2);
+//txjonunal.insert(unsignedTx3);
 //txjonunal.insert(unsignedTx1);
+txjonunal.rotate(testmap);
 txjonunal.load(function (num) {
   console.log(num);
 });

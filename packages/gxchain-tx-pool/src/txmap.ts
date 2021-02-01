@@ -183,4 +183,11 @@ export class TxSortedMap {
     this._slots = 0;
     return removed;
   }
+
+  ls() {
+    for (const [key, value] of this.nonceToTx) {
+      console.log('---');
+      console.log(value.toRPCJSON());
+    }
+  }
 }

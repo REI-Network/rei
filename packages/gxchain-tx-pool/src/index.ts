@@ -170,6 +170,7 @@ export class TxPool {
   }
 
   async newBlock(newBlock: Block) {
+    await this.initPromise;
     const getBlock = async (hash: Buffer, number: BN) => {
       const header = await this.node.db.getHeader(hash, number);
       const bodyBuffer = await this.node.db.getBody(hash, number);
@@ -219,6 +220,7 @@ export class TxPool {
   }
 
   async addTxs(txs: Transaction | Transaction[]) {
+    await this.initPromise;
     await this._addTxs(txs, false);
     this.truncatePending();
     this.truncateQueue();
@@ -471,6 +473,23 @@ export class TxPool {
         break;
       }
       account = heap.remove();
+    }
+  }
+
+  async ls() {
+    const info = (map: TxSortedMap, description: string) => {
+      console.log(`${description} size:`, map.size, '| slots:', map.slots);
+      map.ls();
+    };
+    for (const [sender, account] of this.accounts) {
+      console.log('==========');
+      console.log('address: 0x' + sender.toString('hex'), '| timestamp:', account.timestamp, '| pendingNonce:', (await account.getPendingNonce()).toString());
+      if (account.hasPending()) {
+        info(account.pending, 'pending');
+      }
+      if (account.hasQueue()) {
+        info(account.queue, 'queue');
+      }
     }
   }
 }

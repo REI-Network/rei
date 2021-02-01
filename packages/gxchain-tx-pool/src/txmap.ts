@@ -105,7 +105,7 @@ export class TxSortedMap {
     this.resetNonceHeap(keys);
     this.decreaseSlots(removed);
     if (this.sortedTxCache) {
-      this.sortedTxCache.splice(this.sortedTxCache.length - 1 - removed.length, removed.length);
+      this.sortedTxCache.splice(this.sortedTxCache.length - removed.length, removed.length);
     }
     return removed;
   }

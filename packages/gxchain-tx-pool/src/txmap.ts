@@ -84,6 +84,9 @@ export class TxSortedMap {
       nonceInHeap = this.nonceHeap.peek();
     }
     this.decreaseSlots(removed);
+    if (this.sortedTxCache) {
+      this.sortedTxCache.splice(0, removed.length);
+    }
     return removed;
   }
 
@@ -101,6 +104,9 @@ export class TxSortedMap {
     }
     this.resetNonceHeap(keys);
     this.decreaseSlots(removed);
+    if (this.sortedTxCache) {
+      this.sortedTxCache.splice(this.sortedTxCache.length - 1 - removed.length, removed.length);
+    }
     return removed;
   }
 
@@ -119,6 +125,7 @@ export class TxSortedMap {
     }
     this.nonceToTx.set(nonce, tx);
     this.increaseSlots(tx);
+    this.sortedTxCache = undefined;
     return {
       inserted: true,
       old
@@ -133,6 +140,7 @@ export class TxSortedMap {
       this.strictCheck(nonce, invalids);
       this.resetNonceHeap(this.nonceToTx.keys());
       this.decreaseSlots(invalids.concat(removedTx));
+      this.sortedTxCache = undefined;
       return {
         deleted: true,
         invalids
@@ -158,6 +166,7 @@ export class TxSortedMap {
       this.strictCheck(lowestNonce, invalids);
     }
     this.decreaseSlots(invalids.concat(removed));
+    this.sortedTxCache = undefined;
     return { removed, invalids };
   }
 
@@ -173,6 +182,9 @@ export class TxSortedMap {
       nonceInHeap = this.nonceHeap.peek();
     }
     this.decreaseSlots(readies);
+    if (this.sortedTxCache) {
+      this.sortedTxCache.splice(0, readies.length);
+    }
     return readies;
   }
 
@@ -181,7 +193,19 @@ export class TxSortedMap {
     this.nonceToTx.clear();
     this.resetNonceHeap();
     this._slots = 0;
+    this.sortedTxCache = undefined;
     return removed;
+  }
+
+  toList(): Transaction[] {
+    if (this.sortedTxCache) {
+      return this.sortedTxCache;
+    }
+    this.sortedTxCache = [];
+    for (const [key, value] of this.nonceToTx) {
+      this.sortedTxCache.push(value);
+    }
+    return this.sortedTxCache;
   }
 
   ls() {

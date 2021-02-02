@@ -64,6 +64,11 @@ export class Node {
     };
   }
 
+  get coinbase(): Buffer | undefined {
+    const coinbase = this.options.mine?.coinbase;
+    return coinbase ? hexStringToBuffer(coinbase) : undefined;
+  }
+
   async setupAccountInfo(accountInfo: {
     [index: string]: {
       nonce: string;
@@ -236,6 +241,15 @@ export class Node {
     const stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
     await stateManager.setStateRoot(root);
     return stateManager;
+  }
+
+  async getVM(root: Buffer) {
+    const stateManager = await this.getStateManager(root);
+    return new VM({
+      common: this.common,
+      stateManager,
+      blockchain: this.blockchain
+    });
   }
 
   async processBlock(blockSkeleton: Block) {

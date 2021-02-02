@@ -506,3 +506,5 @@ export class TxPool {
     }
   }
 }
+
+export { PendingTxMap, TxSortedMap };

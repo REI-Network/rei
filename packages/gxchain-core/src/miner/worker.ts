@@ -1,15 +1,16 @@
+import { BN } from 'ethereumjs-util';
 import { Block, BlockHeader } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
 import { PendingTxMap } from '@gxchain2/tx-pool';
 import VM from '@gxchain2/vm';
-import { BN } from 'ethereumjs-util';
+import { RunTxResult } from '@gxchain2/vm/dist/runTx';
 import { Node } from '../node';
 
 export class Worker {
   private readonly node: Node;
   private header!: BlockHeader;
   private vm!: VM;
-  private gasLimit = new BN(0);
+  private gasUsed = new BN(0);
   private txs: Transaction[] = [];
   private initPromise: Promise<void>;
 
@@ -36,7 +37,7 @@ export class Worker {
       await this.vm.stateManager.revert();
     }
     this.txs = [];
-    this.gasLimit = new BN(0);
+    this.gasUsed = new BN(0);
     this.header = BlockHeader.fromHeaderData(
       {
         coinbase: this.node.coinbase,
@@ -80,17 +81,30 @@ export class Worker {
     let tx = pendingMap.peek();
     while (tx) {
       try {
-        if (this.header.gasLimit.lt(tx.gasLimit.add(this.gasLimit))) {
-          pendingMap.pop();
-        } else {
-          await this.vm.runTx({
+        await this.vm.stateManager.checkpoint();
+
+        let txRes: RunTxResult;
+        try {
+          txRes = await this.vm.runTx({
             tx,
             block: Block.fromBlockData({ header: this.header }, { common: this.node.common }),
             skipBalance: false,
             skipNonce: false
           });
+        } catch (err) {
+          await this.vm.stateManager.revert();
+          pendingMap.pop();
+          tx = pendingMap.peek();
+          continue;
+        }
+
+        if (this.header.gasLimit.lt(txRes.gasUsed.add(this.gasUsed))) {
+          await this.vm.stateManager.revert();
+          pendingMap.pop();
+        } else {
+          await this.vm.stateManager.commit();
           this.txs.push(tx);
-          this.gasLimit.iadd(tx.gasLimit);
+          this.gasUsed.iadd(txRes.gasUsed);
           pendingMap.shift();
         }
       } catch (err) {

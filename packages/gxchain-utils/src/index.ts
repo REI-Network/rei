@@ -36,3 +36,4 @@ export * from './abort';
 export * from './priorityqueue';
 export * from './asyncnext';
 export * from './functionalmap';
+export * from './semaphorelock';

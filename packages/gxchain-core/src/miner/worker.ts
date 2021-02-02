@@ -8,11 +8,11 @@ import { Node } from '../node';
 
 export class Worker {
   private readonly node: Node;
-  private header!: BlockHeader;
+  private readonly initPromise: Promise<void>;
   private vm!: VM;
-  private gasUsed = new BN(0);
   private txs: Transaction[] = [];
-  private initPromise: Promise<void>;
+  private header!: BlockHeader;
+  private gasUsed = new BN(0);
 
   constructor(node: Node) {
     this.node = node;

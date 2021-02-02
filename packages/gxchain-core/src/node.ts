@@ -19,6 +19,7 @@ import { Transaction } from '@gxchain2/tx';
 import { hexStringToBuffer } from '@gxchain2/utils';
 
 import { FullSynchronizer, Synchronizer } from './sync';
+import { Worker } from './miner/worker';
 
 export interface NodeOptions {
   databasePath: string;
@@ -45,6 +46,7 @@ export class Node {
   public vm!: VM;
   public sync!: Synchronizer;
   public txPool!: TxPool;
+  public worker?: Worker;
 
   private options: NodeOptions;
   private initPromise: Promise<void>;
@@ -178,8 +180,13 @@ export class Node {
         console.error('Sync error:', err);
       })
       .on('synchronized', async () => {
+        const newBlock = this.blockchain.latestBlock;
         for (const peer of this.peerpool.peers) {
-          peer.newBlock(this.blockchain.latestBlock);
+          peer.newBlock(newBlock);
+        }
+        await this.txPool.newBlock(newBlock);
+        if (this.worker) {
+          await this.worker.newBlock(newBlock);
         }
       });
 
@@ -229,6 +236,7 @@ export class Node {
     this.sync.start();
 
     if (this.options.mine) {
+      this.worker = new Worker(this);
       this.mineLoop({
         coinbase: this.options.mine.coinbase,
         mineInterval: this.options.mine.mineInterval,

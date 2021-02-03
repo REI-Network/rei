@@ -240,11 +240,7 @@ export class Node {
 
     if (this.options.mine) {
       this.worker = new Worker(this);
-      this.mineLoop({
-        coinbase: this.options.mine.coinbase,
-        mineInterval: this.options.mine.mineInterval,
-        gasLimit: new BN(this.options.mine.gasLimit)
-      });
+      this.mineLoop(this.options.mine.mineInterval);
     }
   }
 
@@ -277,6 +273,7 @@ export class Node {
     blockSkeleton = block || blockSkeleton;
     await this.blockchain.putBlock(blockSkeleton);
     await this.db.batch([DBSaveReceipts(result.receipts, blockSkeleton.hash(), blockSkeleton.header.number)]);
+    return blockSkeleton;
   }
 
   async processBlocks(blocks: Block[]) {
@@ -292,7 +289,9 @@ export class Node {
     }
     try {
       for (const peer of this.peerpool.peers) {
-        peer.newBlock(block);
+        if (peer.isSupport(constants.GXC2_ETHWIRE)) {
+          peer.newBlock(block);
+        }
       }
       await this.txPool.newBlock(block);
       await this.worker?.newBlock(block);
@@ -303,7 +302,7 @@ export class Node {
     }
   }
 
-  async addTxs(txs: Transaction[]) {
+  async addPendingTxs(txs: Transaction[]) {
     await this.initPromise;
     await this.pendingLock.lock();
     try {
@@ -318,34 +317,12 @@ export class Node {
     }
   }
 
-  private async mineLoop({ coinbase, mineInterval, gasLimit }: { coinbase: string; mineInterval: number; gasLimit: BN }) {
+  private async mineLoop(mineInterval: number) {
     await this.initPromise;
     while (true) {
       await new Promise((r) => setTimeout(r, mineInterval));
-      const transactions: Transaction[] = [];
-      const lastestHeader = this.blockchain.latestBlock.header;
-      const block = Block.fromBlockData(
-        {
-          header: {
-            coinbase,
-            difficulty: '0x1',
-            gasLimit,
-            nonce: '0x0102030405060708',
-            number: lastestHeader.number.addn(1),
-            parentHash: lastestHeader.hash(),
-            uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
-            transactionsTrie: await Transaction.calculateTransactionTrie(transactions)
-          },
-          transactions
-        },
-        { common: this.common }
-      );
-      await this.processBlock(block);
-      for (const peer of this.peerpool.peers) {
-        if (peer.isSupport(constants.GXC2_ETHWIRE)) {
-          peer.newBlock(this.blockchain.latestBlock);
-        }
-      }
+      const block = await this.worker!.getPendingBlock();
+      await this.newBlock(await this.processBlock(block));
     }
   }
 }

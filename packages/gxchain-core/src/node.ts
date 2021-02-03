@@ -179,15 +179,9 @@ export class Node {
       .on('error', (err) => {
         console.error('Sync error:', err);
       })
-      .on('synchronized', async () => {
-        const newBlock = this.blockchain.latestBlock;
-        for (const peer of this.peerpool.peers) {
-          peer.newBlock(newBlock);
-        }
-        await this.txPool.newBlock(newBlock);
-        if (this.worker) {
-          await this.worker.newBlock(newBlock);
-        }
+      .on('synchronized', () => {
+        const block = this.blockchain.latestBlock;
+        this.newBlock(block);
       });
 
     await this.blockchain.init();
@@ -279,6 +273,22 @@ export class Node {
   async processBlocks(blocks: Block[]) {
     for (const block of blocks) {
       await this.processBlock(block);
+    }
+  }
+
+  async newBlock(block: Block) {
+    for (const peer of this.peerpool.peers) {
+      peer.newBlock(block);
+    }
+    if (await this.txPool.newBlock(block)) {
+      await this.worker?.newBlock(block);
+    }
+  }
+
+  async addTxs(txs: Transaction[]) {
+    const readies = await this.txPool.addTxs(txs);
+    if (readies && readies.size > 0) {
+      await this.worker?.addTxs(readies);
     }
   }
 

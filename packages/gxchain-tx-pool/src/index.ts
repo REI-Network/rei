@@ -194,7 +194,7 @@ export class TxPool {
   async newBlock(newBlock: Block) {
     await this.initPromise;
     if (!(await this.lock.compareLock(newBlock.header.number))) {
-      return;
+      return false;
     }
     try {
       const getBlock = async (hash: Buffer, number: BN) => {
@@ -244,6 +244,7 @@ export class TxPool {
       this.truncatePending();
       this.truncateQueue();
       this.lock.release();
+      return true;
     } catch (err) {
       this.lock.release();
       throw err;
@@ -265,13 +266,13 @@ export class TxPool {
     }
   }
 
-  private async _addTxs(txs: Transaction | Transaction[], force: boolean): Promise<Transaction[]> {
+  private async _addTxs(txs: Transaction | Transaction[], force: boolean): Promise<Map<Buffer, Transaction[]> | undefined> {
     txs = txs instanceof Transaction ? [txs] : txs;
     const dirtyAddrs: Address[] = [];
     for (const tx of txs) {
       const addr = tx.getSenderAddress();
       if (!(await this.validateTx(tx))) {
-        return [];
+        return;
       }
       // drop tx if pool is full
       const account = this.getAccount(addr);
@@ -289,7 +290,6 @@ export class TxPool {
     } else if (force) {
       return await this.promoteExecutables();
     }
-    return [];
   }
 
   private removeTxFromGlobal(key: Transaction | Transaction[]) {
@@ -364,7 +364,7 @@ export class TxPool {
     return inserted;
   }
 
-  private async promoteExecutables(dirtyAddrs?: Address[]): Promise<Transaction[]> {
+  private async promoteExecutables(dirtyAddrs?: Address[]): Promise<Map<Buffer, Transaction[]>> {
     const promoteAccount = async (sender: Buffer, account: TxPoolAccount): Promise<Transaction[]> => {
       let readies: Transaction[] = [];
       if (!account.hasQueue()) {
@@ -393,18 +393,24 @@ export class TxPool {
       return readies;
     };
 
-    let readies: Transaction[] = [];
+    const txs = new Map<Buffer, Transaction[]>();
     if (dirtyAddrs) {
       for (const addr of dirtyAddrs) {
         const account = this.getAccount(addr);
-        readies = readies.concat(await promoteAccount(addr.buf, account));
+        const readies = await promoteAccount(addr.buf, account);
+        if (readies.length > 0) {
+          txs.set(addr.buf, readies);
+        }
       }
     } else {
       for (const [sender, account] of this.accounts) {
-        readies = readies.concat(await promoteAccount(sender, account));
+        const readies = await promoteAccount(sender, account);
+        if (readies.length > 0) {
+          txs.set(sender, readies);
+        }
       }
     }
-    return readies;
+    return txs;
   }
 
   private async demoteUnexecutables() {

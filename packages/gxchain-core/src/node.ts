@@ -16,7 +16,7 @@ import VM from '@gxchain2/vm';
 import { TxPool } from '@gxchain2/tx-pool';
 import { Block } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
-import { hexStringToBuffer } from '@gxchain2/utils';
+import { hexStringToBuffer, SemaphoreLock } from '@gxchain2/utils';
 
 import { FullSynchronizer, Synchronizer } from './sync';
 import { Worker } from './miner/worker';
@@ -48,8 +48,17 @@ export class Node {
   public txPool!: TxPool;
   public worker?: Worker;
 
-  private options: NodeOptions;
-  private initPromise: Promise<void>;
+  private readonly options: NodeOptions;
+  private readonly initPromise: Promise<void>;
+  private readonly pendingLock = new SemaphoreLock<BN>((a, b) => {
+    if (a.lt(b)) {
+      return -1;
+    }
+    if (a.gt(b)) {
+      return 1;
+    }
+    return 0;
+  });
 
   constructor(options: NodeOptions) {
     this.options = options;
@@ -277,18 +286,35 @@ export class Node {
   }
 
   async newBlock(block: Block) {
-    for (const peer of this.peerpool.peers) {
-      peer.newBlock(block);
+    await this.initPromise;
+    if (!(await this.pendingLock.compareLock(block.header.number))) {
+      return;
     }
-    if (await this.txPool.newBlock(block)) {
+    try {
+      for (const peer of this.peerpool.peers) {
+        peer.newBlock(block);
+      }
+      await this.txPool.newBlock(block);
       await this.worker?.newBlock(block);
+      this.pendingLock.release();
+    } catch (err) {
+      console.error('Node new block error:', err);
+      this.pendingLock.release();
     }
   }
 
   async addTxs(txs: Transaction[]) {
-    const readies = await this.txPool.addTxs(txs);
-    if (readies && readies.size > 0) {
-      await this.worker?.addTxs(readies);
+    await this.initPromise;
+    await this.pendingLock.lock();
+    try {
+      const readies = await this.txPool.addTxs(txs);
+      if (readies && readies.size > 0) {
+        await this.worker?.addTxs(readies);
+      }
+      this.pendingLock.release();
+    } catch (err) {
+      console.error('Node add txs error:', err);
+      this.pendingLock.release();
     }
   }
 

@@ -23,8 +23,12 @@ export class PendingTxMap {
   });
 
   push(sender: Buffer, sortedTxs: Transaction[]) {
-    this.txs.set(sender, sortedTxs);
-    this.heap.push(sortedTxs[0]);
+    if (sortedTxs.length > 0) {
+      this.heap.push(sortedTxs.slice(0, 1)[0]);
+      if (sortedTxs.length > 1) {
+        this.txs.set(sender, sortedTxs.slice(1));
+      }
+    }
   }
 
   peek(): Transaction | undefined {
@@ -38,6 +42,9 @@ export class PendingTxMap {
       const nextTx = this.txs.get(sender);
       if (nextTx && nextTx.length > 0) {
         this.heap.push(nextTx.shift());
+        if (nextTx?.length === 0) {
+          this.txs.delete(sender);
+        }
       }
     }
   }

@@ -157,7 +157,7 @@ const startPrompts = async (node: Node) => {
     } else if (arr[0] === 'puttx') {
       const unsignedTx = Transaction.fromTxData(
         {
-          gasLimit: '0x5208',
+          gasLimit: new BN(21000),
           gasPrice: new BN(arr[4] || 1),
           nonce: new BN(arr[3] || 0),
           to: arr[2],

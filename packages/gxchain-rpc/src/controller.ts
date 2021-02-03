@@ -49,15 +49,19 @@ export class Controller {
   }
 
   async eth_getStorageAt([address, key, tag]: [string, string, string]): Promise<any> {
+    /*
     const blockHeader = (await this.getBlockByTag(tag)).header;
     const stateManager = this.node.stateManager.copy();
     await stateManager.setStateRoot(blockHeader.stateRoot);
     return bufferToHex(await stateManager.getContractStorage(Address.fromString(address), hexStringToBuffer(key)));
+    */
   }
 
-  async eth_getTransactionCount([address]: [string]): Promise<string> {
+  async eth_getTransactionCount([address]: [string]): Promise<any> {
+    /*
     let nonce = Buffer.from((await this.node.stateManager.getAccount(Address.fromString(address))).nonce);
     return bufferToHex(nonce);
+    */
   }
 
   async eth_getBlockTransactionCountByHash([hash]: [string]): Promise<string> {
@@ -89,8 +93,10 @@ export class Controller {
     return '0x00';
   }
 
-  async eth_getCode([data, tag]: [Address, string]): Promise<Buffer> {
+  async eth_getCode([data, tag]: [Address, string]): Promise<any> {
+    /*
     return await this.node.vm.stateManager.getContractCode(data);
+    */
   }
 
   //eth_sign
@@ -161,6 +167,7 @@ export class Controller {
   //shh_getMessages
 
   async eth_getAccount([address]: [string]): Promise<any> {
+    /*
     let account = await this.node.stateManager.getAccount(Address.fromString(address));
     return {
       nonce: account.nonce,
@@ -168,12 +175,15 @@ export class Controller {
       stateRoot: account.stateRoot,
       codeHash: account.codeHash
     };
+    */
   }
 
   async eth_getBalance([address]: [string]): Promise<any> {
+    /*
     let account = await this.node.stateManager.getAccount(Address.fromString(address));
     return {
       balance: account.balance
     };
+    */
   }
 }

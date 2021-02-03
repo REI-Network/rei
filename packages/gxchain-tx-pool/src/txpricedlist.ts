@@ -17,7 +17,13 @@ export class TxPricedList {
     this.remotes.push(tx);
   }
 
-  Removed(count: number) {}
+  Removed(count: number) {
+    this.stales += count;
+    if (this.stales <= this.remotes.length / 4) {
+      return;
+    }
+    this.Reheap();
+  }
 
   Cap(threshold: number) {}
 

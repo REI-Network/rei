@@ -10,7 +10,12 @@ export class TxPricedList {
     this.stales = 0;
   }
 
-  Put(tx: Transaction, local: Boolean) {}
+  Put(tx: Transaction, local: Boolean) {
+    if (local) {
+      return;
+    }
+    this.remotes.push(tx);
+  }
 
   Removed(count: number) {}
 

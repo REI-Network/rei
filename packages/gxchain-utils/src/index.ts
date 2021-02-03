@@ -35,3 +35,5 @@ export function hexStringToBuffer(hex: string): Buffer {
 export * from './abort';
 export * from './priorityqueue';
 export * from './asyncnext';
+export * from './functionalmap';
+export * from './semaphorelock';

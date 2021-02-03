@@ -7,7 +7,7 @@ import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import BN from 'bn.js';
 import streamToIterator from 'stream-to-iterator';
-import { Account, Address, rlp } from 'ethereumjs-util';
+import { Account, Address } from 'ethereumjs-util';
 
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
@@ -79,7 +79,7 @@ const startPrompts = async (node: Node) => {
     } else if (arr[0] === 'mine' || arr[0] === 'm') {
       try {
         const lastestHeader = node.blockchain.latestBlock.header;
-        const transactions = node.txPool.get(1, new BN(21000));
+        const transactions: Transaction[] = [];
         const block = Block.fromBlockData(
           {
             header: {
@@ -121,9 +121,9 @@ const startPrompts = async (node: Node) => {
             },
             { common: node.common }
           );
-          node.txPool.put(unsignedTx.sign(getPrivateKey(accounts[fromIndex])));
+          node.txPool.addTxs(unsignedTx.sign(getPrivateKey(accounts[fromIndex])));
 
-          const transactions = node.txPool.get(1, new BN(21000));
+          const transactions: Transaction[] = [];
           const lastestHeader = node.blockchain.latestBlock.header;
           const block = Block.fromBlockData(
             {
@@ -207,18 +207,48 @@ const startPrompts = async (node: Node) => {
         console.error('Get block error:', err);
       }
     } else if (arr[0] === 'puttx') {
-      const acc = await node.stateManager.getAccount(Address.fromString(arr[1]));
       const unsignedTx = Transaction.fromTxData(
         {
           gasLimit: '0x5208',
-          gasPrice: '0x01',
-          nonce: acc.nonce,
+          gasPrice: new BN(arr[4] || 1),
+          nonce: new BN(arr[3] || 0),
           to: arr[2],
           value: '0x01'
         },
         { common: node.common }
       );
-      node.txPool.put(unsignedTx.sign(getPrivateKey(arr[1])));
+      const tx = unsignedTx.sign(getPrivateKey(arr[1]));
+      console.log('puttx 0x' + tx.hash().toString('hex'));
+      node.txPool.addTxs(tx);
+    } else if (arr[0] === 'lstxpool') {
+      await node.txPool.ls();
+    } else if (arr[0] === 'pmine') {
+      try {
+        const lastestHeader = node.blockchain.latestBlock.header;
+        const transactions: Transaction[] = [];
+        const block = Block.fromBlockData(
+          {
+            header: {
+              coinbase: '0x3289621709f5b35d09b4335e129907ac367a0593',
+              difficulty: '0x1',
+              gasLimit: '0x2fefd8',
+              nonce: '0x0102030405060708',
+              number: lastestHeader.number.addn(1),
+              parentHash: lastestHeader.hash(),
+              uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+              transactionsTrie: await Transaction.calculateTransactionTrie(transactions)
+            },
+            transactions
+          },
+          { common: node.common }
+        );
+        await node.processBlock(block);
+        for (const peer of node.peerpool.peers) {
+          peer.newBlock(node.blockchain.latestBlock);
+        }
+      } catch (err) {
+        console.error('Run block error', err);
+      }
     } else {
       console.warn('$ Invalid command');
       continue;

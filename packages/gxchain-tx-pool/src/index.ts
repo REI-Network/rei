@@ -1,6 +1,6 @@
 import { BN, Address } from 'ethereumjs-util';
 import Heap from 'qheap';
-import { FunctionalMap, SemaphoreLock } from '@gxchain2/utils';
+import { FunctionalMap } from '@gxchain2/utils';
 import { Transaction } from '@gxchain2/tx';
 import { StateManager } from '@gxchain2/state-manager';
 import { Blockchain } from '@gxchain2/blockchain';
@@ -98,16 +98,6 @@ export class TxPool {
   private readonly accounts: FunctionalMap<Buffer, TxPoolAccount>;
   private readonly locals: FunctionalMap<Buffer, boolean>;
   private readonly txs: FunctionalMap<Buffer, Transaction>;
-  private readonly lock = new SemaphoreLock<BN>((a, b) => {
-    if (a.lt(b)) {
-      return -1;
-    }
-    if (a.gt(b)) {
-      return 1;
-    }
-    return 0;
-  });
-
   private readonly node: INode;
   private readonly initPromise: Promise<void>;
 
@@ -193,77 +183,60 @@ export class TxPool {
 
   async newBlock(newBlock: Block) {
     await this.initPromise;
-    if (!(await this.lock.compareLock(newBlock.header.number))) {
-      return false;
-    }
-    try {
-      const getBlock = async (hash: Buffer, number: BN) => {
-        const header = await this.node.db.getHeader(hash, number);
-        const bodyBuffer = await this.node.db.getBody(hash, number);
-        return Block.fromBlockData(
-          {
-            header: header,
-            transactions: bodyBuffer[0].map((rawTx) => Transaction.fromValuesArray(rawTx, { common: this.node.common }))
-          },
-          { common: this.node.common }
-        );
-      };
+    const getBlock = async (hash: Buffer, number: BN) => {
+      const header = await this.node.db.getHeader(hash, number);
+      const bodyBuffer = await this.node.db.getBody(hash, number);
+      return Block.fromBlockData(
+        {
+          header: header,
+          transactions: bodyBuffer[0].map((rawTx) => Transaction.fromValuesArray(rawTx, { common: this.node.common }))
+        },
+        { common: this.node.common }
+      );
+    };
 
-      const originalNewBlock = newBlock;
-      let oldBlock = await getBlock(this.currentHeader.hash(), this.currentHeader.number);
-      let discarded: Transaction[] = [];
-      const included = new FunctionalMap<Buffer, boolean>();
-      while (oldBlock.header.number.gt(newBlock.header.number)) {
-        discarded = discarded.concat(oldBlock.transactions);
-        oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
-      }
-      while (newBlock.header.number.gt(oldBlock.header.number)) {
-        for (const tx of newBlock.transactions) {
-          included.set(tx.hash(), true);
-        }
-        newBlock = await getBlock(newBlock.header.parentHash, newBlock.header.number.subn(1));
-      }
-      while (!oldBlock.hash().equals(newBlock.hash())) {
-        discarded = discarded.concat(oldBlock.transactions);
-        oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
-        for (const tx of newBlock.transactions) {
-          included.set(tx.hash(), true);
-        }
-        newBlock = await getBlock(newBlock.header.parentHash, newBlock.header.number.subn(1));
-      }
-      const reinject: Transaction[] = [];
-      for (const tx of discarded) {
-        if (!included.has(tx.hash())) {
-          reinject.push(tx);
-        }
-      }
-      this.currentHeader = originalNewBlock.header;
-      this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot);
-      await this._addTxs(reinject, true);
-      await this.demoteUnexecutables();
-      this.truncatePending();
-      this.truncateQueue();
-      this.lock.release();
-      return true;
-    } catch (err) {
-      this.lock.release();
-      throw err;
+    const originalNewBlock = newBlock;
+    let oldBlock = await getBlock(this.currentHeader.hash(), this.currentHeader.number);
+    let discarded: Transaction[] = [];
+    const included = new FunctionalMap<Buffer, boolean>();
+    while (oldBlock.header.number.gt(newBlock.header.number)) {
+      discarded = discarded.concat(oldBlock.transactions);
+      oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
     }
+    while (newBlock.header.number.gt(oldBlock.header.number)) {
+      for (const tx of newBlock.transactions) {
+        included.set(tx.hash(), true);
+      }
+      newBlock = await getBlock(newBlock.header.parentHash, newBlock.header.number.subn(1));
+    }
+    while (!oldBlock.hash().equals(newBlock.hash())) {
+      discarded = discarded.concat(oldBlock.transactions);
+      oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
+      for (const tx of newBlock.transactions) {
+        included.set(tx.hash(), true);
+      }
+      newBlock = await getBlock(newBlock.header.parentHash, newBlock.header.number.subn(1));
+    }
+    const reinject: Transaction[] = [];
+    for (const tx of discarded) {
+      if (!included.has(tx.hash())) {
+        reinject.push(tx);
+      }
+    }
+    this.currentHeader = originalNewBlock.header;
+    this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot);
+    await this._addTxs(reinject, true);
+    await this.demoteUnexecutables();
+    this.truncatePending();
+    this.truncateQueue();
   }
 
   async addTxs(txs: Transaction | Transaction[]) {
     await this.initPromise;
-    await this.lock.lock();
-    try {
-      const readies = await this._addTxs(txs, false);
-      this.truncatePending();
-      this.truncateQueue();
-      this.lock.release();
-      return readies;
-    } catch (err) {
-      this.lock.release();
-      throw err;
-    }
+    const readies = await this._addTxs(txs, false);
+    this.truncatePending();
+    this.truncateQueue();
+    return readies;
   }
 
   private async _addTxs(txs: Transaction | Transaction[], force: boolean): Promise<Map<Buffer, Transaction[]> | undefined> {

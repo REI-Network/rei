@@ -4,7 +4,7 @@ import { FunctionalMap } from '@gxchain2/utils';
 import { Transaction } from '@gxchain2/tx';
 import { StateManager } from '@gxchain2/state-manager';
 import { Blockchain } from '@gxchain2/blockchain';
-import { BlockHeader, Block } from '@gxchain2/block';
+import { BlockHeader, Block, BlockBodyBuffer } from '@gxchain2/block';
 import { Database } from '@gxchain2/database';
 import { Common } from '@gxchain2/common';
 import { TxSortedMap } from './txmap';
@@ -185,11 +185,19 @@ export class TxPool {
     await this.initPromise;
     const getBlock = async (hash: Buffer, number: BN) => {
       const header = await this.node.db.getHeader(hash, number);
-      const bodyBuffer = await this.node.db.getBody(hash, number);
+      let bodyBuffer: BlockBodyBuffer | undefined;
+      try {
+        bodyBuffer = await this.node.db.getBody(hash, number);
+      } catch (err) {
+        if (err.type !== 'NotFoundError') {
+          throw err;
+        }
+      }
+
       return Block.fromBlockData(
         {
           header: header,
-          transactions: bodyBuffer[0].map((rawTx) => Transaction.fromValuesArray(rawTx, { common: this.node.common }))
+          transactions: bodyBuffer ? bodyBuffer[0].map((rawTx) => Transaction.fromValuesArray(rawTx, { common: this.node.common })) : []
         },
         { common: this.node.common }
       );

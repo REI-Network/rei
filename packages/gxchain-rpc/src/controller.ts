@@ -1,19 +1,16 @@
 import { Node } from '@gxchain2/core';
 import { Block, JsonBlock, BlockHeader, JsonHeader } from '@gxchain2/block';
-import { Account, Address, bufferToHex } from 'ethereumjs-util';
+import { Account, Address, bufferToHex, keccakFromHexString } from 'ethereumjs-util';
 //import { Transaction } from '@gxchain2/tx';
 
 import * as helper from './helper';
-import { hexStringToBuffer } from '../../gxchain-core/node_modules/@gxchain2/utils/dist';
+import { hexStringToBuffer } from '@gxchain2/utils';
 
 export class Controller {
   node: Node;
   constructor(node: Node) {
     this.node = node;
   }
-  hexStringToBuffer = (hex: string): Buffer => {
-    return hex.indexOf('0x') === 0 ? Buffer.from(hex.substr(2), 'hex') : Buffer.from(hex, 'hex');
-  };
 
   private async getBlockByTag(tag: string): Promise<Block> {
     let block!: Block;
@@ -32,7 +29,11 @@ export class Controller {
   }
 
   //web3_clientVersion
-  //aysnc web_sha3()
+
+  async web_sha3([data]: [string]): Promise<string> {
+    return await bufferToHex(keccakFromHexString(data));
+  }
+
   //aysnc eth_net_version()
   //aysnc eth_net_listenging()
   //aysnc eth_netpeer_Count()
@@ -42,9 +43,9 @@ export class Controller {
     return await '0x0000000000000000000000000000000000000000';
   }
 
-  async eth_blockNumber(): Promise<Number> {
+  async eth_blockNumber(): Promise<string> {
     let blockNumber = await Number(this.node.blockchain.latestBlock.header.number);
-    return blockNumber;
+    return '0x' + blockNumber.toString(16);
   }
 
   async eth_getStorageAt([address, key, tag]: [string, string, string]): Promise<any> {
@@ -56,13 +57,42 @@ export class Controller {
 
   async eth_getTransactionCount([address]: [string]): Promise<string> {
     let nonce = Buffer.from((await this.node.stateManager.getAccount(Address.fromString(address))).nonce);
-    return '0x' + nonce.toString('hex');
+    return bufferToHex(nonce);
   }
-  //eth_getBlockTransactionCountByHash
-  //eth_getBlockTransactionCountByNumber
-  //eth_getUncleCountByBlockHash
-  //eth_getUncleCountByBlockNumber
-  //eth_getCode
+
+  async eth_getBlockTransactionCountByHash([hash]: [string]): Promise<string> {
+    let number = (await this.node.db.getBlock(hexStringToBuffer(hash))).transactions.length;
+    return bufferToHex(Buffer.from(number.toString));
+  }
+
+  async eth_getBlockTransactionCountByNumber([tag]: [string]): Promise<string> {
+    let transactionNumber!: number;
+    if (tag === 'earliest') {
+      transactionNumber = await (await this.node.blockchain.getBlock(0)).transactions.length;
+    } else if (tag === 'latest') {
+      transactionNumber = this.node.blockchain.latestBlock.transactions.length;
+    } else if (tag === 'pending') {
+      helper.throwRpcErr('Unsupport pending block');
+    } else if (Number.isInteger(Number(tag))) {
+      transactionNumber = (await this.node.blockchain.getBlock(Number(tag))).transactions.length;
+    } else {
+      helper.throwRpcErr('Invalid tag value');
+    }
+    return bufferToHex(Buffer.from(transactionNumber.toString));
+  }
+
+  async eth_getUncleCountByBlockHash([data]: [string]): Promise<string> {
+    return '0x00';
+  } //0
+
+  async eth_getUncleCountByBlockNumber([tag]: [string]): Promise<string> {
+    return '0x00';
+  }
+
+  async eth_getCode([data, tag]: [Address, string]): Promise<Buffer> {
+    return await this.node.vm.stateManager.getContractCode(data);
+  }
+
   //eth_sign
   //eth_signTransaction
   //eth_sendTransaction
@@ -70,7 +100,7 @@ export class Controller {
   //eth_call
   //eth_estimateGas
   async eth_getBlockByHash([hash, fullTransactions]: [string, boolean]): Promise<JsonBlock> {
-    return (await this.node.db.getBlock(this.hexStringToBuffer(hash))).toJSON();
+    return (await this.node.db.getBlock(hexStringToBuffer(hash))).toJSON();
   }
 
   async eth_getBlockByNumber([tag, fullTransactions]: [string, boolean]): Promise<JsonBlock> {
@@ -84,11 +114,11 @@ export class Controller {
   }
 
   async eth_getTransactionByHash([hash]: [string]): Promise<any> {
-    return (await this.node.db.getTransaction(this.hexStringToBuffer(hash))).toRPCJSON();
+    return (await this.node.db.getTransaction(hexStringToBuffer(hash))).toRPCJSON();
   }
 
   async eth_getTransactionByBlockHashAndIndex([hash, index]: [string, number]): Promise<any> {
-    return (await this.node.db.getBlock(this.hexStringToBuffer(hash))).transactions[index].toRPCJSON();
+    return (await this.node.db.getBlock(hexStringToBuffer(hash))).transactions[index].toRPCJSON();
   }
 
   async eth_getTransactionByBlockNumberAndIndex([number, index]: [number, number]): Promise<any> {
@@ -96,10 +126,17 @@ export class Controller {
   }
 
   async eth_getTransactionReceipt([hash]: [string]): Promise<any> {
-    return (await this.node.db.getReceipt(this.hexStringToBuffer(hash))).toRPCJSON;
+    return (await this.node.db.getReceipt(hexStringToBuffer(hash))).toRPCJSON;
   }
-  //eth_getUncleByBlockHashAndIndex
-  //eth_getUncleByBlockNumberAndIndex
+
+  async eth_getUncleByBlockHashAndIndex([data, quantity]: [string, string]): Promise<any> {
+    return {};
+  }
+
+  async eth_getUncleByBlockNumberAndIndex([tag, quantity]: [string, string]): Promise<any> {
+    return {};
+  }
+
   //eth_compileSolidity
   //eth_compileLLL
   //eth_compileSerpent
@@ -112,14 +149,6 @@ export class Controller {
   //eth_getFilterLogs
   //eth_getLogs
 
-  //eth_getWork
-  //eth_submitWork
-  //eth_submitHashrate
-
-  //db_putString
-  //db_getString
-  //db_putHex
-  //db_getHex
   //shh_version
   //shh_post
   //shh_newIdentity

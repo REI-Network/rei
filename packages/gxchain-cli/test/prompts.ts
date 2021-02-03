@@ -196,7 +196,14 @@ const startPrompts = async (node: Node) => {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir);
     }
-    const node = new Node({ databasePath: dir });
+    const node = new Node({
+      databasePath: dir,
+      mine: {
+        coinbase: '0x3289621709f5b35d09b4335e129907ac367a0593',
+        mineInterval: 10,
+        gasLimit: ''
+      }
+    });
     await node.init();
     const rpcServer = new RpcServer(rpcPort, '::1', node).on('error', (err: any) => {
       console.error('rpc server error', err);

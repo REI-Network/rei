@@ -92,24 +92,19 @@ export class Node {
     stateManager: StateManager
   ) {
     await stateManager.checkpoint();
-
     for (const addr of Object.keys(accountInfo)) {
       const { nonce, balance, storage, code } = accountInfo[addr];
-
       const address = new Address(Buffer.from(addr.slice(2), 'hex'));
       const account = Account.fromAccountData({ nonce, balance });
       await stateManager.putAccount(address, account);
-
       for (const hexStorageKey of Object.keys(storage)) {
         const val = Buffer.from(storage[hexStorageKey], 'hex');
         const storageKey = setLengthLeft(Buffer.from(hexStorageKey, 'hex'), 32);
         await stateManager.putContractStorage(address, storageKey, val);
       }
-
       const codeBuf = Buffer.from(code.slice(2), 'hex');
       await stateManager.putContractCode(address, codeBuf);
     }
-
     await stateManager.commit();
     return stateManager._trie.root;
   }
@@ -162,7 +157,6 @@ export class Node {
       console.log('read genesis block from file', '0x' + genesisBlock.hash().toString('hex'));
 
       const stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
-      await stateManager.setStateRoot(genesisBlock.header.stateRoot);
       const root = await this.setupAccountInfo(genesisJSON.accountInfo, stateManager);
       if (!root.equals(genesisBlock.header.stateRoot)) {
         console.error('state root not equal', '0x' + root.toString('hex'), '0x' + genesisBlock.header.stateRoot.toString('hex'));
@@ -175,9 +169,11 @@ export class Node {
       database: this.db,
       common: this.common,
       validateConsensus: false,
-      validateBlocks: false,
+      validateBlocks: true,
       genesisBlock
     });
+    await this.blockchain.init();
+
     this.sync = new FullSynchronizer({ node: this });
     this.sync
       .on('error', (err) => {
@@ -187,8 +183,6 @@ export class Node {
         const block = this.blockchain.latestBlock;
         this.newBlock(block);
       });
-
-    await this.blockchain.init();
 
     this.txPool = new TxPool({ node: this });
     await this.txPool.init();
@@ -313,9 +307,11 @@ export class Node {
   private async mineLoop(mineInterval: number) {
     await this.initPromise;
     while (true) {
+      /*
       await new Promise((r) => setTimeout(r, mineInterval));
       const block = await this.worker!.getPendingBlock();
       await this.newBlock(await this.processBlock(block));
+      */
     }
   }
 }

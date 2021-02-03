@@ -247,14 +247,14 @@ export class Node {
     });
   }
 
-  async processBlock(blockSkeleton: Block) {
+  async processBlock(blockSkeleton: Block, generate: boolean = true) {
     await this.initPromise;
     console.debug('process block:', blockSkeleton.header.number.toString());
     const lastHeader = await this.db.getHeader(blockSkeleton.header.parentHash, blockSkeleton.header.number.subn(1));
     const opts = {
       block: blockSkeleton,
       root: lastHeader.stateRoot,
-      generate: !blockSkeleton.header.stateRoot
+      generate
     };
     const { result, block } = await (await this.getVM(lastHeader.stateRoot)).runBlock(opts);
     blockSkeleton = block || blockSkeleton;
@@ -306,12 +306,12 @@ export class Node {
 
   private async mineLoop(mineInterval: number) {
     await this.initPromise;
+    /*
     while (true) {
-      /*
       await new Promise((r) => setTimeout(r, mineInterval));
       const block = await this.worker!.getPendingBlock();
       await this.newBlock(await this.processBlock(block));
-      */
     }
+    */
   }
 }

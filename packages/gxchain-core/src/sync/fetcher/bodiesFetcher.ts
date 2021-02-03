@@ -116,7 +116,7 @@ export class BodiesFetcher extends Fetcher<BodiesFetcherTaskData, BodiesFetcherT
   protected async process(task: BodiesFetcherTask): Promise<boolean> {
     try {
       const block = task.result!;
-      await this.node.processBlock(block);
+      await this.node.processBlock(block, false);
       return this.abortFlag || block.header.number.toNumber() === this.bestHeight;
     } catch (err) {
       this.emit('error', err);

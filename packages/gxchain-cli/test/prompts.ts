@@ -167,7 +167,7 @@ const startPrompts = async (node: Node) => {
       );
       const tx = unsignedTx.sign(getPrivateKey(arr[1]));
       console.log('puttx 0x' + tx.hash().toString('hex'));
-      node.txPool.addTxs(tx);
+      await node.addPendingTxs([tx]);
     } else if (arr[0] === 'lstxpool') {
       await node.txPool.ls();
     } else if (arr[0] === 'pending' || arr[0] === 'p') {

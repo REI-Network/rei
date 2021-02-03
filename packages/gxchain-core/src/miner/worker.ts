@@ -69,6 +69,7 @@ export class Worker {
       {
         header: {
           ...this.header,
+          timestamp: new BN(Date.now()),
           transactionsTrie: await Transaction.calculateTransactionTrie(this.txs)
         },
         transactions: this.txs

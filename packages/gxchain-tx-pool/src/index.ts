@@ -376,9 +376,11 @@ export class TxPool {
       this.removeTxFromGlobal(forwards);
       const { removed: drops } = queue.filter(accountInDB.balance, this.currentHeader.gasLimit);
       this.removeTxFromGlobal(drops);
-      readies = queue.ready(await account.getPendingNonce());
-      for (const tx of readies) {
-        this.promoteTx(tx);
+      const totalReadies = queue.ready(await account.getPendingNonce());
+      for (const tx of totalReadies) {
+        if (this.promoteTx(tx)) {
+          readies.push(tx);
+        }
       }
       if (!this.locals.has(sender)) {
         const resizes = queue.resize(this.accountQueue);

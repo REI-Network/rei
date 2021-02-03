@@ -40,10 +40,8 @@ export class Node {
 
   public db!: Database;
   public common!: Common;
-  public stateManager!: StateManager;
   public peerpool!: PeerPool;
   public blockchain!: Blockchain;
-  public vm!: VM;
   public sync!: Synchronizer;
   public txPool!: TxPool;
   public worker?: Worker;
@@ -80,17 +78,19 @@ export class Node {
     return coinbase ? hexStringToBuffer(coinbase) : undefined;
   }
 
-  async setupAccountInfo(accountInfo: {
-    [index: string]: {
-      nonce: string;
-      balance: string;
-      storage: {
-        [index: string]: string;
+  private async setupAccountInfo(
+    accountInfo: {
+      [index: string]: {
+        nonce: string;
+        balance: string;
+        storage: {
+          [index: string]: string;
+        };
+        code: string;
       };
-      code: string;
-    };
-  }) {
-    const stateManager = this.stateManager;
+    },
+    stateManager: StateManager
+  ) {
     await stateManager.checkpoint();
 
     for (const addr of Object.keys(accountInfo)) {
@@ -145,13 +145,11 @@ export class Node {
       poa
     );
     this.db = new Database(this.rawdb, this.common);
-    this.stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
 
     let genesisBlock!: Block;
     try {
       const genesisHash = await this.db.numberToHash(new BN(0));
       genesisBlock = await this.db.getBlock(genesisHash);
-      this.stateManager._trie.root = genesisBlock.header.stateRoot;
       console.log('find genesis block in db', '0x' + genesisHash.toString('hex'));
     } catch (error) {
       if (error.type !== 'NotFoundError') {
@@ -163,7 +161,9 @@ export class Node {
       genesisBlock = Block.genesis({ header: genesisJSON.genesisInfo.genesis }, { common: this.common });
       console.log('read genesis block from file', '0x' + genesisBlock.hash().toString('hex'));
 
-      const root = await this.setupAccountInfo(genesisJSON.accountInfo);
+      const stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
+      await stateManager.setStateRoot(genesisBlock.header.stateRoot);
+      const root = await this.setupAccountInfo(genesisJSON.accountInfo, stateManager);
       if (!root.equals(genesisBlock.header.stateRoot)) {
         console.error('state root not equal', '0x' + root.toString('hex'), '0x' + genesisBlock.header.stateRoot.toString('hex'));
         throw new Error('state root not equal');
@@ -178,11 +178,6 @@ export class Node {
       validateBlocks: false,
       genesisBlock
     });
-    this.vm = new VM({
-      common: this.common,
-      stateManager: this.stateManager,
-      blockchain: this.blockchain
-    });
     this.sync = new FullSynchronizer({ node: this });
     this.sync
       .on('error', (err) => {
@@ -194,7 +189,6 @@ export class Node {
       });
 
     await this.blockchain.init();
-    await this.vm.init();
 
     this.txPool = new TxPool({ node: this });
     await this.txPool.init();
@@ -266,10 +260,9 @@ export class Node {
     const opts = {
       block: blockSkeleton,
       root: lastHeader.stateRoot,
-      generate: !!blockSkeleton.header.stateRoot,
-      skipBlockValidation: true
+      generate: !blockSkeleton.header.stateRoot
     };
-    const { result, block } = await this.vm.runBlock(opts);
+    const { result, block } = await (await this.getVM(lastHeader.stateRoot)).runBlock(opts);
     blockSkeleton = block || blockSkeleton;
     await this.blockchain.putBlock(blockSkeleton);
     await this.db.batch([DBSaveReceipts(result.receipts, blockSkeleton.hash(), blockSkeleton.header.number)]);

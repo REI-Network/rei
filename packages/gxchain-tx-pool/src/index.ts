@@ -109,7 +109,7 @@ export class TxPool {
   });
 
   private readonly node: INode;
-  private initPromise: Promise<void>;
+  private readonly initPromise: Promise<void>;
 
   private currentHeader!: BlockHeader;
   private currentStateManager!: StateManager;
@@ -254,23 +254,24 @@ export class TxPool {
     await this.initPromise;
     await this.lock.lock();
     try {
-      await this._addTxs(txs, false);
+      const readies = await this._addTxs(txs, false);
       this.truncatePending();
       this.truncateQueue();
       this.lock.release();
+      return readies;
     } catch (err) {
       this.lock.release();
       throw err;
     }
   }
 
-  private async _addTxs(txs: Transaction | Transaction[], force: boolean) {
+  private async _addTxs(txs: Transaction | Transaction[], force: boolean): Promise<Transaction[]> {
     txs = txs instanceof Transaction ? [txs] : txs;
     const dirtyAddrs: Address[] = [];
     for (const tx of txs) {
       const addr = tx.getSenderAddress();
       if (!(await this.validateTx(tx))) {
-        return;
+        return [];
       }
       // drop tx if pool is full
       const account = this.getAccount(addr);
@@ -284,10 +285,11 @@ export class TxPool {
       // journalTx
     }
     if (!force && dirtyAddrs.length > 0) {
-      await this.promoteExecutables(dirtyAddrs);
+      return await this.promoteExecutables(dirtyAddrs);
     } else if (force) {
-      await this.promoteExecutables();
+      return await this.promoteExecutables();
     }
+    return [];
   }
 
   private removeTxFromGlobal(key: Transaction | Transaction[]) {
@@ -362,10 +364,11 @@ export class TxPool {
     return inserted;
   }
 
-  private async promoteExecutables(dirtyAddrs?: Address[]) {
-    const promoteAccount = async (sender: Buffer, account: TxPoolAccount) => {
+  private async promoteExecutables(dirtyAddrs?: Address[]): Promise<Transaction[]> {
+    const promoteAccount = async (sender: Buffer, account: TxPoolAccount): Promise<Transaction[]> => {
+      let readies: Transaction[] = [];
       if (!account.hasQueue()) {
-        return;
+        return readies;
       }
       const queue = account.queue;
       const accountInDB = await this.currentStateManager.getAccount(new Address(sender));
@@ -373,7 +376,7 @@ export class TxPool {
       this.removeTxFromGlobal(forwards);
       const { removed: drops } = queue.filter(accountInDB.balance, this.currentHeader.gasLimit);
       this.removeTxFromGlobal(drops);
-      const readies = queue.ready(await account.getPendingNonce());
+      readies = queue.ready(await account.getPendingNonce());
       for (const tx of readies) {
         this.promoteTx(tx);
       }
@@ -385,18 +388,21 @@ export class TxPool {
       if (!account.hasQueue() && !account.hasPending()) {
         this.accounts.delete(sender);
       }
+      return readies;
     };
 
+    let readies: Transaction[] = [];
     if (dirtyAddrs) {
       for (const addr of dirtyAddrs) {
         const account = this.getAccount(addr);
-        await promoteAccount(addr.buf, account);
+        readies = readies.concat(await promoteAccount(addr.buf, account));
       }
     } else {
       for (const [sender, account] of this.accounts) {
-        await promoteAccount(sender, account);
+        readies = readies.concat(await promoteAccount(sender, account));
       }
     }
+    return readies;
   }
 
   private async demoteUnexecutables() {

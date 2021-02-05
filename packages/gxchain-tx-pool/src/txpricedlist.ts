@@ -1,5 +1,5 @@
 import { Transaction } from '@gxchain2/tx';
-import { FunctionalMap } from '@gxchain2/utils';
+import BN from 'bn.js';
 import Heap from 'qheap';
 import { txSlots } from './index';
 
@@ -13,22 +13,22 @@ export class TxPricedList {
     this.remotes = new Heap({ comparBefore: (a: Transaction, b: Transaction) => b.gasPrice.gt(a.gasPrice) });
   }
 
-  Put(tx: Transaction, local: Boolean) {
+  put(tx: Transaction, local: boolean) {
     if (local) {
       return;
     }
     this.remotes.push(tx);
   }
 
-  Removed(count: number) {
+  removed(count: number) {
     this.stales += count;
     if (this.stales <= this.remotes.length / 4) {
       return;
     }
-    this.Reheap();
+    this.reheap();
   }
 
-  Cap(threshold: number): Transaction[] {
+  cap(threshold: BN): Transaction[] {
     let drop: Transaction[] = [];
     while (this.remotes.length > 0) {
       let cheapest: Transaction = this.remotes.peek();
@@ -37,7 +37,7 @@ export class TxPricedList {
         this.stales--;
         continue;
       }
-      if (cheapest.gasPrice.gten(threshold)) {
+      if (cheapest.gasPrice.gte(threshold)) {
         break;
       }
       this.remotes.remove();
@@ -46,7 +46,7 @@ export class TxPricedList {
     return drop;
   }
 
-  Underpriced(tx: Transaction): Boolean {
+  underpriced(tx: Transaction): boolean {
     while (this.remotes.length > 0) {
       const head: Transaction = this.remotes.peek();
       if (!this.all.has(head.hash())) {
@@ -63,8 +63,8 @@ export class TxPricedList {
     return cheapest.gasPrice.gt(tx.gasPrice);
   }
 
-  Discard(slots: number, force: Boolean): [Transaction[] | undefined, Boolean] {
-    let drop: Transaction[] = new Array(slots);
+  discard(slots: number, force: boolean): [Transaction[] | undefined, boolean] {
+    let drop: Transaction[] = [];
     while (this.remotes.length > 0 && slots > 0) {
       let tx: Transaction = this.remotes.remove();
       if (!this.all.has(tx.hash())) {
@@ -83,7 +83,7 @@ export class TxPricedList {
     return [drop, true];
   }
 
-  Reheap() {
+  reheap() {
     let reheap = new Heap({ comparBefore: (a: Transaction, b: Transaction) => b.gasPrice.gt(a.gasPrice) });
     this.stales = 0;
     this.all.forEach((val, key, map) => {

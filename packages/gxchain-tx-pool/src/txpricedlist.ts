@@ -1,4 +1,5 @@
 import { Transaction } from '@gxchain2/tx';
+import { FunctionalMap } from '@gxchain2/utils';
 import Heap from 'qheap';
 import { txSlots } from './index';
 
@@ -6,10 +7,10 @@ export class TxPricedList {
   remotes: Heap;
   stales: number;
   all: Map<Buffer, Transaction>;
-  constructor(all: Map<Buffer, Transaction>, stales: number) {
+  constructor(all: Map<Buffer, Transaction>) {
     this.all = all;
     this.stales = 0;
-    this.remotes = new Heap({ comparBefore: (a: Transaction, b: Transaction) => a.gasPrice.gt(b.gasPrice) });
+    this.remotes = new Heap({ comparBefore: (a: Transaction, b: Transaction) => b.gasPrice.gt(a.gasPrice) });
   }
 
   Put(tx: Transaction, local: Boolean) {
@@ -30,7 +31,7 @@ export class TxPricedList {
   Cap(threshold: number): Transaction[] {
     let drop: Transaction[] = [];
     while (this.remotes.length > 0) {
-      let cheapest = this.remotes[0];
+      let cheapest: Transaction = this.remotes.peek();
       if (!this.all.has(cheapest.hash())) {
         this.remotes.remove();
         this.stales--;
@@ -47,7 +48,7 @@ export class TxPricedList {
 
   Underpriced(tx: Transaction): Boolean {
     while (this.remotes.length > 0) {
-      const head: Transaction = this.remotes[0];
+      const head: Transaction = this.remotes.peek();
       if (!this.all.has(head.hash())) {
         this.stales--;
         this.remotes.remove();
@@ -58,7 +59,7 @@ export class TxPricedList {
     if (this.remotes.length == 0) {
       return false;
     }
-    let cheapest: Transaction = this.remotes[0];
+    let cheapest: Transaction = this.remotes.peek();
     return cheapest.gasPrice.gt(tx.gasPrice);
   }
 
@@ -83,7 +84,7 @@ export class TxPricedList {
   }
 
   Reheap() {
-    let reheap = new Heap({ comparBefore: (a: Transaction, b: Transaction) => a.gasPrice.gt(b.gasPrice) });
+    let reheap = new Heap({ comparBefore: (a: Transaction, b: Transaction) => b.gasPrice.gt(a.gasPrice) });
     this.stales = 0;
     this.all.forEach((val, key, map) => {
       reheap.push(val);

@@ -113,7 +113,7 @@ const startPrompts = async (node: Node) => {
       }
     } else if (arr[0] === 'lstx') {
       try {
-        const tx = await node.db.getTransaction(hexStringToBuffer(arr[1]));
+        const tx = await node.db.getWrappedTransaction(hexStringToBuffer(arr[1]));
         console.log(tx.toRPCJSON());
       } catch (err) {
         if (err.type === 'NotFoundError') {

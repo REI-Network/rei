@@ -1,7 +1,7 @@
 import { BN, Address } from 'ethereumjs-util';
 import Heap from 'qheap';
 import { FunctionalMap } from '@gxchain2/utils';
-import { Transaction } from '@gxchain2/tx';
+import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { StateManager } from '@gxchain2/state-manager';
 import { Blockchain } from '@gxchain2/blockchain';
 import { BlockHeader, Block, BlockBodyBuffer } from '@gxchain2/block';
@@ -17,24 +17,24 @@ interface INode {
   getStateManager(root: Buffer): Promise<StateManager>;
 }
 
-export function txSlots(tx: Transaction) {
+export function txSlots(tx: WrappedTransaction) {
   return Math.ceil(tx.size / 32768);
 }
 
-export function txCost(tx: Transaction) {
-  return tx.value.add(tx.gasPrice.mul(tx.gasLimit));
+export function txCost(tx: WrappedTransaction) {
+  return tx.transaction.value.add(tx.transaction.gasPrice.mul(tx.transaction.gasLimit));
 }
 
-export function checkTxIntrinsicGas(tx: Transaction) {
-  const gas = tx.toCreationAddress() ? new BN(53000) : new BN(21000);
+export function checkTxIntrinsicGas(tx: WrappedTransaction) {
+  const gas = tx.transaction.toCreationAddress() ? new BN(53000) : new BN(21000);
   const nz = new BN(0);
   const z = new BN(0);
-  for (const b of tx.data) {
+  for (const b of tx.transaction.data) {
     (b !== 0 ? nz : z).iaddn(1);
   }
   gas.iadd(nz.muln(16));
   gas.iadd(z.muln(4));
-  return gas.lte(uint64Max) && gas.lte(tx.gasLimit);
+  return gas.lte(uint64Max) && gas.lte(tx.transaction.gasLimit);
 }
 
 const uint64Max = new BN(Buffer.from('ffffffffffffffff', 'hex'));
@@ -97,7 +97,7 @@ class TxPoolAccount {
 export class TxPool {
   private readonly accounts: FunctionalMap<Buffer, TxPoolAccount>;
   private readonly locals: FunctionalMap<Buffer, boolean>;
-  private readonly txs: FunctionalMap<Buffer, Transaction>;
+  private readonly txs: FunctionalMap<Buffer, WrappedTransaction>;
   private readonly node: INode;
   private readonly initPromise: Promise<void>;
 
@@ -142,7 +142,7 @@ export class TxPool {
       return 0;
     };
     this.accounts = new FunctionalMap<Buffer, TxPoolAccount>(bufferCompare);
-    this.txs = new FunctionalMap<Buffer, Transaction>(bufferCompare);
+    this.txs = new FunctionalMap<Buffer, WrappedTransaction>(bufferCompare);
     this.locals = new FunctionalMap<Buffer, boolean>(bufferCompare);
 
     this.initPromise = this.init();
@@ -205,10 +205,10 @@ export class TxPool {
 
     const originalNewBlock = newBlock;
     let oldBlock = await getBlock(this.currentHeader.hash(), this.currentHeader.number);
-    let discarded: Transaction[] = [];
+    let discarded: WrappedTransaction[] = [];
     const included = new FunctionalMap<Buffer, boolean>();
     while (oldBlock.header.number.gt(newBlock.header.number)) {
-      discarded = discarded.concat(oldBlock.transactions);
+      discarded = discarded.concat(oldBlock.transactions.map((tx) => new WrappedTransaction(tx)));
       oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
     }
     while (newBlock.header.number.gt(oldBlock.header.number)) {
@@ -218,16 +218,16 @@ export class TxPool {
       newBlock = await getBlock(newBlock.header.parentHash, newBlock.header.number.subn(1));
     }
     while (!oldBlock.hash().equals(newBlock.hash())) {
-      discarded = discarded.concat(oldBlock.transactions);
+      discarded = discarded.concat(oldBlock.transactions.map((tx) => new WrappedTransaction(tx)));
       oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
       for (const tx of newBlock.transactions) {
         included.set(tx.hash(), true);
       }
       newBlock = await getBlock(newBlock.header.parentHash, newBlock.header.number.subn(1));
     }
-    const reinject: Transaction[] = [];
+    const reinject: WrappedTransaction[] = [];
     for (const tx of discarded) {
-      if (!included.has(tx.hash())) {
+      if (!included.has(tx.transaction.hash())) {
         reinject.push(tx);
       }
     }
@@ -239,7 +239,7 @@ export class TxPool {
     this.truncateQueue();
   }
 
-  async addTxs(txs: Transaction | Transaction[]) {
+  async addTxs(txs: WrappedTransaction | WrappedTransaction[]) {
     await this.initPromise;
     const readies = await this._addTxs(txs, false);
     this.truncatePending();
@@ -247,17 +247,17 @@ export class TxPool {
     return readies;
   }
 
-  private async _addTxs(txs: Transaction | Transaction[], force: boolean): Promise<Map<Buffer, Transaction[]> | undefined> {
-    txs = txs instanceof Transaction ? [txs] : txs;
+  private async _addTxs(txs: WrappedTransaction | WrappedTransaction[], force: boolean): Promise<Map<Buffer, WrappedTransaction[]> | undefined> {
+    txs = txs instanceof WrappedTransaction ? [txs] : txs;
     const dirtyAddrs: Address[] = [];
     for (const tx of txs) {
-      const addr = tx.getSenderAddress();
+      const addr = tx.transaction.getSenderAddress();
       if (!(await this.validateTx(tx))) {
         return;
       }
       // drop tx if pool is full
       const account = this.getAccount(addr);
-      if (account.hasPending() && account.pending.has(tx.nonce)) {
+      if (account.hasPending() && account.pending.has(tx.transaction.nonce)) {
         this.promoteTx(tx);
       } else {
         if (this.enqueueTx(tx)) {
@@ -273,35 +273,35 @@ export class TxPool {
     }
   }
 
-  private removeTxFromGlobal(key: Transaction | Transaction[]) {
+  private removeTxFromGlobal(key: WrappedTransaction | WrappedTransaction[]) {
     if (Array.isArray(key)) {
       for (const tx of key) {
-        this.txs.delete(tx.hash());
+        this.txs.delete(tx.transaction.hash());
       }
     } else {
-      this.txs.delete(key.hash());
+      this.txs.delete(key.transaction.hash());
     }
   }
 
-  private async validateTx(tx: Transaction): Promise<boolean> {
+  private async validateTx(tx: WrappedTransaction): Promise<boolean> {
     // TODO: report error.
     try {
       if (tx.size > this.txMaxSize) {
         return false;
       }
-      if (!tx.isSigned()) {
+      if (!tx.transaction.isSigned()) {
         return false;
       }
-      if (this.currentHeader.gasLimit.lt(tx.gasLimit)) {
+      if (this.currentHeader.gasLimit.lt(tx.transaction.gasLimit)) {
         return false;
       }
-      const senderAddr = tx.getSenderAddress();
+      const senderAddr = tx.transaction.getSenderAddress();
       const sender = senderAddr.buf;
-      if (!this.locals.has(sender) && tx.gasPrice.lt(this.priceLimit)) {
+      if (!this.locals.has(sender) && tx.transaction.gasPrice.lt(this.priceLimit)) {
         return false;
       }
       const accountInDB = await this.currentStateManager.getAccount(senderAddr);
-      if (accountInDB.nonce.gt(tx.nonce)) {
+      if (accountInDB.nonce.gt(tx.transaction.nonce)) {
         return false;
       }
       if (accountInDB.balance.lt(txCost(tx))) {
@@ -316,11 +316,11 @@ export class TxPool {
     }
   }
 
-  private enqueueTx(tx: Transaction): boolean {
-    const account = this.getAccount(tx.getSenderAddress());
+  private enqueueTx(tx: WrappedTransaction): boolean {
+    const account = this.getAccount(tx.transaction.getSenderAddress());
     const { inserted, old } = account.queue.push(tx, this.priceBump);
     if (inserted) {
-      this.txs.set(tx.hash(), tx);
+      this.txs.set(tx.transaction.hash(), tx);
     }
     if (old) {
       this.removeTxFromGlobal(old);
@@ -331,23 +331,23 @@ export class TxPool {
     return inserted;
   }
 
-  private promoteTx(tx: Transaction): boolean {
-    const account = this.getAccount(tx.getSenderAddress());
+  private promoteTx(tx: WrappedTransaction): boolean {
+    const account = this.getAccount(tx.transaction.getSenderAddress());
     const { inserted, old } = account.pending.push(tx, this.priceBump);
     if (inserted) {
-      this.txs.set(tx.hash(), tx);
+      this.txs.set(tx.transaction.hash(), tx);
     }
     if (old) {
       this.removeTxFromGlobal(old);
     }
-    account.updatePendingNonce(tx.nonce.addn(1));
+    account.updatePendingNonce(tx.transaction.nonce.addn(1));
     account.timestamp = Date.now();
     return inserted;
   }
 
-  private async promoteExecutables(dirtyAddrs?: Address[]): Promise<Map<Buffer, Transaction[]>> {
-    const promoteAccount = async (sender: Buffer, account: TxPoolAccount): Promise<Transaction[]> => {
-      let readies: Transaction[] = [];
+  private async promoteExecutables(dirtyAddrs?: Address[]): Promise<Map<Buffer, WrappedTransaction[]>> {
+    const promoteAccount = async (sender: Buffer, account: TxPoolAccount): Promise<WrappedTransaction[]> => {
+      let readies: WrappedTransaction[] = [];
       if (!account.hasQueue()) {
         return readies;
       }
@@ -374,7 +374,7 @@ export class TxPool {
       return readies;
     };
 
-    const txs = new Map<Buffer, Transaction[]>();
+    const txs = new Map<Buffer, WrappedTransaction[]>();
     if (dirtyAddrs) {
       for (const addr of dirtyAddrs) {
         const account = this.getAccount(addr);
@@ -443,7 +443,7 @@ export class TxPool {
       const pending = account.pending;
       const [tx] = pending.resize(pending.size - 1);
       this.removeTxFromGlobal(tx);
-      account.updatePendingNonce(tx.nonce, true);
+      account.updatePendingNonce(tx.transaction.nonce, true);
       // resize priced
       pendingSlots -= txSlots(tx);
     };

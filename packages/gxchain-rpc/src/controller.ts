@@ -119,6 +119,7 @@ export class Controller {
     return blockHeader.toJSON();
   }
 
+  /*
   async eth_getTransactionByHash([hash]: [string]): Promise<any> {
     return (await this.node.db.getTransaction(hexStringToBuffer(hash))).toRPCJSON();
   }
@@ -134,6 +135,7 @@ export class Controller {
   async eth_getTransactionReceipt([hash]: [string]): Promise<any> {
     return (await this.node.db.getReceipt(hexStringToBuffer(hash))).toRPCJSON;
   }
+  */
 
   async eth_getUncleByBlockHashAndIndex([data, quantity]: [string, string]): Promise<any> {
     return {};

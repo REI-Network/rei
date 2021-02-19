@@ -12,10 +12,10 @@ import { Libp2pNode, PeerPool } from '@gxchain2/network';
 import { Common, constants, defaultGenesis } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { StateManager } from '@gxchain2/state-manager';
-import VM from '@gxchain2/vm';
+import { VM, WrappedVM } from '@gxchain2/vm';
 import { TxPool } from '@gxchain2/tx-pool';
 import { Block } from '@gxchain2/block';
-import { Transaction } from '@gxchain2/tx';
+import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { hexStringToBuffer, SemaphoreLock } from '@gxchain2/utils';
 
 import { FullSynchronizer, Synchronizer } from './sync';
@@ -238,13 +238,15 @@ export class Node {
     return stateManager;
   }
 
-  async getVM(root: Buffer) {
+  async getWrappedVM(root: Buffer) {
     const stateManager = await this.getStateManager(root);
-    return new VM({
-      common: this.common,
-      stateManager,
-      blockchain: this.blockchain
-    });
+    return new WrappedVM(
+      new VM({
+        common: this.common,
+        stateManager,
+        blockchain: this.blockchain
+      })
+    );
   }
 
   async processBlock(blockSkeleton: Block, generate: boolean = true) {
@@ -256,7 +258,7 @@ export class Node {
       root: lastHeader.stateRoot,
       generate
     };
-    const { result, block } = await (await this.getVM(lastHeader.stateRoot)).runBlock(opts);
+    const { result, block } = await (await this.getWrappedVM(lastHeader.stateRoot)).runBlock(opts);
     blockSkeleton = block || blockSkeleton;
     await this.blockchain.putBlock(blockSkeleton);
     await this.db.batch([DBSaveReceipts(result.receipts, blockSkeleton.hash(), blockSkeleton.header.number)]);
@@ -293,7 +295,7 @@ export class Node {
     await this.initPromise;
     await this.pendingLock.lock();
     try {
-      const readies = await this.txPool.addTxs(txs);
+      const readies = await this.txPool.addTxs(txs.map((tx) => new WrappedTransaction(tx)));
       if (readies && readies.size > 0) {
         await this.worker?.addTxs(readies);
       }

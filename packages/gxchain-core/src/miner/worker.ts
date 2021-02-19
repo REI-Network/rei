@@ -1,16 +1,16 @@
 import { BN } from 'ethereumjs-util';
 import { Block, BlockHeader } from '@gxchain2/block';
-import { Transaction } from '@gxchain2/tx';
+import { Transaction, calculateTransactionTrie, WrappedTransaction } from '@gxchain2/tx';
 import { PendingTxMap } from '@gxchain2/tx-pool';
-import VM from '@gxchain2/vm';
-import { RunTxResult } from '@gxchain2/vm/dist/runTx';
+import { WrappedVM } from '@gxchain2/vm';
+import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import { Node } from '../node';
 
 export class Worker {
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
-  private vm!: VM;
-  private txs: Transaction[] = [];
+  private wvm!: WrappedVM;
+  private txs: WrappedTransaction[] = [];
   private header!: BlockHeader;
   private gasUsed = new BN(0);
 
@@ -33,8 +33,8 @@ export class Worker {
   }
 
   private async _newBlock(block: Block) {
-    if (this.vm) {
-      await this.vm.stateManager.revert();
+    if (this.wvm) {
+      await this.wvm.vm.stateManager.revert();
     }
     this.txs = [];
     this.gasUsed = new BN(0);
@@ -50,11 +50,11 @@ export class Worker {
       },
       { common: this.node.common }
     );
-    await (this.vm = await this.node.getVM(block.header.stateRoot)).stateManager.checkpoint();
+    await (this.wvm = await this.node.getWrappedVM(block.header.stateRoot)).vm.stateManager.checkpoint();
     await this.commit(await this.node.txPool.getPendingMap());
   }
 
-  async addTxs(map: Map<Buffer, Transaction[]>) {
+  async addTxs(map: Map<Buffer, WrappedTransaction[]>) {
     await this.initPromise;
     const pendingMap = new PendingTxMap();
     for (const [sender, sortedTxs] of map) {
@@ -70,9 +70,9 @@ export class Worker {
         header: {
           ...this.header,
           timestamp: new BN(Date.now()),
-          transactionsTrie: await Transaction.calculateTransactionTrie(this.txs)
+          transactionsTrie: await calculateTransactionTrie(this.txs.map((tx) => tx.transaction))
         },
-        transactions: this.txs
+        transactions: this.txs.map((tx) => tx.transaction)
       },
       { common: this.node.common }
     );
@@ -82,28 +82,28 @@ export class Worker {
     let tx = pendingMap.peek();
     while (tx) {
       try {
-        await this.vm.stateManager.checkpoint();
+        await this.wvm.vm.stateManager.checkpoint();
 
         let txRes: RunTxResult;
         try {
-          txRes = await this.vm.runTx({
-            tx,
+          txRes = await this.wvm.vm.runTx({
+            tx: tx.transaction,
             block: Block.fromBlockData({ header: this.header }, { common: this.node.common }),
             skipBalance: false,
             skipNonce: false
           });
         } catch (err) {
-          await this.vm.stateManager.revert();
+          await this.wvm.vm.stateManager.revert();
           pendingMap.pop();
           tx = pendingMap.peek();
           continue;
         }
 
         if (this.header.gasLimit.lt(txRes.gasUsed.add(this.gasUsed))) {
-          await this.vm.stateManager.revert();
+          await this.wvm.vm.stateManager.revert();
           pendingMap.pop();
         } else {
-          await this.vm.stateManager.commit();
+          await this.wvm.vm.stateManager.commit();
           this.txs.push(tx);
           this.gasUsed.iadd(txRes.gasUsed);
           pendingMap.shift();

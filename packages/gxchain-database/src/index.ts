@@ -1,9 +1,12 @@
+import type { LevelUp } from 'levelup';
 import { DBManager, CacheMap } from '@ethereumjs/blockchain/dist/db/manager';
 import { DBOp, DBTarget, DatabaseKey, DBOpData } from '@ethereumjs/blockchain/dist/db/operation';
+import Cache from '@ethereumjs/blockchain/dist/db/cache';
 import { BN, rlp, toBuffer } from 'ethereumjs-util';
 import { Block, BlockHeader } from '@gxchain2/block';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { Receipt } from '@gxchain2/receipt';
+import { Common } from '@gxchain2/common';
 const level = require('level-mem');
 
 // constants for txLookup and receipts
@@ -130,6 +133,15 @@ export function DBSaveReceipts(receipts: Receipt[], blockHash: Buffer, blockNumb
 }
 
 export class Database extends DBManager {
+  constructor(db: LevelUp, common: Common) {
+    super(db, common);
+    const self: any = this;
+    self._cache = Object.assign(self._cache, {
+      receipts: new Cache({ max: 256 }),
+      txLookup: new Cache({ max: 512 })
+    });
+  }
+
   async get(dbOperationTarget: DBTarget, key?: DatabaseKey): Promise<any> {
     const dbGetOperation = DBOp_get(dbOperationTarget, key);
 

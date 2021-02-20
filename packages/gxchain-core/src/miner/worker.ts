@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
 import { Block, BlockHeader } from '@gxchain2/block';
-import { Transaction, calculateTransactionTrie, WrappedTransaction } from '@gxchain2/tx';
+import { calculateTransactionTrie, WrappedTransaction } from '@gxchain2/tx';
 import { PendingTxMap } from '@gxchain2/tx-pool';
 import { WrappedVM } from '@gxchain2/vm';
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx';

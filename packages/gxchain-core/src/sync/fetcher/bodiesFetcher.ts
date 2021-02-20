@@ -71,7 +71,7 @@ export class BodiesFetcher extends Fetcher<BodiesFetcherTaskData, BodiesFetcherT
           resultBlocks.push(block);
         } catch (err) {
           retryHeaders.push(headers[i]);
-          this.emit('error', err);
+          console.warn('download bodies ', headers.map((h) => h.number.toString()).join(), ' failed, retry');
         }
       }
       return Object.assign(

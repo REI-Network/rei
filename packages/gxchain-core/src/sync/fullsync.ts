@@ -134,7 +134,7 @@ export class FullSynchronizer extends Synchronizer {
 
       let headers!: BlockHeader[];
       try {
-        headers = await peer.getBlockHeaders(latestHeight, count);
+        headers = await peer.getBlockHeaders(latestHeight, this.count);
       } catch (err) {
         if (err instanceof PeerRequestTimeoutError) {
           this.node.peerpool.ban(peer, this.options.timeoutBanTime || 300000);

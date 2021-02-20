@@ -96,9 +96,7 @@ const startPrompts = async (node: Node) => {
           );
           await node.addPendingTxs([unsignedTx.sign(getPrivateKey(accounts[fromIndex]))]);
           const block = await node.worker!.getPendingBlock();
-          if (i === count - 1) {
-            await node.newBlock(await node.processBlock(block));
-          }
+          await node.newBlock(await node.processBlock(block));
           await new Promise((resolve) => setTimeout(resolve, 10));
         }
       } catch (err) {

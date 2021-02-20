@@ -86,10 +86,9 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
   }
 
   insert(task: Task<TData>) {
-    if (this.abortFlag) {
-      throw new Error('fetcher is already aborted');
+    if (!this.abortFlag) {
+      this.taskQueue.push(task);
     }
-    this.taskQueue.push(task);
   }
 
   async fetch(tasks?: Task<TData, TResult>[]): Promise<boolean> {

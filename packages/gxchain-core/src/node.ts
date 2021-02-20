@@ -261,6 +261,7 @@ export class Node {
     const { result, block } = await (await this.getWrappedVM(lastHeader.stateRoot)).runBlock(opts);
     blockSkeleton = block || blockSkeleton;
     await this.blockchain.putBlock(blockSkeleton);
+    await this.blockchain.saveTxLookup(blockSkeleton);
     await this.db.batch([DBSaveReceipts(result.receipts, blockSkeleton.hash(), blockSkeleton.header.number)]);
     return blockSkeleton;
   }

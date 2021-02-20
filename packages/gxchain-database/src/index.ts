@@ -85,41 +85,16 @@ export function DBOp_del(operationTarget: DBTarget, key?: DatabaseKey): DBOp {
   }
 }
 
-export function DBSetBlockOrHeader(blockBody: Block | BlockHeader): DBOp[] {
-  const header: BlockHeader = blockBody instanceof Block ? blockBody.header : blockBody;
+export function DBSaveTxLookup(block: Block): DBOp[] {
   const dbOps: DBOp[] = [];
+  const blockNumber = block.header.number;
 
-  const blockNumber = header.number;
-  const blockHash = header.hash();
-
-  const headerValue = header.serialize();
-  dbOps.push(
-    DBOp.set(DBTarget.Header, headerValue, {
-      blockNumber,
-      blockHash
-    })
-  );
-
-  const isGenesis = header.number.eqn(0);
-
-  if (isGenesis || (blockBody instanceof Block && (blockBody.transactions.length || blockBody.uncleHeaders.length))) {
-    const bodyValue = rlp.encode(blockBody.raw().slice(1));
+  for (const tx of block.transactions) {
     dbOps.push(
-      DBOp.set(DBTarget.Body, bodyValue, {
-        blockNumber,
-        blockHash
-      })
+      DBOp_set(DBTarget_TxLookup, toBuffer(blockNumber), {
+        txHash: tx.hash()
+      } as any)
     );
-  }
-
-  if (blockBody instanceof Block) {
-    for (const tx of blockBody.transactions) {
-      dbOps.push(
-        DBOp_set(DBTarget_TxLookup, toBuffer(blockNumber), {
-          txHash: tx.hash()
-        } as any)
-      );
-    }
   }
 
   return dbOps;
@@ -221,5 +196,4 @@ export const createLevelDB = (path: string) => {
   return levelUp(encoding(levelDown(path)));
 };
 
-export { DBSetTD, DBSetHashToNumber, DBSaveLookups } from '@ethereumjs/blockchain/dist/db/helpers';
 export { DBTarget, DBOp };

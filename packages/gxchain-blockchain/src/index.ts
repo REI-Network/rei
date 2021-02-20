@@ -1,6 +1,6 @@
 import EthereumBlockchain, { BlockchainOptions as EthereumBlockchainOptions } from '@ethereumjs/blockchain';
 import { Block } from '@gxchain2/block';
-import { Database } from '@gxchain2/database';
+import { Database, DBSaveTxLookup } from '@gxchain2/database';
 import { EventEmitter } from 'events';
 
 export interface BlockchainOptions extends EthereumBlockchainOptions {
@@ -53,6 +53,11 @@ export class Blockchain extends EthereumBlockchain {
   async putBlock(block: Block) {
     await super.putBlock(block);
     await this.updateLatest();
+  }
+
+  async saveTxLookup(block: Block) {
+    await this.initPromise;
+    await this.dbManager.batch(DBSaveTxLookup(block));
   }
 
   private validatePOA(block: Block): boolean {

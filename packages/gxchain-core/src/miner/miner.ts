@@ -49,8 +49,10 @@ export class Miner extends Loop {
   }
 
   async startLoop() {
-    await this.init();
-    await super.startLoop();
+    if (this.options) {
+      await this.init();
+      await super.startLoop();
+    }
   }
 
   protected async process() {

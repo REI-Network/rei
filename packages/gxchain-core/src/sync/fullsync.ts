@@ -162,6 +162,7 @@ export class FullSynchronizer extends Synchronizer {
 
   private async syncWithPeer(peer: Peer, bestHeight: number, updateAbort: (newAbort: () => Promise<void>) => void): Promise<boolean> {
     const localHeight = await this.findAncient(peer);
+    this.emit('start synchronize');
     console.debug('get best height from:', peer.peerId, 'best height:', bestHeight, 'local height:', localHeight);
     let totalCount = bestHeight - localHeight;
     let totalTaskCount = 0;
@@ -205,6 +206,7 @@ export class FullSynchronizer extends Synchronizer {
     updateAbort(async () => {
       await Promise.all([headerFetcher.reset(), bodiesFetcher.reset()]);
     });
-    return (await Promise.all([headerFetcher.fetch(headerFetcherTasks), bodiesFetcher.fetch()])).reduce((a, b) => a && b, true);
+    const result = (await Promise.all([headerFetcher.fetch(headerFetcherTasks), bodiesFetcher.fetch()])).reduce((a, b) => a && b, true);
+    return result;
   }
 }

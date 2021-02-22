@@ -95,7 +95,7 @@ const startPrompts = async (node: Node) => {
             { common: node.common }
           );
           await node.addPendingTxs([unsignedTx.sign(getPrivateKey(accounts[fromIndex]))]);
-          const block = await node.worker!.getPendingBlock();
+          const block = await node.miner.worker.getPendingBlock();
           await node.newBlock(await node.processBlock(block));
           await new Promise((resolve) => setTimeout(resolve, 10));
         }
@@ -170,7 +170,7 @@ const startPrompts = async (node: Node) => {
       await node.txPool.ls();
     } else if (arr[0] === 'pending' || arr[0] === 'p') {
       try {
-        const block = await node.worker!.getPendingBlock();
+        const block = await node.miner.worker.getPendingBlock();
         await node.newBlock(await node.processBlock(block));
       } catch (err) {
         console.error('Run block error', err);
@@ -194,14 +194,7 @@ const startPrompts = async (node: Node) => {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir);
     }
-    const node = new Node({
-      databasePath: dir,
-      mine: {
-        coinbase: '0x3289621709f5b35d09b4335e129907ac367a0593',
-        mineInterval: 10,
-        gasLimit: ''
-      }
-    });
+    const node = new Node({ databasePath: dir });
     await node.init();
     const rpcServer = new RpcServer(rpcPort, '::1', node).on('error', (err: any) => {
       console.error('rpc server error', err);

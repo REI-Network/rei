@@ -48,7 +48,6 @@ export class JsonRPCMiddleware {
 
       const p = this.config.methods[method](params);
       const result = util.types.isPromise(p) ? await p : p;
-      // const result = await this.config.methods[method](params, raw);
       const afterMethod = this.config.afterMethods && this.config.afterMethods[method];
       if (afterMethod) {
         await helper.executeHook(afterMethod, params, result);

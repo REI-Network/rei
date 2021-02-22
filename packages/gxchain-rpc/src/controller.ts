@@ -1,6 +1,6 @@
 import { Node } from '@gxchain2/core';
 import { Block, JsonBlock, BlockHeader, JsonHeader } from '@gxchain2/block';
-import { Account, Address, bufferToHex, keccakFromHexString } from 'ethereumjs-util';
+import { Account, Address, bufferToHex, keccakFromHexString, toBuffer } from 'ethereumjs-util';
 //import { Transaction } from '@gxchain2/tx';
 
 import * as helper from './helper';
@@ -19,7 +19,7 @@ export class Controller {
     } else if (tag === 'latest') {
       block = this.node.blockchain.latestBlock;
     } else if (tag === 'pending') {
-      helper.throwRpcErr('Unsupport pending block');
+      block = await this.node.miner.worker.getPendingBlock();
     } else if (Number.isInteger(Number(tag))) {
       block = await this.node.blockchain.getBlock(Number(tag));
     } else {
@@ -28,16 +28,24 @@ export class Controller {
     return block;
   }
 
-  //web3_clientVersion
-
+  async web3_clientVersion() {
+    return 'Mist/v0.0.1/darwin/node12.19.0/typescript4.1.5';
+  }
   async web_sha3([data]: [string]): Promise<string> {
     return await bufferToHex(keccakFromHexString(data));
   }
-
-  //aysnc eth_net_version()
-  //aysnc eth_net_listenging()
-  //aysnc eth_netpeer_Count()
-  //aysnc eth_protocolVersion()
+  async net_version() {
+    return '1';
+  }
+  async net_listenging() {
+    return true;
+  }
+  async net_peerCount() {
+    return bufferToHex(toBuffer(this.node.peerpool.peers.length));
+  }
+  async eth_protocolVersion() {
+    return '1';
+  }
   //aysnc eth_syncing()
   async eth_coinbase(): Promise<string> {
     return await '0x0000000000000000000000000000000000000000';

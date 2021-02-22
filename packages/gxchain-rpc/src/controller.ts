@@ -94,35 +94,20 @@ export class Controller {
     const number = (await this.node.db.getBlock(hexStringToBuffer(hash))).transactions.length;
     return bufferToHex(toBuffer(number));
   }
-
   async eth_getBlockTransactionCountByNumber([tag]: [string]): Promise<string> {
-    let transactionNumber!: number;
-    if (tag === 'earliest') {
-      transactionNumber = await (await this.node.blockchain.getBlock(0)).transactions.length;
-    } else if (tag === 'latest') {
-      transactionNumber = this.node.blockchain.latestBlock.transactions.length;
-    } else if (tag === 'pending') {
-      helper.throwRpcErr('Unsupport pending block');
-    } else if (Number.isInteger(Number(tag))) {
-      transactionNumber = (await this.node.blockchain.getBlock(Number(tag))).transactions.length;
-    } else {
-      helper.throwRpcErr('Invalid tag value');
-    }
-    return bufferToHex(Buffer.from(transactionNumber.toString));
+    const number = (await this.getBlockByTag(tag)).transactions.length;
+    return bufferToHex(toBuffer(number));
   }
-
-  async eth_getUncleCountByBlockHash([data]: [string]): Promise<string> {
-    return '0x00';
-  } //0
-
+  async eth_getUncleCountByBlockHash([hash]: [string]): Promise<string> {
+    return bufferToHex(toBuffer(0));
+  }
   async eth_getUncleCountByBlockNumber([tag]: [string]): Promise<string> {
-    return '0x00';
+    return bufferToHex(toBuffer(0));
   }
-
-  async eth_getCode([data, tag]: [Address, string]): Promise<any> {
-    /*
-    return await this.node.vm.stateManager.getContractCode(data);
-    */
+  async eth_getCode([address, tag]: [string, string]): Promise<any> {
+    const stateManager = await this.getStateManagerByTag(tag);
+    const code = await stateManager.getContractCode(Address.fromString(address));
+    return bufferToHex(code);
   }
 
   //eth_sign

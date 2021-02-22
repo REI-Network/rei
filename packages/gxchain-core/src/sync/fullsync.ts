@@ -37,11 +37,11 @@ export class FullSynchronizer extends Synchronizer {
     // TODO: validata block.
     if (!this.isSyncing) {
       this.sync({ peer, height });
-    } else if (this.bestPeer && this.bestPeer !== peer && this.bestHeight !== undefined && height > this.bestHeight) {
+    } else if (this.bestPeer && this.bestHeight !== undefined && height > this.bestHeight) {
       await this.lock.acquire();
       if (!this.isSyncing) {
         this.sync({ peer, height });
-      } else if (this.bestPeer && this.bestPeer !== peer && this.bestHeight !== undefined && height > this.bestHeight) {
+      } else if (this.bestPeer && this.bestHeight !== undefined && height > this.bestHeight) {
         await this.syncAbort();
         this.sync({ peer, height });
       }
@@ -134,7 +134,7 @@ export class FullSynchronizer extends Synchronizer {
 
       let headers!: BlockHeader[];
       try {
-        headers = await peer.getBlockHeaders(latestHeight, count);
+        headers = await peer.getBlockHeaders(latestHeight, this.count);
       } catch (err) {
         if (err instanceof PeerRequestTimeoutError) {
           this.node.peerpool.ban(peer, this.options.timeoutBanTime || 300000);

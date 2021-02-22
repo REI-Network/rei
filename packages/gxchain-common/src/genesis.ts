@@ -14,6 +14,9 @@ export const defaultGenesis = {
     }
   },
   genesisInfo: {
+    consensus: {
+      type: 'poa'
+    },
     name: 'gxc2',
     chainId: 12358,
     networkId: 12358,

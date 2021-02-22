@@ -1,10 +1,10 @@
 import Heap from 'qheap';
-import { Transaction } from '@gxchain2/tx';
+import { WrappedTransaction } from '@gxchain2/tx';
 import { FunctionalMap } from '@gxchain2/utils';
 
 export class PendingTxMap {
-  private heap = new Heap({ comparBefore: (a: Transaction, b: Transaction) => a.gasPrice.gt(b.gasPrice) });
-  private txs = new FunctionalMap<Buffer, Transaction[]>((a: Buffer, b: Buffer) => {
+  private heap = new Heap({ comparBefore: (a: WrappedTransaction, b: WrappedTransaction) => a.transaction.gasPrice.gt(b.transaction.gasPrice) });
+  private txs = new FunctionalMap<Buffer, WrappedTransaction[]>((a: Buffer, b: Buffer) => {
     if (a.length < b.length) {
       return -1;
     }
@@ -22,22 +22,29 @@ export class PendingTxMap {
     return 0;
   });
 
-  push(sender: Buffer, sortedTxs: Transaction[]) {
-    this.txs.set(sender, sortedTxs);
-    this.heap.push(sortedTxs[0]);
+  push(sender: Buffer, sortedTxs: WrappedTransaction[]) {
+    if (sortedTxs.length > 0) {
+      this.heap.push(sortedTxs.slice(0, 1)[0]);
+      if (sortedTxs.length > 1) {
+        this.txs.set(sender, sortedTxs.slice(1));
+      }
+    }
   }
 
-  peek(): Transaction | undefined {
+  peek(): WrappedTransaction | undefined {
     return this.heap.peek();
   }
 
   shift() {
-    const tx: Transaction | undefined = this.heap.remove();
+    const tx: WrappedTransaction | undefined = this.heap.remove();
     if (tx) {
-      const sender = tx.getSenderAddress().buf;
+      const sender = tx.transaction.getSenderAddress().buf;
       const nextTx = this.txs.get(sender);
       if (nextTx && nextTx.length > 0) {
         this.heap.push(nextTx.shift());
+        if (nextTx?.length === 0) {
+          this.txs.delete(sender);
+        }
       }
     }
   }

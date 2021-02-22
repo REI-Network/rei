@@ -1,5 +1,1 @@
-import { DefaultStateManager } from '@ethereumjs/vm/dist/state';
-
-class StateManager extends DefaultStateManager {}
-
-export { StateManager };
+export { DefaultStateManager as StateManager } from '@ethereumjs/vm/dist/state';

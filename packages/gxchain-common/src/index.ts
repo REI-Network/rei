@@ -1,7 +1,7 @@
-import EthereumJSCommon, { CommonOpts } from '@ethereumjs/common';
+import EthereumCommon, { CommonOpts } from '@ethereumjs/common';
 import * as constants from './constants';
 
-export class Common extends EthereumJSCommon {
+export class Common extends EthereumCommon {
   // TODO: set POA property to genesis chain params
   private readonly POA: Buffer[];
 

@@ -76,33 +76,6 @@ const startPrompts = async (node: Node) => {
       for (const [peerIdString] of node.peerpool.nodes[0].peerStore.peers.entries()) {
         console.log(peerIdString);
       }
-    } else if (arr[0] === 'mine' || arr[0] === 'm') {
-      try {
-        const lastestHeader = node.blockchain.latestBlock.header;
-        const transactions: Transaction[] = [];
-        const block = Block.fromBlockData(
-          {
-            header: {
-              coinbase: '0x3289621709f5b35d09b4335e129907ac367a0593',
-              difficulty: '0x1',
-              gasLimit: '0x2fefd8',
-              nonce: '0x0102030405060708',
-              number: lastestHeader.number.addn(1),
-              parentHash: lastestHeader.hash(),
-              uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
-              transactionsTrie: await Transaction.calculateTransactionTrie(transactions)
-            },
-            transactions
-          },
-          { common: node.common }
-        );
-        await node.processBlock(block);
-        for (const peer of node.peerpool.peers) {
-          peer.newBlock(node.blockchain.latestBlock);
-        }
-      } catch (err) {
-        console.error('Run block error', err);
-      }
     } else if (arr[0] === 'batchmine' || arr[0] === 'bm') {
       try {
         const count = Number.isInteger(Number(arr[1])) ? Number(arr[1]) : 1000;
@@ -110,7 +83,7 @@ const startPrompts = async (node: Node) => {
           const flag = getRandomIntInclusive(1, 2) == 1;
           const fromIndex = flag ? 0 : 1;
           const toIndex = !flag ? 0 : 1;
-          const account = await node.stateManager.getAccount(Address.fromString(accounts[fromIndex]));
+          const account = await (await node.getStateManager(node.blockchain.latestBlock.header.stateRoot)).getAccount(Address.fromString(accounts[fromIndex]));
           const unsignedTx = Transaction.fromTxData(
             {
               gasLimit: '0x5208',
@@ -121,31 +94,10 @@ const startPrompts = async (node: Node) => {
             },
             { common: node.common }
           );
-          node.txPool.addTxs(unsignedTx.sign(getPrivateKey(accounts[fromIndex])));
-
-          const transactions: Transaction[] = [];
-          const lastestHeader = node.blockchain.latestBlock.header;
-          const block = Block.fromBlockData(
-            {
-              header: {
-                coinbase: '0x3289621709f5b35d09b4335e129907ac367a0593',
-                difficulty: '0x1',
-                gasLimit: '0x2fefd8',
-                nonce: '0x0102030405060708',
-                number: lastestHeader.number.addn(1),
-                parentHash: lastestHeader.hash(),
-                uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
-                transactionsTrie: await Transaction.calculateTransactionTrie(transactions)
-              },
-              transactions
-            },
-            { common: node.common }
-          );
-          await node.processBlock(block);
+          await node.addPendingTxs([unsignedTx.sign(getPrivateKey(accounts[fromIndex]))]);
+          const block = await node.worker!.getPendingBlock();
+          await node.newBlock(await node.processBlock(block));
           await new Promise((resolve) => setTimeout(resolve, 10));
-        }
-        for (const peer of node.peerpool.peers) {
-          peer.newBlock(node.blockchain.latestBlock);
         }
       } catch (err) {
         console.error('Run block error', err);
@@ -159,7 +111,7 @@ const startPrompts = async (node: Node) => {
       }
     } else if (arr[0] === 'lstx') {
       try {
-        const tx = await node.db.getTransaction(hexStringToBuffer(arr[1]));
+        const tx = await node.db.getWrappedTransaction(hexStringToBuffer(arr[1]));
         console.log(tx.toRPCJSON());
       } catch (err) {
         if (err.type === 'NotFoundError') {
@@ -193,12 +145,6 @@ const startPrompts = async (node: Node) => {
       const height = node.blockchain.latestHeight;
       const hash = node.blockchain.latestHash;
       console.log('local height:', height, 'hash:', hash);
-    } else if (arr[0] === 'lsaccount') {
-      const stream = node.stateManager._trie.createReadStream();
-      for await (let data of streamToIterator(stream as any)) {
-        const account = Account.fromRlpSerializedAccount(data.value);
-        console.log('key', '0x' + data.key.toString('hex'), '\nbalance', account.balance.toString(), '\nstateRoot', '0x' + account.stateRoot.toString('hex'));
-      }
     } else if (arr[0] === 'getblock' || arr[0] === 'gb') {
       try {
         const block = await node.blockchain.getBlock(Number(arr[1]));
@@ -209,7 +155,7 @@ const startPrompts = async (node: Node) => {
     } else if (arr[0] === 'puttx') {
       const unsignedTx = Transaction.fromTxData(
         {
-          gasLimit: '0x5208',
+          gasLimit: new BN(21000),
           gasPrice: new BN(arr[4] || 1),
           nonce: new BN(arr[3] || 0),
           to: arr[2],
@@ -219,33 +165,13 @@ const startPrompts = async (node: Node) => {
       );
       const tx = unsignedTx.sign(getPrivateKey(arr[1]));
       console.log('puttx 0x' + tx.hash().toString('hex'));
-      node.txPool.addTxs(tx);
+      await node.addPendingTxs([tx]);
     } else if (arr[0] === 'lstxpool') {
       await node.txPool.ls();
-    } else if (arr[0] === 'pmine') {
+    } else if (arr[0] === 'pending' || arr[0] === 'p') {
       try {
-        const lastestHeader = node.blockchain.latestBlock.header;
-        const transactions: Transaction[] = [];
-        const block = Block.fromBlockData(
-          {
-            header: {
-              coinbase: '0x3289621709f5b35d09b4335e129907ac367a0593',
-              difficulty: '0x1',
-              gasLimit: '0x2fefd8',
-              nonce: '0x0102030405060708',
-              number: lastestHeader.number.addn(1),
-              parentHash: lastestHeader.hash(),
-              uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
-              transactionsTrie: await Transaction.calculateTransactionTrie(transactions)
-            },
-            transactions
-          },
-          { common: node.common }
-        );
-        await node.processBlock(block);
-        for (const peer of node.peerpool.peers) {
-          peer.newBlock(node.blockchain.latestBlock);
-        }
+        const block = await node.worker!.getPendingBlock();
+        await node.newBlock(await node.processBlock(block));
       } catch (err) {
         console.error('Run block error', err);
       }
@@ -268,7 +194,14 @@ const startPrompts = async (node: Node) => {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir);
     }
-    const node = new Node({ databasePath: dir });
+    const node = new Node({
+      databasePath: dir,
+      mine: {
+        coinbase: '0x3289621709f5b35d09b4335e129907ac367a0593',
+        mineInterval: 10,
+        gasLimit: ''
+      }
+    });
     await node.init();
     const rpcServer = new RpcServer(rpcPort, '::1', node).on('error', (err: any) => {
       console.error('rpc server error', err);

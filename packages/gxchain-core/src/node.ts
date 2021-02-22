@@ -12,11 +12,11 @@ import { Libp2pNode, PeerPool } from '@gxchain2/network';
 import { Common, constants, defaultGenesis } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { StateManager } from '@gxchain2/state-manager';
-import VM from '@gxchain2/vm';
+import { VM, WrappedVM } from '@gxchain2/vm';
 import { TxPool } from '@gxchain2/tx-pool';
 import { Block } from '@gxchain2/block';
-import { Transaction } from '@gxchain2/tx';
-import { hexStringToBuffer } from '@gxchain2/utils';
+import { Transaction, WrappedTransaction } from '@gxchain2/tx';
+import { hexStringToBuffer, SemaphoreLock } from '@gxchain2/utils';
 
 import { FullSynchronizer, Synchronizer } from './sync';
 import { Worker } from './miner/worker';
@@ -40,16 +40,23 @@ export class Node {
 
   public db!: Database;
   public common!: Common;
-  public stateManager!: StateManager;
   public peerpool!: PeerPool;
   public blockchain!: Blockchain;
-  public vm!: VM;
   public sync!: Synchronizer;
   public txPool!: TxPool;
   public worker?: Worker;
 
-  private options: NodeOptions;
-  private initPromise: Promise<void>;
+  private readonly options: NodeOptions;
+  private readonly initPromise: Promise<void>;
+  private readonly pendingLock = new SemaphoreLock<BN>((a, b) => {
+    if (a.lt(b)) {
+      return -1;
+    }
+    if (a.gt(b)) {
+      return 1;
+    }
+    return 0;
+  });
 
   constructor(options: NodeOptions) {
     this.options = options;
@@ -71,36 +78,33 @@ export class Node {
     return coinbase ? hexStringToBuffer(coinbase) : undefined;
   }
 
-  async setupAccountInfo(accountInfo: {
-    [index: string]: {
-      nonce: string;
-      balance: string;
-      storage: {
-        [index: string]: string;
+  private async setupAccountInfo(
+    accountInfo: {
+      [index: string]: {
+        nonce: string;
+        balance: string;
+        storage: {
+          [index: string]: string;
+        };
+        code: string;
       };
-      code: string;
-    };
-  }) {
-    const stateManager = this.stateManager;
+    },
+    stateManager: StateManager
+  ) {
     await stateManager.checkpoint();
-
     for (const addr of Object.keys(accountInfo)) {
       const { nonce, balance, storage, code } = accountInfo[addr];
-
       const address = new Address(Buffer.from(addr.slice(2), 'hex'));
       const account = Account.fromAccountData({ nonce, balance });
       await stateManager.putAccount(address, account);
-
       for (const hexStorageKey of Object.keys(storage)) {
         const val = Buffer.from(storage[hexStorageKey], 'hex');
         const storageKey = setLengthLeft(Buffer.from(hexStorageKey, 'hex'), 32);
         await stateManager.putContractStorage(address, storageKey, val);
       }
-
       const codeBuf = Buffer.from(code.slice(2), 'hex');
       await stateManager.putContractCode(address, codeBuf);
     }
-
     await stateManager.commit();
     return stateManager._trie.root;
   }
@@ -136,13 +140,11 @@ export class Node {
       poa
     );
     this.db = new Database(this.rawdb, this.common);
-    this.stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
 
     let genesisBlock!: Block;
     try {
       const genesisHash = await this.db.numberToHash(new BN(0));
       genesisBlock = await this.db.getBlock(genesisHash);
-      this.stateManager._trie.root = genesisBlock.header.stateRoot;
       console.log('find genesis block in db', '0x' + genesisHash.toString('hex'));
     } catch (error) {
       if (error.type !== 'NotFoundError') {
@@ -154,7 +156,8 @@ export class Node {
       genesisBlock = Block.genesis({ header: genesisJSON.genesisInfo.genesis }, { common: this.common });
       console.log('read genesis block from file', '0x' + genesisBlock.hash().toString('hex'));
 
-      const root = await this.setupAccountInfo(genesisJSON.accountInfo);
+      const stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
+      const root = await this.setupAccountInfo(genesisJSON.accountInfo, stateManager);
       if (!root.equals(genesisBlock.header.stateRoot)) {
         console.error('state root not equal', '0x' + root.toString('hex'), '0x' + genesisBlock.header.stateRoot.toString('hex'));
         throw new Error('state root not equal');
@@ -166,32 +169,20 @@ export class Node {
       database: this.db,
       common: this.common,
       validateConsensus: false,
-      validateBlocks: false,
+      validateBlocks: true,
       genesisBlock
     });
-    this.vm = new VM({
-      common: this.common,
-      stateManager: this.stateManager,
-      blockchain: this.blockchain
-    });
+    await this.blockchain.init();
+
     this.sync = new FullSynchronizer({ node: this });
     this.sync
       .on('error', (err) => {
         console.error('Sync error:', err);
       })
-      .on('synchronized', async () => {
-        const newBlock = this.blockchain.latestBlock;
-        for (const peer of this.peerpool.peers) {
-          peer.newBlock(newBlock);
-        }
-        await this.txPool.newBlock(newBlock);
-        if (this.worker) {
-          await this.worker.newBlock(newBlock);
-        }
+      .on('synchronized', () => {
+        const block = this.blockchain.latestBlock;
+        this.newBlock(block);
       });
-
-    await this.blockchain.init();
-    await this.vm.init();
 
     this.txPool = new TxPool({ node: this });
     await this.txPool.init();
@@ -237,11 +228,7 @@ export class Node {
 
     if (this.options.mine) {
       this.worker = new Worker(this);
-      this.mineLoop({
-        coinbase: this.options.mine.coinbase,
-        mineInterval: this.options.mine.mineInterval,
-        gasLimit: new BN(this.options.mine.gasLimit)
-      });
+      this.mineLoop(this.options.mine.mineInterval);
     }
   }
 
@@ -251,29 +238,32 @@ export class Node {
     return stateManager;
   }
 
-  async getVM(root: Buffer) {
+  async getWrappedVM(root: Buffer) {
     const stateManager = await this.getStateManager(root);
-    return new VM({
-      common: this.common,
-      stateManager,
-      blockchain: this.blockchain
-    });
+    return new WrappedVM(
+      new VM({
+        common: this.common,
+        stateManager,
+        blockchain: this.blockchain
+      })
+    );
   }
 
-  async processBlock(blockSkeleton: Block) {
+  async processBlock(blockSkeleton: Block, generate: boolean = true) {
     await this.initPromise;
     console.debug('process block:', blockSkeleton.header.number.toString());
     const lastHeader = await this.db.getHeader(blockSkeleton.header.parentHash, blockSkeleton.header.number.subn(1));
     const opts = {
       block: blockSkeleton,
       root: lastHeader.stateRoot,
-      generate: !!blockSkeleton.header.stateRoot,
-      skipBlockValidation: true
+      generate
     };
-    const { result, block } = await this.vm.runBlock(opts);
+    const { result, block } = await (await this.getWrappedVM(lastHeader.stateRoot)).runBlock(opts);
     blockSkeleton = block || blockSkeleton;
     await this.blockchain.putBlock(blockSkeleton);
+    await this.blockchain.saveTxLookup(blockSkeleton);
     await this.db.batch([DBSaveReceipts(result.receipts, blockSkeleton.hash(), blockSkeleton.header.number)]);
+    return blockSkeleton;
   }
 
   async processBlocks(blocks: Block[]) {
@@ -282,34 +272,49 @@ export class Node {
     }
   }
 
-  private async mineLoop({ coinbase, mineInterval, gasLimit }: { coinbase: string; mineInterval: number; gasLimit: BN }) {
+  async newBlock(block: Block) {
     await this.initPromise;
-    while (true) {
-      await new Promise((r) => setTimeout(r, mineInterval));
-      const transactions: Transaction[] = [];
-      const lastestHeader = this.blockchain.latestBlock.header;
-      const block = Block.fromBlockData(
-        {
-          header: {
-            coinbase,
-            difficulty: '0x1',
-            gasLimit,
-            nonce: '0x0102030405060708',
-            number: lastestHeader.number.addn(1),
-            parentHash: lastestHeader.hash(),
-            uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
-            transactionsTrie: await Transaction.calculateTransactionTrie(transactions)
-          },
-          transactions
-        },
-        { common: this.common }
-      );
-      await this.processBlock(block);
+    if (!(await this.pendingLock.compareLock(block.header.number))) {
+      return;
+    }
+    try {
       for (const peer of this.peerpool.peers) {
         if (peer.isSupport(constants.GXC2_ETHWIRE)) {
-          peer.newBlock(this.blockchain.latestBlock);
+          peer.newBlock(block);
         }
       }
+      await this.txPool.newBlock(block);
+      await this.worker?.newBlock(block);
+      this.pendingLock.release();
+    } catch (err) {
+      console.error('Node new block error:', err);
+      this.pendingLock.release();
     }
+  }
+
+  async addPendingTxs(txs: Transaction[]) {
+    await this.initPromise;
+    await this.pendingLock.lock();
+    try {
+      const readies = await this.txPool.addTxs(txs.map((tx) => new WrappedTransaction(tx)));
+      if (readies && readies.size > 0) {
+        await this.worker?.addTxs(readies);
+      }
+      this.pendingLock.release();
+    } catch (err) {
+      console.error('Node add txs error:', err);
+      this.pendingLock.release();
+    }
+  }
+
+  private async mineLoop(mineInterval: number) {
+    await this.initPromise;
+    /*
+    while (true) {
+      await new Promise((r) => setTimeout(r, mineInterval));
+      const block = await this.worker!.getPendingBlock();
+      await this.newBlock(await this.processBlock(block));
+    }
+    */
   }
 }

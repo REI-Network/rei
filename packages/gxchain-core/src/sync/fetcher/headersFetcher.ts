@@ -38,11 +38,11 @@ export class HeadersFetcher extends Fetcher<HeadersFethcerTaskData, HeadersFethc
     peer.headersIdle = false;
   }
 
-  protected findIdlePeer(): Peer | undefined {
+  protected findIdlePeer(blackList?: Set<string>): Peer | undefined {
     return this.node.peerpool.idle((peer) => this.isValidPeer(peer));
   }
 
-  protected isValidPeer(peer: Peer): boolean {
+  protected isValidPeer(peer: Peer, blackList?: Set<string>): boolean {
     return peer.isSupport(GXC2_ETHWIRE) && peer.headersIdle;
   }
 

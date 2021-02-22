@@ -1,20 +1,11 @@
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
-import { Account, Address, BN, toBuffer } from 'ethereumjs-util';
-
+import { Address, BN, toBuffer } from 'ethereumjs-util';
 import { Block } from '@gxchain2/block';
 import { Receipt, Log } from '@gxchain2/receipt';
-
-import VM from './index';
-import Bloom from './bloom';
-import { RunTxResult } from './runTx';
-import { StateManager } from './state';
-
-import * as DAOConfig from './config/dao_fork_accounts_config.json';
-
-/* DAO account list */
-
-const DAOAccountList = DAOConfig.DAOAccounts;
-const DAORefundContract = DAOConfig.DAORefundContract;
+import VM from '@ethereumjs/vm';
+import Bloom from '@ethereumjs/vm/dist/bloom';
+import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
+import { StateManager } from '@ethereumjs/vm/dist/state';
 
 type PromisResultType<T> = T extends PromiseLike<infer U> ? U : T;
 
@@ -278,26 +269,4 @@ async function rewardAccount(state: StateManager, address: Address, reward: BN):
   const account = await state.getAccount(address);
   account.balance.iadd(reward);
   await state.putAccount(address, account);
-}
-
-// apply the DAO fork changes to the VM
-async function _applyDAOHardfork(state: StateManager) {
-  const DAORefundContractAddress = new Address(Buffer.from(DAORefundContract, 'hex'));
-  if (!state.accountExists(DAORefundContractAddress)) {
-    await state.putAccount(DAORefundContractAddress, new Account());
-  }
-  const DAORefundAccount = await state.getAccount(DAORefundContractAddress);
-
-  for (const addr of DAOAccountList) {
-    // retrieve the account and add it to the DAO's Refund accounts' balance.
-    const address = new Address(Buffer.from(addr, 'hex'));
-    const account = await state.getAccount(address);
-    DAORefundAccount.balance.iadd(account.balance);
-    // clear the accounts' balance
-    account.balance = new BN(0);
-    await state.putAccount(address, account);
-  }
-
-  // finally, put the Refund Account
-  await state.putAccount(DAORefundContractAddress, DAORefundAccount);
 }

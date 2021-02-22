@@ -35,6 +35,10 @@ export class Miner extends Loop {
     });
   }
 
+  get isMining() {
+    return !!this.options;
+  }
+
   get coinbase(): Buffer | undefined {
     const coinbase = this?.options?.coinbase;
     return coinbase ? hexStringToBuffer(coinbase) : undefined;

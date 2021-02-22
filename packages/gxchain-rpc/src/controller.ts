@@ -28,6 +28,10 @@ export class Controller {
     return block;
   }
 
+  private async getStateManagerByTag(tag: string) {
+    return this.node.getStateManager((await this.getBlockByTag(tag)).header.stateRoot);
+  }
+
   async web3_clientVersion() {
     return 'Mist/v0.0.1/darwin/node12.19.0/typescript4.1.5';
   }
@@ -57,25 +61,38 @@ export class Controller {
   async eth_coinbase() {
     return !this.node.miner.coinbase ? '0x0000000000000000000000000000000000000000' : bufferToHex(this.node.miner.coinbase);
   }
+  async eth_mining() {
+    return this.node.miner.isMining;
+  }
+  async eth_hashrate() {
+    return bufferToHex(toBuffer(0));
+  }
+  async eth_gasPrice() {
+    return bufferToHex(toBuffer(1));
+  }
+  async eth_accounts() {
+    return [];
+  }
   async eth_blockNumber() {
     return bufferToHex(this.node.blockchain.latestBlock.header.number.toBuffer());
   }
-  async eth_getStorageAt([address, key, tag]: [string, string, string]): Promise<any> {
-    const blockHeader = (await this.getBlockByTag(tag)).header;
-    const stateManager = await this.node.getStateManager(blockHeader.stateRoot);
+  async eth_getBalance([address, tag]: [string, string]) {
+    const stateManager = await this.getStateManagerByTag(tag);
+    const account = await stateManager.getAccount(Address.fromString(address));
+    return bufferToHex(account.balance.toBuffer());
+  }
+  async eth_getStorageAt([address, key, tag]: [string, string, string]) {
+    const stateManager = await this.getStateManagerByTag(tag);
     return bufferToHex(await stateManager.getContractStorage(Address.fromString(address), hexStringToBuffer(key)));
   }
-
-  async eth_getTransactionCount([address]: [string]): Promise<any> {
-    /*
-    let nonce = Buffer.from((await this.node.stateManager.getAccount(Address.fromString(address))).nonce);
-    return bufferToHex(nonce);
-    */
+  async eth_getTransactionCount([address, tag]: [string, string]) {
+    const stateManager = await this.getStateManagerByTag(tag);
+    const account = await stateManager.getAccount(Address.fromString(address));
+    return bufferToHex(account.nonce.toBuffer());
   }
-
-  async eth_getBlockTransactionCountByHash([hash]: [string]): Promise<string> {
-    let number = (await this.node.db.getBlock(hexStringToBuffer(hash))).transactions.length;
-    return bufferToHex(Buffer.from(number.toString));
+  async eth_getBlockTransactionCountByHash([hash]: [string]) {
+    const number = (await this.node.db.getBlock(hexStringToBuffer(hash))).transactions.length;
+    return bufferToHex(toBuffer(number));
   }
 
   async eth_getBlockTransactionCountByNumber([tag]: [string]): Promise<string> {
@@ -185,15 +202,6 @@ export class Controller {
       balance: account.balance,
       stateRoot: account.stateRoot,
       codeHash: account.codeHash
-    };
-    */
-  }
-
-  async eth_getBalance([address]: [string]): Promise<any> {
-    /*
-    let account = await this.node.stateManager.getAccount(Address.fromString(address));
-    return {
-      balance: account.balance
     };
     */
   }

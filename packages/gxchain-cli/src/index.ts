@@ -49,7 +49,6 @@ async function start() {
           gasLimit: opts.blockGasLimit
         }
       : undefined;
-    console.log('mine opt', mineOptions);
     const node = new Node({
       databasePath: opts.datadir,
       mine: mineOptions,

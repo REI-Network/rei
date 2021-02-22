@@ -144,7 +144,7 @@ export class FullSynchronizer extends Synchronizer {
         throw err;
       }
 
-      for (let i = headers.length - 1; i > 0; i--) {
+      for (let i = headers.length - 1; i >= 0; i--) {
         try {
           const remoteHeader = headers[i];
           const localHeader = await this.node.db.getHeader(remoteHeader.hash(), remoteHeader.number);
@@ -206,7 +206,6 @@ export class FullSynchronizer extends Synchronizer {
     updateAbort(async () => {
       await Promise.all([headerFetcher.reset(), bodiesFetcher.reset()]);
     });
-    const result = (await Promise.all([headerFetcher.fetch(headerFetcherTasks), bodiesFetcher.fetch()])).reduce((a, b) => a && b, true);
-    return result;
+    return (await Promise.all([headerFetcher.fetch(headerFetcherTasks), bodiesFetcher.fetch()])).reduce((a, b) => a && b, true);
   }
 }

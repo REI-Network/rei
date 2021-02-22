@@ -11,10 +11,14 @@ export interface SynchronizerOptions {
 }
 
 export declare interface Synchronizer {
+  on(event: 'start synchronize', lisener: () => void): this;
   on(event: 'synchronized', lisener: () => void): this;
+  on(event: 'synchronize failed', lisener: () => void): this;
   on(event: 'error', lisener: (err: any) => void): this;
 
+  once(event: 'start synchronize', lisener: () => void): this;
   once(event: 'synchronized', lisener: () => void): this;
+  once(event: 'synchronize failed', lisener: () => void): this;
   once(event: 'error', lisener: (err: any) => void): this;
 }
 
@@ -41,9 +45,16 @@ export class Synchronizer extends EventEmitter {
 
   async sync(target?: { peer: Peer; height: number }) {
     try {
-      if (!this.isSyncing && (await this._sync(target))) {
-        console.debug('synchronized');
-        this.emit('synchronized');
+      if (!this.isSyncing) {
+        console.debug('start synchronize');
+        this.emit('start synchronize');
+        if (await this._sync(target)) {
+          console.debug('synchronized');
+          this.emit('synchronized');
+        } else {
+          console.debug('synchronize failed');
+          this.emit('synchronize failed');
+        }
       }
     } catch (err) {
       this.emit('error', err);

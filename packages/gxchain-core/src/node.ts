@@ -73,11 +73,6 @@ export class Node {
     };
   }
 
-  get coinbase(): Buffer | undefined {
-    const coinbase = this.options.mine?.coinbase;
-    return coinbase ? hexStringToBuffer(coinbase) : undefined;
-  }
-
   private async setupAccountInfo(
     accountInfo: {
       [index: string]: {

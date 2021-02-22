@@ -5,21 +5,26 @@ import { PendingTxMap } from '@gxchain2/tx-pool';
 import { WrappedVM } from '@gxchain2/vm';
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import { Aborter } from '@gxchain2/utils';
+import { Miner } from './miner';
 import { Node } from '../node';
 
 export class Worker {
+  private readonly miner: Miner;
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
   private wvm!: WrappedVM;
   private txs: WrappedTransaction[] = [];
   private header!: BlockHeader;
   private gasUsed = new BN(0);
+
   private isWorking = false;
+  private recommitAbortPromise?: Promise<void>;
   private recommitLoopPromise?: Promise<void>;
   private recommitAborter = new Aborter();
 
-  constructor(node: Node) {
+  constructor(node: Node, miner: Miner) {
     this.node = node;
+    this.miner = miner;
     this.initPromise = this.init();
   }
 
@@ -32,10 +37,14 @@ export class Worker {
   }
 
   async startRecommitLoop() {
+    if (this.recommitAbortPromise) {
+      await this.recommitAbortPromise;
+    }
     if (this.recommitLoopPromise) {
-      await this.recommitLoopPromise;
+      return;
     }
     this.recommitLoopPromise = new Promise(async (resolve) => {
+      await this.init();
       while (!this.recommitAborter.isAborted) {
         await this.recommitAborter.abortablePromise(new Promise((r) => setTimeout(r, 5000)));
         if (this.recommitAborter.isAborted) {
@@ -51,10 +60,14 @@ export class Worker {
 
   async stopRecommitLoop() {
     if (this.recommitLoopPromise && !this.recommitAborter.isAborted) {
-      await this.recommitAborter.abort();
-      await this.recommitLoopPromise;
-      this.recommitLoopPromise = undefined;
-      this.recommitAborter.reset();
+      await (this.recommitAbortPromise = new Promise(async (resolve) => {
+        await this.recommitAborter.abort();
+        await this.recommitLoopPromise;
+        this.recommitLoopPromise = undefined;
+        this.recommitAborter.reset();
+        resolve();
+      }));
+      this.recommitAbortPromise = undefined;
     }
   }
 
@@ -71,7 +84,7 @@ export class Worker {
     this.gasUsed = new BN(0);
     this.header = BlockHeader.fromHeaderData(
       {
-        coinbase: this.node.coinbase,
+        coinbase: this.miner.coinbase,
         difficulty: '0x1',
         gasLimit: block.header.gasLimit,
         nonce: '0x0102030405060708',

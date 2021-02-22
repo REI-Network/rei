@@ -4,6 +4,7 @@ import { calculateTransactionTrie, WrappedTransaction } from '@gxchain2/tx';
 import { PendingTxMap } from '@gxchain2/tx-pool';
 import { WrappedVM } from '@gxchain2/vm';
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
+import { Aborter } from '@gxchain2/utils';
 import { Node } from '../node';
 
 export class Worker {
@@ -13,6 +14,9 @@ export class Worker {
   private txs: WrappedTransaction[] = [];
   private header!: BlockHeader;
   private gasUsed = new BN(0);
+  private isWorking = false;
+  private recommitLoopPromise?: Promise<void>;
+  private recommitAborter = new Aborter();
 
   constructor(node: Node) {
     this.node = node;
@@ -25,6 +29,33 @@ export class Worker {
       return;
     }
     await this._newBlock(this.node.blockchain.latestBlock);
+  }
+
+  async startRecommitLoop() {
+    if (this.recommitLoopPromise) {
+      await this.recommitLoopPromise;
+    }
+    this.recommitLoopPromise = new Promise(async (resolve) => {
+      while (!this.recommitAborter.isAborted) {
+        await this.recommitAborter.abortablePromise(new Promise((r) => setTimeout(r, 5000)));
+        if (this.recommitAborter.isAborted) {
+          break;
+        }
+        if (!this.isWorking) {
+          await this.commit(await this.node.txPool.getPendingMap());
+        }
+      }
+      resolve();
+    });
+  }
+
+  async stopRecommitLoop() {
+    if (this.recommitLoopPromise && !this.recommitAborter.isAborted) {
+      await this.recommitAborter.abort();
+      await this.recommitLoopPromise;
+      this.recommitLoopPromise = undefined;
+      this.recommitAborter.reset();
+    }
   }
 
   async newBlock(block: Block) {
@@ -79,6 +110,7 @@ export class Worker {
   }
 
   private async commit(pendingMap: PendingTxMap) {
+    this.isWorking = true;
     let tx = pendingMap.peek();
     while (tx) {
       try {
@@ -114,5 +146,6 @@ export class Worker {
         tx = pendingMap.peek();
       }
     }
+    this.isWorking = false;
   }
 }

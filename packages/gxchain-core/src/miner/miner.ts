@@ -1,5 +1,6 @@
 import { hexStringToBuffer } from '@gxchain2/utils';
 import { Worker } from './worker';
+import { Loop } from './loop';
 import { Node } from '../node';
 
 export interface MinerOptions {
@@ -8,23 +9,29 @@ export interface MinerOptions {
   gasLimit: string;
 }
 
-export class Miner {
-  private readonly woker: Worker;
+export class Miner extends Loop {
+  public readonly worker: Worker;
+  private readonly node: Node;
   private readonly initPromise: Promise<void>;
   private readonly options?: MinerOptions;
 
   constructor(node: Node, options?: MinerOptions) {
+    super(options?.mineInterval || 5000);
+    this.node = node;
     this.options = options;
-    this.woker = new Worker(node, this);
+    this.worker = new Worker(node, this);
     this.initPromise = this.init();
-    node.sync.on('start synchronize', () => {
-      this.woker.stopRecommitLoop();
+    node.sync.on('start synchronize', async () => {
+      await this.worker.stopLoop();
+      await this.stopLoop();
     });
-    node.sync.on('synchronized', () => {
-      this.woker.startRecommitLoop();
+    node.sync.on('synchronized', async () => {
+      await this.worker.startLoop();
+      await this.startLoop();
     });
-    node.sync.on('synchronize failed', () => {
-      this.woker.startRecommitLoop();
+    node.sync.on('synchronize failed', async () => {
+      await this.worker.startLoop();
+      await this.startLoop();
     });
   }
 
@@ -38,6 +45,24 @@ export class Miner {
       await this.initPromise;
       return;
     }
-    await this.woker.init();
+    await this.worker.init();
+  }
+
+  async startLoop() {
+    await this.init();
+    await super.startLoop();
+  }
+
+  protected async process() {
+    try {
+      const block = await this.worker.getPendingBlock();
+      if (block.header.number.eq(this.node.blockchain.latestBlock.header.number.addn(1))) {
+        await this.node.newBlock(await this.node.processBlock(block));
+      } else {
+        console.debug('Miner, process, unkonw error, invalid height');
+      }
+    } catch (err) {
+      console.error('Miner, process, error:', err);
+    }
   }
 }

@@ -4,11 +4,11 @@ import { calculateTransactionTrie, WrappedTransaction } from '@gxchain2/tx';
 import { PendingTxMap } from '@gxchain2/tx-pool';
 import { WrappedVM } from '@gxchain2/vm';
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
-import { Aborter } from '@gxchain2/utils';
+import { Loop } from './loop';
 import { Miner } from './miner';
 import { Node } from '../node';
 
-export class Worker {
+export class Worker extends Loop {
   private readonly miner: Miner;
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
@@ -17,12 +17,8 @@ export class Worker {
   private header!: BlockHeader;
   private gasUsed = new BN(0);
 
-  private isWorking = false;
-  private recommitAbortPromise?: Promise<void>;
-  private recommitLoopPromise?: Promise<void>;
-  private recommitAborter = new Aborter();
-
   constructor(node: Node, miner: Miner) {
+    super(3000);
     this.node = node;
     this.miner = miner;
     this.initPromise = this.init();
@@ -34,41 +30,6 @@ export class Worker {
       return;
     }
     await this._newBlock(this.node.blockchain.latestBlock);
-  }
-
-  async startRecommitLoop() {
-    if (this.recommitAbortPromise) {
-      await this.recommitAbortPromise;
-    }
-    if (this.recommitLoopPromise) {
-      return;
-    }
-    this.recommitLoopPromise = new Promise(async (resolve) => {
-      await this.init();
-      while (!this.recommitAborter.isAborted) {
-        await this.recommitAborter.abortablePromise(new Promise((r) => setTimeout(r, 5000)));
-        if (this.recommitAborter.isAborted) {
-          break;
-        }
-        if (!this.isWorking) {
-          await this.commit(await this.node.txPool.getPendingMap());
-        }
-      }
-      resolve();
-    });
-  }
-
-  async stopRecommitLoop() {
-    if (this.recommitLoopPromise && !this.recommitAborter.isAborted) {
-      await (this.recommitAbortPromise = new Promise(async (resolve) => {
-        await this.recommitAborter.abort();
-        await this.recommitLoopPromise;
-        this.recommitLoopPromise = undefined;
-        this.recommitAborter.reset();
-        resolve();
-      }));
-      this.recommitAbortPromise = undefined;
-    }
   }
 
   async newBlock(block: Block) {
@@ -122,8 +83,17 @@ export class Worker {
     );
   }
 
+  async startLoop() {
+    await this.init();
+    await super.startLoop();
+  }
+
+  protected async process() {
+    await this.commit(await this.node.txPool.getPendingMap());
+  }
+
   private async commit(pendingMap: PendingTxMap) {
-    this.isWorking = true;
+    this.isProcessing = true;
     let tx = pendingMap.peek();
     while (tx) {
       try {
@@ -159,6 +129,6 @@ export class Worker {
         tx = pendingMap.peek();
       }
     }
-    this.isWorking = false;
+    this.isProcessing = false;
   }
 }

@@ -19,7 +19,7 @@ import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { hexStringToBuffer, SemaphoreLock } from '@gxchain2/utils';
 
 import { FullSynchronizer, Synchronizer } from './sync';
-import { Worker } from './miner/worker';
+import { Miner } from './miner';
 
 export interface NodeOptions {
   databasePath: string;
@@ -44,7 +44,7 @@ export class Node {
   public blockchain!: Blockchain;
   public sync!: Synchronizer;
   public txPool!: TxPool;
-  public worker?: Worker;
+  public miner!: Miner;
 
   private readonly options: NodeOptions;
   private readonly initPromise: Promise<void>;
@@ -220,11 +220,7 @@ export class Node {
       });
 
     this.sync.start();
-
-    if (this.options.mine) {
-      this.worker = new Worker(this);
-      this.mineLoop(this.options.mine.mineInterval);
-    }
+    this.miner = new Miner(this, this.options.mine);
   }
 
   async getStateManager(root: Buffer) {
@@ -279,7 +275,7 @@ export class Node {
         }
       }
       await this.txPool.newBlock(block);
-      await this.worker?.newBlock(block);
+      await this.miner.worker.newBlock(block);
       this.pendingLock.release();
     } catch (err) {
       console.error('Node new block error:', err);
@@ -293,23 +289,12 @@ export class Node {
     try {
       const readies = await this.txPool.addTxs(txs.map((tx) => new WrappedTransaction(tx)));
       if (readies && readies.size > 0) {
-        await this.worker?.addTxs(readies);
+        await this.miner.worker.addTxs(readies);
       }
       this.pendingLock.release();
     } catch (err) {
       console.error('Node add txs error:', err);
       this.pendingLock.release();
     }
-  }
-
-  private async mineLoop(mineInterval: number) {
-    await this.initPromise;
-    /*
-    while (true) {
-      await new Promise((r) => setTimeout(r, mineInterval));
-      const block = await this.worker!.getPendingBlock();
-      await this.newBlock(await this.processBlock(block));
-    }
-    */
   }
 }

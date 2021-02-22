@@ -46,23 +46,24 @@ export class Controller {
   async eth_protocolVersion() {
     return '1';
   }
-  //aysnc eth_syncing()
-  async eth_coinbase(): Promise<string> {
-    return await '0x0000000000000000000000000000000000000000';
+  async eth_syncing() {
+    const status = this.node.sync.syncStatus;
+    return {
+      startingBlock: bufferToHex(toBuffer(status.startingBlock)),
+      currentBlock: bufferToHex(this.node.blockchain.latestBlock.header.number.toBuffer()),
+      highestBlock: bufferToHex(toBuffer(status.highestBlock))
+    };
   }
-
-  async eth_blockNumber(): Promise<string> {
-    let blockNumber = await Number(this.node.blockchain.latestBlock.header.number);
-    return '0x' + blockNumber.toString(16);
+  async eth_coinbase() {
+    return !this.node.miner.coinbase ? '0x0000000000000000000000000000000000000000' : bufferToHex(this.node.miner.coinbase);
   }
-
+  async eth_blockNumber() {
+    return bufferToHex(this.node.blockchain.latestBlock.header.number.toBuffer());
+  }
   async eth_getStorageAt([address, key, tag]: [string, string, string]): Promise<any> {
-    /*
     const blockHeader = (await this.getBlockByTag(tag)).header;
-    const stateManager = this.node.stateManager.copy();
-    await stateManager.setStateRoot(blockHeader.stateRoot);
+    const stateManager = await this.node.getStateManager(blockHeader.stateRoot);
     return bufferToHex(await stateManager.getContractStorage(Address.fromString(address), hexStringToBuffer(key)));
-    */
   }
 
   async eth_getTransactionCount([address]: [string]): Promise<any> {

@@ -1,4 +1,4 @@
-import { Transaction } from '@gxchain2/tx';
+import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import BN from 'bn.js';
 import Heap from 'qheap';
 import { txSlots } from './index';
@@ -6,14 +6,14 @@ import { txSlots } from './index';
 export class TxPricedList {
   remotes: Heap;
   stales: number;
-  all: Map<Buffer, Transaction>;
-  constructor(all: Map<Buffer, Transaction>) {
+  all: Map<Buffer, WrappedTransaction>;
+  constructor(all: Map<Buffer, WrappedTransaction>) {
     this.all = all;
     this.stales = 0;
-    this.remotes = new Heap({ comparBefore: (a: Transaction, b: Transaction) => b.gasPrice.gt(a.gasPrice) });
+    this.remotes = new Heap({ comparBefore: (a: WrappedTransaction, b: WrappedTransaction) => b.transaction.gasPrice.gt(a.transaction.gasPrice) });
   }
 
-  put(tx: Transaction, local: boolean) {
+  put(tx: WrappedTransaction, local: boolean) {
     if (local) {
       return;
     }
@@ -28,16 +28,16 @@ export class TxPricedList {
     this.reheap();
   }
 
-  cap(threshold: BN): Transaction[] {
-    let drop: Transaction[] = [];
+  cap(threshold: BN): WrappedTransaction[] {
+    let drop: WrappedTransaction[] = [];
     while (this.remotes.length > 0) {
-      let cheapest: Transaction = this.remotes.peek();
-      if (!this.all.has(cheapest.hash())) {
+      let cheapest: WrappedTransaction = this.remotes.peek();
+      if (!this.all.has(cheapest.transaction.hash())) {
         this.remotes.remove();
         this.stales--;
         continue;
       }
-      if (cheapest.gasPrice.gte(threshold)) {
+      if (cheapest.transaction.gasPrice.gte(threshold)) {
         break;
       }
       this.remotes.remove();
@@ -46,10 +46,10 @@ export class TxPricedList {
     return drop;
   }
 
-  underpriced(tx: Transaction): boolean {
+  underpriced(tx: WrappedTransaction): boolean {
     while (this.remotes.length > 0) {
-      const head: Transaction = this.remotes.peek();
-      if (!this.all.has(head.hash())) {
+      const head: WrappedTransaction = this.remotes.peek();
+      if (!this.all.has(head.transaction.hash())) {
         this.stales--;
         this.remotes.remove();
         continue;
@@ -59,15 +59,15 @@ export class TxPricedList {
     if (this.remotes.length == 0) {
       return false;
     }
-    let cheapest: Transaction = this.remotes.peek();
-    return cheapest.gasPrice.gt(tx.gasPrice);
+    let cheapest: WrappedTransaction = this.remotes.peek();
+    return cheapest.transaction.gasPrice.gt(tx.transaction.gasPrice);
   }
 
-  discard(slots: number, force: boolean): [Transaction[] | undefined, boolean] {
-    let drop: Transaction[] = [];
+  discard(slots: number, force: boolean): [WrappedTransaction[] | undefined, boolean] {
+    let drop: WrappedTransaction[] = [];
     while (this.remotes.length > 0 && slots > 0) {
-      let tx: Transaction = this.remotes.remove();
-      if (!this.all.has(tx.hash())) {
+      let tx: WrappedTransaction = this.remotes.remove();
+      if (!this.all.has(tx.transaction.hash())) {
         this.stales--;
         continue;
       }
@@ -84,7 +84,7 @@ export class TxPricedList {
   }
 
   reheap() {
-    let reheap = new Heap({ comparBefore: (a: Transaction, b: Transaction) => b.gasPrice.gt(a.gasPrice) });
+    let reheap = new Heap({ comparBefore: (a: WrappedTransaction, b: WrappedTransaction) => b.transaction.gasPrice.gt(a.transaction.gasPrice) });
     this.stales = 0;
     this.all.forEach((val, key, map) => {
       reheap.push(val);

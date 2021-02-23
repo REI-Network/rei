@@ -1,5 +1,5 @@
 import { Node } from '@gxchain2/core';
-import { Block, JsonBlock, BlockHeader, JsonHeader } from '@gxchain2/block';
+import { Block, JsonBlock, BlockHeader, JsonHeader, WrappedBlock } from '@gxchain2/block';
 import { Account, Address, bnToHex, bufferToHex, keccakFromHexString, toBuffer, BN } from 'ethereumjs-util';
 import { Transaction } from '@gxchain2/tx';
 
@@ -166,13 +166,11 @@ export class Controller {
     const result = await this.runCall(data, tag);
     return bnToHex(result.gasUsed);
   }
-  async eth_getBlockByHash([hash, fullTransactions]: [string, boolean]): Promise<JsonBlock> {
-    return (await this.node.db.getBlock(hexStringToBuffer(hash))).toJSON();
+  async eth_getBlockByHash([hash, fullTransactions]: [string, boolean]) {
+    return new WrappedBlock(await this.node.db.getBlock(hexStringToBuffer(hash))).toRPCJSON();
   }
-
-  async eth_getBlockByNumber([tag, fullTransactions]: [string, boolean]): Promise<JsonBlock> {
-    const block = await this.getBlockByTag(tag);
-    return block.toJSON();
+  async eth_getBlockByNumber([tag, fullTransactions]: [string, boolean]) {
+    return new WrappedBlock(await this.getBlockByTag(tag)).toRPCJSON();
   }
 
   async eth_getBlockHeaderByNumber([tag, fullTransactions]: [string, boolean]): Promise<JsonHeader> {

@@ -1,6 +1,6 @@
 import { Node } from '@gxchain2/core';
 import { Block, JsonBlock, BlockHeader, JsonHeader } from '@gxchain2/block';
-import { Account, Address, bufferToHex, keccakFromHexString, toBuffer, BN } from 'ethereumjs-util';
+import { Account, Address, bnToHex, bufferToHex, keccakFromHexString, toBuffer, BN } from 'ethereumjs-util';
 import { Transaction } from '@gxchain2/tx';
 
 import * as helper from './helper';
@@ -40,6 +40,20 @@ export class Controller {
 
   private async getStateManagerByTag(tag: string) {
     return this.node.getStateManager((await this.getBlockByTag(tag)).header.stateRoot);
+  }
+
+  private async runCall(data: CallData, tag: string) {
+    const block = await this.getBlockByTag(tag);
+    const wvm = await this.node.getWrappedVM(block.header.stateRoot);
+    return await wvm.vm.runCall({
+      block,
+      gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
+      origin: data.from ? Address.fromString(data.from) : undefined,
+      gasLimit: data.gas ? hexStringToBN(data.gas) : undefined,
+      to: data.to ? Address.fromString(data.to) : undefined,
+      value: data.value ? hexStringToBN(data.value) : undefined,
+      data: data.data ? hexStringToBuffer(data.data) : undefined
+    });
   }
 
   async web3_clientVersion() {
@@ -89,7 +103,7 @@ export class Controller {
   async eth_getBalance([address, tag]: [string, string]) {
     const stateManager = await this.getStateManagerByTag(tag);
     const account = await stateManager.getAccount(Address.fromString(address));
-    return bufferToHex(account.balance.toBuffer());
+    return bnToHex(account.balance);
   }
   async eth_getStorageAt([address, key, tag]: [string, string, string]) {
     const stateManager = await this.getStateManagerByTag(tag);
@@ -98,7 +112,7 @@ export class Controller {
   async eth_getTransactionCount([address, tag]: [string, string]) {
     const stateManager = await this.getStateManagerByTag(tag);
     const account = await stateManager.getAccount(Address.fromString(address));
-    return bufferToHex(account.nonce.toBuffer());
+    return bnToHex(account.nonce);
   }
   async eth_getBlockTransactionCountByHash([hash]: [string]) {
     const number = (await this.node.db.getBlock(hexStringToBuffer(hash))).transactions.length;
@@ -145,20 +159,13 @@ export class Controller {
     return bufferToHex(tx.hash());
   }
   async eth_call([data, tag]: [CallData, string]) {
-    const block = await this.getBlockByTag(tag);
-    const wvm = await this.node.getWrappedVM(block.header.stateRoot);
-    const result = await wvm.vm.runCall({
-      block,
-      gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
-      origin: data.from ? Address.fromString(data.from) : undefined,
-      gasLimit: data.gas ? hexStringToBN(data.gas) : undefined,
-      to: data.to ? Address.fromString(data.to) : undefined,
-      value: data.value ? hexStringToBN(data.value) : undefined,
-      data: data.data ? hexStringToBuffer(data.data) : undefined
-    });
+    const result = await this.runCall(data, tag);
     return bufferToHex(result.execResult.returnValue);
   }
-  //eth_estimateGas
+  async eth_estimateGas([data, tag]: [CallData, string]) {
+    const result = await this.runCall(data, tag);
+    return bnToHex(result.gasUsed);
+  }
   async eth_getBlockByHash([hash, fullTransactions]: [string, boolean]): Promise<JsonBlock> {
     return (await this.node.db.getBlock(hexStringToBuffer(hash))).toJSON();
   }

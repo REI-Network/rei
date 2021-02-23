@@ -1,7 +1,7 @@
 import { Node } from '@gxchain2/core';
 import { Block, JsonBlock, BlockHeader, JsonHeader } from '@gxchain2/block';
-import { Account, Address, bufferToHex, keccakFromHexString, toBuffer } from 'ethereumjs-util';
-//import { Transaction } from '@gxchain2/tx';
+import { Account, Address, bufferToHex, keccakFromHexString, toBuffer, BN } from 'ethereumjs-util';
+import { Transaction } from '@gxchain2/tx';
 
 import * as helper from './helper';
 import { hexStringToBuffer } from '@gxchain2/utils';
@@ -94,23 +94,49 @@ export class Controller {
     const number = (await this.node.db.getBlock(hexStringToBuffer(hash))).transactions.length;
     return bufferToHex(toBuffer(number));
   }
-  async eth_getBlockTransactionCountByNumber([tag]: [string]): Promise<string> {
+  async eth_getBlockTransactionCountByNumber([tag]: [string]) {
     const number = (await this.getBlockByTag(tag)).transactions.length;
     return bufferToHex(toBuffer(number));
   }
-  async eth_getUncleCountByBlockHash([hash]: [string]): Promise<string> {
+  async eth_getUncleCountByBlockHash([hash]: [string]) {
     return bufferToHex(toBuffer(0));
   }
-  async eth_getUncleCountByBlockNumber([tag]: [string]): Promise<string> {
+  async eth_getUncleCountByBlockNumber([tag]: [string]) {
     return bufferToHex(toBuffer(0));
   }
-  async eth_getCode([address, tag]: [string, string]): Promise<any> {
+  async eth_getCode([address, tag]: [string, string]) {
     const stateManager = await this.getStateManagerByTag(tag);
     const code = await stateManager.getContractCode(Address.fromString(address));
     return bufferToHex(code);
   }
+  async eth_sign([address, data]: [string, string]) {
+    return '0x00';
+  }
+  async eth_signTransaction([data]: [
+    {
+      from: string;
+      to?: string;
+      gas?: string;
+      gasPrice?: string;
+      value?: string;
+      data: string;
+      nonce?: string | BN;
+    }
+  ]) {
+    /*
+    if (!data.nonce) {
+      const stateManager = await this.getStateManagerByTag('latest');
+      const account = await stateManager.getAccount(Address.fromString(data.from));
+      data.nonce = account.nonce;
+    }
+    const unsignedTx = Transaction.fromTxData({
+      ...data
+    });
+    unsignedTx.sign(privateKey);
+    */
+    return '0x00';
+  }
 
-  //eth_sign
   //eth_signTransaction
   //eth_sendTransaction
   //eth_sendRawTransaction

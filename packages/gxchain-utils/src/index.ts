@@ -1,3 +1,5 @@
+import { BN } from 'ethereumjs-util';
+
 interface Constructor<T = {}> {
   new (...args: any[]): T;
 }
@@ -30,6 +32,10 @@ export function mixin<T1 extends Constructor, T2 extends Constructor>(mix1: T1, 
 
 export function hexStringToBuffer(hex: string): Buffer {
   return hex.indexOf('0x') === 0 ? Buffer.from(hex.substr(2), 'hex') : Buffer.from(hex, 'hex');
+}
+
+export function hexStringToBN(hex: string): BN {
+  return hex.indexOf('0x') === 0 ? new BN(hex.substr(2), 'hex') : new BN(hex, 'hex');
 }
 
 export * from './abort';

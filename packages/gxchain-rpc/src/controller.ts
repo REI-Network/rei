@@ -4,7 +4,17 @@ import { Account, Address, bufferToHex, keccakFromHexString, toBuffer, BN } from
 import { Transaction } from '@gxchain2/tx';
 
 import * as helper from './helper';
-import { hexStringToBuffer } from '@gxchain2/utils';
+import { hexStringToBuffer, hexStringToBN } from '@gxchain2/utils';
+
+type CallData = {
+  from?: string;
+  to?: string;
+  gas?: string;
+  gasPrice?: string;
+  value?: string;
+  data?: string;
+  nonce?: string | BN;
+};
 
 export class Controller {
   node: Node;
@@ -112,17 +122,7 @@ export class Controller {
   async eth_sign([address, data]: [string, string]) {
     return '0x00';
   }
-  async eth_signTransaction([data]: [
-    {
-      from: string;
-      to?: string;
-      gas?: string;
-      gasPrice?: string;
-      value?: string;
-      data: string;
-      nonce?: string | BN;
-    }
-  ]) {
+  async eth_signTransaction([data]: [CallData]) {
     /*
     if (!data.nonce) {
       const stateManager = await this.getStateManagerByTag('latest');
@@ -131,16 +131,33 @@ export class Controller {
     }
     const unsignedTx = Transaction.fromTxData({
       ...data
-    });
+    }, { common: this.node.common });
     unsignedTx.sign(privateKey);
     */
     return '0x00';
   }
-
-  //eth_signTransaction
-  //eth_sendTransaction
-  //eth_sendRawTransaction
-  //eth_call
+  async eth_sendTransaction([data]: [CallData]) {
+    return '0x00';
+  }
+  async eth_sendRawTransaction([rawtx]: [string]) {
+    const tx = Transaction.fromRlpSerializedTx(hexStringToBuffer(rawtx), { common: this.node.common });
+    await this.node.addPendingTxs([tx]);
+    return bufferToHex(tx.hash());
+  }
+  async eth_call([data, tag]: [CallData, string]) {
+    const block = await this.getBlockByTag(tag);
+    const wvm = await this.node.getWrappedVM(block.header.stateRoot);
+    const result = await wvm.vm.runCall({
+      block,
+      gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
+      origin: data.from ? Address.fromString(data.from) : undefined,
+      gasLimit: data.gas ? hexStringToBN(data.gas) : undefined,
+      to: data.to ? Address.fromString(data.to) : undefined,
+      value: data.value ? hexStringToBN(data.value) : undefined,
+      data: data.data ? hexStringToBuffer(data.data) : undefined
+    });
+    return bufferToHex(result.execResult.returnValue);
+  }
   //eth_estimateGas
   async eth_getBlockByHash([hash, fullTransactions]: [string, boolean]): Promise<JsonBlock> {
     return (await this.node.db.getBlock(hexStringToBuffer(hash))).toJSON();

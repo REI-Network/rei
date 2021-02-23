@@ -1,7 +1,7 @@
 import { Node } from '@gxchain2/core';
 import { Block, JsonBlock, BlockHeader, JsonHeader, WrappedBlock } from '@gxchain2/block';
 import { Account, Address, bnToHex, bufferToHex, keccakFromHexString, toBuffer, BN } from 'ethereumjs-util';
-import { Transaction } from '@gxchain2/tx';
+import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 
 import * as helper from './helper';
 import { hexStringToBuffer, hexStringToBN } from '@gxchain2/utils';
@@ -36,6 +36,10 @@ export class Controller {
       helper.throwRpcErr('Invalid tag value');
     }
     return block;
+  }
+
+  private async getWrappedBlockByTag(tag: string) {
+    return new WrappedBlock(await this.getBlockByTag(tag), tag === 'pending');
   }
 
   private async getStateManagerByTag(tag: string) {
@@ -167,37 +171,33 @@ export class Controller {
     return bnToHex(result.gasUsed);
   }
   async eth_getBlockByHash([hash, fullTransactions]: [string, boolean]) {
-    return new WrappedBlock(await this.node.db.getBlock(hexStringToBuffer(hash))).toRPCJSON();
+    return new WrappedBlock(await this.node.db.getBlock(hexStringToBuffer(hash))).toRPCJSON(fullTransactions);
   }
   async eth_getBlockByNumber([tag, fullTransactions]: [string, boolean]) {
-    return new WrappedBlock(await this.getBlockByTag(tag)).toRPCJSON();
+    return (await this.getWrappedBlockByTag(tag)).toRPCJSON(fullTransactions);
+  }
+  async eth_getTransactionByHash([hash]: [string]) {
+    return new WrappedTransaction(await this.node.db.getTransaction(hexStringToBuffer(hash))).toRPCJSON();
+  }
+  async eth_getTransactionByBlockHashAndIndex([hash, index]: [string, string]) {
+    return new WrappedTransaction((await this.node.db.getBlock(hexStringToBuffer(hash))).transactions[Number(index)]).toRPCJSON();
+  }
+  async eth_getTransactionByBlockNumberAndIndex([tag, index]: [string, string]): Promise<any> {
+    return new WrappedTransaction((await this.getBlockByTag(tag)).transactions[Number(index)]).toRPCJSON();
+  }
+  async eth_getTransactionReceipt([hash]: [string]) {
+    return (await this.node.db.getReceipt(hexStringToBuffer(hash))).toRPCJSON();
+  }
+  async eth_getUncleByBlockHashAndIndex() {
+    return null;
+  }
+  async eth_getCompilers() {
+    return [];
   }
 
   async eth_getBlockHeaderByNumber([tag, fullTransactions]: [string, boolean]): Promise<JsonHeader> {
     const blockHeader = (await this.getBlockByTag(tag)).header;
     return blockHeader.toJSON();
-  }
-
-  /*
-  async eth_getTransactionByHash([hash]: [string]): Promise<any> {
-    return (await this.node.db.getTransaction(hexStringToBuffer(hash))).toRPCJSON();
-  }
-
-  async eth_getTransactionByBlockHashAndIndex([hash, index]: [string, number]): Promise<any> {
-    return (await this.node.db.getBlock(hexStringToBuffer(hash))).transactions[index].toRPCJSON();
-  }
-
-  async eth_getTransactionByBlockNumberAndIndex([number, index]: [number, number]): Promise<any> {
-    return (await this.node.db.getBlock(number)).transactions[index].toRPCJSON();
-  }
-
-  async eth_getTransactionReceipt([hash]: [string]): Promise<any> {
-    return (await this.node.db.getReceipt(hexStringToBuffer(hash))).toRPCJSON;
-  }
-  */
-
-  async eth_getUncleByBlockHashAndIndex([data, quantity]: [string, string]): Promise<any> {
-    return {};
   }
 
   async eth_getUncleByBlockNumberAndIndex([tag, quantity]: [string, string]): Promise<any> {

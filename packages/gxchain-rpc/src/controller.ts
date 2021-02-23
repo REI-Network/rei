@@ -1,6 +1,6 @@
 import { Node } from '@gxchain2/core';
-import { Block, JsonBlock, BlockHeader, JsonHeader, WrappedBlock } from '@gxchain2/block';
-import { Account, Address, bnToHex, bufferToHex, keccakFromHexString, toBuffer, BN } from 'ethereumjs-util';
+import { Block, WrappedBlock } from '@gxchain2/block';
+import { Address, bnToHex, bufferToHex, keccakFromHexString, toBuffer, BN } from 'ethereumjs-util';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 
 import * as helper from './helper';
@@ -66,6 +66,7 @@ export class Controller {
   async web_sha3([data]: [string]): Promise<string> {
     return await bufferToHex(keccakFromHexString(data));
   }
+
   async net_version() {
     return '1';
   }
@@ -75,10 +76,14 @@ export class Controller {
   async net_peerCount() {
     return bufferToHex(toBuffer(this.node.peerpool.peers.length));
   }
+
   async eth_protocolVersion() {
     return '1';
   }
   async eth_syncing() {
+    if (!this.node.sync.isSyncing) {
+      return false;
+    }
     const status = this.node.sync.syncStatus;
     return {
       startingBlock: bufferToHex(toBuffer(status.startingBlock)),
@@ -102,7 +107,7 @@ export class Controller {
     return [];
   }
   async eth_blockNumber() {
-    return bufferToHex(this.node.blockchain.latestBlock.header.number.toBuffer());
+    return bnToHex(this.node.blockchain.latestBlock.header.number);
   }
   async eth_getBalance([address, tag]: [string, string]) {
     const stateManager = await this.getStateManagerByTag(tag);
@@ -191,23 +196,21 @@ export class Controller {
   async eth_getUncleByBlockHashAndIndex() {
     return null;
   }
+  async eth_getUncleByBlockNumberAndIndex() {
+    return null;
+  }
   async eth_getCompilers() {
     return [];
   }
-
-  async eth_getBlockHeaderByNumber([tag, fullTransactions]: [string, boolean]): Promise<JsonHeader> {
-    const blockHeader = (await this.getBlockByTag(tag)).header;
-    return blockHeader.toJSON();
+  async eth_compileSolidity() {
+    helper.throwRpcErr('Unsupported compiler!');
   }
-
-  async eth_getUncleByBlockNumberAndIndex([tag, quantity]: [string, string]): Promise<any> {
-    return {};
+  async eth_compileLLL() {
+    helper.throwRpcErr('Unsupported compiler!');
   }
-
-  //eth_compileSolidity
-  //eth_compileLLL
-  //eth_compileSerpent
-
+  async eth_compileSerpent() {
+    helper.throwRpcErr('Unsupported compiler!');
+  }
   //eth_newFilter
   //eth_newBlockFilter
   //eth_newPendingTransactionFilter
@@ -215,6 +218,20 @@ export class Controller {
   //eth_getFilterChanges
   //eth_getFilterLogs
   //eth_getLogs
+  async eth_getWork() {
+    helper.throwRpcErr('Unsupported eth_getWork!');
+  }
+  async eth_submitWork() {
+    helper.throwRpcErr('Unsupported eth_submitWork!');
+  }
+  async eth_submitHashrate() {
+    helper.throwRpcErr('Unsupported eth_submitHashrate!');
+  }
+
+  //db_putString
+  //db_getString
+  //db_putHex
+  //db_getHex
 
   //shh_version
   //shh_post
@@ -226,16 +243,4 @@ export class Controller {
   //shh_uninstallFilter
   //shh_getFilterChanges
   //shh_getMessages
-
-  async eth_getAccount([address]: [string]): Promise<any> {
-    /*
-    let account = await this.node.stateManager.getAccount(Address.fromString(address));
-    return {
-      nonce: account.nonce,
-      balance: account.balance,
-      stateRoot: account.stateRoot,
-      codeHash: account.codeHash
-    };
-    */
-  }
 }

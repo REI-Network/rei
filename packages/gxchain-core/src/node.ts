@@ -287,11 +287,12 @@ export class Node {
     await this.initPromise;
     await this.pendingLock.lock();
     try {
-      const readies = await this.txPool.addTxs(txs.map((tx) => new WrappedTransaction(tx)));
+      const { results, readies } = await this.txPool.addTxs(txs.map((tx) => new WrappedTransaction(tx)));
       if (readies && readies.size > 0) {
         await this.miner.worker.addTxs(readies);
       }
       this.pendingLock.release();
+      return results;
     } catch (err) {
       console.error('Node add txs error:', err);
       this.pendingLock.release();

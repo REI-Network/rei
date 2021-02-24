@@ -94,6 +94,24 @@ class TxPoolAccount {
   }
 }
 
+const bufferCompare = (a: Buffer, b: Buffer) => {
+  if (a.length < b.length) {
+    return -1;
+  }
+  if (a.length > b.length) {
+    return 1;
+  }
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] < b[i]) {
+      return -1;
+    }
+    if (a[i] > b[i]) {
+      return 1;
+    }
+  }
+  return 0;
+};
+
 export class TxPool {
   private readonly accounts: FunctionalMap<Buffer, TxPoolAccount>;
   private readonly locals: FunctionalMap<Buffer, boolean>;
@@ -124,23 +142,6 @@ export class TxPool {
     this.globalQueue = options.globalQueue || 1024;
 
     this.node = options.node;
-    const bufferCompare = (a: Buffer, b: Buffer) => {
-      if (a.length < b.length) {
-        return -1;
-      }
-      if (a.length > b.length) {
-        return 1;
-      }
-      for (let i = 0; i < a.length; i++) {
-        if (a[i] < b[i]) {
-          return -1;
-        }
-        if (a[i] > b[i]) {
-          return 1;
-        }
-      }
-      return 0;
-    };
     this.accounts = new FunctionalMap<Buffer, TxPoolAccount>(bufferCompare);
     this.txs = new FunctionalMap<Buffer, WrappedTransaction>(bufferCompare);
     this.locals = new FunctionalMap<Buffer, boolean>(bufferCompare);
@@ -241,19 +242,21 @@ export class TxPool {
 
   async addTxs(txs: WrappedTransaction | WrappedTransaction[]) {
     await this.initPromise;
-    const readies = await this._addTxs(txs, false);
+    const result = await this._addTxs(txs, false);
     this.truncatePending();
     this.truncateQueue();
-    return readies;
+    return result;
   }
 
-  private async _addTxs(txs: WrappedTransaction | WrappedTransaction[], force: boolean): Promise<Map<Buffer, WrappedTransaction[]> | undefined> {
+  private async _addTxs(txs: WrappedTransaction | WrappedTransaction[], force: boolean): Promise<{ results: boolean[]; readies?: Map<Buffer, WrappedTransaction[]> }> {
     txs = txs instanceof WrappedTransaction ? [txs] : txs;
     const dirtyAddrs: Address[] = [];
+    const results: boolean[] = [];
     for (const tx of txs) {
       const addr = tx.transaction.getSenderAddress();
       if (!(await this.validateTx(tx))) {
-        return;
+        results.push(false);
+        continue;
       }
       // drop tx if pool is full
       const account = this.getAccount(addr);
@@ -265,11 +268,15 @@ export class TxPool {
         }
       }
       // journalTx
+      results.push(true);
     }
-    if (!force && dirtyAddrs.length > 0) {
-      return await this.promoteExecutables(dirtyAddrs);
+    const flag = results.reduce((a, b) => a || b, false);
+    if (flag && !force && dirtyAddrs.length > 0) {
+      return { results, readies: await this.promoteExecutables(dirtyAddrs) };
     } else if (force) {
-      return await this.promoteExecutables();
+      return { results, readies: await this.promoteExecutables() };
+    } else {
+      return { results };
     }
   }
 
@@ -382,7 +389,7 @@ export class TxPool {
       return readies;
     };
 
-    const txs = new Map<Buffer, WrappedTransaction[]>();
+    const txs = new FunctionalMap<Buffer, WrappedTransaction[]>(bufferCompare);
     if (dirtyAddrs) {
       for (const addr of dirtyAddrs) {
         const account = this.getAccount(addr);

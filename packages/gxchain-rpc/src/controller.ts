@@ -183,8 +183,8 @@ export class Controller {
   }
   async eth_sendRawTransaction([rawtx]: [string]) {
     const tx = Transaction.fromRlpSerializedTx(hexStringToBuffer(rawtx), { common: this.node.common });
-    await this.node.addPendingTxs([tx]);
-    return bufferToHex(tx.hash());
+    const results = await this.node.addPendingTxs([tx]);
+    return results && results.length > 0 && results[0] ? bufferToHex(tx.hash()) : null;
   }
   async eth_call([data, tag]: [CallData, string]) {
     const result = await this.runCall(data, tag);

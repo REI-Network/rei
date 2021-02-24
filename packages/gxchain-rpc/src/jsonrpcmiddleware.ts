@@ -120,9 +120,13 @@ export class JsonRPCMiddleware {
       if (req.ws) {
         next();
       } else {
+        // console.log('incomming', req.body);
         this.rpcMiddleware(
           req.body,
-          (resps: any) => res.send(resps),
+          (resps: any) => {
+            // console.log('response', resps);
+            res.send(resps);
+          },
           () => res.send(this.makeParseError())
         ).catch(onError);
       }

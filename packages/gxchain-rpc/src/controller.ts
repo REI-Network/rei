@@ -47,17 +47,23 @@ export class Controller {
   }
 
   private async runCall(data: CallData, tag: string) {
-    const block = await this.getBlockByTag(tag);
-    const wvm = await this.node.getWrappedVM(block.header.stateRoot);
-    return await wvm.vm.runCall({
-      block,
-      gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
-      origin: data.from ? Address.fromString(data.from) : undefined,
-      gasLimit: data.gas ? hexStringToBN(data.gas) : undefined,
-      to: data.to ? Address.fromString(data.to) : undefined,
-      value: data.value ? hexStringToBN(data.value) : undefined,
-      data: data.data ? hexStringToBuffer(data.data) : undefined
-    });
+    try {
+      const block = await this.getBlockByTag(tag);
+      const wvm = await this.node.getWrappedVM(block.header.stateRoot);
+      return await wvm.vm.runCall({
+        block,
+        gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
+        origin: data.from ? Address.fromString(data.from) : Address.zero(),
+        caller: data.from ? Address.fromString(data.from) : Address.zero(),
+        gasLimit: data.gas ? hexStringToBN(data.gas) : undefined,
+        to: data.to ? Address.fromString(data.to) : undefined,
+        value: data.value ? hexStringToBN(data.value) : undefined,
+        data: data.data ? hexStringToBuffer(data.data) : undefined
+      });
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
   }
 
   async web3_clientVersion() {
@@ -68,7 +74,7 @@ export class Controller {
   }
 
   async net_version() {
-    return '1';
+    return '77';
   }
   async net_listenging() {
     return true;
@@ -90,6 +96,9 @@ export class Controller {
       currentBlock: bufferToHex(this.node.blockchain.latestBlock.header.number.toBuffer()),
       highestBlock: bufferToHex(toBuffer(status.highestBlock))
     };
+  }
+  async eth_chainId() {
+    return bufferToHex(toBuffer(this.node.common.chainId()));
   }
   async eth_coinbase() {
     return !this.node.miner.coinbase ? '0x0000000000000000000000000000000000000000' : bufferToHex(this.node.miner.coinbase);

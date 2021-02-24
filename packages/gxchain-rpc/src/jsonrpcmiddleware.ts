@@ -58,10 +58,10 @@ export class JsonRPCMiddleware {
       const error = {
         code: Number(err.code || err.status || errors.INTERNAL_ERROR.code),
         message: err.message || errors.INTERNAL_ERROR.message,
-        data: null
+        data: undefined
       };
       if (err && err.data) error.data = err.data;
-      return { jsonrpc, error, id: id || null };
+      return { jsonrpc, error, id };
     }
   }
 
@@ -73,6 +73,13 @@ export class JsonRPCMiddleware {
         return memo;
       }, [])
     );
+  }
+
+  private makeParseError() {
+    return {
+      jsonrpc: this.VERSION,
+      error: errors.PARSE_ERROR
+    };
   }
 
   async rpcMiddleware(rpcData: any, send: (res: any) => void, onParseError: () => void) {
@@ -91,7 +98,7 @@ export class JsonRPCMiddleware {
       try {
         rpcData = JSON.parse(msg.data);
       } catch (err) {
-        ws.send(JSON.stringify(errors.PARSE_ERROR));
+        ws.send(JSON.stringify(this.makeParseError()));
         return;
       }
       this.rpcMiddleware(
@@ -103,7 +110,7 @@ export class JsonRPCMiddleware {
             onError(err);
           }
         },
-        () => ws.send(JSON.stringify(errors.PARSE_ERROR))
+        () => ws.send(JSON.stringify(this.makeParseError()))
       ).catch(onError);
     });
   }
@@ -116,7 +123,7 @@ export class JsonRPCMiddleware {
         this.rpcMiddleware(
           req.body,
           (resps: any) => res.send(resps),
-          () => res.send(errors.PARSE_ERROR)
+          () => res.send(this.makeParseError())
         ).catch(onError);
       }
     };

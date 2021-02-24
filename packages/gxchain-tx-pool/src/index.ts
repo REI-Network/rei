@@ -1,4 +1,4 @@
-import { BN, Address } from 'ethereumjs-util';
+import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Heap from 'qheap';
 import { FunctionalMap } from '@gxchain2/utils';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
@@ -287,31 +287,39 @@ export class TxPool {
     // TODO: report error.
     try {
       if (tx.size > this.txMaxSize) {
+        console.warn('tx', bufferToHex(tx.transaction.hash()), 'size too large:', tx.size, 'max:', this.txMaxSize);
         return false;
       }
       if (!tx.transaction.isSigned()) {
+        console.warn('tx', bufferToHex(tx.transaction.hash()), 'is not signed');
         return false;
       }
       if (this.currentHeader.gasLimit.lt(tx.transaction.gasLimit)) {
+        console.warn('tx', bufferToHex(tx.transaction.hash()), 'reach block gasLimit:', tx.transaction.gasLimit.toString(), 'limit:', this.currentHeader.gasLimit.toString());
         return false;
       }
       const senderAddr = tx.transaction.getSenderAddress();
       const sender = senderAddr.buf;
       if (!this.locals.has(sender) && tx.transaction.gasPrice.lt(this.priceLimit)) {
+        console.warn('tx', bufferToHex(tx.transaction.hash()), 'gasPrice too low:', tx.transaction.gasPrice.toString(), 'limit:', this.priceLimit.toString());
         return false;
       }
       const accountInDB = await this.currentStateManager.getAccount(senderAddr);
       if (accountInDB.nonce.gt(tx.transaction.nonce)) {
+        console.warn('tx', bufferToHex(tx.transaction.hash()), 'nonce too low:', tx.transaction.nonce.toString(), 'account:', accountInDB.nonce.toString());
         return false;
       }
       if (accountInDB.balance.lt(txCost(tx))) {
+        console.warn('tx', bufferToHex(tx.transaction.hash()), 'balance not enough:', txCost(tx).toString(), 'account:', accountInDB.balance.toString());
         return false;
       }
       if (!checkTxIntrinsicGas(tx)) {
+        console.warn('tx', bufferToHex(tx.transaction.hash()), 'checkTxIntrinsicGas failed');
         return false;
       }
       return true;
     } catch (err) {
+      console.warn('tx', bufferToHex(tx.transaction.hash()), 'validateTx failed:', err);
       return false;
     }
   }

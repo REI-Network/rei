@@ -22,11 +22,13 @@ export class Controller {
     this.node = node;
   }
 
+  private async nullable() {}
+
   private async getBlockByTag(tag: string): Promise<Block> {
     let block!: Block;
     if (tag === 'earliest') {
       block = await this.node.blockchain.getBlock(0);
-    } else if (tag === 'latest') {
+    } else if (tag === 'latest' || tag === undefined) {
       block = this.node.blockchain.latestBlock;
     } else if (tag === 'pending') {
       block = await this.node.miner.worker.getPendingBlock();
@@ -133,12 +135,20 @@ export class Controller {
     return bnToHex(account.nonce);
   }
   async eth_getBlockTransactionCountByHash([hash]: [string]) {
-    const number = (await this.node.db.getBlock(hexStringToBuffer(hash))).transactions.length;
-    return bufferToHex(toBuffer(number));
+    try {
+      const number = (await this.node.db.getBlock(hexStringToBuffer(hash))).transactions.length;
+      return bufferToHex(toBuffer(number));
+    } catch (err) {
+      return null;
+    }
   }
   async eth_getBlockTransactionCountByNumber([tag]: [string]) {
-    const number = (await this.getBlockByTag(tag)).transactions.length;
-    return bufferToHex(toBuffer(number));
+    try {
+      const number = (await this.getBlockByTag(tag)).transactions.length;
+      return bufferToHex(toBuffer(number));
+    } catch (err) {
+      return null;
+    }
   }
   async eth_getUncleCountByBlockHash([hash]: [string]) {
     return bufferToHex(toBuffer(0));
@@ -185,22 +195,46 @@ export class Controller {
     return bnToHex(result.gasUsed);
   }
   async eth_getBlockByHash([hash, fullTransactions]: [string, boolean]) {
-    return new WrappedBlock(await this.node.db.getBlock(hexStringToBuffer(hash))).toRPCJSON(fullTransactions);
+    try {
+      return new WrappedBlock(await this.node.db.getBlock(hexStringToBuffer(hash))).toRPCJSON(fullTransactions);
+    } catch (err) {
+      return null;
+    }
   }
   async eth_getBlockByNumber([tag, fullTransactions]: [string, boolean]) {
-    return (await this.getWrappedBlockByTag(tag)).toRPCJSON(fullTransactions);
+    try {
+      return (await this.getWrappedBlockByTag(tag)).toRPCJSON(fullTransactions);
+    } catch (err) {
+      return null;
+    }
   }
   async eth_getTransactionByHash([hash]: [string]) {
-    return new WrappedTransaction(await this.node.db.getTransaction(hexStringToBuffer(hash))).toRPCJSON();
+    try {
+      return new WrappedTransaction(await this.node.db.getTransaction(hexStringToBuffer(hash))).toRPCJSON();
+    } catch (err) {
+      return null;
+    }
   }
   async eth_getTransactionByBlockHashAndIndex([hash, index]: [string, string]) {
-    return new WrappedTransaction((await this.node.db.getBlock(hexStringToBuffer(hash))).transactions[Number(index)]).toRPCJSON();
+    try {
+      return new WrappedTransaction((await this.node.db.getBlock(hexStringToBuffer(hash))).transactions[Number(index)]).toRPCJSON();
+    } catch (err) {
+      return null;
+    }
   }
-  async eth_getTransactionByBlockNumberAndIndex([tag, index]: [string, string]): Promise<any> {
-    return new WrappedTransaction((await this.getBlockByTag(tag)).transactions[Number(index)]).toRPCJSON();
+  async eth_getTransactionByBlockNumberAndIndex([tag, index]: [string, string]) {
+    try {
+      return new WrappedTransaction((await this.getBlockByTag(tag)).transactions[Number(index)]).toRPCJSON();
+    } catch (err) {
+      return null;
+    }
   }
   async eth_getTransactionReceipt([hash]: [string]) {
-    return (await this.node.db.getReceipt(hexStringToBuffer(hash))).toRPCJSON();
+    try {
+      return (await this.node.db.getReceipt(hexStringToBuffer(hash))).toRPCJSON();
+    } catch (err) {
+      return null;
+    }
   }
   async eth_getUncleByBlockHashAndIndex() {
     return null;

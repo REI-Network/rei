@@ -87,8 +87,15 @@ export class JsonRPCMiddleware {
 
   wrapWs(ws: WebSocket, onError: (err: any) => void) {
     ws.addEventListener('message', (msg) => {
+      let rpcData: any;
+      try {
+        rpcData = JSON.parse(msg.data);
+      } catch (err) {
+        ws.send(JSON.stringify(errors.PARSE_ERROR));
+        return;
+      }
       this.rpcMiddleware(
-        JSON.parse(msg.data),
+        rpcData,
         (resps: any) => {
           try {
             ws.send(JSON.stringify(resps));

@@ -15,6 +15,9 @@ interface INode {
   common: Common;
   blockchain: Blockchain;
   getStateManager(root: Buffer): Promise<StateManager>;
+  miner: {
+    gasLimit: BN;
+  };
 }
 
 export function txSlots(tx: WrappedTransaction) {
@@ -301,8 +304,8 @@ export class TxPool {
         console.warn('tx', bufferToHex(tx.transaction.hash()), 'is not signed');
         return false;
       }
-      if (this.currentHeader.gasLimit.lt(tx.transaction.gasLimit)) {
-        console.warn('tx', bufferToHex(tx.transaction.hash()), 'reach block gasLimit:', tx.transaction.gasLimit.toString(), 'limit:', this.currentHeader.gasLimit.toString());
+      if (this.node.miner.gasLimit.lt(tx.transaction.gasLimit)) {
+        console.warn('tx', bufferToHex(tx.transaction.hash()), 'reach block gasLimit:', tx.transaction.gasLimit.toString(), 'limit:', this.node.miner.gasLimit.toString());
         return false;
       }
       const senderAddr = tx.transaction.getSenderAddress();

@@ -114,7 +114,7 @@ export class Node {
     try {
       genesisJSON = JSON.parse(fs.readFileSync(path.join(this.options.databasePath, 'genesis.json')).toString());
     } catch (err) {
-      console.error('Read genesis.json faild, use default genesis');
+      console.warn('Read genesis.json faild, use default genesis');
       genesisJSON = defaultGenesis;
     }
 

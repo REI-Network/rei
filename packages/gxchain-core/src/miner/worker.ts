@@ -61,7 +61,7 @@ export class Worker extends Loop {
         {
           coinbase: this.miner.coinbase,
           difficulty: '0x1',
-          gasLimit: block.header.gasLimit,
+          gasLimit: this.miner.gasLimit,
           nonce: '0x0102030405060708',
           number: block.header.number.addn(1),
           parentHash: block.header.hash(),

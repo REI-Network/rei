@@ -1,7 +1,8 @@
-import { hexStringToBuffer } from '@gxchain2/utils';
+import { hexStringToBN, hexStringToBuffer } from '@gxchain2/utils';
 import { Worker } from './worker';
 import { Loop } from './loop';
 import { Node } from '../node';
+import { Address, BN, bufferToHex } from 'ethereumjs-util';
 
 export interface MinerOptions {
   coinbase: string;
@@ -11,7 +12,8 @@ export interface MinerOptions {
 
 export class Miner extends Loop {
   public readonly worker: Worker;
-  public coinbase?: Buffer;
+  private _coinbase: Buffer;
+  private _gasLimit: BN;
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
   private readonly options?: MinerOptions;
@@ -20,7 +22,8 @@ export class Miner extends Loop {
     super(options?.mineInterval || 5000);
     this.node = node;
     this.options = options;
-    this.coinbase = this?.options?.coinbase ? hexStringToBuffer(this.options.coinbase) : undefined;
+    this._coinbase = this?.options?.coinbase ? hexStringToBuffer(this.options.coinbase) : Address.zero().buf;
+    this._gasLimit = this?.options?.gasLimit ? hexStringToBN(this.options.gasLimit) : hexStringToBN('0xbe5c8b');
     this.worker = new Worker(node, this);
     this.initPromise = this.init();
     node.sync.on('start synchronize', async () => {
@@ -41,8 +44,21 @@ export class Miner extends Loop {
     return !!this.options;
   }
 
+  get coinbase() {
+    return this._coinbase;
+  }
+
+  get gasLimit() {
+    return this._gasLimit;
+  }
+
   async setCoinbase(coinbase: string | Buffer) {
-    this.coinbase = typeof coinbase === 'string' ? hexStringToBuffer(coinbase) : coinbase;
+    this._coinbase = typeof coinbase === 'string' ? hexStringToBuffer(coinbase) : coinbase;
+    await this.worker.newBlock(this.node.blockchain.latestBlock);
+  }
+
+  async setGasLimit(gasLimit: string | BN) {
+    this._gasLimit = typeof gasLimit === 'string' ? hexStringToBN(gasLimit) : gasLimit;
     await this.worker.newBlock(this.node.blockchain.latestBlock);
   }
 
@@ -63,10 +79,10 @@ export class Miner extends Loop {
 
   async mineBlock() {
     const block = await this.worker.getPendingBlock();
-    if (block.header.number.eq(this.node.blockchain.latestBlock.header.number.addn(1))) {
+    if (block.header.number.eq(this.node.blockchain.latestBlock.header.number.addn(1)) && block.header.parentHash.equals(this.node.blockchain.latestBlock.hash())) {
       await this.node.newBlock(await this.node.processBlock(block));
     } else {
-      console.debug('Miner, process, unkonw error, invalid height');
+      console.warn('Miner, process, unkonw error, invalid pending block:', bufferToHex(block.hash()), 'latest:', bufferToHex(this.node.blockchain.latestBlock.hash()));
     }
   }
 

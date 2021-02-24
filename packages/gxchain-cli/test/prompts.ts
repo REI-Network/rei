@@ -200,7 +200,10 @@ const startPrompts = async (node: Node) => {
       console.error('rpc server error', err);
       process.exit(1);
     });
-    await rpcServer.start();
+    if (!(await rpcServer.start())) {
+      console.error('RpcServer start failed, exit!');
+      process.exit(1);
+    }
     await startPrompts(node);
   } catch (err) {
     console.error('Catch error', err);

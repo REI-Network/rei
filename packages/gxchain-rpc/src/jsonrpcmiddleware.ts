@@ -25,7 +25,6 @@ export class JsonRPCMiddleware {
   private readonly VERSION = '2.0';
 
   constructor(config: JsonMiddlewareOption) {
-    //this.config = Object.assign({}, config)
     helper.validateConfig(config);
     this.config = config;
   }
@@ -104,8 +103,6 @@ export class JsonRPCMiddleware {
 
   makeMiddleWare(onError: (err: any) => void) {
     return (req, res, next) => {
-      const params = { ...req.query, ...req.body };
-      console.log(req.url, 'in coming request parmas:', JSON.stringify(params, null, '  '));
       if (req.ws) {
         next();
       } else {

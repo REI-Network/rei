@@ -57,11 +57,13 @@ async function start() {
 
     await node.init();
     if (opts.rpc) {
-      const rpcSever = new RpcServer(Number(opts.rpcPort), opts.rpcHost, node).on('error', (err) => {
+      const rpcServer = new RpcServer(Number(opts.rpcPort), opts.rpcHost, node).on('error', (err) => {
         console.error('RpcServer error', err);
-        process.exit(1);
       });
-      await rpcSever.start();
+      if (!(await rpcServer.start())) {
+        console.error('RpcServer start failed, exit!');
+        process.exit(1);
+      }
     }
   } catch (err) {
     console.error('Start error', err);

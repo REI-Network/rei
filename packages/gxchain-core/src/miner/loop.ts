@@ -1,7 +1,6 @@
 import { Aborter } from '@gxchain2/utils';
 
 export class Loop {
-  protected isProcessing = false;
   protected readonly aborter = new Aborter();
   private abortPromise?: Promise<void>;
   private loopPromise?: Promise<void>;
@@ -24,9 +23,7 @@ export class Loop {
         if (this.aborter.isAborted) {
           break;
         }
-        if (!this.isProcessing) {
-          await this.process();
-        }
+        await this.process();
       }
       resolve();
     });

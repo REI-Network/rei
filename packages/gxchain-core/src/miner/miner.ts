@@ -11,6 +11,7 @@ export interface MinerOptions {
 
 export class Miner extends Loop {
   public readonly worker: Worker;
+  public coinbase?: Buffer;
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
   private readonly options?: MinerOptions;
@@ -19,6 +20,7 @@ export class Miner extends Loop {
     super(options?.mineInterval || 5000);
     this.node = node;
     this.options = options;
+    this.coinbase = this?.options?.coinbase ? hexStringToBuffer(this.options.coinbase) : undefined;
     this.worker = new Worker(node, this);
     this.initPromise = this.init();
     node.sync.on('start synchronize', async () => {
@@ -39,9 +41,9 @@ export class Miner extends Loop {
     return !!this.options;
   }
 
-  get coinbase(): Buffer | undefined {
-    const coinbase = this?.options?.coinbase;
-    return coinbase ? hexStringToBuffer(coinbase) : undefined;
+  async setCoinbase(coinbase: string | Buffer) {
+    this.coinbase = typeof coinbase === 'string' ? hexStringToBuffer(coinbase) : coinbase;
+    await this.worker.newBlock(this.node.blockchain.latestBlock);
   }
 
   async init() {
@@ -53,20 +55,24 @@ export class Miner extends Loop {
   }
 
   async startLoop() {
-    if (this.options) {
+    if (this.isMining) {
       await this.init();
       await super.startLoop();
     }
   }
 
+  async mineBlock() {
+    const block = await this.worker.getPendingBlock();
+    if (block.header.number.eq(this.node.blockchain.latestBlock.header.number.addn(1))) {
+      await this.node.newBlock(await this.node.processBlock(block));
+    } else {
+      console.debug('Miner, process, unkonw error, invalid height');
+    }
+  }
+
   protected async process() {
     try {
-      const block = await this.worker.getPendingBlock();
-      if (block.header.number.eq(this.node.blockchain.latestBlock.header.number.addn(1))) {
-        await this.node.newBlock(await this.node.processBlock(block));
-      } else {
-        console.debug('Miner, process, unkonw error, invalid height');
-      }
+      await this.mineBlock();
     } catch (err) {
       console.error('Miner, process, error:', err);
     }

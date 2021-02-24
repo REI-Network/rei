@@ -6,13 +6,11 @@ import prompts from 'prompts';
 import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import BN from 'bn.js';
-import streamToIterator from 'stream-to-iterator';
-import { Account, Address } from 'ethereumjs-util';
+import { Address } from 'ethereumjs-util';
 
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
 import { constants } from '@gxchain2/common';
-import { Block } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
 import { hexStringToBuffer } from '@gxchain2/utils';
 
@@ -80,6 +78,7 @@ const startPrompts = async (node: Node) => {
       try {
         const count = Number.isInteger(Number(arr[1])) ? Number(arr[1]) : 1000;
         for (let i = 0; i < count; i++) {
+          /*
           const flag = getRandomIntInclusive(1, 2) == 1;
           const fromIndex = flag ? 0 : 1;
           const toIndex = !flag ? 0 : 1;
@@ -95,8 +94,8 @@ const startPrompts = async (node: Node) => {
             { common: node.common }
           );
           await node.addPendingTxs([unsignedTx.sign(getPrivateKey(accounts[fromIndex]))]);
-          const block = await node.miner.worker.getPendingBlock();
-          await node.newBlock(await node.processBlock(block));
+          */
+          await node.miner.mineBlock();
           await new Promise((resolve) => setTimeout(resolve, 10));
         }
       } catch (err) {
@@ -145,12 +144,12 @@ const startPrompts = async (node: Node) => {
       const height = node.blockchain.latestHeight;
       const hash = node.blockchain.latestHash;
       console.log('local height:', height, 'hash:', hash);
-    } else if (arr[0] === 'getblock' || arr[0] === 'gb') {
+    } else if (arr[0] === 'lsaccount' || arr[0] === 'la') {
       try {
-        const block = await node.blockchain.getBlock(Number(arr[1]));
-        console.log('0x' + block.header.hash().toString('hex'), block.toJSON());
+        const acc = await (await node.getStateManager(node.blockchain.latestBlock.header.stateRoot)).getAccount(Address.fromString(arr[1]));
+        console.log('balance', acc.balance.toString(), 'nonce', acc.nonce.toString());
       } catch (err) {
-        console.error('Get block error:', err);
+        console.error('lsaccount error:', err);
       }
     } else if (arr[0] === 'puttx') {
       const unsignedTx = Transaction.fromTxData(
@@ -196,6 +195,7 @@ const startPrompts = async (node: Node) => {
     }
     const node = new Node({ databasePath: dir });
     await node.init();
+    await node.miner.setCoinbase('0x3289621709f5b35d09b4335e129907ac367a0593');
     const rpcServer = new RpcServer(rpcPort, '::1', node).on('error', (err: any) => {
       console.error('rpc server error', err);
       process.exit(1);

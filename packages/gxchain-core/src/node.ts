@@ -130,7 +130,7 @@ export class Node {
     this.common = new Common(
       {
         chain: genesisJSON.genesisInfo,
-        hardfork: 'muirGlacier'
+        hardfork: 'chainstart'
       },
       poa
     );
@@ -159,6 +159,7 @@ export class Node {
       }
     }
 
+    this.common.setHardfork('muirGlacier');
     this.blockchain = new Blockchain({
       db: this.rawdb,
       database: this.db,

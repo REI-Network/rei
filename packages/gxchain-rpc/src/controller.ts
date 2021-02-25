@@ -46,6 +46,23 @@ export class Controller {
     return this.node.getStateManager((await this.getBlockByTag(tag)).header.stateRoot);
   }
 
+  private calculateBaseFee(data: CallData) {
+    const txDataZero = this.node.common.param('gasPrices', 'txDataZero');
+    const txDataNonZero = this.node.common.param('gasPrices', 'txDataNonZero');
+    let cost = 0;
+    if (data.data) {
+      const buf = hexStringToBuffer(data.data);
+      for (let i = 0; i < data.data.length; i++) {
+        buf[i] === 0 ? (cost += txDataZero) : (cost += txDataNonZero);
+      }
+    }
+    const fee = new BN(cost).addn(this.node.common.param('gasPrices', 'tx'));
+    if (this.node.common.gteHardfork('homestead') && (data.to === undefined || hexStringToBuffer(data.to).length === 0)) {
+      fee.iaddn(this.node.common.param('gasPrices', 'txCreation'));
+    }
+    return fee;
+  }
+
   private async runCall(data: CallData, tag: string) {
     const block = await this.getBlockByTag(tag);
     const wvm = await this.node.getWrappedVM(block.header.stateRoot);
@@ -62,6 +79,7 @@ export class Controller {
         data: data.data ? hexStringToBuffer(data.data) : undefined
       });
       await wvm.vm.stateManager.revert();
+      result.gasUsed.iadd(this.calculateBaseFee(data));
       return result;
     } catch (err) {
       await wvm.vm.stateManager.revert();

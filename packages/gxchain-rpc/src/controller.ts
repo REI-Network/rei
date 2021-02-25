@@ -22,8 +22,6 @@ export class Controller {
     this.node = node;
   }
 
-  private async nullable() {}
-
   private async getBlockByTag(tag: string): Promise<Block> {
     let block!: Block;
     if (tag === 'earliest') {
@@ -49,10 +47,11 @@ export class Controller {
   }
 
   private async runCall(data: CallData, tag: string) {
+    const block = await this.getBlockByTag(tag);
+    const wvm = await this.node.getWrappedVM(block.header.stateRoot);
+    await wvm.vm.stateManager.checkpoint();
     try {
-      const block = await this.getBlockByTag(tag);
-      const wvm = await this.node.getWrappedVM(block.header.stateRoot);
-      return await wvm.vm.runCall({
+      const result = await wvm.vm.runCall({
         block,
         gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
         origin: data.from ? Address.fromString(data.from) : Address.zero(),
@@ -62,7 +61,10 @@ export class Controller {
         value: data.value ? hexStringToBN(data.value) : undefined,
         data: data.data ? hexStringToBuffer(data.data) : undefined
       });
+      await wvm.vm.stateManager.revert();
+      return result;
     } catch (err) {
+      await wvm.vm.stateManager.revert();
       console.error(err);
       throw err;
     }

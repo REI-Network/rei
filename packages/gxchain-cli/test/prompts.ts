@@ -147,7 +147,7 @@ const startPrompts = async (node: Node) => {
     } else if (arr[0] === 'lsaccount' || arr[0] === 'la') {
       try {
         const acc = await (await node.getStateManager(node.blockchain.latestBlock.header.stateRoot)).getAccount(Address.fromString(arr[1]));
-        console.log('balance', acc.balance.toString(), 'nonce', acc.nonce.toString());
+        console.log('balance', acc.balance.toString(), 'nonce', acc.nonce.toString(), 'codeHash', acc.codeHash.toString('hex'));
       } catch (err) {
         console.error('lsaccount error:', err);
       }
@@ -167,13 +167,6 @@ const startPrompts = async (node: Node) => {
       await node.addPendingTxs([tx]);
     } else if (arr[0] === 'lstxpool') {
       await node.txPool.ls();
-    } else if (arr[0] === 'pending' || arr[0] === 'p') {
-      try {
-        const block = await node.miner.worker.getPendingBlock();
-        await node.newBlock(await node.processBlock(block));
-      } catch (err) {
-        console.error('Run block error', err);
-      }
     } else {
       console.warn('$ Invalid command');
       continue;

@@ -115,10 +115,10 @@ export class Libp2pNode extends Libp2p {
     return peer;
   }
 
-  private async removePeer(peerId: string) {
-    const peer = this.peers.get(peerId);
+  async removePeer(peerId: string | Peer) {
+    const peer = typeof peerId === 'string' ? this.peers.get(peerId) : peerId;
     if (peer) {
-      this.peers.delete(peerId);
+      this.peers.delete(peer.peerId);
       this.emit('disconnected', peer);
       await peer.abort();
     }

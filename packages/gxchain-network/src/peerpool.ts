@@ -27,9 +27,6 @@ export class PeerPool extends EventEmitter {
       });
       node.on('disconnected', (peer) => {
         this.disconnected(peer);
-        for (const n of this._nodes) {
-          n.peerStore.delete(PeerId.createFromB58String(peer.peerId));
-        }
       });
       node.on('error', (err) => {
         console.error('Peerpool, p2p node error:', err);
@@ -88,6 +85,9 @@ export class PeerPool extends EventEmitter {
 
   disconnected(peer: Peer) {
     this.remove(peer);
+    for (const n of this._nodes) {
+      n.peerStore.delete(PeerId.createFromB58String(peer.peerId));
+    }
   }
 
   ban(peer: Peer, maxAge: number = 60000) {

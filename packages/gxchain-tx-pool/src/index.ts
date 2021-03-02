@@ -9,6 +9,8 @@ import { Database } from '@gxchain2/database';
 import { Common } from '@gxchain2/common';
 import { TxSortedMap } from './txmap';
 import { PendingTxMap } from './pendingmap';
+import { TxPricedList } from './txpricedlist';
+import { Jonunal } from './jonunal';
 
 interface INode {
   db: Database;
@@ -49,6 +51,8 @@ export interface TxPoolOptions {
   globalSlots?: number;
   accountQueue?: number;
   globalQueue?: number;
+
+  journal?: string;
 
   node: INode;
 }
@@ -114,6 +118,9 @@ export class TxPool {
   private accountQueue: number;
   private globalQueue: number;
 
+  private priced: TxPricedList;
+  private journal: Jonunal;
+
   constructor(options: TxPoolOptions) {
     this.txMaxSize = options.txMaxSize || 32768 * 4;
     this.priceLimit = options.priceLimit || new BN(1);
@@ -144,8 +151,67 @@ export class TxPool {
     this.accounts = new FunctionalMap<Buffer, TxPoolAccount>(bufferCompare);
     this.txs = new FunctionalMap<Buffer, WrappedTransaction>(bufferCompare);
     this.locals = new FunctionalMap<Buffer, boolean>(bufferCompare);
-
+    this.priced = new TxPricedList(this.txs);
+    this.journal = new Jonunal(options.journal || 'transactions.rlp');
+    try {
+      this.journal.load(this.addLocal);
+      this.journal.rotate(this.local());
+    } catch {}
     this.initPromise = this.init();
+  }
+
+  private getAllSolt(): number {
+    let soltsNumer: number = 0;
+    for (const [sender, account] of this.accounts) {
+      soltsNumer += account.pending.slots;
+      soltsNumer += account.queue.slots;
+    }
+    return soltsNumer;
+  }
+
+  // addTxs attempts to queue a batch of transactions if they are valid.
+  private addLocal = (txs: WrappedTransaction[] /*local: boolean sync: boolean*/) => {
+    let news: WrappedTransaction[] = [];
+    for (const tx of txs) {
+      if (this.txs.has(tx.transaction.hash())) {
+        continue;
+      }
+      if (!tx.transaction.isSigned()) {
+        continue;
+      }
+      news.push(tx);
+    }
+    if (news.length == 0) {
+      return;
+    }
+    //TODO add locked transactions according to the (symbol local)
+  };
+
+  private local(): Map<Address, WrappedTransaction[]> {
+    let txs: Map<Address, WrappedTransaction[]> = new Map();
+    for (const addrBuf of this.locals.keys()) {
+      let account = this.accounts.get(addrBuf);
+      let addr = new Address(addrBuf);
+      if (account?.hasPending()) {
+        let transactions = txs.get(addr);
+        if (transactions) {
+          transactions = transactions.concat(account.pending.toList());
+          txs.set(addr, transactions);
+        } else {
+          txs.set(addr, account.pending.toList());
+        }
+      }
+      if (account?.hasQueue()) {
+        let transactions = txs.get(addr);
+        if (transactions) {
+          transactions = transactions.concat(account.queue.toList());
+          txs.set(addr, transactions);
+        } else {
+          txs.set(addr, account.queue.toList());
+        }
+      }
+    }
+    return txs;
   }
 
   async init() {
@@ -256,6 +322,30 @@ export class TxPool {
         return;
       }
       // drop tx if pool is full
+      // TODO
+      // let islocal = local || this.locals.has(addr.buf)
+      let islocal = true;
+      if (txSlots(tx) + this.txs.size > this.globalSlots + this.globalQueue) {
+        if (this.priced.underpriced(tx)) {
+          return;
+        }
+        const [drop, success] = this.priced.discard(this.getAllSolt() - (this.globalSlots + this.globalQueue), true);
+        if (!success) {
+          return;
+        }
+        if (drop) {
+          for (const tx of drop) {
+            this.removeTxFromGlobal(tx);
+            let account = this.accounts.get(addr.buf);
+            if (account?.hasPending()) {
+              account.pending.delete(tx.transaction.nonce);
+            }
+            if (account?.hasPending()) {
+              account.queue.delete(tx.transaction.nonce);
+            }
+          }
+        }
+      }
       const account = this.getAccount(addr);
       if (account.hasPending() && account.pending.has(tx.transaction.nonce)) {
         this.promoteTx(tx);
@@ -265,6 +355,9 @@ export class TxPool {
         }
       }
       // journalTx
+      if (this.journal) {
+        this.journal.insert(tx);
+      }
     }
     if (!force && dirtyAddrs.length > 0) {
       return await this.promoteExecutables(dirtyAddrs);
@@ -363,11 +456,14 @@ export class TxPool {
           readies.push(tx);
         }
       }
+      let resizesNumber = 0;
       if (!this.locals.has(sender)) {
         const resizes = queue.resize(this.accountQueue);
+        resizesNumber = resizes.length;
         this.removeTxFromGlobal(resizes);
       }
       // resize priced
+      this.priced.removed(forwards.length + drops.length + resizesNumber);
       if (!account.hasQueue() && !account.hasPending()) {
         this.accounts.delete(sender);
       }
@@ -406,6 +502,7 @@ export class TxPool {
       const { removed: drops, invalids } = pending.filter(accountInDB.balance, this.currentHeader.gasLimit);
       this.removeTxFromGlobal(drops);
       // resize priced
+      this.priced.removed(forwards.length + drops.length);
       for (const tx of invalids) {
         this.enqueueTx(tx);
       }
@@ -445,6 +542,7 @@ export class TxPool {
       this.removeTxFromGlobal(tx);
       account.updatePendingNonce(tx.transaction.nonce, true);
       // resize priced
+      this.priced.removed([tx].length);
       pendingSlots -= txSlots(tx);
     };
 
@@ -495,12 +593,15 @@ export class TxPool {
       if (queueSlots - queue.slots >= this.globalQueue) {
         queueSlots -= queue.slots;
         // resize priced
-        this.removeTxFromGlobal(queue.clear());
+        let resizes = queue.clear();
+        this.removeTxFromGlobal(resizes);
+        this.priced.removed(resizes.length);
       } else {
         while (queueSlots > this.globalQueue) {
           const [tx] = queue.resize(queue.size - 1);
           this.removeTxFromGlobal(tx);
           // resize priced
+          this.priced.removed(1);
           queueSlots -= txSlots(tx);
         }
         break;

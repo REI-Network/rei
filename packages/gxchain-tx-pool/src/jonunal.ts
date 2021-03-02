@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { Transaction } from '@gxchain2/tx';
+import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { Address } from 'ethereumjs-util';
 
 const bufferSplit = Buffer.from('\r\n');
@@ -12,7 +12,7 @@ export class Jonunal {
     this.writer = fs.createWriteStream(this.path, { flags: 'a' });
   }
 
-  async load(add: (transaction: Transaction) => void) {
+  async load(add: (transactions: WrappedTransaction[]) => void) {
     return new Promise<void>(async (resolve, reject) => {
       if (!fs.existsSync(this.path)) {
         return;
@@ -28,17 +28,19 @@ export class Jonunal {
       let total = 0;
       let dropped = 0;
 
-      const loadBath = (txs: Transaction[]) => {
+      const loadBath = (txs: WrappedTransaction[]) => {
         txs.forEach((tx) => {
+          let drops: WrappedTransaction[] = [];
+          drops.push(tx);
           try {
-            add(tx);
+            add(drops);
           } catch (err) {
             dropped++;
           }
         });
       };
 
-      let batch: Transaction[] = [];
+      let batch: WrappedTransaction[] = [];
       let bufferInput: Buffer = Buffer.from('');
       inputer.on('data', (chunk: Buffer) => {
         bufferInput = Buffer.concat([bufferInput, chunk]);
@@ -48,7 +50,7 @@ export class Jonunal {
             break;
           }
           let bufferTemp = Buffer.from(bufferInput);
-          const tx = Transaction.fromRlpSerializedTx(bufferTemp.slice(0, i));
+          const tx = new WrappedTransaction(Transaction.fromRlpSerializedTx(bufferTemp.slice(0, i)));
           total++;
           batch.push(tx);
           if (batch.length > 1024) {
@@ -73,13 +75,13 @@ export class Jonunal {
     });
   }
 
-  insert(tx: Transaction) {
+  insert(tx: WrappedTransaction) {
     if (!this.writer) {
       throw new Error('no active journal');
     }
     return new Promise<void>((resolve, reject) => {
       if (this.writer) {
-        this.writer.write(Buffer.concat([tx.serialize(), bufferSplit]), (err) => {
+        this.writer.write(Buffer.concat([tx.transaction.serialize(), bufferSplit]), (err) => {
           if (err) {
             reject(err);
           } else {
@@ -90,7 +92,7 @@ export class Jonunal {
     });
   }
 
-  async rotate(all: Map<Address, Transaction[]>) {
+  async rotate(all: Map<Address, WrappedTransaction[]>) {
     if (this.writer) {
       await new Promise((r) => {
         this.writer!.end(r);
@@ -100,13 +102,13 @@ export class Jonunal {
     let output = fs.createWriteStream(this.path + '.new');
     let journaled = 0;
     let key: Address;
-    let val: Transaction[];
+    let val: WrappedTransaction[];
     let array: Promise<any>[] = [];
     for ([key, val] of all) {
       for (let tx of val) {
         array.push(
           new Promise<void>((resolve, reject) => {
-            output.write(Buffer.concat([tx.serialize(), bufferSplit]), (err) => {
+            output.write(Buffer.concat([tx.transaction.serialize(), bufferSplit]), (err) => {
               if (err) {
                 reject(err);
               } else {

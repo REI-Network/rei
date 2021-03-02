@@ -284,11 +284,11 @@ export class Node {
     }
   }
 
-  async addPendingTxs(txs: Transaction[]) {
+  async addPendingTxs(txs: (Transaction | WrappedTransaction)[]) {
     await this.initPromise;
     await this.pendingLock.lock();
     try {
-      const { results, readies } = await this.txPool.addTxs(txs.map((tx) => new WrappedTransaction(tx)));
+      const { results, readies } = await this.txPool.addTxs(txs.map((tx) => (tx instanceof Transaction ? new WrappedTransaction(tx) : tx)));
       if (readies && readies.size > 0) {
         await this.miner.worker.addTxs(readies);
       }
@@ -297,6 +297,7 @@ export class Node {
     } catch (err) {
       console.error('Node add txs error:', err);
       this.pendingLock.release();
+      return new Array<boolean>(txs.length).fill(false);
     }
   }
 }

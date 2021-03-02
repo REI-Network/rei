@@ -1,6 +1,6 @@
 import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Heap from 'qheap';
-import { FunctionalMap } from '@gxchain2/utils';
+import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet } from '@gxchain2/utils';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { StateManager } from '@gxchain2/state-manager';
 import { Blockchain } from '@gxchain2/blockchain';
@@ -97,27 +97,9 @@ class TxPoolAccount {
   }
 }
 
-const bufferCompare = (a: Buffer, b: Buffer) => {
-  if (a.length < b.length) {
-    return -1;
-  }
-  if (a.length > b.length) {
-    return 1;
-  }
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] < b[i]) {
-      return -1;
-    }
-    if (a[i] > b[i]) {
-      return 1;
-    }
-  }
-  return 0;
-};
-
 export class TxPool {
   private readonly accounts: FunctionalMap<Buffer, TxPoolAccount>;
-  private readonly locals: FunctionalMap<Buffer, boolean>;
+  private readonly locals: FunctionalSet<Buffer>;
   private readonly txs: FunctionalMap<Buffer, WrappedTransaction>;
   private readonly node: INode;
   private readonly initPromise: Promise<void>;
@@ -145,9 +127,9 @@ export class TxPool {
     this.globalQueue = options.globalQueue || 1024;
 
     this.node = options.node;
-    this.accounts = new FunctionalMap<Buffer, TxPoolAccount>(bufferCompare);
-    this.txs = new FunctionalMap<Buffer, WrappedTransaction>(bufferCompare);
-    this.locals = new FunctionalMap<Buffer, boolean>(bufferCompare);
+    this.accounts = createBufferFunctionalMap<TxPoolAccount>();
+    this.txs = createBufferFunctionalMap<WrappedTransaction>();
+    this.locals = createBufferFunctionalSet();
 
     this.initPromise = this.init();
   }
@@ -210,14 +192,14 @@ export class TxPool {
     const originalNewBlock = newBlock;
     let oldBlock = await getBlock(this.currentHeader.hash(), this.currentHeader.number);
     let discarded: WrappedTransaction[] = [];
-    const included = new FunctionalMap<Buffer, boolean>();
+    const included = createBufferFunctionalSet();
     while (oldBlock.header.number.gt(newBlock.header.number)) {
       discarded = discarded.concat(oldBlock.transactions.map((tx) => new WrappedTransaction(tx)));
       oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
     }
     while (newBlock.header.number.gt(oldBlock.header.number)) {
       for (const tx of newBlock.transactions) {
-        included.set(tx.hash(), true);
+        included.add(tx.hash());
       }
       newBlock = await getBlock(newBlock.header.parentHash, newBlock.header.number.subn(1));
     }
@@ -225,7 +207,7 @@ export class TxPool {
       discarded = discarded.concat(oldBlock.transactions.map((tx) => new WrappedTransaction(tx)));
       oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
       for (const tx of newBlock.transactions) {
-        included.set(tx.hash(), true);
+        included.add(tx.hash());
       }
       newBlock = await getBlock(newBlock.header.parentHash, newBlock.header.number.subn(1));
     }
@@ -392,7 +374,7 @@ export class TxPool {
       return readies;
     };
 
-    const txs = new FunctionalMap<Buffer, WrappedTransaction[]>(bufferCompare);
+    const txs = createBufferFunctionalMap<WrappedTransaction[]>();
     if (dirtyAddrs) {
       for (const addr of dirtyAddrs) {
         const account = this.getAccount(addr);

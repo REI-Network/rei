@@ -1,5 +1,23 @@
 import createRBTree from 'functional-red-black-tree';
 
+const bufferCompare = (a: Buffer, b: Buffer) => {
+  if (a.length < b.length) {
+    return -1;
+  }
+  if (a.length > b.length) {
+    return 1;
+  }
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] < b[i]) {
+      return -1;
+    }
+    if (a[i] > b[i]) {
+      return 1;
+    }
+  }
+  return 0;
+};
+
 export class FunctionalMapIterator<T> implements IterableIterator<T> {
   protected readonly rbtreeIt;
   private stop = false;
@@ -130,6 +148,10 @@ export class FunctionalMap<K, V> implements Map<K, V> {
   }
 }
 
+export function createBufferFunctionalMap<T>() {
+  return new FunctionalMap<Buffer, T>(bufferCompare);
+}
+
 class FunctionalSetValueIterator<T> extends FunctionalMapIterator<T> {
   protected value(): T | undefined {
     return this.rbtreeIt.key;
@@ -203,4 +225,8 @@ export class FunctionalSet<T> implements Set<T> {
   get [Symbol.toStringTag](): string {
     return 'FunctionalSet';
   }
+}
+
+export function createBufferFunctionalSet() {
+  return new FunctionalSet<Buffer>(bufferCompare);
 }

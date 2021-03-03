@@ -13,19 +13,10 @@ type EnqueuePooledTransactionMessage = {
   origin: string;
 };
 
-function forceAddToStringSet<K>(map: Map<K, Set<string>>, key: K, value: string) {
+function forceAdd<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer | string) {
   let set = map.get(key);
   if (!set) {
-    set = new Set<string>();
-    map.set(key, set);
-  }
-  set.add(value);
-}
-
-function forceAddToBufferSet<K>(map: Map<K, Set<Buffer>>, key: K, value: Buffer) {
-  let set = map.get(key);
-  if (!set) {
-    set = createBufferFunctionalSet();
+    set = typeof value === 'string' ? new Set<string>() : createBufferFunctionalSet();
     map.set(key, set);
   }
   set.add(value);
@@ -73,7 +64,7 @@ export class TxFetcher extends EventEmitter {
             const set = this.alternates.get(hash);
             if (set) {
               set.add(message.origin);
-              forceAddToBufferSet(this.announces, message.origin, hash);
+              forceAdd(this.announces, message.origin, hash);
               continue;
             }
           }
@@ -82,7 +73,7 @@ export class TxFetcher extends EventEmitter {
             const set = this.announced.get(hash);
             if (set) {
               set.add(message.origin);
-              forceAddToBufferSet(this.announces, message.origin, hash);
+              forceAdd(this.announces, message.origin, hash);
               continue;
             }
           }
@@ -91,14 +82,14 @@ export class TxFetcher extends EventEmitter {
             const set = this.waitingList.get(hash);
             if (set) {
               set.add(message.origin);
-              forceAddToBufferSet(this.watingSlots, message.origin, hash);
+              forceAdd(this.watingSlots, message.origin, hash);
               continue;
             }
           }
 
-          forceAddToStringSet(this.waitingList, hash, message.origin);
+          forceAdd(this.waitingList, hash, message.origin);
           this.waitingTime.set(hash, Date.now());
-          forceAddToBufferSet(this.watingSlots, message.origin, hash);
+          forceAdd(this.watingSlots, message.origin, hash);
         }
 
         if (idleWait && this.waitingTime.size > 0) {
@@ -181,7 +172,9 @@ export class TxFetcher extends EventEmitter {
               }
             }
             if (this.alternates.size > 0) {
-              // panic
+              if (this.announced.has(hash)) {
+                // panic
+              }
               this.announced.set(hash, this.alternates.get(hash)!);
             }
           }

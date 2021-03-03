@@ -364,5 +364,7 @@ export class Peer extends EventEmitter {
     this.send(constants.GXC2_ETHWIRE, 'NewPooledTransactionHashes', hashes);
   }
 
-  getPooledTransactions(hashes: Buffer[]) {}
+  getPooledTransactions(hashes: Buffer[]): Promise<Transaction[]> {
+    return this.request(constants.GXC2_ETHWIRE, 'GetPooledTransactions', hashes);
+  }
 }

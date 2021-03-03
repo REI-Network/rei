@@ -120,8 +120,8 @@ const handlers: Handler[] = [
   {
     name: 'PooledTransactions',
     code: 8,
-    encode: (info: MessageInfo, txs: (Transaction | undefined)[]) => rlp.encode([8, txs.map((tx) => (tx ? tx.serialize() : []))]),
-    decode: (info: MessageInfo, raws: TransactionsBuffer) => raws.map((raw) => (raw.length === 0 ? undefined : Transaction.fromValuesArray(raw, { common: info.node.common })))
+    encode: (info: MessageInfo, txs: Transaction[]) => rlp.encode([8, txs.map((tx) => tx.serialize())]),
+    decode: (info: MessageInfo, raws: TransactionsBuffer) => raws.map((raw) => Transaction.fromValuesArray(raw, { common: info.node.common }))
   },
   {
     name: 'Echo',

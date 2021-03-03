@@ -21,41 +21,44 @@ export class RpcServer extends EventEmitter {
   }
 
   start() {
-    return new Promise<void>((resolve) => {
+    return new Promise<boolean>((resolve) => {
       if (this.running) {
         this.emit('error', new Error('RPC and WS server already started!'));
-        resolve();
+        resolve(false);
         return;
       }
       try {
         this.running = true;
         const app = express();
         const server = http.createServer(app);
-        const enableWs = expressws(app, server);
+        expressws(app, server);
         const jsonmid = new JsonRPCMiddleware({ methods: this.controller as any });
 
         app.use(express.json({ type: '*/*' }));
         app.use(jsonmid.makeMiddleWare((err) => this.emit('error', err)));
         app.ws('/', (ws) => {
           jsonmid.wrapWs(ws, (err) => this.emit('error', err));
-
-          ws.on('close', () => {
-            console.log('WebSocket was closed');
-          });
+          ws.on('error', (err) => this.emit('error', err));
+          ws.on('close', () => {});
         });
 
-        server.once('error', (err: Error) => {
+        server.once('error', (err) => {
+          server.removeAllListeners();
           this.emit('error', err);
-          resolve();
+          resolve(false);
         });
         server.listen(this.port, this.host, () => {
-          console.log(`rpc server listening on ${this.host}:${this.port}`);
-          resolve();
+          console.log(`rpc server listening on ${this.host.indexOf('.') === -1 ? '[' + this.host + ']' : this.host}:${this.port}`);
+          server.removeAllListeners('error');
+          server.on('error', (err) => {
+            this.emit('error', err);
+          });
+          resolve(true);
         });
       } catch (err) {
         this.running = false;
         this.emit('error', err);
-        resolve();
+        resolve(false);
       }
     });
   }

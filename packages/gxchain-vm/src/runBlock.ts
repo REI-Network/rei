@@ -214,6 +214,9 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
     // Combine blooms via bitwise OR
     bloom.or(txRes.bloom);
 
+    if (txRes.execResult.exceptionError) {
+      console.warn('applyTransactions, exceptionError', txRes.execResult.exceptionError);
+    }
     const txReceipt = new Receipt(txRes.gasUsed.toArrayLike(Buffer), txRes.bloom.bitvector, txRes.execResult?.logs?.map((log) => Log.fromValuesArray(log)) || [], txRes.execResult.exceptionError ? 0 : 1);
     receipts.push(txReceipt);
 

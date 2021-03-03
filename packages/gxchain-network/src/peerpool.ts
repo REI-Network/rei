@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import PeerId from 'peer-id';
 
 import type { Peer } from './peer';
 import type { Libp2pNode } from './p2p';
@@ -84,6 +85,9 @@ export class PeerPool extends EventEmitter {
 
   disconnected(peer: Peer) {
     this.remove(peer);
+    for (const n of this._nodes) {
+      n.peerStore.delete(PeerId.createFromB58String(peer.peerId));
+    }
   }
 
   ban(peer: Peer, maxAge: number = 60000) {

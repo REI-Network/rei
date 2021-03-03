@@ -11,11 +11,15 @@ export interface SynchronizerOptions {
 }
 
 export declare interface Synchronizer {
-  on(event: 'synchronized', lisener: () => void): this;
-  on(event: 'error', lisener: (err: any) => void): this;
+  on(event: 'start synchronize', listener: () => void): this;
+  on(event: 'synchronized', listener: () => void): this;
+  on(event: 'synchronize failed', listener: () => void): this;
+  on(event: 'error', listener: (err: any) => void): this;
 
-  once(event: 'synchronized', lisener: () => void): this;
-  once(event: 'error', lisener: (err: any) => void): this;
+  once(event: 'start synchronize', listener: () => void): this;
+  once(event: 'synchronized', listener: () => void): this;
+  once(event: 'synchronize failed', listener: () => void): this;
+  once(event: 'error', listener: (err: any) => void): this;
 }
 
 export class Synchronizer extends EventEmitter {
@@ -24,6 +28,8 @@ export class Synchronizer extends EventEmitter {
   protected aborter = new Aborter();
   protected running: boolean = false;
   protected forceSync: boolean = false;
+  protected startingBlock: number = 0;
+  protected highestBlock: number = 0;
 
   constructor(options: SynchronizerOptions) {
     super();
@@ -31,8 +37,18 @@ export class Synchronizer extends EventEmitter {
     this.interval = options.interval || 1000;
   }
 
+  get syncStatus() {
+    return { startingBlock: this.startingBlock, highestBlock: this.highestBlock };
+  }
+
   get isSyncing(): boolean {
     throw new Error('Unimplemented');
+  }
+
+  protected startSyncHook(startingBlock: number, highestBlock: number) {
+    this.startingBlock = startingBlock;
+    this.highestBlock = highestBlock;
+    this.emit('start synchronize');
   }
 
   protected async _sync(target?: { peer: Peer; height: number }): Promise<boolean> {
@@ -41,9 +57,13 @@ export class Synchronizer extends EventEmitter {
 
   async sync(target?: { peer: Peer; height: number }) {
     try {
-      if (!this.isSyncing && (await this._sync(target))) {
-        console.debug('synchronized');
-        this.emit('synchronized');
+      if (!this.isSyncing) {
+        if (await this._sync(target)) {
+          console.debug('synchronized');
+          this.emit('synchronized');
+        } else {
+          this.emit('synchronize failed');
+        }
       }
     } catch (err) {
       this.emit('error', err);

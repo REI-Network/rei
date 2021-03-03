@@ -2,6 +2,15 @@ import { Transaction } from '@ethereumjs/tx';
 import { BN, bufferToHex, bnToHex, intToHex, rlp } from 'ethereumjs-util';
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
 
+export function txSize(tx: Transaction) {
+  const raw = tx.raw();
+  let size = 0;
+  for (const b of raw) {
+    size += b.length;
+  }
+  return size;
+}
+
 export interface BlockLike {
   hash(): Buffer;
   readonly header: {
@@ -27,11 +36,7 @@ export class WrappedTransaction {
     if (this.extension.size) {
       return this.extension.size;
     }
-    const raw = this.transaction.raw();
-    this.extension.size = 0;
-    for (const b of raw) {
-      this.extension.size += b.length;
-    }
+    this.extension.size = txSize(this.transaction);
     return this.extension.size;
   }
 

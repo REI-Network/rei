@@ -19,7 +19,7 @@ import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { hexStringToBuffer, SemaphoreLock } from '@gxchain2/utils';
 
 import { FullSynchronizer, Synchronizer } from './sync';
-import { Worker } from './miner/worker';
+import { Miner } from './miner';
 
 export interface NodeOptions {
   databasePath: string;
@@ -44,7 +44,7 @@ export class Node {
   public blockchain!: Blockchain;
   public sync!: Synchronizer;
   public txPool!: TxPool;
-  public worker?: Worker;
+  public miner!: Miner;
 
   private readonly options: NodeOptions;
   private readonly initPromise: Promise<void>;
@@ -71,11 +71,6 @@ export class Node {
       bestHash: this.blockchain.latestHash,
       genesisHash: this.common.genesis().hash
     };
-  }
-
-  get coinbase(): Buffer | undefined {
-    const coinbase = this.options.mine?.coinbase;
-    return coinbase ? hexStringToBuffer(coinbase) : undefined;
   }
 
   private async setupAccountInfo(
@@ -119,7 +114,7 @@ export class Node {
     try {
       genesisJSON = JSON.parse(fs.readFileSync(path.join(this.options.databasePath, 'genesis.json')).toString());
     } catch (err) {
-      console.error('Read genesis.json faild, use default genesis');
+      console.warn('Read genesis.json faild, use default genesis');
       genesisJSON = defaultGenesis;
     }
 
@@ -164,6 +159,7 @@ export class Node {
       }
     }
 
+    this.common.setHardfork('muirGlacier');
     this.blockchain = new Blockchain({
       db: this.rawdb,
       database: this.db,
@@ -225,11 +221,7 @@ export class Node {
       });
 
     this.sync.start();
-
-    if (this.options.mine) {
-      this.worker = new Worker(this);
-      this.mineLoop(this.options.mine.mineInterval);
-    }
+    this.miner = new Miner(this, this.options.mine);
   }
 
   async getStateManager(root: Buffer) {
@@ -284,7 +276,7 @@ export class Node {
         }
       }
       await this.txPool.newBlock(block);
-      await this.worker?.newBlock(block);
+      await this.miner.worker.newBlock(block);
       this.pendingLock.release();
     } catch (err) {
       console.error('Node new block error:', err);
@@ -292,29 +284,20 @@ export class Node {
     }
   }
 
-  async addPendingTxs(txs: Transaction[]) {
+  async addPendingTxs(txs: (Transaction | WrappedTransaction)[]) {
     await this.initPromise;
     await this.pendingLock.lock();
     try {
-      const readies = await this.txPool.addTxs(txs.map((tx) => new WrappedTransaction(tx)));
+      const { results, readies } = await this.txPool.addTxs(txs.map((tx) => (tx instanceof Transaction ? new WrappedTransaction(tx) : tx)));
       if (readies && readies.size > 0) {
-        await this.worker?.addTxs(readies);
+        await this.miner.worker.addTxs(readies);
       }
       this.pendingLock.release();
+      return results;
     } catch (err) {
       console.error('Node add txs error:', err);
       this.pendingLock.release();
+      return new Array<boolean>(txs.length).fill(false);
     }
-  }
-
-  private async mineLoop(mineInterval: number) {
-    await this.initPromise;
-    /*
-    while (true) {
-      await new Promise((r) => setTimeout(r, mineInterval));
-      const block = await this.worker!.getPendingBlock();
-      await this.newBlock(await this.processBlock(block));
-    }
-    */
   }
 }

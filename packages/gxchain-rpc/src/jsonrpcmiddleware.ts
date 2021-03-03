@@ -25,7 +25,6 @@ export class JsonRPCMiddleware {
   private readonly VERSION = '2.0';
 
   constructor(config: JsonMiddlewareOption) {
-    //this.config = Object.assign({}, config)
     helper.validateConfig(config);
     this.config = config;
   }
@@ -48,7 +47,6 @@ export class JsonRPCMiddleware {
 
       const p = this.config.methods[method](params);
       const result = util.types.isPromise(p) ? await p : p;
-      // const result = await this.config.methods[method](params, raw);
       const afterMethod = this.config.afterMethods && this.config.afterMethods[method];
       if (afterMethod) {
         await helper.executeHook(afterMethod, params, result);
@@ -60,10 +58,10 @@ export class JsonRPCMiddleware {
       const error = {
         code: Number(err.code || err.status || errors.INTERNAL_ERROR.code),
         message: err.message || errors.INTERNAL_ERROR.message,
-        data: null
+        data: undefined
       };
       if (err && err.data) error.data = err.data;
-      return { jsonrpc, error, id: id || null };
+      return { jsonrpc, error, id };
     }
   }
 
@@ -75,6 +73,13 @@ export class JsonRPCMiddleware {
         return memo;
       }, [])
     );
+  }
+
+  private makeParseError() {
+    return {
+      jsonrpc: this.VERSION,
+      error: errors.PARSE_ERROR
+    };
   }
 
   async rpcMiddleware(rpcData: any, send: (res: any) => void, onParseError: () => void) {
@@ -89,8 +94,15 @@ export class JsonRPCMiddleware {
 
   wrapWs(ws: WebSocket, onError: (err: any) => void) {
     ws.addEventListener('message', (msg) => {
+      let rpcData: any;
+      try {
+        rpcData = JSON.parse(msg.data);
+      } catch (err) {
+        ws.send(JSON.stringify(this.makeParseError()));
+        return;
+      }
       this.rpcMiddleware(
-        JSON.parse(msg.data),
+        rpcData,
         (resps: any) => {
           try {
             ws.send(JSON.stringify(resps));
@@ -98,22 +110,24 @@ export class JsonRPCMiddleware {
             onError(err);
           }
         },
-        () => ws.send(JSON.stringify(errors.PARSE_ERROR))
+        () => ws.send(JSON.stringify(this.makeParseError()))
       ).catch(onError);
     });
   }
 
   makeMiddleWare(onError: (err: any) => void) {
     return (req, res, next) => {
-      const params = { ...req.query, ...req.body };
-      console.log(req.url, 'in coming request parmas:', JSON.stringify(params, null, '  '));
       if (req.ws) {
         next();
       } else {
+        console.log('incomming', req.body);
         this.rpcMiddleware(
           req.body,
-          (resps: any) => res.send(resps),
-          () => res.send(errors.PARSE_ERROR)
+          (resps: any) => {
+            console.log('response', resps);
+            res.send(resps);
+          },
+          () => res.send(this.makeParseError())
         ).catch(onError);
       }
     };

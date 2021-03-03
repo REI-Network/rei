@@ -28,9 +28,9 @@ export const defaultGenesis = {
       coinbase: '0x8888f1f195afa192cfee860698584c030f4c9db1',
       difficulty: '0x020000',
       extraData: '0x42',
-      gasLimit: '0x2fefd8',
+      gasLimit: '0xbe5c8b',
       gasUsed: '0x00',
-      hash: '0x10581c6f28e17a166ad683d944649133dfaac717f38415493199380abd6a5c05',
+      hash: '0x70bc9feb9b82fabf799b6f511b9a0c8c89afacd2ce42cb34ed94cab5f54ab8c9',
       mixHash: '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421',
       nonce: '0x0102030405060708',
       number: '0x00',
@@ -46,6 +46,56 @@ export const defaultGenesis = {
         name: 'chainstart',
         block: 0,
         forkHash: '0xfc64ec04'
+      },
+      {
+        name: 'homestead',
+        block: 1150000,
+        forkHash: '0x97c2c34c'
+      },
+      {
+        name: 'dao',
+        block: 1920000,
+        forkHash: '0x91d1f948'
+      },
+      {
+        name: 'tangerineWhistle',
+        block: 2463000,
+        forkHash: '0x7a64da13'
+      },
+      {
+        name: 'spuriousDragon',
+        block: 2675000,
+        forkHash: '0x3edd5b10'
+      },
+      {
+        name: 'byzantium',
+        block: 4370000,
+        forkHash: '0xa00bc324'
+      },
+      {
+        name: 'constantinople',
+        block: 7280000,
+        forkHash: '0x668db0af'
+      },
+      {
+        name: 'petersburg',
+        block: 7280000,
+        forkHash: '0x668db0af'
+      },
+      {
+        name: 'istanbul',
+        block: 9069000,
+        forkHash: '0x879d6e30'
+      },
+      {
+        name: 'muirGlacier',
+        block: 9200000,
+        forkHash: '0xe029e991'
+      },
+      {
+        name: 'berlin',
+        block: null,
+        forkHash: null
       }
     ],
     bootstrapNodes: [],

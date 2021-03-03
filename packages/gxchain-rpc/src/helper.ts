@@ -10,7 +10,7 @@ export function throwRpcErr(message = 'JSON-RPC error', code = 500) {
   throw err;
 }
 
-export function validateJsonRpcVersion(version: any, requiredVersion: any) {
+export function validateJsonRpcVersion(version: string, requiredVersion: string) {
   if (version !== requiredVersion) {
     throwRpcErr(`${error.INVALID_REQUEST.message}, wrong version - ${version}`, error.INVALID_REQUEST.code);
   }
@@ -21,7 +21,7 @@ export function validateJsonRpcVersion(version: any, requiredVersion: any) {
  * @param {string} method
  * @param {array} controller, list of existing methods
  */
-export function validateJsonRpcMethod(method: any, controller: any) {
+export function validateJsonRpcMethod(method: string, controller: any) {
   if (!method || typeof method !== 'string') {
     throwRpcErr(`${error.INVALID_REQUEST.message}, wrong method - ${method}`, error.INVALID_REQUEST.code);
   } else if (!(method in controller)) {

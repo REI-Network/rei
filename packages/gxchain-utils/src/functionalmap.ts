@@ -1,5 +1,23 @@
 import createRBTree from 'functional-red-black-tree';
 
+const bufferCompare = (a: Buffer, b: Buffer) => {
+  if (a.length < b.length) {
+    return -1;
+  }
+  if (a.length > b.length) {
+    return 1;
+  }
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] < b[i]) {
+      return -1;
+    }
+    if (a[i] > b[i]) {
+      return 1;
+    }
+  }
+  return 0;
+};
+
 export class FunctionalMapIterator<T> implements IterableIterator<T> {
   protected readonly rbtreeIt;
   private stop = false;
@@ -128,4 +146,87 @@ export class FunctionalMap<K, V> implements Map<K, V> {
     }
     return result;
   }
+}
+
+export function createBufferFunctionalMap<T>() {
+  return new FunctionalMap<Buffer, T>(bufferCompare);
+}
+
+class FunctionalSetValueIterator<T> extends FunctionalMapIterator<T> {
+  protected value(): T | undefined {
+    return this.rbtreeIt.key;
+  }
+}
+
+class FunctionalSetKeyValueIterator<T> extends FunctionalMapIterator<[T, T]> {
+  protected value(): [T, T] | undefined {
+    return !this.rbtreeIt.key || !this.rbtreeIt.value ? undefined : [this.rbtreeIt.key, this.rbtreeIt.value];
+  }
+}
+
+export class FunctionalSet<T> implements Set<T> {
+  private readonly compare?: (a: T, b: T) => number;
+  private tree;
+
+  constructor(compare?: (a: T, b: T) => number) {
+    this.compare = compare;
+    this.tree = createRBTree(this.compare);
+  }
+
+  clear(): void {
+    this.tree.root = null;
+  }
+
+  delete(value: T): boolean {
+    const newTree = this.tree.remove(value);
+    const result = newTree.length !== this.tree.length;
+    if (result) {
+      this.tree = newTree;
+    }
+    return result;
+  }
+
+  has(value: T): boolean {
+    return !!this.tree.get(value);
+  }
+
+  get size(): number {
+    return this.tree.length;
+  }
+
+  add(value: T): this {
+    this.tree = this.tree.remove(value);
+    this.tree = this.tree.insert(value, true);
+    return this;
+  }
+
+  forEach(callbackfn: (value: T, value2: T, set: Set<T>) => void, thisArg?: any): void {
+    for (const value of this) {
+      thisArg ? callbackfn.call(thisArg, value, value, this) : callbackfn(value, value, this);
+    }
+  }
+
+  [Symbol.iterator](): IterableIterator<T> {
+    return this.values();
+  }
+
+  entries(): IterableIterator<[T, T]> {
+    return new FunctionalSetKeyValueIterator<T>(this.tree.begin);
+  }
+
+  keys(): IterableIterator<T> {
+    return this.values();
+  }
+
+  values(): IterableIterator<T> {
+    return new FunctionalSetValueIterator<T>(this.tree.begin);
+  }
+
+  get [Symbol.toStringTag](): string {
+    return 'FunctionalSet';
+  }
+}
+
+export function createBufferFunctionalSet() {
+  return new FunctionalSet<Buffer>(bufferCompare);
 }

@@ -42,9 +42,12 @@ class MsgQueue extends EventEmitter {
     this.protocol = protocol;
     this.queue = new AsyncQueue({
       push: (data: any) => {
-        this.queue.array.push(data);
-        if (this.queue.array.length > 10) {
-          console.warn('MsgQueue drop message:', this.queue.array.shift());
+        if (!this.aborter.isAborted) {
+          this.queue.array.push(data);
+          if (this.queue.array.length > 10) {
+            console.warn('MsgQueue drop message:', this.queue.array.shift());
+            this.peer.closeSelf();
+          }
         }
       }
     });
@@ -159,17 +162,19 @@ class MsgQueue extends EventEmitter {
   }
 
   async abort() {
-    await this.aborter.abort(new Error('MsgQueue abort'));
-    if (this.queue.isWaiting) {
-      this.queue.push(null);
-    }
-    this.queue.clear();
+    if (!this.aborter.isAborted) {
+      await this.aborter.abort(new Error('MsgQueue abort'));
+      if (this.queue.isWaiting) {
+        this.queue.push(null);
+      }
+      this.queue.clear();
 
-    for (const [response, request] of this.waitingRequests) {
-      clearTimeout(request.timeout);
-      request.reject(new Error('MsgQueue abort'));
+      for (const [response, request] of this.waitingRequests) {
+        clearTimeout(request.timeout);
+        request.reject(new Error('MsgQueue abort'));
+      }
+      this.waitingRequests.clear();
     }
-    this.waitingRequests.clear();
   }
 }
 
@@ -246,6 +251,10 @@ export class Peer extends EventEmitter {
       throw new Error(`Peer unkonw name: ${name}`);
     }
     return queue;
+  }
+
+  closeSelf() {
+    this.node.removePeer(this);
   }
 
   async abort() {

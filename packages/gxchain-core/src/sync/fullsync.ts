@@ -144,7 +144,7 @@ export class FullSynchronizer extends Synchronizer {
         throw err;
       }
 
-      for (let i = headers.length - 1; i > 0; i--) {
+      for (let i = headers.length - 1; i >= 0; i--) {
         try {
           const remoteHeader = headers[i];
           const localHeader = await this.node.db.getHeader(remoteHeader.hash(), remoteHeader.number);
@@ -163,6 +163,7 @@ export class FullSynchronizer extends Synchronizer {
   private async syncWithPeer(peer: Peer, bestHeight: number, updateAbort: (newAbort: () => Promise<void>) => void): Promise<boolean> {
     const localHeight = await this.findAncient(peer);
     console.debug('get best height from:', peer.peerId, 'best height:', bestHeight, 'local height:', localHeight);
+    this.startSyncHook(localHeight, bestHeight);
     let totalCount = bestHeight - localHeight;
     let totalTaskCount = 0;
     const headerFetcherTasks: HeadersFethcerTask[] = [];

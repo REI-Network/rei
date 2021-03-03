@@ -22,6 +22,20 @@ function forceAdd<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer | 
   set.add(value);
 }
 
+function autoDelete<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer | string) {
+  let set = map.get(key);
+  if (set) {
+    set.delete(value);
+    if (set.size === 0) {
+      map.delete(key);
+    }
+  }
+}
+
+const txArriveTimeout = 500;
+const gatherSlack = 100;
+const txGatherSlack = 100;
+
 export class TxFetcher extends EventEmitter {
   private waitingList = createBufferFunctionalMap<Set<string>>();
   private waitingTime = createBufferFunctionalMap<number>();
@@ -39,6 +53,8 @@ export class TxFetcher extends EventEmitter {
   private enqueueTransactionQueue = new AysncChannel<EnqueuePooledTransactionMessage>({ isAbort: () => this.aborter.isAborted });
 
   private readonly node: Node;
+
+  private waitTimeout?: NodeJS.Timeout;
 
   constructor(node: Node) {
     super();
@@ -163,13 +179,7 @@ export class TxFetcher extends EventEmitter {
           if (!delivered.has(hash)) {
             if (i < cutoff) {
               this.alternates.get(hash)?.delete(message.origin);
-              const set = this.announces.get(message.origin);
-              if (set) {
-                set.delete(hash);
-                if (set.size === 0) {
-                  this.announces.delete(message.origin);
-                }
-              }
+              autoDelete(this.announces, message.origin, hash);
             }
             if (this.alternates.size > 0) {
               if (this.announced.has(hash)) {
@@ -184,5 +194,48 @@ export class TxFetcher extends EventEmitter {
         // scheduleFetches
       }
     } catch (err) {}
+  }
+
+  private rescheduleWait() {
+    if (this.waitTimeout) {
+      clearTimeout(this.waitTimeout);
+      this.waitTimeout = undefined;
+    }
+    const now = Date.now();
+    let earliest = now;
+    for (const [hash, instance] of this.waitingTime) {
+      if (earliest > instance) {
+        earliest = instance;
+        if (txArriveTimeout - (now - earliest) < gatherSlack) {
+          break;
+        }
+      }
+    }
+    this.waitTimeout = setTimeout(() => {
+      const now = Date.now();
+      const actives = new Set<string>();
+      for (const [hash, instance] of this.waitingTime) {
+        if (now - instance + txGatherSlack > txArriveTimeout) {
+          if (this.announced.has(hash)) {
+            // panic
+          }
+          const set = this.waitingList.get(hash)!;
+          this.announced.set(hash, set);
+          for (const peer of set) {
+            forceAdd(this.announces, peer, hash);
+            autoDelete(this.watingSlots, peer, hash);
+            actives.add(peer);
+          }
+          this.waitingTime.delete(hash);
+          this.waitingList.delete(hash);
+        }
+      }
+      if (this.waitingList.size > 0) {
+        // rescheduleWait
+      }
+      if (actives.size > 0) {
+        // scheduleFetches
+      }
+    }, txArriveTimeout - (now - earliest));
   }
 }

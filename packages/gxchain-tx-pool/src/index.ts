@@ -12,7 +12,7 @@ import { PendingTxMap } from './pendingmap';
 import { TxPricedList } from './txpricedlist';
 import { Jonunal } from './jonunal';
 
-interface INode {
+export interface INode {
   db: Database;
   common: Common;
   blockchain: Blockchain;
@@ -152,7 +152,7 @@ export class TxPool {
     this.txs = new FunctionalMap<Buffer, WrappedTransaction>(bufferCompare);
     this.locals = new FunctionalMap<Buffer, boolean>(bufferCompare);
     this.priced = new TxPricedList(this.txs);
-    this.journal = new Jonunal(options.journal || 'transactions.rlp');
+    this.journal = new Jonunal(options.journal || 'transactions.rlp', this.node);
     try {
       this.journal.load(this.addLocal);
       this.journal.rotate(this.local());

@@ -1,15 +1,18 @@
 import fs from 'fs';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { Address } from 'ethereumjs-util';
+import { INode } from './index';
 
 const bufferSplit = Buffer.from('\r\n');
 
 export class Jonunal {
   path: string;
   writer?: fs.WriteStream;
-  constructor(path: string) {
+  private readonly node: INode;
+  constructor(path: string, node: INode) {
     this.path = path;
     this.writer = fs.createWriteStream(this.path, { flags: 'a' });
+    this.node = node;
   }
 
   async load(add: (transactions: WrappedTransaction[]) => void) {
@@ -50,7 +53,7 @@ export class Jonunal {
             break;
           }
           let bufferTemp = Buffer.from(bufferInput);
-          const tx = new WrappedTransaction(Transaction.fromRlpSerializedTx(bufferTemp.slice(0, i)));
+          const tx = new WrappedTransaction(Transaction.fromRlpSerializedTx(bufferTemp.slice(0, i), { common: this.node.common }));
           total++;
           batch.push(tx);
           if (batch.length > 1024) {
@@ -77,7 +80,7 @@ export class Jonunal {
 
   insert(tx: WrappedTransaction) {
     if (!this.writer) {
-      throw new Error('no active journal');
+      this.writer = fs.createWriteStream(this.path, { flags: 'a' });
     }
     return new Promise<void>((resolve, reject) => {
       if (this.writer) {

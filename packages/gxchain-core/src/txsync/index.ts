@@ -1,6 +1,6 @@
 import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AysncChannel, Aborter } from '@gxchain2/utils';
 import { EventEmitter } from 'events';
-import { WrappedTransaction } from '@gxchain2/tx';
+import { Transaction } from '@gxchain2/tx';
 import { Node } from '../node';
 
 type NewPooledTransactionMessage = {
@@ -9,7 +9,7 @@ type NewPooledTransactionMessage = {
 };
 
 type EnqueuePooledTransactionMessage = {
-  txs: WrappedTransaction[];
+  txs: Transaction[];
   origin: string;
 };
 
@@ -35,6 +35,9 @@ function autoDelete<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer 
 const txArriveTimeout = 500;
 const gatherSlack = 100;
 const txGatherSlack = 100;
+const maxTxRetrievals = 256;
+
+type Request = { hashes: Buffer[]; stolen?: FunctionalSet<Buffer> };
 
 export class TxFetcher extends EventEmitter {
   private waitingList = createBufferFunctionalMap<Set<string>>();
@@ -45,7 +48,7 @@ export class TxFetcher extends EventEmitter {
   private announced = createBufferFunctionalMap<Set<string>>();
 
   private fetching = createBufferFunctionalMap<string>();
-  private requests = new Map<string, { hashes: Buffer[]; stolen?: FunctionalSet<Buffer> }>();
+  private requests = new Map<string, Request>();
   private alternates = createBufferFunctionalMap<Set<string>>();
 
   private aborter = new Aborter();
@@ -123,9 +126,9 @@ export class TxFetcher extends EventEmitter {
     try {
       for await (const message of this.enqueueTransactionQueue.generator()) {
         // TODO: check underpriced and duplicate and etc.
-        const added = (await this.node.addPendingTxs(message.txs)).map((result, i) => (result ? message.txs[i] : null)).filter((ele) => ele !== null) as WrappedTransaction[];
-        for (const wtx of added) {
-          const hash = wtx.transaction.hash();
+        const added = (await this.node.addPendingTxs(message.txs)).map((result, i) => (result ? message.txs[i] : null)).filter((ele) => ele !== null) as Transaction[];
+        for (const tx of added) {
+          const hash = tx.hash();
           const set = this.waitingList.get(hash);
           if (set) {
             for (const [origin, txset] of this.watingSlots) {
@@ -163,7 +166,7 @@ export class TxFetcher extends EventEmitter {
         }
         this.requests.delete(message.origin);
 
-        const delivered = new Set<Buffer>(added.map((wtx) => wtx.transaction.hash()));
+        const delivered = new Set<Buffer>(added.map((tx) => tx.hash()));
         let cutoff = req.hashes.length;
         for (let i = 0; i < req.hashes.length; i++) {
           if (delivered.has(req.hashes[i])) {
@@ -231,11 +234,74 @@ export class TxFetcher extends EventEmitter {
         }
       }
       if (this.waitingList.size > 0) {
-        // rescheduleWait
+        this.rescheduleWait();
       }
       if (actives.size > 0) {
         // scheduleFetches
       }
     }, txArriveTimeout - (now - earliest));
+  }
+
+  private scheduleFetches(whiteList?: Set<string>) {
+    const actives = whiteList ? new Set<string>(whiteList) : new Set<string>(this.announces.keys());
+    if (actives.size === 0) {
+      return;
+    }
+    const idle = this.requests.size === 0;
+
+    for (const peer of actives) {
+      if (this.requests.has(peer)) {
+        continue;
+      }
+      const set = this.announces.get(peer);
+      if (!set || set.size === 0) {
+        continue;
+      }
+
+      const hashes: Buffer[] = [];
+      for (const hash of set) {
+        if (!this.fetching.has(hash)) {
+          this.fetching.set(hash, peer);
+          if (this.alternates.has(hash)) {
+            // panic
+          }
+          const alters = this.announced.get(hash);
+          if (alters) {
+            this.alternates.set(hash, alters);
+            this.announced.delete(hash);
+          }
+
+          hashes.push(hash);
+          if (hashes.length === maxTxRetrievals) {
+            break;
+          }
+        }
+      }
+
+      if (hashes.length > 0) {
+        this.requests.set(peer, { hashes });
+        const p = this.node.peerpool.getPeer(peer);
+        if (!p) {
+          // drop peer
+        } else {
+          p.getPooledTransactions(hashes)
+            .then((txs) => {
+              this.enqueueTransaction(peer, txs);
+            })
+            .catch((err) => {
+              // drop peer
+              this.emit('error', err);
+            });
+        }
+      }
+    }
+
+    if (idle && this.requests.size > 0) {
+      // rescheduleTimeout
+    }
+  }
+
+  enqueueTransaction(origin: string, txs: Transaction[]) {
+    this.enqueueTransactionQueue.push({ txs, origin });
   }
 }

@@ -62,6 +62,8 @@ export class TxFetcher extends EventEmitter {
   constructor(node: Node) {
     super();
     this.node = node;
+    this.newPooledTransactionLoop();
+    this.enqueueTransactionLoop();
   }
 
   private async newPooledTransactionLoop() {
@@ -301,7 +303,45 @@ export class TxFetcher extends EventEmitter {
     }
   }
 
+  private requestTimeout(peer: string) {
+    const req = this.requests.get(peer);
+    if (!req) {
+      return;
+    }
+
+    for (const hash of req.hashes) {
+      if (req.stolen && req.stolen.has(hash)) {
+        continue;
+      }
+      if (this.announced.has(hash)) {
+        // panic
+      }
+      const alters = this.alternates.get(hash);
+      if (alters) {
+        this.announced.set(hash, alters);
+      }
+      autoDelete(this.announced, hash, peer);
+      this.announces.get(peer)?.delete(hash);
+      this.alternates.delete(hash);
+      this.fetching.delete(hash);
+    }
+    if (this.announces.get(peer)?.size === 0) {
+      this.announces.delete(peer);
+    }
+    req.hashes = [];
+    // scheduleFetches
+    // rescheduleTimeout
+  }
+
+  newPooledTransactionHashes(origin: string, hashes: Buffer[]) {
+    if (!this.aborter.isAborted) {
+      this.newPooledTransactionQueue.push({ hashes, origin });
+    }
+  }
+
   enqueueTransaction(origin: string, txs: Transaction[]) {
-    this.enqueueTransactionQueue.push({ txs, origin });
+    if (!this.aborter.isAborted) {
+      this.enqueueTransactionQueue.push({ txs, origin });
+    }
   }
 }

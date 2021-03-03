@@ -359,4 +359,10 @@ export class Peer extends EventEmitter {
   getBlockBodies(headers: BlockHeader[]): Promise<Transaction[][]> {
     return this.request(constants.GXC2_ETHWIRE, 'GetBlockBodies', headers);
   }
+
+  newPooledTransactionHashes(hashes: Buffer[]) {
+    this.send(constants.GXC2_ETHWIRE, 'NewPooledTransactionHashes', hashes);
+  }
+
+  getPooledTransactions(hashes: Buffer[]) {}
 }

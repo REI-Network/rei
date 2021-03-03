@@ -93,6 +93,37 @@ const handlers: Handler[] = [
     }
   },
   {
+    name: 'NewPooledTransactionHashes',
+    code: 6,
+    encode: (info: MessageInfo, hashes: Buffer[]) => rlp.encode([6, [...hashes]]),
+    decode: (info: MessageInfo, hashes): Buffer[] => hashes,
+    process: (info: MessageInfo, hashes: Buffer[]) => {
+      // TODO: announce to txsync.
+    }
+  },
+  {
+    name: 'GetPooledTransactions',
+    code: 7,
+    response: 8,
+    encode: (info: MessageInfo, hashes: Buffer[]) => rlp.encode([7, [...hashes]]),
+    decode: (info: MessageInfo, hashes): Buffer[] => hashes,
+    process: (info: MessageInfo, hashes: Buffer[]) => {
+      return [
+        'PooledTransactions',
+        hashes.map((hash) => {
+          const wtx = info.node.txPool.getTransaction(hash);
+          return wtx ? wtx.transaction : undefined;
+        })
+      ];
+    }
+  },
+  {
+    name: 'PooledTransactions',
+    code: 8,
+    encode: (info: MessageInfo, txs: (Transaction | undefined)[]) => rlp.encode([8, txs.map((tx) => (tx ? tx.serialize() : []))]),
+    decode: (info: MessageInfo, raws: TransactionsBuffer) => raws.map((raw) => (raw.length === 0 ? undefined : Transaction.fromValuesArray(raw, { common: info.node.common })))
+  },
+  {
     name: 'Echo',
     code: 111,
     encode: (info: MessageInfo, data) => {

@@ -233,6 +233,10 @@ export class TxPool {
     return result;
   }
 
+  getTransaction(hash: Buffer) {
+    return this.txs.get(hash);
+  }
+
   private async _addTxs(txs: WrappedTransaction | WrappedTransaction[], force: boolean): Promise<{ results: boolean[]; readies?: Map<Buffer, WrappedTransaction[]> }> {
     txs = txs instanceof WrappedTransaction ? [txs] : txs;
     const dirtyAddrs: Address[] = [];

@@ -258,7 +258,6 @@ export class TxFetcher extends EventEmitter {
     if (actives.size === 0) {
       return;
     }
-    const idle = this.requests.size === 0;
 
     for (const peer of actives) {
       if (this.requests.has(peer)) {
@@ -302,16 +301,13 @@ export class TxFetcher extends EventEmitter {
             .catch((err) => {
               if (err instanceof PeerRequestTimeoutError) {
                 this.requestTimeout(peer);
+              } else {
+                this.dropPeer(peer);
               }
-              this.dropPeer(peer);
               this.emit('error', err);
             });
         }
       }
-    }
-
-    if (idle && this.requests.size > 0) {
-      // rescheduleTimeout
     }
   }
 
@@ -341,8 +337,8 @@ export class TxFetcher extends EventEmitter {
       this.announces.delete(peer);
     }
     req.hashes = [];
-    // scheduleFetches
-    // rescheduleTimeout
+
+    this.scheduleFetches();
   }
 
   dropPeer(peer: string) {
@@ -395,8 +391,7 @@ export class TxFetcher extends EventEmitter {
     }
 
     if (req) {
-      // scheduleFetches
-      // rescheduleTimeout
+      this.scheduleFetches();
     }
   }
 

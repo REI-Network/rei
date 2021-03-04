@@ -1,4 +1,4 @@
-import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AysncChannel, Aborter } from '@gxchain2/utils';
+import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AysncChannel, Aborter } from '@gxchain2/utils';
 import { EventEmitter } from 'events';
 import { Transaction } from '@gxchain2/tx';
 import { Node } from '../node';
@@ -36,6 +36,7 @@ const txArriveTimeout = 500;
 const gatherSlack = 100;
 const txGatherSlack = 100;
 const maxTxRetrievals = 256;
+const maxTxAnnounces = 4096;
 
 type Request = { hashes: Buffer[]; stolen?: FunctionalSet<Buffer> };
 
@@ -70,12 +71,12 @@ export class TxFetcher extends EventEmitter {
     try {
       for await (const message of this.newPooledTransactionQueue.generator()) {
         const used = (this.watingSlots.get(message.origin)?.size || 0) + (this.announces.get(message.origin)?.size || 0);
-        if (used > 4096) {
+        if (used > maxTxAnnounces) {
           continue;
         }
         const want = used + message.hashes.length;
-        if (want > 4096) {
-          message.hashes.splice(message.hashes.length - (want - 4096));
+        if (want > maxTxAnnounces) {
+          message.hashes.splice(message.hashes.length - (want - maxTxAnnounces));
         }
         const idleWait = this.waitingTime.size === 0;
         const oldPeer = this.announces.has(message.origin);

@@ -173,8 +173,8 @@ export class TxPool {
   private local(): Map<Address, WrappedTransaction[]> {
     let txs: Map<Address, WrappedTransaction[]> = new Map();
     for (const addrBuf of this.locals.keys()) {
-      let account = this.accounts.get(addrBuf);
-      let addr = new Address(addrBuf);
+      const account = this.accounts.get(addrBuf);
+      const addr = new Address(addrBuf);
       if (account?.hasPending()) {
         let transactions = txs.get(addr);
         if (transactions) {
@@ -313,7 +313,7 @@ export class TxPool {
       // drop tx if pool is full
       // TODO
       // let islocal = local || this.locals.has(addr.buf)
-      let islocal = true;
+      const islocal = true;
       if (txSlots(tx) + this.txs.size > this.globalSlots + this.globalQueue) {
         if (this.priced.underpriced(tx)) {
           results.push(false);
@@ -327,7 +327,7 @@ export class TxPool {
         if (drop) {
           for (const tx of drop) {
             this.removeTxFromGlobal(tx);
-            let account = this.accounts.get(addr.buf);
+            const account = this.accounts.get(addr.buf);
             if (account?.hasPending()) {
               account.pending.delete(tx.transaction.nonce);
             }
@@ -596,7 +596,7 @@ export class TxPool {
       if (queueSlots - queue.slots >= this.globalQueue) {
         queueSlots -= queue.slots;
         // resize priced
-        let resizes = queue.clear();
+        const resizes = queue.clear();
         this.removeTxFromGlobal(resizes);
         this.priced.removed(resizes.length);
       } else {

@@ -19,6 +19,7 @@ import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { hexStringToBuffer, SemaphoreLock } from '@gxchain2/utils';
 
 import { FullSynchronizer, Synchronizer } from './sync';
+import { TxFetcher } from './txsync';
 import { Miner } from './miner';
 
 export interface NodeOptions {
@@ -45,6 +46,7 @@ export class Node {
   public sync!: Synchronizer;
   public txPool!: TxPool;
   public miner!: Miner;
+  public txSync!: TxFetcher;
 
   private readonly options: NodeOptions;
   private readonly initPromise: Promise<void>;
@@ -222,6 +224,7 @@ export class Node {
 
     this.sync.start();
     this.miner = new Miner(this, this.options.mine);
+    this.txSync = new TxFetcher(this);
   }
 
   async getStateManager(root: Buffer) {

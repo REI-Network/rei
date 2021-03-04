@@ -98,7 +98,7 @@ const handlers: Handler[] = [
     encode: (info: MessageInfo, hashes: Buffer[]) => rlp.encode([6, [...hashes]]),
     decode: (info: MessageInfo, hashes): Buffer[] => hashes,
     process: (info: MessageInfo, hashes: Buffer[]) => {
-      // TODO: announce to txsync.
+      info.node.txSync.newPooledTransactionHashes(info.peer.peerId, hashes);
     }
   },
   {

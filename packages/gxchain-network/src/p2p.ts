@@ -32,6 +32,10 @@ export interface ITxPool {
   getTransaction: (hash: Buffer) => WrappedTransaction | undefined;
 }
 
+export interface ITxFetcher {
+  newPooledTransactionHashes(origin: string, hashes: Buffer[]);
+}
+
 export interface INode {
   db: Database;
   blockchain: Blockchain;
@@ -39,6 +43,7 @@ export interface INode {
   sync: ISync;
   status: any;
   txPool: ITxPool;
+  txSync: ITxFetcher;
 }
 
 export interface Libp2pNodeOptions {

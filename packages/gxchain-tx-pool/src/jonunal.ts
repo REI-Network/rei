@@ -6,69 +6,58 @@ import { INode } from './index';
 const bufferSplit = Buffer.from('\r\n');
 
 export class Jonunal {
-  path: string;
-  writer?: fs.WriteStream;
+  private path: string;
+  private writer?: fs.WriteStream;
   private readonly node: INode;
   constructor(path: string, node: INode) {
     this.path = path;
-    this.writer = fs.createWriteStream(this.path, { flags: 'a' });
     this.node = node;
+  }
+
+  getWritter() {
+    this.writer = fs.createWriteStream(this.path, { flags: 'a' });
+  }
+
+  async closeWritter() {
+    await new Promise((r) => {
+      this.writer!.end(r);
+    });
+    this.writer = undefined;
   }
 
   async load(add: (transactions: WrappedTransaction[]) => void) {
     return new Promise<void>(async (resolve, reject) => {
       if (!fs.existsSync(this.path)) {
-        return;
+        reject(new Error('The path is not existed'));
       }
       if (this.writer) {
-        await new Promise((r) => {
-          this.writer!.end(r);
-        });
-        this.writer = undefined;
+        this.closeWritter();
       }
-      let inputer = fs.createReadStream(this.path);
 
-      let total = 0;
-      let dropped = 0;
-
-      const loadBath = (txs: WrappedTransaction[]) => {
-        txs.forEach((tx) => {
-          let drops: WrappedTransaction[] = [];
-          drops.push(tx);
-          try {
-            add(drops);
-          } catch (err) {
-            dropped++;
-          }
-        });
-      };
-
+      const inputer = fs.createReadStream(this.path);
       let batch: WrappedTransaction[] = [];
-      let bufferInput: Buffer = Buffer.from('');
+      let bufferInput: Buffer | undefined;
       inputer.on('data', (chunk: Buffer) => {
-        bufferInput = Buffer.concat([bufferInput, chunk]);
+        bufferInput = Buffer.concat(bufferInput ? [bufferInput, chunk] : [chunk]);
         while (true) {
-          let i = bufferInput.indexOf(bufferSplit);
+          const i = bufferInput.indexOf(bufferSplit);
           if (i == -1) {
             break;
           }
-          let bufferTemp = Buffer.from(bufferInput);
-          const tx = new WrappedTransaction(Transaction.fromRlpSerializedTx(bufferTemp.slice(0, i), { common: this.node.common }));
-          total++;
+          const tx = new WrappedTransaction(Transaction.fromRlpSerializedTx(bufferInput.slice(0, i), { common: this.node.common }));
           batch.push(tx);
           if (batch.length > 1024) {
-            loadBath(batch);
+            add(batch);
             batch = [];
           }
           bufferInput = bufferInput.slice(i + bufferSplit.length);
         }
         if (batch.length > 0) {
-          loadBath(batch);
+          add(batch);
         }
       });
 
       inputer.on('end', () => {
-        console.log('Loaded local transaction journal', 'transactions', total, 'dropped', dropped);
         resolve();
       });
 
@@ -80,35 +69,28 @@ export class Jonunal {
 
   insert(tx: WrappedTransaction) {
     if (!this.writer) {
-      this.writer = fs.createWriteStream(this.path, { flags: 'a' });
+      this.getWritter();
     }
     return new Promise<void>((resolve, reject) => {
-      if (this.writer) {
-        this.writer.write(Buffer.concat([tx.transaction.serialize(), bufferSplit]), (err) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        });
-      }
+      this.writer!.write(Buffer.concat([tx.transaction.serialize(), bufferSplit]), (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
     });
   }
 
   async rotate(all: Map<Address, WrappedTransaction[]>) {
     if (this.writer) {
-      await new Promise((r) => {
-        this.writer!.end(r);
-      });
-      this.writer = undefined;
+      this.closeWritter();
     }
-    let output = fs.createWriteStream(this.path + '.new');
+    const output = fs.createWriteStream(this.path + '.new');
     let journaled = 0;
-    let key: Address;
-    let val: WrappedTransaction[];
-    let array: Promise<any>[] = [];
-    for ([key, val] of all) {
-      for (let tx of val) {
+    const array: Promise<void>[] = [];
+    for (const [key, val] of all) {
+      for (const tx of val) {
         array.push(
           new Promise<void>((resolve, reject) => {
             output.write(Buffer.concat([tx.transaction.serialize(), bufferSplit]), (err) => {
@@ -126,14 +108,12 @@ export class Jonunal {
     try {
       await Promise.all(array);
     } catch (err) {
+      return;
+    } finally {
       await new Promise((r) => {
         output.end(r);
       });
-      return;
     }
-    await new Promise((r) => {
-      output.end(r);
-    });
 
     fs.renameSync(this.path + '.new', this.path);
     this.writer = fs.createWriteStream(this.path, { flags: 'a' });
@@ -142,10 +122,7 @@ export class Jonunal {
 
   async close() {
     if (this.writer) {
-      await new Promise((r) => {
-        this.writer!.end(r);
-      });
-      this.writer = undefined;
+      this.closeWritter();
     }
     return;
   }

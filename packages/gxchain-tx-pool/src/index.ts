@@ -143,7 +143,7 @@ export class TxPool {
     this.initPromise = this.init();
   }
 
-  private getAllSolt(): number {
+  private getAllSlot(): number {
     let soltsNumer: number = 0;
     for (const [sender, account] of this.accounts) {
       soltsNumer += account.pending.slots;
@@ -319,7 +319,7 @@ export class TxPool {
           results.push(false);
           continue;
         }
-        const [drop, success] = this.priced.discard(this.getAllSolt() - (this.globalSlots + this.globalQueue), true);
+        const [drop, success] = this.priced.discard(this.getAllSlot() - (this.globalSlots + this.globalQueue), true);
         if (!success) {
           results.push(false);
           continue;

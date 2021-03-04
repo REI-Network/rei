@@ -29,9 +29,9 @@ export class TxPricedList {
   }
 
   cap(threshold: BN): WrappedTransaction[] {
-    let drop: WrappedTransaction[] = [];
+    const drop: WrappedTransaction[] = [];
     while (this.remotes.length > 0) {
-      let cheapest: WrappedTransaction = this.remotes.peek();
+      const cheapest: WrappedTransaction = this.remotes.peek();
       if (!this.all.has(cheapest.transaction.hash())) {
         this.remotes.remove();
         this.stales--;
@@ -59,14 +59,14 @@ export class TxPricedList {
     if (this.remotes.length == 0) {
       return false;
     }
-    let cheapest: WrappedTransaction = this.remotes.peek();
+    const cheapest: WrappedTransaction = this.remotes.peek();
     return cheapest.transaction.gasPrice.gt(tx.transaction.gasPrice);
   }
 
   discard(slots: number, force: boolean): [WrappedTransaction[] | undefined, boolean] {
-    let drop: WrappedTransaction[] = [];
+    const drop: WrappedTransaction[] = [];
     while (this.remotes.length > 0 && slots > 0) {
-      let tx: WrappedTransaction = this.remotes.remove();
+      const tx: WrappedTransaction = this.remotes.remove();
       if (!this.all.has(tx.transaction.hash())) {
         this.stales--;
         continue;
@@ -84,7 +84,7 @@ export class TxPricedList {
   }
 
   reheap() {
-    let reheap = new Heap({ comparBefore: (a: WrappedTransaction, b: WrappedTransaction) => b.transaction.gasPrice.gt(a.transaction.gasPrice) });
+    const reheap = new Heap({ comparBefore: (a: WrappedTransaction, b: WrappedTransaction) => b.transaction.gasPrice.gt(a.transaction.gasPrice) });
     this.stales = 0;
     this.all.forEach((val, key, map) => {
       reheap.push(val);

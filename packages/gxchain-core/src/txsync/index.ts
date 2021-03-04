@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import { Transaction } from '@gxchain2/tx';
 import { PeerRequestTimeoutError } from '@gxchain2/network';
 import { Node } from '../node';
+import { bufferToHex } from 'ethereumjs-util';
 
 type NewPooledTransactionMessage = {
   hashes: Buffer[];
@@ -31,6 +32,10 @@ function autoDelete<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer 
       map.delete(key);
     }
   }
+}
+
+function panicError(...args: any[]) {
+  console.error('TxFetcher, panic error:', ...args);
 }
 
 const txArriveTimeout = 500;
@@ -195,7 +200,7 @@ export class TxFetcher extends EventEmitter {
             }
             if (this.alternates.size > 0) {
               if (this.announced.has(hash)) {
-                // panic
+                panicError('enqueueTransactionLoop, announced hash existed', bufferToHex(hash));
               }
               this.announced.set(hash, this.alternates.get(hash)!);
             }
@@ -231,7 +236,7 @@ export class TxFetcher extends EventEmitter {
       for (const [hash, instance] of this.waitingTime) {
         if (now - instance + txGatherSlack > txArriveTimeout) {
           if (this.announced.has(hash)) {
-            // panic
+            panicError('rescheduleWait, announced hash existed', bufferToHex(hash));
           }
           const set = this.waitingList.get(hash)!;
           this.announced.set(hash, set);
@@ -273,7 +278,7 @@ export class TxFetcher extends EventEmitter {
         if (!this.fetching.has(hash)) {
           this.fetching.set(hash, peer);
           if (this.alternates.has(hash)) {
-            // panic
+            panicError('scheduleFetches, alternates hash existed', bufferToHex(hash));
           }
           const alters = this.announced.get(hash);
           if (alters) {
@@ -322,7 +327,7 @@ export class TxFetcher extends EventEmitter {
         continue;
       }
       if (this.announced.has(hash)) {
-        // panic
+        panicError('requestTimeout, announced hash existed', bufferToHex(hash));
       }
       const alters = this.alternates.get(hash);
       if (alters) {

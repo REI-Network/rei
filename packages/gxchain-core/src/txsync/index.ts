@@ -1,6 +1,7 @@
 import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AysncChannel, Aborter } from '@gxchain2/utils';
 import { EventEmitter } from 'events';
 import { Transaction } from '@gxchain2/tx';
+import { PeerRequestTimeoutError } from '@gxchain2/network';
 import { Node } from '../node';
 
 type NewPooledTransactionMessage = {
@@ -115,14 +116,18 @@ export class TxFetcher extends EventEmitter {
         }
 
         if (idleWait && this.waitingTime.size > 0) {
-          // rescheduleWait
+          this.rescheduleWait();
         }
         const set = this.announces.get(message.origin);
         if (!oldPeer && set && set.size > 0) {
-          // scheduleFetches
+          this.scheduleFetches(
+            new Set<string>([message.origin])
+          );
         }
       }
-    } catch (err) {}
+    } catch (err) {
+      this.emit('error', err);
+    }
   }
 
   private async enqueueTransactionLoop() {
@@ -155,7 +160,9 @@ export class TxFetcher extends EventEmitter {
             const origin = this.fetching.get(hash);
             if (origin !== undefined && origin !== message.origin) {
               const req = this.requests.get(origin);
-              // set stolen
+              if (req) {
+                req.stolen = req.stolen ? req.stolen.add(hash) : createBufferFunctionalSet().add(hash);
+              }
             }
             this.fetching.delete(hash);
           }
@@ -163,8 +170,7 @@ export class TxFetcher extends EventEmitter {
 
         const req = this.requests.get(message.origin);
         if (!req) {
-          // TODO
-          console.warn('unknow error');
+          console.warn('TxFetcher, unexpected transaction delivery, peer:', message.origin);
           continue;
         }
         this.requests.delete(message.origin);
@@ -197,9 +203,11 @@ export class TxFetcher extends EventEmitter {
           this.alternates.delete(hash);
           this.fetching.delete(hash);
         }
-        // scheduleFetches
+        this.scheduleFetches();
       }
-    } catch (err) {}
+    } catch (err) {
+      this.emit('error', err);
+    }
   }
 
   private rescheduleWait() {
@@ -240,7 +248,7 @@ export class TxFetcher extends EventEmitter {
         this.rescheduleWait();
       }
       if (actives.size > 0) {
-        // scheduleFetches
+        this.scheduleFetches(actives);
       }
     }, txArriveTimeout - (now - earliest));
   }
@@ -285,14 +293,17 @@ export class TxFetcher extends EventEmitter {
         this.requests.set(peer, { hashes });
         const p = this.node.peerpool.getPeer(peer);
         if (!p) {
-          // drop peer
+          this.dropPeer(peer);
         } else {
           p.getPooledTransactions(hashes)
             .then((txs) => {
               this.enqueueTransaction(peer, txs);
             })
             .catch((err) => {
-              // drop peer
+              if (err instanceof PeerRequestTimeoutError) {
+                this.requestTimeout(peer);
+              }
+              this.dropPeer(peer);
               this.emit('error', err);
             });
         }

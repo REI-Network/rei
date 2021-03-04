@@ -14,15 +14,19 @@ export class Jonunal {
     this.node = node;
   }
 
-  getWritter() {
-    this.writer = fs.createWriteStream(this.path, { flags: 'a' });
+  createWritter() {
+    if (!this.writer) {
+      this.writer = fs.createWriteStream(this.path, { flags: 'a' });
+    }
   }
 
   async closeWritter() {
-    await new Promise((r) => {
-      this.writer!.end(r);
-    });
-    this.writer = undefined;
+    if (this.writer) {
+      await new Promise((r) => {
+        this.writer!.end(r);
+      });
+      this.writer = undefined;
+    }
   }
 
   async load(add: (transactions: WrappedTransaction[]) => void) {
@@ -30,9 +34,8 @@ export class Jonunal {
       if (!fs.existsSync(this.path)) {
         reject(new Error('The path is not existed'));
       }
-      if (this.writer) {
-        this.closeWritter();
-      }
+
+      await this.closeWritter();
 
       const inputer = fs.createReadStream(this.path);
       let batch: WrappedTransaction[] = [];
@@ -68,9 +71,7 @@ export class Jonunal {
   }
 
   insert(tx: WrappedTransaction) {
-    if (!this.writer) {
-      this.getWritter();
-    }
+    this.createWritter;
     return new Promise<void>((resolve, reject) => {
       this.writer!.write(Buffer.concat([tx.transaction.serialize(), bufferSplit]), (err) => {
         if (err) {
@@ -83,9 +84,7 @@ export class Jonunal {
   }
 
   async rotate(all: Map<Address, WrappedTransaction[]>) {
-    if (this.writer) {
-      this.closeWritter();
-    }
+    await this.closeWritter();
     const output = fs.createWriteStream(this.path + '.new');
     let journaled = 0;
     const array: Promise<void>[] = [];
@@ -116,14 +115,11 @@ export class Jonunal {
     }
 
     fs.renameSync(this.path + '.new', this.path);
-    this.writer = fs.createWriteStream(this.path, { flags: 'a' });
     console.log('Regenerated local transaction journal', 'transactions', journaled, 'accounts', Array.from(all.keys()).length);
   }
 
   async close() {
-    if (this.writer) {
-      this.closeWritter();
-    }
+    await this.closeWritter();
     return;
   }
 }

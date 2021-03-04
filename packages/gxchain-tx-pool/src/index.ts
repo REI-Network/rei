@@ -143,58 +143,13 @@ export class TxPool {
     this.initPromise = this.init();
   }
 
-  private getAllSlot(): number {
+  private getAllSlots(): number {
     let soltsNumer: number = 0;
     for (const [sender, account] of this.accounts) {
       soltsNumer += account.pending.slots;
       soltsNumer += account.queue.slots;
     }
     return soltsNumer;
-  }
-
-  // addTxs attempts to queue a batch of transactions if they are valid.
-  private addLocal = (txs: WrappedTransaction[] /*local: boolean sync: boolean*/) => {
-    let news: WrappedTransaction[] = [];
-    for (const tx of txs) {
-      if (this.txs.has(tx.transaction.hash())) {
-        continue;
-      }
-      if (!tx.transaction.isSigned()) {
-        continue;
-      }
-      news.push(tx);
-    }
-    if (news.length == 0) {
-      return;
-    }
-    //TODO add locked transactions according to the (symbol local)
-  };
-
-  private local(): Map<Address, WrappedTransaction[]> {
-    let txs: Map<Address, WrappedTransaction[]> = new Map();
-    for (const addrBuf of this.locals.keys()) {
-      const account = this.accounts.get(addrBuf);
-      const addr = new Address(addrBuf);
-      if (account?.hasPending()) {
-        let transactions = txs.get(addr);
-        if (transactions) {
-          transactions = transactions.concat(account.pending.toList());
-          txs.set(addr, transactions);
-        } else {
-          txs.set(addr, account.pending.toList());
-        }
-      }
-      if (account?.hasQueue()) {
-        let transactions = txs.get(addr);
-        if (transactions) {
-          transactions = transactions.concat(account.queue.toList());
-          txs.set(addr, transactions);
-        } else {
-          txs.set(addr, account.queue.toList());
-        }
-      }
-    }
-    return txs;
   }
 
   async init() {
@@ -205,8 +160,24 @@ export class TxPool {
     this.currentHeader = this.node.blockchain.latestBlock.header;
     this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot);
     if (this.journal) {
-      await this.journal.load(this.addLocal);
-      await this.journal.rotate(this.local());
+      await this.journal.load(async (txs: WrappedTransaction[]) => {
+        let news: WrappedTransaction[] = [];
+        for (const tx of txs) {
+          if (this.txs.has(tx.transaction.hash())) {
+            continue;
+          }
+          if (!tx.transaction.isSigned()) {
+            continue;
+          }
+          news.push(tx);
+        }
+        if (news.length == 0) {
+          return;
+        }
+        await this._addTxs(news, true);
+        this.truncatePending;
+        this.truncateQueue;
+      });
     }
   }
 
@@ -319,7 +290,7 @@ export class TxPool {
           results.push(false);
           continue;
         }
-        const [drop, success] = this.priced.discard(this.getAllSlot() - (this.globalSlots + this.globalQueue), true);
+        const [drop, success] = this.priced.discard(this.getAllSlots() - (this.globalSlots + this.globalQueue), true);
         if (!success) {
           results.push(false);
           continue;

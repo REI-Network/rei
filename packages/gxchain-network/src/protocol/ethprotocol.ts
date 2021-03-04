@@ -120,7 +120,7 @@ const handlers: Handler[] = [
   {
     name: 'PooledTransactions',
     code: 8,
-    encode: (info: MessageInfo, txs: Transaction[]) => rlp.encode([8, txs.map((tx) => tx.serialize())]),
+    encode: (info: MessageInfo, txs: Transaction[]) => rlp.encode([8, txs.map((tx) => tx.raw())]),
     decode: (info: MessageInfo, raws: TransactionsBuffer) => raws.map((raw) => Transaction.fromValuesArray(raw, { common: info.node.common }))
   },
   {

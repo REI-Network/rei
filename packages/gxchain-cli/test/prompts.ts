@@ -11,7 +11,7 @@ import { Address } from 'ethereumjs-util';
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
 import { constants } from '@gxchain2/common';
-import { Transaction } from '@gxchain2/tx';
+import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { hexStringToBuffer } from '@gxchain2/utils';
 
 const args = process.argv.slice(2);
@@ -76,25 +76,8 @@ const startPrompts = async (node: Node) => {
       }
     } else if (arr[0] === 'batchmine' || arr[0] === 'bm') {
       try {
-        const count = Number.isInteger(Number(arr[1])) ? Number(arr[1]) : 1000;
+        const count = Number.isInteger(Number(arr[1])) ? Number(arr[1]) : 1;
         for (let i = 0; i < count; i++) {
-          /*
-          const flag = getRandomIntInclusive(1, 2) == 1;
-          const fromIndex = flag ? 0 : 1;
-          const toIndex = !flag ? 0 : 1;
-          const account = await (await node.getStateManager(node.blockchain.latestBlock.header.stateRoot)).getAccount(Address.fromString(accounts[fromIndex]));
-          const unsignedTx = Transaction.fromTxData(
-            {
-              gasLimit: '0x5208',
-              gasPrice: '0x01',
-              nonce: account.nonce,
-              to: accounts[toIndex],
-              value: '0x01'
-            },
-            { common: node.common }
-          );
-          await node.addPendingTxs([unsignedTx.sign(getPrivateKey(accounts[fromIndex]))]);
-          */
           await node.miner.mineBlock();
           await new Promise((resolve) => setTimeout(resolve, 10));
         }
@@ -167,6 +150,23 @@ const startPrompts = async (node: Node) => {
       await node.addPendingTxs([tx]);
     } else if (arr[0] === 'lstxpool') {
       await node.txPool.ls();
+    } else if (arr[0] === 'newptx') {
+      const [peerId, hash] = arr.slice(1);
+      const peer = node.peerpool.getPeer(peerId);
+      if (!peer) {
+        console.warn('missing peer', peerId);
+        continue;
+      }
+      peer.newPooledTransactionHashes([hexStringToBuffer(hash)]);
+    } else if (arr[0] === 'getptx') {
+      const [peerId, hash] = arr.slice(1);
+      const peer = node.peerpool.getPeer(peerId);
+      if (!peer) {
+        console.warn('missing peer', peerId);
+        continue;
+      }
+      const wtx = new WrappedTransaction((await peer.getPooledTransactions([hexStringToBuffer(hash)]))[0]);
+      console.log('get pooled transaction:', wtx.toRPCJSON());
     } else {
       console.warn('$ Invalid command');
       continue;

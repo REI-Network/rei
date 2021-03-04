@@ -334,6 +334,61 @@ export class TxFetcher extends EventEmitter {
     // rescheduleTimeout
   }
 
+  dropPeer(peer: string) {
+    {
+      const set = this.watingSlots.get(peer);
+      if (set) {
+        for (const hash of set) {
+          this.waitingList.get(hash)?.delete(peer);
+          if (this.waitingList.get(hash)?.size === 0) {
+            this.waitingList.delete(hash);
+            this.waitingTime.delete(hash);
+          }
+        }
+        this.watingSlots.delete(peer);
+        if (this.waitingTime.size > 0) {
+          this.rescheduleWait();
+        }
+      }
+    }
+
+    const req = this.requests.get(peer);
+    if (req) {
+      for (const hash of req.hashes) {
+        if (req.stolen && req.stolen.has(hash)) {
+          continue;
+        }
+        const alters = this.alternates.get(hash);
+        if (alters && alters.size > 0) {
+          alters.delete(peer);
+          if (alters.size === 0) {
+            this.alternates.delete(hash);
+          } else {
+            this.announced.set(hash, alters);
+            this.alternates.delete(hash);
+          }
+        }
+        this.fetching.delete(hash);
+      }
+      this.requests.delete(peer);
+    }
+
+    {
+      const set = this.announces.get(peer);
+      if (set) {
+        for (const hash of set) {
+          autoDelete(this.announced, hash, peer);
+        }
+        this.announces.delete(peer);
+      }
+    }
+
+    if (req) {
+      // scheduleFetches
+      // rescheduleTimeout
+    }
+  }
+
   newPooledTransactionHashes(origin: string, hashes: Buffer[]) {
     if (!this.aborter.isAborted) {
       this.newPooledTransactionQueue.push({ hashes, origin });

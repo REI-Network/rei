@@ -134,6 +134,12 @@ export class AysncChannel<T = any> extends AsyncQueue<T> {
     this.isAbort = options.isAbort;
   }
 
+  push(data: T | null) {
+    if (!this.isAbort()) {
+      super.push(data);
+    }
+  }
+
   async *generator() {
     while (!this.isAbort()) {
       const result = await this.next();

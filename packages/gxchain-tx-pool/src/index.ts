@@ -106,7 +106,7 @@ type AddTxs = {
 
 export class TxPool {
   private aborter = new Aborter();
-  private newBlockQueue = new AysncChannel<Block>({ isAbort: () => this.aborter.isAborted });
+  private newBlockQueue = new AysncChannel<Block>({ max: 1, isAbort: () => this.aborter.isAborted });
   private addTxsQueue = new AysncChannel<AddTxs>({ isAbort: () => this.aborter.isAborted });
 
   private readonly accounts: FunctionalMap<Buffer, TxPoolAccount>;

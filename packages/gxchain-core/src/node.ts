@@ -16,7 +16,7 @@ import { VM, WrappedVM } from '@gxchain2/vm';
 import { TxPool } from '@gxchain2/tx-pool';
 import { Block } from '@gxchain2/block';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
-import { hexStringToBuffer, SemaphoreLock } from '@gxchain2/utils';
+import { hexStringToBuffer, AysncChannel, Aborter } from '@gxchain2/utils';
 
 import { FullSynchronizer, Synchronizer } from './sync';
 import { TxFetcher } from './txsync';
@@ -36,6 +36,11 @@ export interface NodeOptions {
   };
 }
 
+type AddPendingTxs = {
+  txs: (Transaction | WrappedTransaction)[];
+  resolve: (results: boolean[]) => void;
+};
+
 export class Node {
   public readonly rawdb: LevelUp;
 
@@ -50,20 +55,16 @@ export class Node {
 
   private readonly options: NodeOptions;
   private readonly initPromise: Promise<void>;
-  private readonly pendingLock = new SemaphoreLock<BN>((a, b) => {
-    if (a.lt(b)) {
-      return -1;
-    }
-    if (a.gt(b)) {
-      return 1;
-    }
-    return 0;
-  });
+  private readonly aborter = new Aborter();
+  private readonly newBlockQueue = new AysncChannel<Block>({ isAbort: () => this.aborter.isAborted });
+  private readonly addPendingTxsQueue = new AysncChannel<AddPendingTxs>({ isAbort: () => this.aborter.isAborted });
 
   constructor(options: NodeOptions) {
     this.options = options;
     this.rawdb = createLevelDB(path.join(this.options.databasePath, 'chaindb'));
     this.initPromise = this.init();
+    this.newBlockLoop();
+    this.addPendingTxsLoop();
   }
 
   get status() {
@@ -270,40 +271,48 @@ export class Node {
     }
   }
 
+  private async newBlockLoop() {
+    await this.initPromise;
+    for await (const block of this.newBlockQueue.generator()) {
+      try {
+        for (const peer of this.peerpool.peers) {
+          if (peer.isSupport(constants.GXC2_ETHWIRE)) {
+            peer.newBlock(block);
+          }
+        }
+        await this.txPool.newBlock(block);
+        await this.miner.worker.newBlock(block);
+      } catch (err) {
+        console.error('Node::newBlockLoop, catch error:', err);
+      }
+    }
+  }
+
+  private async addPendingTxsLoop() {
+    await this.initPromise;
+    for await (const addPendingTxs of this.addPendingTxsQueue.generator()) {
+      try {
+        const { results, readies } = await this.txPool.addTxs(addPendingTxs.txs.map((tx) => (tx instanceof Transaction ? new WrappedTransaction(tx) : tx)));
+        if (readies && readies.size > 0) {
+          await this.miner.worker.addTxs(readies);
+        }
+        addPendingTxs.resolve(results);
+      } catch (err) {
+        addPendingTxs.resolve(new Array<boolean>(addPendingTxs.txs.length).fill(false));
+        console.error('Node::addPendingTxsLoop, catch error:', err);
+      }
+    }
+  }
+
   async newBlock(block: Block) {
     await this.initPromise;
-    if (!(await this.pendingLock.compareLock(block.header.number))) {
-      return;
-    }
-    try {
-      for (const peer of this.peerpool.peers) {
-        if (peer.isSupport(constants.GXC2_ETHWIRE)) {
-          peer.newBlock(block);
-        }
-      }
-      await this.txPool.newBlock(block);
-      await this.miner.worker.newBlock(block);
-      this.pendingLock.release();
-    } catch (err) {
-      console.error('Node new block error:', err);
-      this.pendingLock.release();
-    }
+    this.newBlockQueue.push(block);
   }
 
   async addPendingTxs(txs: (Transaction | WrappedTransaction)[]) {
     await this.initPromise;
-    await this.pendingLock.lock();
-    try {
-      const { results, readies } = await this.txPool.addTxs(txs.map((tx) => (tx instanceof Transaction ? new WrappedTransaction(tx) : tx)));
-      if (readies && readies.size > 0) {
-        await this.miner.worker.addTxs(readies);
-      }
-      this.pendingLock.release();
-      return results;
-    } catch (err) {
-      console.error('Node add txs error:', err);
-      this.pendingLock.release();
-      return new Array<boolean>(txs.length).fill(false);
-    }
+    return new Promise<boolean[]>((resolve) => {
+      this.addPendingTxsQueue.push({ txs, resolve });
+    });
   }
 }

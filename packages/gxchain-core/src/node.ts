@@ -220,6 +220,9 @@ export class Node {
         if (status && status.height) {
           this.sync.announce(peer, status.height);
         }
+      })
+      .on('removed', (peer) => {
+        this.txSync.dropPeer(peer.peerId);
       });
 
     this.sync.start();

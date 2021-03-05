@@ -40,18 +40,21 @@ interface AsyncQueueOption<T> {
   push?: (data: T | null) => void;
   hasNext?: () => boolean;
   next?: () => T | null;
+  max?: number;
 }
 
 export class AsyncQueue<T = any> extends AsyncNext<T> {
   private arr: (T | null)[] = [];
+  private max?: number;
 
   constructor(options?: AsyncQueueOption<T>) {
     super(
       Object.assign(
         {
           push: (data: T | null) => {
-            if (data !== null) {
-              this.arr.push(data);
+            this.arr.push(data);
+            if (this.max && this.arr.length > this.max) {
+              this.arr.shift();
             }
           },
           hasNext: () => this.arr.length > 0,
@@ -60,6 +63,7 @@ export class AsyncQueue<T = any> extends AsyncNext<T> {
         options
       )
     );
+    this.max = options?.max;
   }
 
   get array() {

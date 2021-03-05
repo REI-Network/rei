@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { Address } from 'ethereumjs-util';
 import { INode } from './index';
@@ -7,10 +8,12 @@ const bufferSplit = Buffer.from('\r\n');
 
 export class Jonunal {
   private path: string;
+  private dir: string;
   private writer?: fs.WriteStream;
   private readonly node: INode;
-  constructor(path: string, node: INode) {
-    this.path = path;
+  constructor(dir: string, node: INode) {
+    this.dir = dir;
+    this.path = path.join(dir, 'transactions.rlp');
     this.node = node;
   }
 
@@ -29,10 +32,11 @@ export class Jonunal {
     }
   }
 
-  async load(add: (transactions: WrappedTransaction[]) => void) {
+  async load(add: (transactions: WrappedTransaction[]) => Promise<void>) {
     return new Promise<void>(async (resolve, reject) => {
       if (!fs.existsSync(this.path)) {
-        reject(new Error('The path is not existed'));
+        fs.mkdirSync(this.dir, { recursive: true });
+        fs.openSync(this.path, 'a');
       }
 
       await this.closeWritter();
@@ -71,7 +75,7 @@ export class Jonunal {
   }
 
   insert(tx: WrappedTransaction) {
-    this.createWritter;
+    this.createWritter();
     return new Promise<void>((resolve, reject) => {
       this.writer!.write(Buffer.concat([tx.transaction.serialize(), bufferSplit]), (err) => {
         if (err) {

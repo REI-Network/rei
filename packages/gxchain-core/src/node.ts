@@ -20,6 +20,7 @@ import { hexStringToBuffer, SemaphoreLock } from '@gxchain2/utils';
 
 import { FullSynchronizer, Synchronizer } from './sync';
 import { Miner } from './miner';
+import { threadId } from 'worker_threads';
 
 export interface NodeOptions {
   databasePath: string;
@@ -180,8 +181,7 @@ export class Node {
         this.newBlock(block);
       });
 
-    this.txPool = new TxPool({ node: this });
-    await this.txPool.init();
+    this.txPool = new TxPool({ node: this, journal: this.options.databasePath });
 
     let peerId!: PeerId;
     try {
@@ -222,6 +222,7 @@ export class Node {
 
     this.sync.start();
     this.miner = new Miner(this, this.options.mine);
+    await this.txPool.init();
   }
 
   async getStateManager(root: Buffer) {

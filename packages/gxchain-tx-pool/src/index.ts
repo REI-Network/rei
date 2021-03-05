@@ -55,7 +55,7 @@ export interface TxPoolOptions {
   accountQueue?: number;
   globalQueue?: number;
 
-  journal?: string;
+  journal: string;
 
   node: INode;
 }
@@ -138,7 +138,7 @@ export class TxPool {
     this.txs = createBufferFunctionalMap<WrappedTransaction>();
     this.locals = createBufferFunctionalSet();
     this.priced = new TxPricedList(this.txs);
-    this.journal = new Jonunal(options.journal || 'transactions.rlp', this.node);
+    this.journal = new Jonunal(options.journal, this.node);
 
     this.initPromise = this.init();
   }
@@ -175,8 +175,8 @@ export class TxPool {
           return;
         }
         await this._addTxs(news, true);
-        this.truncatePending;
-        this.truncateQueue;
+        this.truncatePending();
+        this.truncateQueue();
       });
     }
   }

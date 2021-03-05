@@ -36,7 +36,8 @@ export class Jonunal {
     return new Promise<void>(async (resolve, reject) => {
       if (!fs.existsSync(this.path)) {
         fs.mkdirSync(this.dir, { recursive: true });
-        fs.openSync(this.path, 'a');
+        resolve();
+        return;
       }
 
       await this.closeWritter();

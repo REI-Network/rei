@@ -9,7 +9,7 @@ interface AsyncNextOption<T> {
 
 export class AsyncNext<T = any> {
   private readonly queue: AsyncNextOption<T>;
-  private resolve?: (data: T) => void;
+  private resolve?: (data: T | null) => void;
   private _shouldStop: boolean = false;
   protected drop?: (data: T) => void;
 
@@ -31,7 +31,11 @@ export class AsyncNext<T = any> {
   }
 
   abort() {
-    if (!this.shouldStop) {
+    if (this.resolve) {
+      this.clear();
+      this.resolve(null);
+      this.resolve = undefined;
+    } else if (!this.shouldStop) {
       this._shouldStop = true;
     }
   }
@@ -53,7 +57,7 @@ export class AsyncNext<T = any> {
     }
     return this.queue.hasNext()
       ? Promise.resolve(this.queue.next())
-      : new Promise<T>((resolve) => {
+      : new Promise<T | null>((resolve) => {
           this.resolve = resolve;
         });
   }

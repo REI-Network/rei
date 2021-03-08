@@ -4,6 +4,7 @@ import type { INode } from '../p2p';
 export type MessageInfo = {
   node: INode;
   peer: Peer;
+  protocol: Protocol;
 };
 
 export type Handler = {
@@ -16,7 +17,7 @@ export type Handler = {
 };
 
 export class Protocol {
-  private _status: any;
+  protected _status: any;
 
   get status() {
     return this._status;

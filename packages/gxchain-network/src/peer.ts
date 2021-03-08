@@ -60,7 +60,8 @@ class MsgQueue extends EventEmitter {
   private makeMessageInfo(): MessageInfo {
     return {
       node: this.peer.node.node,
-      peer: this.peer
+      peer: this.peer,
+      protocol: this.protocol
     };
   }
 

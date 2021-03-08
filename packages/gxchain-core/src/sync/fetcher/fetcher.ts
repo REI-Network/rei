@@ -1,231 +1,187 @@
-import { EventEmitter } from 'events';
-
-import { PriorityQueue, AsyncQueue, AysncChannel, AysncHeapChannel } from '@gxchain2/utils';
-import { Peer } from '@gxchain2/network';
-
+import { AysncHeapChannel, PriorityQueue, getRandomIntInclusive, AysncChannel } from '@gxchain2/utils';
+import { BlockHeader, Block } from '@gxchain2/block';
 import { Node } from '../../node';
+import { Peer } from '@gxchain2/network';
+import { GXC2_ETHWIRE } from '@gxchain2/common/dist/constants';
+import { EventEmitter } from 'events';
 
 export interface FetcherOptions {
   node: Node;
-  limit?: number;
+  limitCount: number;
 }
 
-export type Task<TData = any, TResult = any> = {
-  data: TData;
-  result?: TResult;
-  index: number;
-  peer?: Peer;
-  blackList?: Set<string>;
-};
-
-export declare interface Fetcher {
-  on(event: 'error', listener: (error: Error) => void): this;
-
-  once(event: 'error', listener: (error: Error) => void): this;
-}
-
-export class Fetcher<TData = any, TResult = any> extends EventEmitter {
-  private readonly priorityQueue = new PriorityQueue<Task<TData, TResult>>();
-  private readonly limitQueue = new AsyncQueue<void>();
-  private readonly taskQueue: AysncHeapChannel<Task<TData, TResult>>;
-  private readonly resultQueue: AysncChannel<Task<TData, TResult>>;
-  private readonly idlePeerQueue: AsyncQueue<Peer>;
-
-  protected readonly node: Node;
-  protected abortFlag: boolean = false;
-  private readonly limit: number;
-  private fetchingPromise?: Promise<boolean>;
-  protected waitingTask?: Task<TData, TResult>;
+export class Fetcher extends EventEmitter {
+  private abortFlag: boolean = false;
+  private node: Node;
+  private limitCount: number;
+  private localHeight!: number;
+  private bestHeight!: number;
+  private headerTaskOver = false;
+  private priorityQueue = new PriorityQueue<Block>();
+  private blocksQueue = new AysncChannel<Block>({ isAbort: () => this.abortFlag });
+  private downloadBodiesQueue = new AysncHeapChannel<BlockHeader>({
+    isAbort: () => this.abortFlag,
+    compare: (a, b) => a.number.lt(b.number)
+  });
+  private idlePeerResolve?: (peer?: Peer) => void;
 
   constructor(options: FetcherOptions) {
     super();
     this.node = options.node;
-    this.limit = options.limit || 16;
-
-    this.priorityQueue.on('result', (result) => {
+    this.limitCount = options.limitCount;
+    this.priorityQueue.on('result', (block) => {
       if (!this.abortFlag) {
-        this.resultQueue.push(result);
-      }
-    });
-    this.taskQueue = new AysncHeapChannel<Task<TData, TResult>>({
-      compare: (a, b) => a.index < b.index,
-      isAbort: () => this.abortFlag
-    });
-    this.resultQueue = new AysncChannel<Task<TData, TResult>>({
-      isAbort: () => this.abortFlag
-    });
-    this.idlePeerQueue = new AsyncQueue<Peer>({
-      hasNext: () => {
-        if (this.abortFlag) {
-          this.idlePeerQueue.array.push(null);
-          return true;
+        this.emit('newBlock', block);
+        if (block.header.number.eqn(this.bestHeight)) {
+          this.stopFetch();
         }
-        const peer = this.findIdlePeer();
-        if (!peer) {
-          return false;
-        }
-        this.idlePeerQueue.array.push(peer);
-        return true;
       }
     });
   }
 
-  private clearQueue() {
-    this.taskQueue.clear();
-    this.resultQueue.clear();
-    this.idlePeerQueue.clear();
+  async fetch(start: number, count: number, peerId: string) {
+    this.bestHeight = start + count;
+    this.localHeight = start;
+    await Promise.all([this.downloadHeader(start, count, peerId), this.downloadBodiesLoop()]);
+  }
+
+  abort() {
+    this.stopFetch();
+  }
+
+  private stopFetch() {
+    this.abortFlag = true;
+    if (this.idlePeerResolve) {
+      this.idlePeerResolve(undefined);
+    }
     this.priorityQueue.reset();
+    this.downloadBodiesQueue.abort();
+    this.blocksQueue.abort();
   }
 
-  private taskOver() {
-    this.clearQueue();
-    this.limitQueue.abort();
-    this.taskQueue.abort();
-    this.resultQueue.abort();
-    this.idlePeerQueue.abort();
-  }
-
-  insert(task: Task<TData>) {
-    if (!this.abortFlag) {
-      this.taskQueue.push(task);
+  private async downloadHeader(start: number, count: number, peerId: string) {
+    let i = 0;
+    const headerTaskQueue: { start: number; count: number }[] = [];
+    while (count > 0) {
+      headerTaskQueue.push({
+        start: i * this.limitCount + start + 1,
+        count: count > this.limitCount ? this.limitCount : count
+      });
+      i++;
+      count -= this.limitCount;
     }
-  }
 
-  async fetch(tasks?: Task<TData, TResult>[]): Promise<boolean> {
-    if (this.fetchingPromise) {
-      throw new Error('fetcher is already fetching');
-    }
-    this.clearQueue();
-    const handleIdlePeer = (peer, type) => {
-      if (this.fetchingPromise && !this.abortFlag && this.isValidPeer(peer, this.waitingTask?.blackList) && this.idlePeerQueue.isWaiting) {
-        this.idlePeerQueue.push(peer);
+    for (const { start, count } of headerTaskQueue) {
+      const peer = this.node.peerpool.getPeer(peerId);
+      if (!peer) {
+        this.stopFetch();
+        return;
       }
-    };
-    this.node.peerpool.on('idle', handleIdlePeer);
-    const fetchResult = await (this.fetchingPromise = new Promise<boolean>(async (fetchResolve) => {
-      if (tasks) {
-        tasks.forEach((task) => this.taskQueue.push(task));
-      }
-      const results = await Promise.all([
-        new Promise<boolean>(async (resolve) => {
-          let result = false;
-          try {
-            const promiseArray: Promise<void>[] = [];
-            const processOver = (p: Promise<void>) => {
-              const index = promiseArray.indexOf(p);
-              if (index !== -1) {
-                promiseArray.splice(index, 1);
-                this.limitQueue.push();
-              }
-            };
-            const makePromise = () => {
-              return promiseArray.length < this.limit ? Promise.resolve() : this.limitQueue.next();
-            };
-            let parallelLock: Promise<void> | undefined;
-            for await (const task of this.taskQueue.generator()) {
-              if (parallelLock) {
-                await parallelLock;
-                parallelLock = undefined;
-              }
-
-              const needLock = !!task.peer;
-              if (!task.peer) {
-                let peer = this.findIdlePeer(task?.blackList);
-                if (!peer) {
-                  this.waitingTask = task;
-                  const newPeer = await this.idlePeerQueue.next();
-                  this.waitingTask = undefined;
-                  if (newPeer === null) {
-                    break;
-                  }
-                  peer = newPeer;
-                }
-                this.lockIdlePeer(peer);
-                task.peer = peer;
-              }
-
-              const p = this.download(task)
-                .then((downloadResult) => {
-                  if (downloadResult.retry) {
-                    downloadResult.retry.forEach((t) => this.insert(t));
-                  }
-                  if (downloadResult.results) {
-                    downloadResult.results.forEach((t) => this.priorityQueue.insert(t, t.index));
-                  }
-                })
-                .catch((err) => {
-                  this.emit('error', err);
-                })
-                .finally(() => {
-                  processOver(p);
-                });
-              if (needLock) {
-                parallelLock = p;
-              }
-              promiseArray.push(p);
-              await makePromise();
-            }
-            await Promise.all(promiseArray);
-            result = true;
-          } catch (err) {
-            this.taskOver();
-            this.emit('error', err);
-          } finally {
-            resolve(result);
+      try {
+        const headers: BlockHeader[] = await peer.getBlockHeaders(start, count);
+        if (headers.length !== count) {
+          console.error('Fetcher::downloadHeader, invalid header(length)');
+          this.stopFetch();
+          return;
+        }
+        for (let index = 1; i < headers.length; i++) {
+          if (!headers[index - 1].hash().equals(headers[index].parentHash)) {
+            console.error('Fetcher::downloadHeader, invalid header(parentHash)');
+            this.stopFetch();
+            return;
           }
-        }),
-        new Promise<boolean>(async (resolve) => {
-          let result = false;
-          try {
-            for await (const result of this.resultQueue.generator()) {
-              if (await this.process(result)) {
-                this.taskOver();
-                break;
-              }
+        }
+        for (const header of headers) {
+          this.downloadBodiesQueue.push(header);
+        }
+      } catch (err) {
+        console.error('Fetcher::downloadHeader, catch error:', err);
+        this.stopFetch();
+        return;
+      }
+    }
+    this.headerTaskOver = true;
+  }
+
+  private findIdlePeer(height: number) {
+    const peers = this.node.peerpool.peers.filter((p) => p.bodiesIdle && p.isSupport(GXC2_ETHWIRE) && p.getStatus(GXC2_ETHWIRE).height >= height);
+    let peer: Peer | undefined;
+    if (peers.length === 1) {
+      peer = peers[0];
+    } else if (peers.length > 0) {
+      peer = peers[getRandomIntInclusive(0, peers.length - 1)];
+    }
+    return peer;
+  }
+
+  private async downloadBodiesLoop() {
+    let headersCache: BlockHeader[] = [];
+    for await (const header of this.downloadBodiesQueue.generator()) {
+      headersCache.push(header);
+      if (!this.headerTaskOver && headersCache.length < this.limitCount) {
+        continue;
+      }
+      const headers = [...headersCache];
+      headersCache = [];
+
+      let peer = this.findIdlePeer(headers[headers.length - 1].number.toNumber());
+      if (!peer) {
+        peer = await new Promise<Peer | undefined>((resolve) => {
+          this.idlePeerResolve = resolve;
+          this.node.peerpool.on('idle', () => {
+            const newPeer = this.findIdlePeer(headers[headers.length - 1].number.toNumber());
+            if (newPeer) {
+              resolve(newPeer);
             }
-            result = true;
-          } catch (err) {
-            this.taskOver();
-            this.emit('error', err);
-          } finally {
-            resolve(result);
+          });
+        });
+        this.idlePeerResolve = undefined;
+        this.node.peerpool.removeAllListeners('idle');
+        if (this.abortFlag || peer === undefined) {
+          continue;
+        }
+      }
+      peer.bodiesIdle = false;
+
+      const retry = () => {
+        if (!this.abortFlag) {
+          for (const header of headers) {
+            this.downloadBodiesQueue.push(header);
+          }
+        }
+      };
+      peer
+        .getBlockBodies(headers)
+        .then(async (bodies) => {
+          peer!.bodiesIdle = true;
+          if (bodies.length !== headers.length) {
+            console.error('Fetcher::downloadBodiesLoop, invalid bodies(length)');
+            return retry();
+          }
+          const blocks: Block[] = [];
+          for (let i = 0; i < bodies.length; i++) {
+            try {
+              const transactions = bodies[i];
+              const header = headers[i];
+              const block = Block.fromBlockData({ header, transactions }, { common: this.node.common });
+              await block.validateData();
+              blocks.push(block);
+            } catch (err) {
+              console.error('Fetcher::downloadBodiesLoop, invalid bodies(validateData)');
+              return retry();
+            }
+          }
+          if (!this.abortFlag) {
+            for (const block of blocks) {
+              this.priorityQueue.insert(block, block.header.number.toNumber() - this.localHeight - 1);
+            }
           }
         })
-      ]);
-
-      fetchResolve(!this.abortFlag && results.reduce((a, b) => a && b, true));
-    }));
-    this.node.peerpool.removeListener('idle', handleIdlePeer);
-    this.fetchingPromise = undefined;
-    return fetchResult;
-  }
-
-  async abort() {
-    if (this.fetchingPromise) {
-      this.abortFlag = true;
-      this.taskOver();
-      await this.fetchingPromise;
+        .catch((err) => {
+          peer!.bodiesIdle = true;
+          console.error('Fetcher::downloadBodiesLoop, download failed error:', err);
+          return retry();
+        });
     }
-  }
-
-  async reset() {
-    await this.abort();
-    this.abortFlag = false;
-  }
-
-  protected lockIdlePeer(peer: Peer) {
-    throw new Error('Unimplemented');
-  }
-  protected findIdlePeer(blackList?: Set<string>): Peer | undefined {
-    throw new Error('Unimplemented');
-  }
-  protected isValidPeer(peer: Peer, blackList?: Set<string>): boolean {
-    throw new Error('Unimplemented');
-  }
-  protected async download(data: Task<TData, TResult>): Promise<{ retry?: Task<TData, TResult>[]; results?: Task<TData, TResult>[] }> {
-    throw new Error('Unimplemented');
-  }
-  protected async process(result: Task<TData, TResult>): Promise<boolean> {
-    throw new Error('Unimplemented');
   }
 }

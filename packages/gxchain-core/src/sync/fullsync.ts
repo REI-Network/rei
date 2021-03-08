@@ -5,7 +5,8 @@ import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 import { Block, BlockHeader } from '@gxchain2/block';
 
 import { Synchronizer, SynchronizerOptions } from './sync';
-import { HeadersFetcher, BodiesFetcher, HeadersFethcerTask } from './fetcher';
+import { Fetcher } from './fetcher';
+import { AysncChannel } from '@gxchain2/utils';
 
 export interface FullSynchronizerOptions extends SynchronizerOptions {
   limit?: number;
@@ -20,7 +21,7 @@ export class FullSynchronizer extends Synchronizer {
   private bestPeer?: Peer;
   private bestHeight?: number;
   private syncingPromise?: Promise<boolean>;
-  private abortFetchers?: () => Promise<void>;
+  private abortFetcher?: () => void;
   private lock = new Semaphore(1);
 
   constructor(options: FullSynchronizerOptions) {
@@ -93,18 +94,14 @@ export class FullSynchronizer extends Synchronizer {
       this.bestPeer.headersIdle = false;
 
       try {
-        syncResolve(
-          await this.syncWithPeer(this.bestPeer, this.bestHeight!, (newAbort) => {
-            this.abortFetchers = newAbort;
-          })
-        );
+        syncResolve(await this.syncWithPeer(this.bestPeer, this.bestHeight!));
         console.debug('sync over best:', this.bestHeight, 'local:', this.node.blockchain.latestHeight);
       } catch (err) {
         syncResolve(false);
         this.emit('error', err);
       } finally {
         this.bestPeer.headersIdle = true;
-        this.abortFetchers = undefined;
+        this.abortFetcher = undefined;
         this.bestHeight = undefined;
         this.bestPeer = undefined;
       }
@@ -114,8 +111,8 @@ export class FullSynchronizer extends Synchronizer {
   }
 
   async syncAbort() {
-    if (this.abortFetchers) {
-      await this.abortFetchers();
+    if (this.abortFetcher) {
+      await this.abortFetcher();
     }
     if (this.syncingPromise) {
       await this.syncingPromise;
@@ -160,52 +157,43 @@ export class FullSynchronizer extends Synchronizer {
     throw new Error('find acient failed');
   }
 
-  private async syncWithPeer(peer: Peer, bestHeight: number, updateAbort: (newAbort: () => Promise<void>) => void): Promise<boolean> {
+  private async syncWithPeer(peer: Peer, bestHeight: number): Promise<boolean> {
     const localHeight = await this.findAncient(peer);
     console.debug('get best height from:', peer.peerId, 'best height:', bestHeight, 'local height:', localHeight);
     this.startSyncHook(localHeight, bestHeight);
-    let totalCount = bestHeight - localHeight;
-    let totalTaskCount = 0;
-    const headerFetcherTasks: HeadersFethcerTask[] = [];
-    while (totalCount > 0) {
-      headerFetcherTasks.push({
-        data: {
-          start: totalTaskCount * this.count + localHeight + 1,
-          count: totalCount > this.count ? this.count : totalCount
-        },
-        peer: peer,
-        index: totalTaskCount
-      });
-      totalTaskCount++;
-      totalCount -= this.count;
-    }
 
-    const bodiesFetcher = new BodiesFetcher(
-      Object.assign(this.options, {
-        node: this.node,
-        bestHeight,
-        localHeight
-      })
-    ).on('error', (err) => {
-      console.error('bodiesFetcher error:', err);
+    let syncAbort = false;
+    const blocksQueue = new AysncChannel<Block>({ isAbort: () => syncAbort });
+    const fetcher = new Fetcher({ node: this.node, limitCount: this.count });
+    this.abortFetcher = () => {
+      syncAbort = true;
+      blocksQueue.abort();
+      fetcher.abort();
+    };
+    fetcher.on('newBlock', (block: Block) => {
+      blocksQueue.push(block);
     });
-
-    const headerFetcher = new HeadersFetcher(
-      Object.assign(this.options, {
-        node: this.node,
-        bestHeight
+    let success = false;
+    await Promise.all([
+      fetcher.fetch(localHeight, bestHeight - localHeight, peer.peerId),
+      new Promise<void>(async (resolve) => {
+        for await (const block of blocksQueue.generator()) {
+          try {
+            await this.node.processBlock(block, true);
+            if (block.header.number.eqn(this.bestHeight!)) {
+              success = true;
+              this.abortFetcher!();
+              break;
+            }
+          } catch (err) {
+            console.error('FullSynchronizer::syncWithPeer, process block error:', err);
+            this.abortFetcher!();
+          }
+        }
+        resolve();
       })
-    )
-      .on('error', (err) => {
-        console.error('headerFetcher error:', err);
-      })
-      .on('result', (task) => {
-        bodiesFetcher.insert({ data: task.result!, index: task.result![0].number.toNumber() });
-      });
-
-    updateAbort(async () => {
-      await Promise.all([headerFetcher.reset(), bodiesFetcher.reset()]);
-    });
-    return (await Promise.all([headerFetcher.fetch(headerFetcherTasks), bodiesFetcher.fetch()])).reduce((a, b) => a && b, true);
+    ]);
+    this.abortFetcher = undefined;
+    return success;
   }
 }

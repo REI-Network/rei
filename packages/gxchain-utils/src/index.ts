@@ -30,6 +30,12 @@ export function mixin<T1 extends Constructor, T2 extends Constructor>(mix1: T1, 
   return ctor;
 }
 
+export function getRandomIntInclusive(min: number, max: number): number {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 export function hexStringToBuffer(hex: string): Buffer {
   return hex.indexOf('0x') === 0 ? Buffer.from(hex.substr(2), 'hex') : Buffer.from(hex, 'hex');
 }

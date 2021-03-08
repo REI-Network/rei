@@ -1,6 +1,6 @@
 import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Heap from 'qheap';
-import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet } from '@gxchain2/utils';
+import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AysncChannel, Aborter } from '@gxchain2/utils';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { StateManager } from '@gxchain2/state-manager';
 import { Blockchain } from '@gxchain2/blockchain';
@@ -101,7 +101,18 @@ class TxPoolAccount {
   }
 }
 
+type AddTxsResult = { results: boolean[]; readies?: Map<Buffer, WrappedTransaction[]> };
+
+type AddTxs = {
+  txs: WrappedTransaction[];
+  resolve: (result: AddTxsResult) => void;
+};
+
 export class TxPool {
+  private aborter = new Aborter();
+  private newBlockQueue = new AysncChannel<Block>({ isAbort: () => this.aborter.isAborted });
+  private addTxsQueue = new AysncChannel<AddTxs>({ isAbort: () => this.aborter.isAborted });
+
   private readonly accounts: FunctionalMap<Buffer, TxPoolAccount>;
   private readonly locals: FunctionalSet<Buffer>;
   private readonly txs: FunctionalMap<Buffer, WrappedTransaction>;
@@ -141,6 +152,92 @@ export class TxPool {
     this.journal = new Jonunal(options.journal, this.node);
 
     this.initPromise = this.init();
+
+    this.newBlockLoop();
+    this.addTxsLoop();
+  }
+
+  async abort() {
+    await this.aborter.abort();
+  }
+
+  private async newBlockLoop() {
+    await this.initPromise;
+    for await (let newBlock of this.newBlockQueue.generator()) {
+      try {
+        const getBlock = async (hash: Buffer, number: BN) => {
+          const header = await this.node.db.getHeader(hash, number);
+          let bodyBuffer: BlockBodyBuffer | undefined;
+          try {
+            bodyBuffer = await this.node.db.getBody(hash, number);
+          } catch (err) {
+            if (err.type !== 'NotFoundError') {
+              throw err;
+            }
+          }
+
+          return Block.fromBlockData(
+            {
+              header: header,
+              transactions: bodyBuffer ? bodyBuffer[0].map((rawTx) => Transaction.fromValuesArray(rawTx, { common: this.node.common })) : []
+            },
+            { common: this.node.common }
+          );
+        };
+
+        const originalNewBlock = newBlock;
+        let oldBlock = await getBlock(this.currentHeader.hash(), this.currentHeader.number);
+        let discarded: WrappedTransaction[] = [];
+        const included = createBufferFunctionalSet();
+        while (oldBlock.header.number.gt(newBlock.header.number)) {
+          discarded = discarded.concat(oldBlock.transactions.map((tx) => new WrappedTransaction(tx)));
+          oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
+        }
+        while (newBlock.header.number.gt(oldBlock.header.number)) {
+          for (const tx of newBlock.transactions) {
+            included.add(tx.hash());
+          }
+          newBlock = await getBlock(newBlock.header.parentHash, newBlock.header.number.subn(1));
+        }
+        while (!oldBlock.hash().equals(newBlock.hash())) {
+          discarded = discarded.concat(oldBlock.transactions.map((tx) => new WrappedTransaction(tx)));
+          oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
+          for (const tx of newBlock.transactions) {
+            included.add(tx.hash());
+          }
+          newBlock = await getBlock(newBlock.header.parentHash, newBlock.header.number.subn(1));
+        }
+        const reinject: WrappedTransaction[] = [];
+        for (const tx of discarded) {
+          if (!included.has(tx.transaction.hash())) {
+            reinject.push(tx);
+          }
+        }
+        this.currentHeader = originalNewBlock.header;
+        this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot);
+        await this._addTxs(reinject, true);
+        await this.demoteUnexecutables();
+        this.truncatePending();
+        this.truncateQueue();
+      } catch (err) {
+        console.error('TxPool::newBlockLoop, catch error:', err);
+      }
+    }
+  }
+
+  private async addTxsLoop() {
+    await this.initPromise;
+    for await (const addTxs of this.addTxsQueue.generator()) {
+      try {
+        const result = await this._addTxs(addTxs.txs, false);
+        this.truncatePending();
+        this.truncateQueue();
+        addTxs.resolve(result);
+      } catch (err) {
+        addTxs.resolve({ results: new Array<boolean>(addTxs.txs.length).fill(false) });
+        console.error('TxPool::addTxsLoop, catch error:', err);
+      }
+    }
   }
 
   private getAllSlots(): number {
@@ -207,68 +304,19 @@ export class TxPool {
 
   async newBlock(newBlock: Block) {
     await this.initPromise;
-    const getBlock = async (hash: Buffer, number: BN) => {
-      const header = await this.node.db.getHeader(hash, number);
-      let bodyBuffer: BlockBodyBuffer | undefined;
-      try {
-        bodyBuffer = await this.node.db.getBody(hash, number);
-      } catch (err) {
-        if (err.type !== 'NotFoundError') {
-          throw err;
-        }
-      }
-
-      return Block.fromBlockData(
-        {
-          header: header,
-          transactions: bodyBuffer ? bodyBuffer[0].map((rawTx) => Transaction.fromValuesArray(rawTx, { common: this.node.common })) : []
-        },
-        { common: this.node.common }
-      );
-    };
-
-    const originalNewBlock = newBlock;
-    let oldBlock = await getBlock(this.currentHeader.hash(), this.currentHeader.number);
-    let discarded: WrappedTransaction[] = [];
-    const included = createBufferFunctionalSet();
-    while (oldBlock.header.number.gt(newBlock.header.number)) {
-      discarded = discarded.concat(oldBlock.transactions.map((tx) => new WrappedTransaction(tx)));
-      oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
-    }
-    while (newBlock.header.number.gt(oldBlock.header.number)) {
-      for (const tx of newBlock.transactions) {
-        included.add(tx.hash());
-      }
-      newBlock = await getBlock(newBlock.header.parentHash, newBlock.header.number.subn(1));
-    }
-    while (!oldBlock.hash().equals(newBlock.hash())) {
-      discarded = discarded.concat(oldBlock.transactions.map((tx) => new WrappedTransaction(tx)));
-      oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
-      for (const tx of newBlock.transactions) {
-        included.add(tx.hash());
-      }
-      newBlock = await getBlock(newBlock.header.parentHash, newBlock.header.number.subn(1));
-    }
-    const reinject: WrappedTransaction[] = [];
-    for (const tx of discarded) {
-      if (!included.has(tx.transaction.hash())) {
-        reinject.push(tx);
-      }
-    }
-    this.currentHeader = originalNewBlock.header;
-    this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot);
-    await this._addTxs(reinject, true);
-    await this.demoteUnexecutables();
-    this.truncatePending();
-    this.truncateQueue();
+    this.newBlockQueue.push(newBlock);
   }
 
   async addTxs(txs: WrappedTransaction | WrappedTransaction[]) {
     await this.initPromise;
-    const result = await this._addTxs(txs, false);
-    this.truncatePending();
-    this.truncateQueue();
-    return result;
+    txs = txs instanceof WrappedTransaction ? [txs] : txs;
+    return new Promise<AddTxsResult>((resolve) => {
+      this.addTxsQueue.push({ txs: txs as WrappedTransaction[], resolve });
+    });
+  }
+
+  getTransaction(hash: Buffer) {
+    return this.txs.get(hash);
   }
 
   private async _addTxs(txs: WrappedTransaction | WrappedTransaction[], force: boolean): Promise<{ results: boolean[]; readies?: Map<Buffer, WrappedTransaction[]> }> {

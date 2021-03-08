@@ -13,6 +13,7 @@ import { Database } from '@gxchain2/database';
 
 import { Peer } from './peer';
 import { Protocol, ETHProtocol } from './protocol';
+import { WrappedTransaction } from '@gxchain2/tx';
 
 let Libp2p: any = Libp2pJS;
 
@@ -27,12 +28,22 @@ export interface ISync {
   announce(peer: Peer, height: number): void;
 }
 
+export interface ITxPool {
+  getTransaction: (hash: Buffer) => WrappedTransaction | undefined;
+}
+
+export interface ITxFetcher {
+  newPooledTransactionHashes(origin: string, hashes: Buffer[]);
+}
+
 export interface INode {
   db: Database;
   blockchain: Blockchain;
   common: Common;
   sync: ISync;
   status: any;
+  txPool: ITxPool;
+  txSync: ITxFetcher;
 }
 
 export interface Libp2pNodeOptions {

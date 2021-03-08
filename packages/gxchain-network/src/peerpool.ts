@@ -108,4 +108,8 @@ export class PeerPool extends EventEmitter {
       this.emit('removed', peer);
     }
   }
+
+  getPeer(peerId: string) {
+    return this.pool.get(peerId);
+  }
 }

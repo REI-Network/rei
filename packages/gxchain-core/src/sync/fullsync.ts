@@ -179,11 +179,11 @@ export class FullSynchronizer extends Synchronizer {
       new Promise<void>(async (resolve) => {
         for await (const block of blocksQueue.generator()) {
           try {
-            this.node.processBlock(block, true);
+            await this.node.processBlock(block, true);
             if (block.header.number.eqn(this.bestHeight!)) {
               success = true;
               this.abortFetcher!();
-              return;
+              break;
             }
           } catch (err) {
             console.error('FullSynchronizer::syncWithPeer, process block error:', err);
@@ -193,6 +193,7 @@ export class FullSynchronizer extends Synchronizer {
         resolve();
       })
     ]);
+    this.abortFetcher = undefined;
     return success;
   }
 }

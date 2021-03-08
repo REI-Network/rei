@@ -14,6 +14,7 @@ export class Fetcher extends EventEmitter {
   private abortFlag: boolean = false;
   private node: Node;
   private limitCount: number;
+  private localHeight!: number;
   private bestHeight!: number;
   private headerTaskOver = false;
   private priorityQueue = new PriorityQueue<Block>();
@@ -40,6 +41,7 @@ export class Fetcher extends EventEmitter {
 
   async fetch(start: number, count: number, peerId: string) {
     this.bestHeight = start + count;
+    this.localHeight = start;
     await Promise.all([this.downloadHeader(start, count, peerId), this.downloadBodiesLoop()]);
   }
 
@@ -171,7 +173,7 @@ export class Fetcher extends EventEmitter {
           }
           if (!this.abortFlag) {
             for (const block of blocks) {
-              this.priorityQueue.insert(block, block.header.number.toNumber());
+              this.priorityQueue.insert(block, block.header.number.toNumber() - this.localHeight - 1);
             }
           }
         })

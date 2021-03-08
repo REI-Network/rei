@@ -41,13 +41,13 @@ interface AsyncQueueOption<T> {
   hasNext?: () => boolean;
   next?: () => T | null;
   max?: number;
-  drop?: (data: T | null) => void;
+  drop?: (data: T) => void;
 }
 
 export class AsyncQueue<T = any> extends AsyncNext<T> {
   private arr: (T | null)[] = [];
   private max?: number;
-  private drop?: (data: T | null) => void;
+  private drop?: (data: T) => void;
 
   constructor(options?: AsyncQueueOption<T>) {
     super(
@@ -70,6 +70,7 @@ export class AsyncQueue<T = any> extends AsyncNext<T> {
       )
     );
     this.max = options?.max;
+    this.drop = options?.drop;
   }
 
   get array() {

@@ -89,7 +89,11 @@ const handlers: Handler[] = [
     encode: (info: MessageInfo, block: Block) => rlp.encode([5, [block.header.raw(), block.transactions.map((tx) => tx.raw())]]),
     decode: (info: MessageInfo, blockRaw): Block => Block.fromValuesArray(blockRaw, { common: info.node.common }),
     process(info: MessageInfo, block: Block) {
-      info.node.sync.announce(info.peer, block.header.number.toNumber());
+      const height = block.header.number.toNumber();
+      info.node.sync.announce(info.peer, height);
+      if (info.protocol instanceof ETHProtocol) {
+        info.protocol.updateStatus(height);
+      }
     }
   },
   {
@@ -166,5 +170,9 @@ export class ETHProtocol extends Protocol {
 
   protected isValidRemoteStatus(remoteStatus: any, localStatus: any): boolean {
     return remoteStatus.networkId === localStatus.networkId && Buffer.from(localStatus.genesisHash.substr(2), 'hex').equals(remoteStatus.genesisHash);
+  }
+
+  updateStatus(height: number) {
+    this._status.height = height;
   }
 }

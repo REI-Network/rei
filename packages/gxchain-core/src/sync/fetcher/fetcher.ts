@@ -149,6 +149,7 @@ export class Fetcher extends EventEmitter {
             this.downloadBodiesQueue.push(header);
           }
         }
+        this.node.peerpool.ban(peer!);
       };
       peer
         .getBlockBodies(headers)

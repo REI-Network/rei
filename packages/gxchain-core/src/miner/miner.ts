@@ -85,7 +85,7 @@ export class Miner extends Loop {
 
   async startLoop() {
     if (this.isMining) {
-      await this.init();
+      await this.initPromise;
       await super.startLoop();
     }
   }

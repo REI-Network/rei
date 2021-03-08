@@ -1,4 +1,4 @@
-import { BN } from 'ethereumjs-util';
+import { BN, bufferToHex } from 'ethereumjs-util';
 import { Block, BlockHeader } from '@gxchain2/block';
 import { calculateTransactionTrie, WrappedTransaction } from '@gxchain2/tx';
 import { PendingTxMap } from '@gxchain2/tx-pool';
@@ -36,7 +36,6 @@ export class Worker extends Loop {
   }
 
   private async newBlockLoop() {
-    await this.initPromise;
     for await (const { block, resolve } of this.newBlockQueue.generator()) {
       try {
         if (this.wvm) {
@@ -121,7 +120,7 @@ export class Worker extends Loop {
   }
 
   async startLoop() {
-    await this.init();
+    await this.initPromise;
     await super.startLoop();
   }
 

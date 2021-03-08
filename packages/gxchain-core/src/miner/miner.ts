@@ -1,4 +1,4 @@
-import { hexStringToBN, hexStringToBuffer } from '@gxchain2/utils';
+import { hexStringToBN, hexStringToBuffer, AysncChannel } from '@gxchain2/utils';
 import { Worker } from './worker';
 import { Loop } from './loop';
 import { Node } from '../node';
@@ -12,11 +12,13 @@ export interface MinerOptions {
 
 export class Miner extends Loop {
   public readonly worker: Worker;
+
   private _coinbase: Buffer;
   private _gasLimit: BN;
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
   private readonly options?: MinerOptions;
+  private readonly controlQueue = new AysncChannel<boolean>({ max: 1, isAbort: () => this.aborter.isAborted });
 
   constructor(node: Node, options?: MinerOptions) {
     super(options?.mineInterval || 5000);
@@ -26,18 +28,16 @@ export class Miner extends Loop {
     this._gasLimit = this?.options?.gasLimit ? hexStringToBN(this.options.gasLimit) : hexStringToBN('0xbe5c8b');
     this.worker = new Worker(node, this);
     this.initPromise = this.init();
-    node.sync.on('start synchronize', async () => {
-      await this.worker.stopLoop();
-      await this.stopLoop();
+    node.sync.on('start synchronize', () => {
+      this.controlQueue.push(false);
     });
-    node.sync.on('synchronized', async () => {
-      await this.worker.startLoop();
-      await this.startLoop();
+    node.sync.on('synchronized', () => {
+      this.controlQueue.push(true);
     });
-    node.sync.on('synchronize failed', async () => {
-      await this.worker.startLoop();
-      await this.startLoop();
+    node.sync.on('synchronize failed', () => {
+      this.controlQueue.push(true);
     });
+    this.controlLoop();
   }
 
   get isMining() {
@@ -50,6 +50,19 @@ export class Miner extends Loop {
 
   get gasLimit() {
     return this._gasLimit;
+  }
+
+  private async controlLoop() {
+    await this.initPromise;
+    for await (const flag of this.controlQueue.generator()) {
+      if (flag) {
+        await this.worker.startLoop();
+        await this.startLoop();
+      } else {
+        await this.worker.stopLoop();
+        await this.stopLoop();
+      }
+    }
   }
 
   async setCoinbase(coinbase: string | Buffer) {
@@ -72,7 +85,7 @@ export class Miner extends Loop {
 
   async startLoop() {
     if (this.isMining) {
-      await this.init();
+      await this.initPromise;
       await super.startLoop();
     }
   }
@@ -82,7 +95,7 @@ export class Miner extends Loop {
     if (block.header.number.eq(this.node.blockchain.latestBlock.header.number.addn(1)) && block.header.parentHash.equals(this.node.blockchain.latestBlock.hash())) {
       await this.node.newBlock(await this.node.processBlock(block));
     } else {
-      console.warn('Miner, process, unkonw error, invalid pending block:', bufferToHex(block.hash()), 'latest:', bufferToHex(this.node.blockchain.latestBlock.hash()));
+      console.warn('Miner::mineBlock, invalid pending block:', bufferToHex(block.hash()), 'latest:', bufferToHex(this.node.blockchain.latestBlock.hash()));
     }
   }
 
@@ -90,7 +103,7 @@ export class Miner extends Loop {
     try {
       await this.mineBlock();
     } catch (err) {
-      console.error('Miner, process, error:', err);
+      console.error('Miner::process, catch error:', err);
     }
   }
 }

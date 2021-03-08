@@ -1,5 +1,3 @@
-import { promises } from 'fs';
-
 export class Aborter {
   private _reason: any;
   private _abort: boolean = true;

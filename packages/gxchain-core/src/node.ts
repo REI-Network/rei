@@ -57,7 +57,7 @@ export class Node {
   private readonly options: NodeOptions;
   private readonly initPromise: Promise<void>;
   private readonly aborter = new Aborter();
-  private readonly newBlockQueue = new AysncChannel<Block>({ isAbort: () => this.aborter.isAborted });
+  private readonly newBlockQueue = new AysncChannel<Block>({ max: 1, isAbort: () => this.aborter.isAborted });
   private readonly addPendingTxsQueue = new AysncChannel<AddPendingTxs>({ isAbort: () => this.aborter.isAborted });
 
   constructor(options: NodeOptions) {

@@ -26,12 +26,6 @@ const getPrivateKey = (address: string): Buffer => {
   return keyPair[address];
 };
 
-function getRandomIntInclusive(min: number, max: number): number {
-  min = Math.ceil(min);
-  max = Math.floor(max);
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
 const startPrompts = async (node: Node) => {
   while (true) {
     const response = await prompts({

@@ -1,24 +1,46 @@
 import Heap from 'qheap';
 
 interface AsyncNextOption<T> {
-  push: (data: T | null) => void;
+  push: (data: T) => void;
   hasNext: () => boolean;
-  next: () => T | null;
+  next: () => T;
+  drop?: (data: T) => void;
 }
 
 export class AsyncNext<T = any> {
   private readonly queue: AsyncNextOption<T>;
   private resolve?: (data: T | null) => void;
+  private _shouldStop: boolean = false;
+  protected drop?: (data: T) => void;
 
-  constructor(queue: AsyncNextOption<T>) {
-    this.queue = queue;
+  constructor(option: AsyncNextOption<T>) {
+    this.queue = {
+      push: option.push,
+      hasNext: option.hasNext,
+      next: option.next
+    };
+    this.drop = option.drop;
+  }
+
+  get shouldStop() {
+    return this._shouldStop;
   }
 
   get isWaiting() {
     return !!this.resolve;
   }
 
-  push(data: T | null) {
+  abort() {
+    if (this.resolve) {
+      this.clear();
+      this.resolve(null);
+      this.resolve = undefined;
+    } else if (!this.shouldStop) {
+      this._shouldStop = true;
+    }
+  }
+
+  push(data: T) {
     if (this.resolve) {
       this.resolve(data);
       this.resolve = undefined;
@@ -27,53 +49,69 @@ export class AsyncNext<T = any> {
     }
   }
 
-  next() {
+  next(): Promise<T | null> {
+    if (this.shouldStop) {
+      this._shouldStop = false;
+      this.clear();
+      return Promise.resolve(null);
+    }
     return this.queue.hasNext()
       ? Promise.resolve(this.queue.next())
       : new Promise<T | null>((resolve) => {
           this.resolve = resolve;
         });
   }
+
+  clear() {}
 }
 
 interface AsyncQueueOption<T> {
-  push?: (data: T | null) => void;
+  push?: (data: T) => void;
   hasNext?: () => boolean;
-  next?: () => T | null;
+  next?: () => T;
+  max?: number;
+  drop?: (data: T) => void;
 }
 
 export class AsyncQueue<T = any> extends AsyncNext<T> {
-  private arr: (T | null)[] = [];
+  private _array: T[] = [];
+  private max?: number;
 
   constructor(options?: AsyncQueueOption<T>) {
     super(
       Object.assign(
         {
-          push: (data: T | null) => {
-            if (data !== null) {
-              this.arr.push(data);
+          push: (data: T) => {
+            this._array.push(data);
+            if (this.max && this._array.length > this.max) {
+              if (this.drop) {
+                this.drop(this._array.shift()!);
+              } else {
+                this._array.shift();
+              }
             }
           },
-          hasNext: () => this.arr.length > 0,
-          next: () => this.arr.shift()!
+          hasNext: () => this._array.length > 0,
+          next: () => this._array.shift()!
         },
         options
       )
     );
+    this.max = options?.max;
+    this.drop = options?.drop;
   }
 
   get array() {
-    return this.arr;
+    return this._array;
   }
 
   clear() {
-    this.arr = [];
-  }
-
-  abort() {
-    if (this.isWaiting) {
-      this.push(null);
+    if (this.drop) {
+      for (const data of this._array) {
+        this.drop(data);
+      }
     }
+    this._array = [];
   }
 }
 
@@ -82,10 +120,11 @@ interface AsyncHeapOption<T> {
   push?: (data: T | null) => void;
   hasNext?: () => boolean;
   next?: () => T | null;
+  drop?: (data: T) => void;
 }
 
 export class AsyncHeap<T = any> extends AsyncNext<T> {
-  private h: Heap;
+  private _heap: Heap;
   private compare?: (a: T, b: T) => boolean;
 
   constructor(options?: AsyncHeapOption<T>) {
@@ -93,32 +132,30 @@ export class AsyncHeap<T = any> extends AsyncNext<T> {
       Object.assign(
         {
           push: (data: T | null) => {
-            if (data !== null) {
-              this.h.insert(data);
-            }
+            this._heap.insert(data);
           },
-          hasNext: () => this.h.length > 0,
-          next: () => this.h.remove()
+          hasNext: () => this._heap.length > 0,
+          next: () => this._heap.remove()
         },
         options
       )
     );
     this.compare = options?.compare;
-    this.h = new Heap(this.compare ? { comparBefore: this.compare } : undefined);
+    this._heap = new Heap(this.compare ? { comparBefore: this.compare } : undefined);
   }
 
   get heap() {
-    return this.h;
+    return this._heap;
   }
 
   clear() {
-    this.h = new Heap(this.compare ? { comparBefore: this.compare } : undefined);
-  }
-
-  abort() {
-    if (this.isWaiting) {
-      this.push(null);
+    const array: T[] | null = this._heap._list;
+    if (array !== null && this.drop) {
+      for (const data of array) {
+        this.drop(data);
+      }
     }
+    this._heap = new Heap(this.compare ? { comparBefore: this.compare } : undefined);
   }
 }
 
@@ -134,7 +171,7 @@ export class AysncChannel<T = any> extends AsyncQueue<T> {
     this.isAbort = options.isAbort;
   }
 
-  push(data: T | null) {
+  push(data: T) {
     if (!this.isAbort()) {
       super.push(data);
     }
@@ -161,6 +198,12 @@ export class AysncHeapChannel<T = any> extends AsyncHeap<T> {
   constructor(options: AysncHeapChannelOption<T>) {
     super(options);
     this.isAbort = options.isAbort;
+  }
+
+  push(data: T) {
+    if (!this.isAbort()) {
+      super.push(data);
+    }
   }
 
   async *generator() {

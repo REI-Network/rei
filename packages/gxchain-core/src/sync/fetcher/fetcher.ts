@@ -57,7 +57,7 @@ export class Fetcher<TData = any, TResult = any> extends EventEmitter {
     this.idlePeerQueue = new AsyncQueue<Peer>({
       hasNext: () => {
         if (this.abortFlag) {
-          this.idlePeerQueue.array.push(null);
+          this.idlePeerQueue.array.push(null as any);
           return true;
         }
         const peer = this.findIdlePeer();

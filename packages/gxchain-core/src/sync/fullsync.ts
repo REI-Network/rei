@@ -2,7 +2,7 @@ import Semaphore from 'semaphore-async-await';
 
 import { constants } from '@gxchain2/common';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
-import { Block, BlockHeader } from '@gxchain2/block';
+import { BlockHeader } from '@gxchain2/block';
 
 import { Synchronizer, SynchronizerOptions } from './sync';
 import { HeadersFetcher, BodiesFetcher, HeadersFethcerTask } from './fetcher';

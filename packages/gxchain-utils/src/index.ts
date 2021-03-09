@@ -58,6 +58,8 @@ export const logger = tracer.colorConsole({
   }
 });
 
+export { setLevel } from 'tracer';
+
 export * from './abort';
 export * from './priorityqueue';
 export * from './asyncnext';

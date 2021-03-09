@@ -1,9 +1,9 @@
-import { BN, bufferToHex } from 'ethereumjs-util';
+import { BN } from 'ethereumjs-util';
 import { Block, BlockHeader } from '@gxchain2/block';
 import { calculateTransactionTrie, WrappedTransaction } from '@gxchain2/tx';
 import { PendingTxMap } from '@gxchain2/tx-pool';
 import { WrappedVM } from '@gxchain2/vm';
-import { AsyncChannel } from '@gxchain2/utils';
+import { AsyncChannel, logger } from '@gxchain2/utils';
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import { Loop } from './loop';
 import { Miner } from './miner';
@@ -59,7 +59,7 @@ export class Worker extends Loop {
         await this.commit(this.node.txPool.getPendingMap());
         resolve(true);
       } catch (err) {
-        console.error('Worker::newBlockLoop, catch error:', err);
+        logger.error('Worker::newBlockLoop, catch error:', err);
         resolve(false);
       }
     }
@@ -75,7 +75,7 @@ export class Worker extends Loop {
         }
         await this.commit(pendingMap);
       } catch (err) {
-        console.error('Worker::addTxsLoop, catch error:', err);
+        logger.error('Worker::addTxsLoop, catch error:', err);
       }
     }
   }

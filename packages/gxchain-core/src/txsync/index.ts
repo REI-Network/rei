@@ -1,4 +1,4 @@
-import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AsyncChannel, Aborter } from '@gxchain2/utils';
+import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AsyncChannel, Aborter, logger } from '@gxchain2/utils';
 import { EventEmitter } from 'events';
 import { Transaction } from '@gxchain2/tx';
 import { PeerRequestTimeoutError } from '@gxchain2/network';
@@ -35,7 +35,7 @@ function autoDelete<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer 
 }
 
 function panicError(...args: any[]) {
-  console.error('TxFetcher, panic error:', ...args);
+  logger.error('TxFetcher::panicError', ...args);
 }
 
 const txArriveTimeout = 500;
@@ -175,7 +175,7 @@ export class TxFetcher extends EventEmitter {
 
         const req = this.requests.get(message.origin);
         if (!req) {
-          console.warn('TxFetcher, unexpected transaction delivery, peer:', message.origin);
+          logger.warn('TxFetcher::enqueueTransactionLoop, unexpected transaction delivery, peer:', message.origin);
           continue;
         }
         this.requests.delete(message.origin);

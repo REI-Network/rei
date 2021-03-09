@@ -6,6 +6,7 @@ import VM from '@ethereumjs/vm';
 import Bloom from '@ethereumjs/vm/dist/bloom';
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import { StateManager } from '@ethereumjs/vm/dist/state';
+import { logger } from '@gxchain2/utils';
 
 type PromisResultType<T> = T extends PromiseLike<infer U> ? U : T;
 
@@ -215,7 +216,7 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
     bloom.or(txRes.bloom);
 
     if (txRes.execResult.exceptionError) {
-      console.warn('applyTransactions, exceptionError', txRes.execResult.exceptionError);
+      logger.warn('VM::applyTransactions, exceptionError:', txRes.execResult.exceptionError);
     }
     const txReceipt = new Receipt(txRes.gasUsed.toArrayLike(Buffer), txRes.bloom.bitvector, txRes.execResult?.logs?.map((log) => Log.fromValuesArray(log)) || [], txRes.execResult.exceptionError ? 0 : 1);
     receipts.push(txReceipt);

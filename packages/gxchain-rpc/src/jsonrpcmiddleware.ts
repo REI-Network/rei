@@ -2,6 +2,7 @@ import util from 'util';
 
 import * as helper from './helper';
 import errors from './error-codes';
+import { logger } from '@gxchain2/utils';
 
 type HookFunction = (params: any, result: any) => Promise<any> | any;
 
@@ -40,6 +41,7 @@ export class JsonRPCMiddleware {
       helper.validateJsonRpcVersion(jsonrpc, this.VERSION);
 
       helper.validateJsonRpcMethod(method, this.config.methods);
+      logger.info('📦 Rpc served', method);
       const beforeMethod = this.config.beforeMethods && this.config.beforeMethods[method];
       if (beforeMethod) {
         await helper.executeHook(beforeMethod, params, null);

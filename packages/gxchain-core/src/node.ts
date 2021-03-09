@@ -218,8 +218,9 @@ export class Node {
       })
       .on('added', (peer) => {
         const status = peer.getStatus(constants.GXC2_ETHWIRE);
-        if (status && status.height) {
+        if (status && status.height !== undefined) {
           this.sync.announce(peer, status.height);
+          peer.announceTx(this.txPool.getPooledTransactionHashes());
         }
       })
       .on('removed', (peer) => {

@@ -11,6 +11,8 @@ import type PeerId from 'peer-id';
 import { Protocol, MessageInfo } from './protocol/protocol';
 import { Libp2pNode } from './p2p';
 
+const txsyncPackSize = 102400;
+
 export class PeerRequestTimeoutError extends Error {}
 
 declare interface MsgQueue {
@@ -200,10 +202,14 @@ export class Peer extends EventEmitter {
   private _bodiesIdle: boolean = true;
   private _receiptsIdle: boolean = true;
 
+  private abortFlag: boolean = false;
+  private txAnnouncesQueue = new AsyncChannel<Buffer>({ isAbort: () => this.abortFlag });
+
   constructor(options: { peerId: string; node: Libp2pNode }) {
     super();
     this.peerId = options.peerId;
     this.node = options.node;
+    this.txAnnouncesLoop();
   }
 
   get headersIdle() {
@@ -231,6 +237,20 @@ export class Peer extends EventEmitter {
     if (this._receiptsIdle !== b) {
       this._receiptsIdle = b;
       this.emit(b ? 'idle' : 'busy', 'receipts');
+    }
+  }
+
+  private async txAnnouncesLoop() {
+    let hashesCache: Buffer[] = [];
+    for await (const hash of this.txAnnouncesQueue.generator()) {
+      hashesCache.push(hash);
+      if (hashesCache.length < txsyncPackSize && this.txAnnouncesQueue.array.length > 0) {
+        continue;
+      }
+      this.newPooledTransactionHashes(hashesCache);
+      hashesCache = [];
+      // TODO: remove sleep.
+      await new Promise((r) => setTimeout(r, 100));
     }
   }
 
@@ -283,6 +303,8 @@ export class Peer extends EventEmitter {
   }
 
   async abort() {
+    this.abortFlag = true;
+    this.txAnnouncesQueue.abort();
     for (const [name, queue] of this.queueMap) {
       await queue.abort();
     }
@@ -361,5 +383,12 @@ export class Peer extends EventEmitter {
 
   getPooledTransactions(hashes: Buffer[]): Promise<Transaction[]> {
     return this.request(constants.GXC2_ETHWIRE, 'GetPooledTransactions', hashes);
+  }
+
+  ////////////////////////
+  announceTx(hashes: Buffer[]) {
+    for (const hash of hashes) {
+      this.txAnnouncesQueue.push(hash);
+    }
   }
 }

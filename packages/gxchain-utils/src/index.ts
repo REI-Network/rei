@@ -46,7 +46,16 @@ export function hexStringToBN(hex: string): BN {
 }
 
 export const logger = tracer.colorConsole({
-  format: '[{{title}}][{{timestamp}}] {{message}}'
+  format: '{{title}} [{{timestamp}}] {{message}}',
+  level: 'info',
+  methods: ['detail', 'debug', 'info', 'warn', 'error', 'silent'],
+  dateformat: 'mm-dd|HH:MM:ss.L',
+  preprocess: (data) => {
+    data.title = data.title.toUpperCase();
+    while (data.title.length < 5) {
+      data.title += ' ';
+    }
+  }
 });
 
 export * from './abort';

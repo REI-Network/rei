@@ -7,7 +7,7 @@ export class Aborter {
   private _waitingPromises: Promise<void>[] = [];
 
   get reason() {
-    return this.reason;
+    return this._reason;
   }
 
   get isAborted() {

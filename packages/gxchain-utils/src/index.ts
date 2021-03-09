@@ -1,4 +1,5 @@
 import { BN } from 'ethereumjs-util';
+import tracer from 'tracer';
 
 interface Constructor<T = {}> {
   new (...args: any[]): T;
@@ -43,6 +44,10 @@ export function hexStringToBuffer(hex: string): Buffer {
 export function hexStringToBN(hex: string): BN {
   return hex.indexOf('0x') === 0 ? new BN(hex.substr(2), 'hex') : new BN(hex, 'hex');
 }
+
+export const logger = tracer.colorConsole({
+  format: '[{{title}}][{{timestamp}}] {{message}}'
+});
 
 export * from './abort';
 export * from './priorityqueue';

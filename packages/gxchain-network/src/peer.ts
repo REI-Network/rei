@@ -1,13 +1,10 @@
 import { EventEmitter } from 'events';
-
-import { AsyncQueue, AsyncChannel, Aborter, createBufferFunctionalSet } from '@gxchain2/utils';
+import { AsyncQueue, AsyncChannel, Aborter, createBufferFunctionalSet, logger } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
 import { constants } from '@gxchain2/common';
-
 import pipe from 'it-pipe';
 import type PeerId from 'peer-id';
-
 import { Protocol, MessageInfo } from './protocol/protocol';
 import { Libp2pNode } from './p2p';
 
@@ -47,7 +44,7 @@ class MsgQueue extends EventEmitter {
         if (!this.aborter.isAborted) {
           this.queue.array.push(data);
           if (this.queue.array.length > 10) {
-            console.warn('MsgQueue drop message:', this.queue.array.shift());
+            logger.warn('Peer close self:', this.peer.peerId);
             this.peer.closeSelf();
           }
         }
@@ -68,11 +65,10 @@ class MsgQueue extends EventEmitter {
   }
 
   send(method: string, data: any) {
-    if (this.aborter.isAborted) {
-      throw new Error('MsgQueue already aborted');
+    if (!this.aborter.isAborted) {
+      const handler = this.protocol.findHandler(method);
+      this.queue.push(handler.encode(this.makeMessageInfo(), data));
     }
-    const handler = this.protocol.findHandler(method);
-    return this.queue.push(handler.encode(this.makeMessageInfo(), data));
   }
 
   request(method: string, data: any) {

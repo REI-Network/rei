@@ -61,7 +61,7 @@ async function start() {
     await node.init();
     if (opts.rpc) {
       const rpcServer = new RpcServer(Number(opts.rpcPort), opts.rpcHost, node).on('error', (err) => {
-        logger.error('RpcServer error', err);
+        logger.error('RpcServer error:', err);
       });
       if (!(await rpcServer.start())) {
         logger.error('RpcServer start failed, exit!');
@@ -69,7 +69,7 @@ async function start() {
       }
     }
   } catch (err) {
-    logger.error('Start error', err);
+    logger.error('Start error:', err);
     process.exit(1);
   }
 }

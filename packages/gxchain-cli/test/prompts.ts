@@ -10,7 +10,7 @@ import { Address, bufferToHex } from 'ethereumjs-util';
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
 import { constants } from '@gxchain2/common';
-import { Transaction, WrappedTransaction } from '@gxchain2/tx';
+import { Transaction } from '@gxchain2/tx';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
 
 const args = process.argv.slice(2);

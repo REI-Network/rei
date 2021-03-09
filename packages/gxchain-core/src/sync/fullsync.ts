@@ -184,7 +184,7 @@ export class FullSynchronizer extends Synchronizer {
               break;
             }
           } catch (err) {
-            console.error('FullSynchronizer::syncWithPeer, process block error:', err);
+            logger.error('FullSynchronizer::syncWithPeer, process block error:', err);
             this.abortFetcher!();
           }
         }

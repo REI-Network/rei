@@ -56,7 +56,7 @@ export class Worker extends Loop {
           { common: this.node.common }
         );
         await (this.wvm = await this.node.getWrappedVM(block.header.stateRoot)).vm.stateManager.checkpoint();
-        await this.commit(await this.node.txPool.getPendingMap());
+        await this.commit(this.node.txPool.getPendingMap());
         resolve(true);
       } catch (err) {
         console.error('Worker::newBlockLoop, catch error:', err);

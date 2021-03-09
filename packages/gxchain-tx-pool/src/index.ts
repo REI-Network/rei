@@ -252,18 +252,6 @@ export class TxPool {
     return account;
   }
 
-  async getPendingMap(): Promise<PendingTxMap> {
-    await this.initPromise;
-    const pendingMap = new PendingTxMap();
-    for (const [sender, account] of this.accounts) {
-      if (!account.hasPending()) {
-        continue;
-      }
-      pendingMap.push(sender, account.pending.toList());
-    }
-    return pendingMap;
-  }
-
   async newBlock(newBlock: Block) {
     await this.initPromise;
     this.newBlockQueue.push(newBlock);
@@ -275,6 +263,28 @@ export class TxPool {
     return new Promise<AddTxsResult>((resolve) => {
       this.addTxsQueue.push({ txs: txs as WrappedTransaction[], resolve });
     });
+  }
+
+  getPendingMap() {
+    const pendingMap = new PendingTxMap();
+    for (const [sender, account] of this.accounts) {
+      if (!account.hasPending()) {
+        continue;
+      }
+      pendingMap.push(sender, account.pending.toList());
+    }
+    return pendingMap;
+  }
+
+  getPooledTransactionHashes() {
+    let hashes: Buffer[] = [];
+    for (const [sender, account] of this.accounts) {
+      if (!account.hasPending()) {
+        continue;
+      }
+      hashes = hashes.concat(account.pending.toList().map((wtx) => wtx.transaction.hash()));
+    }
+    return hashes;
   }
 
   getTransaction(hash: Buffer) {

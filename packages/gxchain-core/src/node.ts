@@ -295,6 +295,12 @@ export class Node {
       try {
         const { results, readies } = await this.txPool.addTxs(addPendingTxs.txs.map((tx) => (tx instanceof Transaction ? new WrappedTransaction(tx) : tx)));
         if (readies && readies.size > 0) {
+          const hashes = Array.from(readies.values())
+            .reduce((a, b) => a.concat(b), [])
+            .map((wtx) => wtx.transaction.hash());
+          for (const peer of this.peerpool.peers) {
+            peer.announceTx(hashes);
+          }
           await this.miner.worker.addTxs(readies);
         }
         addPendingTxs.resolve(results);

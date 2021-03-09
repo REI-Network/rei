@@ -1,6 +1,6 @@
 import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Heap from 'qheap';
-import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AsyncChannel, Aborter } from '@gxchain2/utils';
+import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AsyncChannel, Aborter, logger } from '@gxchain2/utils';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { StateManager } from '@gxchain2/state-manager';
 import { Blockchain } from '@gxchain2/blockchain';
@@ -211,7 +211,7 @@ export class TxPool {
         this.truncatePending();
         this.truncateQueue();
       } catch (err) {
-        console.error('TxPool::newBlockLoop, catch error:', err);
+        logger.error('TxPool::newBlockLoop, catch error:', err);
       }
     }
   }
@@ -226,7 +226,7 @@ export class TxPool {
         addTxs.resolve(result);
       } catch (err) {
         addTxs.resolve({ results: new Array<boolean>(addTxs.txs.length).fill(false) });
-        console.error('TxPool::addTxsLoop, catch error:', err);
+        logger.error('TxPool::addTxsLoop, catch error:', err);
       }
     }
   }
@@ -337,39 +337,39 @@ export class TxPool {
     // TODO: report error.
     try {
       if (tx.size > this.txMaxSize) {
-        console.warn('tx', bufferToHex(tx.transaction.hash()), 'size too large:', tx.size, 'max:', this.txMaxSize);
+        logger.warn('Txpool drop tx', bufferToHex(tx.transaction.hash()), 'size too large:', tx.size, 'max:', this.txMaxSize);
         return false;
       }
       if (!tx.transaction.isSigned()) {
-        console.warn('tx', bufferToHex(tx.transaction.hash()), 'is not signed');
+        logger.warn('Txpool drop tx', bufferToHex(tx.transaction.hash()), 'is not signed');
         return false;
       }
       if (this.node.miner.gasLimit.lt(tx.transaction.gasLimit)) {
-        console.warn('tx', bufferToHex(tx.transaction.hash()), 'reach block gasLimit:', tx.transaction.gasLimit.toString(), 'limit:', this.node.miner.gasLimit.toString());
+        logger.warn('Txpool drop tx', bufferToHex(tx.transaction.hash()), 'reach block gasLimit:', tx.transaction.gasLimit.toString(), 'limit:', this.node.miner.gasLimit.toString());
         return false;
       }
       const senderAddr = tx.transaction.getSenderAddress();
       const sender = senderAddr.buf;
       if (!this.locals.has(sender) && tx.transaction.gasPrice.lt(this.priceLimit)) {
-        console.warn('tx', bufferToHex(tx.transaction.hash()), 'gasPrice too low:', tx.transaction.gasPrice.toString(), 'limit:', this.priceLimit.toString());
+        logger.warn('Txpool drop tx', bufferToHex(tx.transaction.hash()), 'gasPrice too low:', tx.transaction.gasPrice.toString(), 'limit:', this.priceLimit.toString());
         return false;
       }
       const accountInDB = await this.currentStateManager.getAccount(senderAddr);
       if (accountInDB.nonce.gt(tx.transaction.nonce)) {
-        console.warn('tx', bufferToHex(tx.transaction.hash()), 'nonce too low:', tx.transaction.nonce.toString(), 'account:', accountInDB.nonce.toString());
+        logger.warn('Txpool drop tx', bufferToHex(tx.transaction.hash()), 'nonce too low:', tx.transaction.nonce.toString(), 'account:', accountInDB.nonce.toString());
         return false;
       }
       if (accountInDB.balance.lt(txCost(tx))) {
-        console.warn('tx', bufferToHex(tx.transaction.hash()), 'balance not enough:', txCost(tx).toString(), 'account:', accountInDB.balance.toString());
+        logger.warn('Txpool drop tx', bufferToHex(tx.transaction.hash()), 'balance not enough:', txCost(tx).toString(), 'account:', accountInDB.balance.toString());
         return false;
       }
       if (!checkTxIntrinsicGas(tx)) {
-        console.warn('tx', bufferToHex(tx.transaction.hash()), 'checkTxIntrinsicGas failed');
+        logger.warn('Txpool drop tx', bufferToHex(tx.transaction.hash()), 'checkTxIntrinsicGas failed');
         return false;
       }
       return true;
     } catch (err) {
-      console.warn('tx', bufferToHex(tx.transaction.hash()), 'validateTx failed:', err);
+      logger.warn('Txpool drop tx', bufferToHex(tx.transaction.hash()), 'validateTx failed:', err);
       return false;
     }
   }
@@ -569,12 +569,12 @@ export class TxPool {
 
   async ls() {
     const info = (map: TxSortedMap, description: string) => {
-      console.log(`${description} size:`, map.size, '| slots:', map.slots);
+      logger.info(`${description} size:`, map.size, '| slots:', map.slots);
       map.ls();
     };
     for (const [sender, account] of this.accounts) {
-      console.log('==========');
-      console.log('address: 0x' + sender.toString('hex'), '| timestamp:', account.timestamp, '| pendingNonce:', (await account.getPendingNonce()).toString());
+      logger.info('==========');
+      logger.info('address: 0x' + sender.toString('hex'), '| timestamp:', account.timestamp, '| pendingNonce:', (await account.getPendingNonce()).toString());
       if (account.hasPending()) {
         info(account.pending, 'pending');
       }

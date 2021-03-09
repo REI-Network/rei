@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
 import Heap from 'qheap';
 import { WrappedTransaction } from '@gxchain2/tx';
-import { FunctionalMap } from '@gxchain2/utils';
+import { FunctionalMap, logger } from '@gxchain2/utils';
 import { txSlots, txCost } from './index';
 
 export class TxSortedMap {
@@ -210,8 +210,8 @@ export class TxSortedMap {
 
   ls() {
     for (const [key, value] of this.nonceToTx) {
-      console.log('---');
-      console.log(value.toRPCJSON());
+      logger.info('---');
+      logger.info(value.toRPCJSON());
     }
   }
 }

@@ -159,14 +159,14 @@ export class AsyncHeap<T = any> extends AsyncNext<T> {
   }
 }
 
-interface AysncChannelOption<T> extends AsyncQueueOption<T> {
+interface AsyncChannelOption<T> extends AsyncQueueOption<T> {
   isAbort: () => boolean;
 }
 
-export class AysncChannel<T = any> extends AsyncQueue<T> {
+export class AsyncChannel<T = any> extends AsyncQueue<T> {
   private isAbort: () => boolean;
 
-  constructor(options: AysncChannelOption<T>) {
+  constructor(options: AsyncChannelOption<T>) {
     super(options);
     this.isAbort = options.isAbort;
   }
@@ -188,14 +188,14 @@ export class AysncChannel<T = any> extends AsyncQueue<T> {
   }
 }
 
-interface AysncHeapChannelOption<T> extends AsyncHeapOption<T> {
+interface AsyncHeapChannelOption<T> extends AsyncHeapOption<T> {
   isAbort: () => boolean;
 }
 
-export class AysncHeapChannel<T = any> extends AsyncHeap<T> {
+export class AsyncHeapChannel<T = any> extends AsyncHeap<T> {
   private isAbort: () => boolean;
 
-  constructor(options: AysncHeapChannelOption<T>) {
+  constructor(options: AsyncHeapChannelOption<T>) {
     super(options);
     this.isAbort = options.isAbort;
   }

@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 
-import { AsyncQueue, AysncChannel, Aborter, createBufferFunctionalSet } from '@gxchain2/utils';
+import { AsyncQueue, AsyncChannel, Aborter, createBufferFunctionalSet } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
 import { constants } from '@gxchain2/common';

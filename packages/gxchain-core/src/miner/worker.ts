@@ -3,7 +3,7 @@ import { Block, BlockHeader } from '@gxchain2/block';
 import { calculateTransactionTrie, WrappedTransaction } from '@gxchain2/tx';
 import { PendingTxMap } from '@gxchain2/tx-pool';
 import { WrappedVM } from '@gxchain2/vm';
-import { AysncChannel } from '@gxchain2/utils';
+import { AsyncChannel } from '@gxchain2/utils';
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import { Loop } from './loop';
 import { Miner } from './miner';
@@ -18,8 +18,8 @@ export class Worker extends Loop {
   private readonly miner: Miner;
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
-  private readonly newBlockQueue = new AysncChannel<NewBlock>({ max: 1, isAbort: () => this.aborter.isAborted, drop: ({ resolve }) => resolve(false) });
-  private readonly addTxsQueue = new AysncChannel<Map<Buffer, WrappedTransaction[]>>({ isAbort: () => this.aborter.isAborted });
+  private readonly newBlockQueue = new AsyncChannel<NewBlock>({ max: 1, isAbort: () => this.aborter.isAborted, drop: ({ resolve }) => resolve(false) });
+  private readonly addTxsQueue = new AsyncChannel<Map<Buffer, WrappedTransaction[]>>({ isAbort: () => this.aborter.isAborted });
 
   private wvm!: WrappedVM;
   private txs: WrappedTransaction[] = [];

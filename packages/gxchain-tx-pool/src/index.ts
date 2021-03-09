@@ -1,6 +1,6 @@
 import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Heap from 'qheap';
-import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AysncChannel, Aborter } from '@gxchain2/utils';
+import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AsyncChannel, Aborter } from '@gxchain2/utils';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { StateManager } from '@gxchain2/state-manager';
 import { Blockchain } from '@gxchain2/blockchain';
@@ -106,8 +106,8 @@ type AddTxs = {
 
 export class TxPool {
   private aborter = new Aborter();
-  private newBlockQueue = new AysncChannel<Block>({ max: 1, isAbort: () => this.aborter.isAborted });
-  private addTxsQueue = new AysncChannel<AddTxs>({ isAbort: () => this.aborter.isAborted });
+  private newBlockQueue = new AsyncChannel<Block>({ max: 1, isAbort: () => this.aborter.isAborted });
+  private addTxsQueue = new AsyncChannel<AddTxs>({ isAbort: () => this.aborter.isAborted });
 
   private readonly accounts: FunctionalMap<Buffer, TxPoolAccount>;
   private readonly locals: FunctionalSet<Buffer>;

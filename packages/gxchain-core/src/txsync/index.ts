@@ -1,4 +1,4 @@
-import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AysncChannel, Aborter } from '@gxchain2/utils';
+import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AsyncChannel, Aborter } from '@gxchain2/utils';
 import { EventEmitter } from 'events';
 import { Transaction } from '@gxchain2/tx';
 import { PeerRequestTimeoutError } from '@gxchain2/network';
@@ -59,8 +59,8 @@ export class TxFetcher extends EventEmitter {
   private alternates = createBufferFunctionalMap<Set<string>>();
 
   private aborter = new Aborter();
-  private newPooledTransactionQueue = new AysncChannel<NewPooledTransactionMessage>({ isAbort: () => this.aborter.isAborted });
-  private enqueueTransactionQueue = new AysncChannel<EnqueuePooledTransactionMessage>({ isAbort: () => this.aborter.isAborted });
+  private newPooledTransactionQueue = new AsyncChannel<NewPooledTransactionMessage>({ isAbort: () => this.aborter.isAborted });
+  private enqueueTransactionQueue = new AsyncChannel<EnqueuePooledTransactionMessage>({ isAbort: () => this.aborter.isAborted });
 
   private readonly node: Node;
 

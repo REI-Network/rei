@@ -6,7 +6,7 @@ import { Block, BlockHeader } from '@gxchain2/block';
 
 import { Synchronizer, SynchronizerOptions } from './sync';
 import { Fetcher } from './fetcher';
-import { AysncChannel } from '@gxchain2/utils';
+import { AsyncChannel } from '@gxchain2/utils';
 
 export interface FullSynchronizerOptions extends SynchronizerOptions {
   limit?: number;
@@ -163,7 +163,7 @@ export class FullSynchronizer extends Synchronizer {
     this.startSyncHook(localHeight, bestHeight);
 
     let syncAbort = false;
-    const blocksQueue = new AysncChannel<Block>({ isAbort: () => syncAbort });
+    const blocksQueue = new AsyncChannel<Block>({ isAbort: () => syncAbort });
     const fetcher = new Fetcher({ node: this.node, limitCount: this.count });
     this.abortFetcher = () => {
       syncAbort = true;

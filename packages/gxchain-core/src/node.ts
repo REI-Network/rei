@@ -16,7 +16,7 @@ import { VM, WrappedVM } from '@gxchain2/vm';
 import { TxPool } from '@gxchain2/tx-pool';
 import { Block } from '@gxchain2/block';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
-import { hexStringToBuffer, AysncChannel, Aborter } from '@gxchain2/utils';
+import { hexStringToBuffer, AsyncChannel, Aborter } from '@gxchain2/utils';
 
 import { FullSynchronizer, Synchronizer } from './sync';
 import { TxFetcher } from './txsync';
@@ -56,8 +56,8 @@ export class Node {
   private readonly options: NodeOptions;
   private readonly initPromise: Promise<void>;
   private readonly aborter = new Aborter();
-  private readonly newBlockQueue = new AysncChannel<Block>({ max: 1, isAbort: () => this.aborter.isAborted });
-  private readonly addPendingTxsQueue = new AysncChannel<AddPendingTxs>({ isAbort: () => this.aborter.isAborted });
+  private readonly newBlockQueue = new AsyncChannel<Block>({ max: 1, isAbort: () => this.aborter.isAborted });
+  private readonly addPendingTxsQueue = new AsyncChannel<AddPendingTxs>({ isAbort: () => this.aborter.isAborted });
 
   constructor(options: NodeOptions) {
     this.options = options;

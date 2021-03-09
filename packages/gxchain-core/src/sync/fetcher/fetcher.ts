@@ -1,4 +1,4 @@
-import { AysncHeapChannel, PriorityQueue, getRandomIntInclusive, AysncChannel } from '@gxchain2/utils';
+import { AsyncHeapChannel, PriorityQueue, getRandomIntInclusive, AsyncChannel } from '@gxchain2/utils';
 import { BlockHeader, Block } from '@gxchain2/block';
 import { Node } from '../../node';
 import { Peer } from '@gxchain2/network';
@@ -18,8 +18,8 @@ export class Fetcher extends EventEmitter {
   private bestHeight!: number;
   private headerTaskOver = false;
   private priorityQueue = new PriorityQueue<Block>();
-  private blocksQueue = new AysncChannel<Block>({ isAbort: () => this.abortFlag });
-  private downloadBodiesQueue = new AysncHeapChannel<BlockHeader>({
+  private blocksQueue = new AsyncChannel<Block>({ isAbort: () => this.abortFlag });
+  private downloadBodiesQueue = new AsyncHeapChannel<BlockHeader>({
     isAbort: () => this.abortFlag,
     compare: (a, b) => a.number.lt(b.number)
   });

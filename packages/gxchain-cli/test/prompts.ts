@@ -1,22 +1,20 @@
 import process from 'process';
 import path from 'path';
 import fs from 'fs';
-
 import prompts from 'prompts';
 import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import BN from 'bn.js';
 import { Address } from 'ethereumjs-util';
-
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
 import { constants } from '@gxchain2/common';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
-import { hexStringToBuffer } from '@gxchain2/utils';
+import { hexStringToBuffer, logger } from '@gxchain2/utils';
 
 const args = process.argv.slice(2);
 
-const accounts = ['0x3289621709f5b35d09b4335e129907ac367a0593', '0xd1e52f6eacbb95f5f8512ff129cbd6360e549b0b'];
+// const accounts = ['0x3289621709f5b35d09b4335e129907ac367a0593', '0xd1e52f6eacbb95f5f8512ff129cbd6360e549b0b'];
 const keyPair = {
   '0x3289621709f5b35d09b4335e129907ac367a0593': Buffer.from('d8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0', 'hex'),
   '0xd1e52f6eacbb95f5f8512ff129cbd6360e549b0b': Buffer.from('db0558cc5f24dd09c390a25c7958a678e7efa0f286053da5df53dcecdba2a13c', 'hex')
@@ -40,7 +38,7 @@ const startPrompts = async (node: Node) => {
 
     const arr = (response.cmd as string).split(' ');
     if (!Array.isArray(arr)) {
-      console.warn('$ Invalid command');
+      logger.warn('Invalid command');
       continue;
     }
 
@@ -61,12 +59,12 @@ const startPrompts = async (node: Node) => {
       if (peer) {
         peer.send(constants.GXC2_ETHWIRE, 'Echo', arr[2]);
       } else {
-        console.warn('$ Can not find peer');
+        logger.warn('Can not find peer');
       }
     } else if (arr[0] === 'lsp2p') {
-      console.log('peers:');
+      logger.info('peers:');
       for (const [peerIdString] of node.peerpool.nodes[0].peerStore.peers.entries()) {
-        console.log(peerIdString);
+        logger.info(peerIdString);
       }
     } else if (arr[0] === 'batchmine' || arr[0] === 'bm') {
       try {
@@ -76,34 +74,34 @@ const startPrompts = async (node: Node) => {
           await new Promise((resolve) => setTimeout(resolve, 10));
         }
       } catch (err) {
-        console.error('Run block error', err);
+        logger.error('Run block error:', err);
       }
     } else if (arr[0] === 'lsreceipt') {
       try {
         const receipt = await node.db.getReceipt(hexStringToBuffer(arr[1]));
-        console.log(receipt.toRPCJSON());
+        logger.info(receipt.toRPCJSON());
       } catch (err) {
-        console.error('Get receipt error', err);
+        logger.error('Get receipt error:', err);
       }
     } else if (arr[0] === 'lstx') {
       try {
         const tx = await node.db.getWrappedTransaction(hexStringToBuffer(arr[1]));
-        console.log(tx.toRPCJSON());
+        logger.info(tx.toRPCJSON());
       } catch (err) {
         if (err.type === 'NotFoundError') {
           continue;
         }
-        console.error('Get transaction error', err);
+        logger.error('Get transaction error:', err);
       }
     } else if (arr[0] === 'lsblock') {
       const printBlock = async (key: number | Buffer): Promise<boolean> => {
         try {
           const block = await node.db.getBlock(key);
-          console.log('block', '0x' + block.hash().toString('hex'), 'on height', block.header.number.toString(), ':', block.toJSON());
+          logger.info('block', '0x' + block.hash().toString('hex'), 'on height', block.header.number.toString(), ':', block.toJSON());
           for (const tx of block.transactions) {
-            console.log('tx', '0x' + tx.hash().toString('hex'));
+            logger.info('tx', '0x' + tx.hash().toString('hex'));
           }
-          console.log('---------------');
+          logger.info('---------------');
         } catch (err) {
           if (err.type === 'NotFoundError') {
             return false;
@@ -120,13 +118,13 @@ const startPrompts = async (node: Node) => {
     } else if (arr[0] === 'lsheight') {
       const height = node.blockchain.latestHeight;
       const hash = node.blockchain.latestHash;
-      console.log('local height:', height, 'hash:', hash);
+      logger.info('local height:', height, 'hash:', hash);
     } else if (arr[0] === 'lsaccount' || arr[0] === 'la') {
       try {
         const acc = await (await node.getStateManager(node.blockchain.latestBlock.header.stateRoot)).getAccount(Address.fromString(arr[1]));
-        console.log('balance', acc.balance.toString(), 'nonce', acc.nonce.toString(), 'codeHash', acc.codeHash.toString('hex'));
+        logger.info('balance', acc.balance.toString(), 'nonce', acc.nonce.toString(), 'codeHash', acc.codeHash.toString('hex'));
       } catch (err) {
-        console.error('lsaccount error:', err);
+        logger.error('Get account error:', err);
       }
     } else if (arr[0] === 'puttx') {
       const unsignedTx = Transaction.fromTxData(
@@ -140,7 +138,7 @@ const startPrompts = async (node: Node) => {
         { common: node.common }
       );
       const tx = unsignedTx.sign(getPrivateKey(arr[1]));
-      console.log('puttx 0x' + tx.hash().toString('hex'));
+      logger.info('puttx 0x' + tx.hash().toString('hex'));
       await node.addPendingTxs([tx]);
     } else if (arr[0] === 'lstxpool') {
       await node.txPool.ls();
@@ -148,7 +146,7 @@ const startPrompts = async (node: Node) => {
       const [peerId, hash] = arr.slice(1);
       const peer = node.peerpool.getPeer(peerId);
       if (!peer) {
-        console.warn('missing peer', peerId);
+        logger.warn('Missing peer', peerId);
         continue;
       }
       peer.newPooledTransactionHashes([hexStringToBuffer(hash)]);
@@ -156,13 +154,13 @@ const startPrompts = async (node: Node) => {
       const [peerId, hash] = arr.slice(1);
       const peer = node.peerpool.getPeer(peerId);
       if (!peer) {
-        console.warn('missing peer', peerId);
+        logger.warn('Missing peer', peerId);
         continue;
       }
       const wtx = new WrappedTransaction((await peer.getPooledTransactions([hexStringToBuffer(hash)]))[0]);
-      console.log('get pooled transaction:', wtx.toRPCJSON());
+      logger.info('Get pooled transaction:', wtx.toRPCJSON());
     } else {
-      console.warn('$ Invalid command');
+      logger.warn('Invalid command');
       continue;
     }
   }
@@ -184,16 +182,16 @@ const startPrompts = async (node: Node) => {
     await node.init();
     await node.miner.setCoinbase('0x3289621709f5b35d09b4335e129907ac367a0593');
     const rpcServer = new RpcServer(rpcPort, '127.0.0.1', node).on('error', (err: any) => {
-      console.error('rpc server error', err);
+      logger.error('Rpc server error:', err);
       process.exit(1);
     });
     if (!(await rpcServer.start())) {
-      console.error('RpcServer start failed, exit!');
+      logger.error('RpcServer start failed, exit!');
       process.exit(1);
     }
     await startPrompts(node);
   } catch (err) {
-    console.error('Catch error', err);
+    logger.error('Catch error:', err);
     process.exit(1);
   }
 })();

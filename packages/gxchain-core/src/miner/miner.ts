@@ -65,14 +65,12 @@ export class Miner extends Loop {
     }
   }
 
-  async setCoinbase(coinbase: string | Buffer) {
+  setCoinbase(coinbase: string | Buffer) {
     this._coinbase = typeof coinbase === 'string' ? hexStringToBuffer(coinbase) : coinbase;
-    await this.worker.newBlock(this.node.blockchain.latestBlock);
   }
 
-  async setGasLimit(gasLimit: string | BN) {
+  setGasLimit(gasLimit: string | BN) {
     this._gasLimit = typeof gasLimit === 'string' ? hexStringToBN(gasLimit) : gasLimit;
-    await this.worker.newBlock(this.node.blockchain.latestBlock);
   }
 
   async init() {

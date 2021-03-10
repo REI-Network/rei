@@ -1,4 +1,4 @@
-import { Transaction, WrappedTransaction } from '@gxchain2/tx';
+import { Transaction } from '@gxchain2/tx';
 import BN from 'bn.js';
 import Heap from 'qheap';
 import { txSlots } from './index';
@@ -6,11 +6,11 @@ import { txSlots } from './index';
 export class TxPricedList {
   remotes: Heap;
   stales: number;
-  all: Map<Buffer, WrappedTransaction>;
-  constructor(all: Map<Buffer, WrappedTransaction>) {
+  all: Map<Buffer, Transaction>;
+  constructor(all: Map<Buffer, Transaction>) {
     this.all = all;
     this.stales = 0;
-    this.remotes = new Heap({ comparBefore: (a: WrappedTransaction, b: WrappedTransaction) => b.transaction.gasPrice.gt(a.transaction.gasPrice) });
+    this.remotes = new Heap({ comparBefore: (a: Transaction, b: Transaction) => b.gasPrice.gt(a.gasPrice) });
   }
 
   /**
@@ -18,7 +18,7 @@ export class TxPricedList {
    * @param tx - The new transaction
    * @param local - Determine whether the transaction is local
    */
-  put(tx: WrappedTransaction, local: boolean) {
+  put(tx: Transaction, local: boolean) {
     if (local) {
       return;
     }
@@ -45,16 +45,16 @@ export class TxPricedList {
    * @param threshold The gasfee threshold of transaction
    * @returns The transactions to be abandoned
    */
-  cap(threshold: BN): WrappedTransaction[] {
-    const drop: WrappedTransaction[] = [];
+  cap(threshold: BN): Transaction[] {
+    const drop: Transaction[] = [];
     while (this.remotes.length > 0) {
-      const cheapest: WrappedTransaction = this.remotes.peek();
-      if (!this.all.has(cheapest.transaction.hash())) {
+      const cheapest: Transaction = this.remotes.peek();
+      if (!this.all.has(cheapest.hash())) {
         this.remotes.remove();
         this.stales--;
         continue;
       }
-      if (cheapest.transaction.gasPrice.gte(threshold)) {
+      if (cheapest.gasPrice.gte(threshold)) {
         break;
       }
       this.remotes.remove();
@@ -69,10 +69,10 @@ export class TxPricedList {
    * @param tx The transaction to be checked
    * @returns Wheather the transaction is cheaper or not
    */
-  underpriced(tx: WrappedTransaction): boolean {
+  underpriced(tx: Transaction): boolean {
     while (this.remotes.length > 0) {
-      const head: WrappedTransaction = this.remotes.peek();
-      if (!this.all.has(head.transaction.hash())) {
+      const head: Transaction = this.remotes.peek();
+      if (!this.all.has(head.hash())) {
         this.stales--;
         this.remotes.remove();
         continue;
@@ -82,8 +82,8 @@ export class TxPricedList {
     if (this.remotes.length == 0) {
       return false;
     }
-    const cheapest: WrappedTransaction = this.remotes.peek();
-    return cheapest.transaction.gasPrice.gt(tx.transaction.gasPrice);
+    const cheapest: Transaction = this.remotes.peek();
+    return cheapest.gasPrice.gt(tx.gasPrice);
   }
 
   /**
@@ -93,11 +93,11 @@ export class TxPricedList {
    * @param force Mandatory or not
    * @returns A number of most underpriced transactions
    */
-  discard(slots: number, force: boolean): [WrappedTransaction[] | undefined, boolean] {
-    const drop: WrappedTransaction[] = [];
+  discard(slots: number, force: boolean): [Transaction[] | undefined, boolean] {
+    const drop: Transaction[] = [];
     while (this.remotes.length > 0 && slots > 0) {
-      const tx: WrappedTransaction = this.remotes.remove();
-      if (!this.all.has(tx.transaction.hash())) {
+      const tx: Transaction = this.remotes.remove();
+      if (!this.all.has(tx.hash())) {
         this.stales--;
         continue;
       }
@@ -114,7 +114,7 @@ export class TxPricedList {
   }
 
   reheap() {
-    const reheap = new Heap({ comparBefore: (a: WrappedTransaction, b: WrappedTransaction) => b.transaction.gasPrice.gt(a.transaction.gasPrice) });
+    const reheap = new Heap({ comparBefore: (a: Transaction, b: Transaction) => b.gasPrice.gt(a.gasPrice) });
     this.stales = 0;
     this.all.forEach((val, key, map) => {
       reheap.push(val);

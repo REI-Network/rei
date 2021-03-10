@@ -10,7 +10,7 @@ import { Blockchain } from '@gxchain2/blockchain';
 import { Database } from '@gxchain2/database';
 import { Peer } from './peer';
 import { Protocol, ETHProtocol } from './protocol';
-import { WrappedTransaction } from '@gxchain2/tx';
+import { Transaction } from '@gxchain2/tx';
 import { logger } from '@gxchain2/utils';
 const Libp2p = require('libp2p');
 
@@ -26,7 +26,7 @@ export interface ISync {
 }
 
 export interface ITxPool {
-  getTransaction: (hash: Buffer) => WrappedTransaction | undefined;
+  getTransaction: (hash: Buffer) => Transaction | undefined;
 }
 
 export interface ITxFetcher {

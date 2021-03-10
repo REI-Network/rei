@@ -34,9 +34,9 @@ export interface NodeOptions {
 }
 
 class NewPendingTxsTask {
-  txs: (Transaction | WrappedTransaction)[];
+  txs: Transaction[];
   resolve: (results: boolean[]) => void;
-  constructor(txs: (Transaction | WrappedTransaction)[], resolve: (results: boolean[]) => void) {
+  constructor(txs: Transaction[], resolve: (results: boolean[]) => void) {
     this.txs = txs;
     this.resolve = resolve;
   }
@@ -284,11 +284,11 @@ export class Node {
       try {
         if (task instanceof NewPendingTxsTask) {
           try {
-            const { results, readies } = await this.txPool.addTxs(task.txs.map((tx) => (tx instanceof Transaction ? new WrappedTransaction(tx) : tx)));
+            const { results, readies } = await this.txPool.addTxs(task.txs);
             if (readies && readies.size > 0) {
               const hashes = Array.from(readies.values())
                 .reduce((a, b) => a.concat(b), [])
-                .map((wtx) => wtx.transaction.hash());
+                .map((tx) => tx.hash());
               for (const peer of this.peerpool.peers) {
                 peer.announceTx(hashes);
               }
@@ -318,7 +318,7 @@ export class Node {
     this.taskQueue.push(new NewBlockTask(block));
   }
 
-  async addPendingTxs(txs: (Transaction | WrappedTransaction)[]) {
+  async addPendingTxs(txs: Transaction[]) {
     await this.initPromise;
     return new Promise<boolean[]>((resolve) => {
       this.taskQueue.push(new NewPendingTxsTask(txs, resolve));

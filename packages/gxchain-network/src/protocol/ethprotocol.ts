@@ -111,13 +111,7 @@ const handlers: Handler[] = [
     encode: (info: MessageInfo, hashes: Buffer[]) => rlp.encode([7, [...hashes]]),
     decode: (info: MessageInfo, hashes): Buffer[] => hashes,
     process: (info: MessageInfo, hashes: Buffer[]) => {
-      return [
-        'PooledTransactions',
-        hashes.map((hash) => {
-          const wtx = info.node.txPool.getTransaction(hash);
-          return wtx ? wtx.transaction : undefined;
-        })
-      ];
+      return ['PooledTransactions', hashes.map((hash) => info.node.txPool.getTransaction(hash)).filter((tx) => tx !== undefined)];
     }
   },
   {

@@ -58,8 +58,8 @@ export interface TxPoolOptions {
   journal: string;
 
   node: INode;
-  //lifetime: number;
-  //interval: number;
+  lifetime?: number;
+  interval?: number;
 }
 
 class TxPoolAccount {
@@ -249,27 +249,30 @@ export class TxPool {
     }
   }
 
-  private local(): Map<Address, WrappedTransaction[]> {
-    let txs: Map<Address, WrappedTransaction[]> = new Map();
+  private local(): Map<Buffer, WrappedTransaction[]> {
+    let txs = createBufferFunctionalMap<WrappedTransaction[]>();
     for (const addrBuf of this.locals) {
       let account = this.accounts.get(addrBuf);
-      let addr = new Address(addrBuf);
       if (account?.hasPending()) {
-        let transactions = txs.get(addr);
+        let transactions = txs.get(addrBuf);
         if (transactions) {
-          transactions = transactions.concat(account.pending.toList());
-          txs.set(addr, transactions);
+          const listtxs = account.pending.toList();
+          for (const tx of listtxs) {
+            transactions.push(tx);
+          }
         } else {
-          txs.set(addr, account.pending.toList());
+          txs.set(addrBuf, account.pending.toList());
         }
       }
       if (account?.hasQueue()) {
-        let transactions = txs.get(addr);
+        let transactions = txs.get(addrBuf);
         if (transactions) {
-          transactions = transactions.concat(account.queue.toList());
-          txs.set(addr, transactions);
+          const listtxs = account.queue.toList();
+          for (const tx of listtxs) {
+            transactions.push(tx);
+          }
         } else {
-          txs.set(addr, account.queue.toList());
+          txs.set(addrBuf, account.queue.toList());
         }
       }
     }
@@ -287,7 +290,7 @@ export class TxPool {
         }
       }
       if (this.journal) {
-        this.journal.rotate(this.local());
+        await this.journal.rotate(this.local());
       }
     }
   }
@@ -373,9 +376,6 @@ export class TxPool {
         continue;
       }
       // drop tx if pool is full
-      // TODO
-      // let islocal = local || this.locals.has(addr.buf)
-      const islocal = true;
       if (txSlots(tx) + this.txs.size > this.globalSlots + this.globalQueue) {
         if (this.priced.underpriced(tx)) {
           results.push(false);
@@ -410,7 +410,7 @@ export class TxPool {
       this.globalAllSlots += txSlots(tx);
       // journalTx
       if (this.journal) {
-        this.journal.insert(tx);
+        await this.journal.insert(tx);
       }
       results.push(true);
     }
@@ -486,9 +486,7 @@ export class TxPool {
     if (old) {
       this.removeTxFromGlobal(old);
     }
-    if (account.timestamp === 0) {
-      account.timestamp = Date.now();
-    }
+    account.timestamp = Date.now();
     return inserted;
   }
 

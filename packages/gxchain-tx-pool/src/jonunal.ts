@@ -88,7 +88,7 @@ export class Jonunal {
     });
   }
 
-  async rotate(all: Map<Address, WrappedTransaction[]>) {
+  async rotate(all: Map<Buffer, WrappedTransaction[]>) {
     await this.closeWritter();
     const output = fs.createWriteStream(this.path + '.new');
     let journaled = 0;

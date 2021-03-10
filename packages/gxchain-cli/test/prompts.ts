@@ -168,7 +168,7 @@ const startPrompts = async (node: Node) => {
     }
     const node = new Node({ databasePath: dir });
     await node.init();
-    await node.miner.setCoinbase('0x3289621709f5b35d09b4335e129907ac367a0593');
+    node.miner.setCoinbase('0x3289621709f5b35d09b4335e129907ac367a0593');
     const rpcServer = new RpcServer(rpcPort, '127.0.0.1', node).on('error', (err: any) => {
       logger.error('Rpc server error:', err);
       process.exit(1);

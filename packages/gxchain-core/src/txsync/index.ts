@@ -1,4 +1,4 @@
-import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AysncChannel, Aborter } from '@gxchain2/utils';
+import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AsyncChannel, Aborter, logger } from '@gxchain2/utils';
 import { EventEmitter } from 'events';
 import { Transaction } from '@gxchain2/tx';
 import { PeerRequestTimeoutError } from '@gxchain2/network';
@@ -35,7 +35,7 @@ function autoDelete<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer 
 }
 
 function panicError(...args: any[]) {
-  console.error('TxFetcher, panic error:', ...args);
+  logger.error('TxFetcher::panicError', ...args);
 }
 
 const txArriveTimeout = 500;
@@ -59,8 +59,8 @@ export class TxFetcher extends EventEmitter {
   private alternates = createBufferFunctionalMap<Set<string>>();
 
   private aborter = new Aborter();
-  private newPooledTransactionQueue = new AysncChannel<NewPooledTransactionMessage>({ isAbort: () => this.aborter.isAborted });
-  private enqueueTransactionQueue = new AysncChannel<EnqueuePooledTransactionMessage>({ isAbort: () => this.aborter.isAborted });
+  private newPooledTransactionQueue = new AsyncChannel<NewPooledTransactionMessage>({ isAbort: () => this.aborter.isAborted });
+  private enqueueTransactionQueue = new AsyncChannel<EnqueuePooledTransactionMessage>({ isAbort: () => this.aborter.isAborted });
 
   private readonly node: Node;
 
@@ -76,13 +76,6 @@ export class TxFetcher extends EventEmitter {
   private async newPooledTransactionLoop() {
     try {
       for await (const message of this.newPooledTransactionQueue.generator()) {
-        console.debug(
-          'new pooled txs',
-          message.hashes.map((h) => bufferToHex(h)),
-          'from',
-          message.origin
-        );
-
         const used = (this.watingSlots.get(message.origin)?.size || 0) + (this.announces.get(message.origin)?.size || 0);
         if (used > maxTxAnnounces) {
           continue;
@@ -100,7 +93,6 @@ export class TxFetcher extends EventEmitter {
             if (set) {
               set.add(message.origin);
               forceAdd(this.announces, message.origin, hash);
-              console.debug('new pooled txs, alternates has hash', bufferToHex(hash));
               continue;
             }
           }
@@ -110,7 +102,6 @@ export class TxFetcher extends EventEmitter {
             if (set) {
               set.add(message.origin);
               forceAdd(this.announces, message.origin, hash);
-              console.debug('new pooled txs, announced has hash', bufferToHex(hash));
               continue;
             }
           }
@@ -120,7 +111,6 @@ export class TxFetcher extends EventEmitter {
             if (set) {
               set.add(message.origin);
               forceAdd(this.watingSlots, message.origin, hash);
-              console.debug('new pooled txs, waitingList has hash', bufferToHex(hash));
               continue;
             }
           }
@@ -128,7 +118,6 @@ export class TxFetcher extends EventEmitter {
           forceAdd(this.waitingList, hash, message.origin);
           this.waitingTime.set(hash, Date.now());
           forceAdd(this.watingSlots, message.origin, hash);
-          console.debug('new pooled txs, add hash to waiting list', bufferToHex(hash));
         }
 
         if (idleWait && this.waitingTime.size > 0) {
@@ -149,18 +138,8 @@ export class TxFetcher extends EventEmitter {
   private async enqueueTransactionLoop() {
     try {
       for await (const message of this.enqueueTransactionQueue.generator()) {
-        console.debug(
-          'enqueue transaction',
-          message.txs.map((tx) => bufferToHex(tx.hash())),
-          'from',
-          message.origin
-        );
         // TODO: check underpriced and duplicate and etc.
         const added = (await this.node.addPendingTxs(message.txs)).map((result, i) => (result ? message.txs[i] : null)).filter((ele) => ele !== null) as Transaction[];
-        console.debug(
-          'enqueue transaction, added',
-          added.map((tx) => bufferToHex(tx.hash()))
-        );
         for (const tx of added) {
           const hash = tx.hash();
           const set = this.waitingList.get(hash);
@@ -173,7 +152,6 @@ export class TxFetcher extends EventEmitter {
             }
             this.waitingList.delete(hash);
             this.waitingTime.delete(hash);
-            console.debug('enqueue transaction, waitingList has hash', bufferToHex(hash));
           } else {
             for (const [origin, txset] of this.announces) {
               txset.delete(hash);
@@ -192,13 +170,12 @@ export class TxFetcher extends EventEmitter {
               }
             }
             this.fetching.delete(hash);
-            console.debug("enqueue transaction, waitingList doesn't has hash", bufferToHex(hash));
           }
         }
 
         const req = this.requests.get(message.origin);
         if (!req) {
-          console.warn('TxFetcher, unexpected transaction delivery, peer:', message.origin);
+          logger.warn('TxFetcher::enqueueTransactionLoop, unexpected transaction delivery, peer:', message.origin);
           continue;
         }
         this.requests.delete(message.origin);
@@ -242,7 +219,6 @@ export class TxFetcher extends EventEmitter {
     if (this.waitTimeout) {
       clearTimeout(this.waitTimeout);
       this.waitTimeout = undefined;
-      console.debug('rescheduleWait clear timeout');
     }
     const now = Date.now();
     let earliest = now;
@@ -254,9 +230,7 @@ export class TxFetcher extends EventEmitter {
         }
       }
     }
-    console.debug('rescheduleWait to', txArriveTimeout - (now - earliest), 'seconds later');
     this.waitTimeout = setTimeout(() => {
-      console.debug('rescheduleWait timeout');
       const now = Date.now();
       const actives = new Set<string>();
       for (const [hash, instance] of this.waitingTime) {
@@ -325,12 +299,6 @@ export class TxFetcher extends EventEmitter {
         if (!p) {
           this.dropPeer(peer);
         } else {
-          console.debug(
-            'scheduleFetches, hashes:',
-            hashes.map((h) => bufferToHex(h)),
-            'to:',
-            peer
-          );
           p.getPooledTransactions(hashes)
             .then((txs) => {
               this.enqueueTransaction(peer, txs);
@@ -353,7 +321,6 @@ export class TxFetcher extends EventEmitter {
     if (!req) {
       return;
     }
-    console.debug('requestTimeout', peer);
 
     for (const hash of req.hashes) {
       if (req.stolen && req.stolen.has(hash)) {
@@ -380,7 +347,6 @@ export class TxFetcher extends EventEmitter {
   }
 
   dropPeer(peer: string) {
-    console.debug('dropPeer', peer);
     {
       const set = this.watingSlots.get(peer);
       if (set) {

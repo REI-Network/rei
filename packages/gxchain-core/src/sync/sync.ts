@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 
-import { Aborter } from '@gxchain2/utils';
+import { Aborter, logger } from '@gxchain2/utils';
 import { Peer } from '@gxchain2/network';
 
 import type { Node } from '../node';
@@ -59,7 +59,7 @@ export class Synchronizer extends EventEmitter {
     try {
       if (!this.isSyncing) {
         if (await this._sync(target)) {
-          console.debug('synchronized');
+          logger.info('💫 Synchronized');
           this.emit('synchronized');
         } else {
           this.emit('synchronize failed');

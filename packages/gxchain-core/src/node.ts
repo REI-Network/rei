@@ -1,12 +1,10 @@
 import path from 'path';
 import fs from 'fs';
-
 import type { LevelUp } from 'levelup';
 import BN from 'bn.js';
-import { Account, Address, setLengthLeft } from 'ethereumjs-util';
+import { Account, Address, bufferToHex, setLengthLeft } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
-
 import { Database, createLevelDB, DBSaveReceipts } from '@gxchain2/database';
 import { Libp2pNode, PeerPool } from '@gxchain2/network';
 import { Common, constants, defaultGenesis } from '@gxchain2/common';
@@ -16,8 +14,7 @@ import { VM, WrappedVM } from '@gxchain2/vm';
 import { TxPool } from '@gxchain2/tx-pool';
 import { Block } from '@gxchain2/block';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
-import { hexStringToBuffer, AysncChannel, Aborter } from '@gxchain2/utils';
-
+import { hexStringToBuffer, AsyncChannel, Aborter, logger } from '@gxchain2/utils';
 import { FullSynchronizer, Synchronizer } from './sync';
 import { TxFetcher } from './txsync';
 import { Miner } from './miner';
@@ -57,8 +54,8 @@ export class Node {
   private readonly options: NodeOptions;
   private readonly initPromise: Promise<void>;
   private readonly aborter = new Aborter();
-  private readonly newBlockQueue = new AysncChannel<Block>({ max: 1, isAbort: () => this.aborter.isAborted });
-  private readonly addPendingTxsQueue = new AysncChannel<AddPendingTxs>({ isAbort: () => this.aborter.isAborted });
+  private readonly newBlockQueue = new AsyncChannel<Block>({ max: 1, isAbort: () => this.aborter.isAborted });
+  private readonly addPendingTxsQueue = new AsyncChannel<AddPendingTxs>({ isAbort: () => this.aborter.isAborted });
 
   constructor(options: NodeOptions) {
     this.options = options;
@@ -118,7 +115,7 @@ export class Node {
     try {
       genesisJSON = JSON.parse(fs.readFileSync(path.join(this.options.databasePath, 'genesis.json')).toString());
     } catch (err) {
-      console.warn('Read genesis.json faild, use default genesis');
+      logger.warn('Read genesis.json faild, use default genesis');
       genesisJSON = defaultGenesis;
     }
 
@@ -144,7 +141,7 @@ export class Node {
     try {
       const genesisHash = await this.db.numberToHash(new BN(0));
       genesisBlock = await this.db.getBlock(genesisHash);
-      console.log('find genesis block in db', '0x' + genesisHash.toString('hex'));
+      logger.info('find genesis block in db', bufferToHex(genesisHash));
     } catch (error) {
       if (error.type !== 'NotFoundError') {
         throw error;
@@ -153,12 +150,12 @@ export class Node {
 
     if (!genesisBlock) {
       genesisBlock = Block.genesis({ header: genesisJSON.genesisInfo.genesis }, { common: this.common });
-      console.log('read genesis block from file', '0x' + genesisBlock.hash().toString('hex'));
+      logger.log('read genesis block from file', bufferToHex(genesisBlock.hash()));
 
       const stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
       const root = await this.setupAccountInfo(genesisJSON.accountInfo, stateManager);
       if (!root.equals(genesisBlock.header.stateRoot)) {
-        console.error('state root not equal', '0x' + root.toString('hex'), '0x' + genesisBlock.header.stateRoot.toString('hex'));
+        logger.error('state root not equal', bufferToHex(root), '0x' + bufferToHex(genesisBlock.hash()));
         throw new Error('state root not equal');
       }
     }
@@ -177,7 +174,7 @@ export class Node {
     this.sync = new FullSynchronizer({ node: this });
     this.sync
       .on('error', (err) => {
-        console.error('Sync error:', err);
+        logger.error('Sync error:', err);
       })
       .on('synchronized', () => {
         const block = this.blockchain.latestBlock;
@@ -191,7 +188,7 @@ export class Node {
       const key = fs.readFileSync(path.join(this.options.databasePath, 'peer-key'));
       peerId = await PeerId.createFromPrivKey(key);
     } catch (err) {
-      console.error('Read peer-key faild, generate new key');
+      logger.warn('Read peer-key faild, generate a new key');
       peerId = await PeerId.create({ bits: 1024, keyType: 'Ed25519' });
       fs.writeFileSync(path.join(this.options.databasePath, 'peer-key'), peerId.privKey.bytes);
     }
@@ -214,12 +211,13 @@ export class Node {
     });
     this.peerpool
       .on('error', (err) => {
-        console.error('Peer pool error:', err);
+        logger.error('Peer pool error:', err);
       })
       .on('added', (peer) => {
         const status = peer.getStatus(constants.GXC2_ETHWIRE);
-        if (status && status.height) {
+        if (status && status.height !== undefined) {
           this.sync.announce(peer, status.height);
+          peer.announceTx(this.txPool.getPooledTransactionHashes());
         }
       })
       .on('removed', (peer) => {
@@ -251,7 +249,6 @@ export class Node {
 
   async processBlock(blockSkeleton: Block, generate: boolean = true) {
     await this.initPromise;
-    console.debug('process block:', blockSkeleton.header.number.toString());
     const lastHeader = await this.db.getHeader(blockSkeleton.header.parentHash, blockSkeleton.header.number.subn(1));
     const opts = {
       block: blockSkeleton,
@@ -260,6 +257,7 @@ export class Node {
     };
     const { result, block } = await (await this.getWrappedVM(lastHeader.stateRoot)).runBlock(opts);
     blockSkeleton = block || blockSkeleton;
+    logger.info('✨ Process block, height:', blockSkeleton.header.number.toString(), 'hash:', bufferToHex(blockSkeleton.hash()));
     await this.blockchain.putBlock(blockSkeleton);
     await this.blockchain.saveTxLookup(blockSkeleton);
     await this.db.batch([DBSaveReceipts(result.receipts, blockSkeleton.hash(), blockSkeleton.header.number)]);
@@ -284,7 +282,7 @@ export class Node {
         await this.txPool.newBlock(block);
         await this.miner.worker.newBlock(block);
       } catch (err) {
-        console.error('Node::newBlockLoop, catch error:', err);
+        logger.error('Node::newBlockLoop, catch error:', err);
       }
     }
   }
@@ -295,12 +293,18 @@ export class Node {
       try {
         const { results, readies } = await this.txPool.addTxs(addPendingTxs.txs.map((tx) => (tx instanceof Transaction ? new WrappedTransaction(tx) : tx)));
         if (readies && readies.size > 0) {
+          const hashes = Array.from(readies.values())
+            .reduce((a, b) => a.concat(b), [])
+            .map((wtx) => wtx.transaction.hash());
+          for (const peer of this.peerpool.peers) {
+            peer.announceTx(hashes);
+          }
           await this.miner.worker.addTxs(readies);
         }
         addPendingTxs.resolve(results);
       } catch (err) {
         addPendingTxs.resolve(new Array<boolean>(addPendingTxs.txs.length).fill(false));
-        console.error('Node::addPendingTxsLoop, catch error:', err);
+        logger.error('Node::addPendingTxsLoop, catch error:', err);
       }
     }
   }

@@ -1,10 +1,9 @@
 import { bufferToInt, rlp } from 'ethereumjs-util';
-
 import { constants } from '@gxchain2/common';
 import { Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
-
 import { Protocol, Handler, MessageInfo } from './protocol';
+import { logger } from '@gxchain2/utils';
 
 const handlers: Handler[] = [
   {
@@ -134,7 +133,7 @@ const handlers: Handler[] = [
       return rlp.encode([111, data]);
     },
     decode: (info: MessageInfo, data) => {
-      console.debug('Echo', (data as Buffer).toString());
+      logger.debug('Echo', (data as Buffer).toString());
       return data;
     }
   }

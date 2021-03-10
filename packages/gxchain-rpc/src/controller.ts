@@ -2,9 +2,8 @@ import { Node } from '@gxchain2/core';
 import { Block, WrappedBlock } from '@gxchain2/block';
 import { Address, bnToHex, bufferToHex, keccakFromHexString, toBuffer, BN } from 'ethereumjs-util';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
-
 import * as helper from './helper';
-import { hexStringToBuffer, hexStringToBN } from '@gxchain2/utils';
+import { hexStringToBuffer, hexStringToBN, logger } from '@gxchain2/utils';
 
 type CallData = {
   from?: string;
@@ -83,7 +82,7 @@ export class Controller {
       return result;
     } catch (err) {
       await wvm.vm.stateManager.revert();
-      console.error(err);
+      logger.error('Controller::runCall, catch error:', err);
       throw err;
     }
   }

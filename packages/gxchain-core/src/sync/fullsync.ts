@@ -1,12 +1,10 @@
 import Semaphore from 'semaphore-async-await';
-
 import { constants } from '@gxchain2/common';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 import { Block, BlockHeader } from '@gxchain2/block';
-
 import { Synchronizer, SynchronizerOptions } from './sync';
 import { Fetcher } from './fetcher';
-import { AysncChannel } from '@gxchain2/utils';
+import { AsyncChannel, logger } from '@gxchain2/utils';
 
 export interface FullSynchronizerOptions extends SynchronizerOptions {
   limit?: number;
@@ -95,7 +93,7 @@ export class FullSynchronizer extends Synchronizer {
 
       try {
         syncResolve(await this.syncWithPeer(this.bestPeer, this.bestHeight!));
-        console.debug('sync over best:', this.bestHeight, 'local:', this.node.blockchain.latestHeight);
+        logger.info('💫 Sync over, local height:', this.node.blockchain.latestHeight, 'best height:', this.bestHeight);
       } catch (err) {
         syncResolve(false);
         this.emit('error', err);
@@ -159,11 +157,11 @@ export class FullSynchronizer extends Synchronizer {
 
   private async syncWithPeer(peer: Peer, bestHeight: number): Promise<boolean> {
     const localHeight = await this.findAncient(peer);
-    console.debug('get best height from:', peer.peerId, 'best height:', bestHeight, 'local height:', localHeight);
+    logger.info('💡 Get best height from:', peer.peerId, 'best height:', bestHeight, 'local height:', localHeight);
     this.startSyncHook(localHeight, bestHeight);
 
     let syncAbort = false;
-    const blocksQueue = new AysncChannel<Block>({ isAbort: () => syncAbort });
+    const blocksQueue = new AsyncChannel<Block>({ isAbort: () => syncAbort });
     const fetcher = new Fetcher({ node: this.node, limitCount: this.count });
     this.abortFetcher = () => {
       syncAbort = true;
@@ -186,7 +184,7 @@ export class FullSynchronizer extends Synchronizer {
               break;
             }
           } catch (err) {
-            console.error('FullSynchronizer::syncWithPeer, process block error:', err);
+            logger.error('FullSynchronizer::syncWithPeer, process block error:', err);
             this.abortFetcher!();
           }
         }

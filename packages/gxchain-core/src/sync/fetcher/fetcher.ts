@@ -1,4 +1,4 @@
-import { AysncHeapChannel, PriorityQueue, getRandomIntInclusive, AysncChannel } from '@gxchain2/utils';
+import { AsyncHeapChannel, PriorityQueue, getRandomIntInclusive, AsyncChannel, logger } from '@gxchain2/utils';
 import { BlockHeader, Block } from '@gxchain2/block';
 import { Node } from '../../node';
 import { Peer } from '@gxchain2/network';
@@ -18,8 +18,8 @@ export class Fetcher extends EventEmitter {
   private bestHeight!: number;
   private headerTaskOver = false;
   private priorityQueue = new PriorityQueue<Block>();
-  private blocksQueue = new AysncChannel<Block>({ isAbort: () => this.abortFlag });
-  private downloadBodiesQueue = new AysncHeapChannel<BlockHeader>({
+  private blocksQueue = new AsyncChannel<Block>({ isAbort: () => this.abortFlag });
+  private downloadBodiesQueue = new AsyncHeapChannel<BlockHeader>({
     isAbort: () => this.abortFlag,
     compare: (a, b) => a.number.lt(b.number)
   });
@@ -80,13 +80,13 @@ export class Fetcher extends EventEmitter {
       try {
         const headers: BlockHeader[] = await peer.getBlockHeaders(start, count);
         if (headers.length !== count) {
-          console.error('Fetcher::downloadHeader, invalid header(length)');
+          logger.warn('Fetcher::downloadHeader, invalid header(length)');
           this.stopFetch();
           return;
         }
         for (let index = 1; i < headers.length; i++) {
           if (!headers[index - 1].hash().equals(headers[index].parentHash)) {
-            console.error('Fetcher::downloadHeader, invalid header(parentHash)');
+            logger.warn('Fetcher::downloadHeader, invalid header(parentHash)');
             this.stopFetch();
             return;
           }
@@ -95,7 +95,7 @@ export class Fetcher extends EventEmitter {
           this.downloadBodiesQueue.push(header);
         }
       } catch (err) {
-        console.error('Fetcher::downloadHeader, catch error:', err);
+        logger.error('Fetcher::downloadHeader, catch error:', err);
         this.stopFetch();
         return;
       }
@@ -149,13 +149,14 @@ export class Fetcher extends EventEmitter {
             this.downloadBodiesQueue.push(header);
           }
         }
+        this.node.peerpool.ban(peer!);
       };
       peer
         .getBlockBodies(headers)
         .then(async (bodies) => {
           peer!.bodiesIdle = true;
           if (bodies.length !== headers.length) {
-            console.error('Fetcher::downloadBodiesLoop, invalid bodies(length)');
+            logger.warn('Fetcher::downloadBodiesLoop, invalid bodies(length)');
             return retry();
           }
           const blocks: Block[] = [];
@@ -167,7 +168,7 @@ export class Fetcher extends EventEmitter {
               await block.validateData();
               blocks.push(block);
             } catch (err) {
-              console.error('Fetcher::downloadBodiesLoop, invalid bodies(validateData)');
+              logger.warn('Fetcher::downloadBodiesLoop, invalid bodies(validateData)');
               return retry();
             }
           }
@@ -179,7 +180,7 @@ export class Fetcher extends EventEmitter {
         })
         .catch((err) => {
           peer!.bodiesIdle = true;
-          console.error('Fetcher::downloadBodiesLoop, download failed error:', err);
+          logger.error('Fetcher::downloadBodiesLoop, download failed error:', err);
           return retry();
         });
     }

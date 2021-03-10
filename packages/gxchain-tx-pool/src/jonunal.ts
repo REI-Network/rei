@@ -3,6 +3,7 @@ import path from 'path';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { Address } from 'ethereumjs-util';
 import { INode } from './index';
+import { logger } from '@gxchain2/utils';
 
 const bufferSplit = Buffer.from('\r\n');
 
@@ -120,7 +121,7 @@ export class Jonunal {
     }
 
     fs.renameSync(this.path + '.new', this.path);
-    console.log('Regenerated local transaction journal', 'transactions', journaled, 'accounts', Array.from(all.keys()).length);
+    logger.info('Regenerated local transaction journal, transactions', journaled, 'accounts', all.size);
   }
 
   async close() {

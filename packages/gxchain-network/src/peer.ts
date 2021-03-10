@@ -1,15 +1,14 @@
 import { EventEmitter } from 'events';
-
-import { AsyncQueue, Aborter } from '@gxchain2/utils';
+import { AsyncQueue, AsyncChannel, Aborter, createBufferFunctionalSet, logger } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
 import { constants } from '@gxchain2/common';
-
 import pipe from 'it-pipe';
 import type PeerId from 'peer-id';
-
 import { Protocol, MessageInfo } from './protocol/protocol';
 import { Libp2pNode } from './p2p';
+
+const txsyncPackSize = 102400;
 
 export class PeerRequestTimeoutError extends Error {}
 
@@ -45,7 +44,7 @@ class MsgQueue extends EventEmitter {
         if (!this.aborter.isAborted) {
           this.queue.array.push(data);
           if (this.queue.array.length > 10) {
-            console.warn('MsgQueue drop message:', this.queue.array.shift());
+            logger.warn('Peer close self:', this.peer.peerId);
             this.peer.closeSelf();
           }
         }
@@ -66,11 +65,10 @@ class MsgQueue extends EventEmitter {
   }
 
   send(method: string, data: any) {
-    if (this.aborter.isAborted) {
-      throw new Error('MsgQueue already aborted');
+    if (!this.aborter.isAborted) {
+      const handler = this.protocol.findHandler(method);
+      this.queue.push(handler.encode(this.makeMessageInfo(), data));
     }
-    const handler = this.protocol.findHandler(method);
-    return this.queue.push(handler.encode(this.makeMessageInfo(), data));
   }
 
   request(method: string, data: any) {
@@ -193,17 +191,21 @@ export class Peer extends EventEmitter {
   readonly peerId: string;
   readonly node: Libp2pNode;
   private queueMap = new Map<string, MsgQueue>();
-  private knowTxs = new Set<Buffer>();
-  private knowBlocks = new Set<Buffer>();
+  private knowTxs = createBufferFunctionalSet();
+  private knowBlocks = createBufferFunctionalSet();
 
   private _headersIdle: boolean = true;
   private _bodiesIdle: boolean = true;
   private _receiptsIdle: boolean = true;
 
+  private abortFlag: boolean = false;
+  private txAnnouncesQueue = new AsyncChannel<Buffer>({ isAbort: () => this.abortFlag });
+
   constructor(options: { peerId: string; node: Libp2pNode }) {
     super();
     this.peerId = options.peerId;
     this.node = options.node;
+    this.txAnnouncesLoop();
   }
 
   get headersIdle() {
@@ -234,6 +236,20 @@ export class Peer extends EventEmitter {
     }
   }
 
+  private async txAnnouncesLoop() {
+    let hashesCache: Buffer[] = [];
+    for await (const hash of this.txAnnouncesQueue.generator()) {
+      hashesCache.push(hash);
+      if (hashesCache.length < txsyncPackSize && this.txAnnouncesQueue.array.length > 0) {
+        continue;
+      }
+      this.newPooledTransactionHashes(hashesCache);
+      hashesCache = [];
+      // TODO: remove sleep.
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+
   private makeQueue(protocol: Protocol) {
     const queue = new MsgQueue(this, protocol);
     queue.on('status', (message) => {
@@ -254,11 +270,37 @@ export class Peer extends EventEmitter {
     return queue;
   }
 
+  private filterHash<T>(know: Set<Buffer>, max: number, data: T[], toHash: (t: T) => Buffer) {
+    const filtered: T[] = [];
+    for (const t of data) {
+      const hash = toHash(t);
+      if (!know.has(hash)) {
+        know.add(hash);
+        filtered.push(t);
+      }
+    }
+    while (know.size > max) {
+      const itr = know.keys();
+      know.delete(itr.next().value);
+    }
+    return filtered;
+  }
+
+  private filterTx<T>(data: T[], toHash: (t: T) => Buffer) {
+    return this.filterHash(this.knowTxs, 32768, data, toHash);
+  }
+
+  private filterBlock<T>(data: T[], toHash: (t: T) => Buffer) {
+    return this.filterHash(this.knowBlocks, 1024, data, toHash);
+  }
+
   closeSelf() {
     this.node.removePeer(this);
   }
 
   async abort() {
+    this.abortFlag = true;
+    this.txAnnouncesQueue.abort();
     for (const [name, queue] of this.queueMap) {
       await queue.abort();
     }
@@ -307,50 +349,17 @@ export class Peer extends EventEmitter {
 
   //////////// Protocol method ////////////
   newBlock(block: Block) {
-    const hash = block.header.hash();
-    if (this.knowBlocks.has(hash)) {
-      return;
+    const filtered = this.filterBlock([block], (b) => b.hash());
+    if (filtered.length > 0) {
+      this.send(constants.GXC2_ETHWIRE, 'NewBlock', filtered[0]);
     }
-    this.knowBlocks.add(hash);
-    // TODO: config this.
-    if (this.knowBlocks.size > 1024) {
-      const itr = this.knowBlocks.keys();
-      this.knowBlocks.delete(itr.next().value);
-    }
-    this.send(constants.GXC2_ETHWIRE, 'NewBlock', block);
   }
 
   newBlockHashes(hashes: Buffer[]) {
-    const filteredHashes: Buffer[] = [];
-    for (const hash of hashes) {
-      if (!this.knowBlocks.has(hash)) {
-        filteredHashes.push(hash);
-        this.knowBlocks.add(hash);
-      }
+    const filtered = this.filterBlock(hashes, (h) => h);
+    if (filtered.length > 0) {
+      this.send(constants.GXC2_ETHWIRE, 'NewBlockHashes', filtered);
     }
-    // TODO: config this.
-    while (this.knowBlocks.size > 1024) {
-      const itr = this.knowBlocks.keys();
-      this.knowBlocks.delete(itr.next().value);
-    }
-    this.send(constants.GXC2_ETHWIRE, 'NewBlockHashes', filteredHashes);
-  }
-
-  transactions(txs: Transaction[]) {
-    const filteredTxs: Transaction[] = [];
-    for (const tx of txs) {
-      const hash = tx.hash();
-      if (!this.knowTxs.has(hash)) {
-        filteredTxs.push(tx);
-        this.knowTxs.add(hash);
-      }
-    }
-    // TODO: config this.
-    while (this.knowTxs.size > 32768) {
-      const itr = this.knowTxs.keys();
-      this.knowTxs.delete(itr.next().value);
-    }
-    this.send(constants.GXC2_ETHWIRE, 'Transactions', filteredTxs);
   }
 
   getBlockHeaders(start: number, count: number): Promise<BlockHeader[]> {
@@ -362,10 +371,20 @@ export class Peer extends EventEmitter {
   }
 
   newPooledTransactionHashes(hashes: Buffer[]) {
-    this.send(constants.GXC2_ETHWIRE, 'NewPooledTransactionHashes', hashes);
+    const filtered = this.filterTx(hashes, (h) => h);
+    if (filtered.length > 0) {
+      this.send(constants.GXC2_ETHWIRE, 'NewPooledTransactionHashes', hashes);
+    }
   }
 
   getPooledTransactions(hashes: Buffer[]): Promise<Transaction[]> {
     return this.request(constants.GXC2_ETHWIRE, 'GetPooledTransactions', hashes);
+  }
+
+  ////////////////////////
+  announceTx(hashes: Buffer[]) {
+    for (const hash of hashes) {
+      this.txAnnouncesQueue.push(hash);
+    }
   }
 }

@@ -1,8 +1,8 @@
 import { EventEmitter } from 'events';
 import PeerId from 'peer-id';
-
 import type { Peer } from './peer';
 import type { Libp2pNode } from './p2p';
+import { logger } from '@gxchain2/utils';
 
 export declare interface PeerPool {
   on(event: 'error', listener: (err: any) => void): this;
@@ -29,7 +29,7 @@ export class PeerPool extends EventEmitter {
         this.disconnected(peer);
       });
       node.on('error', (err) => {
-        console.error('Peerpool, p2p node error:', err);
+        logger.error('Peerpool, p2p node error:', err);
       });
     });
     this.maxSize = options.maxSize || 32;
@@ -74,10 +74,10 @@ export class PeerPool extends EventEmitter {
     });
     peer.on('error', (err) => {
       if (this.pool.get(peer.peerId)) {
-        console.warn(`Peerpool, peer error: ${err} ${peer.peerId}`);
+        logger.warn('Peerpool, peer error:', err);
         this.ban(peer);
       } else {
-        console.error('Peerpool, peer error:', err);
+        logger.error('Peerpool, peer error:', err);
       }
     });
     this.add(peer);

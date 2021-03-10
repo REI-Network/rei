@@ -2,11 +2,10 @@ import express from 'express';
 import expressws from 'express-ws';
 import * as http from 'http';
 import { EventEmitter } from 'events';
-
 import { Node } from '@gxchain2/core';
-
 import { JsonRPCMiddleware } from './jsonrpcmiddleware';
 import { Controller } from './controller';
+import { logger } from '@gxchain2/utils';
 
 export class RpcServer extends EventEmitter {
   protected readonly port: number;
@@ -48,7 +47,7 @@ export class RpcServer extends EventEmitter {
           resolve(false);
         });
         server.listen(this.port, this.host, () => {
-          console.log(`rpc server listening on ${this.host.indexOf('.') === -1 ? '[' + this.host + ']' : this.host}:${this.port}`);
+          logger.info(`Rpc server listening on ${this.host.indexOf('.') === -1 ? '[' + this.host + ']' : this.host}:${this.port}`);
           server.removeAllListeners('error');
           server.on('error', (err) => {
             this.emit('error', err);

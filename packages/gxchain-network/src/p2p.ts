@@ -1,4 +1,3 @@
-import Libp2pJS from 'libp2p';
 import WebSockets from 'libp2p-websockets';
 import MPLEX from 'libp2p-mplex';
 import PeerId from 'peer-id';
@@ -6,16 +5,14 @@ import KadDHT from 'libp2p-kad-dht';
 import TCP from 'libp2p-tcp';
 import secio from 'libp2p-secio';
 import Bootstrap from 'libp2p-bootstrap';
-
 import { constants, Common } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { Database } from '@gxchain2/database';
-
 import { Peer } from './peer';
 import { Protocol, ETHProtocol } from './protocol';
 import { WrappedTransaction } from '@gxchain2/tx';
-
-let Libp2p: any = Libp2pJS;
+import { logger } from '@gxchain2/utils';
+const Libp2p = require('libp2p');
 
 function parseProtocol(name: string): Protocol {
   if (name === constants.GXC2_ETHWIRE) {
@@ -143,7 +140,7 @@ export class Libp2pNode extends Libp2p {
           const id = peerId.toB58String();
           const peer = this.peers.get(id);
           if (peer && (await peer.acceptProtocol(stream, protocol.copy(), this.node.status))) {
-            console.debug('Peer handled:', peer.peerId);
+            logger.info('💬 Peer handled:', peer.peerId);
             this.emit('connected', peer);
           }
         } catch (err) {
@@ -160,7 +157,7 @@ export class Libp2pNode extends Libp2p {
         const peer = this.createPeer(peerId);
         const results = await Promise.all(this.protocols.map((protocol) => peer.installProtocol(this, peerId, protocol.copy(), this.node.status)));
         if (results.reduce((a, b) => a || b, false)) {
-          console.debug('Peer discovered:', peer.peerId);
+          logger.info('💬 Peer discovered:', peer.peerId);
           this.emit('connected', peer);
         }
       } catch (err) {
@@ -174,7 +171,7 @@ export class Libp2pNode extends Libp2p {
         if (!this.peers.get(id)) {
           this.createPeer(connect.remotePeer);
         }
-        console.debug('Peer connected:', id);
+        logger.info('💬 Peer connected:', id);
       } catch (err) {
         this.emit('error', err);
       }
@@ -183,7 +180,7 @@ export class Libp2pNode extends Libp2p {
       try {
         const id = connect.remotePeer.toB58String();
         this.removePeer(id);
-        console.debug('Peer disconnected:', id);
+        logger.info('🤐 Peer disconnected:', id);
       } catch (err) {
         this.emit('error', err);
       }
@@ -191,9 +188,9 @@ export class Libp2pNode extends Libp2p {
 
     // start libp2p
     await this.start();
-    console.log('Libp2p has started', this.peerId!.toB58String());
+    logger.info('Libp2p has started', this.peerId!.toB58String());
     this.multiaddrs.forEach((ma) => {
-      console.log(ma.toString() + '/p2p/' + this.peerId!.toB58String());
+      logger.info(ma.toString() + '/p2p/' + this.peerId!.toB58String());
     });
 
     this.started = true;

@@ -5,6 +5,7 @@ import fs from 'fs';
 import { program } from 'commander';
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
+import { setLevel, logger } from '@gxchain2/utils';
 
 program.version('0.0.1');
 program.option('--rpc', 'open rpc server');
@@ -18,6 +19,7 @@ program.option('--mine', 'mine block');
 program.option('--coinbase <address>', 'miner address');
 program.option('--mine-interval <interval>', 'mine interval', '5000');
 program.option('--block-gas-limit <gas>', 'block gas limit', '0xbe5c8b');
+program.option('--verbosity <verbosity>', 'logging verbosity: silent, error, warn, info, debug, detail (default: info)', 'info');
 
 program
   .command('start')
@@ -37,6 +39,7 @@ async function start() {
       fs.mkdirSync(opts.datadir);
     }
 
+    setLevel(opts.verbosity);
     const p2pOptions = {
       tcpPort: opts.p2pTcpPort ? Number(opts.p2pTcpPort) : undefined,
       wsPort: opts.p2pWsPort ? Number(opts.p2pWsPort) : undefined,
@@ -58,15 +61,15 @@ async function start() {
     await node.init();
     if (opts.rpc) {
       const rpcServer = new RpcServer(Number(opts.rpcPort), opts.rpcHost, node).on('error', (err) => {
-        console.error('RpcServer error', err);
+        logger.error('RpcServer error:', err);
       });
       if (!(await rpcServer.start())) {
-        console.error('RpcServer start failed, exit!');
+        logger.error('RpcServer start failed, exit!');
         process.exit(1);
       }
     }
   } catch (err) {
-    console.error('Start error', err);
+    logger.error('Start error:', err);
     process.exit(1);
   }
 }

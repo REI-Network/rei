@@ -1,9 +1,9 @@
-import { BN, bufferToHex } from 'ethereumjs-util';
+import { BN } from 'ethereumjs-util';
 import { Block, BlockHeader } from '@gxchain2/block';
 import { calculateTransactionTrie, WrappedTransaction } from '@gxchain2/tx';
 import { PendingTxMap } from '@gxchain2/tx-pool';
 import { WrappedVM } from '@gxchain2/vm';
-import { AysncChannel } from '@gxchain2/utils';
+import { AsyncChannel, logger } from '@gxchain2/utils';
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import { Loop } from './loop';
 import { Miner } from './miner';
@@ -18,8 +18,8 @@ export class Worker extends Loop {
   private readonly miner: Miner;
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
-  private readonly newBlockQueue = new AysncChannel<NewBlock>({ max: 1, isAbort: () => this.aborter.isAborted, drop: ({ resolve }) => resolve(false) });
-  private readonly addTxsQueue = new AysncChannel<Map<Buffer, WrappedTransaction[]>>({ isAbort: () => this.aborter.isAborted });
+  private readonly newBlockQueue = new AsyncChannel<NewBlock>({ max: 1, isAbort: () => this.aborter.isAborted, drop: ({ resolve }) => resolve(false) });
+  private readonly addTxsQueue = new AsyncChannel<Map<Buffer, WrappedTransaction[]>>({ isAbort: () => this.aborter.isAborted });
 
   private wvm!: WrappedVM;
   private txs: WrappedTransaction[] = [];
@@ -56,10 +56,10 @@ export class Worker extends Loop {
           { common: this.node.common }
         );
         await (this.wvm = await this.node.getWrappedVM(block.header.stateRoot)).vm.stateManager.checkpoint();
-        await this.commit(await this.node.txPool.getPendingMap());
+        await this.commit(this.node.txPool.getPendingMap());
         resolve(true);
       } catch (err) {
-        console.error('Worker::newBlockLoop, catch error:', err);
+        logger.error('Worker::newBlockLoop, catch error:', err);
         resolve(false);
       }
     }
@@ -75,7 +75,7 @@ export class Worker extends Loop {
         }
         await this.commit(pendingMap);
       } catch (err) {
-        console.error('Worker::addTxsLoop, catch error:', err);
+        logger.error('Worker::addTxsLoop, catch error:', err);
       }
     }
   }

@@ -1,4 +1,4 @@
-import { hexStringToBN, hexStringToBuffer, AysncChannel } from '@gxchain2/utils';
+import { hexStringToBN, hexStringToBuffer, AsyncChannel, logger } from '@gxchain2/utils';
 import { Worker } from './worker';
 import { Loop } from './loop';
 import { Node } from '../node';
@@ -18,7 +18,7 @@ export class Miner extends Loop {
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
   private readonly options?: MinerOptions;
-  private readonly controlQueue = new AysncChannel<boolean>({ max: 1, isAbort: () => this.aborter.isAborted });
+  private readonly controlQueue = new AsyncChannel<boolean>({ max: 1, isAbort: () => this.aborter.isAborted });
 
   constructor(node: Node, options?: MinerOptions) {
     super(options?.mineInterval || 5000);
@@ -93,9 +93,11 @@ export class Miner extends Loop {
   async mineBlock() {
     const block = await this.worker.getPendingBlock();
     if (block.header.number.eq(this.node.blockchain.latestBlock.header.number.addn(1)) && block.header.parentHash.equals(this.node.blockchain.latestBlock.hash())) {
-      await this.node.newBlock(await this.node.processBlock(block));
+      const newBlock = await this.node.processBlock(block);
+      await this.node.newBlock(newBlock);
+      logger.info('⛏️  Mine block, height:', newBlock.header.number.toString(), 'hash:', bufferToHex(newBlock.hash()));
     } else {
-      console.warn('Miner::mineBlock, invalid pending block:', bufferToHex(block.hash()), 'latest:', bufferToHex(this.node.blockchain.latestBlock.hash()));
+      logger.warn('Miner::mineBlock, invalid pending block:', bufferToHex(block.hash()), 'latest:', bufferToHex(this.node.blockchain.latestBlock.hash()));
     }
   }
 
@@ -103,7 +105,7 @@ export class Miner extends Loop {
     try {
       await this.mineBlock();
     } catch (err) {
-      console.error('Miner::process, catch error:', err);
+      logger.error('Miner::process, catch error:', err);
     }
   }
 }

@@ -199,12 +199,14 @@ export class Peer extends EventEmitter {
   private _receiptsIdle: boolean = true;
 
   private abortFlag: boolean = false;
+  private newBlockAnnouncesQueue = new AsyncChannel<Block>({ max: 1, isAbort: () => this.abortFlag });
   private txAnnouncesQueue = new AsyncChannel<Buffer>({ isAbort: () => this.abortFlag });
 
   constructor(options: { peerId: string; node: Libp2pNode }) {
     super();
     this.peerId = options.peerId;
     this.node = options.node;
+    this.newBlockAnnouncesLoop();
     this.txAnnouncesLoop();
   }
 
@@ -233,6 +235,12 @@ export class Peer extends EventEmitter {
     if (this._receiptsIdle !== b) {
       this._receiptsIdle = b;
       this.emit(b ? 'idle' : 'busy', 'receipts');
+    }
+  }
+
+  private async newBlockAnnouncesLoop() {
+    for await (const block of this.newBlockAnnouncesQueue.generator()) {
+      this.newBlock(block);
     }
   }
 
@@ -300,6 +308,7 @@ export class Peer extends EventEmitter {
 
   async abort() {
     this.abortFlag = true;
+    this.newBlockAnnouncesQueue.abort();
     this.txAnnouncesQueue.abort();
     for (const [name, queue] of this.queueMap) {
       await queue.abort();
@@ -348,17 +357,24 @@ export class Peer extends EventEmitter {
   }
 
   //////////// Protocol method ////////////
-  newBlock(block: Block) {
+  private newBlock(block: Block) {
     const filtered = this.filterBlock([block], (b) => b.hash());
     if (filtered.length > 0) {
       this.send(constants.GXC2_ETHWIRE, 'NewBlock', filtered[0]);
     }
   }
 
-  newBlockHashes(hashes: Buffer[]) {
+  private newBlockHashes(hashes: Buffer[]) {
     const filtered = this.filterBlock(hashes, (h) => h);
     if (filtered.length > 0) {
       this.send(constants.GXC2_ETHWIRE, 'NewBlockHashes', filtered);
+    }
+  }
+
+  private newPooledTransactionHashes(hashes: Buffer[]) {
+    const filtered = this.filterTx(hashes, (h) => h);
+    if (filtered.length > 0) {
+      this.send(constants.GXC2_ETHWIRE, 'NewPooledTransactionHashes', hashes);
     }
   }
 
@@ -370,13 +386,6 @@ export class Peer extends EventEmitter {
     return this.request(constants.GXC2_ETHWIRE, 'GetBlockBodies', headers);
   }
 
-  newPooledTransactionHashes(hashes: Buffer[]) {
-    const filtered = this.filterTx(hashes, (h) => h);
-    if (filtered.length > 0) {
-      this.send(constants.GXC2_ETHWIRE, 'NewPooledTransactionHashes', hashes);
-    }
-  }
-
   getPooledTransactions(hashes: Buffer[]): Promise<Transaction[]> {
     return this.request(constants.GXC2_ETHWIRE, 'GetPooledTransactions', hashes);
   }
@@ -386,5 +395,9 @@ export class Peer extends EventEmitter {
     for (const hash of hashes) {
       this.txAnnouncesQueue.push(hash);
     }
+  }
+
+  announceNewBlock(block: Block) {
+    this.newBlockAnnouncesQueue.push(block);
   }
 }

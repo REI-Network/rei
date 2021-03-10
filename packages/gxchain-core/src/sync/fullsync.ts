@@ -177,7 +177,7 @@ export class FullSynchronizer extends Synchronizer {
       new Promise<void>(async (resolve) => {
         for await (const block of blocksQueue.generator()) {
           try {
-            await this.node.processBlock(block, true);
+            await this.node.processBlock(block);
             if (block.header.number.eqn(this.bestHeight!)) {
               success = true;
               this.abortFetcher!();

@@ -13,7 +13,7 @@ import { StateManager } from '@gxchain2/state-manager';
 import { VM, WrappedVM } from '@gxchain2/vm';
 import { TxPool } from '@gxchain2/tx-pool';
 import { Block } from '@gxchain2/block';
-import { Transaction, WrappedTransaction } from '@gxchain2/tx';
+import { Transaction } from '@gxchain2/tx';
 import { hexStringToBuffer, AsyncChannel, Aborter, logger } from '@gxchain2/utils';
 import { FullSynchronizer, Synchronizer } from './sync';
 import { TxFetcher } from './txsync';
@@ -303,13 +303,15 @@ export class Node {
           const { block } = task;
           for (const peer of this.peerpool.peers) {
             if (peer.isSupport(constants.GXC2_ETHWIRE)) {
-              peer.newBlock(block);
+              peer.announceNewBlock(block);
             }
           }
           await this.txPool.newBlock(block);
           await this.miner.worker.newBlock(block);
         }
-      } catch (err) {}
+      } catch (err) {
+        logger.error('Node::taskLoop, catch error:', err);
+      }
     }
   }
 

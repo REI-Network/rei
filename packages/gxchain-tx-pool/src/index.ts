@@ -271,9 +271,7 @@ export class TxPool {
         if (news.length == 0) {
           return;
         }
-        await this._addTxs(news, true);
-        this.truncatePending();
-        this.truncateQueue();
+        await this.addTxsWithoutLock(news);
       });
     }
   }
@@ -297,6 +295,10 @@ export class TxPool {
 
   async addTxs(txs: WrappedTransaction | WrappedTransaction[]) {
     await this.initPromise;
+    await this.addTxsWithoutLock(txs);
+  }
+
+  private async addTxsWithoutLock(txs: WrappedTransaction | WrappedTransaction[]) {
     txs = txs instanceof WrappedTransaction ? [txs] : txs;
     return new Promise<AddTxsResult>((resolve) => {
       this.addTxsQueue.push({ txs: txs as WrappedTransaction[], resolve });

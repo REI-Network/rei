@@ -1,6 +1,6 @@
 import Heap from 'qheap';
 import { WrappedTransaction } from '@gxchain2/tx';
-import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
+import { createBufferFunctionalMap } from '@gxchain2/utils';
 
 export class PendingTxMap {
   private heap = new Heap({ comparBefore: (a: WrappedTransaction, b: WrappedTransaction) => a.transaction.gasPrice.gt(b.transaction.gasPrice) });

@@ -18,7 +18,6 @@ import { hexStringToBuffer, AsyncChannel, Aborter, logger } from '@gxchain2/util
 import { FullSynchronizer, Synchronizer } from './sync';
 import { TxFetcher } from './txsync';
 import { Miner } from './miner';
-import { threadId } from 'worker_threads';
 
 export interface NodeOptions {
   databasePath: string;
@@ -34,10 +33,21 @@ export interface NodeOptions {
   };
 }
 
-type AddPendingTxs = {
+class NewPendingTxsTask {
   txs: (Transaction | WrappedTransaction)[];
   resolve: (results: boolean[]) => void;
-};
+  constructor(txs: (Transaction | WrappedTransaction)[], resolve: (results: boolean[]) => void) {
+    this.txs = txs;
+    this.resolve = resolve;
+  }
+}
+class NewBlockTask {
+  block: Block;
+  constructor(block: Block) {
+    this.block = block;
+  }
+}
+type Task = NewPendingTxsTask | NewBlockTask;
 
 export class Node {
   public readonly rawdb: LevelUp;
@@ -54,15 +64,13 @@ export class Node {
   private readonly options: NodeOptions;
   private readonly initPromise: Promise<void>;
   private readonly aborter = new Aborter();
-  private readonly newBlockQueue = new AsyncChannel<Block>({ max: 1, isAbort: () => this.aborter.isAborted });
-  private readonly addPendingTxsQueue = new AsyncChannel<AddPendingTxs>({ isAbort: () => this.aborter.isAborted });
+  private readonly taskQueue = new AsyncChannel<Task>({ isAbort: () => this.aborter.isAborted });
 
   constructor(options: NodeOptions) {
     this.options = options;
     this.rawdb = createLevelDB(path.join(this.options.databasePath, 'chaindb'));
     this.initPromise = this.init();
-    this.newBlockLoop();
-    this.addPendingTxsLoop();
+    this.taskLoop();
   }
 
   get status() {
@@ -150,7 +158,7 @@ export class Node {
 
     if (!genesisBlock) {
       genesisBlock = Block.genesis({ header: genesisJSON.genesisInfo.genesis }, { common: this.common });
-      logger.log('read genesis block from file', bufferToHex(genesisBlock.hash()));
+      logger.info('read genesis block from file', bufferToHex(genesisBlock.hash()));
 
       const stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
       const root = await this.setupAccountInfo(genesisJSON.accountInfo, stateManager);
@@ -270,54 +278,50 @@ export class Node {
     }
   }
 
-  private async newBlockLoop() {
+  private async taskLoop() {
     await this.initPromise;
-    for await (const block of this.newBlockQueue.generator()) {
+    for await (const task of this.taskQueue.generator()) {
       try {
-        for (const peer of this.peerpool.peers) {
-          if (peer.isSupport(constants.GXC2_ETHWIRE)) {
-            peer.newBlock(block);
+        if (task instanceof NewPendingTxsTask) {
+          try {
+            const { results, readies } = await this.txPool.addTxs(task.txs.map((tx) => (tx instanceof Transaction ? new WrappedTransaction(tx) : tx)));
+            if (readies && readies.size > 0) {
+              const hashes = Array.from(readies.values())
+                .reduce((a, b) => a.concat(b), [])
+                .map((wtx) => wtx.transaction.hash());
+              for (const peer of this.peerpool.peers) {
+                peer.announceTx(hashes);
+              }
+              await this.miner.worker.addTxs(readies);
+            }
+            task.resolve(results);
+          } catch (err) {
+            task.resolve(new Array<boolean>(task.txs.length).fill(false));
+            logger.error('Node::addPendingTxsLoop, catch error:', err);
           }
-        }
-        await this.txPool.newBlock(block);
-        await this.miner.worker.newBlock(block);
-      } catch (err) {
-        logger.error('Node::newBlockLoop, catch error:', err);
-      }
-    }
-  }
-
-  private async addPendingTxsLoop() {
-    await this.initPromise;
-    for await (const addPendingTxs of this.addPendingTxsQueue.generator()) {
-      try {
-        const { results, readies } = await this.txPool.addTxs(addPendingTxs.txs.map((tx) => (tx instanceof Transaction ? new WrappedTransaction(tx) : tx)));
-        if (readies && readies.size > 0) {
-          const hashes = Array.from(readies.values())
-            .reduce((a, b) => a.concat(b), [])
-            .map((wtx) => wtx.transaction.hash());
+        } else if (task instanceof NewBlockTask) {
+          const { block } = task;
           for (const peer of this.peerpool.peers) {
-            peer.announceTx(hashes);
+            if (peer.isSupport(constants.GXC2_ETHWIRE)) {
+              peer.newBlock(block);
+            }
           }
-          await this.miner.worker.addTxs(readies);
+          await this.txPool.newBlock(block);
+          await this.miner.worker.newBlock(block);
         }
-        addPendingTxs.resolve(results);
-      } catch (err) {
-        addPendingTxs.resolve(new Array<boolean>(addPendingTxs.txs.length).fill(false));
-        logger.error('Node::addPendingTxsLoop, catch error:', err);
-      }
+      } catch (err) {}
     }
   }
 
   async newBlock(block: Block) {
     await this.initPromise;
-    this.newBlockQueue.push(block);
+    this.taskQueue.push(new NewBlockTask(block));
   }
 
   async addPendingTxs(txs: (Transaction | WrappedTransaction)[]) {
     await this.initPromise;
     return new Promise<boolean[]>((resolve) => {
-      this.addPendingTxsQueue.push({ txs, resolve });
+      this.taskQueue.push(new NewPendingTxsTask(txs, resolve));
     });
   }
 }

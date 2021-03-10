@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
 import { Block, BlockHeader } from '@gxchain2/block';
-import { calculateTransactionTrie, WrappedTransaction } from '@gxchain2/tx';
+import { calculateTransactionTrie, Transaction } from '@gxchain2/tx';
 import { PendingTxMap } from '@gxchain2/tx-pool';
 import { WrappedVM } from '@gxchain2/vm';
 import { logger } from '@gxchain2/utils';
@@ -15,7 +15,7 @@ export class Worker extends Loop {
   private readonly initPromise: Promise<void>;
 
   private wvm!: WrappedVM;
-  private txs: WrappedTransaction[] = [];
+  private txs: Transaction[] = [];
   private header!: BlockHeader;
   private gasUsed = new BN(0);
 
@@ -65,7 +65,7 @@ export class Worker extends Loop {
     }
   }
 
-  async addTxs(txs: Map<Buffer, WrappedTransaction[]>) {
+  async addTxs(txs: Map<Buffer, Transaction[]>) {
     await this.initPromise;
     try {
       const pendingMap = new PendingTxMap();
@@ -80,14 +80,16 @@ export class Worker extends Loop {
 
   async getPendingBlock() {
     await this.initPromise;
+    const txs = [...this.txs];
+    const header = { ...this.header };
     return Block.fromBlockData(
       {
         header: {
-          ...this.header,
+          ...header,
           timestamp: new BN(Date.now()),
-          transactionsTrie: await calculateTransactionTrie(this.txs.map((tx) => tx.transaction))
+          transactionsTrie: await calculateTransactionTrie(txs)
         },
-        transactions: this.txs.map((tx) => tx.transaction)
+        transactions: txs
       },
       { common: this.node.common }
     );
@@ -111,7 +113,7 @@ export class Worker extends Loop {
         let txRes: RunTxResult;
         try {
           txRes = await this.wvm.vm.runTx({
-            tx: tx.transaction,
+            tx,
             block: Block.fromBlockData({ header: this.header }, { common: this.node.common }),
             skipBalance: false,
             skipNonce: false

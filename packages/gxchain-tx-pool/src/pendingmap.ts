@@ -1,12 +1,12 @@
 import Heap from 'qheap';
-import { WrappedTransaction } from '@gxchain2/tx';
+import { Transaction } from '@gxchain2/tx';
 import { createBufferFunctionalMap } from '@gxchain2/utils';
 
 export class PendingTxMap {
-  private heap = new Heap({ comparBefore: (a: WrappedTransaction, b: WrappedTransaction) => a.transaction.gasPrice.gt(b.transaction.gasPrice) });
-  private txs = createBufferFunctionalMap<WrappedTransaction[]>();
+  private heap = new Heap({ comparBefore: (a: Transaction, b: Transaction) => a.gasPrice.gt(b.gasPrice) });
+  private txs = createBufferFunctionalMap<Transaction[]>();
 
-  push(sender: Buffer, sortedTxs: WrappedTransaction[]) {
+  push(sender: Buffer, sortedTxs: Transaction[]) {
     if (sortedTxs.length > 0) {
       this.heap.push(sortedTxs.slice(0, 1)[0]);
       if (sortedTxs.length > 1) {
@@ -15,14 +15,14 @@ export class PendingTxMap {
     }
   }
 
-  peek(): WrappedTransaction | undefined {
+  peek(): Transaction | undefined {
     return this.heap.peek();
   }
 
   shift() {
-    const tx: WrappedTransaction | undefined = this.heap.remove();
+    const tx: Transaction | undefined = this.heap.remove();
     if (tx) {
-      const sender = tx.transaction.getSenderAddress().buf;
+      const sender = tx.getSenderAddress().buf;
       const nextTx = this.txs.get(sender);
       if (nextTx && nextTx.length > 0) {
         this.heap.push(nextTx.shift());

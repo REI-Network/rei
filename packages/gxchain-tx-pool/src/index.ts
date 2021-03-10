@@ -284,7 +284,6 @@ export class TxPool {
         if (account.hasQueue() && Date.now() - account.timestamp > this.lifetime) {
           const queue: WrappedTransaction[] = account.queue.clear();
           this.removeTxFromGlobal(queue);
-          console.log('looptime:', Date.now());
         }
       }
       if (this.journal) {
@@ -298,7 +297,6 @@ export class TxPool {
       await this.initPromise;
       return;
     }
-    console.log('inittime:', Date.now());
     this.currentHeader = this.node.blockchain.latestBlock.header;
     this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot);
     if (this.journal) {

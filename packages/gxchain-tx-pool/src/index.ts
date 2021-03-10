@@ -295,7 +295,7 @@ export class TxPool {
 
   async addTxs(txs: WrappedTransaction | WrappedTransaction[]) {
     await this.initPromise;
-    await this.addTxsWithoutLock(txs);
+    return await this.addTxsWithoutLock(txs);
   }
 
   private async addTxsWithoutLock(txs: WrappedTransaction | WrappedTransaction[]) {

@@ -3,12 +3,14 @@ import path from 'path';
 import { Transaction } from '@gxchain2/tx';
 import { INode } from './index';
 import { logger } from '@gxchain2/utils';
+import Semaphore from 'semaphore-async-await';
 
 const bufferSplit = Buffer.from('\r\n');
 
 export class Jonunal {
   private path: string;
   private dir: string;
+  private lock = new Semaphore(1);
   private writer?: fs.WriteStream;
   private readonly node: INode;
   constructor(dir: string, node: INode) {
@@ -17,13 +19,13 @@ export class Jonunal {
     this.node = node;
   }
 
-  createWritter() {
+  private createWritterIfNotExists() {
     if (!this.writer) {
       this.writer = fs.createWriteStream(this.path, { flags: 'a' });
     }
   }
 
-  async closeWritter() {
+  private async closeWritter() {
     if (this.writer) {
       await new Promise((r) => {
         this.writer!.end(r);
@@ -36,45 +38,52 @@ export class Jonunal {
    * load parses a transaction journal dump from `disk`, loading its contents into the specified pool.
    * @param add - Callback for adding transactions
    */
-  async load(add: (transactions: Transaction[]) => Promise<void>) {
-    return new Promise<void>(async (resolve, reject) => {
-      if (!fs.existsSync(this.path)) {
-        fs.mkdirSync(this.dir, { recursive: true });
-        resolve();
-        return;
-      }
+  load(add: (transactions: Transaction[]) => Promise<void>) {
+    if (!fs.existsSync(this.path)) {
+      fs.mkdirSync(this.dir, { recursive: true });
+      return;
+    }
 
-      await this.closeWritter();
-
-      const inputer = fs.createReadStream(this.path);
+    return new Promise<boolean>(async (resolve) => {
+      const inputer = fs.createReadStream(this.path, { autoClose: true });
       let batch: Transaction[] = [];
       let bufferInput: Buffer | undefined;
       inputer.on('data', (chunk: Buffer) => {
-        bufferInput = Buffer.concat(bufferInput ? [bufferInput, chunk] : [chunk]);
-        while (true) {
-          const i = bufferInput.indexOf(bufferSplit);
-          if (i == -1) {
-            break;
+        try {
+          if (bufferInput === undefined) {
+            bufferInput = chunk;
+          } else {
+            bufferInput = Buffer.concat([bufferInput, chunk]);
           }
-          const tx = new Transaction(Transaction.fromRlpSerializedTx(bufferInput.slice(0, i), { common: this.node.common }));
-          batch.push(tx);
-          if (batch.length > 1024) {
+          while (true) {
+            const i = bufferInput.indexOf(bufferSplit);
+            if (i === -1) {
+              break;
+            }
+            const tx = new Transaction(Transaction.fromRlpSerializedTx(bufferInput.slice(0, i), { common: this.node.common }));
+            batch.push(tx);
+            if (batch.length > 1024) {
+              add(batch);
+              batch = [];
+            }
+            bufferInput = bufferInput.slice(i + bufferSplit.length);
+          }
+          if (batch.length > 0) {
             add(batch);
-            batch = [];
           }
-          bufferInput = bufferInput.slice(i + bufferSplit.length);
-        }
-        if (batch.length > 0) {
-          add(batch);
+        } catch (err) {
+          logger.error('Jonunal::load, catch error:', err);
+          resolve(false);
         }
       });
 
       inputer.on('end', () => {
-        resolve();
+        resolve(true);
       });
 
       inputer.on('error', (err) => {
-        reject(err);
+        logger.error('Jonunal::load, read stream error:', err);
+        resolve(false);
       });
     });
   }
@@ -83,17 +92,18 @@ export class Jonunal {
    * insert adds the specified transaction to the local disk journal.
    * @param tx - transaction to insert
    */
-  insert(tx: Transaction) {
-    this.createWritter();
-    return new Promise<void>((resolve, reject) => {
+  async insert(tx: Transaction) {
+    await this.lock.acquire();
+    this.createWritterIfNotExists();
+    await new Promise<void>((resolve) => {
       this.writer!.write(Buffer.concat([tx.serialize(), bufferSplit]), (err) => {
         if (err) {
-          reject(err);
-        } else {
-          resolve();
+          logger.error('Jonunal::insert, write stream error:', err);
         }
+        resolve();
       });
     });
+    this.lock.release();
   }
 
   /**
@@ -102,42 +112,43 @@ export class Jonunal {
    * @param all - The map containing the information to be rotated
    */
   async rotate(all: Map<Buffer, Transaction[]>) {
-    await this.closeWritter();
-    const output = fs.createWriteStream(this.path + '.new');
-    let journaled = 0;
-    const array: Promise<void>[] = [];
-    for (const [key, val] of all) {
-      for (const tx of val) {
-        array.push(
-          new Promise<void>((resolve, reject) => {
-            output.write(Buffer.concat([tx.serialize(), bufferSplit]), (err) => {
-              if (err) {
-                reject(err);
-              } else {
-                resolve();
-              }
-            });
-          })
-        );
-      }
-      journaled += val.length;
-    }
+    await this.lock.acquire();
     try {
-      await Promise.all(array);
-    } catch (err) {
-      return;
-    } finally {
+      await this.closeWritter();
+      const output = fs.createWriteStream(this.path + '.new');
+
+      let journaled = 0;
+      await Promise.all(
+        Array.from(all.values())
+          .reduce((a, b) => a.concat(b), [])
+          .map(
+            (tx) =>
+              new Promise<void>((resolve) => {
+                output.write(Buffer.concat([tx.serialize(), bufferSplit]), (err) => {
+                  if (err) {
+                    logger.error('Jonunal::rotate, write stream error:', err);
+                  }
+                  resolve();
+                  journaled++;
+                });
+              })
+          )
+      );
+
       await new Promise((r) => {
         output.end(r);
       });
-    }
 
-    fs.renameSync(this.path + '.new', this.path);
-    logger.info('Regenerated local transaction journal, transactions', journaled, 'accounts', all.size);
+      fs.renameSync(this.path + '.new', this.path);
+      logger.info('Regenerated local transaction journal, transactions', journaled, 'accounts', all.size);
+    } catch (err) {
+      logger.error('Journal::rotate, catch error:', err);
+    } finally {
+      this.lock.release();
+    }
   }
 
   async close() {
     await this.closeWritter();
-    return;
   }
 }

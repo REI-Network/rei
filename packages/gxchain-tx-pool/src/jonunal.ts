@@ -33,6 +33,10 @@ export class Jonunal {
     }
   }
 
+  /**
+   * load parses a transaction journal dump from `disk`, loading its contents into the specified pool.
+   * @param add - Callback for adding transactions
+   */
   async load(add: (transactions: Transaction[]) => Promise<void>) {
     return new Promise<void>(async (resolve, reject) => {
       if (!fs.existsSync(this.path)) {
@@ -76,6 +80,10 @@ export class Jonunal {
     });
   }
 
+  /**
+   * insert adds the specified transaction to the local disk journal.
+   * @param tx - transaction to insert
+   */
   insert(tx: Transaction) {
     this.createWritter();
     return new Promise<void>((resolve, reject) => {
@@ -89,7 +97,12 @@ export class Jonunal {
     });
   }
 
-  async rotate(all: Map<Address, Transaction[]>) {
+  /**
+   *rotate regenerates the transaction journal based on the current contents of
+   *the transaction pool.
+   * @param all - The map containing the information to be rotated
+   */
+  async rotate(all: Map<Buffer, Transaction[]>) {
     await this.closeWritter();
     const output = fs.createWriteStream(this.path + '.new');
     let journaled = 0;

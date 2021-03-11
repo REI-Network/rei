@@ -59,6 +59,8 @@ export interface TxPoolOptions {
   journal: string;
 
   node: INode;
+  lifetime?: number;
+  interval?: number;
 }
 
 class TxPoolAccount {
@@ -123,9 +125,12 @@ export class TxPool {
   private globalSlots: number;
   private accountQueue: number;
   private globalQueue: number;
+  private globalAllSlots: number;
 
   private priced: TxPricedList;
   private journal?: Jonunal;
+  private lifetime: number;
+  private interval: number;
 
   constructor(options: TxPoolOptions) {
     this.txMaxSize = options.txMaxSize || 32768 * 4;
@@ -135,6 +140,9 @@ export class TxPool {
     this.globalSlots = options.globalSlots || 4096;
     this.accountQueue = options.accountQueue || 64;
     this.globalQueue = options.globalQueue || 1024;
+    this.globalAllSlots = 0;
+    this.lifetime = 60000;
+    this.interval = 10000;
 
     this.node = options.node;
     this.accounts = createBufferFunctionalMap<TxPoolAccount>();
@@ -144,19 +152,58 @@ export class TxPool {
     this.journal = new Jonunal(options.journal, this.node);
 
     this.initPromise = this.init();
+
+    this.loop();
   }
 
   async abort() {
     await this.aborter.abort();
   }
 
-  private getAllSlots(): number {
-    let soltsNumer: number = 0;
-    for (const [sender, account] of this.accounts) {
-      soltsNumer += account.pending.slots;
-      soltsNumer += account.queue.slots;
+  private local(): Map<Buffer, Transaction[]> {
+    let txs = createBufferFunctionalMap<Transaction[]>();
+    for (const addrBuf of this.locals) {
+      let account = this.accounts.get(addrBuf);
+      if (account?.hasPending()) {
+        let transactions = txs.get(addrBuf);
+        if (transactions) {
+          const listtxs = account.pending.toList();
+          for (const tx of listtxs) {
+            transactions.push(tx);
+          }
+        } else {
+          txs.set(addrBuf, account.pending.toList());
+        }
+      }
+      if (account?.hasQueue()) {
+        let transactions = txs.get(addrBuf);
+        if (transactions) {
+          const listtxs = account.queue.toList();
+          for (const tx of listtxs) {
+            transactions.push(tx);
+          }
+        } else {
+          txs.set(addrBuf, account.queue.toList());
+        }
+      }
     }
-    return soltsNumer;
+    return txs;
+  }
+
+  private async loop() {
+    await this.initPromise;
+    while (!this.aborter.isAborted) {
+      await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.interval)));
+      for (const [addr, account] of this.accounts) {
+        if (account.hasQueue() && Date.now() - account.timestamp > this.lifetime) {
+          const queue = account.queue.clear();
+          this.removeTxFromGlobal(queue);
+        }
+      }
+      if (this.journal) {
+        await this.journal.rotate(this.local());
+      }
+    }
   }
 
   async init() {
@@ -315,7 +362,7 @@ export class TxPool {
           results.push(false);
           continue;
         }
-        const [drop, success] = this.priced.discard(this.getAllSlots() - (this.globalSlots + this.globalQueue), true);
+        const [drop, success] = this.priced.discard(this.globalAllSlots - (this.globalSlots + this.globalQueue), true);
         if (!success) {
           results.push(false);
           continue;
@@ -341,9 +388,10 @@ export class TxPool {
           dirtyAddrs.push(addr);
         }
       }
+      this.globalAllSlots += txSlots(tx);
       // journalTx
       if (this.journal) {
-        this.journal.insert(tx);
+        await this.journal.insert(tx);
       }
       results.push(true);
     }
@@ -418,9 +466,7 @@ export class TxPool {
     if (old) {
       this.removeTxFromGlobal(old);
     }
-    if (account.timestamp === 0) {
-      account.timestamp = Date.now();
-    }
+    account.timestamp = Date.now();
     return inserted;
   }
 

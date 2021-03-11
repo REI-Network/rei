@@ -13,6 +13,11 @@ export class TxPricedList {
     this.remotes = new Heap({ comparBefore: (a: Transaction, b: Transaction) => b.gasPrice.gt(a.gasPrice) });
   }
 
+  /**
+   * Inserts a new transaction into the heap
+   * @param tx - The new transaction
+   * @param local - Determine whether the transaction is local
+   */
   put(tx: Transaction, local: boolean) {
     if (local) {
       return;
@@ -20,6 +25,12 @@ export class TxPricedList {
     this.remotes.push(tx);
   }
 
+  /**
+   * Notifies the prices transaction list that an old transaction dropped
+   * from the pool. The list will just keep a counter of stale objects and update
+   * the heap if a large enough ratio of transactions go stale.
+   * @param count - The number of transactions to removed
+   */
   removed(count: number) {
     this.stales += count;
     if (this.stales <= this.remotes.length / 4) {
@@ -28,6 +39,12 @@ export class TxPricedList {
     this.reheap();
   }
 
+  /**
+   * Cap finds all the transactions below the given price threshold, drops them
+   * from the priced list and returns them for further removal from the entire pool.
+   * @param threshold The gasfee threshold of transaction
+   * @returns The transactions to be abandoned
+   */
   cap(threshold: BN): Transaction[] {
     const drop: Transaction[] = [];
     while (this.remotes.length > 0) {
@@ -46,6 +63,12 @@ export class TxPricedList {
     return drop;
   }
 
+  /**
+   * Checks whether a transaction is cheaper than (or as cheap as) the
+   * lowest priced (remote) transaction currently being tracked.
+   * @param tx The transaction to be checked
+   * @returns Wheather the transaction is cheaper or not
+   */
   underpriced(tx: Transaction): boolean {
     while (this.remotes.length > 0) {
       const head: Transaction = this.remotes.peek();
@@ -63,6 +86,13 @@ export class TxPricedList {
     return cheapest.gasPrice.gt(tx.gasPrice);
   }
 
+  /**
+   *Finds a number of most underpriced transactions, removes them from the
+   *priced list and returns them for further removal from the entire pool.
+   * @param slots The solts threshold of transaction
+   * @param force Mandatory or not
+   * @returns A number of most underpriced transactions
+   */
   discard(slots: number, force: boolean): [Transaction[] | undefined, boolean] {
     const drop: Transaction[] = [];
     while (this.remotes.length > 0 && slots > 0) {

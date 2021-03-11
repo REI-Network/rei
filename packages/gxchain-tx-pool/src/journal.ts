@@ -60,7 +60,7 @@ export class Journal {
             if (i === -1) {
               break;
             }
-            const tx = new Transaction(Transaction.fromRlpSerializedTx(bufferInput.slice(0, i), { common: this.node.common }));
+            const tx = Transaction.fromRlpSerializedTx(bufferInput.slice(0, i), { common: this.node.common });
             batch.push(tx);
             if (batch.length > 1024) {
               add(batch);

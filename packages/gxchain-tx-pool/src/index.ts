@@ -1,6 +1,6 @@
 import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Heap from 'qheap';
-import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AsyncChannel, Aborter, logger } from '@gxchain2/utils';
+import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Aborter, logger } from '@gxchain2/utils';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { StateManager } from '@gxchain2/state-manager';
 import { Blockchain } from '@gxchain2/blockchain';
@@ -56,11 +56,12 @@ export interface TxPoolOptions {
   accountQueue?: number;
   globalQueue?: number;
 
-  journal: string;
-
   node: INode;
+
+  journal?: string;
   lifetime?: number;
-  interval?: number;
+  timeoutInterval?: number;
+  rejournalInterval?: number;
 }
 
 class TxPoolAccount {
@@ -130,7 +131,8 @@ export class TxPool {
   private priced: TxPricedList;
   private journal?: Jonunal;
   private lifetime: number;
-  private interval: number;
+  private timeoutInterval: number;
+  private rejournalInterval: number;
 
   constructor(options: TxPoolOptions) {
     this.txMaxSize = options.txMaxSize || 32768 * 4;
@@ -141,19 +143,23 @@ export class TxPool {
     this.accountQueue = options.accountQueue || 64;
     this.globalQueue = options.globalQueue || 1024;
     this.globalAllSlots = 0;
-    this.lifetime = 60000;
-    this.interval = 10000;
+    this.lifetime = options.lifetime || 60000;
+    this.timeoutInterval = options.timeoutInterval || 10000;
+    this.rejournalInterval = options.rejournalInterval || 60000 * 60;
 
     this.node = options.node;
     this.accounts = createBufferFunctionalMap<TxPoolAccount>();
     this.txs = createBufferFunctionalMap<Transaction>();
     this.locals = createBufferFunctionalSet();
     this.priced = new TxPricedList(this.txs);
-    this.journal = new Jonunal(options.journal, this.node);
 
     this.initPromise = this.init();
 
-    this.loop();
+    this.timeoutLoop();
+    if (options.journal) {
+      this.journal = new Jonunal(options.journal, this.node);
+      this.rejournalLoop();
+    }
   }
 
   async abort() {
@@ -190,19 +196,30 @@ export class TxPool {
     return txs;
   }
 
-  private async loop() {
+  private async timeoutLoop() {
     await this.initPromise;
     while (!this.aborter.isAborted) {
-      await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.interval)));
+      await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.timeoutInterval)));
+      if (this.aborter.isAborted) {
+        break;
+      }
       for (const [addr, account] of this.accounts) {
         if (account.hasQueue() && Date.now() - account.timestamp > this.lifetime) {
           const queue = account.queue.clear();
           this.removeTxFromGlobal(queue);
         }
       }
-      if (this.journal) {
-        await this.journal.rotate(this.local());
+    }
+  }
+
+  private async rejournalLoop() {
+    await this.initPromise;
+    while (!this.aborter.isAborted) {
+      await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.rejournalInterval)));
+      if (this.aborter.isAborted) {
+        break;
       }
+      await this.journal!.rotate(this.local());
     }
   }
 
@@ -351,6 +368,10 @@ export class TxPool {
     const dirtyAddrs: Address[] = [];
     const results: boolean[] = [];
     for (const tx of txs) {
+      if (this.txs.has(tx.hash())) {
+        results.push(false);
+        continue;
+      }
       const addr = tx.getSenderAddress();
       if (!(await this.validateTx(tx))) {
         results.push(false);

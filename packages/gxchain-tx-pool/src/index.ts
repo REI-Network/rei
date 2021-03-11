@@ -10,7 +10,7 @@ import { Common } from '@gxchain2/common';
 import { TxSortedMap } from './txmap';
 import { PendingTxMap } from './pendingmap';
 import { TxPricedList } from './txpricedlist';
-import { Jonunal } from './jonunal';
+import { Journal } from './jonunal';
 
 export interface INode {
   db: Database;
@@ -129,7 +129,7 @@ export class TxPool {
   private globalAllSlots: number;
 
   private priced: TxPricedList;
-  private journal?: Jonunal;
+  private journal?: Journal;
   private lifetime: number;
   private timeoutInterval: number;
   private rejournalInterval: number;
@@ -157,7 +157,7 @@ export class TxPool {
 
     this.timeoutLoop();
     if (options.journal) {
-      this.journal = new Jonunal(options.journal, this.node);
+      this.journal = new Journal(options.journal, this.node);
       this.rejournalLoop();
     }
   }

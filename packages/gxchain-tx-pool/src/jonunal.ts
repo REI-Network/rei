@@ -7,7 +7,7 @@ import Semaphore from 'semaphore-async-await';
 
 const bufferSplit = Buffer.from('\r\n');
 
-export class Jonunal {
+export class Journal {
   private path: string;
   private dir: string;
   private lock = new Semaphore(1);

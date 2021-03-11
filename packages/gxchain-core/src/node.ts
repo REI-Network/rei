@@ -49,6 +49,13 @@ class NewBlockTask {
 }
 type Task = NewPendingTxsTask | NewBlockTask;
 
+type ProcessBlock = {
+  block: Block;
+  generate: boolean;
+  resolve: (block: Block) => void;
+  reject: (reason?: any) => void;
+};
+
 export class Node {
   public readonly rawdb: LevelUp;
 
@@ -65,12 +72,14 @@ export class Node {
   private readonly initPromise: Promise<void>;
   private readonly aborter = new Aborter();
   private readonly taskQueue = new AsyncChannel<Task>({ isAbort: () => this.aborter.isAborted });
+  private readonly processQueue = new AsyncChannel<ProcessBlock>({ isAbort: () => this.aborter.isAborted });
 
   constructor(options: NodeOptions) {
     this.options = options;
     this.rawdb = createLevelDB(path.join(this.options.databasePath, 'chaindb'));
     this.initPromise = this.init();
     this.taskLoop();
+    this.processLoop();
   }
 
   get status() {
@@ -255,26 +264,33 @@ export class Node {
     );
   }
 
-  async processBlock(blockSkeleton: Block, generate: boolean = true) {
-    await this.initPromise;
-    const lastHeader = await this.db.getHeader(blockSkeleton.header.parentHash, blockSkeleton.header.number.subn(1));
-    const opts = {
-      block: blockSkeleton,
-      root: lastHeader.stateRoot,
-      generate
-    };
-    const { result, block } = await (await this.getWrappedVM(lastHeader.stateRoot)).runBlock(opts);
-    blockSkeleton = block || blockSkeleton;
-    logger.info('✨ Process block, height:', blockSkeleton.header.number.toString(), 'hash:', bufferToHex(blockSkeleton.hash()));
-    await this.blockchain.putBlock(blockSkeleton);
-    await this.blockchain.saveTxLookup(blockSkeleton);
-    await this.db.batch([DBSaveReceipts(result.receipts, blockSkeleton.hash(), blockSkeleton.header.number)]);
-    return blockSkeleton;
+  processBlock(block: Block, generate: boolean = true) {
+    return new Promise<Block>((resolve, reject) => {
+      this.processQueue.push({ block, generate, resolve, reject });
+    });
   }
 
-  async processBlocks(blocks: Block[]) {
-    for (const block of blocks) {
-      await this.processBlock(block);
+  private async processLoop() {
+    await this.initPromise;
+    for await (let { block, generate, resolve, reject } of this.processQueue.generator()) {
+      try {
+        const lastHeader = await this.db.getHeader(block.header.parentHash, block.header.number.subn(1));
+        const opts = {
+          block,
+          generate,
+          root: lastHeader.stateRoot
+        };
+        const { result, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot)).runBlock(opts);
+        block = newBlock || block;
+        logger.info('✨ Process block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
+        await this.blockchain.putBlock(block);
+        await this.blockchain.saveTxLookup(block);
+        await this.db.batch([DBSaveReceipts(result.receipts, block.hash(), block.header.number)]);
+        resolve(block);
+      } catch (err) {
+        console.error('Node::processLoop, process block error:', err);
+        reject(err);
+      }
     }
   }
 
@@ -290,14 +306,16 @@ export class Node {
                 .reduce((a, b) => a.concat(b), [])
                 .map((tx) => tx.hash());
               for (const peer of this.peerpool.peers) {
-                peer.announceTx(hashes);
+                if (peer.isSupport(constants.GXC2_ETHWIRE)) {
+                  peer.announceTx(hashes);
+                }
               }
               await this.miner.worker.addTxs(readies);
             }
             task.resolve(results);
           } catch (err) {
             task.resolve(new Array<boolean>(task.txs.length).fill(false));
-            logger.error('Node::addPendingTxsLoop, catch error:', err);
+            logger.error('Node::taskLoop, NewPendingTxsTask, catch error:', err);
           }
         } else if (task instanceof NewBlockTask) {
           const { block } = task;

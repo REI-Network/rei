@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import { Transaction } from '@gxchain2/tx';
-import { Address } from 'ethereumjs-util';
 import { INode } from './index';
 import { logger } from '@gxchain2/utils';
 

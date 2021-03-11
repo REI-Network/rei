@@ -49,8 +49,8 @@ export class WrappedTransaction {
 
   toRPCJSON() {
     return {
-      blockHash: this.extension.blockHash ? bufferToHex(this.extension.blockHash) : undefined,
-      blockNumber: this.extension.blockNumber ? bnToHex(this.extension.blockNumber) : undefined,
+      blockHash: this.extension.blockHash ? bufferToHex(this.extension.blockHash) : null,
+      blockNumber: this.extension.blockNumber ? bnToHex(this.extension.blockNumber) : null,
       from: bufferToHex(this.transaction.getSenderAddress().toBuffer()),
       gas: bnToHex(this.transaction.gasLimit),
       gasPrice: bnToHex(this.transaction.gasPrice),
@@ -58,7 +58,7 @@ export class WrappedTransaction {
       input: bufferToHex(this.transaction.data),
       nonce: bnToHex(this.transaction.nonce),
       to: this.transaction.to !== undefined ? this.transaction.to.toString() : undefined,
-      transactionIndex: this.extension.transactionIndex !== undefined ? intToHex(this.extension.transactionIndex) : undefined,
+      transactionIndex: this.extension.transactionIndex !== undefined ? intToHex(this.extension.transactionIndex) : null,
       value: bnToHex(this.transaction.value),
       v: this.transaction.v !== undefined ? bnToHex(this.transaction.v) : undefined,
       r: this.transaction.r !== undefined ? bnToHex(this.transaction.r) : undefined,

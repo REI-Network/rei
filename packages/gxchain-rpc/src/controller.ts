@@ -228,11 +228,19 @@ export class Controller {
     }
   }
   async eth_getTransactionByHash([hash]: [string]) {
+    const hashBuffer = hexStringToBuffer(hash);
     try {
-      return new WrappedTransaction(await this.node.db.getTransaction(hexStringToBuffer(hash))).toRPCJSON();
+      return new WrappedTransaction(await this.node.db.getTransaction(hashBuffer)).toRPCJSON();
     } catch (err) {
+      if (err.type !== 'NotFoundError') {
+        throw err;
+      }
+    }
+    const tx = this.node.txPool.getTransaction(hashBuffer);
+    if (!tx) {
       return null;
     }
+    return new WrappedTransaction(tx).toRPCJSON();
   }
   async eth_getTransactionByBlockHashAndIndex([hash, index]: [string, string]) {
     try {

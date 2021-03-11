@@ -10,7 +10,7 @@ import { Common } from '@gxchain2/common';
 import { TxSortedMap } from './txmap';
 import { PendingTxMap } from './pendingmap';
 import { TxPricedList } from './txpricedlist';
-import { Journal } from './jonunal';
+import { Journal } from './journal';
 
 export interface INode {
   db: Database;

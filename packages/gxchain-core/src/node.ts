@@ -264,12 +264,6 @@ export class Node {
     );
   }
 
-  processBlock(block: Block, generate: boolean = true) {
-    return new Promise<Block>((resolve, reject) => {
-      this.processQueue.push({ block, generate, resolve, reject });
-    });
-  }
-
   private async processLoop() {
     await this.initPromise;
     for await (let { block, generate, resolve, reject } of this.processQueue.generator()) {
@@ -331,6 +325,13 @@ export class Node {
         logger.error('Node::taskLoop, catch error:', err);
       }
     }
+  }
+
+  async processBlock(block: Block, generate: boolean = true) {
+    await this.initPromise;
+    return new Promise<Block>((resolve, reject) => {
+      this.processQueue.push({ block, generate, resolve, reject });
+    });
   }
 
   async newBlock(block: Block) {

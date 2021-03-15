@@ -1,5 +1,7 @@
 # GXChain2.0
 
+Nodejs implementation of GXChain2.0 protocols
+
 | package                                          | npm                                                                | issues                                                                    | 
 | ------------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------- |
 | [@gxchain2/block][block-package]                 | [![NPM Version][block-npm-version]][block-npm-url]                 | [![Block Issues][block-issues]][block-issues-url]                         |

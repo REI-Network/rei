@@ -43,6 +43,14 @@ Commands:
 
 ## Example
 
+Block producer startup
+
+```
+gxc2 start --rpc --rpc-host 0.0.0.0 --rpc-port 12345 --datadir ~/gxc2 --mine --coinbase 0x...abc
+```
+
+Normal node startup
+
 ```
 gxc2 start --rpc --rpc-host 0.0.0.0 --rpc-port 12345 --datadir ~/gxc2
 ```

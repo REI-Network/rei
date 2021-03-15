@@ -1,5 +1,5 @@
 import { Transaction } from '@gxchain2/tx';
-import BN from 'bn.js';
+import { BN } from 'ethereumjs-util';
 import Heap from 'qheap';
 import { txSlots } from './index';
 

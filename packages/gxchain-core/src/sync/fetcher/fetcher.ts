@@ -39,6 +39,12 @@ export class Fetcher extends EventEmitter {
     });
   }
 
+  /**
+   * Fetch blocks from specified peer
+   * @param start - start height of block
+   * @param count - the number of blocks to fetch
+   * @param peerId - the id of peer
+   */
   async fetch(start: number, count: number, peerId: string) {
     this.bestHeight = start + count;
     this.localHeight = start;

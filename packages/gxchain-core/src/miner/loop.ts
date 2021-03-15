@@ -10,6 +10,9 @@ export class Loop {
     this.interval = interval;
   }
 
+  /**
+   * Start the loop according to the loopPromise
+   */
   async startLoop() {
     if (this.abortPromise) {
       await this.abortPromise;
@@ -29,6 +32,9 @@ export class Loop {
     });
   }
 
+  /**
+   * stop the loop according to the abortPromise
+   */
   async stopLoop() {
     if (this.loopPromise && !this.aborter.isAborted) {
       await (this.abortPromise = new Promise(async (resolve) => {

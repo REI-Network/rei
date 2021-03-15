@@ -26,6 +26,10 @@ export class Worker extends Loop {
     this.initPromise = this.init();
   }
 
+  /**
+   * Initialize the worker
+   * @returns
+   */
   async init() {
     if (this.initPromise) {
       await this.initPromise;
@@ -34,6 +38,10 @@ export class Worker extends Loop {
     await this._newBlock(this.node.blockchain.latestBlock);
   }
 
+  /**
+   * Assembles the new block
+   * @param block
+   */
   async newBlock(block: Block) {
     await this.initPromise;
     await this._newBlock(block);
@@ -65,6 +73,10 @@ export class Worker extends Loop {
     }
   }
 
+  /**
+   * Add transactions for c
+   * @param txs - The map of Buffer and array of transactions
+   */
   async addTxs(txs: Map<Buffer, Transaction[]>) {
     await this.initPromise;
     try {
@@ -78,6 +90,10 @@ export class Worker extends Loop {
     }
   }
 
+  /**
+   * Assembles the pending block from block data
+   * @returns
+   */
   async getPendingBlock() {
     await this.initPromise;
     const txs = [...this.txs];
@@ -95,6 +111,9 @@ export class Worker extends Loop {
     );
   }
 
+  /**
+   * Start the loop
+   */
   async startLoop() {
     await this.initPromise;
     await super.startLoop();

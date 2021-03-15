@@ -81,6 +81,9 @@ export class Node {
     this.processLoop();
   }
 
+  /**
+   * Get the status of the node syncing
+   */
   get status() {
     return {
       networkId: this.common.networkId(),
@@ -121,6 +124,10 @@ export class Node {
     return stateManager._trie.root;
   }
 
+  /**
+   * Initialize the node
+   * @returns
+   */
   async init() {
     if (this.initPromise) {
       await this.initPromise;
@@ -246,12 +253,22 @@ export class Node {
     this.txSync = new TxFetcher(this);
   }
 
+  /**
+   *
+   * @param root
+   * @returns
+   */
   async getStateManager(root: Buffer) {
     const stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
     await stateManager.setStateRoot(root);
     return stateManager;
   }
 
+  /**
+   *
+   * @param root
+   * @returns
+   */
   async getWrappedVM(root: Buffer) {
     const stateManager = await this.getStateManager(root);
     return new WrappedVM(
@@ -333,11 +350,20 @@ export class Node {
     });
   }
 
+  /**
+   *
+   * @param block
+   */
   async newBlock(block: Block) {
     await this.initPromise;
     this.taskQueue.push(new NewBlockTask(block));
   }
 
+  /**
+   *
+   * @param txs
+   * @returns
+   */
   async addPendingTxs(txs: Transaction[]) {
     await this.initPromise;
     return new Promise<boolean[]>((resolve) => {

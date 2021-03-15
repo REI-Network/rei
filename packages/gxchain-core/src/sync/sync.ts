@@ -37,10 +37,16 @@ export class Synchronizer extends EventEmitter {
     this.interval = options.interval || 1000;
   }
 
+  /**
+   * Get the state of syncing
+   */
   get syncStatus() {
     return { startingBlock: this.startingBlock, highestBlock: this.highestBlock };
   }
 
+  /**
+   *
+   */
   get isSyncing(): boolean {
     throw new Error('Unimplemented');
   }
@@ -55,6 +61,10 @@ export class Synchronizer extends EventEmitter {
     throw new Error('Unimplemented');
   }
 
+  /**
+   * Sync the blocks
+   * @param target - the sync peer and height of block
+   */
   async sync(target?: { peer: Peer; height: number }) {
     try {
       if (!this.isSyncing) {
@@ -78,6 +88,9 @@ export class Synchronizer extends EventEmitter {
     throw new Error('Unimplemented');
   }
 
+  /**
+   * Start the Synchronizer
+   */
   async start() {
     if (this.running) {
       throw new Error('Synchronizer already started!');
@@ -94,10 +107,16 @@ export class Synchronizer extends EventEmitter {
     clearTimeout(timeout);
   }
 
+  /**
+   * Abort the syncing
+   */
   async abort() {
     await this.aborter.abort(new Error('Synchronizer abort'));
   }
 
+  /**
+   * Reset the aborter
+   */
   async reset() {
     this.aborter.reset();
   }

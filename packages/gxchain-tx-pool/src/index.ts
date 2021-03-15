@@ -42,9 +42,9 @@ export function txCost(tx: Transaction) {
 }
 
 /**
- * Check the
+ * Check whether the IntrinsicGas of transaction up to the standard
  * @param tx - transcation
- * @returns
+ * @returns return ture if gas is between the maximum and minimum gas
  */
 export function checkTxIntrinsicGas(tx: Transaction) {
   const gas = tx.toCreationAddress() ? new BN(53000) : new BN(21000);
@@ -177,6 +177,9 @@ export class TxPool {
     }
   }
 
+  /**
+   * The Interrupter
+   */
   async abort() {
     await this.aborter.abort();
   }
@@ -238,6 +241,10 @@ export class TxPool {
     }
   }
 
+  /**
+   * Initialize the tx-pool
+   * @returns
+   */
   async init() {
     if (this.initPromise) {
       await this.initPromise;
@@ -277,6 +284,10 @@ export class TxPool {
     return account;
   }
 
+  /**
+   * New a block
+   * @param newBlock - Block to create
+   */
   async newBlock(newBlock: Block) {
     await this.initPromise;
     try {
@@ -339,6 +350,11 @@ export class TxPool {
     }
   }
 
+  /**
+   * Add the transactions into the pool
+   * @param txs - transaction or transactions
+   * @returns The array of judgments of whether was successfully added
+   */
   async addTxs(txs: Transaction | Transaction[]) {
     await this.initPromise;
     txs = txs instanceof Transaction ? [txs] : txs;
@@ -353,6 +369,10 @@ export class TxPool {
     }
   }
 
+  /**
+   * Obtain the pending transactions in the pool
+   * @returns The map of accounts and pending transactions
+   */
   getPendingMap() {
     const pendingMap = new PendingTxMap();
     for (const [sender, account] of this.accounts) {
@@ -364,6 +384,10 @@ export class TxPool {
     return pendingMap;
   }
 
+  /**
+   * Obtain transactions' hashes in the pool
+   * @returns The array of hashes
+   */
   getPooledTransactionHashes() {
     let hashes: Buffer[] = [];
     for (const [sender, account] of this.accounts) {
@@ -375,6 +399,11 @@ export class TxPool {
     return hashes;
   }
 
+  /**
+   * Obtain the transaction in the pool
+   * @param hash - the hash of transaction
+   * @returns The transaction
+   */
   getTransaction(hash: Buffer) {
     return this.txs.get(hash);
   }
@@ -692,6 +721,9 @@ export class TxPool {
     }
   }
 
+  /**
+   * List the state of the tx-pool
+   */
   async ls() {
     const info = (map: TxSortedMap, description: string) => {
       logger.info(`${description} size:`, map.size, '| slots:', map.slots);

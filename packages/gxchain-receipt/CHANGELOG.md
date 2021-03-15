@@ -5,15 +5,12 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 ## [0.0.2-alpha.0](https://iz11ro8cf9xz/node/gxchain2/compare/v0.0.1-alpha.0...v0.0.2-alpha.0) (2021-03-15)
 
-**Note:** Version bump only for package @gxchain2/crypto
 
+### Bug Fixes
 
-
-
-
-## 0.0.1-alpha.0 (2020-11-24)
+* calculate contractAddress ([4b784ba](https://iz11ro8cf9xz/node/gxchain2/commits/4b784ba1020148e28d40733c72e3bf6d1da56754))
 
 
 ### Features
 
-* **@gxchain2/crypto:** add basic crypto functions ([82696fc](https://iz11ro8cf9xz/node/gxchain2/commits/82696fc4f62f909f434d1e651a2017b869c36527))
+* add gxchain-receipt ([ce88c91](https://iz11ro8cf9xz/node/gxchain2/commits/ce88c91f6749a453b6c00d51f136b8d5f77302dd))

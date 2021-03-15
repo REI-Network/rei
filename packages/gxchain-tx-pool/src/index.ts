@@ -23,14 +23,29 @@ export interface INode {
   };
 }
 
+/**
+ * Calculate the slots of the transaction
+ * @param tx - transaction
+ * @returns the number of transaction's slots
+ */
 export function txSlots(tx: Transaction) {
   return Math.ceil(new WrappedTransaction(tx).size / 32768);
 }
 
+/**
+ * Calulate the cost gas
+ * @param tx - transcation
+ * @returns The value of transaction cost
+ */
 export function txCost(tx: Transaction) {
   return tx.value.add(tx.gasPrice.mul(tx.gasLimit));
 }
 
+/**
+ * Check the
+ * @param tx - transcation
+ * @returns
+ */
 export function checkTxIntrinsicGas(tx: Transaction) {
   const gas = tx.toCreationAddress() ? new BN(53000) : new BN(21000);
   const nz = new BN(0);

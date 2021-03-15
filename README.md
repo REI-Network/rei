@@ -1,6 +1,8 @@
-# GXChain2.0
+# GXChain2.0-Alpha
 
 Nodejs implementation of GXChain2.0 protocols
+
+> This project is under continuous development, all protocols and modules may be changed in the future, use it at your own risk
 
 | package                                          | npm                                                                | issues                                                                    | 
 | ------------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------- |

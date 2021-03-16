@@ -40,14 +40,23 @@ export class Miner extends Loop {
     this.controlLoop();
   }
 
+  /**
+   * Get the minung state
+   */
   get isMining() {
     return !!this.options;
   }
 
+  /**
+   * Get the coinbase
+   */
   get coinbase() {
     return this._coinbase;
   }
 
+  /**
+   * Get the limit of gas
+   */
   get gasLimit() {
     return this._gasLimit;
   }
@@ -65,14 +74,26 @@ export class Miner extends Loop {
     }
   }
 
+  /**
+   * Set the coinbase
+   * @param coinbase
+   */
   setCoinbase(coinbase: string | Buffer) {
     this._coinbase = typeof coinbase === 'string' ? hexStringToBuffer(coinbase) : coinbase;
   }
 
+  /**
+   * Set the gas limit
+   * @param gasLimit
+   */
   setGasLimit(gasLimit: string | BN) {
     this._gasLimit = typeof gasLimit === 'string' ? hexStringToBN(gasLimit) : gasLimit;
   }
 
+  /**
+   * Initialize the miner
+   * @returns
+   */
   async init() {
     if (this.initPromise) {
       await this.initPromise;
@@ -81,6 +102,9 @@ export class Miner extends Loop {
     await this.worker.init();
   }
 
+  /**
+   * Start the loop
+   */
   async startLoop() {
     if (this.isMining) {
       await this.initPromise;
@@ -88,6 +112,9 @@ export class Miner extends Loop {
     }
   }
 
+  /**
+   * Mine the Block
+   */
   async mineBlock() {
     const block = await this.worker.getPendingBlock();
     if (block.header.number.eq(this.node.blockchain.latestBlock.header.number.addn(1)) && block.header.parentHash.equals(this.node.blockchain.latestBlock.hash())) {

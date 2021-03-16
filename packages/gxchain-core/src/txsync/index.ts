@@ -15,6 +15,12 @@ type EnqueuePooledTransactionMessage = {
   origin: string;
 };
 
+/**
+ * Add the key and value to the map
+ * @param map
+ * @param key
+ * @param value
+ */
 function forceAdd<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer | string) {
   let set = map.get(key);
   if (!set) {
@@ -24,6 +30,12 @@ function forceAdd<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer | 
   set.add(value);
 }
 
+/**
+ * Delete the value according to the key from the map
+ * @param map
+ * @param key
+ * @param value
+ */
 function autoDelete<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer | string) {
   let set = map.get(key);
   if (set) {
@@ -346,6 +358,11 @@ export class TxFetcher extends EventEmitter {
     this.scheduleFetches();
   }
 
+  /**
+   * dropPeer should be called when a peer disconnects. It cleans up all the internal
+   * data structures of the given node
+   * @param peer
+   */
   dropPeer(peer: string) {
     {
       const set = this.watingSlots.get(peer);
@@ -400,12 +417,22 @@ export class TxFetcher extends EventEmitter {
     }
   }
 
+  /**
+   * Imports a batch of received transactions' hashes into the transaction pool
+   * @param origin - the peer
+   * @param hashes - transactions' hashes
+   */
   newPooledTransactionHashes(origin: string, hashes: Buffer[]) {
     if (!this.aborter.isAborted) {
       this.newPooledTransactionQueue.push({ hashes, origin });
     }
   }
 
+  /**
+   * Imports a batch of received transaction into the transaction pool
+   * @param origin - the peer
+   * @param txs - transactions
+   */
   enqueueTransaction(origin: string, txs: Transaction[]) {
     if (!this.aborter.isAborted) {
       this.enqueueTransactionQueue.push({ txs, origin });

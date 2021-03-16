@@ -28,10 +28,18 @@ export class FullSynchronizer extends Synchronizer {
     this.count = this.options.count || 128;
   }
 
+  /**
+   * Judge the sync state
+   */
   get isSyncing(): boolean {
     return !!this.syncingPromise;
   }
 
+  /**
+   * Syncing switch to the peer if the peer's block height is more than the bestHeight
+   * @param peer - the syncing peer
+   * @param height - the height of block
+   */
   async announce(peer: Peer, height: number) {
     // TODO: validata block.
     if (!this.isSyncing) {
@@ -108,6 +116,9 @@ export class FullSynchronizer extends Synchronizer {
     return syncResult;
   }
 
+  /**
+   * Abort the sync
+   */
   async syncAbort() {
     if (this.abortFetcher) {
       await this.abortFetcher();

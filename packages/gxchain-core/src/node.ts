@@ -81,6 +81,9 @@ export class Node {
     this.processLoop();
   }
 
+  /**
+   * Get the status of the node syncing
+   */
   get status() {
     return {
       networkId: this.common.networkId(),
@@ -121,6 +124,10 @@ export class Node {
     return stateManager._trie.root;
   }
 
+  /**
+   * Initialize the node
+   * @returns
+   */
   async init() {
     if (this.initPromise) {
       await this.initPromise;
@@ -246,12 +253,22 @@ export class Node {
     this.txSync = new TxFetcher(this);
   }
 
+  /**
+   * Get data from an underlying state trie
+   * @param root - The state root
+   * @returns The state manager
+   */
   async getStateManager(root: Buffer) {
     const stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
     await stateManager.setStateRoot(root);
     return stateManager;
   }
 
+  /**
+   * Assemble the Wrapped VM
+   * @param root - The state root
+   * @returns new VM
+   */
   async getWrappedVM(root: Buffer) {
     const stateManager = await this.getStateManager(root);
     return new WrappedVM(
@@ -326,6 +343,11 @@ export class Node {
     }
   }
 
+  /**
+   * Push a block to the queue of blocks to be processed
+   * @param block - Block data
+   * @param generate - Judgment criteria for root verification
+   */
   async processBlock(block: Block, generate: boolean = true) {
     await this.initPromise;
     return new Promise<Block>((resolve, reject) => {
@@ -333,11 +355,19 @@ export class Node {
     });
   }
 
+  /**
+   * Push a new block task to the taskQueue
+   * @param block - Block data
+   */
   async newBlock(block: Block) {
     await this.initPromise;
     this.taskQueue.push(new NewBlockTask(block));
   }
 
+  /**
+   * Push pending transactions to the taskQueue
+   * @param txs - transactions
+   */
   async addPendingTxs(txs: Transaction[]) {
     await this.initPromise;
     return new Promise<boolean[]>((resolve) => {

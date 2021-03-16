@@ -254,9 +254,9 @@ export class Node {
   }
 
   /**
-   *
-   * @param root
-   * @returns
+   * Get data from an underlying state trie
+   * @param root - The state root
+   * @returns The state manager
    */
   async getStateManager(root: Buffer) {
     const stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
@@ -265,9 +265,9 @@ export class Node {
   }
 
   /**
-   *
-   * @param root
-   * @returns
+   * Assemble the Wrapped VM
+   * @param root - The state root
+   * @returns new VM
    */
   async getWrappedVM(root: Buffer) {
     const stateManager = await this.getStateManager(root);
@@ -343,6 +343,11 @@ export class Node {
     }
   }
 
+  /**
+   * Push a block to the queue of blocks to be processed
+   * @param block - Block data
+   * @param generate - Judgment criteria for root verification
+   */
   async processBlock(block: Block, generate: boolean = true) {
     await this.initPromise;
     return new Promise<Block>((resolve, reject) => {
@@ -351,8 +356,8 @@ export class Node {
   }
 
   /**
-   *
-   * @param block
+   * Push a new block task to the taskQueue
+   * @param block - Block data
    */
   async newBlock(block: Block) {
     await this.initPromise;
@@ -360,9 +365,8 @@ export class Node {
   }
 
   /**
-   *
-   * @param txs
-   * @returns
+   * Push pending transactions to the taskQueue
+   * @param txs - transactions
    */
   async addPendingTxs(txs: Transaction[]) {
     await this.initPromise;

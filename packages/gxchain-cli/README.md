@@ -11,7 +11,7 @@ Command Line of GXChain2.0
 ## Install
 
 ```
-npm i -g @gxchain2/cli
+npm install @gxchain2/cli --global
 ```
 
 ## Usage

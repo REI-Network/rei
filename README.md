@@ -1,5 +1,8 @@
 # GXChain2.0-Alpha
 
+![Node Version](https://img.shields.io/badge/node-%e2%89%a5v12.0.0-blue)
+![NPM Version](https://img.shields.io/badge/npm-%E2%89%A5v6.0.0-blue)
+
 Nodejs implementation of GXChain2.0 protocols
 
 > This project is under continuous development, all protocols and modules may be changed in the future, use it at your own risk
@@ -27,7 +30,7 @@ Nodejs implementation of GXChain2.0 protocols
 ### Install
 
 ```
-npm i -g @gxchain2/cli
+npm install @gxchain2/cli --global
 ```
 
 ### Usage
@@ -78,7 +81,7 @@ gxc2 start --rpc --rpc-host 0.0.0.0 --rpc-port 12345 --datadir ~/gxc2
 This monorepo uses Lerna. Please install lerna first.
 
 ```
-npm i -g lerna
+npm install lerna --global
 ```
 
 Setup and build

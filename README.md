@@ -9,6 +9,7 @@ Nodejs implementation of GXChain2.0 protocols
 | [@gxchain2/block][block-package]                 | [![NPM Version][block-npm-version]][block-npm-url]                 | [![Block Issues][block-issues]][block-issues-url]                         |
 | [@gxchain2/blockchain][blockchain-package]       | [![NPM Version][blockchain-npm-version]][blockchain-npm-url]       | [![Blockchain Issues][blockchain-issues]][blockchain-issues-url]          |
 | [@gxchain2/tx][tx-package]                       | [![NPM Version][tx-npm-version]][tx-npm-url]                       | [![Tx Issues][tx-issues]][tx-issues-url]                                  |
+| [@gxchain2/cli][cli-package]                     | [![NPM Version][cli-npm-version]][cli-npm-url]                     | [![Cli Issues][cli-issues]][cli-issues-url]                               |
 | [@gxchain2/tx-pool][tx-pool-package]             | [![NPM Version][tx-pool-npm-version]][tx-pool-npm-url]             | [![Tx-pool Issues][tx-pool-issues]][tx-pool-issues-url]                   |
 | [@gxchain2/receipt][receipt-package]             | [![NPM Version][receipt-npm-version]][receipt-npm-url]             | [![Receipt Issues][receipt-issues]][receipt-issues-url]                   |
 | [@gxchain2/vm][vm-package]                       | [![NPM Version][vm-npm-version]][vm-npm-url]                       | [![Vm Issues][vm-issues]][vm-issues-url]                                  |
@@ -131,6 +132,11 @@ These scripts execute lint and lint:fix respectively, to all monorepo packages.
 [tx-npm-url]: https://www.npmjs.org/package/@gxchain2/tx
 [tx-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20tx?label=issues
 [tx-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+tx"
+[cli-package]: ./packages/gxchain-cli
+[cli-npm-version]: https://img.shields.io/npm/v/@gxchain2/cli
+[cli-npm-url]: https://www.npmjs.org/package/@gxchain2/cli
+[cli-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20cli?label=issues
+[cli-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+cli"
 [tx-pool-package]: ./packages/gxchain-tx-pool
 [tx-pool-npm-version]: https://img.shields.io/npm/v/@gxchain2/tx-pool
 [tx-pool-npm-url]: https://www.npmjs.org/package/@gxchain2/tx-pool

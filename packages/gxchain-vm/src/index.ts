@@ -1,4 +1,5 @@
 import VM from '@ethereumjs/vm';
+import Bloom from '@ethereumjs/vm/dist/bloom';
 import runBlock, { RunBlockOpts, RunBlockResult } from './runBlock';
 
 export class WrappedVM {
@@ -14,4 +15,4 @@ export class WrappedVM {
   }
 }
 
-export { VM };
+export { VM, Bloom };

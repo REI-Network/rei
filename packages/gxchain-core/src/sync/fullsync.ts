@@ -121,7 +121,7 @@ export class FullSynchronizer extends Synchronizer {
    */
   async syncAbort() {
     if (this.abortFetcher) {
-      await this.abortFetcher();
+      this.abortFetcher();
     }
     if (this.syncingPromise) {
       await this.syncingPromise;
@@ -172,35 +172,39 @@ export class FullSynchronizer extends Synchronizer {
     this.startSyncHook(localHeight, bestHeight);
 
     let syncAbort = false;
-    const blocksQueue = new AsyncChannel<Block>({ isAbort: () => syncAbort });
+    let success = false;
     const fetcher = new Fetcher({ node: this.node, limitCount: this.count });
     this.abortFetcher = () => {
       syncAbort = true;
-      blocksQueue.abort();
       fetcher.abort();
     };
-    fetcher.on('newBlock', (block: Block) => {
-      blocksQueue.push(block);
-    });
-    let success = false;
     await Promise.all([
-      fetcher.fetch(localHeight, bestHeight - localHeight, peer.peerId),
-      new Promise<void>(async (resolve) => {
-        for await (const block of blocksQueue.generator()) {
-          try {
-            await this.node.processBlock(block, false);
-            if (block.header.number.eqn(this.bestHeight!)) {
-              success = true;
-              this.abortFetcher!();
-              break;
-            }
-          } catch (err) {
-            logger.error('FullSynchronizer::syncWithPeer, process block error:', err);
-            this.abortFetcher!();
+      new Promise<void>((resolve) => {
+        fetcher.on('newBlock', (block: Block) => {
+          if (syncAbort) {
+            return;
           }
-        }
-        resolve();
-      })
+          this.node
+            .processBlock(block, false)
+            .then(() => {
+              if (!syncAbort && block.header.number.eqn(bestHeight)) {
+                if (this.abortFetcher) {
+                  this.abortFetcher();
+                }
+                success = true;
+                resolve();
+              }
+            })
+            .catch((err) => {
+              logger.error('FullSynchronizer::syncWithPeer, process block error:', err);
+              if (this.abortFetcher) {
+                this.abortFetcher();
+              }
+              resolve();
+            });
+        });
+      }),
+      fetcher.fetch(localHeight, bestHeight - localHeight, peer.peerId)
     ]);
     this.abortFetcher = undefined;
     return success;

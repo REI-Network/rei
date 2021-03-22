@@ -140,7 +140,8 @@ export class Database extends DBManager {
     const self: any = this;
     self._cache = Object.assign(self._cache, {
       receipts: new Cache({ max: 256 }),
-      txLookup: new Cache({ max: 512 })
+      txLookup: new Cache({ max: 512 }),
+      bloomBits: new Cache({ max: 512 })
     });
   }
 

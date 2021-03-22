@@ -12,15 +12,38 @@ const level = require('level-mem');
 // constants for txLookup and receipts
 const RECEIPTS_PREFIX = Buffer.from('r');
 const TX_LOOKUP_PREFIX = Buffer.from('l');
+const BLOOM_BITS_PREFIX = Buffer.from('');
 const bufBE8 = (n: BN) => n.toArrayLike(Buffer, 'be', 8);
 const receiptsKey = (n: BN, hash: Buffer) => Buffer.concat([RECEIPTS_PREFIX, bufBE8(n), hash]);
 const txLookupKey = (hash: Buffer) => Buffer.concat([TX_LOOKUP_PREFIX, hash]);
+const bloomBitsKey = (bit: number, section: BN, hash: Buffer) => {
+  const buf = Buffer.alloc(10);
+  buf.writeInt16BE(bit);
+  buf.writeBigInt64BE(BigInt(section.toString()), 2);
+  return Buffer.concat([BLOOM_BITS_PREFIX, buf, hash]);
+};
 
 // helpers for txLookup and receipts.
 const DBTarget_Receipts = 100;
 const DBTarget_TxLookup = 101;
+const DBTarget_BloomBits = 102;
 
+// TODO: improve types.
 function new_DBOp(operationTarget: DBTarget, key?: DatabaseKey): DBOp {
+  let cacheString: string;
+  let baseDBOpKey: Buffer;
+  if (operationTarget === DBTarget_Receipts) {
+    cacheString = 'receipts';
+    baseDBOpKey = receiptsKey(key!.blockNumber!, key!.blockHash!);
+  } else if (operationTarget === DBTarget_TxLookup) {
+    cacheString = 'txLookup';
+    baseDBOpKey = txLookupKey((key! as any).txHash!);
+  } else {
+    const anyKey = key! as any;
+    cacheString = 'bloomBits';
+    baseDBOpKey = bloomBitsKey(anyKey.bit, anyKey.section, anyKey.hash);
+  }
+
   const op: {
     operationTarget: DBTarget;
     baseDBOp: DBOpData;
@@ -28,9 +51,9 @@ function new_DBOp(operationTarget: DBTarget, key?: DatabaseKey): DBOp {
     updateCache(cacheMap: CacheMap): void;
   } = {
     operationTarget,
-    cacheString: operationTarget === DBTarget_Receipts ? 'receipts' : 'txLookup',
+    cacheString,
     baseDBOp: {
-      key: operationTarget === DBTarget_Receipts ? receiptsKey(key!.blockNumber!, key!.blockHash!) : txLookupKey((key! as any).txHash!),
+      key: baseDBOpKey,
       keyEncoding: 'binary',
       valueEncoding: 'binary'
     },
@@ -50,7 +73,7 @@ function new_DBOp(operationTarget: DBTarget, key?: DatabaseKey): DBOp {
 }
 
 export function DBOp_get(operationTarget: DBTarget, key?: DatabaseKey): DBOp {
-  if (operationTarget !== DBTarget_Receipts && operationTarget !== DBTarget_TxLookup) {
+  if (operationTarget !== DBTarget_Receipts && operationTarget !== DBTarget_TxLookup && operationTarget !== DBTarget_BloomBits) {
     return DBOp.get(operationTarget, key);
   } else {
     return new_DBOp(operationTarget, key);
@@ -58,7 +81,7 @@ export function DBOp_get(operationTarget: DBTarget, key?: DatabaseKey): DBOp {
 }
 
 export function DBOp_set(operationTarget: DBTarget, value: Buffer | object, key?: DatabaseKey): DBOp {
-  if (operationTarget !== DBTarget_Receipts && operationTarget !== DBTarget_TxLookup) {
+  if (operationTarget !== DBTarget_Receipts && operationTarget !== DBTarget_TxLookup && operationTarget !== DBTarget_BloomBits) {
     return DBOp.set(operationTarget, value, key);
   } else {
     const dbOperation = new_DBOp(operationTarget, key);
@@ -76,7 +99,7 @@ export function DBOp_set(operationTarget: DBTarget, value: Buffer | object, key?
 }
 
 export function DBOp_del(operationTarget: DBTarget, key?: DatabaseKey): DBOp {
-  if (operationTarget !== DBTarget_Receipts && operationTarget !== DBTarget_TxLookup) {
+  if (operationTarget !== DBTarget_Receipts && operationTarget !== DBTarget_TxLookup && operationTarget !== DBTarget_BloomBits) {
     return DBOp.del(operationTarget, key);
   } else {
     const dbOperation = new_DBOp(operationTarget, key);
@@ -105,6 +128,10 @@ export function DBSaveReceipts(receipts: Receipt[], blockHash: Buffer, blockNumb
     blockHash,
     blockNumber
   });
+}
+
+export function DBSaveBloomBits(bit: number, section: BN, hash: Buffer, bits: Buffer) {
+  return DBOp_set(DBTarget_BloomBits, bits, { bit, section, hash } as any);
 }
 
 export class Database extends DBManager {
@@ -185,6 +212,10 @@ export class Database extends DBManager {
       }
     }
     throw new level.errors.NotFoundError();
+  }
+
+  async getBloomBits(bit: number, section: BN, hash: Buffer) {
+    return await this.get(DBTarget_BloomBits, { bit, section, hash } as any);
   }
 }
 

@@ -12,7 +12,7 @@ const level = require('level-mem');
 // constants for txLookup and receipts
 const RECEIPTS_PREFIX = Buffer.from('r');
 const TX_LOOKUP_PREFIX = Buffer.from('l');
-const BLOOM_BITS_PREFIX = Buffer.from('');
+const BLOOM_BITS_PREFIX = Buffer.from('B');
 const bufBE8 = (n: BN) => n.toArrayLike(Buffer, 'be', 8);
 const receiptsKey = (n: BN, hash: Buffer) => Buffer.concat([RECEIPTS_PREFIX, bufBE8(n), hash]);
 const txLookupKey = (hash: Buffer) => Buffer.concat([TX_LOOKUP_PREFIX, hash]);

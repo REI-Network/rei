@@ -1,5 +1,3 @@
-import { Bloom } from '@gxchain2/vm';
-
 const BloomByteLength = 256;
 const BloomBitLength = BloomByteLength * 8;
 
@@ -20,7 +18,7 @@ export class BloomBitsGenerator {
     }
   }
 
-  addBloom(index: number, bloom: Bloom) {
+  addBloom(index: number, bloom: Buffer) {
     if (this.nextSec >= this.sections) {
       throw new Error('section out of bounds');
     }
@@ -30,7 +28,7 @@ export class BloomBitsGenerator {
     const byteIndex = this.nextSec / 8;
     const bitIndex = 7 - (this.nextSec % 8);
     for (let byt = 0; byt < BloomByteLength; byt++) {
-      const bloomByte = bloom.bitvector[BloomByteLength - 1 - byt];
+      const bloomByte = bloom[BloomByteLength - 1 - byt];
       if (bloomByte === 0) {
         continue;
       }

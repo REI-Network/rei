@@ -1,20 +1,12 @@
 import { BN } from 'ethereumjs-util';
 import Heap from 'qheap';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
-import { FunctionalMap, logger } from '@gxchain2/utils';
+import { logger, createBNFunctionalMap } from '@gxchain2/utils';
 import { txSlots, txCost } from './index';
 
 export class TxSortedMap {
   private readonly strict: boolean;
-  private readonly nonceToTx = new FunctionalMap<BN, Transaction>((a, b) => {
-    if (a.lt(b)) {
-      return -1;
-    }
-    if (a.gt(b)) {
-      return 1;
-    }
-    return 0;
-  });
+  private readonly nonceToTx = createBNFunctionalMap<Transaction>();
   private nonceHeap: Heap;
   private sortedTxCache?: Transaction[];
   private _slots: number = 0;

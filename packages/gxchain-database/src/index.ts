@@ -6,7 +6,7 @@ import { BN, rlp, toBuffer } from 'ethereumjs-util';
 import { Block, BlockHeader } from '@gxchain2/block';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { Receipt } from '@gxchain2/receipt';
-import { Common } from '@gxchain2/common';
+import { Common, constants } from '@gxchain2/common';
 const level = require('level-mem');
 
 // constants for txLookup and receipts
@@ -243,7 +243,7 @@ export class Database extends DBManager {
 
   async clearBloomBits(from: BN) {
     const db: LevelUp = (this as any)._db;
-    for (let i = 0; i < 2048; i++) {
+    for (let i = 0; i < constants.BloomBitLength; i++) {
       await new Promise<void>((resolve, reject) => {
         db.clear(
           {

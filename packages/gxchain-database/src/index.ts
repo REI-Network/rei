@@ -240,6 +240,25 @@ export class Database extends DBManager {
     }
     return header1;
   }
+
+  clearBloomBits(fromSection: BN, toSection: BN) {
+    return new Promise<void>((resolve, reject) => {
+      const db: LevelUp = (this as any)._db;
+      db.clear(
+        {
+          gte: bloomBitsKey(0, fromSection, Buffer.alloc(32, 0)),
+          lte: bloomBitsKey(2047, toSection, Buffer.alloc(32, 0xff))
+        },
+        (err?: Error) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
 }
 
 import levelUp from 'levelup';

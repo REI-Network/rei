@@ -12,8 +12,6 @@ export interface ChainIndexerBackend {
   commit(): Promise<void>;
 
   prune(section: BN): Promise<void>;
-
-  reversePrune(section: BN): Promise<void>;
 }
 
 export interface ChainIndexerOptions {
@@ -85,7 +83,7 @@ export class ChainIndexer {
     if (reorg) {
       const sections = number.divn(this.sectionSize);
       if (!sections.eq(this.storedSections)) {
-        await this.backend.reversePrune(sections);
+        await this.backend.prune(sections);
         this.storedSections = sections.clone();
         await setStoredSectionCount(this.node.rawdb, this.storedSections);
       }

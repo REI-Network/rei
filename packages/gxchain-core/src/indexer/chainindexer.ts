@@ -48,6 +48,7 @@ export class ChainIndexer {
     this.backend = options.backend;
     this.node = options.node;
     this.initPromise = this.init();
+    this.processHeaderLoop();
   }
 
   async init() {
@@ -56,7 +57,6 @@ export class ChainIndexer {
       return;
     }
     this.storedSections = await getStoredSectionCount(this.node.rawdb);
-    this.processHeaderLoop();
   }
 
   async newBlockHeader(header: BlockHeader) {

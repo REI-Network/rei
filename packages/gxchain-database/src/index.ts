@@ -218,6 +218,28 @@ export class Database extends DBManager {
   async getBloomBits(bit: number, section: BN, hash: Buffer) {
     return await this.get(DBTarget_BloomBits, { bit, section, hash } as any);
   }
+
+  async getCanonicalHeader(num: BN) {
+    const hash = await this.numberToHash(num);
+    return await this.getHeader(hash, num);
+  }
+
+  async findCommonAncestor(header1: BlockHeader, header2: BlockHeader) {
+    while (header1.number.gt(header2.number)) {
+      header1 = await this.getHeader(header1.parentHash, header1.number.subn(1));
+    }
+    while (header2.number.gt(header1.number)) {
+      header2 = await this.getHeader(header2.parentHash, header2.number.subn(1));
+    }
+    while (!header1.hash().equals(header2.hash()) && header1.number.gtn(0) && header2.number.gtn(0)) {
+      header1 = await this.getHeader(header1.parentHash, header1.number.subn(1));
+      header2 = await this.getHeader(header2.parentHash, header2.number.subn(1));
+    }
+    if (!header1.hash().equals(header2.hash())) {
+      throw new Error('find common ancestor failed');
+    }
+    return header1;
+  }
 }
 
 import levelUp from 'levelup';

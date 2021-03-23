@@ -41,7 +41,7 @@ export class Miner extends Loop {
   }
 
   /**
-   * Get the minung state
+   * Get the mining state
    */
   get isMining() {
     return !!this.options;

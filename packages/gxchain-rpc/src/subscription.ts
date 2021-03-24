@@ -1,5 +1,6 @@
 import { uuidv4 } from 'uuid';
-import { Aborter } from '@gxchain2/utils';
+import { Aborter, FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
+import { createBrotliDecompress } from 'node:zlib';
 function randomIDGenetator(): string {
   return uuidv4();
 }
@@ -26,9 +27,9 @@ class Subscription {
 }
 
 const deadline = 5 * 60 * 1000;
-type fulter = {
+type filter = {
   typ: string;
-  deadline: number;
+  lifetime: number;
   hashes: Buffer[];
   logs: Buffer[];
   s: Subscription;
@@ -36,10 +37,20 @@ type fulter = {
 
 class Filters {
   private aborter = new Aborter();
+
   private readonly initPromise: Promise<void>;
+
+  private readonly pendingMap: FunctionalMap<Buffer, filter>;
+  private readonly logMap: FunctionalMap<Buffer, filter>;
+  private readonly HeadMap: FunctionalMap<Buffer, filter>;
 
   constructor() {
     this.initPromise = this.init();
+    this.pendingMap = createBufferFunctionalMap<filter>();
+    this.HeadMap = createBufferFunctionalMap<filter>();
+    this.logMap = createBufferFunctionalMap<filter>();
+
+    this.timeoutLoop();
   }
   async abort() {
     await this.aborter.abort();
@@ -58,6 +69,11 @@ class Filters {
       await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, deadline)));
       if (this.aborter.isAborted) {
         break;
+      }
+      for (const [addr, filter] of this.pendingMap) {
+        if (Date.now() - filter.lifetime > deadline) {
+          this.pendingMap.delete(addr);
+        }
       }
     }
   }

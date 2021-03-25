@@ -1,4 +1,5 @@
 import createRBTree from 'functional-red-black-tree';
+import { BN } from 'ethereumjs-util';
 
 const bufferCompare = (a: Buffer, b: Buffer) => {
   if (a.length < b.length) {
@@ -14,6 +15,16 @@ const bufferCompare = (a: Buffer, b: Buffer) => {
     if (a[i] > b[i]) {
       return 1;
     }
+  }
+  return 0;
+};
+
+const bnCompare = (a: BN, b: BN) => {
+  if (a.lt(b)) {
+    return -1;
+  }
+  if (a.gt(b)) {
+    return 1;
   }
   return 0;
 };
@@ -152,6 +163,10 @@ export function createBufferFunctionalMap<T>() {
   return new FunctionalMap<Buffer, T>(bufferCompare);
 }
 
+export function createBNFunctionalMap<T>() {
+  return new FunctionalMap<BN, T>(bnCompare);
+}
+
 class FunctionalSetValueIterator<T> extends FunctionalMapIterator<T> {
   protected value(): T | undefined {
     return this.rbtreeIt.key;
@@ -229,4 +244,8 @@ export class FunctionalSet<T> implements Set<T> {
 
 export function createBufferFunctionalSet() {
   return new FunctionalSet<Buffer>(bufferCompare);
+}
+
+export function createBNFunctionalSet() {
+  return new FunctionalSet<BN>(bnCompare);
 }

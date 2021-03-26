@@ -1,5 +1,5 @@
 import { uuidv4 } from 'uuid';
-import { Aborter, FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
+import { Aborter, FunctionalMap, createStringFunctionalMap } from '@gxchain2/utils';
 import { createBrotliDecompress } from 'node:zlib';
 function randomIDGenetator(): string {
   return uuidv4();
@@ -40,15 +40,16 @@ class Filters {
 
   private readonly initPromise: Promise<void>;
 
-  private readonly pendingMap: FunctionalMap<Buffer, filter>;
-  private readonly logMap: FunctionalMap<Buffer, filter>;
-  private readonly HeadMap: FunctionalMap<Buffer, filter>;
+  private readonly pendingMap: FunctionalMap<string, filter>;
+  private readonly logMap: FunctionalMap<string, filter>;
+  private readonly HeadMap: FunctionalMap<string, filter>;
+  private readonly;
 
   constructor() {
     this.initPromise = this.init();
-    this.pendingMap = createBufferFunctionalMap<filter>();
-    this.HeadMap = createBufferFunctionalMap<filter>();
-    this.logMap = createBufferFunctionalMap<filter>();
+    this.pendingMap = createStringFunctionalMap<filter>();
+    this.HeadMap = createStringFunctionalMap<filter>();
+    this.logMap = createStringFunctionalMap<filter>();
 
     this.timeoutLoop();
   }

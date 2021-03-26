@@ -1,81 +1,86 @@
-import { uuidv4 } from 'uuid';
-import { Aborter, FunctionalMap, createStringFunctionalMap } from '@gxchain2/utils';
-import { createBrotliDecompress } from 'node:zlib';
-function randomIDGenetator(): string {
-  return uuidv4();
-}
+// import { uuidv4 } from 'uuid';
+// import { Aborter, FunctionalMap, createStringFunctionalMap } from '@gxchain2/utils';
 
-class Subscription {
-  ID: string;
-  namespace: string;
-  activated: boolean;
-  constructor(namespace: string) {
-    this.ID = randomIDGenetator();
-    this.namespace = namespace;
-    this.activated = true;
-  }
+// function randomIDGenetator(): string {
+//   return uuidv4();
+// }
 
-  notify(id: string, data: any) {
-    if (this.ID != id) {
-      ws.send('Notify with wrong ID');
-      return;
-    }
-    if (this.activated) {
-      ws.send(JSON.stringify(data));
-    }
-  }
-}
+// class Subscription {
+//   ID: string;
+//   namespace: string;
+//   activated: boolean;
+//   constructor(namespace: string) {
+//     this.ID = randomIDGenetator();
+//     this.namespace = namespace;
+//     this.activated = true;
+//   }
 
-const deadline = 5 * 60 * 1000;
-type filter = {
-  typ: string;
-  lifetime: number;
-  hashes: Buffer[];
-  logs: Buffer[];
-  s: Subscription;
-};
+//   notify(id: string, data: any) {
+//     if (this.ID != id) {
+//       ws.send('Notify with wrong ID');
+//       return;
+//     }
+//     if (this.activated) {
+//       ws.send(JSON.stringify(data));
+//     }
+//   }
+// }
 
-class Filters {
-  private aborter = new Aborter();
+// const deadline = 5 * 60 * 1000;
+// type filter = {
+//   typ: string;
+//   lifetime: number;
+//   hashes: Buffer[];
+//   logs: Buffer[];
+//   s: Subscription;
+// };
 
-  private readonly initPromise: Promise<void>;
+// class Filters {
+//   private aborter = new Aborter();
 
-  private readonly pendingMap: FunctionalMap<string, filter>;
-  private readonly logMap: FunctionalMap<string, filter>;
-  private readonly HeadMap: FunctionalMap<string, filter>;
-  private readonly;
+//   private readonly initPromise: Promise<void>;
 
-  constructor() {
-    this.initPromise = this.init();
-    this.pendingMap = createStringFunctionalMap<filter>();
-    this.HeadMap = createStringFunctionalMap<filter>();
-    this.logMap = createStringFunctionalMap<filter>();
+//   private readonly WsPendingMap: FunctionalMap<string, filter>;
+//   private readonly WsLogMap: FunctionalMap<string, filter>;
+//   private readonly WsHeadMap: FunctionalMap<string, filter>;
+//   private readonly HttpPendingMap: FunctionalMap<string, filter>;
+//   private readonly HttpLogMap: FunctionalMap<string, filter>;
+//   private readonly HttpHeadMap: FunctionalMap<string, filter>;
 
-    this.timeoutLoop();
-  }
-  async abort() {
-    await this.aborter.abort();
-  }
+//   constructor() {
+//     this.initPromise = this.init();
+//     this.WsPendingMap = createStringFunctionalMap<filter>();
+//     this.WsHeadMap = createStringFunctionalMap<filter>();
+//     this.WsLogMap = createStringFunctionalMap<filter>();
+//     this.HttpHeadMap = createStringFunctionalMap<filter>();
+//     this.HttpPendingMap = createStringFunctionalMap<filter>();
+//     this.HttpLogMap = createStringFunctionalMap<filter>();
 
-  async init() {
-    if (this.initPromise) {
-      await this.initPromise;
-      return;
-    }
-  }
+//     this.timeoutLoop();
+//   }
+//   async abort() {
+//     await this.aborter.abort();
+//   }
 
-  private async timeoutLoop() {
-    await this.initPromise;
-    while (!this.aborter.isAborted) {
-      await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, deadline)));
-      if (this.aborter.isAborted) {
-        break;
-      }
-      for (const [addr, filter] of this.pendingMap) {
-        if (Date.now() - filter.lifetime > deadline) {
-          this.pendingMap.delete(addr);
-        }
-      }
-    }
-  }
-}
+//   async init() {
+//     if (this.initPromise) {
+//       await this.initPromise;
+//       return;
+//     }
+//   }
+
+//   private async timeoutLoop() {
+//     await this.initPromise;
+//     while (!this.aborter.isAborted) {
+//       await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, deadline)));
+//       if (this.aborter.isAborted) {
+//         break;
+//       }
+//       for (const [addr, filter] of this.pendingMap) {
+//         if (Date.now() - filter.lifetime > deadline) {
+//           this.pendingMap.delete(addr);
+//         }
+//       }
+//     }
+//   }
+// }

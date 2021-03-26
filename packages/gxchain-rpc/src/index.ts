@@ -6,7 +6,9 @@ import { Node } from '@gxchain2/core';
 import { JsonRPCMiddleware } from './jsonrpcmiddleware';
 import { Controller } from './controller';
 import { logger } from '@gxchain2/utils';
+import { v4 as uuidv4 } from 'uuid';
 
+export let soketMap: WeakMap<WebSocket, string> = new WeakMap();
 export class RpcServer extends EventEmitter {
   protected readonly port: number;
   protected readonly host: string;
@@ -35,10 +37,13 @@ export class RpcServer extends EventEmitter {
 
         app.use(express.json({ type: '*/*' }));
         app.use(jsonmid.makeMiddleWare((err) => this.emit('error', err)));
-        app.ws('/', (ws) => {
+        app.ws('/', async (ws) => {
           jsonmid.wrapWs(ws, (err) => this.emit('error', err));
+          await jsonmid.addWsmap(ws, uuidv4(), soketMap);
           ws.on('error', (err) => this.emit('error', err));
-          ws.on('close', () => {});
+          ws.on('close', () => {
+            console.log('deleted');
+          });
         });
 
         server.once('error', (err) => {

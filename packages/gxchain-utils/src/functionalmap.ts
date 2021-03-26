@@ -188,6 +188,7 @@ export function createBNFunctionalMap<T>() {
 export function createStringFunctionalMap<T>() {
   return new FunctionalMap<string, T>(stringCompare);
 }
+
 class FunctionalSetValueIterator<T> extends FunctionalMapIterator<T> {
   protected value(): T | undefined {
     return this.rbtreeIt.key;

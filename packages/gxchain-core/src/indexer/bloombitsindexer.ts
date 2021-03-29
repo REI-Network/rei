@@ -9,6 +9,7 @@ import { Node } from '../node';
 export interface BloomBitsIndexerOptions {
   node: Node;
   sectionSize: number;
+  confirmsBlockNumber: number;
 }
 
 export class BloomBitsIndexer implements ChainIndexerBackend {
@@ -18,7 +19,7 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
   private section!: BN;
   private headerHash!: Buffer;
 
-  static createBloomBitsIndexer(options) {
+  static createBloomBitsIndexer(options: BloomBitsIndexerOptions) {
     return new ChainIndexer(Object.assign(options, { backend: new BloomBitsIndexer(options) }));
   }
 

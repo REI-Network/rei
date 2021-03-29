@@ -20,7 +20,7 @@ function calcBloomIndexes(data: Buffer) {
   return idxs;
 }
 
-export function topicMatched(normalizedTopics: ((Buffer | null)[] | null)[], logTopics: Buffer[]): boolean {
+function topicMatched(normalizedTopics: ((Buffer | null)[] | null)[], logTopics: Buffer[]): boolean {
   for (let i = 0; i < normalizedTopics.length; i++) {
     if (normalizedTopics.length > logTopics.length) {
       return false;

@@ -41,7 +41,8 @@ export class RpcServer extends EventEmitter {
           jsonmid.wrapWs(ws, (err) => this.emit('error', err));
           await jsonmid.addWsmap(ws, uuidv4(), soketMap);
           ws.on('error', (err) => this.emit('error', err));
-          ws.on('close', () => {
+          ws.on('close', (ws) => {
+            soketMap.delete(ws);
             console.log('deleted');
           });
         });

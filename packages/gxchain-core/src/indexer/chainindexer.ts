@@ -22,7 +22,14 @@ export interface ChainIndexerOptions {
 }
 
 async function getStoredSectionCount(rawdb: LevelUp) {
-  return new BN(await rawdb.get('scount'));
+  try {
+    return new BN(await rawdb.get('scount'));
+  } catch (err) {
+    if (err.type === 'NotFoundError') {
+      return new BN(0);
+    }
+    throw err;
+  }
 }
 
 async function setStoredSectionCount(rawdb: LevelUp, section: BN) {

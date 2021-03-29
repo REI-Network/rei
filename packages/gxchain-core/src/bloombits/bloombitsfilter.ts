@@ -46,12 +46,18 @@ function topicMatched(normalizedTopics: ((Buffer | null)[] | null)[], logTopics:
   return true;
 }
 
+export interface BloomBitsFilterOptions {
+  db: Database;
+  sectionSize: number;
+}
+
 export class BloomBitsFilter {
   private readonly db: Database;
-  private readonly sectionSize!: BN;
+  private readonly sectionSize: number;
 
-  constructor(db: Database) {
-    this.db = db;
+  constructor(options: BloomBitsFilterOptions) {
+    this.db = options.db;
+    this.sectionSize = options.sectionSize;
   }
 
   private checkSingleNumber(bits: Buffer, sectionStart: BN, num: BN) {
@@ -106,7 +112,7 @@ export class BloomBitsFilter {
       const getSenctionHash = async (section: BN) => {
         let hash = headCache.get(section);
         if (!hash) {
-          hash = (await this.db.getCanonicalHeader(section)).hash();
+          hash = (await this.db.getCanonicalHeader(section.addn(1).muln(this.sectionSize).subn(1))).hash();
           headCache.set(section, hash);
         }
         return hash;
@@ -130,9 +136,9 @@ export class BloomBitsFilter {
       };
 
       // the start block number of this section.
-      const sectionStart = section.mul(this.sectionSize);
+      const sectionStart = section.muln(this.sectionSize);
       // the end block number of this section.
-      const sectionEnd = section.addn(1).mul(this.sectionSize);
+      const sectionEnd = section.addn(1).muln(this.sectionSize);
       // calculate the start block number for check.
       const fromBlock = from.lt(sectionStart) ? sectionStart : from;
       // calculate the end block number for check.

@@ -2,7 +2,6 @@ import { Address, BN, keccak256 } from 'ethereumjs-util';
 import { constants } from '@gxchain2/common';
 import { Database } from '@gxchain2/database';
 import { Block } from '@gxchain2/block';
-import { Bloom } from '@gxchain2/vm';
 import { createBNFunctionalMap, createBNFunctionalSet } from '@gxchain2/utils';
 import { Log } from '@gxchain2/receipt';
 

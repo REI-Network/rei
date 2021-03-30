@@ -71,21 +71,19 @@ export class ChainIndexer {
   }
 
   private async newHeader(number: BN, reorg: boolean) {
-    if (reorg) {
-      const sections = number.gtn(this.confirmsBlockNumber) ? number.subn(this.confirmsBlockNumber).divn(this.sectionSize) : new BN(0);
-      if (this.storedSections === undefined || !sections.eq(this.storedSections)) {
-        await this.backend.prune(sections);
-        if (number.gtn(this.confirmsBlockNumber)) {
-          this.storedSections = sections.clone();
-        } else {
-          this.storedSections = undefined;
-        }
-        await this.node.db.setStoredSectionCount(this.storedSections);
-      }
-      return;
-    }
     let confirmedSections: BN | undefined = number.gtn(this.confirmsBlockNumber) ? number.subn(this.confirmsBlockNumber).divn(this.sectionSize) : new BN(0);
     confirmedSections = confirmedSections.gtn(0) ? confirmedSections.subn(1) : undefined;
+    if (reorg) {
+      if (confirmedSections === undefined) {
+        await this.backend.prune(new BN(0));
+        this.storedSections = undefined;
+      } else if (this.storedSections === undefined || !confirmedSections.eq(this.storedSections)) {
+        await this.backend.prune(confirmedSections);
+        this.storedSections = confirmedSections.clone();
+      }
+      await this.node.db.setStoredSectionCount(this.storedSections);
+      return;
+    }
     if (confirmedSections !== undefined && (this.storedSections === undefined || confirmedSections.gt(this.storedSections))) {
       for (const currentSections = this.storedSections ? this.storedSections.clone() : new BN(0); confirmedSections.gte(currentSections); currentSections.iaddn(1)) {
         this.backend.reset(currentSections);

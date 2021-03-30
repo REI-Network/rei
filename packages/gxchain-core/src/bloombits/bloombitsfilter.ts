@@ -150,7 +150,7 @@ export class BloomBitsFilter {
         const bits = await getBits(bloom, section);
         for (const num = fromBlock.clone(); num.lt(toBlock); num.iaddn(1)) {
           if (!checkedNums.has(num) && this.checkSingleNumber(bits, sectionStart, num)) {
-            checkedNums.add(num);
+            checkedNums.add(num.clone());
             logs = logs.concat(await this.filterBlock(num, addresses, topics));
           }
         }
@@ -161,6 +161,8 @@ export class BloomBitsFilter {
 
   async filterBlock(blockHashOrNumber: Buffer | BN | number, addresses: Address[], topics: ((Buffer | null)[] | null)[]) {
     const block = await this.db.getBlock(blockHashOrNumber);
-    return this.checkMatches(block, addresses, topics);
+    const logs = await this.checkMatches(block, addresses, topics);
+    logs.forEach((log) => (log.removed = false));
+    return logs;
   }
 }

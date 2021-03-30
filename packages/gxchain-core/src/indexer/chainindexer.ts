@@ -1,6 +1,5 @@
 import { BlockHeader } from '@gxchain2/block';
 import { BN } from 'ethereumjs-util';
-import { LevelUp } from 'levelup';
 import { AsyncChannel, logger } from '@gxchain2/utils';
 import { Node } from '../node';
 
@@ -19,21 +18,6 @@ export interface ChainIndexerOptions {
   sectionSize: number;
   confirmsBlockNumber: number;
   backend: ChainIndexerBackend;
-}
-
-async function getStoredSectionCount(rawdb: LevelUp) {
-  try {
-    return new BN(await rawdb.get('scount'));
-  } catch (err) {
-    if (err.type === 'NotFoundError') {
-      return new BN(0);
-    }
-    throw err;
-  }
-}
-
-async function setStoredSectionCount(rawdb: LevelUp, section: BN) {
-  await rawdb.put('scount', section.toString());
 }
 
 export class ChainIndexer {
@@ -61,7 +45,7 @@ export class ChainIndexer {
       await this.initPromise;
       return;
     }
-    this.storedSections = await getStoredSectionCount(this.node.rawdb);
+    this.storedSections = await this.node.db.getStoredSectionCount();
   }
 
   async newBlockHeader(header: BlockHeader) {
@@ -92,7 +76,7 @@ export class ChainIndexer {
       if (!sections.eq(this.storedSections)) {
         await this.backend.prune(sections);
         this.storedSections = sections.clone();
-        await setStoredSectionCount(this.node.rawdb, this.storedSections);
+        await this.node.db.setStoredSectionCount(this.storedSections);
       }
       return;
     }
@@ -115,7 +99,7 @@ export class ChainIndexer {
       await this.backend.commit();
       this.storedSections.iaddn(1);
       // save stored section count.
-      await setStoredSectionCount(this.node.rawdb, this.storedSections);
+      await this.node.db.setStoredSectionCount(this.storedSections);
     }
   }
 }

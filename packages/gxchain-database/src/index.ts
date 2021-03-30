@@ -145,6 +145,10 @@ export class Database extends DBManager {
     });
   }
 
+  get rawdb(): LevelUp {
+    return (this as any)._db;
+  }
+
   async get(dbOperationTarget: DBTarget, key?: DatabaseKey): Promise<any> {
     const dbGetOperation = DBOp_get(dbOperationTarget, key);
 
@@ -260,6 +264,21 @@ export class Database extends DBManager {
         );
       });
     }
+  }
+
+  async getStoredSectionCount() {
+    try {
+      return new BN(await this.rawdb.get('scount'));
+    } catch (err) {
+      if (err.type === 'NotFoundError') {
+        return new BN(0);
+      }
+      throw err;
+    }
+  }
+
+  async setStoredSectionCount(section: BN) {
+    await this.rawdb.put('scount', section.toString());
   }
 }
 

@@ -141,7 +141,7 @@ const handler: {
     await node.txPool.ls();
   },
   lsscount: async (node: Node) => {
-    console.log('scount', new BN(await node.rawdb.get('scount')).toString());
+    console.log('scount', new BN(await node.db.getStoredSectionCount()).toString());
   },
   filterblock: async (node: Node, number: string, addresses: string, topics: string) => {
     const { addressArray, topicArray } = parseAddressAndTopic(addresses, topics);

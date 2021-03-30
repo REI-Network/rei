@@ -142,19 +142,25 @@ const handler: {
   },
   lsscount: async (node: Node) => {
     const scount = await node.db.getStoredSectionCount();
-    console.log('scount', scount ? scount.toString() : 'undefined');
+    logger.info('scount', scount ? scount.toString() : 'undefined');
   },
   filterblock: async (node: Node, number: string, addresses: string, topics: string) => {
     const { addressArray, topicArray } = parseAddressAndTopic(addresses, topics);
     const filter = new BloomBitsFilter({ db: node.db, sectionSize: constants.BloomBitsBlocks });
     const logs = await filter.filterBlock(new BN(number), addressArray, topicArray);
-    logs.forEach((log) => console.log(log.toRPCJSON()));
+    logs.forEach((log) => logger.info(log.toRPCJSON()));
   },
   filterrange: async (node: Node, from: string, to: string, addresses: string, topics: string) => {
     const { addressArray, topicArray } = parseAddressAndTopic(addresses, topics);
     const filter = new BloomBitsFilter({ db: node.db, sectionSize: constants.BloomBitsBlocks });
     const logs = await filter.filterRange(new BN(from), new BN(to), addressArray, topicArray);
-    logs.forEach((log) => console.log(log.toRPCJSON()));
+    logs.forEach((log) => logger.info(log.toRPCJSON()));
+  },
+  lsbits: async (node: Node, strBit: string, strSection: string, strHead: string) => {
+    const section = new BN(strSection);
+    const headHash = strHead ? Buffer.from(strHead, 'hex') : (await node.db.getCanonicalHeader(section.addn(1).muln(constants.BloomBitsBlocks).subn(1))).hash();
+    const bits = await node.db.getBloomBits(Number(strBit), section, headHash);
+    logger.info('bits', Buffer.from(bits).toString('hex'));
   }
 };
 

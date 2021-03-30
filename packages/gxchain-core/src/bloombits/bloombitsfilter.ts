@@ -88,6 +88,7 @@ export class BloomBitsFilter {
     return logs;
   }
 
+  // TODO: unindexed bloom.
   async filterRange(from: BN, to: BN, addresses: Address[], topics: ((Buffer | null)[] | null)[]) {
     let logs: Log[] = [];
     const blooms: number[][] = [];
@@ -99,7 +100,8 @@ export class BloomBitsFilter {
       }
     }
 
-    const maxSection = await this.db.getStoredSectionCount();
+    let maxSection = await this.db.getStoredSectionCount();
+    maxSection = maxSection ? maxSection : new BN(0);
     let fromSection = from.divn(constants.BloomBitsBlocks);
     let toSection = to.divn(constants.BloomBitsBlocks);
     fromSection = fromSection.gt(maxSection) ? maxSection : fromSection;

@@ -271,14 +271,14 @@ export class Database extends DBManager {
       return new BN(await this.rawdb.get('scount'));
     } catch (err) {
       if (err.type === 'NotFoundError') {
-        return new BN(0);
+        return undefined;
       }
       throw err;
     }
   }
 
-  async setStoredSectionCount(section: BN) {
-    await this.rawdb.put('scount', section.toString());
+  async setStoredSectionCount(section: BN | undefined) {
+    section === undefined ? await this.rawdb.del('scount') : await this.rawdb.put('scount', section.toString());
   }
 }
 

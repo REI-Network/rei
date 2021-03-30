@@ -29,7 +29,7 @@ export class ChainIndexer {
   // TODO: get a aborter from node.
   private readonly headerQueue = new AsyncChannel<BlockHeader>({ max: 1, isAbort: () => false });
 
-  private storedSections!: BN;
+  private storedSections: BN | undefined;
 
   constructor(options: ChainIndexerOptions) {
     this.sectionSize = options.sectionSize;
@@ -72,34 +72,39 @@ export class ChainIndexer {
 
   private async newHeader(number: BN, reorg: boolean) {
     if (reorg) {
-      const sections = number.divn(this.sectionSize);
-      if (!sections.eq(this.storedSections)) {
+      const sections = number.gtn(this.confirmsBlockNumber) ? number.subn(this.confirmsBlockNumber).divn(this.sectionSize) : new BN(0);
+      if (this.storedSections === undefined || !sections.eq(this.storedSections)) {
         await this.backend.prune(sections);
-        this.storedSections = sections.clone();
+        if (number.gtn(this.confirmsBlockNumber)) {
+          this.storedSections = sections.clone();
+        } else {
+          this.storedSections = undefined;
+        }
         await this.node.db.setStoredSectionCount(this.storedSections);
       }
       return;
     }
-    const confirmedSections = number.gtn(this.confirmsBlockNumber) ? number.subn(this.confirmsBlockNumber).divn(this.sectionSize) : new BN(0);
-    while (confirmedSections.gt(this.storedSections)) {
-      // store new sections.
-      const currentSections = this.storedSections;
-      this.backend.reset(currentSections);
-      let lastHeader = currentSections.gtn(0) ? await this.node.db.getCanonicalHeader(currentSections.muln(this.sectionSize).subn(1)) : undefined;
-      // the first header number of the next section.
-      const maxNum = currentSections.addn(1).muln(this.sectionSize);
-      for (const num = currentSections.muln(this.sectionSize); num.lt(maxNum); num.iaddn(1)) {
-        const header = await this.node.db.getCanonicalHeader(num);
-        if (lastHeader !== undefined && !header.parentHash.equals(lastHeader.hash())) {
-          throw new Error(`parentHash is'not match, last: ${lastHeader.number.toString()}, current: ${header.number.toString()}`);
+    let confirmedSections: BN | undefined = number.gtn(this.confirmsBlockNumber) ? number.subn(this.confirmsBlockNumber).divn(this.sectionSize) : new BN(0);
+    confirmedSections = confirmedSections.gtn(0) ? confirmedSections.subn(1) : undefined;
+    if (confirmedSections !== undefined && (this.storedSections === undefined || confirmedSections.gt(this.storedSections))) {
+      for (const currentSections = this.storedSections ? this.storedSections.clone() : new BN(0); confirmedSections.gte(currentSections); currentSections.iaddn(1)) {
+        this.backend.reset(currentSections);
+        let lastHeader = currentSections.gtn(0) ? await this.node.db.getCanonicalHeader(currentSections.muln(this.sectionSize).subn(1)) : undefined;
+        // the first header number of the next section.
+        const maxNum = currentSections.addn(1).muln(this.sectionSize);
+        for (const num = currentSections.muln(this.sectionSize); num.lt(maxNum); num.iaddn(1)) {
+          const header = await this.node.db.getCanonicalHeader(num);
+          if (lastHeader !== undefined && !header.parentHash.equals(lastHeader.hash())) {
+            throw new Error(`parentHash is'not match, last: ${lastHeader.number.toString()}, current: ${header.number.toString()}`);
+          }
+          await this.backend.process(header);
+          lastHeader = header;
         }
-        await this.backend.process(header);
-        lastHeader = header;
+        await this.backend.commit();
+        // save stored section count.
+        await this.node.db.setStoredSectionCount(currentSections);
+        this.storedSections = currentSections.clone();
       }
-      await this.backend.commit();
-      this.storedSections.iaddn(1);
-      // save stored section count.
-      await this.node.db.setStoredSectionCount(this.storedSections);
     }
   }
 }

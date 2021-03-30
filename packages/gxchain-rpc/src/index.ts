@@ -8,7 +8,6 @@ import { Controller } from './controller';
 import { logger } from '@gxchain2/utils';
 import { v4 as uuidv4 } from 'uuid';
 
-export let soketMap: WeakMap<WebSocket, string> = new WeakMap();
 export class RpcServer extends EventEmitter {
   protected readonly port: number;
   protected readonly host: string;
@@ -39,10 +38,8 @@ export class RpcServer extends EventEmitter {
         app.use(jsonmid.makeMiddleWare((err) => this.emit('error', err)));
         app.ws('/', async (ws) => {
           jsonmid.wrapWs(ws, (err) => this.emit('error', err));
-          await jsonmid.addWsmap(ws, uuidv4(), soketMap);
           ws.on('error', (err) => this.emit('error', err));
           ws.on('close', (ws) => {
-            soketMap.delete(ws);
             console.log('deleted');
           });
         });

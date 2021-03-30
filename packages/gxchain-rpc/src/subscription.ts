@@ -5,26 +5,35 @@ function randomIDGenetator(): string {
   return uuidv4();
 }
 
-class Subscription {
+type FilterQuery = {
+  BlockHash: Buffer;
+  FromBlock: number;
+  ToBlock: number;
+  Addresses: Buffer[];
+  Topics: Buffer[][];
+};
+
+type subscription = {
   ID: string;
+  typ: string;
+  created: string;
   namespace: string;
   activated: boolean;
-  constructor(namespace: string) {
-    this.ID = randomIDGenetator();
-    this.namespace = namespace;
-    this.activated = true;
-  }
+  logsCrit: FilterQuery;
+  logs: Buffer[];
+  hashes: Buffer;
+  headers: Buffer;
+};
 
-  notify(id: string, data: any) {
-    if (this.ID != id) {
-      ws.send('Notify with wrong ID');
-      return;
-    }
-    if (this.activated) {
-      ws.send(JSON.stringify(data));
-    }
-  }
-}
+// notify(id: string, data: any) {
+//   if (this.ID != id) {
+//     ws.send('Notify with wrong ID');
+//     return;
+//   }
+//   if (this.activated) {
+//     ws.send(JSON.stringify(data));
+//   }
+// }
 
 const deadline = 5 * 60 * 1000;
 type filter = {
@@ -90,5 +99,8 @@ class Filters {
     }
   }
 
-  newPendingTransactionFilter(typ: string, ws: WebSocket) {}
+  newPendingTransactionFilter(uid: string) {
+    let newfilter: filter = { typ: 'PendingTransactionsSubscription', lifetime: Date.now() };
+    this.HttpPendingMap.set(uid, newfilter);
+  }
 }

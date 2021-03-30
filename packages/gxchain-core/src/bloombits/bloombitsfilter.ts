@@ -5,9 +5,8 @@ import { Block } from '@gxchain2/block';
 import { createBNFunctionalMap, createBNFunctionalSet } from '@gxchain2/utils';
 import { Log } from '@gxchain2/receipt';
 
-function calcBloomIndexes(data: Buffer) {
+export function calcBloomIndexes(data: Buffer) {
   data = keccak256(data);
-  console.log('hash', data.toString('hex'));
   const mask = 2047; // binary 11111111111
 
   const idxs: number[] = [];
@@ -15,7 +14,7 @@ function calcBloomIndexes(data: Buffer) {
     const first2bytes = data.readUInt16BE(i * 2);
     const loc = mask & first2bytes;
     const byteLoc = loc >> 3;
-    idxs.push((256 - byteLoc - 1) * 8 - (loc % 8));
+    idxs.push((256 - byteLoc - 1) * 8 + (loc % 8));
   }
   return idxs;
 }
@@ -100,8 +99,11 @@ export class BloomBitsFilter {
       }
     }
 
-    const fromSection = from.divn(constants.BloomBitsBlocks);
-    const toSection = to.divn(constants.BloomBitsBlocks);
+    const maxSection = await this.db.getStoredSectionCount();
+    let fromSection = from.divn(constants.BloomBitsBlocks);
+    let toSection = to.divn(constants.BloomBitsBlocks);
+    fromSection = fromSection.gt(maxSection) ? maxSection : fromSection;
+    toSection = toSection.gt(maxSection) ? maxSection : toSection;
     for (const section = fromSection.clone(); section.lte(toSection); section.iaddn(1)) {
       // create a map to record checked block numbers.
       const checkedNums = createBNFunctionalSet();

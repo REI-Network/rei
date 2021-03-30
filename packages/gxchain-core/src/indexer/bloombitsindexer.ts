@@ -2,11 +2,15 @@ import { BlockHeader } from '@ethereumjs/block';
 import { BN } from 'ethereumjs-util';
 import { constants } from '@gxchain2/common';
 import { DBSaveBloomBits, DBOp } from '@gxchain2/database';
-import { ChainIndexer, ChainIndexerBackend, ChainIndexerOptions } from './chainindexer';
+import { ChainIndexer, ChainIndexerBackend } from './chainindexer';
 import { BloomBitsGenerator } from '../bloombits';
 import { Node } from '../node';
 
-export interface BloomBitsIndexerOptions extends ChainIndexerOptions {}
+export interface BloomBitsIndexerOptions {
+  node: Node;
+  sectionSize: number;
+  confirmsBlockNumber: number;
+}
 
 export class BloomBitsIndexer implements ChainIndexerBackend {
   private readonly sectionSize: number;
@@ -15,7 +19,7 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
   private section!: BN;
   private headerHash!: Buffer;
 
-  static createBloomBitsIndexer(options) {
+  static createBloomBitsIndexer(options: BloomBitsIndexerOptions) {
     return new ChainIndexer(Object.assign(options, { backend: new BloomBitsIndexer(options) }));
   }
 

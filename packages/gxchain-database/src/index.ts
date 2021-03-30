@@ -18,8 +18,8 @@ const receiptsKey = (n: BN, hash: Buffer) => Buffer.concat([RECEIPTS_PREFIX, buf
 const txLookupKey = (hash: Buffer) => Buffer.concat([TX_LOOKUP_PREFIX, hash]);
 const bloomBitsKey = (bit: number, section: BN, hash: Buffer) => {
   const buf = Buffer.alloc(10);
-  buf.writeInt16BE(bit);
-  buf.writeBigInt64BE(BigInt(section.toString()), 2);
+  buf.writeUInt16BE(bit);
+  buf.writeBigUInt64BE(BigInt(section.toString()), 2);
   return Buffer.concat([BLOOM_BITS_PREFIX, buf, hash]);
 };
 
@@ -145,6 +145,10 @@ export class Database extends DBManager {
     });
   }
 
+  get rawdb(): LevelUp {
+    return (this as any)._db;
+  }
+
   async get(dbOperationTarget: DBTarget, key?: DatabaseKey): Promise<any> {
     const dbGetOperation = DBOp_get(dbOperationTarget, key);
 
@@ -260,6 +264,21 @@ export class Database extends DBManager {
         );
       });
     }
+  }
+
+  async getStoredSectionCount() {
+    try {
+      return new BN(await this.rawdb.get('scount'));
+    } catch (err) {
+      if (err.type === 'NotFoundError') {
+        return undefined;
+      }
+      throw err;
+    }
+  }
+
+  async setStoredSectionCount(section: BN | undefined) {
+    section === undefined ? await this.rawdb.del('scount') : await this.rawdb.put('scount', section.toString());
   }
 }
 

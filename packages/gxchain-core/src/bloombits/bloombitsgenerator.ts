@@ -24,10 +24,10 @@ export class BloomBitsGenerator {
     if (this.nextSec !== index) {
       throw new Error('nextSec not equal to index');
     }
-    const byteIndex = this.nextSec / 8;
+    const byteIndex = Math.floor(this.nextSec / 8);
     const bitIndex = 7 - (this.nextSec % 8);
     for (let byt = 0; byt < constants.BloomByteLength; byt++) {
-      const bloomByte = bloom[constants.BloomByteLength - 1 - byt];
+      const bloomByte = bloom[byt];
       if (bloomByte === 0) {
         continue;
       }

@@ -114,7 +114,7 @@ export class Log {
     if (!Array.isArray(values)) {
       throw new Error('Invalid serialized log input. Must be array');
     }
-    return Receipt.fromValuesArray(values);
+    return Log.fromValuesArray(values);
   }
 
   public static fromValuesArray(values: LogRawValues): Log {

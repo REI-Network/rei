@@ -37,12 +37,11 @@
 
 // const deadline = 5 * 60 * 1000;
 // type filter = {
-//   type: string;
+//   typ: string;
 //   lifetime: number;
 //   hashes: Buffer[];
 //   logs: Buffer[];
-//   queryInfo: FilterQuery;
-//   notify: (data: any) => void;
+//   s: Subscription;
 // };
 
 // class Filters {
@@ -50,24 +49,20 @@
 
 //   private readonly initPromise: Promise<void>;
 
-//   private readonly WsPendingTransactionsMap: FunctionalMap<string, filter>;
-//   private readonly WsPendingLogsMap: FunctionalMap<string, filter>;
+//   private readonly WsPendingMap: FunctionalMap<string, filter>;
 //   private readonly WsLogMap: FunctionalMap<string, filter>;
 //   private readonly WsHeadMap: FunctionalMap<string, filter>;
-//   private readonly HttpPendingTransactionsMap: FunctionalMap<string, filter>;
-//   private readonly HttpPendingLogsMap: FunctionalMap<string, filter>;
+//   private readonly HttpPendingMap: FunctionalMap<string, filter>;
 //   private readonly HttpLogMap: FunctionalMap<string, filter>;
 //   private readonly HttpHeadMap: FunctionalMap<string, filter>;
 
 //   constructor() {
 //     this.initPromise = this.init();
-//     this.WsPendingTransactionsMap = createStringFunctionalMap<filter>();
-//     this.WsPendingLogsMap = createStringFunctionalMap<filter>();
+//     this.WsPendingMap = createStringFunctionalMap<filter>();
 //     this.WsHeadMap = createStringFunctionalMap<filter>();
 //     this.WsLogMap = createStringFunctionalMap<filter>();
 //     this.HttpHeadMap = createStringFunctionalMap<filter>();
-//     this.HttpPendingTransactionsMap = createStringFunctionalMap<filter>();
-//     this.HttpPendingLogsMap = createStringFunctionalMap<filter>();
+//     this.HttpPendingMap = createStringFunctionalMap<filter>();
 //     this.HttpLogMap = createStringFunctionalMap<filter>();
 
 //     this.timeoutLoop();
@@ -104,31 +99,8 @@
 //     }
 //   }
 
-//   wsSubscibe(client: any, queryInfo: FilterQuery) {
-//     // if queryInfo.type === 'PendingTransactions';
-//     this.WsPendingTransactionsMap.set(client.id, 'filter' as any);
-//   }
-
-//   httpSubscribe(filter: any, queryInfo: FilterQuery) {
-//     // if queryInfo.type === 'PendingTransactions';
-//     this.HttpPendingTransactionsMap.set(filter.id, 'filter' as any);
-//   }
-
-//   httpFilterChanged(id: string, type: string) {
-//     // if type === 'PendingTransactions';
-//     const filterInfo = this.HttpPendingTransactionsMap.get(id);
-//     return filterInfo?.logs; // or filterInfo.hashes
-//     // ilterInfo?.logs = []
-//   }
-
-//   newPendingTransactions(hash: Buffer) {
-//     for (const [id, filterInfo] of this.WsPendingTransactionsMap) {
-//       // if (filterInfo.queryInfo) { 判断是否符合条件
-//       // filterInfo.notify(...).
-//     }
-//     for (const [id, filterInfo] of this.HttpPendingTransactionsMap) {
-//       // if (filterInfo.queryInfo) { 判断是否符合条件
-//       // filterInfo.hashes.push(hash);
-//     }
+//   newPendingTransactionFilter(uid: string) {
+//     let newfilter: filter = { typ: 'PendingTransactionsSubscription', lifetime: Date.now() };
+//     this.HttpPendingMap.set(uid, newfilter);
 //   }
 // }

@@ -117,13 +117,6 @@ export class JsonRPCMiddleware {
     });
   }
 
-  async addWsmap(ws: WebSocket, uid: string, map: WeakMap<WebSocket, string>) {
-    console.log('start map');
-    console.log(uid);
-    map.set(ws, uid);
-    console.log(map.get(ws));
-  }
-
   makeMiddleWare(onError: (err: any) => void) {
     return (req, res, next) => {
       if (req.ws) {

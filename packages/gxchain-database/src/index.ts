@@ -18,8 +18,8 @@ const receiptsKey = (n: BN, hash: Buffer) => Buffer.concat([RECEIPTS_PREFIX, buf
 const txLookupKey = (hash: Buffer) => Buffer.concat([TX_LOOKUP_PREFIX, hash]);
 const bloomBitsKey = (bit: number, section: BN, hash: Buffer) => {
   const buf = Buffer.alloc(10);
-  buf.writeInt16BE(bit);
-  buf.writeBigInt64BE(BigInt(section.toString()), 2);
+  buf.writeUInt16BE(bit);
+  buf.writeBigUInt64BE(BigInt(section.toString()), 2);
   return Buffer.concat([BLOOM_BITS_PREFIX, buf, hash]);
 };
 

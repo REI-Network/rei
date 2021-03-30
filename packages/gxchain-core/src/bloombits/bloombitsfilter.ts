@@ -88,9 +88,14 @@ export class BloomBitsFilter {
     return logs;
   }
 
-  // TODO: unindexed bloom.
   async filterRange(from: BN, to: BN, addresses: Address[], topics: ((Buffer | null)[] | null)[]) {
     let logs: Log[] = [];
+    const append = (_logs: Log[]) => {
+      logs = logs.concat(_logs);
+      if (logs.length > 10000) {
+        throw new Error('query returned more than 10000 results');
+      }
+    };
     const blooms: number[][] = [];
     for (const bufArray of ([addresses.map((addr) => addr.buf)] as (Buffer | null)[][]).concat(topics.filter((val) => val !== null) as (Buffer | null)[][])) {
       for (const buf of bufArray) {
@@ -153,10 +158,16 @@ export class BloomBitsFilter {
         for (const num = fromBlock.clone(); num.lt(toBlock); num.iaddn(1)) {
           if (!checkedNums.has(num) && this.checkSingleNumber(bits, sectionStart, num)) {
             checkedNums.add(num.clone());
-            logs = logs.concat(await this.filterBlock(num, addresses, topics));
+            append(await this.filterBlock(num, addresses, topics));
           }
         }
       }
+    }
+
+    // query unindexed logs.
+    const maxIndexedBlockNumber = maxSection.addn(1).muln(constants.BloomBitsBlocks).subn(1);
+    for (const num = maxIndexedBlockNumber.addn(1); num.lte(to); num.iaddn(1)) {
+      append(await this.filterBlock(num, addresses, topics));
     }
     return logs;
   }

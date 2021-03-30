@@ -29,24 +29,6 @@ const bnCompare = (a: BN, b: BN) => {
   return 0;
 };
 
-const stringCompare = (a: string, b: string) => {
-  if (a.length < b.length) {
-    return -1;
-  }
-  if (a.length > b.length) {
-    return 1;
-  }
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] < b[i]) {
-      return -1;
-    }
-    if (a[i] > b[i]) {
-      return 1;
-    }
-  }
-  return 0;
-};
-
 export class FunctionalMapIterator<T> implements IterableIterator<T> {
   protected readonly rbtreeIt;
   private stop = false;
@@ -183,10 +165,6 @@ export function createBufferFunctionalMap<T>() {
 
 export function createBNFunctionalMap<T>() {
   return new FunctionalMap<BN, T>(bnCompare);
-}
-
-export function createStringFunctionalMap<T>() {
-  return new FunctionalMap<string, T>(stringCompare);
 }
 
 class FunctionalSetValueIterator<T> extends FunctionalMapIterator<T> {

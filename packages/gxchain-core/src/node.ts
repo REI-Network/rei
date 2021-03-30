@@ -17,6 +17,7 @@ import { hexStringToBuffer, AsyncChannel, Aborter, logger } from '@gxchain2/util
 import { FullSynchronizer, Synchronizer } from './sync';
 import { TxFetcher } from './txsync';
 import { Miner } from './miner';
+import { BloomBitsIndexer, ChainIndexer } from './indexer';
 
 export interface NodeOptions {
   databasePath: string;
@@ -66,6 +67,8 @@ export class Node {
   public txPool!: TxPool;
   public miner!: Miner;
   public txSync!: TxFetcher;
+
+  public bloomBitsIndexer!: ChainIndexer;
 
   private readonly options: NodeOptions;
   private readonly initPromise: Promise<void>;
@@ -251,6 +254,9 @@ export class Node {
     this.miner = new Miner(this, this.options.mine);
     await this.txPool.init();
     this.txSync = new TxFetcher(this);
+
+    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: constants.BloomBitsBlocks, confirmsBlockNumber: constants.ConfirmsBlockNumber });
+    await this.bloomBitsIndexer.init();
   }
 
   /**
@@ -334,7 +340,7 @@ export class Node {
               peer.announceNewBlock(block);
             }
           }
-          await Promise.all([this.txPool.newBlock(block), this.miner.worker.newBlock(block)]);
+          await Promise.all([this.txPool.newBlock(block), this.miner.worker.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)]);
         }
       } catch (err) {
         logger.error('Node::taskLoop, catch error:', err);

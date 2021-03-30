@@ -11,6 +11,7 @@ import { RpcServer } from '@gxchain2/rpc';
 import { constants } from '@gxchain2/common';
 import { Transaction } from '@gxchain2/tx';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
+import { BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
 
 const args = process.argv.slice(2);
 
@@ -21,6 +22,18 @@ const keyPair = new Map<string, Buffer>([
 
 const getPrivateKey = (address: string): Buffer => {
   return keyPair.get(address)!;
+};
+
+// addresses, a list of address, splited by `,`
+// topics, a list of topic, splited by `,` and each subTopic splited by `;`.
+const parseAddressAndTopic = (addresses: string, topics: string) => {
+  const addressArray = addresses ? addresses.split(',').map((addr) => Address.fromString(addr)) : [];
+  const topicArray = topics
+    ? topics.split(',').map((topic): Buffer[] | null => {
+        return topic === 'null' ? null : topic.split(';').map((subTopic) => hexStringToBuffer(subTopic));
+      })
+    : [];
+  return { addressArray, topicArray };
 };
 
 const handler: {
@@ -60,7 +73,7 @@ const handler: {
   lsreceipt: async (node: Node, hash: string) => {
     try {
       const receipt = await node.db.getReceipt(hexStringToBuffer(hash));
-      logger.info(receipt.toRPCJSON());
+      logger.info(JSON.stringify(receipt.toRPCJSON()));
     } catch (err) {
       if (err.type === 'NotFoundError') {
         return;
@@ -126,6 +139,21 @@ const handler: {
   },
   lstxpool: async (node: Node) => {
     await node.txPool.ls();
+  },
+  lsscount: async (node: Node) => {
+    console.log('scount', new BN(await node.rawdb.get('scount')).toString());
+  },
+  filterblock: async (node: Node, number: string, addresses: string, topics: string) => {
+    const { addressArray, topicArray } = parseAddressAndTopic(addresses, topics);
+    const filter = new BloomBitsFilter({ db: node.db, sectionSize: constants.BloomBitsBlocks });
+    const logs = await filter.filterBlock(new BN(number), addressArray, topicArray);
+    logs.forEach((log) => console.log(log.toRPCJSON()));
+  },
+  filterrange: async (node: Node, from: string, to: string, addresses: string, topics: string) => {
+    const { addressArray, topicArray } = parseAddressAndTopic(addresses, topics);
+    const filter = new BloomBitsFilter({ db: node.db, sectionSize: constants.BloomBitsBlocks });
+    const logs = await filter.filterRange(new BN(from), new BN(to), addressArray, topicArray);
+    logs.forEach((log) => console.log(log.toRPCJSON()));
   }
 };
 

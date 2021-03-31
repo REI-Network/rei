@@ -1,9 +1,10 @@
+import { Address, bnToHex, bufferToHex, keccakFromHexString, toBuffer, BN } from 'ethereumjs-util';
 import { Node } from '@gxchain2/core';
 import { Block, WrappedBlock } from '@gxchain2/block';
-import { Address, bnToHex, bufferToHex, keccakFromHexString, toBuffer, BN } from 'ethereumjs-util';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
-import * as helper from './helper';
 import { hexStringToBuffer, hexStringToBN, logger } from '@gxchain2/utils';
+import { Log } from '@gxchain2/receipt';
+import * as helper from './helper';
 import { RpcContext } from './jsonrpcmiddleware';
 
 type CallData = {
@@ -16,10 +17,56 @@ type CallData = {
   nonce?: string | BN;
 };
 
+type TopicsData = (string | null | (string | null)[])[];
+
+function parseAddressesAndTopics(_addresses?: string[], _topics?: TopicsData) {
+  const addresses: Address[] = _addresses ? _addresses.map((addr) => Address.fromString(addr)) : [];
+  const topics: (Buffer | null | (Buffer | null)[])[] = _topics
+    ? _topics.map((topic) => {
+        if (topic === null) {
+          return null;
+        } else if (typeof topic === 'string') {
+          return hexStringToBuffer(topic);
+        } else if (Array.isArray(topic)) {
+          return topic.map((subTopic) => {
+            if (subTopic === null) {
+              return null;
+            }
+            if (typeof subTopic !== 'string') {
+              helper.throwRpcErr('Invalid topic type');
+            }
+            return hexStringToBuffer(subTopic);
+          });
+        } else {
+          helper.throwRpcErr('Invalid topic type');
+          // for types.
+          return null;
+        }
+      })
+    : [];
+  return { addresses, topics };
+}
+
 export class Controller {
   node: Node;
   constructor(node: Node) {
     this.node = node;
+  }
+
+  private async getBlockNumberByTag(tag: string): Promise<BN> {
+    if (tag === 'earliest') {
+      return new BN(0);
+    } else if (tag === 'latest' || tag === undefined) {
+      return this.node.blockchain.latestBlock.header.number.clone();
+    } else if (tag === 'pending') {
+      return this.node.blockchain.latestBlock.header.number.addn(1);
+    } else if (Number.isInteger(Number(tag))) {
+      return new BN(tag);
+    } else {
+      helper.throwRpcErr('Invalid tag value');
+      // for types.
+      return new BN(0);
+    }
   }
 
   private async getBlockByTag(tag: string): Promise<Block> {
@@ -294,7 +341,13 @@ export class Controller {
   //eth_uninstallFilter
   //eth_getFilterChanges
   //eth_getFilterLogs
-  //eth_getLogs
+  async eth_getLogs([{ fromBlock, toBlock, address: _addresses, topics: _topics, blockhash }]: [{ fromBlock?: string; toBlock?: string; address?: string[]; topics?: TopicsData; blockhash?: string }]) {
+    const from = await this.getBlockNumberByTag(fromBlock ? fromBlock : 'latest');
+    const to = await this.getBlockNumberByTag(toBlock ? toBlock : 'latest');
+    const { addresses, topics } = parseAddressesAndTopics(_addresses, _topics);
+    const filter = this.node.getFilter();
+    return blockhash ? await filter.filterBlock(hexStringToBuffer(blockhash), addresses, topics) : await filter.filterRange(from, to, addresses, topics);
+  }
   async eth_getWork() {
     helper.throwRpcErr('Unsupported eth_getWork!');
   }
@@ -304,33 +357,9 @@ export class Controller {
   async eth_submitHashrate() {
     helper.throwRpcErr('Unsupported eth_submitHashrate!');
   }
-  async eth_subscribe([type, options]: ['newHeads' | 'logs' | 'newPendingTransactions' | 'syncing', undefined | { address?: string[]; topics?: (string | null | (string | null)[])[] }], context: RpcContext) {
+  async eth_subscribe([type, options]: ['newHeads' | 'logs' | 'newPendingTransactions' | 'syncing', undefined | { address?: string[]; topics?: TopicsData }], context: RpcContext) {
     if (type === 'logs') {
-      const addresses: Buffer[] = options && options.address ? options.address.map((addr) => hexStringToBuffer(addr)) : [];
-      const topics: (Buffer | null | (Buffer | null)[])[] =
-        options && options.topics
-          ? options.topics.map((topic) => {
-              if (topic === null) {
-                return null;
-              } else if (typeof topic === 'string') {
-                return hexStringToBuffer(topic);
-              } else if (Array.isArray(topic)) {
-                return topic.map((subTopic) => {
-                  if (subTopic === null) {
-                    return null;
-                  }
-                  if (typeof subTopic !== 'string') {
-                    helper.throwRpcErr('Invalid topic type');
-                  }
-                  return hexStringToBuffer(subTopic);
-                });
-              } else {
-                helper.throwRpcErr('Invalid topic type');
-                // for types
-                return null;
-              }
-            })
-          : [];
+      const { addresses, topics } = parseAddressesAndTopics(options?.address, options?.topics);
       // TODO: create a FilterQuery object to subscribe message.
     }
   }

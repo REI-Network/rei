@@ -18,6 +18,7 @@ import { FullSynchronizer, Synchronizer } from './sync';
 import { TxFetcher } from './txsync';
 import { Miner } from './miner';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
+import { BloomBitsFilter } from './bloombits';
 
 export interface NodeOptions {
   databasePath: string;
@@ -284,6 +285,10 @@ export class Node {
         blockchain: this.blockchain
       })
     );
+  }
+
+  getFilter() {
+    return new BloomBitsFilter({ node: this, sectionSize: constants.BloomBitsBlocks });
   }
 
   private async processLoop() {

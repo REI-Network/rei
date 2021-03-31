@@ -304,10 +304,10 @@ export class Controller {
   async eth_submitHashrate() {
     helper.throwRpcErr('Unsupported eth_submitHashrate!');
   }
-  async eth_subscribe([type, options]: ['newHeads' | 'logs' | 'newPendingTransactions' | 'syncing', undefined | { address?: string[]; topics?: (string | string[] | null)[] }], context: RpcContext) {
+  async eth_subscribe([type, options]: ['newHeads' | 'logs' | 'newPendingTransactions' | 'syncing', undefined | { address?: string[]; topics?: (string | null | (string | null)[])[] }], context: RpcContext) {
     if (type === 'logs') {
       const addresses: Buffer[] = options && options.address ? options.address.map((addr) => hexStringToBuffer(addr)) : [];
-      const topics: (Buffer | Buffer[] | null)[] =
+      const topics: (Buffer | null | (Buffer | null)[])[] =
         options && options.topics
           ? options.topics.map((topic) => {
               if (topic === null) {
@@ -316,6 +316,9 @@ export class Controller {
                 return hexStringToBuffer(topic);
               } else if (Array.isArray(topic)) {
                 return topic.map((subTopic) => {
+                  if (subTopic === null) {
+                    return null;
+                  }
                   if (typeof subTopic !== 'string') {
                     helper.throwRpcErr('Invalid topic type');
                   }

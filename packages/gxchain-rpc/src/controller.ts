@@ -230,7 +230,7 @@ export class Controller {
   async eth_getTransactionByHash([hash]: [string]) {
     const hashBuffer = hexStringToBuffer(hash);
     try {
-      return new WrappedTransaction(await this.node.db.getTransaction(hashBuffer)).toRPCJSON();
+      return (await this.node.db.getWrappedTransaction(hashBuffer)).toRPCJSON();
     } catch (err) {
       if (err.type !== 'NotFoundError') {
         throw err;
@@ -244,14 +244,20 @@ export class Controller {
   }
   async eth_getTransactionByBlockHashAndIndex([hash, index]: [string, string]) {
     try {
-      return new WrappedTransaction((await this.node.db.getBlock(hexStringToBuffer(hash))).transactions[Number(index)]).toRPCJSON();
+      const block = await this.node.db.getBlock(hexStringToBuffer(hash));
+      const wtx = new WrappedTransaction(block.transactions[Number(index)]);
+      wtx.installProperties(block, Number(index));
+      return wtx.toRPCJSON();
     } catch (err) {
       return null;
     }
   }
   async eth_getTransactionByBlockNumberAndIndex([tag, index]: [string, string]) {
     try {
-      return new WrappedTransaction((await this.getBlockByTag(tag)).transactions[Number(index)]).toRPCJSON();
+      const block = await this.getBlockByTag(tag);
+      const wtx = new WrappedTransaction(block.transactions[Number(index)]);
+      wtx.installProperties(block, Number(index));
+      return wtx.toRPCJSON();
     } catch (err) {
       return null;
     }

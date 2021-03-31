@@ -341,7 +341,7 @@ export class Controller {
   //eth_uninstallFilter
   //eth_getFilterChanges
   //eth_getFilterLogs
-  async eth_getLogs([{ fromBlock, toBlock, address: _addresses, topics: _topics, blockhash }]: [{ fromBlock?: string; toBlock?: string; address?: string[]; topics?: TopicsData; blockhash?: string }]) {
+  async eth_getLogs([{ fromBlock, toBlock, address: _addresses, topics: _topics, blockhash }]: [{ fromBlock?: string; toBlock?: string; address?: string[]; topics?: TopicsData; blockhash?: string }]): Promise<Log[]> {
     const from = await this.getBlockNumberByTag(fromBlock ? fromBlock : 'latest');
     const to = await this.getBlockNumberByTag(toBlock ? toBlock : 'latest');
     const { addresses, topics } = parseAddressesAndTopics(_addresses, _topics);

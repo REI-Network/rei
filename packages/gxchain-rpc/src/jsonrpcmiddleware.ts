@@ -1,16 +1,30 @@
 import util from 'util';
-
 import * as helper from './helper';
 import errors from './error-codes';
+import { WsClient } from './client';
 import { logger } from '@gxchain2/utils';
 
 type HookFunction = (params: any, result: any) => Promise<any> | any;
 
 type JsonRPCBody = { id: any; method: string; jsonrpc: string; params: any };
 
+export class RpcContext {
+  public readonly wsClient?: WsClient;
+
+  get isWebsocket() {
+    return !!this.wsClient;
+  }
+
+  constructor(wsClient?: WsClient) {
+    this.wsClient = wsClient;
+  }
+}
+
+const emptyContext = new RpcContext();
+
 export interface JsonMiddlewareOption {
   methods: {
-    [name: string]: (params: any) => Promise<any> | any;
+    [name: string]: (params: any, context: RpcContext) => Promise<any> | any;
   };
   beforeMethods?: {
     [name: string]: HookFunction | HookFunction[];
@@ -35,7 +49,7 @@ export class JsonRPCMiddleware {
    * @param {object} body
    * @return {Promise}
    */
-  async handleSingleReq(body: JsonRPCBody): Promise<any> {
+  private async handleSingleReq(body: JsonRPCBody, context: RpcContext): Promise<any> {
     const { id, method, jsonrpc, params } = body;
     try {
       helper.validateJsonRpcVersion(jsonrpc, this.VERSION);
@@ -47,7 +61,7 @@ export class JsonRPCMiddleware {
         await helper.executeHook(beforeMethod, params, null);
       }
 
-      const p = this.config.methods[method](params);
+      const p = this.config.methods[method](params, context);
       const result = util.types.isPromise(p) ? await p : p;
       const afterMethod = this.config.afterMethods && this.config.afterMethods[method];
       if (afterMethod) {
@@ -67,10 +81,10 @@ export class JsonRPCMiddleware {
     }
   }
 
-  handleBatchReq(bachBody: Array<any>): Promise<any> {
+  private handleBatchReq(bachBody: any[], context: RpcContext): Promise<any[]> {
     return Promise.all(
       bachBody.reduce((memo, body) => {
-        const result = this.handleSingleReq(body);
+        const result = this.handleSingleReq(body, context);
         if (!helper.isNil(body.id)) memo.push(result);
         return memo;
       }, [])
@@ -84,51 +98,36 @@ export class JsonRPCMiddleware {
     };
   }
 
-  async rpcMiddleware(rpcData: any, send: (res: any) => void, onParseError: () => void) {
+  private async rpcMiddleware(rpcData: any, send: (res: any) => void, context: RpcContext) {
     if (Array.isArray(rpcData)) {
-      send(await this.handleBatchReq(rpcData));
+      send(await this.handleBatchReq(rpcData, context));
     } else if (typeof rpcData === 'object') {
-      send(await this.handleSingleReq(rpcData));
+      send(await this.handleSingleReq(rpcData, context));
     } else {
-      onParseError();
+      send(this.makeParseError());
     }
   }
 
-  wrapWs(ws: WebSocket, onError: (err: any) => void) {
-    ws.addEventListener('message', (msg) => {
+  wrapWs(wsClient: WsClient) {
+    const context = new RpcContext(wsClient);
+    wsClient.ws.addEventListener('message', (msg) => {
       let rpcData: any;
       try {
         rpcData = JSON.parse(msg.data);
       } catch (err) {
-        ws.send(JSON.stringify(this.makeParseError()));
+        wsClient.send(this.makeParseError());
         return;
       }
-      this.rpcMiddleware(
-        rpcData,
-        (resps: any) => {
-          try {
-            ws.send(JSON.stringify(resps));
-          } catch (err) {
-            onError(err);
-          }
-        },
-        () => ws.send(JSON.stringify(this.makeParseError()))
-      ).catch(onError);
+      this.rpcMiddleware(rpcData, wsClient.send.bind(wsClient), context);
     });
   }
 
-  makeMiddleWare(onError: (err: any) => void) {
-    return (req, res, next) => {
+  makeMiddleWare() {
+    return (req: any, res: any, next: any) => {
       if (req.ws) {
         next();
       } else {
-        this.rpcMiddleware(
-          req.body,
-          (resps: any) => {
-            res.send(resps);
-          },
-          () => res.send(this.makeParseError())
-        ).catch(onError);
+        this.rpcMiddleware(req.body, res.send.bind(res), emptyContext);
       }
     };
   }

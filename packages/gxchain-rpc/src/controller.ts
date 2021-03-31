@@ -4,6 +4,7 @@ import { Address, bnToHex, bufferToHex, keccakFromHexString, toBuffer, BN } from
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import * as helper from './helper';
 import { hexStringToBuffer, hexStringToBN, logger } from '@gxchain2/utils';
+import { RpcContext } from './jsonrpcmiddleware';
 
 type CallData = {
   from?: string;
@@ -230,7 +231,7 @@ export class Controller {
   async eth_getTransactionByHash([hash]: [string]) {
     const hashBuffer = hexStringToBuffer(hash);
     try {
-      return new WrappedTransaction(await this.node.db.getTransaction(hashBuffer)).toRPCJSON();
+      return (await this.node.db.getWrappedTransaction(hashBuffer)).toRPCJSON();
     } catch (err) {
       if (err.type !== 'NotFoundError') {
         throw err;
@@ -244,14 +245,20 @@ export class Controller {
   }
   async eth_getTransactionByBlockHashAndIndex([hash, index]: [string, string]) {
     try {
-      return new WrappedTransaction((await this.node.db.getBlock(hexStringToBuffer(hash))).transactions[Number(index)]).toRPCJSON();
+      const block = await this.node.db.getBlock(hexStringToBuffer(hash));
+      const wtx = new WrappedTransaction(block.transactions[Number(index)]);
+      wtx.installProperties(block, Number(index));
+      return wtx.toRPCJSON();
     } catch (err) {
       return null;
     }
   }
   async eth_getTransactionByBlockNumberAndIndex([tag, index]: [string, string]) {
     try {
-      return new WrappedTransaction((await this.getBlockByTag(tag)).transactions[Number(index)]).toRPCJSON();
+      const block = await this.getBlockByTag(tag);
+      const wtx = new WrappedTransaction(block.transactions[Number(index)]);
+      wtx.installProperties(block, Number(index));
+      return wtx.toRPCJSON();
     } catch (err) {
       return null;
     }
@@ -296,6 +303,36 @@ export class Controller {
   }
   async eth_submitHashrate() {
     helper.throwRpcErr('Unsupported eth_submitHashrate!');
+  }
+  async eth_subscribe([type, options]: ['newHeads' | 'logs' | 'newPendingTransactions' | 'syncing', undefined | { address?: string[]; topics?: (string | null | (string | null)[])[] }], context: RpcContext) {
+    if (type === 'logs') {
+      const addresses: Buffer[] = options && options.address ? options.address.map((addr) => hexStringToBuffer(addr)) : [];
+      const topics: (Buffer | null | (Buffer | null)[])[] =
+        options && options.topics
+          ? options.topics.map((topic) => {
+              if (topic === null) {
+                return null;
+              } else if (typeof topic === 'string') {
+                return hexStringToBuffer(topic);
+              } else if (Array.isArray(topic)) {
+                return topic.map((subTopic) => {
+                  if (subTopic === null) {
+                    return null;
+                  }
+                  if (typeof subTopic !== 'string') {
+                    helper.throwRpcErr('Invalid topic type');
+                  }
+                  return hexStringToBuffer(subTopic);
+                });
+              } else {
+                helper.throwRpcErr('Invalid topic type');
+                // for types
+                return null;
+              }
+            })
+          : [];
+      // TODO: create a FilterQuery object to subscribe message.
+    }
   }
 
   //db_putString

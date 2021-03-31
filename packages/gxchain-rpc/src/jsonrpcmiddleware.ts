@@ -1,7 +1,7 @@
 import util from 'util';
-
 import * as helper from './helper';
 import errors from './error-codes';
+import { WsClient } from './client';
 import { logger } from '@gxchain2/utils';
 
 type HookFunction = (params: any, result: any) => Promise<any> | any;
@@ -84,51 +84,35 @@ export class JsonRPCMiddleware {
     };
   }
 
-  async rpcMiddleware(rpcData: any, send: (res: any) => void, onParseError: () => void) {
+  async rpcMiddleware(rpcData: any, send: (res: any) => void) {
     if (Array.isArray(rpcData)) {
       send(await this.handleBatchReq(rpcData));
     } else if (typeof rpcData === 'object') {
       send(await this.handleSingleReq(rpcData));
     } else {
-      onParseError();
+      send(this.makeParseError());
     }
   }
 
-  wrapWs(ws: WebSocket, onError: (err: any) => void) {
-    ws.addEventListener('message', (msg) => {
+  wrapWs(wsClient: WsClient) {
+    wsClient.ws.addEventListener('message', (msg) => {
       let rpcData: any;
       try {
         rpcData = JSON.parse(msg.data);
       } catch (err) {
-        ws.send(JSON.stringify(this.makeParseError()));
+        wsClient.send(this.makeParseError());
         return;
       }
-      this.rpcMiddleware(
-        rpcData,
-        (resps: any) => {
-          try {
-            ws.send(JSON.stringify(resps));
-          } catch (err) {
-            onError(err);
-          }
-        },
-        () => ws.send(JSON.stringify(this.makeParseError()))
-      ).catch(onError);
+      this.rpcMiddleware(rpcData, wsClient.send.bind(wsClient));
     });
   }
 
-  makeMiddleWare(onError: (err: any) => void) {
-    return (req, res, next) => {
+  makeMiddleWare() {
+    return (req: any, res: any, next: any) => {
       if (req.ws) {
         next();
       } else {
-        this.rpcMiddleware(
-          req.body,
-          (resps: any) => {
-            res.send(resps);
-          },
-          () => res.send(this.makeParseError())
-        ).catch(onError);
+        this.rpcMiddleware(req.body, res.send.bind(res));
       }
     };
   }

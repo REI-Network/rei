@@ -6,7 +6,7 @@ import { Node } from '@gxchain2/core';
 import { JsonRPCMiddleware } from './jsonrpcmiddleware';
 import { Controller } from './controller';
 import { logger } from '@gxchain2/utils';
-import { v4 as uuidv4 } from 'uuid';
+import { WsClient } from './client';
 
 export class RpcServer extends EventEmitter {
   protected readonly port: number;
@@ -35,12 +35,13 @@ export class RpcServer extends EventEmitter {
         const jsonmid = new JsonRPCMiddleware({ methods: this.controller as any });
 
         app.use(express.json({ type: '*/*' }));
-        app.use(jsonmid.makeMiddleWare((err) => this.emit('error', err)));
-        app.ws('/', async (ws) => {
-          jsonmid.wrapWs(ws, (err) => this.emit('error', err));
+        app.use(jsonmid.makeMiddleWare());
+        app.ws('/', (ws) => {
+          const wsClient = new WsClient(ws);
+          jsonmid.wrapWs(wsClient);
           ws.on('error', (err) => this.emit('error', err));
-          ws.on('close', (ws) => {
-            console.log('deleted');
+          ws.on('close', () => {
+            wsClient.close();
           });
         });
 

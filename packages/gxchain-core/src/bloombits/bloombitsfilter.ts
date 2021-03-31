@@ -104,8 +104,15 @@ export class BloomBitsFilter {
         }
       }
     }
-
     const latestHeader = await this.node.blockchain.getLatestHeader();
+    // if addresses and topics is empty, return all logs between from and to.
+    if (blooms.length === 0) {
+      for (const num = from.gt(latestHeader.number) ? latestHeader.number.clone() : from.clone(); num.lte(to) && num.lte(latestHeader.number); num.iaddn(1)) {
+        append(await this.filterBlock(num, addresses, topics));
+      }
+      return logs;
+    }
+
     let maxSection = await this.node.db.getStoredSectionCount();
     if (maxSection !== undefined) {
       // query indexed logs.

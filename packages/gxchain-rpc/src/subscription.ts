@@ -1,106 +1,211 @@
-// import { uuidv4 } from 'uuid';
-// import { Aborter, FunctionalMap, createStringFunctionalMap } from '@gxchain2/utils';
+import { uuidv4 } from 'uuid';
+import { Aborter } from '@gxchain2/utils';
+import { Log } from '@gxchain2/receipt';
 
-// function randomIDGenetator(): string {
-//   return uuidv4();
-// }
+type FilterQuery = {
+  type: string;
+  BlockHash: Buffer;
+  FromBlock: number;
+  ToBlock: number;
+  Addresses: Buffer[];
+  Topics: Buffer[][];
+};
 
-// type FilterQuery = {
-//   BlockHash: Buffer;
-//   FromBlock: number;
-//   ToBlock: number;
-//   Addresses: Buffer[];
-//   Topics: Buffer[][];
-// };
+const deadline = 5 * 60 * 1000;
+type filterInfo = {
+  type: string;
+  createtime: number;
+  hashes: Buffer[];
+  logs: Log[];
+  queryInfo: FilterQuery;
+  notify?: (data: any) => void;
+};
 
-// type subscription = {
-//   ID: string;
-//   typ: string;
-//   created: string;
-//   namespace: string;
-//   activated: boolean;
-//   logsCrit: FilterQuery;
-//   logs: Buffer[];
-//   hashes: Buffer;
-//   headers: Buffer;
-// };
+class FilterSystem {
+  private aborter = new Aborter();
 
-// // notify(id: string, data: any) {
-// //   if (this.ID != id) {
-// //     ws.send('Notify with wrong ID');
-// //     return;
-// //   }
-// //   if (this.activated) {
-// //     ws.send(JSON.stringify(data));
-// //   }
-// // }
+  private readonly initPromise: Promise<void>;
 
-// const deadline = 5 * 60 * 1000;
-// type filter = {
-//   typ: string;
-//   lifetime: number;
-//   hashes: Buffer[];
-//   logs: Buffer[];
-//   s: Subscription;
-// };
+  private readonly WsPendingTransactionsMap: Map<string, filterInfo>;
+  private readonly WsPendingLogsMap: Map<string, filterInfo>;
+  private readonly WsLogMap: Map<string, filterInfo>;
+  private readonly WsHeadMap: Map<string, filterInfo>;
+  private readonly HttpPendingTransactionsMap: Map<string, filterInfo>;
+  private readonly HttpPendingLogsMap: Map<string, filterInfo>;
+  private readonly HttpLogMap: Map<string, filterInfo>;
+  private readonly HttpHeadMap: Map<string, filterInfo>;
 
-// class Filters {
-//   private aborter = new Aborter();
+  constructor() {
+    this.initPromise = this.init();
+    this.WsPendingTransactionsMap = new Map();
+    this.WsPendingLogsMap = new Map();
+    this.WsHeadMap = new Map();
+    this.WsLogMap = new Map();
+    this.HttpHeadMap = new Map();
+    this.HttpPendingTransactionsMap = new Map();
+    this.HttpPendingLogsMap = new Map();
+    this.HttpLogMap = new Map();
 
-//   private readonly initPromise: Promise<void>;
+    this.timeoutLoop();
+  }
+  async abort() {
+    await this.aborter.abort();
+  }
 
-//   private readonly WsPendingMap: FunctionalMap<string, filter>;
-//   private readonly WsLogMap: FunctionalMap<string, filter>;
-//   private readonly WsHeadMap: FunctionalMap<string, filter>;
-//   private readonly HttpPendingMap: FunctionalMap<string, filter>;
-//   private readonly HttpLogMap: FunctionalMap<string, filter>;
-//   private readonly HttpHeadMap: FunctionalMap<string, filter>;
+  async init() {
+    if (this.initPromise) {
+      await this.initPromise;
+      return;
+    }
+  }
 
-//   constructor() {
-//     this.initPromise = this.init();
-//     this.WsPendingMap = createStringFunctionalMap<filter>();
-//     this.WsHeadMap = createStringFunctionalMap<filter>();
-//     this.WsLogMap = createStringFunctionalMap<filter>();
-//     this.HttpHeadMap = createStringFunctionalMap<filter>();
-//     this.HttpPendingMap = createStringFunctionalMap<filter>();
-//     this.HttpLogMap = createStringFunctionalMap<filter>();
+  private async cycleDelete(map: Map<any, any>) {
+    const timenow = Date.now();
+    for await (const [key, filter] of map) {
+      if (timenow - filter.createtime > deadline) {
+        map.delete(key);
+      }
+    }
+  }
 
-//     this.timeoutLoop();
-//   }
-//   async abort() {
-//     await this.aborter.abort();
-//   }
+  private async timeoutLoop() {
+    await this.initPromise;
+    while (!this.aborter.isAborted) {
+      await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, deadline)));
+      if (this.aborter.isAborted) {
+        break;
+      }
+      await this.cycleDelete(this.HttpLogMap);
+      await this.cycleDelete(this.HttpPendingTransactionsMap);
+      await this.cycleDelete(this.HttpLogMap);
+      await this.cycleDelete(this.HttpPendingLogsMap);
+    }
+  }
 
-//   async init() {
-//     if (this.initPromise) {
-//       await this.initPromise;
-//       return;
-//     }
-//   }
+  wsSubscibe(client: any, queryInfo: FilterQuery) {
+    let hashes: Buffer[] = [];
+    let logs: Log[] = [];
+    let filterInstance = { type: queryInfo.type, createtime: Date.now(), hashes: hashes, logs: logs, queryInfo: queryInfo, notify: client.notify };
+    switch (queryInfo.type) {
+      case 'LogsSubscription': {
+        this.WsLogMap.set(client.id, filterInstance);
+        break;
+      }
+      case 'PendingLogsSubscription': {
+        this.WsPendingLogsMap.set(client.id, filterInstance);
+        break;
+      }
+      case 'MinedAndPendingLogsSubscription': {
+        this.WsLogMap.set(client.id, filterInstance);
+        this.WsPendingLogsMap.set(client.id, filterInstance);
+        break;
+      }
+      case 'PendingTransactionsSubscription': {
+        this.WsPendingTransactionsMap.set(client.id, filterInstance);
+        break;
+      }
+      case 'BlocksSubscription': {
+        this.WsHeadMap.set(client.id, filterInstance);
+        break;
+      }
+    }
+  }
 
-//   private async cycleDelete(map: FunctionalMap<any, any>) {
-//     for await (const [key, filter] of map) {
-//       if (Date.now() - filter.lifetime > deadline) {
-//         map.delete(key);
-//       }
-//     }
-//   }
+  httpSubscribe(queryInfo: FilterQuery): string {
+    const uid = uuidv4();
+    let hashes: Buffer[] = [];
+    let logs: Log[] = [];
+    let filterInstance = { type: queryInfo.type, createtime: Date.now(), hashes: hashes, logs: logs, queryInfo: queryInfo };
+    switch (queryInfo.type) {
+      case 'LogsSubscription': {
+        this.WsLogMap.set(uid, filterInstance);
+        break;
+      }
+      case 'PendingLogsSubscription': {
+        this.WsPendingLogsMap.set(uid, filterInstance);
+        break;
+      }
+      case 'MinedAndPendingLogsSubscription': {
+        this.WsLogMap.set(uid, filterInstance);
+        this.WsPendingLogsMap.set(uid, filterInstance);
+        break;
+      }
+      case 'PendingTransactionsSubscription': {
+        this.WsPendingTransactionsMap.set(uid, filterInstance);
+        break;
+      }
+      case 'BlocksSubscription': {
+        this.WsHeadMap.set(uid, filterInstance);
+        break;
+      }
+    }
+    return uid;
+  }
 
-//   private async timeoutLoop() {
-//     await this.initPromise;
-//     while (!this.aborter.isAborted) {
-//       await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, deadline)));
-//       if (this.aborter.isAborted) {
-//         break;
-//       }
-//       await this.cycleDelete(this.HttpLogMap);
-//       await this.cycleDelete(this.HttpLogMap);
-//       await this.cycleDelete(this.HttpPendingMap);
-//     }
-//   }
+  httpFilterChanged(id: string, type: string) {
+    // if type === 'PendingTransactions';
+    switch (type) {
+      case 'LogsSubscription': {
+        const filterInfo = this.HttpLogMap.get(id);
+        const loginfo = filterInfo?.logs;
+        if (filterInfo?.logs) {
+          filterInfo.logs = [];
+        }
+        return loginfo;
+        break;
+      }
+      case 'PendingLogsSubscription': {
+        const filterInfo = this.HttpPendingLogsMap.get(id);
+        const pendingloginfo = filterInfo?.logs;
+        if (filterInfo?.logs) {
+          filterInfo.logs = [];
+        }
+        return pendingloginfo;
+        break;
+      }
+      case 'MinedAndPendingLogsSubscription': {
+        const filterInfo1 = this.HttpPendingLogsMap.get(id);
+        const filterInfo2 = this.HttpLogMap.get(id);
+        const pendingloginfo = filterInfo1?.logs;
+        const loginfo = filterInfo2?.logs;
+        if (filterInfo1?.logs) {
+          filterInfo1.logs = [];
+        }
+        if (filterInfo2?.logs) {
+          filterInfo2.logs = [];
+        }
+        return [pendingloginfo, loginfo];
+        break;
+      }
+      case 'PendingTransactionsSubscription': {
+        const filterInfo = this.HttpPendingTransactionsMap.get(id);
+        const pendingtrxinfo = filterInfo?.hashes;
+        if (filterInfo?.hashes) {
+          filterInfo.hashes = [];
+        }
+        return pendingtrxinfo;
+        break;
+      }
+      case 'BlocksSubscription': {
+        const filterInfo = this.HttpHeadMap.get(id);
+        const headinfo = filterInfo?.hashes;
+        if (filterInfo?.hashes) {
+          filterInfo.hashes = [];
+        }
+        return headinfo;
+        break;
+      }
+    }
+  }
 
-//   newPendingTransactionFilter(uid: string) {
-//     let newfilter: filter = { typ: 'PendingTransactionsSubscription', lifetime: Date.now() };
-//     this.HttpPendingMap.set(uid, newfilter);
-//   }
-// }
+  //   newPendingTransactions(hash: Buffer) {
+  //     for (const [id, filterInfo] of this.WsPendingTransactionsMap) {
+  //       // if (filterInfo.queryInfo) { 判断是否符合条件
+  //       // filterInfo.notify(...).
+  //     }
+  //     for (const [id, filterInfo] of this.HttpPendingTransactionsMap) {
+  //       // if (filterInfo.queryInfo) { 判断是否符合条件
+  //       // filterInfo.hashes.push(hash);
+  //     }
+  //   }
+}

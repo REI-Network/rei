@@ -1,6 +1,7 @@
 import { uuidv4 } from 'uuid';
 import { Aborter } from '@gxchain2/utils';
 import { Log } from '@gxchain2/receipt';
+import { WsClient } from './client';
 
 type FilterQuery = {
   type: string;
@@ -82,10 +83,10 @@ class FilterSystem {
     }
   }
 
-  wsSubscibe(client: any, queryInfo: FilterQuery) {
+  wsSubscibe(client: WsClient, queryInfo: FilterQuery) {
     let hashes: Buffer[] = [];
     let logs: Log[] = [];
-    let filterInstance = { type: queryInfo.type, createtime: Date.now(), hashes: hashes, logs: logs, queryInfo: queryInfo, notify: client.notify };
+    let filterInstance = { type: queryInfo.type, createtime: Date.now(), hashes: hashes, logs: logs, queryInfo: queryInfo, notify: client.send };
     switch (queryInfo.type) {
       case 'LogsSubscription': {
         this.WsLogMap.set(client.id, filterInstance);
@@ -198,14 +199,25 @@ class FilterSystem {
     }
   }
 
-  //   newPendingTransactions(hash: Buffer) {
-  //     for (const [id, filterInfo] of this.WsPendingTransactionsMap) {
-  //       // if (filterInfo.queryInfo) { 判断是否符合条件
-  //       // filterInfo.notify(...).
-  //     }
-  //     for (const [id, filterInfo] of this.HttpPendingTransactionsMap) {
-  //       // if (filterInfo.queryInfo) { 判断是否符合条件
-  //       // filterInfo.hashes.push(hash);
-  //     }
-  //   }
+  newPendingTransactions(hash: Buffer) {
+    for (const [id, filterInfo] of this.WsPendingTransactionsMap) {
+      if (filterInfo.notify) {
+        filterInfo.notify(hash);
+      }
+    }
+    for (const [id, filterInfo] of this.HttpPendingTransactionsMap) {
+      filterInfo.hashes.push(hash);
+    }
+  }
+
+  newHeads(hash: Buffer) {
+    for (const [id, filterInfo] of this.WsHeadMap) {
+      if (filterInfo.notify) {
+        filterInfo.notify(hash);
+      }
+    }
+    for (const [id, filterInfo] of this.HttpHeadMap) {
+      filterInfo.hashes.push(hash);
+    }
+  }
 }

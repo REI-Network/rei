@@ -5,15 +5,16 @@ import { WsClient } from './client';
 
 type FilterQuery = {
   type: string;
-  BlockHash: Buffer;
-  FromBlock: number;
-  ToBlock: number;
-  Addresses: Buffer[];
-  Topics: Buffer[][];
+  blockHash: Buffer;
+  fromBlock: number;
+  toBlock: number;
+  addresses: Buffer[];
+  topics: Buffer[][];
 };
 
 const deadline = 5 * 60 * 1000;
-type filterInfo = {
+
+export type FilterInfo = {
   type: string;
   createtime: number;
   hashes: Buffer[];
@@ -22,31 +23,22 @@ type filterInfo = {
   notify?: (data: any) => void;
 };
 
-class FilterSystem {
+export class FilterSystem {
   private aborter = new Aborter();
 
   private readonly initPromise: Promise<void>;
 
-  private readonly WsPendingTransactionsMap: Map<string, filterInfo>;
-  private readonly WsPendingLogsMap: Map<string, filterInfo>;
-  private readonly WsLogMap: Map<string, filterInfo>;
-  private readonly WsHeadMap: Map<string, filterInfo>;
-  private readonly HttpPendingTransactionsMap: Map<string, filterInfo>;
-  private readonly HttpPendingLogsMap: Map<string, filterInfo>;
-  private readonly HttpLogMap: Map<string, filterInfo>;
-  private readonly HttpHeadMap: Map<string, filterInfo>;
+  private readonly wsPendingTransactionsMap: Map<string, FilterInfo> = new Map();
+  private readonly wsPendingLogsMap: Map<string, FilterInfo> = new Map();
+  private readonly wsLogMap: Map<string, FilterInfo> = new Map();
+  private readonly wsHeadMap: Map<string, FilterInfo> = new Map();
+  private readonly httpPendingTransactionsMap: Map<string, FilterInfo> = new Map();
+  private readonly httpPendingLogsMap: Map<string, FilterInfo> = new Map();
+  private readonly httpLogMap: Map<string, FilterInfo> = new Map();
+  private readonly httpHeadMap: Map<string, FilterInfo> = new Map();
 
   constructor() {
     this.initPromise = this.init();
-    this.WsPendingTransactionsMap = new Map();
-    this.WsPendingLogsMap = new Map();
-    this.WsHeadMap = new Map();
-    this.WsLogMap = new Map();
-    this.HttpHeadMap = new Map();
-    this.HttpPendingTransactionsMap = new Map();
-    this.HttpPendingLogsMap = new Map();
-    this.HttpLogMap = new Map();
-
     this.timeoutLoop();
   }
   async abort() {
@@ -60,7 +52,7 @@ class FilterSystem {
     }
   }
 
-  private cycleDelete(map: Map<string, filterInfo>) {
+  private cycleDelete(map: Map<string, FilterInfo>) {
     const timenow = Date.now();
     for (const [key, filter] of map) {
       if (timenow - filter.createtime > deadline) {
@@ -76,40 +68,42 @@ class FilterSystem {
       if (this.aborter.isAborted) {
         break;
       }
-      this.cycleDelete(this.HttpLogMap);
-      this.cycleDelete(this.HttpPendingTransactionsMap);
-      this.cycleDelete(this.HttpLogMap);
-      this.cycleDelete(this.HttpPendingLogsMap);
+      this.cycleDelete(this.httpLogMap);
+      this.cycleDelete(this.httpPendingTransactionsMap);
+      this.cycleDelete(this.httpLogMap);
+      this.cycleDelete(this.httpPendingLogsMap);
     }
   }
 
-  wsSubscibe(client: WsClient, queryInfo: FilterQuery) {
+  wsSubscibe(client: WsClient, queryInfo: FilterQuery): string {
     let hashes: Buffer[] = [];
     let logs: Log[] = [];
+    const uid = uuidv4();
     let filterInstance = { type: queryInfo.type, createtime: Date.now(), hashes: hashes, logs: logs, queryInfo: queryInfo, notify: client.send };
     switch (queryInfo.type) {
       case 'LogsSubscription': {
-        this.WsLogMap.set(client.id, filterInstance);
+        this.wsLogMap.set(uid, filterInstance);
         break;
       }
       case 'PendingLogsSubscription': {
-        this.WsPendingLogsMap.set(client.id, filterInstance);
+        this.wsPendingLogsMap.set(uid, filterInstance);
         break;
       }
       case 'MinedAndPendingLogsSubscription': {
-        this.WsLogMap.set(client.id, filterInstance);
-        this.WsPendingLogsMap.set(client.id, filterInstance);
+        this.wsLogMap.set(uid, filterInstance);
+        this.wsPendingLogsMap.set(uid, filterInstance);
         break;
       }
       case 'PendingTransactionsSubscription': {
-        this.WsPendingTransactionsMap.set(client.id, filterInstance);
+        this.wsPendingTransactionsMap.set(uid, filterInstance);
         break;
       }
       case 'BlocksSubscription': {
-        this.WsHeadMap.set(client.id, filterInstance);
+        this.wsHeadMap.set(uid, filterInstance);
         break;
       }
     }
+    return uid;
   }
 
   httpSubscribe(queryInfo: FilterQuery): string {
@@ -119,31 +113,51 @@ class FilterSystem {
     let filterInstance = { type: queryInfo.type, createtime: Date.now(), hashes: hashes, logs: logs, queryInfo: queryInfo };
     switch (queryInfo.type) {
       case 'LogsSubscription': {
-        this.WsLogMap.set(uid, filterInstance);
+        this.httpLogMap.set(uid, filterInstance);
         break;
       }
       case 'PendingLogsSubscription': {
-        this.WsPendingLogsMap.set(uid, filterInstance);
+        this.httpPendingLogsMap.set(uid, filterInstance);
         break;
       }
       case 'MinedAndPendingLogsSubscription': {
-        this.WsLogMap.set(uid, filterInstance);
-        this.WsPendingLogsMap.set(uid, filterInstance);
+        this.httpLogMap.set(uid, filterInstance);
+        this.httpPendingLogsMap.set(uid, filterInstance);
         break;
       }
       case 'PendingTransactionsSubscription': {
-        this.WsPendingTransactionsMap.set(uid, filterInstance);
+        this.httpPendingTransactionsMap.set(uid, filterInstance);
         break;
       }
       case 'BlocksSubscription': {
-        this.WsHeadMap.set(uid, filterInstance);
+        this.httpHeadMap.set(uid, filterInstance);
         break;
       }
     }
     return uid;
   }
 
-  private changed(id: string, map: Map<string, filterInfo>, logorhash: boolean) {
+  private removeFromMap(id: string, map: Map<string, FilterInfo>) {
+    if (map.has(id)) {
+      map.delete(id);
+    }
+  }
+
+  wsUnsubscribe(id: string) {
+    this.removeFromMap(id, this.wsHeadMap);
+    this.removeFromMap(id, this.wsLogMap);
+    this.removeFromMap(id, this.wsPendingLogsMap);
+    this.removeFromMap(id, this.wsPendingTransactionsMap);
+  }
+
+  httpUnsubscribe(id: string) {
+    this.removeFromMap(id, this.httpHeadMap);
+    this.removeFromMap(id, this.httpLogMap);
+    this.removeFromMap(id, this.httpPendingLogsMap);
+    this.removeFromMap(id, this.httpPendingTransactionsMap);
+  }
+
+  private changed(id: string, map: Map<string, FilterInfo>, logorhash: boolean) {
     const filterInfo = map.get(id);
     if (logorhash) {
       const info = filterInfo?.logs;
@@ -164,46 +178,45 @@ class FilterSystem {
     // if type === 'PendingTransactions';
     switch (type) {
       case 'LogsSubscription': {
-        return this.changed(id, this.HttpLogMap, true);
-        break;
+        return this.changed(id, this.httpLogMap, true);
       }
       case 'PendingLogsSubscription': {
-        return this.changed(id, this.HttpPendingLogsMap, true);
+        return this.changed(id, this.httpPendingLogsMap, true);
         break;
       }
       case 'MinedAndPendingLogsSubscription': {
-        return [this.changed(id, this.HttpLogMap, true), this.changed(id, this.HttpPendingLogsMap, true)];
+        return [this.changed(id, this.httpLogMap, true), this.changed(id, this.httpPendingLogsMap, true)];
         break;
       }
       case 'PendingTransactionsSubscription': {
-        return this.changed(id, this.HttpPendingTransactionsMap, false);
+        return this.changed(id, this.httpPendingTransactionsMap, false);
         break;
       }
       case 'BlocksSubscription': {
-        return this.changed(id, this.HttpHeadMap, false);
+        return this.changed(id, this.httpHeadMap, false);
         break;
       }
     }
   }
 
   newPendingTransactions(hash: Buffer) {
-    for (const [id, filterInfo] of this.WsPendingTransactionsMap) {
+    for (const [id, filterInfo] of this.wsPendingTransactionsMap) {
       if (filterInfo.notify) {
         filterInfo.notify(hash);
       }
     }
-    for (const [id, filterInfo] of this.HttpPendingTransactionsMap) {
+    for (const [id, filterInfo] of this.httpPendingTransactionsMap) {
       filterInfo.hashes.push(hash);
     }
   }
 
   newHeads(hash: Buffer) {
-    for (const [id, filterInfo] of this.WsHeadMap) {
+    for (const [id, filterInfo] of this.wsHeadMap) {
       if (filterInfo.notify) {
         filterInfo.notify(hash);
       }
     }
-    for (const [id, filterInfo] of this.HttpHeadMap) {
+    for (const [id, filterInfo] of this.httpHeadMap) {
       filterInfo.hashes.push(hash);
     }
   }

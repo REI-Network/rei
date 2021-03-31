@@ -8,7 +8,7 @@ type HookFunction = (params: any, result: any) => Promise<any> | any;
 
 type JsonRPCBody = { id: any; method: string; jsonrpc: string; params: any };
 
-class RpcContext {
+export class RpcContext {
   public readonly wsClient?: WsClient;
 
   get isWebsocket() {

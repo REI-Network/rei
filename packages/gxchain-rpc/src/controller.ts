@@ -4,6 +4,7 @@ import { Address, bnToHex, bufferToHex, keccakFromHexString, toBuffer, BN } from
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import * as helper from './helper';
 import { hexStringToBuffer, hexStringToBN, logger } from '@gxchain2/utils';
+import { RpcContext } from './jsonrpcmiddleware';
 
 type CallData = {
   from?: string;
@@ -302,6 +303,33 @@ export class Controller {
   }
   async eth_submitHashrate() {
     helper.throwRpcErr('Unsupported eth_submitHashrate!');
+  }
+  async eth_subscribe([type, options]: ['newHeads' | 'logs' | 'newPendingTransactions' | 'syncing', undefined | { address?: string[]; topics?: (string | string[] | null)[] }], context: RpcContext) {
+    if (type === 'logs') {
+      const addresses: Buffer[] = options && options.address ? options.address.map((addr) => hexStringToBuffer(addr)) : [];
+      const topics: (Buffer | Buffer[] | null)[] =
+        options && options.topics
+          ? options.topics.map((topic) => {
+              if (topic === null) {
+                return null;
+              } else if (typeof topic === 'string') {
+                return hexStringToBuffer(topic);
+              } else if (Array.isArray(topic)) {
+                return topic.map((subTopic) => {
+                  if (typeof subTopic !== 'string') {
+                    helper.throwRpcErr('Invalid topic type');
+                  }
+                  return hexStringToBuffer(subTopic);
+                });
+              } else {
+                helper.throwRpcErr('Invalid topic type');
+                // for types
+                return null;
+              }
+            })
+          : [];
+      // TODO: create a FilterQuery object to subscribe message.
+    }
   }
 
   //db_putString

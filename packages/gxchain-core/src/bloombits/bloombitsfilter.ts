@@ -19,7 +19,9 @@ export function calcBloomIndexes(data: Buffer) {
   return idxs;
 }
 
-function topicMatched(normalizedTopics: ((Buffer | null)[] | null)[], logTopics: Buffer[]): boolean {
+type Topics = (Buffer | null | (Buffer | null)[])[];
+
+function topicMatched(normalizedTopics: Topics, logTopics: Buffer[]): boolean {
   for (let i = 0; i < normalizedTopics.length; i++) {
     if (normalizedTopics.length > logTopics.length) {
       return false;
@@ -31,10 +33,14 @@ function topicMatched(normalizedTopics: ((Buffer | null)[] | null)[], logTopics:
     }
 
     let match: boolean = false;
-    for (const topic of sub) {
-      if (topic === null || logTopics[i].equals(topic)) {
-        match = true;
-        break;
+    if (sub instanceof Buffer) {
+      match = logTopics[i].equals(sub);
+    } else {
+      for (const topic of sub) {
+        if (topic === null || logTopics[i].equals(topic)) {
+          match = true;
+          break;
+        }
       }
     }
     if (!match) {
@@ -43,6 +49,18 @@ function topicMatched(normalizedTopics: ((Buffer | null)[] | null)[], logTopics:
   }
 
   return true;
+}
+
+function checkSingleNumber(bits: Buffer, sectionStart: BN, num: BN) {
+  const numOfSection = num.sub(sectionStart).toNumber();
+  const byte = bits[Math.floor(numOfSection / 8)];
+  if (byte !== 0) {
+    const offset = 7 - (numOfSection % 8);
+    if (byte & (1 << offset)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export interface BloomBitsFilterOptions {
@@ -59,19 +77,7 @@ export class BloomBitsFilter {
     this.sectionSize = options.sectionSize;
   }
 
-  private checkSingleNumber(bits: Buffer, sectionStart: BN, num: BN) {
-    const numOfSection = num.sub(sectionStart).toNumber();
-    const byte = bits[Math.floor(numOfSection / 8)];
-    if (byte !== 0) {
-      const offset = 7 - (numOfSection % 8);
-      if (byte & (1 << offset)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private async checkMatches(block: Block, addresses: Address[], topics: ((Buffer | null)[] | null)[]) {
+  private async checkMatches(block: Block, addresses: Address[], topics: Topics) {
     const logs: Log[] = [];
     for (const tx of block.transactions) {
       const receipt = await this.node.db.getReceipt(tx.hash());
@@ -88,7 +94,7 @@ export class BloomBitsFilter {
     return logs;
   }
 
-  async filterRange(from: BN, to: BN, addresses: Address[], topics: ((Buffer | null)[] | null)[]) {
+  async filterRange(from: BN, to: BN, addresses: Address[], topics: Topics) {
     let logs: Log[] = [];
     const append = (_logs: Log[]) => {
       logs = logs.concat(_logs);
@@ -165,7 +171,7 @@ export class BloomBitsFilter {
           // query the bits set of this bit of this section from database.
           const bits = await getBits(bloom, section);
           for (const num = fromBlock.clone(); num.lt(toBlock); num.iaddn(1)) {
-            if (!checkedNums.has(num) && this.checkSingleNumber(bits, sectionStart, num)) {
+            if (!checkedNums.has(num) && checkSingleNumber(bits, sectionStart, num)) {
               checkedNums.add(num.clone());
               append(await this.filterBlock(num, addresses, topics));
             }
@@ -182,7 +188,7 @@ export class BloomBitsFilter {
     return logs;
   }
 
-  async filterBlock(blockHashOrNumber: Buffer | BN | number, addresses: Address[], topics: ((Buffer | null)[] | null)[]) {
+  async filterBlock(blockHashOrNumber: Buffer | BN | number, addresses: Address[], topics: Topics) {
     const block = await this.node.db.getBlock(blockHashOrNumber);
     const logs = await this.checkMatches(block, addresses, topics);
     logs.forEach((log) => (log.removed = false));

@@ -29,19 +29,31 @@ function genSubscriptionId() {
 }
 
 class LogsTask {
-  logs!: Log[];
+  logs: Log[];
+  constructor(logs: Log[]) {
+    this.logs = logs;
+  }
 }
 
 class HeadsTask {
-  hashes!: Buffer[];
+  hashes: Buffer[];
+  constructor(hashes: Buffer[]) {
+    this.hashes = hashes;
+  }
 }
 
 class PendingTxTask {
-  hashes!: Buffer[];
+  hashes: Buffer[];
+  constructor(hashes: Buffer[]) {
+    this.hashes = hashes;
+  }
 }
 
 class SyncingTask {
-  status!: SyncingStatus;
+  status: SyncingStatus;
+  constructor(status: SyncingStatus) {
+    this.status = status;
+  }
 }
 
 type Task = LogsTask | HeadsTask | PendingTxTask | SyncingTask;
@@ -63,6 +75,15 @@ export class FilterSystem {
     this.node = node;
     this.timeoutLoop();
     this.taskLoop();
+    this.node.bcMonitor.on('logs', (logs) => {
+      this.taskQueue.push(new LogsTask(logs));
+    });
+    this.node.bcMonitor.on('removedLogs', (logs) => {
+      this.taskQueue.push(new LogsTask(logs));
+    });
+    this.node.bcMonitor.on('newHeads', (hashes) => {
+      this.taskQueue.push(new HeadsTask(hashes));
+    });
   }
 
   private cycleDelete(map: Map<string, FilterInfo>) {
@@ -111,22 +132,22 @@ export class FilterSystem {
 
   wsSubscibe(client: WsClient, type: string, queryInfo?: QueryInfo): string {
     const uid = genSubscriptionId();
-    const filterInstance = { createtime: Date.now(), hashes: [], logs: [], queryInfo, client };
+    const filter = { createtime: Date.now(), hashes: [], logs: [], queryInfo, client };
     switch (type) {
       case 'newHeads': {
-        this.wsHeads.set(uid, filterInstance);
+        this.wsHeads.set(uid, filter);
         break;
       }
       case 'logs': {
-        this.wsLogs.set(uid, filterInstance);
+        this.wsLogs.set(uid, filter);
         break;
       }
       case 'newPendingTransactions': {
-        this.wsPendingTransactions.set(uid, filterInstance);
+        this.wsPendingTransactions.set(uid, filter);
         break;
       }
       case 'syncing': {
-        this.wsSyncing.set(uid, filterInstance);
+        this.wsSyncing.set(uid, filter);
         break;
       }
     }
@@ -135,18 +156,18 @@ export class FilterSystem {
 
   httpSubscribe(type: string, queryInfo?: QueryInfo): string {
     const uid = genSubscriptionId();
-    const filterInstance = { createtime: Date.now(), hashes: [], logs: [], queryInfo };
+    const filter = { createtime: Date.now(), hashes: [], logs: [], queryInfo };
     switch (type) {
       case 'newHeads': {
-        this.httpHeads.set(uid, filterInstance);
+        this.httpHeads.set(uid, filter);
         break;
       }
       case 'logs': {
-        this.httpLogs.set(uid, filterInstance);
+        this.httpLogs.set(uid, filter);
         break;
       }
       case 'newPendingTransactions': {
-        this.httpPendingTransactions.set(uid, filterInstance);
+        this.httpPendingTransactions.set(uid, filter);
         break;
       }
     }

@@ -2,8 +2,8 @@ import { Address, BN } from 'ethereumjs-util';
 import { uuidv4 } from 'uuid';
 import { Aborter } from '@gxchain2/utils';
 import { Log } from '@gxchain2/receipt';
-import { WsClient } from './client';
 import { Topics, BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
+import { WsClient, SyncingStatus } from './client';
 
 export type FilterQuery = {
   type: string;
@@ -16,12 +16,11 @@ export type FilterQuery = {
 const deadline = 5 * 60 * 1000;
 
 type FilterInfo = {
-  type: string;
   createtime: number;
   hashes: Buffer[];
   logs: Log[];
   queryInfo: FilterQuery;
-  notify?: (data: any) => void;
+  client?: WsClient;
 };
 
 export class FilterSystem {
@@ -66,7 +65,7 @@ export class FilterSystem {
 
   wsSubscibe(client: WsClient, queryInfo: FilterQuery): string {
     const uid = uuidv4();
-    const filterInstance = { type: queryInfo.type, createtime: Date.now(), hashes: [], logs: [], queryInfo: queryInfo, notify: client.send };
+    const filterInstance = { createtime: Date.now(), hashes: [], logs: [], queryInfo, client };
     switch (queryInfo.type) {
       case 'newHeads': {
         this.wsHeads.set(uid, filterInstance);
@@ -90,7 +89,7 @@ export class FilterSystem {
 
   httpSubscribe(queryInfo: FilterQuery): string {
     const uid = uuidv4();
-    const filterInstance = { type: queryInfo.type, createtime: Date.now(), hashes: [], logs: [], queryInfo: queryInfo };
+    const filterInstance = { createtime: Date.now(), hashes: [], logs: [], queryInfo };
     switch (queryInfo.type) {
       case 'newHeads': {
         this.httpHeads.set(uid, filterInstance);
@@ -151,42 +150,39 @@ export class FilterSystem {
     }
   }
 
-  newPendingTransactions(hash: Buffer) {
+  newPendingTransactions(hashs: Buffer[]) {
     for (const [id, filterInfo] of this.wsPendingTransactions) {
-      if (filterInfo.notify) {
-        filterInfo.notify(hash);
-      }
+      filterInfo.client!.notifyPendingTransactions(id, hashs);
     }
     for (const [id, filterInfo] of this.httpPendingTransactions) {
-      filterInfo.hashes.push(hash);
+      filterInfo.hashes = filterInfo.hashes.concat(hashs);
     }
   }
 
   newHeads(hash: Buffer) {
     for (const [id, filterInfo] of this.wsHeads) {
-      filterInfo.notify!(hash);
+      // TODO: get the header.
+      filterInfo.client!.notifyHeader(id, 1 as any);
     }
     for (const [id, filterInfo] of this.httpHeads) {
       filterInfo.hashes.push(hash);
     }
   }
 
-  newLogs(log: Log) {
+  newLogs(logs: Log[]) {
     for (const [id, filterInfo] of this.wsLogs) {
-      if (BloomBitsFilter.checkLogMatches(log, filterInfo.queryInfo)) {
-        filterInfo.notify!(log);
-      }
+      const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filterInfo.queryInfo));
+      filterInfo.client!.notifyLogs(id, filteredLogs);
     }
     for (const [id, filterInfo] of this.httpLogs) {
-      if (BloomBitsFilter.checkLogMatches(log, filterInfo.queryInfo)) {
-        filterInfo.logs.push(log);
-      }
+      const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filterInfo.queryInfo));
+      filterInfo.logs = filterInfo.logs.concat(filteredLogs);
     }
   }
 
-  newSyncing(state: { earliest: string; latest: string; pengding: string } | false) {
+  newSyncing(state: SyncingStatus) {
     for (const [id, filterInfo] of this.wsSyncing) {
-      filterInfo.notify!(state);
+      filterInfo.client!.notifySyncing(id, state);
     }
   }
 }

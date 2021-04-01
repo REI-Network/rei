@@ -4,6 +4,8 @@ class Errexpand extends Error {
   code: number = 0;
 }
 
+export const JSONRPC_VERSION = '2.0';
+
 export function throwRpcErr(message = 'JSON-RPC error', code = 500) {
   const err = new Errexpand(message);
   err.code = code;

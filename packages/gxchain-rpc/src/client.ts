@@ -1,6 +1,7 @@
 import { bufferToHex } from 'ethereumjs-util';
 import { BlockHeader } from '@gxchain2/block';
 import { Log } from '@gxchain2/receipt';
+import { JSONRPC_VERSION } from './helper';
 
 export type SyncingStatus = { syncing: true; status: { startingBlock: string; currentBlock: string; highestBlock: string } } | false;
 
@@ -31,7 +32,7 @@ export class WsClient {
   notifyHeader(subscription: string, heads: BlockHeader[]) {
     for (const header of heads) {
       this.send({
-        jsonrpc: '2.0',
+        jsonrpc: JSONRPC_VERSION,
         method: 'eth_subscription',
         params: {
           subscription,
@@ -44,7 +45,7 @@ export class WsClient {
   notifyLogs(subscription: string, logs: Log[]) {
     for (const log of logs) {
       this.send({
-        jsonrpc: '2.0',
+        jsonrpc: JSONRPC_VERSION,
         method: 'eth_subscription',
         params: {
           subscription,
@@ -57,7 +58,7 @@ export class WsClient {
   notifyPendingTransactions(subscription: string, hashes: Buffer[]) {
     for (const hash of hashes) {
       this.send({
-        jsonrpc: '2.0',
+        jsonrpc: JSONRPC_VERSION,
         method: 'eth_subscription',
         params: {
           subscription,
@@ -69,7 +70,7 @@ export class WsClient {
 
   notifySyncing(subscription: string, status: SyncingStatus) {
     this.send({
-      jsonrpc: '2.0',
+      jsonrpc: JSONRPC_VERSION,
       method: 'eth_subscription',
       params: {
         subscription,

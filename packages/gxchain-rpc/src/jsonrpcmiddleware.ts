@@ -37,7 +37,6 @@ export interface JsonMiddlewareOption {
 
 export class JsonRPCMiddleware {
   private readonly config: JsonMiddlewareOption;
-  private readonly VERSION = '2.0';
 
   constructor(config: JsonMiddlewareOption) {
     helper.validateConfig(config);
@@ -52,7 +51,7 @@ export class JsonRPCMiddleware {
   private async handleSingleReq(body: JsonRPCBody, context: RpcContext): Promise<any> {
     const { id, method, jsonrpc, params } = body;
     try {
-      helper.validateJsonRpcVersion(jsonrpc, this.VERSION);
+      helper.validateJsonRpcVersion(jsonrpc, helper.JSONRPC_VERSION);
 
       helper.validateJsonRpcMethod(method, this.config.methods);
       logger.info('📦 Rpc served', method);
@@ -93,7 +92,7 @@ export class JsonRPCMiddleware {
 
   private makeParseError() {
     return {
-      jsonrpc: this.VERSION,
+      jsonrpc: helper.JSONRPC_VERSION,
       error: errors.PARSE_ERROR
     };
   }

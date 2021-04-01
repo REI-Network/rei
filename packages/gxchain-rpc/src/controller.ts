@@ -138,27 +138,27 @@ export class Controller {
     }
   }
 
-  async web3_clientVersion() {
-    return 'Mist/v0.0.1/darwin/node12.19.0/typescript4.1.5';
+  web3_clientVersion() {
+    return 'Mist/v0.0.1';
   }
   async web_sha3([data]: [string]): Promise<string> {
     return await bufferToHex(keccakFromHexString(data));
   }
 
-  async net_version() {
+  net_version() {
     return '77';
   }
-  async net_listenging() {
+  net_listenging() {
     return true;
   }
-  async net_peerCount() {
+  net_peerCount() {
     return bufferToHex(toBuffer(this.node.peerpool.peers.length));
   }
 
-  async eth_protocolVersion() {
+  eth_protocolVersion() {
     return '1';
   }
-  async eth_syncing() {
+  eth_syncing() {
     if (!this.node.sync.isSyncing) {
       return false;
     }
@@ -169,25 +169,25 @@ export class Controller {
       highestBlock: bufferToHex(toBuffer(status.highestBlock))
     };
   }
-  async eth_chainId() {
+  eth_chainId() {
     return bufferToHex(toBuffer(this.node.common.chainId()));
   }
-  async eth_coinbase() {
-    return !this.node.miner.coinbase ? '0x0000000000000000000000000000000000000000' : bufferToHex(this.node.miner.coinbase);
+  eth_coinbase() {
+    return !this.node.miner.coinbase ? Address.zero().toString() : bufferToHex(this.node.miner.coinbase);
   }
-  async eth_mining() {
+  eth_mining() {
     return this.node.miner.isMining;
   }
-  async eth_hashrate() {
+  eth_hashrate() {
     return bufferToHex(toBuffer(0));
   }
-  async eth_gasPrice() {
+  eth_gasPrice() {
     return bufferToHex(toBuffer(1));
   }
-  async eth_accounts() {
+  eth_accounts() {
     return [];
   }
-  async eth_blockNumber() {
+  eth_blockNumber() {
     return bnToHex(this.node.blockchain.latestBlock.header.number);
   }
   async eth_getBalance([address, tag]: [string, string]) {
@@ -220,10 +220,10 @@ export class Controller {
       return null;
     }
   }
-  async eth_getUncleCountByBlockHash([hash]: [string]) {
+  eth_getUncleCountByBlockHash([hash]: [string]) {
     return bufferToHex(toBuffer(0));
   }
-  async eth_getUncleCountByBlockNumber([tag]: [string]) {
+  eth_getUncleCountByBlockNumber([tag]: [string]) {
     return bufferToHex(toBuffer(0));
   }
   async eth_getCode([address, tag]: [string, string]) {
@@ -231,10 +231,10 @@ export class Controller {
     const code = await stateManager.getContractCode(Address.fromString(address));
     return bufferToHex(code);
   }
-  async eth_sign([address, data]: [string, string]) {
+  eth_sign([address, data]: [string, string]) {
     return '0x00';
   }
-  async eth_signTransaction([data]: [CallData]) {
+  eth_signTransaction([data]: [CallData]) {
     /*
     if (!data.nonce) {
       const stateManager = await this.getStateManagerByTag('latest');
@@ -248,7 +248,7 @@ export class Controller {
     */
     return '0x00';
   }
-  async eth_sendTransaction([data]: [CallData]) {
+  eth_sendTransaction([data]: [CallData]) {
     return '0x00';
   }
   async eth_sendRawTransaction([rawtx]: [string]) {
@@ -320,22 +320,22 @@ export class Controller {
       return null;
     }
   }
-  async eth_getUncleByBlockHashAndIndex() {
+  eth_getUncleByBlockHashAndIndex() {
     return null;
   }
-  async eth_getUncleByBlockNumberAndIndex() {
+  eth_getUncleByBlockNumberAndIndex() {
     return null;
   }
-  async eth_getCompilers() {
+  eth_getCompilers() {
     return [];
   }
-  async eth_compileSolidity() {
+  eth_compileSolidity() {
     helper.throwRpcErr('Unsupported compiler!');
   }
-  async eth_compileLLL() {
+  eth_compileLLL() {
     helper.throwRpcErr('Unsupported compiler!');
   }
-  async eth_compileSerpent() {
+  eth_compileSerpent() {
     helper.throwRpcErr('Unsupported compiler!');
   }
   async eth_newFilter([{ fromBlock, toBlock, address: _addresses, topics: _topics }]: [{ fromBlock?: string; toBlock?: string; address?: string[]; topics?: TopicsData; blockhash?: string }]) {
@@ -344,10 +344,10 @@ export class Controller {
     const { addresses, topics } = parseAddressesAndTopics(_addresses, _topics);
     return this.filterSystem.newFilter('logs', { fromBlock: from, toBlock: to, addresses, topics });
   }
-  async eth_newBlockFilter() {
+  eth_newBlockFilter() {
     return this.filterSystem.newFilter('newHeads');
   }
-  async eth_newPendingTransactionFilter() {
+  eth_newPendingTransactionFilter() {
     return this.filterSystem.newFilter('newPendingTransactions');
   }
   eth_uninstallFilter([id]: [string]) {
@@ -384,13 +384,13 @@ export class Controller {
     const logs = blockhash ? await filter.filterBlock(hexStringToBuffer(blockhash), addresses, topics) : await filter.filterRange(from, to, addresses, topics);
     return logs.map((log) => log.toRPCJSON());
   }
-  async eth_getWork() {
+  eth_getWork() {
     helper.throwRpcErr('Unsupported eth_getWork!');
   }
-  async eth_submitWork() {
+  eth_submitWork() {
     helper.throwRpcErr('Unsupported eth_submitWork!');
   }
-  async eth_submitHashrate() {
+  eth_submitHashrate() {
     helper.throwRpcErr('Unsupported eth_submitHashrate!');
   }
   async eth_subscribe([type, options]: [string, undefined | { address?: string[]; topics?: TopicsData }], context: RpcContext) {
@@ -405,9 +405,9 @@ export class Controller {
       return;
     }
     if (type === 'logs') {
-      this.filterSystem.subscribe(context.client, type, parseAddressesAndTopics(options?.address, options?.topics));
+      return this.filterSystem.subscribe(context.client, type, parseAddressesAndTopics(options?.address, options?.topics));
     } else {
-      this.filterSystem.subscribe(context.client, type);
+      return this.filterSystem.subscribe(context.client, type);
     }
   }
 

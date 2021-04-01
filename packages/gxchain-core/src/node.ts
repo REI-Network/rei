@@ -347,7 +347,7 @@ export class Node {
               peer.announceNewBlock(block);
             }
           }
-          await Promise.all([this.txPool.newBlock(block), this.miner.worker.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)]);
+          await Promise.all([this.txPool.newBlock(block), this.miner.worker.newBlock(block), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)]);
         }
       } catch (err) {
         logger.error('Node::taskLoop, catch error:', err);

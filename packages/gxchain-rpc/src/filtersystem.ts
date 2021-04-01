@@ -5,7 +5,7 @@ import { Log } from '@gxchain2/receipt';
 import { WsClient } from './client';
 import { Topics, BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
 
-type FilterQuery = {
+export type FilterQuery = {
   type: string;
   fromBlock: BN;
   toBlock: BN;
@@ -15,7 +15,7 @@ type FilterQuery = {
 
 const deadline = 5 * 60 * 1000;
 
-export type FilterInfo = {
+type FilterInfo = {
   type: string;
   createtime: number;
   hashes: Buffer[];
@@ -27,8 +27,6 @@ export type FilterInfo = {
 export class FilterSystem {
   private aborter = new Aborter();
 
-  private readonly initPromise: Promise<void>;
-
   private readonly wsHeads = new Map<string, FilterInfo>();
   private readonly wsLogs = new Map<string, FilterInfo>();
   private readonly wsPendingTransactions = new Map<string, FilterInfo>();
@@ -38,18 +36,7 @@ export class FilterSystem {
   private readonly httpPendingTransactions = new Map<string, FilterInfo>();
 
   constructor() {
-    this.initPromise = this.init();
     this.timeoutLoop();
-  }
-  async abort() {
-    await this.aborter.abort();
-  }
-
-  async init() {
-    if (this.initPromise) {
-      await this.initPromise;
-      return;
-    }
   }
 
   private cycleDelete(map: Map<string, FilterInfo>) {
@@ -61,8 +48,11 @@ export class FilterSystem {
     }
   }
 
+  async abort() {
+    await this.aborter.abort();
+  }
+
   private async timeoutLoop() {
-    await this.initPromise;
     while (!this.aborter.isAborted) {
       await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, deadline)));
       if (this.aborter.isAborted) {

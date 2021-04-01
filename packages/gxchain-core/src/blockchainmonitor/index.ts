@@ -108,6 +108,7 @@ export class BlockchainMonitor extends EventEmitter {
         let removedLogs: Log[] = [];
         for (const tx of removed) {
           const receipt = await this.node.db.getReceipt(tx.hash());
+          receipt.logs.forEach((log) => (log.removed = true));
           removedLogs = removedLogs.concat(receipt.logs);
         }
         this.emit('removedLogs', removedLogs);
@@ -116,6 +117,7 @@ export class BlockchainMonitor extends EventEmitter {
         let logs: Log[] = [];
         for (const tx of removed) {
           const receipt = await this.node.db.getReceipt(tx.hash());
+          receipt.logs.forEach((log) => (log.removed = false));
           logs = logs.concat(receipt.logs);
         }
         this.emit('logs', logs);

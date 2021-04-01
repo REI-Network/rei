@@ -6,6 +6,7 @@ import { hexStringToBuffer, hexStringToBN, logger } from '@gxchain2/utils';
 import { Log } from '@gxchain2/receipt';
 import * as helper from './helper';
 import { RpcContext } from './jsonrpcmiddleware';
+import { FilterSystem } from './filtersystem';
 
 type CallData = {
   from?: string;
@@ -48,9 +49,11 @@ function parseAddressesAndTopics(_addresses?: string[], _topics?: TopicsData) {
 }
 
 export class Controller {
-  node: Node;
-  constructor(node: Node) {
+  private readonly node: Node;
+  private readonly filterSystem: FilterSystem;
+  constructor(node: Node, filterSystem: FilterSystem) {
     this.node = node;
+    this.filterSystem = filterSystem;
   }
 
   private async getBlockNumberByTag(tag: string): Promise<BN> {
@@ -357,10 +360,21 @@ export class Controller {
   async eth_submitHashrate() {
     helper.throwRpcErr('Unsupported eth_submitHashrate!');
   }
-  async eth_subscribe([type, options]: ['newHeads' | 'logs' | 'newPendingTransactions' | 'syncing', undefined | { address?: string[]; topics?: TopicsData }], context: RpcContext) {
+  async eth_subscribe([type, options]: [string, undefined | { address?: string[]; topics?: TopicsData }], context: RpcContext) {
+    if (!context.client) {
+      helper.throwRpcErr('eth_subscribe is only supported on websocket!');
+      // for types.
+      return;
+    }
+    if (type !== 'newHeads' && type !== 'logs' && type !== 'newPendingTransactions' && type !== 'syncing') {
+      helper.throwRpcErr('eth_subscribe, invalid subscription type!');
+      // for types.
+      return;
+    }
     if (type === 'logs') {
-      const { addresses, topics } = parseAddressesAndTopics(options?.address, options?.topics);
-      // TODO: create a FilterQuery object to subscribe message.
+      this.filterSystem.wsSubscibe(context.client, type, parseAddressesAndTopics(options?.address, options?.topics));
+    } else {
+      this.filterSystem.wsSubscibe(context.client, type);
     }
   }
 

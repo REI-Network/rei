@@ -5,10 +5,9 @@ import { Log } from '@gxchain2/receipt';
 import { Topics, BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
 import { WsClient, SyncingStatus } from './client';
 
-export type FilterQuery = {
-  type: string;
-  fromBlock: BN;
-  toBlock: BN;
+export type QueryInfo = {
+  fromBlock?: BN;
+  toBlock?: BN;
   addresses: Address[];
   topics: Topics;
 };
@@ -19,7 +18,7 @@ type FilterInfo = {
   createtime: number;
   hashes: Buffer[];
   logs: Log[];
-  queryInfo: FilterQuery;
+  queryInfo?: QueryInfo;
   client?: WsClient;
 };
 
@@ -67,10 +66,10 @@ export class FilterSystem {
     }
   }
 
-  wsSubscibe(client: WsClient, queryInfo: FilterQuery): string {
+  wsSubscibe(client: WsClient, type: string, queryInfo?: QueryInfo): string {
     const uid = genSubscriptionId();
     const filterInstance = { createtime: Date.now(), hashes: [], logs: [], queryInfo, client };
-    switch (queryInfo.type) {
+    switch (type) {
       case 'newHeads': {
         this.wsHeads.set(uid, filterInstance);
         break;
@@ -91,10 +90,10 @@ export class FilterSystem {
     return uid;
   }
 
-  httpSubscribe(queryInfo: FilterQuery): string {
+  httpSubscribe(type: string, queryInfo?: QueryInfo): string {
     const uid = genSubscriptionId();
     const filterInstance = { createtime: Date.now(), hashes: [], logs: [], queryInfo };
-    switch (queryInfo.type) {
+    switch (type) {
       case 'newHeads': {
         this.httpHeads.set(uid, filterInstance);
         break;
@@ -175,11 +174,11 @@ export class FilterSystem {
 
   newLogs(logs: Log[]) {
     for (const [id, filterInfo] of this.wsLogs) {
-      const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filterInfo.queryInfo));
+      const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filterInfo.queryInfo!));
       filterInfo.client!.notifyLogs(id, filteredLogs);
     }
     for (const [id, filterInfo] of this.httpLogs) {
-      const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filterInfo.queryInfo));
+      const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filterInfo.queryInfo!));
       filterInfo.logs = filterInfo.logs.concat(filteredLogs);
     }
   }

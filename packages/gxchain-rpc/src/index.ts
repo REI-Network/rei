@@ -7,17 +7,19 @@ import { JsonRPCMiddleware } from './jsonrpcmiddleware';
 import { Controller } from './controller';
 import { logger } from '@gxchain2/utils';
 import { WsClient } from './client';
+import { FilterSystem } from './filtersystem';
 
 export class RpcServer extends EventEmitter {
   protected readonly port: number;
   protected readonly host: string;
   protected running: boolean = false;
   protected controller: Controller;
+
   constructor(port: number, host: string, node: Node) {
     super();
     this.port = port;
     this.host = host;
-    this.controller = new Controller(node);
+    this.controller = new Controller(node, new FilterSystem());
   }
 
   start() {
@@ -27,6 +29,7 @@ export class RpcServer extends EventEmitter {
         resolve(false);
         return;
       }
+
       try {
         this.running = true;
         const app = express();

@@ -9,14 +9,14 @@ type HookFunction = (params: any, result: any) => Promise<any> | any;
 type JsonRPCBody = { id: any; method: string; jsonrpc: string; params: any };
 
 export class RpcContext {
-  public readonly wsClient?: WsClient;
+  public readonly client?: WsClient;
 
   get isWebsocket() {
-    return !!this.wsClient;
+    return !!this.client;
   }
 
-  constructor(wsClient?: WsClient) {
-    this.wsClient = wsClient;
+  constructor(client?: WsClient) {
+    this.client = client;
   }
 }
 

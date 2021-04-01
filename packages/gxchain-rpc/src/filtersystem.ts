@@ -7,7 +7,7 @@ import { Topics, BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
 import { Node } from '@gxchain2/core';
 import { WsClient, SyncingStatus } from './client';
 
-export type QueryInfo = {
+export type Query = {
   fromBlock?: BN;
   toBlock?: BN;
   addresses: Address[];
@@ -16,11 +16,11 @@ export type QueryInfo = {
 
 const deadline = 5 * 60 * 1000;
 
-type FilterInfo = {
-  createtime: number;
+type Filter = {
   hashes: Buffer[];
   logs: Log[];
-  queryInfo?: QueryInfo;
+  createtime?: number;
+  query?: Query;
   client?: WsClient;
 };
 
@@ -63,13 +63,14 @@ export class FilterSystem {
   private aborter = new Aborter();
   private taskQueue = new AsyncChannel<Task>({ isAbort: () => this.aborter.isAborted });
 
-  private readonly wsHeads = new Map<string, FilterInfo>();
-  private readonly wsLogs = new Map<string, FilterInfo>();
-  private readonly wsPendingTransactions = new Map<string, FilterInfo>();
-  private readonly wsSyncing = new Map<string, FilterInfo>();
-  private readonly httpHeads = new Map<string, FilterInfo>();
-  private readonly httpLogs = new Map<string, FilterInfo>();
-  private readonly httpPendingTransactions = new Map<string, FilterInfo>();
+  private readonly wsHeads = new Map<string, Filter>();
+  private readonly wsLogs = new Map<string, Filter>();
+  private readonly wsPendingTransactions = new Map<string, Filter>();
+  private readonly wsSyncing = new Map<string, Filter>();
+  private readonly httpHeads = new Map<string, Filter>();
+  private readonly httpLogs = new Map<string, Filter>();
+  private readonly httpPendingTransactions = new Map<string, Filter>();
+  private readonly httpFilterType = new Map<string, string>();
 
   constructor(node: Node) {
     this.node = node;
@@ -86,11 +87,12 @@ export class FilterSystem {
     });
   }
 
-  private cycleDelete(map: Map<string, FilterInfo>) {
+  private cycleDelete(map: Map<string, Filter>) {
     const timenow = Date.now();
     for (const [key, filter] of map) {
-      if (timenow - filter.createtime > deadline) {
+      if (timenow - filter.createtime! > deadline) {
         map.delete(key);
+        this.httpFilterType.delete(key);
       }
     }
   }
@@ -130,9 +132,9 @@ export class FilterSystem {
     }
   }
 
-  wsSubscibe(client: WsClient, type: string, queryInfo?: QueryInfo): string {
+  wsSubscibe(client: WsClient, type: string, query?: Query): string {
     const uid = genSubscriptionId();
-    const filter = { createtime: Date.now(), hashes: [], logs: [], queryInfo, client };
+    const filter = { hashes: [], logs: [], query, client };
     switch (type) {
       case 'newHeads': {
         this.wsHeads.set(uid, filter);
@@ -154,9 +156,9 @@ export class FilterSystem {
     return uid;
   }
 
-  httpSubscribe(type: string, queryInfo?: QueryInfo): string {
+  httpSubscribe(type: string, query?: Query): string {
     const uid = genSubscriptionId();
-    const filter = { createtime: Date.now(), hashes: [], logs: [], queryInfo };
+    const filter = { hashes: [], logs: [], createtime: Date.now(), query };
     switch (type) {
       case 'newHeads': {
         this.httpHeads.set(uid, filter);
@@ -171,6 +173,7 @@ export class FilterSystem {
         break;
       }
     }
+    this.httpFilterType.set(uid, type);
     return uid;
   }
 
@@ -185,44 +188,48 @@ export class FilterSystem {
     this.httpHeads.delete(id);
     this.httpLogs.delete(id);
     this.httpPendingTransactions.delete(id);
+    this.httpFilterType.delete(id);
   }
 
-  private changed(id: string, map: Map<string, FilterInfo>, logorhash: boolean) {
-    const filterInfo = map.get(id);
-    if (!filterInfo) {
+  httpFilterChanges(id: string) {
+    const type = this.httpFilterType.get(id);
+    if (!type) {
       return;
     }
-    if (logorhash) {
-      const info = filterInfo.logs;
-      filterInfo.logs = [];
-      return info;
-    } else {
-      const info = filterInfo?.hashes;
-      filterInfo.hashes = [];
-      return info;
-    }
-  }
-
-  httpFilterChanged(id: string, type: string) {
     switch (type) {
       case 'newHeads': {
-        return this.changed(id, this.httpHeads, false);
+        const filter = this.httpHeads.get(id);
+        const hash = filter?.hashes;
+        if (filter) {
+          filter.hashes = [];
+        }
+        return hash;
       }
       case 'logs': {
-        return this.changed(id, this.httpLogs, true);
+        const filter = this.httpLogs.get(id);
+        const logs = filter?.logs;
+        if (filter) {
+          filter.logs = [];
+        }
+        return logs;
       }
       case 'newPendingTransactions': {
-        return this.changed(id, this.httpPendingTransactions, false);
+        const filter = this.httpPendingTransactions.get(id);
+        const hash = filter?.hashes;
+        if (filter) {
+          filter.hashes = [];
+        }
+        return hash;
       }
     }
   }
 
   private newPendingTransactions(hashs: Buffer[]) {
-    for (const [id, filterInfo] of this.wsPendingTransactions) {
-      filterInfo.client!.notifyPendingTransactions(id, hashs);
+    for (const [id, filter] of this.wsPendingTransactions) {
+      filter.client!.notifyPendingTransactions(id, hashs);
     }
-    for (const [id, filterInfo] of this.httpPendingTransactions) {
-      filterInfo.hashes = filterInfo.hashes.concat(hashs);
+    for (const [id, filter] of this.httpPendingTransactions) {
+      filter.hashes = filter.hashes.concat(hashs);
     }
   }
 
@@ -237,11 +244,11 @@ export class FilterSystem {
 
   private newLogs(logs: Log[]) {
     for (const [id, filter] of this.wsLogs) {
-      const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filter.queryInfo!));
+      const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filter.query!));
       filter.client!.notifyLogs(id, filteredLogs);
     }
     for (const [id, filter] of this.httpLogs) {
-      const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filter.queryInfo!));
+      const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filter.query!));
       filter.logs = filter.logs.concat(filteredLogs);
     }
   }

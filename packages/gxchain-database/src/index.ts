@@ -223,6 +223,19 @@ export class Database extends DBManager {
     return await this.get(DBTarget_BloomBits, { bit, section, hash } as any);
   }
 
+  async tryToGetCanonicalHeader(hash: Buffer) {
+    try {
+      const num = await this.hashToNumber(hash);
+      const hashInDB = await this.numberToHash(num);
+      return hashInDB.equals(hash) ? await this.getHeader(hash, num) : undefined;
+    } catch (err) {
+      if (err.type === 'NotFoundError') {
+        return;
+      }
+      throw err;
+    }
+  }
+
   async getCanonicalHeader(num: BN) {
     const hash = await this.numberToHash(num);
     return await this.getHeader(hash, num);

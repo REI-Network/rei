@@ -185,6 +185,24 @@ export class FilterSystem {
     return this.filterHeads.delete(id) || this.filterLogs.delete(id) || this.filterPendingTransactions.delete(id) || this.filterType.delete(id);
   }
 
+  getFilterQuery(id: string) {
+    const type = this.filterType.get(id);
+    if (!type) {
+      return;
+    }
+    switch (type) {
+      case 'newHeads': {
+        return this.filterHeads.get(id)?.query;
+      }
+      case 'logs': {
+        return this.filterLogs.get(id)?.query;
+      }
+      case 'newPendingTransactions': {
+        return this.filterPendingTransactions.get(id)?.query;
+      }
+    }
+  }
+
   filterChanges(id: string) {
     const type = this.filterType.get(id);
     if (!type) {

@@ -338,18 +338,51 @@ export class Controller {
   async eth_compileSerpent() {
     helper.throwRpcErr('Unsupported compiler!');
   }
-  //eth_newFilter
-  //eth_newBlockFilter
-  //eth_newPendingTransactionFilter
-  //eth_uninstallFilter
-  //eth_getFilterChanges
-  //eth_getFilterLogs
-  async eth_getLogs([{ fromBlock, toBlock, address: _addresses, topics: _topics, blockhash }]: [{ fromBlock?: string; toBlock?: string; address?: string[]; topics?: TopicsData; blockhash?: string }]): Promise<Log[]> {
+  async eth_newFilter([{ fromBlock, toBlock, address: _addresses, topics: _topics }]: [{ fromBlock?: string; toBlock?: string; address?: string[]; topics?: TopicsData; blockhash?: string }]) {
+    const from = await this.getBlockNumberByTag(fromBlock ? fromBlock : 'latest');
+    const to = await this.getBlockNumberByTag(toBlock ? toBlock : 'latest');
+    const { addresses, topics } = parseAddressesAndTopics(_addresses, _topics);
+    return this.filterSystem.newFilter('logs', { fromBlock: from, toBlock: to, addresses, topics });
+  }
+  async eth_newBlockFilter() {
+    return this.filterSystem.newFilter('newHeads');
+  }
+  async eth_newPendingTransactionFilter() {
+    return this.filterSystem.newFilter('newPendingTransactions');
+  }
+  eth_uninstallFilter([id]: [string]) {
+    return this.filterSystem.uninstall(id);
+  }
+  eth_getFilterChanges([id]: [string]) {
+    const changes = this.filterSystem.filterChanges(id);
+    if (!changes || changes.length === 0) {
+      return [];
+    }
+    if (changes[0] instanceof Log) {
+      return (changes as Log[]).map((log) => log.toRPCJSON());
+    } else {
+      return (changes as Buffer[]).map((buf) => bufferToHex(buf));
+    }
+  }
+  async eth_getFilterLogs([id]: [string]) {
+    const query = this.filterSystem.getFilterQuery(id);
+    if (!query) {
+      return [];
+    }
+    let { fromBlock: from, toBlock: to, addresses, topics } = query;
+    from = from ? from : await this.getBlockNumberByTag('latest');
+    to = to ? to : await this.getBlockNumberByTag('latest');
+    const filter = this.node.getFilter();
+    const logs = await filter.filterRange(from, to, addresses, topics);
+    return logs.map((log) => log.toRPCJSON());
+  }
+  async eth_getLogs([{ fromBlock, toBlock, address: _addresses, topics: _topics, blockhash }]: [{ fromBlock?: string; toBlock?: string; address?: string[]; topics?: TopicsData; blockhash?: string }]) {
     const from = await this.getBlockNumberByTag(fromBlock ? fromBlock : 'latest');
     const to = await this.getBlockNumberByTag(toBlock ? toBlock : 'latest');
     const { addresses, topics } = parseAddressesAndTopics(_addresses, _topics);
     const filter = this.node.getFilter();
-    return blockhash ? await filter.filterBlock(hexStringToBuffer(blockhash), addresses, topics) : await filter.filterRange(from, to, addresses, topics);
+    const logs = blockhash ? await filter.filterBlock(hexStringToBuffer(blockhash), addresses, topics) : await filter.filterRange(from, to, addresses, topics);
+    return logs.map((log) => log.toRPCJSON());
   }
   async eth_getWork() {
     helper.throwRpcErr('Unsupported eth_getWork!');

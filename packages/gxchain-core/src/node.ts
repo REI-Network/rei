@@ -19,6 +19,7 @@ import { TxFetcher } from './txsync';
 import { Miner } from './miner';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter } from './bloombits';
+import { BlockchainMonitor } from './blockchainmonitor';
 
 export interface NodeOptions {
   databasePath: string;
@@ -68,8 +69,8 @@ export class Node {
   public txPool!: TxPool;
   public miner!: Miner;
   public txSync!: TxFetcher;
-
   public bloomBitsIndexer!: ChainIndexer;
+  public bcMonitor!: BlockchainMonitor;
 
   private readonly options: NodeOptions;
   private readonly initPromise: Promise<void>;
@@ -255,9 +256,10 @@ export class Node {
     this.miner = new Miner(this, this.options.mine);
     await this.txPool.init();
     this.txSync = new TxFetcher(this);
-
     this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: constants.BloomBitsBlocks, confirmsBlockNumber: constants.ConfirmsBlockNumber });
     await this.bloomBitsIndexer.init();
+    this.bcMonitor = new BlockchainMonitor(this);
+    await this.bcMonitor.init();
   }
 
   /**

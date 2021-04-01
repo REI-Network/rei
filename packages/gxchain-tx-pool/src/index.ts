@@ -325,13 +325,16 @@ export class TxPool {
         }
         newBlock = await getBlock(newBlock.header.parentHash, newBlock.header.number.subn(1));
       }
-      while (!oldBlock.hash().equals(newBlock.hash())) {
+      while (!oldBlock.hash().equals(newBlock.hash()) && oldBlock.header.number.gtn(0) && newBlock.header.number.gtn(0)) {
         discarded = discarded.concat(oldBlock.transactions);
         oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
         for (const tx of newBlock.transactions) {
           included.add(tx.hash());
         }
         newBlock = await getBlock(newBlock.header.parentHash, newBlock.header.number.subn(1));
+      }
+      if (!oldBlock.hash().equals(newBlock.hash())) {
+        throw new Error('reorg failed');
       }
       const reinject: Transaction[] = [];
       for (const tx of discarded) {
@@ -346,7 +349,7 @@ export class TxPool {
       this.truncatePending();
       this.truncateQueue();
     } catch (err) {
-      logger.error('TxPool::newBlockLoop, catch error:', err);
+      logger.error('TxPool::newBlock, catch error:', err);
     }
   }
 
@@ -364,7 +367,7 @@ export class TxPool {
       this.truncateQueue();
       return result;
     } catch (err) {
-      logger.error('TxPool::addTxsLoop, catch error:', err);
+      logger.error('TxPool::addTxs, catch error:', err);
       return { results: new Array<boolean>(txs.length).fill(false) };
     }
   }

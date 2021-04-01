@@ -1,5 +1,5 @@
-import { Address, BN } from 'ethereumjs-util';
-import { uuidv4 } from 'uuid';
+import { Address, BN, bufferToHex } from 'ethereumjs-util';
+import { v4 as uuidv4 } from 'uuid';
 import { Aborter } from '@gxchain2/utils';
 import { Log } from '@gxchain2/receipt';
 import { Topics, BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
@@ -22,6 +22,10 @@ type FilterInfo = {
   queryInfo: FilterQuery;
   client?: WsClient;
 };
+
+function genSubscriptionId() {
+  return bufferToHex(uuidv4({}, Buffer.alloc(16, 0)));
+}
 
 export class FilterSystem {
   private aborter = new Aborter();
@@ -64,7 +68,7 @@ export class FilterSystem {
   }
 
   wsSubscibe(client: WsClient, queryInfo: FilterQuery): string {
-    const uid = uuidv4();
+    const uid = genSubscriptionId();
     const filterInstance = { createtime: Date.now(), hashes: [], logs: [], queryInfo, client };
     switch (queryInfo.type) {
       case 'newHeads': {
@@ -88,7 +92,7 @@ export class FilterSystem {
   }
 
   httpSubscribe(queryInfo: FilterQuery): string {
-    const uid = uuidv4();
+    const uid = genSubscriptionId();
     const filterInstance = { createtime: Date.now(), hashes: [], logs: [], queryInfo };
     switch (queryInfo.type) {
       case 'newHeads': {

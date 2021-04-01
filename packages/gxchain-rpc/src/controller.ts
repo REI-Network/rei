@@ -372,9 +372,9 @@ export class Controller {
       return;
     }
     if (type === 'logs') {
-      this.filterSystem.wsSubscibe(context.client, type, parseAddressesAndTopics(options?.address, options?.topics));
+      this.filterSystem.subscribe(context.client, type, parseAddressesAndTopics(options?.address, options?.topics));
     } else {
-      this.filterSystem.wsSubscibe(context.client, type);
+      this.filterSystem.subscribe(context.client, type);
     }
   }
 

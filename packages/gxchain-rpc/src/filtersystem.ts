@@ -63,14 +63,14 @@ export class FilterSystem {
   private aborter = new Aborter();
   private taskQueue = new AsyncChannel<Task>({ isAbort: () => this.aborter.isAborted });
 
-  private readonly wsHeads = new Map<string, Filter>();
-  private readonly wsLogs = new Map<string, Filter>();
-  private readonly wsPendingTransactions = new Map<string, Filter>();
-  private readonly wsSyncing = new Map<string, Filter>();
-  private readonly httpHeads = new Map<string, Filter>();
-  private readonly httpLogs = new Map<string, Filter>();
-  private readonly httpPendingTransactions = new Map<string, Filter>();
-  private readonly httpFilterType = new Map<string, string>();
+  private readonly subscribeHeads = new Map<string, Filter>();
+  private readonly subscribeLogs = new Map<string, Filter>();
+  private readonly subscribePendingTransactions = new Map<string, Filter>();
+  private readonly subscribeSyncing = new Map<string, Filter>();
+  private readonly filterHeads = new Map<string, Filter>();
+  private readonly filterLogs = new Map<string, Filter>();
+  private readonly filterPendingTransactions = new Map<string, Filter>();
+  private readonly filterType = new Map<string, string>();
 
   constructor(node: Node) {
     this.node = node;
@@ -92,7 +92,7 @@ export class FilterSystem {
     for (const [key, filter] of map) {
       if (timenow - filter.createtime! > deadline) {
         map.delete(key);
-        this.httpFilterType.delete(key);
+        this.filterType.delete(key);
       }
     }
   }
@@ -107,9 +107,9 @@ export class FilterSystem {
       if (this.aborter.isAborted) {
         break;
       }
-      this.cycleDelete(this.httpHeads);
-      this.cycleDelete(this.httpLogs);
-      this.cycleDelete(this.httpPendingTransactions);
+      this.cycleDelete(this.filterHeads);
+      this.cycleDelete(this.filterLogs);
+      this.cycleDelete(this.filterPendingTransactions);
     }
   }
 
@@ -132,73 +132,67 @@ export class FilterSystem {
     }
   }
 
-  wsSubscibe(client: WsClient, type: string, query?: Query): string {
+  subscribe(client: WsClient, type: string, query?: Query): string {
     const uid = genSubscriptionId();
     const filter = { hashes: [], logs: [], query, client };
     switch (type) {
       case 'newHeads': {
-        this.wsHeads.set(uid, filter);
+        this.subscribeHeads.set(uid, filter);
         break;
       }
       case 'logs': {
-        this.wsLogs.set(uid, filter);
+        this.subscribeLogs.set(uid, filter);
         break;
       }
       case 'newPendingTransactions': {
-        this.wsPendingTransactions.set(uid, filter);
+        this.subscribePendingTransactions.set(uid, filter);
         break;
       }
       case 'syncing': {
-        this.wsSyncing.set(uid, filter);
+        this.subscribeSyncing.set(uid, filter);
         break;
       }
     }
     return uid;
   }
 
-  httpSubscribe(type: string, query?: Query): string {
+  newFilter(type: string, query?: Query): string {
     const uid = genSubscriptionId();
     const filter = { hashes: [], logs: [], createtime: Date.now(), query };
     switch (type) {
       case 'newHeads': {
-        this.httpHeads.set(uid, filter);
+        this.filterHeads.set(uid, filter);
         break;
       }
       case 'logs': {
-        this.httpLogs.set(uid, filter);
+        this.filterLogs.set(uid, filter);
         break;
       }
       case 'newPendingTransactions': {
-        this.httpPendingTransactions.set(uid, filter);
+        this.filterPendingTransactions.set(uid, filter);
         break;
       }
     }
-    this.httpFilterType.set(uid, type);
+    this.filterType.set(uid, type);
     return uid;
   }
 
-  wsUnsubscribe(id: string) {
-    this.wsHeads.delete(id);
-    this.wsLogs.delete(id);
-    this.wsPendingTransactions.delete(id);
-    this.wsSyncing.delete(id);
+  unsubscribe(id: string) {
+    return this.subscribeHeads.delete(id) || this.subscribeLogs.delete(id) || this.subscribePendingTransactions.delete(id) || this.subscribeSyncing.delete(id);
   }
 
-  httpUnsubscribe(id: string) {
-    this.httpHeads.delete(id);
-    this.httpLogs.delete(id);
-    this.httpPendingTransactions.delete(id);
-    this.httpFilterType.delete(id);
+  uninstall(id: string) {
+    return this.filterHeads.delete(id) || this.filterLogs.delete(id) || this.filterPendingTransactions.delete(id) || this.filterType.delete(id);
   }
 
-  httpFilterChanges(id: string) {
-    const type = this.httpFilterType.get(id);
+  filterChanges(id: string) {
+    const type = this.filterType.get(id);
     if (!type) {
       return;
     }
     switch (type) {
       case 'newHeads': {
-        const filter = this.httpHeads.get(id);
+        const filter = this.filterHeads.get(id);
         const hash = filter?.hashes;
         if (filter) {
           filter.hashes = [];
@@ -206,7 +200,7 @@ export class FilterSystem {
         return hash;
       }
       case 'logs': {
-        const filter = this.httpLogs.get(id);
+        const filter = this.filterLogs.get(id);
         const logs = filter?.logs;
         if (filter) {
           filter.logs = [];
@@ -214,7 +208,7 @@ export class FilterSystem {
         return logs;
       }
       case 'newPendingTransactions': {
-        const filter = this.httpPendingTransactions.get(id);
+        const filter = this.filterPendingTransactions.get(id);
         const hash = filter?.hashes;
         if (filter) {
           filter.hashes = [];
@@ -225,36 +219,36 @@ export class FilterSystem {
   }
 
   private newPendingTransactions(hashs: Buffer[]) {
-    for (const [id, filter] of this.wsPendingTransactions) {
+    for (const [id, filter] of this.subscribePendingTransactions) {
       filter.client!.notifyPendingTransactions(id, hashs);
     }
-    for (const [id, filter] of this.httpPendingTransactions) {
+    for (const [id, filter] of this.filterPendingTransactions) {
       filter.hashes = filter.hashes.concat(hashs);
     }
   }
 
   private newHeads(heads: BlockHeader[]) {
-    for (const [id, filter] of this.wsHeads) {
+    for (const [id, filter] of this.subscribeHeads) {
       filter.client!.notifyHeader(id, heads);
     }
-    for (const [id, filter] of this.httpHeads) {
+    for (const [id, filter] of this.filterHeads) {
       filter.hashes = filter.hashes.concat(heads.map((head) => head.hash()));
     }
   }
 
   private newLogs(logs: Log[]) {
-    for (const [id, filter] of this.wsLogs) {
+    for (const [id, filter] of this.subscribeLogs) {
       const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filter.query!));
       filter.client!.notifyLogs(id, filteredLogs);
     }
-    for (const [id, filter] of this.httpLogs) {
+    for (const [id, filter] of this.filterLogs) {
       const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filter.query!));
       filter.logs = filter.logs.concat(filteredLogs);
     }
   }
 
   private newSyncing(state: SyncingStatus) {
-    for (const [id, filter] of this.wsSyncing) {
+    for (const [id, filter] of this.subscribeSyncing) {
       filter.client!.notifySyncing(id, state);
     }
   }

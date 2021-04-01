@@ -1,15 +1,16 @@
+import { Address, BN } from 'ethereumjs-util';
 import { uuidv4 } from 'uuid';
 import { Aborter } from '@gxchain2/utils';
 import { Log } from '@gxchain2/receipt';
 import { WsClient } from './client';
+import { Topics, BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
 
 type FilterQuery = {
   type: string;
-  blockHash: Buffer;
-  fromBlock: number;
-  toBlock: number;
-  addresses: Buffer[];
-  topics: Buffer[][];
+  fromBlock: BN;
+  toBlock: BN;
+  addresses: Address[];
+  topics: Topics;
 };
 
 const deadline = 5 * 60 * 1000;
@@ -67,9 +68,9 @@ export class FilterSystem {
       if (this.aborter.isAborted) {
         break;
       }
+      this.cycleDelete(this.httpHeadMap);
       this.cycleDelete(this.httpLogMap);
       this.cycleDelete(this.httpPendingTransactionsMap);
-      this.cycleDelete(this.httpLogMap);
     }
   }
 
@@ -147,7 +148,6 @@ export class FilterSystem {
   }
 
   httpFilterChanged(id: string, type: string) {
-    // if type === 'PendingTransactions';
     switch (type) {
       case 'newHeads': {
         return this.changed(id, this.httpHeadMap, false);
@@ -183,19 +183,36 @@ export class FilterSystem {
     }
   }
 
-  // private includes()
+  newLogs(log: Log) {
+    for (const [id, filterInfo] of this.wsLogMap) {
+      const addresses = filterInfo.queryInfo.addresses;
+      const topics = filterInfo.queryInfo.topics;
+      const from = filterInfo.queryInfo.fromBlock;
+      const to = filterInfo.queryInfo.toBlock;
+      if (BloomBitsFilter.checkLogMatches(log, { addresses, topics, from, to })) {
+        if (filterInfo.notify) {
+          filterInfo.notify(log);
+        }
+      }
+    }
+    for (const [id, filterInfo] of this.httpLogMap) {
+      const addresses = filterInfo.queryInfo.addresses;
+      const topics = filterInfo.queryInfo.topics;
+      const from = filterInfo.queryInfo.fromBlock;
+      const to = filterInfo.queryInfo.toBlock;
+      if (BloomBitsFilter.checkLogMatches(log, { addresses, topics, from, to })) {
+        if (filterInfo.notify) {
+          filterInfo.logs.push(log);
+        }
+      }
+    }
+  }
 
-  // filterLogs(logs: Log[], filterinstance: FilterInfo) {
-  //   for (const log of logs) {
-  //     if (filterinstance.queryInfo.fromBlock >= 0 && filterinstance.queryInfo.fromBlock > log.blockNumber!.toNumber()) {
-  //       continue;
-  //     }
-  //     if (filterinstance.queryInfo.toBlock >= 0 && filterinstance.queryInfo.toBlock < log.blockNumber!.toNumber()) {
-  //       continue;
-  //     }
-  //     if (filterinstance.queryInfo.addresses.length > 0 && ) {
-  //       continue
-  //     }
-  //   }
-  // }
+  newSyncing(state: { earliest: string; latest: string; pengding: string } | undefined) {
+    for (const [id, filterInfo] of this.wsSyncingMap) {
+      if (filterInfo.notify) {
+        filterInfo.notify(state);
+      }
+    }
+  }
 }

@@ -19,7 +19,7 @@ export function calcBloomIndexes(data: Buffer) {
   return idxs;
 }
 
-type Topics = (Buffer | null | (Buffer | null)[])[];
+export type Topics = (Buffer | null | (Buffer | null)[])[];
 
 function topicMatched(normalizedTopics: Topics, logTopics: Buffer[]): boolean {
   for (let i = 0; i < normalizedTopics.length; i++) {
@@ -77,18 +77,30 @@ export class BloomBitsFilter {
     this.sectionSize = options.sectionSize;
   }
 
-  private async checkMatches(block: Block, addresses: Address[], topics: Topics) {
+  static checkLogMatches(log: Log, { addresses, topics, from, to }: { addresses: Address[]; topics: Topics; from?: BN; to?: BN }): boolean {
+    if (from && (!log.blockNumber || from.gt(log.blockNumber))) {
+      return false;
+    }
+    if (to && (!log.blockNumber || to.lt(log.blockNumber))) {
+      return false;
+    }
+    if (addresses.length > 0 && addresses.findIndex((addr) => addr.buf.equals(log.address)) === -1) {
+      return false;
+    }
+    if (!topicMatched(topics, log.topics)) {
+      return false;
+    }
+    return true;
+  }
+
+  private async checkBlockMatches(block: Block, addresses: Address[], topics: Topics) {
     const logs: Log[] = [];
     for (const tx of block.transactions) {
       const receipt = await this.node.db.getReceipt(tx.hash());
       for (const log of receipt.logs) {
-        if (addresses.length > 0 && addresses.findIndex((addr) => addr.buf.equals(log.address)) === -1) {
-          continue;
+        if (BloomBitsFilter.checkLogMatches(log, { addresses, topics })) {
+          logs.push(log);
         }
-        if (!topicMatched(topics, log.topics)) {
-          continue;
-        }
-        logs.push(log);
       }
     }
     return logs;
@@ -190,7 +202,7 @@ export class BloomBitsFilter {
 
   async filterBlock(blockHashOrNumber: Buffer | BN | number, addresses: Address[], topics: Topics) {
     const block = await this.node.db.getBlock(blockHashOrNumber);
-    const logs = await this.checkMatches(block, addresses, topics);
+    const logs = await this.checkBlockMatches(block, addresses, topics);
     logs.forEach((log) => (log.removed = false));
     return logs;
   }

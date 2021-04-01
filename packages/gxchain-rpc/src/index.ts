@@ -10,16 +10,22 @@ import { WsClient } from './client';
 import { FilterSystem } from './filtersystem';
 
 export class RpcServer extends EventEmitter {
-  protected readonly port: number;
-  protected readonly host: string;
-  protected running: boolean = false;
-  protected controller: Controller;
+  private readonly port: number;
+  private readonly host: string;
+  private running: boolean = false;
+  private controller: Controller;
+  private filterSystem: FilterSystem;
+
+  get isRunning() {
+    return this.running;
+  }
 
   constructor(port: number, host: string, node: Node) {
     super();
     this.port = port;
     this.host = host;
-    this.controller = new Controller(node, new FilterSystem());
+    this.filterSystem = new FilterSystem(node);
+    this.controller = new Controller(node, this.filterSystem);
   }
 
   start() {

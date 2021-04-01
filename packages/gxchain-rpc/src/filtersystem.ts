@@ -1,8 +1,10 @@
 import { Address, BN, bufferToHex } from 'ethereumjs-util';
 import { v4 as uuidv4 } from 'uuid';
-import { Aborter } from '@gxchain2/utils';
+import { Aborter, AsyncChannel, logger } from '@gxchain2/utils';
 import { Log } from '@gxchain2/receipt';
+import { BlockHeader } from '@gxchain2/block';
 import { Topics, BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
+import { Node } from '@gxchain2/core';
 import { WsClient, SyncingStatus } from './client';
 
 export type QueryInfo = {
@@ -26,8 +28,28 @@ function genSubscriptionId() {
   return bufferToHex(uuidv4({}, Buffer.alloc(16, 0)));
 }
 
+class LogsTask {
+  logs!: Log[];
+}
+
+class HeadsTask {
+  hashes!: Buffer[];
+}
+
+class PendingTxTask {
+  hashes!: Buffer[];
+}
+
+class SyncingTask {
+  status!: SyncingStatus;
+}
+
+type Task = LogsTask | HeadsTask | PendingTxTask | SyncingTask;
+
 export class FilterSystem {
+  private readonly node: Node;
   private aborter = new Aborter();
+  private taskQueue = new AsyncChannel<Task>({ isAbort: () => this.aborter.isAborted });
 
   private readonly wsHeads = new Map<string, FilterInfo>();
   private readonly wsLogs = new Map<string, FilterInfo>();
@@ -37,8 +59,10 @@ export class FilterSystem {
   private readonly httpLogs = new Map<string, FilterInfo>();
   private readonly httpPendingTransactions = new Map<string, FilterInfo>();
 
-  constructor() {
+  constructor(node: Node) {
+    this.node = node;
     this.timeoutLoop();
+    this.taskLoop();
   }
 
   private cycleDelete(map: Map<string, FilterInfo>) {
@@ -63,6 +87,25 @@ export class FilterSystem {
       this.cycleDelete(this.httpHeads);
       this.cycleDelete(this.httpLogs);
       this.cycleDelete(this.httpPendingTransactions);
+    }
+  }
+
+  private async taskLoop() {
+    for await (const task of this.taskQueue.generator()) {
+      try {
+        if (task instanceof LogsTask) {
+          this.newLogs(task.logs);
+        } else if (task instanceof HeadsTask) {
+          const headers = (await Promise.all(task.hashes.map((hash) => this.node.db.tryToGetCanonicalHeader(hash)))).filter((header) => header !== undefined) as BlockHeader[];
+          this.newHeads(headers);
+        } else if (task instanceof PendingTxTask) {
+          this.newPendingTransactions(task.hashes);
+        } else if (task instanceof SyncingTask) {
+          this.newSyncing(task.status);
+        }
+      } catch (err) {
+        logger.error('FilterSystem::taskLoop, catch error:', err);
+      }
     }
   }
 
@@ -153,7 +196,7 @@ export class FilterSystem {
     }
   }
 
-  newPendingTransactions(hashs: Buffer[]) {
+  private newPendingTransactions(hashs: Buffer[]) {
     for (const [id, filterInfo] of this.wsPendingTransactions) {
       filterInfo.client!.notifyPendingTransactions(id, hashs);
     }
@@ -162,30 +205,29 @@ export class FilterSystem {
     }
   }
 
-  newHeads(hash: Buffer) {
-    for (const [id, filterInfo] of this.wsHeads) {
-      // TODO: get the header.
-      filterInfo.client!.notifyHeader(id, 1 as any);
+  private newHeads(heads: BlockHeader[]) {
+    for (const [id, filter] of this.wsHeads) {
+      filter.client!.notifyHeader(id, heads);
     }
-    for (const [id, filterInfo] of this.httpHeads) {
-      filterInfo.hashes.push(hash);
-    }
-  }
-
-  newLogs(logs: Log[]) {
-    for (const [id, filterInfo] of this.wsLogs) {
-      const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filterInfo.queryInfo!));
-      filterInfo.client!.notifyLogs(id, filteredLogs);
-    }
-    for (const [id, filterInfo] of this.httpLogs) {
-      const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filterInfo.queryInfo!));
-      filterInfo.logs = filterInfo.logs.concat(filteredLogs);
+    for (const [id, filter] of this.httpHeads) {
+      filter.hashes = filter.hashes.concat(heads.map((head) => head.hash()));
     }
   }
 
-  newSyncing(state: SyncingStatus) {
-    for (const [id, filterInfo] of this.wsSyncing) {
-      filterInfo.client!.notifySyncing(id, state);
+  private newLogs(logs: Log[]) {
+    for (const [id, filter] of this.wsLogs) {
+      const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filter.queryInfo!));
+      filter.client!.notifyLogs(id, filteredLogs);
+    }
+    for (const [id, filter] of this.httpLogs) {
+      const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filter.queryInfo!));
+      filter.logs = filter.logs.concat(filteredLogs);
+    }
+  }
+
+  private newSyncing(state: SyncingStatus) {
+    for (const [id, filter] of this.wsSyncing) {
+      filter.client!.notifySyncing(id, state);
     }
   }
 }

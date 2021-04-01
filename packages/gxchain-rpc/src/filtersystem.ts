@@ -29,13 +29,13 @@ export class FilterSystem {
 
   private readonly initPromise: Promise<void>;
 
-  private readonly wsHeadMap: Map<string, FilterInfo> = new Map();
-  private readonly wsLogMap: Map<string, FilterInfo> = new Map();
-  private readonly wsPendingTransactionsMap: Map<string, FilterInfo> = new Map();
-  private readonly wsSyncingMap: Map<string, FilterInfo> = new Map();
-  private readonly httpHeadMap: Map<string, FilterInfo> = new Map();
-  private readonly httpLogMap: Map<string, FilterInfo> = new Map();
-  private readonly httpPendingTransactionsMap: Map<string, FilterInfo> = new Map();
+  private readonly wsHeads = new Map<string, FilterInfo>();
+  private readonly wsLogs = new Map<string, FilterInfo>();
+  private readonly wsPendingTransactions = new Map<string, FilterInfo>();
+  private readonly wsSyncing = new Map<string, FilterInfo>();
+  private readonly httpHeads = new Map<string, FilterInfo>();
+  private readonly httpLogs = new Map<string, FilterInfo>();
+  private readonly httpPendingTransactions = new Map<string, FilterInfo>();
 
   constructor() {
     this.initPromise = this.init();
@@ -68,9 +68,9 @@ export class FilterSystem {
       if (this.aborter.isAborted) {
         break;
       }
-      this.cycleDelete(this.httpHeadMap);
-      this.cycleDelete(this.httpLogMap);
-      this.cycleDelete(this.httpPendingTransactionsMap);
+      this.cycleDelete(this.httpHeads);
+      this.cycleDelete(this.httpLogs);
+      this.cycleDelete(this.httpPendingTransactions);
     }
   }
 
@@ -79,19 +79,19 @@ export class FilterSystem {
     const filterInstance = { type: queryInfo.type, createtime: Date.now(), hashes: [], logs: [], queryInfo: queryInfo, notify: client.send };
     switch (queryInfo.type) {
       case 'newHeads': {
-        this.wsHeadMap.set(uid, filterInstance);
+        this.wsHeads.set(uid, filterInstance);
         break;
       }
       case 'logs': {
-        this.wsLogMap.set(uid, filterInstance);
+        this.wsLogs.set(uid, filterInstance);
         break;
       }
       case 'newPendingTransactions': {
-        this.wsPendingTransactionsMap.set(uid, filterInstance);
+        this.wsPendingTransactions.set(uid, filterInstance);
         break;
       }
       case 'syncing': {
-        this.wsSyncingMap.set(uid, filterInstance);
+        this.wsSyncing.set(uid, filterInstance);
         break;
       }
     }
@@ -103,15 +103,15 @@ export class FilterSystem {
     const filterInstance = { type: queryInfo.type, createtime: Date.now(), hashes: [], logs: [], queryInfo: queryInfo };
     switch (queryInfo.type) {
       case 'newHeads': {
-        this.httpHeadMap.set(uid, filterInstance);
+        this.httpHeads.set(uid, filterInstance);
         break;
       }
       case 'logs': {
-        this.httpLogMap.set(uid, filterInstance);
+        this.httpLogs.set(uid, filterInstance);
         break;
       }
       case 'newPendingTransactions': {
-        this.httpPendingTransactionsMap.set(uid, filterInstance);
+        this.httpPendingTransactions.set(uid, filterInstance);
         break;
       }
     }
@@ -119,16 +119,16 @@ export class FilterSystem {
   }
 
   wsUnsubscribe(id: string) {
-    this.wsHeadMap.delete(id);
-    this.wsLogMap.delete(id);
-    this.wsPendingTransactionsMap.delete(id);
-    this.wsSyncingMap.delete(id);
+    this.wsHeads.delete(id);
+    this.wsLogs.delete(id);
+    this.wsPendingTransactions.delete(id);
+    this.wsSyncing.delete(id);
   }
 
   httpUnsubscribe(id: string) {
-    this.httpHeadMap.delete(id);
-    this.httpLogMap.delete(id);
-    this.httpPendingTransactionsMap.delete(id);
+    this.httpHeads.delete(id);
+    this.httpLogs.delete(id);
+    this.httpPendingTransactions.delete(id);
   }
 
   private changed(id: string, map: Map<string, FilterInfo>, logorhash: boolean) {
@@ -150,69 +150,53 @@ export class FilterSystem {
   httpFilterChanged(id: string, type: string) {
     switch (type) {
       case 'newHeads': {
-        return this.changed(id, this.httpHeadMap, false);
+        return this.changed(id, this.httpHeads, false);
       }
       case 'logs': {
-        return this.changed(id, this.httpLogMap, true);
+        return this.changed(id, this.httpLogs, true);
       }
       case 'newPendingTransactions': {
-        return this.changed(id, this.httpPendingTransactionsMap, false);
+        return this.changed(id, this.httpPendingTransactions, false);
       }
     }
   }
 
   newPendingTransactions(hash: Buffer) {
-    for (const [id, filterInfo] of this.wsPendingTransactionsMap) {
+    for (const [id, filterInfo] of this.wsPendingTransactions) {
       if (filterInfo.notify) {
         filterInfo.notify(hash);
       }
     }
-    for (const [id, filterInfo] of this.httpPendingTransactionsMap) {
+    for (const [id, filterInfo] of this.httpPendingTransactions) {
       filterInfo.hashes.push(hash);
     }
   }
 
   newHeads(hash: Buffer) {
-    for (const [id, filterInfo] of this.wsHeadMap) {
-      if (filterInfo.notify) {
-        filterInfo.notify(hash);
-      }
+    for (const [id, filterInfo] of this.wsHeads) {
+      filterInfo.notify!(hash);
     }
-    for (const [id, filterInfo] of this.httpHeadMap) {
+    for (const [id, filterInfo] of this.httpHeads) {
       filterInfo.hashes.push(hash);
     }
   }
 
   newLogs(log: Log) {
-    for (const [id, filterInfo] of this.wsLogMap) {
-      const addresses = filterInfo.queryInfo.addresses;
-      const topics = filterInfo.queryInfo.topics;
-      const from = filterInfo.queryInfo.fromBlock;
-      const to = filterInfo.queryInfo.toBlock;
-      if (BloomBitsFilter.checkLogMatches(log, { addresses, topics, from, to })) {
-        if (filterInfo.notify) {
-          filterInfo.notify(log);
-        }
+    for (const [id, filterInfo] of this.wsLogs) {
+      if (BloomBitsFilter.checkLogMatches(log, filterInfo.queryInfo)) {
+        filterInfo.notify!(log);
       }
     }
-    for (const [id, filterInfo] of this.httpLogMap) {
-      const addresses = filterInfo.queryInfo.addresses;
-      const topics = filterInfo.queryInfo.topics;
-      const from = filterInfo.queryInfo.fromBlock;
-      const to = filterInfo.queryInfo.toBlock;
-      if (BloomBitsFilter.checkLogMatches(log, { addresses, topics, from, to })) {
-        if (filterInfo.notify) {
-          filterInfo.logs.push(log);
-        }
+    for (const [id, filterInfo] of this.httpLogs) {
+      if (BloomBitsFilter.checkLogMatches(log, filterInfo.queryInfo)) {
+        filterInfo.logs.push(log);
       }
     }
   }
 
-  newSyncing(state: { earliest: string; latest: string; pengding: string } | undefined) {
-    for (const [id, filterInfo] of this.wsSyncingMap) {
-      if (filterInfo.notify) {
-        filterInfo.notify(state);
-      }
+  newSyncing(state: { earliest: string; latest: string; pengding: string } | false) {
+    for (const [id, filterInfo] of this.wsSyncing) {
+      filterInfo.notify!(state);
     }
   }
 }

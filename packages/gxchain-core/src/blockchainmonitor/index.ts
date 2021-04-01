@@ -8,10 +8,10 @@ import { Node } from '../node';
 
 export declare interface BlockchainMonitor {
   on(event: 'logs' | 'removedLogs', listener: (logs: Log[]) => void): this;
-  on(event: 'newHeads', listener: (heads: BlockHeader[]) => void): this;
+  on(event: 'newHeads', listener: (hashes: Buffer[]) => void): this;
 
   once(event: 'logs' | 'removedLogs', listener: (logs: Log[]) => void): this;
-  once(event: 'newHeads', listener: (heads: BlockHeader[]) => void): this;
+  once(event: 'newHeads', listener: (hashes: Buffer[]) => void): this;
 }
 
 export class BlockchainMonitor extends EventEmitter {
@@ -123,7 +123,19 @@ export class BlockchainMonitor extends EventEmitter {
         this.emit('logs', logs);
       }
       if (newHeads.length > 0) {
-        this.emit('newHeads', newHeads);
+        newHeads.sort((a, b) => {
+          if (a.number.lt(b.number)) {
+            return -1;
+          }
+          if (a.number.gt(b.number)) {
+            return 1;
+          }
+          return 0;
+        });
+        this.emit(
+          'newHeads',
+          newHeads.map((head) => head.hash())
+        );
       }
     } catch (err) {
       logger.error('BlockchainMonitor::newBlock, catch error:', err);

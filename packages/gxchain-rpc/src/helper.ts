@@ -1,4 +1,4 @@
-import error from './error-codes';
+import error from './errorcodes';
 
 class Errexpand extends Error {
   code: number = 0;

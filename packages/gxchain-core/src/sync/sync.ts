@@ -69,14 +69,15 @@ export class Synchronizer extends EventEmitter {
     try {
       if (!this.isSyncing) {
         const beforeSync = this.node.blockchain.latestBlock.hash();
-        if (await this._sync(target)) {
-          logger.info('💫 Synchronized');
-          this.emit('synchronized');
-        } else {
-          this.emit('synchronize failed');
-        }
+        const result = await this._sync(target);
         const afterSync = this.node.blockchain.latestBlock.hash();
         if (!beforeSync.equals(afterSync)) {
+          if (result) {
+            logger.info('💫 Synchronized');
+            this.emit('synchronized');
+          } else {
+            this.emit('synchronize failed');
+          }
           await this.node.newBlock(this.node.blockchain.latestBlock);
         }
       }

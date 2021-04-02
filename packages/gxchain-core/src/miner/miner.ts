@@ -100,6 +100,10 @@ export class Miner extends Loop {
       return;
     }
     await this.worker.init();
+    await this.worker.startLoop();
+    if (this.isMining) {
+      await super.startLoop();
+    }
   }
 
   /**

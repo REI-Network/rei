@@ -115,7 +115,7 @@ export class BlockchainMonitor extends EventEmitter {
       }
       if (rebirthed.length > 0) {
         let logs: Log[] = [];
-        for (const tx of removed) {
+        for (const tx of rebirthed) {
           const receipt = await this.node.db.getReceipt(tx.hash());
           receipt.logs.forEach((log) => (log.removed = false));
           logs = logs.concat(receipt.logs);

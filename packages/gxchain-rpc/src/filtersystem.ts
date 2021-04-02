@@ -1,4 +1,4 @@
-import { Address, BN, bufferToHex } from 'ethereumjs-util';
+import { Address, BN, bufferToHex, toBuffer, bnToHex } from 'ethereumjs-util';
 import { v4 as uuidv4 } from 'uuid';
 import { Aborter, AsyncChannel, logger } from '@gxchain2/utils';
 import { Log } from '@gxchain2/receipt';
@@ -84,6 +84,24 @@ export class FilterSystem {
     });
     this.node.bcMonitor.on('newHeads', (hashes) => {
       this.taskQueue.push(new HeadsTask(hashes));
+    });
+    this.node.sync.on('start synchronize', () => {
+      const status = this.node.sync.syncStatus;
+      const syncingStatus: SyncingStatus = {
+        syncing: true,
+        status: {
+          startingBlock: bufferToHex(toBuffer(status.startingBlock)),
+          currentBlock: bnToHex(this.node.blockchain.latestBlock.header.number),
+          highestBlock: bufferToHex(toBuffer(status.highestBlock))
+        }
+      };
+      this.taskQueue.push(new SyncingTask(syncingStatus));
+    });
+    this.node.sync.on('synchronize failed', () => {
+      this.taskQueue.push(new SyncingTask(false));
+    });
+    this.node.sync.on('synchronized', () => {
+      this.taskQueue.push(new SyncingTask(false));
     });
   }
 

@@ -165,7 +165,7 @@ export class Controller {
     const status = this.node.sync.syncStatus;
     return {
       startingBlock: bufferToHex(toBuffer(status.startingBlock)),
-      currentBlock: bufferToHex(this.node.blockchain.latestBlock.header.number.toBuffer()),
+      currentBlock: bnToHex(this.node.blockchain.latestBlock.header.number),
       highestBlock: bufferToHex(toBuffer(status.highestBlock))
     };
   }

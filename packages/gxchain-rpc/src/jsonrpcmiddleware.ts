@@ -1,15 +1,13 @@
 import util from 'util';
 import * as helper from './helper';
 import errors from './errorcodes';
-import { RpcContext } from './index';
+import { RpcContext, emptyContext } from './index';
 import { JSONRPC_VERSION } from './types';
 import { logger } from '@gxchain2/utils';
 
 type HookFunction = (params: any, result: any) => Promise<any> | any;
 
 type JsonRPCBody = { id: any; method: string; jsonrpc: string; params: any };
-
-const emptyContext = new RpcContext();
 
 export interface JsonMiddlewareOption {
   methods: {

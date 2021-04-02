@@ -21,6 +21,8 @@ export class RpcContext {
   }
 }
 
+export const emptyContext = new RpcContext();
+
 export class RpcServer extends EventEmitter {
   private readonly port: number;
   private readonly host: string;

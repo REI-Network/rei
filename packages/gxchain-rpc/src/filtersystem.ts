@@ -5,6 +5,7 @@ import { Log } from '@gxchain2/receipt';
 import { BlockHeader } from '@gxchain2/block';
 import { Topics, BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
 import { Node } from '@gxchain2/core';
+import { Transaction } from '@gxchain2/tx';
 import { WsClient, SyncingStatus } from './client';
 
 export type Query = {
@@ -102,6 +103,9 @@ export class FilterSystem {
     });
     this.node.sync.on('synchronized', () => {
       this.taskQueue.push(new SyncingTask(false));
+    });
+    this.node.txPool.on('readies', (readies: Transaction[]) => {
+      this.taskQueue.push(new PendingTxTask(readies.map((tx) => tx.hash())));
     });
   }
 

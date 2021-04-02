@@ -197,17 +197,17 @@ export class FilterSystem {
 
   unsubscribe(id: string) {
     let result = this.subscribeHeads.delete(id);
-    result ||= this.subscribeLogs.delete(id);
-    result ||= this.subscribePendingTransactions.delete(id);
-    result ||= this.subscribeSyncing.delete(id);
+    result = this.subscribeLogs.delete(id) || result;
+    result = this.subscribePendingTransactions.delete(id) || result;
+    result = this.subscribeSyncing.delete(id) || result;
     return result;
   }
 
   uninstall(id: string) {
     let result = this.filterHeads.delete(id);
-    result ||= this.filterLogs.delete(id);
-    result ||= this.filterPendingTransactions.delete(id);
-    result ||= this.filterType.delete(id);
+    result = this.filterLogs.delete(id) || result;
+    result = this.filterPendingTransactions.delete(id) || result;
+    result = this.filterType.delete(id) || result;
     return result;
   }
 

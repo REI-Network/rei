@@ -114,14 +114,23 @@ export class BloomBitsFilter {
         throw new Error('query returned more than 10000 results');
       }
     };
-    const blooms: number[][] = [];
-    for (const bufArray of ([addresses.map((addr) => addr.buf)] as (Buffer | null)[][]).concat(topics.filter((val) => val !== null) as (Buffer | null)[][])) {
-      for (const buf of bufArray) {
-        if (buf !== null) {
-          blooms.push(calcBloomIndexes(buf));
+    const topicsBuf: Buffer[] = [];
+    for (const subTopics of topics.filter((val) => val !== null) as (Buffer | (Buffer | null)[])[]) {
+      if (subTopics instanceof Buffer) {
+        topicsBuf.push(subTopics);
+      } else {
+        for (const topicBuf of subTopics) {
+          if (topicBuf !== null) {
+            topicsBuf.push(topicBuf);
+          }
         }
       }
     }
+    const blooms: number[][] = [];
+    for (const buf of addresses.map((addr) => addr.buf).concat(topicsBuf)) {
+      blooms.push(calcBloomIndexes(buf));
+    }
+
     const latestHeader = await this.node.blockchain.getLatestHeader();
     // if addresses and topics is empty, return all logs between from and to.
     if (blooms.length === 0) {

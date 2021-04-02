@@ -3,7 +3,7 @@ import { DBManager, CacheMap } from '@ethereumjs/blockchain/dist/db/manager';
 import { DBOp, DBTarget, DatabaseKey, DBOpData } from '@ethereumjs/blockchain/dist/db/operation';
 import Cache from '@ethereumjs/blockchain/dist/db/cache';
 import { BN, rlp, toBuffer } from 'ethereumjs-util';
-import { Block, BlockHeader } from '@gxchain2/block';
+import { Block, BlockHeader, BlockHeaderBuffer } from '@gxchain2/block';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { Receipt } from '@gxchain2/receipt';
 import { Common, constants } from '@gxchain2/common';
@@ -205,6 +205,25 @@ export class Database extends DBManager {
     const blockHeihgt = new BN(blockHeightBuffer);
     const block = await this.getBlock(blockHeihgt);
     const rawArr: Buffer[][] = rlp.decode(await this.get(DBTarget_Receipts, { blockHash: block.hash(), blockNumber: blockHeihgt })) as any;
+    const cumulativeGasUsed = new BN(0);
+    for (let i = 0; i < block.transactions.length; i++) {
+      const tx = block.transactions[i];
+      const raw = rawArr[i];
+      const receipt = Receipt.fromValuesArray(raw);
+      cumulativeGasUsed.iadd(new BN(receipt.gasUsed));
+      if (tx.hash().equals(txHash)) {
+        receipt.installProperties(block, tx, cumulativeGasUsed, i);
+        return receipt;
+      }
+    }
+    throw new level.errors.NotFoundError();
+  }
+
+  async getReceiptByHashAndNumber(txHash: Buffer, blockHash: Buffer, blockNumber: BN): Promise<Receipt> {
+    const header: BlockHeaderBuffer = await this.get(DBTarget.Header, { blockHash, blockNumber });
+    const body = await this.getBody(blockHash, blockNumber);
+    const block = Block.fromValuesArray([header, ...body], { common: (this as any)._common });
+    const rawArr: Buffer[][] = rlp.decode(await this.get(DBTarget_Receipts, { blockHash, blockNumber })) as any;
     const cumulativeGasUsed = new BN(0);
     for (let i = 0; i < block.transactions.length; i++) {
       const tx = block.transactions[i];

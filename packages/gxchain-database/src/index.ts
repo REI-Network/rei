@@ -220,7 +220,7 @@ export class Database extends DBManager {
   }
 
   async getReceiptByHashAndNumber(txHash: Buffer, blockHash: Buffer, blockNumber: BN): Promise<Receipt> {
-    const header: BlockHeaderBuffer = await this.get(DBTarget.Header, { blockHash, blockNumber });
+    const header: BlockHeaderBuffer = rlp.decode(await this.get(DBTarget.Header, { blockHash, blockNumber })) as any;
     const body = await this.getBody(blockHash, blockNumber);
     const block = Block.fromValuesArray([header, ...body], { common: (this as any)._common });
     const rawArr: Buffer[][] = rlp.decode(await this.get(DBTarget_Receipts, { blockHash, blockNumber })) as any;

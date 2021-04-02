@@ -1,6 +1,6 @@
 import util from 'util';
 import * as helper from './helper';
-import errors from './error-codes';
+import errors from './errorcodes';
 import { RpcContext } from './index';
 import { JSONRPC_VERSION } from './types';
 import { logger } from '@gxchain2/utils';

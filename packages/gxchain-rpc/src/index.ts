@@ -9,12 +9,24 @@ import { logger } from '@gxchain2/utils';
 import { WsClient } from './client';
 import { FilterSystem } from './filtersystem';
 
+export class RpcContext {
+  public readonly client?: WsClient;
+
+  get isWebsocket() {
+    return !!this.client;
+  }
+
+  constructor(client?: WsClient) {
+    this.client = client;
+  }
+}
+
 export class RpcServer extends EventEmitter {
   private readonly port: number;
   private readonly host: string;
   private running: boolean = false;
-  private controller: Controller;
-  private filterSystem: FilterSystem;
+  private readonly controller: Controller;
+  private readonly filterSystem: FilterSystem;
 
   get isRunning() {
     return this.running;
@@ -46,11 +58,11 @@ export class RpcServer extends EventEmitter {
         app.use(express.json({ type: '*/*' }));
         app.use(jsonmid.makeMiddleWare());
         app.ws('/', (ws) => {
-          const wsClient = new WsClient(ws);
-          jsonmid.wrapWs(wsClient);
+          const context = new RpcContext(new WsClient(ws));
+          jsonmid.wrapWs(context);
           ws.on('error', (err) => this.emit('error', err));
           ws.on('close', () => {
-            wsClient.close();
+            context.client!.close();
           });
         });
 

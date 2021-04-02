@@ -5,8 +5,8 @@ import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { hexStringToBuffer, hexStringToBN, logger } from '@gxchain2/utils';
 import { Log } from '@gxchain2/receipt';
 import * as helper from './helper';
-import { RpcContext } from './jsonrpcmiddleware';
 import { FilterSystem } from './filtersystem';
+import { RpcContext } from './index';
 
 type CallData = {
   from?: string;

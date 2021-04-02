@@ -1,9 +1,7 @@
 import { bufferToHex } from 'ethereumjs-util';
 import { BlockHeader } from '@gxchain2/block';
 import { Log } from '@gxchain2/receipt';
-import { JSONRPC_VERSION } from './helper';
-
-export type SyncingStatus = { syncing: true; status: { startingBlock: string; currentBlock: string; highestBlock: string } } | false;
+import { SyncingStatus, JSONRPC_VERSION } from './types';
 
 export class WsClient {
   public readonly ws: WebSocket;

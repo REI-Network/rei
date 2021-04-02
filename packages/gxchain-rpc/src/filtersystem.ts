@@ -6,7 +6,8 @@ import { BlockHeader } from '@gxchain2/block';
 import { Topics, BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
 import { Node } from '@gxchain2/core';
 import { Transaction } from '@gxchain2/tx';
-import { WsClient, SyncingStatus } from './client';
+import { WsClient } from './client';
+import { SyncingStatus } from './types';
 
 export type Query = {
   fromBlock?: BN;

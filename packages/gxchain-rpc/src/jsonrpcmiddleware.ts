@@ -1,24 +1,13 @@
 import util from 'util';
 import * as helper from './helper';
 import errors from './error-codes';
-import { WsClient } from './client';
+import { RpcContext } from './index';
+import { JSONRPC_VERSION } from './types';
 import { logger } from '@gxchain2/utils';
 
 type HookFunction = (params: any, result: any) => Promise<any> | any;
 
 type JsonRPCBody = { id: any; method: string; jsonrpc: string; params: any };
-
-export class RpcContext {
-  public readonly client?: WsClient;
-
-  get isWebsocket() {
-    return !!this.client;
-  }
-
-  constructor(client?: WsClient) {
-    this.client = client;
-  }
-}
 
 const emptyContext = new RpcContext();
 
@@ -51,7 +40,7 @@ export class JsonRPCMiddleware {
   private async handleSingleReq(body: JsonRPCBody, context: RpcContext): Promise<any> {
     const { id, method, jsonrpc, params } = body;
     try {
-      helper.validateJsonRpcVersion(jsonrpc, helper.JSONRPC_VERSION);
+      helper.validateJsonRpcVersion(jsonrpc, JSONRPC_VERSION);
 
       helper.validateJsonRpcMethod(method, this.config.methods);
       logger.info('📦 Rpc served', method);
@@ -92,7 +81,7 @@ export class JsonRPCMiddleware {
 
   private makeParseError() {
     return {
-      jsonrpc: helper.JSONRPC_VERSION,
+      jsonrpc: JSONRPC_VERSION,
       error: errors.PARSE_ERROR
     };
   }
@@ -107,17 +96,16 @@ export class JsonRPCMiddleware {
     }
   }
 
-  wrapWs(wsClient: WsClient) {
-    const context = new RpcContext(wsClient);
-    wsClient.ws.addEventListener('message', (msg) => {
+  wrapWs(context: RpcContext) {
+    context.client!.ws.addEventListener('message', (msg) => {
       let rpcData: any;
       try {
         rpcData = JSON.parse(msg.data);
       } catch (err) {
-        wsClient.send(this.makeParseError());
+        context.client!.send(this.makeParseError());
         return;
       }
-      this.rpcMiddleware(rpcData, wsClient.send.bind(wsClient), context);
+      this.rpcMiddleware(rpcData, context.client!.send.bind(context.client!), context);
     });
   }
 

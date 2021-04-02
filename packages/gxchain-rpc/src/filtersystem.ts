@@ -238,7 +238,11 @@ export class FilterSystem {
 
   private newPendingTransactions(hashs: Buffer[]) {
     for (const [id, filter] of this.subscribePendingTransactions) {
-      filter.client!.notifyPendingTransactions(id, hashs);
+      if (filter.client!.isClosed) {
+        this.subscribePendingTransactions.delete(id);
+      } else {
+        filter.client!.notifyPendingTransactions(id, hashs);
+      }
     }
     for (const [id, filter] of this.filterPendingTransactions) {
       filter.hashes = filter.hashes.concat(hashs);
@@ -247,7 +251,11 @@ export class FilterSystem {
 
   private newHeads(heads: BlockHeader[]) {
     for (const [id, filter] of this.subscribeHeads) {
-      filter.client!.notifyHeader(id, heads);
+      if (filter.client!.isClosed) {
+        this.subscribeHeads.delete(id);
+      } else {
+        filter.client!.notifyHeader(id, heads);
+      }
     }
     for (const [id, filter] of this.filterHeads) {
       filter.hashes = filter.hashes.concat(heads.map((head) => head.hash()));
@@ -256,18 +264,30 @@ export class FilterSystem {
 
   private newLogs(logs: Log[]) {
     for (const [id, filter] of this.subscribeLogs) {
-      const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filter.query!));
-      filter.client!.notifyLogs(id, filteredLogs);
+      if (filter.client!.isClosed) {
+        this.subscribeLogs.delete(id);
+      } else {
+        const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filter.query!));
+        if (filteredLogs.length > 0) {
+          filter.client!.notifyLogs(id, filteredLogs);
+        }
+      }
     }
     for (const [id, filter] of this.filterLogs) {
       const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filter.query!));
-      filter.logs = filter.logs.concat(filteredLogs);
+      if (filteredLogs.length > 0) {
+        filter.logs = filter.logs.concat(filteredLogs);
+      }
     }
   }
 
   private newSyncing(state: SyncingStatus) {
     for (const [id, filter] of this.subscribeSyncing) {
-      filter.client!.notifySyncing(id, state);
+      if (filter.client!.isClosed) {
+        this.subscribeSyncing.delete(id);
+      } else {
+        filter.client!.notifySyncing(id, state);
+      }
     }
   }
 }

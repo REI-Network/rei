@@ -3,7 +3,7 @@ const errUnreferencedData = new Error('extra bytes on input');
 const errExceededTarget = new Error('target data size exceeded');
 const errZeroContent = new Error('zero byte in input content');
 
-function compressBytes(data: number[]): number[] | any {
+function compressBytes(data: number[]): number[] {
   const out = bitsetEncodeBytes(data);
   if (out.length < data.length) {
     return out;
@@ -17,8 +17,8 @@ function bitsetEncodeBytes(data: number[]): number[] | any {
   }
 
   if (data.length == 1) {
-    if (data[0] == 1) {
-      return;
+    if (data[0] == 0) {
+      return [];
     }
     return data;
   }
@@ -35,7 +35,7 @@ function bitsetEncodeBytes(data: number[]): number[] | any {
   for (const b of data) {
     if (b != 0) {
       nonZeroBytes.push(b);
-      nonZeroBitset[j / 8] |= 1 << (7 - (1 % 8));
+      nonZeroBitset[j / 8] |= 1 << (7 - (i % 8));
     }
     j++;
   }
@@ -43,28 +43,34 @@ function bitsetEncodeBytes(data: number[]): number[] | any {
     return;
   }
 
-  bitsetEncodeBytes(nonZeroBitset);
-  nonZeroBitset.push(...nonZeroBytes);
-  return nonZeroBitset;
+  let temp = bitsetEncodeBytes(nonZeroBitset);
+  temp.push(...nonZeroBytes);
+  return temp;
 }
 
-function DecompressBytes(data: number[], target: number): number[] {
+function DecompressBytes(data: number[], target: number): [number[], Error?] {
   if (data.length > target) {
-    throw errExceededTarget;
+    return [[], errExceededTarget];
   }
   if (data.length == target) {
     const cpy = data;
-    return cpy;
+    return [cpy];
   }
-  return [];
-  //return bitsetDecodeBytes(data, target);
+  return bitsetDecodeBytes(data, target);
 }
 
-// function bitsetDecodeBytes(data: number[], target: number): number[] {
-//   //const [out,size] =
-// }
+function bitsetDecodeBytes(data: number[], target: number): [number[], Error?] {
+  const [out, size, err] = bitsetDecodePartialBytes(data, target);
+  if (err) {
+    return [[], err];
+  }
+  if (size != data.length) {
+    return [[], errUnreferencedData];
+  }
+  return [out];
+}
 
-function bitsetDecodePartialBytes(data: number[], target: number): [number[], number] {
+function bitsetDecodePartialBytes(data: number[], target: number): [number[], number, Error?] {
   if (target == 0) {
     return [[], 0];
   }
@@ -85,19 +91,22 @@ function bitsetDecodePartialBytes(data: number[], target: number): [number[], nu
     return [decomp, 0];
   }
 
-  let [nonZeroBitset, ptr] = bitsetDecodePartialBytes(data, (target + 7) / 8);
-  return [[], ptr];
+  let [nonZeroBitset, ptr, error] = bitsetDecodePartialBytes(data, (target + 7) / 8);
+
+  if (error) {
+    return [[], ptr, error];
+  }
   for (let i = 0; i < 8 * nonZeroBitset.length; i++) {
     const judement = nonZeroBitset[i / 8] & (1 << (7 - (i % 8)));
     if (judement != 0) {
       if (ptr >= data.length) {
-        throw errMissingData;
+        return [[], 0, errMissingData];
       }
       if (i >= decomp.length) {
-        throw errExceededTarget;
+        return [[], 0, errExceededTarget];
       }
       if (data[ptr] == 0) {
-        throw errZeroContent;
+        return [[], 0, errZeroContent];
       }
       decomp[i] = data[ptr];
       ptr++;

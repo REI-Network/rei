@@ -1,3 +1,4 @@
+import EventEmitter from 'events';
 import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Heap from 'qheap';
 import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Aborter, logger } from '@gxchain2/utils';
@@ -120,7 +121,13 @@ class TxPoolAccount {
   }
 }
 
-export class TxPool {
+export declare interface TxPool {
+  on(event: 'readies', listener: (readies: Transaction[]) => void): this;
+
+  once(event: 'readies', listener: (readies: Transaction[]) => void): this;
+}
+
+export class TxPool extends EventEmitter {
   private aborter = new Aborter();
 
   private readonly accounts: FunctionalMap<Buffer, TxPoolAccount>;
@@ -150,6 +157,7 @@ export class TxPool {
   private rejournalInterval: number;
 
   constructor(options: TxPoolOptions) {
+    super();
     this.txMaxSize = options.txMaxSize || 32768 * 4;
     this.priceLimit = options.priceLimit || new BN(1);
     this.priceBump = options.priceBump || 10;
@@ -185,11 +193,11 @@ export class TxPool {
   }
 
   private local(): Map<Buffer, Transaction[]> {
-    let txs = createBufferFunctionalMap<Transaction[]>();
+    const txs = createBufferFunctionalMap<Transaction[]>();
     for (const addrBuf of this.locals) {
-      let account = this.accounts.get(addrBuf);
+      const account = this.accounts.get(addrBuf);
       if (account?.hasPending()) {
-        let transactions = txs.get(addrBuf);
+        const transactions = txs.get(addrBuf);
         if (transactions) {
           const listtxs = account.pending.toList();
           for (const tx of listtxs) {
@@ -200,7 +208,7 @@ export class TxPool {
         }
       }
       if (account?.hasQueue()) {
-        let transactions = txs.get(addrBuf);
+        const transactions = txs.get(addrBuf);
         if (transactions) {
           const listtxs = account.queue.toList();
           for (const tx of listtxs) {
@@ -238,6 +246,16 @@ export class TxPool {
         break;
       }
       await this.journal!.rotate(this.local());
+    }
+  }
+
+  private emitReadies(readies?: Map<Buffer, Transaction[]>) {
+    if (readies) {
+      let txs: Transaction[] = [];
+      for (const list of readies.values()) {
+        txs = txs.concat(list);
+      }
+      this.emit('readies', txs);
     }
   }
 
@@ -344,7 +362,7 @@ export class TxPool {
       }
       this.currentHeader = originalNewBlock.header;
       this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot);
-      await this._addTxs(reinject, true);
+      this.emitReadies((await this._addTxs(reinject, true)).readies);
       await this.demoteUnexecutables();
       this.truncatePending();
       this.truncateQueue();
@@ -363,6 +381,7 @@ export class TxPool {
     txs = txs instanceof Transaction ? [txs] : txs;
     try {
       const result = await this._addTxs(txs, false);
+      this.emitReadies(result.readies);
       this.truncatePending();
       this.truncateQueue();
       return result;

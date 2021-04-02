@@ -393,6 +393,9 @@ export class Controller {
   eth_submitHashrate() {
     helper.throwRpcErr('Unsupported eth_submitHashrate!');
   }
+  eth_unsubscribe([id]: [string]) {
+    return this.filterSystem.unsubscribe(id);
+  }
   async eth_subscribe([type, options]: [string, undefined | { address?: string[]; topics?: TopicsData }], context: RpcContext) {
     if (!context.client) {
       helper.throwRpcErr('eth_subscribe is only supported on websocket!');

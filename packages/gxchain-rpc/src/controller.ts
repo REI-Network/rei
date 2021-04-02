@@ -93,7 +93,7 @@ export class Controller {
   }
 
   private async getStateManagerByTag(tag: string) {
-    return this.node.getStateManager((await this.getBlockByTag(tag)).header.stateRoot);
+    return tag === 'pending' ? await this.node.miner.worker.getPendingStateManager() : this.node.getStateManager((await this.getBlockByTag(tag)).header.stateRoot);
   }
 
   private calculateBaseFee(data: CallData) {

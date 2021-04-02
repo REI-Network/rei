@@ -4,6 +4,7 @@ import { calculateTransactionTrie, Transaction } from '@gxchain2/tx';
 import { PendingTxMap } from '@gxchain2/tx-pool';
 import { WrappedVM } from '@gxchain2/vm';
 import { logger } from '@gxchain2/utils';
+import { StateManager } from '@gxchain2/state-manager';
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import { Loop } from './loop';
 import { Miner } from './miner';
@@ -109,6 +110,14 @@ export class Worker extends Loop {
       },
       { common: this.node.common }
     );
+  }
+
+  async getPendingStateManager() {
+    await this.initPromise;
+    if (this.wvm) {
+      return new StateManager({ common: this.node.common, trie: (this.wvm.vm.stateManager as any)._trie.copy(false) });
+    }
+    return await this.node.getStateManager(this.node.blockchain.latestBlock.header.stateRoot);
   }
 
   /**

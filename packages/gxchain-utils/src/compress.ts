@@ -26,12 +26,12 @@ function bitsetEncodeBytes(data: Buffer): Buffer | undefined {
     return data;
   }
 
-  let nonZeroBitset: Buffer = Buffer.alloc(Math.round((data.length + 7) / 8)).fill(0);
-  let nonZeroBytes: Buffer = Buffer.from('');
+  const nonZeroBitset: Buffer = Buffer.alloc(Math.round((data.length + 7) / 8)).fill(0);
+  const nonZeroBytes: number[] = [];
 
   for (let i = 0; i < data.length; i++) {
     if (data[i] != 0) {
-      nonZeroBytes = Buffer.concat([nonZeroBytes, Buffer.from([data[i]])]);
+      nonZeroBytes.push(data[i]);
       nonZeroBitset[Math.round(i / 8)] |= 1 << (7 - (i % 8));
     }
   }
@@ -40,11 +40,11 @@ function bitsetEncodeBytes(data: Buffer): Buffer | undefined {
     return;
   }
 
-  let result = bitsetEncodeBytes(nonZeroBitset);
+  const result = bitsetEncodeBytes(nonZeroBitset);
   if (!result) {
     return;
   }
-  return Buffer.concat([result, nonZeroBytes]);
+  return Buffer.concat([result, Buffer.from(nonZeroBytes)]);
 }
 
 export function decompressBytes(data: Buffer, target: number) {
@@ -71,7 +71,7 @@ function bitsetDecodePartialBytes(data: Buffer, target: number): [Buffer, number
     return [Buffer.from(''), 0];
   }
 
-  let decomp = Buffer.alloc(target).fill(0);
+  const decomp = Buffer.alloc(target).fill(0);
 
   if (data.length == 0) {
     return [decomp, 0];

@@ -17,9 +17,7 @@ export function mixin<T1 extends Constructor, T2 extends Constructor>(mix1: T1, 
 
   let ctor;
   if (mix1 && typeof mix1 === 'function') {
-    ctor = class extends (
-      mix1
-    ) {
+    ctor = class extends mix1 {
       constructor(...props) {
         super(...props);
       }
@@ -65,3 +63,4 @@ export * from './priorityqueue';
 export * from './asyncnext';
 export * from './functionalmap';
 export * from './semaphorelock';
+export * from './compress';

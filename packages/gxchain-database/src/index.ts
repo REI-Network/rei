@@ -7,7 +7,7 @@ import { Block, BlockHeader, BlockHeaderBuffer } from '@gxchain2/block';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { Receipt } from '@gxchain2/receipt';
 import { Common, constants } from '@gxchain2/common';
-import { compressBytes, decompressBytes } from '../../gxchain-utils/src/compress';
+import { compressBytes, decompressBytes } from '@gxchain2/utils';
 const level = require('level-mem');
 
 // constants for txLookup and receipts
@@ -86,12 +86,11 @@ export function DBOp_set(operationTarget: DBTarget, value: Buffer | object, key?
     return DBOp.set(operationTarget, value, key);
   } else {
     const dbOperation = new_DBOp(operationTarget, key);
-    dbOperation.baseDBOp.value = value;
     dbOperation.baseDBOp.type = 'put';
     if (operationTarget == DBTarget_BloomBits) {
-      if (Buffer.isBuffer(value)) {
-        dbOperation.baseDBOp.value = compressBytes(value);
-      }
+      dbOperation.baseDBOp.value = compressBytes(value as Buffer);
+    } else {
+      dbOperation.baseDBOp.value = value;
     }
     if (operationTarget == DBTarget.Heads) {
       dbOperation.baseDBOp.valueEncoding = 'json';
@@ -243,9 +242,8 @@ export class Database extends DBManager {
     throw new level.errors.NotFoundError();
   }
 
-  async getBloomBits(bit: number, section: BN, hash: Buffer, target: number) {
-    hash = decompressBytes(hash, target);
-    return await this.get(DBTarget_BloomBits, { bit, section, hash } as any);
+  async getBloomBits(bit: number, section: BN, hash: Buffer) {
+    return decompressBytes(await this.get(DBTarget_BloomBits, { bit, section, hash } as any), Math.round(constants.BloomBitsBlocks / 8));
   }
 
   async tryToGetCanonicalHeader(hash: Buffer) {

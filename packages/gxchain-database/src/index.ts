@@ -243,7 +243,7 @@ export class Database extends DBManager {
   }
 
   async getBloomBits(bit: number, section: BN, hash: Buffer) {
-    return decompressBytes(await this.get(DBTarget_BloomBits, { bit, section, hash } as any), Math.round(constants.BloomBitsBlocks / 8));
+    return decompressBytes(await this.get(DBTarget_BloomBits, { bit, section, hash } as any), Math.floor(constants.BloomBitsBlocks / 8));
   }
 
   async tryToGetCanonicalHeader(hash: Buffer) {

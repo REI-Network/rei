@@ -51,7 +51,9 @@ export class Worker extends Loop {
   private async _newBlock(block: Block) {
     try {
       if (this.wvm) {
-        await this.wvm.vm.stateManager.revert();
+        if ((this.wvm.vm.stateManager as any)._checkpointCount > 0) {
+          await this.wvm.vm.stateManager.revert();
+        }
       }
       this.txs = [];
       this.gasUsed = new BN(0);
@@ -67,8 +69,9 @@ export class Worker extends Loop {
         },
         { common: this.node.common }
       );
-      await (this.wvm = await this.node.getWrappedVM(block.header.stateRoot)).vm.stateManager.checkpoint();
-      await this.commit(this.node.txPool.getPendingMap());
+      this.wvm = await this.node.getWrappedVM(block.header.stateRoot);
+      await this.wvm.vm.stateManager.checkpoint();
+      await this.commit(await this.node.txPool.getPendingMap(block.header.number, block.header.hash()));
     } catch (err) {
       logger.error('Worker::_newBlock, catch error:', err);
     }
@@ -95,8 +98,26 @@ export class Worker extends Loop {
    * Assembles the pending block from block data
    * @returns
    */
-  async getPendingBlock() {
+  async getPendingBlock(number?: BN, hash?: Buffer) {
     await this.initPromise;
+    if (number && hash && (!number.addn(1).eq(this.header.number) || !hash.equals(this.header.parentHash))) {
+      return Block.fromBlockData(
+        {
+          header: {
+            coinbase: this.miner.coinbase,
+            difficulty: '0x1',
+            gasLimit: this.miner.gasLimit,
+            nonce: '0x0102030405060708',
+            number: number.addn(1),
+            parentHash: hash,
+            uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+            timestamp: new BN(Date.now()),
+            transactionsTrie: await calculateTransactionTrie([])
+          }
+        },
+        { common: this.node.common }
+      );
+    }
     const txs = [...this.txs];
     const header = { ...this.header };
     return Block.fromBlockData(

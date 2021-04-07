@@ -395,8 +395,12 @@ export class TxPool extends EventEmitter {
    * Obtain the pending transactions in the pool
    * @returns The map of accounts and pending transactions
    */
-  getPendingMap() {
+  async getPendingMap(number?: BN, hash?: Buffer) {
+    await this.initPromise;
     const pendingMap = new PendingTxMap();
+    if (number && hash && (!number.eq(this.currentHeader.number) || !hash.equals(this.currentHeader.hash()))) {
+      return pendingMap;
+    }
     for (const [sender, account] of this.accounts) {
       if (!account.hasPending()) {
         continue;

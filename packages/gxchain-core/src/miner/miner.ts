@@ -120,14 +120,11 @@ export class Miner extends Loop {
    * Mine the Block
    */
   async mineBlock() {
-    const block = await this.worker.getPendingBlock();
-    if (block.header.number.eq(this.node.blockchain.latestBlock.header.number.addn(1)) && block.header.parentHash.equals(this.node.blockchain.latestBlock.hash())) {
-      const newBlock = await this.node.processBlock(block);
-      await this.node.newBlock(newBlock);
-      logger.info('⛏️  Mine block, height:', newBlock.header.number.toString(), 'hash:', bufferToHex(newBlock.hash()));
-    } else {
-      logger.warn('Miner::mineBlock, invalid pending block:', bufferToHex(block.hash()), 'latest:', bufferToHex(this.node.blockchain.latestBlock.hash()));
-    }
+    const lastHeader = this.node.blockchain.latestBlock.header;
+    const block = await this.worker.getPendingBlock(lastHeader.number, lastHeader.hash());
+    const newBlock = await this.node.processBlock(block);
+    await this.node.newBlock(newBlock);
+    logger.info('⛏️  Mine block, height:', newBlock.header.number.toString(), 'hash:', bufferToHex(newBlock.hash()));
   }
 
   protected async process() {

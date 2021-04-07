@@ -67,7 +67,6 @@ const handler: {
     const count = isNaN(Number(strCount)) ? 1 : Number(strCount);
     for (let i = 0; i < count; i++) {
       await node.miner.mineBlock();
-      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   },
   lsreceipt: async (node: Node, hash: string) => {

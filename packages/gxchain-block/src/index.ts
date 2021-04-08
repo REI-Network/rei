@@ -42,7 +42,13 @@ export class WrappedBlock {
       gasLimit: bnToHex(this.block.header.gasLimit),
       gasUsed: bnToHex(this.block.header.gasUsed),
       timestamp: bnToHex(this.block.header.timestamp),
-      transactions: fullTransactions ? this.block.transactions.map((tx) => new WrappedTransaction(tx).toRPCJSON()) : this.block.transactions.map((tx) => bufferToHex(tx.hash())),
+      transactions: fullTransactions
+        ? this.block.transactions.map((tx, i) => {
+            const wtx = new WrappedTransaction(tx);
+            wtx.installProperties(this.block, i);
+            return wtx.toRPCJSON();
+          })
+        : this.block.transactions.map((tx) => bufferToHex(tx.hash())),
       uncles: this.block.uncleHeaders.map((uh) => bufferToHex(uh.hash()))
     };
   }

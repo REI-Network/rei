@@ -111,7 +111,7 @@ export class Worker extends Loop {
             number: number.addn(1),
             parentHash: hash,
             uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
-            timestamp: new BN(Date.now()),
+            timestamp: new BN(Math.floor(Date.now() / 1000)),
             transactionsTrie: await calculateTransactionTrie([])
           }
         },
@@ -124,7 +124,7 @@ export class Worker extends Loop {
       {
         header: {
           ...header,
-          timestamp: new BN(Date.now()),
+          timestamp: new BN(Math.floor(Date.now() / 1000)),
           transactionsTrie: await calculateTransactionTrie(txs)
         },
         transactions: txs

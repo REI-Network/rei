@@ -434,6 +434,42 @@ export class TxPool extends EventEmitter {
     return this.txs.get(hash);
   }
 
+  getPoolContent() {
+    const result: { pending: { [address: string]: { [nonce: string]: any } }; queued: { [address: string]: { [nonce: string]: any } } } = { pending: {}, queued: {} };
+    function forceGet<T>(obj: { [name: string]: T }, name: string) {
+      let val = obj[name];
+      if (val === undefined) {
+        val = {} as any;
+        Object.defineProperty(obj, name, { value: val, enumerable: true });
+      }
+      return val;
+    }
+    for (const [sender, account] of this.accounts) {
+      const address = bufferToHex(sender);
+      if (account.hasPending()) {
+        const pendingObj = forceGet(result.pending, address);
+        for (const [nonce, tx] of account.pending.nonceToTx) {
+          const txObj = forceGet(pendingObj, nonce.toString());
+          const txInfo = new WrappedTransaction(tx).toRPCJSON();
+          for (const property in txInfo) {
+            Object.defineProperty(txObj, property, { value: txInfo[property], enumerable: true });
+          }
+        }
+      }
+      if (account.hasQueue()) {
+        const queuedObj = forceGet(result.queued, address);
+        for (const [nonce, tx] of account.queue.nonceToTx) {
+          const txObj = forceGet(queuedObj, nonce.toString());
+          const txInfo = new WrappedTransaction(tx).toRPCJSON();
+          for (const property in txInfo) {
+            Object.defineProperty(txObj, property, { value: txInfo[property], enumerable: true });
+          }
+        }
+      }
+    }
+    return result;
+  }
+
   private async _addTxs(txs: Transaction[], force: boolean): Promise<{ results: boolean[]; readies?: Map<Buffer, Transaction[]> }> {
     const dirtyAddrs: Address[] = [];
     const results: boolean[] = [];

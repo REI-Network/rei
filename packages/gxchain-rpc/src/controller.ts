@@ -429,4 +429,8 @@ export class Controller {
   //shh_uninstallFilter
   //shh_getFilterChanges
   //shh_getMessages
+
+  txpool_content() {
+    return this.node.txPool.getPoolContent();
+  }
 }

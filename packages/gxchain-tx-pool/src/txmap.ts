@@ -5,8 +5,8 @@ import { logger, createBNFunctionalMap } from '@gxchain2/utils';
 import { txSlots, txCost } from './index';
 
 export class TxSortedMap {
+  readonly nonceToTx = createBNFunctionalMap<Transaction>();
   private readonly strict: boolean;
-  private readonly nonceToTx = createBNFunctionalMap<Transaction>();
   private nonceHeap: Heap;
   private sortedTxCache?: Transaction[];
   private _slots: number = 0;

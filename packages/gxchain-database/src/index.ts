@@ -242,6 +242,12 @@ export class Database extends DBManager {
     throw new level.errors.NotFoundError();
   }
 
+  async getBlockByHashAndNumber(blockHash: Buffer, blockNumber: BN): Promise<Block> {
+    const header: BlockHeaderBuffer = rlp.decode(await this.get(DBTarget.Header, { blockHash, blockNumber })) as any;
+    const body = await this.getBody(blockHash, blockNumber);
+    return Block.fromValuesArray([header, ...body], { common: (this as any)._common });
+  }
+
   async getBloomBits(bit: number, section: BN, hash: Buffer) {
     return decompressBytes(await this.get(DBTarget_BloomBits, { bit, section, hash } as any), Math.floor(constants.BloomBitsBlocks / 8));
   }

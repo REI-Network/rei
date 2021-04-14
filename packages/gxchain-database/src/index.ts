@@ -3,7 +3,7 @@ import { DBManager, CacheMap } from '@ethereumjs/blockchain/dist/db/manager';
 import { DBOp, DBTarget, DatabaseKey, DBOpData } from '@ethereumjs/blockchain/dist/db/operation';
 import Cache from '@ethereumjs/blockchain/dist/db/cache';
 import { BN, rlp, toBuffer } from 'ethereumjs-util';
-import { Block, BlockHeader, BlockHeaderBuffer } from '@gxchain2/block';
+import { Block, BlockBodyBuffer, BlockHeader, BlockHeaderBuffer } from '@gxchain2/block';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { Receipt } from '@gxchain2/receipt';
 import { Common, constants } from '@gxchain2/common';
@@ -244,7 +244,14 @@ export class Database extends DBManager {
 
   async getBlockByHashAndNumber(blockHash: Buffer, blockNumber: BN): Promise<Block> {
     const header: BlockHeaderBuffer = rlp.decode(await this.get(DBTarget.Header, { blockHash, blockNumber })) as any;
-    const body = await this.getBody(blockHash, blockNumber);
+    let body: BlockBodyBuffer = [[], []];
+    try {
+      body = await this.getBody(blockHash, blockNumber);
+    } catch (err) {
+      if (err.type !== 'NotFoundError') {
+        throw err;
+      }
+    }
     return Block.fromValuesArray([header, ...body], { common: (this as any)._common });
   }
 

@@ -6,7 +6,8 @@ import VM from '@ethereumjs/vm';
 import Bloom from '@ethereumjs/vm/dist/bloom';
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import { StateManager } from '@ethereumjs/vm/dist/state';
-import { logger } from '@gxchain2/utils';
+import { VmError } from '@ethereumjs/vm/dist/exceptions';
+import { InterpreterStep } from '@ethereumjs/vm/dist/evm/interpreter';
 
 type PromisResultType<T> = T extends PromiseLike<infer U> ? U : T;
 
@@ -44,6 +45,27 @@ export interface RunBlockOpts {
    * If true, skips the balance check
    */
   skipBalance?: boolean;
+  /**
+   * Debug callback
+   */
+  debug?: {
+    /**
+     * Called when the transaction starts processing
+     */
+    captureStart: (from: Address, create: boolean, input: Buffer, gas: BN, value: BN, to?: Address) => void;
+    /**
+     * Called at every step of processing a transaction
+     */
+    captureState: (step: InterpreterStep) => void;
+    /**
+     * Called when a transaction processing error
+     */
+    captureFault: (step: InterpreterStep, err: VmError) => void;
+    /**
+     * Called when the transaction is processed
+     */
+    captureEnd: (time: number, output: Buffer, gasUsed: BN) => void;
+  };
 }
 
 /**
@@ -188,50 +210,97 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
   const receiptTrie = new Trie();
   const receipts: Receipt[] = [];
   const txResults: RunTxResult[] = [];
+  const errors: (VmError | undefined)[] = [];
+
+  let lastStep: undefined | InterpreterStep;
+  let handler: undefined | ((step: InterpreterStep, next: () => void) => void);
+  if (opts.debug) {
+    handler = (step: InterpreterStep, next: () => void) => {
+      if (lastStep !== undefined) {
+        opts.debug!.captureState(lastStep);
+      }
+      lastStep = step;
+      next();
+    };
+    this.on('step', handler);
+  }
 
   /*
    * Process transactions
    */
-  for (let txIdx = 0; txIdx < block.transactions.length; txIdx++) {
-    const tx = block.transactions[txIdx];
+  try {
+    for (let txIdx = 0; txIdx < block.transactions.length; txIdx++) {
+      const tx = block.transactions[txIdx];
 
-    const gasLimitIsHigherThanBlock = block.header.gasLimit.lt(tx.gasLimit.add(gasUsed));
-    if (gasLimitIsHigherThanBlock) {
-      throw new Error('tx has a higher gas limit than the block');
+      const gasLimitIsHigherThanBlock = block.header.gasLimit.lt(tx.gasLimit.add(gasUsed));
+      if (gasLimitIsHigherThanBlock) {
+        throw new Error('tx has a higher gas limit than the block');
+      }
+
+      // Call tx exec start
+      let time: undefined | number;
+      if (opts.debug) {
+        time = Date.now();
+        opts.debug.captureStart(tx.getSenderAddress(), tx.toCreationAddress(), tx.data, tx.gasLimit, tx.value, tx.to);
+      }
+
+      // Run the tx through the VM
+      const { skipBalance, skipNonce } = opts;
+      const txRes = await this.runTx({
+        tx,
+        block,
+        skipBalance,
+        skipNonce
+      });
+      txResults.push(txRes);
+
+      // Add to total block gas usage
+      gasUsed = gasUsed.add(txRes.gasUsed);
+      // Combine blooms via bitwise OR
+      bloom.or(txRes.bloom);
+
+      const txReceipt = new Receipt(txRes.gasUsed.toArrayLike(Buffer), txRes.bloom.bitvector, txRes.execResult?.logs?.map((log) => Log.fromValuesArray(log)) || [], txRes.execResult.exceptionError ? 0 : 1);
+      receipts.push(txReceipt);
+
+      // Save the vm error
+      errors.push(txRes.execResult.exceptionError);
+
+      // Add receipt to trie to later calculate receipt root
+      await receiptTrie.put(toBuffer(txIdx), txReceipt.serialize());
+
+      // Call tx exec over
+      if (opts.debug) {
+        // lastStep logically must exist here
+        if (txRes.execResult.exceptionError) {
+          opts.debug.captureFault(lastStep!, txRes.execResult.exceptionError);
+        } else {
+          opts.debug.captureState(lastStep!);
+        }
+        lastStep = undefined;
+        opts.debug.captureEnd(Date.now() - time!, txRes.execResult.returnValue, txRes.gasUsed);
+      }
     }
 
-    // Run the tx through the VM
-    const { skipBalance, skipNonce } = opts;
-    const txRes = await this.runTx({
-      tx,
-      block,
-      skipBalance,
-      skipNonce
-    });
-    txResults.push(txRes);
-
-    // Add to total block gas usage
-    gasUsed = gasUsed.add(txRes.gasUsed);
-    // Combine blooms via bitwise OR
-    bloom.or(txRes.bloom);
-
-    if (txRes.execResult.exceptionError) {
-      logger.warn('VM::applyTransactions, exceptionError:', txRes.execResult.exceptionError);
+    // Remove Listener
+    if (handler) {
+      this.removeListener('step', handler);
     }
-    const txReceipt = new Receipt(txRes.gasUsed.toArrayLike(Buffer), txRes.bloom.bitvector, txRes.execResult?.logs?.map((log) => Log.fromValuesArray(log)) || [], txRes.execResult.exceptionError ? 0 : 1);
-    receipts.push(txReceipt);
 
-    // Add receipt to trie to later calculate receipt root
-    await receiptTrie.put(toBuffer(txIdx), txReceipt.serialize());
+    return {
+      bloom,
+      gasUsed,
+      receiptRoot: receiptTrie.root,
+      receipts,
+      errors,
+      results: txResults
+    };
+  } catch (err) {
+    // Remove Listener
+    if (handler) {
+      this.removeListener('step', handler);
+    }
+    throw err;
   }
-
-  return {
-    bloom,
-    gasUsed,
-    receiptRoot: receiptTrie.root,
-    receipts,
-    results: txResults
-  };
 }
 
 /**

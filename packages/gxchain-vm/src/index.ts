@@ -16,3 +16,4 @@ export class WrappedVM {
 }
 
 export { VM, Bloom };
+export * from '@ethereumjs/vm/dist/evm/interpreter';

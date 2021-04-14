@@ -187,6 +187,14 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockDebugOpts
   for (let txIdx = 0; txIdx < block.transactions.length; txIdx++) {
     const tx = block.transactions[txIdx];
 
+    const gasLimitIsHigherThanBlock = block.header.gasLimit.lt(tx.gasLimit.add(gasUsed));
+    if (gasLimitIsHigherThanBlock) {
+      if (handler) {
+        this.removeListener('step', handler);
+      }
+      throw new Error('tx has a higher gas limit than the block');
+    }
+
     // Call tx exec start
     let time: undefined | number;
     if (opts.debug && (!opts.debug.hash || opts.debug.hash.equals(tx.hash()))) {
@@ -196,11 +204,6 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockDebugOpts
 
     let txRes: undefined | RunTxResult;
     try {
-      const gasLimitIsHigherThanBlock = block.header.gasLimit.lt(tx.gasLimit.add(gasUsed));
-      if (gasLimitIsHigherThanBlock) {
-        throw new Error('tx has a higher gas limit than the block');
-      }
-
       // Run the tx through the VM
       const { skipBalance, skipNonce } = opts;
       txRes = await this.runTx({
@@ -232,13 +235,14 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockDebugOpts
 
     // Call tx exec over
     if (opts.debug && (!opts.debug.hash || opts.debug.hash.equals(tx.hash()))) {
-      // lastStep logically must exist here
-      if (txRes?.execResult.exceptionError) {
-        opts.debug.captureFault(lastStep!, txRes.execResult.exceptionError);
-      } else if (catchedErr !== undefined) {
-        opts.debug.captureFault(lastStep!, catchedErr);
-      } else {
-        opts.debug.captureState(lastStep!);
+      if (lastStep) {
+        if (txRes?.execResult.exceptionError) {
+          opts.debug.captureFault(lastStep, txRes.execResult.exceptionError);
+        } else if (catchedErr !== undefined) {
+          opts.debug.captureFault(lastStep, catchedErr);
+        } else {
+          opts.debug.captureState(lastStep);
+        }
       }
       if (txRes) {
         opts.debug.captureEnd(txRes.execResult.returnValue, txRes.gasUsed, Date.now() - time!);

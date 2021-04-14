@@ -66,13 +66,14 @@ export default async function runCall(this: VM, opts: RunCallDebugOpts): Promise
 
   // Call tx exec over
   if (opts.debug) {
-    // lastStep logically must exist here
-    if (result?.execResult.exceptionError) {
-      opts.debug.captureFault(lastStep!, result.execResult.exceptionError);
-    } else if (catchedErr !== undefined) {
-      opts.debug.captureFault(lastStep!, catchedErr);
-    } else {
-      opts.debug.captureState(lastStep!);
+    if (lastStep) {
+      if (result?.execResult.exceptionError) {
+        opts.debug.captureFault(lastStep, result.execResult.exceptionError);
+      } else if (catchedErr !== undefined) {
+        opts.debug.captureFault(lastStep, catchedErr);
+      } else {
+        opts.debug.captureState(lastStep);
+      }
     }
     if (result) {
       opts.debug.captureEnd(result.execResult.returnValue, result.gasUsed, Date.now() - time!);

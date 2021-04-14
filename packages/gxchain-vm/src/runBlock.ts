@@ -6,66 +6,21 @@ import VM from '@ethereumjs/vm';
 import Bloom from '@ethereumjs/vm/dist/bloom';
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import { StateManager } from '@ethereumjs/vm/dist/state';
+import { RunBlockOpts } from '@ethereumjs/vm/dist/runBlock';
 import { VmError } from '@ethereumjs/vm/dist/exceptions';
 import { InterpreterStep } from '@ethereumjs/vm/dist/evm/interpreter';
+import { DebugOpts } from './types';
 
 type PromisResultType<T> = T extends PromiseLike<infer U> ? U : T;
 
 /**
  * Options for running a block.
  */
-export interface RunBlockOpts {
-  /**
-   * The @ethereumjs/block to process
-   */
-  block: Block;
-  /**
-   * Root of the state trie
-   */
-  root?: Buffer;
-  /**
-   * Whether to generate the stateRoot. If `true` `runBlock` will check the
-   * `stateRoot` of the block against the current Trie, check the `receiptsTrie`,
-   * the `gasUsed` and the `logsBloom` after running. If any does not match,
-   * `runBlock` throws.
-   * Defaults to `false`.
-   */
-  generate?: boolean;
-  /**
-   * If true, will skip "Block validation":
-   * Block validation validates the header (with respect to the blockchain),
-   * the transactions, the transaction trie and the uncle hash.
-   */
-  skipBlockValidation?: boolean;
-  /**
-   * If true, skips the nonce check
-   */
-  skipNonce?: boolean;
-  /**
-   * If true, skips the balance check
-   */
-  skipBalance?: boolean;
+export interface RunBlockDebugOpts extends RunBlockOpts {
   /**
    * Debug callback
    */
-  debug?: {
-    /**
-     * Called when the transaction starts processing
-     */
-    captureStart: (from: Address, create: boolean, input: Buffer, gas: BN, value: BN, to?: Address) => void;
-    /**
-     * Called at every step of processing a transaction
-     */
-    captureState: (step: InterpreterStep) => void;
-    /**
-     * Called when a transaction processing error
-     */
-    captureFault: (step: InterpreterStep, err: VmError) => void;
-    /**
-     * Called when the transaction is processed
-     */
-    captureEnd: (time: number, output: Buffer, gasUsed: BN) => void;
-  };
+  debug?: DebugOpts;
 }
 
 /**
@@ -84,7 +39,7 @@ export interface AfterBlockEvent extends RunBlockResult {
 /**
  * @ignore
  */
-export default async function runBlock(this: VM, opts: RunBlockOpts): Promise<{ result: PromisResultType<ReturnType<typeof applyBlock>>; block?: Block }> {
+export default async function runBlock(this: VM, opts: RunBlockDebugOpts): Promise<{ result: PromisResultType<ReturnType<typeof applyBlock>>; block?: Block }> {
   const state = this.stateManager;
   const { root } = opts;
   let block = opts.block;
@@ -180,7 +135,7 @@ export default async function runBlock(this: VM, opts: RunBlockOpts): Promise<{ 
  * @param {Block} block
  * @param {RunBlockOpts} opts
  */
-async function applyBlock(this: VM, block: Block, opts: RunBlockOpts) {
+async function applyBlock(this: VM, block: Block, opts: RunBlockDebugOpts) {
   // Validate block
   if (!opts.skipBlockValidation) {
     if (block.header.gasLimit.gte(new BN('8000000000000000', 16))) {
@@ -203,7 +158,7 @@ async function applyBlock(this: VM, block: Block, opts: RunBlockOpts) {
  * @param {Block} block
  * @param {RunBlockOpts} opts
  */
-async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
+async function applyTransactions(this: VM, block: Block, opts: RunBlockDebugOpts) {
   const bloom = new Bloom();
   // the total amount of gas used processing these transactions
   let gasUsed = new BN(0);
@@ -228,32 +183,38 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
   /*
    * Process transactions
    */
-  try {
-    for (let txIdx = 0; txIdx < block.transactions.length; txIdx++) {
-      const tx = block.transactions[txIdx];
+  let catchedErr: any;
+  for (let txIdx = 0; txIdx < block.transactions.length; txIdx++) {
+    const tx = block.transactions[txIdx];
 
+    // Call tx exec start
+    let time: undefined | number;
+    if (opts.debug && (!opts.debug.hash || opts.debug.hash.equals(tx.hash()))) {
+      time = Date.now();
+      opts.debug.captureStart(tx.getSenderAddress(), tx.toCreationAddress(), tx.data, tx.gasLimit, tx.value, tx.to);
+    }
+
+    let txRes: undefined | RunTxResult;
+    try {
       const gasLimitIsHigherThanBlock = block.header.gasLimit.lt(tx.gasLimit.add(gasUsed));
       if (gasLimitIsHigherThanBlock) {
         throw new Error('tx has a higher gas limit than the block');
       }
 
-      // Call tx exec start
-      let time: undefined | number;
-      if (opts.debug) {
-        time = Date.now();
-        opts.debug.captureStart(tx.getSenderAddress(), tx.toCreationAddress(), tx.data, tx.gasLimit, tx.value, tx.to);
-      }
-
       // Run the tx through the VM
       const { skipBalance, skipNonce } = opts;
-      const txRes = await this.runTx({
+      txRes = await this.runTx({
         tx,
         block,
         skipBalance,
         skipNonce
       });
       txResults.push(txRes);
+    } catch (err) {
+      catchedErr = err;
+    }
 
+    if (txRes) {
       // Add to total block gas usage
       gasUsed = gasUsed.add(txRes.gasUsed);
       // Combine blooms via bitwise OR
@@ -267,40 +228,49 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
 
       // Add receipt to trie to later calculate receipt root
       await receiptTrie.put(toBuffer(txIdx), txReceipt.serialize());
+    }
 
-      // Call tx exec over
-      if (opts.debug) {
-        // lastStep logically must exist here
-        if (txRes.execResult.exceptionError) {
-          opts.debug.captureFault(lastStep!, txRes.execResult.exceptionError);
-        } else {
-          opts.debug.captureState(lastStep!);
-        }
-        lastStep = undefined;
-        opts.debug.captureEnd(Date.now() - time!, txRes.execResult.returnValue, txRes.gasUsed);
+    // Call tx exec over
+    if (opts.debug && (!opts.debug.hash || opts.debug.hash.equals(tx.hash()))) {
+      // lastStep logically must exist here
+      if (txRes?.execResult.exceptionError) {
+        opts.debug.captureFault(lastStep!, txRes.execResult.exceptionError);
+      } else if (catchedErr !== undefined) {
+        opts.debug.captureFault(lastStep!, catchedErr);
+      } else {
+        opts.debug.captureState(lastStep!);
+      }
+      if (txRes) {
+        opts.debug.captureEnd(txRes.execResult.returnValue, txRes.gasUsed, Date.now() - time!);
+      } else {
+        opts.debug.captureEnd(Buffer.alloc(0), new BN(0), Date.now() - time!);
       }
     }
-
-    // Remove Listener
-    if (handler) {
-      this.removeListener('step', handler);
+    if (lastStep !== undefined) {
+      lastStep = undefined;
     }
 
-    return {
-      bloom,
-      gasUsed,
-      receiptRoot: receiptTrie.root,
-      receipts,
-      errors,
-      results: txResults
-    };
-  } catch (err) {
-    // Remove Listener
-    if (handler) {
-      this.removeListener('step', handler);
+    if (catchedErr) {
+      break;
     }
-    throw err;
   }
+
+  if (handler) {
+    this.removeListener('step', handler);
+  }
+
+  if (catchedErr) {
+    throw catchedErr;
+  }
+
+  return {
+    bloom,
+    gasUsed,
+    receiptRoot: receiptTrie.root,
+    receipts,
+    errors,
+    results: txResults
+  };
 }
 
 /**

@@ -1,5 +1,5 @@
 import { Address, BN, setLengthLeft } from 'ethereumjs-util';
-import { DebugOpts, InterpreterStep, VmError } from '@gxchain2/vm';
+import { IDebug, InterpreterStep, VmError } from '@gxchain2/vm';
 import { createBufferFunctionalMap } from '@gxchain2/utils';
 import { TraceConfig } from '../tracer';
 
@@ -17,7 +17,7 @@ export type StructLog = {
   };
 };
 
-export class StructLogDebug implements DebugOpts {
+export class StructLogDebug implements IDebug {
   hash?: Buffer;
   config: TraceConfig;
   logs: StructLog[] = [];
@@ -31,7 +31,7 @@ export class StructLogDebug implements DebugOpts {
     this.hash = hash;
   }
 
-  private captureLog(step: InterpreterStep, error?: string) {
+  private async captureLog(step: InterpreterStep, error?: string) {
     let memory: string[] = [];
     if (!this.config.disableMemory && step.memoryWordCount.gtn(0)) {
       const memoryLength = new BN(step.memory.length).div(step.memoryWordCount).toNumber();
@@ -48,10 +48,9 @@ export class StructLogDebug implements DebugOpts {
     if (!this.config.disableStorage) {
       if (step.opcode.name === 'SLOAD' && step.stack.length >= 1) {
         const address = setLengthLeft(step.stack[step.stack.length - 1].toBuffer(), 32);
-        // TODO: async
-        const value = step.stateManager.getContractStorage(step.address, address);
+        const value = await step.stateManager.getContractStorage(step.address, address);
         Object.defineProperty(storage, address.toString('hex'), {
-          value: (value as any).toString('hex'),
+          value: value.toString('hex'),
           enumerable: true
         });
       }
@@ -85,13 +84,13 @@ export class StructLogDebug implements DebugOpts {
     this.logs.push(log);
   }
 
-  captureStart(from: Address, create: boolean, input: Buffer, gas: BN, value: BN, to?: Address) {}
+  async captureStart(from: Address, create: boolean, input: Buffer, gas: BN, value: BN, to?: Address) {}
 
-  captureState(step: InterpreterStep) {
-    this.captureLog(step);
+  async captureState(step: InterpreterStep) {
+    await this.captureLog(step);
   }
 
-  captureFault(step: InterpreterStep, err: any) {
+  async captureFault(step: InterpreterStep, err: any) {
     let errString: string;
     if (err instanceof VmError) {
       errString = err.errorType;
@@ -103,10 +102,10 @@ export class StructLogDebug implements DebugOpts {
       errString = 'unkonw error';
     }
     this.failed = true;
-    this.captureLog(step, errString);
+    await this.captureLog(step, errString);
   }
 
-  captureEnd(output: Buffer, gasUsed: BN, time: number) {
+  async captureEnd(output: Buffer, gasUsed: BN, time: number) {
     this.output = output;
     this.gasUsed = gasUsed.clone();
   }

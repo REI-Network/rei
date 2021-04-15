@@ -6,10 +6,10 @@ import Message from '@ethereumjs/vm/dist/evm/message';
 import { default as EVM, EVMResult } from '@ethereumjs/vm/dist/evm/evm';
 import { RunCallOpts } from '@ethereumjs/vm/dist/runCall';
 import { InterpreterStep } from '@ethereumjs/vm/dist/evm/interpreter';
-import { DebugOpts } from './types';
+import { IDebug } from './types';
 
 export interface RunCallDebugOpts extends RunCallOpts {
-  debug?: DebugOpts;
+  debug?: IDebug;
 }
 
 /**
@@ -38,16 +38,16 @@ export default async function runCall(this: VM, opts: RunCallDebugOpts): Promise
   let lastStep: undefined | InterpreterStep;
   let handler: undefined | ((step: InterpreterStep, next: () => void) => void);
   if (opts.debug) {
-    handler = (step: InterpreterStep, next: () => void) => {
+    handler = async (step: InterpreterStep, next: () => void) => {
       if (lastStep !== undefined) {
-        opts.debug!.captureState(lastStep);
+        await opts.debug!.captureState(lastStep);
       }
       lastStep = step;
       next();
     };
     this.on('step', handler);
     time = Date.now();
-    opts.debug.captureStart(message.caller ? message.caller : Address.zero(), message.to === undefined, message.data, message.gasLimit, message.value, message.to);
+    await opts.debug.captureStart(message.caller ? message.caller : Address.zero(), message.to === undefined, message.data, message.gasLimit, message.value, message.to);
   }
 
   let result: undefined | EVMResult;
@@ -68,17 +68,17 @@ export default async function runCall(this: VM, opts: RunCallDebugOpts): Promise
   if (opts.debug) {
     if (lastStep) {
       if (result?.execResult.exceptionError) {
-        opts.debug.captureFault(lastStep, result.execResult.exceptionError);
+        await opts.debug.captureFault(lastStep, result.execResult.exceptionError);
       } else if (catchedErr !== undefined) {
-        opts.debug.captureFault(lastStep, catchedErr);
+        await opts.debug.captureFault(lastStep, catchedErr);
       } else {
-        opts.debug.captureState(lastStep);
+        await opts.debug.captureState(lastStep);
       }
     }
     if (result) {
-      opts.debug.captureEnd(result.execResult.returnValue, result.gasUsed, Date.now() - time!);
+      await opts.debug.captureEnd(result.execResult.returnValue, result.gasUsed, Date.now() - time!);
     } else {
-      opts.debug.captureEnd(Buffer.alloc(0), new BN(0), Date.now() - time!);
+      await opts.debug.captureEnd(Buffer.alloc(0), new BN(0), Date.now() - time!);
     }
   }
 

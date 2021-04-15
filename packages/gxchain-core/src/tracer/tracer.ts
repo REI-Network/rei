@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
 import { Block } from '@gxchain2/block';
-import { DebugOpts } from '@gxchain2/vm';
+import { IDebug } from '@gxchain2/vm';
 import { Node } from '../node';
 import { StructLogDebug } from './debug/structlogdebug';
 
@@ -23,11 +23,11 @@ export class Tracer {
     this.node = options.node;
   }
 
-  private createDebugImpl(config: TraceConfig, hash?: Buffer): DebugOpts {
+  private createDebugImpl(config: TraceConfig, hash?: Buffer): IDebug {
     return new StructLogDebug(config, hash);
   }
 
-  private debugResult(debug: DebugOpts) {
+  private debugResult(debug: IDebug) {
     if (debug instanceof StructLogDebug) {
       return debug.result();
     }

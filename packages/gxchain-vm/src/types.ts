@@ -4,7 +4,7 @@ import { InterpreterStep } from '@ethereumjs/vm/dist/evm/interpreter';
 /**
  * Options for debugging.
  */
-export interface DebugOpts {
+export interface IDebug {
   /**
    * Target transaction hash
    */
@@ -12,17 +12,17 @@ export interface DebugOpts {
   /**
    * Called when the transaction starts processing
    */
-  captureStart: (from: Address, create: boolean, input: Buffer, gas: BN, value: BN, to?: Address) => void;
+  captureStart(from: Address, create: boolean, input: Buffer, gas: BN, value: BN, to?: Address): Promise<void>;
   /**
    * Called at every step of processing a transaction
    */
-  captureState: (step: InterpreterStep) => void;
+  captureState(step: InterpreterStep): Promise<void>;
   /**
    * Called when a transaction processing error
    */
-  captureFault: (step: InterpreterStep, err: any) => void;
+  captureFault(step: InterpreterStep, err: any): Promise<void>;
   /**
    * Called when the transaction is processed
    */
-  captureEnd: (output: Buffer, gasUsed: BN, time: number) => void;
+  captureEnd(output: Buffer, gasUsed: BN, time: number): Promise<void>;
 }

@@ -9,7 +9,7 @@ import { StateManager } from '@ethereumjs/vm/dist/state';
 import { RunBlockOpts } from '@ethereumjs/vm/dist/runBlock';
 import { VmError } from '@ethereumjs/vm/dist/exceptions';
 import { InterpreterStep } from '@ethereumjs/vm/dist/evm/interpreter';
-import { DebugOpts } from './types';
+import { IDebug } from './types';
 
 type PromisResultType<T> = T extends PromiseLike<infer U> ? U : T;
 
@@ -20,7 +20,7 @@ export interface RunBlockDebugOpts extends RunBlockOpts {
   /**
    * Debug callback
    */
-  debug?: DebugOpts;
+  debug?: IDebug;
 }
 
 /**
@@ -170,9 +170,9 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockDebugOpts
   let lastStep: undefined | InterpreterStep;
   let handler: undefined | ((step: InterpreterStep, next: () => void) => void);
   if (opts.debug) {
-    handler = (step: InterpreterStep, next: () => void) => {
+    handler = async (step: InterpreterStep, next: () => void) => {
       if (lastStep !== undefined) {
-        opts.debug!.captureState(lastStep);
+        await opts.debug!.captureState(lastStep);
       }
       lastStep = {
         ...step,
@@ -205,7 +205,7 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockDebugOpts
     let time: undefined | number;
     if (opts.debug && (!opts.debug.hash || opts.debug.hash.equals(tx.hash()))) {
       time = Date.now();
-      opts.debug.captureStart(tx.getSenderAddress(), tx.toCreationAddress(), tx.data, tx.gasLimit, tx.value, tx.to);
+      await opts.debug.captureStart(tx.getSenderAddress(), tx.toCreationAddress(), tx.data, tx.gasLimit, tx.value, tx.to);
     }
 
     let txRes: undefined | RunTxResult;
@@ -243,17 +243,17 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockDebugOpts
     if (opts.debug && (!opts.debug.hash || opts.debug.hash.equals(tx.hash()))) {
       if (lastStep) {
         if (txRes?.execResult.exceptionError) {
-          opts.debug.captureFault(lastStep, txRes.execResult.exceptionError);
+          await opts.debug.captureFault(lastStep, txRes.execResult.exceptionError);
         } else if (catchedErr !== undefined) {
-          opts.debug.captureFault(lastStep, catchedErr);
+          await opts.debug.captureFault(lastStep, catchedErr);
         } else {
-          opts.debug.captureState(lastStep);
+          await opts.debug.captureState(lastStep);
         }
       }
       if (txRes) {
-        opts.debug.captureEnd(txRes.execResult.returnValue, txRes.gasUsed, Date.now() - time!);
+        await opts.debug.captureEnd(txRes.execResult.returnValue, txRes.gasUsed, Date.now() - time!);
       } else {
-        opts.debug.captureEnd(Buffer.alloc(0), new BN(0), Date.now() - time!);
+        await opts.debug.captureEnd(Buffer.alloc(0), new BN(0), Date.now() - time!);
       }
     }
     if (lastStep !== undefined) {

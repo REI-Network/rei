@@ -159,7 +159,8 @@ export class Node {
     this.common = new Common(
       {
         chain: genesisJSON.genesisInfo,
-        hardfork: 'chainstart'
+        hardfork: 'chainstart',
+        eips: [2537, 2929]
       },
       poa
     );

@@ -99,7 +99,7 @@ export class StructLogDebug implements IDebug {
   async captureFault(step: InterpreterStep, cost: BN, err: any) {
     let errString: string;
     if (err instanceof VmError) {
-      errString = err.errorType;
+      errString = err.error;
     } else if (err instanceof Error) {
       errString = err.message;
     } else if (typeof err === 'string') {

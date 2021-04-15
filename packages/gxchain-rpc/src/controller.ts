@@ -7,6 +7,7 @@ import { Log } from '@gxchain2/receipt';
 import * as helper from './helper';
 import { FilterSystem } from './filtersystem';
 import { RpcContext } from './index';
+import { Tracer } from '@gxchain2/core/dist/tracer/tracer';
 
 type CallData = {
   from?: string;
@@ -432,5 +433,21 @@ export class Controller {
 
   txpool_content() {
     return this.node.txPool.getPoolContent();
+  }
+
+  debug_traceBlock([blockRlp]: [string]) {
+    return new Tracer({ node: this.node }).traceBlock(hexStringToBuffer(blockRlp), {});
+  }
+
+  debug_traceBlockByNumber([number]: [string]) {
+    return new Tracer({ node: this.node }).traceBlockByNumber(new BN(number), {});
+  }
+
+  debug_traceBlockByHash([hash]: [string]) {
+    return new Tracer({ node: this.node }).traceBlockByHash(hexStringToBuffer(hash), {});
+  }
+
+  debug_traceTransaction([hash]: [string]) {
+    return new Tracer({ node: this.node }).traceTx(hexStringToBuffer(hash), {});
   }
 }

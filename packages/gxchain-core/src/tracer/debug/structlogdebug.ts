@@ -1,5 +1,6 @@
-import { DebugOpts, InterpreterStep, VmError } from '@gxchain2/vm';
 import { Address, BN, setLengthLeft } from 'ethereumjs-util';
+import { DebugOpts, InterpreterStep, VmError } from '@gxchain2/vm';
+import { createBufferFunctionalMap } from '@gxchain2/utils';
 import { TraceConfig } from '../tracer';
 
 export type StructLog = {
@@ -23,6 +24,7 @@ export class StructLogDebug implements DebugOpts {
   output!: Buffer;
   gasUsed!: BN;
   failed: boolean = false;
+  storage = createBufferFunctionalMap<{ [address: string]: string }>();
 
   constructor(config: TraceConfig, hash?: Buffer) {
     this.config = config;
@@ -38,6 +40,37 @@ export class StructLogDebug implements DebugOpts {
         memory.push(step.memory.slice(i * memoryLength, (i + 1) * memoryLength).toString('hex'));
       }
     }
+    let storage = this.storage.get(step.address.buf);
+    if (storage === undefined) {
+      storage = {};
+      this.storage.set(step.address.buf, storage);
+    }
+    if (!this.config.disableStorage) {
+      if (step.opcode.name === 'SLOAD' && step.stack.length >= 1) {
+        const address = setLengthLeft(step.stack[step.stack.length - 1].toBuffer(), 32);
+        // TODO: async
+        const value = step.stateManager.getContractStorage(step.address, address);
+        Object.defineProperty(storage, address.toString('hex'), {
+          value: (value as any).toString('hex'),
+          enumerable: true
+        });
+      }
+      if (step.opcode.name === 'SSTORE' && step.stack.length >= 2) {
+        const address = setLengthLeft(step.stack[step.stack.length - 1].toBuffer(), 32);
+        const value = setLengthLeft(step.stack[step.stack.length - 2].toBuffer(), 32);
+        Object.defineProperty(storage, address.toString('hex'), {
+          value: value.toString('hex'),
+          enumerable: true
+        });
+      }
+    }
+    const storageObj = {};
+    for (const address in storage) {
+      Object.defineProperty(storageObj, address, {
+        value: storage[address],
+        enumerable: true
+      });
+    }
     const log: StructLog = {
       depth: step.depth,
       error,
@@ -47,7 +80,7 @@ export class StructLogDebug implements DebugOpts {
       op: step.opcode.name,
       pc: step.pc,
       stack: !this.config.disableStack ? step.stack.map((bn) => setLengthLeft(bn.toBuffer(), 32).toString('hex')) : [],
-      storage: !this.config.disableStorage ? {} : {}
+      storage: storageObj
     };
     this.logs.push(log);
   }
@@ -69,6 +102,7 @@ export class StructLogDebug implements DebugOpts {
     } else {
       errString = 'unkonw error';
     }
+    this.failed = true;
     this.captureLog(step, errString);
   }
 

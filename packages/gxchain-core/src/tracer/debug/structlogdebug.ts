@@ -77,7 +77,7 @@ export class StructLogDebug implements IDebug {
       });
     }
     const log: StructLog = {
-      depth: step.depth,
+      depth: step.depth + 1,
       error,
       gas: step.gasLeft.toNumber(),
       gasCost: cost.toNumber(),

@@ -174,7 +174,13 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockDebugOpts
       if (lastStep !== undefined) {
         opts.debug!.captureState(lastStep);
       }
-      lastStep = step;
+      lastStep = {
+        ...step,
+        gasLeft: step.gasLeft.clone(),
+        stack: step.stack.map((bn) => bn.clone()),
+        returnStack: step.returnStack.map((bn) => bn.clone()),
+        memoryWordCount: step.memoryWordCount.clone()
+      };
       next();
     };
     this.on('step', handler);

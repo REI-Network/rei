@@ -1,10 +1,10 @@
 import { DebugOpts, InterpreterStep, VmError } from '@gxchain2/vm';
-import { Address, BN } from 'ethereumjs-util';
+import { Address, BN, setLengthLeft } from 'ethereumjs-util';
 import { TraceConfig } from '../tracer';
 
 export type StructLog = {
   depth: number;
-  error: string;
+  error?: string;
   gas: number;
   gasCost: number;
   memory: null | string[];
@@ -29,7 +29,7 @@ export class StructLogDebug implements DebugOpts {
     this.hash = hash;
   }
 
-  private captureLog(step: InterpreterStep, err?: string) {
+  private captureLog(step: InterpreterStep, error?: string) {
     let memory: null | string[] = null;
     if (!this.config.disableMemory && step.memoryWordCount.gtn(0)) {
       const memoryLength = new BN(step.memory.length).div(step.memoryWordCount).toNumber();
@@ -40,13 +40,13 @@ export class StructLogDebug implements DebugOpts {
     }
     const log: StructLog = {
       depth: step.depth,
-      error: err || '',
+      error,
       gas: step.gasLeft.toNumber(),
       gasCost: step.opcode.fee,
       memory,
       op: step.opcode.name,
       pc: step.pc,
-      stack: !this.config.disableStack ? step.stack.map((bn) => bn.toString('hex')) : [],
+      stack: !this.config.disableStack ? step.stack.map((bn) => setLengthLeft(bn.toBuffer(), 32).toString('hex')) : [],
       storage: !this.config.disableStorage ? {} : {}
     };
     this.logs.push(log);

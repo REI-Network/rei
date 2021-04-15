@@ -27,6 +27,13 @@ program
   .action((options) => start());
 
 program
+  .command('newaccount')
+  .description('new a account')
+  .action((options) => {
+    console.log();
+  });
+
+program
   .command('attach')
   .description('attach to gxchain2 node')
   .action((options) => {});

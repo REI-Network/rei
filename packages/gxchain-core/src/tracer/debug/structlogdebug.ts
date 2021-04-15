@@ -7,7 +7,7 @@ export type StructLog = {
   error?: string;
   gas: number;
   gasCost: number;
-  memory: null | string[];
+  memory: string[];
   op: string;
   pc: number;
   stack: string[];
@@ -30,7 +30,7 @@ export class StructLogDebug implements DebugOpts {
   }
 
   private captureLog(step: InterpreterStep, error?: string) {
-    let memory: null | string[] = null;
+    let memory: string[] = [];
     if (!this.config.disableMemory && step.memoryWordCount.gtn(0)) {
       const memoryLength = new BN(step.memory.length).div(step.memoryWordCount).toNumber();
       memory = [];

@@ -16,11 +16,11 @@ export interface IDebug {
   /**
    * Called at every step of processing a transaction
    */
-  captureState(step: InterpreterStep): Promise<void>;
+  captureState(step: InterpreterStep, cost: BN): Promise<void>;
   /**
    * Called when a transaction processing error
    */
-  captureFault(step: InterpreterStep, err: any): Promise<void>;
+  captureFault(step: InterpreterStep, cost: BN, err: any): Promise<void>;
   /**
    * Called when the transaction is processed
    */

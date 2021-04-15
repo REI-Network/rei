@@ -172,7 +172,7 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockDebugOpts
   if (opts.debug) {
     handler = async (step: InterpreterStep, next: () => void) => {
       if (lastStep !== undefined) {
-        await opts.debug!.captureState(lastStep);
+        await opts.debug!.captureState(lastStep, lastStep.gasLeft.sub(step.gasLeft));
       }
       lastStep = {
         ...step,
@@ -243,11 +243,11 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockDebugOpts
     if (opts.debug && (!opts.debug.hash || opts.debug.hash.equals(tx.hash()))) {
       if (lastStep) {
         if (txRes?.execResult.exceptionError) {
-          await opts.debug.captureFault(lastStep, txRes.execResult.exceptionError);
+          await opts.debug.captureFault(lastStep, new BN(lastStep.opcode.fee), txRes.execResult.exceptionError);
         } else if (catchedErr !== undefined) {
-          await opts.debug.captureFault(lastStep, catchedErr);
+          await opts.debug.captureFault(lastStep, new BN(lastStep.opcode.fee), catchedErr);
         } else {
-          await opts.debug.captureState(lastStep);
+          await opts.debug.captureState(lastStep, new BN(lastStep.opcode.fee));
         }
       }
       if (txRes) {

@@ -40,7 +40,7 @@ export default async function runCall(this: VM, opts: RunCallDebugOpts): Promise
   if (opts.debug) {
     handler = async (step: InterpreterStep, next: () => void) => {
       if (lastStep !== undefined) {
-        await opts.debug!.captureState(lastStep);
+        await opts.debug!.captureState(lastStep, lastStep.gasLeft.sub(step.gasLeft));
       }
       lastStep = step;
       next();
@@ -68,11 +68,11 @@ export default async function runCall(this: VM, opts: RunCallDebugOpts): Promise
   if (opts.debug) {
     if (lastStep) {
       if (result?.execResult.exceptionError) {
-        await opts.debug.captureFault(lastStep, result.execResult.exceptionError);
+        await opts.debug.captureFault(lastStep, new BN(lastStep.opcode.fee), result.execResult.exceptionError);
       } else if (catchedErr !== undefined) {
-        await opts.debug.captureFault(lastStep, catchedErr);
+        await opts.debug.captureFault(lastStep, new BN(lastStep.opcode.fee), catchedErr);
       } else {
-        await opts.debug.captureState(lastStep);
+        await opts.debug.captureState(lastStep, new BN(lastStep.opcode.fee));
       }
     }
     if (result) {

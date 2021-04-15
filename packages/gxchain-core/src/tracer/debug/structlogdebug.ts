@@ -31,7 +31,7 @@ export class StructLogDebug implements IDebug {
     this.hash = hash;
   }
 
-  private async captureLog(step: InterpreterStep, error?: string) {
+  private async captureLog(step: InterpreterStep, cost: BN, error?: string) {
     let memory: string[] = [];
     if (!this.config.disableMemory && step.memoryWordCount.gtn(0)) {
       const memoryLength = new BN(step.memory.length).div(step.memoryWordCount).toNumber();
@@ -48,19 +48,25 @@ export class StructLogDebug implements IDebug {
     if (!this.config.disableStorage) {
       if (step.opcode.name === 'SLOAD' && step.stack.length >= 1) {
         const address = setLengthLeft(step.stack[step.stack.length - 1].toBuffer(), 32);
-        const value = await step.stateManager.getContractStorage(step.address, address);
-        Object.defineProperty(storage, address.toString('hex'), {
-          value: value.toString('hex'),
-          enumerable: true
-        });
+        const key = address.toString('hex');
+        if (!(key in storage)) {
+          const value = setLengthLeft(await step.stateManager.getContractStorage(step.address, address), 32);
+          Object.defineProperty(storage, address.toString('hex'), {
+            value: value.toString('hex'),
+            enumerable: true
+          });
+        }
       }
       if (step.opcode.name === 'SSTORE' && step.stack.length >= 2) {
         const address = setLengthLeft(step.stack[step.stack.length - 1].toBuffer(), 32);
-        const value = setLengthLeft(step.stack[step.stack.length - 2].toBuffer(), 32);
-        Object.defineProperty(storage, address.toString('hex'), {
-          value: value.toString('hex'),
-          enumerable: true
-        });
+        const key = address.toString('hex');
+        if (!(key in storage)) {
+          const value = setLengthLeft(step.stack[step.stack.length - 2].toBuffer(), 32);
+          Object.defineProperty(storage, address.toString('hex'), {
+            value: value.toString('hex'),
+            enumerable: true
+          });
+        }
       }
     }
     const storageObj = {};
@@ -74,7 +80,7 @@ export class StructLogDebug implements IDebug {
       depth: step.depth,
       error,
       gas: step.gasLeft.toNumber(),
-      gasCost: step.opcode.fee,
+      gasCost: cost.toNumber(),
       memory,
       op: step.opcode.name,
       pc: step.pc,
@@ -86,11 +92,11 @@ export class StructLogDebug implements IDebug {
 
   async captureStart(from: Address, create: boolean, input: Buffer, gas: BN, value: BN, to?: Address) {}
 
-  async captureState(step: InterpreterStep) {
-    await this.captureLog(step);
+  async captureState(step: InterpreterStep, cost: BN) {
+    await this.captureLog(step, cost);
   }
 
-  async captureFault(step: InterpreterStep, err: any) {
+  async captureFault(step: InterpreterStep, cost: BN, err: any) {
     let errString: string;
     if (err instanceof VmError) {
       errString = err.errorType;
@@ -102,7 +108,7 @@ export class StructLogDebug implements IDebug {
       errString = 'unkonw error';
     }
     this.failed = true;
-    await this.captureLog(step, errString);
+    await this.captureLog(step, cost, errString);
   }
 
   async captureEnd(output: Buffer, gasUsed: BN, time: number) {

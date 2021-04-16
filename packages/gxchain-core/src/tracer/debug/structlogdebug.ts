@@ -1,7 +1,7 @@
 import { Address, BN, setLengthLeft } from 'ethereumjs-util';
-import { IDebug, InterpreterStep, VmError } from '@gxchain2/vm';
+import { InterpreterStep, VmError } from '@gxchain2/vm';
 import { createBufferFunctionalMap } from '@gxchain2/utils';
-import { TraceConfig } from '../tracer';
+import { TraceConfig, IDebugImpl } from '../tracer';
 
 export type StructLog = {
   depth: number;
@@ -17,7 +17,7 @@ export type StructLog = {
   };
 };
 
-export class StructLogDebug implements IDebug {
+export class StructLogDebug implements IDebugImpl {
   hash?: Buffer;
   config: TraceConfig;
   logs: StructLog[] = [];

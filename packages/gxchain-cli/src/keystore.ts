@@ -1,9 +1,9 @@
-import { Address, bufferToHex, BN } from 'ethereumjs-util';
+// import { Address, bufferToHex, BN } from 'ethereumjs-util';
 
-type keyStore = {
-  getKey(add: Address);
-};
+// type keyStore = {
+//   getKey(add: Address);
+// };
 
-export type KeyStore = {
-  storage: keyStore;
-};
+// export type KeyStore = {
+//   storage: keyStore;
+// };

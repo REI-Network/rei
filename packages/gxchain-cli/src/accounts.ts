@@ -1,46 +1,46 @@
-import { Transaction } from '@ethereumjs/tx';
-import { Address, bufferToHex, BN } from 'ethereumjs-util';
+// import { Transaction } from '@ethereumjs/tx';
+// import { Address, bufferToHex, BN } from 'ethereumjs-util';
 
-type URL = {
-  Scheme: string;
-  Path: string;
-};
+// type URL = {
+//   Scheme: string;
+//   Path: string;
+// };
 
-type Account = {
-  address: Address;
-  url: URL;
-};
-export interface Wallet {
-  url();
+// type Account = {
+//   address: Address;
+//   url: URL;
+// };
+// export interface Wallet {
+//   url();
 
-  status(): string;
+//   status(): string;
 
-  Open(passphrase: string);
+//   Open(passphrase: string);
 
-  close();
+//   close();
 
-  accounts(): Account[];
+//   accounts(): Account[];
 
-  contain(account: Account): boolean;
+//   contain(account: Account): boolean;
 
-  derive(path: Buffer, pin: boolean): Account;
+//   derive(path: Buffer, pin: boolean): Account;
 
-  selfDerive(base: Buffer[]); //todo anther  parameter
+//   selfDerive(base: Buffer[]); //todo anther  parameter
 
-  signData(account: Account, mimeType: string, data: Buffer): Buffer;
+//   signData(account: Account, mimeType: string, data: Buffer): Buffer;
 
-  signDataWithPassphrase(account: Account, passphrase, mimeType: string, data: Buffer): Buffer;
+//   signDataWithPassphrase(account: Account, passphrase, mimeType: string, data: Buffer): Buffer;
 
-  signText(account: Account, text: Buffer): Buffer;
+//   signText(account: Account, text: Buffer): Buffer;
 
-  signTextWithPassphrase(account: Account, passphrase: string, text: Buffer): Buffer;
+//   signTextWithPassphrase(account: Account, passphrase: string, text: Buffer): Buffer;
 
-  signTx(account: Account, tx: Transaction, chainID: number): Transaction;
+//   signTx(account: Account, tx: Transaction, chainID: number): Transaction;
 
-  signTxWithPassphrase(account: Account, passphrase: string, tx: Transaction, chainID: number): Transaction;
-}
+//   signTxWithPassphrase(account: Account, passphrase: string, tx: Transaction, chainID: number): Transaction;
+// }
 
-export type Backend = {
-  wallets(): Wallet[];
-  subscribe();
-};
+// export type Backend = {
+//   wallets(): Wallet[];
+//   subscribe();
+// };

@@ -34,7 +34,8 @@ export class Tracer {
     throw new Error('unknow error');
   }
 
-  private async _traceBlock(block: Block, config: TraceConfig, hash?: Buffer) {
+  async traceBlock(block: Block | Buffer, config: TraceConfig, hash?: Buffer) {
+    block = block instanceof Block ? block : Block.fromRLPSerializedBlock(block, { common: this.node.common });
     if (block.header.number.eqn(0)) {
       throw new Error('invalid block number, 0');
     }
@@ -45,20 +46,12 @@ export class Tracer {
     return this.debugResult(debug);
   }
 
-  async traceBlockByNumber(number: BN, config: TraceConfig) {
-    return await this._traceBlock(await this.node.db.getBlock(number), config);
-  }
-
   async traceBlockByHash(hash: Buffer, config: TraceConfig) {
-    return await this._traceBlock(await this.node.db.getBlock(hash), config);
-  }
-
-  async traceBlock(blockRlp: Buffer, config: TraceConfig) {
-    return await this._traceBlock(Block.fromRLPSerializedBlock(blockRlp, { common: this.node.common }), config);
+    return await this.traceBlock(await this.node.db.getBlock(hash), config);
   }
 
   async traceTx(hash: Buffer, config: TraceConfig) {
     const wtx = await this.node.db.getWrappedTransaction(hash);
-    return await this._traceBlock(await this.node.db.getBlockByHashAndNumber(wtx.extension.blockHash!, wtx.extension.blockNumber!), config, hash);
+    return await this.traceBlock(await this.node.db.getBlockByHashAndNumber(wtx.extension.blockHash!, wtx.extension.blockNumber!), config, hash);
   }
 }

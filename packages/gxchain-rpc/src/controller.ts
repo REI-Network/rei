@@ -439,8 +439,8 @@ export class Controller {
     return new Tracer({ node: this.node }).traceBlock(hexStringToBuffer(blockRlp), {});
   }
 
-  debug_traceBlockByNumber([number]: [string]) {
-    return new Tracer({ node: this.node }).traceBlockByNumber(new BN(number), {});
+  async debug_traceBlockByNumber([tag]: [string]) {
+    return new Tracer({ node: this.node }).traceBlock(await this.getBlockByTag(tag), {});
   }
 
   debug_traceBlockByHash([hash]: [string]) {

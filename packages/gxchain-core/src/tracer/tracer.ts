@@ -1,12 +1,7 @@
-import { BN } from 'ethereumjs-util';
 import { Block } from '@gxchain2/block';
 import { IDebug } from '@gxchain2/vm';
 import { Node } from '../node';
-import { StructLogDebug } from './debug/structlogdebug';
-
-export interface TracerOptions {
-  node: Node;
-}
+import { StructLogDebug } from './debug';
 
 export interface TraceConfig {
   disableStorage?: boolean;
@@ -19,8 +14,8 @@ export interface TraceConfig {
 export class Tracer {
   private readonly node: Node;
 
-  constructor(options: TracerOptions) {
-    this.node = options.node;
+  constructor(node: Node) {
+    this.node = node;
   }
 
   private createDebugImpl(config: TraceConfig, hash?: Buffer): IDebug {

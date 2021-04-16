@@ -4,10 +4,10 @@ import { Block, WrappedBlock } from '@gxchain2/block';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
 import { hexStringToBuffer, hexStringToBN, logger } from '@gxchain2/utils';
 import { Log } from '@gxchain2/receipt';
+import { Tracer, TraceConfig } from '@gxchain2/core/dist/tracer';
 import * as helper from './helper';
 import { FilterSystem } from './filtersystem';
 import { RpcContext } from './index';
-import { Tracer } from '@gxchain2/core/dist/tracer/tracer';
 
 type CallData = {
   from?: string;
@@ -435,19 +435,19 @@ export class Controller {
     return this.node.txPool.getPoolContent();
   }
 
-  debug_traceBlock([blockRlp]: [string]) {
-    return new Tracer({ node: this.node }).traceBlock(hexStringToBuffer(blockRlp), {});
+  debug_traceBlock([blockRlp, options]: [string, TraceConfig]) {
+    return new Tracer(this.node).traceBlock(hexStringToBuffer(blockRlp), options);
   }
 
-  async debug_traceBlockByNumber([tag]: [string]) {
-    return new Tracer({ node: this.node }).traceBlock(await this.getBlockByTag(tag), {});
+  async debug_traceBlockByNumber([tag, options]: [string, TraceConfig]) {
+    return new Tracer(this.node).traceBlock(await this.getBlockByTag(tag), options);
   }
 
-  debug_traceBlockByHash([hash]: [string]) {
-    return new Tracer({ node: this.node }).traceBlockByHash(hexStringToBuffer(hash), {});
+  debug_traceBlockByHash([hash, options]: [string, TraceConfig]) {
+    return new Tracer(this.node).traceBlockByHash(hexStringToBuffer(hash), options);
   }
 
-  debug_traceTransaction([hash]: [string]) {
-    return new Tracer({ node: this.node }).traceTx(hexStringToBuffer(hash), {});
+  debug_traceTransaction([hash, options]: [string, TraceConfig]) {
+    return new Tracer(this.node).traceTx(hexStringToBuffer(hash), options);
   }
 }

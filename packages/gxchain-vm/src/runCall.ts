@@ -47,7 +47,7 @@ export default async function runCall(this: VM, opts: RunCallDebugOpts): Promise
     };
     this.on('step', handler);
     time = Date.now();
-    await opts.debug.captureStart(message.caller ? message.caller : Address.zero(), message.to === undefined, message.data, message.gasLimit, message.value, message.to);
+    await opts.debug.captureStart(message?.caller?.buf, message?.to?.buf, message.to === undefined, message.data, message.gasLimit, message.value, block.header.number, this.stateManager);
   }
 
   let result: undefined | EVMResult;

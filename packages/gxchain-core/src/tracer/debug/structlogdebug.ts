@@ -1,4 +1,5 @@
-import { Address, BN, setLengthLeft } from 'ethereumjs-util';
+import { BN, setLengthLeft } from 'ethereumjs-util';
+import { StateManager } from '@ethereumjs/vm/dist/state';
 import { InterpreterStep, VmError } from '@gxchain2/vm';
 import { createBufferFunctionalMap } from '@gxchain2/utils';
 import { TraceConfig, IDebugImpl } from '../tracer';
@@ -91,7 +92,7 @@ export class StructLogDebug implements IDebugImpl {
     this.logs.push(log);
   }
 
-  async captureStart(from: Address, create: boolean, input: Buffer, gas: BN, value: BN, to?: Address) {}
+  async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, value: BN, number: BN, stateManager: StateManager) {}
 
   async captureState(step: InterpreterStep, cost: BN) {
     await this.captureLog(step, cost);

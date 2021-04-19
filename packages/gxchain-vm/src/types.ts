@@ -1,5 +1,6 @@
-import { Address, BN } from 'ethereumjs-util';
+import { BN } from 'ethereumjs-util';
 import { InterpreterStep } from '@ethereumjs/vm/dist/evm/interpreter';
+import { StateManager } from '@ethereumjs/vm/dist/state';
 
 /**
  * Options for debugging.
@@ -12,7 +13,7 @@ export interface IDebug {
   /**
    * Called when the transaction starts processing
    */
-  captureStart(from: Address, create: boolean, input: Buffer, gas: BN, value: BN, to?: Address): Promise<void>;
+  captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, value: BN, number: BN, stateManager: StateManager): Promise<void>;
   /**
    * Called at every step of processing a transaction
    */

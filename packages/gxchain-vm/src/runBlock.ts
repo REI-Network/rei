@@ -205,7 +205,7 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockDebugOpts
     let time: undefined | number;
     if (opts.debug && (!opts.debug.hash || opts.debug.hash.equals(tx.hash()))) {
       time = Date.now();
-      await opts.debug.captureStart(tx.getSenderAddress(), tx.toCreationAddress(), tx.data, tx.gasLimit, tx.value, tx.to);
+      await opts.debug.captureStart(tx.getSenderAddress().buf, tx?.to?.buf, tx.toCreationAddress(), tx.data, tx.gasLimit, tx.value, block.header.number, this.stateManager);
     }
 
     let txRes: undefined | RunTxResult;

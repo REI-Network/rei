@@ -76,6 +76,7 @@ export class StructLogDebug implements IDebugImpl {
         enumerable: true
       });
     }
+    // TODO: fix wrong depth.
     const log: StructLog = {
       depth: step.depth + 1,
       error,

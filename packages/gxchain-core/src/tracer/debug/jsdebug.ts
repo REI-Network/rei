@@ -148,7 +148,7 @@ function makeLog(ctx: { [key: string]: any }, step: InterpreterStep, cost: BN, e
       return cost.toNumber();
     },
     getDepth() {
-      return step.depth;
+      return step.depth + 1;
     },
     getRefund() {
       logger.warn('JSDebug_Log::getRefund, unsupported api');
@@ -176,6 +176,7 @@ export class JSDebug implements IDebugImpl {
     globalCtx: { [key: string]: any };
     globalReturnValue?: any;
     bigInt: typeof bi;
+    // log: any;
   } = {
     toHex(buf: Buffer) {
       return bufferToHex(buf);
@@ -194,6 +195,9 @@ export class JSDebug implements IDebugImpl {
     },
     globalCtx: this.debugContext,
     bigInt: bi
+    // log(...arg: any[]) {
+    //   console.log(...arg);
+    // }
   };
   private vmContext: vm.Context;
 

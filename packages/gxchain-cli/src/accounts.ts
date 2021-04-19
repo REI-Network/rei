@@ -1,46 +1,64 @@
-// import { Transaction } from '@ethereumjs/tx';
-// import { Address, bufferToHex, BN } from 'ethereumjs-util';
+import { Transaction } from '@ethereumjs/tx';
+import { Address, bufferToHex, BN } from 'ethereumjs-util';
 
-// type URL = {
-//   Scheme: string;
-//   Path: string;
-// };
+type URL = {
+  Scheme: string;
+  Path: string;
+};
 
-// type Account = {
-//   address: Address;
-//   url: URL;
-// };
-// export interface Wallet {
-//   url();
+export type Account = {
+  address: Address;
+  url: URL;
+};
 
-//   status(): string;
+function stringcompare(a: string, b: string) {
+  if (a == b) {
+    return 0;
+  }
+  if (a < b) {
+    return -1;
+  }
+  return 1;
+}
 
-//   Open(passphrase: string);
+export function urlcompare(url1: URL, url2: URL): number {
+  if (url1.Scheme == url2.Scheme) {
+    return stringcompare(url1.Path, url2.Path);
+  }
+  return stringcompare(url1.Scheme, url2.Scheme);
+}
 
-//   close();
+export interface Wallet {
+  url();
 
-//   accounts(): Account[];
+  status(): string;
 
-//   contain(account: Account): boolean;
+  Open(passphrase: string);
 
-//   derive(path: Buffer, pin: boolean): Account;
+  close();
 
-//   selfDerive(base: Buffer[]); //todo anther  parameter
+  accounts(): Account[];
 
-//   signData(account: Account, mimeType: string, data: Buffer): Buffer;
+  contain(account: Account): boolean;
 
-//   signDataWithPassphrase(account: Account, passphrase, mimeType: string, data: Buffer): Buffer;
+  derive(path: Buffer, pin: boolean): Account;
 
-//   signText(account: Account, text: Buffer): Buffer;
+  selfDerive(base: Buffer[]); //todo anther  parameter
 
-//   signTextWithPassphrase(account: Account, passphrase: string, text: Buffer): Buffer;
+  signData(account: Account, mimeType: string, data: Buffer): Buffer;
 
-//   signTx(account: Account, tx: Transaction, chainID: number): Transaction;
+  signDataWithPassphrase(account: Account, passphrase, mimeType: string, data: Buffer): Buffer;
 
-//   signTxWithPassphrase(account: Account, passphrase: string, tx: Transaction, chainID: number): Transaction;
-// }
+  signText(account: Account, text: Buffer): Buffer;
 
-// export type Backend = {
-//   wallets(): Wallet[];
-//   subscribe();
-// };
+  signTextWithPassphrase(account: Account, passphrase: string, text: Buffer): Buffer;
+
+  signTx(account: Account, tx: Transaction, chainID: number): Transaction;
+
+  signTxWithPassphrase(account: Account, passphrase: string, tx: Transaction, chainID: number): Transaction;
+}
+
+export type Backend = {
+  wallets(): Wallet[];
+  subscribe();
+};

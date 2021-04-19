@@ -27,8 +27,8 @@ export class StructLogDebug implements IDebugImpl {
   failed: boolean = false;
   storage = createBufferFunctionalMap<{ [address: string]: string }>();
 
-  constructor(config: TraceConfig, hash?: Buffer) {
-    this.config = config;
+  constructor(config?: TraceConfig, hash?: Buffer) {
+    this.config = config || {};
     this.hash = hash;
   }
 

@@ -3,7 +3,7 @@ import { IDebug } from '@gxchain2/vm';
 import { hexStringToBN, hexStringToBuffer } from '@gxchain2/utils';
 import { Address } from 'ethereumjs-util';
 import { Node } from '../node';
-import { StructLogDebug } from './debug';
+import { StructLogDebug, JSDebug } from './debug';
 
 export interface IDebugImpl extends IDebug {
   result(): any;
@@ -24,11 +24,11 @@ export class Tracer {
     this.node = node;
   }
 
-  private createDebugImpl(config: TraceConfig, hash?: Buffer): IDebugImpl {
-    return new StructLogDebug(config, hash);
+  private createDebugImpl(config?: TraceConfig, hash?: Buffer): IDebugImpl {
+    return config?.tracer ? new JSDebug(config.tracer) : new StructLogDebug(config, hash);
   }
 
-  async traceBlock(block: Block | Buffer, config: TraceConfig, hash?: Buffer) {
+  async traceBlock(block: Block | Buffer, config?: TraceConfig, hash?: Buffer) {
     block = block instanceof Block ? block : Block.fromRLPSerializedBlock(block, { common: this.node.common });
     if (block.header.number.eqn(0)) {
       throw new Error('invalid block number, 0');
@@ -40,11 +40,11 @@ export class Tracer {
     return debug.result();
   }
 
-  async traceBlockByHash(hash: Buffer, config: TraceConfig) {
+  async traceBlockByHash(hash: Buffer, config?: TraceConfig) {
     return await this.traceBlock(await this.node.db.getBlock(hash), config);
   }
 
-  async traceTx(hash: Buffer, config: TraceConfig) {
+  async traceTx(hash: Buffer, config?: TraceConfig) {
     const wtx = await this.node.db.getWrappedTransaction(hash);
     return await this.traceBlock(await this.node.db.getBlockByHashAndNumber(wtx.extension.blockHash!, wtx.extension.blockNumber!), config, hash);
   }
@@ -59,7 +59,7 @@ export class Tracer {
       data?: string;
     },
     block: Block,
-    config: TraceConfig
+    config?: TraceConfig
   ) {
     if (block.header.number.eqn(0)) {
       throw new Error('invalid block number, 0');

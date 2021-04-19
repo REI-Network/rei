@@ -77,51 +77,49 @@ class Contract {
   }
 }
 
-class DB {
-  stateManager: StateManager;
-  constructor(stateManager: StateManager) {
-    this.stateManager = stateManager;
-  }
-  getBalance(address: Buffer) {
-    try {
-      return BigInt(deasync(this.stateManager.getAccount(new Address(address))).balance.toString());
-    } catch (err) {
-      logger.warn('JSDebug_DB::getBalance, catch error:', err);
-      return BigInt(0);
+function makeDB(stateManager: StateManager) {
+  return {
+    getBalance(address: Buffer) {
+      try {
+        return BigInt(deasync(stateManager.getAccount(new Address(address))).balance.toString());
+      } catch (err) {
+        logger.warn('JSDebug_DB::getBalance, catch error:', err);
+        return BigInt(0);
+      }
+    },
+    getNonce(address: Buffer) {
+      try {
+        return deasync(stateManager.getAccount(new Address(address))).nonce.toNumber();
+      } catch (err) {
+        logger.warn('JSDebug_DB::getNonce, catch error:', err);
+        return 0;
+      }
+    },
+    getCode(address: Buffer) {
+      try {
+        return deasync(stateManager.getContractCode(new Address(address)));
+      } catch (err) {
+        logger.warn('JSDebug_DB::getCode, catch error:', err);
+        return Buffer.alloc(0);
+      }
+    },
+    getState(address: Buffer, hash: Buffer) {
+      try {
+        return deasync(stateManager.getContractStorage(new Address(address), hash));
+      } catch (err) {
+        logger.warn('JSDebug_DB::getState, catch error:', err);
+        return Buffer.alloc(0);
+      }
+    },
+    exists(address: Buffer) {
+      try {
+        return deasync(stateManager.accountExists(new Address(address)));
+      } catch (err) {
+        logger.warn('JSDebug_DB::exists, catch error:', err);
+        return false;
+      }
     }
-  }
-  getNonce(address: Buffer) {
-    try {
-      return deasync(this.stateManager.getAccount(new Address(address))).nonce.toNumber();
-    } catch (err) {
-      logger.warn('JSDebug_DB::getNonce, catch error:', err);
-      return 0;
-    }
-  }
-  getCode(address: Buffer) {
-    try {
-      return deasync(this.stateManager.getContractCode(new Address(address)));
-    } catch (err) {
-      logger.warn('JSDebug_DB::getCode, catch error:', err);
-      return Buffer.alloc(0);
-    }
-  }
-  getState(address: Buffer, hash: Buffer) {
-    try {
-      return deasync(this.stateManager.getContractStorage(new Address(address), hash));
-    } catch (err) {
-      logger.warn('JSDebug_DB::getState, catch error:', err);
-      return Buffer.alloc(0);
-    }
-  }
-  exists(address: Buffer) {
-    try {
-      return deasync(this.stateManager.accountExists(new Address(address)));
-    } catch (err) {
-      logger.warn('JSDebug_DB::exists, catch error:', err);
-      return false;
-    }
-  }
+  };
 }
 
 function makeLog(ctx: { [key: string]: any }, step: InterpreterStep, cost: BN, error?: string) {
@@ -173,7 +171,7 @@ export class JSDebug implements IDebugImpl {
     toContract(data: Buffer | string, nonce: number): Buffer;
     toContract2(data: Buffer | string, salt: string, code: Buffer): Buffer;
     globalLog?: ReturnType<typeof makeLog>;
-    globalDB?: DB;
+    globalDB?: ReturnType<typeof makeDB>;
     globalCtx: { [key: string]: any };
     globalReturnValue?: any;
   } = {
@@ -209,7 +207,7 @@ export class JSDebug implements IDebugImpl {
     this.debugContext['gas'] = gas.toNumber();
     this.debugContext['value'] = BigInt(value.toString());
     this.debugContext['block'] = number.toNumber();
-    this.vmContextObj.globalDB = new DB(stateManager);
+    this.vmContextObj.globalDB = makeDB(stateManager);
   }
 
   private captureLog(step: InterpreterStep, cost: BN, error?: string) {

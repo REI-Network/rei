@@ -5,6 +5,7 @@ import { IDebugImpl } from '../tracer';
 import { StateManager } from '@ethereumjs/vm/dist/state';
 import d from 'deasync';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
+import bi, { BigInteger } from 'big-integer';
 
 function deasync<T>(p: Promise<T>): T {
   let result: undefined | T;
@@ -46,7 +47,7 @@ class Memory {
   }
   getUint(offset: number) {
     if (offset < 0 || offset + 32 > this.memory.length - 1) {
-      return BigInt(0);
+      return bi(0);
     }
     return this.memory.slice(offset, offset + 32).readUInt32BE();
   }
@@ -55,9 +56,9 @@ class Memory {
 class Contract {
   caller: Buffer;
   address: Buffer;
-  value: BigInt;
+  value: BigInteger;
   input: Buffer;
-  constructor(caller: Buffer, address: Buffer, value: BigInt, input: Buffer) {
+  constructor(caller: Buffer, address: Buffer, value: BigInteger, input: Buffer) {
     this.caller = caller;
     this.address = address;
     this.value = value;
@@ -81,10 +82,10 @@ function makeDB(stateManager: StateManager) {
   return {
     getBalance(address: Buffer) {
       try {
-        return BigInt(deasync(stateManager.getAccount(new Address(address))).balance.toString());
+        return bi(deasync(stateManager.getAccount(new Address(address))).balance.toString());
       } catch (err) {
         logger.warn('JSDebug_DB::getBalance, catch error:', err);
-        return BigInt(0);
+        return bi(0);
       }
     },
     getNonce(address: Buffer) {
@@ -123,11 +124,11 @@ function makeDB(stateManager: StateManager) {
 }
 
 function makeLog(ctx: { [key: string]: any }, step: InterpreterStep, cost: BN, error?: string) {
-  const stack = step.stack.map((bn) => BigInt(bn.toString()));
+  const stack = step.stack.map((bn) => bi(bn.toString()));
   Object.defineProperty(stack, 'peek', {
     value: (idx: number) => {
       if (idx < 0 || idx > stack.length - 1) {
-        return BigInt(0);
+        return bi(0);
       }
       return stack[idx];
     }
@@ -174,6 +175,7 @@ export class JSDebug implements IDebugImpl {
     globalDB?: ReturnType<typeof makeDB>;
     globalCtx: { [key: string]: any };
     globalReturnValue?: any;
+    bigInt: typeof bi;
   } = {
     toHex(buf: Buffer) {
       return bufferToHex(buf);
@@ -190,13 +192,18 @@ export class JSDebug implements IDebugImpl {
     toContract2(data: Buffer | string, salt: string, code: Buffer) {
       return generateAddress2(data instanceof Buffer ? data : hexStringToBuffer(data), hexStringToBuffer(salt), keccak256(code));
     },
-    globalCtx: this.debugContext
+    globalCtx: this.debugContext,
+    bigInt: bi
   };
   private vmContext: vm.Context;
 
   constructor(code: string) {
     this.vmContext = vm.createContext(this.vmContextObj, { codeGeneration: { strings: false, wasm: false } });
-    new vm.Script(`const obj = ${code}`).runInContext(this.vmContext);
+    try {
+      new vm.Script(`const obj = ${code}`).runInContext(this.vmContext);
+    } catch (err) {
+      logger.warn('JSDebug::constructor, catch error:', err);
+    }
   }
 
   async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, value: BN, number: BN, stateManager: StateManager) {
@@ -205,14 +212,18 @@ export class JSDebug implements IDebugImpl {
     this.debugContext['to'] = to;
     this.debugContext['input'] = input;
     this.debugContext['gas'] = gas.toNumber();
-    this.debugContext['value'] = BigInt(value.toString());
+    this.debugContext['value'] = bi(value.toString());
     this.debugContext['block'] = number.toNumber();
     this.vmContextObj.globalDB = makeDB(stateManager);
   }
 
   private captureLog(step: InterpreterStep, cost: BN, error?: string) {
-    this.vmContextObj.globalLog = makeLog(this.debugContext, step, cost, error);
-    error ? new vm.Script('obj.fault.call(obj, globalLog, globalDB)').runInContext(this.vmContext) : new vm.Script('obj.step.call(obj, globalLog, globalDB)').runInContext(this.vmContext);
+    try {
+      this.vmContextObj.globalLog = makeLog(this.debugContext, step, cost, error);
+      error ? new vm.Script('obj.fault.call(obj, globalLog, globalDB)').runInContext(this.vmContext) : new vm.Script('obj.step.call(obj, globalLog, globalDB)').runInContext(this.vmContext);
+    } catch (err) {
+      logger.warn('JSDebug::captureLog, catch error:', err);
+    }
   }
 
   async captureState(step: InterpreterStep, cost: BN) {
@@ -240,7 +251,11 @@ export class JSDebug implements IDebugImpl {
   }
 
   result() {
-    new vm.Script('globalReturnValue = obj.result.call(obj, globalCtx, globalDB)').runInContext(this.vmContext);
-    return this.vmContextObj.globalReturnValue;
+    try {
+      new vm.Script('globalReturnValue = obj.result.call(obj, globalCtx, globalDB)').runInContext(this.vmContext);
+      return this.vmContextObj.globalReturnValue;
+    } catch (err) {
+      logger.warn('JSDebug::result, catch error:', err);
+    }
   }
 }

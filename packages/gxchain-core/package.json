@@ -25,6 +25,7 @@
         "@gxchain2/tx-pool": "^0.0.2-alpha.0",
         "@gxchain2/utils": "^0.0.2-alpha.0",
         "@gxchain2/vm": "^0.0.2-alpha.0",
+        "big-integer": "^1.6.48",
         "deasync": "^0.1.21",
         "ethereumjs-util": "^7.0.7",
         "levelup": "^4.4.0",

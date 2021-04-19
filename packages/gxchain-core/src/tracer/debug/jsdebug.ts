@@ -124,51 +124,41 @@ class DB {
   }
 }
 
-class Log {
-  step: InterpreterStep;
-  cost: BN;
-  error?: string;
-
-  op: Op;
-  stack: BigInt[];
-  memory: Memory;
-  contract: Contract;
-  constructor(ctx: { [key: string]: any }, step: InterpreterStep, cost: BN, error?: string) {
-    this.step = step;
-    this.cost = cost;
-    this.error = error;
-    this.op = new Op(step.opcode.name);
-    this.stack = step.stack.map((bn) => BigInt(bn.toString()));
-    Object.defineProperty(this.stack, 'peek', {
-      value: (idx: number) => {
-        if (idx < 0 || idx > this.stack.length - 1) {
-          return BigInt(0);
-        }
-        return this.stack[idx];
+function makeLog(ctx: { [key: string]: any }, step: InterpreterStep, cost: BN, error?: string) {
+  const stack = step.stack.map((bn) => BigInt(bn.toString()));
+  Object.defineProperty(stack, 'peek', {
+    value: (idx: number) => {
+      if (idx < 0 || idx > stack.length - 1) {
+        return BigInt(0);
       }
-    });
-    this.memory = new Memory(step.memory);
-    this.contract = new Contract(ctx['from'], ctx['to'], ctx['value'], ctx['input']);
-  }
-  getPC() {
-    return this.step.pc;
-  }
-  getGas() {
-    return this.step.gasLeft.toNumber();
-  }
-  getCost() {
-    return this.cost.toNumber();
-  }
-  getDepth() {
-    return this.step.depth;
-  }
-  getRefund() {
-    logger.warn('JSDebug_Log::getRefund, unsupported api');
-    return 0;
-  }
-  getError() {
-    return this.error;
-  }
+      return stack[idx];
+    }
+  });
+  return {
+    op: new Op(step.opcode.name),
+    stack,
+    memory: new Memory(step.memory),
+    contract: new Contract(ctx['from'], ctx['to'], ctx['value'], ctx['input']),
+    getPC() {
+      return step.pc;
+    },
+    getGas() {
+      return step.gasLeft.toNumber();
+    },
+    getCost() {
+      return cost.toNumber();
+    },
+    getDepth() {
+      return step.depth;
+    },
+    getRefund() {
+      logger.warn('JSDebug_Log::getRefund, unsupported api');
+      return 0;
+    },
+    getError() {
+      return error;
+    }
+  };
 }
 
 export class JSDebug implements IDebugImpl {
@@ -182,7 +172,7 @@ export class JSDebug implements IDebugImpl {
     toAddress(data: Buffer | string): Buffer;
     toContract(data: Buffer | string, nonce: number): Buffer;
     toContract2(data: Buffer | string, salt: string, code: Buffer): Buffer;
-    globalLog?: Log;
+    globalLog?: ReturnType<typeof makeLog>;
     globalDB?: DB;
     globalCtx: { [key: string]: any };
     globalReturnValue?: any;
@@ -223,8 +213,8 @@ export class JSDebug implements IDebugImpl {
   }
 
   private captureLog(step: InterpreterStep, cost: BN, error?: string) {
-    this.vmContextObj.globalLog = new Log(this.debugContext, step, cost, error);
-    error ? new vm.Script('obj.fault(globalLog, globalDB)').runInContext(this.vmContext) : new vm.Script('obj.step(globalLog, globalDB)').runInContext(this.vmContext);
+    this.vmContextObj.globalLog = makeLog(this.debugContext, step, cost, error);
+    error ? new vm.Script('obj.fault.call(obj, globalLog, globalDB)').runInContext(this.vmContext) : new vm.Script('obj.step.call(obj, globalLog, globalDB)').runInContext(this.vmContext);
   }
 
   async captureState(step: InterpreterStep, cost: BN) {
@@ -252,7 +242,7 @@ export class JSDebug implements IDebugImpl {
   }
 
   result() {
-    new vm.Script('globalReturnValue = obj.result(globalCtx, globalDB)').runInContext(this.vmContext);
+    new vm.Script('globalReturnValue = obj.result.call(obj, globalCtx, globalDB)').runInContext(this.vmContext);
     return this.vmContextObj.globalReturnValue;
   }
 }

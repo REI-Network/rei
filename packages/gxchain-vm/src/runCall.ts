@@ -1,4 +1,4 @@
-import { Address, BN } from 'ethereumjs-util';
+import { Address, BN, generateAddress } from 'ethereumjs-util';
 import { Block } from '@ethereumjs/block';
 import VM from '@ethereumjs/vm';
 import TxContext from '@ethereumjs/vm/dist/evm/txContext';
@@ -34,6 +34,12 @@ export default async function runCall(this: VM, opts: RunCallDebugOpts): Promise
     delegatecall: opts.delegatecall || false
   });
 
+  // Update from account's nonce and balance
+  const state = this.stateManager;
+  let fromAccount = await state.getAccount(message.caller);
+  fromAccount.nonce.iaddn(1);
+  await state.putAccount(message.caller, fromAccount);
+
   let time: undefined | number;
   let lastStep: undefined | InterpreterStep;
   let handler: undefined | ((step: InterpreterStep, next: () => void) => void);
@@ -47,14 +53,8 @@ export default async function runCall(this: VM, opts: RunCallDebugOpts): Promise
     };
     this.on('step', handler);
     time = Date.now();
-    await opts.debug.captureStart(message?.caller?.buf, message?.to?.buf, message.to === undefined, message.data, message.gasLimit, message.value, block.header.number, this.stateManager);
+    await opts.debug.captureStart(message?.caller?.buf, message?.to?.buf || generateAddress(message.caller.buf, fromAccount.nonce.subn(1).toArrayLike(Buffer)), message.to === undefined, message.data, message.gasLimit, message.value, block.header.number, this.stateManager);
   }
-
-  // Update from account's nonce and balance
-  const state = this.stateManager;
-  let fromAccount = await state.getAccount(message.caller);
-  fromAccount.nonce.iaddn(1);
-  await state.putAccount(message.caller, fromAccount);
 
   let result: undefined | EVMResult;
   let catchedErr: any;

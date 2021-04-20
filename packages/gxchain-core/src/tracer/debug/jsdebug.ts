@@ -5,7 +5,7 @@ import { StateManager } from '@ethereumjs/vm/dist/state';
 import { getPrecompile } from '@ethereumjs/vm/dist/evm/precompiles';
 import { Address, BN, bufferToHex, setLengthLeft, generateAddress, generateAddress2, keccak256 } from 'ethereumjs-util';
 import { InterpreterStep, VmError } from '@gxchain2/vm';
-import { hexStringToBuffer, logger } from '@gxchain2/utils';
+import { createBufferFunctionalMap, hexStringToBuffer, logger } from '@gxchain2/utils';
 import { IDebugImpl } from '../tracer';
 import { Node } from '../../node';
 
@@ -13,9 +13,12 @@ function deasync<T>(p: Promise<T>): T {
   let result: undefined | T;
   let error: any;
   p.then((res) => (result = res)).catch((err) => (error = err));
-  while (result === undefined && error === undefined) {
-    d.sleep(10);
-  }
+  d.loopWhile(() => {
+    return result === undefined && error === undefined;
+  });
+  // while (result === undefined && error === undefined) {
+  //   d.sleep(10);
+  // }
   if (error) {
     throw error;
   }
@@ -80,7 +83,7 @@ class Contract {
   }
 }
 
-function makeDB(stateManager: StateManager) {
+function makeDB(codeCache: Map<Buffer, Buffer>, stateManager: StateManager) {
   return {
     getBalance(address: Buffer) {
       try {
@@ -100,6 +103,9 @@ function makeDB(stateManager: StateManager) {
     },
     getCode(address: Buffer) {
       try {
+        if (codeCache.has(address)) {
+          return codeCache.get(address);
+        }
         return deasync(stateManager.getContractCode(new Address(address)));
       } catch (err) {
         logger.warn('JSDebug_DB::getCode, catch error:', err);
@@ -181,7 +187,7 @@ export class JSDebug implements IDebugImpl {
     globalCtx: { [key: string]: any };
     globalReturnValue?: any;
     bigInt: typeof bi;
-    // log: any;
+    // glog: any;
   } = {
     toHex(buf: Buffer) {
       return bufferToHex(buf);
@@ -210,11 +216,15 @@ export class JSDebug implements IDebugImpl {
     },
     globalCtx: this.debugContext,
     bigInt: bi
-    // log(...arg: any[]) {
+    // glog(...arg: any[]) {
     //   console.log(...arg);
     // }
   };
   private vmContext: vm.Context;
+
+  // TODO: remove this two things.
+  private stateManager?: StateManager;
+  private codeCache = createBufferFunctionalMap<Buffer>();
 
   constructor(node: Node, code: string) {
     this.node = node;
@@ -227,14 +237,15 @@ export class JSDebug implements IDebugImpl {
   }
 
   async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, value: BN, number: BN, stateManager: StateManager) {
-    this.debugContext['type'] = create ? 'CREAT' : 'CALL';
+    this.debugContext['type'] = create ? 'CREATE' : 'CALL';
     this.debugContext['from'] = from;
     this.debugContext['to'] = to;
     this.debugContext['input'] = input;
     this.debugContext['gas'] = gas.toNumber();
     this.debugContext['value'] = bi(value.toString());
     this.debugContext['block'] = number.toNumber();
-    this.vmContextObj.globalDB = makeDB(stateManager);
+    this.vmContextObj.globalDB = makeDB(this.codeCache, stateManager);
+    this.stateManager = stateManager;
   }
 
   private captureLog(step: InterpreterStep, cost: BN, error?: string) {
@@ -268,6 +279,9 @@ export class JSDebug implements IDebugImpl {
     this.debugContext['output'] = output;
     this.debugContext['gasUsed'] = gasUsed.toNumber();
     this.debugContext['time'] = time;
+    const to = this.vmContext['to'];
+    const code = await this.stateManager!.getContractCode(new Address(to));
+    this.codeCache.set(to, code);
   }
 
   result() {

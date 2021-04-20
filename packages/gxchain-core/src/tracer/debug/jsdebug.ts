@@ -1,11 +1,13 @@
 import vm from 'vm';
+import d from 'deasync';
+import bi, { BigInteger } from 'big-integer';
+import { StateManager } from '@ethereumjs/vm/dist/state';
+import { getPrecompile } from '@ethereumjs/vm/dist/evm/precompiles';
 import { Address, BN, bufferToHex, setLengthLeft, generateAddress, generateAddress2, keccak256 } from 'ethereumjs-util';
 import { InterpreterStep, VmError } from '@gxchain2/vm';
-import { IDebugImpl } from '../tracer';
-import { StateManager } from '@ethereumjs/vm/dist/state';
-import d from 'deasync';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
-import bi, { BigInteger } from 'big-integer';
+import { IDebugImpl } from '../tracer';
+import { Node } from '../../node';
 
 function deasync<T>(p: Promise<T>): T {
   let result: undefined | T;
@@ -162,6 +164,7 @@ function makeLog(ctx: { [key: string]: any }, step: InterpreterStep, cost: BN, e
 
 export class JSDebug implements IDebugImpl {
   hash: Buffer | undefined;
+  private node: Node;
   private debugContext: {
     [key: string]: any;
   } = {};
@@ -171,6 +174,8 @@ export class JSDebug implements IDebugImpl {
     toAddress(data: Buffer | string): Buffer;
     toContract(data: Buffer | string, nonce: number): Buffer;
     toContract2(data: Buffer | string, salt: string, code: Buffer): Buffer;
+    isPrecompiled(address: Buffer): boolean;
+    slice(buf: Buffer, start: number, end: number): Buffer;
     globalLog?: ReturnType<typeof makeLog>;
     globalDB?: ReturnType<typeof makeDB>;
     globalCtx: { [key: string]: any };
@@ -193,6 +198,16 @@ export class JSDebug implements IDebugImpl {
     toContract2(data: Buffer | string, salt: string, code: Buffer) {
       return generateAddress2(data instanceof Buffer ? data : hexStringToBuffer(data), hexStringToBuffer(salt), keccak256(code));
     },
+    isPrecompiled: (address: Buffer) => {
+      return getPrecompile(new Address(address), this.node.common) !== undefined;
+    },
+    slice(buf: Buffer, start: number, end: number) {
+      if (start < 0 || start > end || end > buf.length - 1) {
+        logger.warn('JSDebug::slice, tracer accessed out of bound memory, available', buf.length - 1, 'start:', start, 'end:', end);
+        return Buffer.alloc(0);
+      }
+      return buf.slice(start, end);
+    },
     globalCtx: this.debugContext,
     bigInt: bi
     // log(...arg: any[]) {
@@ -201,7 +216,8 @@ export class JSDebug implements IDebugImpl {
   };
   private vmContext: vm.Context;
 
-  constructor(code: string) {
+  constructor(node: Node, code: string) {
+    this.node = node;
     this.vmContext = vm.createContext(this.vmContextObj, { codeGeneration: { strings: false, wasm: false } });
     try {
       new vm.Script(`const obj = ${code}`).runInContext(this.vmContext);

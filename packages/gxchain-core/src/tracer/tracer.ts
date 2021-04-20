@@ -25,7 +25,7 @@ export class Tracer {
   }
 
   private createDebugImpl(config?: TraceConfig, hash?: Buffer): IDebugImpl {
-    return config?.tracer ? new JSDebug(config.tracer) : new StructLogDebug(config, hash);
+    return config?.tracer ? new JSDebug(this.node, config.tracer) : new StructLogDebug(config, hash);
   }
 
   async traceBlock(block: Block | Buffer, config?: TraceConfig, hash?: Buffer) {

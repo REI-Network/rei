@@ -79,7 +79,17 @@ class KeystoreWallet implements Wallet {
     return this.keystore.signHashWithPassphrase(account, passphrase, text);
   }
 
-  // signTx(account: Accountinfo, tx: Transaction, chainID: number): Transaction {}
+  signTx(account: Accountinfo, tx: Transaction, chainID: number): Transaction {
+    if (!this.contain(account)) {
+      throw new Error('unknown account');
+    }
+    return this.keystore.signTx(account, tx);
+  }
 
-  // signTxWithPassphrase(account: Accountinfo, passphrase: string, tx: Transaction, chainID: number): Transaction {}
+  signTxWithPassphrase(account: Accountinfo, passphrase: string, tx: Transaction, chainID: number): Transaction {
+    if (!this.contain(account)) {
+      throw new Error('unknown account');
+    }
+    return this.keystore.signTxWithPassphrase(account, passphrase, tx);
+  }
 }

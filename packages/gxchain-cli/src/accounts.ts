@@ -53,9 +53,9 @@ export interface Wallet {
 
   signTextWithPassphrase(account: Accountinfo, passphrase: string, text: Buffer);
 
-  // signTx(account: Accountinfo, tx: Transaction, chainID: number): Transaction;
+  signTx(account: Accountinfo, tx: Transaction, chainID: number): Transaction;
 
-  // signTxWithPassphrase(account: Accountinfo, passphrase: string, tx: Transaction, chainID: number): Transaction;
+  signTxWithPassphrase(account: Accountinfo, passphrase: string, tx: Transaction, chainID: number): Transaction;
 }
 
 export type Backend = {

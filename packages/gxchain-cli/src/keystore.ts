@@ -44,4 +44,17 @@ export class KeyStore {
     const [account, key] = this.getDecryptedKey(a, passphrase);
     return web3accounts.sign(hash.toString(), key.privateKeyb);
   }
+
+  signTx(a: Accountinfo, tx: Transaction) {
+    const unlockedKey = this.unlocked.get(a.address.toBuffer());
+    if (!unlockedKey) {
+      throw new Error('password or unlock');
+    }
+    return tx.sign(Buffer.from(unlockedKey.privateKey));
+  }
+
+  signTxWithPassphrase(a: Accountinfo, passphrase: string, tx: Transaction) {
+    const [account, key] = this.getDecryptedKey(a, passphrase);
+    return tx.sign(Buffer.from(key.privateKey));
+  }
 }

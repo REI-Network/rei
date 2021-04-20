@@ -55,7 +55,7 @@ export class JsonRPCMiddleware {
       }
 
       if (!helper.isNil(id)) {
-        return JSON.stringify({ jsonrpc, result, id }, (key, value) => (typeof value === 'bigint' ? value.toString() : value));
+        return { jsonrpc, result, id };
       }
     } catch (err) {
       if (helper.isFunction(this.config.onError)) this.config.onError && this.config.onError(err, body);

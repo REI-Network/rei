@@ -57,7 +57,7 @@ export class WrappedTransaction {
       hash: bufferToHex(this.transaction.hash()),
       input: bufferToHex(this.transaction.data),
       nonce: bnToHex(this.transaction.nonce),
-      to: this.transaction.to !== undefined ? this.transaction.to.toString() : undefined,
+      to: this.transaction.to !== undefined ? this.transaction.to.toString() : null,
       transactionIndex: this.extension.transactionIndex !== undefined ? intToHex(this.extension.transactionIndex) : null,
       value: bnToHex(this.transaction.value),
       v: this.transaction.v !== undefined ? bnToHex(this.transaction.v) : undefined,

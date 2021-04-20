@@ -6,7 +6,7 @@ type URL = {
   Path: string;
 };
 
-export type Account = {
+export type Accountinfo = {
   address: Address;
   url: URL;
 };
@@ -33,29 +33,29 @@ export interface Wallet {
 
   status(): string;
 
-  Open(passphrase: string);
+  open(passphrase: string);
 
   close();
 
-  accounts(): Account[];
+  accounts(): Accountinfo[];
 
-  contain(account: Account): boolean;
+  contain(account: Accountinfo): boolean;
 
-  derive(path: Buffer, pin: boolean): Account;
+  derive(path: Buffer, pin: boolean): Accountinfo | undefined;
 
   selfDerive(base: Buffer[]); //todo anther  parameter
 
-  signData(account: Account, mimeType: string, data: Buffer): Buffer;
+  signData(account: Accountinfo, mimeType: string, data: Buffer);
 
-  signDataWithPassphrase(account: Account, passphrase, mimeType: string, data: Buffer): Buffer;
+  signDataWithPassphrase(account: Accountinfo, passphrase, mimeType: string, data: Buffer);
 
-  signText(account: Account, text: Buffer): Buffer;
+  signText(account: Accountinfo, text: Buffer);
 
-  signTextWithPassphrase(account: Account, passphrase: string, text: Buffer): Buffer;
+  signTextWithPassphrase(account: Accountinfo, passphrase: string, text: Buffer);
 
-  signTx(account: Account, tx: Transaction, chainID: number): Transaction;
+  // signTx(account: Accountinfo, tx: Transaction, chainID: number): Transaction;
 
-  signTxWithPassphrase(account: Account, passphrase: string, tx: Transaction, chainID: number): Transaction;
+  // signTxWithPassphrase(account: Accountinfo, passphrase: string, tx: Transaction, chainID: number): Transaction;
 }
 
 export type Backend = {

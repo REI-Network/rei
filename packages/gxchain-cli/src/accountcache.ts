@@ -1,19 +1,19 @@
 import { Address } from 'ethereumjs-util';
 import { Accounts } from 'web3-eth-accounts';
-import { Account, urlcompare } from './accounts';
+import { Accountinfo, urlcompare } from './accounts';
 import path from 'path';
 import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
 export class AccountCache {
   keydir: string;
   //   watcher:watcher;
-  byAddr: FunctionalMap<Buffer, Account[]> = createBufferFunctionalMap<Account[]>();
-  private all: Account[] = [];
+  byAddr: FunctionalMap<Buffer, Accountinfo[]> = createBufferFunctionalMap<Accountinfo[]>();
+  private all: Accountinfo[] = [];
   constructor(keydir: string) {
     this.keydir = keydir;
   }
 
-  accounts(): Account[] {
-    const cpy: Account[] = [];
+  accounts(): Accountinfo[] {
+    const cpy: Accountinfo[] = [];
     for (const account of this.all) {
       cpy.push(account);
     }
@@ -28,7 +28,7 @@ export class AccountCache {
     return false;
   }
 
-  add(newaccount: Account) {
+  add(newaccount: Accountinfo) {
     let index = 0;
     for (let i = 0; i < this.all.length; i++) {
       if (urlcompare(this.all[i].url, newaccount.url)) {
@@ -48,7 +48,7 @@ export class AccountCache {
     }
   }
 
-  private removeAccount(slice: Account[], elem: Account): Account[] {
+  private removeAccount(slice: Accountinfo[], elem: Accountinfo): Accountinfo[] {
     for (const account of slice) {
       if (account == elem) {
         const index = slice.indexOf(account);
@@ -59,7 +59,7 @@ export class AccountCache {
     return slice;
   }
 
-  delete(removed: Account) {
+  delete(removed: Accountinfo) {
     this.all = this.removeAccount(this.all, removed);
     let instance = this.byAddr.get(removed.address.toBuffer());
     if (instance) {
@@ -72,7 +72,7 @@ export class AccountCache {
     }
   }
 
-  find(a: Account) {
+  find(a: Accountinfo) {
     let matches = this.all;
     if (a.address != Address.zero()) {
       const accounts = this.byAddr.get(a.address.toBuffer());

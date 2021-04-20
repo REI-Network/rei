@@ -1,6 +1,7 @@
 import { Address } from 'ethereumjs-util';
 import { Accounts } from 'web3-eth-accounts';
 import { Account, urlcompare } from './accounts';
+import path from 'path';
 import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
 export class AccountCache {
   keydir: string;
@@ -68,6 +69,38 @@ export class AccountCache {
       } else {
         instance = ba;
       }
+    }
+  }
+
+  find(a: Account) {
+    let matches = this.all;
+    if (a.address != Address.zero()) {
+      const accounts = this.byAddr.get(a.address.toBuffer());
+      if (accounts) {
+        matches = accounts;
+      }
+    }
+    if (a.url.Path != '') {
+      if (a.url.Path.indexOf(path.sep) == -1) {
+        a.url.Path = path.join(this.keydir, a.url.Path);
+      }
+      for (const i of matches) {
+        if (i.url == a.url) {
+          return i;
+        }
+      }
+      if (a.address == Address.zero()) {
+        return {};
+      }
+    }
+
+    switch (matches.length) {
+      case 1:
+        return matches[0];
+      case 0:
+        return {};
+      default:
+        return {};
     }
   }
 }

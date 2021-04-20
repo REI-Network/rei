@@ -50,6 +50,12 @@ export default async function runCall(this: VM, opts: RunCallDebugOpts): Promise
     await opts.debug.captureStart(message?.caller?.buf, message?.to?.buf, message.to === undefined, message.data, message.gasLimit, message.value, block.header.number, this.stateManager);
   }
 
+  // Update from account's nonce and balance
+  const state = this.stateManager;
+  let fromAccount = await state.getAccount(message.caller);
+  fromAccount.nonce.iaddn(1);
+  await state.putAccount(message.caller, fromAccount);
+
   let result: undefined | EVMResult;
   let catchedErr: any;
   try {

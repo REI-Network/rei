@@ -118,7 +118,7 @@ export class Controller {
     const wvm = await this.node.getWrappedVM(block.header.stateRoot);
     await wvm.vm.stateManager.checkpoint();
     try {
-      const result = await wvm.vm.runCall({
+      const result = await wvm.runCall({
         block,
         gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
         origin: data.from ? Address.fromString(data.from) : Address.zero(),
@@ -128,12 +128,15 @@ export class Controller {
         value: data.value ? hexStringToBN(data.value) : undefined,
         data: data.data ? hexStringToBuffer(data.data) : undefined
       });
+      if (result.execResult.exceptionError) {
+        throw result.execResult.exceptionError;
+      }
       await wvm.vm.stateManager.revert();
       result.gasUsed.iadd(this.calculateBaseFee(data));
       return result;
     } catch (err) {
       await wvm.vm.stateManager.revert();
-      logger.error('Controller::runCall, catch error:', err);
+      logger.warn('Controller::runCall, catch error:', err);
       throw err;
     }
   }

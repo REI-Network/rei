@@ -279,7 +279,7 @@ export class JSDebug implements IDebugImpl {
     this.debugContext['output'] = output;
     this.debugContext['gasUsed'] = gasUsed.toNumber();
     this.debugContext['time'] = time;
-    const to = this.vmContext['to'];
+    const to = this.debugContext['to'];
     const code = await this.stateManager!.getContractCode(new Address(to));
     this.codeCache.set(to, code);
   }

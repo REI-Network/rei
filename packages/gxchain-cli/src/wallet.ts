@@ -5,7 +5,7 @@ import { Transaction } from '@ethereumjs/tx';
 
 // const web3accounts = new Accounts();
 
-class KeystoreWallet implements Wallet {
+export class KeystoreWallet implements Wallet {
   account: Accountinfo;
   keystore: KeyStore;
 

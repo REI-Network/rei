@@ -1,11 +1,12 @@
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
 import { keyFileName, keyStore } from './key';
 import { Account } from 'web3-core';
-import { Wallet, Accountinfo } from './accounts';
+import { Wallet, Accountinfo, urlcompare } from './accounts';
 import { AccountCache } from './accountcache';
 import { Transaction } from '@ethereumjs/tx';
 import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
 import { Accounts } from 'web3-eth-accounts';
+import { KeystoreWallet } from './wallet';
 import path from 'path';
 
 const web3accounts = new Accounts();
@@ -23,7 +24,7 @@ export class KeyStore {
     let accs = this.cache.accounts;
     this.wallets = [];
     for (let i = 0; i < accs.length; i++) {
-      this.wallets.push();
+      this.wallets.push(new KeystoreWallet(accs[i], this));
     }
   }
 
@@ -60,15 +61,48 @@ export class KeyStore {
   }
 
   importKey(key: any, passphrase: string) {
-    const addr = Address.fromPublicKey(key.privateKey);
+    const addr = Address.fromString(key.address);
     const a: Accountinfo = { address: addr, url: { Scheme: 'keystore', Path: path.join(this.storage.joinPath(keyFileName(addr))) } };
     this.storage.storekey(a.url.Path, key, passphrase);
     this.cache.add(a);
+    this.refreshwallets();
     return a;
   }
 
   update(a: Accountinfo, passphrase: string, newpassphrase: string) {
     const [account, key] = this.getDecryptedKey(a, passphrase);
     return this.storage.storekey(a.url.Path, key, newpassphrase);
+  }
+
+  newaccount(passphrase: string) {
+    const key = web3accounts.create();
+    const addr = Address.fromString(key.address);
+    const account: Accountinfo = { address: addr, url: { Path: this.storage.joinPath(keyFileName(addr)), Scheme: 'keystore' } };
+    this.storage.storekey(account.url.Path, key, passphrase);
+    this.cache.add(account);
+    this.refreshwallets();
+    return account;
+  }
+
+  refreshwallets() {
+    const accs = this.cache.accounts();
+    const wallets: Wallet[] = [];
+    for (const account of accs) {
+      while (this.wallets.length > 0 && urlcompare(this.wallets[0].url(), account.url) < 0) {
+        this.wallets = this.wallets.slice(1);
+      }
+      if (this.wallets.length == 0 || urlcompare(this.wallets[0].url(), account.url) > 0) {
+        const wallet = new KeystoreWallet(account, this);
+        wallets.push(wallet);
+        continue;
+      }
+      if (this.wallets[0].accounts()[0] == account) {
+        wallets.push(this.wallets[0]);
+        this.wallets = this.wallets.slice(1);
+        continue;
+      }
+    }
+
+    this.wallets = wallets;
   }
 }

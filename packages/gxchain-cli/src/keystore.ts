@@ -1,11 +1,12 @@
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
-import { keyStore } from './key';
+import { keyFileName, keyStore } from './key';
 import { Account } from 'web3-core';
 import { Wallet, Accountinfo } from './accounts';
 import { AccountCache } from './accountcache';
 import { Transaction } from '@ethereumjs/tx';
 import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
 import { Accounts } from 'web3-eth-accounts';
+import path from 'path';
 
 const web3accounts = new Accounts();
 
@@ -56,5 +57,18 @@ export class KeyStore {
   signTxWithPassphrase(a: Accountinfo, passphrase: string, tx: Transaction) {
     const [account, key] = this.getDecryptedKey(a, passphrase);
     return tx.sign(Buffer.from(key.privateKey));
+  }
+
+  importKey(key: any, passphrase: string) {
+    const addr = Address.fromPublicKey(key.privateKey);
+    const a: Accountinfo = { address: addr, url: { Scheme: 'keystore', Path: path.join(this.storage.joinPath(keyFileName(addr))) } };
+    this.storage.storekey(a.url.Path, key, passphrase);
+    this.cache.add(a);
+    return a;
+  }
+
+  update(a: Accountinfo, passphrase: string, newpassphrase: string) {
+    const [account, key] = this.getDecryptedKey(a, passphrase);
+    return this.storage.storekey(a.url.Path, key, newpassphrase);
   }
 }

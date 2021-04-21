@@ -12,11 +12,11 @@ export class keyStorePassphrase {
     this.keyDirPath = keydir;
   }
 
-  getKey(add: Address, filename: string, auth: string) {
+  getKey(addr: Address, filename: string, auth: string) {
     const keybuffer = fs.readFileSync(filename);
     const keyjson = JSON.parse(keybuffer.toString());
     const key = web3accounts.decrypt(keyjson, auth);
-    if (key.address != add.toString()) {
+    if (key.address != addr.toString()) {
       throw new Error('key content mismatch');
     }
     return key;

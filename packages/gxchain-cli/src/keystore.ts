@@ -105,4 +105,20 @@ export class KeyStore {
 
     this.wallets = wallets;
   }
+
+  lock(addr: Address) {
+    const account = this.unlocked.get(addr.toBuffer());
+    if (account) {
+      this.unlocked.delete(addr.toBuffer());
+    }
+  }
+
+  unlock(a: Accountinfo, passphrase: string) {
+    const [account, key] = this.getDecryptedKey(a, passphrase);
+    const cache = this.unlocked.get(Buffer.from(account.address));
+    if (cache && !account) {
+      return;
+    }
+    this.unlocked.set(a.address.toBuffer(), key);
+  }
 }

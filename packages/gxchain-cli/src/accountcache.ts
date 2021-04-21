@@ -90,7 +90,7 @@ export class AccountCache {
         }
       }
       if (a.address == Address.zero()) {
-        return {};
+        return;
       }
     }
 
@@ -98,9 +98,9 @@ export class AccountCache {
       case 1:
         return matches[0];
       case 0:
-        return {};
+        return;
       default:
-        return {};
+        return;
     }
   }
 }

@@ -92,7 +92,7 @@ export class StructLogDebug implements IDebugImpl {
     this.logs.push(log);
   }
 
-  async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, value: BN, number: BN, stateManager: StateManager) {}
+  async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, gasPrice: BN, intrinsicGas: BN, value: BN, number: BN, stateManager: StateManager) {}
 
   async captureState(step: InterpreterStep, cost: BN) {
     await this.captureLog(step, cost);

@@ -1,6 +1,7 @@
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { Address, BN, toBuffer, generateAddress } from 'ethereumjs-util';
 import { Block } from '@gxchain2/block';
+import { calculateIntrinsicGas } from '@gxchain2/tx';
 import { Receipt, Log } from '@gxchain2/receipt';
 import VM from '@ethereumjs/vm';
 import Bloom from '@ethereumjs/vm/dist/bloom';
@@ -205,7 +206,7 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockDebugOpts
     let time: undefined | number;
     if (opts.debug && (!opts.debug.hash || opts.debug.hash.equals(tx.hash()))) {
       time = Date.now();
-      await opts.debug.captureStart(tx.getSenderAddress().buf, tx?.to?.buf || generateAddress(tx.getSenderAddress().buf, tx.nonce.toArrayLike(Buffer)), tx.toCreationAddress(), tx.data, tx.gasLimit, tx.value, block.header.number, this.stateManager);
+      await opts.debug.captureStart(tx.getSenderAddress().buf, tx?.to?.buf || generateAddress(tx.getSenderAddress().buf, tx.nonce.toArrayLike(Buffer)), tx.toCreationAddress(), tx.data, tx.gasLimit, tx.gasPrice, calculateIntrinsicGas(tx), tx.value, block.header.number, this.stateManager);
     }
 
     let txRes: undefined | RunTxResult;

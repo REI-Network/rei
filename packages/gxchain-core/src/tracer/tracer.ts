@@ -1,8 +1,9 @@
 import util from 'util';
+import { Address } from 'ethereumjs-util';
+import { OpcodeList } from '@ethereumjs/vm/dist/evm/opcodes';
 import { Block } from '@gxchain2/block';
 import { IDebug } from '@gxchain2/vm';
 import { hexStringToBN, hexStringToBuffer } from '@gxchain2/utils';
-import { Address } from 'ethereumjs-util';
 import { Node } from '../node';
 import { StructLogDebug, JSDebug } from './debug';
 import { toAsync } from './toasync';
@@ -29,13 +30,13 @@ export class Tracer {
     this.node = node;
   }
 
-  private createDebugImpl(reject: (reason?: any) => void, config?: TraceConfig, hash?: Buffer): IDebugImpl {
+  private createDebugImpl(opcodes: OpcodeList, reject: (reason?: any) => void, config?: TraceConfig, hash?: Buffer): IDebugImpl {
     if (config?.tracer) {
       if (tracers.has(config.tracer)) {
         config.tracer = tracers.get(config.tracer)!;
         config.toAsync = true;
       }
-      return new JSDebug(this.node, reject, Object.assign({ ...config }, { tracer: config.toAsync === false ? `const obj = ${config.tracer}` : toAsync(`const obj = ${config.tracer}`) }));
+      return new JSDebug(this.node, opcodes, reject, Object.assign({ ...config }, { tracer: config.toAsync === false ? `const obj = ${config.tracer}` : toAsync(`const obj = ${config.tracer}`) }));
     } else {
       return new StructLogDebug(config, hash);
     }
@@ -51,7 +52,7 @@ export class Tracer {
         block = block as Block;
         const parent = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
         const wvm = await this.node.getWrappedVM(parent.header.stateRoot);
-        const debug = this.createDebugImpl(reject, config, hash);
+        const debug = this.createDebugImpl((wvm.vm as any)._opcodes, reject, config, hash);
         await wvm.runBlock({ block, debug });
         const result = debug.result();
         resolve(util.types.isPromise(result) ? await result : result);
@@ -89,7 +90,7 @@ export class Tracer {
       try {
         const parent = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
         const wvm = await this.node.getWrappedVM(parent.header.stateRoot);
-        const debug = this.createDebugImpl(reject, config);
+        const debug = this.createDebugImpl((wvm.vm as any)._opcodes, reject, config);
         await wvm.runCall({
           block,
           debug,

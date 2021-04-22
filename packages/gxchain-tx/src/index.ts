@@ -78,4 +78,16 @@ export async function calculateTransactionTrie(transactions: Transaction[]): Pro
   return txTrie.root;
 }
 
+export function calculateIntrinsicGas(tx: Transaction) {
+  const gas = tx.toCreationAddress() ? new BN(53000) : new BN(21000);
+  const nz = new BN(0);
+  const z = new BN(0);
+  for (const b of tx.data) {
+    (b !== 0 ? nz : z).iaddn(1);
+  }
+  gas.iadd(nz.muln(16));
+  gas.iadd(z.muln(4));
+  return gas;
+}
+
 export * from '@ethereumjs/tx';

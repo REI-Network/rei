@@ -2,7 +2,7 @@ import EventEmitter from 'events';
 import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Heap from 'qheap';
 import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Aborter, logger } from '@gxchain2/utils';
-import { Transaction, WrappedTransaction } from '@gxchain2/tx';
+import { Transaction, WrappedTransaction, calculateIntrinsicGas } from '@gxchain2/tx';
 import { StateManager } from '@gxchain2/state-manager';
 import { Blockchain } from '@gxchain2/blockchain';
 import { BlockHeader, Block, BlockBodyBuffer } from '@gxchain2/block';
@@ -48,14 +48,7 @@ export function txCost(tx: Transaction) {
  * @returns return ture if gas is between the maximum and minimum gas
  */
 export function checkTxIntrinsicGas(tx: Transaction) {
-  const gas = tx.toCreationAddress() ? new BN(53000) : new BN(21000);
-  const nz = new BN(0);
-  const z = new BN(0);
-  for (const b of tx.data) {
-    (b !== 0 ? nz : z).iaddn(1);
-  }
-  gas.iadd(nz.muln(16));
-  gas.iadd(z.muln(4));
+  const gas = calculateIntrinsicGas(tx);
   return gas.lte(uint64Max) && gas.lte(tx.gasLimit);
 }
 

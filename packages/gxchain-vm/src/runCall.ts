@@ -53,7 +53,7 @@ export default async function runCall(this: VM, opts: RunCallDebugOpts): Promise
     };
     this.on('step', handler);
     time = Date.now();
-    await opts.debug.captureStart(message?.caller?.buf, message?.to?.buf || generateAddress(message.caller.buf, fromAccount.nonce.subn(1).toArrayLike(Buffer)), message.to === undefined, message.data, message.gasLimit, message.value, block.header.number, this.stateManager);
+    await opts.debug.captureStart(message?.caller?.buf, message?.to?.buf || generateAddress(message.caller.buf, fromAccount.nonce.subn(1).toArrayLike(Buffer)), message.to === undefined, message.data, message.gasLimit, new BN(0), new BN(0), message.value, block.header.number, this.stateManager);
   }
 
   let result: undefined | EVMResult;

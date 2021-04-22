@@ -13,7 +13,7 @@ export interface IDebug {
   /**
    * Called when the transaction starts processing
    */
-  captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, value: BN, number: BN, stateManager: StateManager): Promise<void>;
+  captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, gasPrice: BN, intrinsicGas: BN, value: BN, number: BN, stateManager: StateManager): Promise<void>;
   /**
    * Called at every step of processing a transaction
    */

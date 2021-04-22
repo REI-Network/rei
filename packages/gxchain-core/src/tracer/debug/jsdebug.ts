@@ -2,7 +2,7 @@ import vm from 'vm';
 import bi, { BigInteger } from 'big-integer';
 import { StateManager } from '@ethereumjs/vm/dist/state';
 import { getPrecompile } from '@ethereumjs/vm/dist/evm/precompiles';
-import { OpcodeList, getOpcodesForHF } from '@ethereumjs/vm/dist/evm/opcodes';
+import { OpcodeList } from '@ethereumjs/vm/dist/evm/opcodes';
 import { Address, BN, bufferToHex, setLengthLeft, generateAddress, generateAddress2, keccak256 } from 'ethereumjs-util';
 import { InterpreterStep, VmError } from '@gxchain2/vm';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
@@ -193,7 +193,7 @@ export class JSDebug implements IDebugImpl {
     },
     globalCtx: this.debugContext,
     glog(...args: any[]) {
-      logger.detail('JSDebug::glog,', ...args);
+      logger.warn('JSDebug::glog,', ...args);
     },
     bigInt: bi
   };
@@ -202,11 +202,11 @@ export class JSDebug implements IDebugImpl {
   private rejected: boolean = false;
   private reject: (reason?: any) => void;
 
-  constructor(node: Node, reject: (reason?: any) => void, config: TraceConfig) {
+  constructor(node: Node, opcodes: OpcodeList, reject: (reason?: any) => void, config: TraceConfig) {
     this.node = node;
     this.config = config;
+    this.opcodes = opcodes;
     this.vmContext = vm.createContext(this.vmContextObj, { codeGeneration: { strings: false, wasm: false } });
-    this.opcodes = getOpcodesForHF(this.node.common);
     this.reject = reject;
     new vm.Script(config.tracer!).runInContext(this.vmContext);
   }
@@ -218,12 +218,14 @@ export class JSDebug implements IDebugImpl {
     }
   }
 
-  async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, value: BN, number: BN, stateManager: StateManager) {
+  async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, gasPrice: BN, intrinsicGas: BN, value: BN, number: BN, stateManager: StateManager) {
     this.debugContext['type'] = create ? 'CREATE' : 'CALL';
     this.debugContext['from'] = from;
     this.debugContext['to'] = to;
     this.debugContext['input'] = input;
     this.debugContext['gas'] = gas.toNumber();
+    this.debugContext['gasPrice'] = gasPrice.toNumber();
+    this.debugContext['intrinsicGas'] = intrinsicGas.toNumber();
     this.debugContext['value'] = bi(value.toString());
     this.debugContext['block'] = number.toNumber();
     this.vmContextObj.globalDB = makeDB(stateManager);

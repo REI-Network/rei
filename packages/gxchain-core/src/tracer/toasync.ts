@@ -19,7 +19,6 @@ function convert(unknowVal: any): any {
     return unknowVal;
   }
   if (unknowVal.type === undefined) {
-    console.log('unknowVal:', unknowVal);
     return unknowVal;
   }
   switch (unknowVal.type) {
@@ -1127,7 +1126,6 @@ function convert(unknowVal: any): any {
       return v;
     }
     default:
-      console.log('unknowVal:', unknowVal);
       return unknowVal;
   }
 }

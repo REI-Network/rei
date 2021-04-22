@@ -228,7 +228,8 @@ export class JSDebug implements IDebugImpl {
   private async captureLog(step: InterpreterStep, cost: BN, error?: string) {
     try {
       this.vmContextObj.globalLog = makeLog(this.debugContext, step, cost, error);
-      error ? new vm.Script('globalPromise = obj.fault.call(obj, globalLog, globalDB)').runInContext(this.vmContext) : new vm.Script('globalPromise = obj.step.call(obj, globalLog, globalDB)').runInContext(this.vmContext);
+      const script = error ? new vm.Script('globalPromise = obj.fault.call(obj, globalLog, globalDB)') : new vm.Script('globalPromise = obj.step.call(obj, globalLog, globalDB)');
+      script.runInContext(this.vmContext, { timeout: this.config.timeout ? Number(this.config.timeout) : undefined, breakOnSigint: true });
       if (this.vmContextObj.globalPromise) {
         await this.vmContextObj.globalPromise;
         this.vmContextObj.globalPromise = undefined;
@@ -264,7 +265,7 @@ export class JSDebug implements IDebugImpl {
 
   async result() {
     try {
-      new vm.Script('globalPromise = obj.result.call(obj, globalCtx, globalDB)').runInContext(this.vmContext);
+      new vm.Script('globalPromise = obj.result.call(obj, globalCtx, globalDB)').runInContext(this.vmContext, { timeout: this.config.timeout ? Number(this.config.timeout) : undefined, breakOnSigint: true });
       if (this.vmContextObj.globalPromise) {
         const result = await this.vmContextObj.globalPromise;
         this.vmContextObj.globalPromise = undefined;

@@ -2,7 +2,7 @@ import * as recast from 'recast';
 import { namedTypes } from 'ast-types';
 
 export function toAsync(code: string) {
-  return recast.print(recast.parse(code)).code;
+  return recast.print(convert(recast.parse(code))).code;
 }
 
 function convertArray<T>(array: T[] | undefined) {

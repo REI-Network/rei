@@ -40,7 +40,7 @@ class Op {
     };
   }
   isPush() {
-    return this.name === 'PUSH';
+    return this.name.indexOf('PUSH') === 0;
   }
   toString() {
     return this.name;

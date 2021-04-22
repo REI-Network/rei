@@ -2,7 +2,7 @@
 
 import process from 'process';
 import fs from 'fs';
-import { program } from 'commander';
+import commander, { program } from 'commander';
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
 import { setLevel, logger } from '@gxchain2/utils';
@@ -27,16 +27,40 @@ program
   .action((options) => start());
 
 program
-  .command('newaccount')
-  .description('new a account')
-  .action((options) => {
-    console.log();
-  });
-
-program
   .command('attach')
   .description('attach to gxchain2 node')
   .action((options) => {});
+
+const account = new commander.Command('account');
+program.addCommand(account);
+account
+  .description('Manage accounts')
+  .command('list')
+  .description('List all the accounts')
+  .action((options) => {
+    console.log('list');
+  });
+
+account
+  .command('new')
+  .description('New a account')
+  .action(() => {
+    console.log('new');
+  });
+
+account
+  .command('update')
+  .description('Update the account')
+  .action(() => {
+    console.log('update');
+  });
+
+account
+  .command('import')
+  .description('Import a account')
+  .action(() => {
+    console.log('import');
+  });
 program.parse(process.argv);
 
 async function start() {

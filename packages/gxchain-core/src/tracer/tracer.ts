@@ -6,6 +6,7 @@ import { Address } from 'ethereumjs-util';
 import { Node } from '../node';
 import { StructLogDebug, JSDebug } from './debug';
 import { toAsync } from './toasync';
+import { tracers } from './tracers';
 
 export interface IDebugImpl extends IDebug {
   result(): any;
@@ -30,6 +31,10 @@ export class Tracer {
 
   private createDebugImpl(config?: TraceConfig, hash?: Buffer): IDebugImpl {
     if (config?.tracer) {
+      if (tracers.has(config.tracer)) {
+        config.tracer = tracers.get(config.tracer)!;
+        config.toAsync = true;
+      }
       return new JSDebug(this.node, Object.assign({ ...config }, { tracer: config.toAsync === false ? `const obj = ${config.tracer}` : toAsync(`const obj = ${config.tracer}`) }));
     } else {
       return new StructLogDebug(config, hash);

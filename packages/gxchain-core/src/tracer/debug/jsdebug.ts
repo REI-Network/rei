@@ -92,44 +92,19 @@ class Contract {
 function makeDB(stateManager: StateManager) {
   return {
     async getBalance(address: Buffer) {
-      try {
-        return bi((await stateManager.getAccount(new Address(address))).balance.toString());
-      } catch (err) {
-        logger.warn('JSDebug_DB::getBalance, catch error:', err);
-        return bi(0);
-      }
+      return bi((await stateManager.getAccount(new Address(address))).balance.toString());
     },
     async getNonce(address: Buffer) {
-      try {
-        return (await stateManager.getAccount(new Address(address))).nonce.toNumber();
-      } catch (err) {
-        logger.warn('JSDebug_DB::getNonce, catch error:', err);
-        return 0;
-      }
+      return (await stateManager.getAccount(new Address(address))).nonce.toNumber();
     },
-    async getCode(address: Buffer) {
-      try {
-        return await stateManager.getContractCode(new Address(address));
-      } catch (err) {
-        logger.warn('JSDebug_DB::getCode, catch error:', err);
-        return Buffer.alloc(0);
-      }
+    getCode(address: Buffer) {
+      return stateManager.getContractCode(new Address(address));
     },
-    async getState(address: Buffer, hash: Buffer) {
-      try {
-        return await stateManager.getContractStorage(new Address(address), hash);
-      } catch (err) {
-        logger.warn('JSDebug_DB::getState, catch error:', err);
-        return Buffer.alloc(0);
-      }
+    getState(address: Buffer, hash: Buffer) {
+      return stateManager.getContractStorage(new Address(address), hash);
     },
-    async exists(address: Buffer) {
-      try {
-        return await stateManager.accountExists(new Address(address));
-      } catch (err) {
-        logger.warn('JSDebug_DB::exists, catch error:', err);
-        return false;
-      }
+    exists(address: Buffer) {
+      return stateManager.accountExists(new Address(address));
     }
   };
 }
@@ -162,8 +137,7 @@ function makeLog(ctx: { [key: string]: any }, opcodes: OpcodeList, step: Interpr
       return step.depth + 1;
     },
     getRefund() {
-      logger.warn('JSDebug_Log::getRefund, unsupported api');
-      return 0;
+      throw new Error('unsupported api getRefund');
     },
     getError() {
       return error;
@@ -213,7 +187,6 @@ export class JSDebug implements IDebugImpl {
     },
     slice(buf: Buffer, start: number, end: number) {
       if (start < 0 || start > end || end > buf.length - 1) {
-        logger.warn('JSDebug::slice, tracer accessed out of bound memory, available', buf.length - 1, 'start:', start, 'end:', end);
         return Buffer.alloc(0);
       }
       return buf.slice(start, end);
@@ -226,13 +199,23 @@ export class JSDebug implements IDebugImpl {
   };
   private vmContext: vm.Context;
   private opcodes: OpcodeList;
+  private rejected: boolean = false;
+  private reject: (reason?: any) => void;
 
-  constructor(node: Node, config: TraceConfig) {
+  constructor(node: Node, reject: (reason?: any) => void, config: TraceConfig) {
     this.node = node;
     this.config = config;
     this.vmContext = vm.createContext(this.vmContextObj, { codeGeneration: { strings: false, wasm: false } });
     this.opcodes = getOpcodesForHF(this.node.common);
+    this.reject = reject;
     new vm.Script(config.tracer!).runInContext(this.vmContext);
+  }
+
+  private error(reason?: any) {
+    if (!this.rejected) {
+      this.rejected = true;
+      this.reject(reason);
+    }
   }
 
   async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, value: BN, number: BN, stateManager: StateManager) {
@@ -247,6 +230,9 @@ export class JSDebug implements IDebugImpl {
   }
 
   private async captureLog(step: InterpreterStep, cost: BN, error?: string) {
+    if (this.rejected) {
+      return;
+    }
     try {
       this.vmContextObj.globalLog = makeLog(this.debugContext, this.opcodes, step, cost, error);
       const script = error ? new vm.Script('globalPromise = obj.fault.call(obj, globalLog, globalDB)') : new vm.Script('globalPromise = obj.step.call(obj, globalLog, globalDB)');
@@ -256,7 +242,7 @@ export class JSDebug implements IDebugImpl {
         this.vmContextObj.globalPromise = undefined;
       }
     } catch (err) {
-      logger.warn('JSDebug::captureLog, catch error:', err);
+      this.error(err);
     }
   }
 
@@ -285,6 +271,9 @@ export class JSDebug implements IDebugImpl {
   }
 
   async result() {
+    if (this.rejected) {
+      return;
+    }
     try {
       new vm.Script('globalPromise = obj.result.call(obj, globalCtx, globalDB)').runInContext(this.vmContext, { timeout: this.config.timeout ? Number(this.config.timeout) : undefined, breakOnSigint: true });
       if (this.vmContextObj.globalPromise) {
@@ -293,7 +282,7 @@ export class JSDebug implements IDebugImpl {
         return result;
       }
     } catch (err) {
-      logger.warn('JSDebug::result, catch error:', err);
+      this.error(err);
     }
   }
 }

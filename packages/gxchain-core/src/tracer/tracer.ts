@@ -29,29 +29,36 @@ export class Tracer {
     this.node = node;
   }
 
-  private createDebugImpl(config?: TraceConfig, hash?: Buffer): IDebugImpl {
+  private createDebugImpl(reject: (reason?: any) => void, config?: TraceConfig, hash?: Buffer): IDebugImpl {
     if (config?.tracer) {
       if (tracers.has(config.tracer)) {
         config.tracer = tracers.get(config.tracer)!;
         config.toAsync = true;
       }
-      return new JSDebug(this.node, Object.assign({ ...config }, { tracer: config.toAsync === false ? `const obj = ${config.tracer}` : toAsync(`const obj = ${config.tracer}`) }));
+      return new JSDebug(this.node, reject, Object.assign({ ...config }, { tracer: config.toAsync === false ? `const obj = ${config.tracer}` : toAsync(`const obj = ${config.tracer}`) }));
     } else {
       return new StructLogDebug(config, hash);
     }
   }
 
-  async traceBlock(block: Block | Buffer, config?: TraceConfig, hash?: Buffer) {
+  traceBlock(block: Block | Buffer, config?: TraceConfig, hash?: Buffer) {
     block = block instanceof Block ? block : Block.fromRLPSerializedBlock(block, { common: this.node.common });
     if (block.header.number.eqn(0)) {
       throw new Error('invalid block number, 0');
     }
-    const parent = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
-    const wvm = await this.node.getWrappedVM(parent.header.stateRoot);
-    const debug = this.createDebugImpl(config, hash);
-    await wvm.runBlock({ block, debug });
-    const result = debug.result();
-    return util.types.isPromise(result) ? await result : result;
+    return new Promise<any>(async (resolve, reject) => {
+      try {
+        block = block as Block;
+        const parent = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
+        const wvm = await this.node.getWrappedVM(parent.header.stateRoot);
+        const debug = this.createDebugImpl(reject, config, hash);
+        await wvm.runBlock({ block, debug });
+        const result = debug.result();
+        resolve(util.types.isPromise(result) ? await result : result);
+      } catch (err) {
+        reject(err);
+      }
+    });
   }
 
   async traceBlockByHash(hash: Buffer, config?: TraceConfig) {
@@ -78,21 +85,27 @@ export class Tracer {
     if (block.header.number.eqn(0)) {
       throw new Error('invalid block number, 0');
     }
-    const parent = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
-    const wvm = await this.node.getWrappedVM(parent.header.stateRoot);
-    const debug = this.createDebugImpl(config);
-    await wvm.runCall({
-      block,
-      debug,
-      gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
-      origin: data.from ? Address.fromString(data.from) : Address.zero(),
-      caller: data.from ? Address.fromString(data.from) : Address.zero(),
-      gasLimit: data.gas ? hexStringToBN(data.gas) : undefined,
-      to: data.to ? Address.fromString(data.to) : undefined,
-      value: data.value ? hexStringToBN(data.value) : undefined,
-      data: data.data ? hexStringToBuffer(data.data) : undefined
+    return new Promise<any>(async (resolve, reject) => {
+      try {
+        const parent = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
+        const wvm = await this.node.getWrappedVM(parent.header.stateRoot);
+        const debug = this.createDebugImpl(reject, config);
+        await wvm.runCall({
+          block,
+          debug,
+          gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
+          origin: data.from ? Address.fromString(data.from) : Address.zero(),
+          caller: data.from ? Address.fromString(data.from) : Address.zero(),
+          gasLimit: data.gas ? hexStringToBN(data.gas) : undefined,
+          to: data.to ? Address.fromString(data.to) : undefined,
+          value: data.value ? hexStringToBN(data.value) : undefined,
+          data: data.data ? hexStringToBuffer(data.data) : undefined
+        });
+        const result = debug.result();
+        resolve(util.types.isPromise(result) ? await result : result);
+      } catch (err) {
+        reject(err);
+      }
     });
-    const result = debug.result();
-    return util.types.isPromise(result) ? await result : result;
   }
 }

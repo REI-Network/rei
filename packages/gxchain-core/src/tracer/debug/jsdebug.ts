@@ -2,16 +2,42 @@ import vm from 'vm';
 import bi, { BigInteger } from 'big-integer';
 import { StateManager } from '@ethereumjs/vm/dist/state';
 import { getPrecompile } from '@ethereumjs/vm/dist/evm/precompiles';
+import { OpcodeList, getOpcodesForHF } from '@ethereumjs/vm/dist/evm/opcodes';
 import { Address, BN, bufferToHex, setLengthLeft, generateAddress, generateAddress2, keccak256 } from 'ethereumjs-util';
 import { InterpreterStep, VmError } from '@gxchain2/vm';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
 import { IDebugImpl, TraceConfig } from '../tracer';
 import { Node } from '../../node';
 
+function opNameToNumber(opcodes: OpcodeList, name: string) {
+  if (name.indexOf('LOG') === 0) {
+    return Number(name.substr(3)) + 0xa0;
+  } else if (name.indexOf('PUSH') === 0) {
+    return Number(name.substr(4)) + 0x5f;
+  } else if (name.indexOf('DUP') === 0) {
+    return Number(name.substr(3)) + 0x7f;
+  } else if (name.indexOf('SWAP') === 0) {
+    return Number(name.substr(4)) + 0x8f;
+  }
+  for (const [code, opcode] of opcodes) {
+    if (code >= 0x60 && code <= 0xa4) {
+      continue;
+    }
+    if (opcode.name === name) {
+      return code;
+    }
+  }
+  throw new Error(`unknow opcode: ${name}`);
+}
+
 class Op {
   name: string;
-  constructor(name: string) {
+  constructor(opcodes: OpcodeList, name: string) {
     this.name = name;
+    this.toNumber = () => {
+      const res = opNameToNumber(opcodes, this.name);
+      return res;
+    };
   }
   isPush() {
     return this.name === 'PUSH';
@@ -19,10 +45,7 @@ class Op {
   toString() {
     return this.name;
   }
-  toNumber() {
-    logger.warn('JSDebug_Op::toNumber, unsupported api');
-    return 0;
-  }
+  toNumber: () => number;
 }
 
 class Memory {
@@ -111,7 +134,7 @@ function makeDB(stateManager: StateManager) {
   };
 }
 
-function makeLog(ctx: { [key: string]: any }, step: InterpreterStep, cost: BN, error?: string) {
+function makeLog(ctx: { [key: string]: any }, opcodes: OpcodeList, step: InterpreterStep, cost: BN, error?: string) {
   const stack = step.stack.map((bn) => bi(bn.toString()));
   Object.defineProperty(stack, 'peek', {
     value: (idx: number) => {
@@ -122,7 +145,7 @@ function makeLog(ctx: { [key: string]: any }, step: InterpreterStep, cost: BN, e
     }
   });
   return {
-    op: new Op(step.opcode.name),
+    op: new Op(opcodes, step.opcode.name),
     stack,
     memory: new Memory(step.memory),
     contract: new Contract(ctx['from'], ctx['to'], ctx['value'], ctx['input']),
@@ -202,16 +225,14 @@ export class JSDebug implements IDebugImpl {
     bigInt: bi
   };
   private vmContext: vm.Context;
+  private opcodes: OpcodeList;
 
   constructor(node: Node, config: TraceConfig) {
     this.node = node;
     this.config = config;
     this.vmContext = vm.createContext(this.vmContextObj, { codeGeneration: { strings: false, wasm: false } });
-    try {
-      new vm.Script(config.tracer!).runInContext(this.vmContext);
-    } catch (err) {
-      logger.warn('JSDebug::constructor, catch error:', err);
-    }
+    this.opcodes = getOpcodesForHF(this.node.common);
+    new vm.Script(config.tracer!).runInContext(this.vmContext);
   }
 
   async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, value: BN, number: BN, stateManager: StateManager) {
@@ -227,7 +248,7 @@ export class JSDebug implements IDebugImpl {
 
   private async captureLog(step: InterpreterStep, cost: BN, error?: string) {
     try {
-      this.vmContextObj.globalLog = makeLog(this.debugContext, step, cost, error);
+      this.vmContextObj.globalLog = makeLog(this.debugContext, this.opcodes, step, cost, error);
       const script = error ? new vm.Script('globalPromise = obj.fault.call(obj, globalLog, globalDB)') : new vm.Script('globalPromise = obj.step.call(obj, globalLog, globalDB)');
       script.runInContext(this.vmContext, { timeout: this.config.timeout ? Number(this.config.timeout) : undefined, breakOnSigint: true });
       if (this.vmContextObj.globalPromise) {

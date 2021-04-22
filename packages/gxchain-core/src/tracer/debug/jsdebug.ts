@@ -193,7 +193,7 @@ export class JSDebug implements IDebugImpl {
     },
     globalCtx: this.debugContext,
     glog(...args: any[]) {
-      logger.warn('JSDebug::glog,', ...args);
+      logger.detail('JSDebug::glog,', ...args);
     },
     bigInt: bi
   };

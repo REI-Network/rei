@@ -45,7 +45,7 @@ export function hexStringToBN(hex: string): BN {
 
 export const logger = tracer.colorConsole({
   format: '{{title}} [{{timestamp}}] {{message}}',
-  level: 'info',
+  level: 'detail',
   methods: ['detail', 'debug', 'info', 'warn', 'error', 'silent'],
   dateformat: 'mm-dd|HH:MM:ss.L',
   preprocess: (data) => {

@@ -1,26 +1,12 @@
 import vm from 'vm';
-import d from 'deasync';
 import bi, { BigInteger } from 'big-integer';
 import { StateManager } from '@ethereumjs/vm/dist/state';
 import { getPrecompile } from '@ethereumjs/vm/dist/evm/precompiles';
 import { Address, BN, bufferToHex, setLengthLeft, generateAddress, generateAddress2, keccak256 } from 'ethereumjs-util';
 import { InterpreterStep, VmError } from '@gxchain2/vm';
-import { createBufferFunctionalMap, hexStringToBuffer, logger } from '@gxchain2/utils';
+import { hexStringToBuffer, logger } from '@gxchain2/utils';
 import { IDebugImpl, TraceConfig } from '../tracer';
 import { Node } from '../../node';
-
-function deasync<T>(p: Promise<T>): T {
-  let result: undefined | T;
-  let error: any;
-  p.then((res) => (result = res)).catch((err) => (error = err));
-  d.loopWhile(() => {
-    return result === undefined && error === undefined;
-  });
-  if (error) {
-    throw error;
-  }
-  return result!;
-}
 
 class Op {
   name: string;
@@ -80,46 +66,43 @@ class Contract {
   }
 }
 
-function makeDB(codeCache: Map<Buffer, Buffer>, stateManager: StateManager) {
+function makeDB(stateManager: StateManager) {
   return {
-    getBalance(address: Buffer) {
+    async getBalance(address: Buffer) {
       try {
-        return bi(deasync(stateManager.getAccount(new Address(address))).balance.toString());
+        return bi((await stateManager.getAccount(new Address(address))).balance.toString());
       } catch (err) {
         logger.warn('JSDebug_DB::getBalance, catch error:', err);
         return bi(0);
       }
     },
-    getNonce(address: Buffer) {
+    async getNonce(address: Buffer) {
       try {
-        return deasync(stateManager.getAccount(new Address(address))).nonce.toNumber();
+        return (await stateManager.getAccount(new Address(address))).nonce.toNumber();
       } catch (err) {
         logger.warn('JSDebug_DB::getNonce, catch error:', err);
         return 0;
       }
     },
-    getCode(address: Buffer) {
+    async getCode(address: Buffer) {
       try {
-        if (codeCache.has(address)) {
-          return codeCache.get(address);
-        }
-        return deasync(stateManager.getContractCode(new Address(address)));
+        return await stateManager.getContractCode(new Address(address));
       } catch (err) {
         logger.warn('JSDebug_DB::getCode, catch error:', err);
         return Buffer.alloc(0);
       }
     },
-    getState(address: Buffer, hash: Buffer) {
+    async getState(address: Buffer, hash: Buffer) {
       try {
-        return deasync(stateManager.getContractStorage(new Address(address), hash));
+        return await stateManager.getContractStorage(new Address(address), hash);
       } catch (err) {
         logger.warn('JSDebug_DB::getState, catch error:', err);
         return Buffer.alloc(0);
       }
     },
-    exists(address: Buffer) {
+    async exists(address: Buffer) {
       try {
-        return deasync(stateManager.accountExists(new Address(address)));
+        return await stateManager.accountExists(new Address(address));
       } catch (err) {
         logger.warn('JSDebug_DB::exists, catch error:', err);
         return false;
@@ -183,9 +166,9 @@ export class JSDebug implements IDebugImpl {
     globalLog?: ReturnType<typeof makeLog>;
     globalDB?: ReturnType<typeof makeDB>;
     globalCtx: { [key: string]: any };
-    globalReturnValue?: any;
+    globalPromise?: Promise<any>;
     bigInt: typeof bi;
-    // glog: any;
+    glog: any;
   } = {
     toHex(buf: Buffer) {
       return bufferToHex(buf);
@@ -213,16 +196,12 @@ export class JSDebug implements IDebugImpl {
       return buf.slice(start, end);
     },
     globalCtx: this.debugContext,
-    bigInt: bi
-    // glog(...arg: any[]) {
-    //   console.log(...arg);
-    // }
+    bigInt: bi,
+    glog(...arg: any[]) {
+      console.log(...arg);
+    }
   };
   private vmContext: vm.Context;
-
-  // TODO: remove this two things.
-  private stateManager?: StateManager;
-  private codeCache = createBufferFunctionalMap<Buffer>();
 
   constructor(node: Node, config: TraceConfig) {
     this.node = node;
@@ -243,21 +222,24 @@ export class JSDebug implements IDebugImpl {
     this.debugContext['gas'] = gas.toNumber();
     this.debugContext['value'] = bi(value.toString());
     this.debugContext['block'] = number.toNumber();
-    this.vmContextObj.globalDB = makeDB(this.codeCache, stateManager);
-    this.stateManager = stateManager;
+    this.vmContextObj.globalDB = makeDB(stateManager);
   }
 
-  private captureLog(step: InterpreterStep, cost: BN, error?: string) {
+  private async captureLog(step: InterpreterStep, cost: BN, error?: string) {
     try {
       this.vmContextObj.globalLog = makeLog(this.debugContext, step, cost, error);
-      error ? new vm.Script('obj.fault.call(obj, globalLog, globalDB)').runInContext(this.vmContext) : new vm.Script('obj.step.call(obj, globalLog, globalDB)').runInContext(this.vmContext);
+      error ? new vm.Script('globalPromise = obj.fault.call(obj, globalLog, globalDB)').runInContext(this.vmContext) : new vm.Script('globalPromise = obj.step.call(obj, globalLog, globalDB)').runInContext(this.vmContext);
+      if (this.vmContextObj.globalPromise) {
+        await this.vmContextObj.globalPromise;
+        this.vmContextObj.globalPromise = undefined;
+      }
     } catch (err) {
       logger.warn('JSDebug::captureLog, catch error:', err);
     }
   }
 
   async captureState(step: InterpreterStep, cost: BN) {
-    this.captureLog(step, cost);
+    await this.captureLog(step, cost);
   }
 
   async captureFault(step: InterpreterStep, cost: BN, err: any) {
@@ -271,22 +253,23 @@ export class JSDebug implements IDebugImpl {
     } else {
       errString = 'unkonw error';
     }
-    this.captureLog(step, cost, errString);
+    await this.captureLog(step, cost, errString);
   }
 
   async captureEnd(output: Buffer, gasUsed: BN, time: number) {
     this.debugContext['output'] = output;
     this.debugContext['gasUsed'] = gasUsed.toNumber();
     this.debugContext['time'] = time;
-    const to = this.debugContext['to'];
-    const code = await this.stateManager!.getContractCode(new Address(to));
-    this.codeCache.set(to, code);
   }
 
-  result() {
+  async result() {
     try {
-      new vm.Script('globalReturnValue = obj.result.call(obj, globalCtx, globalDB)').runInContext(this.vmContext);
-      return this.vmContextObj.globalReturnValue;
+      new vm.Script('globalPromise = obj.result.call(obj, globalCtx, globalDB)').runInContext(this.vmContext);
+      if (this.vmContextObj.globalPromise) {
+        const result = await this.vmContextObj.globalPromise;
+        this.vmContextObj.globalPromise = undefined;
+        return result;
+      }
     } catch (err) {
       logger.warn('JSDebug::result, catch error:', err);
     }

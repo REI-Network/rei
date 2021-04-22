@@ -1,3 +1,4 @@
+import util from 'util';
 import { Block } from '@gxchain2/block';
 import { IDebug } from '@gxchain2/vm';
 import { hexStringToBN, hexStringToBuffer } from '@gxchain2/utils';
@@ -44,7 +45,8 @@ export class Tracer {
     const wvm = await this.node.getWrappedVM(parent.header.stateRoot);
     const debug = this.createDebugImpl(config, hash);
     await wvm.runBlock({ block, debug });
-    return debug.result();
+    const result = debug.result();
+    return util.types.isPromise(result) ? await result : result;
   }
 
   async traceBlockByHash(hash: Buffer, config?: TraceConfig) {
@@ -85,6 +87,7 @@ export class Tracer {
       value: data.value ? hexStringToBN(data.value) : undefined,
       data: data.data ? hexStringToBuffer(data.data) : undefined
     });
-    return debug.result();
+    const result = debug.result();
+    return util.types.isPromise(result) ? await result : result;
   }
 }

@@ -167,7 +167,7 @@ export class JSDebug implements IDebugImpl {
     globalDB?: ReturnType<typeof makeDB>;
     globalCtx: { [key: string]: any };
     globalPromise?: Promise<any>;
-    glog(...arg: any[]): void;
+    glog(...args: any[]): void;
     bigInt: typeof bi;
   } = {
     toHex(buf: Buffer) {
@@ -196,8 +196,8 @@ export class JSDebug implements IDebugImpl {
       return buf.slice(start, end);
     },
     globalCtx: this.debugContext,
-    glog(...arg: any[]) {
-      console.log(...arg);
+    glog(...args: any[]) {
+      logger.detail('JSDebug::glog,', ...args);
     },
     bigInt: bi
   };

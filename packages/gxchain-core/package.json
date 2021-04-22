@@ -33,6 +33,7 @@
         "multiaddr": "^8.1.1",
         "peer-id": "^0.14.2",
         "prompts": "^2.4.0",
+        "recast": "^0.20.4",
         "semaphore-async-await": "^1.5.1"
     }
 }

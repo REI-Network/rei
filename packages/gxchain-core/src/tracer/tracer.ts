@@ -4,6 +4,7 @@ import { hexStringToBN, hexStringToBuffer } from '@gxchain2/utils';
 import { Address } from 'ethereumjs-util';
 import { Node } from '../node';
 import { StructLogDebug, JSDebug } from './debug';
+import { toAsync } from './toasync';
 
 export interface IDebugImpl extends IDebug {
   result(): any;
@@ -15,6 +16,8 @@ export interface TraceConfig {
   disableStack?: boolean;
   tracer?: string;
   timeout?: string;
+  // Use ast to convert synchronous functions to asynchronous, default `true`.
+  toAsync?: boolean;
 }
 
 export class Tracer {
@@ -25,7 +28,11 @@ export class Tracer {
   }
 
   private createDebugImpl(config?: TraceConfig, hash?: Buffer): IDebugImpl {
-    return config?.tracer ? new JSDebug(this.node, config.tracer) : new StructLogDebug(config, hash);
+    if (config?.tracer) {
+      return new JSDebug(this.node, Object.assign({ ...config }, { tracer: config.toAsync === false ? `const obj = ${config.tracer}` : toAsync(`const obj = ${config.tracer}`) }));
+    } else {
+      return new StructLogDebug(config, hash);
+    }
   }
 
   async traceBlock(block: Block | Buffer, config?: TraceConfig, hash?: Buffer) {

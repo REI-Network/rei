@@ -6,7 +6,7 @@ import { getPrecompile } from '@ethereumjs/vm/dist/evm/precompiles';
 import { Address, BN, bufferToHex, setLengthLeft, generateAddress, generateAddress2, keccak256 } from 'ethereumjs-util';
 import { InterpreterStep, VmError } from '@gxchain2/vm';
 import { createBufferFunctionalMap, hexStringToBuffer, logger } from '@gxchain2/utils';
-import { IDebugImpl } from '../tracer';
+import { IDebugImpl, TraceConfig } from '../tracer';
 import { Node } from '../../node';
 
 function deasync<T>(p: Promise<T>): T {
@@ -16,9 +16,6 @@ function deasync<T>(p: Promise<T>): T {
   d.loopWhile(() => {
     return result === undefined && error === undefined;
   });
-  // while (result === undefined && error === undefined) {
-  //   d.sleep(10);
-  // }
   if (error) {
     throw error;
   }
@@ -171,6 +168,7 @@ function makeLog(ctx: { [key: string]: any }, step: InterpreterStep, cost: BN, e
 export class JSDebug implements IDebugImpl {
   hash: Buffer | undefined;
   private node: Node;
+  private config: TraceConfig;
   private debugContext: {
     [key: string]: any;
   } = {};
@@ -226,11 +224,12 @@ export class JSDebug implements IDebugImpl {
   private stateManager?: StateManager;
   private codeCache = createBufferFunctionalMap<Buffer>();
 
-  constructor(node: Node, code: string) {
+  constructor(node: Node, config: TraceConfig) {
     this.node = node;
+    this.config = config;
     this.vmContext = vm.createContext(this.vmContextObj, { codeGeneration: { strings: false, wasm: false } });
     try {
-      new vm.Script(`const obj = ${code}`).runInContext(this.vmContext);
+      new vm.Script(config.tracer!).runInContext(this.vmContext);
     } catch (err) {
       logger.warn('JSDebug::constructor, catch error:', err);
     }

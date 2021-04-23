@@ -78,6 +78,9 @@ export class Fetcher extends EventEmitter {
     }
 
     for (const { start, count } of headerTaskQueue) {
+      if (this.abortFlag) {
+        return;
+      }
       const peer = this.node.peerpool.getPeer(peerId);
       if (!peer) {
         this.stopFetch();

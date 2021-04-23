@@ -1,10 +1,9 @@
-import Semaphore from 'semaphore-async-await';
 import { constants } from '@gxchain2/common';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 import { Block, BlockHeader } from '@gxchain2/block';
 import { Synchronizer, SynchronizerOptions } from './sync';
 import { Fetcher } from './fetcher';
-import { AsyncChannel, logger } from '@gxchain2/utils';
+import { logger } from '@gxchain2/utils';
 
 export interface FullSynchronizerOptions extends SynchronizerOptions {
   limit?: number;
@@ -20,7 +19,6 @@ export class FullSynchronizer extends Synchronizer {
   private bestHeight?: number;
   private syncingPromise?: Promise<boolean>;
   private abortFetcher?: () => void;
-  private lock = new Semaphore(1);
 
   constructor(options: FullSynchronizerOptions) {
     super(options);
@@ -44,15 +42,6 @@ export class FullSynchronizer extends Synchronizer {
     // TODO: validata block.
     if (!this.isSyncing) {
       this.sync({ peer, height });
-    } else if (this.bestPeer && this.bestHeight !== undefined && height > this.bestHeight) {
-      await this.lock.acquire();
-      if (!this.isSyncing) {
-        this.sync({ peer, height });
-      } else if (this.bestPeer && this.bestHeight !== undefined && height > this.bestHeight) {
-        await this.syncAbort();
-        this.sync({ peer, height });
-      }
-      this.lock.release();
     }
   }
 
@@ -174,12 +163,14 @@ export class FullSynchronizer extends Synchronizer {
     let syncAbort = false;
     let success = false;
     const fetcher = new Fetcher({ node: this.node, limitCount: this.count });
-    this.abortFetcher = () => {
-      syncAbort = true;
-      fetcher.abort();
-    };
     await Promise.all([
       new Promise<void>((resolve) => {
+        this.abortFetcher = () => {
+          syncAbort = true;
+          resolve();
+          fetcher.abort();
+          fetcher.removeAllListeners();
+        };
         fetcher.on('newBlock', (block: Block) => {
           if (syncAbort) {
             return;

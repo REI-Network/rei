@@ -5,10 +5,10 @@ import { Wallet, Accountinfo, urlcompare } from './accounts';
 import { AccountCache } from './accountcache';
 import { Transaction } from '@ethereumjs/tx';
 import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
-import { Accounts } from 'web3-eth-accounts';
 import { KeystoreWallet } from './wallet';
 import path from 'path';
 
+const Accounts = require('web3-eth-accounts');
 const web3accounts = new Accounts();
 
 export class KeyStore {

@@ -1,5 +1,4 @@
 import { Address } from 'ethereumjs-util';
-import { Accounts } from 'web3-eth-accounts';
 import { Accountinfo, urlcompare } from './accounts';
 import path from 'path';
 import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';

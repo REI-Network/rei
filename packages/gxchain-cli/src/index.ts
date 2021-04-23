@@ -6,6 +6,7 @@ import commander, { program } from 'commander';
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
 import { setLevel, logger } from '@gxchain2/utils';
+import * as accountcmd from './accountcmd';
 
 program.version('0.0.1');
 program.option('--rpc', 'open rpc server');
@@ -33,6 +34,7 @@ program
 
 const account = new commander.Command('account');
 program.addCommand(account);
+
 account
   .description('Manage accounts')
   .command('list')
@@ -44,8 +46,9 @@ account
 account
   .command('new')
   .description('New a account')
-  .action(() => {
-    console.log('new');
+  .option('--password <string>', 'wuhu', 'eee')
+  .action((options) => {
+    accountcmd.accountCreate(options.opts().password);
   });
 
 account

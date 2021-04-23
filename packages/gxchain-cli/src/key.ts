@@ -1,5 +1,4 @@
-import Web3EthAccounts from 'web3-eth-accounts';
-import { Address, bufferToHex, BN } from 'ethereumjs-util';
+import { Address } from 'ethereumjs-util';
 import { Account } from 'web3-core';
 
 export interface keyStore {

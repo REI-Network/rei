@@ -1,22 +1,23 @@
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
-import { Accounts } from 'web3-eth-accounts';
 import fs from 'fs';
 import path from 'path';
 import { fileSync } from 'tmp';
+import { keyStore } from './key';
 
+const Accounts = require('web3-eth-accounts');
 const web3accounts = new Accounts();
 
-export class keyStorePassphrase {
+export class KeyStorePassphrase {
   keyDirPath: string;
   constructor(keydir: string) {
     this.keyDirPath = keydir;
   }
 
-  getKey(addr: Address, filename: string, auth: string) {
+  getkey(addr: Address, filename: string, auth: string) {
     const keybuffer = fs.readFileSync(filename);
     const keyjson = JSON.parse(keybuffer.toString());
     const key = web3accounts.decrypt(keyjson, auth);
-    if (key.address != addr.toString()) {
+    if (key.address.toLowerCase() != addr.toString()) {
       throw new Error('key content mismatch');
     }
     return key;
@@ -29,11 +30,11 @@ export class keyStorePassphrase {
     return path.join(this.keyDirPath, filename);
   }
 
-  storeKey(filename: string, key: any, auth: string) {
+  storekey(filename: string, key: any, auth: string) {
     const keyjson = web3accounts.encrypt(key.privateKey, auth);
     const tmpname = this.writeTemporaryKeyFile(filename, Buffer.from(JSON.stringify(keyjson)));
     try {
-      this.getKey(Address.fromString(key.address), filename, auth);
+      this.getkey(Address.fromString(key.address), tmpname, auth);
     } catch (err) {
       console.log('can not store the key ');
       return;
@@ -43,8 +44,8 @@ export class keyStorePassphrase {
 
   private writeTemporaryKeyFile(file: string, content: Buffer): string {
     fs.mkdirSync(path.dirname(file), { mode: 0o700, recursive: true });
-    const tmpfile = fileSync({ tmpdir: path.dirname(file), name: '.' + path.basename(file) + '.tmp', keep: false });
-    fs.writeFileSync(tmpfile.name, content);
+    const tmpfile = fileSync({ tmpdir: path.dirname(file), name: path.basename(file) + '.tmp', keep: false });
+    fs.writeFileSync(tmpfile.name, content, { mode: 0o700, flag: 'a' });
     return tmpfile.name;
   }
 }

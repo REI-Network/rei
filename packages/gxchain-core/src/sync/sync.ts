@@ -90,7 +90,7 @@ export class Synchronizer extends EventEmitter {
     throw new Error('Unimplemented');
   }
 
-  async announce(peer: Peer, height: number) {
+  announce(peer: Peer, height: number) {
     throw new Error('Unimplemented');
   }
 

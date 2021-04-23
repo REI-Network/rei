@@ -38,9 +38,8 @@ export class FullSynchronizer extends Synchronizer {
    * @param peer - the syncing peer
    * @param height - the height of block
    */
-  async announce(peer: Peer, height: number) {
-    // TODO: validata block.
-    if (!this.isSyncing) {
+  announce(peer: Peer, height: number) {
+    if (!this.isSyncing && this.node.blockchain.latestHeight < height) {
       this.sync({ peer, height });
     }
   }

@@ -1,19 +1,25 @@
 import { AsyncHeapChannel, PriorityQueue, getRandomIntInclusive, AsyncChannel, logger } from '@gxchain2/utils';
 import { BlockHeader, Block } from '@gxchain2/block';
 import { Node } from '../../node';
-import { Peer } from '@gxchain2/network';
+import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 import { GXC2_ETHWIRE } from '@gxchain2/common/dist/constants';
 import { EventEmitter } from 'events';
 
 export interface FetcherOptions {
   node: Node;
-  limitCount: number;
+  count: number;
+  limit: number;
+  banPeer: (peer: Peer, reason: 'invalid' | 'timeout' | 'error') => void;
 }
 
 export class Fetcher extends EventEmitter {
   private abortFlag: boolean = false;
   private node: Node;
-  private limitCount: number;
+  private count: number;
+  private limit: number;
+  private banPeer: (peer: Peer, reason: 'invalid' | 'timeout' | 'error') => void;
+  private parallel: number = 0;
+  private parallelResolve?: () => void;
   private localHeight!: number;
   private bestHeight!: number;
   private headerTaskOver = false;
@@ -28,7 +34,9 @@ export class Fetcher extends EventEmitter {
   constructor(options: FetcherOptions) {
     super();
     this.node = options.node;
-    this.limitCount = options.limitCount;
+    this.count = options.count;
+    this.limit = options.limit;
+    this.banPeer = options.banPeer;
     this.priorityQueue.on('result', (block) => {
       if (!this.abortFlag) {
         this.emit('newBlock', block);
@@ -70,11 +78,11 @@ export class Fetcher extends EventEmitter {
     const headerTaskQueue: { start: number; count: number }[] = [];
     while (count > 0) {
       headerTaskQueue.push({
-        start: i * this.limitCount + start + 1,
-        count: count > this.limitCount ? this.limitCount : count
+        start: i * this.count + start + 1,
+        count: count > this.count ? this.count : count
       });
       i++;
-      count -= this.limitCount;
+      count -= this.count;
     }
 
     for (const { start, count } of headerTaskQueue) {
@@ -91,12 +99,14 @@ export class Fetcher extends EventEmitter {
         if (headers.length !== count) {
           logger.warn('Fetcher::downloadHeader, invalid header(length)');
           this.stopFetch();
+          this.banPeer(peer, 'invalid');
           return;
         }
         for (let index = 1; i < headers.length; i++) {
           if (!headers[index - 1].hash().equals(headers[index].parentHash)) {
             logger.warn('Fetcher::downloadHeader, invalid header(parentHash)');
             this.stopFetch();
+            this.banPeer(peer, 'invalid');
             return;
           }
         }
@@ -106,6 +116,7 @@ export class Fetcher extends EventEmitter {
       } catch (err) {
         logger.error('Fetcher::downloadHeader, catch error:', err);
         this.stopFetch();
+        this.banPeer(peer, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
         return;
       }
     }
@@ -127,7 +138,7 @@ export class Fetcher extends EventEmitter {
     let headersCache: BlockHeader[] = [];
     for await (const header of this.downloadBodiesQueue.generator()) {
       headersCache.push(header);
-      if (!this.headerTaskOver && headersCache.length < this.limitCount) {
+      if (!this.headerTaskOver && headersCache.length < this.count) {
         continue;
       }
       const headers = [...headersCache];
@@ -158,14 +169,20 @@ export class Fetcher extends EventEmitter {
             this.downloadBodiesQueue.push(header);
           }
         }
-        this.node.peerpool.ban(peer!);
       };
+      this.parallel++;
       peer
         .getBlockBodies(headers)
         .then(async (bodies) => {
-          peer!.bodiesIdle = true;
+          this.parallel--;
+          if (this.parallelResolve) {
+            this.parallelResolve();
+            this.parallelResolve = undefined;
+          }
+
           if (bodies.length !== headers.length) {
             logger.warn('Fetcher::downloadBodiesLoop, invalid bodies(length)');
+            this.banPeer(peer!, 'invalid');
             return retry();
           }
           const blocks: Block[] = [];
@@ -178,6 +195,7 @@ export class Fetcher extends EventEmitter {
               blocks.push(block);
             } catch (err) {
               logger.warn('Fetcher::downloadBodiesLoop, invalid bodies(validateData)');
+              this.banPeer(peer!, 'invalid');
               return retry();
             }
           }
@@ -186,12 +204,19 @@ export class Fetcher extends EventEmitter {
               this.priorityQueue.insert(block, block.header.number.toNumber() - this.localHeight - 1);
             }
           }
+          peer!.bodiesIdle = true;
         })
         .catch((err) => {
           peer!.bodiesIdle = true;
           logger.error('Fetcher::downloadBodiesLoop, download failed error:', err);
+          this.banPeer(peer!, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
           return retry();
         });
+      if (this.parallel >= this.limit) {
+        await new Promise<void>((resolve) => {
+          this.parallelResolve = resolve;
+        });
+      }
     }
   }
 }

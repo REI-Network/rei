@@ -10,11 +10,15 @@ export interface FullSynchronizerOptions extends SynchronizerOptions {
   count?: number;
   timeoutBanTime?: number;
   errorBanTime?: number;
+  invalidBanTime?: number;
 }
 
 export class FullSynchronizer extends Synchronizer {
-  private readonly options: FullSynchronizerOptions;
   private readonly count: number;
+  private readonly limit: number;
+  private readonly timeoutBanTime: number;
+  private readonly errorBanTime: number;
+  private readonly invalidBanTime: number;
   private bestPeer?: Peer;
   private bestHeight?: number;
   private syncingPromise?: Promise<boolean>;
@@ -22,8 +26,11 @@ export class FullSynchronizer extends Synchronizer {
 
   constructor(options: FullSynchronizerOptions) {
     super(options);
-    this.options = options;
-    this.count = this.options.count || 128;
+    this.count = options.count || 128;
+    this.limit = options.limit || 16;
+    this.timeoutBanTime = options.timeoutBanTime || 300000;
+    this.errorBanTime = options.timeoutBanTime || 60000;
+    this.invalidBanTime = options.invalidBanTime || 600000;
   }
 
   /**
@@ -116,6 +123,17 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
+  // TODO: this method should be removed.
+  banPeer(peer: Peer, reason: 'invalid' | 'timeout' | 'error') {
+    if (reason === 'invalid') {
+      this.node.peerpool.ban(peer, this.invalidBanTime);
+    } else if (reason === 'error') {
+      this.node.peerpool.ban(peer, this.errorBanTime);
+    } else {
+      this.node.peerpool.ban(peer, this.timeoutBanTime);
+    }
+  }
+
   // TODO: binary search and rollback lock.
   private async findAncient(peer: Peer): Promise<number> {
     let latestHeight = this.node.blockchain.latestHeight;
@@ -130,11 +148,7 @@ export class FullSynchronizer extends Synchronizer {
       try {
         headers = await peer.getBlockHeaders(latestHeight, this.count);
       } catch (err) {
-        if (err instanceof PeerRequestTimeoutError) {
-          this.node.peerpool.ban(peer, this.options.timeoutBanTime || 300000);
-        } else {
-          this.node.peerpool.ban(peer, this.options.errorBanTime || 60000);
-        }
+        this.banPeer(peer, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
         throw err;
       }
 
@@ -161,7 +175,7 @@ export class FullSynchronizer extends Synchronizer {
 
     let syncAbort = false;
     let success = false;
-    const fetcher = new Fetcher({ node: this.node, limitCount: this.count });
+    const fetcher = new Fetcher({ node: this.node, count: this.count, limit: this.limit!, banPeer: this.banPeer.bind(this) });
     await Promise.all([
       new Promise<void>((resolve) => {
         this.abortFetcher = () => {

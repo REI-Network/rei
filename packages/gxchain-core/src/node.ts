@@ -312,7 +312,7 @@ export class Node {
         await this.db.batch([DBSaveReceipts(result.receipts, block.hash(), block.header.number)]);
         resolve(block);
       } catch (err) {
-        console.error('Node::processLoop, process block error:', err);
+        logger.error('Node::processLoop, process block error:', err);
         reject(err);
       }
     }

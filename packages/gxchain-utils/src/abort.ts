@@ -1,3 +1,5 @@
+export class AbortError extends Error {}
+
 export class Aborter {
   private _reason: any;
   private _abort: boolean = true;
@@ -24,22 +26,17 @@ export class Aborter {
   async abortablePromise<T>(p: Promise<T>, throwAbortError: boolean): Promise<T | undefined>;
   async abortablePromise<T>(p: Promise<T>, throwAbortError: boolean = false): Promise<T | undefined> {
     if (this._abort) {
-      return Promise.reject(this._reason);
+      if (throwAbortError) {
+        return Promise.reject(this._reason);
+      } else {
+        return Promise.resolve(undefined);
+      }
     }
-    let promiseResolve!: () => void;
-    const promise = new Promise<void>((resolve) => {
-      promiseResolve = resolve;
-    });
-    this._waitingPromises.push(promise);
     try {
       const result = (await Promise.race([this._abortPromise, p])) as T;
-      promiseResolve();
-      this._waitingPromises.splice(this._waitingPromises.indexOf(promise), 1);
       return result;
     } catch (err) {
-      promiseResolve();
-      this._waitingPromises.splice(this._waitingPromises.indexOf(promise), 1);
-      if (!this.isAborted) {
+      if (!(err instanceof AbortError)) {
         throw err;
       } else if (throwAbortError) {
         throw err;
@@ -47,8 +44,25 @@ export class Aborter {
     }
   }
 
-  async abort(reason?: any) {
+  addWaitingPromise<T>(p: Promise<T>) {
+    const promise = p.then(
+      () => {
+        this._waitingPromises.splice(this._waitingPromises.indexOf(promise), 1);
+      },
+      () => {
+        this._waitingPromises.splice(this._waitingPromises.indexOf(promise), 1);
+      }
+    );
+    this._waitingPromises.push(promise);
+  }
+
+  async abort(reason?: string | AbortError) {
     if (!this._abort) {
+      if (reason === undefined) {
+        reason = new AbortError();
+      } else if (typeof reason === 'string') {
+        reason = new AbortError(reason);
+      }
       this._reason = reason;
       this._abort = true;
       if (this._waitingPromises.length > 0) {

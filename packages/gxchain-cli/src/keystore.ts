@@ -7,6 +7,7 @@ import { Transaction } from '@ethereumjs/tx';
 import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
 import { KeystoreWallet } from './wallet';
 import path from 'path';
+import { KeyStorePassphrase } from './passphrase';
 
 const Accounts = require('web3-eth-accounts');
 const web3accounts = new Accounts();
@@ -21,7 +22,7 @@ export class KeyStore {
     this.storage = ks;
     this.unlocked = createBufferFunctionalMap<Account>();
     this.cache = new AccountCache(keydir);
-    let accs = this.cache.accounts;
+    let accs = this.cache.accounts();
     this.wallets = [];
     for (let i = 0; i < accs.length; i++) {
       this.wallets.push(new KeystoreWallet(accs[i], this));
@@ -121,4 +122,13 @@ export class KeyStore {
     }
     this.unlocked.set(a.address.toBuffer(), key);
   }
+}
+
+export function newKeyStore(keydir: string) {
+  if (!path.isAbsolute(keydir)) {
+    keydir = path.join(process.cwd(), keydir);
+  }
+  const keypassphrase = new KeyStorePassphrase(keydir);
+  const ks = new KeyStore(keydir, keypassphrase);
+  return ks;
 }

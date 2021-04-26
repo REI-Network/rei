@@ -16,4 +16,6 @@ export function accountCreate(password: string) {
   console.log("- You must REMEMBER your password! Without the password, it's impossible to decrypt the key!");
 }
 
-//export function accountUpdate(oldpassword: string, newpassword) {}
+export function accountUpdate(oldpassword: string, newpassword) {}
+
+export function accountList() {}

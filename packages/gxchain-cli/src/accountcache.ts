@@ -1,14 +1,19 @@
 import { Address } from 'ethereumjs-util';
 import { Accountinfo, urlcompare } from './accounts';
+import fs from 'fs';
 import path from 'path';
 import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
+import { FileCache } from './filecache';
+
 export class AccountCache {
   keydir: string;
   //   watcher:watcher;
   byAddr: FunctionalMap<Buffer, Accountinfo[]> = createBufferFunctionalMap<Accountinfo[]>();
-  private all: Accountinfo[] = [];
+  all: Accountinfo[] = [];
+  fileC: FileCache;
   constructor(keydir: string) {
     this.keydir = keydir;
+    this.fileC = new FileCache();
   }
 
   accounts(): Accountinfo[] {
@@ -51,7 +56,7 @@ export class AccountCache {
     for (const account of slice) {
       if (account == elem) {
         const index = slice.indexOf(account);
-        slice = slice.slice(0, index).concat(this.all.slice(index + 1));
+        slice = slice.slice(0, index).concat(slice.slice(index + 1));
         return slice;
       }
     }
@@ -66,6 +71,28 @@ export class AccountCache {
       if (ba.length == 0) {
         this.byAddr.delete(removed.address.toBuffer());
       } else {
+        instance = ba;
+      }
+    }
+  }
+
+  deleteByFile(path: string) {
+    let index = 0;
+    for (let i = 0; i < this.all.length; i++) {
+      if (this.all[i].url.Path >= path) {
+        index = i;
+        break;
+      }
+    }
+
+    if (index < this.all.length && this.all[index].url.Path == path) {
+      const removed = this.all[index];
+      this.all = this.all.slice(0, index).concat(this.all.slice(index + 1));
+      let ba = this.removeAccount(this.byAddr.get(removed.address.toBuffer())!, removed);
+      if (ba.length == 0) {
+        this.byAddr.delete(removed.address.toBuffer());
+      } else {
+        let instance = this.byAddr.get(removed.address.toBuffer())!;
         instance = ba;
       }
     }
@@ -101,5 +128,39 @@ export class AccountCache {
       default:
         return;
     }
+  }
+
+  scanAccounts() {
+    const result = this.fileC.scan(this.keydir);
+    if (!result) {
+      return;
+    }
+    const [creates, deletes, updates] = result;
+
+    if (creates.length == 0 && deletes.length == 0 && updates.length == 0) {
+      return;
+    }
+
+    for (const fi of creates) {
+      const a = this.readAccount(fi);
+      if (a) {
+        this.add(a);
+      }
+    }
+
+    for (const fi of deletes) {
+    }
+  }
+
+  private readAccount(path: string) {
+    const keybuffer = fs.readFileSync(path);
+    if (!keybuffer) {
+      return;
+    }
+    const keyjson = JSON.parse(keybuffer.toString());
+    const addrstring = keyjson.address;
+    const addr = Address.fromString(addrstring);
+    const account: Accountinfo = { address: addr, url: { Path: path, Scheme: 'keystore' } };
+    return account;
   }
 }

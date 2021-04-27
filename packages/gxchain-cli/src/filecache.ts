@@ -22,7 +22,7 @@ export class FileCache {
     for (const fi of files) {
       let pathtmp = path.join(keydir, fi);
       all.push(pathtmp);
-      const modified = fs.statSync(fi).mtime.getTime();
+      const modified = fs.statSync(pathtmp).mtime.getTime();
       if (modified > this.lastMod) {
         mods.push(pathtmp);
       }

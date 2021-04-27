@@ -17,6 +17,7 @@ export class AccountCache {
   }
 
   accounts(): Accountinfo[] {
+    this.scanAccounts();
     const cpy: Accountinfo[] = [];
     for (const account of this.all) {
       cpy.push(account);
@@ -25,6 +26,7 @@ export class AccountCache {
   }
 
   hasAddress(addr: Address): boolean {
+    this.scanAccounts();
     const instance = this.byAddr.get(addr.toBuffer());
     if (instance) {
       return instance.length > 0;
@@ -149,6 +151,13 @@ export class AccountCache {
     }
 
     for (const fi of deletes) {
+      this.deleteByFile(fi);
+    }
+
+    for (const fi of updates) {
+      this.deleteByFile(fi);
+      const a = this.readAccount(fi)!;
+      this.add(a);
     }
   }
 
@@ -159,7 +168,7 @@ export class AccountCache {
     }
     const keyjson = JSON.parse(keybuffer.toString());
     const addrstring = keyjson.address;
-    const addr = Address.fromString(addrstring);
+    const addr = Address.fromString('0x' + addrstring);
     const account: Accountinfo = { address: addr, url: { Path: path, Scheme: 'keystore' } };
     return account;
   }

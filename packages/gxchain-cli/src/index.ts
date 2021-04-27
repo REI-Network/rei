@@ -7,6 +7,7 @@ import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
 import { setLevel, logger } from '@gxchain2/utils';
 import * as accountcmd from './accountcmd';
+import inquirer from 'inquirer';
 
 program.version('0.0.1');
 program.option('--rpc', 'open rpc server');
@@ -40,13 +41,13 @@ account
   .command('list')
   .description('List all the accounts')
   .action((options) => {
-    console.log('list');
+    accountcmd.accountList();
   });
 
 account
   .command('new')
   .description('New a account')
-  .option('--password <string>', 'wuhu', 'eee')
+  .option('--password <string>')
   .action((options) => {
     accountcmd.accountCreate(options.opts().password);
   });
@@ -54,15 +55,87 @@ account
 account
   .command('update')
   .description('Update the account')
-  .action(() => {
-    console.log('update');
+  .option('--address <string>')
+  .action((options) => {
+    if (!options.opts().address) {
+      console.error('You must input a address');
+    }
+    inquirer
+      .prompt([
+        {
+          type: 'password',
+          name: 'password',
+          message: 'Password:'
+        }
+      ])
+      .then((answner1) => {
+        const a = accountcmd.accountUnlock(options.opts().address, answner1.password);
+        if (!a) {
+          console.error('No account or key is not match');
+          return;
+        }
+        console.log('Please give a new password. Do not forget this password.');
+        inquirer
+          .prompt([
+            {
+              type: 'password',
+              name: 'newpassword',
+              message: 'NewPassword:'
+            }
+          ])
+          .then((answner2) => {
+            inquirer
+              .prompt([
+                {
+                  type: 'password',
+                  name: 'repassword',
+                  message: 'Repeat password:'
+                }
+              ])
+              .then((answner3) => {
+                if (answner2.newpassword !== answner3.repassword) {
+                  console.log('You must input the same password!');
+                  return;
+                }
+                accountcmd.accountUpdate(a, answner1.password, answner2.newpassword);
+              });
+          });
+      });
   });
 
 account
   .command('import')
-  .description('Import a account')
-  .action(() => {
-    console.log('import');
+  .description('Import a account from privatekey')
+  .option('--prekeydir <string>')
+  .action((options) => {
+    const key = fs.readFileSync(options.prekeydir);
+    console.log('Your new account is locked with a password. Please give a password. Do not forget this password..');
+    inquirer
+      .prompt([
+        {
+          type: 'password',
+          name: 'password',
+          message: 'Password:'
+        }
+      ])
+      .then((answer1) => {
+        inquirer
+          .prompt([
+            {
+              type: 'password',
+              name: 'password',
+              message: 'Repeat password:'
+            }
+          ])
+          .then((answer2) => {
+            if (answer1.password !== answer2.password) {
+              console.log('You must input the same password!');
+              return;
+            }
+            const a = accountcmd.accoumtImport(key.toString(), answer1.password);
+            console.log('Address : ', a);
+          });
+      });
   });
 program.parse(process.argv);
 

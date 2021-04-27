@@ -116,7 +116,7 @@ export class KeyStore {
 
   unlock(a: Accountinfo, passphrase: string) {
     const [account, key] = this.getDecryptedKey(a, passphrase);
-    const cache = this.unlocked.get(Buffer.from(account.address));
+    const cache = this.unlocked.get(account.address.toBuffer());
     if (cache && !account) {
       return;
     }

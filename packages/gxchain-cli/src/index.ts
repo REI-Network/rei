@@ -47,9 +47,10 @@ account
 account
   .command('new')
   .description('New a account')
-  .option('--password <string>')
+  .option('--passwordfile <string>')
   .action((options) => {
-    accountcmd.accountCreate(options.opts().password);
+    const password = fs.readFileSync(options.passwordfile);
+    accountcmd.accountCreate(password.toString());
   });
 
 account
@@ -105,8 +106,8 @@ account
 
 account
   .command('import')
-  .description('Import a account from privatekey')
-  .option('--prekeydir <string>')
+  .description('Import a account from privatekey file')
+  .option('--prekeyfile <string>')
   .action((options) => {
     const key = fs.readFileSync(options.prekeydir);
     console.log('Your new account is locked with a password. Please give a password. Do not forget this password..');

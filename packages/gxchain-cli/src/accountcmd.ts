@@ -28,7 +28,7 @@ export function accountUpdate(addr: Accountinfo, oldpassword: string, newpasswor
 export function accountList() {
   const accounts = store.cache.accounts();
   for (let i = 0; i < accounts.length; i++) {
-    console.log('Account #', i, ':', accounts[i].address.toString(), accounts[i].url.Scheme, ':', accounts[i].url.Path);
+    console.log('Account #', i, ': {', accounts[i].address.toString(), '}', accounts[i].url.Scheme, ':', accounts[i].url.Path);
   }
 }
 

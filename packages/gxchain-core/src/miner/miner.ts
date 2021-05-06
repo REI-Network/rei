@@ -110,6 +110,10 @@ export class Miner extends Loop {
     await this.initPromise;
     const lastHeader = this.node.blockchain.latestBlock.header;
     const block = await this.worker.getPendingBlock(lastHeader.number, lastHeader.hash());
+    if (block.header.timestamp.lte(lastHeader.timestamp)) {
+      return;
+    }
+    await block.validate(this.node.blockchain);
     const newBlock = await this.node.processBlock(block);
     await this.node.newBlock(newBlock);
     logger.info('⛏️  Mine block, height:', newBlock.header.number.toString(), 'hash:', bufferToHex(newBlock.hash()));

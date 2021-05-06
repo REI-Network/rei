@@ -1,108 +1,75 @@
 import Heap from 'qheap';
+import { Aborter, AbortError } from './abort';
 
-interface AsyncNextOption<T> {
-  push: (data: T) => void;
-  hasNext: () => boolean;
-  next: () => T;
+interface ChannelOption<T> {
+  max?: number;
   drop?: (data: T) => void;
+  aborter: Aborter;
 }
 
-export class AsyncNext<T = any> {
-  private readonly queue: AsyncNextOption<T>;
-  private resolve?: (data: T | null) => void;
-  private _shouldStop: boolean = false;
-  protected drop?: (data: T) => void;
+export class Channel<T = any> {
+  private aborted = false;
+  private _array: T[] = [];
+  private max?: number;
+  private drop?: (data: T) => void;
+  private resolve?: (data: T) => void;
+  private reject?: (reason?: any) => void;
+  private aborter: Aborter;
 
-  constructor(option: AsyncNextOption<T>) {
-    this.queue = {
-      push: option.push,
-      hasNext: option.hasNext,
-      next: option.next
-    };
-    this.drop = option.drop;
+  get array() {
+    return [...this._array];
   }
 
-  get shouldStop() {
-    return this._shouldStop;
-  }
-
-  get isWaiting() {
-    return !!this.resolve;
-  }
-
-  abort() {
-    if (this.resolve) {
-      this.clear();
-      this.resolve(null);
-      this.resolve = undefined;
-    } else if (!this.shouldStop) {
-      this._shouldStop = true;
-    }
+  constructor(options: ChannelOption<T>) {
+    this.max = options.max;
+    this.drop = options.drop;
+    this.aborter = options.aborter;
   }
 
   push(data: T) {
+    if (this.aborter.isAborted || this.aborted) {
+      return false;
+    }
     if (this.resolve) {
       this.resolve(data);
+      this.reject = undefined;
       this.resolve = undefined;
     } else {
-      this.queue.push(data);
+      this._array.push(data);
+      if (this.max && this._array.length > this.max) {
+        if (this.drop) {
+          while (this._array.length > this.max) {
+            this.drop(this._array.shift()!);
+          }
+        } else {
+          this._array.splice(0, this._array.length - this.max);
+        }
+      }
     }
+    return true;
   }
 
-  next(): Promise<T | null> {
-    if (this.shouldStop) {
-      this._shouldStop = false;
-      this.clear();
-      return Promise.resolve(null);
-    }
-    return this.queue.hasNext()
-      ? Promise.resolve(this.queue.next())
-      : new Promise<T | null>((resolve) => {
+  next() {
+    return this._array.length > 0
+      ? Promise.resolve(this._array.shift()!)
+      : new Promise<T>((resolve, reject) => {
           this.resolve = resolve;
+          this.reject = reject;
         });
   }
 
-  clear() {}
-}
-
-interface AsyncQueueOption<T> {
-  push?: (data: T) => void;
-  hasNext?: () => boolean;
-  next?: () => T;
-  max?: number;
-  drop?: (data: T) => void;
-}
-
-export class AsyncQueue<T = any> extends AsyncNext<T> {
-  private _array: T[] = [];
-  private max?: number;
-
-  constructor(options?: AsyncQueueOption<T>) {
-    super(
-      Object.assign(
-        {
-          push: (data: T) => {
-            this._array.push(data);
-            if (this.max && this._array.length > this.max) {
-              if (this.drop) {
-                this.drop(this._array.shift()!);
-              } else {
-                this._array.shift();
-              }
-            }
-          },
-          hasNext: () => this._array.length > 0,
-          next: () => this._array.shift()!
-        },
-        options
-      )
-    );
-    this.max = options?.max;
-    this.drop = options?.drop;
+  abort() {
+    if (this.reject) {
+      this.reject(new AbortError('Channel abort'));
+      this.reject = undefined;
+      this.resolve = undefined;
+    }
+    this.aborted = true;
+    this.clear();
   }
 
-  get array() {
-    return this._array;
+  reset() {
+    this.aborted = false;
   }
 
   clear() {
@@ -113,106 +80,112 @@ export class AsyncQueue<T = any> extends AsyncNext<T> {
     }
     this._array = [];
   }
+
+  async *generator() {
+    try {
+      while (!this.aborter.isAborted && !this.aborted) {
+        yield await this.aborter.abortablePromise(this.next(), true);
+      }
+    } catch (err) {
+      if (!(err instanceof AbortError)) {
+        throw err;
+      }
+    }
+  }
 }
 
-interface AsyncHeapOption<T> {
+interface HChannelOption<T> {
+  max?: number;
+  aborter: Aborter;
   compare?: (a: T, b: T) => boolean;
-  push?: (data: T | null) => void;
-  hasNext?: () => boolean;
-  next?: () => T | null;
   drop?: (data: T) => void;
 }
 
-export class AsyncHeap<T = any> extends AsyncNext<T> {
+export class HChannel<T = any> {
+  private aborted = false;
   private _heap: Heap;
-  private compare?: (a: T, b: T) => boolean;
-
-  constructor(options?: AsyncHeapOption<T>) {
-    super(
-      Object.assign(
-        {
-          push: (data: T | null) => {
-            this._heap.insert(data);
-          },
-          hasNext: () => this._heap.length > 0,
-          next: () => this._heap.remove()
-        },
-        options
-      )
-    );
-    this.compare = options?.compare;
-    this._heap = new Heap(this.compare ? { comparBefore: this.compare } : undefined);
-  }
+  private max?: number;
+  private drop?: (data: T) => void;
+  private resolve?: (data: T) => void;
+  private reject?: (reason?: any) => void;
+  private aborter: Aborter;
 
   get heap() {
     return this._heap;
   }
 
+  constructor(options: HChannelOption<T>) {
+    this.max = options.max;
+    this.drop = options.drop;
+    this.aborter = options.aborter;
+    this._heap = new Heap(options?.compare ? { comparBefore: options.compare } : undefined);
+  }
+
+  push(data: T) {
+    if (this.aborter.isAborted || this.aborted) {
+      return false;
+    }
+    if (this.resolve) {
+      this.resolve(data);
+      this.reject = undefined;
+      this.resolve = undefined;
+    } else {
+      this._heap.insert(data);
+      if (this.max && this._heap.length > this.max) {
+        while (this._heap.length > this.max) {
+          if (this.drop) {
+            this.drop(this._heap.remove());
+          } else {
+            this._heap.remove();
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  next() {
+    return this._heap.length > 0
+      ? Promise.resolve(this._heap.remove() as T)
+      : new Promise<T>((resolve, reject) => {
+          this.resolve = resolve;
+          this.reject = reject;
+        });
+  }
+
+  abort() {
+    if (this.reject) {
+      this.reject(new AbortError('HChannel abort'));
+      this.reject = undefined;
+      this.resolve = undefined;
+    }
+    this.aborted = true;
+    this.clear();
+  }
+
+  reset() {
+    this.aborted = false;
+  }
+
   clear() {
-    const array: T[] | null = this._heap._list;
-    if (array !== null && this.drop) {
-      for (const data of array) {
-        this.drop(data);
+    while (this._heap.length > 0) {
+      if (this.drop) {
+        this.drop(this._heap.remove());
+      } else {
+        this._heap.remove();
       }
-    }
-    this._heap = new Heap(this.compare ? { comparBefore: this.compare } : undefined);
-  }
-}
-
-interface AsyncChannelOption<T> extends AsyncQueueOption<T> {
-  isAbort: () => boolean;
-}
-
-export class AsyncChannel<T = any> extends AsyncQueue<T> {
-  private isAbort: () => boolean;
-
-  constructor(options: AsyncChannelOption<T>) {
-    super(options);
-    this.isAbort = options.isAbort;
-  }
-
-  push(data: T) {
-    if (!this.isAbort()) {
-      super.push(data);
     }
   }
 
   async *generator() {
-    while (!this.isAbort()) {
-      const result = await this.next();
-      if (this.isAbort() || result === null) {
-        return;
+    try {
+      while (!this.aborter.isAborted && !this.aborted) {
+        yield await this.aborter.abortablePromise(this.next(), true);
       }
-      yield result;
-    }
-  }
-}
-
-interface AsyncHeapChannelOption<T> extends AsyncHeapOption<T> {
-  isAbort: () => boolean;
-}
-
-export class AsyncHeapChannel<T = any> extends AsyncHeap<T> {
-  private isAbort: () => boolean;
-
-  constructor(options: AsyncHeapChannelOption<T>) {
-    super(options);
-    this.isAbort = options.isAbort;
-  }
-
-  push(data: T) {
-    if (!this.isAbort()) {
-      super.push(data);
-    }
-  }
-
-  async *generator() {
-    while (!this.isAbort()) {
-      const result = await this.next();
-      if (this.isAbort() || result === null) {
-        return;
+    } catch (err) {
+      if (!(err instanceof AbortError)) {
+        throw err;
       }
-      yield result;
     }
   }
 }

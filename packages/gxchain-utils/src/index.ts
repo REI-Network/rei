@@ -60,7 +60,7 @@ export { setLevel } from 'tracer';
 
 export * from './abort';
 export * from './priorityqueue';
-export * from './asyncnext';
+export * from './channel';
 export * from './functionalmap';
 export * from './semaphorelock';
 export * from './compress';

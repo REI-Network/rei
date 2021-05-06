@@ -387,4 +387,9 @@ export class Node {
       this.taskQueue.push(new NewPendingTxsTask(txs, resolve));
     });
   }
+
+  async abort() {
+    await this.aborter.abort();
+    await this.peerpool.abort();
+  }
 }

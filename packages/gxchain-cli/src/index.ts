@@ -32,6 +32,28 @@ program
   .action((options) => {});
 program.parse(process.argv);
 
+function SIGINT(node: Node) {
+  let SIGINTLock = false;
+  process.on('SIGINT', () => {
+    if (!SIGINTLock) {
+      logger.info('SIGINT, graceful exit');
+      SIGINTLock = true;
+      node.abort().then(
+        () => {
+          logger.info('SIGINT, abort finished');
+          process.exit(0);
+        },
+        (err) => {
+          logger.error('SIGINT, catch error:', err);
+          process.exit(1);
+        }
+      );
+    } else {
+      logger.warn('Please wait for graceful exit, or you can kill this process');
+    }
+  });
+}
+
 async function start() {
   try {
     const opts = program.opts();
@@ -59,6 +81,7 @@ async function start() {
     });
 
     await node.init();
+    SIGINT(node);
     if (opts.rpc) {
       const rpcServer = new RpcServer(Number(opts.rpcPort), opts.rpcHost, node).on('error', (err) => {
         logger.error('RpcServer error:', err);

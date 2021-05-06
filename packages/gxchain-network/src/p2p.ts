@@ -8,6 +8,7 @@ import Bootstrap from 'libp2p-bootstrap';
 import { constants, Common } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { Database } from '@gxchain2/database';
+import { Aborter } from '@gxchain2/utils';
 import { Peer } from './peer';
 import { Protocol, ETHProtocol } from './protocol';
 import { Transaction } from '@gxchain2/tx';
@@ -41,6 +42,7 @@ export interface INode {
   status: any;
   txPool: ITxPool;
   txSync: ITxFetcher;
+  aborter: Aborter;
 }
 
 export interface Libp2pNodeOptions {

@@ -107,76 +107,64 @@ account
 account
   .command('import <keydir>')
   .description('Import a account from privatekey file')
-  .action((keydir) => {
+  .action(async (keydir) => {
     const key = fs.readFileSync(keydir);
     if (accountcmd.hasAddress(key.toString())) {
-      inquirer
-        .prompt([
-          {
-            type: 'confirm',
-            name: 'cover',
-            message: 'The account is existed, would you want to cover it?'
-          }
-        ])
-        .then((cover) => {
-          if (cover.cover == true) {
-            console.log('Your new account is locked with a password. Please give a password. Do not forget this password..');
-            inquirer
-              .prompt([
-                {
-                  type: 'password',
-                  name: 'password',
-                  message: 'Password:'
-                }
-              ])
-              .then((answer1) => {
-                inquirer
-                  .prompt([
-                    {
-                      type: 'password',
-                      name: 'password',
-                      message: 'Repeat password:'
-                    }
-                  ])
-                  .then((answer2) => {
-                    if (answer1.password !== answer2.password) {
-                      console.log('You must input the same password!');
-                      return;
-                    }
-                    const a = accountcmd.accoumtImport(key.toString(), answer1.password);
-                    console.log('Address : ', a);
-                  });
-              });
-          }
-        });
-    } else {
-      console.log('Your new account is locked with a password. Please give a password. Do not forget this password..');
-      inquirer
-        .prompt([
+      const cover = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'cover',
+          message: 'The account is existed, would you want to cover it?'
+        }
+      ]);
+
+      if (cover.cover == true) {
+        console.log('Your new account is locked with a password. Please give a password. Do not forget this password..');
+        const answer1 = await inquirer.prompt([
           {
             type: 'password',
             name: 'password',
             message: 'Password:'
           }
-        ])
-        .then((answer1) => {
-          inquirer
-            .prompt([
-              {
-                type: 'password',
-                name: 'password',
-                message: 'Repeat password:'
-              }
-            ])
-            .then((answer2) => {
-              if (answer1.password !== answer2.password) {
-                console.log('You must input the same password!');
-                return;
-              }
-              const a = accountcmd.accoumtImport(key.toString(), answer1.password);
-              console.log('Address : ', a);
-            });
-        });
+        ]);
+        const answer2 = await inquirer.prompt([
+          {
+            type: 'password',
+            name: 'password',
+            message: 'Repeat password:'
+          }
+        ]);
+
+        if (answer1.password !== answer2.password) {
+          console.log('You must input the same password!');
+          return;
+        }
+        const a = accountcmd.accoumtImport(key.toString(), answer1.password);
+        console.log('Address : ', a);
+      }
+    } else {
+      console.log('Your new account is locked with a password. Please give a password. Do not forget this password..');
+      const answer1 = await inquirer.prompt([
+        {
+          type: 'password',
+          name: 'password',
+          message: 'Password:'
+        }
+      ]);
+      const answer2 = await inquirer.prompt([
+        {
+          type: 'password',
+          name: 'password',
+          message: 'Repeat password:'
+        }
+      ]);
+
+      if (answer1.password !== answer2.password) {
+        console.log('You must input the same password!');
+        return;
+      }
+      const a = accountcmd.accoumtImport(key.toString(), answer1.password);
+      console.log('Address : ', a);
     }
   });
 program.parse(process.argv);

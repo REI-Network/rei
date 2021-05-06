@@ -1,7 +1,7 @@
 import type { Peer } from '../peer';
 import type { INode } from '../p2p';
 
-export type MessageInfo = {
+export type MsgContext = {
   node: INode;
   peer: Peer;
   protocol: Protocol;
@@ -11,9 +11,9 @@ export type Handler = {
   name: string;
   code: number;
   response?: number;
-  encode: (info: MessageInfo, data: any) => any;
-  decode: (info: MessageInfo, data: any) => any;
-  process?: (info: MessageInfo, data: any) => Promise<[string, any]> | [string, any] | void;
+  encode: (info: MsgContext, data: any) => any;
+  decode: (info: MsgContext, data: any) => any;
+  process?: (info: MsgContext, data: any) => Promise<[string, any]> | [string, any] | void;
 };
 
 export class Protocol {

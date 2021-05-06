@@ -5,7 +5,7 @@ import { Transaction } from '@gxchain2/tx';
 import { constants } from '@gxchain2/common';
 import pipe from 'it-pipe';
 import type PeerId from 'peer-id';
-import { Protocol, MessageInfo } from './protocol/protocol';
+import { Protocol, MsgContext } from './protocol/protocol';
 import { Libp2pNode } from './p2p';
 
 const txsyncPackSize = 102400;
@@ -55,7 +55,7 @@ class MsgQueue extends EventEmitter {
     return this.protocol.name;
   }
 
-  private makeMessageInfo(): MessageInfo {
+  private makeContext(): MsgContext {
     return {
       node: this.peer.node.node,
       peer: this.peer,
@@ -66,7 +66,7 @@ class MsgQueue extends EventEmitter {
   send(method: string, data: any) {
     if (!this.aborter.isAborted) {
       const handler = this.protocol.findHandler(method);
-      this.queue.push(handler.encode(this.makeMessageInfo(), data));
+      this.queue.push(handler.encode(this.makeContext(), data));
     }
   }
 
@@ -90,7 +90,7 @@ class MsgQueue extends EventEmitter {
           reject(new PeerRequestTimeoutError(`MsgQueue timeout request: ${method}`));
         }, 8000)
       });
-      this.queue.push(handler.encode(this.makeMessageInfo(), data));
+      this.queue.push(handler.encode(this.makeContext(), data));
     });
   }
 
@@ -127,7 +127,7 @@ class MsgQueue extends EventEmitter {
         try {
           // TODO: fix _bufs.
           const { code, handler, payload } = this.protocol.handle(value._bufs[0]);
-          const data = handler.decode(this.makeMessageInfo(), payload);
+          const data = handler.decode(this.makeContext(), payload);
           if (code === 0) {
             this.emit('status', data);
           } else {
@@ -137,7 +137,7 @@ class MsgQueue extends EventEmitter {
               this.waitingRequests.delete(code);
               request.resolve(data);
             } else if (handler.process) {
-              const result = handler.process(this.makeMessageInfo(), data);
+              const result = handler.process(this.makeContext(), data);
               if (result) {
                 if (Array.isArray(result)) {
                   const [method, resps] = result;

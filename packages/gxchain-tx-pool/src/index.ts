@@ -17,6 +17,7 @@ export interface INode {
   db: Database;
   common: Common;
   blockchain: Blockchain;
+  aborter: Aborter;
   getStateManager(root: Buffer): Promise<StateManager>;
   addPendingTxs: (txs: Transaction[]) => Promise<boolean[]>;
   miner: {
@@ -121,7 +122,7 @@ export declare interface TxPool {
 }
 
 export class TxPool extends EventEmitter {
-  private aborter = new Aborter();
+  private aborter: Aborter;
 
   private readonly accounts: FunctionalMap<Buffer, TxPoolAccount>;
   private readonly locals: FunctionalSet<Buffer>;
@@ -164,6 +165,7 @@ export class TxPool extends EventEmitter {
     this.rejournalInterval = options.rejournalInterval || 60000 * 60;
 
     this.node = options.node;
+    this.aborter = options.node.aborter;
     this.accounts = createBufferFunctionalMap<TxPoolAccount>();
     this.txs = createBufferFunctionalMap<Transaction>();
     this.locals = createBufferFunctionalSet();
@@ -174,15 +176,8 @@ export class TxPool extends EventEmitter {
     this.timeoutLoop();
     if (options.journal) {
       this.journal = new Journal(options.journal, this.node);
-      this.rejournalLoop();
+      this.aborter.addWaitingPromise(this.rejournalLoop());
     }
-  }
-
-  /**
-   * The Interrupter
-   */
-  async abort() {
-    await this.aborter.abort();
   }
 
   private local(): Map<Buffer, Transaction[]> {

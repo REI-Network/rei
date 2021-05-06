@@ -105,38 +105,79 @@ account
   });
 
 account
-  .command('import')
+  .command('import <keydir>')
   .description('Import a account from privatekey file')
-  .option('--prekeyfile <string>')
-  .action((options) => {
-    const key = fs.readFileSync(options.prekeydir);
-    console.log('Your new account is locked with a password. Please give a password. Do not forget this password..');
-    inquirer
-      .prompt([
-        {
-          type: 'password',
-          name: 'password',
-          message: 'Password:'
-        }
-      ])
-      .then((answer1) => {
-        inquirer
-          .prompt([
-            {
-              type: 'password',
-              name: 'password',
-              message: 'Repeat password:'
-            }
-          ])
-          .then((answer2) => {
-            if (answer1.password !== answer2.password) {
-              console.log('You must input the same password!');
-              return;
-            }
-            const a = accountcmd.accoumtImport(key.toString(), answer1.password);
-            console.log('Address : ', a);
-          });
-      });
+  .action((keydir) => {
+    const key = fs.readFileSync(keydir);
+    if (accountcmd.hasAddress(key.toString())) {
+      inquirer
+        .prompt([
+          {
+            type: 'confirm',
+            name: 'cover',
+            message: 'The account is existed, would you want to cover it?'
+          }
+        ])
+        .then((cover) => {
+          if (cover.cover == true) {
+            console.log('Your new account is locked with a password. Please give a password. Do not forget this password..');
+            inquirer
+              .prompt([
+                {
+                  type: 'password',
+                  name: 'password',
+                  message: 'Password:'
+                }
+              ])
+              .then((answer1) => {
+                inquirer
+                  .prompt([
+                    {
+                      type: 'password',
+                      name: 'password',
+                      message: 'Repeat password:'
+                    }
+                  ])
+                  .then((answer2) => {
+                    if (answer1.password !== answer2.password) {
+                      console.log('You must input the same password!');
+                      return;
+                    }
+                    const a = accountcmd.accoumtImport(key.toString(), answer1.password);
+                    console.log('Address : ', a);
+                  });
+              });
+          }
+        });
+    } else {
+      console.log('Your new account is locked with a password. Please give a password. Do not forget this password..');
+      inquirer
+        .prompt([
+          {
+            type: 'password',
+            name: 'password',
+            message: 'Password:'
+          }
+        ])
+        .then((answer1) => {
+          inquirer
+            .prompt([
+              {
+                type: 'password',
+                name: 'password',
+                message: 'Repeat password:'
+              }
+            ])
+            .then((answer2) => {
+              if (answer1.password !== answer2.password) {
+                console.log('You must input the same password!');
+                return;
+              }
+              const a = accountcmd.accoumtImport(key.toString(), answer1.password);
+              console.log('Address : ', a);
+            });
+        });
+    }
   });
 program.parse(process.argv);
 

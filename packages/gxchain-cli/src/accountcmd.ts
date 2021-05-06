@@ -54,3 +54,14 @@ export function accoumtImport(privatekey: string, auth: string) {
   ks.storekey(account.url.Path, { address: addr.toString(), privateKey: privatekey }, auth);
   return utils.toChecksumAddress(account.address.toString());
 }
+
+export function hasAddress(privatekey: string) {
+  const accounts = store.cache.accounts();
+  const addr = web3account.privateKeyToAccount(privatekey).address;
+  for (const a of accounts) {
+    if (a.address.toString() === addr.toLowerCase()) {
+      return true;
+    }
+  }
+  return false;
+}

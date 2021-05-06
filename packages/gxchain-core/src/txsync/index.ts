@@ -70,7 +70,7 @@ export class TxFetcher extends EventEmitter {
   private requests = new Map<string, Request>();
   private alternates = createBufferFunctionalMap<Set<string>>();
 
-  private aborter = new Aborter();
+  private aborter: Aborter;
   private newPooledTransactionQueue: Channel<NewPooledTransactionMessage>;
   private enqueueTransactionQueue: Channel<EnqueuePooledTransactionMessage>;
 
@@ -81,10 +81,11 @@ export class TxFetcher extends EventEmitter {
   constructor(node: Node) {
     super();
     this.node = node;
+    this.aborter = node.aborter;
     this.newPooledTransactionQueue = new Channel<NewPooledTransactionMessage>({ aborter: node.aborter });
     this.enqueueTransactionQueue = new Channel<EnqueuePooledTransactionMessage>({ aborter: node.aborter });
-    node.aborter.addWaitingPromise(this.newPooledTransactionLoop());
-    node.aborter.addWaitingPromise(this.enqueueTransactionLoop());
+    this.newPooledTransactionLoop();
+    this.enqueueTransactionLoop();
   }
 
   private async newPooledTransactionLoop() {

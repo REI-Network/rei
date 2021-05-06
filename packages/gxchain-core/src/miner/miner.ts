@@ -1,4 +1,4 @@
-import { hexStringToBN, hexStringToBuffer, Channel, logger } from '@gxchain2/utils';
+import { hexStringToBN, hexStringToBuffer, logger } from '@gxchain2/utils';
 import { Worker } from './worker';
 import { Loop } from './loop';
 import { Node } from '../node';

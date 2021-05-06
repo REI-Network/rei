@@ -1,19 +1,16 @@
-import process from 'process';
+import { startNode } from '../src/start';
+import program from '../src/program';
 import path from 'path';
-import fs from 'fs';
 import util from 'util';
 import prompts from 'prompts';
 import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
 import { Node } from '@gxchain2/core';
-import { RpcServer } from '@gxchain2/rpc';
 import { constants } from '@gxchain2/common';
 import { Transaction } from '@gxchain2/tx';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
 import { BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
-
-const args = process.argv.slice(2);
 
 const keyPair = new Map<string, Buffer>([
   ['0x3289621709f5b35d09b4335e129907ac367a0593', Buffer.from('d8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0', 'hex')],
@@ -190,30 +187,16 @@ const startPrompts = async (node: Node) => {
 
 (async () => {
   try {
-    const dirName = args[0] || 'test-node-01';
-    const rpcPort = Number(args[1]) || 12358;
-    const testdir = path.join(__dirname, './test-dir');
-    if (!fs.existsSync(testdir)) {
-      fs.mkdirSync(testdir);
-    }
-    const dir = path.join(testdir, dirName);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir);
-    }
-    const node = new Node({ databasePath: dir });
-    await node.init();
-    node.miner.setCoinbase('0x3289621709f5b35d09b4335e129907ac367a0593');
-    const rpcServer = new RpcServer(rpcPort, '127.0.0.1', node).on('error', (err: any) => {
-      logger.error('Rpc server error:', err);
-      process.exit(1);
-    });
-    if (!(await rpcServer.start())) {
-      logger.error('RpcServer start failed, exit!');
-      process.exit(1);
+    program.parse(process.argv);
+    const opts = program.opts();
+    opts.datadir = path.join(__dirname, './test-dir/', opts.datadir);
+    const [node, sever] = await startNode(opts);
+    if (opts.mine !== true) {
+      node.miner.setCoinbase('0x3289621709f5b35d09b4335e129907ac367a0593');
     }
     await startPrompts(node);
   } catch (err) {
-    logger.error('Catch error:', err);
+    logger.error('Prompts start error:', err);
     process.exit(1);
   }
 })();

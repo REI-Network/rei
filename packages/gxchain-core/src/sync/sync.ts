@@ -1,8 +1,6 @@
 import { EventEmitter } from 'events';
-
-import { Aborter, logger } from '@gxchain2/utils';
+import { logger } from '@gxchain2/utils';
 import { Peer } from '@gxchain2/network';
-
 import type { Node } from '../node';
 
 export interface SynchronizerOptions {
@@ -25,7 +23,6 @@ export declare interface Synchronizer {
 export class Synchronizer extends EventEmitter {
   protected readonly node: Node;
   protected readonly interval: number;
-  protected aborter = new Aborter();
   protected running: boolean = false;
   protected forceSync: boolean = false;
   protected startingBlock: number = 0;
@@ -105,25 +102,11 @@ export class Synchronizer extends EventEmitter {
     const timeout = setTimeout(() => {
       this.forceSync = true;
     }, this.interval * 30);
-    while (!this.aborter.isAborted) {
+    while (!this.node.aborter.isAborted) {
       await this.sync();
-      await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.interval)));
+      await this.node.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.interval)));
     }
     this.running = false;
     clearTimeout(timeout);
-  }
-
-  /**
-   * Abort the syncing
-   */
-  async abort() {
-    await this.aborter.abort(new Error('Synchronizer abort'));
-  }
-
-  /**
-   * Reset the aborter
-   */
-  async reset() {
-    this.aborter.reset();
   }
 }

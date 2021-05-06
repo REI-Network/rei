@@ -1,4 +1,4 @@
-import { hexStringToBN, hexStringToBuffer, AsyncChannel, logger } from '@gxchain2/utils';
+import { hexStringToBN, hexStringToBuffer, Channel, logger } from '@gxchain2/utils';
 import { Worker } from './worker';
 import { Loop } from './loop';
 import { Node } from '../node';
@@ -18,7 +18,7 @@ export class Miner extends Loop {
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
   private readonly options?: MinerOptions;
-  private readonly controlQueue = new AsyncChannel<boolean>({ max: 1, isAbort: () => this.aborter.isAborted });
+  private readonly controlQueue = new Channel<boolean>({ max: 1, aborter: this.aborter });
 
   constructor(node: Node, options?: MinerOptions) {
     super(options?.mineInterval || 5000);

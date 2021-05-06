@@ -1,6 +1,6 @@
 import { BlockHeader } from '@gxchain2/block';
 import { BN } from 'ethereumjs-util';
-import { AsyncChannel, logger } from '@gxchain2/utils';
+import { Channel, logger } from '@gxchain2/utils';
 import { Node } from '../node';
 
 export interface ChainIndexerBackend {
@@ -26,8 +26,7 @@ export class ChainIndexer {
   private readonly backend: ChainIndexerBackend;
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
-  // TODO: get a aborter from node.
-  private readonly headerQueue = new AsyncChannel<BlockHeader>({ max: 1, isAbort: () => false });
+  private readonly headerQueue: Channel<BlockHeader>;
 
   private storedSections: BN | undefined;
 
@@ -37,7 +36,8 @@ export class ChainIndexer {
     this.backend = options.backend;
     this.node = options.node;
     this.initPromise = this.init();
-    this.processHeaderLoop();
+    this.headerQueue = new Channel<BlockHeader>({ max: 1, aborter: options.node.aborter });
+    options.node.aborter.addWaitingPromise(this.processHeaderLoop());
   }
 
   async init() {

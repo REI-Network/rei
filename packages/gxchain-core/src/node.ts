@@ -13,7 +13,7 @@ import { VM, WrappedVM } from '@gxchain2/vm';
 import { TxPool } from '@gxchain2/tx-pool';
 import { Block } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
-import { hexStringToBuffer, AsyncChannel, Aborter, logger } from '@gxchain2/utils';
+import { hexStringToBuffer, Channel, Aborter, logger } from '@gxchain2/utils';
 import { FullSynchronizer, Synchronizer } from './sync';
 import { TxFetcher } from './txsync';
 import { Miner } from './miner';
@@ -60,6 +60,7 @@ type ProcessBlock = {
 
 export class Node {
   public readonly rawdb: LevelUp;
+  public readonly aborter = new Aborter();
 
   public db!: Database;
   public common!: Common;
@@ -74,16 +75,15 @@ export class Node {
 
   private readonly options: NodeOptions;
   private readonly initPromise: Promise<void>;
-  private readonly aborter = new Aborter();
-  private readonly taskQueue = new AsyncChannel<Task>({ isAbort: () => this.aborter.isAborted });
-  private readonly processQueue = new AsyncChannel<ProcessBlock>({ isAbort: () => this.aborter.isAborted });
+  private readonly taskQueue = new Channel<Task>({ aborter: this.aborter });
+  private readonly processQueue = new Channel<ProcessBlock>({ aborter: this.aborter });
 
   constructor(options: NodeOptions) {
     this.options = options;
     this.rawdb = createLevelDB(path.join(this.options.databasePath, 'chaindb'));
     this.initPromise = this.init();
-    this.taskLoop();
-    this.processLoop();
+    this.aborter.addWaitingPromise(this.taskLoop());
+    this.aborter.addWaitingPromise(this.processLoop());
   }
 
   /**

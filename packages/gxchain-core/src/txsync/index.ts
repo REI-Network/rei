@@ -1,4 +1,4 @@
-import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, AsyncChannel, Aborter, logger } from '@gxchain2/utils';
+import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Channel, Aborter, logger } from '@gxchain2/utils';
 import { EventEmitter } from 'events';
 import { Transaction } from '@gxchain2/tx';
 import { PeerRequestTimeoutError } from '@gxchain2/network';
@@ -71,8 +71,8 @@ export class TxFetcher extends EventEmitter {
   private alternates = createBufferFunctionalMap<Set<string>>();
 
   private aborter = new Aborter();
-  private newPooledTransactionQueue = new AsyncChannel<NewPooledTransactionMessage>({ isAbort: () => this.aborter.isAborted });
-  private enqueueTransactionQueue = new AsyncChannel<EnqueuePooledTransactionMessage>({ isAbort: () => this.aborter.isAborted });
+  private newPooledTransactionQueue: Channel<NewPooledTransactionMessage>;
+  private enqueueTransactionQueue: Channel<EnqueuePooledTransactionMessage>;
 
   private readonly node: Node;
 
@@ -81,8 +81,10 @@ export class TxFetcher extends EventEmitter {
   constructor(node: Node) {
     super();
     this.node = node;
-    this.newPooledTransactionLoop();
-    this.enqueueTransactionLoop();
+    this.newPooledTransactionQueue = new Channel<NewPooledTransactionMessage>({ aborter: node.aborter });
+    this.enqueueTransactionQueue = new Channel<EnqueuePooledTransactionMessage>({ aborter: node.aborter });
+    node.aborter.addWaitingPromise(this.newPooledTransactionLoop());
+    node.aborter.addWaitingPromise(this.enqueueTransactionLoop());
   }
 
   private async newPooledTransactionLoop() {

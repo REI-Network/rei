@@ -1,4 +1,4 @@
-import { AsyncHeapChannel, PriorityQueue, getRandomIntInclusive, AsyncChannel, logger } from '@gxchain2/utils';
+import { HChannel, Channel, PriorityQueue, getRandomIntInclusive, logger } from '@gxchain2/utils';
 import { BlockHeader, Block } from '@gxchain2/block';
 import { Node } from '../../node';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
@@ -24,11 +24,8 @@ export class Fetcher extends EventEmitter {
   private bestHeight!: number;
   private headerTaskOver = false;
   private priorityQueue = new PriorityQueue<Block>();
-  private blocksQueue = new AsyncChannel<Block>({ isAbort: () => this.abortFlag });
-  private downloadBodiesQueue = new AsyncHeapChannel<BlockHeader>({
-    isAbort: () => this.abortFlag,
-    compare: (a, b) => a.number.lt(b.number)
-  });
+  private blocksQueue: Channel<Block>;
+  private downloadBodiesQueue: HChannel<BlockHeader>;
   private idlePeerResolve?: (peer?: Peer) => void;
 
   constructor(options: FetcherOptions) {
@@ -37,6 +34,11 @@ export class Fetcher extends EventEmitter {
     this.count = options.count;
     this.limit = options.limit;
     this.banPeer = options.banPeer;
+    this.blocksQueue = new Channel<Block>({ aborter: options.node.aborter });
+    this.downloadBodiesQueue = new HChannel<BlockHeader>({
+      aborter: options.node.aborter,
+      compare: (a, b) => a.number.lt(b.number)
+    });
     this.priorityQueue.on('result', (block) => {
       if (!this.abortFlag) {
         this.emit('newBlock', block);

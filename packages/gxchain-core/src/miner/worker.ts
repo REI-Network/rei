@@ -51,7 +51,7 @@ export class Worker extends Loop {
   private async _newBlock(block: Block) {
     try {
       if (this.wvm) {
-        if ((this.wvm.vm.stateManager as any)._checkpointCount > 0) {
+        if ((this.wvm.vm.stateManager as any)._trie.isCheckpoint) {
           await this.wvm.vm.stateManager.revert();
         }
       }
@@ -139,14 +139,6 @@ export class Worker extends Loop {
       return new StateManager({ common: this.node.common, trie: (this.wvm.vm.stateManager as any)._trie.copy(false) });
     }
     return await this.node.getStateManager(this.node.blockchain.latestBlock.header.stateRoot);
-  }
-
-  /**
-   * Start the loop
-   */
-  async startLoop() {
-    await this.initPromise;
-    await super.startLoop();
   }
 
   protected async process() {

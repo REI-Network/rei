@@ -1,50 +1,46 @@
-import { Aborter } from '@gxchain2/utils';
-
 export class Loop {
-  protected readonly aborter = new Aborter();
-  private abortPromise?: Promise<void>;
-  private loopPromise?: Promise<void>;
-  private readonly interval: number;
+  private working: boolean = false;
+  private resolve?: () => void;
 
   constructor(interval: number) {
-    this.interval = interval;
+    this.loop(interval);
   }
 
   /**
    * Start the loop according to the loopPromise
    */
-  async startLoop() {
-    if (this.abortPromise) {
-      await this.abortPromise;
-    }
-    if (this.loopPromise) {
+  startLoop() {
+    if (this.working !== false) {
       return;
     }
-    this.loopPromise = new Promise(async (resolve) => {
-      while (!this.aborter.isAborted) {
-        await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.interval)));
-        if (this.aborter.isAborted) {
-          break;
-        }
-        await this.process();
-      }
-      resolve();
-    });
+    this.working = true;
+    if (this.resolve) {
+      this.resolve();
+      this.resolve = undefined;
+    }
   }
 
   /**
    * stop the loop according to the abortPromise
    */
-  async stopLoop() {
-    if (this.loopPromise && !this.aborter.isAborted) {
-      await (this.abortPromise = new Promise(async (resolve) => {
-        await this.aborter.abort();
-        await this.loopPromise;
-        this.loopPromise = undefined;
-        this.aborter.reset();
-        resolve();
-      }));
-      this.abortPromise = undefined;
+  stopLoop() {
+    if (this.working !== true) {
+      return;
+    }
+    this.working = false;
+  }
+
+  private async loop(interval: number) {
+    while (true) {
+      await Promise.race([
+        new Promise((r) => setTimeout(r, interval)),
+        new Promise<void>((resolve) => {
+          this.resolve = resolve;
+        })
+      ]);
+      if (this.working) {
+        await this.process();
+      }
     }
   }
 

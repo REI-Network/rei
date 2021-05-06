@@ -18,7 +18,6 @@ export class Miner extends Loop {
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
   private readonly options?: MinerOptions;
-  private readonly controlQueue = new Channel<boolean>({ max: 1, aborter: this.aborter });
 
   constructor(node: Node, options?: MinerOptions) {
     super(options?.mineInterval || 5000);
@@ -29,15 +28,17 @@ export class Miner extends Loop {
     this.worker = new Worker(node, this);
     this.initPromise = this.init();
     node.sync.on('start synchronize', () => {
-      this.controlQueue.push(false);
+      this.worker.stopLoop();
+      this.stopLoop();
     });
     node.sync.on('synchronized', () => {
-      this.controlQueue.push(true);
+      this.worker.startLoop();
+      this.startLoop();
     });
     node.sync.on('synchronize failed', () => {
-      this.controlQueue.push(true);
+      this.worker.startLoop();
+      this.startLoop();
     });
-    this.controlLoop();
   }
 
   /**
@@ -59,19 +60,6 @@ export class Miner extends Loop {
    */
   get gasLimit() {
     return this._gasLimit;
-  }
-
-  private async controlLoop() {
-    await this.initPromise;
-    for await (const flag of this.controlQueue.generator()) {
-      if (flag) {
-        await this.worker.startLoop();
-        await this.startLoop();
-      } else {
-        await this.worker.stopLoop();
-        await this.stopLoop();
-      }
-    }
   }
 
   /**
@@ -100,19 +88,18 @@ export class Miner extends Loop {
       return;
     }
     await this.worker.init();
-    await this.worker.startLoop();
+    this.worker.startLoop();
     if (this.isMining) {
-      await super.startLoop();
+      super.startLoop();
     }
   }
 
   /**
    * Start the loop
    */
-  async startLoop() {
+  startLoop() {
     if (this.isMining) {
-      await this.initPromise;
-      await super.startLoop();
+      super.startLoop();
     }
   }
 
@@ -120,6 +107,7 @@ export class Miner extends Loop {
    * Mine the Block
    */
   async mineBlock() {
+    await this.initPromise;
     const lastHeader = this.node.blockchain.latestBlock.header;
     const block = await this.worker.getPendingBlock(lastHeader.number, lastHeader.hash());
     const newBlock = await this.node.processBlock(block);

@@ -130,7 +130,7 @@ export class Libp2pNode extends Libp2p {
     if (peer) {
       this.peers.delete(peer.peerId);
       this.emit('disconnected', peer);
-      await peer.abort();
+      peer.abort();
     }
   }
 

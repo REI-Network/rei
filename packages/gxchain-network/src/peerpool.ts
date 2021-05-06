@@ -112,4 +112,8 @@ export class PeerPool extends EventEmitter {
   getPeer(peerId: string) {
     return this.pool.get(peerId);
   }
+
+  async abort() {
+    await Promise.all(this._nodes.map((n) => n.abort()));
+  }
 }

@@ -218,7 +218,7 @@ export class Libp2pNode extends Libp2p {
   async abort() {
     if (this.started) {
       for (const [peerId, peer] of this.peers) {
-        await peer.abort();
+        peer.abort();
       }
       this.peers.clear();
       await this.stop();

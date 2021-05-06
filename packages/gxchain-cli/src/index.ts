@@ -7,6 +7,13 @@ import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
 import { setLevel, logger } from '@gxchain2/utils';
 
+process.on('uncaughtException', (err) => {
+  logger.error('uncaughtException:', err);
+});
+process.on('unhandledRejection', (err) => {
+  logger.error('unhandledRejection:', err);
+});
+
 program.version('0.0.1');
 program.option('--rpc', 'open rpc server');
 program.option('--rpc-port <port>', 'rpc server port', '12358');

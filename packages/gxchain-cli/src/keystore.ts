@@ -1,5 +1,4 @@
-import { Address, bufferToHex, BN } from 'ethereumjs-util';
-import { keyFileName, keyStore } from './key';
+import { Address } from 'ethereumjs-util';
 import { Account } from 'web3-core';
 import { Wallet, Accountinfo, urlcompare } from './accounts';
 import { AccountCache } from './accountcache';
@@ -13,12 +12,12 @@ const Accounts = require('web3-eth-accounts');
 const web3accounts = new Accounts();
 
 export class KeyStore {
-  storage: keyStore;
+  storage: KeyStorePassphrase;
   cache: AccountCache;
   unlocked: FunctionalMap<Buffer, Account>;
   wallets: Wallet[];
 
-  constructor(keydir: string, ks: keyStore) {
+  constructor(keydir: string, ks: KeyStorePassphrase) {
     this.storage = ks;
     this.unlocked = createBufferFunctionalMap<Account>();
     this.cache = new AccountCache(keydir);
@@ -131,4 +130,11 @@ export function newKeyStore(keydir: string) {
   const keypassphrase = new KeyStorePassphrase(keydir);
   const ks = new KeyStore(keydir, keypassphrase);
   return ks;
+}
+
+export function keyFileName(keyAddr: Address): string {
+  const ts = new Date();
+  const utc = new Date(ts.getTime() + ts.getTimezoneOffset() * 60000);
+  const format = utc.toISOString().replace(/:/g, '-');
+  return 'UTC--' + format + '--' + keyAddr.toString();
 }

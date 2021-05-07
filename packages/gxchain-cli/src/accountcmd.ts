@@ -1,8 +1,7 @@
 import { KeyStorePassphrase } from './passphrase';
-import { KeyStore } from './keystore';
+import { KeyStore, keyFileName } from './keystore';
 import { Address } from 'ethereumjs-util';
 import { Accountinfo } from './accounts';
-import { keyFileName } from './key';
 
 const web3 = require('web3-eth-accounts');
 const web3account = new web3();

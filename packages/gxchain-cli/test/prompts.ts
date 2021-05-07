@@ -1,5 +1,3 @@
-import { startNode } from '../src/start';
-import program from '../src/program';
 import path from 'path';
 import util from 'util';
 import prompts from 'prompts';
@@ -11,6 +9,9 @@ import { constants } from '@gxchain2/common';
 import { Transaction } from '@gxchain2/tx';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
 import { BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
+import { startNode } from '../src/start';
+import program from '../src/program';
+import { SIGINT } from '../src/process';
 
 const keyPair = new Map<string, Buffer>([
   ['0x3289621709f5b35d09b4335e129907ac367a0593', Buffer.from('d8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0', 'hex')],
@@ -170,7 +171,8 @@ const startPrompts = async (node: Node) => {
     });
 
     if (response.cmd === undefined || response.cmd === 'exit' || response.cmd === 'q' || response.cmd === 'quit') {
-      process.exit(0);
+      process.emit('SIGINT', 'SIGINT');
+      break;
     }
 
     try {
@@ -191,6 +193,7 @@ const startPrompts = async (node: Node) => {
     const opts = program.opts();
     opts.datadir = path.join(__dirname, './test-dir/', opts.datadir);
     const [node, sever] = await startNode(opts);
+    SIGINT(node);
     if (opts.mine !== true) {
       node.miner.setCoinbase('0x3289621709f5b35d09b4335e129907ac367a0593');
     }

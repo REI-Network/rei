@@ -9,8 +9,8 @@ process.on('unhandledRejection', (err) => {
   logger.error('unhandledRejection:', err);
 });
 
+let SIGINTLock = false;
 export function SIGINT(node: Node) {
-  let SIGINTLock = false;
   process.on('SIGINT', () => {
     if (!SIGINTLock) {
       logger.info('SIGINT, graceful exit');

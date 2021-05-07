@@ -1,7 +1,6 @@
 import express from 'express';
 import expressws from 'express-ws';
 import * as http from 'http';
-import { EventEmitter } from 'events';
 import { Node } from '@gxchain2/core';
 import { JsonRPCMiddleware } from './jsonrpcmiddleware';
 import { Controller } from './controller';
@@ -23,7 +22,7 @@ export class RpcContext {
 
 export const emptyContext = new RpcContext();
 
-export class RpcServer extends EventEmitter {
+export class RpcServer {
   private readonly port: number;
   private readonly host: string;
   private running: boolean = false;
@@ -35,7 +34,6 @@ export class RpcServer extends EventEmitter {
   }
 
   constructor(port: number, host: string, node: Node) {
-    super();
     this.port = port;
     this.host = host;
     this.filterSystem = new FilterSystem(node);
@@ -43,10 +41,9 @@ export class RpcServer extends EventEmitter {
   }
 
   start() {
-    return new Promise<boolean>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
       if (this.running) {
-        this.emit('error', new Error('RPC and WS server already started!'));
-        resolve(false);
+        reject(new Error('RPC and WS server already started!'));
         return;
       }
 
@@ -62,7 +59,9 @@ export class RpcServer extends EventEmitter {
         app.ws('/', (ws) => {
           const context = new RpcContext(new WsClient(ws));
           jsonmid.wrapWs(context);
-          ws.on('error', (err) => this.emit('error', err));
+          ws.on('error', (err) => {
+            logger.detail('RpcServer, ws error:', err);
+          });
           ws.on('close', () => {
             context.client!.close();
           });
@@ -70,21 +69,20 @@ export class RpcServer extends EventEmitter {
 
         server.once('error', (err) => {
           server.removeAllListeners();
-          this.emit('error', err);
-          resolve(false);
+          logger.error('RpcServer, error:', err);
+          reject(err);
         });
         server.listen(this.port, this.host, () => {
           logger.info(`Rpc server listening on ${this.host.indexOf('.') === -1 ? '[' + this.host + ']' : this.host}:${this.port}`);
           server.removeAllListeners('error');
           server.on('error', (err) => {
-            this.emit('error', err);
+            logger.error('RpcServer, error:', err);
           });
-          resolve(true);
+          resolve();
         });
       } catch (err) {
         this.running = false;
-        this.emit('error', err);
-        resolve(false);
+        reject(err);
       }
     });
   }

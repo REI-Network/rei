@@ -60,7 +60,7 @@ export class KeyStore {
     return tx.sign(Buffer.from(key.privateKey));
   }
 
-  importKey(key: any, passphrase: string) {
+  importKey(key: { address: string; privateKey: string }, passphrase: string) {
     const addr = Address.fromString(key.address);
     const a: Accountinfo = { address: addr, url: { Scheme: 'keystore', Path: path.join(this.storage.joinPath(keyFileName(addr))) } };
     this.storage.storekey(a.url.Path, key, passphrase);

@@ -28,7 +28,7 @@ export class KeyStorePassphrase {
     return path.join(this.keyDirPath, filename);
   }
 
-  storekey(filename: string, key: any, auth: string) {
+  storekey(filename: string, key: { address: string; privateKey: string }, auth: string) {
     const keyjson = web3accounts.encrypt(key.privateKey, auth);
     fs.mkdirSync(path.dirname(filename), { mode: 0o700, recursive: true });
     const tmpname = path.join(path.dirname(filename), path.basename(filename) + '.tmp');

@@ -29,9 +29,14 @@ export class KeyStore {
   }
 
   getDecryptedKey(a: Accountinfo, auth: string) {
-    const account = this.cache.find(a);
-    const key = this.storage.getkey(a.address, a.url.Path, auth);
-    return [account, key];
+    try {
+      const account = this.cache.find(a);
+      const key = this.storage.getkey(a.address, a.url.Path, auth);
+      return [account, key];
+    } catch (err) {
+      console.log(err);
+      return [];
+    }
   }
 
   signHash(a: Accountinfo, hash: Buffer) {

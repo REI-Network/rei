@@ -5,6 +5,10 @@ import path from 'path';
 import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
 import { FileCache } from './filecache';
 
+class Errexpand extends Error {
+  accountinfo = {};
+}
+
 export class AccountCache {
   keydir: string;
   //   watcher:watcher;
@@ -128,7 +132,9 @@ export class AccountCache {
       case 0:
         return;
       default:
-        return;
+        const err = new Errexpand('The Address has more than one file exists');
+        err.accountinfo = { Addr: a.address, match: matches };
+        throw err;
     }
   }
 

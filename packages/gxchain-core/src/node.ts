@@ -12,7 +12,7 @@ import { StateManager } from '@gxchain2/state-manager';
 import { VM, WrappedVM } from '@gxchain2/vm';
 import { TxPool } from '@gxchain2/tx-pool';
 import { Block } from '@gxchain2/block';
-import { Transaction } from '@gxchain2/tx';
+import { TypedTransaction } from '@gxchain2/tx';
 import { hexStringToBuffer, Channel, Aborter, logger } from '@gxchain2/utils';
 import { FullSynchronizer, Synchronizer } from './sync';
 import { TxFetcher } from './txsync';
@@ -36,9 +36,9 @@ export interface NodeOptions {
 }
 
 class NewPendingTxsTask {
-  txs: Transaction[];
+  txs: TypedTransaction[];
   resolve: (results: boolean[]) => void;
-  constructor(txs: Transaction[], resolve: (results: boolean[]) => void) {
+  constructor(txs: TypedTransaction[], resolve: (results: boolean[]) => void) {
     this.txs = txs;
     this.resolve = resolve;
   }
@@ -381,7 +381,7 @@ export class Node {
    * Push pending transactions to the taskQueue
    * @param txs - transactions
    */
-  async addPendingTxs(txs: Transaction[]) {
+  async addPendingTxs(txs: TypedTransaction[]) {
     await this.initPromise;
     return new Promise<boolean[]>((resolve) => {
       this.taskQueue.push(new NewPendingTxsTask(txs, resolve));

@@ -1,14 +1,14 @@
 import { BN } from 'ethereumjs-util';
 import Heap from 'qheap';
-import { Transaction, WrappedTransaction } from '@gxchain2/tx';
+import { TypedTransaction, WrappedTransaction } from '@gxchain2/tx';
 import { logger, createBNFunctionalMap } from '@gxchain2/utils';
 import { txSlots, txCost } from './index';
 
 export class TxSortedMap {
-  readonly nonceToTx = createBNFunctionalMap<Transaction>();
+  readonly nonceToTx = createBNFunctionalMap<TypedTransaction>();
   private readonly strict: boolean;
   private nonceHeap: Heap;
-  private sortedTxCache?: Transaction[];
+  private sortedTxCache?: TypedTransaction[];
   private _slots: number = 0;
 
   constructor(strict: boolean) {
@@ -16,15 +16,15 @@ export class TxSortedMap {
     this.resetNonceHeap();
   }
 
-  private increaseSlots(txs: Transaction | Transaction[]) {
-    txs = txs instanceof Transaction ? [txs] : txs;
+  private increaseSlots(txs: TypedTransaction | TypedTransaction[]) {
+    txs = Array.isArray(txs) ? txs : [txs];
     for (const tx of txs) {
       this._slots += txSlots(tx);
     }
   }
 
-  private decreaseSlots(txs: Transaction | Transaction[]) {
-    txs = txs instanceof Transaction ? [txs] : txs;
+  private decreaseSlots(txs: TypedTransaction | TypedTransaction[]) {
+    txs = Array.isArray(txs) ? txs : [txs];
     for (const tx of txs) {
       this._slots -= txSlots(tx);
     }
@@ -42,7 +42,7 @@ export class TxSortedMap {
     }
   }
 
-  private strictCheck(nonce: BN, invalids: Transaction[]) {
+  private strictCheck(nonce: BN, invalids: TypedTransaction[]) {
     if (this.strict) {
       for (const [key, value] of this.nonceToTx) {
         if (value.nonce.gt(nonce)) {
@@ -66,7 +66,7 @@ export class TxSortedMap {
   }
 
   forward(nonce: BN) {
-    const removed: Transaction[] = [];
+    const removed: TypedTransaction[] = [];
     let nonceInHeap: BN = this.nonceHeap.peek();
     while (nonceInHeap && nonceInHeap.lt(nonce)) {
       const tx = this.nonceToTx.get(nonceInHeap)!;
@@ -83,7 +83,7 @@ export class TxSortedMap {
   }
 
   resize(size: number) {
-    const removed: Transaction[] = [];
+    const removed: TypedTransaction[] = [];
     if (this.size <= size) {
       return removed;
     }
@@ -102,7 +102,7 @@ export class TxSortedMap {
     return removed;
   }
 
-  push(tx: Transaction, priceBump: number): { inserted: boolean; old?: Transaction } {
+  push(tx: TypedTransaction, priceBump: number): { inserted: boolean; old?: TypedTransaction } {
     const nonce = tx.nonce;
     const old = this.nonceToTx.get(nonce);
     if (old) {
@@ -124,11 +124,11 @@ export class TxSortedMap {
     };
   }
 
-  delete(nonce: BN): { deleted: boolean; invalids?: Transaction[] } {
+  delete(nonce: BN): { deleted: boolean; invalids?: TypedTransaction[] } {
     const removedTx = this.nonceToTx.get(nonce);
     if (removedTx) {
       this.nonceToTx.delete(nonce);
-      const invalids: Transaction[] = [];
+      const invalids: TypedTransaction[] = [];
       this.strictCheck(nonce, invalids);
       this.resetNonceHeap(this.nonceToTx.keys());
       this.decreaseSlots(invalids.concat(removedTx));
@@ -143,9 +143,9 @@ export class TxSortedMap {
     };
   }
 
-  filter(balance: BN, gasLimit: BN): { removed: Transaction[]; invalids: Transaction[] } {
+  filter(balance: BN, gasLimit: BN): { removed: TypedTransaction[]; invalids: TypedTransaction[] } {
     let lowestNonce: BN | undefined;
-    const removed: Transaction[] = [];
+    const removed: TypedTransaction[] = [];
     for (const [key, value] of this.nonceToTx) {
       if (txCost(value).gt(balance) || value.gasLimit.gt(gasLimit)) {
         lowestNonce = lowestNonce ? (lowestNonce.gt(key) ? key : lowestNonce) : key;
@@ -153,7 +153,7 @@ export class TxSortedMap {
         this.nonceToTx.delete(key);
       }
     }
-    const invalids: Transaction[] = [];
+    const invalids: TypedTransaction[] = [];
     if (lowestNonce) {
       this.strictCheck(lowestNonce, invalids);
     }
@@ -162,9 +162,9 @@ export class TxSortedMap {
     return { removed, invalids };
   }
 
-  ready(start: BN): Transaction[] {
+  ready(start: BN): TypedTransaction[] {
     const nonce = start.clone();
-    const readies: Transaction[] = [];
+    const readies: TypedTransaction[] = [];
     let nonceInHeap: BN = this.nonceHeap.peek();
     while (nonceInHeap && nonceInHeap.eq(nonce)) {
       readies.push(this.nonceToTx.get(nonceInHeap)!);
@@ -180,7 +180,7 @@ export class TxSortedMap {
     return readies;
   }
 
-  clear(): Transaction[] {
+  clear(): TypedTransaction[] {
     const removed = Array.from(this.nonceToTx.values());
     this.nonceToTx.clear();
     this.resetNonceHeap();
@@ -189,7 +189,7 @@ export class TxSortedMap {
     return removed;
   }
 
-  toList(): Transaction[] {
+  toList(): TypedTransaction[] {
     if (this.sortedTxCache) {
       return this.sortedTxCache;
     }

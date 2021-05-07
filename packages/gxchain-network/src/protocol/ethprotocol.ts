@@ -1,7 +1,7 @@
 import { bufferToInt, rlp } from 'ethereumjs-util';
 import { constants } from '@gxchain2/common';
 import { Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/block';
-import { Transaction } from '@gxchain2/tx';
+import { TxFromValuesArray, TypedTransaction } from '@gxchain2/tx';
 import { Protocol, Handler, MsgContext } from './protocol';
 import { logger } from '@gxchain2/utils';
 
@@ -51,8 +51,8 @@ const handlers: Handler[] = [
     response: 4,
     encode: (info: MsgContext, headers: BlockHeader[]) => rlp.encode([3, headers.map((h) => h.hash())]),
     decode: (info: MsgContext, headerHashs: Buffer[]) => headerHashs,
-    async process(info: MsgContext, headerHashs: Buffer[]): Promise<[string, Transaction[][]]> {
-      const bodies: Transaction[][] = [];
+    async process(info: MsgContext, headerHashs: Buffer[]): Promise<[string, TypedTransaction[][]]> {
+      const bodies: TypedTransaction[][] = [];
       for (const hash of headerHashs) {
         try {
           const block = await info.node.db.getBlock(hash);
@@ -70,16 +70,16 @@ const handlers: Handler[] = [
   {
     name: 'BlockBodies',
     code: 4,
-    encode: (info: MsgContext, bodies: Transaction[][]) =>
+    encode: (info: MsgContext, bodies: TypedTransaction[][]) =>
       rlp.encode([
         4,
         bodies.map((txs) => {
           return txs.map((tx) => tx.raw());
         })
       ]),
-    decode: (info: MsgContext, bodies: TransactionsBuffer[]): Transaction[][] =>
+    decode: (info: MsgContext, bodies: TransactionsBuffer[]): TypedTransaction[][] =>
       bodies.map((txs) => {
-        return txs.map((tx) => Transaction.fromValuesArray(tx, { common: info.node.common }));
+        return txs.map((tx) => TxFromValuesArray(tx, { common: info.node.common }));
       })
   },
   {
@@ -117,8 +117,8 @@ const handlers: Handler[] = [
   {
     name: 'PooledTransactions',
     code: 8,
-    encode: (info: MsgContext, txs: Transaction[]) => rlp.encode([8, txs.map((tx) => tx.raw())]),
-    decode: (info: MsgContext, raws: TransactionsBuffer) => raws.map((raw) => Transaction.fromValuesArray(raw, { common: info.node.common }))
+    encode: (info: MsgContext, txs: TypedTransaction[]) => rlp.encode([8, txs.map((tx) => tx.raw())]),
+    decode: (info: MsgContext, raws: TransactionsBuffer) => raws.map((raw) => TxFromValuesArray(raw, { common: info.node.common }))
   },
   {
     name: 'Echo',

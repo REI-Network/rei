@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { Transaction } from '@gxchain2/tx';
+import { TransactionFactory, TypedTransaction } from '@gxchain2/tx';
 import { INode } from './index';
 import { logger } from '@gxchain2/utils';
 import Semaphore from 'semaphore-async-await';
@@ -38,7 +38,7 @@ export class Journal {
    * load parses a transaction journal dump from `disk`, loading its contents into the specified pool.
    * @param add - Callback for adding transactions
    */
-  load(add: (transactions: Transaction[]) => Promise<void>) {
+  load(add: (transactions: TypedTransaction[]) => Promise<void>) {
     if (!fs.existsSync(this.path)) {
       fs.mkdirSync(this.dir, { recursive: true });
       return;
@@ -46,7 +46,7 @@ export class Journal {
 
     return new Promise<boolean>(async (resolve) => {
       const inputer = fs.createReadStream(this.path, { autoClose: true });
-      let batch: Transaction[] = [];
+      let batch: TypedTransaction[] = [];
       let bufferInput: Buffer | undefined;
       inputer.on('data', (chunk: Buffer) => {
         try {
@@ -60,7 +60,7 @@ export class Journal {
             if (i === -1) {
               break;
             }
-            const tx = Transaction.fromRlpSerializedTx(bufferInput.slice(0, i), { common: this.node.common });
+            const tx = TransactionFactory.fromSerializedData(bufferInput.slice(0, i), { common: this.node.common });
             batch.push(tx);
             if (batch.length > 1024) {
               add(batch);
@@ -92,7 +92,7 @@ export class Journal {
    * insert adds the specified transaction to the local disk journal.
    * @param tx - transaction to insert
    */
-  async insert(tx: Transaction) {
+  async insert(tx: TypedTransaction) {
     await this.lock.acquire();
     this.createWritterIfNotExists();
     await new Promise<void>((resolve) => {
@@ -111,7 +111,7 @@ export class Journal {
    *the transaction pool.
    * @param all - The map containing the information to be rotated
    */
-  async rotate(all: Map<Buffer, Transaction[]>) {
+  async rotate(all: Map<Buffer, TypedTransaction[]>) {
     await this.lock.acquire();
     try {
       await this.closeWritter();

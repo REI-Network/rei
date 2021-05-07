@@ -4,7 +4,7 @@ import { DBOp, DBTarget, DatabaseKey, DBOpData } from '@ethereumjs/blockchain/di
 import Cache from '@ethereumjs/blockchain/dist/db/cache';
 import { BN, rlp, toBuffer } from 'ethereumjs-util';
 import { Block, BlockBodyBuffer, BlockHeader, BlockHeaderBuffer } from '@gxchain2/block';
-import { Transaction, WrappedTransaction } from '@gxchain2/tx';
+import { TypedTransaction, WrappedTransaction } from '@gxchain2/tx';
 import { Receipt } from '@gxchain2/receipt';
 import { Common, constants } from '@gxchain2/common';
 import { compressBytes, decompressBytes } from '@gxchain2/utils';
@@ -178,7 +178,7 @@ export class Database extends DBManager {
     return self._db.get(dbKey, dbOpts);
   }
 
-  async getTransaction(txHash: Buffer): Promise<Transaction> {
+  async getTransaction(txHash: Buffer): Promise<TypedTransaction> {
     const blockHeightBuffer = await this.get(DBTarget_TxLookup, { txHash } as any);
     const blockHeihgt = new BN(blockHeightBuffer);
     const block = await this.getBlock(blockHeihgt);

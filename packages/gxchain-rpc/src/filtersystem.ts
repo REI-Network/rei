@@ -5,7 +5,7 @@ import { Log } from '@gxchain2/receipt';
 import { BlockHeader } from '@gxchain2/block';
 import { Topics, BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
 import { Node } from '@gxchain2/core';
-import { Transaction } from '@gxchain2/tx';
+import { TypedTransaction } from '@gxchain2/tx';
 import { WsClient } from './client';
 import { SyncingStatus } from './types';
 
@@ -105,7 +105,7 @@ export class FilterSystem {
     this.node.sync.on('synchronized', () => {
       this.taskQueue.push(new SyncingTask(false));
     });
-    this.node.txPool.on('readies', (readies: Transaction[]) => {
+    this.node.txPool.on('readies', (readies: TypedTransaction[]) => {
       this.taskQueue.push(new PendingTxTask(readies.map((tx) => tx.hash())));
     });
   }

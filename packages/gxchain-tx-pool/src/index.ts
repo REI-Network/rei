@@ -2,7 +2,7 @@ import EventEmitter from 'events';
 import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Heap from 'qheap';
 import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Aborter, logger } from '@gxchain2/utils';
-import { Transaction, WrappedTransaction, calculateIntrinsicGas } from '@gxchain2/tx';
+import { TxFromValuesArray, TypedTransaction, WrappedTransaction, calculateIntrinsicGas } from '@gxchain2/tx';
 import { StateManager } from '@gxchain2/state-manager';
 import { Blockchain } from '@gxchain2/blockchain';
 import { BlockHeader, Block, BlockBodyBuffer } from '@gxchain2/block';
@@ -19,7 +19,7 @@ export interface INode {
   blockchain: Blockchain;
   aborter: Aborter;
   getStateManager(root: Buffer): Promise<StateManager>;
-  addPendingTxs: (txs: Transaction[]) => Promise<boolean[]>;
+  addPendingTxs: (txs: TypedTransaction[]) => Promise<boolean[]>;
   miner: {
     gasLimit: BN;
   };
@@ -30,7 +30,7 @@ export interface INode {
  * @param tx - transaction
  * @returns the number of transaction's slots
  */
-export function txSlots(tx: Transaction) {
+export function txSlots(tx: TypedTransaction) {
   return Math.ceil(new WrappedTransaction(tx).size / 32768);
 }
 
@@ -39,7 +39,7 @@ export function txSlots(tx: Transaction) {
  * @param tx - transcation
  * @returns The value of transaction cost
  */
-export function txCost(tx: Transaction) {
+export function txCost(tx: TypedTransaction) {
   return tx.value.add(tx.gasPrice.mul(tx.gasLimit));
 }
 
@@ -48,7 +48,7 @@ export function txCost(tx: Transaction) {
  * @param tx - transcation
  * @returns return ture if gas is between the maximum and minimum gas
  */
-export function checkTxIntrinsicGas(tx: Transaction) {
+export function checkTxIntrinsicGas(tx: TypedTransaction) {
   const gas = calculateIntrinsicGas(tx);
   return gas.lte(uint64Max) && gas.lte(tx.gasLimit);
 }
@@ -116,9 +116,9 @@ class TxPoolAccount {
 }
 
 export declare interface TxPool {
-  on(event: 'readies', listener: (readies: Transaction[]) => void): this;
+  on(event: 'readies', listener: (readies: TypedTransaction[]) => void): this;
 
-  once(event: 'readies', listener: (readies: Transaction[]) => void): this;
+  once(event: 'readies', listener: (readies: TypedTransaction[]) => void): this;
 }
 
 export class TxPool extends EventEmitter {
@@ -126,7 +126,7 @@ export class TxPool extends EventEmitter {
 
   private readonly accounts: FunctionalMap<Buffer, TxPoolAccount>;
   private readonly locals: FunctionalSet<Buffer>;
-  private readonly txs: FunctionalMap<Buffer, Transaction>;
+  private readonly txs: FunctionalMap<Buffer, TypedTransaction>;
   private readonly node: INode;
   private readonly initPromise: Promise<void>;
 
@@ -167,7 +167,7 @@ export class TxPool extends EventEmitter {
     this.node = options.node;
     this.aborter = options.node.aborter;
     this.accounts = createBufferFunctionalMap<TxPoolAccount>();
-    this.txs = createBufferFunctionalMap<Transaction>();
+    this.txs = createBufferFunctionalMap<TypedTransaction>();
     this.locals = createBufferFunctionalSet();
     this.priced = new TxPricedList(this.txs);
 
@@ -180,8 +180,8 @@ export class TxPool extends EventEmitter {
     }
   }
 
-  private local(): Map<Buffer, Transaction[]> {
-    const txs = createBufferFunctionalMap<Transaction[]>();
+  private local(): Map<Buffer, TypedTransaction[]> {
+    const txs = createBufferFunctionalMap<TypedTransaction[]>();
     for (const addrBuf of this.locals) {
       const account = this.accounts.get(addrBuf);
       if (account?.hasPending()) {
@@ -237,9 +237,9 @@ export class TxPool extends EventEmitter {
     }
   }
 
-  private emitReadies(readies?: Map<Buffer, Transaction[]>) {
+  private emitReadies(readies?: Map<Buffer, TypedTransaction[]>) {
     if (readies) {
-      let txs: Transaction[] = [];
+      let txs: TypedTransaction[] = [];
       for (const list of readies.values()) {
         txs = txs.concat(list);
       }
@@ -259,8 +259,8 @@ export class TxPool extends EventEmitter {
     this.currentHeader = this.node.blockchain.latestBlock.header;
     this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot);
     if (this.journal) {
-      await this.journal.load(async (txs: Transaction[]) => {
-        let news: Transaction[] = [];
+      await this.journal.load(async (txs: TypedTransaction[]) => {
+        let news: TypedTransaction[] = [];
         for (const tx of txs) {
           if (this.txs.has(tx.hash())) {
             continue;
@@ -311,7 +311,7 @@ export class TxPool extends EventEmitter {
         return Block.fromBlockData(
           {
             header: header,
-            transactions: bodyBuffer ? bodyBuffer[0].map((rawTx) => Transaction.fromValuesArray(rawTx, { common: this.node.common })) : []
+            transactions: bodyBuffer ? bodyBuffer[0].map((rawTx) => TxFromValuesArray(rawTx, { common: this.node.common })) : []
           },
           { common: this.node.common }
         );
@@ -319,7 +319,7 @@ export class TxPool extends EventEmitter {
 
       const originalNewBlock = newBlock;
       let oldBlock = await getBlock(this.currentHeader.hash(), this.currentHeader.number);
-      let discarded: Transaction[] = [];
+      let discarded: TypedTransaction[] = [];
       const included = createBufferFunctionalSet();
       while (oldBlock.header.number.gt(newBlock.header.number)) {
         discarded = discarded.concat(oldBlock.transactions);
@@ -342,7 +342,7 @@ export class TxPool extends EventEmitter {
       if (!oldBlock.hash().equals(newBlock.hash())) {
         throw new Error('reorg failed');
       }
-      const reinject: Transaction[] = [];
+      const reinject: TypedTransaction[] = [];
       for (const tx of discarded) {
         if (!included.has(tx.hash())) {
           reinject.push(tx);
@@ -364,9 +364,9 @@ export class TxPool extends EventEmitter {
    * @param txs - transaction or transactions
    * @returns The array of judgments of whether was successfully added
    */
-  async addTxs(txs: Transaction | Transaction[]) {
+  async addTxs(txs: TypedTransaction | TypedTransaction[]) {
     await this.initPromise;
-    txs = txs instanceof Transaction ? [txs] : txs;
+    txs = Array.isArray(txs) ? txs : [txs];
     try {
       const result = await this._addTxs(txs, false);
       this.emitReadies(result.readies);
@@ -458,7 +458,7 @@ export class TxPool extends EventEmitter {
     return result;
   }
 
-  private async _addTxs(txs: Transaction[], force: boolean): Promise<{ results: boolean[]; readies?: Map<Buffer, Transaction[]> }> {
+  private async _addTxs(txs: TypedTransaction[], force: boolean): Promise<{ results: boolean[]; readies?: Map<Buffer, TypedTransaction[]> }> {
     const dirtyAddrs: Address[] = [];
     const results: boolean[] = [];
     for (const tx of txs) {
@@ -520,7 +520,7 @@ export class TxPool extends EventEmitter {
     }
   }
 
-  private removeTxFromGlobal(key: Transaction | Transaction[]) {
+  private removeTxFromGlobal(key: TypedTransaction | TypedTransaction[]) {
     if (Array.isArray(key)) {
       for (const tx of key) {
         this.txs.delete(tx.hash());
@@ -530,7 +530,7 @@ export class TxPool extends EventEmitter {
     }
   }
 
-  private async validateTx(tx: Transaction): Promise<boolean> {
+  private async validateTx(tx: TypedTransaction): Promise<boolean> {
     // TODO: report error.
     try {
       const txSize = new WrappedTransaction(tx).size;
@@ -572,7 +572,7 @@ export class TxPool extends EventEmitter {
     }
   }
 
-  private enqueueTx(tx: Transaction): boolean {
+  private enqueueTx(tx: TypedTransaction): boolean {
     const account = this.getAccount(tx.getSenderAddress());
     const { inserted, old } = account.queue.push(tx, this.priceBump);
     if (inserted) {
@@ -585,7 +585,7 @@ export class TxPool extends EventEmitter {
     return inserted;
   }
 
-  private promoteTx(tx: Transaction): boolean {
+  private promoteTx(tx: TypedTransaction): boolean {
     const account = this.getAccount(tx.getSenderAddress());
     const { inserted, old } = account.pending.push(tx, this.priceBump);
     if (inserted) {
@@ -599,9 +599,9 @@ export class TxPool extends EventEmitter {
     return inserted;
   }
 
-  private async promoteExecutables(dirtyAddrs?: Address[]): Promise<Map<Buffer, Transaction[]>> {
-    const promoteAccount = async (sender: Buffer, account: TxPoolAccount): Promise<Transaction[]> => {
-      let readies: Transaction[] = [];
+  private async promoteExecutables(dirtyAddrs?: Address[]): Promise<Map<Buffer, TypedTransaction[]>> {
+    const promoteAccount = async (sender: Buffer, account: TxPoolAccount): Promise<TypedTransaction[]> => {
+      let readies: TypedTransaction[] = [];
       if (!account.hasQueue()) {
         return readies;
       }
@@ -631,7 +631,7 @@ export class TxPool extends EventEmitter {
       return readies;
     };
 
-    const txs = createBufferFunctionalMap<Transaction[]>();
+    const txs = createBufferFunctionalMap<TypedTransaction[]>();
     if (dirtyAddrs) {
       for (const addr of dirtyAddrs) {
         const account = this.getAccount(addr);

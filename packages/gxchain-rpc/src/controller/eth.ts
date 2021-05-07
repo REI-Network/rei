@@ -1,6 +1,6 @@
 import { Address, bnToHex, bufferToHex, toBuffer } from 'ethereumjs-util';
 import { WrappedBlock } from '@gxchain2/block';
-import { Transaction, WrappedTransaction } from '@gxchain2/tx';
+import { TransactionFactory, WrappedTransaction } from '@gxchain2/tx';
 import { hexStringToBuffer } from '@gxchain2/utils';
 import { Log } from '@gxchain2/receipt';
 import * as helper from '../helper';
@@ -135,7 +135,7 @@ export class ETHController extends Controller {
     return '0x00';
   }
   async eth_sendRawTransaction([rawtx]: [string]) {
-    const tx = Transaction.fromRlpSerializedTx(hexStringToBuffer(rawtx), { common: this.node.common });
+    const tx = TransactionFactory.fromSerializedData(hexStringToBuffer(rawtx), { common: this.node.common });
     const results = await this.node.addPendingTxs([tx]);
     return results && results.length > 0 && results[0] ? bufferToHex(tx.hash()) : null;
   }

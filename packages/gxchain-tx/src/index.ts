@@ -1,12 +1,14 @@
-import { Transaction } from '@ethereumjs/tx';
+import { TypedTransaction, TxOptions, Transaction, AccessListEIP2930Transaction, AccessListEIP2930ValuesArray } from '@ethereumjs/tx';
 import { BN, bufferToHex, bnToHex, intToHex, rlp } from 'ethereumjs-util';
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
 
-export function txSize(tx: Transaction) {
+export function txSize(tx: TypedTransaction) {
   const raw = tx.raw();
   let size = 0;
   for (const b of raw) {
-    size += b.length;
+    if (b instanceof Buffer) {
+      size += b.length;
+    }
   }
   return size;
 }
@@ -18,10 +20,14 @@ export interface BlockLike {
   };
 }
 
-export class WrappedTransaction {
-  public readonly transaction: Transaction;
+export function TxFromValuesArray(values: Buffer[], opts?: TxOptions) {
+  return values.length === 6 ? Transaction.fromValuesArray(values, opts) : AccessListEIP2930Transaction.fromValuesArray(values as AccessListEIP2930ValuesArray, opts);
+}
 
-  constructor(transaction: Transaction) {
+export class WrappedTransaction {
+  public readonly transaction: TypedTransaction;
+
+  constructor(transaction: TypedTransaction) {
     this.transaction = transaction;
   }
 
@@ -67,7 +73,7 @@ export class WrappedTransaction {
   }
 }
 
-export async function calculateTransactionTrie(transactions: Transaction[]): Promise<Buffer> {
+export async function calculateTransactionTrie(transactions: TypedTransaction[]): Promise<Buffer> {
   const txTrie = new Trie();
   for (let i = 0; i < transactions.length; i++) {
     const tx = transactions[i];
@@ -78,7 +84,7 @@ export async function calculateTransactionTrie(transactions: Transaction[]): Pro
   return txTrie.root;
 }
 
-export function calculateIntrinsicGas(tx: Transaction) {
+export function calculateIntrinsicGas(tx: TypedTransaction) {
   const gas = tx.toCreationAddress() ? new BN(53000) : new BN(21000);
   const nz = new BN(0);
   const z = new BN(0);

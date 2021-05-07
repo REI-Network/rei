@@ -1,13 +1,13 @@
 import EventEmitter from 'events';
 import { BN } from 'ethereumjs-util';
-import { Transaction } from '@gxchain2/tx';
+import { TxFromValuesArray, TypedTransaction } from '@gxchain2/tx';
 import { Block, BlockHeader, BlockBodyBuffer } from '@gxchain2/block';
 import { createBufferFunctionalMap, logger } from '@gxchain2/utils';
 import { Log } from '@gxchain2/receipt';
 import { Node } from '../node';
 
 // record block hash and block number for quering receipt.
-type TransactionInfo = { tx: Transaction; blockHash: Buffer; blockNumber: BN };
+type TransactionInfo = { tx: TypedTransaction; blockHash: Buffer; blockNumber: BN };
 
 export declare interface BlockchainMonitor {
   on(event: 'logs' | 'removedLogs', listener: (logs: Log[]) => void): this;
@@ -54,7 +54,7 @@ export class BlockchainMonitor extends EventEmitter {
         return Block.fromBlockData(
           {
             header: header,
-            transactions: bodyBuffer ? bodyBuffer[0].map((rawTx) => Transaction.fromValuesArray(rawTx, { common: this.node.common })) : []
+            transactions: bodyBuffer ? bodyBuffer[0].map((rawTx) => TxFromValuesArray(rawTx, { common: this.node.common })) : []
           },
           { common: this.node.common }
         );

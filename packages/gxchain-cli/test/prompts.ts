@@ -6,7 +6,7 @@ import Multiaddr from 'multiaddr';
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
 import { Node } from '@gxchain2/core';
 import { constants } from '@gxchain2/common';
-import { Transaction } from '@gxchain2/tx';
+import { TransactionFactory } from '@gxchain2/tx';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
 import { BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
 import { startNode } from '../src/start';
@@ -119,7 +119,7 @@ const handler: {
     logger.info('balance', acc.balance.toString(), 'nonce', acc.nonce.toString(), 'codeHash', acc.codeHash.toString('hex'));
   },
   puttx: async (node: Node, from: string, to: string, nonce?: string, gasPrice?: string) => {
-    const unsignedTx = Transaction.fromTxData(
+    const unsignedTx = TransactionFactory.fromTxData(
       {
         gasLimit: new BN(21000),
         gasPrice: new BN(gasPrice || 1),

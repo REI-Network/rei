@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
 import { Block, BlockHeader } from '@gxchain2/block';
-import { calculateTransactionTrie, Transaction } from '@gxchain2/tx';
+import { calculateTransactionTrie, TypedTransaction } from '@gxchain2/tx';
 import { PendingTxMap } from '@gxchain2/tx-pool';
 import { WrappedVM } from '@gxchain2/vm';
 import { logger } from '@gxchain2/utils';
@@ -16,7 +16,7 @@ export class Worker extends Loop {
   private readonly initPromise: Promise<void>;
 
   private wvm!: WrappedVM;
-  private txs: Transaction[] = [];
+  private txs: TypedTransaction[] = [];
   private header!: BlockHeader;
   private gasUsed = new BN(0);
 
@@ -81,7 +81,7 @@ export class Worker extends Loop {
    * Add transactions for c
    * @param txs - The map of Buffer and array of transactions
    */
-  async addTxs(txs: Map<Buffer, Transaction[]>) {
+  async addTxs(txs: Map<Buffer, TypedTransaction[]>) {
     await this.initPromise;
     try {
       const pendingMap = new PendingTxMap();

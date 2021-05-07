@@ -11,7 +11,7 @@ import { Database } from '@gxchain2/database';
 import { Aborter } from '@gxchain2/utils';
 import { Peer } from './peer';
 import { Protocol, ETHProtocol } from './protocol';
-import { Transaction } from '@gxchain2/tx';
+import { TypedTransaction } from '@gxchain2/tx';
 import { logger } from '@gxchain2/utils';
 const Libp2p = require('libp2p');
 
@@ -27,7 +27,7 @@ export interface ISync {
 }
 
 export interface ITxPool {
-  getTransaction: (hash: Buffer) => Transaction | undefined;
+  getTransaction: (hash: Buffer) => TypedTransaction | undefined;
 }
 
 export interface ITxFetcher {

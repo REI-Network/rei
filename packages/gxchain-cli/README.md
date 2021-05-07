@@ -17,13 +17,14 @@ npm install @gxchain2/cli --global
 ## Usage
 
 ```
-Usage: index [options] [command]
+Usage: index [options]
 
 Options:
   -V, --version               output the version number
   --rpc                       open rpc server
   --rpc-port <port>           rpc server port (default: "12358")
   --rpc-host <port>           rpc server host (default: "127.0.0.1")
+  --rpc-api <apis>            rpc server apis: debug, eth, net, txpool, web3 (default: "eth,net,web3")
   --p2p-tcp-port <port>       p2p server tcp port (default: "0")
   --p2p-ws-port <port>        p2p server websocket port (default: "0")
   --bootnodes <bootnodes...>  bootnodes list
@@ -32,13 +33,8 @@ Options:
   --coinbase <address>        miner address
   --mine-interval <interval>  mine interval (default: "5000")
   --block-gas-limit <gas>     block gas limit (default: "0xbe5c8b")
-  --verbosity <verbosity>     logging verbosity: silent, error, warn, info, debug, detail (default: info) (default: "info")
+  --verbosity <verbosity>     logging verbosity: silent, error, warn, info, debug, detail (default: "info")
   -h, --help                  display help for command
-
-Commands:
-  start                       start gxchain2
-  attach                      attach to gxchain2 node
-  help [command]              display help for command
 ```
 
 ## Example
@@ -46,11 +42,11 @@ Commands:
 Block producer startup
 
 ```
-gxc2 start --rpc --rpc-host 0.0.0.0 --rpc-port 12345 --datadir ~/gxc2 --mine --coinbase 0x...abc
+gxc2 --rpc --rpc-host 0.0.0.0 --rpc-port 12345 --datadir ~/gxc2 --mine --coinbase 0x...abc
 ```
 
 Normal node startup
 
 ```
-gxc2 start --rpc --rpc-host 0.0.0.0 --rpc-port 12345 --datadir ~/gxc2
+gxc2 --rpc --rpc-host 0.0.0.0 --rpc-port 12345 --datadir ~/gxc2
 ```

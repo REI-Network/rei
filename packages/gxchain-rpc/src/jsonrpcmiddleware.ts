@@ -12,7 +12,7 @@ type JsonRPCBody = { id: any; method: string; jsonrpc: string; params: any };
 export interface JsonMiddlewareOption {
   methods: {
     [name: string]: (params: any, context: RpcContext) => Promise<any> | any;
-  };
+  }[];
   beforeMethods?: {
     [name: string]: HookFunction | HookFunction[];
   };
@@ -47,7 +47,7 @@ export class JsonRPCMiddleware {
         await helper.executeHook(beforeMethod, params, null);
       }
 
-      const p = this.config.methods[method](params, context);
+      const p = this.config.methods.find((c) => method in c)![method](params, context);
       const result = util.types.isPromise(p) ? await p : p;
       const afterMethod = this.config.afterMethods && this.config.afterMethods[method];
       if (afterMethod) {

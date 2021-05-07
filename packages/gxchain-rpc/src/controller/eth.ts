@@ -1,22 +1,11 @@
-import { Address, bnToHex, bufferToHex, keccakFromHexString, toBuffer, BN } from 'ethereumjs-util';
-import { Node } from '@gxchain2/core';
-import { Block, WrappedBlock } from '@gxchain2/block';
+import { Address, bnToHex, bufferToHex, toBuffer } from 'ethereumjs-util';
+import { WrappedBlock } from '@gxchain2/block';
 import { Transaction, WrappedTransaction } from '@gxchain2/tx';
-import { hexStringToBuffer, hexStringToBN, logger } from '@gxchain2/utils';
+import { hexStringToBuffer } from '@gxchain2/utils';
 import { Log } from '@gxchain2/receipt';
-import { Tracer, TraceConfig } from '@gxchain2/core/dist/tracer';
-import * as helper from './helper';
-import { FilterSystem } from './filtersystem';
-import { RpcContext } from './index';
-
-type CallData = {
-  from?: string;
-  to?: string;
-  gas?: string;
-  gasPrice?: string;
-  value?: string;
-  data?: string;
-};
+import * as helper from '../helper';
+import { RpcContext } from '../index';
+import { Controller, CallData } from './base';
 
 type TopicsData = (string | null | (string | null)[])[];
 
@@ -48,116 +37,7 @@ function parseAddressesAndTopics(_addresses?: string[], _topics?: TopicsData) {
   return { addresses, topics };
 }
 
-export class Controller {
-  private readonly node: Node;
-  private readonly filterSystem: FilterSystem;
-  constructor(node: Node, filterSystem: FilterSystem) {
-    this.node = node;
-    this.filterSystem = filterSystem;
-  }
-
-  private async getBlockNumberByTag(tag: string): Promise<BN> {
-    if (tag === 'earliest') {
-      return new BN(0);
-    } else if (tag === 'latest' || tag === undefined) {
-      return this.node.blockchain.latestBlock.header.number.clone();
-    } else if (tag === 'pending') {
-      return this.node.blockchain.latestBlock.header.number.addn(1);
-    } else if (Number.isInteger(Number(tag))) {
-      return new BN(tag);
-    } else {
-      helper.throwRpcErr('Invalid tag value');
-      // for types.
-      return new BN(0);
-    }
-  }
-
-  private async getBlockByTag(tag: string): Promise<Block> {
-    let block!: Block;
-    if (tag === 'earliest') {
-      block = await this.node.blockchain.getBlock(0);
-    } else if (tag === 'latest' || tag === undefined) {
-      block = this.node.blockchain.latestBlock;
-    } else if (tag === 'pending') {
-      block = await this.node.miner.worker.getPendingBlock();
-    } else if (Number.isInteger(Number(tag))) {
-      block = await this.node.blockchain.getBlock(Number(tag));
-    } else {
-      helper.throwRpcErr('Invalid tag value');
-    }
-    return block;
-  }
-
-  private async getWrappedBlockByTag(tag: string) {
-    return new WrappedBlock(await this.getBlockByTag(tag), tag === 'pending');
-  }
-
-  private async getStateManagerByTag(tag: string) {
-    return tag === 'pending' ? await this.node.miner.worker.getPendingStateManager() : this.node.getStateManager((await this.getBlockByTag(tag)).header.stateRoot);
-  }
-
-  private calculateBaseFee(data: CallData) {
-    const txDataZero = this.node.common.param('gasPrices', 'txDataZero');
-    const txDataNonZero = this.node.common.param('gasPrices', 'txDataNonZero');
-    let cost = 0;
-    if (data.data) {
-      const buf = hexStringToBuffer(data.data);
-      for (let i = 0; i < data.data.length; i++) {
-        buf[i] === 0 ? (cost += txDataZero) : (cost += txDataNonZero);
-      }
-    }
-    const fee = new BN(cost).addn(this.node.common.param('gasPrices', 'tx'));
-    if (this.node.common.gteHardfork('homestead') && (data.to === undefined || hexStringToBuffer(data.to).length === 0)) {
-      fee.iaddn(this.node.common.param('gasPrices', 'txCreation'));
-    }
-    return fee;
-  }
-
-  private async runCall(data: CallData, tag: string) {
-    const block = await this.getBlockByTag(tag);
-    const wvm = await this.node.getWrappedVM(block.header.stateRoot);
-    await wvm.vm.stateManager.checkpoint();
-    try {
-      const result = await wvm.runCall({
-        block,
-        gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
-        origin: data.from ? Address.fromString(data.from) : Address.zero(),
-        caller: data.from ? Address.fromString(data.from) : Address.zero(),
-        gasLimit: data.gas ? hexStringToBN(data.gas) : undefined,
-        to: data.to ? Address.fromString(data.to) : undefined,
-        value: data.value ? hexStringToBN(data.value) : undefined,
-        data: data.data ? hexStringToBuffer(data.data) : undefined
-      });
-      if (result.execResult.exceptionError) {
-        throw result.execResult.exceptionError;
-      }
-      await wvm.vm.stateManager.revert();
-      result.gasUsed.iadd(this.calculateBaseFee(data));
-      return result;
-    } catch (err) {
-      await wvm.vm.stateManager.revert();
-      logger.warn('Controller::runCall, catch error:', err);
-      throw err;
-    }
-  }
-
-  web3_clientVersion() {
-    return 'Mist/v0.0.1';
-  }
-  async web_sha3([data]: [string]): Promise<string> {
-    return await bufferToHex(keccakFromHexString(data));
-  }
-
-  net_version() {
-    return '77';
-  }
-  net_listenging() {
-    return true;
-  }
-  net_peerCount() {
-    return bufferToHex(toBuffer(this.node.peerpool.peers.length));
-  }
-
+export class ETHController extends Controller {
   eth_protocolVersion() {
     return '1';
   }
@@ -415,41 +295,5 @@ export class Controller {
     } else {
       return this.filterSystem.subscribe(context.client, type);
     }
-  }
-
-  //db_putString
-  //db_getString
-  //db_putHex
-  //db_getHex
-
-  //shh_version
-  //shh_post
-  //shh_newIdentity
-  //shh_hasIdentity
-  //shh_newGroup(?)
-  //shh_addToGroup
-  //shh_newFilter
-  //shh_uninstallFilter
-  //shh_getFilterChanges
-  //shh_getMessages
-
-  txpool_content() {
-    return this.node.txPool.getPoolContent();
-  }
-
-  debug_traceBlock([blockRlp, options]: [string, undefined | TraceConfig]) {
-    return new Tracer(this.node).traceBlock(hexStringToBuffer(blockRlp), options);
-  }
-  async debug_traceBlockByNumber([tag, options]: [string, undefined | TraceConfig]) {
-    return new Tracer(this.node).traceBlock(await this.getBlockByTag(tag), options);
-  }
-  debug_traceBlockByHash([hash, options]: [string, undefined | TraceConfig]) {
-    return new Tracer(this.node).traceBlockByHash(hexStringToBuffer(hash), options);
-  }
-  debug_traceTransaction([hash, options]: [string, undefined | TraceConfig]) {
-    return new Tracer(this.node).traceTx(hexStringToBuffer(hash), options);
-  }
-  async debug_traceCall([data, tag, options]: [CallData, string, undefined | TraceConfig]) {
-    return new Tracer(this.node).traceCall(data, await this.getBlockByTag(tag), options);
   }
 }

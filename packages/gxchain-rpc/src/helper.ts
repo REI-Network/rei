@@ -21,10 +21,10 @@ export function validateJsonRpcVersion(version: string, requiredVersion: string)
  * @param {string} method
  * @param {array} controller, list of existing methods
  */
-export function validateJsonRpcMethod(method: string, controller: any) {
+export function validateJsonRpcMethod(method: string, controllers: any[]) {
   if (!method || typeof method !== 'string') {
     throwRpcErr(`${error.INVALID_REQUEST.message}, wrong method - ${method}`, error.INVALID_REQUEST.code);
-  } else if (!(method in controller)) {
+  } else if (controllers.find((c) => method in c) === undefined) {
     throwRpcErr(`${error.METHOD_NOT_FOUND.message} - ${method}`, error.METHOD_NOT_FOUND.code);
   }
 }
@@ -54,8 +54,8 @@ export function validateConfig(config: any) {
   if (typeof config !== 'object') {
     throwRpcErr('JSON-RPC error: userConfig should be an object.');
   }
-  if (typeof config.methods !== 'object' || Array.isArray(config.methods)) {
-    throwRpcErr('JSON-RPC error: methods should be an object');
+  if (!Array.isArray(config.methods)) {
+    throwRpcErr('JSON-RPC error: methods should be an array');
   }
   if ('beforeMethods' in config) {
     if (typeof config.beforeMethods !== 'object' || Array.isArray(config.beforeMethods)) {

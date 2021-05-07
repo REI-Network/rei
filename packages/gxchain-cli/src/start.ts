@@ -30,7 +30,7 @@ export async function startNode(opts: { [key: string]: any }): Promise<[Node, un
   SIGINT(node);
   let server: undefined | RpcServer;
   if (opts.rpc) {
-    server = new RpcServer(Number(opts.rpcPort), opts.rpcHost, node);
+    server = new RpcServer(Number(opts.rpcPort), opts.rpcHost, opts.rpcApi, node);
     await server.start();
   }
   return [node, server];

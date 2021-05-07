@@ -3,7 +3,7 @@ import expressws from 'express-ws';
 import * as http from 'http';
 import { Node } from '@gxchain2/core';
 import { JsonRPCMiddleware } from './jsonrpcmiddleware';
-import { Controller } from './controller';
+import { api } from './controller';
 import { logger } from '@gxchain2/utils';
 import { WsClient } from './client';
 import { FilterSystem } from './filtersystem';
@@ -26,18 +26,22 @@ export class RpcServer {
   private readonly port: number;
   private readonly host: string;
   private running: boolean = false;
-  private readonly controller: Controller;
-  private readonly filterSystem: FilterSystem;
+  private readonly controllers: { [name: string]: any }[];
 
   get isRunning() {
     return this.running;
   }
 
-  constructor(port: number, host: string, node: Node) {
+  constructor(port: number, host: string, apis: string, node: Node) {
     this.port = port;
     this.host = host;
-    this.filterSystem = new FilterSystem(node);
-    this.controller = new Controller(node, this.filterSystem);
+    const filterSystem = new FilterSystem(node);
+    this.controllers = apis.split(',').map((name) => {
+      if (!(name in api)) {
+        throw new Error('RpcServer, Unknow api:' + name);
+      }
+      return new api[name](node, filterSystem);
+    });
   }
 
   start() {
@@ -52,7 +56,7 @@ export class RpcServer {
         const app = express();
         const server = http.createServer(app);
         expressws(app, server);
-        const jsonmid = new JsonRPCMiddleware({ methods: this.controller as any });
+        const jsonmid = new JsonRPCMiddleware({ methods: this.controllers });
 
         app.use(express.json({ type: '*/*' }));
         app.use(jsonmid.makeMiddleWare());

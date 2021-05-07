@@ -7,10 +7,10 @@ import { keyFileName } from './key';
 const web3 = require('web3-eth-accounts');
 const web3account = new web3();
 const utils = require('web3-utils');
-const ks = new KeyStorePassphrase('/Users/bijianing/Desktop/keystore');
-const store = new KeyStore('/Users/bijianing/Desktop/keystore', ks);
 
-export function accountCreate(password: string) {
+export function accountCreate(path: string, password: string) {
+  const ks = new KeyStorePassphrase(path);
+  const store = new KeyStore(path, ks);
   const account = store.newaccount(password);
   console.log('Your new key was generated');
   console.log('Public address of the key :', utils.toChecksumAddress(account.address.toString()));
@@ -21,18 +21,24 @@ export function accountCreate(password: string) {
   console.log("- You must REMEMBER your password! Without the password, it's impossible to decrypt the key!");
 }
 
-export function accountUpdate(addr: Accountinfo, oldpassword: string, newpassword: string) {
+export function accountUpdate(path: string, addr: Accountinfo, oldpassword: string, newpassword: string) {
+  const ks = new KeyStorePassphrase(path);
+  const store = new KeyStore(path, ks);
   store.update(addr, oldpassword, newpassword);
 }
 
-export function accountList() {
+export function accountList(path: string) {
+  const ks = new KeyStorePassphrase(path);
+  const store = new KeyStore(path, ks);
   const accounts = store.cache.accounts();
   for (let i = 0; i < accounts.length; i++) {
     console.log('Account #', i, ': {', accounts[i].address.toString(), '}', accounts[i].url.Scheme, ':', accounts[i].url.Path);
   }
 }
 
-export function accountUnlock(addr: string, password: string) {
+export function accountUnlock(path: string, addr: string, password: string) {
+  const ks = new KeyStorePassphrase(path);
+  const store = new KeyStore(path, ks);
   const accounts = store.cache.accounts();
   for (const a of accounts) {
     if (a.address.toString() === addr) {
@@ -47,7 +53,9 @@ export function accountUnlock(addr: string, password: string) {
   }
 }
 
-export function accoumtImport(privatekey: string, auth: string) {
+export function accoumtImport(path: string, privatekey: string, auth: string) {
+  const ks = new KeyStorePassphrase(path);
+  const store = new KeyStore(path, ks);
   const keyjson = web3account.encrypt(privatekey, auth);
   const addr = Address.fromString('0x' + keyjson.address);
   const account: Accountinfo = { address: addr, url: { Path: store.storage.joinPath(keyFileName(addr)), Scheme: 'keystore' } };
@@ -55,7 +63,9 @@ export function accoumtImport(privatekey: string, auth: string) {
   return utils.toChecksumAddress(account.address.toString());
 }
 
-export function hasAddress(privatekey: string) {
+export function hasAddress(path: string, privatekey: string) {
+  const ks = new KeyStorePassphrase(path);
+  const store = new KeyStore(path, ks);
   const accounts = store.cache.accounts();
   const addr = web3account.privateKeyToAccount(privatekey).address;
   for (const a of accounts) {

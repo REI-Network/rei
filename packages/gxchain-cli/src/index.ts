@@ -2,6 +2,7 @@
 
 import process from 'process';
 import fs from 'fs';
+import path from 'path';
 import commander, { program } from 'commander';
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
@@ -35,28 +36,32 @@ program
 
 const account = new commander.Command('account');
 program.addCommand(account);
+const opts = program.opts();
 
 account
   .description('Manage accounts')
   .command('list')
+  .option('--datadir [string]', 'The datadir for keystore', 'keystore')
   .description('List all the accounts')
   .action((options) => {
-    accountcmd.accountList();
+    accountcmd.accountList(path.join(opts.datadir, options.datadir));
   });
 
 account
   .command('new')
   .description('New a account')
   .option('--passwordfile <string>')
+  .option('--datadir [string]', 'The datadir for keystore', 'keystore')
   .action((options) => {
     const password = fs.readFileSync(options.passwordfile);
-    accountcmd.accountCreate(password.toString());
+    accountcmd.accountCreate(path.join(opts.datadir, options.datadir), password.toString());
   });
 
 account
   .command('update')
   .description('Update the account')
   .option('--address <string>')
+  .option('--datadir [string]', 'The datadir for keystore', 'keystore')
   .action((options) => {
     if (!options.opts().address) {
       console.error('You must input a address');
@@ -70,7 +75,7 @@ account
         }
       ])
       .then((answner1) => {
-        const a = accountcmd.accountUnlock(options.opts().address, answner1.password);
+        const a = accountcmd.accountUnlock(path.join(opts.datadir, options.datadir), options.opts().address, answner1.password);
         if (!a) {
           console.error('No account or key is not match');
           return;
@@ -98,7 +103,7 @@ account
                   console.log('You must input the same password!');
                   return;
                 }
-                accountcmd.accountUpdate(a, answner1.password, answner2.newpassword);
+                accountcmd.accountUpdate(path.join(opts.datadir, options.datadir), a, answner1.password, answner2.newpassword);
               });
           });
       });
@@ -107,9 +112,10 @@ account
 account
   .command('import <keydir>')
   .description('Import a account from privatekey file')
-  .action(async (keydir) => {
+  .option('--datadir [string]', 'The datadir for keystore', 'keystore')
+  .action(async (keydir, options) => {
     const key = fs.readFileSync(keydir);
-    if (accountcmd.hasAddress(key.toString())) {
+    if (accountcmd.hasAddress(path.join(opts.datadir, options.datadir), key.toString())) {
       const cover = await inquirer.prompt([
         {
           type: 'confirm',
@@ -139,7 +145,7 @@ account
           console.log('You must input the same password!');
           return;
         }
-        const a = accountcmd.accoumtImport(key.toString(), answer1.password);
+        const a = accountcmd.accoumtImport(path.join(opts.datadir, options.datadir), key.toString(), answer1.password);
         console.log('Address : ', a);
       }
     } else {
@@ -163,7 +169,7 @@ account
         console.log('You must input the same password!');
         return;
       }
-      const a = accountcmd.accoumtImport(key.toString(), answer1.password);
+      const a = accountcmd.accoumtImport(path.join(opts.datadir, options.datadir), key.toString(), answer1.password);
       console.log('Address : ', a);
     }
   });

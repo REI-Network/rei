@@ -11,6 +11,11 @@ export class FileCache {
   }
 
   scan(keydir: string) {
+    try {
+      fs.readdirSync(keydir);
+    } catch (error) {
+      return [[], [], []];
+    }
     const filestmp = fs.readdirSync(keydir);
     const files = filestmp.filter((item) => !/(^|\/)\.[^\/\.]/g.test(item));
     if (files.length == 0) {

@@ -8,6 +8,8 @@ export class WrappedVM {
 
   constructor(vm: VM) {
     this.vm = vm;
+    // TODO: fix this.
+    this.vm._common.removeAllListeners('hardforkChanged');
   }
 
   async runBlock(opts: RunBlockDebugOpts): Promise<RunBlockResult> {

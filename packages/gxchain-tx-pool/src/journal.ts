@@ -60,7 +60,7 @@ export class Journal {
             if (i === -1) {
               break;
             }
-            const tx = TransactionFactory.fromSerializedData(bufferInput.slice(0, i), { common: this.node.common });
+            const tx = TransactionFactory.fromSerializedData(bufferInput.slice(0, i), { common: this.node.getCommon(0) });
             batch.push(tx);
             if (batch.length > 1024) {
               add(batch);

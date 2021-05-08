@@ -43,7 +43,7 @@ export class Tracer {
   }
 
   traceBlock(block: Block | Buffer, config?: TraceConfig, hash?: Buffer) {
-    block = block instanceof Block ? block : Block.fromRLPSerializedBlock(block, { common: this.node.common });
+    block = block instanceof Block ? block : Block.fromRLPSerializedBlock(block, { common: this.node.getCommon(0) });
     if (block.header.number.eqn(0)) {
       throw new Error('invalid block number, 0');
     }
@@ -51,7 +51,7 @@ export class Tracer {
       try {
         block = block as Block;
         const parent = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
-        const wvm = await this.node.getWrappedVM(parent.header.stateRoot);
+        const wvm = await this.node.getWrappedVM(parent.header.stateRoot, block.header.number);
         const debug = this.createDebugImpl((wvm.vm as any)._opcodes, reject, config, hash);
         await wvm.runBlock({ block, debug, skipBlockValidation: true });
         const result = debug.result();
@@ -89,7 +89,7 @@ export class Tracer {
     return new Promise<any>(async (resolve, reject) => {
       try {
         const parent = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
-        const wvm = await this.node.getWrappedVM(parent.header.stateRoot);
+        const wvm = await this.node.getWrappedVM(parent.header.stateRoot, block.header.number.subn(1));
         const debug = this.createDebugImpl((wvm.vm as any)._opcodes, reject, config);
         await wvm.runCall({
           block,

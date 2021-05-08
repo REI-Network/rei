@@ -115,7 +115,7 @@ const handler: {
     logger.info('local height:', height, 'hash:', hash);
   },
   lsaccount: async (node: Node, address: string) => {
-    const acc = await (await node.getStateManager(node.blockchain.latestBlock.header.stateRoot)).getAccount(Address.fromString(address));
+    const acc = await (await node.getStateManager(node.blockchain.latestBlock.header.stateRoot, node.blockchain.latestHeight)).getAccount(Address.fromString(address));
     logger.info('balance', acc.balance.toString(), 'nonce', acc.nonce.toString(), 'codeHash', acc.codeHash.toString('hex'));
   },
   puttx: async (node: Node, from: string, to: string, nonce?: string, gasPrice?: string) => {
@@ -127,7 +127,7 @@ const handler: {
         to,
         value: '0x01'
       },
-      { common: node.common }
+      { common: node.getCommon(node.blockchain.latestHeight) }
     );
     const tx = unsignedTx.sign(getPrivateKey(from));
     const results = await node.addPendingTxs([tx]);

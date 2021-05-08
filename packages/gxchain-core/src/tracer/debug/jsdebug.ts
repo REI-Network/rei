@@ -183,7 +183,7 @@ export class JSDebug implements IDebugImpl {
       return generateAddress2(data instanceof Buffer ? data : hexStringToBuffer(data), hexStringToBuffer(salt), keccak256(code));
     },
     isPrecompiled: (address: Buffer) => {
-      return getPrecompile(new Address(address), this.node.common) !== undefined;
+      return getPrecompile(new Address(address), this.node.getCommon(this.debugContext['block'])) !== undefined;
     },
     slice(buf: Buffer, start: number, end: number) {
       if (start < 0 || start > end || end > buf.length - 1) {

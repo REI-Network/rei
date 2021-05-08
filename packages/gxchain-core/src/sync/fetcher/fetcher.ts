@@ -192,7 +192,7 @@ export class Fetcher extends EventEmitter {
             try {
               const transactions = bodies[i];
               const header = headers[i];
-              const block = Block.fromBlockData({ header, transactions }, { common: this.node.common });
+              const block = Block.fromBlockData({ header, transactions }, { common: this.node.getCommon(header.number) });
               await block.validateData();
               blocks.push(block);
             } catch (err) {

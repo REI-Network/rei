@@ -1,5 +1,5 @@
 import EventEmitter from 'events';
-import { BN, Address, bufferToHex } from 'ethereumjs-util';
+import { BN, Address, bufferToHex, BNLike } from 'ethereumjs-util';
 import Heap from 'qheap';
 import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Aborter, logger } from '@gxchain2/utils';
 import { TxFromValuesArray, TypedTransaction, WrappedTransaction, calculateIntrinsicGas } from '@gxchain2/tx';
@@ -15,14 +15,14 @@ import { Journal } from './journal';
 
 export interface INode {
   db: Database;
-  common: Common;
   blockchain: Blockchain;
   aborter: Aborter;
-  getStateManager(root: Buffer): Promise<StateManager>;
-  addPendingTxs: (txs: TypedTransaction[]) => Promise<boolean[]>;
   miner: {
     gasLimit: BN;
   };
+  getCommon(num: BNLike): Common;
+  getStateManager(root: Buffer, num: BNLike): Promise<StateManager>;
+  addPendingTxs: (txs: TypedTransaction[]) => Promise<boolean[]>;
 }
 
 /**
@@ -257,7 +257,7 @@ export class TxPool extends EventEmitter {
       return;
     }
     this.currentHeader = this.node.blockchain.latestBlock.header;
-    this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot);
+    this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, 0);
     if (this.journal) {
       await this.journal.load(async (txs: TypedTransaction[]) => {
         let news: TypedTransaction[] = [];
@@ -311,9 +311,9 @@ export class TxPool extends EventEmitter {
         return Block.fromBlockData(
           {
             header: header,
-            transactions: bodyBuffer ? bodyBuffer[0].map((rawTx) => TxFromValuesArray(rawTx, { common: this.node.common })) : []
+            transactions: bodyBuffer ? bodyBuffer[0].map((rawTx) => TxFromValuesArray(rawTx, { common: this.node.getCommon(number) })) : []
           },
-          { common: this.node.common }
+          { common: this.node.getCommon(number) }
         );
       };
 
@@ -349,7 +349,7 @@ export class TxPool extends EventEmitter {
         }
       }
       this.currentHeader = originalNewBlock.header;
-      this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot);
+      this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, newBlock.header.number);
       this.emitReadies((await this._addTxs(reinject, true)).readies);
       await this.demoteUnexecutables();
       this.truncatePending();

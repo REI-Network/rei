@@ -53,7 +53,7 @@ export class ETHController extends Controller {
     };
   }
   eth_chainId() {
-    return bufferToHex(toBuffer(this.node.common.chainId()));
+    return bufferToHex(this.node.getCommon(0).chainIdBN().toBuffer());
   }
   eth_coinbase() {
     return !this.node.miner.coinbase ? Address.zero().toString() : bufferToHex(this.node.miner.coinbase);
@@ -135,7 +135,7 @@ export class ETHController extends Controller {
     return '0x00';
   }
   async eth_sendRawTransaction([rawtx]: [string]) {
-    const tx = TransactionFactory.fromSerializedData(hexStringToBuffer(rawtx), { common: this.node.common });
+    const tx = TransactionFactory.fromSerializedData(hexStringToBuffer(rawtx), { common: this.node.getCommon(0) });
     const results = await this.node.addPendingTxs([tx]);
     return results && results.length > 0 && results[0] ? bufferToHex(tx.hash()) : null;
   }

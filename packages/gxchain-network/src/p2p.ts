@@ -5,44 +5,18 @@ import KadDHT from 'libp2p-kad-dht';
 import TCP from 'libp2p-tcp';
 import secio from 'libp2p-secio';
 import Bootstrap from 'libp2p-bootstrap';
-import { constants, Common } from '@gxchain2/common';
-import { Blockchain } from '@gxchain2/blockchain';
-import { Database } from '@gxchain2/database';
-import { Aborter } from '@gxchain2/utils';
-import { Peer } from './peer';
-import { Protocol, ETHProtocol } from './protocol';
-import { TypedTransaction } from '@gxchain2/tx';
+import { constants } from '@gxchain2/common';
 import { logger } from '@gxchain2/utils';
 const Libp2p = require('libp2p');
+import { Peer } from './peer';
+import { Protocol, ETHProtocol } from './protocol';
+import { INode } from './types';
 
 function parseProtocol(name: string): Protocol {
   if (name === constants.GXC2_ETHWIRE) {
     return new ETHProtocol();
   }
   throw new Error(`Unkonw protocol: ${name}`);
-}
-
-export interface ISync {
-  announce(peer: Peer, height: number): void;
-}
-
-export interface ITxPool {
-  getTransaction: (hash: Buffer) => TypedTransaction | undefined;
-}
-
-export interface ITxFetcher {
-  newPooledTransactionHashes(origin: string, hashes: Buffer[]);
-}
-
-export interface INode {
-  db: Database;
-  blockchain: Blockchain;
-  common: Common;
-  sync: ISync;
-  status: any;
-  txPool: ITxPool;
-  txSync: ITxFetcher;
-  aborter: Aborter;
 }
 
 export interface Libp2pNodeOptions {

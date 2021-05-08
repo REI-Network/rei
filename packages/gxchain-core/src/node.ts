@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import type { LevelUp } from 'levelup';
-import { Account, Address, bufferToHex, setLengthLeft, BN } from 'ethereumjs-util';
+import { Account, Address, bufferToHex, setLengthLeft, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
 import { Database, createLevelDB, DBSaveReceipts } from '@gxchain2/database';
@@ -13,7 +13,7 @@ import { VM, WrappedVM } from '@gxchain2/vm';
 import { TxPool } from '@gxchain2/tx-pool';
 import { Block } from '@gxchain2/block';
 import { TypedTransaction } from '@gxchain2/tx';
-import { hexStringToBuffer, Channel, Aborter, logger } from '@gxchain2/utils';
+import { Channel, Aborter, logger } from '@gxchain2/utils';
 import { FullSynchronizer, Synchronizer } from './sync';
 import { TxFetcher } from './txsync';
 import { Miner } from './miner';
@@ -63,7 +63,6 @@ export class Node {
   public readonly aborter = new Aborter();
 
   public db!: Database;
-  public common!: Common;
   public peerpool!: PeerPool;
   public blockchain!: Blockchain;
   public sync!: Synchronizer;
@@ -78,6 +77,10 @@ export class Node {
   private readonly taskQueue = new Channel<Task>({ aborter: this.aborter });
   private readonly processQueue = new Channel<ProcessBlock>({ aborter: this.aborter });
 
+  private genesisJSON!: any;
+  private networkId!: number;
+  private genesisHash!: string;
+
   constructor(options: NodeOptions) {
     this.options = options;
     this.rawdb = createLevelDB(path.join(this.options.databasePath, 'chaindb'));
@@ -91,10 +94,10 @@ export class Node {
    */
   get status() {
     return {
-      networkId: this.common.networkId(),
+      networkId: this.networkId,
       height: this.blockchain.latestHeight,
       bestHash: this.blockchain.latestHash,
-      genesisHash: this.common.genesis().hash
+      genesisHash: this.genesisHash
     };
   }
 
@@ -139,31 +142,20 @@ export class Node {
       return;
     }
 
-    let genesisJSON;
     try {
-      genesisJSON = JSON.parse(fs.readFileSync(path.join(this.options.databasePath, 'genesis.json')).toString());
+      this.genesisJSON = JSON.parse(fs.readFileSync(path.join(this.options.databasePath, 'genesis.json')).toString());
     } catch (err) {
       logger.warn('Read genesis.json faild, use default genesis');
-      genesisJSON = defaultGenesis;
+      this.genesisJSON = defaultGenesis;
     }
 
-    const poa: Buffer[] = [];
-    if (genesisJSON.POA && Array.isArray(genesisJSON.POA)) {
-      for (const address of genesisJSON.POA) {
-        if (typeof address === 'string') {
-          poa.push(hexStringToBuffer(address));
-        }
-      }
-    }
-
-    this.common = new Common(
-      {
-        chain: genesisJSON.genesisInfo,
-        hardfork: 'chainstart'
-      },
-      poa
-    );
-    this.db = new Database(this.rawdb, this.common);
+    const common = new Common({
+      chain: this.genesisJSON.genesisInfo,
+      hardfork: 'chainstart'
+    });
+    this.db = new Database(this.rawdb, common);
+    this.networkId = common.networkIdBN().toNumber();
+    this.genesisHash = common.genesis().hash;
 
     let genesisBlock!: Block;
     try {
@@ -177,22 +169,22 @@ export class Node {
     }
 
     if (!genesisBlock) {
-      genesisBlock = Block.genesis({ header: genesisJSON.genesisInfo.genesis }, { common: this.common });
+      genesisBlock = Block.genesis({ header: this.genesisJSON.genesisInfo.genesis }, { common });
       logger.info('read genesis block from file', bufferToHex(genesisBlock.hash()));
 
-      const stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
-      const root = await this.setupAccountInfo(genesisJSON.accountInfo, stateManager);
+      const stateManager = new StateManager({ common, trie: new Trie(this.rawdb) });
+      const root = await this.setupAccountInfo(this.genesisJSON.accountInfo, stateManager);
       if (!root.equals(genesisBlock.header.stateRoot)) {
         logger.error('state root not equal', bufferToHex(root), '0x' + bufferToHex(genesisBlock.hash()));
         throw new Error('state root not equal');
       }
     }
 
-    this.common.setHardfork('berlin');
+    common.setHardforkByBlockNumber(0);
     this.blockchain = new Blockchain({
       db: this.rawdb,
       database: this.db,
-      common: this.common,
+      common: common,
       validateConsensus: false,
       validateBlocks: false,
       genesisBlock
@@ -209,7 +201,7 @@ export class Node {
         this.newBlock(block);
       });
 
-    this.txPool = new TxPool({ node: this, journal: this.options.databasePath });
+    this.txPool = new TxPool({ node: this as any, journal: this.options.databasePath });
 
     let peerId!: PeerId;
     try {
@@ -225,7 +217,7 @@ export class Node {
       nodes: await Promise.all(
         [
           new Libp2pNode({
-            node: this,
+            node: this as any,
             peerId,
             protocols: new Set<string>([constants.GXC2_ETHWIRE]),
             tcpPort: this.options?.p2p?.tcpPort,
@@ -262,13 +254,17 @@ export class Node {
     await this.bcMonitor.init();
   }
 
+  getCommon(num: BNLike) {
+    return Common.createCommonByBlockNumber(num, this.genesisJSON);
+  }
+
   /**
    * Get data from an underlying state trie
    * @param root - The state root
    * @returns The state manager
    */
-  async getStateManager(root: Buffer) {
-    const stateManager = new StateManager({ common: this.common, trie: new Trie(this.rawdb) });
+  async getStateManager(root: Buffer, num: BNLike) {
+    const stateManager = new StateManager({ common: this.getCommon(num), trie: new Trie(this.rawdb) });
     await stateManager.setStateRoot(root);
     return stateManager;
   }
@@ -278,11 +274,11 @@ export class Node {
    * @param root - The state root
    * @returns new VM
    */
-  async getWrappedVM(root: Buffer) {
-    const stateManager = await this.getStateManager(root);
+  async getWrappedVM(root: Buffer, num: BNLike) {
+    const stateManager = await this.getStateManager(root, num);
     return new WrappedVM(
       new VM({
-        common: this.common,
+        common: stateManager._common,
         stateManager,
         blockchain: this.blockchain
       })
@@ -297,6 +293,9 @@ export class Node {
     await this.initPromise;
     for await (let { block, generate, resolve, reject } of this.processQueue.generator()) {
       try {
+        for (const tx of block.transactions) {
+          tx.common.getHardforkByBlockNumber(block.header.number);
+        }
         const lastHeader = await this.db.getHeader(block.header.parentHash, block.header.number.subn(1));
         const opts = {
           block,
@@ -304,7 +303,7 @@ export class Node {
           root: lastHeader.stateRoot,
           customValidateBlock: true
         };
-        const { result, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot)).runBlock(opts);
+        const { result, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot, lastHeader.number)).runBlock(opts);
         block = newBlock || block;
         logger.info('✨ Process block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
         await this.blockchain.putBlock(block);

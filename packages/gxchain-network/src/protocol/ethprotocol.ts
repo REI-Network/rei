@@ -43,7 +43,7 @@ const handlers: Handler[] = [
     name: 'BlockHeaders',
     code: 2,
     encode: (info: MsgContext, headers: BlockHeader[]) => rlp.encode([2, headers.map((h) => h.raw())]),
-    decode: (info: MsgContext, headers: BlockHeaderBuffer[]) => headers.map((h) => BlockHeader.fromValuesArray(h, { common: info.node.common }))
+    decode: (info: MsgContext, headers: BlockHeaderBuffer[]) => headers.map((h) => BlockHeader.fromValuesArray(h, { common: info.node.getCommon(0) }))
   },
   {
     name: 'GetBlockBodies',
@@ -79,14 +79,14 @@ const handlers: Handler[] = [
       ]),
     decode: (info: MsgContext, bodies: TransactionsBuffer[]): TypedTransaction[][] =>
       bodies.map((txs) => {
-        return txs.map((tx) => TxFromValuesArray(tx, { common: info.node.common }));
+        return txs.map((tx) => TxFromValuesArray(tx, { common: info.node.getCommon(0) }));
       })
   },
   {
     name: 'NewBlock',
     code: 5,
     encode: (info: MsgContext, block: Block) => rlp.encode([5, [block.header.raw(), block.transactions.map((tx) => tx.raw())]]),
-    decode: (info: MsgContext, blockRaw): Block => Block.fromValuesArray(blockRaw, { common: info.node.common }),
+    decode: (info: MsgContext, blockRaw): Block => Block.fromValuesArray(blockRaw, { common: info.node.getCommon(0) }),
     process(info: MsgContext, block: Block) {
       const height = block.header.number.toNumber();
       info.node.sync.announce(info.peer, height);
@@ -118,7 +118,7 @@ const handlers: Handler[] = [
     name: 'PooledTransactions',
     code: 8,
     encode: (info: MsgContext, txs: TypedTransaction[]) => rlp.encode([8, txs.map((tx) => tx.raw())]),
-    decode: (info: MsgContext, raws: TransactionsBuffer) => raws.map((raw) => TxFromValuesArray(raw, { common: info.node.common }))
+    decode: (info: MsgContext, raws: TransactionsBuffer) => raws.map((raw) => TxFromValuesArray(raw, { common: info.node.getCommon(0) }))
   },
   {
     name: 'Echo',

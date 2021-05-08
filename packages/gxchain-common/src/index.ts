@@ -1,17 +1,15 @@
-import EthereumCommon, { CommonOpts } from '@ethereumjs/common';
+import EthereumCommon from '@ethereumjs/common';
+import { BNLike } from 'ethereumjs-util';
 import * as constants from './constants';
 
 export class Common extends EthereumCommon {
-  // TODO: set POA property to genesis chain params
-  private readonly POA: Buffer[];
-
-  constructor(opts: CommonOpts, POA?: Buffer[]) {
-    super(opts);
-    this.POA = POA || [];
-  }
-
-  isValidPOA(address: Buffer) {
-    return !!this.POA.find((b) => address.equals(b));
+  static createCommonByBlockNumber(num: BNLike, genesisJSON: any) {
+    const common = new Common({
+      chain: genesisJSON.genesisInfo,
+      hardfork: 'chainstart'
+    });
+    common.setHardforkByBlockNumber(num);
+    return common;
   }
 }
 

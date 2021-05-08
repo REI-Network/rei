@@ -54,9 +54,9 @@ export class BlockchainMonitor extends EventEmitter {
         return Block.fromBlockData(
           {
             header: header,
-            transactions: bodyBuffer ? bodyBuffer[0].map((rawTx) => TxFromValuesArray(rawTx, { common: this.node.common })) : []
+            transactions: bodyBuffer ? bodyBuffer[0].map((rawTx) => TxFromValuesArray(rawTx, { common: this.node.getCommon(number) })) : []
           },
-          { common: this.node.common }
+          { common: this.node.getCommon(number) }
         );
       };
 

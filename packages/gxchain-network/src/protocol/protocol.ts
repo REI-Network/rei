@@ -1,5 +1,5 @@
 import type { Peer } from '../peer';
-import type { INode } from '../p2p';
+import type { INode } from '../types';
 
 export type MsgContext = {
   node: INode;

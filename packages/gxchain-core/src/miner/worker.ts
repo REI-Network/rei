@@ -57,19 +57,20 @@ export class Worker extends Loop {
       }
       this.txs = [];
       this.gasUsed = new BN(0);
+      const newNumber = block.header.number.addn(1);
       this.header = BlockHeader.fromHeaderData(
         {
           coinbase: this.miner.coinbase,
           difficulty: '0x1',
           gasLimit: this.miner.gasLimit,
           nonce: '0x0102030405060708',
-          number: block.header.number.addn(1),
+          number: newNumber,
           parentHash: block.header.hash(),
           uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347'
         },
-        { common: this.node.common }
+        { common: this.node.getCommon(newNumber) }
       );
-      this.wvm = await this.node.getWrappedVM(block.header.stateRoot);
+      this.wvm = await this.node.getWrappedVM(block.header.stateRoot, newNumber);
       await this.wvm.vm.stateManager.checkpoint();
       await this.commit(await this.node.txPool.getPendingMap(block.header.number, block.header.hash()));
     } catch (err) {
@@ -101,6 +102,7 @@ export class Worker extends Loop {
   async getPendingBlock(number?: BN, hash?: Buffer) {
     await this.initPromise;
     if (number && hash && (!number.addn(1).eq(this.header.number) || !hash.equals(this.header.parentHash))) {
+      const newNumber = number.addn(1);
       return Block.fromBlockData(
         {
           header: {
@@ -108,14 +110,14 @@ export class Worker extends Loop {
             difficulty: '0x1',
             gasLimit: this.miner.gasLimit,
             nonce: '0x0102030405060708',
-            number: number.addn(1),
+            number: newNumber,
             parentHash: hash,
             uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
             timestamp: new BN(Math.floor(Date.now() / 1000)),
             transactionsTrie: await calculateTransactionTrie([])
           }
         },
-        { common: this.node.common }
+        { common: this.node.getCommon(newNumber) }
       );
     }
     const txs = [...this.txs];
@@ -129,16 +131,16 @@ export class Worker extends Loop {
         },
         transactions: txs
       },
-      { common: this.node.common }
+      { common: this.node.getCommon(header.number) }
     );
   }
 
   async getPendingStateManager() {
     await this.initPromise;
     if (this.wvm) {
-      return new StateManager({ common: this.node.common, trie: (this.wvm.vm.stateManager as any)._trie.copy(false) });
+      return new StateManager({ common: (this.wvm.vm.stateManager as any)._common, trie: (this.wvm.vm.stateManager as any)._trie.copy(false) });
     }
-    return await this.node.getStateManager(this.node.blockchain.latestBlock.header.stateRoot);
+    return await this.node.getStateManager(this.node.blockchain.latestBlock.header.stateRoot, this.node.blockchain.latestHeight);
   }
 
   protected async process() {
@@ -155,7 +157,7 @@ export class Worker extends Loop {
         try {
           txRes = await this.wvm.vm.runTx({
             tx,
-            block: Block.fromBlockData({ header: this.header }, { common: this.node.common }),
+            block: Block.fromBlockData({ header: this.header }, { common: (this.wvm.vm.stateManager as any)._common }),
             skipBalance: false,
             skipNonce: false
           });

@@ -60,12 +60,18 @@ export class Controller {
   }
 
   protected async getStateManagerByTag(tag: string): Promise<StateManager> {
-    return tag === 'pending' ? await this.node.miner.worker.getPendingStateManager() : this.node.getStateManager((await this.getBlockByTag(tag)).header.stateRoot);
+    if (tag === 'pending') {
+      return await this.node.miner.worker.getPendingStateManager();
+    } else {
+      const block = await this.getBlockByTag(tag);
+      return this.node.getStateManager(block.header.stateRoot, block.header.number);
+    }
   }
 
-  protected calculateBaseFee(data: CallData) {
-    const txDataZero = this.node.common.param('gasPrices', 'txDataZero');
-    const txDataNonZero = this.node.common.param('gasPrices', 'txDataNonZero');
+  protected calculateBaseFee(data: CallData, num: BN) {
+    const common = this.node.getCommon(num);
+    const txDataZero = common.param('gasPrices', 'txDataZero');
+    const txDataNonZero = common.param('gasPrices', 'txDataNonZero');
     let cost = 0;
     if (data.data) {
       const buf = hexStringToBuffer(data.data);
@@ -73,16 +79,16 @@ export class Controller {
         buf[i] === 0 ? (cost += txDataZero) : (cost += txDataNonZero);
       }
     }
-    const fee = new BN(cost).addn(this.node.common.param('gasPrices', 'tx'));
-    if (this.node.common.gteHardfork('homestead') && (data.to === undefined || hexStringToBuffer(data.to).length === 0)) {
-      fee.iaddn(this.node.common.param('gasPrices', 'txCreation'));
+    const fee = new BN(cost).addn(common.param('gasPrices', 'tx'));
+    if (common.gteHardfork('homestead') && (data.to === undefined || hexStringToBuffer(data.to).length === 0)) {
+      fee.iaddn(common.param('gasPrices', 'txCreation'));
     }
     return fee;
   }
 
   protected async runCall(data: CallData, tag: string) {
     const block = await this.getBlockByTag(tag);
-    const wvm = await this.node.getWrappedVM(block.header.stateRoot);
+    const wvm = await this.node.getWrappedVM(block.header.stateRoot, block.header.number);
     await wvm.vm.stateManager.checkpoint();
     try {
       const result = await wvm.runCall({
@@ -99,7 +105,7 @@ export class Controller {
         throw result.execResult.exceptionError;
       }
       await wvm.vm.stateManager.revert();
-      result.gasUsed.iadd(this.calculateBaseFee(data));
+      result.gasUsed.iadd(this.calculateBaseFee(data, block.header.number));
       return result;
     } catch (err) {
       await wvm.vm.stateManager.revert();

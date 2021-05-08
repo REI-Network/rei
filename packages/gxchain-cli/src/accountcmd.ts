@@ -1,6 +1,6 @@
-import { AccountManger, keyFileName } from './keystore';
+import { AccountManger, keyFileName } from '@gxchain2/wallet';
 import { Address } from 'ethereumjs-util';
-import { Accountinfo } from './accounts';
+import { Accountinfo } from '@gxchain2/wallet';
 
 const web3 = require('web3-eth-accounts');
 const web3account = new web3();

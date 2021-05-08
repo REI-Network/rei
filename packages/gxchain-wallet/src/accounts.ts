@@ -14,7 +14,7 @@ export type Accountinfo = {
 };
 
 function stringcompare(a: string, b: string) {
-  if (a == b) {
+  if (a === b) {
     return 0;
   }
   if (a < b) {
@@ -24,7 +24,7 @@ function stringcompare(a: string, b: string) {
 }
 
 export function urlcompare(url1: URL, url2: URL): number {
-  if (url1.Scheme == url2.Scheme) {
+  if (url1.Scheme === url2.Scheme) {
     return stringcompare(url1.Path, url2.Path);
   }
   return stringcompare(url1.Scheme, url2.Scheme);

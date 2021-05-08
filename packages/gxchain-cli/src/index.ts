@@ -7,7 +7,7 @@ import commander, { option, program } from 'commander';
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
 import { setLevel, logger } from '@gxchain2/utils';
-import { accountcmd } from '@gxchain2/wallet';
+import * as accountcmd from './accountcmd';
 import inquirer from 'inquirer';
 
 program.version('0.0.1');

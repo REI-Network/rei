@@ -37,7 +37,7 @@ export class KeystoreWallet implements Wallet {
   }
 
   contain(account: Accountinfo): boolean {
-    return account.address == this.account.address && account.url == this.account.url;
+    return account.address === this.account.address && account.url === this.account.url;
   }
 
   derive(path: Buffer, pin: boolean): Accountinfo | undefined {

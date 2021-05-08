@@ -96,12 +96,12 @@ export class AccountManger {
       while (this.wallets.length > 0 && urlcompare(this.wallets[0].url(), account.url) < 0) {
         this.wallets = this.wallets.slice(1);
       }
-      if (this.wallets.length == 0 || urlcompare(this.wallets[0].url(), account.url) > 0) {
+      if (this.wallets.length === 0 || urlcompare(this.wallets[0].url(), account.url) > 0) {
         const wallet = new KeystoreWallet(account, this);
         wallets.push(wallet);
         continue;
       }
-      if (this.wallets[0].accounts()[0] == account) {
+      if (this.wallets[0].accounts()[0] === account) {
         wallets.push(this.wallets[0]);
         this.wallets = this.wallets.slice(1);
         continue;

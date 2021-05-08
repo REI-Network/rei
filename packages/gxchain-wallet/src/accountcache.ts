@@ -46,7 +46,7 @@ export class AccountCache {
         break;
       }
     }
-    if (index < this.all.length && this.all[index] == newaccount) {
+    if (index < this.all.length && this.all[index] === newaccount) {
       return;
     }
     this.all = this.all.slice(0, index).concat(newaccount).concat(this.all.slice(index));
@@ -60,7 +60,7 @@ export class AccountCache {
 
   private removeAccount(slice: Accountinfo[], elem: Accountinfo): Accountinfo[] {
     for (const account of slice) {
-      if (account == elem) {
+      if (account === elem) {
         const index = slice.indexOf(account);
         slice = slice.slice(0, index).concat(slice.slice(index + 1));
         return slice;
@@ -74,7 +74,7 @@ export class AccountCache {
     let instance = this.byAddr.get(removed.address.toBuffer());
     if (instance) {
       const ba = this.removeAccount(instance, removed);
-      if (ba.length == 0) {
+      if (ba.length === 0) {
         this.byAddr.delete(removed.address.toBuffer());
       } else {
         instance = ba;
@@ -91,11 +91,11 @@ export class AccountCache {
       }
     }
 
-    if (index < this.all.length && this.all[index].url.Path == path) {
+    if (index < this.all.length && this.all[index].url.Path === path) {
       const removed = this.all[index];
       this.all = this.all.slice(0, index).concat(this.all.slice(index + 1));
       let ba = this.removeAccount(this.byAddr.get(removed.address.toBuffer())!, removed);
-      if (ba.length == 0) {
+      if (ba.length === 0) {
         this.byAddr.delete(removed.address.toBuffer());
       } else {
         let instance = this.byAddr.get(removed.address.toBuffer())!;
@@ -113,15 +113,15 @@ export class AccountCache {
       }
     }
     if (a.url.Path != '') {
-      if (a.url.Path.indexOf(path.sep) == -1) {
+      if (a.url.Path.indexOf(path.sep) === -1) {
         a.url.Path = path.join(this.keydir, a.url.Path);
       }
       for (const i of matches) {
-        if (i.url == a.url) {
+        if (i.url === a.url) {
           return i;
         }
       }
-      if (a.address == Address.zero()) {
+      if (a.address === Address.zero()) {
         return;
       }
     }
@@ -145,7 +145,7 @@ export class AccountCache {
     }
     const [creates, deletes, updates] = result;
 
-    if (creates.length == 0 && deletes.length == 0 && updates.length == 0) {
+    if (creates.length === 0 && deletes.length === 0 && updates.length === 0) {
       return;
     }
 

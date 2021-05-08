@@ -6,6 +6,8 @@ type URL = {
   Path: string;
 };
 
+export type addrtype = Address | string | Buffer;
+
 export type Accountinfo = {
   address: Address;
   url: URL;
@@ -43,19 +45,19 @@ export interface Wallet {
 
   derive(path: Buffer, pin: boolean): Accountinfo | undefined;
 
-  selfDerive(base: Buffer[]); //todo anther  parameter
+  selfDerive(base: Buffer[]);
 
-  signData(account: Accountinfo, mimeType: string, data: Buffer);
+  signData(addr: addrtype, mimeType: string, data: Buffer): Buffer;
 
-  signDataWithPassphrase(account: Accountinfo, passphrase, mimeType: string, data: Buffer);
+  signDataWithPassphrase(addr: addrtype, passphrase: string, mimeType: string, data: Buffer): Buffer;
 
-  signText(account: Accountinfo, text: Buffer);
+  signText(addr: addrtype, text: Buffer): Buffer;
 
-  signTextWithPassphrase(account: Accountinfo, passphrase: string, text: Buffer);
+  signTextWithPassphrase(addr: addrtype, passphrase: string, text: Buffer): Buffer;
 
-  signTx(account: Accountinfo, tx: Transaction, chainID: number): Transaction;
+  signTx(addr: addrtype, tx: Transaction, chainID: number): Transaction;
 
-  signTxWithPassphrase(account: Accountinfo, passphrase: string, tx: Transaction, chainID: number): Transaction;
+  signTxWithPassphrase(addr: addrtype, passphrase: string, tx: Transaction, chainID: number): Transaction;
 }
 
 export function textAndHash(data: Buffer) {

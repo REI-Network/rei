@@ -1,5 +1,5 @@
-import { Wallet, Accountinfo, textAndHash } from './accounts';
-import { keccak256 } from 'ethereumjs-util';
+import { Wallet, Accountinfo, textAndHash, addrtype } from './accounts';
+import { keccak256, Address } from 'ethereumjs-util';
 import { KeyStore } from './keystore';
 import { Transaction } from '@ethereumjs/tx';
 
@@ -48,46 +48,61 @@ export class KeystoreWallet implements Wallet {
     return;
   }
 
-  signHash(account: Accountinfo, hash: Buffer) {
-    if (!this.contain(account)) {
+  signHash(addr: addrtype, hash: Buffer) {
+    this.keystore.cache.scanAccounts();
+    const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr))![0];
+    if (!this.contain(accountinfo)) {
       throw new Error('unknown account');
     }
-    return this.keystore.signHash(account, hash);
+    return this.keystore.signHash(accountinfo, hash);
   }
 
-  signData(account: Accountinfo, mimeType: string, data: Buffer) {
-    return this.signHash(account, keccak256(data));
+  signData(addr: addrtype, mimeType: string, data: Buffer) {
+    return this.signHash(addr, keccak256(data));
   }
 
-  signDataWithPassphrase(account: Accountinfo, passphrase, mimeType: string, data: Buffer) {
-    if (!this.contain(account)) {
+  signDataWithPassphrase(addr: addrtype, passphrase, mimeType: string, data: Buffer) {
+    const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr))![0];
+    if (!this.contain(accountinfo)) {
       throw new Error('unknown account');
     }
-    return this.keystore.signHashWithPassphrase(account, passphrase, keccak256(data));
+    return this.keystore.signHashWithPassphrase(accountinfo, passphrase, keccak256(data));
   }
 
-  signText(account: Accountinfo, text: Buffer) {
-    return this.signHash(account, textAndHash(text));
+  signText(addr: addrtype, text: Buffer) {
+    return this.signHash(addr, textAndHash(text));
   }
 
-  signTextWithPassphrase(account: Accountinfo, passphrase: string, text: Buffer) {
-    if (!this.contain(account)) {
+  signTextWithPassphrase(addr: addrtype, passphrase: string, text: Buffer) {
+    const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr))![0];
+    if (!this.contain(accountinfo)) {
       throw new Error('unknown account');
     }
-    return this.keystore.signHashWithPassphrase(account, passphrase, textAndHash(text));
+    return this.keystore.signHashWithPassphrase(accountinfo, passphrase, textAndHash(text));
   }
 
-  signTx(account: Accountinfo, tx: Transaction, chainID: number): Transaction {
-    if (!this.contain(account)) {
+  signTx(addr: addrtype, tx: Transaction, chainID: number): Transaction {
+    const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr))![0];
+    if (!this.contain(accountinfo)) {
       throw new Error('unknown account');
     }
-    return this.keystore.signTx(account, tx);
+    return this.keystore.signTx(accountinfo, tx);
   }
 
-  signTxWithPassphrase(account: Accountinfo, passphrase: string, tx: Transaction, chainID: number): Transaction {
-    if (!this.contain(account)) {
+  signTxWithPassphrase(addr: addrtype, passphrase: string, tx: Transaction, chainID: number): Transaction {
+    const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr))![0];
+    if (!this.contain(accountinfo)) {
       throw new Error('unknown account');
     }
-    return this.keystore.signTxWithPassphrase(account, passphrase, tx);
+    return this.keystore.signTxWithPassphrase(accountinfo, passphrase, tx);
   }
+}
+
+function dealAddrToBuffer(addr: addrtype) {
+  if (Buffer.isBuffer(addr)) {
+    addr = Address.fromPublicKey(addr).toBuffer();
+  } else {
+    addr = typeof addr === 'object' ? addr.toBuffer() : Address.fromString(addr).toBuffer();
+  }
+  return addr;
 }

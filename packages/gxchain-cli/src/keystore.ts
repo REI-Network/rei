@@ -17,8 +17,8 @@ export class KeyStore {
   unlocked: FunctionalMap<Buffer, Account>;
   wallets: Wallet[];
 
-  constructor(keydir: string, ks: KeyStorePassphrase) {
-    this.storage = ks;
+  constructor(keydir: string) {
+    this.storage = new KeyStorePassphrase(keydir);
     this.unlocked = createBufferFunctionalMap<Account>();
     this.cache = new AccountCache(keydir);
     let accs = this.cache.accounts();
@@ -42,7 +42,7 @@ export class KeyStore {
   signHash(a: Accountinfo, hash: Buffer) {
     const unlockedKey = this.unlocked.get(a.address.toBuffer());
     if (!unlockedKey) {
-      throw new Error('password or unlock');
+      throw new Error('password is wrong or unlock');
     }
     return web3accounts.sign(hash.toString(), unlockedKey.privateKey);
   }
@@ -55,7 +55,7 @@ export class KeyStore {
   signTx(a: Accountinfo, tx: Transaction) {
     const unlockedKey = this.unlocked.get(a.address.toBuffer());
     if (!unlockedKey) {
-      throw new Error('password or unlock');
+      throw new Error('password is wrong or unlock');
     }
     return tx.sign(Buffer.from(unlockedKey.privateKey));
   }
@@ -132,8 +132,7 @@ export function newKeyStore(keydir: string) {
   if (!path.isAbsolute(keydir)) {
     keydir = path.join(process.cwd(), keydir);
   }
-  const keypassphrase = new KeyStorePassphrase(keydir);
-  const ks = new KeyStore(keydir, keypassphrase);
+  const ks = new KeyStore(keydir);
   return ks;
 }
 

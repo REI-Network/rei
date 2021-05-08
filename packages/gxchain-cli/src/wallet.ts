@@ -1,4 +1,5 @@
-import { Wallet, Accountinfo } from './accounts';
+import { Wallet, Accountinfo, textAndHash } from './accounts';
+import { keccak256 } from 'ethereumjs-util';
 import { KeyStore } from './keystore';
 import { Transaction } from '@ethereumjs/tx';
 
@@ -55,25 +56,25 @@ export class KeystoreWallet implements Wallet {
   }
 
   signData(account: Accountinfo, mimeType: string, data: Buffer) {
-    return this.signHash(account, data);
+    return this.signHash(account, keccak256(data));
   }
 
   signDataWithPassphrase(account: Accountinfo, passphrase, mimeType: string, data: Buffer) {
     if (!this.contain(account)) {
       throw new Error('unknown account');
     }
-    return this.keystore.signHashWithPassphrase(account, passphrase, data);
+    return this.keystore.signHashWithPassphrase(account, passphrase, keccak256(data));
   }
 
   signText(account: Accountinfo, text: Buffer) {
-    return this.signHash(account, text);
+    return this.signHash(account, textAndHash(text));
   }
 
   signTextWithPassphrase(account: Accountinfo, passphrase: string, text: Buffer) {
     if (!this.contain(account)) {
       throw new Error('unknown account');
     }
-    return this.keystore.signHashWithPassphrase(account, passphrase, text);
+    return this.keystore.signHashWithPassphrase(account, passphrase, textAndHash(text));
   }
 
   signTx(account: Accountinfo, tx: Transaction, chainID: number): Transaction {

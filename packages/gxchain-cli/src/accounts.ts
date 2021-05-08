@@ -1,5 +1,5 @@
 import { Transaction } from '@ethereumjs/tx';
-import { Address, bufferToHex, BN } from 'ethereumjs-util';
+import { Address, keccak256 } from 'ethereumjs-util';
 
 type URL = {
   Scheme: string;
@@ -58,7 +58,7 @@ export interface Wallet {
   signTxWithPassphrase(account: Accountinfo, passphrase: string, tx: Transaction, chainID: number): Transaction;
 }
 
-export type Backend = {
-  wallets(): Wallet[];
-  subscribe();
-};
+export function textAndHash(data: Buffer) {
+  const msg = '\x19Ethereum Signed Message:\n%d%s' + data.toString();
+  return keccak256(Buffer.from(msg));
+}

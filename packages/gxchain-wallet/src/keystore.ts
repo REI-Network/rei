@@ -11,7 +11,7 @@ import { KeyStorePassphrase } from './passphrase';
 const Accounts = require('web3-eth-accounts');
 const web3accounts = new Accounts();
 
-export class KeyStore {
+export class AccountManger {
   storage: KeyStorePassphrase;
   cache: AccountCache;
   unlocked: FunctionalMap<Buffer, Account>;
@@ -132,7 +132,7 @@ export function newKeyStore(keydir: string) {
   if (!path.isAbsolute(keydir)) {
     keydir = path.join(process.cwd(), keydir);
   }
-  const ks = new KeyStore(keydir);
+  const ks = new AccountManger(keydir);
   return ks;
 }
 

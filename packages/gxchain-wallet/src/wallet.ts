@@ -1,13 +1,13 @@
 import { Wallet, Accountinfo, textAndHash, addrtype } from './accounts';
 import { keccak256, Address } from 'ethereumjs-util';
-import { KeyStore } from './keystore';
+import { AccountManger } from './keystore';
 import { Transaction } from '@ethereumjs/tx';
 
 export class KeystoreWallet implements Wallet {
   account: Accountinfo;
-  keystore: KeyStore;
+  keystore: AccountManger;
 
-  constructor(account: Accountinfo, ks: KeyStore) {
+  constructor(account: Accountinfo, ks: AccountManger) {
     this.account = account;
     this.keystore = ks;
   }

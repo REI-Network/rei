@@ -21,7 +21,7 @@ export interface BlockLike {
 }
 
 export function TxFromValuesArray(values: Buffer[], opts?: TxOptions) {
-  return values.length === 6 ? Transaction.fromValuesArray(values, opts) : AccessListEIP2930Transaction.fromValuesArray(values as AccessListEIP2930ValuesArray, opts);
+  return values.length === 6 || values.length === 9 ? Transaction.fromValuesArray(values, opts) : AccessListEIP2930Transaction.fromValuesArray(values as AccessListEIP2930ValuesArray, opts);
 }
 
 export class WrappedTransaction {

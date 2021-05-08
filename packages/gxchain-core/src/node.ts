@@ -194,7 +194,7 @@ export class Node {
       database: this.db,
       common: this.common,
       validateConsensus: false,
-      validateBlocks: true,
+      validateBlocks: false,
       genesisBlock
     });
     await this.blockchain.init();
@@ -301,7 +301,8 @@ export class Node {
         const opts = {
           block,
           generate,
-          root: lastHeader.stateRoot
+          root: lastHeader.stateRoot,
+          customValidateBlock: true
         };
         const { result, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot)).runBlock(opts);
         block = newBlock || block;

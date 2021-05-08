@@ -1,4 +1,5 @@
 import { hexStringToBN, hexStringToBuffer, logger } from '@gxchain2/utils';
+import { validateBlock } from '@gxchain2/block';
 import { Worker } from './worker';
 import { Loop } from './loop';
 import { Node } from '../node';
@@ -113,7 +114,7 @@ export class Miner extends Loop {
     if (block.header.timestamp.lte(lastHeader.timestamp)) {
       return;
     }
-    await block.validate(this.node.blockchain);
+    await validateBlock.call(block, this.node.blockchain);
     const newBlock = await this.node.processBlock(block);
     await this.node.newBlock(newBlock);
     logger.info('⛏️  Mine block, height:', newBlock.header.number.toString(), 'hash:', bufferToHex(newBlock.hash()));

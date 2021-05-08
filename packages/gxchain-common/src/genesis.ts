@@ -15,7 +15,7 @@ export const defaultGenesis = {
   },
   genesisInfo: {
     consensus: {
-      type: 'poa'
+      type: 'pow'
     },
     name: 'gxc2',
     chainId: 12358,
@@ -44,58 +44,47 @@ export const defaultGenesis = {
     hardforks: [
       {
         name: 'chainstart',
-        block: 0,
-        forkHash: '0xfc64ec04'
+        block: 0
       },
       {
         name: 'homestead',
-        block: 1150000,
-        forkHash: '0x97c2c34c'
+        block: 0
       },
       {
         name: 'dao',
-        block: 1920000,
-        forkHash: '0x91d1f948'
+        block: null
       },
       {
         name: 'tangerineWhistle',
-        block: 2463000,
-        forkHash: '0x7a64da13'
+        block: 0
       },
       {
         name: 'spuriousDragon',
-        block: 2675000,
-        forkHash: '0x3edd5b10'
+        block: 0
       },
       {
         name: 'byzantium',
-        block: 4370000,
-        forkHash: '0xa00bc324'
+        block: 0
       },
       {
         name: 'constantinople',
-        block: 7280000,
-        forkHash: '0x668db0af'
+        block: 0
       },
       {
         name: 'petersburg',
-        block: 7280000,
-        forkHash: '0x668db0af'
+        block: 0
       },
       {
         name: 'istanbul',
-        block: 9069000,
-        forkHash: '0x879d6e30'
+        block: 0
       },
       {
         name: 'muirGlacier',
-        block: 9200000,
-        forkHash: '0xe029e991'
+        block: 0
       },
       {
         name: 'berlin',
-        block: null,
-        forkHash: null
+        block: 0
       }
     ],
     bootstrapNodes: [],

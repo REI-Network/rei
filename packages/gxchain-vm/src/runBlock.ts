@@ -1,6 +1,6 @@
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { Address, BN, toBuffer, generateAddress } from 'ethereumjs-util';
-import { Block } from '@gxchain2/block';
+import { Block, validateBlock } from '@gxchain2/block';
 import { calculateIntrinsicGas } from '@gxchain2/tx';
 import { Receipt, Log } from '@gxchain2/receipt';
 import VM from '@ethereumjs/vm';
@@ -22,6 +22,10 @@ export interface RunBlockDebugOpts extends RunBlockOpts {
    * Debug callback
    */
   debug?: IDebug;
+  /**
+   * Custom validate block
+   */
+  customValidateBlock?: boolean;
 }
 
 /**
@@ -142,7 +146,11 @@ async function applyBlock(this: VM, block: Block, opts: RunBlockDebugOpts) {
     if (block.header.gasLimit.gte(new BN('8000000000000000', 16))) {
       throw new Error('Invalid block with gas limit greater than (2^63 - 1)');
     } else {
-      await block.validate(this.blockchain);
+      if (opts.customValidateBlock) {
+        await validateBlock.call(block, this.blockchain);
+      } else {
+        await block.validate(this.blockchain);
+      }
     }
   }
   // Apply transactions

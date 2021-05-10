@@ -1,5 +1,5 @@
 import { Address } from 'ethereumjs-util';
-import { Accountinfo, urlcompare } from './accounts';
+import { Accountinfo } from './accounts';
 import fs from 'fs';
 import path from 'path';
 import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
@@ -11,9 +11,7 @@ class Errexpand extends Error {
 
 export class AccountCache {
   keydir: string;
-  //   watcher:watcher;
   byAddr: FunctionalMap<Buffer, Accountinfo> = createBufferFunctionalMap<Accountinfo>();
-  all: Accountinfo[] = [];
   fileC: FileCache;
   constructor(keydir: string) {
     this.keydir = keydir;
@@ -22,7 +20,7 @@ export class AccountCache {
 
   accounts(): Accountinfo[] {
     this.scanAccounts();
-    return [...this.all];
+    return Array.from(this.byAddr.values());
   }
 
   hasAddress(addr: Address): boolean {
@@ -35,51 +33,22 @@ export class AccountCache {
   }
 
   add(newaccount: Accountinfo) {
-    let index = 0;
-    for (let i = 0; i < this.all.length; i++) {
-      if (urlcompare(this.all[i].url, newaccount.url) >= 0) {
-        index = i;
-        break;
-      }
-    }
-    if (index < this.all.length && this.all[index].address.toBuffer() === newaccount.address.toBuffer()) {
-      return;
-    }
-    this.all = this.all.slice(0, index).concat(newaccount).concat(this.all.slice(index));
     let instance = this.byAddr.get(newaccount.address.toBuffer());
     if (!instance) {
       this.byAddr.set(newaccount.address.toBuffer(), newaccount);
     }
   }
 
-  private removeAccount(slice: Accountinfo[], elem: Accountinfo): Accountinfo[] {
-    for (const account of slice) {
-      if (account.address.toBuffer() === elem.address.toBuffer()) {
-        const index = slice.indexOf(account);
-        slice = slice.slice(0, index).concat(slice.slice(index + 1));
-        return slice;
-      }
-    }
-    return slice;
-  }
-
   delete(removed: Accountinfo) {
-    this.all = this.removeAccount(this.all, removed);
     let instance = this.byAddr.get(removed.address.toBuffer());
     this.byAddr.delete(removed.address.toBuffer());
   }
 
   deleteByFile(path: string) {
     let index = 0;
-    for (let i = 0; i < this.all.length; i++) {
-      if (this.all[i].url.Path >= path) {
-        index = i;
-        break;
-      }
-    }
-    if (index < this.all.length && this.all[index].url.Path === path) {
-      const removed = this.all[index];
-      this.all = this.all.slice(0, index).concat(this.all.slice(index + 1));
+    const all = Array.from(this.byAddr.values());
+    if (index < all.length && all[index].path === path) {
+      const removed = all[index];
       const toremove = this.byAddr.get(removed.address.toBuffer());
       if (toremove) {
         this.byAddr.delete(toremove.address.toBuffer());
@@ -88,23 +57,23 @@ export class AccountCache {
   }
 
   find(a: Accountinfo) {
-    let matches = this.all;
+    let matches = Array.from(this.byAddr.values());
     if (a.address != Address.zero()) {
       const account = this.byAddr.get(a.address.toBuffer());
       if (account) {
         return account;
       }
     }
-    if (a.url.Path != '') {
-      if (a.url.Path.indexOf(path.sep) === -1) {
-        a.url.Path = path.join(this.keydir, a.url.Path);
+    if (a.path != '') {
+      if (a.path.indexOf(path.sep) === -1) {
+        a.path = path.join(this.keydir, a.path);
       }
       for (const i of matches) {
-        if (i.url.Path === a.url.Path) {
+        if (i.path === a.path) {
           return i;
         }
       }
-      if (a.address.toBuffer() === Address.zero().toBuffer()) {
+      if (a.address.equals(Address.zero())) {
         return;
       }
     }
@@ -149,7 +118,7 @@ export class AccountCache {
     const keyjson = JSON.parse(keybuffer.toString());
     const addrstring = keyjson.address;
     const addr = Address.fromString('0x' + addrstring);
-    const account: Accountinfo = { address: addr, url: { Path: path, Scheme: 'keystore' } };
+    const account: Accountinfo = { address: addr, path: path };
     return account;
   }
 }

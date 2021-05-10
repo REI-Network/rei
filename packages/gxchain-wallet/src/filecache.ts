@@ -2,11 +2,11 @@ import fs from 'fs';
 import path from 'path';
 
 export class FileCache {
-  all: Array<string>;
+  all: string[];
   lastMod: number;
 
   constructor() {
-    this.all = new Array<string>();
+    this.all = [];
     this.lastMod = Date.now();
   }
 
@@ -21,8 +21,8 @@ export class FileCache {
     if (files.length === 0) {
       return [[], [], []];
     }
-    let all = new Array<string>();
-    let mods = new Array<string>();
+    const all: string[] = [];
+    let mods: string[] = [];
     let newLastmode = Date.now();
     for (const fi of files) {
       let pathtmp = path.join(keydir, fi);

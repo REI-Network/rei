@@ -76,32 +76,36 @@ account
         message: 'Password:'
       }
     ]);
-
-    const a = accountcmd.accountUnlock(keydatadir, options.opts().address, answer1.password);
-    if (!a) {
-      console.error('No account or key is not match');
+    try {
+      const a = accountcmd.accountUnlock(keydatadir, options.opts().address, answer1.password);
+      if (!a) {
+        console.error('No account or key is not match!');
+        return;
+      }
+      console.log('Please give a new password. Do not forget this password.');
+      const answer2 = await inquirer.prompt([
+        {
+          type: 'password',
+          name: 'newpassword',
+          message: 'NewPassword:'
+        }
+      ]);
+      const answer3 = await inquirer.prompt([
+        {
+          type: 'password',
+          name: 'repassword',
+          message: 'Repeat password:'
+        }
+      ]);
+      if (answer2.newpassword !== answer3.repassword) {
+        console.log('You must input the same password!');
+        return;
+      }
+      accountcmd.accountUpdate(keydatadir, a, answer1.password, answer2.newpassword);
+    } catch (err) {
+      console.log('No account or key is not match!');
       return;
     }
-    console.log('Please give a new password. Do not forget this password.');
-    const answer2 = await inquirer.prompt([
-      {
-        type: 'password',
-        name: 'newpassword',
-        message: 'NewPassword:'
-      }
-    ]);
-    const answer3 = await inquirer.prompt([
-      {
-        type: 'password',
-        name: 'repassword',
-        message: 'Repeat password:'
-      }
-    ]);
-    if (answer2.newpassword !== answer3.repassword) {
-      console.log('You must input the same password!');
-      return;
-    }
-    accountcmd.accountUpdate(keydatadir, a, answer1.password, answer2.newpassword);
   });
 
 account

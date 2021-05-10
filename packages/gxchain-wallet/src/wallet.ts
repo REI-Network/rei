@@ -1,5 +1,5 @@
-import { Wallet, Accountinfo, textAndHash, addrtype } from './accounts';
-import { keccak256, Address } from 'ethereumjs-util';
+import { Wallet, Accountinfo, addrtype } from './accounts';
+import { keccak256, Address, hashPersonalMessage } from 'ethereumjs-util';
 import { AccountManger } from './keystore';
 import { Transaction } from '@ethereumjs/tx';
 
@@ -12,8 +12,8 @@ export class KeystoreWallet implements Wallet {
     this.keystore = ks;
   }
 
-  url() {
-    return this.account.url;
+  path() {
+    return this.account.path;
   }
 
   status(): string {
@@ -24,28 +24,12 @@ export class KeystoreWallet implements Wallet {
     return 'Locked';
   }
 
-  open(passphrase: string) {
-    return;
-  }
-
-  close() {
-    return;
-  }
-
   accounts(): Accountinfo[] {
     return [this.account];
   }
 
   contain(account: Accountinfo): boolean {
-    return account.address.toBuffer() === this.account.address.toBuffer();
-  }
-
-  derive(path: Buffer, pin: boolean): Accountinfo | undefined {
-    return;
-  }
-
-  selfDerive(base: Buffer[]) {
-    return;
+    return account.address.equals(this.account.address);
   }
 
   signHash(addr: addrtype, hash: Buffer) {
@@ -70,7 +54,7 @@ export class KeystoreWallet implements Wallet {
   }
 
   signText(addr: addrtype, text: Buffer) {
-    return this.signHash(addr, textAndHash(text));
+    return this.signHash(addr, hashPersonalMessage(text));
   }
 
   signTextWithPassphrase(addr: addrtype, passphrase: string, text: Buffer) {
@@ -81,7 +65,7 @@ export class KeystoreWallet implements Wallet {
     if (!this.contain(accountinfo)) {
       throw new Error('unknown account');
     }
-    return this.keystore.signHashWithPassphrase(accountinfo, passphrase, textAndHash(text));
+    return this.keystore.signHashWithPassphrase(accountinfo, passphrase, hashPersonalMessage(text));
   }
 
   signTx(addr: addrtype, tx: Transaction, chainID: number): Transaction {

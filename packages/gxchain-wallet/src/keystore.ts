@@ -1,6 +1,6 @@
 import { Address } from 'ethereumjs-util';
 import { Account } from 'web3-core';
-import { Wallet, Accountinfo, urlcompare } from './accounts';
+import { Wallet, Accountinfo } from './accounts';
 import { AccountCache } from './accountcache';
 import { Transaction } from '@ethereumjs/tx';
 import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
@@ -29,14 +29,9 @@ export class AccountManger {
   }
 
   getDecryptedKey(a: Accountinfo, auth: string) {
-    try {
-      const account = this.cache.find(a);
-      const key = this.storage.getkey(a.address, a.url.Path, auth);
-      return [account, key];
-    } catch (err) {
-      console.log(err);
-      return [];
-    }
+    const account = this.cache.find(a);
+    const key = this.storage.getkey(a.address, a.path, auth);
+    return [account, key];
   }
 
   signHash(a: Accountinfo, hash: Buffer) {
@@ -67,8 +62,8 @@ export class AccountManger {
 
   importKey(key: { address: string; privateKey: string }, passphrase: string) {
     const addr = Address.fromString(key.address);
-    const a: Accountinfo = { address: addr, url: { Scheme: 'keystore', Path: path.join(this.storage.joinPath(keyFileName(addr))) } };
-    this.storage.storekey(a.url.Path, key, passphrase);
+    const a: Accountinfo = { address: addr, path: path.join(this.storage.joinPath(keyFileName(addr))) };
+    this.storage.storekey(a.path, key, passphrase);
     this.cache.add(a);
     this.refreshwallets();
     return a;
@@ -76,14 +71,14 @@ export class AccountManger {
 
   update(a: Accountinfo, passphrase: string, newpassphrase: string) {
     const [account, key] = this.getDecryptedKey(a, passphrase);
-    return this.storage.storekey(a.url.Path, key, newpassphrase);
+    return this.storage.storekey(a.path, key, newpassphrase);
   }
 
   newaccount(passphrase: string) {
     const key = web3accounts.create();
     const addr = Address.fromString(key.address);
-    const account: Accountinfo = { address: addr, url: { Path: this.storage.joinPath(keyFileName(addr)), Scheme: 'keystore' } };
-    this.storage.storekey(account.url.Path, key, passphrase);
+    const account: Accountinfo = { address: addr, path: this.storage.joinPath(keyFileName(addr)) };
+    this.storage.storekey(account.path, key, passphrase);
     this.cache.add(account);
     this.refreshwallets();
     return account;
@@ -93,15 +88,15 @@ export class AccountManger {
     const accs = this.cache.accounts();
     const wallets: Wallet[] = [];
     for (const account of accs) {
-      while (this.wallets.length > 0 && urlcompare(this.wallets[0].url(), account.url) < 0) {
+      while (this.wallets.length > 0 && this.wallets[0].path() < account.path) {
         this.wallets = this.wallets.slice(1);
       }
-      if (this.wallets.length === 0 || urlcompare(this.wallets[0].url(), account.url) > 0) {
+      if (this.wallets.length === 0 || this.wallets[0].path() > account.path) {
         const wallet = new KeystoreWallet(account, this);
         wallets.push(wallet);
         continue;
       }
-      if (this.wallets[0].accounts()[0].address.toBuffer() === account.address.toBuffer()) {
+      if (this.wallets[0].accounts()[0].address.equals(account.address)) {
         wallets.push(this.wallets[0]);
         this.wallets = this.wallets.slice(1);
         continue;

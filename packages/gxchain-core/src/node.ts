@@ -6,7 +6,7 @@ import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
 import { Database, createLevelDB, DBSaveReceipts } from '@gxchain2/database';
 import { Libp2pNode, PeerPool } from '@gxchain2/network';
-import { Common, constants, getGenesisState } from '@gxchain2/common';
+import { Common, constants, getGenesisState, getChain } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { StateManager } from '@gxchain2/state-manager';
 import { VM, WrappedVM } from '@gxchain2/vm';
@@ -23,6 +23,7 @@ import { BlockchainMonitor } from './blockchainmonitor';
 
 export interface NodeOptions {
   databasePath: string;
+  chain?: string;
   mine?: {
     coinbase: string;
     mineInterval: number;
@@ -111,11 +112,18 @@ export class Node {
       return;
     }
 
-    try {
-      this.chain = JSON.parse(fs.readFileSync(path.join(this.options.databasePath, 'genesis.json')).toString());
-    } catch (err) {
-      logger.warn('Read genesis.json faild, use default chain(gxc2-mainnet)');
-      this.chain = 'gxc2';
+    if (this.options.chain) {
+      this.chain = this.options.chain;
+    }
+    if (this.chain === undefined) {
+      try {
+        this.chain = JSON.parse(fs.readFileSync(path.join(this.options.databasePath, 'genesis.json')).toString());
+      } catch (err) {
+        logger.warn('Read genesis.json faild, use default chain(gxc2-mainnet)');
+        this.chain = 'gxc2-mainnet';
+      }
+    } else if (getChain(this.chain as string) === undefined) {
+      throw new Error(`Unknow chain: ${this.chain}`);
     }
 
     const common = Common.createChainStartCommon(typeof this.chain === 'string' ? this.chain : this.chain.chain);
@@ -127,7 +135,7 @@ export class Node {
     try {
       const genesisHash = await this.db.numberToHash(new BN(0));
       genesisBlock = await this.db.getBlock(genesisHash);
-      logger.info('find genesis block in db', bufferToHex(genesisHash));
+      logger.info('Find genesis block in db', bufferToHex(genesisHash));
     } catch (error) {
       if (error.type !== 'NotFoundError') {
         throw error;
@@ -136,13 +144,15 @@ export class Node {
 
     if (!genesisBlock) {
       genesisBlock = Block.genesis({ header: common.genesis() }, { common });
-      logger.info('read genesis block from file', bufferToHex(genesisBlock.hash()));
-      const stateManager = new StateManager({ common, trie: new Trie(this.rawdb) });
-      await stateManager.generateGenesis(typeof this.chain === 'string' ? getGenesisState(this.chain) : this.chain.genesisState);
-      const root = await stateManager.getStateRoot();
-      if (!root.equals(genesisBlock.header.stateRoot)) {
-        logger.error('state root not equal', bufferToHex(root), bufferToHex(genesisBlock.header.stateRoot));
-        throw new Error('state root not equal');
+      logger.info('Read genesis block from file', bufferToHex(genesisBlock.hash()));
+      if (typeof this.chain === 'string' || this.chain.genesisState) {
+        const stateManager = new StateManager({ common, trie: new Trie(this.rawdb) });
+        await stateManager.generateGenesis(typeof this.chain === 'string' ? getGenesisState(this.chain) : this.chain.genesisState);
+        const root = await stateManager.getStateRoot();
+        if (!root.equals(genesisBlock.header.stateRoot)) {
+          logger.error('State root not equal', bufferToHex(root), bufferToHex(genesisBlock.header.stateRoot));
+          throw new Error('state root not equal');
+        }
       }
     }
 

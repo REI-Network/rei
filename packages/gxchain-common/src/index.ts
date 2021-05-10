@@ -25,3 +25,4 @@ export class Common extends EthereumCommon {
 
 export { constants };
 export * from './genesisStates';
+export * from './chains';

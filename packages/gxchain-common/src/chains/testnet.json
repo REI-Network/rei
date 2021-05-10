@@ -2,10 +2,10 @@
   "consensus": {
     "type": "pow"
   },
-  "name": "gxc2-mainnet",
-  "chainId": 12358,
-  "networkId": 12358,
-  "comment": "The gxchain2.0 main net",
+  "name": "gxc2-testnest",
+  "chainId": 12357,
+  "networkId": 12357,
+  "comment": "The gxchain2.0 test net",
   "url": "https://does.not.exist/",
   "genesis": {
     "bloom":

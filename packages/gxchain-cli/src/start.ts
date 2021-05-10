@@ -23,6 +23,7 @@ export async function startNode(opts: { [key: string]: any }): Promise<[Node, un
     : undefined;
   const node = new Node({
     databasePath: opts.datadir,
+    chain: opts.chain,
     mine: mineOptions,
     p2p: p2pOptions
   });

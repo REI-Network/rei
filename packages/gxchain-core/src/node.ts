@@ -6,7 +6,7 @@ import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
 import { Database, createLevelDB, DBSaveReceipts } from '@gxchain2/database';
 import { Libp2pNode, PeerPool } from '@gxchain2/network';
-import { Common, constants, defaultGenesis } from '@gxchain2/common';
+import { Common, constants, getGenesisState } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { StateManager } from '@gxchain2/state-manager';
 import { VM, WrappedVM } from '@gxchain2/vm';
@@ -77,7 +77,7 @@ export class Node {
   private readonly taskQueue = new Channel<Task>({ aborter: this.aborter });
   private readonly processQueue = new Channel<ProcessBlock>({ aborter: this.aborter });
 
-  private genesisJSON!: any;
+  private chain!: string | { chain: any; genesisState?: any };
   private networkId!: number;
   private genesisHash!: string;
 
@@ -101,37 +101,6 @@ export class Node {
     };
   }
 
-  private async setupAccountInfo(
-    accountInfo: {
-      [index: string]: {
-        nonce: string;
-        balance: string;
-        storage: {
-          [index: string]: string;
-        };
-        code: string;
-      };
-    },
-    stateManager: StateManager
-  ) {
-    await stateManager.checkpoint();
-    for (const addr of Object.keys(accountInfo)) {
-      const { nonce, balance, storage, code } = accountInfo[addr];
-      const address = new Address(Buffer.from(addr.slice(2), 'hex'));
-      const account = Account.fromAccountData({ nonce, balance });
-      await stateManager.putAccount(address, account);
-      for (const hexStorageKey of Object.keys(storage)) {
-        const val = Buffer.from(storage[hexStorageKey], 'hex');
-        const storageKey = setLengthLeft(Buffer.from(hexStorageKey, 'hex'), 32);
-        await stateManager.putContractStorage(address, storageKey, val);
-      }
-      const codeBuf = Buffer.from(code.slice(2), 'hex');
-      await stateManager.putContractCode(address, codeBuf);
-    }
-    await stateManager.commit();
-    return stateManager._trie.root;
-  }
-
   /**
    * Initialize the node
    * @returns
@@ -143,16 +112,13 @@ export class Node {
     }
 
     try {
-      this.genesisJSON = JSON.parse(fs.readFileSync(path.join(this.options.databasePath, 'genesis.json')).toString());
+      this.chain = JSON.parse(fs.readFileSync(path.join(this.options.databasePath, 'genesis.json')).toString());
     } catch (err) {
-      logger.warn('Read genesis.json faild, use default genesis');
-      this.genesisJSON = defaultGenesis;
+      logger.warn('Read genesis.json faild, use default chain(gxc2-mainnet)');
+      this.chain = 'gxc2';
     }
 
-    const common = new Common({
-      chain: this.genesisJSON.genesisInfo,
-      hardfork: 'chainstart'
-    });
+    const common = Common.createChainStartCommon(typeof this.chain === 'string' ? this.chain : this.chain.chain);
     this.db = new Database(this.rawdb, common);
     this.networkId = common.networkIdBN().toNumber();
     this.genesisHash = common.genesis().hash;
@@ -169,13 +135,13 @@ export class Node {
     }
 
     if (!genesisBlock) {
-      genesisBlock = Block.genesis({ header: this.genesisJSON.genesisInfo.genesis }, { common });
+      genesisBlock = Block.genesis({ header: common.genesis() }, { common });
       logger.info('read genesis block from file', bufferToHex(genesisBlock.hash()));
-
       const stateManager = new StateManager({ common, trie: new Trie(this.rawdb) });
-      const root = await this.setupAccountInfo(this.genesisJSON.accountInfo, stateManager);
+      await stateManager.generateGenesis(typeof this.chain === 'string' ? getGenesisState(this.chain) : this.chain.genesisState);
+      const root = await stateManager.getStateRoot();
       if (!root.equals(genesisBlock.header.stateRoot)) {
-        logger.error('state root not equal', bufferToHex(root), '0x' + bufferToHex(genesisBlock.hash()));
+        logger.error('state root not equal', bufferToHex(root), bufferToHex(genesisBlock.header.stateRoot));
         throw new Error('state root not equal');
       }
     }
@@ -184,7 +150,7 @@ export class Node {
     this.blockchain = new Blockchain({
       db: this.rawdb,
       database: this.db,
-      common: common,
+      common,
       validateConsensus: false,
       validateBlocks: false,
       genesisBlock
@@ -255,7 +221,7 @@ export class Node {
   }
 
   getCommon(num: BNLike) {
-    return Common.createCommonByBlockNumber(num, this.genesisJSON);
+    return Common.createCommonByBlockNumber(num, typeof this.chain === 'string' ? this.chain : this.chain.chain);
   }
 
   /**
@@ -306,6 +272,9 @@ export class Node {
         const { result, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot, lastHeader.number)).runBlock(opts);
         block = newBlock || block;
         logger.info('✨ Process block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
+        if (block._common.param('vm', 'debugConsole')) {
+          logger.debug('process on hardfork:', block._common.hardfork());
+        }
         await this.blockchain.putBlock(block);
         await this.blockchain.saveTxLookup(block);
         await this.db.batch([DBSaveReceipts(result.receipts, block.hash(), block.header.number)]);

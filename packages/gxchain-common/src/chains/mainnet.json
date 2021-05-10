@@ -1,0 +1,79 @@
+{
+  "consensus": {
+    "type": "pow"
+  },
+  "name": "gxc2",
+  "chainId": 12358,
+  "networkId": 12358,
+  "comment": "The gxchain2.0 main net",
+  "url": "https://does.not.exist/",
+  "genesis": {
+    "bloom":
+      "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "coinbase": "0x3289621709f5b35d09b4335e129907ac367a0593",
+    "difficulty": "0x1",
+    "extraData": "0x42",
+    "gasLimit": "0xbe5c8b",
+    "gasUsed": "0x00",
+    "mixHash": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+    "nonce": "0x0102030405060708",
+    "number": "0x00",
+    "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "receiptTrie": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+    "stateRoot": "0x6ad3fbe704c8b303b37327a2ce5d4cf43b1d9538288ec518bbaf626a83ffb41a",
+    "timestamp": "0x54c98c81",
+    "transactionsTrie": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+    "uncleHash": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"
+  },
+  "hardforks": [
+    {
+      "name": "chainstart",
+      "block": 0
+    },
+    {
+      "name": "homestead",
+      "block": 0
+    },
+    {
+      "name": "dao",
+      "block": null
+    },
+    {
+      "name": "tangerineWhistle",
+      "block": 0
+    },
+    {
+      "name": "spuriousDragon",
+      "block": 0
+    },
+    {
+      "name": "byzantium",
+      "block": 0
+    },
+    {
+      "name": "constantinople",
+      "block": 0
+    },
+    {
+      "name": "petersburg",
+      "block": 0
+    },
+    {
+      "name": "istanbul",
+      "block": 0
+    },
+    {
+      "name": "muirGlacier",
+      "block": 0
+    },
+    {
+      "name": "berlin",
+      "block": 0
+    },
+    {
+      "name": "qaraqorum",
+      "block": 10
+    }
+  ],
+  "bootstrapNodes": []
+}

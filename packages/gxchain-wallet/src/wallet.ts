@@ -1,6 +1,6 @@
 import { Wallet, Accountinfo, addrtype } from './accounts';
 import { keccak256, Address, hashPersonalMessage } from 'ethereumjs-util';
-import { AccountManger } from './keystore';
+import { AccountManger } from './accountmanager';
 import { Transaction } from '@ethereumjs/tx';
 
 export class KeystoreWallet implements Wallet {

@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import type { LevelUp } from 'levelup';
-import { Account, Address, bufferToHex, setLengthLeft, BN, BNLike } from 'ethereumjs-util';
+import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
 import { Database, createLevelDB, DBSaveReceipts } from '@gxchain2/database';

@@ -12,7 +12,7 @@ class Errexpand extends Error {
 export class AccountCache {
   keydir: string;
   //   watcher:watcher;
-  byAddr: FunctionalMap<Buffer, Accountinfo[]> = createBufferFunctionalMap<Accountinfo[]>();
+  byAddr: FunctionalMap<Buffer, Accountinfo> = createBufferFunctionalMap<Accountinfo>();
   all: Accountinfo[] = [];
   fileC: FileCache;
   constructor(keydir: string) {
@@ -22,18 +22,14 @@ export class AccountCache {
 
   accounts(): Accountinfo[] {
     this.scanAccounts();
-    const cpy: Accountinfo[] = [];
-    for (const account of this.all) {
-      cpy.push(account);
-    }
-    return cpy;
+    return [...this.all];
   }
 
   hasAddress(addr: Address): boolean {
     this.scanAccounts();
     const instance = this.byAddr.get(addr.toBuffer());
     if (instance) {
-      return instance.length > 0;
+      return true;
     }
     return false;
   }
@@ -41,26 +37,24 @@ export class AccountCache {
   add(newaccount: Accountinfo) {
     let index = 0;
     for (let i = 0; i < this.all.length; i++) {
-      if (urlcompare(this.all[i].url, newaccount.url)) {
+      if (urlcompare(this.all[i].url, newaccount.url) >= 0) {
         index = i;
         break;
       }
     }
-    if (index < this.all.length && this.all[index] === newaccount) {
+    if (index < this.all.length && this.all[index].address.toBuffer() === newaccount.address.toBuffer()) {
       return;
     }
     this.all = this.all.slice(0, index).concat(newaccount).concat(this.all.slice(index));
     let instance = this.byAddr.get(newaccount.address.toBuffer());
-    if (instance) {
-      instance.push(newaccount);
-    } else {
-      this.byAddr.set(newaccount.address.toBuffer(), [newaccount]);
+    if (!instance) {
+      this.byAddr.set(newaccount.address.toBuffer(), newaccount);
     }
   }
 
   private removeAccount(slice: Accountinfo[], elem: Accountinfo): Accountinfo[] {
     for (const account of slice) {
-      if (account === elem) {
+      if (account.address.toBuffer() === elem.address.toBuffer()) {
         const index = slice.indexOf(account);
         slice = slice.slice(0, index).concat(slice.slice(index + 1));
         return slice;
@@ -72,14 +66,7 @@ export class AccountCache {
   delete(removed: Accountinfo) {
     this.all = this.removeAccount(this.all, removed);
     let instance = this.byAddr.get(removed.address.toBuffer());
-    if (instance) {
-      const ba = this.removeAccount(instance, removed);
-      if (ba.length === 0) {
-        this.byAddr.delete(removed.address.toBuffer());
-      } else {
-        instance = ba;
-      }
-    }
+    this.byAddr.delete(removed.address.toBuffer());
   }
 
   deleteByFile(path: string) {
@@ -90,16 +77,12 @@ export class AccountCache {
         break;
       }
     }
-
     if (index < this.all.length && this.all[index].url.Path === path) {
       const removed = this.all[index];
       this.all = this.all.slice(0, index).concat(this.all.slice(index + 1));
-      let ba = this.removeAccount(this.byAddr.get(removed.address.toBuffer())!, removed);
-      if (ba.length === 0) {
-        this.byAddr.delete(removed.address.toBuffer());
-      } else {
-        let instance = this.byAddr.get(removed.address.toBuffer())!;
-        instance = ba;
+      const toremove = this.byAddr.get(removed.address.toBuffer());
+      if (toremove) {
+        this.byAddr.delete(toremove.address.toBuffer());
       }
     }
   }
@@ -107,9 +90,9 @@ export class AccountCache {
   find(a: Accountinfo) {
     let matches = this.all;
     if (a.address != Address.zero()) {
-      const accounts = this.byAddr.get(a.address.toBuffer());
-      if (accounts) {
-        matches = accounts;
+      const account = this.byAddr.get(a.address.toBuffer());
+      if (account) {
+        return account;
       }
     }
     if (a.url.Path != '') {
@@ -117,24 +100,13 @@ export class AccountCache {
         a.url.Path = path.join(this.keydir, a.url.Path);
       }
       for (const i of matches) {
-        if (i.url === a.url) {
+        if (i.url.Path === a.url.Path) {
           return i;
         }
       }
-      if (a.address === Address.zero()) {
+      if (a.address.toBuffer() === Address.zero().toBuffer()) {
         return;
       }
-    }
-
-    switch (matches.length) {
-      case 1:
-        return matches[0];
-      case 0:
-        return;
-      default:
-        const err = new Errexpand('The Address has more than one file exists');
-        err.accountinfo = { Addr: a.address, match: matches };
-        throw err;
     }
   }
 
@@ -162,8 +134,10 @@ export class AccountCache {
 
     for (const fi of updates) {
       this.deleteByFile(fi);
-      const a = this.readAccount(fi)!;
-      this.add(a);
+      const a = this.readAccount(fi);
+      if (a) {
+        this.add(a);
+      }
     }
   }
 

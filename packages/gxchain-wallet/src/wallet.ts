@@ -37,7 +37,7 @@ export class KeystoreWallet implements Wallet {
   }
 
   contain(account: Accountinfo): boolean {
-    return account.address === this.account.address && account.url === this.account.url;
+    return account.address.toBuffer() === this.account.address.toBuffer();
   }
 
   derive(path: Buffer, pin: boolean): Accountinfo | undefined {
@@ -74,7 +74,10 @@ export class KeystoreWallet implements Wallet {
   }
 
   signTextWithPassphrase(addr: addrtype, passphrase: string, text: Buffer) {
-    const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr))![0];
+    const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr));
+    if (!accountinfo) {
+      throw new Error('unknown account');
+    }
     if (!this.contain(accountinfo)) {
       throw new Error('unknown account');
     }
@@ -82,7 +85,10 @@ export class KeystoreWallet implements Wallet {
   }
 
   signTx(addr: addrtype, tx: Transaction, chainID: number): Transaction {
-    const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr))![0];
+    const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr));
+    if (!accountinfo) {
+      throw new Error('unknown account');
+    }
     if (!this.contain(accountinfo)) {
       throw new Error('unknown account');
     }
@@ -90,7 +96,10 @@ export class KeystoreWallet implements Wallet {
   }
 
   signTxWithPassphrase(addr: addrtype, passphrase: string, tx: Transaction, chainID: number): Transaction {
-    const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr))![0];
+    const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr));
+    if (!accountinfo) {
+      throw new Error('unknown account');
+    }
     if (!this.contain(accountinfo)) {
       throw new Error('unknown account');
     }

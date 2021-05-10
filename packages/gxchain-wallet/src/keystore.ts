@@ -101,7 +101,7 @@ export class AccountManger {
         wallets.push(wallet);
         continue;
       }
-      if (this.wallets[0].accounts()[0] === account) {
+      if (this.wallets[0].accounts()[0].address.toBuffer() === account.address.toBuffer()) {
         wallets.push(this.wallets[0]);
         this.wallets = this.wallets.slice(1);
         continue;

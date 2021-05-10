@@ -10,7 +10,7 @@ export class FileCache {
     this.lastMod = Date.now();
   }
 
-  scan(keydir: string) {
+  scan(keydir: string): string[][] {
     try {
       fs.readdirSync(keydir);
     } catch (error) {
@@ -19,7 +19,7 @@ export class FileCache {
     const filestmp = fs.readdirSync(keydir);
     const files = filestmp.filter((item) => !/(^|\/)\.[^\/\.]/g.test(item));
     if (files.length === 0) {
-      return;
+      return [[], [], []];
     }
     let all = new Array<string>();
     let mods = new Array<string>();

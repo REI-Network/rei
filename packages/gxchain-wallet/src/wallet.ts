@@ -34,7 +34,10 @@ export class KeystoreWallet implements Wallet {
 
   signHash(addr: addrtype, hash: Buffer) {
     this.keystore.cache.scanAccounts();
-    const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr))![0];
+    const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr));
+    if (!accountinfo) {
+      throw new Error('unknown account');
+    }
     if (!this.contain(accountinfo)) {
       throw new Error('unknown account');
     }
@@ -46,7 +49,11 @@ export class KeystoreWallet implements Wallet {
   }
 
   signDataWithPassphrase(addr: addrtype, passphrase, mimeType: string, data: Buffer) {
-    const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr))![0];
+    this.keystore.cache.scanAccounts();
+    const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr));
+    if (!accountinfo) {
+      throw new Error('unknown account');
+    }
     if (!this.contain(accountinfo)) {
       throw new Error('unknown account');
     }
@@ -58,6 +65,7 @@ export class KeystoreWallet implements Wallet {
   }
 
   signTextWithPassphrase(addr: addrtype, passphrase: string, text: Buffer) {
+    this.keystore.cache.scanAccounts();
     const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr));
     if (!accountinfo) {
       throw new Error('unknown account');
@@ -69,6 +77,7 @@ export class KeystoreWallet implements Wallet {
   }
 
   signTx(addr: addrtype, tx: Transaction, chainID: number): Transaction {
+    this.keystore.cache.scanAccounts();
     const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr));
     if (!accountinfo) {
       throw new Error('unknown account');
@@ -80,6 +89,7 @@ export class KeystoreWallet implements Wallet {
   }
 
   signTxWithPassphrase(addr: addrtype, passphrase: string, tx: Transaction, chainID: number): Transaction {
+    this.keystore.cache.scanAccounts();
     const accountinfo = this.keystore.cache.byAddr.get(dealAddrToBuffer(addr));
     if (!accountinfo) {
       throw new Error('unknown account');

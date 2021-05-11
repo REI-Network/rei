@@ -1,13 +1,8 @@
 import { Address } from 'ethereumjs-util';
-import { Accountinfo } from './accounts';
+import { Accountinfo } from './accountmanager';
 import fs from 'fs';
-import path from 'path';
 import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
 import { FileCache } from './filecache';
-
-class Errexpand extends Error {
-  accountinfo = {};
-}
 
 export class AccountCache {
   keydir: string;
@@ -25,8 +20,7 @@ export class AccountCache {
 
   hasAddress(addr: Address): boolean {
     this.scanAccounts();
-    const instance = this.byAddr.get(addr.toBuffer());
-    return !!instance;
+    return !!this.byAddr.get(addr.toBuffer());
   }
 
   add(newaccount: Accountinfo) {
@@ -38,8 +32,11 @@ export class AccountCache {
   }
 
   deleteByFile(path: string) {
-    for (const addr of Array.from(this.byAddr.values())) {
-      if (addr.path === path) this.byAddr.delete(addr.address.toBuffer());
+    const addr = Array.from(this.byAddr.values()).find((addr) => {
+      addr.path === path;
+    });
+    if (addr) {
+      this.byAddr.delete(addr.address.toBuffer());
     }
   }
 
@@ -80,9 +77,6 @@ export class AccountCache {
 
   private readAccount(path: string) {
     const keybuffer = fs.readFileSync(path);
-    if (!keybuffer) {
-      return;
-    }
     const keyjson = JSON.parse(keybuffer.toString());
     const addrstring = keyjson.address;
     const addr = Address.fromString('0x' + addrstring);

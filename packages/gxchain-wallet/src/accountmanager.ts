@@ -1,63 +1,85 @@
-import { Address } from 'ethereumjs-util';
+import { Address, keccak256, hashPersonalMessage } from 'ethereumjs-util';
 import { Account } from 'web3-core';
-import { Wallet, Accountinfo } from './accounts';
 import { AccountCache } from './accountcache';
 import { Transaction } from '@ethereumjs/tx';
 import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
-import { KeystoreWallet } from './wallet';
 import path from 'path';
 import { KeyStorePassphrase } from './passphrase';
 
 const Accounts = require('web3-eth-accounts');
 const web3accounts = new Accounts();
 
+type AddrType = Address | string | Buffer;
+
+export type Accountinfo = {
+  address: Address;
+  path: string;
+};
+
 export class AccountManger {
   storage: KeyStorePassphrase;
   cache: AccountCache;
   unlocked: FunctionalMap<Buffer, Account>;
-  wallets: Wallet[];
 
   constructor(keydir: string) {
+    if (!path.isAbsolute(keydir)) {
+      keydir = path.join(process.cwd(), keydir);
+    }
     this.storage = new KeyStorePassphrase(keydir);
     this.unlocked = createBufferFunctionalMap<Account>();
     this.cache = new AccountCache(keydir);
-    let accs = this.cache.accounts();
-    this.wallets = [];
-    for (let i = 0; i < accs.length; i++) {
-      this.wallets.push(new KeystoreWallet(accs[i], this));
+  }
+
+  getDecryptedKey(a: AddrType, auth: string) {
+    this.cache.accounts();
+    const accountinfo = this.cache.byAddr.get(dealAddrToBuffer(a));
+    if (!accountinfo) {
+      throw new Error('unknown account');
     }
+    const key = this.storage.getkey(accountinfo.address, accountinfo.path, auth);
+    return [accountinfo, key];
   }
 
-  getDecryptedKey(a: Accountinfo, auth: string) {
-    const account = this.cache.find(a);
-    const key = this.storage.getkey(a.address, a.path, auth);
-    return [account, key];
-  }
-
-  signHash(a: Accountinfo, hash: Buffer) {
-    const unlockedKey = this.unlocked.get(a.address.toBuffer());
+  signHash(a: AddrType, hash: Buffer) {
+    const unlockedKey = this.unlocked.get(dealAddrToBuffer(a));
     if (!unlockedKey) {
       throw new Error('password is wrong or unlock');
     }
     return web3accounts.sign(hash.toString(), unlockedKey.privateKey);
   }
 
-  signHashWithPassphrase(a: Accountinfo, passphrase: string, hash: Buffer) {
+  signHashWithPassphrase(a: AddrType, passphrase: string, hash: Buffer) {
     const [account, key] = this.getDecryptedKey(a, passphrase);
     return web3accounts.sign(hash.toString(), key.privateKeyb);
   }
 
-  signTx(a: Accountinfo, tx: Transaction) {
-    const unlockedKey = this.unlocked.get(a.address.toBuffer());
+  signTx(a: AddrType, tx: Transaction) {
+    const unlockedKey = this.unlocked.get(dealAddrToBuffer(a));
     if (!unlockedKey) {
       throw new Error('password is wrong or unlock');
     }
     return tx.sign(Buffer.from(unlockedKey.privateKey));
   }
 
-  signTxWithPassphrase(a: Accountinfo, passphrase: string, tx: Transaction) {
+  signTxWithPassphrase(a: AddrType, passphrase: string, tx: Transaction) {
     const [account, key] = this.getDecryptedKey(a, passphrase);
     return tx.sign(Buffer.from(key.privateKey));
+  }
+
+  signData(addr: AddrType, mimeType: string, data: Buffer) {
+    return this.signHash(addr, keccak256(data));
+  }
+
+  signDataWithPassphrase(addr: AddrType, passphrase, data: Buffer) {
+    return this.signHashWithPassphrase(addr, passphrase, keccak256(data));
+  }
+
+  signText(addr: AddrType, text: Buffer) {
+    return this.signHash(addr, hashPersonalMessage(text));
+  }
+
+  signTextWithPassphrase(addr: AddrType, passphrase: string, text: Buffer) {
+    return this.signHashWithPassphrase(addr, passphrase, hashPersonalMessage(text));
   }
 
   importKey(key: { address: string; privateKey: string }, passphrase: string) {
@@ -65,13 +87,12 @@ export class AccountManger {
     const a: Accountinfo = { address: addr, path: path.join(this.storage.joinPath(keyFileName(addr))) };
     this.storage.storekey(a.path, key, passphrase);
     this.cache.add(a);
-    this.refreshwallets();
     return a;
   }
 
-  update(a: Accountinfo, passphrase: string, newpassphrase: string) {
+  update(a: AddrType, passphrase: string, newpassphrase: string) {
     const [account, key] = this.getDecryptedKey(a, passphrase);
-    return this.storage.storekey(a.path, key, newpassphrase);
+    return this.storage.storekey(account.path, key, newpassphrase);
   }
 
   newaccount(passphrase: string) {
@@ -80,30 +101,7 @@ export class AccountManger {
     const account: Accountinfo = { address: addr, path: this.storage.joinPath(keyFileName(addr)) };
     this.storage.storekey(account.path, key, passphrase);
     this.cache.add(account);
-    this.refreshwallets();
     return account;
-  }
-
-  refreshwallets() {
-    const accs = this.cache.accounts();
-    const wallets: Wallet[] = [];
-    for (const account of accs) {
-      while (this.wallets.length > 0 && this.wallets[0].path() < account.path) {
-        this.wallets = this.wallets.slice(1);
-      }
-      if (this.wallets.length === 0 || this.wallets[0].path() > account.path) {
-        const wallet = new KeystoreWallet(account, this);
-        wallets.push(wallet);
-        continue;
-      }
-      if (this.wallets[0].accounts()[0].address.equals(account.address)) {
-        wallets.push(this.wallets[0]);
-        this.wallets = this.wallets.slice(1);
-        continue;
-      }
-    }
-
-    this.wallets = wallets;
   }
 
   lock(addr: Address) {
@@ -113,22 +111,13 @@ export class AccountManger {
     }
   }
 
-  unlock(a: Accountinfo, passphrase: string) {
+  unlock(a: AddrType, passphrase: string) {
     const [account, key] = this.getDecryptedKey(a, passphrase);
-    const cache = this.unlocked.get(account.address.toBuffer());
-    if (cache && !account) {
+    if (this.unlocked.get(account.address.toBuffer())) {
       return;
     }
-    this.unlocked.set(a.address.toBuffer(), key);
+    this.unlocked.set(dealAddrToBuffer(a), key);
   }
-}
-
-export function newKeyStore(keydir: string) {
-  if (!path.isAbsolute(keydir)) {
-    keydir = path.join(process.cwd(), keydir);
-  }
-  const ks = new AccountManger(keydir);
-  return ks;
 }
 
 export function keyFileName(keyAddr: Address): string {
@@ -136,4 +125,13 @@ export function keyFileName(keyAddr: Address): string {
   const utc = new Date(ts.getTime() + ts.getTimezoneOffset() * 60000);
   const format = utc.toISOString().replace(/:/g, '-');
   return 'UTC--' + format + '--' + keyAddr.toString();
+}
+
+function dealAddrToBuffer(addr: AddrType) {
+  if (Buffer.isBuffer(addr)) {
+    addr = Address.fromPublicKey(addr).toBuffer();
+  } else {
+    addr = typeof addr === 'object' ? addr.toBuffer() : Address.fromString(addr).toBuffer();
+  }
+  return addr;
 }

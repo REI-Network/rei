@@ -20,7 +20,7 @@ export function accountCreate(path: string, password: string) {
 
 export function accountUpdate(path: string, addr: Accountinfo, oldpassword: string, newpassword: string) {
   const store = new AccountManger(path);
-  store.update(addr, oldpassword, newpassword);
+  store.update(addr.address, oldpassword, newpassword);
 }
 
 export function accountList(path: string) {
@@ -36,7 +36,7 @@ export function accountUnlock(path: string, addr: string, password: string) {
   const accounts = store.cache.accounts();
   for (const a of accounts) {
     if (a.address.toString() === addr) {
-      store.unlock(a, password);
+      store.unlock(a.address, password);
       console.log('Unlocked account', utils.toChecksumAddress(a.address.toString()));
       return a;
     }

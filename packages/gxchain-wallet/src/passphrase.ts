@@ -13,6 +13,9 @@ export class KeyStorePassphrase {
 
   getkey(addr: Address, filename: string, auth: string) {
     const keybuffer = fs.readFileSync(filename);
+    if (!keybuffer) {
+      throw new Error('Can not read the files');
+    }
     const keyjson = JSON.parse(keybuffer.toString());
     const key = web3accounts.decrypt(keyjson, auth);
     if (key.address.toLowerCase() != addr.toString()) {
@@ -31,14 +34,6 @@ export class KeyStorePassphrase {
   storekey(filename: string, key: { address: string; privateKey: string }, auth: string) {
     const keyjson = web3accounts.encrypt(key.privateKey, auth);
     fs.mkdirSync(path.dirname(filename), { mode: 0o700, recursive: true });
-    const tmpname = path.join(path.dirname(filename), path.basename(filename) + '.tmp');
-    fs.writeFileSync(tmpname, Buffer.from(JSON.stringify(keyjson)));
-    try {
-      this.getkey(Address.fromString(key.address), tmpname, auth);
-    } catch (err) {
-      console.log('can not store the key ');
-      return;
-    }
-    return fs.renameSync(tmpname, filename);
+    return fs.writeFileSync(filename, JSON.stringify(keyjson));
   }
 }

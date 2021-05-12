@@ -1,14 +1,10 @@
 import { Address, keccak256, hashPersonalMessage } from 'ethereumjs-util';
-import { Account } from 'web3-core';
 import { AccountCache } from './accountcache';
 import { Transaction } from '@ethereumjs/tx';
 import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
 import path from 'path';
 import { KeyStorePassphrase } from './passphrase';
-
-const Accounts = require('web3-eth-accounts');
-const web3accounts = new Accounts();
-
+import { sign, create } from './account';
 type AddrType = Address | string | Buffer;
 
 export type Accountinfo = {
@@ -45,12 +41,12 @@ export class AccountManger {
     if (!unlockedKey) {
       throw new Error('password is wrong or unlock');
     }
-    return web3accounts.sign(hash.toString(), unlockedKey);
+    return sign(hash.toString(), unlockedKey);
   }
 
   signHashWithPassphrase(a: AddrType, passphrase: string, hash: Buffer) {
     const [account, key] = this.getDecryptedKey(a, passphrase);
-    return web3accounts.sign(hash.toString(), key.privateKeyb);
+    return sign(hash.toString(), key.privateKeyb);
   }
 
   signTx(a: AddrType, tx: Transaction) {
@@ -96,7 +92,7 @@ export class AccountManger {
   }
 
   newaccount(passphrase: string) {
-    const key = web3accounts.create();
+    const key = create();
     const addr = Address.fromString(key.address);
     const account: Accountinfo = { address: addr, path: this.storage.joinPath(keyFileName(addr)) };
     this.storage.storekey(account.path, key, passphrase);

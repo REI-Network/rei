@@ -1,9 +1,7 @@
 import { Address } from 'ethereumjs-util';
 import fs from 'fs';
 import path from 'path';
-
-const Accounts = require('web3-eth-accounts');
-const web3accounts = new Accounts();
+import { decrypt, encrypt } from './account';
 
 export class KeyStorePassphrase {
   keyDirPath: string;
@@ -17,7 +15,7 @@ export class KeyStorePassphrase {
       throw new Error('Can not read the files');
     }
     const keyjson = JSON.parse(keybuffer.toString());
-    const key = web3accounts.decrypt(keyjson, auth);
+    const key = decrypt(keyjson, auth);
     if (key.address.toLowerCase() != addr.toString()) {
       throw new Error('key content mismatch');
     }
@@ -32,7 +30,7 @@ export class KeyStorePassphrase {
   }
 
   storekey(filename: string, key: { address: string; privateKey: string }, auth: string) {
-    const keyjson = web3accounts.encrypt(key.privateKey, auth);
+    const keyjson = encrypt(key.privateKey, auth);
     fs.mkdirSync(path.dirname(filename), { mode: 0o700, recursive: true });
     return fs.writeFileSync(filename, JSON.stringify(keyjson));
   }

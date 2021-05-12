@@ -50,7 +50,6 @@ export class AccountCache {
       return;
     }
     const [creates, deletes, updates] = result;
-
     if (creates.length === 0 && deletes.length === 0 && updates.length === 0) {
       return;
     }

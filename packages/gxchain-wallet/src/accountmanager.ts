@@ -24,6 +24,7 @@ export class AccountManger {
     this.storage = new KeyStorePassphrase(keydir);
     this.unlocked = createBufferFunctionalMap<string>();
     this.cache = new AccountCache(keydir);
+    this.cache.accounts();
   }
 
   getDecryptedKey(a: AddrType, auth: string) {

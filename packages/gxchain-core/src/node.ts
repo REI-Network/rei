@@ -20,6 +20,7 @@ import { Miner } from './miner';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter } from './bloombits';
 import { BlockchainMonitor } from './blockchainmonitor';
+import { getPrivateKey } from './fakeaccountmanager';
 
 export interface NodeOptions {
   databasePath: string;
@@ -129,7 +130,6 @@ export class Node {
     const common = Common.createChainStartCommon(typeof this.chain === 'string' ? this.chain : this.chain.chain);
     this.db = new Database(this.rawdb, common);
     this.networkId = common.networkIdBN().toNumber();
-    this.genesisHash = common.genesis().hash;
 
     let genesisBlock!: Block;
     try {
@@ -155,6 +155,7 @@ export class Node {
         }
       }
     }
+    this.genesisHash = bufferToHex(genesisBlock.hash());
 
     common.setHardforkByBlockNumber(0);
     this.blockchain = new Blockchain({
@@ -275,7 +276,8 @@ export class Node {
           block,
           generate,
           root: lastHeader.stateRoot,
-          customValidateBlock: true
+          customValidateBlock: true,
+          cliqueSigner: getPrivateKey(block.header.cliqueSigner().buf.toString('hex'))
         };
         const { result, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot, lastHeader.number)).runBlock(opts);
         block = newBlock || block;

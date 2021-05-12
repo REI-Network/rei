@@ -92,13 +92,13 @@ export async function validateBlockHeader(this: BlockHeader, blockchain: Blockch
   }
 }
 
-export function calcCliqueDifficulty(activeSigners: Address[], signer: Address, number: BN) {
+export function calcCliqueDifficulty(activeSigners: Address[], signer: Address, number: BN): [boolean, BN] {
   if (activeSigners.length === 0) {
     throw new Error('Missing active signers information');
   }
   const signerIndex = activeSigners.findIndex((address: Address) => address.equals(signer));
-  const inTurn = number.modn(activeSigners.length) === signerIndex;
-  return (inTurn ? CLIQUE_DIFF_INTURN : CLIQUE_DIFF_NOTURN).clone();
+  const inTurn = signerIndex !== -1 && number.modn(activeSigners.length) === signerIndex;
+  return [inTurn, (inTurn ? CLIQUE_DIFF_INTURN : CLIQUE_DIFF_NOTURN).clone()];
 }
 
 export class WrappedBlock {
@@ -154,3 +154,4 @@ export class WrappedBlock {
 }
 
 export * from '@ethereumjs/block';
+export { CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN };

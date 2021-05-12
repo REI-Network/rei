@@ -26,6 +26,10 @@ export interface RunBlockDebugOpts extends RunBlockOpts {
    * Custom validate block
    */
   customValidateBlock?: boolean;
+  /**
+   * Custom validate block
+   */
+  cliqueSigner?: Buffer;
 }
 
 /**
@@ -101,7 +105,7 @@ export default async function runBlock(this: VM, opts: RunBlockDebugOpts): Promi
           bloom: result.bloom.bitvector
         }
       },
-      { common: this._common }
+      { common: this._common, cliqueSigner: opts.cliqueSigner }
     );
   } else {
     if (result.receiptRoot && !result.receiptRoot.equals(block.header.receiptTrie)) {
@@ -307,7 +311,8 @@ async function assignBlockRewards(this: VM, block: Block): Promise<void> {
   }
   // Reward miner
   const reward = calculateMinerReward(minerReward, ommers.length);
-  await rewardAccount(state, block.header.coinbase, reward);
+  // await rewardAccount(state, block.header.coinbase, reward);
+  await rewardAccount(state, block.header.cliqueSigner(), reward);
 }
 
 function calculateOmmerReward(ommerBlockNumber: BN, blockNumber: BN, minerReward: BN): BN {

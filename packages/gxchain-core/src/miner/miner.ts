@@ -1,5 +1,5 @@
-import { hexStringToBN, hexStringToBuffer, logger } from '@gxchain2/utils';
-import { validateBlock } from '@gxchain2/block';
+import { hexStringToBN, hexStringToBuffer, logger, getRandomIntInclusive } from '@gxchain2/utils';
+import { CLIQUE_DIFF_NOTURN, validateBlock } from '@gxchain2/block';
 import { Worker } from './worker';
 import { Loop } from './loop';
 import { Node } from '../node';
@@ -21,7 +21,7 @@ export class Miner extends Loop {
   private readonly options?: MinerOptions;
 
   constructor(node: Node, options?: MinerOptions) {
-    super(options?.mineInterval || 5000);
+    super(options?.mineInterval || 3000);
     this.node = node;
     this.options = options;
     this._coinbase = this?.options?.coinbase ? hexStringToBuffer(this.options.coinbase) : Address.zero().buf;
@@ -110,11 +110,28 @@ export class Miner extends Loop {
   async mineBlock() {
     await this.initPromise;
     const lastHeader = this.node.blockchain.latestBlock.header;
+    const now = Math.floor(Date.now() / 1000);
+    const sleep = lastHeader._common.consensusConfig().period - (now - lastHeader.timestamp.toNumber());
+    if (sleep > 0) {
+      logger.debug('sleep for block period', sleep);
+      await new Promise((r) => setTimeout(r, sleep * 1000));
+    }
+    if (!lastHeader.hash().equals(this.node.blockchain.latestBlock.header.hash())) {
+      return;
+    }
     const block = await this.worker.getPendingBlock(lastHeader.number, lastHeader.hash());
     if (block.header.timestamp.lte(lastHeader.timestamp)) {
       return;
     }
-    await validateBlock.call(block, this.node.blockchain);
+    if (block.header.difficulty.eq(CLIQUE_DIFF_NOTURN)) {
+      const signerCount = this.node.blockchain.cliqueActiveSigners().length;
+      const sleep2 = getRandomIntInclusive(0, signerCount) * 200;
+      logger.debug('random sleep', sleep2);
+      await new Promise((r) => setTimeout(r, sleep2));
+    }
+    if (!lastHeader.hash().equals(this.node.blockchain.latestBlock.header.hash())) {
+      return;
+    }
     const newBlock = await this.node.processBlock(block);
     await this.node.newBlock(newBlock);
     logger.info('⛏️  Mine block, height:', newBlock.header.number.toString(), 'hash:', bufferToHex(newBlock.hash()));

@@ -1,5 +1,5 @@
-import { BN } from 'ethereumjs-util';
-import { Block, BlockHeader } from '@gxchain2/block';
+import { Address, BN } from 'ethereumjs-util';
+import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN } from '@gxchain2/block';
 import { calculateTransactionTrie, TypedTransaction } from '@gxchain2/tx';
 import { PendingTxMap } from '@gxchain2/tx-pool';
 import { WrappedVM } from '@gxchain2/vm';
@@ -9,6 +9,7 @@ import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import { Loop } from './loop';
 import { Miner } from './miner';
 import { Node } from '../node';
+import { getPrivateKey } from '../fakeaccountmanager';
 
 export class Worker extends Loop {
   private readonly miner: Miner;
@@ -21,7 +22,7 @@ export class Worker extends Loop {
   private gasUsed = new BN(0);
 
   constructor(node: Node, miner: Miner) {
-    super(3000);
+    super(1000);
     this.node = node;
     this.miner = miner;
     this.initPromise = this.init();
@@ -48,6 +49,43 @@ export class Worker extends Loop {
     await this._newBlock(block);
   }
 
+  private async makeHeader(parentHash: Buffer, number: BN) {
+    if (this.miner.isMining) {
+      const signer = new Address(this.miner.coinbase);
+      const [inTurn, difficulty] = calcCliqueDifficulty(this.node.blockchain.cliqueActiveSigners(), signer, number);
+      return BlockHeader.fromHeaderData(
+        {
+          // TODO: add beneficiary.
+          coinbase: Address.zero(),
+          difficulty,
+          gasLimit: this.miner.gasLimit,
+          // TODO: add beneficiary.
+          nonce: Buffer.alloc(8),
+          number,
+          parentHash,
+          timestamp: new BN(Math.floor(Date.now() / 1000)),
+          uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347'
+        },
+        { common: this.node.getCommon(number), cliqueSigner: getPrivateKey(this.miner.coinbase.toString('hex')) }
+      );
+    } else {
+      return BlockHeader.fromHeaderData(
+        {
+          coinbase: Address.zero(),
+          difficulty: CLIQUE_DIFF_NOTURN.clone(),
+          gasLimit: this.miner.gasLimit,
+          nonce: Buffer.alloc(8),
+          number,
+          parentHash,
+          timestamp: new BN(Math.floor(Date.now() / 1000)),
+          uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+          transactionsTrie: await calculateTransactionTrie([])
+        },
+        { common: this.node.getCommon(number) }
+      );
+    }
+  }
+
   private async _newBlock(block: Block) {
     try {
       if (this.wvm) {
@@ -58,18 +96,7 @@ export class Worker extends Loop {
       this.txs = [];
       this.gasUsed = new BN(0);
       const newNumber = block.header.number.addn(1);
-      this.header = BlockHeader.fromHeaderData(
-        {
-          coinbase: this.miner.coinbase,
-          difficulty: '0x1',
-          gasLimit: this.miner.gasLimit,
-          nonce: '0x0102030405060708',
-          number: newNumber,
-          parentHash: block.header.hash(),
-          uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347'
-        },
-        { common: this.node.getCommon(newNumber) }
-      );
+      this.header = await this.makeHeader(block.header.hash(), block.header.number.addn(1));
       this.wvm = await this.node.getWrappedVM(block.header.stateRoot, newNumber);
       await this.wvm.vm.stateManager.checkpoint();
       await this.commit(await this.node.txPool.getPendingMap(block.header.number, block.header.hash()));
@@ -102,22 +129,12 @@ export class Worker extends Loop {
   async getPendingBlock(number?: BN, hash?: Buffer) {
     await this.initPromise;
     if (number && hash && (!number.addn(1).eq(this.header.number) || !hash.equals(this.header.parentHash))) {
-      const newNumber = number.addn(1);
+      logger.debug('getPendingBlock return a empty block');
       return Block.fromBlockData(
         {
-          header: {
-            coinbase: this.miner.coinbase,
-            difficulty: '0x1',
-            gasLimit: this.miner.gasLimit,
-            nonce: '0x0102030405060708',
-            number: newNumber,
-            parentHash: hash,
-            uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
-            timestamp: new BN(Math.floor(Date.now() / 1000)),
-            transactionsTrie: await calculateTransactionTrie([])
-          }
+          header: await this.makeHeader(hash, number.addn(1))
         },
-        { common: this.node.getCommon(newNumber) }
+        { common: this.node.getCommon(number.addn(1)) }
       );
     }
     const txs = [...this.txs];
@@ -131,7 +148,7 @@ export class Worker extends Loop {
         },
         transactions: txs
       },
-      { common: this.node.getCommon(header.number) }
+      { common: this.node.getCommon(header.number), cliqueSigner: this.miner.isMining ? getPrivateKey(this.miner.coinbase.toString('hex')) : undefined }
     );
   }
 

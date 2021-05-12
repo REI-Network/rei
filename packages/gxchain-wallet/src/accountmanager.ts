@@ -19,14 +19,14 @@ export type Accountinfo = {
 export class AccountManger {
   storage: KeyStorePassphrase;
   cache: AccountCache;
-  unlocked: FunctionalMap<Buffer, Account>;
+  unlocked: FunctionalMap<Buffer, string>;
 
   constructor(keydir: string) {
     if (!path.isAbsolute(keydir)) {
       keydir = path.join(process.cwd(), keydir);
     }
     this.storage = new KeyStorePassphrase(keydir);
-    this.unlocked = createBufferFunctionalMap<Account>();
+    this.unlocked = createBufferFunctionalMap<string>();
     this.cache = new AccountCache(keydir);
   }
 
@@ -45,7 +45,7 @@ export class AccountManger {
     if (!unlockedKey) {
       throw new Error('password is wrong or unlock');
     }
-    return web3accounts.sign(hash.toString(), unlockedKey.privateKey);
+    return web3accounts.sign(hash.toString(), unlockedKey);
   }
 
   signHashWithPassphrase(a: AddrType, passphrase: string, hash: Buffer) {
@@ -58,7 +58,7 @@ export class AccountManger {
     if (!unlockedKey) {
       throw new Error('password is wrong or unlock');
     }
-    return tx.sign(Buffer.from(unlockedKey.privateKey));
+    return tx.sign(Buffer.from(unlockedKey));
   }
 
   signTxWithPassphrase(a: AddrType, passphrase: string, tx: Transaction) {

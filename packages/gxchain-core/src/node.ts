@@ -161,8 +161,6 @@ export class Node {
       db: this.rawdb,
       database: this.db,
       common,
-      validateConsensus: false,
-      validateBlocks: false,
       genesisBlock
     });
     await this.blockchain.init();

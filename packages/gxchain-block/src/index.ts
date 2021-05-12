@@ -1,6 +1,6 @@
-import { bnToHex, bufferToHex, BN } from 'ethereumjs-util';
+import { bnToHex, bufferToHex, BN, Address } from 'ethereumjs-util';
 import { Block, Blockchain, BlockHeader } from '@ethereumjs/block';
-import { CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL } from '@ethereumjs/block/dist/clique';
+import { CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL, CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@ethereumjs/block/dist/clique';
 import { txSize, WrappedTransaction } from '@gxchain2/tx';
 
 export async function validateBlock(this: Block, blockchain: Blockchain) {
@@ -90,6 +90,15 @@ export async function validateBlockHeader(this: BlockHeader, blockchain: Blockch
       throw new Error('uncle block has a parent that is too old or too young');
     }
   }
+}
+
+export function calcCliqueDifficulty(activeSigners: Address[], signer: Address, number: BN) {
+  if (activeSigners.length === 0) {
+    throw new Error('Missing active signers information');
+  }
+  const signerIndex = activeSigners.findIndex((address: Address) => address.equals(signer));
+  const inTurn = number.modn(activeSigners.length) === signerIndex;
+  return (inTurn ? CLIQUE_DIFF_INTURN : CLIQUE_DIFF_NOTURN).clone();
 }
 
 export class WrappedBlock {

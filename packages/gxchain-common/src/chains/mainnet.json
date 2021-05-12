@@ -1,6 +1,11 @@
 {
   "consensus": {
-    "type": "pow"
+    "type": "poa",
+    "algorithm": "clique",
+    "clique": {
+      "period": 3,
+      "epoch": 30000
+    }
   },
   "name": "gxc2-mainnet",
   "chainId": 12358,

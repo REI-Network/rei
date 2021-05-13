@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { BN } from 'ethereumjs-util';
 import { logger } from '@gxchain2/utils';
 import { Peer } from '@gxchain2/network';
 import type { Node } from '../node';
@@ -62,7 +63,7 @@ export class Synchronizer extends EventEmitter {
    * Sync the blocks
    * @param target - the sync peer and height of block
    */
-  async sync(target?: { peer: Peer; height: number }) {
+  async sync(target?: { peer: Peer; height: number; td: BN }) {
     try {
       if (!this.isSyncing) {
         const beforeSync = this.node.blockchain.latestBlock.hash();
@@ -87,7 +88,7 @@ export class Synchronizer extends EventEmitter {
     throw new Error('Unimplemented');
   }
 
-  announce(peer: Peer, height: number) {
+  announce(peer: Peer, height: number, td: BN) {
     throw new Error('Unimplemented');
   }
 

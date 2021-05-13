@@ -1,4 +1,4 @@
-import { BNLike } from 'ethereumjs-util';
+import { BNLike, BN } from 'ethereumjs-util';
 import { Blockchain } from '@gxchain2/blockchain';
 import { Database } from '@gxchain2/database';
 import { Aborter } from '@gxchain2/utils';
@@ -7,7 +7,7 @@ import { Common } from '@gxchain2/common';
 import { Peer } from './peer';
 
 export interface ISync {
-  announce(peer: Peer, height: number): void;
+  announce(peer: Peer, height: number, td: BN): void;
 }
 
 export interface ITxPool {

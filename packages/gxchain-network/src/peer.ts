@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { BN } from 'ethereumjs-util';
 import { Channel, Aborter, createBufferFunctionalSet, logger } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/block';
 import { Transaction } from '@gxchain2/tx';
@@ -193,7 +194,7 @@ export class Peer extends EventEmitter {
   private _bodiesIdle: boolean = true;
   private _receiptsIdle: boolean = true;
 
-  private newBlockAnnouncesQueue: Channel<Block>;
+  private newBlockAnnouncesQueue: Channel<{ block: Block; td: BN }>;
   private txAnnouncesQueue: Channel<Buffer>;
 
   constructor(options: { peerId: string; node: Libp2pNode }) {
@@ -201,7 +202,7 @@ export class Peer extends EventEmitter {
     this.peerId = options.peerId;
     this.node = options.node;
     this.aborter = options.node.node.aborter;
-    this.newBlockAnnouncesQueue = new Channel<Block>({ max: 1, aborter: this.aborter });
+    this.newBlockAnnouncesQueue = new Channel<{ block: Block; td: BN }>({ max: 1, aborter: this.aborter });
     this.txAnnouncesQueue = new Channel<Buffer>({ aborter: this.aborter });
     this.newBlockAnnouncesLoop();
     this.txAnnouncesLoop();
@@ -236,8 +237,8 @@ export class Peer extends EventEmitter {
   }
 
   private async newBlockAnnouncesLoop() {
-    for await (const block of this.newBlockAnnouncesQueue.generator()) {
-      this.newBlock(block);
+    for await (const { block, td } of this.newBlockAnnouncesQueue.generator()) {
+      this.newBlock(block, td);
     }
   }
 
@@ -353,10 +354,10 @@ export class Peer extends EventEmitter {
   }
 
   //////////// Protocol method ////////////
-  private newBlock(block: Block) {
+  private newBlock(block: Block, td: BN) {
     const filtered = this.filterBlock([block], (b) => b.hash());
     if (filtered.length > 0) {
-      this.send(constants.GXC2_ETHWIRE, 'NewBlock', filtered[0]);
+      this.send(constants.GXC2_ETHWIRE, 'NewBlock', { block: filtered[0], td });
     }
   }
 
@@ -393,7 +394,7 @@ export class Peer extends EventEmitter {
     }
   }
 
-  announceNewBlock(block: Block) {
-    this.newBlockAnnouncesQueue.push(block);
+  announceNewBlock(block: Block, td: BN) {
+    this.newBlockAnnouncesQueue.push({ block, td });
   }
 }

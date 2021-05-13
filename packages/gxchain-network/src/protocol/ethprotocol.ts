@@ -1,4 +1,4 @@
-import { bufferToInt, rlp } from 'ethereumjs-util';
+import { bufferToInt, bufferToHex, rlp, BN } from 'ethereumjs-util';
 import { constants } from '@gxchain2/common';
 import { Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/block';
 import { TxFromValuesArray, TypedTransaction } from '@gxchain2/tx';
@@ -20,6 +20,7 @@ const handlers: Handler[] = [
       });
       return {
         networkId: bufferToInt(status.networkId),
+        totalDifficulty: status.totalDifficulty,
         height: bufferToInt(status.height),
         bestHash: status.bestHash,
         genesisHash: status.genesisHash
@@ -85,13 +86,20 @@ const handlers: Handler[] = [
   {
     name: 'NewBlock',
     code: 5,
-    encode: (info: MsgContext, block: Block) => rlp.encode([5, [block.header.raw(), block.transactions.map((tx) => tx.raw())]]),
-    decode: (info: MsgContext, blockRaw): Block => Block.fromValuesArray(blockRaw, { common: info.node.getCommon(0) }),
-    process(info: MsgContext, block: Block) {
+    encode: (info: MsgContext, { block, td }: { block: Block; td: BN }) => rlp.encode([5, [[block.header.raw(), block.transactions.map((tx) => tx.raw())], td.toBuffer()]]),
+    decode: (info: MsgContext, raw): { block: Block; td: BN } => {
+      return {
+        block: Block.fromValuesArray(raw[0], { common: info.node.getCommon(0) }),
+        td: new BN(raw[1])
+      };
+    },
+    process(info: MsgContext, { block, td }: { block: Block; td: BN }) {
       const height = block.header.number.toNumber();
-      info.node.sync.announce(info.peer, height);
+      const bestHash = bufferToHex(block.hash());
+      const totalDifficulty = td.toString();
+      info.node.sync.announce(info.peer, height, td);
       if (info.protocol instanceof ETHProtocol) {
-        info.protocol.updateStatus(height);
+        info.protocol.updateStatus(height, bestHash, totalDifficulty);
       }
     }
   },
@@ -162,10 +170,12 @@ export class ETHProtocol extends Protocol {
   }
 
   protected isValidRemoteStatus(remoteStatus: any, localStatus: any): boolean {
-    return remoteStatus.networkId === localStatus.networkId && Buffer.from(localStatus.genesisHash.substr(2), 'hex').equals(remoteStatus.genesisHash);
+    return remoteStatus.networkId === localStatus.networkId && localStatus.genesisHash.equals(remoteStatus.genesisHash);
   }
 
-  updateStatus(height: number) {
+  updateStatus(height: number, bestHash: string, totalDifficulty: string) {
     this._status.height = height;
+    this._status.bestHash = bestHash;
+    this._status.totalDifficulty = totalDifficulty;
   }
 }

@@ -4,7 +4,7 @@ import type { LevelUp } from 'levelup';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
-import { Database, createLevelDB, DBSaveReceipts } from '@gxchain2/database';
+import { Database, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchain2/database';
 import { Libp2pNode, PeerPool } from '@gxchain2/network';
 import { Common, constants, getGenesisState, getChain } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
@@ -81,7 +81,7 @@ export class Node {
 
   private chain!: string | { chain: any; genesisState?: any };
   private networkId!: number;
-  private genesisHash!: string;
+  private genesisHash!: Buffer;
 
   constructor(options: NodeOptions) {
     this.options = options;
@@ -97,8 +97,9 @@ export class Node {
   get status() {
     return {
       networkId: this.networkId,
+      totalDifficulty: this.blockchain.totalDifficulty.toBuffer(),
       height: this.blockchain.latestHeight,
-      bestHash: this.blockchain.latestHash,
+      bestHash: this.blockchain.latestBlock.hash(),
       genesisHash: this.genesisHash
     };
   }
@@ -155,7 +156,7 @@ export class Node {
         }
       }
     }
-    this.genesisHash = bufferToHex(genesisBlock.hash());
+    this.genesisHash = genesisBlock.hash();
 
     common.setHardforkByBlockNumber(0);
     this.blockchain = new Blockchain({
@@ -211,7 +212,7 @@ export class Node {
       .on('added', (peer) => {
         const status = peer.getStatus(constants.GXC2_ETHWIRE);
         if (status && status.height !== undefined) {
-          this.sync.announce(peer, status.height);
+          this.sync.announce(peer, status.height, new BN(status.totalDifficulty));
           peer.announceTx(this.txPool.getPooledTransactionHashes());
         }
       })
@@ -286,8 +287,7 @@ export class Node {
           logger.debug('process on hardfork:', block._common.hardfork());
         }
         await this.blockchain.putBlock(block);
-        await this.blockchain.saveTxLookup(block);
-        await this.db.batch([DBSaveReceipts(result.receipts, block.hash(), block.header.number)]);
+        await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(result.receipts, block.hash(), block.header.number)));
         resolve(block);
       } catch (err) {
         logger.error('Node::processLoop, process block error:', err);
@@ -322,8 +322,9 @@ export class Node {
         } else if (task instanceof NewBlockTask) {
           const { block } = task;
           for (const peer of this.peerpool.peers) {
+            const td = await this.db.getTotalDifficulty(block.hash(), block.header.number);
             if (peer.isSupport(constants.GXC2_ETHWIRE)) {
-              peer.announceNewBlock(block);
+              peer.announceNewBlock(block, td);
             }
           }
           await Promise.all([this.txPool.newBlock(block), this.miner.worker.newBlock(block), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)]);

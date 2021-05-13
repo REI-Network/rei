@@ -176,6 +176,9 @@ export class FullSynchronizer extends Synchronizer {
 
   private async syncWithPeer(peer: Peer, bestHeight: number): Promise<boolean> {
     const localHeight = await this.findAncient(peer);
+    if (localHeight <= bestHeight) {
+      return false;
+    }
     logger.info('💡 Get best height from:', peer.peerId, 'best height:', bestHeight, 'local height:', localHeight);
     this.startSyncHook(localHeight, bestHeight);
 

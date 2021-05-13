@@ -1,9 +1,10 @@
 import { hexStringToBN, hexStringToBuffer, logger, getRandomIntInclusive } from '@gxchain2/utils';
-import { CLIQUE_DIFF_NOTURN, validateBlock } from '@gxchain2/block';
+import { Block, CLIQUE_DIFF_NOTURN, validateBlock } from '@gxchain2/block';
 import { Worker } from './worker';
 import { Loop } from './loop';
 import { Node } from '../node';
 import { Address, BN, bufferToHex } from 'ethereumjs-util';
+import { getPrivateKey } from '../fakeaccountmanager';
 
 export interface MinerOptions {
   coinbase: string;
@@ -21,7 +22,7 @@ export class Miner extends Loop {
   private readonly options?: MinerOptions;
 
   constructor(node: Node, options?: MinerOptions) {
-    super(options?.mineInterval || 3000);
+    super(options?.mineInterval || 0);
     this.node = node;
     this.options = options;
     this._coinbase = this?.options?.coinbase ? hexStringToBuffer(this.options.coinbase) : Address.zero().buf;
@@ -110,30 +111,36 @@ export class Miner extends Loop {
   async mineBlock() {
     await this.initPromise;
     const lastHeader = this.node.blockchain.latestBlock.header;
+    let block = await this.worker.getPendingBlock(lastHeader.number, lastHeader.hash());
     const now = Math.floor(Date.now() / 1000);
     const sleep = lastHeader._common.consensusConfig().period - (now - lastHeader.timestamp.toNumber());
     if (sleep > 0) {
-      logger.debug('sleep for block period', sleep);
+      logger.debug('sleep for block period', sleep, 'last block should mine at', lastHeader.timestamp.toNumber() + lastHeader._common.consensusConfig().period);
       await new Promise((r) => setTimeout(r, sleep * 1000));
     }
-    if (!lastHeader.hash().equals(this.node.blockchain.latestBlock.header.hash())) {
-      return;
-    }
-    const block = await this.worker.getPendingBlock(lastHeader.number, lastHeader.hash());
-    if (block.header.timestamp.lte(lastHeader.timestamp)) {
-      return;
-    }
+    block = Block.fromBlockData({ header: { ...block.header, timestamp: Math.floor(Date.now() / 1000) }, transactions: [...block.transactions] }, { common: block._common, cliqueSigner: getPrivateKey(this.coinbase.toString('hex')) });
     if (block.header.difficulty.eq(CLIQUE_DIFF_NOTURN)) {
+      if (!lastHeader.hash().equals(this.node.blockchain.latestBlock.header.hash())) {
+        return;
+      }
+      if (block.header.timestamp.lte(lastHeader.timestamp)) {
+        return;
+      }
       const signerCount = this.node.blockchain.cliqueActiveSigners().length;
-      const sleep2 = getRandomIntInclusive(0, signerCount) * 200;
-      logger.debug('random sleep', sleep2);
+      const sleep2 = getRandomIntInclusive(1, signerCount + 1) * 200;
+      logger.debug('not turn, random sleep', sleep2);
       await new Promise((r) => setTimeout(r, sleep2));
+      logger.debug('not turn, sleep over');
+      if (!lastHeader.hash().equals(this.node.blockchain.latestBlock.header.hash())) {
+        return;
+      }
+    } else {
+      logger.debug('in turn');
     }
-    if (!lastHeader.hash().equals(this.node.blockchain.latestBlock.header.hash())) {
-      return;
-    }
+    logger.debug('start mint');
     const newBlock = await this.node.processBlock(block);
     await this.node.newBlock(newBlock);
+    logger.debug('mint over');
     logger.info('⛏️  Mine block, height:', newBlock.header.number.toString(), 'hash:', bufferToHex(newBlock.hash()));
   }
 

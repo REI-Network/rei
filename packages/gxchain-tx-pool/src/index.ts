@@ -458,6 +458,10 @@ export class TxPool extends EventEmitter {
     return result;
   }
 
+  getCurrentHeader(): [BN, Buffer] {
+    return [this.currentHeader.number, this.currentHeader.hash()];
+  }
+
   private async _addTxs(txs: TypedTransaction[], force: boolean): Promise<{ results: boolean[]; readies?: Map<Buffer, TypedTransaction[]> }> {
     const dirtyAddrs: Address[] = [];
     const results: boolean[] = [];

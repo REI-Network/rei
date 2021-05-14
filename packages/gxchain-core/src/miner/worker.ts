@@ -1,4 +1,5 @@
 import { Address, BN, bufferToHex } from 'ethereumjs-util';
+import Semaphore from 'semaphore-async-await';
 import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN } from '@gxchain2/block';
 import { calculateTransactionTrie, TypedTransaction } from '@gxchain2/tx';
 import { PendingTxMap } from '@gxchain2/tx-pool';
@@ -19,8 +20,10 @@ export class Worker extends Loop {
   private wvm!: WrappedVM;
   private txs: TypedTransaction[] = [];
   private header!: BlockHeader;
+  private currentHeader!: BlockHeader;
   private gasUsed = new BN(0);
   private history: [number, Buffer, Block][] = [];
+  private lock = new Semaphore(1);
 
   constructor(node: Node, miner: Miner) {
     super(1000);
@@ -38,16 +41,16 @@ export class Worker extends Loop {
       await this.initPromise;
       return;
     }
-    await this._newBlock(this.node.blockchain.latestBlock);
+    await this._newBlockHeader(this.node.blockchain.latestBlock.header);
   }
 
   /**
    * Assembles the new block
-   * @param block
+   * @param header
    */
-  async newBlock(block: Block) {
+  async newBlockHeader(header: BlockHeader) {
     await this.initPromise;
-    await this._newBlock(block);
+    await this._newBlockHeader(header);
   }
 
   private async makeHeader(parentHash: Buffer, number: BN) {
@@ -87,12 +90,13 @@ export class Worker extends Loop {
     }
   }
 
-  private async _newBlock(block: Block) {
+  private async _newBlockHeader(header: BlockHeader, txMap?: PendingTxMap) {
     try {
+      await this.lock.acquire();
       if (this.wvm) {
-        if ((this.wvm.vm.stateManager as any)._trie.isCheckpoint) {
-          await this.wvm.vm.stateManager.revert();
-        }
+        // if ((this.wvm.vm.stateManager as any)._trie.isCheckpoint) {
+        await this.wvm.vm.stateManager.revert();
+        // }
       }
       // save history pending blocks.
       if (this.header !== undefined && this.header.number.gtn(0)) {
@@ -103,13 +107,16 @@ export class Worker extends Loop {
       }
       this.txs = [];
       this.gasUsed = new BN(0);
-      const newNumber = block.header.number.addn(1);
-      this.header = await this.makeHeader(block.header.hash(), block.header.number.addn(1));
-      this.wvm = await this.node.getWrappedVM(block.header.stateRoot, newNumber);
+      this.currentHeader = header;
+      const newNumber = header.number.addn(1);
+      this.header = await this.makeHeader(header.hash(), header.number.addn(1));
+      this.wvm = await this.node.getWrappedVM(header.stateRoot, newNumber);
       await this.wvm.vm.stateManager.checkpoint();
-      await this.commit(await this.node.txPool.getPendingTxMap(block.header.number, block.header.hash()));
+      await this.commit(txMap || (await this.node.txPool.getPendingTxMap(header.number, header.hash())));
     } catch (err) {
       logger.error('Worker::_newBlock, catch error:', err);
+    } finally {
+      this.lock.release();
     }
   }
 
@@ -145,6 +152,7 @@ export class Worker extends Loop {
       if (h) {
         logger.debug('Worker::getPendingBlock, find a pending block in history, parent block:', number.toNumber(), bufferToHex(hash));
         const block = h[2];
+        // rebuild timestamp.
         return Block.fromBlockData(
           {
             header: {
@@ -188,7 +196,12 @@ export class Worker extends Loop {
   }
 
   protected async process() {
-    // await this.newBlock(this.node.blockchain.latestBlock);
+    if (this.lock.getPermits() > 0) {
+      const [number, hash] = this.node.txPool.getCurrentHeader();
+      if (number.eq(this.currentHeader.number) && hash.equals(this.currentHeader.hash())) {
+        await this._newBlockHeader(this.currentHeader, await this.node.txPool.getPendingTxMap(this.currentHeader.number, this.currentHeader.hash()));
+      }
+    }
   }
 
   private async commit(pendingMap: PendingTxMap) {

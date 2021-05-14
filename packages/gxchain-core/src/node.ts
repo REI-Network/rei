@@ -328,7 +328,7 @@ export class Node {
             }
           }
           await this.txPool.newBlock(block);
-          await Promise.all([this.miner.worker.newBlock(block), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)]);
+          await Promise.all([this.miner.worker.newBlockHeader(block.header), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)]);
         }
       } catch (err) {
         logger.error('Node::taskLoop, catch error:', err);

@@ -383,12 +383,12 @@ export class TxPool extends EventEmitter {
    * Obtain the pending transactions in the pool
    * @returns The map of accounts and pending transactions
    */
-  async getPendingMap(number?: BN, hash?: Buffer) {
+  async getPendingTxMap(number: BN, hash: Buffer) {
     await this.initPromise;
-    const pendingMap = new PendingTxMap();
-    if (number && hash && (!number.eq(this.currentHeader.number) || !hash.equals(this.currentHeader.hash()))) {
-      return pendingMap;
+    if (!number.eq(this.currentHeader.number) || !hash.equals(this.currentHeader.hash())) {
+      throw new Error(`invalid number and hash, ${number.toString()}, ${bufferToHex(hash)}, current, ${this.currentHeader.number.toString()}, ${bufferToHex(this.currentHeader.hash())}`);
     }
+    const pendingMap = new PendingTxMap();
     for (const [sender, account] of this.accounts) {
       if (!account.hasPending()) {
         continue;

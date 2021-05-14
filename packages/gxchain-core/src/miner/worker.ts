@@ -1,4 +1,4 @@
-import { Address, BN } from 'ethereumjs-util';
+import { Address, BN, bufferToHex } from 'ethereumjs-util';
 import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN } from '@gxchain2/block';
 import { calculateTransactionTrie, TypedTransaction } from '@gxchain2/tx';
 import { PendingTxMap } from '@gxchain2/tx-pool';
@@ -20,6 +20,7 @@ export class Worker extends Loop {
   private txs: TypedTransaction[] = [];
   private header!: BlockHeader;
   private gasUsed = new BN(0);
+  private history: [number, Buffer, Block][] = [];
 
   constructor(node: Node, miner: Miner) {
     super(1000);
@@ -93,13 +94,20 @@ export class Worker extends Loop {
           await this.wvm.vm.stateManager.revert();
         }
       }
+      // save history pending blocks.
+      if (this.header !== undefined && this.header.number.gtn(0)) {
+        this.history.push([this.header.number.toNumber() - 1, this.header.parentHash, await this.getPendingBlock()]);
+        if (this.history.length > 10) {
+          this.history.shift();
+        }
+      }
       this.txs = [];
       this.gasUsed = new BN(0);
       const newNumber = block.header.number.addn(1);
       this.header = await this.makeHeader(block.header.hash(), block.header.number.addn(1));
       this.wvm = await this.node.getWrappedVM(block.header.stateRoot, newNumber);
       await this.wvm.vm.stateManager.checkpoint();
-      await this.commit(await this.node.txPool.getPendingMap(block.header.number, block.header.hash()));
+      await this.commit(await this.node.txPool.getPendingTxMap(block.header.number, block.header.hash()));
     } catch (err) {
       logger.error('Worker::_newBlock, catch error:', err);
     }
@@ -122,6 +130,10 @@ export class Worker extends Loop {
     }
   }
 
+  private getCliqueSigner() {
+    return this.miner.isMining ? getPrivateKey(this.miner.coinbase.toString('hex')) : undefined;
+  }
+
   /**
    * Assembles the pending block from block data
    * @returns
@@ -129,12 +141,27 @@ export class Worker extends Loop {
   async getPendingBlock(number?: BN, hash?: Buffer) {
     await this.initPromise;
     if (number && hash && (!number.addn(1).eq(this.header.number) || !hash.equals(this.header.parentHash))) {
-      logger.debug('getPendingBlock return a empty block');
+      const h = this.history.find((v) => v[0] === number.toNumber() && v[1].equals(hash));
+      if (h) {
+        logger.debug('Worker::getPendingBlock, find a pending block in history, parent block:', number.toNumber(), bufferToHex(hash));
+        const block = h[2];
+        return Block.fromBlockData(
+          {
+            header: {
+              ...block.header,
+              timestamp: new BN(Math.floor(Date.now() / 1000))
+            },
+            transactions: block.transactions
+          },
+          { common: this.node.getCommon(block.header.number), cliqueSigner: this.getCliqueSigner() }
+        );
+      }
+      logger.debug('Worker::getPendingBlock, return a empty block, parent block:', number.toNumber(), bufferToHex(hash));
       return Block.fromBlockData(
         {
           header: await this.makeHeader(hash, number.addn(1))
         },
-        { common: this.node.getCommon(number.addn(1)), cliqueSigner: this.miner.isMining ? getPrivateKey(this.miner.coinbase.toString('hex')) : undefined }
+        { common: this.node.getCommon(number.addn(1)), cliqueSigner: this.getCliqueSigner() }
       );
     }
     const txs = [...this.txs];
@@ -148,7 +175,7 @@ export class Worker extends Loop {
         },
         transactions: txs
       },
-      { common: this.node.getCommon(header.number), cliqueSigner: this.miner.isMining ? getPrivateKey(this.miner.coinbase.toString('hex')) : undefined }
+      { common: this.node.getCommon(header.number), cliqueSigner: this.getCliqueSigner() }
     );
   }
 
@@ -161,7 +188,7 @@ export class Worker extends Loop {
   }
 
   protected async process() {
-    await this.newBlock(this.node.blockchain.latestBlock);
+    // await this.newBlock(this.node.blockchain.latestBlock);
   }
 
   private async commit(pendingMap: PendingTxMap) {

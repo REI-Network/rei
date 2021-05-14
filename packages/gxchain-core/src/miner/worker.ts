@@ -134,7 +134,7 @@ export class Worker extends Loop {
         {
           header: await this.makeHeader(hash, number.addn(1))
         },
-        { common: this.node.getCommon(number.addn(1)) }
+        { common: this.node.getCommon(number.addn(1)), cliqueSigner: this.miner.isMining ? getPrivateKey(this.miner.coinbase.toString('hex')) : undefined }
       );
     }
     const txs = [...this.txs];

@@ -321,8 +321,8 @@ export class Node {
           }
         } else if (task instanceof NewBlockTask) {
           const { block } = task;
+          const td = await this.db.getTotalDifficulty(block.hash(), block.header.number);
           for (const peer of this.peerpool.peers) {
-            const td = await this.db.getTotalDifficulty(block.hash(), block.header.number);
             if (peer.isSupport(constants.GXC2_ETHWIRE)) {
               peer.announceNewBlock(block, td);
             }

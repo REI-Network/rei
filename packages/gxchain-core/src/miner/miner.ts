@@ -145,8 +145,12 @@ export class Miner extends Loop {
       logger.debug('in turn');
     }
     logger.debug('start mint');
+    const beforeMint = this.node.blockchain.latestBlock.hash();
     const newBlock = await this.node.processBlock(block);
-    await this.node.newBlock(newBlock);
+    const afterMint = this.node.blockchain.latestBlock.hash();
+    if (!beforeMint.equals(afterMint)) {
+      await this.node.newBlock(newBlock);
+    }
     logger.debug('mint over');
     logger.info('⛏️  Mine block, height:', newBlock.header.number.toString(), 'hash:', bufferToHex(newBlock.hash()));
   }

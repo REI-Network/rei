@@ -1,5 +1,6 @@
 import { HChannel, Channel, PriorityQueue, getRandomIntInclusive, logger } from '@gxchain2/utils';
 import { BlockHeader, Block } from '@gxchain2/block';
+import { emptyTxTrie } from '@gxchain2/tx';
 import { Node } from '../../node';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 import { GXC2_ETHWIRE } from '@gxchain2/common/dist/constants';
@@ -125,8 +126,8 @@ export class Fetcher extends EventEmitter {
     this.headerTaskOver = true;
   }
 
-  private findIdlePeer(height: number) {
-    const peers = this.node.peerpool.peers.filter((p) => p.bodiesIdle && p.isSupport(GXC2_ETHWIRE) && p.getStatus(GXC2_ETHWIRE).height >= height);
+  private findIdlePeer(uselessPeer: Set<string>, height: number) {
+    const peers = this.node.peerpool.peers.filter((p) => p.bodiesIdle && p.isSupport(GXC2_ETHWIRE) && p.getStatus(GXC2_ETHWIRE).height >= height && !uselessPeer.has(p.peerId));
     let peer: Peer | undefined;
     if (peers.length === 1) {
       peer = peers[0];
@@ -137,6 +138,7 @@ export class Fetcher extends EventEmitter {
   }
 
   private async downloadBodiesLoop() {
+    const uselessPeer = new Set<string>();
     let headersCache: BlockHeader[] = [];
     for await (const header of this.downloadBodiesQueue.generator()) {
       headersCache.push(header);
@@ -146,20 +148,34 @@ export class Fetcher extends EventEmitter {
       const headers = [...headersCache];
       headersCache = [];
 
-      let peer = this.findIdlePeer(headers[headers.length - 1].number.toNumber());
+      let peer = this.findIdlePeer(uselessPeer, headers[headers.length - 1].number.toNumber());
       if (!peer) {
+        // set timeout for find idle peer.
+        const timeout = setTimeout(() => {
+          if (this.idlePeerResolve) {
+            logger.debug('Fetcher, find peer timeout!');
+            this.idlePeerResolve();
+          } else {
+            logger.debug("Fetcher, find peer timeout, but can't resolve!");
+          }
+        }, 3000);
         peer = await new Promise<Peer | undefined>((resolve) => {
           this.idlePeerResolve = resolve;
           this.node.peerpool.on('idle', () => {
-            const newPeer = this.findIdlePeer(headers[headers.length - 1].number.toNumber());
+            const newPeer = this.findIdlePeer(uselessPeer, headers[headers.length - 1].number.toNumber());
             if (newPeer) {
               resolve(newPeer);
             }
           });
         });
+        clearTimeout(timeout);
         this.idlePeerResolve = undefined;
         this.node.peerpool.removeAllListeners('idle');
-        if (this.abortFlag || peer === undefined) {
+        if (peer === undefined) {
+          this.stopFetch();
+          continue;
+        }
+        if (this.abortFlag) {
           continue;
         }
       }
@@ -193,10 +209,17 @@ export class Fetcher extends EventEmitter {
               const transactions = bodies[i];
               const header = headers[i];
               const block = Block.fromBlockData({ header, transactions }, { common: this.node.getCommon(header.number) });
+              // the target peer does not have the block body, so it is marked as a useless peer.
+              if (!block.header.transactionsTrie.equals(emptyTxTrie) && transactions.length === 0) {
+                uselessPeer.add(peer!.peerId);
+                logger.debug('Fetcher, ', peer!.peerId, 'add to useless peer');
+                peer!.bodiesIdle = true;
+                return retry();
+              }
               await block.validateData();
               blocks.push(block);
             } catch (err) {
-              logger.warn('Fetcher::downloadBodiesLoop, invalid bodies(validateData)');
+              logger.warn('Fetcher::downloadBodiesLoop, invalid bodies(validateData)', err);
               this.banPeer(peer!, 'invalid');
               return retry();
             }

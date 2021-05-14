@@ -73,7 +73,12 @@ export class WrappedTransaction {
   }
 }
 
+export const emptyTxTrie = Buffer.from('56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421', 'hex');
+
 export async function calculateTransactionTrie(transactions: TypedTransaction[]): Promise<Buffer> {
+  if (transactions.length === 0) {
+    return emptyTxTrie;
+  }
   const txTrie = new Trie();
   for (let i = 0; i < transactions.length; i++) {
     const tx = transactions[i];

@@ -115,11 +115,15 @@ export class Miner extends Loop {
     const now = Math.floor(Date.now() / 1000);
     const sleep = lastHeader._common.consensusConfig().period - (now - lastHeader.timestamp.toNumber());
     if (sleep > 0) {
-      logger.debug('sleep for block period', sleep, 'last block should mine at', lastHeader.timestamp.toNumber() + lastHeader._common.consensusConfig().period);
+      logger.debug('sleep for block period', sleep, 'next block should be mined at', lastHeader.timestamp.toNumber() + lastHeader._common.consensusConfig().period);
       await new Promise((r) => setTimeout(r, sleep * 1000));
     }
+    // rebuild block for timestamp.
     block = Block.fromBlockData({ header: { ...block.header, timestamp: Math.floor(Date.now() / 1000) }, transactions: [...block.transactions] }, { common: block._common, cliqueSigner: getPrivateKey(this.coinbase.toString('hex')) });
     if (block.header.difficulty.eq(CLIQUE_DIFF_NOTURN)) {
+      if (!this.working) {
+        return;
+      }
       if (!lastHeader.hash().equals(this.node.blockchain.latestBlock.header.hash())) {
         return;
       }
@@ -131,6 +135,9 @@ export class Miner extends Loop {
       logger.debug('not turn, random sleep', sleep2);
       await new Promise((r) => setTimeout(r, sleep2));
       logger.debug('not turn, sleep over');
+      if (!this.working) {
+        return;
+      }
       if (!lastHeader.hash().equals(this.node.blockchain.latestBlock.header.hash())) {
         return;
       }

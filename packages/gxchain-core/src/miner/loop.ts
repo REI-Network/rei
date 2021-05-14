@@ -1,5 +1,5 @@
 export class Loop {
-  private working: boolean = false;
+  protected working: boolean = false;
   private resolve?: () => void;
 
   constructor(interval: number) {

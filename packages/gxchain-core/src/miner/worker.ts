@@ -94,9 +94,7 @@ export class Worker extends Loop {
     try {
       await this.lock.acquire();
       if (this.wvm) {
-        // if ((this.wvm.vm.stateManager as any)._trie.isCheckpoint) {
         await this.wvm.vm.stateManager.revert();
-        // }
       }
       // save history pending blocks.
       if (this.header !== undefined && this.header.number.gtn(0)) {
@@ -199,7 +197,10 @@ export class Worker extends Loop {
     if (this.lock.getPermits() > 0) {
       const [number, hash] = this.node.txPool.getCurrentHeader();
       if (number.eq(this.currentHeader.number) && hash.equals(this.currentHeader.hash())) {
-        await this._newBlockHeader(this.currentHeader, await this.node.txPool.getPendingTxMap(this.currentHeader.number, this.currentHeader.hash()));
+        const txMap = await this.node.txPool.getPendingTxMap(this.currentHeader.number, this.currentHeader.hash());
+        if (this.lock.getPermits() > 0 && number.eq(this.currentHeader.number) && hash.equals(this.currentHeader.hash())) {
+          await this._newBlockHeader(this.currentHeader, txMap);
+        }
       }
     }
   }

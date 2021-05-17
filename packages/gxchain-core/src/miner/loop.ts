@@ -1,6 +1,7 @@
 export class Loop {
   protected working: boolean = false;
   private resolve?: () => void;
+  private waitingPromise?: Promise<void>;
 
   constructor(interval: number) {
     this.loop(interval);
@@ -14,9 +15,10 @@ export class Loop {
       return;
     }
     this.working = true;
-    if (this.resolve) {
+    if (this.resolve && this.waitingPromise) {
       this.resolve();
       this.resolve = undefined;
+      this.waitingPromise = undefined;
     }
   }
 
@@ -34,9 +36,10 @@ export class Loop {
     while (true) {
       await Promise.race([
         new Promise((r) => setTimeout(r, interval)),
-        new Promise<void>((resolve) => {
-          this.resolve = resolve;
-        })
+        this.waitingPromise ||
+          (this.waitingPromise = new Promise<void>((resolve) => {
+            this.resolve = resolve;
+          }))
       ]);
       if (this.working) {
         await this.process();

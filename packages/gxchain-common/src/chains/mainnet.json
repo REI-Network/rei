@@ -3,7 +3,7 @@
     "type": "poa",
     "algorithm": "clique",
     "clique": {
-      "period": 15,
+      "period": 5,
       "epoch": 30000
     }
   },

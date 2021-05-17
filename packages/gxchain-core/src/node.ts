@@ -283,7 +283,7 @@ export class Node {
         block = newBlock || block;
         logger.info('✨ Process block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
         if (block._common.param('vm', 'debugConsole')) {
-          logger.debug('process on hardfork:', block._common.hardfork());
+          logger.debug('Node::processLoop, process on hardfork:', block._common.hardfork());
         }
         await this.blockchain.putBlock(block);
         await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(result.receipts, block.hash(), block.header.number)));

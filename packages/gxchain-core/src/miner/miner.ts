@@ -1,5 +1,5 @@
 import { hexStringToBN, hexStringToBuffer, logger, getRandomIntInclusive } from '@gxchain2/utils';
-import { Block, CLIQUE_DIFF_NOTURN, validateBlock } from '@gxchain2/block';
+import { Block, CLIQUE_DIFF_NOTURN } from '@gxchain2/block';
 import { Worker } from './worker';
 import { Loop } from './loop';
 import { Node } from '../node';
@@ -116,30 +116,34 @@ export class Miner extends Loop {
     while (true) {
       now = Math.floor(Date.now() / 1000);
       let sleep = period - (now - header.timestamp.toNumber());
+      let flag = false;
       if (sleep > 0) {
         logger.debug('Miner::mint, sleep for block period', sleep, 'next block', header.number.addn(1).toNumber(), 'should be mined at', header.timestamp.toNumber() + period);
         await new Promise((r) => setTimeout(r, sleep * 1000));
-        const record = await this.worker.getRecord_OrderByTD(header.number);
-        if (record) {
-          header = record[0];
-          block = record[1];
-        } else {
-          logger.debug('Miner::mint, missing parent block header in worker, stop minting', header.number.toNumber());
-          return;
-        }
       } else {
-        block = block
-          ? Block.fromBlockData(
-              {
-                header: {
-                  ...block.header,
-                  timestamp: now
-                },
-                transactions: block.transactions
-              },
-              { common: this.node.getCommon(block.header.number), cliqueSigner: getPrivateKey(this.coinbase.toString('hex')) }
-            )
-          : await this.worker.getPendingBlock(now, header.number, header.hash());
+        flag = true;
+      }
+
+      const record = await this.worker.getRecord_OrderByTD(header.number);
+      if (record) {
+        header = record[0];
+        block = record[1];
+        block = Block.fromBlockData(
+          {
+            header: {
+              ...block.header,
+              timestamp: now
+            },
+            transactions: block.transactions
+          },
+          { common: this.node.getCommon(block.header.number), cliqueSigner: getPrivateKey(this.coinbase.toString('hex')) }
+        );
+      } else {
+        logger.debug('Miner::mint, missing parent block header in worker, stop minting', header.number.toNumber());
+        return;
+      }
+
+      if (flag) {
         break;
       }
     }

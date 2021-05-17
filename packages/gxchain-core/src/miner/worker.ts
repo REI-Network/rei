@@ -1,4 +1,4 @@
-import { Address, BN, bufferToHex } from 'ethereumjs-util';
+import { Address, BN } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
 import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN } from '@gxchain2/block';
 import { calculateTransactionTrie, TypedTransaction } from '@gxchain2/tx';
@@ -182,32 +182,8 @@ export class Worker extends Loop {
    * Assembles the pending block from block data
    * @returns
    */
-  async getPendingBlock(timestamp?: number, number?: BN, hash?: Buffer) {
+  async getPendingBlock(timestamp?: number) {
     await this.initPromise;
-    if (number && hash && !number.addn(1).eq(this.header.number)) {
-      const record = await this.getRecord_OrderByTD(number);
-      if (record) {
-        const block = record[1];
-        // rebuild timestamp.
-        return Block.fromBlockData(
-          {
-            header: {
-              ...block.header,
-              timestamp: timestamp || Math.floor(Date.now() / 1000)
-            },
-            transactions: block.transactions
-          },
-          { common: this.node.getCommon(block.header.number), cliqueSigner: this.getCliqueSigner() }
-        );
-      }
-      logger.debug('Worker::getPendingBlock, return a empty block, parent block:', number.toNumber(), bufferToHex(hash));
-      return Block.fromBlockData(
-        {
-          header: await this.makeHeader(timestamp || Math.floor(Date.now() / 1000), hash, number.addn(1))
-        },
-        { common: this.node.getCommon(number.addn(1)), cliqueSigner: this.getCliqueSigner() }
-      );
-    }
     const txs = [...this.txs];
     const header = { ...this.header };
     return Block.fromBlockData(

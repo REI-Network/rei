@@ -8,7 +8,6 @@ import { getPrivateKey } from '../fakeaccountmanager';
 
 export interface MinerOptions {
   coinbase: string;
-  mineInterval: number;
   gasLimit: string;
 }
 
@@ -22,7 +21,7 @@ export class Miner extends Loop {
   private readonly options?: MinerOptions;
 
   constructor(node: Node, options?: MinerOptions) {
-    super(options?.mineInterval || 0);
+    super(0);
     this.node = node;
     this.options = options;
     this._coinbase = this?.options?.coinbase ? hexStringToBuffer(this.options.coinbase) : Address.zero().buf;
@@ -110,22 +109,46 @@ export class Miner extends Loop {
    */
   async mint() {
     await this.initPromise;
-    const lastHeader = this.node.blockchain.latestBlock.header;
-    const now = Math.floor(Date.now() / 1000);
-    const sleep = lastHeader._common.consensusConfig().period - (now - lastHeader.timestamp.toNumber());
-    if (sleep > 0) {
-      logger.debug('Miner::mint, sleep for block period', sleep, 'next block should be mined at', lastHeader.timestamp.toNumber() + lastHeader._common.consensusConfig().period);
-      await new Promise((r) => setTimeout(r, sleep * 1000));
+    let header = this.node.blockchain.latestBlock.header;
+    const period = header._common.consensusConfig().period;
+    let now!: number;
+    let block!: Block;
+    while (true) {
+      now = Math.floor(Date.now() / 1000);
+      let sleep = period - (now - header.timestamp.toNumber());
+      if (sleep > 0) {
+        logger.debug('Miner::mint, sleep for block period', sleep, 'next block', header.number.addn(1).toNumber(), 'should be mined at', header.timestamp.toNumber() + period);
+        await new Promise((r) => setTimeout(r, sleep * 1000));
+        const record = await this.worker.getRecord_OrderByTD(header.number);
+        if (record) {
+          header = record[0];
+          block = record[1];
+        } else {
+          logger.debug('Miner::mint, missing parent block header in worker, stop minting', header.number.toNumber());
+          return;
+        }
+      } else {
+        block = block
+          ? Block.fromBlockData(
+              {
+                header: {
+                  ...block.header,
+                  timestamp: now
+                },
+                transactions: block.transactions
+              },
+              { common: this.node.getCommon(block.header.number), cliqueSigner: getPrivateKey(this.coinbase.toString('hex')) }
+            )
+          : await this.worker.getPendingBlock(now, header.number, header.hash());
+        break;
+      }
     }
-    const block = await this.worker.getPendingBlock(lastHeader.number, lastHeader.hash());
+
     if (block.header.difficulty.eq(CLIQUE_DIFF_NOTURN)) {
       if (!this.working) {
         return;
       }
-      if (!lastHeader.hash().equals(this.node.blockchain.latestBlock.header.hash())) {
-        return;
-      }
-      if (block.header.timestamp.lte(lastHeader.timestamp)) {
+      if (!header.hash().equals(this.node.blockchain.latestBlock.header.hash())) {
         return;
       }
       const signerCount = this.node.blockchain.cliqueActiveSigners().length;
@@ -136,7 +159,7 @@ export class Miner extends Loop {
       if (!this.working) {
         return;
       }
-      if (!lastHeader.hash().equals(this.node.blockchain.latestBlock.header.hash())) {
+      if (!header.hash().equals(this.node.blockchain.latestBlock.header.hash())) {
         return;
       }
     } else {

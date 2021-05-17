@@ -27,7 +27,6 @@ export interface NodeOptions {
   chain?: string;
   mine?: {
     coinbase: string;
-    mineInterval: number;
     gasLimit: string;
   };
   p2p?: {

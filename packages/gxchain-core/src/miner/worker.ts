@@ -22,7 +22,7 @@ export class Worker extends Loop {
   private header!: BlockHeader;
   private currentHeader!: BlockHeader;
   private gasUsed = new BN(0);
-  private history: [number, Buffer, Block][] = [];
+  private history: [number, Buffer, BlockHeader, Block][] = [];
   private lock = new Semaphore(1);
 
   constructor(node: Node, miner: Miner) {
@@ -53,7 +53,7 @@ export class Worker extends Loop {
     await this._newBlockHeader(header);
   }
 
-  private async makeHeader(parentHash: Buffer, number: BN) {
+  private async makeHeader(timestamp: number, parentHash: Buffer, number: BN) {
     if (this.miner.isMining) {
       const signer = new Address(this.miner.coinbase);
       const [inTurn, difficulty] = calcCliqueDifficulty(this.node.blockchain.cliqueActiveSigners(), signer, number);
@@ -67,7 +67,7 @@ export class Worker extends Loop {
           nonce: Buffer.alloc(8),
           number,
           parentHash,
-          timestamp: new BN(Math.floor(Date.now() / 1000)),
+          timestamp,
           uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347'
         },
         { common: this.node.getCommon(number), cliqueSigner: getPrivateKey(this.miner.coinbase.toString('hex')) }
@@ -81,7 +81,7 @@ export class Worker extends Loop {
           nonce: Buffer.alloc(8),
           number,
           parentHash,
-          timestamp: new BN(Math.floor(Date.now() / 1000)),
+          timestamp,
           uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
           transactionsTrie: await calculateTransactionTrie([])
         },
@@ -98,16 +98,20 @@ export class Worker extends Loop {
       }
       // save history pending blocks.
       if (this.header !== undefined && this.header.number.gtn(0)) {
-        this.history.push([this.header.number.toNumber() - 1, this.header.parentHash, await this.getPendingBlock()]);
-        if (this.history.length > 10) {
-          this.history.shift();
+        const number = this.header.number.toNumber() - 1;
+        const hash = this.header.parentHash;
+        if (!this.history.find((h) => h[0] === number && h[1].equals(hash))) {
+          this.history.push([this.header.number.toNumber() - 1, this.header.parentHash, this.currentHeader, await this.getPendingBlock()]);
+          if (this.history.length > 10) {
+            this.history.shift();
+          }
         }
       }
       this.txs = [];
       this.gasUsed = new BN(0);
       this.currentHeader = header;
       const newNumber = header.number.addn(1);
-      this.header = await this.makeHeader(header.hash(), header.number.addn(1));
+      this.header = await this.makeHeader(Math.floor(Date.now() / 1000), header.hash(), header.number.addn(1));
       this.wvm = await this.node.getWrappedVM(header.stateRoot, newNumber);
       await this.wvm.vm.stateManager.checkpoint();
       await this.commit(txMap || (await this.node.txPool.getPendingTxMap(header.number, header.hash())));
@@ -139,23 +143,57 @@ export class Worker extends Loop {
     return this.miner.isMining ? getPrivateKey(this.miner.coinbase.toString('hex')) : undefined;
   }
 
+  async getRecord_OrderByTD(number: BN): Promise<undefined | [BlockHeader, Block]> {
+    const records: [BlockHeader, Block][] = this.history.filter((v) => v[0] === number.toNumber()).map((r) => [r[2], r[3]]);
+    if (number.addn(1).eq(this.header.number)) {
+      const number = this.header.number.toNumber() - 1;
+      const hash = this.header.parentHash;
+      if (!this.history.find((h) => h[0] === number && h[1].equals(hash))) {
+        records.push([this.currentHeader, await this.getPendingBlock()]);
+      }
+    }
+    if (records.length === 1) {
+      return [records[0][0], records[0][1]];
+    }
+    if (records.length > 0) {
+      const record = (
+        await Promise.all(
+          records.map(async (record) => {
+            return {
+              record,
+              td: await this.node.db.getTotalDifficulty(record[0].hash(), record[0].number)
+            };
+          })
+        )
+      ).sort((a, b) => {
+        if (a.td.lt(b.td)) {
+          return 1;
+        }
+        if (a.td.gt(b.td)) {
+          return -1;
+        }
+        return 0;
+      })[0].record;
+      return record;
+    }
+  }
+
   /**
    * Assembles the pending block from block data
    * @returns
    */
-  async getPendingBlock(number?: BN, hash?: Buffer) {
+  async getPendingBlock(timestamp?: number, number?: BN, hash?: Buffer) {
     await this.initPromise;
-    if (number && hash && (!number.addn(1).eq(this.header.number) || !hash.equals(this.header.parentHash))) {
-      const h = this.history.find((v) => v[0] === number.toNumber() && v[1].equals(hash));
-      if (h) {
-        logger.debug('Worker::getPendingBlock, find a pending block in history, parent block:', number.toNumber(), bufferToHex(hash));
-        const block = h[2];
+    if (number && hash && !number.addn(1).eq(this.header.number)) {
+      const record = await this.getRecord_OrderByTD(number);
+      if (record) {
+        const block = record[1];
         // rebuild timestamp.
         return Block.fromBlockData(
           {
             header: {
               ...block.header,
-              timestamp: new BN(Math.floor(Date.now() / 1000))
+              timestamp: timestamp || Math.floor(Date.now() / 1000)
             },
             transactions: block.transactions
           },
@@ -165,7 +203,7 @@ export class Worker extends Loop {
       logger.debug('Worker::getPendingBlock, return a empty block, parent block:', number.toNumber(), bufferToHex(hash));
       return Block.fromBlockData(
         {
-          header: await this.makeHeader(hash, number.addn(1))
+          header: await this.makeHeader(timestamp || Math.floor(Date.now() / 1000), hash, number.addn(1))
         },
         { common: this.node.getCommon(number.addn(1)), cliqueSigner: this.getCliqueSigner() }
       );
@@ -176,7 +214,7 @@ export class Worker extends Loop {
       {
         header: {
           ...header,
-          timestamp: new BN(Math.floor(Date.now() / 1000)),
+          timestamp: timestamp || Math.floor(Date.now() / 1000),
           transactionsTrie: await calculateTransactionTrie(txs)
         },
         transactions: txs

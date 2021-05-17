@@ -17,7 +17,6 @@ export async function startNode(opts: { [key: string]: any }): Promise<[Node, un
   const mineOptions = opts.mine
     ? {
         coinbase: opts.coinbase,
-        mineInterval: Number(opts.mineInterval),
         gasLimit: opts.blockGasLimit
       }
     : undefined;

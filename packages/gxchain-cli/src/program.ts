@@ -12,7 +12,6 @@ program.option('--datadir <path>', 'chain data dir path', './gxchain2');
 program.option('--chain <chain>', 'chain name: gxc2-mainnet, gxc2-testnet');
 program.option('--mine', 'mine block');
 program.option('--coinbase <address>', 'miner address');
-program.option('--mine-interval <interval>', 'mine interval', '5000');
 program.option('--block-gas-limit <gas>', 'block gas limit', '0xbe5c8b');
 program.option('--verbosity <verbosity>', 'logging verbosity: silent, error, warn, info, debug, detail', 'info');
 

@@ -106,15 +106,15 @@ export class Miner extends Loop {
   }
 
   /**
-   * Mine the Block
+   * Mint the Block
    */
-  async mineBlock() {
+  async mint() {
     await this.initPromise;
     const lastHeader = this.node.blockchain.latestBlock.header;
     const now = Math.floor(Date.now() / 1000);
     const sleep = lastHeader._common.consensusConfig().period - (now - lastHeader.timestamp.toNumber());
     if (sleep > 0) {
-      logger.debug('sleep for block period', sleep, 'next block should be mined at', lastHeader.timestamp.toNumber() + lastHeader._common.consensusConfig().period);
+      logger.debug('Miner::mint, sleep for block period', sleep, 'next block should be mined at', lastHeader.timestamp.toNumber() + lastHeader._common.consensusConfig().period);
       await new Promise((r) => setTimeout(r, sleep * 1000));
     }
     const block = await this.worker.getPendingBlock(lastHeader.number, lastHeader.hash());
@@ -130,9 +130,9 @@ export class Miner extends Loop {
       }
       const signerCount = this.node.blockchain.cliqueActiveSigners().length;
       const sleep2 = getRandomIntInclusive(1, signerCount + 1) * 200;
-      logger.debug('not turn, random sleep', sleep2);
+      logger.debug('Miner::mint, not turn, random sleep', sleep2);
       await new Promise((r) => setTimeout(r, sleep2));
-      logger.debug('not turn, sleep over');
+      logger.debug('Miner::mint, not turn, sleep over');
       if (!this.working) {
         return;
       }
@@ -140,22 +140,22 @@ export class Miner extends Loop {
         return;
       }
     } else {
-      logger.debug('in turn');
+      logger.debug('Miner::mint, in turn');
     }
-    logger.debug('start mint');
+    logger.debug('Miner::mint, start mint');
     const beforeMint = this.node.blockchain.latestBlock.hash();
     const newBlock = await this.node.processBlock(block);
     const afterMint = this.node.blockchain.latestBlock.hash();
     if (!beforeMint.equals(afterMint)) {
       await this.node.newBlock(newBlock);
     }
-    logger.debug('mint over');
+    logger.debug('Miner::mint, mint over');
     logger.info('⛏️  Mine block, height:', newBlock.header.number.toString(), 'hash:', bufferToHex(newBlock.hash()));
   }
 
   protected async process() {
     try {
-      await this.mineBlock();
+      await this.mint();
     } catch (err) {
       logger.error('Miner::process, catch error:', err);
     }

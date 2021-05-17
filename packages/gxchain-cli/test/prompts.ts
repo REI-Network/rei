@@ -64,7 +64,7 @@ const handler: {
   bm: async (node: Node, strCount?: string) => {
     const count = isNaN(Number(strCount)) ? 1 : Number(strCount);
     for (let i = 0; i < count; i++) {
-      await node.miner.mineBlock();
+      await node.miner.mint();
       await new Promise((r) => setTimeout(r, 1000));
     }
   },

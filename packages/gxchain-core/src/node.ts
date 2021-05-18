@@ -276,7 +276,6 @@ export class Node {
           block,
           generate,
           root: lastHeader.stateRoot,
-          customValidateBlock: true,
           cliqueSigner: getPrivateKey(block.header.cliqueSigner().buf.toString('hex'))
         };
         const { result, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot, lastHeader.number)).runBlock(opts);

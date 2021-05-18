@@ -1,8 +1,9 @@
-import { BN } from 'ethereumjs-util';
+import { EventEmitter } from 'events';
+import { BN, Address } from 'ethereumjs-util';
 import EthereumBlockchain, { BlockchainOptions as EthereumBlockchainOptions } from '@ethereumjs/blockchain';
+import { CliqueLatestSignerStates } from '@ethereumjs/blockchain/dist/clique';
 import { Block, BlockHeader } from '@gxchain2/block';
 import { Database, DBSetTD, DBSetBlockOrHeader, DBSetHashToNumber, DBOp } from '@gxchain2/database';
-import { EventEmitter } from 'events';
 
 export interface BlockchainOptions extends EthereumBlockchainOptions {
   database: Database;
@@ -193,5 +194,17 @@ export class Blockchain extends EthereumBlockchain {
   async putBlock(block: Block) {
     await super.putBlock(block);
     await this.updateLatest();
+  }
+
+  cliqueActiveSignersByBlockNumber(number: BN): Address[] {
+    const _cliqueLatestSignerStates: CliqueLatestSignerStates = (this as any)._cliqueLatestSignerStates;
+    for (let i = _cliqueLatestSignerStates.length - 1; i >= 0; i--) {
+      const state = _cliqueLatestSignerStates[i];
+      if (state[0].gt(number)) {
+        continue;
+      }
+      return [...state[1]];
+    }
+    return [];
   }
 }

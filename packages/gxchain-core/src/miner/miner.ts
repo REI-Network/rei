@@ -110,7 +110,7 @@ export class Miner extends Loop {
   async mint() {
     await this.initPromise;
     let header = this.node.blockchain.latestBlock.header;
-    const period = header._common.consensusConfig().period;
+    const period: number = header._common.consensusConfig().period;
     let now!: number;
     let block!: Block;
     while (true) {
@@ -126,18 +126,28 @@ export class Miner extends Loop {
 
       const record = await this.worker.getRecord_OrderByTD(header.number);
       if (record) {
-        header = record[0];
-        block = record[1];
-        block = Block.fromBlockData(
-          {
-            header: {
-              ...block.header,
-              timestamp: now
+        if (flag) {
+          block = record[1];
+          if (block.header.cliqueIsEpochTransition()) {
+            logger.debug(
+              'Miner::mint, epoch transition block, active signers:',
+              this.node.blockchain.cliqueActiveSignersByBlockNumber(block.header.number).map((addr) => addr.toString())
+            );
+          }
+          block = Block.fromBlockData(
+            {
+              header: {
+                ...block.header,
+                timestamp: now,
+                extraData: block.header.cliqueIsEpochTransition() ? Buffer.concat([Buffer.alloc(32), ...this.node.blockchain.cliqueActiveSignersByBlockNumber(block.header.number).map((addr) => addr.toBuffer()), Buffer.alloc(65)]) : undefined
+              },
+              transactions: block.transactions
             },
-            transactions: block.transactions
-          },
-          { common: this.node.getCommon(block.header.number), cliqueSigner: getPrivateKey(this.coinbase.toString('hex')) }
-        );
+            { common: this.node.getCommon(block.header.number), cliqueSigner: getPrivateKey(this.coinbase.toString('hex')) }
+          );
+        } else {
+          header = record[0];
+        }
       } else {
         logger.debug('Miner::mint, missing parent block header in worker, stop minting', header.number.toNumber());
         return;

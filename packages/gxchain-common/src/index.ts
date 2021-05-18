@@ -1,4 +1,4 @@
-import './installparams';
+import './install';
 import EthereumCommon from '@ethereumjs/common';
 import { BNLike } from 'ethereumjs-util';
 import { getChain } from './chains';

@@ -89,7 +89,7 @@ const handlers: Handler[] = [
     encode: (info: MsgContext, { block, td }: { block: Block; td: BN }) => rlp.encode([5, [[block.header.raw(), block.transactions.map((tx) => tx.raw())], td.toBuffer()]]),
     decode: (info: MsgContext, raw): { block: Block; td: BN } => {
       return {
-        block: Block.fromValuesArray(raw[0], { common: info.node.getCommon(0) }),
+        block: Block.fromValuesArray(raw[0], { common: info.node.getCommon(0), hardforkByBlockNumber: true }),
         td: new BN(raw[1])
       };
     },

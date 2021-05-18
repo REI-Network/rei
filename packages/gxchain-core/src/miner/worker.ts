@@ -195,7 +195,7 @@ export class Worker extends Loop {
         },
         transactions: txs
       },
-      { common: this.node.getCommon(header.number), cliqueSigner: this.getCliqueSigner() }
+      { common: this.node.getCommon(header.number), hardforkByBlockNumber: true, cliqueSigner: this.getCliqueSigner() }
     );
   }
 
@@ -226,6 +226,7 @@ export class Worker extends Loop {
         await this.wvm.vm.stateManager.checkpoint();
 
         let txRes: RunTxResult;
+        tx.common.setHardforkByBlockNumber(this.header.number);
         try {
           txRes = await this.wvm.vm.runTx({
             tx,

@@ -226,7 +226,7 @@ export class Database extends DBManager {
   async getReceiptByHashAndNumber(txHash: Buffer, blockHash: Buffer, blockNumber: BN): Promise<Receipt> {
     const header: BlockHeaderBuffer = rlp.decode(await this.get(DBTarget.Header, { blockHash, blockNumber })) as any;
     const body = await this.getBody(blockHash, blockNumber);
-    const block = Block.fromValuesArray([header, ...body], { common: (this as any)._common });
+    const block = Block.fromValuesArray([header, ...body], { common: (this as any)._common, hardforkByBlockNumber: true });
     const rawArr: Buffer[][] = rlp.decode(await this.get(DBTarget_Receipts, { blockHash, blockNumber })) as any;
     const cumulativeGasUsed = new BN(0);
     for (let i = 0; i < block.transactions.length; i++) {
@@ -252,7 +252,7 @@ export class Database extends DBManager {
         throw err;
       }
     }
-    return Block.fromValuesArray([header, ...body], { common: (this as any)._common });
+    return Block.fromValuesArray([header, ...body], { common: (this as any)._common, hardforkByBlockNumber: true });
   }
 
   async getBloomBits(bit: number, section: BN, hash: Buffer) {

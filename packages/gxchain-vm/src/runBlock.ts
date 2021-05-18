@@ -101,7 +101,7 @@ export default async function runBlock(this: VM, opts: RunBlockDebugOpts): Promi
           bloom: result.bloom.bitvector
         }
       },
-      { common: this._common, cliqueSigner: opts.cliqueSigner }
+      { common: this._common, hardforkByBlockNumber: true, cliqueSigner: opts.cliqueSigner }
     );
   } else {
     if (result.receiptRoot && !result.receiptRoot.equals(block.header.receiptTrie)) {

@@ -208,7 +208,7 @@ export class Fetcher extends EventEmitter {
             try {
               const transactions = bodies[i];
               const header = headers[i];
-              const block = Block.fromBlockData({ header, transactions }, { common: this.node.getCommon(header.number) });
+              const block = Block.fromBlockData({ header, transactions }, { common: this.node.getCommon(header.number), hardforkByBlockNumber: true });
               // the target peer does not have the block body, so it is marked as a useless peer.
               if (!block.header.transactionsTrie.equals(emptyTxTrie) && transactions.length === 0) {
                 uselessPeer.add(peer!.peerId);

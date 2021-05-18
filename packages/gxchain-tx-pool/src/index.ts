@@ -313,7 +313,7 @@ export class TxPool extends EventEmitter {
             header: header,
             transactions: bodyBuffer ? bodyBuffer[0].map((rawTx) => TxFromValuesArray(rawTx, { common: this.node.getCommon(number) })) : []
           },
-          { common: this.node.getCommon(number) }
+          { common: this.node.getCommon(number), hardforkByBlockNumber: true }
         );
       };
 

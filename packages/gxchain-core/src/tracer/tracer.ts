@@ -43,7 +43,7 @@ export class Tracer {
   }
 
   traceBlock(block: Block | Buffer, config?: TraceConfig, hash?: Buffer) {
-    block = block instanceof Block ? block : Block.fromRLPSerializedBlock(block, { common: this.node.getCommon(0) });
+    block = block instanceof Block ? block : Block.fromRLPSerializedBlock(block, { common: this.node.getCommon(0), hardforkByBlockNumber: true });
     if (block.header.number.eqn(0)) {
       throw new Error('invalid block number, 0');
     }

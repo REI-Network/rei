@@ -149,7 +149,8 @@ export class Miner extends Loop {
           header = record[0];
         }
       } else {
-        logger.debug('Miner::mint, missing parent block header in worker, stop minting', header.number.toNumber());
+        logger.debug('Miner::mint, missing parent block header in worker, stop minting', header.number.toNumber(), ', waiting for worker');
+        await new Promise((r) => setTimeout(r, 500));
         return;
       }
 

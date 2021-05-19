@@ -129,6 +129,7 @@ export class Worker extends Loop {
   async addTxs(txs: Map<Buffer, TypedTransaction[]>) {
     await this.initPromise;
     try {
+      await this.lock.acquire();
       const pendingMap = new PendingTxMap();
       for (const [sender, sortedTxs] of txs) {
         pendingMap.push(sender, sortedTxs);
@@ -136,6 +137,8 @@ export class Worker extends Loop {
       await this.commit(pendingMap);
     } catch (err) {
       logger.error('Worker::addTxs, catch error:', err);
+    } finally {
+      this.lock.release();
     }
   }
 

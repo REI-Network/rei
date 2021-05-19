@@ -94,11 +94,8 @@ export class Channel<T = any> {
   }
 }
 
-interface HChannelOption<T> {
-  max?: number;
-  aborter: Aborter;
+interface HChannelOption<T> extends ChannelOption<T> {
   compare?: (a: T, b: T) => boolean;
-  drop?: (data: T) => void;
 }
 
 export class HChannel<T = any> {
@@ -187,5 +184,125 @@ export class HChannel<T = any> {
         throw err;
       }
     }
+  }
+}
+
+export class PChannel<U = any, T extends { data: U; index: number } = { data: any; index: number }> {
+  private processed: number = 0;
+  private aborted = false;
+  private _array: T[] = [];
+  private _heap: Heap;
+  private max?: number;
+  private drop?: (data: T) => void;
+  private resolve?: (data: T) => void;
+  private reject?: (reason?: any) => void;
+  private aborter: Aborter;
+
+  get heap() {
+    return this._heap;
+  }
+
+  get array() {
+    return [...this._array];
+  }
+
+  constructor(options: ChannelOption<T>) {
+    this.max = options.max;
+    this.drop = options.drop;
+    this.aborter = options.aborter;
+    this._heap = new Heap({
+      comparBefore: (a: T, b: T) => a.index < b.index
+    });
+  }
+
+  push(data: T) {
+    if (this.aborter.isAborted || this.aborted) {
+      return false;
+    }
+    this._heap.insert(data);
+    const q = this.readies();
+    if (q.length > 0) {
+      if (this.resolve) {
+        this.resolve(q.shift()!);
+        this.reject = undefined;
+        this.resolve = undefined;
+      }
+      if (q.length > 0) {
+        this._array = this._array.concat(q);
+        if (this.max && this._array.length > this.max) {
+          if (this.drop) {
+            while (this._array.length > this.max) {
+              this.drop(this._array.shift()!);
+            }
+          } else {
+            this._array.splice(0, this._array.length - this.max);
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  next() {
+    return this._array.length > 0
+      ? Promise.resolve(this._array.shift()!)
+      : new Promise<T>((resolve, reject) => {
+          this.resolve = resolve;
+          this.reject = reject;
+        });
+  }
+
+  abort() {
+    if (this.reject) {
+      this.reject(new AbortError('PChannel abort'));
+      this.reject = undefined;
+      this.resolve = undefined;
+    }
+    this.aborted = true;
+    this.clear();
+  }
+
+  reset() {
+    this.aborted = false;
+  }
+
+  clear() {
+    while (this._heap.length > 0) {
+      if (this.drop) {
+        this.drop(this._heap.remove());
+      } else {
+        this._heap.remove();
+      }
+    }
+    if (this.drop) {
+      for (const data of this._array) {
+        this.drop(data);
+      }
+    }
+    this._array = [];
+    this.processed = 0;
+  }
+
+  async *generator() {
+    try {
+      while (!this.aborter.isAborted && !this.aborted) {
+        yield await this.aborter.abortablePromise(this.next(), true);
+      }
+    } catch (err) {
+      if (!(err instanceof AbortError)) {
+        throw err;
+      }
+    }
+  }
+
+  private readies() {
+    let d: T | undefined;
+    const q: T[] = [];
+    while ((d = this._heap.peek()) && d !== undefined && d.index === this.processed) {
+      this.processed++;
+      q.push(d);
+      this._heap.remove();
+    }
+    return q;
   }
 }

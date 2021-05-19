@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
 import { constants } from '@gxchain2/common';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
-import { Block, BlockHeader } from '@gxchain2/block';
+import { BlockHeader } from '@gxchain2/block';
 import { Synchronizer, SynchronizerOptions } from './sync';
 import { Fetcher } from './fetcher';
 import { logger } from '@gxchain2/utils';
@@ -182,44 +182,13 @@ export class FullSynchronizer extends Synchronizer {
     logger.info('💡 Get best height from:', peer.peerId, 'best height:', bestHeight, 'local height:', localHeight);
     this.startSyncHook(localHeight, bestHeight);
 
-    let syncAbort = false;
-    let success = false;
+    let success = true;
     const fetcher = new Fetcher({ node: this.node, count: this.count, limit: this.limit!, banPeer: this.banPeer.bind(this) });
-    await Promise.all([
-      new Promise<void>((resolve) => {
-        this.abortFetcher = () => {
-          syncAbort = true;
-          resolve();
-          fetcher.abort();
-          fetcher.removeAllListeners();
-        };
-        fetcher.on('newBlock', (block: Block) => {
-          if (syncAbort) {
-            return;
-          }
-          // TODO: limit this.
-          this.node
-            .processBlock(block, false)
-            .then(() => {
-              if (!syncAbort && block.header.number.eqn(bestHeight)) {
-                if (this.abortFetcher) {
-                  this.abortFetcher();
-                }
-                success = true;
-                resolve();
-              }
-            })
-            .catch((err) => {
-              logger.error('FullSynchronizer::syncWithPeer, process block error:', err);
-              if (this.abortFetcher) {
-                this.abortFetcher();
-              }
-              resolve();
-            });
-        });
-      }),
-      fetcher.fetch(localHeight, bestHeight - localHeight, peer.peerId)
-    ]);
+    this.abortFetcher = () => {
+      success = false;
+      fetcher.abort();
+    };
+    await fetcher.fetch(localHeight, bestHeight - localHeight, peer.peerId);
     this.abortFetcher = undefined;
     return success;
   }

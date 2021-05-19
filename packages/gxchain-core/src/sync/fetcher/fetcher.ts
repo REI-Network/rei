@@ -1,10 +1,9 @@
-import { HChannel, Channel, PriorityQueue, getRandomIntInclusive, logger } from '@gxchain2/utils';
+import { HChannel, PChannel, getRandomIntInclusive, logger } from '@gxchain2/utils';
 import { BlockHeader, Block } from '@gxchain2/block';
 import { emptyTxTrie } from '@gxchain2/tx';
 import { Node } from '../../node';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 import { GXC2_ETHWIRE } from '@gxchain2/common/dist/constants';
-import { EventEmitter } from 'events';
 
 export interface FetcherOptions {
   node: Node;
@@ -13,40 +12,37 @@ export interface FetcherOptions {
   banPeer: (peer: Peer, reason: 'invalid' | 'timeout' | 'error') => void;
 }
 
-export class Fetcher extends EventEmitter {
+export class Fetcher {
   private abortFlag: boolean = false;
   private node: Node;
   private count: number;
-  private limit: number;
   private banPeer: (peer: Peer, reason: 'invalid' | 'timeout' | 'error') => void;
-  private parallel: number = 0;
-  private parallelResolve?: () => void;
+  private downloadLimit: number;
+  private downloadParallel: number = 0;
+  private downloadParallelResolve?: () => void;
+
+  private processLimit: number = 10;
+  private processParallel: number = 0;
+  private processParallelResolve?: () => void;
+  private processParallelPromise?: Promise<void>;
+
   private localHeight!: number;
   private bestHeight!: number;
+
   private headerTaskOver = false;
-  private priorityQueue = new PriorityQueue<Block>();
-  private blocksQueue: Channel<Block>;
+  private blockQueue: PChannel<Block>;
   private downloadBodiesQueue: HChannel<BlockHeader>;
   private idlePeerResolve?: (peer?: Peer) => void;
 
   constructor(options: FetcherOptions) {
-    super();
     this.node = options.node;
     this.count = options.count;
-    this.limit = options.limit;
+    this.downloadLimit = options.limit;
     this.banPeer = options.banPeer;
-    this.blocksQueue = new Channel<Block>({ aborter: options.node.aborter });
+    this.blockQueue = new PChannel<Block>({ aborter: options.node.aborter });
     this.downloadBodiesQueue = new HChannel<BlockHeader>({
       aborter: options.node.aborter,
       compare: (a, b) => a.number.lt(b.number)
-    });
-    this.priorityQueue.on('result', (block) => {
-      if (!this.abortFlag) {
-        this.emit('newBlock', block);
-        if (block.header.number.eqn(this.bestHeight)) {
-          this.stopFetch();
-        }
-      }
     });
   }
 
@@ -59,7 +55,7 @@ export class Fetcher extends EventEmitter {
   async fetch(start: number, count: number, peerId: string) {
     this.bestHeight = start + count;
     this.localHeight = start;
-    await Promise.all([this.downloadHeader(start, count, peerId), this.downloadBodiesLoop()]);
+    await Promise.all([this.downloadHeader(start, count, peerId), this.downloadBodiesLoop(), this.processBlockLoop()]);
   }
 
   abort() {
@@ -67,13 +63,22 @@ export class Fetcher extends EventEmitter {
   }
 
   private stopFetch() {
+    logger.debug('Fetcher::stopFetch');
     this.abortFlag = true;
     if (this.idlePeerResolve) {
       this.idlePeerResolve(undefined);
     }
-    this.priorityQueue.reset();
+    if (this.downloadParallelResolve) {
+      this.downloadParallelResolve();
+      this.downloadParallelResolve = undefined;
+    }
+    if (this.processParallelResolve) {
+      this.processParallelResolve();
+      this.processParallelResolve = undefined;
+      this.processParallelPromise = undefined;
+    }
     this.downloadBodiesQueue.abort();
-    this.blocksQueue.abort();
+    this.blockQueue.abort();
   }
 
   private async downloadHeader(start: number, count: number, peerId: string) {
@@ -121,6 +126,10 @@ export class Fetcher extends EventEmitter {
         this.stopFetch();
         this.banPeer(peer, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
         return;
+      }
+      if (this.processParallelPromise) {
+        logger.debug('Fetcher::downloadHeader, waiting for process');
+        await this.processParallelPromise;
       }
     }
     this.headerTaskOver = true;
@@ -188,14 +197,14 @@ export class Fetcher extends EventEmitter {
           }
         }
       };
-      this.parallel++;
+      this.downloadParallel++;
       peer
         .getBlockBodies(headers)
         .then(async (bodies) => {
-          this.parallel--;
-          if (this.parallelResolve) {
-            this.parallelResolve();
-            this.parallelResolve = undefined;
+          this.downloadParallel--;
+          if (this.downloadParallelResolve) {
+            this.downloadParallelResolve();
+            this.downloadParallelResolve = undefined;
           }
 
           if (bodies.length !== headers.length) {
@@ -226,7 +235,7 @@ export class Fetcher extends EventEmitter {
           }
           if (!this.abortFlag) {
             for (const block of blocks) {
-              this.priorityQueue.insert(block, block.header.number.toNumber() - this.localHeight - 1);
+              this.blockQueue.push({ data: block, index: block.header.number.toNumber() - this.localHeight - 1 });
             }
           }
           peer!.bodiesIdle = true;
@@ -237,9 +246,47 @@ export class Fetcher extends EventEmitter {
           this.banPeer(peer!, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
           return retry();
         });
-      if (this.parallel >= this.limit) {
+      if (this.downloadParallel >= this.downloadLimit) {
         await new Promise<void>((resolve) => {
-          this.parallelResolve = resolve;
+          this.downloadParallelResolve = resolve;
+        });
+      }
+      if (this.processParallelPromise) {
+        logger.debug('Fetcher::downloadBodiesLoop, waiting for process');
+        await this.processParallelPromise;
+      }
+    }
+  }
+
+  private async processBlockLoop() {
+    for await (const { data: block } of this.blockQueue.generator()) {
+      this.processParallel++;
+      this.node
+        .processBlock(block, false)
+        .then(() => {
+          this.processParallel--;
+          if (this.processParallel < this.processLimit && this.processParallelResolve) {
+            logger.debug('Fetcher::processBlockLoop, waiting promise resolved');
+            this.processParallelResolve();
+            this.processParallelResolve = undefined;
+            this.processParallelPromise = undefined;
+          }
+
+          if (block.header.number.eqn(this.bestHeight)) {
+            this.stopFetch();
+          }
+        })
+        .catch((err) => {
+          if (!this.abortFlag) {
+            logger.error('Fetcher::processBlockLoop, process block error:', err);
+            this.stopFetch();
+            process.exit(1);
+          }
+        });
+      if (this.processParallel >= this.processLimit && !this.processParallelPromise) {
+        logger.debug('Fetcher::processBlockLoop, new waiting promise');
+        this.processParallelPromise = new Promise<void>((resolve) => {
+          this.processParallelResolve = resolve;
         });
       }
     }

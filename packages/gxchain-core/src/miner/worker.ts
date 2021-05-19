@@ -211,14 +211,18 @@ export class Worker extends Loop {
   }
 
   protected async process() {
-    if (this.lock.getPermits() > 0) {
-      const [number, hash] = this.node.txPool.getCurrentHeader();
-      if (number.eq(this.currentHeader.number) && hash.equals(this.currentHeader.hash())) {
-        const txMap = await this.node.txPool.getPendingTxMap(this.currentHeader.number, this.currentHeader.hash());
-        if (this.lock.getPermits() > 0 && number.eq(this.currentHeader.number) && hash.equals(this.currentHeader.hash())) {
-          await this._newBlockHeader(this.currentHeader, txMap);
+    try {
+      if (this.lock.getPermits() > 0) {
+        const [number, hash] = this.node.txPool.getCurrentHeader();
+        if (number.eq(this.currentHeader.number) && hash.equals(this.currentHeader.hash())) {
+          const txMap = await this.node.txPool.getPendingTxMap(this.currentHeader.number, this.currentHeader.hash());
+          if (this.lock.getPermits() > 0 && number.eq(this.currentHeader.number) && hash.equals(this.currentHeader.hash())) {
+            await this._newBlockHeader(this.currentHeader, txMap);
+          }
         }
       }
+    } catch (err) {
+      logger.error('Worker::process, catch error:', err);
     }
   }
 

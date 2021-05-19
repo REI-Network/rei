@@ -10,6 +10,7 @@ program.action(async () => {
     await startNode(program.opts());
   } catch (err) {
     logger.error('Start error:', err);
+    process.exit(1);
   }
 });
 

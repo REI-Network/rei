@@ -45,6 +45,7 @@ export class WrappedBlock {
       stateRoot: bufferToHex(this.block.header.stateRoot),
       receiptsRoot: bufferToHex(this.block.header.receiptTrie),
       miner: this.block.header.coinbase.toString(),
+      mixHash: bufferToHex(this.block.header.mixHash),
       difficulty: bnToHex(this.block.header.difficulty),
       totalDifficulty: bnToHex(this.block.header.number),
       extraData: bufferToHex(this.block.header.extraData),

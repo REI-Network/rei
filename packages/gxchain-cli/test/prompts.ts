@@ -56,8 +56,8 @@ const handler: {
     }
   },
   lsp2p: (node: Node) => {
-    for (const [peerIdString] of node.peerpool.nodes[0].peerStore.peers.entries()) {
-      logger.info(peerIdString);
+    for (const peer of node.peerpool.peers) {
+      logger.info(peer.peerId);
     }
   },
   // batch mine block.
@@ -159,6 +159,42 @@ const handler: {
     const headHash = strHead ? Buffer.from(strHead, 'hex') : (await node.db.getCanonicalHeader(section.addn(1).muln(constants.BloomBitsBlocks).subn(1))).hash();
     const bits = await node.db.getBloomBits(Number(strBit), section, headHash);
     logger.info('bits', Buffer.from(bits).toString('hex'));
+  },
+  rexec: async (node: Node, number: string) => {
+    const block = await node.db.getBlock(Number(number));
+    const parentHeader = await node.db.getHeader(block.header.parentHash, block.header.number.subn(1));
+    const wvm = await node.getWrappedVM(parentHeader.stateRoot, parentHeader.number);
+    await wvm.runBlock({
+      block,
+      generate: false,
+      root: parentHeader.stateRoot,
+      fff: true
+    } as any);
+    logger.info('rexec', block.header.number.toNumber(), 'successfully');
+  },
+  ga: async (node: Node, root: string, address: string) => {
+    const stateManager = await node.getStateManager(hexStringToBuffer(root), 0);
+    console.log(await stateManager.getAccount(Address.fromString(address)));
+  },
+  cs: async (node: Node, number: string) => {
+    const block = await node.db.getBlock(Number(number));
+    console.log(block.header.cliqueSigner().toString());
+  },
+  ts: async (node: Node, number: string, address1: string, address2: string) => {
+    const addr1 = Address.fromString(address1);
+    const addr2 = Address.fromString(address2);
+    const block = await node.db.getBlock(Number(number));
+    const stateManager = await node.getStateManager(block.header.stateRoot, block.header.number);
+    await stateManager.checkpoint();
+    let account1 = await stateManager.getAccount(addr1);
+    let account2 = await stateManager.getAccount(addr2);
+    console.log('before test', block.header.stateRoot.toString('hex'), account1, account2);
+    account1.balance.iaddn(100);
+    await stateManager.putAccount(addr1, account1);
+    await stateManager.commit();
+    account1 = await stateManager.getAccount(addr1);
+    account2 = await stateManager.getAccount(addr2);
+    console.log('after test', (await stateManager.getStateRoot()).toString('hex'), account1, account2);
   }
 };
 
@@ -191,7 +227,7 @@ const startPrompts = async (node: Node) => {
   try {
     program.parse(process.argv);
     const opts = program.opts();
-    opts.datadir = path.join(__dirname, './test-dir/', opts.datadir);
+    opts.datadir = path.isAbsolute(opts.datadir) ? opts.datadir : path.join(__dirname, './test-dir/', opts.datadir);
     const [node, sever] = await startNode(opts);
     SIGINT(node);
     if (opts.mine !== true) {

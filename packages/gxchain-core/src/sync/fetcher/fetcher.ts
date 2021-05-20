@@ -103,6 +103,7 @@ export class Fetcher {
         return;
       }
       try {
+        logger.debug('Fetcher::downloadHeader, start download headers', start, count);
         const headers: BlockHeader[] = await peer.getBlockHeaders(start, count);
         if (headers.length !== count) {
           logger.warn('Fetcher::downloadHeader, invalid header(length)');
@@ -110,6 +111,7 @@ export class Fetcher {
           this.banPeer(peer, 'invalid');
           return;
         }
+        logger.debug('Fetcher::downloadHeader, download headers over', start, count);
         for (let index = 1; i < headers.length; i++) {
           if (!headers[index - 1].hash().equals(headers[index].parentHash)) {
             logger.warn('Fetcher::downloadHeader, invalid header(parentHash)');
@@ -130,6 +132,7 @@ export class Fetcher {
       if (this.processParallelPromise) {
         logger.debug('Fetcher::downloadHeader, waiting for process');
         await this.processParallelPromise;
+        logger.debug('Fetcher::downloadHeader, waiting for process over');
       }
     }
     this.headerTaskOver = true;
@@ -198,10 +201,12 @@ export class Fetcher {
         }
       };
       this.downloadParallel++;
+      logger.debug('Fetcher::downloadBodiesLoop, start download bodies', headers.length);
       peer
         .getBlockBodies(headers)
         .then(async (bodies) => {
           this.downloadParallel--;
+          logger.debug('Fetcher::downloadBodiesLoop, download bodies over', this.downloadParallel);
           if (this.downloadParallelResolve) {
             this.downloadParallelResolve();
             this.downloadParallelResolve = undefined;
@@ -254,6 +259,7 @@ export class Fetcher {
       if (this.processParallelPromise) {
         logger.debug('Fetcher::downloadBodiesLoop, waiting for process');
         await this.processParallelPromise;
+        logger.debug('Fetcher::downloadBodiesLoop, waiting for process over');
       }
     }
   }
@@ -265,6 +271,7 @@ export class Fetcher {
         .processBlock(block, false)
         .then(() => {
           this.processParallel--;
+          logger.debug('Fetcher::processBlockLoop, process over', this.processParallel, this.processParallel < this.processLimit, !!this.processParallelResolve);
           if (this.processParallel < this.processLimit && this.processParallelResolve) {
             logger.debug('Fetcher::processBlockLoop, waiting promise resolved');
             this.processParallelResolve();
@@ -283,6 +290,7 @@ export class Fetcher {
             process.exit(1);
           }
         });
+      logger.debug('Fetcher::processBlockLoop, process start', this.processParallel);
       if (this.processParallel >= this.processLimit && !this.processParallelPromise) {
         logger.debug('Fetcher::processBlockLoop, new waiting promise');
         this.processParallelPromise = new Promise<void>((resolve) => {

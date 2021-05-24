@@ -35,7 +35,7 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
   }
 
   async prune(section: BN) {
-    await this.node.db.clearBloomBits(section);
+    // await this.node.db.clearBloomBits(section);
   }
 
   process(header: BlockHeader): void {

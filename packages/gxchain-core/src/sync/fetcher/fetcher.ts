@@ -29,7 +29,6 @@ export class Fetcher {
   private localHeight!: number;
   private bestHeight!: number;
 
-  private headerTaskOver = false;
   private blockQueue: PChannel<Block>;
   private downloadBodiesQueue: HChannel<BlockHeader>;
   private idlePeerResolve?: (peer?: Peer) => void;
@@ -135,7 +134,6 @@ export class Fetcher {
         logger.debug('Fetcher::downloadHeader, waiting for process over');
       }
     }
-    this.headerTaskOver = true;
   }
 
   private findIdlePeer(uselessPeer: Set<string>, height: number) {
@@ -154,7 +152,7 @@ export class Fetcher {
     let headersCache: BlockHeader[] = [];
     for await (const header of this.downloadBodiesQueue.generator()) {
       headersCache.push(header);
-      if (!this.headerTaskOver && headersCache.length < this.count) {
+      if (headersCache.length < this.count && this.downloadBodiesQueue.heap.length > 0) {
         continue;
       }
       const headers = [...headersCache];

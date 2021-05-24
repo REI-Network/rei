@@ -102,7 +102,6 @@ export class Fetcher {
         return;
       }
       try {
-        logger.debug('Fetcher::downloadHeader, start download headers', start, count);
         const headers: BlockHeader[] = await peer.getBlockHeaders(start, count);
         if (headers.length !== count) {
           logger.warn('Fetcher::downloadHeader, invalid header(length)');
@@ -110,7 +109,6 @@ export class Fetcher {
           this.banPeer(peer, 'invalid');
           return;
         }
-        logger.debug('Fetcher::downloadHeader, download headers over', start, count);
         for (let index = 1; i < headers.length; i++) {
           if (!headers[index - 1].hash().equals(headers[index].parentHash)) {
             logger.warn('Fetcher::downloadHeader, invalid header(parentHash)');
@@ -119,6 +117,7 @@ export class Fetcher {
             return;
           }
         }
+        logger.info('Download headers start:', start, 'count:', count, 'from:', peer.peerId);
         for (const header of headers) {
           this.downloadBodiesQueue.push(header);
         }
@@ -129,9 +128,7 @@ export class Fetcher {
         return;
       }
       if (this.processParallelPromise) {
-        logger.debug('Fetcher::downloadHeader, waiting for process');
         await this.processParallelPromise;
-        logger.debug('Fetcher::downloadHeader, waiting for process over');
       }
     }
   }
@@ -199,12 +196,10 @@ export class Fetcher {
         }
       };
       this.downloadParallel++;
-      logger.debug('Fetcher::downloadBodiesLoop, start download bodies', headers.length);
       peer
         .getBlockBodies(headers)
         .then(async (bodies) => {
           this.downloadParallel--;
-          logger.debug('Fetcher::downloadBodiesLoop, download bodies over', this.downloadParallel);
           if (this.downloadParallelResolve) {
             this.downloadParallelResolve();
             this.downloadParallelResolve = undefined;
@@ -236,6 +231,7 @@ export class Fetcher {
               return retry();
             }
           }
+          logger.info('Download bodies start:', headers[0].number.toNumber(), 'count:', headers.length, 'from:', peer!.peerId);
           if (!this.abortFlag) {
             for (const block of blocks) {
               this.blockQueue.push({ data: block, index: block.header.number.toNumber() - this.localHeight - 1 });
@@ -255,9 +251,7 @@ export class Fetcher {
         });
       }
       if (this.processParallelPromise) {
-        logger.debug('Fetcher::downloadBodiesLoop, waiting for process');
         await this.processParallelPromise;
-        logger.debug('Fetcher::downloadBodiesLoop, waiting for process over');
       }
     }
   }
@@ -269,9 +263,7 @@ export class Fetcher {
         .processBlock(block, false)
         .then(() => {
           this.processParallel--;
-          logger.debug('Fetcher::processBlockLoop, process over', this.processParallel, this.processParallel < this.processLimit, !!this.processParallelResolve);
           if (this.processParallel < this.processLimit && this.processParallelResolve) {
-            logger.debug('Fetcher::processBlockLoop, waiting promise resolved');
             this.processParallelResolve();
             this.processParallelResolve = undefined;
             this.processParallelPromise = undefined;
@@ -288,9 +280,7 @@ export class Fetcher {
             process.exit(1);
           }
         });
-      logger.debug('Fetcher::processBlockLoop, process start', this.processParallel);
       if (this.processParallel >= this.processLimit && !this.processParallelPromise) {
-        logger.debug('Fetcher::processBlockLoop, new waiting promise');
         this.processParallelPromise = new Promise<void>((resolve) => {
           this.processParallelResolve = resolve;
         });

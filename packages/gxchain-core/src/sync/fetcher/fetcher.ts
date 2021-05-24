@@ -277,7 +277,6 @@ export class Fetcher {
           if (!this.abortFlag) {
             logger.error('Fetcher::processBlockLoop, process block error:', err);
             this.stopFetch();
-            process.exit(1);
           }
         });
       if (this.processParallel >= this.processLimit && !this.processParallelPromise) {

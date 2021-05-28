@@ -57,12 +57,14 @@ export class Fetcher {
     await Promise.all([this.downloadHeader(start, count, peerId), this.downloadBodiesLoop(), this.processBlockLoop()]);
   }
 
-  abort() {
-    this.stopFetch();
+  reset() {
+    this.abortFlag = false;
+    this.downloadBodiesQueue.reset();
+    this.blockQueue.reset();
   }
 
-  private stopFetch() {
-    logger.debug('Fetcher::stopFetch');
+  abort() {
+    logger.debug('Fetcher::abort');
     this.abortFlag = true;
     if (this.idlePeerResolve) {
       this.idlePeerResolve(undefined);
@@ -98,21 +100,21 @@ export class Fetcher {
       }
       const peer = this.node.peerpool.getPeer(peerId);
       if (!peer) {
-        this.stopFetch();
+        this.abort();
         return;
       }
       try {
         const headers: BlockHeader[] = await peer.getBlockHeaders(start, count);
         if (headers.length !== count) {
           logger.warn('Fetcher::downloadHeader, invalid header(length)');
-          this.stopFetch();
+          this.abort();
           this.banPeer(peer, 'invalid');
           return;
         }
         for (let index = 1; i < headers.length; i++) {
           if (!headers[index - 1].hash().equals(headers[index].parentHash)) {
             logger.warn('Fetcher::downloadHeader, invalid header(parentHash)');
-            this.stopFetch();
+            this.abort();
             this.banPeer(peer, 'invalid');
             return;
           }
@@ -123,7 +125,7 @@ export class Fetcher {
         }
       } catch (err) {
         logger.error('Fetcher::downloadHeader, catch error:', err);
-        this.stopFetch();
+        this.abort();
         this.banPeer(peer, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
         return;
       }
@@ -179,7 +181,7 @@ export class Fetcher {
         this.idlePeerResolve = undefined;
         this.node.peerpool.removeAllListeners('idle');
         if (peer === undefined) {
-          this.stopFetch();
+          this.abort();
           continue;
         }
         if (this.abortFlag) {
@@ -270,13 +272,13 @@ export class Fetcher {
           }
 
           if (block.header.number.eqn(this.bestHeight)) {
-            this.stopFetch();
+            this.abort();
           }
         })
         .catch((err) => {
           if (!this.abortFlag) {
             logger.error('Fetcher::processBlockLoop, process block error:', err);
-            this.stopFetch();
+            this.abort();
           }
         });
       if (this.processParallel >= this.processLimit && !this.processParallelPromise) {

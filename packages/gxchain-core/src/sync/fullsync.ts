@@ -20,11 +20,11 @@ export class FullSynchronizer extends Synchronizer {
   private readonly timeoutBanTime: number;
   private readonly errorBanTime: number;
   private readonly invalidBanTime: number;
+  private readonly fetcher: Fetcher;
   private bestPeer?: Peer;
   private bestHeight?: number;
   private bestTD?: BN;
   private syncingPromise?: Promise<boolean>;
-  private abortFetcher?: () => void;
 
   constructor(options: FullSynchronizerOptions) {
     super(options);
@@ -33,6 +33,7 @@ export class FullSynchronizer extends Synchronizer {
     this.timeoutBanTime = options.timeoutBanTime || 300000;
     this.errorBanTime = options.timeoutBanTime || 60000;
     this.invalidBanTime = options.invalidBanTime || 600000;
+    this.fetcher = new Fetcher({ node: this.node, count: this.count, limit: this.limit!, banPeer: this.banPeer.bind(this) });
   }
 
   /**
@@ -107,7 +108,6 @@ export class FullSynchronizer extends Synchronizer {
         this.emit('error', err);
       } finally {
         this.bestPeer.headersIdle = true;
-        this.abortFetcher = undefined;
         this.bestHeight = undefined;
         this.bestPeer = undefined;
         this.bestTD = undefined;
@@ -121,9 +121,7 @@ export class FullSynchronizer extends Synchronizer {
    * Abort the sync
    */
   async syncAbort() {
-    if (this.abortFetcher) {
-      this.abortFetcher();
-    }
+    this.fetcher.abort();
     if (this.syncingPromise) {
       await this.syncingPromise;
     }
@@ -182,14 +180,8 @@ export class FullSynchronizer extends Synchronizer {
     logger.info('💡 Get best height from:', peer.peerId, 'best height:', bestHeight, 'local height:', localHeight);
     this.startSyncHook(localHeight, bestHeight);
 
-    let success = true;
-    const fetcher = new Fetcher({ node: this.node, count: this.count, limit: this.limit!, banPeer: this.banPeer.bind(this) });
-    this.abortFetcher = () => {
-      success = false;
-      fetcher.abort();
-    };
-    await fetcher.fetch(localHeight, bestHeight - localHeight, peer.peerId);
-    this.abortFetcher = undefined;
-    return success;
+    this.fetcher.reset();
+    await this.fetcher.fetch(localHeight, bestHeight - localHeight, peer.peerId);
+    return true;
   }
 }

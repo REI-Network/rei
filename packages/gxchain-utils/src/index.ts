@@ -59,8 +59,6 @@ export const logger = tracer.colorConsole({
 export { setLevel } from 'tracer';
 
 export * from './abort';
-export * from './priorityqueue';
 export * from './channel';
 export * from './functionalmap';
-export * from './semaphorelock';
 export * from './compress';

@@ -129,6 +129,7 @@ export class TxPool extends EventEmitter {
   private readonly txs: FunctionalMap<Buffer, TypedTransaction>;
   private readonly node: INode;
   private readonly initPromise: Promise<void>;
+  private readonly rejournalLoopPromise: undefined | Promise<void>;
 
   private currentHeader!: BlockHeader;
   private currentStateManager!: StateManager;
@@ -176,7 +177,7 @@ export class TxPool extends EventEmitter {
     this.timeoutLoop();
     if (options.journal) {
       this.journal = new Journal(options.journal, this.node);
-      this.aborter.addWaitingPromise(this.rejournalLoop());
+      this.rejournalLoopPromise = this.rejournalLoop();
     }
   }
 
@@ -275,6 +276,12 @@ export class TxPool extends EventEmitter {
         }
         await this.node.addPendingTxs(news);
       });
+    }
+  }
+
+  async abort() {
+    if (this.rejournalLoopPromise) {
+      await this.rejournalLoopPromise;
     }
   }
 

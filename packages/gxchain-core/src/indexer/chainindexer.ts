@@ -26,6 +26,7 @@ export class ChainIndexer {
   private readonly backend: ChainIndexerBackend;
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
+  private readonly processHeaderLoopPromise: Promise<void>;
   private readonly headerQueue: Channel<BlockHeader>;
 
   private storedSections: BN | undefined;
@@ -37,7 +38,7 @@ export class ChainIndexer {
     this.node = options.node;
     this.initPromise = this.init();
     this.headerQueue = new Channel<BlockHeader>({ max: 1, aborter: options.node.aborter });
-    options.node.aborter.addWaitingPromise(this.processHeaderLoop());
+    this.processHeaderLoopPromise = this.processHeaderLoop();
   }
 
   async init() {
@@ -46,6 +47,10 @@ export class ChainIndexer {
       return;
     }
     this.storedSections = await this.node.db.getStoredSectionCount();
+  }
+
+  async abort() {
+    await this.processHeaderLoop;
   }
 
   async newBlockHeader(header: BlockHeader) {

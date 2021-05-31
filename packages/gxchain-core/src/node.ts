@@ -75,6 +75,8 @@ export class Node {
 
   private readonly options: NodeOptions;
   private readonly initPromise: Promise<void>;
+  private readonly taskLoopPromise: Promise<void>;
+  private readonly processLoopPromise: Promise<void>;
   private readonly taskQueue = new Channel<Task>({ aborter: this.aborter });
   private readonly processQueue = new Channel<ProcessBlock>({ aborter: this.aborter });
 
@@ -86,8 +88,8 @@ export class Node {
     this.options = options;
     this.rawdb = createLevelDB(path.join(this.options.databasePath, 'chaindb'));
     this.initPromise = this.init();
-    this.aborter.addWaitingPromise(this.taskLoop());
-    this.aborter.addWaitingPromise(this.processLoop());
+    this.taskLoopPromise = this.taskLoop();
+    this.processLoopPromise = this.processLoop();
   }
 
   /**
@@ -369,5 +371,9 @@ export class Node {
   async abort() {
     await this.aborter.abort();
     await this.peerpool.abort();
+    await this.bloomBitsIndexer.abort();
+    await this.txPool.abort();
+    await this.taskLoopPromise;
+    await this.processLoopPromise;
   }
 }

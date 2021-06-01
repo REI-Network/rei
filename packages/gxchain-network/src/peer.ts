@@ -36,18 +36,15 @@ class MsgQueue extends EventEmitter {
     }
   >();
 
-  constructor(peer: Peer, aborter: Aborter, protocol: Protocol) {
+  constructor(peer: Peer, protocol: Protocol) {
     super();
     this.peer = peer;
     this.protocol = protocol;
-    this.aborter = aborter;
+    this.aborter = new Aborter();
     this.queue = new Channel({
-      aborter: this.aborter,
       drop: (data: any) => {
-        if (this.queue.array.length > 10) {
-          logger.warn('Peer close self:', this.peer.peerId);
-          this.peer.closeSelf();
-        }
+        logger.warn('Peer close self:', this.peer.peerId);
+        this.peer.closeSelf();
       }
     });
   }
@@ -162,13 +159,14 @@ class MsgQueue extends EventEmitter {
     });
   }
 
-  abort() {
+  async abort() {
     this.queue.abort();
     for (const [response, request] of this.waitingRequests) {
       clearTimeout(request.timeout);
       request.reject(new Error('MsgQueue abort'));
     }
     this.waitingRequests.clear();
+    await this.aborter.abort();
   }
 }
 
@@ -185,7 +183,6 @@ export declare interface Peer {
 export class Peer extends EventEmitter {
   readonly peerId: string;
   readonly node: Libp2pNode;
-  private aborter: Aborter;
   private queueMap = new Map<string, MsgQueue>();
   private knowTxs = createBufferFunctionalSet();
   private knowBlocks = createBufferFunctionalSet();
@@ -201,9 +198,8 @@ export class Peer extends EventEmitter {
     super();
     this.peerId = options.peerId;
     this.node = options.node;
-    this.aborter = options.node.node.aborter;
-    this.newBlockAnnouncesQueue = new Channel<{ block: Block; td: BN }>({ max: 1, aborter: this.aborter });
-    this.txAnnouncesQueue = new Channel<Buffer>({ aborter: this.aborter });
+    this.newBlockAnnouncesQueue = new Channel<{ block: Block; td: BN }>({ max: 1 });
+    this.txAnnouncesQueue = new Channel<Buffer>();
     this.newBlockAnnouncesLoop();
     this.txAnnouncesLoop();
   }
@@ -257,7 +253,7 @@ export class Peer extends EventEmitter {
   }
 
   private makeQueue(protocol: Protocol) {
-    const queue = new MsgQueue(this, this.aborter, protocol);
+    const queue = new MsgQueue(this, protocol);
     queue.on('status', (message) => {
       this.emit(`status:${queue.name}`, message, protocol);
     });
@@ -304,12 +300,10 @@ export class Peer extends EventEmitter {
     this.node.removePeer(this);
   }
 
-  abort() {
+  async abort() {
     this.newBlockAnnouncesQueue.abort();
     this.txAnnouncesQueue.abort();
-    for (const [name, queue] of this.queueMap) {
-      queue.abort();
-    }
+    await Promise.all(Array.from(this.queueMap.values()).map((queue) => queue.abort()));
     this.queueMap.clear();
   }
 

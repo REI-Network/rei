@@ -3,11 +3,11 @@ export class AbortError extends Error {}
 export class Aborter {
   private _reason: any;
   private _abort: boolean = true;
-  private _waiting: {
+  private _waiting = new Set<{
     p: Promise<void>;
     r: () => void;
     j: (reason?: any) => void;
-  }[] = [];
+  }>();
 
   get reason() {
     return this._reason;
@@ -33,14 +33,16 @@ export class Aborter {
         return Promise.resolve(undefined);
       }
     }
-    const { p: wp, r } = this.createWaitingPromise();
+    const w = this.createWaitingPromise();
     try {
-      const result = (await Promise.race([wp, p])) as T;
-      r();
+      const result = (await Promise.race([w.p, p])) as T;
+      w.r();
+      this._waiting.delete(w);
       return result;
     } catch (err) {
+      w.r();
+      this._waiting.delete(w);
       if (!(err instanceof AbortError)) {
-        r();
         throw err;
       } else if (throwAbortError) {
         throw err;
@@ -56,15 +58,7 @@ export class Aborter {
       j = reject;
     });
     const w = { p, r, j };
-    p.then(
-      () => {
-        this._waiting.splice(this._waiting.indexOf(w), 1);
-      },
-      () => {
-        this._waiting.splice(this._waiting.indexOf(w), 1);
-      }
-    );
-    this._waiting.push(w);
+    this._waiting.add(w);
     return w;
   }
 
@@ -77,9 +71,9 @@ export class Aborter {
       }
       this._reason = reason;
       this._abort = true;
-      if (this._waiting.length > 0) {
+      if (this._waiting.size > 0) {
         this._waiting.forEach(({ j }) => j(reason));
-        await Promise.all(this._waiting.map(({ p }) => p.catch(() => {})));
+        await Promise.all(Array.from(this._waiting).map(({ p }) => p.catch(() => {})));
       }
     }
   }

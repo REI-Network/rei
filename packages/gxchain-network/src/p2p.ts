@@ -7,10 +7,10 @@ import secio from 'libp2p-secio';
 import Bootstrap from 'libp2p-bootstrap';
 import { constants } from '@gxchain2/common';
 import { logger } from '@gxchain2/utils';
-const Libp2p = require('libp2p');
 import { Peer } from './peer';
 import { Protocol, ETHProtocol } from './protocol';
 import { INode } from './types';
+const Libp2p = require('libp2p');
 
 function parseProtocol(name: string): Protocol {
   if (name === constants.GXC2_ETHWIRE) {
@@ -146,8 +146,8 @@ export class Libp2pNode extends Libp2p {
         const id = connect.remotePeer.toB58String();
         if (!this.peers.get(id)) {
           this.createPeer(connect.remotePeer);
+          logger.info('💬 Peer connected:', id);
         }
-        logger.info('💬 Peer connected:', id);
       } catch (err) {
         this.emit('error', err);
       }
@@ -191,9 +191,7 @@ export class Libp2pNode extends Libp2p {
 
   async abort() {
     if (this.started) {
-      for (const [peerId, peer] of this.peers) {
-        peer.abort();
-      }
+      await Promise.all(Array.from(this.peers.values()).map((peer) => peer.abort()));
       this.peers.clear();
       await this.stop();
       this.started = false;

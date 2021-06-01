@@ -63,7 +63,7 @@ type Task = LogsTask | HeadsTask | PendingTxTask | SyncingTask;
 export class FilterSystem {
   private readonly node: Node;
   private aborter = new Aborter();
-  private taskQueue = new Channel<Task>({ aborter: this.aborter });
+  private taskQueue = new Channel<Task>();
 
   private readonly subscribeHeads = new Map<string, Filter>();
   private readonly subscribeLogs = new Map<string, Filter>();

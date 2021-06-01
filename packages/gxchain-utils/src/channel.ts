@@ -1,10 +1,10 @@
 import Heap from 'qheap';
-import { Aborter, AbortError } from './abort';
 
-interface ChannelOption<T> {
+export class ChannelAbortError extends Error {}
+
+export interface ChannelOption<T> {
   max?: number;
   drop?: (data: T) => void;
-  aborter: Aborter;
 }
 
 export class Channel<T = any> {
@@ -14,20 +14,18 @@ export class Channel<T = any> {
   private drop?: (data: T) => void;
   private resolve?: (data: T) => void;
   private reject?: (reason?: any) => void;
-  private aborter: Aborter;
 
   get array() {
     return [...this._array];
   }
 
-  constructor(options: ChannelOption<T>) {
-    this.max = options.max;
-    this.drop = options.drop;
-    this.aborter = options.aborter;
+  constructor(options?: ChannelOption<T>) {
+    this.max = options?.max;
+    this.drop = options?.drop;
   }
 
   push(data: T) {
-    if (this.aborter.isAborted || this.aborted) {
+    if (this.aborted) {
       return false;
     }
     if (this.resolve) {
@@ -60,7 +58,7 @@ export class Channel<T = any> {
 
   abort() {
     if (this.reject) {
-      this.reject(new AbortError('Channel abort'));
+      this.reject(new ChannelAbortError());
       this.reject = undefined;
       this.resolve = undefined;
     }
@@ -83,18 +81,18 @@ export class Channel<T = any> {
 
   async *generator() {
     try {
-      while (!this.aborter.isAborted && !this.aborted) {
-        yield await this.aborter.abortablePromise(this.next(), true);
+      while (!this.aborted) {
+        yield await this.next();
       }
     } catch (err) {
-      if (!(err instanceof AbortError)) {
+      if (!(err instanceof ChannelAbortError)) {
         throw err;
       }
     }
   }
 }
 
-interface HChannelOption<T> extends ChannelOption<T> {
+export interface HChannelOption<T> extends ChannelOption<T> {
   compare?: (a: T, b: T) => boolean;
 }
 
@@ -105,21 +103,19 @@ export class HChannel<T = any> {
   private drop?: (data: T) => void;
   private resolve?: (data: T) => void;
   private reject?: (reason?: any) => void;
-  private aborter: Aborter;
 
   get heap() {
     return this._heap;
   }
 
-  constructor(options: HChannelOption<T>) {
-    this.max = options.max;
-    this.drop = options.drop;
-    this.aborter = options.aborter;
+  constructor(options?: HChannelOption<T>) {
+    this.max = options?.max;
+    this.drop = options?.drop;
     this._heap = new Heap(options?.compare ? { comparBefore: options.compare } : undefined);
   }
 
   push(data: T) {
-    if (this.aborter.isAborted || this.aborted) {
+    if (this.aborted) {
       return false;
     }
     if (this.resolve) {
@@ -152,7 +148,7 @@ export class HChannel<T = any> {
 
   abort() {
     if (this.reject) {
-      this.reject(new AbortError('HChannel abort'));
+      this.reject(new ChannelAbortError());
       this.reject = undefined;
       this.resolve = undefined;
     }
@@ -176,11 +172,11 @@ export class HChannel<T = any> {
 
   async *generator() {
     try {
-      while (!this.aborter.isAborted && !this.aborted) {
-        yield await this.aborter.abortablePromise(this.next(), true);
+      while (!this.aborted) {
+        yield await this.next();
       }
     } catch (err) {
-      if (!(err instanceof AbortError)) {
+      if (!(err instanceof ChannelAbortError)) {
         throw err;
       }
     }
@@ -196,7 +192,6 @@ export class PChannel<U = any, T extends { data: U; index: number } = { data: an
   private drop?: (data: T) => void;
   private resolve?: (data: T) => void;
   private reject?: (reason?: any) => void;
-  private aborter: Aborter;
 
   get heap() {
     return this._heap;
@@ -206,17 +201,16 @@ export class PChannel<U = any, T extends { data: U; index: number } = { data: an
     return [...this._array];
   }
 
-  constructor(options: ChannelOption<T>) {
-    this.max = options.max;
-    this.drop = options.drop;
-    this.aborter = options.aborter;
+  constructor(options?: ChannelOption<T>) {
+    this.max = options?.max;
+    this.drop = options?.drop;
     this._heap = new Heap({
       comparBefore: (a: T, b: T) => a.index < b.index
     });
   }
 
   push(data: T) {
-    if (this.aborter.isAborted || this.aborted) {
+    if (this.aborted) {
       return false;
     }
     this._heap.insert(data);
@@ -254,7 +248,7 @@ export class PChannel<U = any, T extends { data: U; index: number } = { data: an
 
   abort() {
     if (this.reject) {
-      this.reject(new AbortError('PChannel abort'));
+      this.reject(new ChannelAbortError());
       this.reject = undefined;
       this.resolve = undefined;
     }
@@ -285,11 +279,11 @@ export class PChannel<U = any, T extends { data: U; index: number } = { data: an
 
   async *generator() {
     try {
-      while (!this.aborter.isAborted && !this.aborted) {
-        yield await this.aborter.abortablePromise(this.next(), true);
+      while (!this.aborted) {
+        yield await this.next();
       }
     } catch (err) {
-      if (!(err instanceof AbortError)) {
+      if (!(err instanceof ChannelAbortError)) {
         throw err;
       }
     }

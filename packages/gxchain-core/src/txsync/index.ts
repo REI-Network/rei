@@ -82,8 +82,8 @@ export class TxFetcher extends EventEmitter {
     super();
     this.node = node;
     this.aborter = node.aborter;
-    this.newPooledTransactionQueue = new Channel<NewPooledTransactionMessage>({ aborter: node.aborter });
-    this.enqueueTransactionQueue = new Channel<EnqueuePooledTransactionMessage>({ aborter: node.aborter });
+    this.newPooledTransactionQueue = new Channel<NewPooledTransactionMessage>();
+    this.enqueueTransactionQueue = new Channel<EnqueuePooledTransactionMessage>();
     this.newPooledTransactionLoop();
     this.enqueueTransactionLoop();
   }

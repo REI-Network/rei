@@ -37,7 +37,7 @@ export class ChainIndexer {
     this.backend = options.backend;
     this.node = options.node;
     this.initPromise = this.init();
-    this.headerQueue = new Channel<BlockHeader>({ max: 1, aborter: options.node.aborter });
+    this.headerQueue = new Channel<BlockHeader>({ max: 1 });
     this.processHeaderLoopPromise = this.processHeaderLoop();
   }
 
@@ -50,6 +50,7 @@ export class ChainIndexer {
   }
 
   async abort() {
+    this.headerQueue.abort();
     await this.processHeaderLoop;
   }
 

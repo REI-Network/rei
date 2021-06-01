@@ -77,8 +77,8 @@ export class Node {
   private readonly initPromise: Promise<void>;
   private readonly taskLoopPromise: Promise<void>;
   private readonly processLoopPromise: Promise<void>;
-  private readonly taskQueue = new Channel<Task>({ aborter: this.aborter });
-  private readonly processQueue = new Channel<ProcessBlock>({ aborter: this.aborter });
+  private readonly taskQueue = new Channel<Task>();
+  private readonly processQueue = new Channel<ProcessBlock>();
 
   private chain!: string | { chain: any; genesisState?: any };
   private networkId!: number;
@@ -369,6 +369,8 @@ export class Node {
   }
 
   async abort() {
+    this.taskQueue.abort();
+    this.processQueue.abort();
     await this.aborter.abort();
     await this.peerpool.abort();
     await this.bloomBitsIndexer.abort();

@@ -38,9 +38,8 @@ export class Fetcher {
     this.count = options.count;
     this.downloadLimit = options.limit;
     this.banPeer = options.banPeer;
-    this.blockQueue = new PChannel<Block>({ aborter: options.node.aborter });
+    this.blockQueue = new PChannel<Block>();
     this.downloadBodiesQueue = new HChannel<BlockHeader>({
-      aborter: options.node.aborter,
       compare: (a, b) => a.number.lt(b.number)
     });
   }

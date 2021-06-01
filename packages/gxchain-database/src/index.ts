@@ -143,9 +143,14 @@ export class Database extends DBManager {
     super(db, common);
     const self: any = this;
     self._cache = Object.assign(self._cache, {
-      receipts: new Cache({ max: 256 }),
-      txLookup: new Cache({ max: 512 }),
-      bloomBits: new Cache({ max: 512 })
+      td: new Cache({ max: 1 }),
+      header: new Cache({ max: 1 }),
+      body: new Cache({ max: 1 }),
+      numberToHash: new Cache({ max: 1 }),
+      hashToNumber: new Cache({ max: 1 }),
+      receipts: new Cache({ max: 1 }),
+      txLookup: new Cache({ max: 1 }),
+      bloomBits: new Cache({ max: 1 })
     });
   }
 

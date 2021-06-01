@@ -289,11 +289,11 @@ export class Peer extends EventEmitter {
   }
 
   private filterTx<T>(data: T[], toHash: (t: T) => Buffer) {
-    return this.filterHash(this.knowTxs, 32768, data, toHash);
+    return this.filterHash(this.knowTxs, 1, data, toHash);
   }
 
   private filterBlock<T>(data: T[], toHash: (t: T) => Buffer) {
-    return this.filterHash(this.knowBlocks, 1024, data, toHash);
+    return this.filterHash(this.knowBlocks, 1, data, toHash);
   }
 
   closeSelf() {

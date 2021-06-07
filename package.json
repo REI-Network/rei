@@ -37,6 +37,7 @@
     "build:tx-pool": "npm run build -- --scope @gxchain2/tx-pool",
     "build:utils": "npm run build -- --scope @gxchain2/utils",
     "build:vm": "npm run build -- --scope @gxchain2/vm",
+    "build:wallet": "npm run build -- --scope @gxchain2/wallet",
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/package-lock.json",
     "clean:build": "rm -rf packages/*/dist",
     "test:prompts": "node -r ts-node/register ./packages/gxchain-cli/test/prompts.ts",

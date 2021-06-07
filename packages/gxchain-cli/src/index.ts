@@ -34,29 +34,28 @@ program
   .description('attach to gxchain2 node')
   .action((options) => {});
 
-const account = new commander.Command('account');
+const account = new commander.Command('account').description('Manage accounts');
 program.addCommand(account);
 const opts = program.opts();
 
 account
-  .description('Manage accounts')
   .command('list')
   .option('--keydatadir [string]', 'The datadir for keystore', 'keystore')
   .description('List all the accounts')
   .action((options) => {
-    const keydatadir = options.keydatadir !== options.options[0].defaultValue ? options.keydatadir : path.join(opts.datadir, options.keydatadir);
-    accountcmd.accountList(keydatadir);
+    // const keydatadir = options.keydatadir !== options.options[0].defaultValue ? options.keydatadir : path.join(opts.datadir, options.keydatadir);
+    // accountcmd.accountList(keydatadir);
   });
 
 account
   .command('new')
   .description('New a account')
   .option('--passwordfile <string>')
-  .option('--keydatadir [string]', 'The datadir for keystore', 'keystore')
+  .option('--keydatadir [string]', 'The datadir for keystore')
   .action((options) => {
-    const keydatadir = options.keydatadir !== options.options[1].defaultValue ? options.keydatadir : path.join(opts.datadir, options.keydatadir);
-    const password = fs.readFileSync(options.passwordfile);
-    accountcmd.accountCreate(keydatadir, password.toString());
+    // const keydatadir = options.keydatadir !== options.options[1].defaultValue ? options.keydatadir : path.join(opts.datadir, options.keydatadir);
+    // const password = fs.readFileSync(options.passwordfile);
+    // accountcmd.accountCreate(keydatadir, password.toString());
   });
 
 account
@@ -113,65 +112,62 @@ account
   .description('Import a account from privatekey file')
   .option('--keydatadir [string]', 'The datadir for keystore', 'keystore')
   .action(async (keydir, options) => {
-    const key = fs.readFileSync(keydir);
-    const keydatadir = options.keydatadir !== options.options[0].defaultValue ? options.keydatadir : path.join(opts.datadir, options.keydatadir);
-    if (accountcmd.hasAddress(keydatadir, key.toString())) {
-      const cover = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'cover',
-          message: 'The account is existed, would you want to cover it?'
-        }
-      ]);
-
-      if (cover.cover == true) {
-        console.log('Your new account is locked with a password. Please give a password. Do not forget this password..');
-        const answer1 = await inquirer.prompt([
-          {
-            type: 'password',
-            name: 'password',
-            message: 'Password:'
-          }
-        ]);
-        const answer2 = await inquirer.prompt([
-          {
-            type: 'password',
-            name: 'password',
-            message: 'Repeat password:'
-          }
-        ]);
-
-        if (answer1.password !== answer2.password) {
-          console.log('You must input the same password!');
-          return;
-        }
-        const a = accountcmd.accoumtImport(keydatadir, key.toString(), answer1.password);
-        console.log('Address : ', a);
-      }
-    } else {
-      console.log('Your new account is locked with a password. Please give a password. Do not forget this password..');
-      const answer1 = await inquirer.prompt([
-        {
-          type: 'password',
-          name: 'password',
-          message: 'Password:'
-        }
-      ]);
-      const answer2 = await inquirer.prompt([
-        {
-          type: 'password',
-          name: 'password',
-          message: 'Repeat password:'
-        }
-      ]);
-
-      if (answer1.password !== answer2.password) {
-        console.log('You must input the same password!');
-        return;
-      }
-      const a = accountcmd.accoumtImport(keydatadir, key.toString(), answer1.password);
-      console.log('Address : ', a);
-    }
+    // const key = fs.readFileSync(keydir);
+    // const keydatadir = options.keydatadir !== options.options[0].defaultValue ? options.keydatadir : path.join(opts.datadir, options.keydatadir);
+    // if (accountcmd.hasAddress(keydatadir, key.toString())) {
+    //   const cover = await inquirer.prompt([
+    //     {
+    //       type: 'confirm',
+    //       name: 'cover',
+    //       message: 'The account is existed, would you want to cover it?'
+    //     }
+    //   ]);
+    //   if (cover.cover == true) {
+    //     console.log('Your new account is locked with a password. Please give a password. Do not forget this password..');
+    //     const answer1 = await inquirer.prompt([
+    //       {
+    //         type: 'password',
+    //         name: 'password',
+    //         message: 'Password:'
+    //       }
+    //     ]);
+    //     const answer2 = await inquirer.prompt([
+    //       {
+    //         type: 'password',
+    //         name: 'password',
+    //         message: 'Repeat password:'
+    //       }
+    //     ]);
+    //     if (answer1.password !== answer2.password) {
+    //       console.log('You must input the same password!');
+    //       return;
+    //     }
+    //     const a = accountcmd.accoumtImport(keydatadir, key.toString(), answer1.password);
+    //     console.log('Address : ', a);
+    //   }
+    // } else {
+    //   console.log('Your new account is locked with a password. Please give a password. Do not forget this password..');
+    //   const answer1 = await inquirer.prompt([
+    //     {
+    //       type: 'password',
+    //       name: 'password',
+    //       message: 'Password:'
+    //     }
+    //   ]);
+    //   const answer2 = await inquirer.prompt([
+    //     {
+    //       type: 'password',
+    //       name: 'password',
+    //       message: 'Repeat password:'
+    //     }
+    //   ]);
+    //   if (answer1.password !== answer2.password) {
+    //     console.log('You must input the same password!');
+    //     return;
+    //   }
+    //   const a = accountcmd.accoumtImport(keydatadir, key.toString(), answer1.password);
+    //   console.log('Address : ', a);
+    // }
   });
 program.parse(process.argv);
 

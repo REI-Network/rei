@@ -7,7 +7,7 @@ import { create } from './account';
 
 type AddrType = Address | string | Buffer;
 
-export class AccountManger {
+export class AccountManager {
   private storage: KeyStore;
   private cache: AccountCache;
   private unlocked = createBufferFunctionalMap<string>();
@@ -30,6 +30,14 @@ export class AccountManger {
     return { ...this.storage.getKey(path, auth), path };
   }
 
+  totalAccounts() {
+    return this.cache.accounts();
+  }
+
+  hasAccount(addr: AddrType) {
+    return this.cache.has(addrToBuffer(addr));
+  }
+
   importKey(path: string, passphrase: string) {
     const { address, privateKey } = this.storage.getKey(path, passphrase);
     const localPath = this.storage.joinPath(keyStoreFileName(address));
@@ -38,9 +46,17 @@ export class AccountManger {
     return address;
   }
 
-  update(addr: AddrType, passphrase: string, newpassphrase: string) {
+  importKeyByPrivateKey(privateKey: string, passphrase: string) {
+    const address = Address.fromPrivateKey(hexStringToBuffer(privateKey)).toString();
+    const localPath = this.storage.joinPath(keyStoreFileName(address));
+    this.storage.storeKey(localPath, privateKey, passphrase);
+    this.cache.add(addrToBuffer(address), localPath);
+    return address;
+  }
+
+  update(addr: AddrType, passphrase: string, newPassphrase: string) {
     const { privateKey, path } = this.getDecryptedKey(addr, passphrase);
-    this.storage.storeKey(path, privateKey, newpassphrase);
+    this.storage.storeKey(path, privateKey, newPassphrase);
   }
 
   newAccount(passphrase: string) {
@@ -48,7 +64,7 @@ export class AccountManger {
     const localPath = this.storage.joinPath(keyStoreFileName(address));
     this.storage.storeKey(localPath, privateKey, passphrase);
     this.cache.add(addrToBuffer(address), localPath);
-    return address;
+    return { address, path: localPath };
   }
 
   lock(addr: AddrType) {
@@ -60,7 +76,9 @@ export class AccountManger {
     if (!this.unlocked.has(buf)) {
       const { privateKey } = this.getDecryptedKey(addr, passphrase);
       this.unlocked.set(buf, privateKey);
+      return true;
     }
+    return false;
   }
 }
 

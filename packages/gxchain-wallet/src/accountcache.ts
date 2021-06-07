@@ -1,5 +1,4 @@
 import fs from 'fs';
-import { Address } from 'ethereumjs-util';
 import { createBufferFunctionalMap, hexStringToBuffer } from '@gxchain2/utils';
 import { FileCache } from './filecache';
 
@@ -27,9 +26,9 @@ export class AccountCache {
     });
   }
 
-  hasAddress(addr: Address): boolean {
+  has(addrBuf: Buffer): boolean {
     this.scanAccounts();
-    return !!this.addrToPath.get(addr.toBuffer());
+    return !!this.addrToPath.get(addrBuf);
   }
 
   get(addrBuf: Buffer) {

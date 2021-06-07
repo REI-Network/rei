@@ -1,18 +1,18 @@
 import fs from 'fs';
 import path from 'path';
-import { Address } from 'ethereumjs-util';
 import { decrypt, encrypt } from './account';
 
 export class KeyStore {
-  keyDirPath: string;
+  private keyDirPath: string;
+
   constructor(keydir: string) {
     this.keyDirPath = keydir;
   }
 
-  getKey(addr: Address, filename: string, auth: string) {
-    const keyjson = JSON.parse(fs.readFileSync(filename).toString());
-    const key = decrypt(keyjson, auth);
-    if (key.address.toLowerCase() != addr.toString()) {
+  getKey(path: string, auth: string, address?: string): { address: string; privateKey: string } {
+    const keyjson = JSON.parse(fs.readFileSync(path).toString());
+    const key: { address: string; privateKey: string } = decrypt(keyjson, auth);
+    if (address && key.address.toLowerCase() !== address) {
       throw new Error('key content mismatch');
     }
     return key;
@@ -22,9 +22,16 @@ export class KeyStore {
     return path.isAbsolute(filename) ? filename : path.join(this.keyDirPath, filename);
   }
 
-  storeKey(filename: string, key: { address: string; privateKey: string }, auth: string) {
-    const keyjson = encrypt(key.privateKey, auth);
-    fs.mkdirSync(path.dirname(filename), { mode: 0o700, recursive: true });
-    return fs.writeFileSync(filename, JSON.stringify(keyjson));
+  storeKey(fullPath: string, privateKey: string, auth: string) {
+    const keyjson = encrypt(privateKey, auth);
+    fs.mkdirSync(path.dirname(fullPath), { mode: 0o700, recursive: true });
+    fs.writeFileSync(fullPath, JSON.stringify(keyjson));
   }
+}
+
+export function keyStoreFileName(address: string): string {
+  const ts = new Date();
+  const utc = new Date(ts.getTime() + ts.getTimezoneOffset() * 60000);
+  const format = utc.toISOString().replace(/:/g, '-');
+  return 'UTC--' + format + '--' + address;
 }

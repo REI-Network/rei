@@ -1,13 +1,13 @@
-import { Address } from 'ethereumjs-util';
-import { Accountinfo } from './accountmanager';
 import fs from 'fs';
+import { Address } from 'ethereumjs-util';
 import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
+import { Accountinfo } from './types';
 import { FileCache } from './filecache';
 
 export class AccountCache {
-  keydir: string;
-  byAddr: FunctionalMap<Buffer, Accountinfo> = createBufferFunctionalMap<Accountinfo>();
-  fileC: FileCache;
+  private keydir: string;
+  private byAddr: FunctionalMap<Buffer, Accountinfo> = createBufferFunctionalMap<Accountinfo>();
+  private fileC: FileCache;
   constructor(keydir: string) {
     this.keydir = keydir;
     this.fileC = new FileCache();
@@ -23,6 +23,10 @@ export class AccountCache {
     return !!this.byAddr.get(addr.toBuffer());
   }
 
+  get(buf: Buffer) {
+    return this.byAddr.get(buf);
+  }
+
   add(newaccount: Accountinfo) {
     this.byAddr.set(newaccount.address.toBuffer(), newaccount);
   }
@@ -32,11 +36,9 @@ export class AccountCache {
   }
 
   deleteByFile(path: string) {
-    const addr = Array.from(this.byAddr.values()).find((addr) => {
-      addr.path === path;
-    });
-    if (addr) {
-      this.byAddr.delete(addr.address.toBuffer());
+    const ai = Array.from(this.byAddr.values()).find((addr) => addr.path === path);
+    if (ai) {
+      this.byAddr.delete(ai.address.toBuffer());
     }
   }
 
@@ -45,20 +47,13 @@ export class AccountCache {
   }
 
   scanAccounts() {
-    const result = this.fileC.scan(this.keydir);
-    if (!result) {
-      return;
-    }
-    const [creates, deletes, updates] = result;
+    const [creates, deletes, updates] = this.fileC.scan(this.keydir);
     if (creates.length === 0 && deletes.length === 0 && updates.length === 0) {
       return;
     }
 
     for (const fi of creates) {
-      const a = this.readAccount(fi);
-      if (a) {
-        this.add(a);
-      }
+      this.add(this.readAccount(fi));
     }
 
     for (const fi of deletes) {
@@ -67,19 +62,14 @@ export class AccountCache {
 
     for (const fi of updates) {
       this.deleteByFile(fi);
-      const a = this.readAccount(fi);
-      if (a) {
-        this.add(a);
-      }
+      this.add(this.readAccount(fi));
     }
   }
 
   private readAccount(path: string) {
-    const keybuffer = fs.readFileSync(path);
-    const keyjson = JSON.parse(keybuffer.toString());
-    const addrstring = keyjson.address;
-    const addr = Address.fromString('0x' + addrstring);
-    const account: Accountinfo = { address: addr, path: path };
+    const keyjson = JSON.parse(fs.readFileSync(path).toString());
+    const address = Address.fromString('0x' + keyjson.address);
+    const account: Accountinfo = { address, path };
     return account;
   }
 }

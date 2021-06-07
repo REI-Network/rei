@@ -16,7 +16,3 @@ export function create() {
 export function privateKeyToAccount(key: string) {
   return web3accounts.privateKeyToAccount(key);
 }
-
-export function sign(hash: string, auth: string) {
-  return web3accounts.sign(hash, auth);
-}

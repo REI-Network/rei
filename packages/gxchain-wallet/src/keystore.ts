@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { decrypt, encrypt } from './account';
+import Wallet from 'ethereumjs-wallet';
+import { hexStringToBuffer } from '@gxchain2/utils';
 
 export class KeyStore {
   private keyDirPath: string;
@@ -9,9 +10,9 @@ export class KeyStore {
     this.keyDirPath = keydir;
   }
 
-  getKey(path: string, auth: string, address?: string): { address: string; privateKey: string } {
-    const keyjson = JSON.parse(fs.readFileSync(path).toString());
-    const key: { address: string; privateKey: string } = decrypt(keyjson, auth);
+  async getKey(path: string, passphrase: string, address?: string): Promise<{ address: string; privateKey: string }> {
+    const wallet = await Wallet.fromV3(fs.readFileSync(path).toString(), passphrase);
+    const key = { address: wallet.getAddressString(), privateKey: wallet.getPrivateKeyString() };
     if (address && key.address.toLowerCase() !== address) {
       throw new Error('key content mismatch');
     }
@@ -22,10 +23,10 @@ export class KeyStore {
     return path.isAbsolute(filename) ? filename : path.join(this.keyDirPath, filename);
   }
 
-  storeKey(fullPath: string, privateKey: string, auth: string) {
-    const keyjson = encrypt(privateKey, auth);
+  async storeKey(fullPath: string, privateKey: string, passphrase: string) {
+    const keyStore = await Wallet.fromPrivateKey(hexStringToBuffer(privateKey)).toV3(passphrase);
     fs.mkdirSync(path.dirname(fullPath), { mode: 0o700, recursive: true });
-    fs.writeFileSync(fullPath, JSON.stringify(keyjson));
+    fs.writeFileSync(fullPath, JSON.stringify(keyStore));
   }
 }
 

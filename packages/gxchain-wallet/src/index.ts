@@ -1,11 +1,27 @@
 import path from 'path';
-import { Address } from 'ethereumjs-util';
+import Wallet from 'ethereumjs-wallet';
+import { Address, bufferToHex } from 'ethereumjs-util';
 import { createBufferFunctionalMap, hexStringToBuffer } from '@gxchain2/utils';
 import { AccountCache } from './accountcache';
 import { KeyStore, keyStoreFileName } from './keystore';
-import { create } from './account';
 
 type AddrType = Address | string | Buffer;
+
+function addrToBuffer(addr: AddrType) {
+  if (!Buffer.isBuffer(addr)) {
+    addr = typeof addr === 'object' ? addr.toBuffer() : hexStringToBuffer(addr);
+  }
+  return addr;
+}
+
+function addrToString(addr: AddrType) {
+  if (Buffer.isBuffer(addr)) {
+    return bufferToHex(addr);
+  } else if (addr instanceof Address) {
+    return addr.toString();
+  }
+  return addr;
+}
 
 export class AccountManager {
   private storage: KeyStore;
@@ -21,13 +37,13 @@ export class AccountManager {
     this.cache.accounts();
   }
 
-  private getDecryptedKey(addr: AddrType, auth: string) {
+  private async getDecryptedKey(addr: AddrType, passphrase: string) {
     this.cache.accounts();
     const path = this.cache.get(addrToBuffer(addr));
     if (!path) {
       throw new Error('unknown account');
     }
-    return { ...this.storage.getKey(path, auth), path };
+    return { ...(await this.storage.getKey(path, passphrase, addrToString(addr))), path };
   }
 
   totalAccounts() {
@@ -38,31 +54,33 @@ export class AccountManager {
     return this.cache.has(addrToBuffer(addr));
   }
 
-  importKey(path: string, passphrase: string) {
-    const { address, privateKey } = this.storage.getKey(path, passphrase);
+  async importKey(path: string, passphrase: string) {
+    const { address, privateKey } = await this.storage.getKey(path, passphrase);
     const localPath = this.storage.joinPath(keyStoreFileName(address));
-    this.storage.storeKey(localPath, privateKey, passphrase);
+    await this.storage.storeKey(localPath, privateKey, passphrase);
     this.cache.add(addrToBuffer(address), localPath);
     return address;
   }
 
-  importKeyByPrivateKey(privateKey: string, passphrase: string) {
+  async importKeyByPrivateKey(privateKey: string, passphrase: string) {
     const address = Address.fromPrivateKey(hexStringToBuffer(privateKey)).toString();
     const localPath = this.storage.joinPath(keyStoreFileName(address));
-    this.storage.storeKey(localPath, privateKey, passphrase);
+    await this.storage.storeKey(localPath, privateKey, passphrase);
     this.cache.add(addrToBuffer(address), localPath);
     return address;
   }
 
-  update(addr: AddrType, passphrase: string, newPassphrase: string) {
-    const { privateKey, path } = this.getDecryptedKey(addr, passphrase);
-    this.storage.storeKey(path, privateKey, newPassphrase);
+  async update(addr: AddrType, passphrase: string, newPassphrase: string) {
+    const { privateKey, path } = await this.getDecryptedKey(addr, passphrase);
+    await this.storage.storeKey(path, privateKey, newPassphrase);
   }
 
-  newAccount(passphrase: string) {
-    const { address, privateKey }: { address: string; privateKey: string } = create();
+  async newAccount(passphrase: string) {
+    const wallet = Wallet.generate();
+    const address = wallet.getAddressString();
+    const privateKey = wallet.getPrivateKeyString();
     const localPath = this.storage.joinPath(keyStoreFileName(address));
-    this.storage.storeKey(localPath, privateKey, passphrase);
+    await this.storage.storeKey(localPath, privateKey, passphrase);
     this.cache.add(addrToBuffer(address), localPath);
     return { address, path: localPath };
   }
@@ -71,20 +89,13 @@ export class AccountManager {
     this.unlocked.delete(addrToBuffer(addr));
   }
 
-  unlock(addr: AddrType, passphrase: string) {
+  async unlock(addr: AddrType, passphrase: string) {
     const buf = addrToBuffer(addr);
     if (!this.unlocked.has(buf)) {
-      const { privateKey } = this.getDecryptedKey(addr, passphrase);
+      const { privateKey } = await this.getDecryptedKey(addr, passphrase);
       this.unlocked.set(buf, privateKey);
       return true;
     }
     return false;
   }
-}
-
-function addrToBuffer(addr: AddrType) {
-  if (!Buffer.isBuffer(addr)) {
-    addr = typeof addr === 'object' ? addr.toBuffer() : hexStringToBuffer(addr);
-  }
-  return addr;
 }

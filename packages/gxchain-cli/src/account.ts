@@ -6,11 +6,57 @@ import { AccountManager } from '@gxchain2/wallet';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
 import inquirer from 'inquirer';
 
-export function installAccountCommand(program: any) {
-  function getKeyStorePath() {
-    return path.join(program.opts().datadir, program.opts().keystore);
-  }
+export async function getPassphrase(program: any, options?: { addresses?: string[]; repeat?: boolean; message?: string; forceInput?: boolean }) {
+  let passphrase: string[];
+  if (!options?.forceInput && program.opts().password) {
+    const password = fs.readFileSync(program.opts().password).toString();
+    passphrase = password.split('\n').map((p) => p.trim());
+  } else {
+    async function getSinglePassphrase(address?: string): Promise<string> {
+      if (address) {
+        console.log(`Please input the password of account ${address.startsWith('0x') ? address.substr(2) : address}`);
+      } else if (options?.message) {
+        console.log(options.message);
+      }
 
+      const result = await inquirer.prompt([
+        {
+          type: 'password',
+          name: 'password',
+          message: 'Password:'
+        }
+      ]);
+      if (options?.repeat) {
+        const result2 = await inquirer.prompt([
+          {
+            type: 'password',
+            name: 'password',
+            message: 'Repeat password:'
+          }
+        ]);
+        if (result.password !== result2.password) {
+          throw new Error('You must input the same password!');
+        }
+      }
+      return result.password;
+    }
+    if (!options?.addresses) {
+      passphrase = [await getSinglePassphrase()];
+    } else {
+      passphrase = [];
+      for (const address of options.addresses) {
+        passphrase.push(await getSinglePassphrase(address));
+      }
+    }
+  }
+  return passphrase;
+}
+
+export function getKeyStorePath(program: any) {
+  return path.join(program.opts().datadir, program.opts().keystore);
+}
+
+export function installAccountCommand(program: any) {
   const account = new Command('account').description('Manage accounts');
   program.addCommand(account);
 
@@ -19,7 +65,7 @@ export function installAccountCommand(program: any) {
     .description('List all the accounts')
     .action(() => {
       try {
-        const manager = new AccountManager(getKeyStorePath());
+        const manager = new AccountManager(getKeyStorePath(program));
         const accounts = manager.totalAccounts();
         for (let i = accounts.length - 1; i >= 0; i--) {
           console.log(`Account #${accounts.length - i - 1}: {${bufferToHex(accounts[i].addrBuf)}} keystore://${accounts[i].path}`);
@@ -32,36 +78,10 @@ export function installAccountCommand(program: any) {
   account
     .command('new')
     .description('New a account')
-    .option('--password <string>')
-    .action(async (options) => {
+    .action(async () => {
       try {
-        let passphrase: string;
-        if (options.password) {
-          passphrase = fs.readFileSync(options.password).toString();
-        } else {
-          console.log('Your new account is locked with a password. Please give a password. Do not forget this password.');
-          const answer1 = await inquirer.prompt([
-            {
-              type: 'password',
-              name: 'password',
-              message: 'Password:'
-            }
-          ]);
-          const answer2 = await inquirer.prompt([
-            {
-              type: 'password',
-              name: 'repassword',
-              message: 'Repeat password:'
-            }
-          ]);
-          if (answer1.password !== answer2.repassword) {
-            console.log('You must input the same password!');
-            return;
-          }
-          passphrase = answer1.password;
-        }
-
-        const manager = new AccountManager(getKeyStorePath());
+        const passphrase = (await getPassphrase(program, { repeat: true, message: 'Your new account is locked with a password. Please give a password. Do not forget this password.' }))[0];
+        const manager = new AccountManager(getKeyStorePath(program));
         const { address, path } = await manager.newAccount(passphrase);
         console.log('\nYour new key was generated\n');
         console.log('Public address of the key :', toChecksumAddress(address.toString()));
@@ -80,34 +100,10 @@ export function installAccountCommand(program: any) {
     .description('Update the account')
     .action(async (address) => {
       try {
-        const manager = new AccountManager(getKeyStorePath());
-        const answer1 = await inquirer.prompt([
-          {
-            type: 'password',
-            name: 'password',
-            message: 'Password:'
-          }
-        ]);
-        console.log('Please give a new password. Do not forget this password.');
-        const answer2 = await inquirer.prompt([
-          {
-            type: 'password',
-            name: 'newpassword',
-            message: 'New password:'
-          }
-        ]);
-        const answer3 = await inquirer.prompt([
-          {
-            type: 'password',
-            name: 'repassword',
-            message: 'Repeat password:'
-          }
-        ]);
-        if (answer2.newpassword !== answer3.repassword) {
-          console.log('You must input the same password!');
-          return;
-        }
-        await manager.update(address, answer1.password, answer2.newpassword);
+        const passphrase = (await getPassphrase(program, { addresses: [address] }))[0];
+        const manager = new AccountManager(getKeyStorePath(program));
+        const newPassphrase = (await getPassphrase(program, { repeat: true, message: 'Please give a new password. Do not forget this password.', forceInput: true }))[0];
+        await manager.update(address, passphrase, newPassphrase);
       } catch (err) {
         logger.error('Account, update, error:', err);
       }
@@ -119,42 +115,13 @@ export function installAccountCommand(program: any) {
     .action(async (keyfile) => {
       try {
         const privateKey = fs.readFileSync(keyfile).toString();
-        const manager = new AccountManager(getKeyStorePath());
+        const manager = new AccountManager(getKeyStorePath(program));
         const address = Address.fromPrivateKey(hexStringToBuffer(privateKey)).toString();
-        let update = !manager.hasAccount(address);
-        if (!update) {
-          const cover = await inquirer.prompt([
-            {
-              type: 'confirm',
-              name: 'cover',
-              message: 'The account is existed, would you want to cover it?'
-            }
-          ]);
-          update = cover.cover;
+        if (manager.hasAccount(address)) {
+          throw new Error('Could not create the account: account alreaady exists');
         }
-
-        if (update) {
-          console.log('Your new account is locked with a password. Please give a password. Do not forget this password..');
-          const answer1 = await inquirer.prompt([
-            {
-              type: 'password',
-              name: 'password',
-              message: 'Password:'
-            }
-          ]);
-          const answer2 = await inquirer.prompt([
-            {
-              type: 'password',
-              name: 'password',
-              message: 'Repeat password:'
-            }
-          ]);
-          if (answer1.password !== answer2.password) {
-            console.log('You must input the same password!');
-            return;
-          }
-          console.log('Address : ', toChecksumAddress(await manager.importKeyByPrivateKey(privateKey, answer1.password)));
-        }
+        const passphrase = (await getPassphrase(program, { repeat: true, message: 'Your new account is locked with a password. Please give a password. Do not forget this password.' }))[0];
+        console.log(`Address: ${toChecksumAddress(await manager.importKeyByPrivateKey(privateKey, passphrase))}`);
       } catch (err) {
         logger.error('Account, import, error:', err);
       }

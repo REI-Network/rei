@@ -24,6 +24,7 @@ Nodejs implementation of GXChain2.0 protocols
 | [@gxchain2/network][network-package]             | [![NPM Version][network-npm-version]][network-npm-url]             | [![Network Issues][network-issues]][network-issues-url]                   |
 | [@gxchain2/rpc][rpc-package]                     | [![NPM Version][rpc-npm-version]][rpc-npm-url]                     | [![Rpc Issues][rpc-issues]][rpc-issues-url]                               |
 | [@gxchain2/state-manager][state-manager-package] | [![NPM Version][state-manager-npm-version]][state-manager-npm-url] | [![State-manager Issues][state-manager-issues]][state-manager-issues-url] |
+| [@gxchain2/wallet][wallet-package]               | [![NPM Version][wallet-npm-version]][wallet-npm-url]               | [![Wallet Issues][wallet-issues]][wallet-issues-url]                      |
 
 ## Quick start
 
@@ -193,3 +194,7 @@ These scripts execute lint and lint:fix respectively, to all monorepo packages.
 [state-manager-npm-url]: https://www.npmjs.org/package/@gxchain2/state-manager
 [state-manager-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20state-manager?label=issues
 [state-manager-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+state-manager"
+[wallet-npm-version]: https://img.shields.io/npm/v/@gxchain2/wallet
+[wallet-npm-url]: https://www.npmjs.org/package/@gxchain2/wallet
+[wallet-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20wallet?label=issues
+[wallet-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+wallet"

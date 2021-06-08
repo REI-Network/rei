@@ -7,8 +7,8 @@ import { hexStringToBuffer, logger } from '@gxchain2/utils';
 import inquirer from 'inquirer';
 
 export function installAccountCommand(program: any) {
-  function getKeyDataDir(keydatadir?: string) {
-    return keydatadir ? keydatadir : path.join(program.opts().datadir, 'keystore');
+  function getKeyStorePath() {
+    return path.join(program.opts().datadir, program.opts().keystore);
   }
 
   const account = new Command('account').description('Manage accounts');
@@ -17,10 +17,9 @@ export function installAccountCommand(program: any) {
   account
     .command('list')
     .description('List all the accounts')
-    .option('--keydatadir <string>', 'The datadir for keystore')
-    .action((options) => {
+    .action(() => {
       try {
-        const manager = new AccountManager(getKeyDataDir(options.keydatadir));
+        const manager = new AccountManager(getKeyStorePath());
         const accounts = manager.totalAccounts();
         for (let i = accounts.length - 1; i >= 0; i--) {
           console.log('Account #', accounts.length - i - 1, ': {', bufferToHex(accounts[i].addrBuf), '}', ':', accounts[i].path);
@@ -34,11 +33,10 @@ export function installAccountCommand(program: any) {
     .command('new')
     .description('New a account')
     .requiredOption('--passwordfile <string>')
-    .option('--keydatadir <string>', 'The datadir for keystore')
     .action(async (options) => {
       try {
         const passphrase = fs.readFileSync(options.passwordfile).toString();
-        const manager = new AccountManager(getKeyDataDir(options.keydatadir));
+        const manager = new AccountManager(getKeyStorePath());
         const { address, path } = await manager.newAccount(passphrase);
         console.log('Your new key was generated');
         console.log('Public address of the key :', toChecksumAddress(address.toString()));
@@ -56,10 +54,9 @@ export function installAccountCommand(program: any) {
     .command('update')
     .description('Update the account')
     .requiredOption('--address <string>')
-    .option('--keydatadir <string>', 'The datadir for keystore')
     .action(async (options) => {
       try {
-        const manager = new AccountManager(getKeyDataDir(options.keydatadir));
+        const manager = new AccountManager(getKeyStorePath());
         const answer1 = await inquirer.prompt([
           {
             type: 'password',
@@ -93,13 +90,12 @@ export function installAccountCommand(program: any) {
     });
 
   account
-    .command('import <keydir>')
+    .command('import <keyfile>')
     .description('Import a account from privatekey file')
-    .option('--keydatadir <string>', 'The datadir for keystore')
-    .action(async (keydir, options) => {
+    .action(async (keyfile) => {
       try {
-        const privateKey = fs.readFileSync(keydir).toString();
-        const manager = new AccountManager(getKeyDataDir(options.keydatadir));
+        const privateKey = fs.readFileSync(keyfile).toString();
+        const manager = new AccountManager(getKeyStorePath());
         const address = Address.fromPrivateKey(hexStringToBuffer(privateKey)).toString();
         let update = !manager.hasAccount(address);
         if (!update) {

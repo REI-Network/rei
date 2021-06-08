@@ -6,10 +6,10 @@ import { AccountManager } from '@gxchain2/wallet';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
 import inquirer from 'inquirer';
 
-export async function getPassphrase(program: any, options?: { addresses?: string[]; repeat?: boolean; message?: string; forceInput?: boolean }) {
+export async function getPassphrase(opts: { [option: string]: string }, options?: { addresses?: string[]; repeat?: boolean; message?: string; forceInput?: boolean }) {
   let passphrase: string[];
-  if (!options?.forceInput && program.opts().password) {
-    const password = fs.readFileSync(program.opts().password).toString();
+  if (!options?.forceInput && opts.password) {
+    const password = fs.readFileSync(opts.password).toString();
     passphrase = password.split('\n').map((p) => p.trim());
   } else {
     async function getSinglePassphrase(address?: string): Promise<string> {
@@ -52,8 +52,8 @@ export async function getPassphrase(program: any, options?: { addresses?: string
   return passphrase;
 }
 
-export function getKeyStorePath(program: any) {
-  return path.join(program.opts().datadir, program.opts().keystore);
+export function getKeyStorePath(opts: { [option: string]: string }) {
+  return path.join(opts.datadir, opts.keystore);
 }
 
 export function installAccountCommand(program: any) {
@@ -65,7 +65,7 @@ export function installAccountCommand(program: any) {
     .description('List all the accounts')
     .action(() => {
       try {
-        const manager = new AccountManager(getKeyStorePath(program));
+        const manager = new AccountManager(getKeyStorePath(program.opts()));
         const accounts = manager.totalAccounts();
         for (let i = accounts.length - 1; i >= 0; i--) {
           console.log(`Account #${accounts.length - i - 1}: {${bufferToHex(accounts[i].addrBuf)}} keystore://${accounts[i].path}`);
@@ -80,8 +80,8 @@ export function installAccountCommand(program: any) {
     .description('New a account')
     .action(async () => {
       try {
-        const passphrase = (await getPassphrase(program, { repeat: true, message: 'Your new account is locked with a password. Please give a password. Do not forget this password.' }))[0];
-        const manager = new AccountManager(getKeyStorePath(program));
+        const passphrase = (await getPassphrase(program.opts(), { repeat: true, message: 'Your new account is locked with a password. Please give a password. Do not forget this password.' }))[0];
+        const manager = new AccountManager(getKeyStorePath(program.opts()));
         const { address, path } = await manager.newAccount(passphrase);
         console.log('\nYour new key was generated\n');
         console.log('Public address of the key :', toChecksumAddress(address.toString()));
@@ -100,9 +100,9 @@ export function installAccountCommand(program: any) {
     .description('Update the account')
     .action(async (address) => {
       try {
-        const passphrase = (await getPassphrase(program, { addresses: [address] }))[0];
-        const manager = new AccountManager(getKeyStorePath(program));
-        const newPassphrase = (await getPassphrase(program, { repeat: true, message: 'Please give a new password. Do not forget this password.', forceInput: true }))[0];
+        const passphrase = (await getPassphrase(program.opts(), { addresses: [address] }))[0];
+        const manager = new AccountManager(getKeyStorePath(program.opts()));
+        const newPassphrase = (await getPassphrase(program.opts(), { repeat: true, message: 'Please give a new password. Do not forget this password.', forceInput: true }))[0];
         await manager.update(address, passphrase, newPassphrase);
       } catch (err) {
         logger.error('Account, update, error:', err);
@@ -115,12 +115,12 @@ export function installAccountCommand(program: any) {
     .action(async (keyfile) => {
       try {
         const privateKey = fs.readFileSync(keyfile).toString();
-        const manager = new AccountManager(getKeyStorePath(program));
+        const manager = new AccountManager(getKeyStorePath(program.opts()));
         const address = Address.fromPrivateKey(hexStringToBuffer(privateKey)).toString();
         if (manager.hasAccount(address)) {
           throw new Error('Could not create the account: account alreaady exists');
         }
-        const passphrase = (await getPassphrase(program, { repeat: true, message: 'Your new account is locked with a password. Please give a password. Do not forget this password.' }))[0];
+        const passphrase = (await getPassphrase(program.opts(), { repeat: true, message: 'Your new account is locked with a password. Please give a password. Do not forget this password.' }))[0];
         console.log(`Address: ${toChecksumAddress(await manager.importKeyByPrivateKey(privateKey, passphrase))}`);
       } catch (err) {
         logger.error('Account, import, error:', err);

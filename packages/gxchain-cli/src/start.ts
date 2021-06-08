@@ -1,21 +1,32 @@
 import fs from 'fs';
 import process from 'process';
-import { SIGINT } from './process';
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
 import { setLevel, logger } from '@gxchain2/utils';
+import { SIGINT } from './process';
+import { getPassphrase, getKeyStorePath } from './account';
 
-export async function startNode(opts: { [key: string]: any }): Promise<[Node, undefined | RpcServer]> {
+export async function startNode(opts: { [option: string]: string }): Promise<[Node, undefined | RpcServer]> {
   setLevel(opts.verbosity);
   if (!fs.existsSync(opts.datadir)) {
     fs.mkdirSync(opts.datadir);
   }
-  const p2pOptions = {
+  let addresses: string[] = [];
+  let passphrase: string[] = [];
+  if (opts.unlock) {
+    addresses = (opts.unlock as string).split(',').map((address) => address.trim());
+    passphrase = await getPassphrase(opts, { addresses });
+  }
+  const account = {
+    keyStorePath: getKeyStorePath(opts),
+    unlock: addresses.map((address, i): [string, string] => [address, passphrase[i]])
+  };
+  const p2p = {
     tcpPort: opts.p2pTcpPort ? Number(opts.p2pTcpPort) : undefined,
     wsPort: opts.p2pWsPort ? Number(opts.p2pWsPort) : undefined,
     bootnodes: Array.isArray(opts.bootnodes) ? opts.bootnodes : undefined
   };
-  const mineOptions = opts.mine
+  const mine = opts.mine
     ? {
         coinbase: opts.coinbase,
         gasLimit: opts.blockGasLimit
@@ -24,8 +35,9 @@ export async function startNode(opts: { [key: string]: any }): Promise<[Node, un
   const node = new Node({
     databasePath: opts.datadir,
     chain: opts.chain,
-    mine: mineOptions,
-    p2p: p2pOptions
+    mine,
+    p2p,
+    account
   });
   await node.init();
   SIGINT(node);

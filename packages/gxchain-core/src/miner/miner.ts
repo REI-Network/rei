@@ -4,7 +4,6 @@ import { Worker } from './worker';
 import { Loop } from './loop';
 import { Node } from '../node';
 import { Address, BN, bufferToHex } from 'ethereumjs-util';
-import { getPrivateKey } from '../fakeaccountmanager';
 
 export interface MinerOptions {
   coinbase: string;
@@ -143,7 +142,7 @@ export class Miner extends Loop {
               },
               transactions: block.transactions
             },
-            { common: this.node.getCommon(block.header.number), cliqueSigner: getPrivateKey(this.coinbase.toString('hex')) }
+            { common: this.node.getCommon(block.header.number), cliqueSigner: this.node.accMngr.getPrivateKey(this.coinbase) }
           );
         } else {
           header = record[0];

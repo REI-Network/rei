@@ -10,7 +10,6 @@ import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import { Loop } from './loop';
 import { Miner } from './miner';
 import { Node } from '../node';
-import { getPrivateKey } from '../fakeaccountmanager';
 
 export class Worker extends Loop {
   private readonly miner: Miner;
@@ -70,7 +69,7 @@ export class Worker extends Loop {
           timestamp,
           uncleHash: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347'
         },
-        { common: this.node.getCommon(number), cliqueSigner: getPrivateKey(this.miner.coinbase.toString('hex')) }
+        { common: this.node.getCommon(number), cliqueSigner: this.node.accMngr.getPrivateKey(this.miner.coinbase) }
       );
     } else {
       return BlockHeader.fromHeaderData(
@@ -143,7 +142,7 @@ export class Worker extends Loop {
   }
 
   private getCliqueSigner() {
-    return this.miner.isMining ? getPrivateKey(this.miner.coinbase.toString('hex')) : undefined;
+    return this.miner.isMining ? this.node.accMngr.getPrivateKey(this.miner.coinbase) : undefined;
   }
 
   async getRecord_OrderByTD(number: BN): Promise<undefined | [BlockHeader, Block]> {

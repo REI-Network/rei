@@ -26,7 +26,7 @@ function addrToString(addr: AddrType) {
 export class AccountManager {
   private storage: KeyStore;
   private cache: AccountCache;
-  private unlocked = createBufferFunctionalMap<string>();
+  private unlocked = createBufferFunctionalMap<Buffer>();
 
   constructor(keydir: string) {
     if (!path.isAbsolute(keydir)) {
@@ -52,6 +52,36 @@ export class AccountManager {
 
   hasAccount(addr: AddrType) {
     return this.cache.has(addrToBuffer(addr));
+  }
+
+  hasUnlockedAccount(addr: AddrType) {
+    return this.unlocked.has(addrToBuffer(addr));
+  }
+
+  getPrivateKey(addr: AddrType) {
+    const privateKey = this.unlocked.get(addrToBuffer(addr));
+    if (!privateKey) {
+      throw new Error(`Unknow address: ${addrToString(addr)}`);
+    }
+    return privateKey;
+  }
+
+  lock(addr: AddrType) {
+    this.unlocked.delete(addrToBuffer(addr));
+  }
+
+  async unlock(addr: AddrType, passphrase: string) {
+    try {
+      const buf = addrToBuffer(addr);
+      if (!this.unlocked.has(buf)) {
+        const { privateKey } = await this.getDecryptedKey(addr, passphrase);
+        this.unlocked.set(buf, hexStringToBuffer(privateKey));
+        return true;
+      }
+      return false;
+    } catch (err) {
+      return false;
+    }
   }
 
   async importKey(path: string, passphrase: string) {
@@ -83,19 +113,5 @@ export class AccountManager {
     await this.storage.storeKey(localPath, privateKey, passphrase);
     this.cache.add(addrToBuffer(address), localPath);
     return { address, path: localPath };
-  }
-
-  lock(addr: AddrType) {
-    this.unlocked.delete(addrToBuffer(addr));
-  }
-
-  async unlock(addr: AddrType, passphrase: string) {
-    const buf = addrToBuffer(addr);
-    if (!this.unlocked.has(buf)) {
-      const { privateKey } = await this.getDecryptedKey(addr, passphrase);
-      this.unlocked.set(buf, privateKey);
-      return true;
-    }
-    return false;
   }
 }

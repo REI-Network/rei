@@ -14,13 +14,13 @@ import { TxPool } from '@gxchain2/tx-pool';
 import { Block } from '@gxchain2/block';
 import { TypedTransaction } from '@gxchain2/tx';
 import { Channel, Aborter, logger } from '@gxchain2/utils';
+import { AccountManager } from '@gxchain2/wallet';
 import { FullSynchronizer, Synchronizer } from './sync';
 import { TxFetcher } from './txsync';
 import { Miner } from './miner';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter } from './bloombits';
 import { BlockchainMonitor } from './blockchainmonitor';
-import { getPrivateKey } from './fakeaccountmanager';
 
 export interface NodeOptions {
   databasePath: string;
@@ -33,6 +33,10 @@ export interface NodeOptions {
     tcpPort?: number;
     wsPort?: number;
     bootnodes?: string[];
+  };
+  account: {
+    keyStorePath: string;
+    unlock: [string, string][];
   };
 }
 
@@ -72,8 +76,8 @@ export class Node {
   public txSync!: TxFetcher;
   public bloomBitsIndexer!: ChainIndexer;
   public bcMonitor!: BlockchainMonitor;
+  public accMngr!: AccountManager;
 
-  private readonly options: NodeOptions;
   private readonly initPromise: Promise<void>;
   private readonly taskLoopPromise: Promise<void>;
   private readonly processLoopPromise: Promise<void>;
@@ -85,9 +89,8 @@ export class Node {
   private genesisHash!: Buffer;
 
   constructor(options: NodeOptions) {
-    this.options = options;
-    this.rawdb = createLevelDB(path.join(this.options.databasePath, 'chaindb'));
-    this.initPromise = this.init();
+    this.rawdb = createLevelDB(path.join(options.databasePath, 'chaindb'));
+    this.initPromise = this.init(options);
     this.taskLoopPromise = this.taskLoop();
     this.processLoopPromise = this.processLoop();
   }
@@ -109,18 +112,34 @@ export class Node {
    * Initialize the node
    * @returns
    */
-  async init() {
+  async init(options?: NodeOptions) {
     if (this.initPromise) {
       await this.initPromise;
       return;
     }
+    if (!options) {
+      throw new Error('Missing options');
+    }
 
-    if (this.options.chain) {
-      this.chain = this.options.chain;
+    this.accMngr = new AccountManager(options.account.keyStorePath);
+    if (options.account.unlock.length > 0) {
+      const result = await Promise.all(options.account.unlock.map(([address, passphrase]) => this.accMngr.unlock(address, passphrase)));
+      for (let i = 0; i < result.length; i++) {
+        if (!result[i]) {
+          throw new Error(`Unlock account ${options.account.unlock[i][0]} failed!`);
+        }
+      }
+    }
+    if (options?.mine?.coinbase && !this.accMngr.hasUnlockedAccount(options.mine.coinbase)) {
+      throw new Error(`Unlock coin account ${options.mine.coinbase} failed!`);
+    }
+
+    if (options.chain) {
+      this.chain = options.chain;
     }
     if (this.chain === undefined) {
       try {
-        this.chain = JSON.parse(fs.readFileSync(path.join(this.options.databasePath, 'genesis.json')).toString());
+        this.chain = JSON.parse(fs.readFileSync(path.join(options.databasePath, 'genesis.json')).toString());
       } catch (err) {
         logger.warn('Read genesis.json faild, use default chain(gxc2-mainnet)');
         this.chain = 'gxc2-mainnet';
@@ -178,16 +197,16 @@ export class Node {
         this.newBlock(block);
       });
 
-    this.txPool = new TxPool({ node: this as any, journal: this.options.databasePath });
+    this.txPool = new TxPool({ node: this as any, journal: options.databasePath });
 
     let peerId!: PeerId;
     try {
-      const key = fs.readFileSync(path.join(this.options.databasePath, 'peer-key'));
+      const key = fs.readFileSync(path.join(options.databasePath, 'peer-key'));
       peerId = await PeerId.createFromPrivKey(key);
     } catch (err) {
       logger.warn('Read peer-key faild, generate a new key');
       peerId = await PeerId.create({ bits: 1024, keyType: 'Ed25519' });
-      fs.writeFileSync(path.join(this.options.databasePath, 'peer-key'), peerId.privKey.bytes);
+      fs.writeFileSync(path.join(options.databasePath, 'peer-key'), peerId.privKey.bytes);
     }
 
     this.peerpool = new PeerPool({
@@ -197,9 +216,9 @@ export class Node {
             node: this as any,
             peerId,
             protocols: new Set<string>([constants.GXC2_ETHWIRE]),
-            tcpPort: this.options?.p2p?.tcpPort,
-            wsPort: this.options?.p2p?.wsPort,
-            bootnodes: this.options?.p2p?.bootnodes
+            tcpPort: options?.p2p?.tcpPort,
+            wsPort: options?.p2p?.wsPort,
+            bootnodes: options?.p2p?.bootnodes
           })
         ].map(
           (n) => new Promise<Libp2pNode>((resolve) => n.init().then(() => resolve(n)))
@@ -222,7 +241,7 @@ export class Node {
       });
 
     this.sync.start();
-    this.miner = new Miner(this, this.options.mine);
+    this.miner = new Miner(this, options.mine);
     await this.txPool.init();
     this.txSync = new TxFetcher(this);
     this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: constants.BloomBitsBlocks, confirmsBlockNumber: constants.ConfirmsBlockNumber });
@@ -278,7 +297,7 @@ export class Node {
           block,
           generate,
           root: lastHeader.stateRoot,
-          cliqueSigner: getPrivateKey(block.header.cliqueSigner().buf.toString('hex'))
+          cliqueSigner: this.accMngr.getPrivateKey(block.header.cliqueSigner().buf)
         };
         const { result, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot, lastHeader.number)).runBlock(opts);
         block = newBlock || block;

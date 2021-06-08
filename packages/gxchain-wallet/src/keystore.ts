@@ -34,5 +34,5 @@ export function keyStoreFileName(address: string): string {
   const ts = new Date();
   const utc = new Date(ts.getTime() + ts.getTimezoneOffset() * 60000);
   const format = utc.toISOString().replace(/:/g, '-');
-  return 'UTC--' + format + '--' + address;
+  return 'UTC--' + format + '--' + (address.startsWith('0x') ? address.substr(2) : address);
 }

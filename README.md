@@ -194,6 +194,7 @@ These scripts execute lint and lint:fix respectively, to all monorepo packages.
 [state-manager-npm-url]: https://www.npmjs.org/package/@gxchain2/state-manager
 [state-manager-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20state-manager?label=issues
 [state-manager-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+state-manager"
+[wallet-package]: ./packages/gxchain-wallet
 [wallet-npm-version]: https://img.shields.io/npm/v/@gxchain2/wallet
 [wallet-npm-url]: https://www.npmjs.org/package/@gxchain2/wallet
 [wallet-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20wallet?label=issues

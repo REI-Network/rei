@@ -17,7 +17,7 @@ npm install @gxchain2/cli --global
 ## Usage
 
 ```
-Usage: index [options]
+Usage: index [options] [command]
 
 Options:
   -V, --version               output the version number
@@ -28,13 +28,15 @@ Options:
   --p2p-tcp-port <port>       p2p server tcp port (default: "0")
   --p2p-ws-port <port>        p2p server websocket port (default: "0")
   --bootnodes <bootnodes...>  bootnodes list
-  --datadir <path>            chain data dir path (default: "./gxchain2")
+  --datadir <path>            chain data dir path (default: "/Users/samlior/.gxchain2")
+  --chain <chain>             chain name: gxc2-mainnet, gxc2-testnet
   --mine                      mine block
   --coinbase <address>        miner address
-  --mine-interval <interval>  mine interval (default: "5000")
-  --block-gas-limit <gas>     block gas limit (default: "0xbe5c8b")
   --verbosity <verbosity>     logging verbosity: silent, error, warn, info, debug, detail (default: "info")
   -h, --help                  display help for command
+
+Commands:
+  account                     Manage accounts
 ```
 
 ## Example

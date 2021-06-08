@@ -17,7 +17,7 @@ export function installAccountCommand(program: any) {
   account
     .command('list')
     .description('List all the accounts')
-    .option('--keydatadir [string]', 'The datadir for keystore', 'keystore')
+    .option('--keydatadir <string>', 'The datadir for keystore')
     .action((options) => {
       try {
         const manager = new AccountManager(getKeyDataDir(options.keydatadir));
@@ -33,8 +33,8 @@ export function installAccountCommand(program: any) {
   account
     .command('new')
     .description('New a account')
-    .option('--passwordfile <string>')
-    .option('--keydatadir [string]', 'The datadir for keystore')
+    .requiredOption('--passwordfile <string>')
+    .option('--keydatadir <string>', 'The datadir for keystore')
     .action(async (options) => {
       try {
         const passphrase = fs.readFileSync(options.passwordfile).toString();
@@ -55,8 +55,8 @@ export function installAccountCommand(program: any) {
   account
     .command('update')
     .description('Update the account')
-    .option('--address <string>')
-    .option('--keydatadir [string]', 'The datadir for keystore', 'keystore')
+    .requiredOption('--address <string>')
+    .option('--keydatadir <string>', 'The datadir for keystore')
     .action(async (options) => {
       try {
         const manager = new AccountManager(getKeyDataDir(options.keydatadir));
@@ -67,31 +67,26 @@ export function installAccountCommand(program: any) {
             message: 'Password:'
           }
         ]);
-        try {
-          console.log('Please give a new password. Do not forget this password.');
-          const answer2 = await inquirer.prompt([
-            {
-              type: 'password',
-              name: 'newpassword',
-              message: 'New password:'
-            }
-          ]);
-          const answer3 = await inquirer.prompt([
-            {
-              type: 'password',
-              name: 'repassword',
-              message: 'Repeat password:'
-            }
-          ]);
-          if (answer2.newpassword !== answer3.repassword) {
-            console.log('You must input the same password!');
-            return;
+        console.log('Please give a new password. Do not forget this password.');
+        const answer2 = await inquirer.prompt([
+          {
+            type: 'password',
+            name: 'newpassword',
+            message: 'New password:'
           }
-          await manager.update(options.address, answer1.password, answer2.newpassword);
-        } catch (err) {
-          console.log('No account or key is not match!');
+        ]);
+        const answer3 = await inquirer.prompt([
+          {
+            type: 'password',
+            name: 'repassword',
+            message: 'Repeat password:'
+          }
+        ]);
+        if (answer2.newpassword !== answer3.repassword) {
+          console.log('You must input the same password!');
           return;
         }
+        await manager.update(options.address, answer1.password, answer2.newpassword);
       } catch (err) {
         logger.error('Account, update, error:', err);
       }
@@ -100,7 +95,7 @@ export function installAccountCommand(program: any) {
   account
     .command('import <keydir>')
     .description('Import a account from privatekey file')
-    .option('--keydatadir [string]', 'The datadir for keystore', 'keystore')
+    .option('--keydatadir <string>', 'The datadir for keystore')
     .action(async (keydir, options) => {
       try {
         const privateKey = fs.readFileSync(keydir).toString();

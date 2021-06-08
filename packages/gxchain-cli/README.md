@@ -28,7 +28,7 @@ Options:
   --p2p-tcp-port <port>       p2p server tcp port (default: "0")
   --p2p-ws-port <port>        p2p server websocket port (default: "0")
   --bootnodes <bootnodes...>  bootnodes list
-  --datadir <path>            chain data dir path (default: "/Users/samlior/.gxchain2")
+  --datadir <path>            chain data dir path (default: "~/.gxchain2")
   --chain <chain>             chain name: gxc2-mainnet, gxc2-testnet
   --mine                      mine block
   --coinbase <address>        miner address

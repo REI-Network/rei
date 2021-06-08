@@ -1,8 +1,9 @@
 import fs from 'fs';
+import process from 'process';
 import { SIGINT } from './process';
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
-import { setLevel } from '@gxchain2/utils';
+import { setLevel, logger } from '@gxchain2/utils';
 
 export async function startNode(opts: { [key: string]: any }): Promise<[Node, undefined | RpcServer]> {
   setLevel(opts.verbosity);
@@ -34,4 +35,15 @@ export async function startNode(opts: { [key: string]: any }): Promise<[Node, un
     await server.start();
   }
   return [node, server];
+}
+
+export function installStartAction(program: any) {
+  program.action(async () => {
+    try {
+      await startNode(program.opts());
+    } catch (err) {
+      logger.error('Start error:', err);
+      process.exit(1);
+    }
+  });
 }

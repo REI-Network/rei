@@ -2,16 +2,9 @@
 
 import process from 'process';
 import program from './program';
-import { logger } from '@gxchain2/utils';
-import { startNode } from './start';
+import { installStartAction } from './start';
+import { installAccountCommand } from './account';
 
-program.action(async () => {
-  try {
-    await startNode(program.opts());
-  } catch (err) {
-    logger.error('Start error:', err);
-    process.exit(1);
-  }
-});
-
+installStartAction(program);
+installAccountCommand(program);
 program.parse(process.argv);

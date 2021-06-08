@@ -1,33 +1,9 @@
 import createRBTree from 'functional-red-black-tree';
 import { BN } from 'ethereumjs-util';
 
-const bufferCompare = (a: Buffer, b: Buffer) => {
-  if (a.length < b.length) {
-    return -1;
-  }
-  if (a.length > b.length) {
-    return 1;
-  }
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] < b[i]) {
-      return -1;
-    }
-    if (a[i] > b[i]) {
-      return 1;
-    }
-  }
-  return 0;
-};
+const bufferCompare = (a: Buffer, b: Buffer) => a.compare(b);
 
-const bnCompare = (a: BN, b: BN) => {
-  if (a.lt(b)) {
-    return -1;
-  }
-  if (a.gt(b)) {
-    return 1;
-  }
-  return 0;
-};
+const bnCompare = (a: BN, b: BN) => a.cmp(b);
 
 export class FunctionalMapIterator<T> implements IterableIterator<T> {
   protected readonly rbtreeIt;

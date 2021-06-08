@@ -20,7 +20,7 @@ function addrToString(addr: AddrType) {
   } else if (addr instanceof Address) {
     return addr.toString();
   }
-  return addr;
+  return addr.startsWith('0x') ? addr : '0x' + addr;
 }
 
 export class AccountManager {

@@ -22,7 +22,7 @@ export function installAccountCommand(program: any) {
         const manager = new AccountManager(getKeyStorePath());
         const accounts = manager.totalAccounts();
         for (let i = accounts.length - 1; i >= 0; i--) {
-          console.log('Account #', accounts.length - i - 1, ': {', bufferToHex(accounts[i].addrBuf), '}', ':', accounts[i].path);
+          console.log(`Account #${accounts.length - i - 1}: {${bufferToHex(accounts[i].addrBuf)}} keystore://${accounts[i].path}`);
         }
       } catch (err) {
         logger.error('Account, list, error:', err);
@@ -32,15 +32,40 @@ export function installAccountCommand(program: any) {
   account
     .command('new')
     .description('New a account')
-    .requiredOption('--passwordfile <string>')
+    .option('--password <string>')
     .action(async (options) => {
       try {
-        const passphrase = fs.readFileSync(options.passwordfile).toString();
+        let passphrase: string;
+        if (options.password) {
+          passphrase = fs.readFileSync(options.password).toString();
+        } else {
+          console.log('Your new account is locked with a password. Please give a password. Do not forget this password.');
+          const answer1 = await inquirer.prompt([
+            {
+              type: 'password',
+              name: 'password',
+              message: 'Password:'
+            }
+          ]);
+          const answer2 = await inquirer.prompt([
+            {
+              type: 'password',
+              name: 'repassword',
+              message: 'Repeat password:'
+            }
+          ]);
+          if (answer1.password !== answer2.repassword) {
+            console.log('You must input the same password!');
+            return;
+          }
+          passphrase = answer1.password;
+        }
+
         const manager = new AccountManager(getKeyStorePath());
         const { address, path } = await manager.newAccount(passphrase);
-        console.log('Your new key was generated');
+        console.log('\nYour new key was generated\n');
         console.log('Public address of the key :', toChecksumAddress(address.toString()));
-        console.log('Path of the secret key file:', path);
+        console.log('Path of the secret key file:', path, '\n');
         console.log('- You can share your public address with anyone. Others need it to interact with you.');
         console.log('- You must NEVER share the secret key with anyone! The key controls access to your funds!');
         console.log("- You must BACKUP your key file! Without the key, it's impossible to access account funds!");
@@ -51,10 +76,9 @@ export function installAccountCommand(program: any) {
     });
 
   account
-    .command('update')
+    .command('update <address>')
     .description('Update the account')
-    .requiredOption('--address <string>')
-    .action(async (options) => {
+    .action(async (address) => {
       try {
         const manager = new AccountManager(getKeyStorePath());
         const answer1 = await inquirer.prompt([
@@ -83,7 +107,7 @@ export function installAccountCommand(program: any) {
           console.log('You must input the same password!');
           return;
         }
-        await manager.update(options.address, answer1.password, answer2.newpassword);
+        await manager.update(address, answer1.password, answer2.newpassword);
       } catch (err) {
         logger.error('Account, update, error:', err);
       }

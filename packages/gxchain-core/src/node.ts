@@ -297,7 +297,7 @@ export class Node {
           block,
           generate,
           root: lastHeader.stateRoot,
-          cliqueSigner: this.accMngr.getPrivateKey(block.header.cliqueSigner().buf)
+          cliqueSigner: generate ? this.accMngr.getPrivateKey(block.header.cliqueSigner().buf) : undefined
         };
         const { result, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot, lastHeader.number)).runBlock(opts);
         block = newBlock || block;

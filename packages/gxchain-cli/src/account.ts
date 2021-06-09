@@ -11,6 +11,9 @@ export async function getPassphrase(opts: { [option: string]: string }, options?
   if (!options?.forceInput && opts.password) {
     const password = fs.readFileSync(opts.password).toString();
     passphrase = password.split('\n').map((p) => p.trim());
+    if (options?.addresses && passphrase.length < options.addresses.length) {
+      throw new Error('Passphrase length is less than addresses length');
+    }
   } else {
     async function getSinglePassphrase(address?: string): Promise<string> {
       if (address) {

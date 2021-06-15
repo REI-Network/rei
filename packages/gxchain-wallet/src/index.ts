@@ -54,6 +54,10 @@ export class AccountManager {
     return this.cache.has(addrToBuffer(addr));
   }
 
+  totalUnlockedAccounts() {
+    return Array.from(this.unlocked.keys());
+  }
+
   hasUnlockedAccount(addr: AddrType) {
     return this.unlocked.has(addrToBuffer(addr));
   }

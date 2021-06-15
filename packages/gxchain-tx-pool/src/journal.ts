@@ -127,9 +127,10 @@ export class Journal {
                 output.write(Buffer.concat([tx.serialize(), bufferSplit]), (err) => {
                   if (err) {
                     logger.error('Jonunal::rotate, write stream error:', err);
+                  } else {
+                    journaled++;
                   }
                   resolve();
-                  journaled++;
                 });
               })
           )

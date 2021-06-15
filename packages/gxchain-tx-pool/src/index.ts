@@ -20,6 +20,9 @@ export interface INode {
   miner: {
     gasLimit: BN;
   };
+  accMngr: {
+    totalUnlockedAccounts: () => Buffer[];
+  };
   getCommon(num: BNLike): Common;
   getStateManager(root: Buffer, num: BNLike): Promise<StateManager>;
   addPendingTxs: (txs: TypedTransaction[]) => Promise<boolean[]>;
@@ -171,9 +174,10 @@ export class TxPool extends EventEmitter {
     this.txs = createBufferFunctionalMap<TypedTransaction>();
     this.locals = createBufferFunctionalSet();
     this.priced = new TxPricedList(this.txs);
-
+    for (const buf of this.node.accMngr.totalUnlockedAccounts()) {
+      this.locals.add(buf);
+    }
     this.initPromise = this.init();
-
     this.timeoutLoop();
     if (options.journal) {
       this.journal = new Journal(options.journal, this.node);
@@ -516,7 +520,7 @@ export class TxPool extends EventEmitter {
       }
       this.globalAllSlots += txSlots(tx);
       // journalTx
-      if (this.journal) {
+      if (this.journal && this.locals.has(addr.toBuffer())) {
         await this.journal.insert(tx);
       }
       results.push(true);

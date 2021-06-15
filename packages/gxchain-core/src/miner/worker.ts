@@ -21,6 +21,7 @@ export class Worker extends Loop {
   private header!: BlockHeader;
   private currentHeader!: BlockHeader;
   private gasUsed = new BN(0);
+  // blockNumber, blockHash, blockHeader, pendingBlock(nextBlock)
   private history: [number, Buffer, BlockHeader, Block][] = [];
   private lock = new Semaphore(1);
 
@@ -100,7 +101,7 @@ export class Worker extends Loop {
         const number = this.header.number.toNumber() - 1;
         const hash = this.header.parentHash;
         if (!this.history.find((h) => h[0] === number && h[1].equals(hash))) {
-          this.history.push([this.header.number.toNumber() - 1, this.header.parentHash, this.currentHeader, await this.getPendingBlock()]);
+          this.history.push([number, hash, this.currentHeader, await this.getPendingBlock()]);
           if (this.history.length > 10) {
             this.history.shift();
           }

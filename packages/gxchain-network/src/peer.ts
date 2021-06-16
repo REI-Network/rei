@@ -7,7 +7,7 @@ import { constants } from '@gxchain2/common';
 import pipe from 'it-pipe';
 import type PeerId from 'peer-id';
 import { Protocol, ETHProtocol } from './protocol';
-import { Libp2pNode } from './p2p';
+import { Libp2pNode } from './libp2pnode';
 import type { INode } from './types';
 
 const txsyncPackSize = 102400;

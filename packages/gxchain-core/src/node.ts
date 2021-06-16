@@ -65,7 +65,7 @@ type ProcessBlock = {
 };
 
 export class Node {
-  public readonly rawdb: LevelUp;
+  public readonly chaindb: LevelUp;
   public readonly aborter = new Aborter();
 
   public db!: Database;
@@ -90,7 +90,7 @@ export class Node {
   private genesisHash!: Buffer;
 
   constructor(options: NodeOptions) {
-    this.rawdb = createLevelDB(path.join(options.databasePath, 'chaindb'));
+    this.chaindb = createLevelDB(path.join(options.databasePath, 'chaindb'));
     this.initPromise = this.init(options);
     this.taskLoopPromise = this.taskLoop();
     this.processLoopPromise = this.processLoop();
@@ -150,7 +150,7 @@ export class Node {
     }
 
     const common = Common.createChainStartCommon(typeof this.chain === 'string' ? this.chain : this.chain.chain);
-    this.db = new Database(this.rawdb, common);
+    this.db = new Database(this.chaindb, common);
     this.networkId = common.networkIdBN().toNumber();
 
     let genesisBlock!: Block;
@@ -168,7 +168,7 @@ export class Node {
       genesisBlock = Block.genesis({ header: common.genesis() }, { common });
       logger.info('Read genesis block from file', bufferToHex(genesisBlock.hash()));
       if (typeof this.chain === 'string' || this.chain.genesisState) {
-        const stateManager = new StateManager({ common, trie: new Trie(this.rawdb) });
+        const stateManager = new StateManager({ common, trie: new Trie(this.chaindb) });
         await stateManager.generateGenesis(typeof this.chain === 'string' ? getGenesisState(this.chain) : this.chain.genesisState);
         const root = await stateManager.getStateRoot();
         if (!root.equals(genesisBlock.header.stateRoot)) {
@@ -181,7 +181,7 @@ export class Node {
 
     common.setHardforkByBlockNumber(0);
     this.blockchain = new Blockchain({
-      db: this.rawdb,
+      db: this.chaindb,
       database: this.db,
       common,
       genesisBlock
@@ -198,7 +198,7 @@ export class Node {
         this.newBlock(block);
       });
 
-    this.txPool = new TxPool({ node: this as any, journal: options.databasePath });
+    this.txPool = new TxPool({ node: this, journal: options.databasePath });
 
     let peerId!: PeerId;
     try {
@@ -216,7 +216,7 @@ export class Node {
       nodes: await Promise.all(
         [
           new Libp2pNode({
-            node: this as any,
+            node: this,
             peerId,
             protocols: new Set<string>([constants.GXC2_ETHWIRE]),
             tcpPort: options?.p2p?.tcpPort,
@@ -264,7 +264,7 @@ export class Node {
    * @returns The state manager
    */
   async getStateManager(root: Buffer, num: BNLike) {
-    const stateManager = new StateManager({ common: this.getCommon(num), trie: new Trie(this.rawdb) });
+    const stateManager = new StateManager({ common: this.getCommon(num), trie: new Trie(this.chaindb) });
     await stateManager.setStateRoot(root);
     return stateManager;
   }

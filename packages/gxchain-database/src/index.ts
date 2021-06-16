@@ -294,26 +294,26 @@ export class Database extends DBManager {
     return header1;
   }
 
-  async clearBloomBits(from: BN) {
-    const db: LevelUp = (this as any)._db;
-    for (let i = 0; i < constants.BloomBitLength; i++) {
-      await new Promise<void>((resolve, reject) => {
-        db.clear(
-          {
-            gte: bloomBitsKey(i, from, Buffer.alloc(32, 0)),
-            lte: bloomBitsKey(i, new BN('ffffffffffffffff', 'hex'), Buffer.alloc(32, 0xff))
-          },
-          (err?: Error) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            }
-          }
-        );
-      });
-    }
-  }
+  // async clearBloomBits(from: BN) {
+  //   const db: LevelUp = (this as any)._db;
+  //   for (let i = 0; i < constants.BloomBitLength; i++) {
+  //     await new Promise<void>((resolve, reject) => {
+  //       db.clear(
+  //         {
+  //           gte: bloomBitsKey(i, from, Buffer.alloc(32, 0)),
+  //           lte: bloomBitsKey(i, new BN('ffffffffffffffff', 'hex'), Buffer.alloc(32, 0xff))
+  //         },
+  //         (err?: Error) => {
+  //           if (err) {
+  //             reject(err);
+  //           } else {
+  //             resolve();
+  //           }
+  //         }
+  //       );
+  //     });
+  //   }
+  // }
 
   async getStoredSectionCount() {
     try {

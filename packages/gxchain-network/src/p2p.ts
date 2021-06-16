@@ -23,6 +23,7 @@ export interface Libp2pNodeOptions {
   node: INode;
   peerId: PeerId;
   protocols: Set<string>;
+  datastore: any;
   tcpPort?: number;
   wsPort?: number;
   bootnodes?: string[];
@@ -78,6 +79,11 @@ export class Libp2pNode extends Libp2p {
           dht: false,
           pubsub: false
         }
+      },
+      datastore: options.datastore,
+      peerStore: {
+        persistence: true,
+        threshold: 0
       }
     });
 

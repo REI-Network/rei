@@ -4,6 +4,7 @@ import type { LevelUp } from 'levelup';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
+import LevelStore from 'datastore-level';
 import { Database, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchain2/database';
 import { Libp2pNode, PeerPool } from '@gxchain2/network';
 import { Common, constants, getGenesisState, getChain } from '@gxchain2/common';
@@ -209,6 +210,8 @@ export class Node {
       fs.writeFileSync(path.join(options.databasePath, 'peer-key'), peerId.privKey.bytes);
     }
 
+    const datastore = new LevelStore(path.join(options.databasePath, 'networkdb'), { createIfMissing: true });
+    await datastore.open();
     this.peerpool = new PeerPool({
       nodes: await Promise.all(
         [
@@ -218,7 +221,8 @@ export class Node {
             protocols: new Set<string>([constants.GXC2_ETHWIRE]),
             tcpPort: options?.p2p?.tcpPort,
             wsPort: options?.p2p?.wsPort,
-            bootnodes: options?.p2p?.bootnodes
+            bootnodes: options?.p2p?.bootnodes,
+            datastore
           })
         ].map(
           (n) => new Promise<Libp2pNode>((resolve) => n.init().then(() => resolve(n)))

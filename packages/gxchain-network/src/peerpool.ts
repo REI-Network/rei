@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import PeerId from 'peer-id';
 import type { Peer } from './peer';
-import type { Libp2pNode } from './p2p';
+import type { Libp2pNode } from './libp2pnode';
 import { logger } from '@gxchain2/utils';
 
 export declare interface PeerPool {

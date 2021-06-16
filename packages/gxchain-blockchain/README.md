@@ -4,7 +4,7 @@
 ![License](https://img.shields.io/npm/l/@gxchain2/blockchain)
 
 
- Definition of blockchain structure and rules, based on '@ethereumjs/blockchain'`.
+ Definition of blockchain structure and rules, based on `@ethereumjs/blockchain`.
 
 ## INSTALL
 

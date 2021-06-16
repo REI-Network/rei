@@ -1,4 +1,8 @@
 # @gxchain2/database
+[![NPM Version](https://img.shields.io/npm/v/@gxchain2/database)](https://www.npmjs.org/package/@gxchain2/database)
+[![Install Size](https://packagephobia.now.sh/badge?p=@gxchain2/database)](https://packagephobia.now.sh/result?p=@gxchain2/database)
+![License](https://img.shields.io/npm/l/@gxchain2/database)
+
 
 The low level database implementation, based on `@ehtereumjs/blockchain`. Added logic about `Receipt`, `BloomBits`.
 

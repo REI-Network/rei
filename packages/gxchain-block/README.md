@@ -4,7 +4,7 @@
 ![License](https://img.shields.io/npm/l/@gxchain2/block)
 
 
- Definition of block structure, based on '@ethereumjs/block'`. Added class `WrappedBlock`and logic about `toRPCJSON`.
+ Definition of block structure, based on `@ethereumjs/block`. Added class `WrappedBlock`and logic about `toRPCJSON`.
 
 ## INSTALL
 

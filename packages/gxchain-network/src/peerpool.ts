@@ -91,7 +91,7 @@ export class PeerPool extends EventEmitter {
   }
 
   ban(peer: Peer, maxAge: number = 60000) {
-    peer.node.ban(peer.peerId, maxAge);
+    peer.libp2pNode.ban(peer.peerId, maxAge);
     this.remove(peer);
     this.emit('banned', peer);
   }

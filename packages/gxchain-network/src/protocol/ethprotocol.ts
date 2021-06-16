@@ -2,8 +2,9 @@ import { bufferToInt, bufferToHex, rlp, BN } from 'ethereumjs-util';
 import { constants } from '@gxchain2/common';
 import { Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/block';
 import { TxFromValuesArray, TypedTransaction } from '@gxchain2/tx';
-import { Protocol, Handler, MsgContext } from './protocol';
 import { logger } from '@gxchain2/utils';
+import { Protocol, Handler } from './protocol';
+import type { MsgContext } from '../peer';
 
 const handlers: Handler[] = [
   {
@@ -148,10 +149,6 @@ export class ETHProtocol extends Protocol {
 
   get protocolString(): string {
     return `/${this.name}/1`;
-  }
-
-  copy(): Protocol {
-    return new ETHProtocol();
   }
 
   findHandler(key: string | number): Handler {

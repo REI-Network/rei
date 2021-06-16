@@ -1,11 +1,4 @@
-import type { Peer } from '../peer';
-import type { INode } from '../types';
-
-export type MsgContext = {
-  node: INode;
-  peer: Peer;
-  protocol: Protocol;
-};
+import type { Peer, MsgContext } from '../peer';
 
 export type Handler = {
   name: string;
@@ -16,7 +9,7 @@ export type Handler = {
   process?: (info: MsgContext, data: any) => Promise<[string, any]> | [string, any] | void;
 };
 
-export class Protocol {
+export abstract class Protocol {
   protected _status: any;
 
   get status() {
@@ -28,10 +21,6 @@ export class Protocol {
   }
 
   get protocolString(): string {
-    throw new Error('Unimplemented');
-  }
-
-  copy(): Protocol {
     throw new Error('Unimplemented');
   }
 

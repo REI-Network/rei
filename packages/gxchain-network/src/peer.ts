@@ -6,12 +6,26 @@ import { Transaction } from '@gxchain2/tx';
 import { constants } from '@gxchain2/common';
 import pipe from 'it-pipe';
 import type PeerId from 'peer-id';
-import { Protocol, MsgContext } from './protocol/protocol';
+import { Protocol, ETHProtocol } from './protocol';
 import { Libp2pNode } from './p2p';
+import type { INode } from './types';
 
 const txsyncPackSize = 102400;
 
 export class PeerRequestTimeoutError extends Error {}
+
+export type MsgContext = {
+  node: INode;
+  peer: Peer;
+  protocol: Protocol;
+};
+
+function makeProtocol(name: string): Protocol {
+  if (name === constants.GXC2_ETHWIRE) {
+    return new ETHProtocol();
+  }
+  throw new Error(`Unkonw protocol: ${name}`);
+}
 
 declare interface MsgQueue {
   on(event: 'status', listener: (message: any) => void): this;
@@ -44,7 +58,7 @@ class MsgQueue extends EventEmitter {
     this.queue = new Channel({
       drop: (data: any) => {
         logger.warn('Peer close self:', this.peer.peerId);
-        this.peer.closeSelf();
+        this.peer.libp2pNode.removePeer(this.peer);
       }
     });
   }
@@ -55,7 +69,7 @@ class MsgQueue extends EventEmitter {
 
   private makeContext(): MsgContext {
     return {
-      node: this.peer.node.node,
+      node: this.peer.libp2pNode.node,
       peer: this.peer,
       protocol: this.protocol
     };
@@ -99,7 +113,7 @@ class MsgQueue extends EventEmitter {
       if (value !== undefined) {
         yield value;
       } else {
-        return { length: 0 };
+        return [];
       }
     }
   }
@@ -182,7 +196,7 @@ export declare interface Peer {
 
 export class Peer extends EventEmitter {
   readonly peerId: string;
-  readonly node: Libp2pNode;
+  readonly libp2pNode: Libp2pNode;
   private queueMap = new Map<string, MsgQueue>();
   private knowTxs = createBufferFunctionalSet();
   private knowBlocks = createBufferFunctionalSet();
@@ -194,10 +208,10 @@ export class Peer extends EventEmitter {
   private newBlockAnnouncesQueue: Channel<{ block: Block; td: BN }>;
   private txAnnouncesQueue: Channel<Buffer>;
 
-  constructor(options: { peerId: string; node: Libp2pNode }) {
+  constructor(options: { peerId: string; libp2pNode: Libp2pNode }) {
     super();
     this.peerId = options.peerId;
-    this.node = options.node;
+    this.libp2pNode = options.libp2pNode;
     this.newBlockAnnouncesQueue = new Channel<{ block: Block; td: BN }>({ max: 1 });
     this.txAnnouncesQueue = new Channel<Buffer>();
     this.newBlockAnnouncesLoop();
@@ -247,12 +261,11 @@ export class Peer extends EventEmitter {
       }
       this.newPooledTransactionHashes(hashesCache);
       hashesCache = [];
-      // TODO: remove sleep.
-      await new Promise((r) => setTimeout(r, 100));
     }
   }
 
-  private makeQueue(protocol: Protocol) {
+  private makeMsgQueue(name: string) {
+    const protocol = makeProtocol(name);
     const queue = new MsgQueue(this, protocol);
     queue.on('status', (message) => {
       this.emit(`status:${queue.name}`, message, protocol);
@@ -261,10 +274,10 @@ export class Peer extends EventEmitter {
       this.emit('error', err);
     });
     this.queueMap.set(queue.name, queue);
-    return queue;
+    return { queue, protocol };
   }
 
-  private getQueue(name: string) {
+  private getMsgQueue(name: string) {
     const queue = this.queueMap.get(name);
     if (!queue) {
       throw new Error(`Peer unkonw name: ${name}`);
@@ -296,10 +309,6 @@ export class Peer extends EventEmitter {
     return this.filterHash(this.knowBlocks, 1024, data, toHash);
   }
 
-  closeSelf() {
-    this.node.removePeer(this);
-  }
-
   async abort() {
     this.newBlockAnnouncesQueue.abort();
     this.txAnnouncesQueue.abort();
@@ -309,7 +318,7 @@ export class Peer extends EventEmitter {
 
   isSupport(name: string): boolean {
     try {
-      const status = this.getQueue(name).protocol.status;
+      const status = this.getMsgQueue(name).protocol.status;
       return status !== undefined;
     } catch (err) {
       return false;
@@ -318,33 +327,29 @@ export class Peer extends EventEmitter {
 
   getStatus(name: string): any {
     try {
-      return this.getQueue(name).protocol.status;
+      return this.getMsgQueue(name).protocol.status;
     } catch (err) {}
   }
 
   send(name: string, method: string, message: any) {
-    this.getQueue(name).send(method, message);
+    this.getMsgQueue(name).send(method, message);
   }
 
   request(name: string, method: string, message: any) {
-    return this.getQueue(name).request(method, message);
+    return this.getMsgQueue(name).request(method, message);
   }
 
-  async acceptProtocol(stream: any, protocol: Protocol, status: any): Promise<boolean> {
-    const queue = this.makeQueue(protocol);
+  async acceptProtocol(stream: any, name: string, status: any): Promise<boolean> {
+    const { queue, protocol } = this.makeMsgQueue(name);
     queue.pipeStream(stream);
     return await protocol.handshake(this, status);
   }
 
-  async installProtocol(p2p: any, peerInfo: PeerId, protocol: Protocol, status: any): Promise<boolean> {
-    const { stream } = await p2p.dialProtocol(peerInfo, protocol.protocolString);
-    const queue = this.makeQueue(protocol);
+  async installProtocol(peerId: PeerId, name: string, status: any): Promise<boolean> {
+    const { queue, protocol } = this.makeMsgQueue(name);
+    const { stream } = await this.libp2pNode.dialProtocol(peerId, protocol.protocolString);
     queue.pipeStream(stream);
     return await protocol.handshake(this, status);
-  }
-
-  async installProtocols(p2p: any, peerInfo: PeerId, protocols: Protocol[], status: any) {
-    await Promise.all(protocols.map((p) => this.installProtocol(p2p, peerInfo, p, status)));
   }
 
   //////////// Protocol method ////////////

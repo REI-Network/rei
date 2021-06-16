@@ -5,24 +5,15 @@ import KadDHT from 'libp2p-kad-dht';
 import TCP from 'libp2p-tcp';
 import secio from 'libp2p-secio';
 import Bootstrap from 'libp2p-bootstrap';
-import { constants } from '@gxchain2/common';
 import { logger } from '@gxchain2/utils';
 import { Peer } from './peer';
-import { Protocol, ETHProtocol } from './protocol';
 import { INode } from './types';
 const Libp2p = require('libp2p');
-
-function parseProtocol(name: string): Protocol {
-  if (name === constants.GXC2_ETHWIRE) {
-    return new ETHProtocol();
-  }
-  throw new Error(`Unkonw protocol: ${name}`);
-}
 
 export interface Libp2pNodeOptions {
   node: INode;
   peerId: PeerId;
-  protocols: Set<string>;
+  protocols: string[];
   datastore: any;
   tcpPort?: number;
   wsPort?: number;
@@ -40,9 +31,8 @@ export declare interface Libp2pNode {
 export class Libp2pNode extends Libp2p {
   readonly node: INode;
   private readonly peers = new Map<string, Peer>();
-  private readonly protocols: Protocol[];
+  private readonly protocols: string[];
   private readonly banned = new Map<string, number>();
-  private started: boolean = false;
 
   constructor(options: Libp2pNodeOptions) {
     super({
@@ -88,7 +78,7 @@ export class Libp2pNode extends Libp2p {
     });
 
     this.node = options.node;
-    this.protocols = Array.from(options.protocols.values()).map((p) => parseProtocol(p));
+    this.protocols = options.protocols;
   }
 
   getPeer(peerId: string) {
@@ -100,7 +90,7 @@ export class Libp2pNode extends Libp2p {
   }
 
   private createPeer(peerInfo: PeerId) {
-    const peer = new Peer({ peerId: peerInfo.toB58String(), node: this });
+    const peer = new Peer({ peerId: peerInfo.toB58String(), libp2pNode: this });
     this.peers.set(peer.peerId, peer);
     return peer;
   }
@@ -110,18 +100,18 @@ export class Libp2pNode extends Libp2p {
     if (peer) {
       this.peers.delete(peer.peerId);
       this.emit('disconnected', peer);
-      peer.abort();
+      await peer.abort();
     }
   }
 
   async init() {
     this.protocols.forEach((protocol) => {
-      this.handle(protocol.protocolString, async ({ connection, stream }) => {
+      this.handle(protocol, async ({ connection, stream }) => {
         try {
           const peerId: PeerId = connection.remotePeer;
           const id = peerId.toB58String();
           const peer = this.peers.get(id);
-          if (peer && (await peer.acceptProtocol(stream, protocol.copy(), this.node.status))) {
+          if (peer && (await peer.acceptProtocol(stream, protocol, this.node.status))) {
             logger.info('💬 Peer handled:', peer.peerId);
             this.emit('connected', peer);
           }
@@ -137,13 +127,13 @@ export class Libp2pNode extends Libp2p {
           return;
         }
         const peer = this.createPeer(peerId);
-        const results = await Promise.all(this.protocols.map((protocol) => peer.installProtocol(this, peerId, protocol.copy(), this.node.status)));
+        const results = await Promise.all(this.protocols.map((protocol) => peer.installProtocol(peerId, protocol, this.node.status)));
         if (results.reduce((a, b) => a || b, false)) {
           logger.info('💬 Peer discovered:', peer.peerId);
           this.emit('connected', peer);
         }
       } catch (err) {
-        this.removePeer(id);
+        await this.removePeer(id);
         this.emit('error', err);
       }
     });
@@ -158,10 +148,10 @@ export class Libp2pNode extends Libp2p {
         this.emit('error', err);
       }
     });
-    this.connectionManager.on('peer:disconnect', (connect) => {
+    this.connectionManager.on('peer:disconnect', async (connect) => {
       try {
         const id = connect.remotePeer.toB58String();
-        this.removePeer(id);
+        await this.removePeer(id);
         logger.info('🤐 Peer disconnected:', id);
       } catch (err) {
         this.emit('error', err);
@@ -174,8 +164,6 @@ export class Libp2pNode extends Libp2p {
     this.multiaddrs.forEach((ma) => {
       logger.info(ma.toString() + '/p2p/' + this.peerId!.toB58String());
     });
-
-    this.started = true;
   }
 
   ban(peerId: string, maxAge = 60000): boolean {
@@ -200,7 +188,6 @@ export class Libp2pNode extends Libp2p {
       await Promise.all(Array.from(this.peers.values()).map((peer) => peer.abort()));
       this.peers.clear();
       await this.stop();
-      this.started = false;
     }
   }
 }

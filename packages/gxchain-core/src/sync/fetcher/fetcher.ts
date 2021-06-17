@@ -97,7 +97,7 @@ export class Fetcher {
       if (this.abortFlag) {
         return;
       }
-      const peer = this.node.peerpool.getPeer(peerId);
+      const peer = this.node.networkMngr.getPeer(peerId);
       if (!peer) {
         this.abort();
         return;
@@ -135,7 +135,7 @@ export class Fetcher {
   }
 
   private findIdlePeer(uselessPeer: Set<string>, height: number) {
-    const peers = this.node.peerpool.peers.filter((p) => p.bodiesIdle && p.isSupport(GXC2_ETHWIRE) && p.getStatus(GXC2_ETHWIRE).height >= height && !uselessPeer.has(p.peerId));
+    const peers = this.node.networkMngr.peers.filter((p) => p.bodiesIdle && p.isSupport(GXC2_ETHWIRE) && p.getStatus(GXC2_ETHWIRE).height >= height && !uselessPeer.has(p.peerId));
     let peer: Peer | undefined;
     if (peers.length === 1) {
       peer = peers[0];
@@ -169,7 +169,7 @@ export class Fetcher {
         }, 3000);
         peer = await new Promise<Peer | undefined>((resolve) => {
           this.idlePeerResolve = resolve;
-          this.node.peerpool.on('idle', () => {
+          this.node.networkMngr.on('idle', () => {
             const newPeer = this.findIdlePeer(uselessPeer, headers[headers.length - 1].number.toNumber());
             if (newPeer) {
               resolve(newPeer);
@@ -178,7 +178,7 @@ export class Fetcher {
         });
         clearTimeout(timeout);
         this.idlePeerResolve = undefined;
-        this.node.peerpool.removeAllListeners('idle');
+        this.node.networkMngr.removeAllListeners('idle');
         if (peer === undefined) {
           this.abort();
           continue;

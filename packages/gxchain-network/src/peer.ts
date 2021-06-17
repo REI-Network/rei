@@ -6,7 +6,7 @@ import { Transaction } from '@gxchain2/tx';
 import { constants } from '@gxchain2/common';
 import pipe from 'it-pipe';
 import type PeerId from 'peer-id';
-import { Protocol, ETHProtocol } from './protocol';
+import { Protocol, makeProtocol } from './protocol';
 import { Libp2pNode } from './libp2pnode';
 import type { INode } from './types';
 
@@ -19,13 +19,6 @@ export type MsgContext = {
   peer: Peer;
   protocol: Protocol;
 };
-
-function makeProtocol(name: string): Protocol {
-  if (name === constants.GXC2_ETHWIRE) {
-    return new ETHProtocol();
-  }
-  throw new Error(`Unkonw protocol: ${name}`);
-}
 
 declare interface MsgQueue {
   on(event: 'status', listener: (message: any) => void): this;
@@ -69,7 +62,7 @@ class MsgQueue extends EventEmitter {
 
   private makeContext(): MsgContext {
     return {
-      node: this.peer.libp2pNode.node,
+      node: this.peer.node,
       peer: this.peer,
       protocol: this.protocol
     };
@@ -196,6 +189,7 @@ export declare interface Peer {
 
 export class Peer extends EventEmitter {
   readonly peerId: string;
+  readonly node: INode;
   readonly libp2pNode: Libp2pNode;
   private queueMap = new Map<string, MsgQueue>();
   private knowTxs = createBufferFunctionalSet();
@@ -208,9 +202,10 @@ export class Peer extends EventEmitter {
   private newBlockAnnouncesQueue: Channel<{ block: Block; td: BN }>;
   private txAnnouncesQueue: Channel<Buffer>;
 
-  constructor(options: { peerId: string; libp2pNode: Libp2pNode }) {
+  constructor(options: { peerId: string; libp2pNode: Libp2pNode; node: INode }) {
     super();
     this.peerId = options.peerId;
+    this.node = options.node;
     this.libp2pNode = options.libp2pNode;
     this.newBlockAnnouncesQueue = new Channel<{ block: Block; td: BN }>({ max: 1 });
     this.txAnnouncesQueue = new Channel<Buffer>();
@@ -314,6 +309,7 @@ export class Peer extends EventEmitter {
     this.txAnnouncesQueue.abort();
     await Promise.all(Array.from(this.queueMap.values()).map((queue) => queue.abort()));
     this.queueMap.clear();
+    this.removeAllListeners();
   }
 
   isSupport(name: string): boolean {

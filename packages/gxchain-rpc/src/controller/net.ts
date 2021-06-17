@@ -9,6 +9,6 @@ export class NetController extends Controller {
     return true;
   }
   net_peerCount() {
-    return bufferToHex(toBuffer(this.node.peerpool.peers.length));
+    return bufferToHex(toBuffer(this.node.networkMngr.peers.length));
   }
 }

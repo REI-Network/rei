@@ -39,7 +39,7 @@ const handler: {
 } = {
   add: (node: Node, peerId: string) => {
     const pos = peerId.indexOf('/p2p/');
-    node.peerpool.nodes[0].peerStore.addressBook.set(PeerId.createFromB58String(peerId.substr(pos + 5)), [new Multiaddr(peerId.substr(0, pos))]);
+    (node.networkMngr as any).libp2pNode.peerStore.addressBook.set(PeerId.createFromB58String(peerId.substr(pos + 5)), [new Multiaddr(peerId.substr(0, pos))]);
   },
   // batch add.
   ba: (node: Node, peerIds: string) => {
@@ -48,7 +48,7 @@ const handler: {
     }
   },
   send: (node: Node, peerId: string, message: string) => {
-    const peer = node.peerpool.getPeer(peerId);
+    const peer = node.networkMngr.getPeer(peerId);
     if (peer) {
       peer.send(constants.GXC2_ETHWIRE, 'Echo', message);
     } else {
@@ -56,7 +56,7 @@ const handler: {
     }
   },
   lsp2p: (node: Node) => {
-    for (const peer of node.peerpool.peers) {
+    for (const peer of node.networkMngr.peers) {
       logger.info(peer.peerId);
     }
   },

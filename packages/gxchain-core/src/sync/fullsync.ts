@@ -76,7 +76,7 @@ export class FullSynchronizer extends Synchronizer {
         }
       } else {
         this.bestTD = this.node.blockchain.totalDifficulty;
-        for (const peer of this.node.peerpool.peers) {
+        for (const peer of this.node.networkMngr.peers) {
           const remoteStatus = peer.getStatus(constants.GXC2_ETHWIRE);
           if (!remoteStatus) {
             continue;
@@ -130,11 +130,11 @@ export class FullSynchronizer extends Synchronizer {
   // TODO: this method should be removed.
   banPeer(peer: Peer, reason: 'invalid' | 'timeout' | 'error') {
     if (reason === 'invalid') {
-      this.node.peerpool.ban(peer, this.invalidBanTime);
+      this.node.networkMngr.ban(peer, this.invalidBanTime);
     } else if (reason === 'error') {
-      this.node.peerpool.ban(peer, this.errorBanTime);
+      this.node.networkMngr.ban(peer, this.errorBanTime);
     } else {
-      this.node.peerpool.ban(peer, this.timeoutBanTime);
+      this.node.networkMngr.ban(peer, this.timeoutBanTime);
     }
   }
 

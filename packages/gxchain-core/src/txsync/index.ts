@@ -310,7 +310,7 @@ export class TxFetcher extends EventEmitter {
 
       if (hashes.length > 0) {
         this.requests.set(peer, { hashes });
-        const p = this.node.peerpool.getPeer(peer);
+        const p = this.node.networkMngr.getPeer(peer);
         if (!p) {
           this.dropPeer(peer);
         } else {

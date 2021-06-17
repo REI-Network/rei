@@ -4,9 +4,8 @@ import type { LevelUp } from 'levelup';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
-import LevelStore from 'datastore-level';
 import { Database, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchain2/database';
-import { Libp2pNode, PeerPool } from '@gxchain2/network';
+import { NetworkManager } from '@gxchain2/network';
 import { Common, constants, getGenesisState, getChain } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { StateManager } from '@gxchain2/state-manager';
@@ -69,7 +68,7 @@ export class Node {
   public readonly aborter = new Aborter();
 
   public db!: Database;
-  public peerpool!: PeerPool;
+  public networkMngr!: NetworkManager;
   public blockchain!: Blockchain;
   public sync!: Synchronizer;
   public txPool!: TxPool;
@@ -188,8 +187,7 @@ export class Node {
     });
     await this.blockchain.init();
 
-    this.sync = new FullSynchronizer({ node: this });
-    this.sync
+    this.sync = new FullSynchronizer({ node: this })
       .on('error', (err) => {
         logger.error('Sync error:', err);
       })
@@ -210,29 +208,13 @@ export class Node {
       fs.writeFileSync(path.join(options.databasePath, 'peer-key'), peerId.privKey.bytes);
     }
 
-    const datastore = new LevelStore(path.join(options.databasePath, 'networkdb'), { createIfMissing: true });
-    await datastore.open();
-    this.peerpool = new PeerPool({
-      nodes: await Promise.all(
-        [
-          new Libp2pNode({
-            node: this,
-            peerId,
-            protocols: new Set<string>([constants.GXC2_ETHWIRE]),
-            tcpPort: options?.p2p?.tcpPort,
-            wsPort: options?.p2p?.wsPort,
-            bootnodes: options?.p2p?.bootnodes,
-            datastore
-          })
-        ].map(
-          (n) => new Promise<Libp2pNode>((resolve) => n.init().then(() => resolve(n)))
-        )
-      )
-    });
-    this.peerpool
-      .on('error', (err) => {
-        logger.error('Peer pool error:', err);
-      })
+    this.txSync = new TxFetcher(this);
+    this.networkMngr = new NetworkManager({
+      node: this,
+      peerId,
+      dbPath: path.join(options.databasePath, 'networkdb'),
+      ...options?.p2p
+    })
       .on('added', (peer) => {
         const status = peer.getStatus(constants.GXC2_ETHWIRE);
         if (status && status.height !== undefined) {
@@ -243,11 +225,11 @@ export class Node {
       .on('removed', (peer) => {
         this.txSync.dropPeer(peer.peerId);
       });
+    await this.networkMngr.init();
 
     this.sync.start();
     this.miner = new Miner(this, options.mine);
     await this.txPool.init();
-    this.txSync = new TxFetcher(this);
     this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: constants.BloomBitsBlocks, confirmsBlockNumber: constants.ConfirmsBlockNumber });
     await this.bloomBitsIndexer.init();
     this.bcMonitor = new BlockchainMonitor(this);
@@ -330,7 +312,7 @@ export class Node {
               const hashes = Array.from(readies.values())
                 .reduce((a, b) => a.concat(b), [])
                 .map((tx) => tx.hash());
-              for (const peer of this.peerpool.peers) {
+              for (const peer of this.networkMngr.peers) {
                 if (peer.isSupport(constants.GXC2_ETHWIRE)) {
                   peer.announceTx(hashes);
                 }
@@ -345,7 +327,7 @@ export class Node {
         } else if (task instanceof NewBlockTask) {
           const { block } = task;
           const td = await this.db.getTotalDifficulty(block.hash(), block.header.number);
-          for (const peer of this.peerpool.peers) {
+          for (const peer of this.networkMngr.peers) {
             if (peer.isSupport(constants.GXC2_ETHWIRE)) {
               peer.announceNewBlock(block, td);
             }
@@ -395,7 +377,7 @@ export class Node {
     this.taskQueue.abort();
     this.processQueue.abort();
     await this.aborter.abort();
-    await this.peerpool.abort();
+    await this.networkMngr.abort();
     await this.bloomBitsIndexer.abort();
     await this.txPool.abort();
     await this.taskLoopPromise;

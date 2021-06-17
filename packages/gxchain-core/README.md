@@ -4,7 +4,15 @@
 ![License](https://img.shields.io/npm/l/@gxchain2/core)
 
 
-The core logic of blockchain node, including blockchain monitor, bloombit and index,  mine blockes, sync blockes, sync transactions and trancer. 
+The core logic of blockchain node, including:
+- `blockchain monitor` Listening on events from blockchain:
+   - `logs` For new block 
+   - `removedLogs` For block rollback
+- `bloombit and index` Index for blockes and transactions
+- `miner and woker` Mine blockes
+- `sync blockes` Sync blockes
+- `sync transactions` Sync transactions
+- `trancer` For debug
 
 ## INSTALL
 
@@ -16,12 +24,20 @@ npm install @gxchain2/core
 
 ```ts
 const node = new Node({
-    databasePath: opts.datadir,
-    chain: opts.chain,
-    mine,
-    p2p,
-    account
-  });
+  databasePath:"path/to/database",
+  chain: "gxc2-mainnet",
+  mine:{
+    coinbase:"0xd1e52f6eacbb95f5f8512ff129cbd6360e549b0b",
+    gasLimit:"21000"
+  }
+  p2p:{
+    bootnodes:[/ip4/127.0.0.1/tcp/41115/p2p/12D3KooWMWg2wU3fzqVR1bGcuVhSqNtPp8ugB3XAzfFtci7ywVgK]
+  },
+  account:{
+    keyStorePath:"path/to/keystore",
+    unlock:[["d1e52f6eacbb95f5f8512ff129cbd6360e549b0b",privatekey]]
+  }
+});
 ```
 
 ## License

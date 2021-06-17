@@ -4,7 +4,7 @@
 ![License](https://img.shields.io/npm/l/@gxchain2/blockchain)
 
 
- Definition of blockchain structure and rules, based on `@ethereumjs/blockchain`.
+ Definition of blockchain structure and rules, based on `@ethereumjs/blockchain`, fixed the incorrect calculation of total difficult difficulty under clique consensus,optimized the function to get the latest block `latestBlock`.
 
 ## INSTALL
 
@@ -13,14 +13,14 @@ npm install @gxchain2/blockchain
 ```
 
 ## USAGE
-
 ```ts
 blockchain = new Blockchain({
-      db: rawdb,
-      database: db,
-      common,
-      genesisBlock
-    });
+  db: rawdb,
+  database: db,
+  common,
+  genesisBlock
+});
+console.log(blockchain.latestBlock());
 ```
 
 ## License

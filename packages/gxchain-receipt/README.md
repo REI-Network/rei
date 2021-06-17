@@ -14,7 +14,13 @@ npm install @gxchain2/receipt
 ## USAGE
 
 ```ts
-const txReceipt = new Receipt(gasUsed, txRes.bloom.bitvector, txRes.execResult, txRes.execResult.exceptionError ? 0 : 1);
+const txReceipt = new Receipt(
+    gasUsed, //Gas used in transaction
+    bloom, // index of bloom filter
+    logs, // The result of execution transactionx
+    1 //transaction's state 
+);
+console.log(txReceipt.toRPCJSON());
 ```
 
 ## License

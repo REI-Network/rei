@@ -4,7 +4,11 @@
 ![License](https://img.shields.io/npm/l/@gxchain2/utils)
 
 
-Utils includes the commonly used classes in the program,  `abort`, `channel`, `compress`, `functionalmap`.
+Utils includes the commonly used classes in the program:
+- `abort` Aborter is a interrupt class used to terminate the module.
+- `channel` Used to cache data, arranged in order.
+- `compress` Functions used to compress and decompress data.
+- `functionalmap` The key of map could be an object.
 
 ## INSTALL
 
@@ -15,8 +19,13 @@ npm install @gxchain2/utils
 ## USAGE
 
 ```ts
-aborter = new Aborter();
-bufferToburffer = createBufferFunctionalMap<Buffer>()
+const aborter = new Aborter();
+const channel = new HChannel<BlockHeader>({
+    compare: (a, b) => a.number.lt(b.number);
+});
+const dataAfter = compressBytes(data);
+const dataBefore = decompressBytes(dataAfter,data.length);
+const bufferToburffer = createBufferFunctionalMap<Buffer>()
 ```
 
 ## License

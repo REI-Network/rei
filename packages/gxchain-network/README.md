@@ -15,13 +15,13 @@ npm install @gxchain2/network
 
 ```ts
 new Libp2pNode({
-            node: node,
-            peerId,
-            protocols: new Set<string>([constants.GXC2_ETHWIRE]),
-            tcpPort: options.p2p.tcpPort,
-            wsPort: options.p2p.wsPort,
-            bootnodes: options.p2p.bootnodes
-          })
+  node: node,
+  peerId,
+  protocols: new Set<string>([constants.GXC2_ETHWIRE]),
+  tcpPort: options.p2p.tcpPort,
+  wsPort: options.p2p.wsPort,
+  bootnodes: options.p2p.bootnodes
+})
 ```
 
 ## License

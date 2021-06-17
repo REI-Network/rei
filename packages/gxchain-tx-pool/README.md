@@ -5,6 +5,7 @@
 
 
 Tx-pool has functions can be summarized as: transaction caching, transaction verification and transaction filtering.
+It has event `readies` for transaction from queue into pending.
 
 ## INSTALL
 
@@ -15,7 +16,14 @@ npm install @gxchain2/tx-pool
 ## USAGE
 
 ```ts
-txPool = new TxPool({ node: this as any, journal: options.databasePath });
+txPool = new TxPool(
+{ 
+    node: node, 
+    journal: "path/to/jornal"
+});
+txPool.newBlock(block);
+txPool.addTxs(transaction);
+txPool.getPooledTransactionHashes();
 ```
 
 ## License

@@ -15,7 +15,8 @@ npm install @gxchain2/tx
 ## USAGE
 
 ```ts
-const wtx = new WrappedTransaction(transaction)
+const wtx = new WrappedTransaction(transaction);
+console.log(wtx.toRPCJSON());
 ```
 
 ## License

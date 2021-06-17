@@ -4,7 +4,10 @@
 ![License](https://img.shields.io/npm/l/@gxchain2/common)
 
 
-The basic settings of gxchain2,based on '@ethereumjs/common' including parameters of the mainnet and testnet: genesis states, Gxchain2 Improvement Proposal, and hardforks.
+The basic settings of gxchain2, based on '@ethereumjs/common' including parameters of the mainnet and testnet: 
+- `Genesis states`  
+- `GIP` Gxchain2 Improvement Proposal
+- `Hardfork`
 
 ## INSTALL
 
@@ -15,8 +18,18 @@ npm install @gxchain2/common
 ## USAGE
 
 ```ts
+//common生成三种情况，string number objcet
 common = Common.createChainStartCommon(chain);
-Common.createCommonByBlockNumber(num, typeof this.chain === 'string' ? this.chain : this.chain.chain);
+Common.createCommonByBlockNumber(0,5);
+Common.createCommonByBlockNumber(0,"Goerli");
+Common.createCommonByBlockNumber(0,
+  {
+    chain:"gxc2-mainnet",
+    eips:[10001],
+    hardfork:"byzantium",
+    customChains:[]
+  }
+);
 ```
 
 ## License

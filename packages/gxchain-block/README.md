@@ -5,7 +5,6 @@
 
 
  Definition of block structure, based on `@ethereumjs/block`. Added class `WrappedBlock`and logic about `toRPCJSON`.
-
 ## INSTALL
 
 ```sh
@@ -15,7 +14,8 @@ npm install @gxchain2/block
 ## USAGE
 
 ```ts
-new WrappedBlock(block,true);
+const wrappedblock = new WrappedBlock(block,true);
+console.log(wrappedblock.toRPCJson());
 ```
 
 ## License

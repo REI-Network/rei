@@ -16,7 +16,10 @@ npm install @gxchain2/tx
 
 ```ts
 const wtx = new WrappedTransaction(transaction);
+
 console.log(wtx.toRPCJSON());
+
+console.log(wtx.size); // log the wrappedtransaction's size
 ```
 
 ## License

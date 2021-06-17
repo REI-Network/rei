@@ -14,8 +14,11 @@ npm install @gxchain2/block
 ## USAGE
 
 ```ts
-const wrappedblock = new WrappedBlock(block,true);
-console.log(wrappedblock.toRPCJson());
+const wrappedblock = new WrappedBlock(block, true);
+
+wrappedblock.size();
+
+console.log(wrappedblock.toRPCJSON());
 ```
 
 ## License

@@ -21,9 +21,12 @@ txPool = new TxPool(
     node: node, 
     journal: "path/to/jornal"
 });
-txPool.newBlock(block);
-txPool.addTxs(transaction);
-txPool.getPooledTransactionHashes();
+
+txPool.newBlock(block); //new block with block message
+
+txPool.addTxs(transaction); // add a transaction into pool
+
+txPool.getPooledTransactionHashes(); // get transactions in pool
 ```
 
 ## License

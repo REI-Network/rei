@@ -5,9 +5,12 @@
 
 
 Utils includes the commonly used classes in the program:
-- `abort` Aborter is a interrupt class used to terminate the module.
-- `channel` Used to cache data, arranged in order.
+- `Aborter` Aborter is a interrupt class used to terminate the module.
+  
+- channel: Used to cache data, arranged in order, including `Channel`, `HChannel`, `PChannel`
+  
 - `compress` Functions used to compress and decompress data.
+  
 - `functionalmap` The key of map could be an object.
 
 ## INSTALL
@@ -20,12 +23,25 @@ npm install @gxchain2/utils
 
 ```ts
 const aborter = new Aborter();
+aborter.reset();                 // reset the aborter
+console.log(aborter.reason);     
+console.log(aborter.isAborted)   // get the aborter's state
+aborter.abort();                 // abort the aborter
+
 const channel = new HChannel<BlockHeader>({
     compare: (a, b) => a.number.lt(b.number);
 });
-const dataAfter = compressBytes(data);
-const dataBefore = decompressBytes(dataAfter,data.length);
-const bufferToburffer = createBufferFunctionalMap<Buffer>()
+channel.push(data as BlockHeader) // push data into channel
+channel.clear()                   // clear the channel
+
+const dataAfter = compressBytes(data); //compress the data 
+const dataBefore = decompressBytes(dataAfter,data.length); //decompress the data
+
+const bufferTobuffer = createBufferFunctionalMap<Buffer>()
+bufferTobuffer.keys()   // get keys from the map
+bufferTobuffer.values() // get values from the map
+bufferTobuffer.set(buffer, buffer); //set key and value into map
+bufferTobuffer.get(buffer) // get value from map
 ```
 
 ## License

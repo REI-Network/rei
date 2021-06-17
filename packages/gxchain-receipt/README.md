@@ -17,7 +17,7 @@ npm install @gxchain2/receipt
 const txReceipt = new Receipt(
     gasUsed, //Gas used in transaction
     bloom, // index of bloom filter
-    logs, // The result of execution transactionx
+    logs, // The result of executing transaction
     1 //transaction's state 
 );
 console.log(txReceipt.toRPCJSON());

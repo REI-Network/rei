@@ -5,14 +5,21 @@
 
 
 The core logic of blockchain node, including:
-- `blockchain monitor` Listening on events from blockchain:
-   - `logs` For new block 
-   - `removedLogs` For block rollback
-- `bloombit and index` Index for blockes and transactions
-- `miner and woker` Mine blockes
-- `sync blockes` Sync blockes
-- `sync transactions` Sync transactions
-- `trancer` For debug
+- `BlockchainMonitor` contains several events
+  
+   - logs: When a new transaction's log is generated, respond.
+   - removedLogs: When the transaction rolled back, respond.
+   - newHeads: Respond to the new blockHeads.
+  
+- `ChainIndexer` and `BloomBitsFilter` : Index of chain and Bloom filter to find blocks and transactions.
+  
+- `Miner` and `Woker` : Calculate and generate blocks.
+  
+- `Fetcher` : Sync blockes from other nodes in the network.
+  
+- `TxFetcher` : Sync transactions from other nodes in the network.
+  
+- `Tracer` : Trace blocks and transactions to debug the program.
 
 ## INSTALL
 

@@ -5,10 +5,16 @@
 
 
 Rpc call interface of websocket and http.
-- `debug` Dangerous, public nodes should not be opened
-- `eth` Basic call interface
-- `net` Interface for network
-- `txpool` Interface for transactions' pool
+- `DebugController`: Debug interface, for tracing blocks and transactions, for example: *debug_traceBlock*, *debug_traceTransaction* *...etc*.
+
+  **warning**: this interface is dangerous, public nodes should not open
+
+- `ETHController` Basic call interface, to get messages of blockchain, for example: *eth_coinbase*, *eth_gasPrice* *...etc*.
+
+- `NetController` Interface to get network state, for example: *net_version*, *net_listenging* *...etc*.
+  
+- `txpool` Interface to get txpool state.
+  
 - `web3` Web3 compatible interface
 
 ## INSTALL

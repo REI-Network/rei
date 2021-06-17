@@ -5,9 +5,11 @@
 
 
 The basic settings of gxchain2, based on '@ethereumjs/common' including parameters of the mainnet and testnet: 
-- `Genesis states`  
-- `GIP` Gxchain2 Improvement Proposal
-- `Hardfork`
+- `genesisStates` Initial state of the chain
+  
+- GIP Gxchain2 Improvement Proposal
+  
+- `hardforks` Fork information of the chain
 
 ## INSTALL
 
@@ -18,11 +20,11 @@ npm install @gxchain2/common
 ## USAGE
 
 ```ts
-//common生成三种情况，string number objcet
+
 common = Common.createChainStartCommon(chain);
-Common.createCommonByBlockNumber(0,5);
-Common.createCommonByBlockNumber(0,"Goerli");
-Common.createCommonByBlockNumber(0,
+Common.createCommonByBlockNumber(0, 5);        // create with chianID
+Common.createCommonByBlockNumber(0, "goerli"); // create with chian name
+Common.createCommonByBlockNumber(0,           // create with object containing chain information
   {
     chain:"gxc2-mainnet",
     eips:[10001],

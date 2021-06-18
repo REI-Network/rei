@@ -3,7 +3,7 @@ import path from 'path';
 import Semaphore from 'semaphore-async-await';
 import { TransactionFactory, TypedTransaction } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
-import { INode } from './index';
+import { Node } from '../node';
 
 const bufferSplit = Buffer.from('\r\n');
 
@@ -12,8 +12,8 @@ export class Journal {
   private dir: string;
   private lock = new Semaphore(1);
   private writer?: fs.WriteStream;
-  private readonly node: INode;
-  constructor(dir: string, node: INode) {
+  private readonly node: Node;
+  constructor(dir: string, node: Node) {
     this.dir = dir;
     this.path = path.join(dir, 'transactions.rlp');
     this.node = node;

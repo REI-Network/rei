@@ -14,9 +14,7 @@
     },
     "dependencies": {
         "@gxchain2/block": "^0.0.2-alpha.0",
-        "@gxchain2/blockchain": "^0.0.2-alpha.0",
         "@gxchain2/common": "^0.0.2-alpha.0",
-        "@gxchain2/database": "^0.0.2-alpha.0",
         "@gxchain2/tx": "^0.0.2-alpha.0",
         "@gxchain2/utils": "^0.0.2-alpha.0",
         "datastore-level": "^5.0.1",
@@ -31,7 +29,6 @@
         "libp2p-secio": "^0.13.1",
         "libp2p-tcp": "^0.15.1",
         "libp2p-websockets": "^0.14.0",
-        "peer-id": "^0.14.2",
-        "uint8arrays": "^1.1.0"
+        "peer-id": "^0.14.2"
     }
 }

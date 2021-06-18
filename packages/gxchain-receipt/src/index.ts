@@ -1,5 +1,4 @@
 import { rlp, toBuffer, unpadBuffer, bufferToInt, BN, bufferToHex, bnToHex, intToHex, generateAddress } from 'ethereumjs-util';
-
 import { Block } from '@gxchain2/block';
 import { TypedTransaction } from '@gxchain2/tx';
 

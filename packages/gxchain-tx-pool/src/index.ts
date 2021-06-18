@@ -4,9 +4,7 @@ import Heap from 'qheap';
 import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Aborter, logger } from '@gxchain2/utils';
 import { TxFromValuesArray, TypedTransaction, WrappedTransaction, calculateIntrinsicGas } from '@gxchain2/tx';
 import { StateManager } from '@gxchain2/state-manager';
-import { Blockchain } from '@gxchain2/blockchain';
 import { BlockHeader, Block, BlockBodyBuffer } from '@gxchain2/block';
-import { Database } from '@gxchain2/database';
 import { Common } from '@gxchain2/common';
 import { TxSortedMap } from './txmap';
 import { PendingTxMap } from './pendingmap';
@@ -14,8 +12,13 @@ import { TxPricedList } from './txpricedlist';
 import { Journal } from './journal';
 
 export interface INode {
-  db: Database;
-  blockchain: Blockchain;
+  db: {
+    getHeader(blockHash: Buffer, blockNumber: BN): Promise<BlockHeader>;
+    getBody(blockHash: Buffer, blockNumber: BN): Promise<BlockBodyBuffer>;
+  };
+  blockchain: {
+    latestBlock: Block;
+  };
   aborter: Aborter;
   miner: {
     gasLimit: BN;

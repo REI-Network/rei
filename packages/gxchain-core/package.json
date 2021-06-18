@@ -17,7 +17,6 @@
         "@gxchain2/blockchain": "^0.0.2-alpha.0",
         "@gxchain2/common": "^0.0.2-alpha.0",
         "@gxchain2/database": "^0.0.2-alpha.0",
-        "@gxchain2/interface": "^0.0.1-alpha.0",
         "@gxchain2/network": "^0.0.2-alpha.0",
         "@gxchain2/receipt": "^0.0.2-alpha.0",
         "@gxchain2/state-manager": "^0.0.2-alpha.0",
@@ -30,10 +29,7 @@
         "ethereumjs-util": "^7.0.7",
         "levelup": "^4.4.0",
         "merkle-patricia-tree": "^4.0.0",
-        "multiaddr": "^8.1.1",
         "peer-id": "^0.14.2",
-        "prompts": "^2.4.0",
-        "recast": "^0.20.4",
-        "semaphore-async-await": "^1.5.1"
+        "recast": "^0.20.4"
     }
 }

@@ -71,7 +71,7 @@ Normal node startup
 gxc2 --rpc --rpc-host 0.0.0.0
 ```
 
-[More](./packages/gxchain-cli)
+[More](./packages/cli)
 
 ## Build
 
@@ -122,52 +122,52 @@ These scripts execute lint and lint:fix respectively, to all monorepo packages.
 [structure-npm-url]: https://www.npmjs.org/package/@gxchain2/structure
 [structure-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20structure?label=issues
 [structure-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+structure"
-[blockchain-package]: ./packages/gxchain-blockchain
+[blockchain-package]: ./packages/blockchain
 [blockchain-npm-version]: https://img.shields.io/npm/v/@gxchain2/blockchain
 [blockchain-npm-url]: https://www.npmjs.org/package/@gxchain2/blockchain
 [blockchain-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20blockchain?label=issues
 [blockchain-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+blockchain"
-[cli-package]: ./packages/gxchain-cli
+[cli-package]: ./packages/cli
 [cli-npm-version]: https://img.shields.io/npm/v/@gxchain2/cli
 [cli-npm-url]: https://www.npmjs.org/package/@gxchain2/cli
 [cli-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20cli?label=issues
 [cli-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+cli"
-[vm-package]: ./packages/gxchain-vm
+[vm-package]: ./packages/vm
 [vm-npm-version]: https://img.shields.io/npm/v/@gxchain2/vm
 [vm-npm-url]: https://www.npmjs.org/package/@gxchain2/vm
 [vm-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20vm?label=issues
 [vm-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+vm"
-[utils-package]: ./packages/gxchain-utils
+[utils-package]: ./packages/utils
 [utils-npm-version]: https://img.shields.io/npm/v/@gxchain2/utils
 [utils-npm-url]: https://www.npmjs.org/package/@gxchain2/utils
 [utils-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20utils?label=issues
 [utils-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+utils"
-[core-package]: ./packages/gxchain-core
+[core-package]: ./packages/core
 [core-npm-version]: https://img.shields.io/npm/v/@gxchain2/core
 [core-npm-url]: https://www.npmjs.org/package/@gxchain2/core
 [core-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20core?label=issues
 [core-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+core"
-[common-package]: ./packages/gxchain-common
+[common-package]: ./packages/common
 [common-npm-version]: https://img.shields.io/npm/v/@gxchain2/common
 [common-npm-url]: https://www.npmjs.org/package/@gxchain2/common
 [common-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20common?label=issues
 [common-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+common"
-[database-package]: ./packages/gxchain-database
+[database-package]: ./packages/database
 [database-npm-version]: https://img.shields.io/npm/v/@gxchain2/database
 [database-npm-url]: https://www.npmjs.org/package/@gxchain2/database
 [database-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20database?label=issues
 [database-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+database"
-[network-package]: ./packages/gxchain-network
+[network-package]: ./packages/network
 [network-npm-version]: https://img.shields.io/npm/v/@gxchain2/network
 [network-npm-url]: https://www.npmjs.org/package/@gxchain2/network
 [network-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20network?label=issues
 [network-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+network"
-[rpc-package]: ./packages/gxchain-rpc
+[rpc-package]: ./packages/rpc
 [rpc-npm-version]: https://img.shields.io/npm/v/@gxchain2/rpc
 [rpc-npm-url]: https://www.npmjs.org/package/@gxchain2/rpc
 [rpc-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20rpc?label=issues
 [rpc-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+rpc"
-[wallet-package]: ./packages/gxchain-wallet
+[wallet-package]: ./packages/wallet
 [wallet-npm-version]: https://img.shields.io/npm/v/@gxchain2/wallet
 [wallet-npm-url]: https://www.npmjs.org/package/@gxchain2/wallet
 [wallet-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20wallet?label=issues

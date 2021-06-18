@@ -6,7 +6,7 @@ import Multiaddr from 'multiaddr';
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
 import { Node } from '@gxchain2/core';
 import { constants } from '@gxchain2/common';
-import { TransactionFactory } from '@gxchain2/tx';
+import { TransactionFactory } from '@gxchain2/structure';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
 import { BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
 import { startNode } from '../src/start';

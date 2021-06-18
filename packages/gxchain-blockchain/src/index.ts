@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 import { BN, Address } from 'ethereumjs-util';
 import EthereumBlockchain, { BlockchainOptions as EthereumBlockchainOptions } from '@ethereumjs/blockchain';
 import { CliqueLatestSignerStates } from '@ethereumjs/blockchain/dist/clique';
-import { Block, BlockHeader } from '@gxchain2/block';
+import { Block, BlockHeader } from '@gxchain2/structure';
 import { Database, DBSetTD, DBSetBlockOrHeader, DBSetHashToNumber, DBOp } from '@gxchain2/database';
 
 export interface BlockchainOptions extends EthereumBlockchainOptions {

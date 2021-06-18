@@ -1,7 +1,6 @@
 import { BNLike, BN } from 'ethereumjs-util';
-import { Block } from '@gxchain2/block';
 import { Aborter } from '@gxchain2/utils';
-import { TypedTransaction } from '@gxchain2/tx';
+import { TypedTransaction, Block } from '@gxchain2/structure';
 import { Common } from '@gxchain2/common';
 import { Peer } from './peer';
 

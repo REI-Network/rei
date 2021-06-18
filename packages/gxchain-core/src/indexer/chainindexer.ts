@@ -1,5 +1,5 @@
-import { BlockHeader } from '@gxchain2/block';
 import { BN } from 'ethereumjs-util';
+import { BlockHeader } from '@gxchain2/structure';
 import { Channel, logger } from '@gxchain2/utils';
 import { Node } from '../node';
 

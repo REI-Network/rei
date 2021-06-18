@@ -1,6 +1,5 @@
 import { HChannel, PChannel, getRandomIntInclusive, logger } from '@gxchain2/utils';
-import { BlockHeader, Block } from '@gxchain2/block';
-import { emptyTxTrie } from '@gxchain2/tx';
+import { emptyTxTrie, BlockHeader, Block } from '@gxchain2/structure';
 import { Node } from '../../node';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
 import { GXC2_ETHWIRE } from '@gxchain2/common/dist/constants';

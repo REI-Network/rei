@@ -1,7 +1,7 @@
 import util from 'util';
 import { Address } from 'ethereumjs-util';
 import { OpcodeList } from '@ethereumjs/vm/dist/evm/opcodes';
-import { Block } from '@gxchain2/block';
+import { Block } from '@gxchain2/structure';
 import { IDebug } from '@gxchain2/vm';
 import { hexStringToBN, hexStringToBuffer } from '@gxchain2/utils';
 import { Node } from '../node';

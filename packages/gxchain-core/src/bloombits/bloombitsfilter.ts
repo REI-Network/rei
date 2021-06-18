@@ -1,8 +1,7 @@
 import { Address, BN, keccak256 } from 'ethereumjs-util';
 import { constants } from '@gxchain2/common';
-import { Block } from '@gxchain2/block';
+import { Block, Log } from '@gxchain2/structure';
 import { createBNFunctionalMap, createBNFunctionalSet } from '@gxchain2/utils';
-import { Log } from '@gxchain2/receipt';
 import { Node } from '../node';
 
 export function calcBloomIndexes(data: Buffer) {

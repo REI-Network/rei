@@ -1,6 +1,5 @@
 import { bufferToHex } from 'ethereumjs-util';
-import { BlockHeader } from '@gxchain2/block';
-import { Log } from '@gxchain2/receipt';
+import { BlockHeader, Log } from '@gxchain2/structure';
 import { SyncingStatus, JSONRPC_VERSION } from './types';
 
 export class WsClient {

@@ -1,7 +1,7 @@
 import { bnToHex, bufferToHex, BN, Address } from 'ethereumjs-util';
 import { Block } from '@ethereumjs/block';
 import { CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@ethereumjs/block/dist/clique';
-import { txSize, WrappedTransaction } from '@gxchain2/tx';
+import { txSize, WrappedTransaction } from './transaction';
 
 export function calcCliqueDifficulty(activeSigners: Address[], signer: Address, number: BN): [boolean, BN] {
   if (activeSigners.length === 0) {

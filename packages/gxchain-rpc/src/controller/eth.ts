@@ -1,8 +1,6 @@
 import { Address, bnToHex, bufferToHex, toBuffer, hashPersonalMessage, toRpcSig, ecsign } from 'ethereumjs-util';
-import { WrappedBlock } from '@gxchain2/block';
-import { TransactionFactory, WrappedTransaction } from '@gxchain2/tx';
+import { TransactionFactory, WrappedTransaction, WrappedBlock, Log } from '@gxchain2/structure';
 import { hexStringToBuffer } from '@gxchain2/utils';
-import { Log } from '@gxchain2/receipt';
 import * as helper from '../helper';
 import { RpcContext } from '../index';
 import { Controller, CallData } from './base';

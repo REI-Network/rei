@@ -1,7 +1,6 @@
 import { Address, BN } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
-import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN } from '@gxchain2/block';
-import { calculateTransactionTrie, TypedTransaction } from '@gxchain2/tx';
+import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN, calculateTransactionTrie, TypedTransaction } from '@gxchain2/structure';
 import { PendingTxMap } from '@gxchain2/tx-pool';
 import { WrappedVM } from '@gxchain2/vm';
 import { logger } from '@gxchain2/utils';

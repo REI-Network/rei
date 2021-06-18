@@ -1,6 +1,6 @@
 import { Address, BN } from 'ethereumjs-util';
 import { Node } from '@gxchain2/core';
-import { Block, WrappedBlock } from '@gxchain2/block';
+import { Block, WrappedBlock } from '@gxchain2/structure';
 import { hexStringToBuffer, hexStringToBN, logger } from '@gxchain2/utils';
 import { StateManager } from '@gxchain2/state-manager';
 import * as helper from '../helper';

@@ -1,5 +1,5 @@
 import { hexStringToBN, hexStringToBuffer, logger, getRandomIntInclusive } from '@gxchain2/utils';
-import { Block, CLIQUE_DIFF_NOTURN } from '@gxchain2/block';
+import { Block, CLIQUE_DIFF_NOTURN } from '@gxchain2/structure';
 import { Worker } from './worker';
 import { Loop } from './loop';
 import { Node } from '../node';

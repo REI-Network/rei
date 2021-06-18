@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
 import { constants } from '@gxchain2/common';
 import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
-import { BlockHeader } from '@gxchain2/block';
+import { BlockHeader } from '@gxchain2/structure';
 import { Synchronizer, SynchronizerOptions } from './sync';
 import { Fetcher } from './fetcher';
 import { logger } from '@gxchain2/utils';

@@ -1,11 +1,10 @@
 import { EventEmitter } from 'events';
 import { BN } from 'ethereumjs-util';
-import { Channel, Aborter, createBufferFunctionalSet, logger } from '@gxchain2/utils';
-import { Block, BlockHeader } from '@gxchain2/block';
-import { Transaction } from '@gxchain2/tx';
-import { constants } from '@gxchain2/common';
 import pipe from 'it-pipe';
 import type PeerId from 'peer-id';
+import { Channel, Aborter, createBufferFunctionalSet, logger } from '@gxchain2/utils';
+import { Transaction, Block, BlockHeader } from '@gxchain2/structure';
+import { constants } from '@gxchain2/common';
 import { Protocol, makeProtocol } from './protocol';
 import { Libp2pNode } from './libp2pnode';
 import type { INode } from './types';

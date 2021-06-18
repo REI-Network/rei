@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import { TransactionFactory, TypedTransaction } from '@gxchain2/tx';
-import { INode } from './index';
-import { logger } from '@gxchain2/utils';
 import Semaphore from 'semaphore-async-await';
+import { TransactionFactory, TypedTransaction } from '@gxchain2/structure';
+import { logger } from '@gxchain2/utils';
+import { INode } from './index';
 
 const bufferSplit = Buffer.from('\r\n');
 

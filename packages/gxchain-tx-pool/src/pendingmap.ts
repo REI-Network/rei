@@ -1,5 +1,5 @@
 import Heap from 'qheap';
-import { TypedTransaction } from '@gxchain2/tx';
+import { TypedTransaction } from '@gxchain2/structure';
 import { createBufferFunctionalMap } from '@gxchain2/utils';
 
 export class PendingTxMap {

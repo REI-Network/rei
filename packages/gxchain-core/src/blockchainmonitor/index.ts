@@ -1,9 +1,7 @@
 import EventEmitter from 'events';
 import { BN } from 'ethereumjs-util';
-import { TxFromValuesArray, TypedTransaction } from '@gxchain2/tx';
-import { Block, BlockHeader, BlockBodyBuffer } from '@gxchain2/block';
+import { TxFromValuesArray, TypedTransaction, Block, BlockHeader, BlockBodyBuffer, Log } from '@gxchain2/structure';
 import { createBufferFunctionalMap, logger } from '@gxchain2/utils';
-import { Log } from '@gxchain2/receipt';
 import { Node } from '../node';
 
 // record block hash and block number for quering receipt.

@@ -1,11 +1,11 @@
 import { Address, BN, generateAddress } from 'ethereumjs-util';
-import { Block } from '@ethereumjs/block';
 import VM from '@ethereumjs/vm';
 import TxContext from '@ethereumjs/vm/dist/evm/txContext';
 import Message from '@ethereumjs/vm/dist/evm/message';
 import { default as EVM, EVMResult } from '@ethereumjs/vm/dist/evm/evm';
 import { RunCallOpts } from '@ethereumjs/vm/dist/runCall';
 import { InterpreterStep } from '@ethereumjs/vm/dist/evm/interpreter';
+import { Block } from '@gxchain2/structure';
 import { IDebug } from './types';
 
 export interface RunCallDebugOpts extends RunCallOpts {

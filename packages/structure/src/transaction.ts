@@ -1,6 +1,7 @@
 import { TypedTransaction, TxOptions, Transaction, AccessListEIP2930Transaction, AccessListEIP2930ValuesArray } from '@ethereumjs/tx';
 import { BN, bufferToHex, bnToHex, intToHex, rlp } from 'ethereumjs-util';
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
+import { Block } from './block';
 
 export function txSize(tx: TypedTransaction) {
   const raw = tx.raw();
@@ -11,13 +12,6 @@ export function txSize(tx: TypedTransaction) {
     }
   }
   return size;
-}
-
-export interface BlockLike {
-  hash(): Buffer;
-  readonly header: {
-    number: BN;
-  };
 }
 
 export function TxFromValuesArray(values: Buffer[], opts?: TxOptions) {
@@ -46,7 +40,7 @@ export class WrappedTransaction {
     return this.extension.size;
   }
 
-  installProperties(block: BlockLike, transactionIndex: number): this {
+  installProperties(block: Block, transactionIndex: number): this {
     this.extension.blockHash = block.hash();
     this.extension.blockNumber = block.header.number;
     this.extension.transactionIndex = transactionIndex;

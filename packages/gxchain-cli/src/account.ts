@@ -1,10 +1,10 @@
 import fs from 'fs';
 import path from 'path';
 import { Command } from 'commander';
+import inquirer from 'inquirer';
 import { bufferToHex, toChecksumAddress, Address } from 'ethereumjs-util';
 import { AccountManager } from '@gxchain2/wallet';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
-import inquirer from 'inquirer';
 
 export async function getPassphrase(opts: { [option: string]: string }, options?: { addresses?: string[]; repeat?: boolean; message?: string; forceInput?: boolean }) {
   let passphrase: string[];

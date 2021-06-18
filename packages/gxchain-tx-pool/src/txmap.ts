@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
 import Heap from 'qheap';
-import { TypedTransaction, WrappedTransaction } from '@gxchain2/tx';
+import { TypedTransaction, WrappedTransaction } from '@gxchain2/structure';
 import { logger, createBNFunctionalMap } from '@gxchain2/utils';
 import { txSlots, txCost } from './index';
 

@@ -1,8 +1,6 @@
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { Address, BN, toBuffer, generateAddress } from 'ethereumjs-util';
-import { Block } from '@gxchain2/block';
-import { calculateIntrinsicGas } from '@gxchain2/tx';
-import { Receipt, Log } from '@gxchain2/receipt';
+import { calculateIntrinsicGas, Block, Receipt, Log } from '@gxchain2/structure';
 import VM from '@ethereumjs/vm';
 import Bloom from '@ethereumjs/vm/dist/bloom';
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx';

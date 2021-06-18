@@ -75,7 +75,7 @@ const handlers: Handler[] = [
       rlp.encode([
         4,
         bodies.map((txs) => {
-          return txs.map((tx) => tx.raw());
+          return txs.map((tx) => tx.raw() as Buffer[]);
         })
       ]),
     decode: (info: MsgContext, bodies: TransactionsBuffer[]): TypedTransaction[][] =>
@@ -86,7 +86,7 @@ const handlers: Handler[] = [
   {
     name: 'NewBlock',
     code: 5,
-    encode: (info: MsgContext, { block, td }: { block: Block; td: BN }) => rlp.encode([5, [[block.header.raw(), block.transactions.map((tx) => tx.raw())], td.toBuffer()]]),
+    encode: (info: MsgContext, { block, td }: { block: Block; td: BN }) => rlp.encode([5, [[block.header.raw(), block.transactions.map((tx) => tx.raw() as Buffer[])], td.toBuffer()]]),
     decode: (info: MsgContext, raw): { block: Block; td: BN } => {
       return {
         block: Block.fromValuesArray(raw[0], { common: info.node.getCommon(0), hardforkByBlockNumber: true }),
@@ -125,7 +125,7 @@ const handlers: Handler[] = [
   {
     name: 'PooledTransactions',
     code: 8,
-    encode: (info: MsgContext, txs: TypedTransaction[]) => rlp.encode([8, txs.map((tx) => tx.raw())]),
+    encode: (info: MsgContext, txs: TypedTransaction[]) => rlp.encode([8, txs.map((tx) => tx.raw() as Buffer[])]),
     decode: (info: MsgContext, raws: TransactionsBuffer) => raws.map((raw) => TxFromValuesArray(raw, { common: info.node.getCommon(0) }))
   },
   {

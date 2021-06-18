@@ -13,6 +13,7 @@ export type CallData = {
   gasPrice?: string;
   value?: string;
   data?: string;
+  nonce?: string;
 };
 
 export class Controller {

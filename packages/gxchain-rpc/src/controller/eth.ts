@@ -1,4 +1,4 @@
-import { Address, bnToHex, bufferToHex, toBuffer } from 'ethereumjs-util';
+import { Address, bnToHex, bufferToHex, toBuffer, hashPersonalMessage, toRpcSig, ecsign } from 'ethereumjs-util';
 import { WrappedBlock } from '@gxchain2/block';
 import { TransactionFactory, WrappedTransaction } from '@gxchain2/tx';
 import { hexStringToBuffer } from '@gxchain2/utils';
@@ -56,7 +56,7 @@ export class ETHController extends Controller {
     return bufferToHex(this.node.getCommon(0).chainIdBN().toBuffer());
   }
   eth_coinbase() {
-    return !this.node.miner.coinbase ? Address.zero().toString() : bufferToHex(this.node.miner.coinbase);
+    return bufferToHex(this.node.miner.coinbase);
   }
   eth_mining() {
     return this.node.miner.isMining;
@@ -64,11 +64,12 @@ export class ETHController extends Controller {
   eth_hashrate() {
     return bufferToHex(toBuffer(0));
   }
+  // TODO: eth_gasPrice
   eth_gasPrice() {
-    return bufferToHex(toBuffer(1));
+    return '0x3b9aca00';
   }
   eth_accounts() {
-    return [];
+    return this.node.accMngr.totalUnlockedAccounts().map((addr) => bufferToHex(addr));
   }
   eth_blockNumber() {
     return bnToHex(this.node.blockchain.latestBlock.header.number);
@@ -115,29 +116,41 @@ export class ETHController extends Controller {
     return bufferToHex(code);
   }
   eth_sign([address, data]: [string, string]) {
-    return '0x00';
+    const signature = ecsign(hashPersonalMessage(Buffer.from(data)), this.node.accMngr.getPrivateKey(address));
+    return toRpcSig(signature.v, signature.r, signature.s);
   }
-  eth_signTransaction([data]: [CallData]) {
-    /*
+  private async makeTxForUnlockedAccount(data: CallData) {
+    if (!data.from) {
+      helper.throwRpcErr('Missing from');
+      // for types.
+      throw new Error();
+    }
     if (!data.nonce) {
       const stateManager = await this.getStateManagerByTag('latest');
       const account = await stateManager.getAccount(Address.fromString(data.from));
-      data.nonce = account.nonce;
+      data.nonce = account.nonce.toString();
     }
-    const unsignedTx = Transaction.fromTxData({
-      ...data
-    }, { common: this.node.common });
-    unsignedTx.sign(privateKey);
-    */
-    return '0x00';
+    const unsignedTx = TransactionFactory.fromTxData(
+      {
+        ...data
+      },
+      { common: this.node.getCommon(0) }
+    );
+    const privateKey = this.node.accMngr.getPrivateKey(data.from);
+    return unsignedTx.sign(privateKey);
   }
-  eth_sendTransaction([data]: [CallData]) {
-    return '0x00';
+  async eth_signTransaction([data]: [CallData]) {
+    return bufferToHex((await this.makeTxForUnlockedAccount(data)).serialize());
+  }
+  async eth_sendTransaction([data]: [CallData]) {
+    const tx = await this.makeTxForUnlockedAccount(data);
+    const results = await this.node.addPendingTxs([tx]);
+    return results.length > 0 && results[0] ? bufferToHex(tx.hash()) : null;
   }
   async eth_sendRawTransaction([rawtx]: [string]) {
     const tx = TransactionFactory.fromSerializedData(hexStringToBuffer(rawtx), { common: this.node.getCommon(0) });
     const results = await this.node.addPendingTxs([tx]);
-    return results && results.length > 0 && results[0] ? bufferToHex(tx.hash()) : null;
+    return results.length > 0 && results[0] ? bufferToHex(tx.hash()) : null;
   }
   async eth_call([data, tag]: [CallData, string]) {
     const result = await this.runCall(data, tag);

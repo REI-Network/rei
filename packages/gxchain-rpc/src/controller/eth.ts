@@ -128,11 +128,12 @@ export class ETHController extends Controller {
     if (!data.nonce) {
       const stateManager = await this.getStateManagerByTag('latest');
       const account = await stateManager.getAccount(Address.fromString(data.from));
-      data.nonce = account.nonce.toString();
+      data.nonce = bnToHex(account.nonce);
     }
     const unsignedTx = TransactionFactory.fromTxData(
       {
-        ...data
+        ...data,
+        gasLimit: data.gas
       },
       { common: this.node.getCommon(0) }
     );

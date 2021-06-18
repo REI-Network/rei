@@ -25,10 +25,13 @@ Options:
   --rpc-port <port>           rpc server port (default: "12358")
   --rpc-host <port>           rpc server host (default: "127.0.0.1")
   --rpc-api <apis>            rpc server apis: debug, eth, net, txpool, web3 (default: "eth,net,web3")
-  --p2p-tcp-port <port>       p2p server tcp port (default: "0")
-  --p2p-ws-port <port>        p2p server websocket port (default: "0")
+  --p2p-tcp-port <port>       p2p server tcp port (default: "11451")
+  --p2p-ws-port <port>        p2p server websocket port (default: "41919")
   --bootnodes <bootnodes...>  bootnodes list
   --datadir <path>            chain data dir path (default: "~/.gxchain2")
+  --keystore <keystore>       The datadir for keystore (default: "keystore")
+  --unlock <unlock>           Comma separated list of accounts to unlock
+  --password <password>       Password file to use for non-interactive password input
   --chain <chain>             chain name: gxc2-mainnet, gxc2-testnet
   --mine                      mine block
   --coinbase <address>        miner address
@@ -44,11 +47,11 @@ Commands:
 Block producer startup
 
 ```
-gxc2 --rpc --rpc-host 0.0.0.0 --rpc-port 12345 --datadir ~/gxc2 --mine --coinbase 0x...abc
+gxc2 --mine --coinbase 0x...abc --unlock 0x...abc --password ./password
 ```
 
 Normal node startup
 
 ```
-gxc2 --rpc --rpc-host 0.0.0.0 --rpc-port 12345 --datadir ~/gxc2
+gxc2 --rpc --rpc-host 0.0.0.0
 ```

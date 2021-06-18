@@ -50,8 +50,8 @@ export const logger = tracer.colorConsole({
   dateformat: 'mm-dd|HH:MM:ss.L',
   preprocess: (data) => {
     data.title = data.title.toUpperCase();
-    while (data.title.length < 5) {
-      data.title += ' ';
+    if (data.title.length < 5) {
+      data.title += ' '.repeat(5 - data.title.length);
     }
   }
 });

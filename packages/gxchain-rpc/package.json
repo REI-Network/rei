@@ -15,7 +15,7 @@
     "dependencies": {
         "@gxchain2/structure": "^0.0.2-alpha.0",
         "@gxchain2/core": "^0.0.2-alpha.0",
-        "@gxchain2/state-manager": "^0.0.2-alpha.0",
+        "@gxchain2/vm": "^0.0.2-alpha.0",
         "@gxchain2/utils": "^0.0.2-alpha.0",
         "express": "^4.17.1",
         "express-ws": "^4.0.0",

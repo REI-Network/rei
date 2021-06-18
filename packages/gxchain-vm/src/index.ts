@@ -27,3 +27,4 @@ export { VM, Bloom };
 export * from '@ethereumjs/vm/dist/evm/interpreter';
 export * from '@ethereumjs/vm/dist/exceptions';
 export * from './types';
+export { DefaultStateManager as StateManager } from '@ethereumjs/vm/dist/state';

@@ -30,7 +30,6 @@
     "build:database": "npm run build -- --scope @gxchain2/database",
     "build:network": "npm run build -- --scope @gxchain2/network",
     "build:rpc": "npm run build -- --scope @gxchain2/rpc",
-    "build:state-manager": "npm run build -- --scope @gxchain2/state-manager",
     "build:utils": "npm run build -- --scope @gxchain2/utils",
     "build:vm": "npm run build -- --scope @gxchain2/vm",
     "build:wallet": "npm run build -- --scope @gxchain2/wallet",

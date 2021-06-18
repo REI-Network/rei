@@ -8,8 +8,7 @@ import { Database, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchai
 import { NetworkManager } from '@gxchain2/network';
 import { Common, constants, getGenesisState, getChain } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
-import { StateManager } from '@gxchain2/state-manager';
-import { VM, WrappedVM } from '@gxchain2/vm';
+import { VM, WrappedVM, StateManager } from '@gxchain2/vm';
 import { TypedTransaction, Block } from '@gxchain2/structure';
 import { Channel, Aborter, logger } from '@gxchain2/utils';
 import { AccountManager } from '@gxchain2/wallet';

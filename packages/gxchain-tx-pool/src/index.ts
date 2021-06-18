@@ -164,9 +164,11 @@ export class TxPool extends EventEmitter {
     this.accountQueue = options.accountQueue || 64;
     this.globalQueue = options.globalQueue || 1024;
     this.globalAllSlots = 0;
-    this.lifetime = options.lifetime || 60000;
-    this.timeoutInterval = options.timeoutInterval || 10000;
-    this.rejournalInterval = options.rejournalInterval || 60000 * 60;
+    // 3 houres
+    this.lifetime = options.lifetime || 1000 * 60 * 60 * 3;
+    this.timeoutInterval = options.timeoutInterval || 1000 * 60;
+    // 1 houres
+    this.rejournalInterval = options.rejournalInterval || 1000 * 60 * 60;
 
     this.node = options.node;
     this.aborter = options.node.aborter;
@@ -361,6 +363,10 @@ export class TxPool extends EventEmitter {
       }
       this.currentHeader = originalNewBlock.header;
       this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, this.currentHeader.number);
+      for (const reinjectTx of reinject) {
+        const account = this.getAccount(reinjectTx.getSenderAddress());
+        account.updatePendingNonce(reinjectTx.nonce.addn(1), true);
+      }
       this.emitReadies((await this._addTxs(reinject, true)).readies);
       await this.demoteUnexecutables();
       this.truncatePending();
@@ -716,7 +722,7 @@ export class TxPool extends EventEmitter {
       const pending = account.pending;
       const [tx] = pending.resize(pending.size - 1);
       this.removeTxFromGlobal(tx);
-      account.updatePendingNonce(tx.nonce, true);
+      account.updatePendingNonce(tx.nonce.addn(1), true);
       // resize priced
       this.priced.removed([tx].length);
       pendingSlots -= txSlots(tx);

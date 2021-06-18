@@ -68,7 +68,7 @@ export class TxSortedMap {
   forward(nonce: BN) {
     const removed: TypedTransaction[] = [];
     let nonceInHeap: BN = this.nonceHeap.peek();
-    while (nonceInHeap && nonceInHeap.lte(nonce)) {
+    while (nonceInHeap && nonceInHeap.lt(nonce)) {
       const tx = this.nonceToTx.get(nonceInHeap)!;
       removed.push(tx);
       this.nonceToTx.delete(nonceInHeap);

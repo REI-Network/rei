@@ -27,7 +27,6 @@
     "build:cli": "npm run build -- --scope @gxchain2/cli",
     "build:common": "npm run build -- --scope @gxchain2/common",
     "build:core": "npm run build -- --scope @gxchain2/core",
-    "build:crypto": "npm run build -- --scope @gxchain2/crypto",
     "build:database": "npm run build -- --scope @gxchain2/database",
     "build:network": "npm run build -- --scope @gxchain2/network",
     "build:rpc": "npm run build -- --scope @gxchain2/rpc",

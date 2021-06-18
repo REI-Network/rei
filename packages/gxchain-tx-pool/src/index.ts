@@ -360,7 +360,7 @@ export class TxPool extends EventEmitter {
         }
       }
       this.currentHeader = originalNewBlock.header;
-      this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, newBlock.header.number);
+      this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, this.currentHeader.number);
       this.emitReadies((await this._addTxs(reinject, true)).readies);
       await this.demoteUnexecutables();
       this.truncatePending();

@@ -35,7 +35,7 @@
     "build:wallet": "npm run build -- --scope @gxchain2/wallet",
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/package-lock.json",
     "clean:build": "rm -rf packages/*/dist",
-    "test:prompts": "node -r ts-node/register ./packages/gxchain-cli/test/prompts.ts",
+    "test:prompts": "node -r ts-node/register ./packages/cli/test/prompts.ts",
     "postinstall": "npm run bootstrap",
     "lint": "eslint packages/*/src/**.ts packages/*/test/**.ts --format=codeframe",
     "lint:fix": "eslint packages/*/src/**.ts packages/*/test/**.ts --fix",
@@ -44,7 +44,7 @@
     "publish:main": "lerna publish --no-git-tag-version --no-push",
     "release": "lerna version --conventional-commits",
     "release:prepatch": "lerna version prepatch --conventional-commits",
-    "cli": "node -r ts-node/register ./packages/gxchain-cli/src/index.ts"
+    "cli": "node -r ts-node/register ./packages/cli/src/index.ts"
   },
   "lint-staged": {
     "*.{js,ts}": [

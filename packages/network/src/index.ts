@@ -7,6 +7,7 @@ import { Libp2pNode } from './libp2pnode';
 import { Protocol } from './types';
 
 export * from './peer';
+export * from './types';
 
 export declare interface NetworkManager {
   on(event: 'added' | 'removed', listener: (peer: Peer) => void): this;

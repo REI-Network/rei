@@ -3,16 +3,6 @@ import { Channel, Aborter, logger } from '@gxchain2/utils';
 import { NetworkManager } from './index';
 import { Protocol, ProtocolHandler } from './types';
 
-export class PeerRequestTimeoutError extends Error {}
-
-declare interface MsgQueue {
-  on(event: 'status', listener: (message: any) => void): this;
-  on(event: 'error', listener: (error: any) => void): this;
-
-  once(event: 'status', listener: (message: any) => void): this;
-  once(event: 'error', listener: (error: any) => void): this;
-}
-
 class MsgQueue {
   private readonly peer: Peer;
   private readonly aborter: Aborter;
@@ -38,13 +28,6 @@ class MsgQueue {
     }
     data = this.handler.encode(method, data);
     this.queue.push(data);
-  }
-
-  request(method: string, data: any) {
-    this.send(method, data);
-    return new Promise<any>((resolve, reject) => {
-      this.handler.waiting(method, data, resolve, reject);
-    });
   }
 
   private async *generator() {
@@ -79,7 +62,7 @@ class MsgQueue {
           }
 
           const data: Buffer = value._bufs[0];
-          await this.handler.handle(data);
+          await this.handler.handle(data, this.send.bind(this));
         } catch (err) {
           logger.error('MsgQueue::pipeStream, handle message error:', err);
         }
@@ -129,20 +112,11 @@ export class Peer {
   }
 
   isSupport(name: string): boolean {
-    try {
-      this.getMsgQueue(name);
-      return true;
-    } catch (err) {
-      return false;
-    }
+    return this.queueMap.has(name);
   }
 
   send(name: string, method: string, data: any) {
     this.getMsgQueue(name).send(method, data);
-  }
-
-  request(name: string, method: string, data: any) {
-    return this.getMsgQueue(name).request(method, data);
   }
 
   async installProtocol(protocol: Protocol, stream?: any) {

@@ -1,3 +1,5 @@
+import { Peer } from './peer';
+
 export interface Protocol {
   name: string;
   protocolString: string;
@@ -6,8 +8,7 @@ export interface Protocol {
 
 export interface ProtocolHandler {
   handshake(): boolean | Promise<boolean>;
-  handle(data: Buffer): Promise<void>;
-  waiting(method: string | number, data: any, resolve: (resps: any) => void, reject: (reason?: any) => void);
+  handle(data: Buffer, send: (method: string, data: any) => void): Promise<void>;
   encode(method: string | number, data: any): any;
   abort(): Promise<void>;
 }

@@ -3,11 +3,11 @@ import { Channel, Aborter, logger } from '@gxchain2/utils';
 import { NetworkManager } from './index';
 import { Protocol, ProtocolHandler } from './types';
 
-class MsgQueue {
+export class MsgQueue {
+  readonly handler: ProtocolHandler;
   private readonly peer: Peer;
   private readonly aborter: Aborter;
   private readonly queue: Channel;
-  private readonly handler: ProtocolHandler;
 
   constructor(peer: Peer, handler: ProtocolHandler) {
     this.peer = peer;
@@ -22,7 +22,7 @@ class MsgQueue {
     });
   }
 
-  send(method: string, data: any) {
+  send(method: string | number, data: any) {
     if (this.aborter.isAborted) {
       throw new Error('MsgQueue already aborted');
     }
@@ -62,7 +62,7 @@ class MsgQueue {
           }
 
           const data: Buffer = value._bufs[0];
-          await this.handler.handle(data, this.send.bind(this));
+          await this.handler.handle(data);
         } catch (err) {
           logger.error('MsgQueue::pipeStream, handle message error:', err);
         }
@@ -72,7 +72,7 @@ class MsgQueue {
 
   async abort() {
     this.queue.abort();
-    await this.handler.abort();
+    this.handler.abort();
     await this.aborter.abort();
   }
 }
@@ -88,13 +88,13 @@ export class Peer {
   }
 
   private makeMsgQueue(protocol: Protocol) {
-    const handler = protocol.makeHandler();
+    const handler = protocol.makeHandler(this);
     const queue = new MsgQueue(this, handler);
     this.queueMap.set(protocol.name, queue);
     return { queue, handler };
   }
 
-  private getMsgQueue(name: string) {
+  getMsgQueue(name: string) {
     const queue = this.queueMap.get(name);
     if (!queue) {
       throw new Error(`Peer unkonw name: ${name}`);
@@ -113,10 +113,6 @@ export class Peer {
 
   isSupport(name: string): boolean {
     return this.queueMap.has(name);
-  }
-
-  send(name: string, method: string, data: any) {
-    this.getMsgQueue(name).send(method, data);
   }
 
   async installProtocol(protocol: Protocol, stream?: any) {

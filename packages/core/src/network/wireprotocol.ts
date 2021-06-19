@@ -1,8 +1,7 @@
 import { bufferToInt, bufferToHex, rlp, BN } from 'ethereumjs-util';
-import { constants } from '@gxchain2/common';
 import { TxFromValuesArray, TypedTransaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
-import { Protocol, ProtocolHandler, Peer } from '@gxchain2/network';
+import { Protocol, ProtocolHandler, Peer, MsgQueue } from '@gxchain2/network';
 import { Node } from '../node';
 
 export type Handler = {
@@ -20,7 +19,7 @@ const wireHandlers: Handler[] = [
     code: 0,
     encode(this: WireProtocolHandler, data) {
       const payload: any = Object.entries(data).map(([k, v]) => [k, v]);
-      return rlp.encode([0, payload]);
+      return [0, payload];
     },
     decode(this: WireProtocolHandler, data) {
       const status: any = {};
@@ -34,6 +33,9 @@ const wireHandlers: Handler[] = [
         bestHash: status.bestHash,
         genesisHash: status.genesisHash
       };
+    },
+    process(this: WireProtocolHandler, status: any) {
+      this.handshakeResponse(status);
     }
   },
   {
@@ -41,13 +43,13 @@ const wireHandlers: Handler[] = [
     code: 1,
     response: 2,
     encode(this: WireProtocolHandler, { start, count }: { start: number; count: number }) {
-      return rlp.encode([1, [start, count]]);
+      return [1, [start, count]];
     },
     decode(this: WireProtocolHandler, [start, count]: Buffer[]) {
       return { start: bufferToInt(start), count: bufferToInt(count) };
     },
     async process(this: WireProtocolHandler, { start, count }: { start: number; count: number }): Promise<[string, BlockHeader[]]> {
-      const blocks = await info.node.blockchain.getBlocks(start, count, 0, false);
+      const blocks = await this.node.blockchain.getBlocks(start, count, 0, false);
       return ['BlockHeaders', blocks.map((b) => b.header)];
     }
   },
@@ -55,10 +57,10 @@ const wireHandlers: Handler[] = [
     name: 'BlockHeaders',
     code: 2,
     encode(this: WireProtocolHandler, headers: BlockHeader[]) {
-      return rlp.encode([2, headers.map((h) => h.raw())]);
+      return [2, headers.map((h) => h.raw())];
     },
     decode(this: WireProtocolHandler, headers: BlockHeaderBuffer[]) {
-      return headers.map((h) => BlockHeader.fromValuesArray(h, { common: info.node.getCommon(0) }));
+      return headers.map((h) => BlockHeader.fromValuesArray(h, { common: this.node.getCommon(0) }));
     }
   },
   {
@@ -66,7 +68,7 @@ const wireHandlers: Handler[] = [
     code: 3,
     response: 4,
     encode(this: WireProtocolHandler, headers: BlockHeader[]) {
-      return rlp.encode([3, headers.map((h) => h.hash())]);
+      return [3, headers.map((h) => h.hash())];
     },
     decode(this: WireProtocolHandler, headerHashs: Buffer[]) {
       return headerHashs;
@@ -75,7 +77,7 @@ const wireHandlers: Handler[] = [
       const bodies: TypedTransaction[][] = [];
       for (const hash of headerHashs) {
         try {
-          const block = await info.node.db.getBlock(hash);
+          const block = await this.node.db.getBlock(hash);
           bodies.push(block.transactions);
         } catch (err) {
           if (err.type !== 'NotFoundError') {
@@ -91,16 +93,16 @@ const wireHandlers: Handler[] = [
     name: 'BlockBodies',
     code: 4,
     encode(this: WireProtocolHandler, bodies: TypedTransaction[][]) {
-      return rlp.encode([
+      return [
         4,
         bodies.map((txs) => {
           return txs.map((tx) => tx.raw() as Buffer[]);
         })
-      ]);
+      ];
     },
     decode(this: WireProtocolHandler, bodies: TransactionsBuffer[]): TypedTransaction[][] {
       return bodies.map((txs) => {
-        return txs.map((tx) => TxFromValuesArray(tx, { common: info.node.getCommon(0) }));
+        return txs.map((tx) => TxFromValuesArray(tx, { common: this.node.getCommon(0) }));
       });
     }
   },
@@ -108,11 +110,11 @@ const wireHandlers: Handler[] = [
     name: 'NewBlock',
     code: 5,
     encode(this: WireProtocolHandler, { block, td }: { block: Block; td: BN }) {
-      return rlp.encode([5, [[block.header.raw(), block.transactions.map((tx) => tx.raw() as Buffer[])], td.toBuffer()]]);
+      return [5, [[block.header.raw(), block.transactions.map((tx) => tx.raw() as Buffer[])], td.toBuffer()]];
     },
     decode(this: WireProtocolHandler, raw): { block: Block; td: BN } {
       return {
-        block: Block.fromValuesArray(raw[0], { common: info.node.getCommon(0), hardforkByBlockNumber: true }),
+        block: Block.fromValuesArray(raw[0], { common: this.node.getCommon(0), hardforkByBlockNumber: true }),
         td: new BN(raw[1])
       };
     },
@@ -120,23 +122,21 @@ const wireHandlers: Handler[] = [
       const height = block.header.number.toNumber();
       const bestHash = bufferToHex(block.hash());
       const totalDifficulty = td.toString();
-      info.node.sync.announce(info.peer, height, td);
-      if (info.protocol instanceof ETHProtocol) {
-        info.protocol.updateStatus(height, bestHash, totalDifficulty);
-      }
+      this.node.sync.announce(this.peer, height, td);
+      this.updateStatus({ height, bestHash, totalDifficulty });
     }
   },
   {
     name: 'NewPooledTransactionHashes',
     code: 6,
     encode(this: WireProtocolHandler, hashes: Buffer[]) {
-      return rlp.encode([6, [...hashes]]);
+      return [6, [...hashes]];
     },
     decode(this: WireProtocolHandler, hashes): Buffer[] {
       return hashes;
     },
     process(this: WireProtocolHandler, hashes: Buffer[]) {
-      info.node.txSync.newPooledTransactionHashes(info.peer.peerId, hashes);
+      this.node.txSync.newPooledTransactionHashes(this.peer.peerId, hashes);
     }
   },
   {
@@ -144,30 +144,30 @@ const wireHandlers: Handler[] = [
     code: 7,
     response: 8,
     encode(this: WireProtocolHandler, hashes: Buffer[]) {
-      return rlp.encode([7, [...hashes]]);
+      return [7, [...hashes]];
     },
     decode(this: WireProtocolHandler, hashes): Buffer[] {
       return hashes;
     },
     process(this: WireProtocolHandler, hashes: Buffer[]) {
-      return ['PooledTransactions', hashes.map((hash) => info.node.txPool.getTransaction(hash)).filter((tx) => tx !== undefined)];
+      return ['PooledTransactions', hashes.map((hash) => this.node.txPool.getTransaction(hash)).filter((tx) => tx !== undefined)];
     }
   },
   {
     name: 'PooledTransactions',
     code: 8,
     encode(this: WireProtocolHandler, txs: TypedTransaction[]) {
-      return rlp.encode([8, txs.map((tx) => tx.raw() as Buffer[])]);
+      return [8, txs.map((tx) => tx.raw() as Buffer[])];
     },
     decode(this: WireProtocolHandler, raws: TransactionsBuffer) {
-      return raws.map((raw) => TxFromValuesArray(raw, { common: info.node.getCommon(0) }));
+      return raws.map((raw) => TxFromValuesArray(raw, { common: this.node.getCommon(0) }));
     }
   },
   {
     name: 'Echo',
     code: 111,
     encode(this: WireProtocolHandler, data) {
-      return rlp.encode([111, data]);
+      return [111, data];
     },
     decode(this: WireProtocolHandler, data) {
       logger.debug('Echo', (data as Buffer).toString());
@@ -177,6 +177,12 @@ const wireHandlers: Handler[] = [
 ];
 
 export class WireProtocol implements Protocol {
+  readonly node: Node;
+
+  constructor(node: Node) {
+    this.node = node;
+  }
+
   get name() {
     return '';
   }
@@ -185,7 +191,9 @@ export class WireProtocol implements Protocol {
     return '';
   }
 
-  // makeHandler() {}
+  makeHandler(peer: Peer) {
+    return new WireProtocolHandler(this.node, this, peer);
+  }
 }
 
 function findHandler(method: string | number) {
@@ -197,6 +205,14 @@ function findHandler(method: string | number) {
 }
 
 export class WireProtocolHandler implements ProtocolHandler {
+  readonly node: Node;
+  readonly peer: Peer;
+  readonly protocol: Protocol;
+  private _status: any;
+  private queue?: MsgQueue;
+  private handshakeResolve?: (result: boolean) => void;
+  private handshakeTimeout?: NodeJS.Timeout;
+  private readonly handshakePromise: Promise<boolean>;
   private readonly waitingRequests = new Map<
     number,
     {
@@ -206,38 +222,96 @@ export class WireProtocolHandler implements ProtocolHandler {
     }
   >();
 
-  encode(method: string | number, data: any) {
-    return findHandler(method).encode.call(this, data);
+  get status() {
+    return this._status;
   }
 
-  async handle(data: Buffer, send: (method: string, data: any) => void) {
+  constructor(node: Node, protocol: Protocol, peer: Peer) {
+    this.node = node;
+    this.peer = peer;
+    this.protocol = protocol;
+    this.handshakePromise = new Promise<boolean>((resolve) => {
+      this.handshakeResolve = resolve;
+    });
+  }
+
+  private getMsgQueue() {
+    return this.queue ? this.queue : (this.queue = this.peer.getMsgQueue(this.protocol.name));
+  }
+
+  updateStatus(newStatus: any) {
+    this._status = Object.assign(this._status, newStatus);
+  }
+
+  handshake() {
+    if (!this.handshakeResolve) {
+      throw new Error('Repeat handshake');
+    }
+    this.getMsgQueue().send(0, this.node.status);
+    this.handshakeTimeout = setTimeout(() => {
+      if (this.handshakeResolve) {
+        this.handshakeResolve(false);
+        this.handshakeResolve = undefined;
+      }
+    }, 8000);
+    return this.handshakePromise;
+  }
+
+  handshakeResponse(status: any) {
+    if (this.handshakeResolve) {
+      this._status = status;
+      this.handshakeResolve(true);
+      this.handshakeResolve = undefined;
+      if (this.handshakeTimeout) {
+        clearTimeout(this.handshakeTimeout);
+        this.handshakeTimeout = undefined;
+      }
+    }
+  }
+
+  abort() {
+    if (this.handshakeResolve) {
+      this.handshakeResolve(false);
+      if (this.handshakeTimeout) {
+        clearTimeout(this.handshakeTimeout);
+      }
+    }
+    for (const [response, request] of this.waitingRequests) {
+      clearTimeout(request.timeout);
+      request.reject(new Error('WireProtocol abort'));
+    }
+    this.waitingRequests.clear();
+  }
+
+  encode(method: string | number, data: any) {
+    return rlp.encode(findHandler(method).encode.call(this, data));
+  }
+
+  async handle(data: Buffer) {
     const [code, payload]: any = rlp.decode(data);
     const numCode = bufferToInt(code);
     const handler = findHandler(numCode);
     data = handler.decode.call(this, payload);
-    if (code === 0) {
-      //
-    } else {
-      const request = this.waitingRequests.get(code);
-      if (request) {
-        clearTimeout(request.timeout);
-        this.waitingRequests.delete(code);
-        request.resolve(data);
-      } else if (handler.process) {
-        const result = handler.process.call(this, data);
-        if (result) {
-          if (Array.isArray(result)) {
-            const [method, resps] = result;
-            send(method, resps);
-          } else {
-            result
-              .then(([method, resps]) => {
-                send(method, resps);
-              })
-              .catch((err) => {
-                // this.emit('error', err);
-              });
-          }
+
+    const request = this.waitingRequests.get(code);
+    if (request) {
+      clearTimeout(request.timeout);
+      this.waitingRequests.delete(code);
+      request.resolve(data);
+    } else if (handler.process) {
+      const result = handler.process.call(this, data);
+      if (result) {
+        if (Array.isArray(result)) {
+          const [method, resps] = result;
+          this.getMsgQueue().send(method, resps);
+        } else {
+          result
+            .then(([method, resps]) => {
+              this.getMsgQueue().send(method, resps);
+            })
+            .catch((err) => {
+              logger.error('WireProtocolHandler::handle, error:', err);
+            });
         }
       }
     }

@@ -6,7 +6,7 @@ import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
 import { Database, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchain2/database';
 import { NetworkManager } from '@gxchain2/network';
-import { Common, constants, getGenesisState, getChain } from '@gxchain2/common';
+import { Common, getGenesisState, getChain } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { VM, WrappedVM, StateManager } from '@gxchain2/vm';
 import { TypedTransaction, Block } from '@gxchain2/structure';
@@ -17,7 +17,7 @@ import { FullSynchronizer, Synchronizer } from './sync';
 import { TxFetcher } from './txsync';
 import { Miner } from './miner';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
-import { BloomBitsFilter } from './bloombits';
+import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
 import { BlockchainMonitor } from './blockchainmonitor';
 import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
 
@@ -229,7 +229,7 @@ export class Node {
     this.sync.start();
     this.miner = new Miner(this, options.mine);
     await this.txPool.init();
-    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: constants.BloomBitsBlocks, confirmsBlockNumber: constants.ConfirmsBlockNumber });
+    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: BloomBitsBlocks, confirmsBlockNumber: ConfirmsBlockNumber });
     await this.bloomBitsIndexer.init();
     this.bcMonitor = new BlockchainMonitor(this);
     await this.bcMonitor.init();
@@ -267,7 +267,7 @@ export class Node {
   }
 
   getFilter() {
-    return new BloomBitsFilter({ node: this, sectionSize: constants.BloomBitsBlocks });
+    return new BloomBitsFilter({ node: this, sectionSize: BloomBitsBlocks });
   }
 
   private async processLoop() {

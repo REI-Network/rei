@@ -1,10 +1,10 @@
 import { BlockHeader } from '@ethereumjs/block';
 import { BN } from 'ethereumjs-util';
-import { constants } from '@gxchain2/common';
 import { DBSaveBloomBits, DBOp } from '@gxchain2/database';
 import { ChainIndexer, ChainIndexerBackend } from './chainindexer';
 import { BloomBitsGenerator } from '../bloombits';
 import { Node } from '../node';
+import { BloomBitLength } from '../bloombits';
 
 export interface BloomBitsIndexerOptions {
   node: Node;
@@ -45,7 +45,7 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
 
   async commit() {
     const batch: DBOp[] = [];
-    for (let i = 0; i < constants.BloomBitLength; i++) {
+    for (let i = 0; i < BloomBitLength; i++) {
       const bits = this.gen.bitset(i);
       batch.push(DBSaveBloomBits(i, this.section, this.headerHash, Buffer.from(bits)));
     }

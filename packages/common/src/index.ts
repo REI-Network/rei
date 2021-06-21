@@ -2,7 +2,6 @@ import './install';
 import EthereumCommon from '@ethereumjs/common';
 import { BNLike } from 'ethereumjs-util';
 import { getChain } from './chains';
-import * as constants from './constants';
 
 export class Common extends EthereumCommon {
   static createChainStartCommon(chain: number | string | Object) {
@@ -23,6 +22,5 @@ export class Common extends EthereumCommon {
   }
 }
 
-export { constants };
 export * from './genesisStates';
 export * from './chains';

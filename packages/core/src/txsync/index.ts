@@ -1,7 +1,7 @@
 import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Channel, Aborter, logger } from '@gxchain2/utils';
 import { EventEmitter } from 'events';
 import { TypedTransaction } from '@gxchain2/structure';
-import { PeerRequestTimeoutError } from '@gxchain2/network';
+import { WireProtocol, PeerRequestTimeoutError } from '../protocols';
 import { Node } from '../node';
 import { bufferToHex } from 'ethereumjs-util';
 
@@ -314,7 +314,8 @@ export class TxFetcher extends EventEmitter {
         if (!p) {
           this.dropPeer(peer);
         } else {
-          p.getPooledTransactions(hashes)
+          WireProtocol.getHandler(p)
+            .getPooledTransactions(hashes)
             .then((txs) => {
               this.enqueueTransaction(peer, txs);
             })

@@ -1,10 +1,10 @@
 import { BN } from 'ethereumjs-util';
-import { constants } from '@gxchain2/common';
-import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
+import { Peer } from '@gxchain2/network';
 import { BlockHeader } from '@gxchain2/structure';
+import { logger } from '@gxchain2/utils';
 import { Synchronizer, SynchronizerOptions } from './sync';
 import { Fetcher } from './fetcher';
-import { logger } from '@gxchain2/utils';
+import { WireProtocol, WireProtocolHandler, PeerRequestTimeoutError } from '../protocols';
 
 export interface FullSynchronizerOptions extends SynchronizerOptions {
   limit?: number;
@@ -21,7 +21,7 @@ export class FullSynchronizer extends Synchronizer {
   private readonly errorBanTime: number;
   private readonly invalidBanTime: number;
   private readonly fetcher: Fetcher;
-  private bestPeer?: Peer;
+  private bestPeerHandler?: WireProtocolHandler;
   private bestHeight?: number;
   private bestTD?: BN;
   private syncingPromise?: Promise<boolean>;
@@ -33,7 +33,7 @@ export class FullSynchronizer extends Synchronizer {
     this.timeoutBanTime = options.timeoutBanTime || 300000;
     this.errorBanTime = options.timeoutBanTime || 60000;
     this.invalidBanTime = options.invalidBanTime || 600000;
-    this.fetcher = new Fetcher({ node: this.node, count: this.count, limit: this.limit!, banPeer: this.banPeer.bind(this) });
+    this.fetcher = new Fetcher({ node: this.node, count: this.count, limit: this.limit, banPeer: this.banPeer.bind(this) });
   }
 
   /**
@@ -62,13 +62,13 @@ export class FullSynchronizer extends Synchronizer {
       const syncFailed = () => {
         syncResolve(false);
         this.bestHeight = undefined;
-        this.bestPeer = undefined;
+        this.bestPeerHandler = undefined;
         this.bestTD = undefined;
       };
 
       if (target) {
         this.bestHeight = target.height;
-        this.bestPeer = target.peer;
+        this.bestPeerHandler = WireProtocol.getHandler(target.peer);
         this.bestTD = target.td.clone();
         if (this.bestTD.lt(this.node.blockchain.totalDifficulty)) {
           syncFailed();
@@ -76,40 +76,30 @@ export class FullSynchronizer extends Synchronizer {
         }
       } else {
         this.bestTD = this.node.blockchain.totalDifficulty;
-        for (const peer of this.node.networkMngr.peers) {
-          const remoteStatus = peer.getStatus(constants.GXC2_ETHWIRE);
-          if (!remoteStatus) {
-            continue;
-          }
+        for (const handler of WireProtocol.getPool().handlers) {
+          const remoteStatus = handler.status;
           const td = new BN(remoteStatus.totalDifficulty);
           if (td.gt(this.bestTD)) {
-            this.bestPeer = peer;
+            this.bestPeerHandler = handler;
             this.bestHeight = remoteStatus.height;
             this.bestTD = td;
           }
         }
-        if (!this.bestPeer) {
+        if (!this.bestPeerHandler) {
           syncFailed();
           return;
         }
       }
 
-      if (!this.bestPeer.headersIdle) {
-        syncFailed();
-        return;
-      }
-      this.bestPeer.headersIdle = false;
-
       try {
-        syncResolve(await this.syncWithPeer(this.bestPeer, this.bestHeight!));
+        syncResolve(await this.syncWithPeerHandler(this.bestPeerHandler, this.bestHeight!));
         logger.info('💫 Sync over, local height:', this.node.blockchain.latestHeight, 'local td:', this.node.blockchain.totalDifficulty.toString(), 'best height:', this.bestHeight, 'best td:', this.bestTD.toString());
       } catch (err) {
         syncResolve(false);
         this.emit('error', err);
       } finally {
-        this.bestPeer.headersIdle = true;
         this.bestHeight = undefined;
-        this.bestPeer = undefined;
+        this.bestPeerHandler = undefined;
         this.bestTD = undefined;
       }
     }));
@@ -138,8 +128,8 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
-  // TODO: binary search and rollback lock.
-  private async findAncient(peer: Peer): Promise<number> {
+  // TODO: binary search.
+  private async findAncient(handler: WireProtocolHandler): Promise<number> {
     let latestHeight = this.node.blockchain.latestHeight;
     if (latestHeight === 0) {
       return 0;
@@ -150,9 +140,9 @@ export class FullSynchronizer extends Synchronizer {
 
       let headers!: BlockHeader[];
       try {
-        headers = await peer.getBlockHeaders(latestHeight, this.count);
+        headers = await handler.getBlockHeaders(latestHeight, this.count);
       } catch (err) {
-        this.banPeer(peer, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
+        this.banPeer(handler.peer, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
         throw err;
       }
 
@@ -172,16 +162,16 @@ export class FullSynchronizer extends Synchronizer {
     throw new Error('find acient failed');
   }
 
-  private async syncWithPeer(peer: Peer, bestHeight: number): Promise<boolean> {
-    const localHeight = await this.findAncient(peer);
+  private async syncWithPeerHandler(handler: WireProtocolHandler, bestHeight: number): Promise<boolean> {
+    const localHeight = await this.findAncient(handler);
     if (localHeight >= bestHeight) {
       return false;
     }
-    logger.info('💡 Get best height from:', peer.peerId, 'best height:', bestHeight, 'local height:', localHeight);
+    logger.info('💡 Get best height from:', handler.peer.peerId, 'best height:', bestHeight, 'local height:', localHeight);
     this.startSyncHook(localHeight, bestHeight);
 
     this.fetcher.reset();
-    await this.fetcher.fetch(localHeight, bestHeight - localHeight, peer.peerId);
+    await this.fetcher.fetch(localHeight, bestHeight - localHeight, handler);
     return true;
   }
 }

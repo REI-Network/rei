@@ -10,9 +10,9 @@ export * from './peer';
 export * from './types';
 
 export declare interface NetworkManager {
-  on(event: 'added' | 'removed', listener: (peer: Peer) => void): this;
+  on(event: 'added' | 'installed' | 'removed', listener: (peer: Peer) => void): this;
 
-  once(event: 'added' | 'removed', listener: (peer: Peer) => void): this;
+  once(event: 'added' | 'installed' | 'removed', listener: (peer: Peer) => void): this;
 }
 
 export interface NetworkManagerOptions {
@@ -151,6 +151,7 @@ export class NetworkManager extends EventEmitter {
           const peer = this.toPeer(peerId);
           if (peer && (await peer.installProtocol(protocol, stream))) {
             logger.info('💬 Peer handled:', peer.peerId);
+            this.emit('installed', peer);
           }
         } catch (err) {
           await this.removePeer(peerId);
@@ -172,6 +173,7 @@ export class NetworkManager extends EventEmitter {
         );
         if (results.reduce((a, b) => a || b, false)) {
           logger.info('💬 Peer discovered:', peer.peerId);
+          this.emit('installed', peer);
         }
       } catch (err) {
         await this.removePeer(id);

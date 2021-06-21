@@ -1,10 +1,15 @@
+import EventEmitter from 'events';
 import { bufferToInt, bufferToHex, rlp, BN } from 'ethereumjs-util';
 import { TxFromValuesArray, TypedTransaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/structure';
-import { logger } from '@gxchain2/utils';
-import { Protocol, ProtocolHandler, Peer, MsgQueue } from '@gxchain2/network';
+import { logger, Channel } from '@gxchain2/utils';
+import { ProtocolHandler, Peer, MsgQueue } from '@gxchain2/network';
 import { Node } from '../node';
 
-export type Handler = {
+const txsyncPackSize = 102400;
+
+export class PeerRequestTimeoutError extends Error {}
+
+type Handler = {
   name: string;
   code: number;
   response?: number;
@@ -176,26 +181,6 @@ const wireHandlers: Handler[] = [
   }
 ];
 
-export class WireProtocol implements Protocol {
-  readonly node: Node;
-
-  constructor(node: Node) {
-    this.node = node;
-  }
-
-  get name() {
-    return '';
-  }
-
-  get protocolString() {
-    return '';
-  }
-
-  makeHandler(peer: Peer) {
-    return new WireProtocolHandler(this.node, this, peer);
-  }
-}
-
 function findHandler(method: string | number) {
   const handler = wireHandlers.find((h) => (typeof method === 'string' ? h.name === method : h.code === method));
   if (!handler) {
@@ -204,15 +189,14 @@ function findHandler(method: string | number) {
   return handler;
 }
 
-export class WireProtocolHandler implements ProtocolHandler {
+export class WireProtocolHandler extends EventEmitter implements ProtocolHandler {
   readonly node: Node;
   readonly peer: Peer;
-  readonly protocol: Protocol;
+  readonly name: string;
+  protected readonly onDestroy: () => void;
   private _status: any;
+
   private queue?: MsgQueue;
-  private handshakeResolve?: (result: boolean) => void;
-  private handshakeTimeout?: NodeJS.Timeout;
-  private readonly handshakePromise: Promise<boolean>;
   private readonly waitingRequests = new Map<
     number,
     {
@@ -222,25 +206,54 @@ export class WireProtocolHandler implements ProtocolHandler {
     }
   >();
 
+  private handshakeResolve?: (result: boolean) => void;
+  private handshakeTimeout?: NodeJS.Timeout;
+  private readonly handshakePromise: Promise<boolean>;
+
+  private newBlockAnnouncesQueue: Channel<{ block: Block; td: BN }>;
+  private txAnnouncesQueue: Channel<Buffer>;
+
   get status() {
     return this._status;
   }
 
-  constructor(node: Node, protocol: Protocol, peer: Peer) {
-    this.node = node;
-    this.peer = peer;
-    this.protocol = protocol;
+  constructor(options: { node: Node; name: string; peer: Peer; onDestroy: () => void }) {
+    super();
+    this.node = options.node;
+    this.peer = options.peer;
+    this.name = options.name;
+    this.onDestroy = options.onDestroy;
     this.handshakePromise = new Promise<boolean>((resolve) => {
       this.handshakeResolve = resolve;
     });
+    this.newBlockAnnouncesQueue = new Channel<{ block: Block; td: BN }>({ max: 1 });
+    this.txAnnouncesQueue = new Channel<Buffer>();
+  }
+
+  private async newBlockAnnouncesLoop() {
+    for await (const { block, td } of this.newBlockAnnouncesQueue.generator()) {
+      this.newBlock(block, td);
+    }
+  }
+
+  private async txAnnouncesLoop() {
+    let hashesCache: Buffer[] = [];
+    for await (const hash of this.txAnnouncesQueue.generator()) {
+      hashesCache.push(hash);
+      if (hashesCache.length < txsyncPackSize && this.txAnnouncesQueue.array.length > 0) {
+        continue;
+      }
+      this.newPooledTransactionHashes(hashesCache);
+      hashesCache = [];
+    }
   }
 
   private getMsgQueue() {
-    return this.queue ? this.queue : (this.queue = this.peer.getMsgQueue(this.protocol.name));
+    return this.queue ? this.queue : (this.queue = this.peer.getMsgQueue(this.name));
   }
 
   updateStatus(newStatus: any) {
-    this._status = Object.assign(this._status, newStatus);
+    this._status = { ...this._status, ...newStatus };
   }
 
   handshake() {
@@ -269,18 +282,44 @@ export class WireProtocolHandler implements ProtocolHandler {
     }
   }
 
+  request(method: string, data: any) {
+    const handler = findHandler(method);
+    if (!handler.response) {
+      throw new Error(`WireProtocolHandler invalid request: ${method}`);
+    }
+    if (this.waitingRequests.has(handler.response!)) {
+      throw new Error(`WireProtocolHandler repeated request: ${method}`);
+    }
+    return new Promise<any>((resolve, reject) => {
+      this.waitingRequests.set(handler.response!, {
+        reject,
+        resolve,
+        timeout: setTimeout(() => {
+          this.waitingRequests.delete(handler.response!);
+          reject(new PeerRequestTimeoutError(`WireProtocolHandler timeout request: ${method}`));
+        }, 8000)
+      });
+      this.getMsgQueue().send(method, data);
+    });
+  }
+
   abort() {
     if (this.handshakeResolve) {
       this.handshakeResolve(false);
+      this.handshakeResolve = undefined;
       if (this.handshakeTimeout) {
         clearTimeout(this.handshakeTimeout);
+        this.handshakeTimeout = undefined;
       }
     }
     for (const [response, request] of this.waitingRequests) {
       clearTimeout(request.timeout);
-      request.reject(new Error('WireProtocol abort'));
+      request.reject(new Error('WireProtocolHandler abort'));
     }
     this.waitingRequests.clear();
+    this.newBlockAnnouncesQueue.abort();
+    this.txAnnouncesQueue.abort();
+    this.onDestroy();
   }
 
   encode(method: string | number, data: any) {
@@ -310,10 +349,44 @@ export class WireProtocolHandler implements ProtocolHandler {
               this.getMsgQueue().send(method, resps);
             })
             .catch((err) => {
-              logger.error('WireProtocolHandler::handle, error:', err);
+              logger.error('WireProtocolHandler::process, catch error:', err);
             });
         }
       }
     }
+  }
+
+  private newBlock(block: Block, td: BN) {
+    this.getMsgQueue().send('NewBlock', { block: block.hash(), td });
+  }
+
+  private newBlockHashes(hashes: Buffer[]) {
+    this.getMsgQueue().send('NewBlockHashes', hashes);
+  }
+
+  private newPooledTransactionHashes(hashes: Buffer[]) {
+    this.getMsgQueue().send('NewPooledTransactionHashes', hashes);
+  }
+
+  getBlockHeaders(start: number, count: number): Promise<BlockHeader[]> {
+    return this.request('GetBlockHeaders', { start, count });
+  }
+
+  getBlockBodies(headers: BlockHeader[]): Promise<TypedTransaction[][]> {
+    return this.request('GetBlockBodies', headers);
+  }
+
+  getPooledTransactions(hashes: Buffer[]): Promise<TypedTransaction[]> {
+    return this.request('GetPooledTransactions', hashes);
+  }
+
+  announceTx(hashes: Buffer[]) {
+    for (const hash of hashes) {
+      this.txAnnouncesQueue.push(hash);
+    }
+  }
+
+  announceNewBlock(block: Block, td: BN) {
+    this.newBlockAnnouncesQueue.push({ block, td });
   }
 }

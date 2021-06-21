@@ -1,8 +1,8 @@
-import { HChannel, PChannel, getRandomIntInclusive, logger } from '@gxchain2/utils';
+import { HChannel, PChannel, logger } from '@gxchain2/utils';
 import { emptyTxTrie, BlockHeader, Block } from '@gxchain2/structure';
 import { Node } from '../../node';
-import { Peer, PeerRequestTimeoutError } from '@gxchain2/network';
-import { GXC2_ETHWIRE } from '@gxchain2/common/dist/constants';
+import { Peer } from '@gxchain2/network';
+import { PeerRequestTimeoutError, WireProtocol, WireProtocolHandler, GetHandlerTimeoutError } from '../../protocols';
 
 export interface FetcherOptions {
   node: Node;
@@ -16,6 +16,7 @@ export class Fetcher {
   private node: Node;
   private count: number;
   private banPeer: (peer: Peer, reason: 'invalid' | 'timeout' | 'error') => void;
+
   private downloadLimit: number;
   private downloadParallel: number = 0;
   private downloadParallelResolve?: () => void;
@@ -30,7 +31,7 @@ export class Fetcher {
 
   private blockQueue: PChannel<Block>;
   private downloadBodiesQueue: HChannel<BlockHeader>;
-  private idlePeerResolve?: (peer?: Peer) => void;
+  private uselessHandlers = new Set<WireProtocolHandler>();
 
   constructor(options: FetcherOptions) {
     this.node = options.node;
@@ -45,14 +46,23 @@ export class Fetcher {
 
   /**
    * Fetch blocks from specified peer
-   * @param start - start height of block
-   * @param count - the number of blocks to fetch
-   * @param peerId - the id of peer
+   * @param start - start height of sync
+   * @param count - sync block count
+   * @param handler - best peer handler
    */
-  async fetch(start: number, count: number, peerId: string) {
+  async fetch(start: number, count: number, handler: WireProtocolHandler) {
     this.bestHeight = start + count;
     this.localHeight = start;
-    await Promise.all([this.downloadHeader(start, count, peerId), this.downloadBodiesLoop(), this.processBlockLoop()]);
+    try {
+      await Promise.all([this.downloadHeader(start, count, handler), this.downloadBodiesLoop(), this.processBlockLoop()]);
+    } catch (err) {
+      throw err;
+    } finally {
+      for (const handler of this.uselessHandlers) {
+        WireProtocol.getPool().put(handler);
+      }
+      this.uselessHandlers.clear();
+    }
   }
 
   reset() {
@@ -64,9 +74,6 @@ export class Fetcher {
   abort() {
     logger.debug('Fetcher::abort');
     this.abortFlag = true;
-    if (this.idlePeerResolve) {
-      this.idlePeerResolve(undefined);
-    }
     if (this.downloadParallelResolve) {
       this.downloadParallelResolve();
       this.downloadParallelResolve = undefined;
@@ -80,7 +87,7 @@ export class Fetcher {
     this.blockQueue.abort();
   }
 
-  private async downloadHeader(start: number, count: number, peerId: string) {
+  private async downloadHeader(start: number, count: number, handler: WireProtocolHandler) {
     let i = 0;
     const headerTaskQueue: { start: number; count: number }[] = [];
     while (count > 0) {
@@ -96,35 +103,30 @@ export class Fetcher {
       if (this.abortFlag) {
         return;
       }
-      const peer = this.node.networkMngr.getPeer(peerId);
-      if (!peer) {
-        this.abort();
-        return;
-      }
       try {
-        const headers: BlockHeader[] = await peer.getBlockHeaders(start, count);
+        const headers: BlockHeader[] = await handler.getBlockHeaders(start, count);
         if (headers.length !== count) {
           logger.warn('Fetcher::downloadHeader, invalid header(length)');
           this.abort();
-          this.banPeer(peer, 'invalid');
+          this.banPeer(handler.peer, 'invalid');
           return;
         }
         for (let index = 1; i < headers.length; i++) {
           if (!headers[index - 1].hash().equals(headers[index].parentHash)) {
             logger.warn('Fetcher::downloadHeader, invalid header(parentHash)');
             this.abort();
-            this.banPeer(peer, 'invalid');
+            this.banPeer(handler.peer, 'invalid');
             return;
           }
         }
-        logger.info('Download headers start:', start, 'count:', count, 'from:', peer.peerId);
+        logger.info('Download headers start:', start, 'count:', count, 'from:', handler.peer.peerId);
         for (const header of headers) {
           this.downloadBodiesQueue.push(header);
         }
       } catch (err) {
         logger.error('Fetcher::downloadHeader, catch error:', err);
         this.abort();
-        this.banPeer(peer, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
+        this.banPeer(handler.peer, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
         return;
       }
       if (this.processParallelPromise) {
@@ -133,19 +135,7 @@ export class Fetcher {
     }
   }
 
-  private findIdlePeer(uselessPeer: Set<string>, height: number) {
-    const peers = this.node.networkMngr.peers.filter((p) => p.bodiesIdle && p.isSupport(GXC2_ETHWIRE) && p.getStatus(GXC2_ETHWIRE).height >= height && !uselessPeer.has(p.peerId));
-    let peer: Peer | undefined;
-    if (peers.length === 1) {
-      peer = peers[0];
-    } else if (peers.length > 0) {
-      peer = peers[getRandomIntInclusive(0, peers.length - 1)];
-    }
-    return peer;
-  }
-
   private async downloadBodiesLoop() {
-    const uselessPeer = new Set<string>();
     let headersCache: BlockHeader[] = [];
     for await (const header of this.downloadBodiesQueue.generator()) {
       headersCache.push(header);
@@ -155,38 +145,7 @@ export class Fetcher {
       const headers = [...headersCache];
       headersCache = [];
 
-      let peer = this.findIdlePeer(uselessPeer, headers[headers.length - 1].number.toNumber());
-      if (!peer) {
-        // set timeout for find idle peer.
-        const timeout = setTimeout(() => {
-          if (this.idlePeerResolve) {
-            logger.debug('Fetcher, find peer timeout!');
-            this.idlePeerResolve();
-          } else {
-            logger.debug("Fetcher, find peer timeout, but can't resolve!");
-          }
-        }, 3000);
-        peer = await new Promise<Peer | undefined>((resolve) => {
-          this.idlePeerResolve = resolve;
-          this.node.networkMngr.on('idle', () => {
-            const newPeer = this.findIdlePeer(uselessPeer, headers[headers.length - 1].number.toNumber());
-            if (newPeer) {
-              resolve(newPeer);
-            }
-          });
-        });
-        clearTimeout(timeout);
-        this.idlePeerResolve = undefined;
-        this.node.networkMngr.removeAllListeners('idle');
-        if (peer === undefined) {
-          this.abort();
-          continue;
-        }
-        if (this.abortFlag) {
-          continue;
-        }
-      }
-      peer.bodiesIdle = false;
+      const handler = await WireProtocol.getPool().get();
 
       const retry = () => {
         if (!this.abortFlag) {
@@ -196,7 +155,8 @@ export class Fetcher {
         }
       };
       this.downloadParallel++;
-      peer
+
+      handler
         .getBlockBodies(headers)
         .then(async (bodies) => {
           this.downloadParallel--;
@@ -207,7 +167,7 @@ export class Fetcher {
 
           if (bodies.length !== headers.length) {
             logger.warn('Fetcher::downloadBodiesLoop, invalid bodies(length)');
-            this.banPeer(peer!, 'invalid');
+            this.banPeer(handler.peer, 'invalid');
             return retry();
           }
           const blocks: Block[] = [];
@@ -218,31 +178,30 @@ export class Fetcher {
               const block = Block.fromBlockData({ header, transactions }, { common: this.node.getCommon(header.number), hardforkByBlockNumber: true });
               // the target peer does not have the block body, so it is marked as a useless peer.
               if (!block.header.transactionsTrie.equals(emptyTxTrie) && transactions.length === 0) {
-                uselessPeer.add(peer!.peerId);
-                logger.debug('Fetcher, ', peer!.peerId, 'add to useless peer');
-                peer!.bodiesIdle = true;
+                this.uselessHandlers.add(handler);
+                logger.debug('Fetcher, ', handler.peer.peerId, 'add to useless peer');
                 return retry();
               }
               await block.validateData();
               blocks.push(block);
             } catch (err) {
               logger.warn('Fetcher::downloadBodiesLoop, invalid bodies(validateData)', err);
-              this.banPeer(peer!, 'invalid');
+              this.banPeer(handler.peer, 'invalid');
               return retry();
             }
           }
-          logger.info('Download bodies start:', headers[0].number.toNumber(), 'count:', headers.length, 'from:', peer!.peerId);
+          logger.info('Download bodies start:', headers[0].number.toNumber(), 'count:', headers.length, 'from:', handler.peer.peerId);
           if (!this.abortFlag) {
             for (const block of blocks) {
               this.blockQueue.push({ data: block, index: block.header.number.toNumber() - this.localHeight - 1 });
             }
           }
-          peer!.bodiesIdle = true;
+          WireProtocol.getPool().put(handler);
         })
         .catch((err) => {
-          peer!.bodiesIdle = true;
+          WireProtocol.getPool().remove(handler);
           logger.error('Fetcher::downloadBodiesLoop, download failed error:', err);
-          this.banPeer(peer!, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
+          this.banPeer(handler.peer, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
           return retry();
         });
       if (this.downloadParallel >= this.downloadLimit) {

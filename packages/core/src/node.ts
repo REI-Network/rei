@@ -19,6 +19,7 @@ import { Miner } from './miner';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter } from './bloombits';
 import { BlockchainMonitor } from './blockchainmonitor';
+import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
 
 export interface NodeOptions {
   databasePath: string;
@@ -208,16 +209,16 @@ export class Node {
 
     this.txSync = new TxFetcher(this);
     this.networkMngr = new NetworkManager({
-      node: this,
+      protocols: createProtocolsByNames(this, [NetworkProtocol.GXC2_ETHWIRE]),
       peerId,
       dbPath: path.join(options.databasePath, 'networkdb'),
       ...options?.p2p
     })
-      .on('added', (peer) => {
-        const status = peer.getStatus(constants.GXC2_ETHWIRE);
-        if (status && status.height !== undefined) {
-          this.sync.announce(peer, status.height, new BN(status.totalDifficulty));
-          peer.announceTx(this.txPool.getPooledTransactionHashes());
+      .on('installed', (peer) => {
+        if (peer.isSupport(NetworkProtocol.GXC2_ETHWIRE)) {
+          const handler = WireProtocol.getHandler(peer);
+          this.sync.announce(peer, handler.status.height, new BN(handler.status.totalDifficulty));
+          handler.announceTx(this.txPool.getPooledTransactionHashes());
         }
       })
       .on('removed', (peer) => {
@@ -310,10 +311,8 @@ export class Node {
               const hashes = Array.from(readies.values())
                 .reduce((a, b) => a.concat(b), [])
                 .map((tx) => tx.hash());
-              for (const peer of this.networkMngr.peers) {
-                if (peer.isSupport(constants.GXC2_ETHWIRE)) {
-                  peer.announceTx(hashes);
-                }
+              for (const handler of WireProtocol.getPool().handlers) {
+                handler.announceTx(hashes);
               }
               await this.miner.worker.addTxs(readies);
             }
@@ -325,10 +324,8 @@ export class Node {
         } else if (task instanceof NewBlockTask) {
           const { block } = task;
           const td = await this.db.getTotalDifficulty(block.hash(), block.header.number);
-          for (const peer of this.networkMngr.peers) {
-            if (peer.isSupport(constants.GXC2_ETHWIRE)) {
-              peer.announceNewBlock(block, td);
-            }
+          for (const handler of WireProtocol.getPool().handlers) {
+            handler.announceNewBlock(block, td);
           }
           await this.txPool.newBlock(block);
           await Promise.all([this.miner.worker.newBlockHeader(block.header), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)]);

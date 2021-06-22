@@ -1,11 +1,14 @@
-import EventEmitter from 'events';
-import { bufferToInt, bufferToHex, rlp, BN } from 'ethereumjs-util';
+import { bufferToInt, rlp, BN } from 'ethereumjs-util';
 import { TxFromValuesArray, TypedTransaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/structure';
-import { logger, Channel } from '@gxchain2/utils';
+import { logger, Channel, createBufferFunctionalSet } from '@gxchain2/utils';
 import { ProtocolHandler, Peer, MsgQueue } from '@gxchain2/network';
 import { Node, NodeStatus } from '../node';
 
-const txsyncPackSize = 102400;
+const maxTxPacketSize = 102400;
+const maxKnownTxs = 32768;
+const maxKnownBlocks = 1024;
+const maxQueuedTxs = 4096;
+const maxQueuedBlocks = 4;
 
 export class PeerRequestTimeoutError extends Error {}
 
@@ -126,6 +129,7 @@ const wireHandlers: Handler[] = [
     process(this: WireProtocolHandler, { block, td }: { block: Block; td: BN }) {
       const height = block.header.number.toNumber();
       const bestHash = block.hash();
+      this.knowBlocks([bestHash]);
       const totalDifficulty = td.toBuffer();
       this.updateStatus({ height, bestHash, totalDifficulty });
       this.node.sync.announce(this.peer);
@@ -141,6 +145,7 @@ const wireHandlers: Handler[] = [
       return hashes;
     },
     process(this: WireProtocolHandler, hashes: Buffer[]) {
+      this.knowTxs(hashes);
       this.node.txSync.newPooledTransactionHashes(this.peer.peerId, hashes);
     }
   },
@@ -178,7 +183,7 @@ function findHandler(method: string | number) {
   return handler;
 }
 
-export class WireProtocolHandler extends EventEmitter implements ProtocolHandler {
+export class WireProtocolHandler implements ProtocolHandler {
   readonly node: Node;
   readonly peer: Peer;
   readonly name: string;
@@ -193,6 +198,8 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
       timeout: NodeJS.Timeout;
     }
   >();
+  private _knowTxs = createBufferFunctionalSet();
+  private _knowBlocks = createBufferFunctionalSet();
 
   private handshakeResolve?: (result: boolean) => void;
   private handshakeTimeout?: NodeJS.Timeout;
@@ -206,15 +213,14 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
   }
 
   constructor(options: { node: Node; name: string; peer: Peer }) {
-    super();
     this.node = options.node;
     this.peer = options.peer;
     this.name = options.name;
     this.handshakePromise = new Promise<boolean>((resolve) => {
       this.handshakeResolve = resolve;
     });
-    this.newBlockAnnouncesQueue = new Channel<{ block: Block; td: BN }>({ max: 1 });
-    this.txAnnouncesQueue = new Channel<Buffer>();
+    this.newBlockAnnouncesQueue = new Channel<{ block: Block; td: BN }>({ max: maxQueuedBlocks });
+    this.txAnnouncesQueue = new Channel<Buffer>({ max: maxQueuedTxs });
     this.newBlockAnnouncesLoop();
     this.txAnnouncesLoop();
   }
@@ -239,7 +245,7 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
     let hashesCache: Buffer[] = [];
     for await (const hash of this.txAnnouncesQueue.generator()) {
       hashesCache.push(hash);
-      if (hashesCache.length < txsyncPackSize && this.txAnnouncesQueue.array.length > 0) {
+      if (hashesCache.length < maxTxPacketSize && this.txAnnouncesQueue.array.length > 0) {
         continue;
       }
       try {
@@ -255,13 +261,53 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
     return this.queue ? this.queue : (this.queue = this.peer.getMsgQueue(this.name));
   }
 
+  private filterHash<T>(know: Set<Buffer>, data: T[], toHash?: (t: T) => Buffer) {
+    const filtered: T[] = [];
+    for (const t of data) {
+      const hash = Buffer.isBuffer(t) ? t : toHash!(t);
+      if (!know.has(hash)) {
+        filtered.push(t);
+      }
+    }
+    return filtered;
+  }
+
+  private filterTxs<T>(data: T[], toHash?: (t: T) => Buffer) {
+    return this.filterHash(this._knowTxs, data, toHash);
+  }
+
+  private filterBlocks<T>(data: T[], toHash?: (t: T) => Buffer) {
+    return this.filterHash(this._knowBlocks, data, toHash);
+  }
+
+  private knowHash(know: Set<Buffer>, max: number, hashs: Buffer[]) {
+    if (hashs.length >= max) {
+      throw new Error(`WireProtocolHandler invalid hash length: ${hashs.length}`);
+    }
+    while (know.size + hashs.length >= max) {
+      const { value } = know.keys().next();
+      know.delete(value);
+    }
+    for (const h of hashs) {
+      know.add(h);
+    }
+  }
+
+  knowTxs(hashs: Buffer[]) {
+    this.knowHash(this._knowTxs, maxKnownTxs, hashs);
+  }
+
+  knowBlocks(hashs: Buffer[]) {
+    this.knowHash(this._knowBlocks, maxKnownBlocks, hashs);
+  }
+
   updateStatus(newStatus: Partial<NodeStatus>) {
     this._status = { ...this._status!, ...newStatus };
   }
 
   handshake() {
     if (!this.handshakeResolve) {
-      throw new Error('Repeat handshake');
+      throw new Error('WireProtocolHandler repeat handshake');
     }
     this.getMsgQueue().send(0, this.node.status);
     this.handshakeTimeout = setTimeout(() => {
@@ -359,15 +405,27 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
   }
 
   private newBlock(block: Block, td: BN) {
-    this.getMsgQueue().send('NewBlock', { block, td });
+    const filtered = this.filterBlocks([block], (b) => b.hash());
+    if (filtered.length > 0) {
+      this.getMsgQueue().send('NewBlock', { block, td });
+      this.knowBlocks([block.hash()]);
+    }
   }
 
   private newBlockHashes(hashes: Buffer[]) {
-    this.getMsgQueue().send('NewBlockHashes', hashes);
+    const filtered = this.filterBlocks(hashes, (h) => h);
+    if (filtered.length > 0) {
+      this.getMsgQueue().send('NewBlockHashes', filtered);
+      this.knowBlocks(filtered);
+    }
   }
 
   private newPooledTransactionHashes(hashes: Buffer[]) {
-    this.getMsgQueue().send('NewPooledTransactionHashes', hashes);
+    const filtered = this.filterTxs(hashes, (h) => h);
+    if (filtered.length > 0) {
+      this.getMsgQueue().send('NewPooledTransactionHashes', filtered);
+      this.knowTxs(filtered);
+    }
   }
 
   getBlockHeaders(start: number, count: number): Promise<BlockHeader[]> {

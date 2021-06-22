@@ -1,4 +1,3 @@
-import { EventEmitter } from 'events';
 import { BN, Address } from 'ethereumjs-util';
 import EthereumBlockchain, { BlockchainOptions as EthereumBlockchainOptions } from '@ethereumjs/blockchain';
 import { CliqueLatestSignerStates } from '@ethereumjs/blockchain/dist/clique';
@@ -9,16 +8,7 @@ export interface BlockchainOptions extends EthereumBlockchainOptions {
   database: Database;
 }
 
-export declare interface BlockchainEventEmitter {
-  on(event: 'updated', listener: (block: Block) => void): this;
-
-  once(event: 'updated', listener: (block: Block) => void): this;
-}
-
-export class BlockchainEventEmitter extends EventEmitter {}
-
 export class Blockchain extends EthereumBlockchain {
-  event: BlockchainEventEmitter = new BlockchainEventEmitter();
   dbManager: Database;
   private _latestBlock!: Block;
   private _totalDifficulty!: BN;
@@ -182,7 +172,6 @@ export class Blockchain extends EthereumBlockchain {
     if (!this._latestBlock || !latestBlock.header.hash().equals(this._latestBlock.header.hash())) {
       this._latestBlock = latestBlock;
       this._totalDifficulty = await this.getTotalDifficulty(latestBlock.hash(), latestBlock.header.number);
-      this.event.emit('updated', this._latestBlock);
     }
   }
 

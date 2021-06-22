@@ -182,7 +182,6 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
   readonly node: Node;
   readonly peer: Peer;
   readonly name: string;
-  protected readonly onDestroy: () => void;
   private _status: any;
 
   private queue?: MsgQueue;
@@ -206,12 +205,11 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
     return this._status;
   }
 
-  constructor(options: { node: Node; name: string; peer: Peer; onDestroy: () => void }) {
+  constructor(options: { node: Node; name: string; peer: Peer }) {
     super();
     this.node = options.node;
     this.peer = options.peer;
     this.name = options.name;
-    this.onDestroy = options.onDestroy;
     this.handshakePromise = new Promise<boolean>((resolve) => {
       this.handshakeResolve = resolve;
     });
@@ -324,7 +322,6 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
     this.waitingRequests.clear();
     this.newBlockAnnouncesQueue.abort();
     this.txAnnouncesQueue.abort();
-    this.onDestroy();
   }
 
   encode(method: string | number, data: any) {

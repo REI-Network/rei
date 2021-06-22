@@ -47,16 +47,11 @@ export class WireProtocol implements Protocol {
   }
 
   makeHandler(peer: Peer) {
-    const pool = WireProtocol.getPool();
     const handler = new WireProtocolHandler({
       node: this.node,
       name: this.name,
-      peer,
-      onDestroy: () => {
-        pool.remove(handler);
-      }
+      peer
     });
-    pool.add(handler);
     return handler;
   }
 

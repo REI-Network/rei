@@ -215,13 +215,17 @@ export class Node {
         const handler = WireProtocol.getHandler(peer, false);
         if (handler) {
           handler.announceTx(this.txPool.getPooledTransactionHashes());
+          WireProtocol.getPool().add(handler);
         }
       })
       .on('removed', (peer) => {
         this.txSync.dropPeer(peer.peerId);
+        const handler = WireProtocol.getHandler(peer, false);
+        if (handler) {
+          WireProtocol.getPool().remove(handler);
+        }
       });
     await this.networkMngr.init();
-
     this.miner = new Miner(this, options.mine);
     await this.txPool.init();
     this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: BloomBitsBlocks, confirmsBlockNumber: ConfirmsBlockNumber });

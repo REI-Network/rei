@@ -3,7 +3,7 @@ import { bufferToInt, bufferToHex, rlp, BN } from 'ethereumjs-util';
 import { TxFromValuesArray, TypedTransaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/structure';
 import { logger, Channel } from '@gxchain2/utils';
 import { ProtocolHandler, Peer, MsgQueue } from '@gxchain2/network';
-import { Node } from '../node';
+import { Node, NodeStatus } from '../node';
 
 const txsyncPackSize = 102400;
 
@@ -22,11 +22,11 @@ const wireHandlers: Handler[] = [
   {
     name: 'Status',
     code: 0,
-    encode(this: WireProtocolHandler, data) {
+    encode(this: WireProtocolHandler, data: NodeStatus) {
       const payload: any = Object.entries(data).map(([k, v]) => [k, v]);
       return [0, payload];
     },
-    decode(this: WireProtocolHandler, data) {
+    decode(this: WireProtocolHandler, data): NodeStatus {
       const status: any = {};
       data.forEach(([k, v]: any) => {
         status[k.toString()] = v;
@@ -39,7 +39,7 @@ const wireHandlers: Handler[] = [
         genesisHash: status.genesisHash
       };
     },
-    process(this: WireProtocolHandler, status: any) {
+    process(this: WireProtocolHandler, status: NodeStatus) {
       this.handshakeResponse(status);
     }
   },
@@ -125,8 +125,8 @@ const wireHandlers: Handler[] = [
     },
     process(this: WireProtocolHandler, { block, td }: { block: Block; td: BN }) {
       const height = block.header.number.toNumber();
-      const bestHash = bufferToHex(block.hash());
-      const totalDifficulty = td.toString();
+      const bestHash = block.hash();
+      const totalDifficulty = td.toBuffer();
       this.updateStatus({ height, bestHash, totalDifficulty });
       this.node.sync.announce(this.peer);
     }
@@ -182,7 +182,7 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
   readonly node: Node;
   readonly peer: Peer;
   readonly name: string;
-  private _status: any;
+  private _status?: NodeStatus;
 
   private queue?: MsgQueue;
   private readonly waitingRequests = new Map<
@@ -255,8 +255,8 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
     return this.queue ? this.queue : (this.queue = this.peer.getMsgQueue(this.name));
   }
 
-  updateStatus(newStatus: any) {
-    this._status = { ...this._status, ...newStatus };
+  updateStatus(newStatus: Partial<NodeStatus>) {
+    this._status = { ...this._status!, ...newStatus };
   }
 
   handshake() {
@@ -273,7 +273,7 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
     return this.handshakePromise;
   }
 
-  handshakeResponse(status: any) {
+  handshakeResponse(status: NodeStatus) {
     if (this.handshakeResolve) {
       this.updateStatus(status);
       this.handshakeResolve(true);

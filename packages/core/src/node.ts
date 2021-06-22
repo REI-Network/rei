@@ -25,6 +25,14 @@ const timeoutBanTime = 60 * 5 * 1000;
 const errorBanTime = 60 * 1000;
 const invalidBanTime = 60 * 10 * 1000;
 
+export type NodeStatus = {
+  networkId: number;
+  totalDifficulty: Buffer;
+  height: number;
+  bestHash: Buffer;
+  genesisHash: Buffer;
+};
+
 export interface NodeOptions {
   databasePath: string;
   chain?: string;
@@ -101,7 +109,7 @@ export class Node {
   /**
    * Get the status of the node syncing
    */
-  get status() {
+  get status(): NodeStatus {
     return {
       networkId: this.networkId,
       totalDifficulty: this.blockchain.totalDifficulty.toBuffer(),

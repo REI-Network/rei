@@ -41,7 +41,7 @@ export class FullSynchronizer extends Synchronizer {
    */
   announce(peer: Peer) {
     const handler = WireProtocol.getHandler(peer);
-    if (handler && !this.isSyncing && this.node.blockchain.totalDifficulty.lt(new BN(handler.status.totalDifficulty))) {
+    if (handler && !this.isSyncing && this.node.blockchain.totalDifficulty.lt(new BN(handler.status!.totalDifficulty))) {
       this.sync(peer);
     }
   }
@@ -60,8 +60,8 @@ export class FullSynchronizer extends Synchronizer {
 
       if (peer) {
         this.bestPeerHandler = WireProtocol.getHandler(peer);
-        this.bestHeight = this.bestPeerHandler.status.height;
-        this.bestTD = new BN(this.bestPeerHandler.status.totalDifficulty);
+        this.bestHeight = this.bestPeerHandler.status!.height;
+        this.bestTD = new BN(this.bestPeerHandler.status!.totalDifficulty);
         if (this.bestTD.lt(this.node.blockchain.totalDifficulty)) {
           syncFailed();
           return;
@@ -69,7 +69,7 @@ export class FullSynchronizer extends Synchronizer {
       } else {
         this.bestTD = this.node.blockchain.totalDifficulty;
         for (const handler of WireProtocol.getPool().handlers) {
-          const remoteStatus = handler.status;
+          const remoteStatus = handler.status!;
           const td = new BN(remoteStatus.totalDifficulty);
           if (td.gt(this.bestTD)) {
             this.bestPeerHandler = handler;

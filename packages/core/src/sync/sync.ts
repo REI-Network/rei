@@ -9,14 +9,14 @@ export interface SynchronizerOptions {
 }
 
 export declare interface Synchronizer {
-  on(event: 'start synchronize', listener: () => void): this;
+  on(event: 'start', listener: () => void): this;
   on(event: 'synchronized', listener: () => void): this;
-  on(event: 'synchronize failed', listener: () => void): this;
+  on(event: 'failed', listener: () => void): this;
   on(event: 'error', listener: (err: any) => void): this;
 
-  once(event: 'start synchronize', listener: () => void): this;
+  once(event: 'start', listener: () => void): this;
   once(event: 'synchronized', listener: () => void): this;
-  once(event: 'synchronize failed', listener: () => void): this;
+  once(event: 'failed', listener: () => void): this;
   once(event: 'error', listener: (err: any) => void): this;
 }
 
@@ -51,7 +51,7 @@ export abstract class Synchronizer extends EventEmitter {
   protected startSyncHook(startingBlock: number, highestBlock: number) {
     this.startingBlock = startingBlock;
     this.highestBlock = highestBlock;
-    this.emit('start synchronize');
+    this.emit('start');
   }
 
   protected async _sync(peer?: Peer): Promise<boolean> {
@@ -73,7 +73,7 @@ export abstract class Synchronizer extends EventEmitter {
             logger.info('💫 Synchronized');
             this.emit('synchronized');
           } else {
-            this.emit('synchronize failed');
+            this.emit('failed');
           }
           await this.node.newBlock(this.node.blockchain.latestBlock);
         }

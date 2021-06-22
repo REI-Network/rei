@@ -27,7 +27,7 @@ export class Miner extends Loop {
     this._gasLimit = this?.options?.gasLimit ? hexStringToBN(this.options.gasLimit) : hexStringToBN('0xbe5c8b');
     this.worker = new Worker(node, this);
     this.initPromise = this.init();
-    node.sync.on('start synchronize', () => {
+    node.sync.on('start', () => {
       this.worker.stopLoop();
       this.stopLoop();
     });
@@ -35,7 +35,7 @@ export class Miner extends Loop {
       this.worker.startLoop();
       this.startLoop();
     });
-    node.sync.on('synchronize failed', () => {
+    node.sync.on('failed', () => {
       this.worker.startLoop();
       this.startLoop();
     });

@@ -1,5 +1,4 @@
 import { EventEmitter } from 'events';
-import { BN } from 'ethereumjs-util';
 import { logger } from '@gxchain2/utils';
 import { Peer } from '@gxchain2/network';
 import type { Node } from '../node';
@@ -21,10 +20,9 @@ export declare interface Synchronizer {
   once(event: 'error', listener: (err: any) => void): this;
 }
 
-export class Synchronizer extends EventEmitter {
+export abstract class Synchronizer extends EventEmitter {
   protected readonly node: Node;
   protected readonly interval: number;
-  protected running: boolean = false;
   protected forceSync: boolean = false;
   protected startingBlock: number = 0;
   protected highestBlock: number = 0;
@@ -33,12 +31,13 @@ export class Synchronizer extends EventEmitter {
     super();
     this.node = options.node;
     this.interval = options.interval || 1000;
+    this.syncLoop();
   }
 
   /**
    * Get the state of syncing
    */
-  get syncStatus() {
+  get status() {
     return { startingBlock: this.startingBlock, highestBlock: this.highestBlock };
   }
 
@@ -55,7 +54,7 @@ export class Synchronizer extends EventEmitter {
     this.emit('start synchronize');
   }
 
-  protected async _sync(target?: { peer: Peer; height: number }): Promise<boolean> {
+  protected async _sync(peer?: Peer): Promise<boolean> {
     throw new Error('Unimplemented');
   }
 
@@ -63,11 +62,11 @@ export class Synchronizer extends EventEmitter {
    * Sync the blocks
    * @param target - the sync peer and height of block
    */
-  async sync(target?: { peer: Peer; height: number; td: BN }) {
+  async sync(peer?: Peer) {
     try {
       if (!this.isSyncing) {
         const beforeSync = this.node.blockchain.latestBlock.hash();
-        const result = await this._sync(target);
+        const result = await this._sync(peer);
         const afterSync = this.node.blockchain.latestBlock.hash();
         if (!beforeSync.equals(afterSync)) {
           if (result) {
@@ -80,26 +79,19 @@ export class Synchronizer extends EventEmitter {
         }
       }
     } catch (err) {
-      this.emit('error', err);
+      logger.error('Synchronizer::sync, catch error:', err);
     }
   }
 
-  async syncAbort() {
-    throw new Error('Unimplemented');
-  }
+  async abort() {}
 
-  announce(peer: Peer, height: number, td: BN) {
-    throw new Error('Unimplemented');
-  }
+  announce(peer: Peer) {}
 
   /**
    * Start the Synchronizer
    */
-  async start() {
-    if (this.running) {
-      throw new Error('Synchronizer already started!');
-    }
-    this.running = true;
+  async syncLoop() {
+    await this.node.blockchain.init();
     const timeout = setTimeout(() => {
       this.forceSync = true;
     }, this.interval * 30);
@@ -107,7 +99,6 @@ export class Synchronizer extends EventEmitter {
       await this.sync();
       await this.node.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.interval)));
     }
-    this.running = false;
     clearTimeout(timeout);
   }
 }

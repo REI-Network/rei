@@ -21,6 +21,10 @@ import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombi
 import { BlockchainMonitor } from './blockchainmonitor';
 import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
 
+const timeoutBanTime = 60 * 5 * 1000;
+const errorBanTime = 60 * 1000;
+const invalidBanTime = 60 * 10 * 1000;
+
 export interface NodeOptions {
   databasePath: string;
   chain?: string;
@@ -186,15 +190,7 @@ export class Node {
     });
     await this.blockchain.init();
 
-    this.sync = new FullSynchronizer({ node: this })
-      .on('error', (err) => {
-        logger.error('Sync error:', err);
-      })
-      .on('synchronized', () => {
-        const block = this.blockchain.latestBlock;
-        this.newBlock(block);
-      });
-
+    this.sync = new FullSynchronizer({ node: this });
     this.txPool = new TxPool({ node: this, journal: options.databasePath });
 
     let peerId!: PeerId;
@@ -215,18 +211,21 @@ export class Node {
       ...options?.p2p
     })
       .on('installed', (peer) => {
-        if (peer.isSupport(NetworkProtocol.GXC2_ETHWIRE)) {
-          const handler = WireProtocol.getHandler(peer);
-          this.sync.announce(peer, handler.status.height, new BN(handler.status.totalDifficulty));
+        this.sync.announce(peer);
+        const handler = WireProtocol.getHandler(peer, false);
+        if (handler) {
           handler.announceTx(this.txPool.getPooledTransactionHashes());
         }
       })
       .on('removed', (peer) => {
         this.txSync.dropPeer(peer.peerId);
+        const handler = WireProtocol.getHandler(peer, false);
+        if (handler) {
+          WireProtocol.getPool().remove(handler);
+        }
       });
     await this.networkMngr.init();
 
-    this.sync.start();
     this.miner = new Miner(this, options.mine);
     await this.txPool.init();
     this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: BloomBitsBlocks, confirmsBlockNumber: ConfirmsBlockNumber });
@@ -377,5 +376,15 @@ export class Node {
     await this.txPool.abort();
     await this.taskLoopPromise;
     await this.processLoopPromise;
+  }
+
+  async banPeer(peerId: string, reason: 'invalid' | 'timeout' | 'error') {
+    if (reason === 'invalid') {
+      await this.networkMngr.ban(peerId, timeoutBanTime);
+    } else if (reason === 'error') {
+      await this.networkMngr.ban(peerId, errorBanTime);
+    } else {
+      await this.networkMngr.ban(peerId, invalidBanTime);
+    }
   }
 }

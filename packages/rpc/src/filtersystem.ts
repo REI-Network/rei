@@ -86,7 +86,7 @@ export class FilterSystem {
       this.taskQueue.push(new HeadsTask(hashes));
     });
     this.node.sync.on('start synchronize', () => {
-      const status = this.node.sync.syncStatus;
+      const status = this.node.sync.status;
       const syncingStatus: SyncingStatus = {
         syncing: true,
         status: {

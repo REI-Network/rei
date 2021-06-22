@@ -1,21 +1,18 @@
 import { HChannel, PChannel, logger } from '@gxchain2/utils';
 import { emptyTxTrie, BlockHeader, Block } from '@gxchain2/structure';
 import { Node } from '../../node';
-import { Peer } from '@gxchain2/network';
-import { PeerRequestTimeoutError, WireProtocol, WireProtocolHandler, GetHandlerTimeoutError } from '../../protocols';
+import { PeerRequestTimeoutError, WireProtocol, WireProtocolHandler } from '../../protocols';
 
 export interface FetcherOptions {
   node: Node;
   count: number;
   limit: number;
-  banPeer: (peer: Peer, reason: 'invalid' | 'timeout' | 'error') => void;
 }
 
 export class Fetcher {
   private abortFlag: boolean = false;
   private node: Node;
   private count: number;
-  private banPeer: (peer: Peer, reason: 'invalid' | 'timeout' | 'error') => void;
 
   private downloadLimit: number;
   private downloadParallel: number = 0;
@@ -37,7 +34,6 @@ export class Fetcher {
     this.node = options.node;
     this.count = options.count;
     this.downloadLimit = options.limit;
-    this.banPeer = options.banPeer;
     this.blockQueue = new PChannel<Block>();
     this.downloadBodiesQueue = new HChannel<BlockHeader>({
       compare: (a, b) => a.number.lt(b.number)
@@ -108,14 +104,14 @@ export class Fetcher {
         if (headers.length !== count) {
           logger.warn('Fetcher::downloadHeader, invalid header(length)');
           this.abort();
-          this.banPeer(handler.peer, 'invalid');
+          await this.node.banPeer(handler.peer.peerId, 'invalid');
           return;
         }
         for (let index = 1; i < headers.length; i++) {
           if (!headers[index - 1].hash().equals(headers[index].parentHash)) {
             logger.warn('Fetcher::downloadHeader, invalid header(parentHash)');
             this.abort();
-            this.banPeer(handler.peer, 'invalid');
+            await this.node.banPeer(handler.peer.peerId, 'invalid');
             return;
           }
         }
@@ -126,7 +122,7 @@ export class Fetcher {
       } catch (err) {
         logger.error('Fetcher::downloadHeader, catch error:', err);
         this.abort();
-        this.banPeer(handler.peer, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
+        await this.node.banPeer(handler.peer.peerId, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
         return;
       }
       if (this.processParallelPromise) {
@@ -167,7 +163,7 @@ export class Fetcher {
 
           if (bodies.length !== headers.length) {
             logger.warn('Fetcher::downloadBodiesLoop, invalid bodies(length)');
-            this.banPeer(handler.peer, 'invalid');
+            await this.node.banPeer(handler.peer.peerId, 'invalid');
             return retry();
           }
           const blocks: Block[] = [];
@@ -186,7 +182,7 @@ export class Fetcher {
               blocks.push(block);
             } catch (err) {
               logger.warn('Fetcher::downloadBodiesLoop, invalid bodies(validateData)', err);
-              this.banPeer(handler.peer, 'invalid');
+              await this.node.banPeer(handler.peer.peerId, 'invalid');
               return retry();
             }
           }
@@ -201,7 +197,7 @@ export class Fetcher {
         .catch((err) => {
           WireProtocol.getPool().remove(handler);
           logger.error('Fetcher::downloadBodiesLoop, download failed error:', err);
-          this.banPeer(handler.peer, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
+          this.node.banPeer(handler.peer.peerId, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
           return retry();
         });
       if (this.downloadParallel >= this.downloadLimit) {

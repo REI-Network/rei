@@ -10,9 +10,9 @@ export enum NetworkProtocol {
   GXC2_ETHWIRE = 'gxc2-ethwire'
 }
 
-const pools = new Map<string, ProtocolPool<ProtocolHandler>>([[NetworkProtocol.GXC2_ETHWIRE, new ProtocolPool()]]);
+const pools = new Map<string, ProtocolPool<ProtocolHandler>>([[NetworkProtocol.GXC2_ETHWIRE, new ProtocolPool<WireProtocolHandler>()]]);
 
-function getProtocolPoolByName(name: string) {
+export function getProtocolPoolByName(name: string) {
   const pool = pools.get(name);
   if (!pool) {
     throw new Error(`Unknow protocol name: ${name}`);

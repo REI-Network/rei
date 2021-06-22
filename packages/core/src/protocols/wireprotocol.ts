@@ -127,8 +127,8 @@ const wireHandlers: Handler[] = [
       const height = block.header.number.toNumber();
       const bestHash = bufferToHex(block.hash());
       const totalDifficulty = td.toString();
-      this.node.sync.announce(this.peer, height, td);
       this.updateStatus({ height, bestHash, totalDifficulty });
+      this.node.sync.announce(this.peer);
     }
   },
   {
@@ -228,15 +228,23 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
     });
     this.newBlockAnnouncesQueue = new Channel<{ block: Block; td: BN }>({ max: 1 });
     this.txAnnouncesQueue = new Channel<Buffer>();
+    this.newBlockAnnouncesLoop();
+    this.txAnnouncesLoop();
   }
 
   private async newBlockAnnouncesLoop() {
+    if (!(await this.handshakePromise)) {
+      return;
+    }
     for await (const { block, td } of this.newBlockAnnouncesQueue.generator()) {
       this.newBlock(block, td);
     }
   }
 
   private async txAnnouncesLoop() {
+    if (!(await this.handshakePromise)) {
+      return;
+    }
     let hashesCache: Buffer[] = [];
     for await (const hash of this.txAnnouncesQueue.generator()) {
       hashesCache.push(hash);

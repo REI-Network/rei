@@ -9,18 +9,13 @@ import { WireProtocol, WireProtocolHandler, PeerRequestTimeoutError } from '../p
 export interface FullSynchronizerOptions extends SynchronizerOptions {
   limit?: number;
   count?: number;
-  timeoutBanTime?: number;
-  errorBanTime?: number;
-  invalidBanTime?: number;
 }
 
 export class FullSynchronizer extends Synchronizer {
   private readonly count: number;
   private readonly limit: number;
-  private readonly timeoutBanTime: number;
-  private readonly errorBanTime: number;
-  private readonly invalidBanTime: number;
   private readonly fetcher: Fetcher;
+
   private bestPeerHandler?: WireProtocolHandler;
   private bestHeight?: number;
   private bestTD?: BN;
@@ -30,10 +25,7 @@ export class FullSynchronizer extends Synchronizer {
     super(options);
     this.count = options.count || 128;
     this.limit = options.limit || 16;
-    this.timeoutBanTime = options.timeoutBanTime || 300000;
-    this.errorBanTime = options.timeoutBanTime || 60000;
-    this.invalidBanTime = options.invalidBanTime || 600000;
-    this.fetcher = new Fetcher({ node: this.node, count: this.count, limit: this.limit, banPeer: this.banPeer.bind(this) });
+    this.fetcher = new Fetcher({ node: this.node, count: this.count, limit: this.limit });
   }
 
   /**
@@ -45,16 +37,16 @@ export class FullSynchronizer extends Synchronizer {
 
   /**
    * Syncing switch to the peer if the peer's block height is more than the bestHeight
-   * @param peer - the syncing peer
-   * @param height - the height of block
+   * @param peer - remote peer
    */
-  announce(peer: Peer, height: number, td: BN) {
-    if (!this.isSyncing && this.node.blockchain.totalDifficulty.lt(td)) {
-      this.sync({ peer, height, td });
+  announce(peer: Peer) {
+    const handler = WireProtocol.getHandler(peer);
+    if (handler && !this.isSyncing && this.node.blockchain.totalDifficulty.lt(new BN(handler.status.totalDifficulty))) {
+      this.sync(peer);
     }
   }
 
-  protected async _sync(target?: { peer: Peer; height: number; td: BN }): Promise<boolean> {
+  protected async _sync(peer?: Peer): Promise<boolean> {
     if (this.syncingPromise) {
       throw new Error('FullSynchronizer already sync');
     }
@@ -66,10 +58,10 @@ export class FullSynchronizer extends Synchronizer {
         this.bestTD = undefined;
       };
 
-      if (target) {
-        this.bestHeight = target.height;
-        this.bestPeerHandler = WireProtocol.getHandler(target.peer);
-        this.bestTD = target.td.clone();
+      if (peer) {
+        this.bestPeerHandler = WireProtocol.getHandler(peer);
+        this.bestHeight = this.bestPeerHandler.status.height;
+        this.bestTD = new BN(this.bestPeerHandler.status.totalDifficulty);
         if (this.bestTD.lt(this.node.blockchain.totalDifficulty)) {
           syncFailed();
           return;
@@ -96,7 +88,7 @@ export class FullSynchronizer extends Synchronizer {
         logger.info('💫 Sync over, local height:', this.node.blockchain.latestHeight, 'local td:', this.node.blockchain.totalDifficulty.toString(), 'best height:', this.bestHeight, 'best td:', this.bestTD.toString());
       } catch (err) {
         syncResolve(false);
-        this.emit('error', err);
+        logger.error('FullSynchronizer::_sync, catch error:', err);
       } finally {
         this.bestHeight = undefined;
         this.bestPeerHandler = undefined;
@@ -110,21 +102,10 @@ export class FullSynchronizer extends Synchronizer {
   /**
    * Abort the sync
    */
-  async syncAbort() {
+  async abort() {
     this.fetcher.abort();
     if (this.syncingPromise) {
       await this.syncingPromise;
-    }
-  }
-
-  // TODO: this method should be removed.
-  banPeer(peer: Peer, reason: 'invalid' | 'timeout' | 'error') {
-    if (reason === 'invalid') {
-      this.node.networkMngr.ban(peer, this.invalidBanTime);
-    } else if (reason === 'error') {
-      this.node.networkMngr.ban(peer, this.errorBanTime);
-    } else {
-      this.node.networkMngr.ban(peer, this.timeoutBanTime);
     }
   }
 
@@ -142,7 +123,7 @@ export class FullSynchronizer extends Synchronizer {
       try {
         headers = await handler.getBlockHeaders(latestHeight, this.count);
       } catch (err) {
-        this.banPeer(handler.peer, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
+        await this.node.banPeer(handler.peer.peerId, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
         throw err;
       }
 

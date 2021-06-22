@@ -10,6 +10,10 @@ import { Loop } from './loop';
 import { Miner } from './miner';
 import { Node } from '../node';
 
+/**
+ * worker is the main object which takes care of submitting new work to
+ * consensus engine and gathering the sealing result
+ */
 export class Worker extends Loop {
   private readonly miner: Miner;
   private readonly node: Node;

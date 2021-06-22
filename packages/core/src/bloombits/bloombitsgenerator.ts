@@ -1,5 +1,9 @@
 import { constants } from '@gxchain2/common';
 
+/**
+ * Generator takes a number of bloom filters and generates the rotated bloom bits
+ * to be used for batched filtering.
+ */
 export class BloomBitsGenerator {
   private sections: number;
   private nextSec: number;
@@ -17,6 +21,12 @@ export class BloomBitsGenerator {
     }
   }
 
+  /**
+   * AddBloom takes a single bloom filter and sets the corresponding bit column
+   * in memory accordingly.
+   * @param index Position information
+   * @param bloom Bloom filter to be added
+   */
   addBloom(index: number, bloom: Buffer) {
     if (this.nextSec >= this.sections) {
       throw new Error('section out of bounds');
@@ -44,6 +54,12 @@ export class BloomBitsGenerator {
     this.nextSec++;
   }
 
+  /**
+   * Bitset returns the bit vector belonging to the given bit index after all
+   * blooms have been added.
+   * @param index Position information
+   * @returns A bit vector
+   */
   bitset(index: number) {
     if (this.nextSec !== this.sections) {
       throw new Error('bloom not fully generated yet');

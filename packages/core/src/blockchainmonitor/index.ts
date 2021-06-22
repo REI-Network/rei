@@ -7,6 +7,9 @@ import { Node } from '../node';
 // record block hash and block number for quering receipt.
 type TransactionInfo = { tx: TypedTransaction; blockHash: Buffer; blockNumber: BN };
 
+/**
+ * Events for new transactions and blocks in the blockchain
+ */
 export declare interface BlockchainMonitor {
   on(event: 'logs' | 'removedLogs', listener: (logs: Log[]) => void): this;
   on(event: 'newHeads', listener: (hashes: Buffer[]) => void): this;
@@ -35,6 +38,13 @@ export class BlockchainMonitor extends EventEmitter {
     this.currentHeader = this.node.blockchain.latestBlock.header;
   }
 
+  /**
+   * After getting a new block, this method will compare it with the latest block in the local database, find their
+   * common ancestor and record the new transactions, blockheads, or transactions which need to rolled back, then
+   * emit the corresponding events
+   *
+   * @param block New Block data
+   */
   async newBlock(block: Block) {
     await this.initPromise;
     try {

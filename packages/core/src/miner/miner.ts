@@ -10,6 +10,9 @@ export interface MinerOptions {
   gasLimit: string;
 }
 
+/**
+ * Miner creates blocks and searches for proof-of-work values.
+ */
 export class Miner extends Loop {
   public readonly worker: Worker;
 

@@ -219,10 +219,6 @@ export class Node {
       })
       .on('removed', (peer) => {
         this.txSync.dropPeer(peer.peerId);
-        const handler = WireProtocol.getHandler(peer, false);
-        if (handler) {
-          WireProtocol.getPool().remove(handler);
-        }
       });
     await this.networkMngr.init();
 

@@ -167,17 +167,6 @@ const wireHandlers: Handler[] = [
     decode(this: WireProtocolHandler, raws: TransactionsBuffer) {
       return raws.map((raw) => TxFromValuesArray(raw, { common: this.node.getCommon(0) }));
     }
-  },
-  {
-    name: 'Echo',
-    code: 111,
-    encode(this: WireProtocolHandler, data) {
-      return [111, data];
-    },
-    decode(this: WireProtocolHandler, data) {
-      logger.debug('Echo', (data as Buffer).toString());
-      return data;
-    }
   }
 ];
 
@@ -237,7 +226,11 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
       return;
     }
     for await (const { block, td } of this.newBlockAnnouncesQueue.generator()) {
-      this.newBlock(block, td);
+      try {
+        this.newBlock(block, td);
+      } catch (err) {
+        logger.error('WireProtocolHandler::newBlockAnnouncesLoop, catch error:', err);
+      }
     }
   }
 
@@ -251,7 +244,11 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
       if (hashesCache.length < txsyncPackSize && this.txAnnouncesQueue.array.length > 0) {
         continue;
       }
-      this.newPooledTransactionHashes(hashesCache);
+      try {
+        this.newPooledTransactionHashes(hashesCache);
+      } catch (err) {
+        logger.error('WireProtocolHandler::txAnnouncesLoop, catch error:', err);
+      }
       hashesCache = [];
     }
   }
@@ -280,7 +277,7 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
 
   handshakeResponse(status: any) {
     if (this.handshakeResolve) {
-      this._status = status;
+      this.updateStatus(status);
       this.handshakeResolve(true);
       this.handshakeResolve = undefined;
       if (this.handshakeTimeout) {
@@ -340,10 +337,10 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
     const handler = findHandler(numCode);
     data = handler.decode.call(this, payload);
 
-    const request = this.waitingRequests.get(code);
+    const request = this.waitingRequests.get(numCode);
     if (request) {
       clearTimeout(request.timeout);
-      this.waitingRequests.delete(code);
+      this.waitingRequests.delete(numCode);
       request.resolve(data);
     } else if (handler.process) {
       const result = handler.process.call(this, data);
@@ -365,7 +362,7 @@ export class WireProtocolHandler extends EventEmitter implements ProtocolHandler
   }
 
   private newBlock(block: Block, td: BN) {
-    this.getMsgQueue().send('NewBlock', { block: block.hash(), td });
+    this.getMsgQueue().send('NewBlock', { block, td });
   }
 
   private newBlockHashes(hashes: Buffer[]) {

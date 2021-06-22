@@ -168,7 +168,7 @@ export class NetworkManager extends EventEmitter {
         const peer = this.createPeer(peerId);
         const results = await Promise.all(
           this.protocols.map(async (protocol) => {
-            return peer.installProtocol(protocol, await this.libp2pNode.dialProtocol(peerId, protocol.protocolString));
+            return peer.installProtocol(protocol, (await this.libp2pNode.dialProtocol(peerId, protocol.protocolString)).stream);
           })
         );
         if (results.reduce((a, b) => a || b, false)) {

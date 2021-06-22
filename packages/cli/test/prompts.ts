@@ -5,9 +5,7 @@ import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
 import { Node } from '@gxchain2/core';
-import { constants } from '@gxchain2/common';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
-import { BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
 import { startNode } from '../src/start';
 import program from '../src/program';
 import { SIGINT } from '../src/process';
@@ -35,14 +33,6 @@ const handler: {
   ba: (node: Node, peerIds: string) => {
     for (const str of peerIds.split(';')) {
       handler.add(node, str);
-    }
-  },
-  send: (node: Node, peerId: string, message: string) => {
-    const peer = node.networkMngr.getPeer(peerId);
-    if (peer) {
-      peer.send(constants.GXC2_ETHWIRE, 'Echo', message);
-    } else {
-      logger.warn('Can not find peer');
     }
   },
   lsp2p: (node: Node) => {
@@ -109,21 +99,15 @@ const handler: {
   },
   filterblock: async (node: Node, number: string, addresses: string, topics: string) => {
     const { addressArray, topicArray } = parseAddressAndTopic(addresses, topics);
-    const filter = new BloomBitsFilter({ node, sectionSize: constants.BloomBitsBlocks });
+    const filter = node.getFilter();
     const logs = await filter.filterBlock(new BN(number), addressArray, topicArray);
     logs.forEach((log) => logger.info(log.toRPCJSON()));
   },
   filterrange: async (node: Node, from: string, to: string, addresses: string, topics: string) => {
     const { addressArray, topicArray } = parseAddressAndTopic(addresses, topics);
-    const filter = new BloomBitsFilter({ node, sectionSize: constants.BloomBitsBlocks });
+    const filter = node.getFilter();
     const logs = await filter.filterRange(new BN(from), new BN(to), addressArray, topicArray);
     logs.forEach((log) => logger.info(log.toRPCJSON()));
-  },
-  lsbits: async (node: Node, strBit: string, strSection: string, strHead: string) => {
-    const section = new BN(strSection);
-    const headHash = strHead ? Buffer.from(strHead, 'hex') : (await node.db.getCanonicalHeader(section.addn(1).muln(constants.BloomBitsBlocks).subn(1))).hash();
-    const bits = await node.db.getBloomBits(Number(strBit), section, headHash);
-    logger.info('bits', Buffer.from(bits).toString('hex'));
   }
 };
 

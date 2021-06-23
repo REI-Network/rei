@@ -1,4 +1,4 @@
-import { constants } from '@gxchain2/common';
+import { BloomBitLength, BloomByteLength } from './index';
 
 /**
  * Generator takes a number of bloom filters and generates the rotated bloom bits
@@ -16,7 +16,7 @@ export class BloomBitsGenerator {
     this.sections = sections;
     this.nextSec = 0;
     this.blooms = [];
-    for (let i = 0; i < constants.BloomBitLength; i++) {
+    for (let i = 0; i < BloomBitLength; i++) {
       this.blooms.push(new Array<number>(Math.floor(sections / 8)).fill(0));
     }
   }
@@ -36,7 +36,7 @@ export class BloomBitsGenerator {
     }
     const byteIndex = Math.floor(this.nextSec / 8);
     const bitIndex = 7 - (this.nextSec % 8);
-    for (let byt = 0; byt < constants.BloomByteLength; byt++) {
+    for (let byt = 0; byt < BloomByteLength; byt++) {
       const bloomByte = bloom[byt];
       if (bloomByte === 0) {
         continue;
@@ -64,7 +64,7 @@ export class BloomBitsGenerator {
     if (this.nextSec !== this.sections) {
       throw new Error('bloom not fully generated yet');
     }
-    if (index >= constants.BloomBitLength) {
+    if (index >= BloomBitLength) {
       throw new Error('bloom bit out of bounds');
     }
     return this.blooms[index];

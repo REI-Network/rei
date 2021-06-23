@@ -4,8 +4,8 @@ import { DBOp, DBTarget, DatabaseKey, DBOpData } from '@ethereumjs/blockchain/di
 import Cache from '@ethereumjs/blockchain/dist/db/cache';
 import { BN, rlp, toBuffer } from 'ethereumjs-util';
 import { Block, BlockBodyBuffer, BlockHeader, BlockHeaderBuffer, TypedTransaction, WrappedTransaction, Receipt } from '@gxchain2/structure';
-import { Common, constants } from '@gxchain2/common';
-import { compressBytes, decompressBytes } from '@gxchain2/utils';
+import { Common } from '@gxchain2/common';
+import { compressBytes } from '@gxchain2/utils';
 const level = require('level-mem');
 
 // constants for txLookup and receipts
@@ -207,16 +207,17 @@ export class Database extends DBManager {
     const blockHeihgt = new BN(blockHeightBuffer);
     const block = await this.getBlock(blockHeihgt);
     const rawArr: Buffer[][] = rlp.decode(await this.get(DBTarget_Receipts, { blockHash: block.hash(), blockNumber: blockHeihgt })) as any;
-    const cumulativeGasUsed = new BN(0);
+    let lastCumulativeGasUsed = new BN(0);
     for (let i = 0; i < block.transactions.length; i++) {
       const tx = block.transactions[i];
       const raw = rawArr[i];
       const receipt = Receipt.fromValuesArray(raw);
-      cumulativeGasUsed.iadd(new BN(receipt.gasUsed));
       if (tx.hash().equals(txHash)) {
-        receipt.installProperties(block, tx, cumulativeGasUsed, i);
+        const gasUsed = receipt.bnCumulativeGasUsed.sub(lastCumulativeGasUsed);
+        receipt.installProperties(block, tx, gasUsed, i);
         return receipt;
       }
+      lastCumulativeGasUsed = receipt.bnCumulativeGasUsed;
     }
     throw new level.errors.NotFoundError();
   }
@@ -226,16 +227,17 @@ export class Database extends DBManager {
     const body = await this.getBody(blockHash, blockNumber);
     const block = Block.fromValuesArray([header, ...body], { common: (this as any)._common, hardforkByBlockNumber: true });
     const rawArr: Buffer[][] = rlp.decode(await this.get(DBTarget_Receipts, { blockHash, blockNumber })) as any;
-    const cumulativeGasUsed = new BN(0);
+    let lastCumulativeGasUsed = new BN(0);
     for (let i = 0; i < block.transactions.length; i++) {
       const tx = block.transactions[i];
       const raw = rawArr[i];
       const receipt = Receipt.fromValuesArray(raw);
-      cumulativeGasUsed.iadd(new BN(receipt.gasUsed));
       if (tx.hash().equals(txHash)) {
-        receipt.installProperties(block, tx, cumulativeGasUsed, i);
+        const gasUsed = receipt.bnCumulativeGasUsed.sub(lastCumulativeGasUsed);
+        receipt.installProperties(block, tx, gasUsed, i);
         return receipt;
       }
+      lastCumulativeGasUsed = receipt.bnCumulativeGasUsed;
     }
     throw new level.errors.NotFoundError();
   }
@@ -253,8 +255,8 @@ export class Database extends DBManager {
     return Block.fromValuesArray([header, ...body], { common: (this as any)._common, hardforkByBlockNumber: true });
   }
 
-  async getBloomBits(bit: number, section: BN, hash: Buffer) {
-    return decompressBytes(await this.get(DBTarget_BloomBits, { bit, section, hash } as any), Math.floor(constants.BloomBitsBlocks / 8));
+  getBloomBits(bit: number, section: BN, hash: Buffer) {
+    return this.get(DBTarget_BloomBits, { bit, section, hash } as any);
   }
 
   async tryToGetCanonicalHeader(hash: Buffer) {

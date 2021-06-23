@@ -43,7 +43,7 @@ export class ETHController extends Controller {
     if (!this.node.sync.isSyncing) {
       return false;
     }
-    const status = this.node.sync.syncStatus;
+    const status = this.node.sync.status;
     return {
       startingBlock: bufferToHex(toBuffer(status.startingBlock)),
       currentBlock: bnToHex(this.node.blockchain.latestBlock.header.number),

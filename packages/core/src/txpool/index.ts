@@ -337,7 +337,7 @@ export class TxPool extends EventEmitter {
       if (!oldBlock.hash().equals(newBlock.hash())) {
         throw new Error('reorg failed');
       }
-      const reinject: TypedTransaction[] = [];
+      let reinject: TypedTransaction[] = [];
       for (const tx of discarded) {
         if (!included.has(tx.hash())) {
           reinject.push(tx);
@@ -345,9 +345,25 @@ export class TxPool extends EventEmitter {
       }
       this.currentHeader = originalNewBlock.header;
       this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, this.currentHeader.number);
+      const reinjectAccounts = createBufferFunctionalMap<TxPoolAccount>();
+      const getAccount = (addr: Address) => {
+        let account = reinjectAccounts.get(addr.buf);
+        if (!account) {
+          account = this.getAccount(addr);
+          reinjectAccounts.set(addr.buf, account);
+        }
+        return account;
+      };
       for (const reinjectTx of reinject) {
-        const account = this.getAccount(reinjectTx.getSenderAddress());
-        account.updatePendingNonce(reinjectTx.nonce.addn(1), true);
+        const account = getAccount(reinjectTx.getSenderAddress());
+        account.updatePendingNonce(reinjectTx.nonce, true);
+      }
+      for (const account of reinjectAccounts.values()) {
+        if (account.hasPending()) {
+          const requeue = account.pending.back(await account.getPendingNonce());
+          requeue.forEach((tx) => this.removeTxFromGlobal(tx));
+          reinject = reinject.concat(requeue);
+        }
       }
       this.emitReadies((await this._addTxs(reinject, true)).readies);
       await this.demoteUnexecutables();
@@ -704,7 +720,7 @@ export class TxPool extends EventEmitter {
       const pending = account.pending;
       const [tx] = pending.resize(pending.size - 1);
       this.removeTxFromGlobal(tx);
-      account.updatePendingNonce(tx.nonce.addn(1), true);
+      account.updatePendingNonce(tx.nonce, true);
       // resize priced
       this.priced.removed([tx].length);
       pendingSlots -= txSlots(tx);

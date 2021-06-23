@@ -2,7 +2,6 @@ import './install';
 import EthereumCommon from '@ethereumjs/common';
 import { BNLike } from 'ethereumjs-util';
 import { getChain } from './chains';
-import * as constants from './constants';
 
 /**
  * Common class to access chain and hardfork parameters, based on 'EthereumCommon'
@@ -39,6 +38,5 @@ export class Common extends EthereumCommon {
   }
 }
 
-export { constants };
 export * from './genesisStates';
 export * from './chains';

@@ -2,28 +2,24 @@ import { EventEmitter } from 'events';
 import PeerId from 'peer-id';
 import LevelStore from 'datastore-level';
 import { logger } from '@gxchain2/utils';
-import { constants } from '@gxchain2/common';
 import { Peer } from './peer';
 import { Libp2pNode } from './libp2pnode';
-import { INode } from './types';
-import { makeProtocol } from './protocol';
+import { Protocol } from './types';
 
 export * from './peer';
+export * from './types';
 
 export declare interface NetworkManager {
-  on(event: 'idle' | 'busy', listener: (peer: Peer, type: string) => void): this;
-  on(event: 'added' | 'removed', listener: (peer: Peer) => void): this;
+  on(event: 'added' | 'installed' | 'removed', listener: (peer: Peer) => void): this;
 
-  once(event: 'idle' | 'busy', listener: (peer: Peer, type: string) => void): this;
-  once(event: 'added' | 'removed', listener: (peer: Peer) => void): this;
+  once(event: 'added' | 'installed' | 'removed', listener: (peer: Peer) => void): this;
 }
 
 export interface NetworkManagerOptions {
-  node: INode;
   peerId: PeerId;
   dbPath: string;
+  protocols: Protocol[];
   maxSize?: number;
-  protocols?: string[];
   tcpPort?: number;
   wsPort?: number;
   bootnodes?: string[];
@@ -31,7 +27,7 @@ export interface NetworkManagerOptions {
 
 const ignoredErrors = new RegExp(['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED'].join('|'));
 
-function error(err: any) {
+function logError(err: any) {
   if (err.message && ignoredErrors.test(err.message)) {
     return;
   }
@@ -51,9 +47,10 @@ function error(err: any) {
   logger.error('NetworkManager, error:', err);
 }
 
+export type PeerType = string | Peer | PeerId;
+
 export class NetworkManager extends EventEmitter {
-  public readonly node: INode;
-  private readonly protocols: string[];
+  private readonly protocols: Protocol[];
   private readonly _peers = new Map<string, Peer>();
   private readonly banned = new Map<string, number>();
   private readonly maxSize: number;
@@ -62,9 +59,8 @@ export class NetworkManager extends EventEmitter {
 
   constructor(options: NetworkManagerOptions) {
     super();
-    this.node = options.node;
     this.maxSize = options.maxSize || 32;
-    this.protocols = options.protocols || [constants.GXC2_ETHWIRE];
+    this.protocols = options.protocols;
     this.initPromise = this.init(options);
   }
 
@@ -76,35 +72,34 @@ export class NetworkManager extends EventEmitter {
     return this._peers.size;
   }
 
-  private toPeer(peerId: string | Peer) {
-    return typeof peerId === 'string' ? this._peers.get(peerId) : peerId;
+  private toPeer(peerId: PeerType) {
+    if (typeof peerId === 'string') {
+      return this._peers.get(peerId);
+    } else if (peerId instanceof PeerId) {
+      return this._peers.get(peerId.toB58String());
+    } else {
+      return peerId;
+    }
   }
 
-  private toPeerId(peerId: string | Peer) {
-    return typeof peerId === 'string' ? peerId : peerId.peerId;
+  private toPeerId(peerId: PeerType) {
+    if (typeof peerId === 'string') {
+      return peerId;
+    } else if (peerId instanceof PeerId) {
+      return peerId.toB58String();
+    } else {
+      return peerId.peerId;
+    }
   }
 
   private createPeer(peerInfo: PeerId) {
-    const peer = new Peer({ peerId: peerInfo.toB58String(), libp2pNode: this.libp2pNode, node: this.node });
+    const peer = new Peer(peerInfo.toB58String(), this);
     this._peers.set(peer.peerId, peer);
-    peer.on('idle', (type) => {
-      if (this._peers.get(peer.peerId)) {
-        this.emit('idle', peer, type);
-      }
-    });
-    peer.on('busy', (type) => {
-      if (this._peers.get(peer.peerId)) {
-        this.emit('busy', peer, type);
-      }
-    });
-    peer.on('error', (err) => {
-      error(err);
-    });
     this.emit('added', peer);
     return peer;
   }
 
-  async removePeer(peerId: string | Peer) {
+  async removePeer(peerId: PeerType) {
     const peer = this.toPeer(peerId);
     if (peer) {
       if (this._peers.delete(peer.peerId)) {
@@ -114,22 +109,23 @@ export class NetworkManager extends EventEmitter {
     }
   }
 
-  getPeer(peerId: string) {
-    return this._peers.get(peerId);
+  getPeer(peerId: PeerType) {
+    return this.toPeer(peerId);
   }
 
-  async ban(peerId: string | Peer, maxAge = 60000) {
+  async ban(peerId: PeerType, maxAge = 60000) {
     this.banned.set(this.toPeerId(peerId), Date.now() + maxAge);
     await this.removePeer(peerId);
     return true;
   }
 
-  isBanned(peerId: string): boolean {
-    const expireTime = this.banned.get(peerId);
+  isBanned(peerId: PeerType): boolean {
+    const id = this.toPeerId(peerId);
+    const expireTime = this.banned.get(id);
     if (expireTime && expireTime > Date.now()) {
       return true;
     }
-    this.banned.delete(peerId);
+    this.banned.delete(id);
     return false;
   }
 
@@ -139,7 +135,7 @@ export class NetworkManager extends EventEmitter {
       return;
     }
     if (!options) {
-      throw new Error('NetworkManager::init, missing options');
+      throw new Error('NetworkManager missing init options');
     }
 
     const datastore = new LevelStore(options.dbPath, { createIfMissing: true });
@@ -149,18 +145,17 @@ export class NetworkManager extends EventEmitter {
       datastore
     });
     this.protocols.forEach((protocol) => {
-      // TODO: improve makeProtocol.
-      this.libp2pNode.handle(makeProtocol(protocol).protocolString, async ({ connection, stream }) => {
+      this.libp2pNode.handle(protocol.protocolString, async ({ connection, stream }) => {
+        const peerId: PeerId = connection.remotePeer;
         try {
-          const peerId: PeerId = connection.remotePeer;
-          const id = peerId.toB58String();
-          const peer = this._peers.get(id);
-          if (peer && (await peer.acceptProtocol(stream, protocol, this.node.status))) {
+          const peer = this.toPeer(peerId);
+          if (peer && (await peer.installProtocol(protocol, stream))) {
             logger.info('💬 Peer handled:', peer.peerId);
-            this.emit('connected', peer);
+            this.emit('installed', peer);
           }
         } catch (err) {
-          error(err);
+          await this.removePeer(peerId);
+          logError(err);
         }
       });
     });
@@ -171,25 +166,30 @@ export class NetworkManager extends EventEmitter {
           return;
         }
         const peer = this.createPeer(peerId);
-        const results = await Promise.all(this.protocols.map((protocol) => peer.installProtocol(peerId, protocol, this.node.status)));
+        const results = await Promise.all(
+          this.protocols.map(async (protocol) => {
+            return peer.installProtocol(protocol, (await this.libp2pNode.dialProtocol(peerId, protocol.protocolString)).stream);
+          })
+        );
         if (results.reduce((a, b) => a || b, false)) {
           logger.info('💬 Peer discovered:', peer.peerId);
-          this.emit('connected', peer);
+          this.emit('installed', peer);
         }
       } catch (err) {
         await this.removePeer(id);
-        error(err);
+        logError(err);
       }
     });
     this.libp2pNode.connectionManager.on('peer:connect', async (connect) => {
+      const id = connect.remotePeer.toB58String();
       try {
-        const id = connect.remotePeer.toB58String();
         if (!this._peers.get(id)) {
           this.createPeer(connect.remotePeer);
           logger.info('💬 Peer connected:', id);
         }
       } catch (err) {
-        error(err);
+        await this.removePeer(id);
+        logError(err);
       }
     });
     this.libp2pNode.connectionManager.on('peer:disconnect', async (connect) => {
@@ -198,7 +198,7 @@ export class NetworkManager extends EventEmitter {
         await this.removePeer(id);
         logger.info('🤐 Peer disconnected:', id);
       } catch (err) {
-        error(err);
+        logError(err);
       }
     });
 

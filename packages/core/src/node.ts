@@ -6,7 +6,7 @@ import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
 import { Database, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchain2/database';
 import { NetworkManager } from '@gxchain2/network';
-import { Common, constants, getGenesisState, getChain } from '@gxchain2/common';
+import { Common, getGenesisState, getChain } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { VM, WrappedVM, StateManager } from '@gxchain2/vm';
 import { TypedTransaction, Block } from '@gxchain2/structure';
@@ -17,8 +17,21 @@ import { FullSynchronizer, Synchronizer } from './sync';
 import { TxFetcher } from './txsync';
 import { Miner } from './miner';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
-import { BloomBitsFilter } from './bloombits';
+import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
 import { BlockchainMonitor } from './blockchainmonitor';
+import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
+
+const timeoutBanTime = 60 * 5 * 1000;
+const errorBanTime = 60 * 1000;
+const invalidBanTime = 60 * 10 * 1000;
+
+export type NodeStatus = {
+  networkId: number;
+  totalDifficulty: Buffer;
+  height: number;
+  bestHash: Buffer;
+  genesisHash: Buffer;
+};
 
 export interface NodeOptions {
   databasePath: string;
@@ -96,7 +109,7 @@ export class Node {
   /**
    * Get the status of the node syncing
    */
-  get status() {
+  get status(): NodeStatus {
     return {
       networkId: this.networkId,
       totalDifficulty: this.blockchain.totalDifficulty.toBuffer(),
@@ -185,15 +198,7 @@ export class Node {
     });
     await this.blockchain.init();
 
-    this.sync = new FullSynchronizer({ node: this })
-      .on('error', (err) => {
-        logger.error('Sync error:', err);
-      })
-      .on('synchronized', () => {
-        const block = this.blockchain.latestBlock;
-        this.newBlock(block);
-      });
-
+    this.sync = new FullSynchronizer({ node: this });
     this.txPool = new TxPool({ node: this, journal: options.databasePath });
 
     let peerId!: PeerId;
@@ -208,27 +213,30 @@ export class Node {
 
     this.txSync = new TxFetcher(this);
     this.networkMngr = new NetworkManager({
-      node: this,
+      protocols: createProtocolsByNames(this, [NetworkProtocol.GXC2_ETHWIRE]),
       peerId,
       dbPath: path.join(options.databasePath, 'networkdb'),
       ...options?.p2p
     })
-      .on('added', (peer) => {
-        const status = peer.getStatus(constants.GXC2_ETHWIRE);
-        if (status && status.height !== undefined) {
-          this.sync.announce(peer, status.height, new BN(status.totalDifficulty));
-          peer.announceTx(this.txPool.getPooledTransactionHashes());
+      .on('installed', (peer) => {
+        this.sync.announce(peer);
+        const handler = WireProtocol.getHandler(peer, false);
+        if (handler) {
+          handler.announceTx(this.txPool.getPooledTransactionHashes());
+          WireProtocol.getPool().add(handler);
         }
       })
       .on('removed', (peer) => {
         this.txSync.dropPeer(peer.peerId);
+        const handler = WireProtocol.getHandler(peer, false);
+        if (handler) {
+          WireProtocol.getPool().remove(handler);
+        }
       });
     await this.networkMngr.init();
-
-    this.sync.start();
     this.miner = new Miner(this, options.mine);
     await this.txPool.init();
-    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: constants.BloomBitsBlocks, confirmsBlockNumber: constants.ConfirmsBlockNumber });
+    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: BloomBitsBlocks, confirmsBlockNumber: ConfirmsBlockNumber });
     await this.bloomBitsIndexer.init();
     this.bcMonitor = new BlockchainMonitor(this);
     await this.bcMonitor.init();
@@ -266,7 +274,7 @@ export class Node {
   }
 
   getFilter() {
-    return new BloomBitsFilter({ node: this, sectionSize: constants.BloomBitsBlocks });
+    return new BloomBitsFilter({ node: this, sectionSize: BloomBitsBlocks });
   }
 
   private async processLoop() {
@@ -310,10 +318,8 @@ export class Node {
               const hashes = Array.from(readies.values())
                 .reduce((a, b) => a.concat(b), [])
                 .map((tx) => tx.hash());
-              for (const peer of this.networkMngr.peers) {
-                if (peer.isSupport(constants.GXC2_ETHWIRE)) {
-                  peer.announceTx(hashes);
-                }
+              for (const handler of WireProtocol.getPool().handlers) {
+                handler.announceTx(hashes);
               }
               await this.miner.worker.addTxs(readies);
             }
@@ -325,10 +331,8 @@ export class Node {
         } else if (task instanceof NewBlockTask) {
           const { block } = task;
           const td = await this.db.getTotalDifficulty(block.hash(), block.header.number);
-          for (const peer of this.networkMngr.peers) {
-            if (peer.isSupport(constants.GXC2_ETHWIRE)) {
-              peer.announceNewBlock(block, td);
-            }
+          for (const handler of WireProtocol.getPool().handlers) {
+            handler.announceNewBlock(block, td);
           }
           await this.txPool.newBlock(block);
           await Promise.all([this.miner.worker.newBlockHeader(block.header), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)]);
@@ -380,5 +384,15 @@ export class Node {
     await this.txPool.abort();
     await this.taskLoopPromise;
     await this.processLoopPromise;
+  }
+
+  async banPeer(peerId: string, reason: 'invalid' | 'timeout' | 'error') {
+    if (reason === 'invalid') {
+      await this.networkMngr.ban(peerId, timeoutBanTime);
+    } else if (reason === 'error') {
+      await this.networkMngr.ban(peerId, errorBanTime);
+    } else {
+      await this.networkMngr.ban(peerId, invalidBanTime);
+    }
   }
 }

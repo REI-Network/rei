@@ -85,8 +85,8 @@ export class FilterSystem {
     this.node.bcMonitor.on('newHeads', (hashes) => {
       this.taskQueue.push(new HeadsTask(hashes));
     });
-    this.node.sync.on('start synchronize', () => {
-      const status = this.node.sync.syncStatus;
+    this.node.sync.on('start', () => {
+      const status = this.node.sync.status;
       const syncingStatus: SyncingStatus = {
         syncing: true,
         status: {
@@ -97,7 +97,7 @@ export class FilterSystem {
       };
       this.taskQueue.push(new SyncingTask(syncingStatus));
     });
-    this.node.sync.on('synchronize failed', () => {
+    this.node.sync.on('failed', () => {
       this.taskQueue.push(new SyncingTask(false));
     });
     this.node.sync.on('synchronized', () => {

@@ -65,6 +65,23 @@ export class TxSortedMap {
     return this.nonceToTx.has(nonce);
   }
 
+  back(nonce: BN) {
+    const removed: TypedTransaction[] = [];
+    let nonceInHeap: BN = this.nonceHeap.peek();
+    while (nonceInHeap && nonceInHeap.gte(nonce)) {
+      const tx = this.nonceToTx.get(nonceInHeap)!;
+      removed.push(tx);
+      this.nonceToTx.delete(nonceInHeap);
+      this.nonceHeap.remove();
+      nonceInHeap = this.nonceHeap.peek();
+    }
+    this.decreaseSlots(removed);
+    if (this.sortedTxCache) {
+      this.sortedTxCache.splice(0, removed.length);
+    }
+    return removed;
+  }
+
   forward(nonce: BN) {
     const removed: TypedTransaction[] = [];
     let nonceInHeap: BN = this.nonceHeap.peek();

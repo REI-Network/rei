@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import type { LevelUp } from 'levelup';
-import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
+import { bufferToHex, BN, BNLike, Address } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
 import { Database, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchain2/database';
@@ -234,7 +234,14 @@ export class Node {
         }
       });
     await this.networkMngr.init();
-    this.miner = new Miner(this, options.mine);
+    this.miner = new Miner(
+      options.mine
+        ? {
+            node: this,
+            coinbase: options.mine.coinbase ? Address.fromString(options.mine.coinbase) : undefined
+          }
+        : { node: this }
+    );
     await this.txPool.init();
     this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: BloomBitsBlocks, confirmsBlockNumber: ConfirmsBlockNumber });
     await this.bloomBitsIndexer.init();
@@ -321,7 +328,7 @@ export class Node {
               for (const handler of WireProtocol.getPool().handlers) {
                 handler.announceTx(hashes);
               }
-              await this.miner.worker.addTxs(readies);
+              await this.miner.addTxs(readies);
             }
             task.resolve(results);
           } catch (err) {
@@ -335,7 +342,7 @@ export class Node {
             handler.announceNewBlock(block, td);
           }
           await this.txPool.newBlock(block);
-          await Promise.all([this.miner.worker.newBlockHeader(block.header), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)]);
+          await Promise.all([this.miner.newBlockHeader(block.header), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)]);
         }
       } catch (err) {
         logger.error('Node::taskLoop, catch error:', err);

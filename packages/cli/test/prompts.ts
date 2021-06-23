@@ -134,8 +134,9 @@ const startPrompts = async (node: Node) => {
     opts.datadir = path.isAbsolute(opts.datadir) ? opts.datadir : path.join(__dirname, './test-dir/', opts.datadir);
     const [node, sever] = await startNode(opts);
     SIGINT(node);
+    console.log('opts.mine', opts.mine);
     if (opts.mine !== true) {
-      node.miner.setCoinbase('0x3289621709f5b35d09b4335e129907ac367a0593');
+      await node.miner.setCoinbase(Address.fromString('0x3289621709f5b35d09b4335e129907ac367a0593'));
     }
     await startPrompts(node);
   } catch (err) {

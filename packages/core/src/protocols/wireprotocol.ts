@@ -386,6 +386,10 @@ export class WireProtocolHandler implements ProtocolHandler {
       this.waitingRequests.delete(numCode);
       request.resolve(data);
     } else if (handler.process) {
+      if (numCode !== 0 && !(await this.handshakePromise)) {
+        logger.warn('WireProtocolHandler::handle, handshake failed');
+        return;
+      }
       const result = handler.process.call(this, data);
       if (result) {
         if (Array.isArray(result)) {

@@ -229,14 +229,14 @@ export class Miner {
             }
             logger.info('⛏️  Mine block, height:', newBlock.header.number.toString(), 'hash:', bufferToHex(newBlock.hash()));
           } catch (err) {
-            logger.error('Worker::_newBlock, setTimeout, catch error:', err);
+            logger.error('Miner::_newBlock, setTimeout, catch error:', err);
           } finally {
             this.lock.release();
           }
         }, timeout);
       }
     } catch (err) {
-      logger.error('Worker::_newBlock, catch error:', err);
+      logger.error('Miner::_newBlock, catch error:', err);
     } finally {
       this.lock.release();
     }
@@ -256,7 +256,7 @@ export class Miner {
       }
       await this._commit(pendingMap);
     } catch (err) {
-      logger.error('Worker::addTxs, catch error:', err);
+      logger.error('Miner::addTxs, catch error:', err);
     } finally {
       this.lock.release();
     }

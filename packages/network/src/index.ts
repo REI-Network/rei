@@ -27,6 +27,10 @@ export interface NetworkManagerOptions {
 
 const ignoredErrors = new RegExp(['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED'].join('|'));
 
+/**
+ * Handle errors other than predicted errors or errors without error messages
+ * @param err Pending errors
+ */
 function logError(err: any) {
   if (err.message && ignoredErrors.test(err.message)) {
     return;
@@ -49,6 +53,10 @@ function logError(err: any) {
 
 export type PeerType = string | Peer | PeerId;
 
+/**
+ * NetworkManager manages nodes and node communications protocols connected
+ * with local node
+ */
 export class NetworkManager extends EventEmitter {
   private readonly protocols: Protocol[];
   private readonly _peers = new Map<string, Peer>();
@@ -64,10 +72,16 @@ export class NetworkManager extends EventEmitter {
     this.initPromise = this.init(options);
   }
 
+  /**
+   * Return all nodes recorded
+   */
   get peers() {
     return Array.from(this._peers.values());
   }
 
+  /**
+   * Return `_peers` map's size
+   */
   get size() {
     return this._peers.size;
   }
@@ -92,6 +106,11 @@ export class NetworkManager extends EventEmitter {
     }
   }
 
+  /**
+   * Add peer info into the map when a peer connected
+   * @param peerInfo The peer's infomation
+   * @returns
+   */
   private createPeer(peerInfo: PeerId) {
     const peer = new Peer(peerInfo.toB58String(), this);
     this._peers.set(peer.peerId, peer);
@@ -99,6 +118,10 @@ export class NetworkManager extends EventEmitter {
     return peer;
   }
 
+  /**
+   * Remove the peer's infomation when the peer is disconnected
+   * @param peerId The peer's id
+   */
   async removePeer(peerId: PeerType) {
     const peer = this.toPeer(peerId);
     if (peer) {
@@ -109,16 +132,32 @@ export class NetworkManager extends EventEmitter {
     }
   }
 
+  /**
+   * Get the peer's infomation by peerId
+   * @param peerId
+   * @returns The peer's infomation
+   */
   getPeer(peerId: PeerType) {
     return this.toPeer(peerId);
   }
 
+  /**
+   * Set the node status to prohibited and remove from the map
+   * @param peerId The peer to be banned
+   * @param maxAge Prohibited duration
+   * @returns
+   */
   async ban(peerId: PeerType, maxAge = 60000) {
     this.banned.set(this.toPeerId(peerId), Date.now() + maxAge);
     await this.removePeer(peerId);
     return true;
   }
 
+  /**
+   * Determine whether a peer is banned
+   * @param peerId peer's information
+   * @returns `true` if the peer is banned, `false` if the peer is active
+   */
   isBanned(peerId: PeerType): boolean {
     const id = this.toPeerId(peerId);
     const expireTime = this.banned.get(id);
@@ -129,6 +168,12 @@ export class NetworkManager extends EventEmitter {
     return false;
   }
 
+  /**
+   * Initialization function, used to configure the operation of libp2p nodes
+   * and start it to receive messages from other nodes
+   * @param options
+   * @returns
+   */
   async init(options?: NetworkManagerOptions) {
     if (this.initPromise) {
       await this.initPromise;
@@ -210,6 +255,9 @@ export class NetworkManager extends EventEmitter {
     });
   }
 
+  /**
+   * Stop all node connections and delete data
+   */
   async abort() {
     await Promise.all(Array.from(this._peers.values()).map((peer) => peer.abort()));
     this._peers.clear();

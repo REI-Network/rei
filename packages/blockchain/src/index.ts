@@ -8,6 +8,10 @@ export interface BlockchainOptions extends EthereumBlockchainOptions {
   database: Database;
 }
 
+/**
+ * Blockchain represents the canonical chain given a database with a genesis
+ * block. The Blockchain manages chain imports, reverts, chain reorganisations.
+ */
 export class Blockchain extends EthereumBlockchain {
   dbManager: Database;
   private _latestBlock!: Block;

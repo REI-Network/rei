@@ -126,7 +126,7 @@ export class Worker extends Loop {
   }
 
   /**
-   * Add transactions for c
+   * Add ready transactions from txpool for worker
    * @param txs - The map of Buffer and array of transactions
    */
   async addTxs(txs: Map<Buffer, TypedTransaction[]>) {
@@ -149,6 +149,11 @@ export class Worker extends Loop {
     return this.miner.isMining ? this.node.accMngr.getPrivateKey(this.miner.coinbase) : undefined;
   }
 
+  /**
+   *
+   * @param number
+   * @returns
+   */
   async getRecord_OrderByTD(number: BN): Promise<undefined | [BlockHeader, Block]> {
     const records: [BlockHeader, Block][] = this.history.filter((v) => v[0] === number.toNumber()).map((r) => [r[2], r[3]]);
     if (number.addn(1).eq(this.header.number)) {

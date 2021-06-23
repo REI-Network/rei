@@ -107,7 +107,8 @@ export class Miner extends Loop {
   }
 
   /**
-   * Mint the Block
+   * The mint method will check new block, inlclude active signer, totaldifficultity,
+   * then assemble the block, isssue log messages
    */
   async mint() {
     await this.initPromise;

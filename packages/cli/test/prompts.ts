@@ -9,6 +9,7 @@ import { hexStringToBuffer, logger } from '@gxchain2/utils';
 import { startNode } from '../src/start';
 import program from '../src/program';
 import { SIGINT } from '../src/process';
+import { WrappedBlock } from '../../database/node_modules/@gxchain2/structure/dist';
 
 // addresses, a list of address, splited by `,`
 // topics, a list of topic, splited by `,` and each subTopic splited by `;`.
@@ -63,23 +64,13 @@ const handler: {
     }
   },
   lsblock: async (node: Node, hashOrHeight: string) => {
-    const printBlock = async (key: number | Buffer) => {
-      try {
-        const block = await node.db.getBlock(key);
-        logger.info('block', bufferToHex(block.hash()), 'on height', block.header.number.toString(), ':', block.toJSON());
-        for (const tx of block.transactions) {
-          logger.info('tx', bufferToHex(tx.hash()));
-        }
-        logger.info('---------------');
-      } catch (err) {
-        if (err.type === 'NotFoundError') {
-          return;
-        }
-        throw err;
-      }
-      return;
-    };
-    await printBlock(hashOrHeight.indexOf('0x') !== 0 ? Number(hashOrHeight) : hexStringToBuffer(hashOrHeight));
+    const key = hashOrHeight.indexOf('0x') !== 0 ? Number(hashOrHeight) : hexStringToBuffer(hashOrHeight);
+    const block = await node.db.getBlock(key);
+    logger.info('block', bufferToHex(block.hash()), 'on height', block.header.number.toString(), ':', new WrappedBlock(block).toRPCJSON(true));
+  },
+  lsblock2: async (node: Node, hash: string, height: string) => {
+    const block = await node.db.getBlockByHashAndNumber(hexStringToBuffer(hash), new BN(height));
+    logger.info('block', bufferToHex(block.hash()), 'on height', block.header.number.toString(), ':', new WrappedBlock(block).toRPCJSON(true));
   },
   lsheight: (node: Node) => {
     const height = node.blockchain.latestHeight;

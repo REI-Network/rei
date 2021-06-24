@@ -1,5 +1,8 @@
 export class AbortError extends Error {}
 
+/**
+ * This class is used to interrupt operations and record interrupt information.
+ */
 export class Aborter {
   private _reason: any;
   private _abort: boolean = true;
@@ -9,10 +12,16 @@ export class Aborter {
     j: (reason?: any) => void;
   }>();
 
+  /**
+   * Return abort information.
+   */
   get reason() {
     return this._reason;
   }
 
+  /**
+   * Return the aborter state, whether aborted or not.
+   */
   get isAborted() {
     return this._abort;
   }
@@ -21,6 +30,13 @@ export class Aborter {
     this.reset();
   }
 
+  /**
+   * This template function receives a Promise and races with the aborted
+   * Promise in the class to ensure the safety of the program.
+   * @param p Given Promise to be raced.
+   * @param throwAbortError Whether to throw an interrupt error
+   * @returns
+   */
   async abortablePromise<T>(p: Promise<T>): Promise<T | undefined>;
   async abortablePromise<T>(p: Promise<T>, throwAbortError: false): Promise<T | undefined>;
   async abortablePromise<T>(p: Promise<T>, throwAbortError: true): Promise<T>;
@@ -50,6 +66,11 @@ export class Aborter {
     }
   }
 
+  /**
+   * Create a waiting Promise and push it and it's resolve, reject
+   * into the _waiting set
+   * @returns
+   */
   private createWaitingPromise() {
     let r!: () => void;
     let j!: (reason?: any) => void;
@@ -62,6 +83,11 @@ export class Aborter {
     return w;
   }
 
+  /**
+   * This method abort the class, set the _abort state, the abort reason
+   * clear the _waiting set.
+   * @param reason Reason for interruption
+   */
   async abort(reason?: string | AbortError) {
     if (!this._abort) {
       if (reason === undefined) {
@@ -78,6 +104,9 @@ export class Aborter {
     }
   }
 
+  /**
+   * Reset the options: _reason and _abort
+   */
   reset() {
     if (this._abort) {
       this._reason = undefined;

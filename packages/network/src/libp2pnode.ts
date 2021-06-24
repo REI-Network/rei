@@ -15,6 +15,9 @@ export interface Libp2pNodeOptions {
   bootnodes?: string[];
 }
 
+/**
+ * The Libp2pNode inherits the libp2p class and initializes settings.
+ */
 export class Libp2pNode extends Libp2p {
   constructor(options: Libp2pNodeOptions) {
     super({

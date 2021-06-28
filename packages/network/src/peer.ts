@@ -115,7 +115,7 @@ export class Peer {
     return this.queueMap.has(name);
   }
 
-  async installProtocol(protocol: Protocol, stream?: any) {
+  async installProtocol(protocol: Protocol, stream: any) {
     const { queue, handler } = this.makeMsgQueue(protocol);
     queue.pipeStream(stream);
     try {

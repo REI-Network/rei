@@ -109,7 +109,7 @@ export class NetworkManager extends EventEmitter {
   /**
    * Add peer info into the map when a peer connected
    * @param peerInfo The peer's infomation
-   * @returns
+   * @returns The Peer object
    */
   private createPeer(peerInfo: PeerId) {
     const peer = new Peer(peerInfo.toB58String(), this);

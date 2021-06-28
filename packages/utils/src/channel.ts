@@ -7,6 +7,9 @@ export interface ChannelOption<T> {
   drop?: (data: T) => void;
 }
 
+/**
+ * Channel class, the storage structure is an array
+ */
 export class Channel<T = any> {
   private aborted = false;
   private _array: T[] = [];
@@ -15,6 +18,9 @@ export class Channel<T = any> {
   private resolve?: (data: T) => void;
   private reject?: (reason?: any) => void;
 
+  /**
+   * Get the data in the array
+   */
   get array() {
     return [...this._array];
   }
@@ -24,6 +30,11 @@ export class Channel<T = any> {
     this.drop = options?.drop;
   }
 
+  /**
+   * Push data into array
+   * @param data Data to be processed
+   * @returns `true` if successfully pushed
+   */
   push(data: T) {
     if (this.aborted) {
       return false;
@@ -47,6 +58,11 @@ export class Channel<T = any> {
     return true;
   }
 
+  /**
+   * Next is an iterative function
+   * @returns The first element in the array if the array.length is
+   * greater than zero, else new a Promise
+   */
   next() {
     return this._array.length > 0
       ? Promise.resolve(this._array.shift()!)
@@ -56,6 +72,9 @@ export class Channel<T = any> {
         });
   }
 
+  /**
+   * Issue an interrupt command to clean up the channel
+   */
   abort() {
     if (this.reject) {
       this.reject(new ChannelAbortError());
@@ -66,10 +85,16 @@ export class Channel<T = any> {
     this.clear();
   }
 
+  /**
+   * Reset aborted status
+   */
   reset() {
     this.aborted = false;
   }
 
+  /**
+   * Clear the channel and drop the data in array
+   */
   clear() {
     if (this.drop) {
       for (const data of this._array) {
@@ -79,6 +104,9 @@ export class Channel<T = any> {
     this._array = [];
   }
 
+  /**
+   * Iterator function, used to get data in the channel
+   */
   async *generator() {
     try {
       while (!this.aborted) {
@@ -96,6 +124,9 @@ export interface HChannelOption<T> extends ChannelOption<T> {
   compare?: (a: T, b: T) => boolean;
 }
 
+/**
+ * Channel class, the storage structure is a heap
+ */
 export class HChannel<T = any> {
   private aborted = false;
   private _heap: Heap;
@@ -104,6 +135,9 @@ export class HChannel<T = any> {
   private resolve?: (data: T) => void;
   private reject?: (reason?: any) => void;
 
+  /**
+   * Get the data in the heap
+   */
   get heap() {
     return this._heap;
   }
@@ -114,6 +148,11 @@ export class HChannel<T = any> {
     this._heap = new Heap(options?.compare ? { comparBefore: options.compare } : undefined);
   }
 
+  /**
+   * Insert data into heap
+   * @param data Data to be processed
+   * @returns `true` if successfully pushed
+   */
   push(data: T) {
     if (this.aborted) {
       return false;
@@ -137,6 +176,11 @@ export class HChannel<T = any> {
     return true;
   }
 
+  /**
+   * Next is an iterative function
+   * @returns The first element in the heap if the heap.length is
+   * greater than zero, else new a Promise
+   */
   next() {
     return this._heap.length > 0
       ? Promise.resolve(this._heap.remove() as T)
@@ -146,6 +190,9 @@ export class HChannel<T = any> {
         });
   }
 
+  /**
+   * Issue an interrupt command to clean up the channel
+   */
   abort() {
     if (this.reject) {
       this.reject(new ChannelAbortError());
@@ -156,10 +203,16 @@ export class HChannel<T = any> {
     this.clear();
   }
 
+  /**
+   * Reset aborted status
+   */
   reset() {
     this.aborted = false;
   }
 
+  /**
+   * Clear the channel and drop the data in heap
+   */
   clear() {
     while (this._heap.length > 0) {
       if (this.drop) {
@@ -170,6 +223,9 @@ export class HChannel<T = any> {
     }
   }
 
+  /**
+   * Iterator function, used to get data in the channel
+   */
   async *generator() {
     try {
       while (!this.aborted) {
@@ -183,6 +239,9 @@ export class HChannel<T = any> {
   }
 }
 
+/**
+ * Channel class, the storage structures are array and heap
+ */
 export class PChannel<U = any, T extends { data: U; index: number } = { data: any; index: number }> {
   private processed: number = 0;
   private aborted = false;
@@ -193,10 +252,16 @@ export class PChannel<U = any, T extends { data: U; index: number } = { data: an
   private resolve?: (data: T) => void;
   private reject?: (reason?: any) => void;
 
+  /**
+   * Get the data in the heap
+   */
   get heap() {
     return this._heap;
   }
 
+  /**
+   * Get the data in the array
+   */
   get array() {
     return [...this._array];
   }
@@ -209,6 +274,11 @@ export class PChannel<U = any, T extends { data: U; index: number } = { data: an
     });
   }
 
+  /**
+   * Push the element into the heap and add it to the array after sorting
+   * @param data Data to be processed
+   * @returns `true` if successfully pushed
+   */
   push(data: T) {
     if (this.aborted) {
       return false;
@@ -260,6 +330,9 @@ export class PChannel<U = any, T extends { data: U; index: number } = { data: an
     this.aborted = false;
   }
 
+  /**
+   * Clear the channel and drop the data in heap and array
+   */
   clear() {
     while (this._heap.length > 0) {
       if (this.drop) {
@@ -289,6 +362,10 @@ export class PChannel<U = any, T extends { data: U; index: number } = { data: an
     }
   }
 
+  /**
+   * Get the processed elements in the heap
+   * @returns The elements array
+   */
   private readies() {
     let d: T | undefined;
     const q: T[] = [];

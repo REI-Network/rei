@@ -35,7 +35,7 @@ export class AccountCache {
 
   /**
    * Determine whether the account exists in cache
-   * @param addrBuf
+   * @param addrBuf Buffer of address
    * @returns `true` if exist
    */
   has(addrBuf: Buffer): boolean {

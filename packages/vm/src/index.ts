@@ -12,11 +12,21 @@ export class WrappedVM {
     this.vm._common.removeAllListeners('hardforkChanged');
   }
 
+  /**
+   * The method call the runBlock method and redirect it to the vm
+   * @param opts Options for running block.
+   * @returns
+   */
   async runBlock(opts: RunBlockDebugOpts): Promise<RunBlockResult> {
     await this.vm.init();
     return runBlock.bind(this.vm)(opts);
   }
 
+  /**
+   * The method call the runCall method and redirect it to the vm
+   * @param opts Options for running call.
+   * @returns
+   */
   async runCall(opts: RunCallDebugOpts) {
     await this.vm.init();
     return runCall.bind(this.vm)(opts);

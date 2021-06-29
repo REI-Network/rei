@@ -7,6 +7,11 @@ import { KeyStore, keyStoreFileName } from './keystore';
 
 type AddrType = Address | string | Buffer;
 
+/**
+ *
+ * @param addr
+ * @returns
+ */
 function addrToBuffer(addr: AddrType) {
   if (!Buffer.isBuffer(addr)) {
     addr = typeof addr === 'object' ? addr.toBuffer() : hexStringToBuffer(addr);
@@ -23,6 +28,10 @@ function addrToString(addr: AddrType) {
   return (addr.startsWith('0x') ? addr : '0x' + addr).toLowerCase();
 }
 
+/**
+ * AccountManager is an overarching manager that contain all
+ * accounts' infomation
+ */
 export class AccountManager {
   private storage: KeyStore;
   private cache: AccountCache;
@@ -37,6 +46,12 @@ export class AccountManager {
     this.cache.accounts();
   }
 
+  /**
+   *
+   * @param addr
+   * @param passphrase
+   * @returns
+   */
   private async getDecryptedKey(addr: AddrType, passphrase: string) {
     this.cache.accounts();
     const path = this.cache.get(addrToBuffer(addr));

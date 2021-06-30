@@ -42,7 +42,7 @@ export class Libp2pNode extends Libp2p {
           kBucketSize: 20,
           enabled: true,
           randomWalk: {
-            enabled: true,
+            enabled: false,
             interval: 3e3,
             timeout: 10e3
           }
@@ -51,6 +51,10 @@ export class Libp2pNode extends Libp2p {
           dht: false,
           pubsub: false
         }
+      },
+      connectionManager: {
+        maxConnections: 2,
+        minConnections: 2
       },
       datastore: options.datastore,
       peerStore: {

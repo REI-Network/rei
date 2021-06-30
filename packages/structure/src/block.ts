@@ -49,9 +49,9 @@ export class WrappedBlock {
   }
 
   /**
-   * Convert the block into json form for use by the rpc port
+   * Convert the block into json form so that can be transported by rpc port
    * @param fullTransactions Whether to load all transaction information
-   * @returns
+   * @returns Converted Json object
    */
   toRPCJSON(fullTransactions: boolean = false) {
     return {

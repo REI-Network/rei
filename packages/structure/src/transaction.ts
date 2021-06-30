@@ -3,6 +3,11 @@ import { BN, bufferToHex, bnToHex, intToHex, rlp } from 'ethereumjs-util';
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { Block } from './block';
 
+/**
+ * Calculate the size of the transaction
+ * @param tx Transaction
+ * @returns Total length of all row transaction
+ */
 export function txSize(tx: TypedTransaction) {
   const raw = tx.raw();
   let size = 0;
@@ -14,10 +19,19 @@ export function txSize(tx: TypedTransaction) {
   return size;
 }
 
+/**
+ * Generate transaction object by given values
+ * @param values Given values
+ * @param opts The options for initializing a Transaction.
+ * @returns A new transaction object
+ */
 export function TxFromValuesArray(values: Buffer[], opts?: TxOptions) {
   return values.length === 6 || values.length === 9 ? Transaction.fromValuesArray(values, opts) : AccessListEIP2930Transaction.fromValuesArray(values as AccessListEIP2930ValuesArray, opts);
 }
 
+/**
+ * WrappedBlock based Ethereum transaction.
+ */
 export class WrappedTransaction {
   public readonly transaction: TypedTransaction;
 
@@ -32,6 +46,9 @@ export class WrappedTransaction {
     size?: number;
   } = {};
 
+  /**
+   * Get the size of the total transaction
+   */
   get size() {
     if (this.extension.size) {
       return this.extension.size;
@@ -40,6 +57,12 @@ export class WrappedTransaction {
     return this.extension.size;
   }
 
+  /**
+   * Assign attribute according to the given value
+   * @param block Block
+   * @param transactionIndex Transaction index
+   * @returns The transction object
+   */
   installProperties(block: Block, transactionIndex: number): this {
     this.extension.blockHash = block.hash();
     this.extension.blockNumber = block.header.number;
@@ -47,6 +70,10 @@ export class WrappedTransaction {
     return this;
   }
 
+  /**
+   * Convert the transaction into json form so that can be transported by rpc port
+   * @returns Converted Json object
+   */
   toRPCJSON() {
     return {
       blockHash: this.extension.blockHash ? bufferToHex(this.extension.blockHash) : null,
@@ -69,6 +96,11 @@ export class WrappedTransaction {
 
 export const emptyTxTrie = Buffer.from('56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421', 'hex');
 
+/**
+ * Generate transaction Trie based on given transactions
+ * @param transactions
+ * @returns The root transaction trie
+ */
 export async function calculateTransactionTrie(transactions: TypedTransaction[]): Promise<Buffer> {
   if (transactions.length === 0) {
     return emptyTxTrie;
@@ -83,6 +115,11 @@ export async function calculateTransactionTrie(transactions: TypedTransaction[])
   return txTrie.root;
 }
 
+/**
+ * Computes the 'intrinsic gas' for the transactions
+ * @param tx Transaction
+ * @returns Gas amount
+ */
 export function calculateIntrinsicGas(tx: TypedTransaction) {
   const gas = tx.toCreationAddress() ? new BN(53000) : new BN(21000);
   const nz = new BN(0);

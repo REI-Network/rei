@@ -22,7 +22,7 @@ export function calcCliqueDifficulty(activeSigners: Address[], signer: Address, 
 }
 
 /**
- * WrappedBlock based on `@ethereumjs/block`
+ * WrappedBlock based on Ethereum block.
  */
 export class WrappedBlock {
   readonly block: Block;

@@ -81,7 +81,7 @@ export class Log {
   }
 
   /**
-   * Convert the block into json form so that can be transported by rpc port
+   * Convert the log into json form so that can be transported by rpc port
    * @returns Converted Json object
    */
   toRPCJSON() {

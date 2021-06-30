@@ -57,6 +57,9 @@ export class Libp2pNode extends Libp2p {
         maxConnections: options.maxConnections,
         minConnections: 0
       },
+      dialer: {
+        dialTimeout: 5e3
+      },
       datastore: options.datastore,
       peerStore: {
         persistence: !!options.datastore,

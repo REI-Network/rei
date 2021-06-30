@@ -139,12 +139,18 @@ export class NetworkManager extends EventEmitter {
     await datastore.open();
     this.libp2pNode = new Libp2pNode({
       ...options,
+      maxConnections: this.maxConnections,
       datastore
     });
     this.protocols.forEach((protocol) => {
       this.libp2pNode.handle(protocol.protocolString, ({ connection, stream }) => {
         const peerId: string = connection.remotePeer.toB58String();
-        this.install(peerId, [protocol], [stream]);
+        this.connected.delete(peerId);
+        this.install(peerId, [protocol], [stream]).then((result) => {
+          if (!result && this.isConnected(peerId)) {
+            this.connected.add(peerId);
+          }
+        });
       });
     });
     this.libp2pNode.on('peer:discovery', (peerId: PeerId) => {
@@ -152,12 +158,14 @@ export class NetworkManager extends EventEmitter {
     });
     this.libp2pNode.connectionManager.on('peer:connect', (connect) => {
       const peerId: string = connect.remotePeer.toB58String();
-      logger.info('💬 Peer connect:', peerId);
-      this.connected.add(peerId);
       if (this.libp2pNode.connectionManager.size > this.maxConnections) {
         this.setPeerValue(peerId, 'useless');
       } else {
+        logger.info('💬 Peer connect:', peerId);
         this.setPeerValue(peerId, 'connected');
+      }
+      if (!this.dialing.has(peerId) && !this.installing.has(peerId) && !this.installed.has(peerId)) {
+        this.connected.add(peerId);
       }
     });
     this.libp2pNode.connectionManager.on('peer:disconnect', (connect) => {
@@ -178,13 +186,16 @@ export class NetworkManager extends EventEmitter {
   }
 
   private async install(peerId: string, protocols: Protocol[], streams: any[]) {
+    console.log('install:', peerId);
     if (this.isBanned(peerId) || this.installing.has(peerId)) {
+      console.log('install:', peerId, 'ban or repeated');
       streams.forEach((stream) => stream.close());
       return false;
     }
     let peer = this.installed.get(peerId);
     if (!peer) {
-      if (this.installed.size > this.maxPeers) {
+      if (this.installed.size + 1 > this.maxPeers) {
+        console.log('install:', peerId, 'maxPeers');
         streams.forEach((stream) => stream.close());
         return false;
       }
@@ -203,12 +214,15 @@ export class NetworkManager extends EventEmitter {
       this.emit('installed', peer);
       return true;
     }
+    console.log('install:', peerId, 'missing or failed');
     await peer.abort();
     return false;
   }
 
   private async dial(peerId: string, protocols: Protocol[]) {
+    console.log('dial:', peerId);
     if (this.isBanned(peerId) || this.dialing.has(peerId)) {
+      console.log('dial:', peerId, 'ban or repeated');
       return { success: false, streams: [] };
     }
     this.dialing.add(peerId);
@@ -219,12 +233,15 @@ export class NetworkManager extends EventEmitter {
         streams.push(stream);
       } catch (err) {
         logNetworkError('NetworkManager::dial', err);
+        console.log('dial:', peerId, 'dial protocol:', protocol.protocolString, 'failed');
         streams.push(null);
       }
     }
     if (!this.dialing.delete(peerId) || streams.reduce((b, s) => b && s === null, true)) {
+      console.log('dial:', peerId, 'missing or failed');
       return { success: false, streams: [] };
     }
+    console.log('dial:', peerId, 'success');
     return { success: true, streams };
   }
 
@@ -251,45 +268,49 @@ export class NetworkManager extends EventEmitter {
 
   private async dialLoop() {
     await this.initPromise;
-    let lastPeerId: string | undefined;
     while (true) {
       try {
         if (this.installed.size < this.maxPeers && this.dialing.size < this.maxDials) {
           let peerId: string | undefined;
           if (this.connected.size > 0) {
+            console.log('connected', Array.from(this.connected.values()));
             peerId = this.randomConnected();
             this.connected.delete(peerId);
+            console.log('dialLoop, use a connected peer:', peerId);
           } else {
             const peers: {
               id: PeerId;
               addresses: any[];
               protocols: string[];
-            }[] = this.libp2pNode.peerStore.peers;
+            }[] = Array.from(this.libp2pNode.peerStore.peers.values());
             const peerIds = peers
               .filter((peer) => {
                 const id = peer.id.toB58String();
-                return peer.addresses.length > 0 && peer.protocols.length > 0 && this.matchProtocols(peer.protocols) && !this.dialing.has(id) && !this.installing.has(id) && !this.installed.has(id) && !this.isBanned(id) && id !== lastPeerId;
+                return peer.addresses.length > 0 && peer.protocols.length > 0 && this.matchProtocols(peer.protocols) && !this.dialing.has(id) && !this.installing.has(id) && !this.installed.has(id) && !this.isBanned(id);
               })
               .map(({ id }) => id.toB58String());
             if (peerIds.length > 0) {
               peerId = this.randomOne(peerIds);
+              console.log('dialLoop, use a stored peer:', peerId);
+            } else {
+              console.log('dialLoop, find stored peer failed');
             }
           }
 
           if (peerId) {
-            const { success, streams } = await this.dial(peerId, this.protocols);
-            if (!success || !(await this.install(peerId, this.protocols, streams))) {
-              if (this.isConnected(peerId)) {
-                this.connected.add(peerId);
+            this.dial(peerId, this.protocols).then(async ({ success, streams }) => {
+              if (!success || !(await this.install(peerId!, this.protocols, streams))) {
+                if (this.isConnected(peerId!)) {
+                  this.connected.add(peerId!);
+                }
               }
-            }
-            lastPeerId = peerId;
+            });
           }
         }
-        await new Promise((r) => setTimeout(r, this.installed.size < this.maxPeers ? dialLoopInterval1 : dialLoopInterval2));
       } catch (err) {
         logger.error('NetworkManager::dialLoop, catch error:', err);
       }
+      await new Promise((r) => setTimeout(r, this.installed.size < this.maxPeers ? dialLoopInterval1 : dialLoopInterval2));
     }
   }
 

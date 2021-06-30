@@ -36,10 +36,17 @@ const handler: {
       handler.add(node, str);
     }
   },
-  lsp2p: (node: Node) => {
+  ban: async (node: Node, peerId: string) => {
+    console.log('remove result:', await node.networkMngr.removePeer(peerId));
+  },
+  lspeers: (node: Node) => {
     for (const peer of node.networkMngr.peers) {
       logger.info(peer.peerId);
     }
+  },
+  lsp2p: (node: Node) => {
+    logger.info(Array.from((node.networkMngr as any).libp2pNode.connectionManager.connections.keys()));
+    logger.info('size:', (node.networkMngr as any).libp2pNode.connectionManager.size);
   },
   lsreceipt: async (node: Node, hash: string) => {
     try {

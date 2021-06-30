@@ -3,6 +3,7 @@ import { TxFromValuesArray, TypedTransaction, Block, BlockHeader, BlockHeaderBuf
 import { logger, Channel, createBufferFunctionalSet } from '@gxchain2/utils';
 import { ProtocolHandler, Peer, MsgQueue } from '@gxchain2/network';
 import { Node, NodeStatus } from '../node';
+import { WireProtocol } from './index';
 
 const maxTxPacketSize = 102400;
 const maxKnownTxs = 32768;
@@ -219,6 +220,12 @@ export class WireProtocolHandler implements ProtocolHandler {
     this.handshakePromise = new Promise<boolean>((resolve) => {
       this.handshakeResolve = resolve;
     });
+    this.handshakePromise.then((result) => {
+      if (result) {
+        WireProtocol.getPool().add(this);
+        this.announceTx(this.node.txPool.getPooledTransactionHashes());
+      }
+    });
     this.newBlockAnnouncesQueue = new Channel<{ block: Block; td: BN }>({ max: maxQueuedBlocks });
     this.txAnnouncesQueue = new Channel<Buffer>({ max: maxQueuedTxs });
     this.newBlockAnnouncesLoop();
@@ -368,6 +375,7 @@ export class WireProtocolHandler implements ProtocolHandler {
     this.waitingRequests.clear();
     this.newBlockAnnouncesQueue.abort();
     this.txAnnouncesQueue.abort();
+    WireProtocol.getPool().remove(this);
   }
 
   encode(method: string | number, data: any) {

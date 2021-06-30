@@ -9,6 +9,7 @@ const Libp2p = require('libp2p');
 
 export interface Libp2pNodeOptions {
   peerId: PeerId;
+  maxConnections?: number;
   datastore?: any;
   tcpPort?: number;
   wsPort?: number;
@@ -31,7 +32,7 @@ export class Libp2pNode extends Libp2p {
       },
       config: {
         peerDiscovery: {
-          autoDial: true,
+          autoDial: false,
           bootstrap: {
             interval: 2000,
             enabled: true,
@@ -42,7 +43,7 @@ export class Libp2pNode extends Libp2p {
           kBucketSize: 20,
           enabled: true,
           randomWalk: {
-            enabled: false,
+            enabled: true,
             interval: 3e3,
             timeout: 10e3
           }
@@ -53,8 +54,8 @@ export class Libp2pNode extends Libp2p {
         }
       },
       connectionManager: {
-        maxConnections: 2,
-        minConnections: 2
+        maxConnections: options.maxConnections,
+        minConnections: 0
       },
       datastore: options.datastore,
       peerStore: {

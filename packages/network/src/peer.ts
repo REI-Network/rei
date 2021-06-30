@@ -20,7 +20,7 @@ export class MsgQueue {
       drop: async (data: any) => {
         if (!this.aborted) {
           this.aborted = true;
-          logger.warn('MsgQueue::drop, Peer', this.peer.peerId, 'message queue too large, droped:', data);
+          logger.warn('MsgQueue::drop, Peer:', this.peer.peerId, 'message queue too large, droped:', data);
           await this.peer.close();
         }
       },
@@ -129,7 +129,7 @@ export class Peer {
   }
 
   async close() {
-    await this.networkMngr.removePeer(this);
+    await this.networkMngr.removePeer(this.peerId);
   }
 
   async abort() {
@@ -152,6 +152,7 @@ export class Peer {
     } catch (err) {
       await queue.abort();
       this.queueMap.delete(protocol.name);
+      logger.error('Peer::installProtocol, catch error:', err);
       return false;
     }
   }

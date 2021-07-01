@@ -330,7 +330,7 @@ export class Database extends DBManager {
   }
 
   /**
-   * Get blcok from database by blockHash and blockNumber
+   * Get block from database by blockHash and blockNumber
    * @param blockHash  BlockHash
    * @param blockNumber BlockNumber
    * @returns Block

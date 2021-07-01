@@ -108,7 +108,7 @@ export class NetworkManager extends EventEmitter {
 
   /**
    * Add peer info into the map when a peer connected
-   * @param peerInfo The peer's infomation
+   * @param peerInfo The peer's information
    * @returns The Peer object
    */
   private createPeer(peerInfo: PeerId) {
@@ -119,7 +119,7 @@ export class NetworkManager extends EventEmitter {
   }
 
   /**
-   * Remove the peer's infomation when the peer is disconnected
+   * Remove the peer's information when the peer is disconnected
    * @param peerId The peer's id
    */
   async removePeer(peerId: PeerType) {
@@ -133,9 +133,9 @@ export class NetworkManager extends EventEmitter {
   }
 
   /**
-   * Get the peer's infomation by peerId
+   * Get the peer's information by peerId
    * @param peerId
-   * @returns The peer's infomation
+   * @returns The peer's information
    */
   getPeer(peerId: PeerType) {
     return this.toPeer(peerId);

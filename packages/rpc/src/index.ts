@@ -8,9 +8,15 @@ import { logger } from '@gxchain2/utils';
 import { WsClient } from './client';
 import { FilterSystem } from './filtersystem';
 
+/**
+ * RPC running context, https or websocket
+ */
 export class RpcContext {
   public readonly client?: WsClient;
 
+  /**
+   * Determine whether it is a websock connection
+   */
   get isWebsocket() {
     return !!this.client;
   }
@@ -22,12 +28,18 @@ export class RpcContext {
 
 export const emptyContext = new RpcContext();
 
+/**
+ * Manage rpc server
+ */
 export class RpcServer {
   private readonly port: number;
   private readonly host: string;
   private running: boolean = false;
   private readonly controllers: { [name: string]: any }[];
 
+  /**
+   * Determine whether the rpc server is running
+   */
   get isRunning() {
     return this.running;
   }
@@ -44,6 +56,9 @@ export class RpcServer {
     });
   }
 
+  /**
+   * start rpc service, listening on the rpc request
+   */
   start() {
     return new Promise<void>((resolve, reject) => {
       if (this.running) {

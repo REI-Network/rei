@@ -24,6 +24,10 @@ type Filter = {
   client?: WsClient;
 };
 
+/**
+ * Generate subscription Id
+ * @returns Buffer of id
+ */
 function genSubscriptionId() {
   return bufferToHex(uuidv4({}, Buffer.alloc(16, 0)));
 }
@@ -58,6 +62,9 @@ class SyncingTask {
 
 type Task = LogsTask | HeadsTask | PendingTxTask | SyncingTask;
 
+/**
+ * FilterSystem used to filter and send subscription data
+ */
 export class FilterSystem {
   private readonly node: Node;
   private aborter = new Aborter();
@@ -108,6 +115,11 @@ export class FilterSystem {
     });
   }
 
+  /**
+   * Loop through all key-value pairs in the map, delete
+   * all timed out filter
+   * @param map
+   */
   private cycleDelete(map: Map<string, Filter>) {
     const timenow = Date.now();
     for (const [key, filter] of map) {
@@ -122,6 +134,9 @@ export class FilterSystem {
     await this.aborter.abort();
   }
 
+  /**
+   * Recycle all subscriptions once in a while and delete the timeout ones
+   */
   private async timeoutLoop() {
     while (!this.aborter.isAborted) {
       await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, deadline)));
@@ -134,6 +149,9 @@ export class FilterSystem {
     }
   }
 
+  /**
+   * Task loop used to push messages cyclically to subscribers
+   */
   private async taskLoop() {
     for await (const task of this.taskQueue.generator()) {
       try {
@@ -153,6 +171,15 @@ export class FilterSystem {
     }
   }
 
+  /**
+   * Subscription operation, categorize subscription types, including
+   * `newHeads`, `logs`, `newPendingTransactions`, `syncing`, then set
+   * into map
+   * @param client Websocket client
+   * @param type Subscription types
+   * @param query Query option
+   * @returns Subscription Id
+   */
   subscribe(client: WsClient, type: string, query?: Query): string {
     const uid = genSubscriptionId();
     const filter = { hashes: [], logs: [], query, client };
@@ -177,6 +204,12 @@ export class FilterSystem {
     return uid;
   }
 
+  /**
+   * Creates a filter object, based on filter options, to notify when the state changes
+   * @param type Filter type
+   * @param query Query option
+   * @returns Filter Id
+   */
   newFilter(type: string, query?: Query): string {
     const uid = genSubscriptionId();
     const filter = { hashes: [], logs: [], createtime: Date.now(), query };
@@ -198,6 +231,11 @@ export class FilterSystem {
     return uid;
   }
 
+  /**
+   * Unsubscribe, delete from subscription maps
+   * @param id  Subscription Id
+   * @returns `true` if sucessfully deleted
+   */
   unsubscribe(id: string) {
     let result = this.subscribeHeads.delete(id);
     result = this.subscribeLogs.delete(id) || result;
@@ -206,6 +244,11 @@ export class FilterSystem {
     return result;
   }
 
+  /**
+   * uninstall, delete from filter maps
+   * @param id Filter id
+   * @returns `true` if sucessfully deleted
+   */
   uninstall(id: string) {
     let result = this.filterHeads.delete(id);
     result = this.filterLogs.delete(id) || result;
@@ -214,6 +257,11 @@ export class FilterSystem {
     return result;
   }
 
+  /**
+   * Get the query of filter
+   * @param id Filter id
+   * @returns Query object
+   */
   getFilterQuery(id: string) {
     const type = this.filterType.get(id);
     if (!type) {
@@ -232,6 +280,12 @@ export class FilterSystem {
     }
   }
 
+  /**
+   * Polling method for a filter, which returns an array of
+   * specified type of datawhich occurred since last poll.
+   * @param id Filter id
+   * @returns Changed data
+   */
   filterChanges(id: string) {
     const type = this.filterType.get(id);
     if (!type) {
@@ -265,6 +319,11 @@ export class FilterSystem {
     }
   }
 
+  /**
+   * Send new pending transactions to all subscription which
+   * subscribe PendingTransaction
+   * @param hashs Transaction Hashs
+   */
   private newPendingTransactions(hashs: Buffer[]) {
     for (const [id, filter] of this.subscribePendingTransactions) {
       if (filter.client!.isClosed) {
@@ -278,6 +337,11 @@ export class FilterSystem {
     }
   }
 
+  /**
+   * Send new block headers to all subscription which
+   * subscribe Heads
+   * @param heads Block headers
+   */
   private newHeads(heads: BlockHeader[]) {
     for (const [id, filter] of this.subscribeHeads) {
       if (filter.client!.isClosed) {
@@ -291,6 +355,11 @@ export class FilterSystem {
     }
   }
 
+  /**
+   * Send new logs to all subscription which
+   * subscribe Logs
+   * @param logs Transaction logs
+   */
   private newLogs(logs: Log[]) {
     for (const [id, filter] of this.subscribeLogs) {
       if (filter.client!.isClosed) {
@@ -310,6 +379,11 @@ export class FilterSystem {
     }
   }
 
+  /**
+   * Send Syncing state to all subscription which
+   * subscribe Syncing
+   * @param state Syncing state
+   */
   private newSyncing(state: SyncingStatus) {
     for (const [id, filter] of this.subscribeSyncing) {
       if (filter.client!.isClosed) {

@@ -108,7 +108,7 @@ export class Peer {
 
   /**
    * Create a MsgQueue object, and push it into the queueMap
-   * @param protocol Protocol infomation
+   * @param protocol Protocol information
    * @returns The object of MsgQueue and ProtocolHandler
    */
   private makeMsgQueue(protocol: Protocol) {
@@ -153,9 +153,9 @@ export class Peer {
   }
 
   /**
-   * Receive protocol and stream infomation, install protocol, determine
+   * Receive protocol and stream information, install protocol, determine
    * and return whether the handshake is successful
-   * @param protocol Protocol infomation
+   * @param protocol Protocol information
    * @param stream Information transmission structure
    * @returns `true` if the protocol is installed successfully, `false`
    * if not

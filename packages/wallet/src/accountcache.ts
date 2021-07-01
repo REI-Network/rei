@@ -20,7 +20,7 @@ export class AccountCache {
   }
 
   /**
-   * Get all accounts infomation
+   * Get all accounts information
    * @returns Accountinfo array
    */
   accounts(): AccountInfo[] {

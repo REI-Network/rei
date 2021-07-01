@@ -30,7 +30,7 @@ function addrToString(addr: AddrType) {
 
 /**
  * AccountManager is an overarching manager that contain all
- * accounts' infomation
+ * accounts' information
  */
 export class AccountManager {
   private storage: KeyStore;
@@ -116,7 +116,7 @@ export class AccountManager {
   }
 
   /**
-   * Unlock account, add account infomation to the map
+   * Unlock account, add account information to the map
    * @param addr Account address
    * @param passphrase Decryption password
    * @returns `true` if sucessfully unlock

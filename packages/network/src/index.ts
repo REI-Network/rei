@@ -23,9 +23,8 @@ const defaultMaxConnections = 3;
 const defaultMaxDials = 4;
 
 export declare interface NetworkManager {
-  on(event: 'added' | 'installed' | 'removed', listener: (peer: Peer) => void): this;
-
-  once(event: 'added' | 'installed' | 'removed', listener: (peer: Peer) => void): this;
+  on(event: 'installed' | 'removed', listener: (peer: Peer) => void): this;
+  once(event: 'installed' | 'removed', listener: (peer: Peer) => void): this;
 }
 
 const ignoredErrors = new RegExp(['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED'].join('|'));

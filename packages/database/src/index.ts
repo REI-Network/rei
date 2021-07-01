@@ -302,11 +302,12 @@ export class Database extends DBManager {
   }
 
   /**
-   *
-   * @param txHash
-   * @param blockHash
-   * @param blockNumber
-   * @returns
+   * Get transaction receipt from database by transaction hash,
+   * blcokhash and blocknumber
+   * @param txHash Transaction hash
+   * @param blockHash Block hash
+   * @param blockNumber Block number
+   * @returns Transaction recript
    */
   async getReceiptByHashAndNumber(txHash: Buffer, blockHash: Buffer, blockNumber: BN): Promise<Receipt> {
     const header: BlockHeaderBuffer = rlp.decode(await this.get(DBTarget.Header, { blockHash, blockNumber })) as any;
@@ -359,9 +360,9 @@ export class Database extends DBManager {
   }
 
   /**
-   *
-   * @param hash
-   * @returns
+   * Get Canonical block header
+   * @param hash Block header hash
+   * @returns Block header
    */
   async tryToGetCanonicalHeader(hash: Buffer) {
     try {
@@ -376,11 +377,6 @@ export class Database extends DBManager {
     }
   }
 
-  /**
-   *
-   * @param num
-   * @returns
-   */
   async getCanonicalHeader(num: BN) {
     const hash = await this.numberToHash(num);
     return await this.getHeader(hash, num);
@@ -431,8 +427,8 @@ export class Database extends DBManager {
   // }
 
   /**
-   *
-   * @returns
+   * Get section count of database
+   * @returns Max section
    */
   async getStoredSectionCount() {
     try {
@@ -445,6 +441,10 @@ export class Database extends DBManager {
     }
   }
 
+  /**
+   * Set section count of database
+   * @param section
+   */
   async setStoredSectionCount(section: BN | undefined) {
     section === undefined ? await this.rawdb.del('scount') : await this.rawdb.put('scount', section.toString());
   }

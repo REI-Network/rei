@@ -193,9 +193,13 @@ export class NetworkManager extends EventEmitter {
     this.libp2pNode.connectionManager.on('peer:disconnect', (connect) => {
       const peerId: string = connect.remotePeer.toB58String();
       logger.info('🤐 Peer disconnected:', peerId);
-      this.dialing.delete(peerId);
-      this.installing.delete(peerId);
       this.connected.delete(peerId);
+      this.dialing.delete(peerId);
+      const peer = this.installing.get(peerId);
+      if (peer) {
+        this.installing.delete(peerId);
+        peer.abort();
+      }
       this.removePeer(peerId);
     });
 
@@ -414,6 +418,7 @@ export class NetworkManager extends EventEmitter {
 
   async abort() {
     await Promise.all(Array.from(this.installed.values()).map((peer) => peer.abort()));
+    await Promise.all(Array.from(this.installing.values()).map((peer) => peer.abort()));
     this.connected.clear();
     this.dialing.clear();
     this.installing.clear();

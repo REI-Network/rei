@@ -5,6 +5,7 @@ import { getRandomIntInclusive, logger } from '@gxchain2/utils';
 import { Peer } from './peer';
 import { Libp2pNode } from './libp2pnode';
 import { Protocol } from './types';
+import { ExpHeap } from './expheap';
 
 export * from './peer';
 export * from './types';
@@ -12,9 +13,11 @@ export * from './types';
 const installedPeerValue = 1;
 const connectedPeerValue = 0.5;
 const uselessPeerValue = 0;
-const timeoutLoopInterval = 30000;
-const dialLoopInterval1 = 2000;
-const dialLoopInterval2 = 10000;
+const timeoutLoopInterval = 30e3;
+const dialLoopInterval1 = 2e3;
+const dialLoopInterval2 = 10e3;
+const inboundThrottleTime = 30e3;
+const outboundThrottleTime = 35e3;
 const defaultMaxPeers = 2;
 const defaultMaxConnections = 3;
 const defaultMaxDials = 4;
@@ -68,12 +71,17 @@ export class NetworkManager extends EventEmitter {
   private readonly maxConnections: number;
   private readonly maxDials: number;
 
+  private readonly discovered: string[] = [];
   private readonly connected = new Set<string>();
   private readonly dialing = new Set<string>();
   private readonly installing = new Map<string, Peer>();
   private readonly installed = new Map<string, Peer>();
   private readonly banned = new Map<string, number>();
   private readonly timeout = new Map<string, number>();
+
+  private readonly inboundHistory = new ExpHeap();
+  private readonly outboundHistory = new ExpHeap();
+  private outboundTimer: undefined | NodeJS.Timeout;
 
   constructor(options: NetworkManagerOptions) {
     super();
@@ -145,16 +153,30 @@ export class NetworkManager extends EventEmitter {
     this.protocols.forEach((protocol) => {
       this.libp2pNode.handle(protocol.protocolString, ({ connection, stream }) => {
         const peerId: string = connection.remotePeer.toB58String();
-        this.connected.delete(peerId);
-        this.install(peerId, [protocol], [stream]).then((result) => {
-          if (!result && this.isConnected(peerId)) {
-            this.connected.add(peerId);
-          }
-        });
+        if (this.checkInbound(peerId)) {
+          this.connected.delete(peerId);
+          this.install(peerId, [protocol], [stream]).then((result) => {
+            if (!result) {
+              stream.close();
+              if (this.isConnected(peerId)) {
+                this.connected.add(peerId);
+              }
+            }
+          });
+        } else {
+          stream.close();
+        }
       });
     });
-    this.libp2pNode.on('peer:discovery', (peerId: PeerId) => {
-      logger.info('💬 Peer discovered:', peerId.toB58String());
+    this.libp2pNode.on('peer:discovery', (id: PeerId) => {
+      const peerId: string = id.toB58String();
+      if (!this.discovered.includes(peerId)) {
+        logger.info('💬 Peer discovered:', peerId);
+        this.discovered.push(peerId);
+        if (this.discovered.length > this.maxPeers) {
+          this.discovered.shift();
+        }
+      }
     });
     this.libp2pNode.connectionManager.on('peer:connect', (connect) => {
       const peerId: string = connect.remotePeer.toB58String();
@@ -185,18 +207,55 @@ export class NetworkManager extends EventEmitter {
     });
   }
 
+  private checkInbound(peerId: string) {
+    const now = Date.now();
+    this.inboundHistory.expire(now);
+    if (this.inboundHistory.contains(peerId)) {
+      return false;
+    }
+    this.inboundHistory.add(peerId, now + inboundThrottleTime);
+    return true;
+  }
+
+  private checkOutbound(peerId: string) {
+    return !this.outboundHistory.contains(peerId);
+  }
+
+  private setupOutboundTimer(now: number) {
+    if (!this.outboundTimer) {
+      const next = this.outboundHistory.nextExpiry();
+      if (next) {
+        const sep = next - now;
+        if (sep > 0) {
+          this.outboundTimer = setTimeout(() => {
+            const _now = Date.now();
+            this.outboundHistory.expire(_now);
+            this.outboundTimer = undefined;
+            this.setupOutboundTimer(_now);
+          }, sep);
+        } else {
+          this.outboundHistory.expire(now);
+        }
+      }
+    }
+  }
+
+  private updateOutbound(peerId: string) {
+    const now = Date.now();
+    this.outboundHistory.add(peerId, now + outboundThrottleTime);
+    this.setupOutboundTimer(now);
+  }
+
   private async install(peerId: string, protocols: Protocol[], streams: any[]) {
     console.log('install:', peerId);
     if (this.isBanned(peerId) || this.installing.has(peerId)) {
       console.log('install:', peerId, 'ban or repeated');
-      streams.forEach((stream) => stream.close());
       return false;
     }
     let peer = this.installed.get(peerId);
     if (!peer) {
       if (this.installed.size + 1 > this.maxPeers) {
         console.log('install:', peerId, 'maxPeers');
-        streams.forEach((stream) => stream.close());
         return false;
       }
       peer = new Peer(peerId, this);
@@ -249,10 +308,6 @@ export class NetworkManager extends EventEmitter {
     return array[getRandomIntInclusive(0, array.length - 1)];
   }
 
-  private randomConnected() {
-    return this.randomOne(Array.from(this.connected.values()));
-  }
-
   private matchProtocols(protocols: string[]) {
     for (const protocol of this.protocols) {
       if (protocols.includes(protocol.protocolString)) {
@@ -273,11 +328,25 @@ export class NetworkManager extends EventEmitter {
         if (this.installed.size < this.maxPeers && this.dialing.size < this.maxDials) {
           let peerId: string | undefined;
           if (this.connected.size > 0) {
-            console.log('connected', Array.from(this.connected.values()));
-            peerId = this.randomConnected();
-            this.connected.delete(peerId);
-            console.log('dialLoop, use a connected peer:', peerId);
-          } else {
+            const filtered = Array.from(this.connected.values()).filter((peerId) => !this.isBanned(peerId) && this.checkOutbound(peerId));
+            if (filtered.length > 0) {
+              peerId = this.randomOne(filtered);
+              this.connected.delete(peerId);
+              console.log('dialLoop, use a connected peer:', peerId);
+            }
+          }
+          if (!peerId) {
+            while (this.discovered.length > 0) {
+              const id = this.discovered.shift()!;
+              console.log('this.checkOutbound(id)', this.checkOutbound(id));
+              if (this.checkOutbound(id) && !this.dialing.has(id) && !this.installing.has(id) && !this.installed.has(id) && !this.isBanned(id)) {
+                peerId = id;
+                console.log('dialLoop, use a discovered peer:', peerId);
+                break;
+              }
+            }
+          }
+          if (!peerId) {
             const peers: {
               id: PeerId;
               addresses: any[];
@@ -286,7 +355,12 @@ export class NetworkManager extends EventEmitter {
             const peerIds = peers
               .filter((peer) => {
                 const id = peer.id.toB58String();
-                return peer.addresses.length > 0 && peer.protocols.length > 0 && this.matchProtocols(peer.protocols) && !this.dialing.has(id) && !this.installing.has(id) && !this.installed.has(id) && !this.isBanned(id);
+                let b = peer.addresses.length > 0 && peer.protocols.length > 0;
+                b &&= this.matchProtocols(peer.protocols);
+                b &&= !this.dialing.has(id) && !this.installing.has(id) && !this.installed.has(id);
+                b &&= !this.isBanned(id);
+                b &&= this.checkOutbound(id);
+                return b;
               })
               .map(({ id }) => id.toB58String());
             if (peerIds.length > 0) {
@@ -298,8 +372,10 @@ export class NetworkManager extends EventEmitter {
           }
 
           if (peerId) {
+            this.updateOutbound(peerId);
             this.dial(peerId, this.protocols).then(async ({ success, streams }) => {
               if (!success || !(await this.install(peerId!, this.protocols, streams))) {
+                streams.forEach((stream) => stream.close());
                 if (this.isConnected(peerId!)) {
                   this.connected.add(peerId!);
                 }

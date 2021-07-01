@@ -43,7 +43,7 @@ export class Libp2pNode extends Libp2p {
           kBucketSize: 20,
           enabled: true,
           randomWalk: {
-            enabled: true,
+            enabled: false,
             interval: 3e3,
             timeout: 10e3
           }

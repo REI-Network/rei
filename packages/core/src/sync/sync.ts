@@ -41,9 +41,6 @@ export abstract class Synchronizer extends EventEmitter {
     return { startingBlock: this.startingBlock, highestBlock: this.highestBlock };
   }
 
-  /**
-   *
-   */
   get isSyncing(): boolean {
     throw new Error('Unimplemented');
   }
@@ -59,8 +56,8 @@ export abstract class Synchronizer extends EventEmitter {
   }
 
   /**
-   * Sync the blocks
-   * @param target - the sync peer and height of block
+   *
+   * @param peer
    */
   async sync(peer?: Peer) {
     try {

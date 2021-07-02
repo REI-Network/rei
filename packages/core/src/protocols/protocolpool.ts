@@ -8,6 +8,9 @@ type Getter<T> = {
 
 export class GetHandlerTimeoutError extends Error {}
 
+/**
+ * ProtocolPool is used to manage all the handlers
+ */
 export class ProtocolPool<T> {
   private idlePool = new Set<T>();
   private busyPool = new Set<T>();
@@ -24,18 +27,35 @@ export class ProtocolPool<T> {
     }
   }
 
+  /**
+   * Get all hanlders
+   */
   get handlers() {
     return [...Array.from(this.idlePool), ...Array.from(this.busyPool)];
   }
 
+  /**
+   * Add a handler to pool
+   * @param handler Handler object
+   */
   add(handler: T) {
     this.addIdleHandler(handler);
   }
 
+  /**
+   * Remov handler from pool
+   * @param handler Handler object
+   * @returns `true` if successfully deleted
+   */
   remove(handler: T): boolean {
     return this.idlePool.delete(handler) || this.busyPool.delete(handler);
   }
 
+  /**
+   * Randomly obtain a handler to process the request,
+   * if there is no idle handler, just push the request into the queue
+   * @param timeout Timeout period
+   */
   get(timeout: number = 3 * 1000) {
     if (this.idlePool.size > 0) {
       const handler = Array.from(this.idlePool)[getRandomIntInclusive(0, this.idlePool.size - 1)];
@@ -56,6 +76,10 @@ export class ProtocolPool<T> {
     });
   }
 
+  /**
+   * Move the handler from the busy pool into the idle pool
+   * @param handler Handler object
+   */
   put(handler: T) {
     if (this.busyPool.delete(handler)) {
       this.addIdleHandler(handler);

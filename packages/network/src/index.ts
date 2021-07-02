@@ -20,9 +20,13 @@ const dialLoopInterval1 = 2e3;
 const dialLoopInterval2 = 10e3;
 const inboundThrottleTime = 30e3;
 const outboundThrottleTime = 35e3;
+
 const defaultMaxPeers = 4;
 const defaultMaxConnections = 4;
 const defaultMaxDials = 4;
+const defaultTcpPort = 4191;
+const defaultUdpPort = 9810;
+const defaultNat = '127.0.0.1';
 
 export declare interface NetworkManager {
   on(event: 'installed' | 'removed', listener: (peer: Peer) => void): this;
@@ -53,10 +57,10 @@ export function logNetworkError(prefix: string, err: any) {
 
 export interface NetworkManagerOptions {
   peerId: PeerId;
-  dbPath: string;
   protocols: Protocol[];
-  tcpPort: number;
-  wsPort: number;
+  dbPath?: string;
+  tcpPort?: number;
+  udpPort?: number;
   nat?: string;
   maxPeers?: number;
   maxConnections?: number;
@@ -89,6 +93,9 @@ export class NetworkManager extends EventEmitter {
     super();
     this.maxPeers = options.maxPeers || defaultMaxPeers;
     this.maxConnections = options.maxConnections || defaultMaxConnections;
+    if (this.maxPeers > this.maxConnections) {
+      throw new Error('invalid maxPeers or maxConnections');
+    }
     this.maxDials = options.maxDials || defaultMaxDials;
     this.protocols = options.protocols;
     this.initPromise = this.init(options);
@@ -147,15 +154,21 @@ export class NetworkManager extends EventEmitter {
 
     const keypair = createKeypairFromPeerId(options.peerId);
     const enr = ENR.createV4(keypair.publicKey);
-    enr.tcp = options.tcpPort;
-    enr.udp = options.wsPort;
-    enr.ip = options.nat || '127.0.0.1';
+    enr.tcp = options.tcpPort || defaultTcpPort;
+    enr.udp = options.udpPort || defaultUdpPort;
+    enr.ip = options.nat || defaultNat;
     logger.info('NetworkManager::init,', enr.encodeTxt(keypair.privateKey));
 
-    const datastore = new LevelStore(options.dbPath, { createIfMissing: true });
-    await datastore.open();
+    let datastore: undefined | LevelStore;
+    if (options.dbPath) {
+      datastore = new LevelStore(options.dbPath, { createIfMissing: true });
+      await datastore.open();
+    }
     this.libp2pNode = new Libp2pNode({
       ...options,
+      tcpPort: options.tcpPort || defaultTcpPort,
+      udpPort: options.udpPort || defaultUdpPort,
+      bootnodes: options.bootnodes || [],
       enr,
       maxConnections: this.maxConnections,
       datastore

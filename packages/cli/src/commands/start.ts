@@ -3,7 +3,7 @@ import process from 'process';
 import { Node } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
 import { setLevel, logger } from '@gxchain2/utils';
-import { SIGINT } from './process';
+import { SIGINT } from '../process';
 import { getPassphrase, getKeyStorePath } from './account';
 
 export async function startNode(opts: { [option: string]: string }): Promise<[Node, undefined | RpcServer]> {
@@ -22,16 +22,15 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     unlock: addresses.map((address, i): [string, string] => [address, passphrase[i]])
   };
   const p2p = {
-    tcpPort: Number(opts.p2pTcpPort),
-    wsPort: Number(opts.p2pWsPort),
-    bootnodes: (opts.bootnodes as unknown) as string[]
+    tcpPort: opts.p2pTcpPort ? Number(opts.p2pTcpPort) : undefined,
+    udpPort: opts.p2pUdpPort ? Number(opts.p2pUdpPort) : undefined,
+    bootnodes: opts.bootnodes ? ((opts.bootnodes as unknown) as string[]) : undefined,
+    nat: opts.p2pNat
   };
-  const mine = opts.mine
-    ? {
-        coinbase: opts.coinbase,
-        gasLimit: opts.blockGasLimit
-      }
-    : undefined;
+  const mine = {
+    enable: !!opts.mine,
+    coinbase: opts.coinbase
+  };
   const node = new Node({
     databasePath: opts.datadir,
     chain: opts.chain,
@@ -43,7 +42,13 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
   SIGINT(node);
   let server: undefined | RpcServer;
   if (opts.rpc) {
-    server = new RpcServer(Number(opts.rpcPort), opts.rpcHost, opts.rpcApi, node);
+    const rpc = {
+      node,
+      port: opts.rpcPort ? Number(opts.rpcPort) : undefined,
+      host: opts.rpcHost ? opts.rpcHost : undefined,
+      apis: opts.rpcApis ? opts.rpcApis : undefined
+    };
+    server = new RpcServer(rpc);
     await server.start();
   }
   return [node, server];

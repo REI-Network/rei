@@ -9,10 +9,10 @@ export interface Libp2pNodeOptions {
   peerId: PeerId;
   enr: ENR;
   tcpPort: number;
-  wsPort: number;
-  maxConnections?: number;
+  udpPort: number;
+  maxConnections: number;
+  bootnodes: string[];
   datastore?: any;
-  bootnodes?: string[];
 }
 
 export class Libp2pNode extends Libp2p {
@@ -33,7 +33,7 @@ export class Libp2pNode extends Libp2p {
           autoDial: false,
           discv5: {
             enr: options.enr,
-            bindAddr: `/ip4/0.0.0.0/udp/${options.wsPort}`,
+            bindAddr: `/ip4/0.0.0.0/udp/${options.udpPort}`,
             bootEnrs: options.bootnodes || []
           }
         }

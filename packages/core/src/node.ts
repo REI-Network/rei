@@ -25,6 +25,8 @@ const timeoutBanTime = 60 * 5 * 1000;
 const errorBanTime = 60 * 1000;
 const invalidBanTime = 60 * 10 * 1000;
 
+const defaultChainName = 'gxc2-mainnet';
+
 export type NodeStatus = {
   networkId: number;
   totalDifficulty: Buffer;
@@ -36,14 +38,15 @@ export type NodeStatus = {
 export interface NodeOptions {
   databasePath: string;
   chain?: string;
-  mine?: {
-    coinbase: string;
-    gasLimit: string;
+  mine: {
+    enable: boolean;
+    coinbase?: string;
   };
   p2p: {
-    tcpPort: number;
-    wsPort: number;
-    bootnodes: string[];
+    tcpPort?: number;
+    udpPort?: number;
+    nat?: string;
+    bootnodes?: string[];
   };
   account: {
     keyStorePath: string;
@@ -141,7 +144,7 @@ export class Node {
         }
       }
     }
-    if (options?.mine?.coinbase && !this.accMngr.hasUnlockedAccount(options.mine.coinbase)) {
+    if (options.mine.coinbase && !this.accMngr.hasUnlockedAccount(options.mine.coinbase)) {
       throw new Error(`Unlock coin account ${options.mine.coinbase} failed!`);
     }
 
@@ -152,8 +155,8 @@ export class Node {
       try {
         this.chain = JSON.parse(fs.readFileSync(path.join(options.databasePath, 'genesis.json')).toString());
       } catch (err) {
-        logger.warn('Read genesis.json faild, use default chain(gxc2-mainnet)');
-        this.chain = 'gxc2-mainnet';
+        logger.warn(`Read genesis.json faild, use default chain(${defaultChainName})`);
+        this.chain = defaultChainName;
       }
     } else if (getChain(this.chain as string) === undefined) {
       throw new Error(`Unknow chain: ${this.chain}`);
@@ -225,14 +228,7 @@ export class Node {
         this.txSync.dropPeer(peer.peerId);
       });
     await this.networkMngr.init();
-    this.miner = new Miner(
-      options.mine
-        ? {
-            node: this,
-            coinbase: options.mine.coinbase ? Address.fromString(options.mine.coinbase) : undefined
-          }
-        : { node: this }
-    );
+    this.miner = new Miner({ node: this, ...options.mine });
     await this.txPool.init();
     this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: BloomBitsBlocks, confirmsBlockNumber: ConfirmsBlockNumber });
     await this.bloomBitsIndexer.init();

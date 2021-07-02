@@ -19,14 +19,15 @@ function nowTimestamp() {
 
 export interface MinerOptions {
   node: Node;
-  coinbase?: Address;
-  gasLimit?: BN;
+  enable: boolean;
+  coinbase?: string;
 }
 
 export class Miner {
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
 
+  private enable: boolean;
   private _coinbase: Address;
   private _gasLimit: BN;
   private wvm!: WrappedVM;
@@ -40,8 +41,9 @@ export class Miner {
 
   constructor(options: MinerOptions) {
     this.node = options.node;
-    this._coinbase = options.coinbase || Address.zero();
-    this._gasLimit = (options.gasLimit || defaultGasLimit).clone();
+    this.enable = options.enable;
+    this._coinbase = options.coinbase ? Address.fromString(options.coinbase) : Address.zero();
+    this._gasLimit = defaultGasLimit.clone();
     this.initPromise = this.init();
   }
 
@@ -49,7 +51,7 @@ export class Miner {
    * Get the mining state
    */
   get isMining() {
-    return !this._coinbase.equals(Address.zero());
+    return !this._coinbase.equals(Address.zero()) && this.enable;
   }
 
   /**

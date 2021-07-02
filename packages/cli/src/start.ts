@@ -22,9 +22,9 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     unlock: addresses.map((address, i): [string, string] => [address, passphrase[i]])
   };
   const p2p = {
-    tcpPort: opts.p2pTcpPort ? Number(opts.p2pTcpPort) : undefined,
-    wsPort: opts.p2pWsPort ? Number(opts.p2pWsPort) : undefined,
-    bootnodes: Array.isArray(opts.bootnodes) ? opts.bootnodes : undefined
+    tcpPort: Number(opts.p2pTcpPort),
+    wsPort: Number(opts.p2pWsPort),
+    bootnodes: (opts.bootnodes as unknown) as string[]
   };
   const mine = opts.mine
     ? {

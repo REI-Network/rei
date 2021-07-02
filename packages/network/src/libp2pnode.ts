@@ -1,18 +1,17 @@
-import WebSockets from 'libp2p-websockets';
 import MPLEX from 'libp2p-mplex';
 import PeerId from 'peer-id';
-import KadDHT from 'libp2p-kad-dht';
 import TCP from 'libp2p-tcp';
 import secio from 'libp2p-secio';
-import Bootstrap from 'libp2p-bootstrap';
+import { Discv5Discovery, ENR } from '@chainsafe/discv5';
 const Libp2p = require('libp2p');
 
 export interface Libp2pNodeOptions {
   peerId: PeerId;
+  enr: ENR;
+  tcpPort: number;
+  wsPort: number;
   maxConnections?: number;
   datastore?: any;
-  tcpPort?: number;
-  wsPort?: number;
   bootnodes?: string[];
 }
 
@@ -21,36 +20,22 @@ export class Libp2pNode extends Libp2p {
     super({
       peerId: options.peerId,
       addresses: {
-        listen: [`/ip4/0.0.0.0/tcp/${options.tcpPort || 0}`, `/ip4/0.0.0.0/tcp/${options.wsPort || 0}/ws`]
+        listen: [`/ip4/0.0.0.0/tcp/${options.tcpPort}`]
       },
       modules: {
-        transport: [TCP, WebSockets],
+        transport: [TCP],
         streamMuxer: [MPLEX],
         connEncryption: [secio],
-        peerDiscovery: options.bootnodes !== undefined ? [Bootstrap] : [],
-        dht: KadDHT
+        peerDiscovery: [Discv5Discovery]
       },
       config: {
         peerDiscovery: {
           autoDial: false,
-          bootstrap: {
-            interval: 2000,
-            enabled: true,
-            list: options.bootnodes || []
+          discv5: {
+            enr: options.enr,
+            bindAddr: `/ip4/0.0.0.0/udp/${options.wsPort}`,
+            bootEnrs: options.bootnodes || []
           }
-        },
-        dht: {
-          kBucketSize: 20,
-          enabled: true,
-          randomWalk: {
-            enabled: false,
-            interval: 3e3,
-            timeout: 10e3
-          }
-        },
-        EXPERIMENTAL: {
-          dht: false,
-          pubsub: false
         }
       },
       connectionManager: {

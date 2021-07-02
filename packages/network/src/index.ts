@@ -1,6 +1,8 @@
 import { EventEmitter } from 'events';
 import PeerId from 'peer-id';
 import LevelStore from 'datastore-level';
+import { ENR } from '@chainsafe/discv5';
+import { createKeypairFromPeerId } from '@chainsafe/discv5/lib/keypair';
 import { getRandomIntInclusive, logger } from '@gxchain2/utils';
 import { Peer } from './peer';
 import { Libp2pNode } from './libp2pnode';
@@ -18,8 +20,8 @@ const dialLoopInterval1 = 2e3;
 const dialLoopInterval2 = 10e3;
 const inboundThrottleTime = 30e3;
 const outboundThrottleTime = 35e3;
-const defaultMaxPeers = 2;
-const defaultMaxConnections = 3;
+const defaultMaxPeers = 4;
+const defaultMaxConnections = 4;
 const defaultMaxDials = 4;
 
 export declare interface NetworkManager {
@@ -53,11 +55,12 @@ export interface NetworkManagerOptions {
   peerId: PeerId;
   dbPath: string;
   protocols: Protocol[];
+  tcpPort: number;
+  wsPort: number;
+  nat?: string;
   maxPeers?: number;
   maxConnections?: number;
   maxDials?: number;
-  tcpPort?: number;
-  wsPort?: number;
   bootnodes?: string[];
 }
 
@@ -142,10 +145,18 @@ export class NetworkManager extends EventEmitter {
       throw new Error('NetworkManager missing init options');
     }
 
+    const keypair = createKeypairFromPeerId(options.peerId);
+    const enr = ENR.createV4(keypair.publicKey);
+    enr.tcp = options.tcpPort;
+    enr.udp = options.wsPort;
+    enr.ip = options.nat || '127.0.0.1';
+    logger.info('NetworkManager::init,', enr.encodeTxt(keypair.privateKey));
+
     const datastore = new LevelStore(options.dbPath, { createIfMissing: true });
     await datastore.open();
     this.libp2pNode = new Libp2pNode({
       ...options,
+      enr,
       maxConnections: this.maxConnections,
       datastore
     });
@@ -201,13 +212,7 @@ export class NetworkManager extends EventEmitter {
       }
       this.removePeer(peerId);
     });
-
-    // start libp2p
     await this.libp2pNode.start();
-    logger.info('Libp2p has started, local id:', this.libp2pNode.peerId.toB58String());
-    this.libp2pNode.multiaddrs.forEach((ma) => {
-      logger.info(ma.toString() + '/p2p/' + this.libp2pNode.peerId.toB58String());
-    });
   }
 
   private checkInbound(peerId: string) {
@@ -250,15 +255,12 @@ export class NetworkManager extends EventEmitter {
   }
 
   private async install(peerId: string, protocols: Protocol[], streams: any[]) {
-    console.log('install:', peerId);
     if (this.isBanned(peerId) || this.installing.has(peerId)) {
-      console.log('install:', peerId, 'ban or repeated');
       return false;
     }
     let peer = this.installed.get(peerId);
     if (!peer) {
       if (this.installed.size + 1 > this.maxPeers) {
-        console.log('install:', peerId, 'maxPeers');
         return false;
       }
       peer = new Peer(peerId, this);
@@ -276,15 +278,12 @@ export class NetworkManager extends EventEmitter {
       this.emit('installed', peer);
       return true;
     }
-    console.log('install:', peerId, 'missing or failed');
     await peer.abort();
     return false;
   }
 
   private async dial(peerId: string, protocols: Protocol[]) {
-    console.log('dial:', peerId);
     if (this.isBanned(peerId) || this.dialing.has(peerId)) {
-      console.log('dial:', peerId, 'ban or repeated');
       return { success: false, streams: [] };
     }
     this.dialing.add(peerId);
@@ -295,15 +294,12 @@ export class NetworkManager extends EventEmitter {
         streams.push(stream);
       } catch (err) {
         logNetworkError('NetworkManager::dial', err);
-        console.log('dial:', peerId, 'dial protocol:', protocol.protocolString, 'failed');
         streams.push(null);
       }
     }
     if (!this.dialing.delete(peerId) || streams.reduce((b, s) => b && s === null, true)) {
-      console.log('dial:', peerId, 'missing or failed');
       return { success: false, streams: [] };
     }
-    console.log('dial:', peerId, 'success');
     return { success: true, streams };
   }
 
@@ -311,14 +307,14 @@ export class NetworkManager extends EventEmitter {
     return array[getRandomIntInclusive(0, array.length - 1)];
   }
 
-  private matchProtocols(protocols: string[]) {
-    for (const protocol of this.protocols) {
-      if (protocols.includes(protocol.protocolString)) {
-        return true;
-      }
-    }
-    return false;
-  }
+  // private matchProtocols(protocols: string[]) {
+  //   for (const protocol of this.protocols) {
+  //     if (protocols.includes(protocol.protocolString)) {
+  //       return true;
+  //     }
+  //   }
+  //   return false;
+  // }
 
   private isConnected(peerId: string) {
     return this.libp2pNode.connectionManager.get(PeerId.createFromB58String(peerId)) !== null;
@@ -335,16 +331,15 @@ export class NetworkManager extends EventEmitter {
             if (filtered.length > 0) {
               peerId = this.randomOne(filtered);
               this.connected.delete(peerId);
-              console.log('dialLoop, use a connected peer:', peerId);
+              logger.debug('NetworkManager::dialLoop, use a connected peer:', peerId);
             }
           }
           if (!peerId) {
             while (this.discovered.length > 0) {
               const id = this.discovered.shift()!;
-              console.log('this.checkOutbound(id)', this.checkOutbound(id));
               if (this.checkOutbound(id) && !this.dialing.has(id) && !this.installing.has(id) && !this.installed.has(id) && !this.isBanned(id)) {
                 peerId = id;
-                console.log('dialLoop, use a discovered peer:', peerId);
+                logger.debug('NetworkManager::dialLoop, use a discovered peer:', peerId);
                 break;
               }
             }
@@ -358,8 +353,7 @@ export class NetworkManager extends EventEmitter {
             const peerIds = peers
               .filter((peer) => {
                 const id = peer.id.toB58String();
-                let b = peer.addresses.length > 0 && peer.protocols.length > 0;
-                b &&= this.matchProtocols(peer.protocols);
+                let b = peer.addresses.length > 0;
                 b &&= !this.dialing.has(id) && !this.installing.has(id) && !this.installed.has(id);
                 b &&= !this.isBanned(id);
                 b &&= this.checkOutbound(id);
@@ -368,9 +362,7 @@ export class NetworkManager extends EventEmitter {
               .map(({ id }) => id.toB58String());
             if (peerIds.length > 0) {
               peerId = this.randomOne(peerIds);
-              console.log('dialLoop, use a stored peer:', peerId);
-            } else {
-              console.log('dialLoop, find stored peer failed');
+              logger.debug('NetworkManager::dialLoop, use a stored peer:', peerId);
             }
           }
 
@@ -405,7 +397,7 @@ export class NetworkManager extends EventEmitter {
         const now = Date.now();
         for (const [peerId, timestamp] of this.timeout) {
           if (now - timestamp >= timeoutLoopInterval) {
-            console.log('timeoutLoop, remove:', peerId);
+            logger.debug('NetworkManager::timeoutLoop, remove:', peerId);
             await this.removePeer(peerId);
           }
         }

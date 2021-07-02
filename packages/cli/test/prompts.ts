@@ -3,6 +3,8 @@ import util from 'util';
 import prompts from 'prompts';
 import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
+import { ENR } from '@chainsafe/discv5';
+import { createKeypairFromPeerId } from '@chainsafe/discv5/lib/keypair';
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
 import { Node } from '@gxchain2/core';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
@@ -36,8 +38,17 @@ const handler: {
       handler.add(node, str);
     }
   },
-  ban: async (node: Node, peerId: string) => {
-    console.log('remove result:', await node.networkMngr.removePeer(peerId));
+  rmpeer: async (node: Node, peerId: string) => {
+    await node.networkMngr.removePeer(peerId);
+    logger.info('removed');
+  },
+  lsenr: (node: Node, multiaddr: string) => {
+    const ma = new Multiaddr(multiaddr);
+    const peerId: PeerId = (node.networkMngr as any).libp2pNode.peerId;
+    const keypair = createKeypairFromPeerId(peerId);
+    const enr = ENR.createV4(keypair.publicKey);
+    enr.setLocationMultiaddr(ma as any);
+    logger.info('local:', enr.encodeTxt(keypair.privateKey));
   },
   lspeers: (node: Node) => {
     for (const peer of node.networkMngr.peers) {

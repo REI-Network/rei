@@ -3,8 +3,6 @@ import { Channel, logger } from '@gxchain2/utils';
 import { NetworkManager } from './index';
 import { Protocol, ProtocolHandler } from './types';
 
-let iii = 0;
-
 export class MsgQueue {
   readonly handler: ProtocolHandler;
   private readonly peer: Peer;
@@ -58,7 +56,6 @@ export class MsgQueue {
     this.stream = stream;
     this.streamPromise = (async () => {
       try {
-        let local = iii++;
         const sinkPromise = pipe(this.generator(), stream.sink);
         const sourcePromise = pipe(stream.source, async (source) => {
           for await (const data of source as AsyncGenerator<{ _bufs: Buffer[] }, any, any>) {
@@ -75,9 +72,7 @@ export class MsgQueue {
             }
           }
         });
-        console.log('start wait stream', local, this.peer.peerId);
         await Promise.all([sinkPromise, sourcePromise]);
-        console.log('stop wait stream', local, this.peer.peerId);
       } catch (err) {
         logger.error('MsgQueue::pipeStream, pipe error:', err);
       }

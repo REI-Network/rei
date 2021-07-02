@@ -40,10 +40,10 @@ export interface NodeOptions {
     coinbase: string;
     gasLimit: string;
   };
-  p2p?: {
-    tcpPort?: number;
-    wsPort?: number;
-    bootnodes?: string[];
+  p2p: {
+    tcpPort: number;
+    wsPort: number;
+    bootnodes: string[];
   };
   account: {
     keyStorePath: string;
@@ -207,7 +207,7 @@ export class Node {
       peerId = await PeerId.createFromPrivKey(key);
     } catch (err) {
       logger.warn('Read peer-key faild, generate a new key');
-      peerId = await PeerId.create({ bits: 1024, keyType: 'Ed25519' });
+      peerId = await PeerId.create({ keyType: 'secp256k1' });
       fs.writeFileSync(path.join(options.databasePath, 'peer-key'), peerId.privKey.bytes);
     }
 
@@ -216,22 +216,13 @@ export class Node {
       protocols: createProtocolsByNames(this, [NetworkProtocol.GXC2_ETHWIRE]),
       peerId,
       dbPath: path.join(options.databasePath, 'networkdb'),
-      ...options?.p2p
+      ...options.p2p
     })
       .on('installed', (peer) => {
         this.sync.announce(peer);
-        const handler = WireProtocol.getHandler(peer, false);
-        if (handler) {
-          handler.announceTx(this.txPool.getPooledTransactionHashes());
-          WireProtocol.getPool().add(handler);
-        }
       })
       .on('removed', (peer) => {
         this.txSync.dropPeer(peer.peerId);
-        const handler = WireProtocol.getHandler(peer, false);
-        if (handler) {
-          WireProtocol.getPool().remove(handler);
-        }
       });
     await this.networkMngr.init();
     this.miner = new Miner(

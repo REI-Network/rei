@@ -1,3 +1,4 @@
+import { Address } from 'ethereumjs-util';
 import { HChannel, PChannel, logger } from '@gxchain2/utils';
 import { emptyTxTrie, BlockHeader, Block } from '@gxchain2/structure';
 import { Node } from '../../node';
@@ -179,6 +180,14 @@ export class Fetcher {
                 return retry();
               }
               await block.validateData();
+              // additional check for beneficiary
+              if (!block.header.nonce.equals(Buffer.alloc(8)) || !block.header.coinbase.equals(Address.zero())) {
+                throw new Error('invalid nonce or coinbase, currently does not support beneficiary');
+              }
+              // additional check for gasLimit
+              if (!block.header.gasLimit.eq(this.node.miner.gasLimit)) {
+                throw new Error('invalid gasLimit');
+              }
               blocks.push(block);
             } catch (err) {
               logger.warn('Fetcher::downloadBodiesLoop, invalid bodies(validateData)', err);

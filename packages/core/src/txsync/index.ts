@@ -57,6 +57,9 @@ const maxTxAnnounces = 4096;
 
 type Request = { hashes: Buffer[]; stolen?: FunctionalSet<Buffer> };
 
+/**
+ * TxFetcher is responsible for retrieving new transaction based on announcements.
+ */
 export class TxFetcher {
   private waitingList = createBufferFunctionalMap<Set<string>>();
   private waitingTime = createBufferFunctionalMap<number>();
@@ -148,6 +151,10 @@ export class TxFetcher {
     }
   }
 
+  /**
+   * enqueueTransactionLoop imports a batch of received transaction into the transaction pool
+   * and the fetcher
+   */
   private async enqueueTransactionLoop() {
     try {
       for await (const message of this.enqueueTransactionQueue.generator()) {
@@ -228,6 +235,10 @@ export class TxFetcher {
     }
   }
 
+  /**
+   * rescheduleWait iterates over all the transactions currently in the waitlist
+   * and schedules the movement into the fetcher for the earliest.
+   */
   private rescheduleWait() {
     if (this.waitTimeout) {
       clearTimeout(this.waitTimeout);
@@ -271,6 +282,11 @@ export class TxFetcher {
     }, txArriveTimeout - (now - earliest));
   }
 
+  /**
+   * scheduleFetches starts a batch of retrievals for all available idle peers.
+   * @param whiteList Given set of active peers
+   * @returns
+   */
   private scheduleFetches(whiteList?: Set<string>) {
     const actives = whiteList ? new Set<string>(whiteList) : new Set<string>(this.announces.keys());
     if (actives.size === 0) {

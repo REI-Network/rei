@@ -10,6 +10,9 @@ export function installOptions(program: any) {
   program.option('--p2p-tcp-port <port>', 'p2p server tcp port');
   program.option('--p2p-udp-port <port>', 'p2p server udp port');
   program.option('--p2p-nat <ip>', 'p2p server nat ip');
+  program.option('--max-peers <peers>', 'max p2p peers count');
+  program.option('--max-connections <connections>', 'max p2p connections count');
+  program.option('--max-dials <dials>', 'max p2p dials count');
   program.option('--bootnodes <bootnodes...>', 'comma separated list of bootnodes');
   program.option('--datadir <path>', 'chain data dir path', path.join(os.homedir(), '.gxchain2'));
   program.option('--keystore <keystore>', 'the datadir for keystore', 'keystore');

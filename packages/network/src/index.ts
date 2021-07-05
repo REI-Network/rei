@@ -21,8 +21,8 @@ const dialLoopInterval2 = 10e3;
 const inboundThrottleTime = 30e3;
 const outboundThrottleTime = 35e3;
 
-const defaultMaxPeers = 4;
-const defaultMaxConnections = 4;
+const defaultMaxPeers = 50;
+const defaultMaxConnections = 50;
 const defaultMaxDials = 4;
 const defaultTcpPort = 4191;
 const defaultUdpPort = 9810;

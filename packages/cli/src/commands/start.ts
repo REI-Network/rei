@@ -25,7 +25,10 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     tcpPort: opts.p2pTcpPort ? Number(opts.p2pTcpPort) : undefined,
     udpPort: opts.p2pUdpPort ? Number(opts.p2pUdpPort) : undefined,
     bootnodes: opts.bootnodes ? ((opts.bootnodes as unknown) as string[]) : undefined,
-    nat: opts.p2pNat
+    nat: opts.p2pNat,
+    maxPeers: opts.maxPeers ? Number(opts.maxPeers) : undefined,
+    maxConnections: opts.maxConnections ? Number(opts.maxConnections) : undefined,
+    maxDials: opts.maxDials ? Number(opts.maxDials) : undefined
   };
   const mine = {
     enable: !!opts.mine,

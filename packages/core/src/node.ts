@@ -47,6 +47,9 @@ export interface NodeOptions {
     udpPort?: number;
     nat?: string;
     bootnodes?: string[];
+    maxPeers?: number;
+    maxConnections?: number;
+    maxDials?: number;
   };
   account: {
     keyStorePath: string;

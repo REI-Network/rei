@@ -9,6 +9,9 @@ export interface FetcherOptions {
   limit: number;
 }
 
+/**
+ * Fetcher is responsible for retrieving new blocks based on announcements.
+ */
 export class Fetcher {
   private abortFlag: boolean = false;
   private node: Node;
@@ -61,12 +64,18 @@ export class Fetcher {
     }
   }
 
+  /**
+   * Reset fetch, clear up Queues
+   */
   reset() {
     this.abortFlag = false;
     this.downloadBodiesQueue.reset();
     this.blockQueue.reset();
   }
 
+  /**
+   * Abort fetch
+   */
   abort() {
     logger.debug('Fetcher::abort');
     this.abortFlag = true;
@@ -83,6 +92,12 @@ export class Fetcher {
     this.blockQueue.abort();
   }
 
+  /**
+   * Download block headers
+   * @param start Start block height
+   * @param count Total blockheaders amount
+   * @param handler Peer's WireProtocolHandler
+   */
   private async downloadHeader(start: number, count: number, handler: WireProtocolHandler) {
     let i = 0;
     const headerTaskQueue: { start: number; count: number }[] = [];
@@ -131,6 +146,9 @@ export class Fetcher {
     }
   }
 
+  /**
+   * Download blockbodies according to the block headers
+   */
   private async downloadBodiesLoop() {
     let headersCache: BlockHeader[] = [];
     for await (const header of this.downloadBodiesQueue.generator()) {

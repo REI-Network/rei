@@ -280,6 +280,10 @@ export class Node {
     );
   }
 
+  /**
+   * Create a new Bloom Filter
+   * @returns A BloomBitsFilter object
+   */
   getFilter() {
     return new BloomBitsFilter({ node: this, sectionSize: BloomBitsBlocks });
   }

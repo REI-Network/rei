@@ -11,6 +11,9 @@ export interface FullSynchronizerOptions extends SynchronizerOptions {
   count?: number;
 }
 
+/**
+ * FullSynchronizer represents full syncmode based on Synchronizer
+ */
 export class FullSynchronizer extends Synchronizer {
   private readonly count: number;
   private readonly limit: number;
@@ -46,6 +49,11 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
+  /**
+   * Fetch all blocks from current height up to highest found amongst peers
+   * @param  peer remote peer to sync with
+   * @return Resolves with true if sync successful
+   */
   protected async _sync(peer?: Peer): Promise<boolean> {
     if (this.syncingPromise) {
       throw new Error('FullSynchronizer already sync');
@@ -109,6 +117,11 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
+  /**
+   * Find the same highest block with the local and target node
+   * @param handler WireProtocolHandler of peer
+   * @returns The number of block
+   */
   // TODO: binary search.
   private async findAncient(handler: WireProtocolHandler): Promise<number> {
     let latestHeight = this.node.blockchain.latestHeight;
@@ -143,6 +156,12 @@ export class FullSynchronizer extends Synchronizer {
     throw new Error('find acient failed');
   }
 
+  /**
+   * Sync all blocks and state from peer starting from current height.
+   * @param handler WireProtocolHandler of remote peer to sync with
+   * @param bestHeight The highest height of the target node
+   * @return Resolves when sync completed
+   */
   private async syncWithPeerHandler(handler: WireProtocolHandler, bestHeight: number): Promise<boolean> {
     const localHeight = await this.findAncient(handler);
     if (localHeight >= bestHeight) {

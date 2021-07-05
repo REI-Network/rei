@@ -1,8 +1,8 @@
 import { EventEmitter } from 'events';
 import PeerId from 'peer-id';
 import LevelStore from 'datastore-level';
-import { ENR } from '@chainsafe/discv5';
-import { createKeypairFromPeerId } from '@chainsafe/discv5/lib/keypair';
+import { ENR } from '@gxchain2/discv5';
+import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
 import { getRandomIntInclusive, logger } from '@gxchain2/utils';
 import { Peer } from './peer';
 import { Libp2pNode } from './libp2pnode';

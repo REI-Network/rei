@@ -2,7 +2,7 @@ import MPLEX from 'libp2p-mplex';
 import PeerId from 'peer-id';
 import TCP from 'libp2p-tcp';
 import secio from 'libp2p-secio';
-import { Discv5Discovery, ENR } from '@chainsafe/discv5';
+import { Discv5Discovery, ENR } from '@gxchain2/discv5';
 const Libp2p = require('libp2p');
 
 export interface Libp2pNodeOptions {

@@ -120,19 +120,23 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
+  private async _tryToGetHeader(handler: WireProtocolHandler, latestHeight: number, count: number) {
+    try {
+      const headers = await handler.getBlockHeaders(latestHeight, this.count);
+      return headers;
+    } catch (err) {
+      await this.node.banPeer(handler.peer.peerId, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
+      throw err;
+    }
+  }
+
   private async _findAncient(handler: WireProtocolHandler, latestHeight: number, counter: number): Promise<number> {
     while (counter > 0) {
       const count = latestHeight >= this.count ? this.count : latestHeight;
       latestHeight -= count;
       counter -= count;
       let headers!: BlockHeader[];
-      try {
-        headers = await handler.getBlockHeaders(latestHeight, this.count);
-      } catch (err) {
-        await this.node.banPeer(handler.peer.peerId, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
-        throw err;
-      }
-
+      headers = await this._tryToGetHeader(handler, latestHeight, this.count);
       for (let i = headers.length - 1; i >= 0; i--) {
         try {
           const remoteHeader = headers[i];
@@ -163,56 +167,29 @@ export class FullSynchronizer extends Synchronizer {
     const counter = ifEnough ? this.count * mult : latestHeight;
     const result = await this._findAncient(handler, latestHeight, counter);
     if (result !== -1) {
-      console.log('🤗🤗🤗🤗🤗🤗 origin find ancient', result);
       return result;
     }
     if (ifEnough) {
-      console.log('enough');
       let end = latestHeight - counter;
       let start = 0;
       let result = -1;
-      let headers;
-      while (start + 1 < end) {
+      let headers!: BlockHeader[];
+      while (start <= end) {
         const check = Math.floor((start + end) / 2);
-        console.log('--------check-------', check);
-        try {
-          headers = await handler.getBlockHeaders(check, 1);
-        } catch (err) {
-          await this.node.banPeer(handler.peer.peerId, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
-          throw err;
-        }
+        headers = await this._tryToGetHeader(handler, check, 1);
         try {
           const localHeader = await this.node.db.getHeader(headers[0].hash(), headers[0].number);
-          start = check;
+          start = check + 1;
           result = localHeader.number.toNumber();
         } catch (err) {
           if (err.type === 'NotFoundError') {
-            end = check;
+            end = check - 1;
             continue;
           }
           throw err;
         }
       }
       if (result !== -1) {
-        console.log('🤠🤠🤠🤠🤠🤠🤠 binary find ancient', result);
-        return result;
-      }
-      try {
-        headers = await handler.getBlockHeaders(0, 1);
-      } catch (err) {
-        await this.node.banPeer(handler.peer.peerId, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
-        throw err;
-      }
-      try {
-        const localHeader = await this.node.db.getHeader(headers[0].hash(), headers[0].number);
-        result = localHeader.number.toNumber();
-      } catch (err) {
-        if (err.type !== 'NotFoundError') {
-          throw err;
-        }
-      }
-      if (result !== -1) {
-        console.log('🤠🤠🤠🤠🤠🤠🤠 binary find ancient', result);
         return result;
       }
     }

@@ -1,5 +1,5 @@
 import pipe from 'it-pipe';
-import { Channel, Aborter, logger } from '@gxchain2/utils';
+import { Channel, logger } from '@gxchain2/utils';
 import { NetworkManager } from './index';
 import { Protocol, ProtocolHandler } from './types';
 
@@ -9,17 +9,21 @@ import { Protocol, ProtocolHandler } from './types';
 export class MsgQueue {
   readonly handler: ProtocolHandler;
   private readonly peer: Peer;
-  private readonly aborter: Aborter;
   private readonly queue: Channel;
+  private aborted: boolean = false;
+  private stream?: any;
+  private streamPromise?: Promise<void>;
 
   constructor(peer: Peer, handler: ProtocolHandler) {
     this.peer = peer;
     this.handler = handler;
-    this.aborter = new Aborter();
     this.queue = new Channel({
       drop: async (data: any) => {
-        logger.warn('MsgQueue::drop, Peer', this.peer.peerId, 'message queue too large, droped');
-        await this.peer.close();
+        if (!this.aborted) {
+          this.aborted = true;
+          logger.warn('MsgQueue::drop, Peer:', this.peer.peerId, 'message queue too large, droped:', data);
+          await this.peer.close();
+        }
       },
       max: 50
     });
@@ -31,7 +35,7 @@ export class MsgQueue {
    * @param data The data
    */
   send(method: string | number, data: any) {
-    if (this.aborter.isAborted) {
+    if (this.aborted) {
       throw new Error('MsgQueue already aborted');
     }
     data = this.handler.encode(method, data);
@@ -59,37 +63,50 @@ export class MsgQueue {
    * @param stream Information transmission structure
    */
   pipeStream(stream: any) {
-    if (this.aborter.isAborted) {
+    if (this.aborted) {
       throw new Error('MsgQueue already aborted');
     }
-    pipe(this.generator(), stream.sink);
-
-    pipe(stream.source, async (source) => {
-      const it = source[Symbol.asyncIterator]();
-      while (!this.aborter.isAborted) {
-        try {
-          const result: any = await this.aborter.abortablePromise(it.next());
-          if (this.aborter.isAborted) {
-            break;
+    if (this.stream || this.streamPromise) {
+      throw new Error('MsgQueue already piped');
+    }
+    this.stream = stream;
+    this.streamPromise = (async () => {
+      try {
+        const sinkPromise = pipe(this.generator(), stream.sink);
+        const sourcePromise = pipe(stream.source, async (source) => {
+          for await (const data of source as AsyncGenerator<{ _bufs: Buffer[] }, any, any>) {
+            try {
+              if (this.aborted) {
+                break;
+              }
+              const buf = data._bufs.reduce((buf1, buf2) => Buffer.concat([buf1, buf2]));
+              await this.handler.handle(buf);
+              this.peer.updateTimestamp();
+            } catch (err) {
+              logger.error('MsgQueue::pipeStream, handle message error:', err);
+              await this.peer.close();
+            }
           }
-          const { done, value } = result;
-          if (done) {
-            break;
-          }
-
-          const data: Buffer = value._bufs[0];
-          await this.handler.handle(data);
-        } catch (err) {
-          logger.error('MsgQueue::pipeStream, handle message error:', err);
-        }
+        });
+        await Promise.all([sinkPromise, sourcePromise]);
+      } catch (err) {
+        logger.error('MsgQueue::pipeStream, pipe error:', err);
       }
-    });
+    })();
   }
 
   async abort() {
+    this.aborted = true;
     this.queue.abort();
+    if (this.stream) {
+      this.stream.close();
+      this.stream = undefined;
+    }
+    if (this.streamPromise) {
+      await this.streamPromise;
+      this.streamPromise = undefined;
+    }
     this.handler.abort();
-    await this.aborter.abort();
   }
 }
 
@@ -111,7 +128,11 @@ export class Peer {
    * @param protocol Protocol information
    * @returns The object of MsgQueue and ProtocolHandler
    */
-  private makeMsgQueue(protocol: Protocol) {
+  private async makeMsgQueue(protocol: Protocol) {
+    const oldQueue = this.queueMap.get(protocol.name);
+    if (oldQueue) {
+      await oldQueue.abort();
+    }
     const handler = protocol.makeHandler(this);
     const queue = new MsgQueue(this, handler);
     this.queueMap.set(protocol.name, queue);
@@ -135,7 +156,7 @@ export class Peer {
    * Close node communication and remove the peer
    */
   async close() {
-    await this.networkMngr.removePeer(this);
+    await this.networkMngr.removePeer(this.peerId);
   }
 
   async abort() {
@@ -160,8 +181,8 @@ export class Peer {
    * @returns `true` if the protocol is installed successfully, `false`
    * if not
    */
-  async installProtocol(protocol: Protocol, stream?: any) {
-    const { queue, handler } = this.makeMsgQueue(protocol);
+  async installProtocol(protocol: Protocol, stream: any) {
+    const { queue, handler } = await this.makeMsgQueue(protocol);
     queue.pipeStream(stream);
     try {
       if (!(await handler.handshake())) {
@@ -171,7 +192,12 @@ export class Peer {
     } catch (err) {
       await queue.abort();
       this.queueMap.delete(protocol.name);
+      logger.error('Peer::installProtocol, catch error:', err);
       return false;
     }
+  }
+
+  updateTimestamp(timestamp: number = Date.now()) {
+    this.networkMngr.updateTimestamp(this.peerId, timestamp);
   }
 }

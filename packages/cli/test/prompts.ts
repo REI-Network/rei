@@ -3,13 +3,17 @@ import util from 'util';
 import prompts from 'prompts';
 import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
+import { program } from 'commander';
+import { ENR } from '@gxchain2/discv5';
+import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
 import { Node } from '@gxchain2/core';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
-import { startNode } from '../src/start';
-import program from '../src/program';
+import { startNode, installOptions } from '../src/commands';
 import { SIGINT } from '../src/process';
 import { WrappedBlock } from '../../database/node_modules/@gxchain2/structure/dist';
+
+installOptions(program);
 
 // addresses, a list of address, splited by `,`
 // topics, a list of topic, splited by `,` and each subTopic splited by `;`.
@@ -36,10 +40,26 @@ const handler: {
       handler.add(node, str);
     }
   },
-  lsp2p: (node: Node) => {
+  rmpeer: async (node: Node, peerId: string) => {
+    await node.networkMngr.removePeer(peerId);
+    logger.info('removed');
+  },
+  lsenr: (node: Node, multiaddr: string) => {
+    const ma = new Multiaddr(multiaddr);
+    const peerId: PeerId = (node.networkMngr as any).libp2pNode.peerId;
+    const keypair = createKeypairFromPeerId(peerId);
+    const enr = ENR.createV4(keypair.publicKey);
+    enr.setLocationMultiaddr(ma as any);
+    logger.info('local:', enr.encodeTxt(keypair.privateKey));
+  },
+  lspeers: (node: Node) => {
     for (const peer of node.networkMngr.peers) {
       logger.info(peer.peerId);
     }
+  },
+  lsp2p: (node: Node) => {
+    logger.info(Array.from((node.networkMngr as any).libp2pNode.connectionManager.connections.keys()));
+    logger.info('size:', (node.networkMngr as any).libp2pNode.connectionManager.size);
   },
   lsreceipt: async (node: Node, hash: string) => {
     try {
@@ -132,11 +152,8 @@ const startPrompts = async (node: Node) => {
     program.parse(process.argv);
     const opts = program.opts();
     opts.datadir = path.isAbsolute(opts.datadir) ? opts.datadir : path.join(__dirname, './test-dir/', opts.datadir);
-    const [node, sever] = await startNode(opts);
+    const [node] = await startNode(opts);
     SIGINT(node);
-    if (opts.mine !== true) {
-      await node.miner.setCoinbase(Address.fromString('0x3289621709f5b35d09b4335e129907ac367a0593'));
-    }
     await startPrompts(node);
   } catch (err) {
     logger.error('Prompts start error:', err);

@@ -119,25 +119,29 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
-  private async _findAncient(handler: WireProtocolHandler, latestHeight: number, count: number): Promise<number> {
-    let headers!: BlockHeader[];
-    try {
-      headers = await handler.getBlockHeaders(latestHeight, this.count);
-    } catch (err) {
-      await this.node.banPeer(handler.peer.peerId, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
-      throw err;
-    }
-
-    for (let i = headers.length - 1; i >= 0; i--) {
+  private async _findAncient(handler: WireProtocolHandler, latestHeight: number): Promise<number> {
+    while (latestHeight > 0) {
+      const count = latestHeight >= this.count ? this.count : latestHeight;
+      latestHeight -= count;
+      let headers!: BlockHeader[];
       try {
-        const remoteHeader = headers[i];
-        const localHeader = await this.node.db.getHeader(remoteHeader.hash(), remoteHeader.number);
-        return localHeader.number.toNumber();
+        headers = await handler.getBlockHeaders(latestHeight, this.count);
       } catch (err) {
-        if (err.type === 'NotFoundError') {
-          continue;
-        }
+        await this.node.banPeer(handler.peer.peerId, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
         throw err;
+      }
+
+      for (let i = headers.length - 1; i >= 0; i--) {
+        try {
+          const remoteHeader = headers[i];
+          const localHeader = await this.node.db.getHeader(remoteHeader.hash(), remoteHeader.number);
+          return localHeader.number.toNumber();
+        } catch (err) {
+          if (err.type === 'NotFoundError') {
+            continue;
+          }
+          throw err;
+        }
       }
     }
     return -1;
@@ -154,13 +158,13 @@ export class FullSynchronizer extends Synchronizer {
       return 0;
     }
     const ifEnough = latestHeight > this.count * mult ? true : false;
-    const count = ifEnough ? this.count * mult : latestHeight;
-    const result = await this._findAncient(handler, latestHeight, count);
+    const result = await this._findAncient(handler, latestHeight);
     if (result != -1) {
+      console.log('🤗🤗🤗🤗🤗🤗 origin find ancient', result);
       return result;
     }
     if (ifEnough) {
-      let end = latestHeight - count;
+      let end = latestHeight - this.count * mult;
       let start = 0;
       let result = -1;
       let header;
@@ -185,6 +189,7 @@ export class FullSynchronizer extends Synchronizer {
         }
       }
       if (result != -1) {
+        console.log('🤠🤠🤠🤠🤠🤠🤠 binary find ancient', result);
         return result;
       }
     }

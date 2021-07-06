@@ -100,20 +100,39 @@ export class Fetcher {
       if (this.abortFlag) {
         return;
       }
+      let headers: BlockHeader[];
       try {
-        const headers: BlockHeader[] = await handler.getBlockHeaders(start, count);
+        headers = await handler.getBlockHeaders(start, count);
+      } catch (err) {
+        logger.error('Fetcher::downloadHeader, catch error:', err);
+        this.abort();
+        await this.node.banPeer(handler.peer.peerId, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
+        return;
+      }
+      try {
         if (headers.length !== count) {
-          logger.warn('Fetcher::downloadHeader, invalid header(length)');
-          this.abort();
-          await this.node.banPeer(handler.peer.peerId, 'invalid');
-          return;
+          throw new Error('invalid header(length)');
         }
-        for (let index = 1; i < headers.length; i++) {
-          if (!headers[index - 1].hash().equals(headers[index].parentHash)) {
-            logger.warn('Fetcher::downloadHeader, invalid header(parentHash)');
-            this.abort();
-            await this.node.banPeer(handler.peer.peerId, 'invalid');
-            return;
+        for (let index = 0; i < headers.length; i++) {
+          const header = headers[index];
+          if (index > 0) {
+            if (!headers[index - 1].hash().equals(header.parentHash)) {
+              throw new Error('invalid header(parentHash)');
+            }
+          }
+          await header.validate(this.node.blockchain);
+          // TODO: check recently signers
+          // additional check for signer
+          if (!header.cliqueVerifySignature(this.node.blockchain.cliqueActiveSigners())) {
+            throw new Error('invalid header(signers)');
+          }
+          // additional check for beneficiary
+          if (!header.nonce.equals(Buffer.alloc(8)) || !header.coinbase.equals(Address.zero())) {
+            throw new Error('invalid header(nonce or coinbase), currently does not support beneficiary');
+          }
+          // additional check for gasLimit
+          if (!header.gasLimit.eq(this.node.miner.gasLimit)) {
+            throw new Error('invalid header(gas limit)');
           }
         }
         logger.info('Download headers start:', start, 'count:', count, 'from:', handler.peer.peerId);
@@ -121,9 +140,9 @@ export class Fetcher {
           this.downloadBodiesQueue.push(header);
         }
       } catch (err) {
-        logger.error('Fetcher::downloadHeader, catch error:', err);
+        logger.warn('Fetcher::downloadHeader, catch error:', err);
         this.abort();
-        await this.node.banPeer(handler.peer.peerId, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
+        await this.node.banPeer(handler.peer.peerId, 'invalid');
         return;
       }
       if (this.processParallelPromise) {
@@ -180,17 +199,13 @@ export class Fetcher {
                 return retry();
               }
               await block.validateData();
-              // additional check for beneficiary
-              if (!block.header.nonce.equals(Buffer.alloc(8)) || !block.header.coinbase.equals(Address.zero())) {
-                throw new Error('invalid nonce or coinbase, currently does not support beneficiary');
-              }
-              // additional check for gasLimit
-              if (!block.header.gasLimit.eq(this.node.miner.gasLimit)) {
-                throw new Error('invalid gasLimit');
+              // additional check for uncle headers
+              if (block.uncleHeaders.length !== 0) {
+                throw new Error('invalid block(uncle headers)');
               }
               blocks.push(block);
             } catch (err) {
-              logger.warn('Fetcher::downloadBodiesLoop, invalid bodies(validateData)', err);
+              logger.warn('Fetcher::downloadBodiesLoop, catch error:', err);
               await this.node.banPeer(handler.peer.peerId, 'invalid');
               return retry();
             }

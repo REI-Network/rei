@@ -14,7 +14,7 @@ export class Blockchain extends EthereumBlockchain {
   private _totalDifficulty!: BN;
 
   constructor(opts: BlockchainOptions) {
-    super(Object.assign(opts, { validateConsensus: false }));
+    super({ ...opts, validateConsensus: false });
     this.dbManager = opts.database;
     const self = this as any;
     // fix _putBlockOrHeader.

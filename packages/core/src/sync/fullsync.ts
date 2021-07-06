@@ -6,7 +6,7 @@ import { Synchronizer, SynchronizerOptions } from './sync';
 import { Fetcher } from './fetcher';
 import { WireProtocol, WireProtocolHandler, PeerRequestTimeoutError } from '../protocols';
 
-const mult = 10;
+const mult = 3;
 
 export interface FullSynchronizerOptions extends SynchronizerOptions {
   limit?: number;
@@ -28,7 +28,8 @@ export class FullSynchronizer extends Synchronizer {
 
   constructor(options: FullSynchronizerOptions) {
     super(options);
-    this.count = options.count || 128;
+    // this.count = options.count || 128;
+    this.count = 2;
     this.limit = options.limit || 16;
     this.fetcher = new Fetcher({ node: this.node, count: this.count, limit: this.limit });
   }
@@ -119,10 +120,11 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
-  private async _findAncient(handler: WireProtocolHandler, latestHeight: number): Promise<number> {
-    while (latestHeight > 0) {
+  private async _findAncient(handler: WireProtocolHandler, latestHeight: number, counter: number): Promise<number> {
+    while (counter > 0) {
       const count = latestHeight >= this.count ? this.count : latestHeight;
       latestHeight -= count;
+      counter -= count;
       let headers!: BlockHeader[];
       try {
         headers = await handler.getBlockHeaders(latestHeight, this.count);
@@ -158,26 +160,29 @@ export class FullSynchronizer extends Synchronizer {
       return 0;
     }
     const ifEnough = latestHeight > this.count * mult ? true : false;
-    const result = await this._findAncient(handler, latestHeight);
-    if (result != -1) {
+    const counter = ifEnough ? this.count * mult : latestHeight;
+    const result = await this._findAncient(handler, latestHeight, counter);
+    if (result !== -1) {
       console.log('🤗🤗🤗🤗🤗🤗 origin find ancient', result);
       return result;
     }
     if (ifEnough) {
-      let end = latestHeight - this.count * mult;
+      console.log('enough');
+      let end = latestHeight - counter;
       let start = 0;
       let result = -1;
-      let header;
+      let headers;
       while (start + 1 < end) {
         const check = Math.floor((start + end) / 2);
+        console.log('--------check-------', check);
         try {
-          header = await handler.getBlockHeaders(check, 1);
+          headers = await handler.getBlockHeaders(check, 1);
         } catch (err) {
           await this.node.banPeer(handler.peer.peerId, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
           throw err;
         }
         try {
-          const localHeader = await this.node.db.getHeader(header.hash(), header.number);
+          const localHeader = await this.node.db.getHeader(headers[0].hash(), headers[0].number);
           start = check;
           result = localHeader.number.toNumber();
         } catch (err) {
@@ -188,7 +193,25 @@ export class FullSynchronizer extends Synchronizer {
           throw err;
         }
       }
-      if (result != -1) {
+      if (result !== -1) {
+        console.log('🤠🤠🤠🤠🤠🤠🤠 binary find ancient', result);
+        return result;
+      }
+      try {
+        headers = await handler.getBlockHeaders(0, 1);
+      } catch (err) {
+        await this.node.banPeer(handler.peer.peerId, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
+        throw err;
+      }
+      try {
+        const localHeader = await this.node.db.getHeader(headers[0].hash(), headers[0].number);
+        result = localHeader.number.toNumber();
+      } catch (err) {
+        if (err.type !== 'NotFoundError') {
+          throw err;
+        }
+      }
+      if (result !== -1) {
         console.log('🤠🤠🤠🤠🤠🤠🤠 binary find ancient', result);
         return result;
       }

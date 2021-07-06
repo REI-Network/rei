@@ -23,6 +23,10 @@ export interface TraceConfig {
   toAsync?: boolean;
 }
 
+/**
+ * Tracer provides an implementation of Tracer that evaluates a Javascript
+ * function for each VM execution step.
+ */
 export class Tracer {
   private readonly node: Node;
 
@@ -71,6 +75,13 @@ export class Tracer {
     return await this.traceBlock(await this.node.db.getBlockByHashAndNumber(wtx.extension.blockHash!, wtx.extension.blockNumber!), config, hash);
   }
 
+  /**
+   *
+   * @param data
+   * @param block
+   * @param config
+   * @returns
+   */
   async traceCall(
     data: {
       from?: string;

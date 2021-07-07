@@ -127,6 +127,7 @@ export class NetworkManager extends EventEmitter {
         }
       }
       await peer.abort();
+      await this.libp2pNode.hangUp(PeerId.createFromB58String(peerId));
     }
   }
 
@@ -185,10 +186,12 @@ export class NetworkManager extends EventEmitter {
               if (this.isConnected(peerId)) {
                 this.connected.add(peerId);
               }
+              this.libp2pNode.hangUp(PeerId.createFromB58String(peerId));
             }
           });
         } else {
           stream.close();
+          this.libp2pNode.hangUp(PeerId.createFromB58String(peerId));
         }
       });
     });
@@ -236,9 +239,10 @@ export class NetworkManager extends EventEmitter {
         addresses: { multiaddr: Multiaddr }[];
       }
     >) {
-      if (addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'udp').length > 0) {
+      const udpAddresses = addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'udp');
+      if (udpAddresses.length > 0) {
         const enr = ENR.createFromPeerId(id);
-        addresses.forEach(({ multiaddr }) => enr.setLocationMultiaddr(multiaddr as any));
+        enr.setLocationMultiaddr(udpAddresses[0].multiaddr as any);
         this.libp2pNode.discv5.addEnr(enr);
       }
     }
@@ -311,7 +315,7 @@ export class NetworkManager extends EventEmitter {
     return false;
   }
 
-  private async dial(peerId: string, protocols: Protocol[]) {
+  private async dial({ peerId, multiaddr }: { peerId: string; multiaddr?: Multiaddr }, protocols: Protocol[]) {
     if (this.isBanned(peerId) || this.dialing.has(peerId)) {
       return { success: false, streams: [] };
     }
@@ -319,7 +323,7 @@ export class NetworkManager extends EventEmitter {
     const streams: any[] = [];
     for (const protocol of protocols) {
       try {
-        const { stream } = await this.libp2pNode.dialProtocol(PeerId.createFromB58String(peerId), protocol.protocolString);
+        const { stream } = await this.libp2pNode.dialProtocol(multiaddr || PeerId.createFromB58String(peerId), protocol.protocolString);
         streams.push(stream);
       } catch (err) {
         logNetworkError('NetworkManager::dial', err);
@@ -336,15 +340,6 @@ export class NetworkManager extends EventEmitter {
     return array[getRandomIntInclusive(0, array.length - 1)];
   }
 
-  // private matchProtocols(protocols: string[]) {
-  //   for (const protocol of this.protocols) {
-  //     if (protocols.includes(protocol.protocolString)) {
-  //       return true;
-  //     }
-  //   }
-  //   return false;
-  // }
-
   private isConnected(peerId: string) {
     return this.libp2pNode.connectionManager.get(PeerId.createFromB58String(peerId)) !== null;
   }
@@ -355,6 +350,7 @@ export class NetworkManager extends EventEmitter {
       try {
         if (this.installed.size < this.maxPeers && this.dialing.size < this.maxDials) {
           let peerId: string | undefined;
+          let multiaddr: Multiaddr | undefined;
           if (this.connected.size > 0) {
             const filtered = Array.from(this.connected.values()).filter((peerId) => !this.isBanned(peerId) && this.checkOutbound(peerId));
             if (filtered.length > 0) {
@@ -374,33 +370,37 @@ export class NetworkManager extends EventEmitter {
             }
           }
           if (!peerId) {
-            const peers: {
+            let peers: {
               id: PeerId;
               addresses: { multiaddr: Multiaddr }[];
             }[] = Array.from(this.libp2pNode.peerStore.peers.values());
-            const peerIds = peers
-              .filter((peer) => {
-                const id = peer.id.toB58String();
-                let b = peer.addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp').length > 0;
-                b &&= !this.dialing.has(id) && !this.installing.has(id) && !this.installed.has(id);
-                b &&= !this.isBanned(id);
-                b &&= this.checkOutbound(id);
-                return b;
-              })
-              .map(({ id }) => id.toB58String());
-            if (peerIds.length > 0) {
-              peerId = this.randomOne(peerIds);
+            peers = peers.filter((peer) => {
+              const id = peer.id.toB58String();
+              let b = peer.addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp').length > 0;
+              b &&= !this.dialing.has(id) && !this.installing.has(id) && !this.installed.has(id);
+              b &&= !this.isBanned(id);
+              b &&= this.checkOutbound(id);
+              return b;
+            });
+            if (peers.length > 0) {
+              const { id, addresses } = this.randomOne(peers);
+              peerId = id.toB58String();
+              multiaddr = addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp')[0].multiaddr;
+              multiaddr = multiaddr.encapsulate(`/p2p/${peerId}`);
               logger.debug('NetworkManager::dialLoop, use a stored peer:', peerId);
             }
           }
 
           if (peerId) {
             this.updateOutbound(peerId);
-            this.dial(peerId, this.protocols).then(async ({ success, streams }) => {
-              if (!success || !(await this.install(peerId!, this.protocols, streams))) {
-                streams.forEach((stream) => stream.close());
-                if (this.isConnected(peerId!)) {
-                  this.connected.add(peerId!);
+            this.dial({ peerId, multiaddr }, this.protocols).then(async ({ success, streams }) => {
+              if (success) {
+                if (!(await this.install(peerId!, this.protocols, streams))) {
+                  streams.forEach((stream) => stream.close());
+                  if (this.isConnected(peerId!)) {
+                    this.connected.add(peerId!);
+                  }
+                  await this.libp2pNode.hangUp(PeerId.createFromB58String(peerId!));
                 }
               }
             });

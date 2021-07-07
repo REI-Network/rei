@@ -147,7 +147,6 @@ export class Peer {
     } catch (err) {
       await queue.abort();
       this.queueMap.delete(protocol.name);
-      logger.error('Peer::installProtocol, catch error:', err);
       return false;
     }
   }

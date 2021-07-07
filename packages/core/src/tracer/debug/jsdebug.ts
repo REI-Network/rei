@@ -9,6 +9,12 @@ import { hexStringToBuffer, logger } from '@gxchain2/utils';
 import { IDebugImpl, TraceConfig } from '../tracer';
 import { Node } from '../../node';
 
+/**
+ * Convert operation name to number
+ * @param opcodes Opcodes collection
+ * @param name Opcode name
+ * @returns Opcode number
+ */
 function opNameToNumber(opcodes: OpcodeList, name: string) {
   if (name.indexOf('LOG') === 0) {
     return Number(name.substr(3)) + 0xa0;
@@ -30,6 +36,9 @@ function opNameToNumber(opcodes: OpcodeList, name: string) {
   throw new Error(`unknow opcode: ${name}`);
 }
 
+/**
+ * Used to manage an operation object
+ */
 class Op {
   name: string;
   constructor(opcodes: OpcodeList, name: string) {
@@ -64,6 +73,10 @@ class Memory {
   }
 }
 
+/**
+ * Contract represents an ethereum contract in the state database. It contains
+ * the contract code, calling arguments.
+ */
 class Contract {
   caller: Buffer;
   address: Buffer;
@@ -75,20 +88,43 @@ class Contract {
     this.value = value;
     this.input = input;
   }
+  /**
+   * getCaller returns the caller of the contract.
+   * @returns Contract caller
+   */
   getCaller() {
     return this.caller;
   }
+
+  /**
+   * getAddress returns the contracts address
+   * @returns contracts address
+   */
   getAddress() {
     return this.address;
   }
+
+  /**
+   * getValue returns the contract's value (sent to it from it's caller)
+   * @returns contract's value
+   */
   getValue() {
     return this.value;
   }
+  /**
+   * getInput return the input data
+   * @returns Input data
+   */
   getInput() {
     return this.input;
   }
 }
 
+/**
+ * Generate and return the operation method of the database
+ * @param stateManager state trie manager
+ * @returns A object of functions
+ */
 function makeDB(stateManager: StateManager) {
   return {
     async getBalance(address: Buffer) {
@@ -109,6 +145,15 @@ function makeDB(stateManager: StateManager) {
   };
 }
 
+/**
+ * Generate and return the operation method of the log
+ * @param ctx Contract transaction information
+ * @param opcodes Opcodes collection
+ * @param step Step state
+ * @param cost Transaction cost
+ * @param error Error message
+ * @returns A object for get contract parameter
+ */
 function makeLog(ctx: { [key: string]: any }, opcodes: OpcodeList, step: InterpreterStep, cost: BN, error?: string) {
   const stack = step.stack.map((bn) => bi(bn.toString()));
   Object.defineProperty(stack, 'peek', {
@@ -218,6 +263,19 @@ export class JSDebug implements IDebugImpl {
     }
   }
 
+  /**
+   * CaptureStart implements the Tracer interface to initialize the tracing operation.
+   * @param from From address
+   * @param to To address
+   * @param create Create or call
+   * @param input Input data
+   * @param gas GasLimit
+   * @param gasPrice  gasPrice
+   * @param intrinsicGas Intrinsic gas
+   * @param value Sent to it from it's caller
+   * @param number Blocknumber
+   * @param stateManager state trie manager
+   */
   async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, gasPrice: BN, intrinsicGas: BN, value: BN, number: BN, stateManager: StateManager) {
     this.debugContext['type'] = create ? 'CREATE' : 'CALL';
     this.debugContext['from'] = from;
@@ -231,6 +289,13 @@ export class JSDebug implements IDebugImpl {
     this.vmContextObj.globalDB = makeDB(stateManager);
   }
 
+  /**
+   * captureLog implements the Tracer interface to trace a single step of VM execution.
+   * @param step Step state
+   * @param cost Cost value
+   * @param error Error message
+   * @returns
+   */
   private async captureLog(step: InterpreterStep, cost: BN, error?: string) {
     if (this.rejected) {
       return;
@@ -248,10 +313,21 @@ export class JSDebug implements IDebugImpl {
     }
   }
 
+  /**
+   * captureState call the captureLog function
+   * @param step Step state
+   * @param cost Cost value
+   */
   async captureState(step: InterpreterStep, cost: BN) {
     await this.captureLog(step, cost);
   }
 
+  /**
+   * captureFault implements the Tracer interface to trace an execution fault
+   * @param step Step state
+   * @param cost Cost value
+   * @param err Error message
+   */
   async captureFault(step: InterpreterStep, cost: BN, err: any) {
     let errString: string;
     if (err instanceof VmError) {
@@ -266,12 +342,22 @@ export class JSDebug implements IDebugImpl {
     await this.captureLog(step, cost, errString);
   }
 
+  /**
+   * CaptureEnd is called after the call finishes to finalize the tracing.
+   * @param output Output result
+   * @param gasUsed Gas used
+   * @param time Running time
+   */
   async captureEnd(output: Buffer, gasUsed: BN, time: number) {
     this.debugContext['output'] = output;
     this.debugContext['gasUsed'] = gasUsed.toNumber();
     this.debugContext['time'] = time;
   }
 
+  /**
+   * GetResult calls the Javascript 'result' function and returns its value, or any accumulated error
+   * @returns
+   */
   async result() {
     if (this.rejected) {
       return;

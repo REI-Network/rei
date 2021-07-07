@@ -6,7 +6,7 @@ import { Synchronizer, SynchronizerOptions } from './sync';
 import { Fetcher } from './fetcher';
 import { WireProtocol, WireProtocolHandler, PeerRequestTimeoutError } from '../protocols';
 
-const mult = 3;
+const mult = 10;
 
 export interface FullSynchronizerOptions extends SynchronizerOptions {
   limit?: number;
@@ -28,8 +28,7 @@ export class FullSynchronizer extends Synchronizer {
 
   constructor(options: FullSynchronizerOptions) {
     super(options);
-    // this.count = options.count || 128;
-    this.count = 2;
+    this.count = options.count || 128;
     this.limit = options.limit || 16;
     this.fetcher = new Fetcher({ node: this.node, count: this.count, limit: this.limit });
   }

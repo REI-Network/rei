@@ -34,6 +34,14 @@ export class Tracer {
     this.node = node;
   }
 
+  /**
+   * Select the debug mode and generate the return object
+   * @param opcodes Opcodes collection
+   * @param reject Reject function
+   * @param config Trace Config
+   * @param hash
+   * @returns Debug object
+   */
   private createDebugImpl(opcodes: OpcodeList, reject: (reason?: any) => void, config?: TraceConfig, hash?: Buffer): IDebugImpl {
     if (config?.tracer) {
       if (tracers.has(config.tracer)) {
@@ -46,6 +54,14 @@ export class Tracer {
     }
   }
 
+  /**
+   * TraceBlock achieve to trace the block again by building a vm,
+   * run the block in it, and return result of execution
+   * @param block Block object
+   * @param config Trace config
+   * @param hash
+   * @returns Result of execution
+   */
   traceBlock(block: Block | Buffer, config?: TraceConfig, hash?: Buffer) {
     block = block instanceof Block ? block : Block.fromRLPSerializedBlock(block, { common: this.node.getCommon(0), hardforkByBlockNumber: true });
     if (block.header.number.eqn(0)) {
@@ -66,21 +82,34 @@ export class Tracer {
     });
   }
 
+  /**
+   * TraceBlockByHash call the traceBlock by using the block hash
+   * @param hash Block hash
+   * @param config Trace config
+   * @returns Result of execution
+   */
   async traceBlockByHash(hash: Buffer, config?: TraceConfig) {
     return await this.traceBlock(await this.node.db.getBlock(hash), config);
   }
 
+  /**
+   * traceTx trace a transaction by trace a block which the
+   * transaction belong to
+   * @param hash Transaction hash
+   * @param config Trace config
+   * @returns Result of execution
+   */
   async traceTx(hash: Buffer, config?: TraceConfig) {
     const wtx = await this.node.db.getWrappedTransaction(hash);
     return await this.traceBlock(await this.node.db.getBlockByHashAndNumber(wtx.extension.blockHash!, wtx.extension.blockNumber!), config, hash);
   }
 
   /**
-   *
-   * @param data
-   * @param block
-   * @param config
-   * @returns
+   * traceCall trace given transaction by call vm.runCall fucntion
+   * @param data Given data
+   * @param block Block object
+   * @param config Trace config
+   * @returns Result of execution
    */
   async traceCall(
     data: {

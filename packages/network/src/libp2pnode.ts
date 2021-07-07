@@ -52,4 +52,8 @@ export class Libp2pNode extends Libp2p {
       }
     });
   }
+
+  get discv5(): Discv5Discovery {
+    return this._discovery.get(Discv5Discovery.tag);
+  }
 }

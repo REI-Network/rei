@@ -227,6 +227,21 @@ export class NetworkManager extends EventEmitter {
       this.removePeer(peerId);
     });
     await this.libp2pNode.start();
+
+    // load udp address from networkdb.
+    for (const [, { id, addresses }] of this.libp2pNode.peerStore.peers as Map<
+      string,
+      {
+        id: PeerId;
+        addresses: { multiaddr: Multiaddr }[];
+      }
+    >) {
+      if (addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'udp').length > 0) {
+        const enr = ENR.createFromPeerId(id);
+        addresses.forEach(({ multiaddr }) => enr.setLocationMultiaddr(multiaddr as any));
+        this.libp2pNode.discv5.addEnr(enr);
+      }
+    }
   }
 
   private checkInbound(peerId: string) {
@@ -361,13 +376,12 @@ export class NetworkManager extends EventEmitter {
           if (!peerId) {
             const peers: {
               id: PeerId;
-              addresses: Multiaddr[];
-              protocols: string[];
+              addresses: { multiaddr: Multiaddr }[];
             }[] = Array.from(this.libp2pNode.peerStore.peers.values());
             const peerIds = peers
               .filter((peer) => {
                 const id = peer.id.toB58String();
-                let b = peer.addresses.filter((addr) => addr.toOptions().transport === 'tcp').length > 0;
+                let b = peer.addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp').length > 0;
                 b &&= !this.dialing.has(id) && !this.installing.has(id) && !this.installed.has(id);
                 b &&= !this.isBanned(id);
                 b &&= this.checkOutbound(id);

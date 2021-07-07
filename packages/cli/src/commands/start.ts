@@ -49,7 +49,7 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
       node,
       port: opts.rpcPort ? Number(opts.rpcPort) : undefined,
       host: opts.rpcHost ? opts.rpcHost : undefined,
-      apis: opts.rpcApis ? opts.rpcApis : undefined
+      apis: opts.rpcApi ? opts.rpcApi : undefined
     };
     server = new RpcServer(rpc);
     await server.start();

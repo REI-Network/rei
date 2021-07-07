@@ -363,9 +363,17 @@ export class NetworkManager extends EventEmitter {
             while (this.discovered.length > 0) {
               const id = this.discovered.shift()!;
               if (this.checkOutbound(id) && !this.dialing.has(id) && !this.installing.has(id) && !this.installed.has(id) && !this.isBanned(id)) {
-                peerId = id;
-                logger.debug('NetworkManager::dialLoop, use a discovered peer:', peerId);
-                break;
+                const addresses: { multiaddr: Multiaddr }[] | undefined = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(id));
+                if (addresses) {
+                  if ((multiaddr = addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp')[0]?.multiaddr)) {
+                    peerId = id;
+                    if (multiaddr.getPeerId() === null) {
+                      multiaddr = multiaddr.encapsulate(`/p2p/${peerId}`);
+                    }
+                    logger.debug('NetworkManager::dialLoop, use a discovered peer:', peerId);
+                    break;
+                  }
+                }
               }
             }
           }
@@ -386,7 +394,9 @@ export class NetworkManager extends EventEmitter {
               const { id, addresses } = this.randomOne(peers);
               peerId = id.toB58String();
               multiaddr = addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp')[0].multiaddr;
-              multiaddr = multiaddr.encapsulate(`/p2p/${peerId}`);
+              if (multiaddr.getPeerId() === null) {
+                multiaddr = multiaddr.encapsulate(`/p2p/${peerId}`);
+              }
               logger.debug('NetworkManager::dialLoop, use a stored peer:', peerId);
             }
           }

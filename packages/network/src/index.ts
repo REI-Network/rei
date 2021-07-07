@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import PeerId from 'peer-id';
+import Multiaddr from 'multiaddr';
 import LevelStore from 'datastore-level';
 import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
@@ -157,7 +158,7 @@ export class NetworkManager extends EventEmitter {
     enr.tcp = options.tcpPort || defaultTcpPort;
     enr.udp = options.udpPort || defaultUdpPort;
     enr.ip = options.nat || defaultNat;
-    logger.info('NetworkManager::init,', enr.encodeTxt(keypair.privateKey));
+    logger.info('NetworkManager::init, peerId:', options.peerId.toB58String(), enr.encodeTxt(keypair.privateKey));
 
     let datastore: undefined | LevelStore;
     if (options.dbPath) {
@@ -360,13 +361,13 @@ export class NetworkManager extends EventEmitter {
           if (!peerId) {
             const peers: {
               id: PeerId;
-              addresses: any[];
+              addresses: Multiaddr[];
               protocols: string[];
             }[] = Array.from(this.libp2pNode.peerStore.peers.values());
             const peerIds = peers
               .filter((peer) => {
                 const id = peer.id.toB58String();
-                let b = peer.addresses.length > 0;
+                let b = peer.addresses.filter((addr) => addr.toOptions().transport === 'tcp').length > 0;
                 b &&= !this.dialing.has(id) && !this.installing.has(id) && !this.installed.has(id);
                 b &&= !this.isBanned(id);
                 b &&= this.checkOutbound(id);

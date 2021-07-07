@@ -5,7 +5,7 @@
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
     "bin": {
-        "gxc2": "dist/index.js"
+        "gxchain2": "dist/index.js"
     },
     "scripts": {
         "build": "tsc"

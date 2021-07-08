@@ -1,6 +1,6 @@
 import pipe from 'it-pipe';
 import { Channel, logger } from '@gxchain2/utils';
-import { NetworkManager } from './index';
+import { NetworkManager, logNetworkError } from './index';
 import { Protocol, ProtocolHandler } from './types';
 
 export class MsgQueue {
@@ -74,7 +74,7 @@ export class MsgQueue {
         });
         await Promise.all([sinkPromise, sourcePromise]);
       } catch (err) {
-        logger.error('MsgQueue::pipeStream, pipe error:', err);
+        logNetworkError('MsgQueue::pipeStream', err);
       }
     })();
   }

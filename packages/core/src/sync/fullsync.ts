@@ -4,7 +4,9 @@ import { BlockHeader } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
 import { Synchronizer, SynchronizerOptions } from './sync';
 import { Fetcher } from './fetcher';
-import { WireProtocol, WireProtocolHandler, PeerRequestTimeoutError } from '../protocols';
+import { WireProtocol, WireProtocolHandler, PeerRequestTimeoutError, maxGetBlockHeaders } from '../protocols';
+
+const defaultMaxLimit = 16;
 
 export interface FullSynchronizerOptions extends SynchronizerOptions {
   limit?: number;
@@ -23,8 +25,8 @@ export class FullSynchronizer extends Synchronizer {
 
   constructor(options: FullSynchronizerOptions) {
     super(options);
-    this.count = options.count || 128;
-    this.limit = options.limit || 16;
+    this.count = options.count || maxGetBlockHeaders;
+    this.limit = options.limit || defaultMaxLimit;
     this.fetcher = new Fetcher({ node: this.node, count: this.count, limit: this.limit });
   }
 

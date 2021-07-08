@@ -11,6 +11,9 @@ const maxKnownBlocks = 1024;
 const maxQueuedTxs = 4096;
 const maxQueuedBlocks = 4;
 
+export const maxGetBlockHeaders = 128;
+export const maxTxRetrievals = 256;
+
 export class PeerRequestTimeoutError extends Error {}
 
 type Handler = {
@@ -19,7 +22,7 @@ type Handler = {
   response?: number;
   encode(data: any): any;
   decode(data: any): any;
-  process?: (data: any) => Promise<[string, any]> | [string, any] | void;
+  process?: (data: any) => Promise<[string, any]> | Promise<[string, any] | void> | [string, any] | void;
 };
 
 const wireHandlers: Handler[] = [
@@ -57,7 +60,11 @@ const wireHandlers: Handler[] = [
     decode(this: WireProtocolHandler, [start, count]: Buffer[]) {
       return { start: bufferToInt(start), count: bufferToInt(count) };
     },
-    async process(this: WireProtocolHandler, { start, count }: { start: number; count: number }): Promise<[string, BlockHeader[]]> {
+    async process(this: WireProtocolHandler, { start, count }: { start: number; count: number }): Promise<[string, BlockHeader[]] | void> {
+      if (count > maxGetBlockHeaders) {
+        this.node.banPeer(this.peer.peerId, 'invalid');
+        return;
+      }
       const blocks = await this.node.blockchain.getBlocks(start, count, 0, false);
       return ['BlockHeaders', blocks.map((b) => b.header)];
     }
@@ -82,7 +89,11 @@ const wireHandlers: Handler[] = [
     decode(this: WireProtocolHandler, headerHashs: Buffer[]) {
       return headerHashs;
     },
-    async process(this: WireProtocolHandler, headerHashs: Buffer[]): Promise<[string, TypedTransaction[][]]> {
+    async process(this: WireProtocolHandler, headerHashs: Buffer[]): Promise<[string, TypedTransaction[][]] | void> {
+      if (headerHashs.length > maxGetBlockHeaders) {
+        this.node.banPeer(this.peer.peerId, 'invalid');
+        return;
+      }
       const bodies: TypedTransaction[][] = [];
       for (const hash of headerHashs) {
         try {
@@ -146,6 +157,10 @@ const wireHandlers: Handler[] = [
       return hashes;
     },
     process(this: WireProtocolHandler, hashes: Buffer[]) {
+      if (hashes.length > maxTxPacketSize) {
+        this.node.banPeer(this.peer.peerId, 'invalid');
+        return;
+      }
       this.knowTxs(hashes);
       this.node.txSync.newPooledTransactionHashes(this.peer.peerId, hashes);
     }
@@ -161,6 +176,10 @@ const wireHandlers: Handler[] = [
       return hashes;
     },
     process(this: WireProtocolHandler, hashes: Buffer[]) {
+      if (hashes.length > maxTxRetrievals) {
+        this.node.banPeer(this.peer.peerId, 'invalid');
+        return;
+      }
       return ['PooledTransactions', hashes.map((hash) => this.node.txPool.getTransaction(hash)).filter((tx) => tx !== undefined)];
     }
   },
@@ -405,8 +424,11 @@ export class WireProtocolHandler implements ProtocolHandler {
           this.getMsgQueue().send(method, resps);
         } else {
           result
-            .then(([method, resps]) => {
-              this.getMsgQueue().send(method, resps);
+            .then((response) => {
+              if (response) {
+                const [method, resps] = response;
+                this.getMsgQueue().send(method, resps);
+              }
             })
             .catch((err) => {
               logger.error('WireProtocolHandler::process, catch error:', err);

@@ -1,8 +1,8 @@
+import { bufferToHex } from 'ethereumjs-util';
 import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Channel, Aborter, logger } from '@gxchain2/utils';
 import { TypedTransaction } from '@gxchain2/structure';
-import { WireProtocol, PeerRequestTimeoutError } from '../protocols';
+import { WireProtocol, PeerRequestTimeoutError, maxTxRetrievals } from '../protocols';
 import { Node } from '../node';
-import { bufferToHex } from 'ethereumjs-util';
 
 type NewPooledTransactionMessage = {
   hashes: Buffer[];
@@ -52,7 +52,6 @@ function panicError(...args: any[]) {
 const txArriveTimeout = 500;
 const gatherSlack = 100;
 const txGatherSlack = 100;
-const maxTxRetrievals = 256;
 const maxTxAnnounces = 4096;
 
 type Request = { hashes: Buffer[]; stolen?: FunctionalSet<Buffer> };

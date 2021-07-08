@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Aborter, Channel, logger } from '@gxchain2/utils';
 import { Topics, BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
 import { Node } from '@gxchain2/core';
-import { TypedTransaction, Log, BlockHeader } from '@gxchain2/structure';
+import { Transaction, Log, BlockHeader } from '@gxchain2/structure';
 import { WsClient } from './client';
 import { SyncingStatus } from './types';
 
@@ -103,7 +103,7 @@ export class FilterSystem {
     this.node.sync.on('synchronized', () => {
       this.taskQueue.push(new SyncingTask(false));
     });
-    this.node.txPool.on('readies', (readies: TypedTransaction[]) => {
+    this.node.txPool.on('readies', (readies: Transaction[]) => {
       this.taskQueue.push(new PendingTxTask(readies.map((tx) => tx.hash())));
     });
   }

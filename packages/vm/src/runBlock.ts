@@ -1,6 +1,6 @@
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { Address, BN, toBuffer, generateAddress } from 'ethereumjs-util';
-import { calculateIntrinsicGas, Block, Receipt, Log } from '@gxchain2/structure';
+import { calculateIntrinsicGas, Block, Receipt, Log, Transaction } from '@gxchain2/structure';
 import VM from '@ethereumjs/vm';
 import Bloom from '@ethereumjs/vm/dist/bloom';
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
@@ -194,7 +194,7 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockDebugOpts
    */
   let catchedErr: any;
   for (let txIdx = 0; txIdx < block.transactions.length; txIdx++) {
-    const tx = block.transactions[txIdx];
+    const tx = block.transactions[txIdx] as Transaction;
 
     const gasLimitIsHigherThanBlock = block.header.gasLimit.lt(tx.gasLimit.add(gasUsed));
     if (gasLimitIsHigherThanBlock) {

@@ -1,5 +1,5 @@
 import { bufferToInt, rlp, BN } from 'ethereumjs-util';
-import { TxFromValuesArray, TypedTransaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/structure';
+import { mustParseTransction, Transaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/structure';
 import { logger, Channel, createBufferFunctionalSet } from '@gxchain2/utils';
 import { ProtocolHandler, Peer, MsgQueue } from '@gxchain2/network';
 import { Node, NodeStatus } from '../node';
@@ -89,16 +89,16 @@ const wireHandlers: Handler[] = [
     decode(this: WireProtocolHandler, headerHashs: Buffer[]) {
       return headerHashs;
     },
-    async process(this: WireProtocolHandler, headerHashs: Buffer[]): Promise<[string, TypedTransaction[][]] | void> {
+    async process(this: WireProtocolHandler, headerHashs: Buffer[]): Promise<[string, Transaction[][]] | void> {
       if (headerHashs.length > maxGetBlockHeaders) {
         this.node.banPeer(this.peer.peerId, 'invalid');
         return;
       }
-      const bodies: TypedTransaction[][] = [];
+      const bodies: Transaction[][] = [];
       for (const hash of headerHashs) {
         try {
           const block = await this.node.db.getBlock(hash);
-          bodies.push(block.transactions);
+          bodies.push(block.transactions as Transaction[]);
         } catch (err) {
           if (err.type !== 'NotFoundError') {
             throw err;
@@ -112,7 +112,7 @@ const wireHandlers: Handler[] = [
   {
     name: 'BlockBodies',
     code: 4,
-    encode(this: WireProtocolHandler, bodies: TypedTransaction[][]) {
+    encode(this: WireProtocolHandler, bodies: Transaction[][]) {
       return [
         4,
         bodies.map((txs) => {
@@ -120,9 +120,9 @@ const wireHandlers: Handler[] = [
         })
       ];
     },
-    decode(this: WireProtocolHandler, bodies: TransactionsBuffer[]): TypedTransaction[][] {
+    decode(this: WireProtocolHandler, bodies: TransactionsBuffer[]): Transaction[][] {
       return bodies.map((txs) => {
-        return txs.map((tx) => TxFromValuesArray(tx, { common: this.node.getCommon(0) }));
+        return txs.map((tx) => mustParseTransction(tx, { common: this.node.getCommon(0) }));
       });
     }
   },
@@ -186,11 +186,11 @@ const wireHandlers: Handler[] = [
   {
     name: 'PooledTransactions',
     code: 8,
-    encode(this: WireProtocolHandler, txs: TypedTransaction[]) {
+    encode(this: WireProtocolHandler, txs: Transaction[]) {
       return [8, txs.map((tx) => tx.raw() as Buffer[])];
     },
     decode(this: WireProtocolHandler, raws: TransactionsBuffer) {
-      return raws.map((raw) => TxFromValuesArray(raw, { common: this.node.getCommon(0) }));
+      return raws.map((raw) => mustParseTransction(raw, { common: this.node.getCommon(0) }));
     }
   }
 ];
@@ -466,11 +466,11 @@ export class WireProtocolHandler implements ProtocolHandler {
     return this.request('GetBlockHeaders', { start, count });
   }
 
-  getBlockBodies(headers: BlockHeader[]): Promise<TypedTransaction[][]> {
+  getBlockBodies(headers: BlockHeader[]): Promise<Transaction[][]> {
     return this.request('GetBlockBodies', headers);
   }
 
-  getPooledTransactions(hashes: Buffer[]): Promise<TypedTransaction[]> {
+  getPooledTransactions(hashes: Buffer[]): Promise<Transaction[]> {
     return this.request('GetPooledTransactions', hashes);
   }
 

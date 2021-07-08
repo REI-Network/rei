@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import Semaphore from 'semaphore-async-await';
-import { TransactionFactory, TypedTransaction } from '@gxchain2/structure';
+import { TransactionFactory, Transaction } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
 import { Node } from '../node';
 
@@ -38,7 +38,7 @@ export class Journal {
    * load parses a transaction journal dump from `disk`, loading its contents into the specified pool.
    * @param add - Callback for adding transactions
    */
-  load(add: (transactions: TypedTransaction[]) => Promise<void>) {
+  load(add: (transactions: Transaction[]) => Promise<void>) {
     if (!fs.existsSync(this.path)) {
       fs.mkdirSync(this.dir, { recursive: true });
       return;
@@ -46,7 +46,7 @@ export class Journal {
 
     return new Promise<boolean>(async (resolve) => {
       const inputer = fs.createReadStream(this.path, { autoClose: true });
-      let batch: TypedTransaction[] = [];
+      let batch: Transaction[] = [];
       let bufferInput: Buffer | undefined;
       inputer.on('data', (chunk: Buffer) => {
         try {
@@ -61,10 +61,12 @@ export class Journal {
               break;
             }
             const tx = TransactionFactory.fromSerializedData(bufferInput.slice(0, i), { common: this.node.getCommon(0) });
-            batch.push(tx);
-            if (batch.length > 1024) {
-              add(batch);
-              batch = [];
+            if (tx instanceof Transaction) {
+              batch.push(tx);
+              if (batch.length > 1024) {
+                add(batch);
+                batch = [];
+              }
             }
             bufferInput = bufferInput.slice(i + bufferSplit.length);
           }
@@ -92,7 +94,7 @@ export class Journal {
    * insert adds the specified transaction to the local disk journal.
    * @param tx - transaction to insert
    */
-  async insert(tx: TypedTransaction) {
+  async insert(tx: Transaction) {
     await this.lock.acquire();
     this.createWritterIfNotExists();
     await new Promise<void>((resolve) => {
@@ -111,7 +113,7 @@ export class Journal {
    *the transaction pool.
    * @param all - The map containing the information to be rotated
    */
-  async rotate(all: Map<Buffer, TypedTransaction[]>) {
+  async rotate(all: Map<Buffer, Transaction[]>) {
     await this.lock.acquire();
     try {
       await this.closeWritter();

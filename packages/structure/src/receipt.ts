@@ -1,6 +1,6 @@
 import { rlp, toBuffer, unpadBuffer, bufferToInt, BN, bufferToHex, bnToHex, intToHex, generateAddress } from 'ethereumjs-util';
 import { Block } from './block';
-import { TypedTransaction } from './transaction';
+import { Transaction } from './transaction';
 import { LogRawValues, Log } from './log';
 
 export type ReceiptRawValue = (Buffer | LogRawValues[])[];
@@ -60,7 +60,7 @@ export class Receipt {
     return rlp.encode(this.raw());
   }
 
-  installProperties(block: Block, tx: TypedTransaction, gasUsed: BN, txIndex: number) {
+  installProperties(block: Block, tx: Transaction, gasUsed: BN, txIndex: number) {
     this.blockHash = block.hash();
     this.blockNumber = block.header.number;
     this.from = tx.getSenderAddress().toBuffer();

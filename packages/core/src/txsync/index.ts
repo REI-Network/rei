@@ -1,6 +1,6 @@
 import { bufferToHex } from 'ethereumjs-util';
 import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Channel, Aborter, logger } from '@gxchain2/utils';
-import { TypedTransaction } from '@gxchain2/structure';
+import { Transaction } from '@gxchain2/structure';
 import { WireProtocol, PeerRequestTimeoutError, maxTxRetrievals } from '../protocols';
 import { Node } from '../node';
 
@@ -10,7 +10,7 @@ type NewPooledTransactionMessage = {
 };
 
 type EnqueuePooledTransactionMessage = {
-  txs: TypedTransaction[];
+  txs: Transaction[];
   origin: string;
 };
 
@@ -151,7 +151,7 @@ export class TxFetcher {
     try {
       for await (const message of this.enqueueTransactionQueue.generator()) {
         // TODO: check underpriced and duplicate and etc.
-        const added = (await this.node.addPendingTxs(message.txs)).map((result, i) => (result ? message.txs[i] : null)).filter((ele) => ele !== null) as TypedTransaction[];
+        const added = (await this.node.addPendingTxs(message.txs)).map((result, i) => (result ? message.txs[i] : null)).filter((ele) => ele !== null) as Transaction[];
         for (const tx of added) {
           const hash = tx.hash();
           const set = this.waitingList.get(hash);
@@ -434,7 +434,7 @@ export class TxFetcher {
    * @param origin - the peer
    * @param txs - transactions
    */
-  enqueueTransaction(origin: string, txs: TypedTransaction[]) {
+  enqueueTransaction(origin: string, txs: Transaction[]) {
     if (!this.aborter.isAborted) {
       this.enqueueTransactionQueue.push({ txs, origin });
     }

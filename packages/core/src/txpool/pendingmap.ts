@@ -1,12 +1,12 @@
 import Heap from 'qheap';
-import { TypedTransaction } from '@gxchain2/structure';
+import { Transaction } from '@gxchain2/structure';
 import { createBufferFunctionalMap } from '@gxchain2/utils';
 
 export class PendingTxMap {
-  private heap = new Heap({ comparBefore: (a: TypedTransaction, b: TypedTransaction) => a.gasPrice.gt(b.gasPrice) });
-  private txs = createBufferFunctionalMap<TypedTransaction[]>();
+  private heap = new Heap({ comparBefore: (a: Transaction, b: Transaction) => a.gasPrice.gt(b.gasPrice) });
+  private txs = createBufferFunctionalMap<Transaction[]>();
 
-  push(sender: Buffer, sortedTxs: TypedTransaction[]) {
+  push(sender: Buffer, sortedTxs: Transaction[]) {
     if (sortedTxs.length > 0) {
       this.heap.push(sortedTxs.slice(0, 1)[0]);
       if (sortedTxs.length > 1) {
@@ -15,12 +15,12 @@ export class PendingTxMap {
     }
   }
 
-  peek(): TypedTransaction | undefined {
+  peek(): Transaction | undefined {
     return this.heap.peek();
   }
 
   shift() {
-    const tx: TypedTransaction | undefined = this.heap.remove();
+    const tx: Transaction | undefined = this.heap.remove();
     if (tx) {
       const sender = tx.getSenderAddress().buf;
       const nextTx = this.txs.get(sender);

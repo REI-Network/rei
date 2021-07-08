@@ -1,5 +1,5 @@
 import { Address, bnToHex, bufferToHex, toBuffer, hashPersonalMessage, toRpcSig, ecsign } from 'ethereumjs-util';
-import { TransactionFactory, WrappedTransaction, WrappedBlock, Log } from '@gxchain2/structure';
+import { TransactionFactory, WrappedTransaction, WrappedBlock, Log, Transaction } from '@gxchain2/structure';
 import { hexStringToBuffer } from '@gxchain2/utils';
 import * as helper from '../helper';
 import { RpcContext } from '../index';
@@ -143,11 +143,17 @@ export class ETHController extends Controller {
   }
   async eth_sendTransaction([data]: [CallData]) {
     const tx = await this.makeTxForUnlockedAccount(data);
+    if (!(tx instanceof Transaction)) {
+      return null;
+    }
     const results = await this.node.addPendingTxs([tx]);
     return results.length > 0 && results[0] ? bufferToHex(tx.hash()) : null;
   }
   async eth_sendRawTransaction([rawtx]: [string]) {
     const tx = TransactionFactory.fromSerializedData(hexStringToBuffer(rawtx), { common: this.node.getCommon(0) });
+    if (!(tx instanceof Transaction)) {
+      return null;
+    }
     const results = await this.node.addPendingTxs([tx]);
     return results.length > 0 && results[0] ? bufferToHex(tx.hash()) : null;
   }
@@ -191,7 +197,7 @@ export class ETHController extends Controller {
   async eth_getTransactionByBlockHashAndIndex([hash, index]: [string, string]) {
     try {
       const block = await this.node.db.getBlock(hexStringToBuffer(hash));
-      const wtx = new WrappedTransaction(block.transactions[Number(index)]);
+      const wtx = new WrappedTransaction(block.transactions[Number(index)] as Transaction);
       wtx.installProperties(block, Number(index));
       return wtx.toRPCJSON();
     } catch (err) {
@@ -201,7 +207,7 @@ export class ETHController extends Controller {
   async eth_getTransactionByBlockNumberAndIndex([tag, index]: [string, string]) {
     try {
       const block = await this.getBlockByTag(tag);
-      const wtx = new WrappedTransaction(block.transactions[Number(index)]);
+      const wtx = new WrappedTransaction(block.transactions[Number(index)] as Transaction);
       wtx.installProperties(block, Number(index));
       return wtx.toRPCJSON();
     } catch (err) {

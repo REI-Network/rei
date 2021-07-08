@@ -1,6 +1,6 @@
 import { Address, BN, bufferToHex } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
-import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN, calculateTransactionTrie, TypedTransaction } from '@gxchain2/structure';
+import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN, calculateTransactionTrie, Transaction } from '@gxchain2/structure';
 import { WrappedVM } from '@gxchain2/vm';
 import { logger, getRandomIntInclusive, hexStringToBN } from '@gxchain2/utils';
 import { StateManager } from '@gxchain2/vm';
@@ -31,7 +31,7 @@ export class Miner {
   private _coinbase: Address;
   private _gasLimit: BN;
   private wvm!: WrappedVM;
-  private pendingTxs: TypedTransaction[] = [];
+  private pendingTxs: Transaction[] = [];
   private pendingHeader!: BlockHeader;
   private gasUsed = new BN(0);
   private lock = new Semaphore(1);
@@ -248,7 +248,7 @@ export class Miner {
    * Add transactions for c
    * @param txs - The map of Buffer and array of transactions
    */
-  async addTxs(txs: Map<Buffer, TypedTransaction[]>) {
+  async addTxs(txs: Map<Buffer, Transaction[]>) {
     await this.initPromise;
     try {
       await this.lock.acquire();
@@ -288,7 +288,7 @@ export class Miner {
     return await this.node.getStateManager(this.node.blockchain.latestBlock.header.stateRoot, this.node.blockchain.latestHeight);
   }
 
-  private async _putTx(tx: TypedTransaction) {
+  private async _putTx(tx: Transaction) {
     this.pendingTxs.push(tx);
     const txs = [...this.pendingTxs];
     const header = { ...this.pendingHeader };

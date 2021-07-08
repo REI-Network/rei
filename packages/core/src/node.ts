@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import type { LevelUp } from 'levelup';
-import { bufferToHex, BN, BNLike, Address } from 'ethereumjs-util';
+import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
 import { Database, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchain2/database';
@@ -9,7 +9,7 @@ import { NetworkManager } from '@gxchain2/network';
 import { Common, getGenesisState, getChain } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { VM, WrappedVM, StateManager } from '@gxchain2/vm';
-import { TypedTransaction, Block } from '@gxchain2/structure';
+import { Transaction, Block } from '@gxchain2/structure';
 import { Channel, Aborter, logger } from '@gxchain2/utils';
 import { AccountManager } from '@gxchain2/wallet';
 import { TxPool } from './txpool';
@@ -58,9 +58,9 @@ export interface NodeOptions {
 }
 
 class NewPendingTxsTask {
-  txs: TypedTransaction[];
+  txs: Transaction[];
   resolve: (results: boolean[]) => void;
-  constructor(txs: TypedTransaction[], resolve: (results: boolean[]) => void) {
+  constructor(txs: Transaction[], resolve: (results: boolean[]) => void) {
     this.txs = txs;
     this.resolve = resolve;
   }
@@ -365,7 +365,7 @@ export class Node {
    * Push pending transactions to the taskQueue
    * @param txs - transactions
    */
-  async addPendingTxs(txs: TypedTransaction[]) {
+  async addPendingTxs(txs: Transaction[]) {
     await this.initPromise;
     return new Promise<boolean[]>((resolve) => {
       this.taskQueue.push(new NewPendingTxsTask(txs, resolve));

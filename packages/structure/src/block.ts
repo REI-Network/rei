@@ -1,7 +1,7 @@
 import { bnToHex, bufferToHex, BN, Address } from 'ethereumjs-util';
 import { Block } from '@ethereumjs/block';
 import { CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@ethereumjs/block/dist/clique';
-import { txSize, WrappedTransaction } from './transaction';
+import { txSize, WrappedTransaction, Transaction } from './transaction';
 
 export function calcCliqueDifficulty(activeSigners: Address[], signer: Address, number: BN): [boolean, BN] {
   if (activeSigners.length === 0) {
@@ -28,7 +28,7 @@ export class WrappedBlock {
     }
     this._size = this.block.header.raw().length;
     for (const tx of this.block.transactions) {
-      this._size += txSize(tx);
+      this._size += txSize(tx as Transaction);
     }
     return this._size;
   }
@@ -55,7 +55,7 @@ export class WrappedBlock {
       timestamp: bnToHex(this.block.header.timestamp),
       transactions: fullTransactions
         ? this.block.transactions.map((tx, i) => {
-            const wtx = new WrappedTransaction(tx);
+            const wtx = new WrappedTransaction(tx as Transaction);
             wtx.installProperties(this.block, i);
             return wtx.toRPCJSON();
           })

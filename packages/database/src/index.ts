@@ -3,7 +3,7 @@ import { DBManager, CacheMap } from '@ethereumjs/blockchain/dist/db/manager';
 import { DBOp, DBTarget, DatabaseKey, DBOpData } from '@ethereumjs/blockchain/dist/db/operation';
 import Cache from '@ethereumjs/blockchain/dist/db/cache';
 import { BN, rlp, toBuffer } from 'ethereumjs-util';
-import { Block, BlockBodyBuffer, BlockHeader, BlockHeaderBuffer, TypedTransaction, WrappedTransaction, Receipt } from '@gxchain2/structure';
+import { Block, BlockBodyBuffer, BlockHeader, BlockHeaderBuffer, WrappedTransaction, Receipt, Transaction } from '@gxchain2/structure';
 import { Common } from '@gxchain2/common';
 import { compressBytes } from '@gxchain2/utils';
 const level = require('level-mem');
@@ -176,14 +176,14 @@ export class Database extends DBManager {
     return self._db.get(dbKey, dbOpts);
   }
 
-  async getTransaction(txHash: Buffer): Promise<TypedTransaction> {
+  async getTransaction(txHash: Buffer): Promise<Transaction> {
     const blockHeightBuffer = await this.get(DBTarget_TxLookup, { txHash } as any);
     const blockHeihgt = new BN(blockHeightBuffer);
     const block = await this.getBlock(blockHeihgt);
     for (let i = 0; i < block.transactions.length; i++) {
       const tx = block.transactions[i];
       if (tx.hash().equals(txHash)) {
-        return tx;
+        return tx as Transaction;
       }
     }
     throw new level.errors.NotFoundError();
@@ -196,7 +196,7 @@ export class Database extends DBManager {
     for (let i = 0; i < block.transactions.length; i++) {
       const tx = block.transactions[i];
       if (tx.hash().equals(txHash)) {
-        return new WrappedTransaction(tx).installProperties(block, i);
+        return new WrappedTransaction(tx as Transaction).installProperties(block, i);
       }
     }
     throw new level.errors.NotFoundError();
@@ -214,7 +214,7 @@ export class Database extends DBManager {
       const receipt = Receipt.fromValuesArray(raw);
       if (tx.hash().equals(txHash)) {
         const gasUsed = receipt.bnCumulativeGasUsed.sub(lastCumulativeGasUsed);
-        receipt.installProperties(block, tx, gasUsed, i);
+        receipt.installProperties(block, tx as Transaction, gasUsed, i);
         return receipt;
       }
       lastCumulativeGasUsed = receipt.bnCumulativeGasUsed;
@@ -234,7 +234,7 @@ export class Database extends DBManager {
       const receipt = Receipt.fromValuesArray(raw);
       if (tx.hash().equals(txHash)) {
         const gasUsed = receipt.bnCumulativeGasUsed.sub(lastCumulativeGasUsed);
-        receipt.installProperties(block, tx, gasUsed, i);
+        receipt.installProperties(block, tx as Transaction, gasUsed, i);
         return receipt;
       }
       lastCumulativeGasUsed = receipt.bnCumulativeGasUsed;

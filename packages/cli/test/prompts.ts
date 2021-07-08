@@ -44,6 +44,10 @@ const handler: {
     await node.networkMngr.removePeer(peerId);
     logger.info('removed');
   },
+  ban: async (node: Node, peerId: string) => {
+    await node.networkMngr.ban(peerId);
+    logger.info('removed');
+  },
   lsenr: (node: Node, multiaddr: string) => {
     const ma = new Multiaddr(multiaddr);
     const peerId: PeerId = (node.networkMngr as any).libp2pNode.peerId;

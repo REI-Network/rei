@@ -127,7 +127,7 @@ export class NetworkManager extends EventEmitter {
         }
       }
       await peer.abort();
-      await this.libp2pNode.hangUp(PeerId.createFromB58String(peerId));
+      await this.disconnect(peerId);
     }
   }
 
@@ -145,6 +145,14 @@ export class NetworkManager extends EventEmitter {
     return false;
   }
 
+  private isIdle(peerId: string) {
+    return !this.dialing.has(peerId) && !this.installing.has(peerId) && !this.installed.has(peerId);
+  }
+
+  private disconnect(peerId: string): Promise<void> {
+    return this.libp2pNode.hangUp(PeerId.createFromB58String(peerId));
+  }
+
   async init(options?: NetworkManagerOptions) {
     if (this.initPromise) {
       await this.initPromise;
@@ -159,7 +167,8 @@ export class NetworkManager extends EventEmitter {
     enr.tcp = options.tcpPort || defaultTcpPort;
     enr.udp = options.udpPort || defaultUdpPort;
     enr.ip = options.nat || defaultNat;
-    logger.info('NetworkManager::init, peerId:', options.peerId.toB58String(), enr.encodeTxt(keypair.privateKey));
+    logger.info('NetworkManager::init, peerId:', options.peerId.toB58String());
+    logger.info('NetworkManager::init,', enr.encodeTxt(keypair.privateKey));
 
     let datastore: undefined | LevelStore;
     if (options.dbPath) {
@@ -186,12 +195,12 @@ export class NetworkManager extends EventEmitter {
               if (this.isConnected(peerId)) {
                 this.connected.add(peerId);
               }
-              this.libp2pNode.hangUp(PeerId.createFromB58String(peerId));
+              this.disconnect(peerId);
             }
           });
         } else {
           stream.close();
-          this.libp2pNode.hangUp(PeerId.createFromB58String(peerId));
+          this.disconnect(peerId);
         }
       });
     });
@@ -207,13 +216,17 @@ export class NetworkManager extends EventEmitter {
     });
     this.libp2pNode.connectionManager.on('peer:connect', (connect) => {
       const peerId: string = connect.remotePeer.toB58String();
+      if (this.isBanned(peerId)) {
+        connect.close();
+        return;
+      }
       if (this.libp2pNode.connectionManager.size > this.maxConnections) {
         this.setPeerValue(peerId, 'useless');
       } else {
         logger.info('💬 Peer connect:', peerId);
         this.setPeerValue(peerId, 'connected');
       }
-      if (!this.dialing.has(peerId) && !this.installing.has(peerId) && !this.installed.has(peerId)) {
+      if (this.isIdle(peerId)) {
         this.connected.add(peerId);
       }
     });
@@ -344,6 +357,17 @@ export class NetworkManager extends EventEmitter {
     return this.libp2pNode.connectionManager.get(PeerId.createFromB58String(peerId)) !== null;
   }
 
+  private chooseMultiaddrsByTransport(multiaddrs: Multiaddr[], transport: 'tcp' | 'udp'): Multiaddr | undefined {
+    return multiaddrs.filter((ma) => ma.toOptions().transport === transport)[0];
+  }
+
+  private appendPeerId(multiaddr: Multiaddr, peerId: string) {
+    if (multiaddr.getPeerId() === null) {
+      return multiaddr.encapsulate(`/p2p/${peerId}`);
+    }
+    return multiaddr;
+  }
+
   private async dialLoop() {
     await this.initPromise;
     while (true) {
@@ -362,17 +386,19 @@ export class NetworkManager extends EventEmitter {
           if (!peerId) {
             while (this.discovered.length > 0) {
               const id = this.discovered.shift()!;
-              if (this.checkOutbound(id) && !this.dialing.has(id) && !this.installing.has(id) && !this.installed.has(id) && !this.isBanned(id)) {
+              if (this.checkOutbound(id) && this.isIdle(id) && !this.isBanned(id)) {
                 const addresses: { multiaddr: Multiaddr }[] | undefined = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(id));
-                if (addresses) {
-                  if ((multiaddr = addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp')[0]?.multiaddr)) {
-                    peerId = id;
-                    if (multiaddr.getPeerId() === null) {
-                      multiaddr = multiaddr.encapsulate(`/p2p/${peerId}`);
-                    }
-                    logger.debug('NetworkManager::dialLoop, use a discovered peer:', peerId);
-                    break;
-                  }
+                if (
+                  addresses &&
+                  (multiaddr = this.chooseMultiaddrsByTransport(
+                    addresses.map(({ multiaddr }) => multiaddr),
+                    'tcp'
+                  ))
+                ) {
+                  peerId = id;
+                  multiaddr = this.appendPeerId(multiaddr, peerId);
+                  logger.debug('NetworkManager::dialLoop, use a discovered peer:', peerId);
+                  break;
                 }
               }
             }
@@ -385,7 +411,7 @@ export class NetworkManager extends EventEmitter {
             peers = peers.filter((peer) => {
               const id = peer.id.toB58String();
               let b = peer.addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp').length > 0;
-              b &&= !this.dialing.has(id) && !this.installing.has(id) && !this.installed.has(id);
+              b &&= this.isIdle(id);
               b &&= !this.isBanned(id);
               b &&= this.checkOutbound(id);
               return b;
@@ -393,10 +419,11 @@ export class NetworkManager extends EventEmitter {
             if (peers.length > 0) {
               const { id, addresses } = this.randomOne(peers);
               peerId = id.toB58String();
-              multiaddr = addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp')[0].multiaddr;
-              if (multiaddr.getPeerId() === null) {
-                multiaddr = multiaddr.encapsulate(`/p2p/${peerId}`);
-              }
+              multiaddr = this.chooseMultiaddrsByTransport(
+                addresses.map(({ multiaddr }) => multiaddr),
+                'tcp'
+              );
+              multiaddr = this.appendPeerId(multiaddr!, peerId);
               logger.debug('NetworkManager::dialLoop, use a stored peer:', peerId);
             }
           }
@@ -410,7 +437,7 @@ export class NetworkManager extends EventEmitter {
                   if (this.isConnected(peerId!)) {
                     this.connected.add(peerId!);
                   }
-                  await this.libp2pNode.hangUp(PeerId.createFromB58String(peerId!));
+                  await this.disconnect(peerId!);
                 }
               }
             });

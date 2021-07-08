@@ -20,6 +20,18 @@ export class Common extends EthereumCommon {
     common.setHardforkByBlockNumber(num);
     return common;
   }
+
+  // ensure onlyActive is always true
+  hardforkGteHardfork(
+    hardfork1: string | null,
+    hardfork2: string,
+    opts?: {
+      onlySupported?: boolean;
+      onlyActive?: boolean;
+    }
+  ) {
+    return super.hardforkGteHardfork(hardfork1, hardfork2, { ...opts, onlyActive: true });
+  }
 }
 
 export * from './genesisStates';

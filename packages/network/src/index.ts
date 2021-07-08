@@ -34,7 +34,7 @@ export declare interface NetworkManager {
   once(event: 'installed' | 'removed', listener: (peer: Peer) => void): this;
 }
 
-const ignoredErrors = new RegExp(['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED', '1 bytes'].join('|'));
+const ignoredErrors = new RegExp(['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED', '1 bytes', 'No transport available'].join('|'));
 
 export function logNetworkError(prefix: string, err: any) {
   if (err.message && ignoredErrors.test(err.message)) {
@@ -328,7 +328,7 @@ export class NetworkManager extends EventEmitter {
     return false;
   }
 
-  private async dial({ peerId, multiaddr }: { peerId: string; multiaddr?: Multiaddr }, protocols: Protocol[]) {
+  private async dial(peerId: string, protocols: Protocol[]) {
     if (this.isBanned(peerId) || this.dialing.has(peerId)) {
       return { success: false, streams: [] };
     }
@@ -336,7 +336,7 @@ export class NetworkManager extends EventEmitter {
     const streams: any[] = [];
     for (const protocol of protocols) {
       try {
-        const { stream } = await this.libp2pNode.dialProtocol(multiaddr || PeerId.createFromB58String(peerId), protocol.protocolString);
+        const { stream } = await this.libp2pNode.dialProtocol(PeerId.createFromB58String(peerId), protocol.protocolString);
         streams.push(stream);
       } catch (err) {
         logNetworkError('NetworkManager::dial', err);
@@ -357,24 +357,12 @@ export class NetworkManager extends EventEmitter {
     return this.libp2pNode.connectionManager.get(PeerId.createFromB58String(peerId)) !== null;
   }
 
-  private chooseMultiaddrsByTransport(multiaddrs: Multiaddr[], transport: 'tcp' | 'udp'): Multiaddr | undefined {
-    return multiaddrs.filter((ma) => ma.toOptions().transport === transport)[0];
-  }
-
-  private appendPeerId(multiaddr: Multiaddr, peerId: string) {
-    if (multiaddr.getPeerId() === null) {
-      return multiaddr.encapsulate(`/p2p/${peerId}`);
-    }
-    return multiaddr;
-  }
-
   private async dialLoop() {
     await this.initPromise;
     while (true) {
       try {
         if (this.installed.size < this.maxPeers && this.dialing.size < this.maxDials) {
           let peerId: string | undefined;
-          let multiaddr: Multiaddr | undefined;
           if (this.connected.size > 0) {
             const filtered = Array.from(this.connected.values()).filter((peerId) => !this.isBanned(peerId) && this.checkOutbound(peerId));
             if (filtered.length > 0) {
@@ -388,15 +376,8 @@ export class NetworkManager extends EventEmitter {
               const id = this.discovered.shift()!;
               if (this.checkOutbound(id) && this.isIdle(id) && !this.isBanned(id)) {
                 const addresses: { multiaddr: Multiaddr }[] | undefined = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(id));
-                if (
-                  addresses &&
-                  (multiaddr = this.chooseMultiaddrsByTransport(
-                    addresses.map(({ multiaddr }) => multiaddr),
-                    'tcp'
-                  ))
-                ) {
+                if (addresses && addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp').length > 0) {
                   peerId = id;
-                  multiaddr = this.appendPeerId(multiaddr, peerId);
                   logger.debug('NetworkManager::dialLoop, use a discovered peer:', peerId);
                   break;
                 }
@@ -417,20 +398,15 @@ export class NetworkManager extends EventEmitter {
               return b;
             });
             if (peers.length > 0) {
-              const { id, addresses } = this.randomOne(peers);
+              const { id } = this.randomOne(peers);
               peerId = id.toB58String();
-              multiaddr = this.chooseMultiaddrsByTransport(
-                addresses.map(({ multiaddr }) => multiaddr),
-                'tcp'
-              );
-              multiaddr = this.appendPeerId(multiaddr!, peerId);
               logger.debug('NetworkManager::dialLoop, use a stored peer:', peerId);
             }
           }
 
           if (peerId) {
             this.updateOutbound(peerId);
-            this.dial({ peerId, multiaddr }, this.protocols).then(async ({ success, streams }) => {
+            this.dial(peerId, this.protocols).then(async ({ success, streams }) => {
               if (success) {
                 if (!(await this.install(peerId!, this.protocols, streams))) {
                   streams.forEach((stream) => stream.close());

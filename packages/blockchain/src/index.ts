@@ -1,8 +1,9 @@
 import { BN, Address } from 'ethereumjs-util';
 import EthereumBlockchain, { BlockchainOptions as EthereumBlockchainOptions } from '@ethereumjs/blockchain';
+import { CliqueLatestBlockSigners } from '@ethereumjs/blockchain/dist/clique';
 import { CliqueLatestSignerStates } from '@ethereumjs/blockchain/dist/clique';
 import { Block, BlockHeader } from '@gxchain2/structure';
-import { Database, DBSetTD, DBSetBlockOrHeader, DBSetHashToNumber, DBOp } from '@gxchain2/database';
+import { Database } from '@gxchain2/database';
 
 export interface BlockchainOptions extends EthereumBlockchainOptions {
   database: Database;
@@ -14,7 +15,7 @@ export class Blockchain extends EthereumBlockchain {
   private _totalDifficulty!: BN;
 
   constructor(opts: BlockchainOptions) {
-    super({ ...opts, validateConsensus: false });
+    super(opts);
     this.dbManager = opts.database;
   }
 
@@ -62,5 +63,17 @@ export class Blockchain extends EthereumBlockchain {
       return [...state[1]];
     }
     return [];
+  }
+
+  cliqueCheckNextRecentlySigned(currentHeader: BlockHeader, signer: Address): boolean {
+    if (currentHeader.isGenesis()) {
+      return false;
+    }
+    const limit: number = (this as any).cliqueSignerLimit();
+    let signers: CliqueLatestBlockSigners = (this as any)._cliqueLatestBlockSigners;
+    signers = signers.slice(signers.length < limit ? 0 : 1);
+    signers.push([currentHeader.number.addn(1), signer]);
+    const seen = signers.filter((s) => s[1].equals(signer)).length;
+    return seen > 1;
   }
 }

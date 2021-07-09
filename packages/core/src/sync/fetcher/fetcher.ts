@@ -121,7 +121,6 @@ export class Fetcher {
             }
           }
           await header.validate(this.node.blockchain);
-          // TODO: check recently signers
           // additional check for signer
           if (!header.cliqueVerifySignature(this.node.blockchain.cliqueActiveSigners())) {
             throw new Error('invalid header(signers)');
@@ -239,7 +238,7 @@ export class Fetcher {
     for await (const { data: block } of this.blockQueue.generator()) {
       this.processParallel++;
       this.node
-        .processBlock(block, false)
+        .processBlock(block, false, false)
         .then(() => {
           this.processParallel--;
           if (this.processParallel < this.processLimit && this.processParallelResolve) {

@@ -91,6 +91,10 @@ export class Miner {
     this._gasLimit = gasLimit.clone();
   }
 
+  private shouldMintNextBlock(currentHeader: BlockHeader) {
+    return this.isMining && !this.node.blockchain.cliqueCheckNextRecentlySigned(currentHeader, this.coinbase);
+  }
+
   private _pushToHistory(block: Block) {
     this.history.push(block);
     if (this.history.length > maxHistoryLength) {
@@ -206,7 +210,7 @@ export class Miner {
       await this._commit(txMap || (await this.node.txPool.getPendingTxMap(header.number, header.hash())));
 
       // Mint block logic.
-      if (this.isMining) {
+      if (this.shouldMintNextBlock(header)) {
         this.nextTd = nextTd.clone();
         const now = nowTimestamp();
         let timeout = now > timestamp ? 0 : timestamp - now;
@@ -223,12 +227,7 @@ export class Miner {
             if (!pendingBlock) {
               throw new Error(`Missing pending block, parentHash: ${bufferToHex(parentHash)}`);
             }
-            const beforeMint = this.node.blockchain.latestBlock.hash();
-            const newBlock = await this.node.processBlock(pendingBlock);
-            const afterMint = this.node.blockchain.latestBlock.hash();
-            if (!beforeMint.equals(afterMint)) {
-              await this.node.newBlock(newBlock);
-            }
+            const newBlock = await this.node.processBlock(pendingBlock, true, true);
             logger.info('⛏️  Mine block, height:', newBlock.header.number.toString(), 'hash:', bufferToHex(newBlock.hash()));
           } catch (err) {
             logger.error('Miner::_newBlock, setTimeout, catch error:', err);

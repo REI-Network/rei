@@ -57,25 +57,15 @@ export interface NodeOptions {
   };
 }
 
-class NewPendingTxsTask {
+type PendingTxs = {
   txs: Transaction[];
   resolve: (results: boolean[]) => void;
-  constructor(txs: Transaction[], resolve: (results: boolean[]) => void) {
-    this.txs = txs;
-    this.resolve = resolve;
-  }
-}
-class NewBlockTask {
-  block: Block;
-  constructor(block: Block) {
-    this.block = block;
-  }
-}
-type Task = NewPendingTxsTask | NewBlockTask;
+};
 
 type ProcessBlock = {
   block: Block;
   generate: boolean;
+  broadcast: boolean;
   resolve: (block: Block) => void;
   reject: (reason?: any) => void;
 };
@@ -98,7 +88,7 @@ export class Node {
   private readonly initPromise: Promise<void>;
   private readonly taskLoopPromise: Promise<void>;
   private readonly processLoopPromise: Promise<void>;
-  private readonly taskQueue = new Channel<Task>();
+  private readonly taskQueue = new Channel<PendingTxs>();
   private readonly processQueue = new Channel<ProcessBlock>();
 
   private chain!: string | { chain: any; genesisState?: any };
@@ -276,7 +266,7 @@ export class Node {
 
   private async processLoop() {
     await this.initPromise;
-    for await (let { block, generate, resolve, reject } of this.processQueue.generator()) {
+    for await (let { block, generate, broadcast, resolve, reject } of this.processQueue.generator()) {
       try {
         for (const tx of block.transactions) {
           tx.common.getHardforkByBlockNumber(block.header.number);
@@ -294,9 +284,19 @@ export class Node {
         if (block._common.param('vm', 'debugConsole')) {
           logger.debug('Node::processLoop, process on hardfork:', block._common.hardfork());
         }
+        const before = this.blockchain.latestBlock.hash();
         await this.blockchain.putBlock(block);
         await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(result.receipts, block.hash(), block.header.number)));
+        const after = this.blockchain.latestBlock.hash();
         resolve(block);
+        if (!before.equals(after)) {
+          await this.txPool.newBlock(block);
+          const promises = [this.miner.newBlockHeader(block.header), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
+          if (broadcast) {
+            promises.push(this.broadcastNewBlock(block));
+          }
+          await Promise.all(promises);
+        }
       } catch (err) {
         logger.error('Node::processLoop, process block error:', err);
         reject(err);
@@ -308,33 +308,19 @@ export class Node {
     await this.initPromise;
     for await (const task of this.taskQueue.generator()) {
       try {
-        if (task instanceof NewPendingTxsTask) {
-          try {
-            const { results, readies } = await this.txPool.addTxs(task.txs);
-            if (readies && readies.size > 0) {
-              const hashes = Array.from(readies.values())
-                .reduce((a, b) => a.concat(b), [])
-                .map((tx) => tx.hash());
-              for (const handler of WireProtocol.getPool().handlers) {
-                handler.announceTx(hashes);
-              }
-              await this.miner.addTxs(readies);
-            }
-            task.resolve(results);
-          } catch (err) {
-            task.resolve(new Array<boolean>(task.txs.length).fill(false));
-            logger.error('Node::taskLoop, NewPendingTxsTask, catch error:', err);
-          }
-        } else if (task instanceof NewBlockTask) {
-          const { block } = task;
-          const td = await this.db.getTotalDifficulty(block.hash(), block.header.number);
+        const { results, readies } = await this.txPool.addTxs(task.txs);
+        if (readies && readies.size > 0) {
+          const hashes = Array.from(readies.values())
+            .reduce((a, b) => a.concat(b), [])
+            .map((tx) => tx.hash());
           for (const handler of WireProtocol.getPool().handlers) {
-            handler.announceNewBlock(block, td);
+            handler.announceTx(hashes);
           }
-          await this.txPool.newBlock(block);
-          await Promise.all([this.miner.newBlockHeader(block.header), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)]);
+          await this.miner.addTxs(readies);
         }
+        task.resolve(results);
       } catch (err) {
+        task.resolve(new Array<boolean>(task.txs.length).fill(false));
         logger.error('Node::taskLoop, catch error:', err);
       }
     }
@@ -345,20 +331,11 @@ export class Node {
    * @param block - Block data
    * @param generate - Judgment criteria for root verification
    */
-  async processBlock(block: Block, generate: boolean = true) {
+  async processBlock(block: Block, generate: boolean, broadcast: boolean) {
     await this.initPromise;
     return new Promise<Block>((resolve, reject) => {
-      this.processQueue.push({ block, generate, resolve, reject });
+      this.processQueue.push({ block, generate, broadcast, resolve, reject });
     });
-  }
-
-  /**
-   * Push a new block task to the taskQueue
-   * @param block - Block data
-   */
-  async newBlock(block: Block) {
-    await this.initPromise;
-    this.taskQueue.push(new NewBlockTask(block));
   }
 
   /**
@@ -368,8 +345,15 @@ export class Node {
   async addPendingTxs(txs: Transaction[]) {
     await this.initPromise;
     return new Promise<boolean[]>((resolve) => {
-      this.taskQueue.push(new NewPendingTxsTask(txs, resolve));
+      this.taskQueue.push({ txs, resolve });
     });
+  }
+
+  async broadcastNewBlock(block: Block) {
+    const td = await this.db.getTotalDifficulty(block.hash(), block.header.number);
+    for (const handler of WireProtocol.getPool().handlers) {
+      handler.announceNewBlock(block, td);
+    }
   }
 
   async abort() {

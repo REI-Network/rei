@@ -214,9 +214,8 @@ export class Blockchain extends EthereumBlockchain {
 
   /**
    * Get active clique signers in a certain blocknumber, return addresses
-   *
    * @param number - The number of block
-   * @returns
+   * @returns Active clique signers
    */
   cliqueActiveSignersByBlockNumber(number: BN): Address[] {
     const _cliqueLatestSignerStates: CliqueLatestSignerStates = (this as any)._cliqueLatestSignerStates;

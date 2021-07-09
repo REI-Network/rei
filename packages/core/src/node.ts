@@ -22,7 +22,6 @@ import { BlockchainMonitor } from './blockchainmonitor';
 import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
 
 const timeoutBanTime = 60 * 5 * 1000;
-const errorBanTime = 60 * 1000;
 const invalidBanTime = 60 * 10 * 1000;
 
 const defaultChainName = 'gxc2-mainnet';
@@ -373,13 +372,11 @@ export class Node {
     await this.processLoopPromise;
   }
 
-  async banPeer(peerId: string, reason: 'invalid' | 'timeout' | 'error') {
+  async banPeer(peerId: string, reason: 'invalid' | 'timeout') {
     if (reason === 'invalid') {
-      await this.networkMngr.ban(peerId, timeoutBanTime);
-    } else if (reason === 'error') {
-      await this.networkMngr.ban(peerId, errorBanTime);
-    } else {
       await this.networkMngr.ban(peerId, invalidBanTime);
+    } else {
+      await this.networkMngr.ban(peerId, timeoutBanTime);
     }
   }
 }

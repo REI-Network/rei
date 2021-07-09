@@ -106,7 +106,6 @@ export class Fetcher {
       } catch (err) {
         logger.error('Fetcher::downloadHeader, catch error:', err);
         this.abort();
-        await this.node.banPeer(handler.peer.peerId, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
         return;
       }
       try {
@@ -219,8 +218,11 @@ export class Fetcher {
         })
         .catch((err) => {
           WireProtocol.getPool().remove(handler);
-          logger.error('Fetcher::downloadBodiesLoop, download failed error:', err);
-          this.node.banPeer(handler.peer.peerId, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
+          if (err instanceof PeerRequestTimeoutError) {
+            this.node.banPeer(handler.peer.peerId, 'timeout');
+          } else {
+            logger.error('Fetcher::downloadBodiesLoop, download failed error:', err);
+          }
           return retry();
         });
       if (this.downloadParallel >= this.downloadLimit) {

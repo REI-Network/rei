@@ -12,12 +12,10 @@ export declare interface Synchronizer {
   on(event: 'start', listener: () => void): this;
   on(event: 'synchronized', listener: () => void): this;
   on(event: 'failed', listener: () => void): this;
-  on(event: 'error', listener: (err: any) => void): this;
 
   once(event: 'start', listener: () => void): this;
   once(event: 'synchronized', listener: () => void): this;
   once(event: 'failed', listener: () => void): this;
-  once(event: 'error', listener: (err: any) => void): this;
 }
 
 export abstract class Synchronizer extends EventEmitter {

@@ -11,15 +11,19 @@ The core logic of blockchain node, including:
    - removedLogs: When the transaction rolled back, respond.
    - newHeads: Respond to the new blockHeads.
   
-- `ChainIndexer` and `BloomBitsFilter` : Index of chain and Bloom filter to find blocks and transactions.
+- `Indexer` and `BloomBitsFilter` : Index of chain and Bloom filter to find blocks and transactions.
   
-- `Miner` and `Woker` : Calculate and generate blocks.
+- `Miner` : Calculate and generate blocks.
   
-- `Fetcher` : Sync blockes from other nodes in the network.
+- `Protocols` : Used for communication and data transmission between nodes
   
-- `TxFetcher` : Sync transactions from other nodes in the network.
+- `Txpool` : Txpool contains all transactions obtained from local and network
   
-- `Tracer` : Trace blocks and transactions to debug the program.
+- `Sync` : Synchronize blocks
+
+- `Txsync`: Synchronize transactions
+
+- `Tracer`: Tracer provides an implementation of trace block or transaction
 
 ## INSTALL
 
@@ -27,26 +31,131 @@ The core logic of blockchain node, including:
 npm install @gxchain2/core
 ```
 
-## USAGE
-
+## STRUCTURE
+- `BlockchainMonitor`
 ```ts
-const node = new Node({
-  databasePath:"path/to/database",
-  chain: "gxc2-mainnet",
-  mine:{
-    coinbase:"0xd1e52f6eacbb95f5f8512ff129cbd6360e549b0b",
-    gasLimit:"21000"
-  }
-  p2p:{
-    bootnodes:[/ip4/127.0.0.1/tcp/41115/p2p/12D3KooWMWg2wU3fzqVR1bGcuVhSqNtPp8ugB3XAzfFtci7ywVgK]
-  },
-  account:{
-    keyStorePath:"path/to/keystore",
-    unlock:[["d1e52f6eacbb95f5f8512ff129cbd6360e549b0b",privatekey]]
-  }
-});
+/**
+ * Events for new transactions and blocks in the blockchain
+ */
+export declare interface BlockchainMonitor {
+    on(event: 'logs' | 'removedLogs', listener: (logs: Log[]) => void): this;
+    on(event: 'newHeads', listener: (hashes: Buffer[]) => void): this;
+    once(event: 'logs' | 'removedLogs', listener: (logs: Log[]) => void): this;
+    once(event: 'newHeads', listener: (hashes: Buffer[]) => void): this;
+}
+/**
+ * BlockchainMonitor is used to monitor changes on the chain
+ */
+export declare class BlockchainMonitor extends EventEmitter {
+    private readonly node;
+    private readonly initPromise;
+    private currentHeader;
+    constructor(node: Node);
+    /**
+     * initialization
+     */
+    init(): Promise<void>;
+    /**
+     * After getting a new block, this method will compare it with the latest block in the local database, find their
+     * common ancestor and record the new transactions, blockheads, or transactions which need to rolled back, then
+     * emit the corresponding events
+     *
+     * @param block New Block data
+     */
+    newBlock(block: Block): Promise<void>;
+}
+
+  ```
+
+- `Miner`
+```ts
+/**
+ * Miner creates blocks and searches for proof-of-work values.
+ */
+export declare class Miner {
+    private readonly node;
+    private readonly initPromise;
+    private enable;
+    private _coinbase;
+    private _gasLimit;
+    private wvm;
+    private pendingTxs;
+    private pendingHeader;
+    private gasUsed;
+    private lock;
+    private timeout?;
+    private nextTd?;
+    private history;
+    constructor(options: MinerOptions);
+    /**
+     * Get the mining state
+     */
+    get isMining(): boolean;
+    /**
+     * Get the coinbase
+     */
+    get coinbase(): Address;
+    /**
+     * Get the limit of gas
+     */
+    get gasLimit(): BN;
+    /**
+     * Set the coinbase
+     * @param coinbase
+     */
+    setCoinbase(coinbase: Address): Promise<void>;
+    /**
+     * Set the gas limit
+     * @param gasLimit
+     */
+    setGasLimit(gasLimit: BN): void;
+    private _pushToHistory;
+    private _getPendingBlockByParentHash;
+    /**
+     * Initialize the miner
+     * @returns
+     */
+    init(): Promise<void>;
+    /**
+     * Assembles the new block
+     * @param header
+     */
+    newBlockHeader(header: BlockHeader): Promise<void>;
+    private makeHeader;
+    private _newBlockHeader;
+    /**
+     * Add transactions for commit
+     * @param txs - The map of Buffer and array of transactions
+     */
+    addTxs(txs: Map<Buffer, TypedTransaction[]>): Promise<void>;
+    /**
+     * Assembles the pending block from block data
+     * @returns
+     */
+    getPendingBlock(): Promise<Block>;
+    getPendingStateManager(): Promise<StateManager>;
+    /**
+     * Pack different pending block headers according to whether the node produces blocks
+     * @param tx
+     */
+    private _putTx;
+    /**
+     * _commit runs any post-transaction state modifications,
+     * check whether the fees of all transactions exceed the standard
+     * @param pendingMap All pending transactions
+     */
+    private _commit;
+}
 ```
 
+- `Sync`
+```ts
+```
+
+- Txsync
+- Txpool
+- Tracer
+- 
 ## License
 
 [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html)

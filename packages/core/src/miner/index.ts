@@ -23,6 +23,9 @@ export interface MinerOptions {
   coinbase?: string;
 }
 
+/**
+ * Miner creates blocks and searches for proof-of-work values.
+ */
 export class Miner {
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
@@ -111,7 +114,7 @@ export class Miner {
   }
 
   /**
-   * Initialize the worker
+   * Initialize the miner
    * @returns
    */
   async init() {
@@ -245,7 +248,7 @@ export class Miner {
   }
 
   /**
-   * Add transactions for c
+   * Add transactions for commit
    * @param txs - The map of Buffer and array of transactions
    */
   async addTxs(txs: Map<Buffer, TypedTransaction[]>) {
@@ -288,6 +291,10 @@ export class Miner {
     return await this.node.getStateManager(this.node.blockchain.latestBlock.header.stateRoot, this.node.blockchain.latestHeight);
   }
 
+  /**
+   * Pack different pending block headers according to whether the node produces blocks
+   * @param tx
+   */
   private async _putTx(tx: TypedTransaction) {
     this.pendingTxs.push(tx);
     const txs = [...this.pendingTxs];
@@ -311,6 +318,11 @@ export class Miner {
     }
   }
 
+  /**
+   * _commit runs any post-transaction state modifications,
+   * check whether the fees of all transactions exceed the standard
+   * @param pendingMap All pending transactions
+   */
   private async _commit(pendingMap: PendingTxMap) {
     let tx = pendingMap.peek();
     while (tx) {

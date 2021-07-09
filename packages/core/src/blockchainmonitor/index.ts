@@ -18,6 +18,9 @@ export declare interface BlockchainMonitor {
   once(event: 'newHeads', listener: (hashes: Buffer[]) => void): this;
 }
 
+/**
+ * BlockchainMonitor is used to monitor changes on the chain
+ */
 export class BlockchainMonitor extends EventEmitter {
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
@@ -29,6 +32,9 @@ export class BlockchainMonitor extends EventEmitter {
     this.initPromise = this.init();
   }
 
+  /**
+   * initialization
+   */
   async init() {
     if (this.initPromise) {
       await this.initPromise;

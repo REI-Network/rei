@@ -106,6 +106,11 @@ export declare interface TxPool {
   once(event: 'readies', listener: (readies: TypedTransaction[]) => void): this;
 }
 
+/**
+ * TxPool contains all currently known transactions. Transactions
+ * enter the pool when they are received from the network or submitted
+ * locally. They exit the pool when they are included in the blockchain.
+ */
 export class TxPool extends EventEmitter {
   private aborter: Aborter;
 

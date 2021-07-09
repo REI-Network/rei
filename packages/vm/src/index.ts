@@ -3,6 +3,11 @@ import Bloom from '@ethereumjs/vm/dist/bloom';
 import runBlock, { RunBlockDebugOpts, RunBlockResult } from './runBlock';
 import runCall, { RunCallDebugOpts } from './runCall';
 
+/**
+ * WrappedVM contains a evm, responsible for executing an EVM message fully
+ * (including any nested calls and creates), processing the results and
+ * storing them to state (or discarding changes in case of exceptions).
+ */
 export class WrappedVM {
   public readonly vm: VM;
 

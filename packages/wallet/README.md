@@ -6,6 +6,7 @@
 <font size= 3>
 Wallet based on `ethereumjs-wallet`, for managing accounts.
 </font>
+
 ## INSTALL
 
 ```sh

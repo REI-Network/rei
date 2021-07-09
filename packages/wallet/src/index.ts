@@ -8,9 +8,9 @@ import { KeyStore, keyStoreFileName } from './keystore';
 type AddrType = Address | string | Buffer;
 
 /**
- *
- * @param addr
- * @returns
+ * Convert address to buffer type
+ * @param addr Address
+ * @returns Buffer of address
  */
 function addrToBuffer(addr: AddrType) {
   if (!Buffer.isBuffer(addr)) {
@@ -19,6 +19,11 @@ function addrToBuffer(addr: AddrType) {
   return addr;
 }
 
+/**
+ * Convert the address to string type
+ * @param addr
+ * @returns
+ */
 function addrToString(addr: AddrType) {
   if (Buffer.isBuffer(addr)) {
     return bufferToHex(addr);

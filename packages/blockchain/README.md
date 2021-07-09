@@ -3,8 +3,10 @@
 [![Install Size](https://packagephobia.now.sh/badge?p=@gxchain2/blockchain)](https://packagephobia.now.sh/result?p=@gxchain2/blockchain)
 ![License](https://img.shields.io/npm/l/@gxchain2/blockchain)
 
-
+<font size=3>
  Definition of blockchain structure and rules, based on `@ethereumjs/blockchain`, fixed the incorrect calculation of total difficult difficulty under clique consensus,optimized the function to get the latest block `latestBlock`.
+</font>
+
 
 ## INSTALL
 

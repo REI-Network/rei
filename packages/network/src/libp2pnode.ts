@@ -29,6 +29,9 @@ export class Libp2pNode extends Libp2p {
         peerDiscovery: [Discv5Discovery]
       },
       config: {
+        relay: {
+          enabled: false
+        },
         peerDiscovery: {
           autoDial: false,
           discv5: {

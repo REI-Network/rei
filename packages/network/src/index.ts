@@ -73,6 +73,7 @@ export class NetworkManager extends EventEmitter {
   private readonly protocols: Protocol[];
   private readonly initPromise: Promise<void>;
   private libp2pNode!: Libp2pNode;
+  private aborted: boolean = false;
 
   private readonly maxPeers: number;
   private readonly maxConnections: number;
@@ -153,6 +154,47 @@ export class NetworkManager extends EventEmitter {
     return this.libp2pNode.hangUp(PeerId.createFromB58String(peerId));
   }
 
+  private onDiscovered = (id: PeerId) => {
+    const peerId: string = id.toB58String();
+    if (!this.discovered.includes(peerId)) {
+      logger.info('💬 Peer discovered:', peerId);
+      this.discovered.push(peerId);
+      if (this.discovered.length > this.maxPeers) {
+        this.discovered.shift();
+      }
+    }
+  };
+
+  private onConnect = (connect) => {
+    const peerId: string = connect.remotePeer.toB58String();
+    if (this.isBanned(peerId)) {
+      connect.close();
+      return;
+    }
+    if (this.libp2pNode.connectionManager.size > this.maxConnections) {
+      this.setPeerValue(peerId, 'useless');
+    } else {
+      logger.info('💬 Peer connect:', peerId);
+      this.setPeerValue(peerId, 'connected');
+    }
+    if (this.isIdle(peerId)) {
+      this.connected.add(peerId);
+    }
+  };
+
+  private onDisconnect = (connect) => {
+    const peerId: string = connect.remotePeer.toB58String();
+    logger.info('🤐 Peer disconnected:', peerId);
+    this.connected.delete(peerId);
+    this.dialing.delete(peerId);
+    const peer = this.installing.get(peerId);
+    if (peer) {
+      this.installing.delete(peerId);
+      peer.abort();
+    }
+    this.removePeer(peerId);
+  };
+
   async init(options?: NetworkManagerOptions) {
     if (this.initPromise) {
       await this.initPromise;
@@ -204,44 +246,9 @@ export class NetworkManager extends EventEmitter {
         }
       });
     });
-    this.libp2pNode.on('peer:discovery', (id: PeerId) => {
-      const peerId: string = id.toB58String();
-      if (!this.discovered.includes(peerId)) {
-        logger.info('💬 Peer discovered:', peerId);
-        this.discovered.push(peerId);
-        if (this.discovered.length > this.maxPeers) {
-          this.discovered.shift();
-        }
-      }
-    });
-    this.libp2pNode.connectionManager.on('peer:connect', (connect) => {
-      const peerId: string = connect.remotePeer.toB58String();
-      if (this.isBanned(peerId)) {
-        connect.close();
-        return;
-      }
-      if (this.libp2pNode.connectionManager.size > this.maxConnections) {
-        this.setPeerValue(peerId, 'useless');
-      } else {
-        logger.info('💬 Peer connect:', peerId);
-        this.setPeerValue(peerId, 'connected');
-      }
-      if (this.isIdle(peerId)) {
-        this.connected.add(peerId);
-      }
-    });
-    this.libp2pNode.connectionManager.on('peer:disconnect', (connect) => {
-      const peerId: string = connect.remotePeer.toB58String();
-      logger.info('🤐 Peer disconnected:', peerId);
-      this.connected.delete(peerId);
-      this.dialing.delete(peerId);
-      const peer = this.installing.get(peerId);
-      if (peer) {
-        this.installing.delete(peerId);
-        peer.abort();
-      }
-      this.removePeer(peerId);
-    });
+    this.libp2pNode.on('peer:discovery', this.onDiscovered);
+    this.libp2pNode.connectionManager.on('peer:connect', this.onConnect);
+    this.libp2pNode.connectionManager.on('peer:disconnect', this.onDisconnect);
     await this.libp2pNode.start();
 
     // load udp address from networkdb.
@@ -359,7 +366,7 @@ export class NetworkManager extends EventEmitter {
 
   private async dialLoop() {
     await this.initPromise;
-    while (true) {
+    while (!this.aborted) {
       try {
         if (this.installed.size < this.maxPeers && this.dialing.size < this.maxDials) {
           let peerId: string | undefined;
@@ -432,7 +439,7 @@ export class NetworkManager extends EventEmitter {
 
   private async timeoutLoop() {
     await this.initPromise;
-    while (true) {
+    while (!this.aborted) {
       try {
         await new Promise((r) => setTimeout(r, timeoutLoopInterval));
         const now = Date.now();
@@ -449,13 +456,18 @@ export class NetworkManager extends EventEmitter {
   }
 
   async abort() {
+    this.aborted = true;
+    this.libp2pNode.unhandle(this.protocols.map(({ protocolString }) => protocolString));
+    this.libp2pNode.removeListener('peer:discovery', this.onDiscovered);
+    this.libp2pNode.connectionManager.removeListener('peer:connect', this.onConnect);
+    this.libp2pNode.connectionManager.removeListener('peer:disconnect', this.onDisconnect);
     await Promise.all(Array.from(this.installed.values()).map((peer) => peer.abort()));
     await Promise.all(Array.from(this.installing.values()).map((peer) => peer.abort()));
     this.connected.clear();
     this.dialing.clear();
     this.installing.clear();
     this.installed.clear();
-    await this.libp2pNode.stop();
     this.removeAllListeners();
+    await this.libp2pNode.stop();
   }
 }

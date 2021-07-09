@@ -5,7 +5,7 @@ import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
 import { Database, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchain2/database';
-import { NetworkManager } from '@gxchain2/network';
+import { NetworkManager, Peer } from '@gxchain2/network';
 import { Common, getGenesisState, getChain } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { VM, WrappedVM, StateManager } from '@gxchain2/vm';
@@ -214,12 +214,8 @@ export class Node {
       dbPath: path.join(options.databasePath, 'networkdb'),
       ...options.p2p
     })
-      .on('installed', (peer) => {
-        this.sync.announce(peer);
-      })
-      .on('removed', (peer) => {
-        this.txSync.dropPeer(peer.peerId);
-      });
+      .on('installed', this.onPeerInstalled)
+      .on('removed', this.onPeerRemoved);
     await this.networkMngr.init();
     this.miner = new Miner({ node: this, ...options.mine });
     await this.txPool.init();
@@ -228,6 +224,14 @@ export class Node {
     this.bcMonitor = new BlockchainMonitor(this);
     await this.bcMonitor.init();
   }
+
+  private onPeerInstalled = (peer: Peer) => {
+    this.sync.announce(peer);
+  };
+
+  private onPeerRemoved = (peer: Peer) => {
+    this.txSync.dropPeer(peer.peerId);
+  };
 
   getCommon(num: BNLike) {
     return Common.createCommonByBlockNumber(num, typeof this.chain === 'string' ? this.chain : this.chain.chain);
@@ -357,6 +361,8 @@ export class Node {
   }
 
   async abort() {
+    this.networkMngr.removeListener('installed', this.onPeerInstalled);
+    this.networkMngr.removeListener('removed', this.onPeerRemoved);
     this.taskQueue.abort();
     this.processQueue.abort();
     await this.aborter.abort();

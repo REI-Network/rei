@@ -1,10 +1,11 @@
 import path from 'path';
 import fs from 'fs';
 import type { LevelUp } from 'levelup';
+import LevelStore from 'datastore-level';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
-import { Database, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchain2/database';
+import { Database, createEncodingLevelDB, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchain2/database';
 import { NetworkManager, Peer } from '@gxchain2/network';
 import { Common, getGenesisState, getChain } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
@@ -71,6 +72,8 @@ type ProcessBlock = {
 
 export class Node {
   public readonly chaindb: LevelUp;
+  public readonly nodedb: LevelUp;
+  public readonly networkdb: LevelStore;
   public readonly aborter = new Aborter();
 
   public db!: Database;
@@ -95,7 +98,9 @@ export class Node {
   private genesisHash!: Buffer;
 
   constructor(options: NodeOptions) {
-    this.chaindb = createLevelDB(path.join(options.databasePath, 'chaindb'));
+    this.chaindb = createEncodingLevelDB(path.join(options.databasePath, 'chaindb'));
+    this.nodedb = createLevelDB(path.join(options.databasePath, 'nodes'));
+    this.networkdb = new LevelStore(path.join(options.databasePath, 'networkdb'), { createIfMissing: true });
     this.initPromise = this.init(options);
     this.taskLoopPromise = this.taskLoop();
     this.processLoopPromise = this.processLoop();
@@ -112,6 +117,19 @@ export class Node {
       bestHash: this.blockchain.latestBlock.hash(),
       genesisHash: this.genesisHash
     };
+  }
+
+  private async loadPeerId(databasePath: string) {
+    let peerId!: PeerId;
+    try {
+      const key = fs.readFileSync(path.join(databasePath, 'peer-key'));
+      peerId = await PeerId.createFromPrivKey(key);
+    } catch (err) {
+      logger.warn('Read peer-key faild, generate a new key');
+      peerId = await PeerId.create({ keyType: 'secp256k1' });
+      fs.writeFileSync(path.join(databasePath, 'peer-key'), peerId.privKey.bytes);
+    }
+    return peerId;
   }
 
   /**
@@ -196,21 +214,15 @@ export class Node {
     this.sync = new FullSynchronizer({ node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
     this.txPool = new TxPool({ node: this, journal: options.databasePath });
 
-    let peerId!: PeerId;
-    try {
-      const key = fs.readFileSync(path.join(options.databasePath, 'peer-key'));
-      peerId = await PeerId.createFromPrivKey(key);
-    } catch (err) {
-      logger.warn('Read peer-key faild, generate a new key');
-      peerId = await PeerId.create({ keyType: 'secp256k1' });
-      fs.writeFileSync(path.join(options.databasePath, 'peer-key'), peerId.privKey.bytes);
-    }
+    const peerId = await this.loadPeerId(options.databasePath);
+    await this.networkdb.open();
 
     this.txSync = new TxFetcher(this);
     this.networkMngr = new NetworkManager({
       protocols: createProtocolsByNames(this, [NetworkProtocol.GXC2_ETHWIRE]),
+      datastore: this.networkdb,
+      nodedb: this.nodedb,
       peerId,
-      dbPath: path.join(options.databasePath, 'networkdb'),
       ...options.p2p
     })
       .on('installed', this.onPeerInstalled)

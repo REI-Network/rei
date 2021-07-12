@@ -15,8 +15,8 @@
     "dependencies": {
         "@gxchain2/discv5": "^0.6.2",
         "@gxchain2/utils": "^0.0.2-alpha.0",
-        "datastore-level": "^5.0.1",
         "it-pipe": "^1.1.0",
+        "levelup": "^4.4.0",
         "libp2p": "^0.29.3",
         "libp2p-mplex": "^0.10.1",
         "libp2p-secio": "^0.13.1",

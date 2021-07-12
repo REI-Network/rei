@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
-import LevelStore from 'datastore-level';
+import { LevelUp } from 'levelup';
 import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
 import { getRandomIntInclusive, logger } from '@gxchain2/utils';
@@ -9,6 +9,7 @@ import { Peer } from './peer';
 import { Libp2pNode } from './libp2pnode';
 import { Protocol } from './types';
 import { ExpHeap } from './expheap';
+import { NodeDB } from './nodedb';
 
 export * from './peer';
 export * from './types';
@@ -34,7 +35,7 @@ export declare interface NetworkManager {
   once(event: 'installed' | 'removed', listener: (peer: Peer) => void): this;
 }
 
-const ignoredErrors = new RegExp(['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED', '1 bytes', 'No transport available'].join('|'));
+const ignoredErrors = new RegExp(['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED', '1 bytes'].join('|'));
 
 export function logNetworkError(prefix: string, err: any) {
   if (err.message && ignoredErrors.test(err.message)) {
@@ -59,7 +60,8 @@ export function logNetworkError(prefix: string, err: any) {
 export interface NetworkManagerOptions {
   peerId: PeerId;
   protocols: Protocol[];
-  dbPath?: string;
+  nodedb: LevelUp;
+  datastore?: any;
   tcpPort?: number;
   udpPort?: number;
   nat?: string;
@@ -72,6 +74,8 @@ export interface NetworkManagerOptions {
 export class NetworkManager extends EventEmitter {
   private readonly protocols: Protocol[];
   private readonly initPromise: Promise<void>;
+  private readonly nodedb: NodeDB;
+  private privateKey!: Buffer;
   private libp2pNode!: Libp2pNode;
   private aborted: boolean = false;
 
@@ -100,6 +104,7 @@ export class NetworkManager extends EventEmitter {
     }
     this.maxDials = options.maxDials || defaultMaxDials;
     this.protocols = options.protocols;
+    this.nodedb = new NodeDB(options.nodedb);
     this.initPromise = this.init(options);
     this.dialLoop();
     this.timeoutLoop();
@@ -195,6 +200,30 @@ export class NetworkManager extends EventEmitter {
     this.removePeer(peerId);
   };
 
+  private onENRAdded = (enr: ENR) => {
+    this.nodedb.persist(enr);
+  };
+
+  private onMultiaddrUpdated = () => {
+    this.nodedb.persistLocal(this.libp2pNode.discv5.discv5.enr, this.privateKey);
+  };
+
+  private async loadLocalENR(options: NetworkManagerOptions) {
+    const keypair = createKeypairFromPeerId(options.peerId);
+    let enr = ENR.createV4(keypair.publicKey);
+    enr.tcp = options.tcpPort || defaultTcpPort;
+    enr.udp = options.udpPort || defaultUdpPort;
+    enr.ip = options.nat || defaultNat;
+
+    const localENR = await this.nodedb.loadLocal();
+    if (localENR && localENR.nodeId === enr.nodeId) {
+      enr = localENR;
+    } else {
+      await this.nodedb.persistLocal(enr, keypair.privateKey);
+    }
+    return { enr, keypair };
+  }
+
   async init(options?: NetworkManagerOptions) {
     if (this.initPromise) {
       await this.initPromise;
@@ -204,27 +233,18 @@ export class NetworkManager extends EventEmitter {
       throw new Error('NetworkManager missing init options');
     }
 
-    const keypair = createKeypairFromPeerId(options.peerId);
-    const enr = ENR.createV4(keypair.publicKey);
-    enr.tcp = options.tcpPort || defaultTcpPort;
-    enr.udp = options.udpPort || defaultUdpPort;
-    enr.ip = options.nat || defaultNat;
+    const { enr, keypair } = await this.loadLocalENR(options);
+    this.privateKey = keypair.privateKey;
     logger.info('NetworkManager::init, peerId:', options.peerId.toB58String());
     logger.info('NetworkManager::init,', enr.encodeTxt(keypair.privateKey));
 
-    let datastore: undefined | LevelStore;
-    if (options.dbPath) {
-      datastore = new LevelStore(options.dbPath, { createIfMissing: true });
-      await datastore.open();
-    }
     this.libp2pNode = new Libp2pNode({
       ...options,
       tcpPort: options.tcpPort || defaultTcpPort,
       udpPort: options.udpPort || defaultUdpPort,
       bootnodes: options.bootnodes || [],
       enr,
-      maxConnections: this.maxConnections,
-      datastore
+      maxConnections: this.maxConnections
     });
     this.protocols.forEach((protocol) => {
       this.libp2pNode.handle(protocol.protocolString, ({ connection, stream }) => {
@@ -251,21 +271,12 @@ export class NetworkManager extends EventEmitter {
     this.libp2pNode.connectionManager.on('peer:disconnect', this.onDisconnect);
     await this.libp2pNode.start();
 
-    // load udp address from networkdb.
-    for (const [, { id, addresses }] of this.libp2pNode.peerStore.peers as Map<
-      string,
-      {
-        id: PeerId;
-        addresses: { multiaddr: Multiaddr }[];
-      }
-    >) {
-      const udpAddresses = addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'udp');
-      if (udpAddresses.length > 0) {
-        const enr = ENR.createFromPeerId(id);
-        enr.setLocationMultiaddr(udpAddresses[0].multiaddr as any);
-        this.libp2pNode.discv5.addEnr(enr);
-      }
-    }
+    // load enr from nodes db.
+    await this.nodedb.load((enr) => {
+      this.libp2pNode.discv5.addEnr(enr);
+    });
+    this.libp2pNode.discv5.discv5.on('enrAdded', this.onENRAdded);
+    this.libp2pNode.discv5.discv5.on('multiaddrUpdated', this.onMultiaddrUpdated);
   }
 
   private checkInbound(peerId: string) {
@@ -461,6 +472,8 @@ export class NetworkManager extends EventEmitter {
     this.libp2pNode.removeListener('peer:discovery', this.onDiscovered);
     this.libp2pNode.connectionManager.removeListener('peer:connect', this.onConnect);
     this.libp2pNode.connectionManager.removeListener('peer:disconnect', this.onDisconnect);
+    this.libp2pNode.discv5.discv5.removeListener('enrAdded', this.onENRAdded);
+    this.libp2pNode.discv5.discv5.removeListener('multiaddrUpdated', this.onMultiaddrUpdated);
     await Promise.all(Array.from(this.installed.values()).map((peer) => peer.abort()));
     await Promise.all(Array.from(this.installing.values()).map((peer) => peer.abort()));
     this.connected.clear();

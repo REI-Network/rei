@@ -294,27 +294,6 @@ export class Database extends DBManager {
     return header1;
   }
 
-  // async clearBloomBits(from: BN) {
-  //   const db: LevelUp = (this as any)._db;
-  //   for (let i = 0; i < constants.BloomBitLength; i++) {
-  //     await new Promise<void>((resolve, reject) => {
-  //       db.clear(
-  //         {
-  //           gte: bloomBitsKey(i, from, Buffer.alloc(32, 0)),
-  //           lte: bloomBitsKey(i, new BN('ffffffffffffffff', 'hex'), Buffer.alloc(32, 0xff))
-  //         },
-  //         (err?: Error) => {
-  //           if (err) {
-  //             reject(err);
-  //           } else {
-  //             resolve();
-  //           }
-  //         }
-  //       );
-  //     });
-  //   }
-  // }
-
   async getStoredSectionCount() {
     try {
       return new BN(await this.rawdb.get('scount'));
@@ -335,8 +314,12 @@ import levelUp from 'levelup';
 import levelDown from 'leveldown';
 import encoding from 'encoding-down';
 
-export const createLevelDB = (path: string) => {
+export const createEncodingLevelDB = (path: string) => {
   return levelUp(encoding(levelDown(path)));
+};
+
+export const createLevelDB = (path: string) => {
+  return levelUp(levelDown(path));
 };
 
 export { DBTarget, DBOp };

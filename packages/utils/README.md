@@ -3,7 +3,7 @@
 [![Install Size](https://packagephobia.now.sh/badge?p=@gxchain2/utils)](https://packagephobia.now.sh/result?p=@gxchain2/utils)
 ![License](https://img.shields.io/npm/l/@gxchain2/utils)
 
-<font size=3>
+
 Utils includes the commonly used classes in the program:
 - `Aborter` Aborter is a interrupt class used to terminate the module.
   
@@ -12,7 +12,7 @@ Utils includes the commonly used classes in the program:
 - `compress` Functions used to compress and decompress data.
   
 - `functionalmap` The key of map could be an object.
-</font>
+
 
 
 ## INSTALL

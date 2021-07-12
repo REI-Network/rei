@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
 import { Peer } from '@gxchain2/network';
 import { BlockHeader } from '@gxchain2/structure';
-import { logger } from '@gxchain2/utils';
+import { logger, hexStringToBN } from '@gxchain2/utils';
 import { Synchronizer, SynchronizerOptions } from './sync';
 import { Fetcher } from './fetcher';
 import { WireProtocol, WireProtocolHandler, PeerRequestTimeoutError, maxGetBlockHeaders } from '../protocols';
@@ -17,10 +17,6 @@ export class FullSynchronizer extends Synchronizer {
   private readonly count: number;
   private readonly limit: number;
   private readonly fetcher: Fetcher;
-
-  private bestPeerHandler?: WireProtocolHandler;
-  private bestHeight?: number;
-  private bestTD?: BN;
   private syncingPromise?: Promise<boolean>;
 
   constructor(options: FullSynchronizerOptions) {
@@ -46,48 +42,39 @@ export class FullSynchronizer extends Synchronizer {
       throw new Error('FullSynchronizer already sync');
     }
     const syncResult = await (this.syncingPromise = new Promise<boolean>(async (syncResolve) => {
-      const syncFailed = () => {
-        syncResolve(false);
-        this.bestHeight = undefined;
-        this.bestPeerHandler = undefined;
-        this.bestTD = undefined;
-      };
+      let bestPeerHandler!: WireProtocolHandler;
+      let bestHeight!: number;
+      let bestTD!: BN;
 
       if (peer) {
-        this.bestPeerHandler = WireProtocol.getHandler(peer);
-        this.bestHeight = this.bestPeerHandler.status!.height;
-        this.bestTD = new BN(this.bestPeerHandler.status!.totalDifficulty);
-        if (this.bestTD.lt(this.node.blockchain.totalDifficulty)) {
-          syncFailed();
-          return;
+        bestPeerHandler = WireProtocol.getHandler(peer);
+        bestHeight = bestPeerHandler.status!.height;
+        bestTD = new BN(bestPeerHandler.status!.totalDifficulty);
+        if (bestTD.lte(this.node.blockchain.totalDifficulty)) {
+          return syncResolve(false);
         }
       } else {
-        this.bestTD = this.node.blockchain.totalDifficulty;
+        bestTD = this.node.blockchain.totalDifficulty;
         for (const handler of WireProtocol.getPool().handlers) {
           const remoteStatus = handler.status!;
           const td = new BN(remoteStatus.totalDifficulty);
-          if (td.gt(this.bestTD)) {
-            this.bestPeerHandler = handler;
-            this.bestHeight = remoteStatus.height;
-            this.bestTD = td;
+          if (td.gt(bestTD)) {
+            bestPeerHandler = handler;
+            bestHeight = remoteStatus.height;
+            bestTD = td;
           }
         }
-        if (!this.bestPeerHandler) {
-          syncFailed();
-          return;
+        if (!bestPeerHandler) {
+          return syncResolve(false);
         }
       }
 
       try {
-        syncResolve(await this.syncWithPeerHandler(this.bestPeerHandler, this.bestHeight!));
-        logger.info('💫 Sync over, local height:', this.node.blockchain.latestHeight, 'local td:', this.node.blockchain.totalDifficulty.toString(), 'best height:', this.bestHeight, 'best td:', this.bestTD.toString());
+        syncResolve(await this.syncWithPeerHandler(bestPeerHandler, bestHeight, bestTD));
+        logger.info('💫 Sync over, local height:', this.node.blockchain.latestHeight, 'local td:', this.node.blockchain.totalDifficulty.toString(), 'best height:', bestHeight, 'best td:', bestTD.toString());
       } catch (err) {
         syncResolve(false);
         logger.error('FullSynchronizer::_sync, catch error:', err);
-      } finally {
-        this.bestHeight = undefined;
-        this.bestPeerHandler = undefined;
-        this.bestTD = undefined;
       }
     }));
     this.syncingPromise = undefined;
@@ -104,11 +91,15 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
+  private genesis(): [number, Buffer, BN] {
+    return [0, this.node.status.genesisHash, hexStringToBN(this.node.getCommon(0).genesis().difficulty)];
+  }
+
   // TODO: binary search.
-  private async findAncient(handler: WireProtocolHandler): Promise<number> {
+  private async findAncient(handler: WireProtocolHandler): Promise<[number, Buffer, BN]> {
     let latestHeight = this.node.blockchain.latestHeight;
     if (latestHeight === 0) {
-      return 0;
+      return this.genesis();
     }
     while (latestHeight > 0) {
       const count = latestHeight >= this.count ? this.count : latestHeight;
@@ -127,8 +118,10 @@ export class FullSynchronizer extends Synchronizer {
       for (let i = headers.length - 1; i >= 0; i--) {
         try {
           const remoteHeader = headers[i];
-          const localHeader = await this.node.db.getHeader(remoteHeader.hash(), remoteHeader.number);
-          return localHeader.number.toNumber();
+          const hash = remoteHeader.hash();
+          const localHeader = await this.node.db.getHeader(hash, remoteHeader.number);
+          const localTD = await this.node.db.getTotalDifficulty(hash, remoteHeader.number);
+          return [localHeader.number.toNumber(), hash, localTD];
         } catch (err) {
           if (err.type === 'NotFoundError') {
             continue;
@@ -138,14 +131,14 @@ export class FullSynchronizer extends Synchronizer {
       }
 
       if (latestHeight === 1) {
-        return 0;
+        return this.genesis();
       }
     }
     throw new Error('find acient failed');
   }
 
-  private async syncWithPeerHandler(handler: WireProtocolHandler, bestHeight: number): Promise<boolean> {
-    const localHeight = await this.findAncient(handler);
+  private async syncWithPeerHandler(handler: WireProtocolHandler, bestHeight: number, bestTD: BN): Promise<boolean> {
+    const [localHeight, localHash, localTD] = await this.findAncient(handler);
     if (localHeight >= bestHeight) {
       return false;
     }
@@ -153,7 +146,7 @@ export class FullSynchronizer extends Synchronizer {
     this.startSyncHook(localHeight, bestHeight);
 
     this.fetcher.reset();
-    await this.fetcher.fetch(localHeight, bestHeight - localHeight, handler);
+    await this.fetcher.fetch(localHeight, localHash, localTD, bestHeight, bestTD, handler);
     return true;
   }
 }

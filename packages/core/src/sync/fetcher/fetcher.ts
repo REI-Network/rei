@@ -1,4 +1,4 @@
-import { Address } from 'ethereumjs-util';
+import { Address, BN } from 'ethereumjs-util';
 import { HChannel, PChannel, logger } from '@gxchain2/utils';
 import { emptyTxTrie, BlockHeader, Block } from '@gxchain2/structure';
 import { Node } from '../../node';
@@ -25,8 +25,11 @@ export class Fetcher {
   private processParallelResolve?: () => void;
   private processParallelPromise?: Promise<void>;
 
+  private remote!: string;
   private localHeight!: number;
   private bestHeight!: number;
+  private totalTD!: BN;
+  private bestTD!: BN;
 
   private blockQueue: PChannel<Block>;
   private downloadBodiesQueue: HChannel<BlockHeader>;
@@ -44,15 +47,15 @@ export class Fetcher {
 
   /**
    * Fetch blocks from specified peer
-   * @param start - start height of sync
-   * @param count - sync block count
-   * @param handler - best peer handler
    */
-  async fetch(start: number, count: number, handler: WireProtocolHandler) {
-    this.bestHeight = start + count;
-    this.localHeight = start;
+  async fetch(localHeight: number, localHash: Buffer, localTD: BN, bestHeight: number, bestTD: BN, handler: WireProtocolHandler) {
+    this.remote = handler.peer.peerId;
+    this.localHeight = localHeight;
+    this.bestHeight = bestHeight;
+    this.totalTD = localTD.clone();
+    this.bestTD = bestTD.clone();
     try {
-      await Promise.all([this.downloadHeader(start, count, handler), this.downloadBodiesLoop(), this.processBlockLoop()]);
+      await Promise.all([this.downloadHeader(localHeight, localHash, bestHeight - localHeight, handler), this.downloadBodiesLoop(), this.processBlockLoop()]);
       await Promise.all(Array.from(this.downloadBodiesPromises));
     } catch (err) {
       throw err;
@@ -86,18 +89,19 @@ export class Fetcher {
     this.blockQueue.abort();
   }
 
-  private async downloadHeader(start: number, count: number, handler: WireProtocolHandler) {
+  private async downloadHeader(localHeight: number, localHash: Buffer, totalCount: number, handler: WireProtocolHandler) {
     let i = 0;
     const headerTaskQueue: { start: number; count: number }[] = [];
-    while (count > 0) {
+    while (totalCount > 0) {
       headerTaskQueue.push({
-        start: i * this.count + start + 1,
-        count: count > this.count ? this.count : count
+        start: i * this.count + localHeight + 1,
+        count: totalCount > this.count ? this.count : totalCount
       });
       i++;
-      count -= this.count;
+      totalCount -= this.count;
     }
 
+    let lastHash = localHash;
     for (const { start, count } of headerTaskQueue) {
       if (this.aborted) {
         return;
@@ -124,6 +128,10 @@ export class Fetcher {
             if (!headers[index - 1].hash().equals(header.parentHash)) {
               throw new Error('invalid header(parentHash)');
             }
+          } else {
+            if (!header.parentHash.equals(lastHash)) {
+              throw new Error('invalid header(parentHash)');
+            }
           }
           await header.validate(this.node.blockchain);
           // additional check for signer
@@ -137,6 +145,15 @@ export class Fetcher {
           // additional check for gasLimit
           if (!header.gasLimit.eq(this.node.miner.gasLimit)) {
             throw new Error('invalid header(gas limit)');
+          }
+          this.totalTD.iadd(header.difficulty);
+          if (index === headers.length - 1) {
+            lastHash = header.hash();
+            if (header.number.toNumber() === this.bestHeight) {
+              if (this.totalTD.lt(this.bestTD)) {
+                throw new Error('invalid header(total difficulty)');
+              }
+            }
           }
         }
         logger.info('Download headers start:', start, 'count:', count, 'from:', handler.peer.peerId);
@@ -266,22 +283,27 @@ export class Fetcher {
     }
   }
 
+  private blockProcessed() {
+    this.processParallel--;
+    if (this.processParallel < this.processLimit && this.processParallelResolve) {
+      this.processParallelResolve();
+      this.processParallelResolve = undefined;
+      this.processParallelPromise = undefined;
+    }
+  }
+
   private async processBlockLoop() {
     for await (const { data: block } of this.blockQueue.generator()) {
       try {
         await this.node.processBlock(block, false, false);
-        this.processParallel--;
-        if (this.processParallel < this.processLimit && this.processParallelResolve) {
-          this.processParallelResolve();
-          this.processParallelResolve = undefined;
-          this.processParallelPromise = undefined;
-        }
+        this.blockProcessed();
         if (block.header.number.eqn(this.bestHeight)) {
           this.abort();
         }
       } catch (err) {
         logger.error('Fetcher::processBlockLoop, process block error:', err);
         this.abort();
+        this.node.banPeer(this.remote, 'timeout');
         return;
       }
     }

@@ -21,5 +21,5 @@ export function installOptions(program: any) {
   program.option('--chain <chain>', 'chain name: gxc2-mainnet, gxc2-testnet');
   program.option('--mine', 'mine block');
   program.option('--coinbase <address>', 'miner address');
-  program.option('--verbosity <verbosity>', 'logging verbosity: silent, error, warn, info, debug, detail');
+  program.option('--verbosity <verbosity>', 'logging verbosity: silent, error, warn, info, debug, detail', 'info');
 }

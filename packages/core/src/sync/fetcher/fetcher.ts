@@ -20,7 +20,7 @@ export class Fetcher {
   private downloadParallelResolve?: () => void;
   private downloadBodiesPromises = new Set<Promise<void>>();
 
-  private processLimit: number = 10;
+  private processLimit: number = 1;
   private processParallel: number = 0;
   private processParallelResolve?: () => void;
   private processParallelPromise?: Promise<void>;

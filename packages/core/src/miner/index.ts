@@ -91,8 +91,8 @@ export class Miner {
     this._gasLimit = gasLimit.clone();
   }
 
-  private shouldMintNextBlock(currentHeader: BlockHeader) {
-    return this.isMining && !this.node.blockchain.cliqueCheckNextRecentlySigned(currentHeader, this.coinbase);
+  private _shouldMintNextBlock(currentHeader: BlockHeader) {
+    return this.isMining && !this.node.sync.isSyncing && !this.node.blockchain.cliqueCheckNextRecentlySigned(currentHeader, this.coinbase);
   }
 
   private _pushToHistory(block: Block) {
@@ -135,6 +135,11 @@ export class Miner {
     await this._newBlockHeader(header);
   }
 
+  async startMint(header: BlockHeader) {
+    await this.initPromise;
+    await this._startMint(header);
+  }
+
   private makeHeader(timestamp: number, parentHash: Buffer, number: BN): [boolean, BlockHeader] {
     if (this.isMining) {
       const [inTurn, difficulty] = calcCliqueDifficulty(this.node.blockchain.cliqueActiveSigners(), this.coinbase, number);
@@ -172,7 +177,7 @@ export class Miner {
     }
   }
 
-  private async _newBlockHeader(header: BlockHeader, txMap?: PendingTxMap) {
+  private async _newBlockHeader(header: BlockHeader) {
     try {
       await this.lock.acquire();
       if (this.wvm) {
@@ -194,53 +199,95 @@ export class Miner {
       const currentTd = await this.node.db.getTotalDifficulty(header.hash(), header.number);
       const nextTd = currentTd.add(newHeader.difficulty);
 
-      // Mint block logic.
-      if (this.isMining) {
-        if (this.nextTd && this.nextTd.lt(nextTd)) {
-          this.nextTd = undefined;
-          if (this.timeout) {
-            clearTimeout(this.timeout);
-            this.timeout = undefined;
-          }
-        }
-      }
-
+      this._cancel(nextTd);
       this.wvm = await this.node.getWrappedVM(header.stateRoot, newNumber);
       await this.wvm.vm.stateManager.checkpoint();
-      await this._commit(txMap || (await this.node.txPool.getPendingTxMap(header.number, header.hash())));
-
-      // Mint block logic.
-      if (this.shouldMintNextBlock(header)) {
+      await this._commit(await this.node.txPool.getPendingTxMap(header.number, header.hash()));
+      if (this._shouldMintNextBlock(header)) {
         this.nextTd = nextTd.clone();
-        const now = nowTimestamp();
-        let timeout = now > timestamp ? 0 : timestamp - now;
-        timeout *= 1000;
-        if (!inTurn) {
-          const signerCount = this.node.blockchain.cliqueActiveSigners().length;
-          timeout += getRandomIntInclusive(1, signerCount + 1) * noTurnSignerDelay;
-        }
-        const parentHash = header.hash();
-        this.timeout = setTimeout(async () => {
-          try {
-            await this.lock.acquire();
-            const pendingBlock = await this._getPendingBlockByParentHash(parentHash);
-            if (!pendingBlock) {
-              throw new Error(`Missing pending block, parentHash: ${bufferToHex(parentHash)}`);
-            }
-            const newBlock = await this.node.processBlock(pendingBlock, true, true);
-            logger.info('⛏️  Mine block, height:', newBlock.header.number.toString(), 'hash:', bufferToHex(newBlock.hash()));
-          } catch (err) {
-            logger.error('Miner::_newBlock, setTimeout, catch error:', err);
-          } finally {
-            this.lock.release();
-          }
-        }, timeout);
+        this._mint(header.hash(), this._calcTimeout(timestamp, inTurn));
       }
     } catch (err) {
       logger.error('Miner::_newBlock, catch error:', err);
     } finally {
       this.lock.release();
     }
+  }
+
+  private async _startMint(header: BlockHeader) {
+    try {
+      await this.lock.acquire();
+
+      if (!header.hash().equals(this.pendingHeader.parentHash)) {
+        return;
+      }
+
+      const newNumber = header.number.addn(1);
+      const period: number = header._common.consensusConfig().period;
+      const timestamp = header.timestamp.toNumber() + period;
+      const [inTurn, difficulty] = calcCliqueDifficulty(this.node.blockchain.cliqueActiveSigners(), this.coinbase, newNumber);
+      const currentTd = await this.node.db.getTotalDifficulty(header.hash(), header.number);
+      const nextTd = currentTd.add(difficulty);
+
+      this._cancel(nextTd);
+      if (this._shouldMintNextBlock(header)) {
+        this.nextTd = nextTd.clone();
+        this._mint(header.hash(), this._calcTimeout(timestamp, inTurn));
+      }
+    } catch (err) {
+      logger.error('Miner::_startMint, catch error:', err);
+    } finally {
+      this.lock.release();
+    }
+  }
+
+  private _cancel(nextTd: BN) {
+    if (this.isMining) {
+      if (this.nextTd && this.nextTd.lte(nextTd)) {
+        this.nextTd = undefined;
+        if (this.timeout) {
+          clearTimeout(this.timeout);
+          this.timeout = undefined;
+        }
+      }
+    }
+  }
+
+  private _calcTimeout(nextBlockTimestamp: number, inTurn: boolean) {
+    const now = nowTimestamp();
+    let timeout = now > nextBlockTimestamp ? 0 : nextBlockTimestamp - now;
+    timeout *= 1000;
+    if (!inTurn) {
+      const signerCount = this.node.blockchain.cliqueActiveSigners().length;
+      timeout += getRandomIntInclusive(1, signerCount + 1) * noTurnSignerDelay;
+    }
+    return timeout;
+  }
+
+  private _mint(parentHash: Buffer, timeout: number) {
+    this.timeout = setTimeout(async () => {
+      let pendingBlock: Block | undefined;
+      try {
+        await this.lock.acquire();
+        pendingBlock = await this._getPendingBlockByParentHash(parentHash);
+        if (!pendingBlock) {
+          throw new Error(`Missing pending block, parentHash: ${bufferToHex(parentHash)}`);
+        }
+      } catch (err) {
+        logger.error('Miner::_mint, setTimeout, catch error:', err);
+        return;
+      } finally {
+        this.lock.release();
+      }
+      this.node
+        .processBlock(pendingBlock, true, true)
+        .then((newBlock) => {
+          logger.info('⛏️  Mine block, height:', newBlock.header.number.toString(), 'hash:', bufferToHex(newBlock.hash()));
+        })
+        .catch((err) => {
+          logger.error('Miner::_mint, setTimeout, catch error:', err);
+        });
+    }, timeout);
   }
 
   /**
@@ -286,7 +333,6 @@ export class Miner {
     }
     return await this.node.getStateManager(this.node.blockchain.latestBlock.header.stateRoot, this.node.blockchain.latestHeight);
   }
-
   private async _putTx(tx: Transaction) {
     this.pendingTxs.push(tx);
     const txs = [...this.pendingTxs];

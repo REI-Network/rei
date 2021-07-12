@@ -193,7 +193,7 @@ export class Node {
     });
     await this.blockchain.init();
 
-    this.sync = new FullSynchronizer({ node: this });
+    this.sync = new FullSynchronizer({ node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
     this.txPool = new TxPool({ node: this, journal: options.databasePath });
 
     let peerId!: PeerId;
@@ -230,6 +230,10 @@ export class Node {
 
   private onPeerRemoved = (peer: Peer) => {
     this.txSync.dropPeer(peer.peerId);
+  };
+
+  private onSyncOver = () => {
+    this.miner.startMint(this.blockchain.latestBlock.header);
   };
 
   getCommon(num: BNLike) {
@@ -301,7 +305,6 @@ export class Node {
           await Promise.all(promises);
         }
       } catch (err) {
-        logger.error('Node::processLoop, process block error:', err);
         reject(err);
       }
     }
@@ -360,6 +363,8 @@ export class Node {
   }
 
   async abort() {
+    this.sync.removeListener('synchronized', this.onSyncOver);
+    this.sync.removeListener('failed', this.onSyncOver);
     this.networkMngr.removeListener('installed', this.onPeerInstalled);
     this.networkMngr.removeListener('removed', this.onPeerRemoved);
     this.taskQueue.abort();

@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import Semaphore from 'semaphore-async-await';
 import { logger } from '@gxchain2/utils';
 import { Peer } from '@gxchain2/network';
 import type { Node } from '../node';
@@ -21,6 +22,7 @@ export declare interface Synchronizer {
 export abstract class Synchronizer extends EventEmitter {
   protected readonly node: Node;
   protected readonly interval: number;
+  private lock = new Semaphore(1);
   protected forceSync: boolean = false;
   protected startingBlock: number = 0;
   protected highestBlock: number = 0;
@@ -43,6 +45,10 @@ export abstract class Synchronizer extends EventEmitter {
    *
    */
   get isSyncing(): boolean {
+    return this.lock.getPermits() === 0;
+  }
+
+  announce(peer: Peer) {
     throw new Error('Unimplemented');
   }
 
@@ -61,29 +67,22 @@ export abstract class Synchronizer extends EventEmitter {
    * @param target - the sync peer and height of block
    */
   async sync(peer?: Peer) {
-    try {
-      if (!this.isSyncing) {
-        const before = this.node.blockchain.latestBlock.hash();
-        const result = await this._sync(peer);
-        const after = this.node.blockchain.latestBlock.hash();
-        if (!before.equals(after)) {
-          await this.node.broadcastNewBlock(this.node.blockchain.latestBlock);
-          if (result) {
-            logger.info('💫 Synchronized');
-            this.emit('synchronized');
-          } else {
-            this.emit('failed');
-          }
-        }
+    await this.lock.acquire();
+    const before = this.node.blockchain.latestBlock.hash();
+    const result = await this._sync(peer);
+    const after = this.node.blockchain.latestBlock.hash();
+    this.lock.release();
+
+    if (!before.equals(after)) {
+      if (result) {
+        logger.info('💫 Synchronized');
+        this.emit('synchronized');
+      } else {
+        this.emit('failed');
       }
-    } catch (err) {
-      logger.error('Synchronizer::sync, catch error:', err);
+      this.node.broadcastNewBlock(this.node.blockchain.latestBlock);
     }
   }
-
-  async abort() {}
-
-  announce(peer: Peer) {}
 
   /**
    * Start the Synchronizer
@@ -94,9 +93,15 @@ export abstract class Synchronizer extends EventEmitter {
       this.forceSync = true;
     }, this.interval * 30);
     while (!this.node.aborter.isAborted) {
-      await this.sync();
+      if (!this.isSyncing) {
+        await this.sync();
+      }
       await this.node.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.interval)));
     }
     clearTimeout(timeout);
+  }
+
+  async abort() {
+    throw new Error('Unimplemented');
   }
 }

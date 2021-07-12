@@ -11,13 +11,14 @@ export interface FetcherOptions {
 }
 
 export class Fetcher {
-  private abortFlag: boolean = false;
+  private aborted: boolean = false;
   private node: Node;
   private count: number;
 
   private downloadLimit: number;
   private downloadParallel: number = 0;
   private downloadParallelResolve?: () => void;
+  private downloadBodiesPromises = new Set<Promise<void>>();
 
   private processLimit: number = 10;
   private processParallel: number = 0;
@@ -52,6 +53,7 @@ export class Fetcher {
     this.localHeight = start;
     try {
       await Promise.all([this.downloadHeader(start, count, handler), this.downloadBodiesLoop(), this.processBlockLoop()]);
+      await Promise.all(Array.from(this.downloadBodiesPromises));
     } catch (err) {
       throw err;
     } finally {
@@ -63,14 +65,14 @@ export class Fetcher {
   }
 
   reset() {
-    this.abortFlag = false;
+    this.aborted = false;
     this.downloadBodiesQueue.reset();
     this.blockQueue.reset();
   }
 
   abort() {
     logger.debug('Fetcher::abort');
-    this.abortFlag = true;
+    this.aborted = true;
     if (this.downloadParallelResolve) {
       this.downloadParallelResolve();
       this.downloadParallelResolve = undefined;
@@ -97,14 +99,18 @@ export class Fetcher {
     }
 
     for (const { start, count } of headerTaskQueue) {
-      if (this.abortFlag) {
+      if (this.aborted) {
         return;
       }
       let headers: BlockHeader[];
       try {
         headers = await handler.getBlockHeaders(start, count);
       } catch (err) {
-        logger.error('Fetcher::downloadHeader, catch error:', err);
+        if (err instanceof PeerRequestTimeoutError) {
+          await this.node.banPeer(handler.peer.peerId, 'timeout');
+        } else {
+          logger.warn('Fetcher::downloadHeader, catch error:', err);
+        }
         this.abort();
         return;
       }
@@ -159,72 +165,23 @@ export class Fetcher {
       const headers = [...headersCache];
       headersCache = [];
 
-      const handler = await WireProtocol.getPool().get();
-
-      const retry = () => {
-        if (!this.abortFlag) {
-          for (const header of headers) {
-            this.downloadBodiesQueue.push(header);
-          }
-        }
-      };
+      let handler: WireProtocolHandler;
+      try {
+        handler = await WireProtocol.getPool().get();
+      } catch (err) {
+        logger.warn('Fetcher::downloadBodiesLoop, catch error:', err);
+        this.abort();
+        return;
+      }
       this.downloadParallel++;
-
-      handler
-        .getBlockBodies(headers)
-        .then(async (bodies) => {
-          this.downloadParallel--;
-          if (this.downloadParallelResolve) {
-            this.downloadParallelResolve();
-            this.downloadParallelResolve = undefined;
-          }
-
-          if (bodies.length !== headers.length) {
-            logger.warn('Fetcher::downloadBodiesLoop, invalid bodies(length)');
-            await this.node.banPeer(handler.peer.peerId, 'invalid');
-            return retry();
-          }
-          const blocks: Block[] = [];
-          for (let i = 0; i < bodies.length; i++) {
-            try {
-              const transactions = bodies[i];
-              const header = headers[i];
-              const block = Block.fromBlockData({ header, transactions }, { common: this.node.getCommon(header.number), hardforkByBlockNumber: true });
-              // the target peer does not have the block body, so it is marked as a useless peer.
-              if (!block.header.transactionsTrie.equals(emptyTxTrie) && transactions.length === 0) {
-                this.uselessHandlers.add(handler);
-                logger.debug('Fetcher, ', handler.peer.peerId, 'add to useless peer');
-                return retry();
-              }
-              await block.validateData();
-              // additional check for uncle headers
-              if (block.uncleHeaders.length !== 0) {
-                throw new Error('invalid block(uncle headers)');
-              }
-              blocks.push(block);
-            } catch (err) {
-              logger.warn('Fetcher::downloadBodiesLoop, catch error:', err);
-              await this.node.banPeer(handler.peer.peerId, 'invalid');
-              return retry();
-            }
-          }
-          logger.info('Download bodies start:', headers[0].number.toNumber(), 'count:', headers.length, 'from:', handler.peer.peerId);
-          if (!this.abortFlag) {
-            for (const block of blocks) {
-              this.blockQueue.push({ data: block, index: block.header.number.toNumber() - this.localHeight - 1 });
-            }
-          }
-          WireProtocol.getPool().put(handler);
-        })
-        .catch((err) => {
-          WireProtocol.getPool().remove(handler);
-          if (err instanceof PeerRequestTimeoutError) {
-            this.node.banPeer(handler.peer.peerId, 'timeout');
-          } else {
-            logger.error('Fetcher::downloadBodiesLoop, download failed error:', err);
-          }
-          return retry();
-        });
+      const p = this.downloadBodies(handler, headers, () => {
+        this.downloadBodiesPromises.delete(p);
+        if (--this.downloadParallel < this.downloadLimit && this.downloadParallelResolve) {
+          this.downloadParallelResolve();
+          this.downloadParallelResolve = undefined;
+        }
+      });
+      this.downloadBodiesPromises.add(p);
       if (this.downloadParallel >= this.downloadLimit) {
         await new Promise<void>((resolve) => {
           this.downloadParallelResolve = resolve;
@@ -236,33 +193,96 @@ export class Fetcher {
     }
   }
 
+  private downloadBodies(handler: WireProtocolHandler, headers: BlockHeader[], over: () => void) {
+    const retry = () => {
+      if (!this.aborted) {
+        for (const header of headers) {
+          this.downloadBodiesQueue.push(header);
+        }
+      }
+    };
+    return handler
+      .getBlockBodies(headers)
+      .then(async (bodies) => {
+        over();
+
+        if (bodies.length !== headers.length) {
+          logger.warn('Fetcher::downloadBodiesLoop, invalid bodies(length)');
+          await this.node.banPeer(handler.peer.peerId, 'invalid');
+          return retry();
+        }
+        const blocks: Block[] = [];
+        for (let i = 0; i < bodies.length; i++) {
+          try {
+            const transactions = bodies[i];
+            const header = headers[i];
+            const block = Block.fromBlockData({ header, transactions }, { common: this.node.getCommon(header.number), hardforkByBlockNumber: true });
+            // the target peer does not have the block body, so it is marked as a useless peer.
+            if (!block.header.transactionsTrie.equals(emptyTxTrie) && transactions.length === 0) {
+              this.uselessHandlers.add(handler);
+              logger.debug('Fetcher, ', handler.peer.peerId, 'add to useless peer');
+              return retry();
+            }
+            await block.validateData();
+            // additional check for uncle headers
+            if (block.uncleHeaders.length !== 0) {
+              throw new Error('invalid block(uncle headers)');
+            }
+            blocks.push(block);
+          } catch (err) {
+            logger.warn('Fetcher::downloadBodies, catch error:', err);
+            await this.node.banPeer(handler.peer.peerId, 'invalid');
+            return retry();
+          }
+        }
+        logger.info('Download bodies start:', headers[0].number.toNumber(), 'count:', headers.length, 'from:', handler.peer.peerId);
+        if (!this.aborted) {
+          for (const block of blocks) {
+            this.pushToBlockQueue(block);
+          }
+        }
+        WireProtocol.getPool().put(handler);
+      })
+      .catch((err) => {
+        over();
+
+        if (err instanceof PeerRequestTimeoutError) {
+          this.node.banPeer(handler.peer.peerId, 'timeout');
+        } else {
+          // TODO: put handler to pool.
+          logger.warn('Fetcher::downloadBodies, download failed error:', err);
+        }
+        return retry();
+      });
+  }
+
+  private pushToBlockQueue(block: Block) {
+    this.processParallel++;
+    this.blockQueue.push({ data: block, index: block.header.number.toNumber() - this.localHeight - 1 });
+    if (this.processParallel >= this.processLimit && !this.processParallelPromise) {
+      this.processParallelPromise = new Promise<void>((resolve) => {
+        this.processParallelResolve = resolve;
+      });
+    }
+  }
+
   private async processBlockLoop() {
     for await (const { data: block } of this.blockQueue.generator()) {
-      this.processParallel++;
-      this.node
-        .processBlock(block, false, false)
-        .then(() => {
-          this.processParallel--;
-          if (this.processParallel < this.processLimit && this.processParallelResolve) {
-            this.processParallelResolve();
-            this.processParallelResolve = undefined;
-            this.processParallelPromise = undefined;
-          }
-
-          if (block.header.number.eqn(this.bestHeight)) {
-            this.abort();
-          }
-        })
-        .catch((err) => {
-          if (!this.abortFlag) {
-            logger.error('Fetcher::processBlockLoop, process block error:', err);
-            this.abort();
-          }
-        });
-      if (this.processParallel >= this.processLimit && !this.processParallelPromise) {
-        this.processParallelPromise = new Promise<void>((resolve) => {
-          this.processParallelResolve = resolve;
-        });
+      try {
+        await this.node.processBlock(block, false, false);
+        this.processParallel--;
+        if (this.processParallel < this.processLimit && this.processParallelResolve) {
+          this.processParallelResolve();
+          this.processParallelResolve = undefined;
+          this.processParallelPromise = undefined;
+        }
+        if (block.header.number.eqn(this.bestHeight)) {
+          this.abort();
+        }
+      } catch (err) {
+        logger.error('Fetcher::processBlockLoop, process block error:', err);
+        this.abort();
+        return;
       }
     }
   }

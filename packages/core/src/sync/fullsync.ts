@@ -31,13 +31,6 @@ export class FullSynchronizer extends Synchronizer {
   }
 
   /**
-   * Judge the sync state
-   */
-  get isSyncing(): boolean {
-    return !!this.syncingPromise;
-  }
-
-  /**
    * Syncing switch to the peer if the peer's block height is more than the bestHeight
    * @param peer - remote peer
    */
@@ -119,13 +112,15 @@ export class FullSynchronizer extends Synchronizer {
     }
     while (latestHeight > 0) {
       const count = latestHeight >= this.count ? this.count : latestHeight;
-      latestHeight -= count;
+      latestHeight -= count - 1;
 
       let headers!: BlockHeader[];
       try {
         headers = await handler.getBlockHeaders(latestHeight, this.count);
       } catch (err) {
-        await this.node.banPeer(handler.peer.peerId, err instanceof PeerRequestTimeoutError ? 'timeout' : 'error');
+        if (err instanceof PeerRequestTimeoutError) {
+          await this.node.banPeer(handler.peer.peerId, 'timeout');
+        }
         throw err;
       }
 
@@ -140,6 +135,10 @@ export class FullSynchronizer extends Synchronizer {
           }
           throw err;
         }
+      }
+
+      if (latestHeight === 1) {
+        return 0;
       }
     }
     throw new Error('find acient failed');

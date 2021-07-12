@@ -7,6 +7,7 @@ import { Fetcher } from './fetcher';
 import { WireProtocol, WireProtocolHandler, PeerRequestTimeoutError, maxGetBlockHeaders } from '../protocols';
 
 const defaultMaxLimit = 16;
+const minSyncPeers = 3;
 
 export interface FullSynchronizerOptions extends SynchronizerOptions {
   limit?: number;
@@ -39,9 +40,12 @@ export class FullSynchronizer extends Synchronizer {
 
   protected async _sync(peer?: Peer): Promise<boolean> {
     if (this.syncingPromise) {
-      throw new Error('FullSynchronizer already sync');
+      return false;
     }
-    const syncResult = await (this.syncingPromise = new Promise<boolean>(async (syncResolve) => {
+    if (!this.forceSync && WireProtocol.getPool().handlers.length < minSyncPeers) {
+      return false;
+    }
+    const result = await (this.syncingPromise = new Promise<boolean>(async (resolve) => {
       let bestPeerHandler!: WireProtocolHandler;
       let bestHeight!: number;
       let bestTD!: BN;
@@ -51,7 +55,7 @@ export class FullSynchronizer extends Synchronizer {
         bestHeight = bestPeerHandler.status!.height;
         bestTD = new BN(bestPeerHandler.status!.totalDifficulty);
         if (bestTD.lte(this.node.blockchain.totalDifficulty)) {
-          return syncResolve(false);
+          return resolve(false);
         }
       } else {
         bestTD = this.node.blockchain.totalDifficulty;
@@ -65,20 +69,20 @@ export class FullSynchronizer extends Synchronizer {
           }
         }
         if (!bestPeerHandler) {
-          return syncResolve(false);
+          return resolve(false);
         }
       }
 
       try {
-        syncResolve(await this.syncWithPeerHandler(bestPeerHandler, bestHeight, bestTD));
+        resolve(await this.syncWithPeerHandler(bestPeerHandler, bestHeight, bestTD));
         logger.info('💫 Sync over, local height:', this.node.blockchain.latestHeight, 'local td:', this.node.blockchain.totalDifficulty.toString(), 'best height:', bestHeight, 'best td:', bestTD.toString());
       } catch (err) {
-        syncResolve(false);
+        resolve(false);
         logger.error('FullSynchronizer::_sync, catch error:', err);
       }
     }));
     this.syncingPromise = undefined;
-    return syncResult;
+    return result;
   }
 
   /**

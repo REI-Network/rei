@@ -32,6 +32,9 @@ export abstract class Synchronizer extends EventEmitter {
     this.node = options.node;
     this.interval = options.interval || 1000;
     this.syncLoop();
+    setTimeout(() => {
+      this.forceSync = true;
+    }, this.interval * 30);
   }
 
   /**
@@ -89,16 +92,12 @@ export abstract class Synchronizer extends EventEmitter {
    */
   async syncLoop() {
     await this.node.blockchain.init();
-    const timeout = setTimeout(() => {
-      this.forceSync = true;
-    }, this.interval * 30);
     while (!this.node.aborter.isAborted) {
       if (!this.isSyncing) {
         await this.sync();
       }
       await this.node.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.interval)));
     }
-    clearTimeout(timeout);
   }
 
   async abort() {

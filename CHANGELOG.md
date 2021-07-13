@@ -3,6 +3,51 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.0.3-alpha.0](https://github.com/gxchain/gxchain2/compare/v0.0.2-alpha.0...v0.0.3-alpha.0) (2021-07-13)
+
+
+### Bug Fixes
+
+* **network:** handle message after handshake success ([e058166](https://github.com/gxchain/gxchain2/commit/e058166168175b4f63859d5af842363f7377cd76))
+* **tx-pool:** fix tx stuck when reorg ([03c8036](https://github.com/gxchain/gxchain2/commit/03c803628932fbafd323114d7c1d898571841e4c))
+* add handler to pool after handshake success ([2a6b543](https://github.com/gxchain/gxchain2/commit/2a6b543b6a1b453a780543be38f35ea40c1746ff))
+* **rpc:** fix nonce type error ([1350bed](https://github.com/gxchain/gxchain2/commit/1350bed44285e09a07090d290afd84d569e09cd4))
+* **tx-pool:** fix tx suck(pending nonce error) ([fe8423d](https://github.com/gxchain/gxchain2/commit/fe8423d357e7b4b1526124f49991f040ab09dafc))
+* aborter and channel(channel abort cause memory leak) ([34c7c6d](https://github.com/gxchain/gxchain2/commit/34c7c6d59b849273a9b6e742690071c62a8aa168))
+* fix aborter(promise.race cause memory leak) ([87d6eb1](https://github.com/gxchain/gxchain2/commit/87d6eb18840c235ec10f8004f5f533619ace7cd0))
+* shouldn't getPrivateKey when don't generate state root ([ebb05c1](https://github.com/gxchain/gxchain2/commit/ebb05c1b5f0ec2eb95125ad0b2e0ba1df423169d))
+* tx pool, transaction stuck ([7ea4e31](https://github.com/gxchain/gxchain2/commit/7ea4e313371a37ce1e37d70abd7a8b13b902ae26))
+* **core:** fix sync stop ([66f232d](https://github.com/gxchain/gxchain2/commit/66f232db08180176e46c01b0ec710f8ef98aa48f))
+* **doc:** add cli to README.md ([096b570](https://github.com/gxchain/gxchain2/commit/096b5700b3751bea27473db1358bd43ff89574f4))
+* **doc:** add node version and npm version, update install command ([f2a4a0f](https://github.com/gxchain/gxchain2/commit/f2a4a0f1e533b4b74c5305fe52f266d39fee03aa))
+* **doc:** fix README.md ([f25b1bd](https://github.com/gxchain/gxchain2/commit/f25b1bd3a0dc38d00e0065de06bb75e8554cbe58))
+* **state-manager:** fix merkle-patricia-tree version bug ([4ef947d](https://github.com/gxchain/gxchain2/commit/4ef947dd15ec918a055bca69cafc881ab8300f72))
+* **wallet:** fix keyStoreFileName(startsWith 0x) ([d737f6e](https://github.com/gxchain/gxchain2/commit/d737f6e3cb3ffe1573edaf7b4b5019a305323283))
+
+
+### Features
+
+* **network:** use discv5 instead of kad-dht ([6baa79c](https://github.com/gxchain/gxchain2/commit/6baa79c73901359a841a265575c70ffa0951c96f))
+* add cli wallet ([c45da52](https://github.com/gxchain/gxchain2/commit/c45da527867536448ad3268ec90bee1788c3e891))
+* add expheap for inbound and outbound ([79d2050](https://github.com/gxchain/gxchain2/commit/79d2050cab21010af40c233a1c3459ead1adfd9c))
+* add unlock option for node, remove fake account manager ([e9648fe](https://github.com/gxchain/gxchain2/commit/e9648fe1773f2bf4f5acdb46b6ab82f125f72a92))
+* **core:** add blockchain monitor ([1dc6bce](https://github.com/gxchain/gxchain2/commit/1dc6bced778541aa6e7bde81eddf7a4e1a651b1a))
+* **core:** add bloom bits filter ([6977bf8](https://github.com/gxchain/gxchain2/commit/6977bf8eaffed0dd9ddcc851412a20de48aec01c))
+* **core:** add bloom bits indexer, change chain indexer backend interface ([fd2e000](https://github.com/gxchain/gxchain2/commit/fd2e000356046b889ded1db15d81158379c97236))
+* **core:** add bloombits generator ([07916fd](https://github.com/gxchain/gxchain2/commit/07916fd10dd81bedae22635b9bc895193e6ccac9))
+* **core:** add simple chain indexer ([bdb9526](https://github.com/gxchain/gxchain2/commit/bdb9526380e67f10e1a54566ae49566baaacfc18))
+* **core:** add tracer for core ([ed30c5f](https://github.com/gxchain/gxchain2/commit/ed30c5f6d51daacb4fb5c9f4c0e6d763638634d9))
+* add write and read bloom bits ([fa66a0e](https://github.com/gxchain/gxchain2/commit/fa66a0ed02f5e59985b191582649407c28456e9b))
+
+
+### Reverts
+
+* Revert "chore: add debug code" ([1b13f64](https://github.com/gxchain/gxchain2/commit/1b13f648dceba66084d66bcd0e956063b2a3c79d))
+
+
+
+
+
 ## [0.0.2-alpha.0](https://iz11ro8cf9xz/node/gxchain2/compare/v0.0.1-alpha.0...v0.0.2-alpha.0) (2021-03-15)
 
 

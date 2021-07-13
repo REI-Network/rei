@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.0.3-alpha.0](https://github.com/gxchain/gxchain2/compare/v0.0.2-alpha.0...v0.0.3-alpha.0) (2021-07-13)
+
+
+### Bug Fixes
+
+* **network:** handle message after handshake success ([e058166](https://github.com/gxchain/gxchain2/commit/e058166168175b4f63859d5af842363f7377cd76))
+* **tx-pool:** fix tx stuck when reorg ([03c8036](https://github.com/gxchain/gxchain2/commit/03c803628932fbafd323114d7c1d898571841e4c))
+* add handler to pool after handshake success ([2a6b543](https://github.com/gxchain/gxchain2/commit/2a6b543b6a1b453a780543be38f35ea40c1746ff))
+
+
+### Features
+
+* **network:** use discv5 instead of kad-dht ([6baa79c](https://github.com/gxchain/gxchain2/commit/6baa79c73901359a841a265575c70ffa0951c96f))
+
+
+
+
+
 ## [0.0.2-alpha.0](https://iz11ro8cf9xz/node/gxchain2/compare/v0.0.1-alpha.0...v0.0.2-alpha.0) (2021-03-15)
 
 

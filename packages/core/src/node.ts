@@ -301,9 +301,6 @@ export class Node {
         const { result, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot, lastHeader.number)).runBlock(opts);
         block = newBlock || block;
         logger.info('✨ Process block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
-        if (block._common.param('vm', 'debugConsole')) {
-          logger.debug('Node::processLoop, process on hardfork:', block._common.hardfork());
-        }
         const before = this.blockchain.latestBlock.hash();
         await this.blockchain.putBlock(block);
         await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(result.receipts, block.hash(), block.header.number)));

@@ -78,10 +78,6 @@
     {
       "name": "london",
       "block": null
-    },
-    {
-      "name": "qaraqorum",
-      "block": 10
     }
   ],
   "bootstrapNodes": []

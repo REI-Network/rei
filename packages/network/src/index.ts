@@ -35,7 +35,7 @@ export declare interface NetworkManager {
   once(event: 'installed' | 'removed', listener: (peer: Peer) => void): this;
 }
 
-const ignoredErrors = new RegExp(['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED', '1 bytes'].join('|'));
+const ignoredErrors = new RegExp(['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED', '1 bytes', 'abort'].join('|'));
 
 export function logNetworkError(prefix: string, err: any) {
   if (err.message && ignoredErrors.test(err.message)) {

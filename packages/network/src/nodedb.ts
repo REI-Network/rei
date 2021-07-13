@@ -2,7 +2,7 @@ import { LevelUp } from 'levelup';
 import { AbstractLevelDOWN, AbstractIterator } from 'abstract-leveldown';
 import { ENR } from '@gxchain2/discv5';
 
-type DB = LevelUp<AbstractLevelDOWN, AbstractIterator<Buffer, Buffer>>;
+type DB = LevelUp<AbstractLevelDOWN<Buffer, Buffer>, AbstractIterator<Buffer, Buffer>>;
 
 async function* iteratorToAsyncGenerator<K, V>(itr: AbstractIterator<K, V>) {
   while (true) {
@@ -34,7 +34,7 @@ export class NodeDB {
 
   async loadLocal() {
     try {
-      return ENR.decode(await this.db.get('local'));
+      return ENR.decode(await this.db.get(Buffer.from('local')));
     } catch (err) {
       if (err.type === 'NotFoundError') {
         return;
@@ -54,10 +54,10 @@ export class NodeDB {
   }
 
   persistLocal(enr: ENR, privateKey?: Buffer) {
-    return this.db.put('local', enr.encode(privateKey));
+    return this.db.put(Buffer.from('local'), enr.encode(privateKey));
   }
 
   persist(enr: ENR) {
-    return this.db.put(enr.nodeId, enr.encode());
+    return this.db.put(Buffer.from(enr.nodeId), enr.encode());
   }
 }

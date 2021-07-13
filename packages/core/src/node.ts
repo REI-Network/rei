@@ -219,12 +219,15 @@ export class Node {
     await this.networkdb.open();
 
     this.txSync = new TxFetcher(this);
+    let bootnodes = options.p2p.bootnodes || [];
+    bootnodes = bootnodes.concat(common.bootstrapNodes());
     this.networkMngr = new NetworkManager({
       protocols: createProtocolsByNames(this, [NetworkProtocol.GXC2_ETHWIRE]),
       datastore: this.networkdb,
       nodedb: this.nodedb,
       peerId,
-      ...options.p2p
+      ...options.p2p,
+      bootnodes
     })
       .on('installed', this.onPeerInstalled)
       .on('removed', this.onPeerRemoved);

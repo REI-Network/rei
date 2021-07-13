@@ -54,7 +54,7 @@ Options:
   --chain <chain>                  chain name: gxc2-mainnet, gxc2-testnet
   --mine                           mine block
   --coinbase <address>             miner address
-  --verbosity <verbosity>          logging verbosity: silent, error, warn, info, debug, detail
+  --verbosity <verbosity>          logging verbosity: silent, error, warn, info, debug, detail (default: "info")
   -h, --help                       display help for command
 
 Commands:

@@ -121,13 +121,14 @@ export class Node {
 
   private async loadPeerId(databasePath: string) {
     let peerId!: PeerId;
+    const nodeKeyPath = path.join(databasePath, 'nodekey');
     try {
-      const key = fs.readFileSync(path.join(databasePath, 'peer-key'));
+      const key = fs.readFileSync(nodeKeyPath);
       peerId = await PeerId.createFromPrivKey(key);
     } catch (err) {
-      logger.warn('Read peer-key faild, generate a new key');
+      logger.warn('Read nodekey faild, generate a new key');
       peerId = await PeerId.create({ keyType: 'secp256k1' });
-      fs.writeFileSync(path.join(databasePath, 'peer-key'), peerId.privKey.bytes);
+      fs.writeFileSync(nodeKeyPath, peerId.privKey.bytes);
     }
     return peerId;
   }

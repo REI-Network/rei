@@ -20,7 +20,7 @@
     "prettier": "^2.2.0"
   },
   "scripts": {
-    "bootstrap": "lerna bootstrap --ignore-scripts --include-dependencies --no-ci --hoist && npm run build",
+    "bootstrap": "lerna bootstrap --ignore-scripts --include-dependencies --no-ci --hoist && npm rebuild && npm run build",
     "build": "lerna run build --stream",
     "build:structure": "npm run build -- --scope @gxchain2/structure",
     "build:blockchain": "npm run build -- --scope @gxchain2/blockchain",

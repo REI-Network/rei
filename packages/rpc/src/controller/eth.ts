@@ -139,7 +139,11 @@ export class ETHController extends Controller {
     return unsignedTx.sign(privateKey);
   }
   async eth_signTransaction([data]: [CallData]) {
-    return bufferToHex((await this.makeTxForUnlockedAccount(data)).serialize());
+    const tx = await this.makeTxForUnlockedAccount(data);
+    if (!(tx instanceof Transaction)) {
+      return null;
+    }
+    return bufferToHex(tx.serialize());
   }
   async eth_sendTransaction([data]: [CallData]) {
     const tx = await this.makeTxForUnlockedAccount(data);
@@ -301,12 +305,12 @@ export class ETHController extends Controller {
     if (!context.client) {
       helper.throwRpcErr('eth_subscribe is only supported on websocket!');
       // for types.
-      return;
+      throw new Error();
     }
     if (type !== 'newHeads' && type !== 'logs' && type !== 'newPendingTransactions' && type !== 'syncing') {
       helper.throwRpcErr('eth_subscribe, invalid subscription type!');
       // for types.
-      return;
+      throw new Error();
     }
     if (type === 'logs') {
       return this.filterSystem.subscribe(context.client, type, parseAddressesAndTopics(options?.address, options?.topics));

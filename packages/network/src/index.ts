@@ -214,9 +214,10 @@ export class NetworkManager extends EventEmitter {
     enr.tcp = options.tcpPort || defaultTcpPort;
     enr.udp = options.udpPort || defaultUdpPort;
     enr.ip = options.nat || defaultNat;
+    const setNAT = !!options.nat;
 
     const localENR = await this.nodedb.loadLocal();
-    if (localENR && localENR.nodeId === enr.nodeId) {
+    if (localENR && localENR.nodeId === enr.nodeId && (!setNAT || (setNAT && enr.ip === localENR.ip))) {
       enr = localENR;
     } else {
       await this.nodedb.persistLocal(enr, keypair.privateKey);

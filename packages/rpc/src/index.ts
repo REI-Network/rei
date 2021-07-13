@@ -1,10 +1,11 @@
 import express from 'express';
 import expressws from 'express-ws';
 import * as http from 'http';
+import bodyParse from 'body-parser';
 import { Node } from '@gxchain2/core';
+import { logger } from '@gxchain2/utils';
 import { JsonRPCMiddleware } from './jsonrpcmiddleware';
 import { api } from './controller';
-import { logger } from '@gxchain2/utils';
 import { WsClient } from './client';
 import { FilterSystem } from './filtersystem';
 
@@ -70,7 +71,7 @@ export class RpcServer {
         expressws(app, server);
         const jsonmid = new JsonRPCMiddleware({ methods: this.controllers });
 
-        app.use(express.json({ type: '*/*' }));
+        app.use(bodyParse.json({ type: '*/*', limit: '5mb' }));
         app.use(jsonmid.makeMiddleWare());
         app.ws('/', (ws) => {
           const context = new RpcContext(new WsClient(ws));

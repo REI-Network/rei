@@ -2,7 +2,7 @@ import { Address, BN, bufferToHex } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
 import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN, calculateTransactionTrie, Transaction } from '@gxchain2/structure';
 import { WrappedVM } from '@gxchain2/vm';
-import { logger, getRandomIntInclusive, hexStringToBN } from '@gxchain2/utils';
+import { logger, getRandomIntInclusive, hexStringToBN, nowTimestamp } from '@gxchain2/utils';
 import { StateManager } from '@gxchain2/vm';
 import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import { PendingTxMap } from '../txpool';
@@ -12,10 +12,6 @@ const emptyUncleHash = '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142
 const noTurnSignerDelay = 500;
 const maxHistoryLength = 10;
 const defaultGasLimit = hexStringToBN('0xbe5c8b');
-
-function nowTimestamp() {
-  return Math.floor(Date.now() / 1000);
-}
 
 export interface MinerOptions {
   node: Node;
@@ -264,6 +260,21 @@ export class Miner {
     return timeout;
   }
 
+  private _updateTimestamp(block: Block, timestamp: number) {
+    return block.header.timestamp.toNumber() === timestamp
+      ? block
+      : Block.fromBlockData(
+          {
+            header: {
+              ...block.header,
+              timestamp
+            },
+            transactions: [...block.transactions]
+          },
+          { common: this.node.getCommon(block.header.number), cliqueSigner: this.isMining ? this.node.accMngr.getPrivateKey(this.coinbase) : undefined }
+        );
+  }
+
   private _mint(parentHash: Buffer, timeout: number) {
     this.timeout = setTimeout(async () => {
       let pendingBlock: Block | undefined;
@@ -273,6 +284,7 @@ export class Miner {
         if (!pendingBlock) {
           throw new Error(`Missing pending block, parentHash: ${bufferToHex(parentHash)}`);
         }
+        pendingBlock = this._updateTimestamp(pendingBlock, nowTimestamp());
       } catch (err) {
         logger.error('Miner::_mint, setTimeout, catch error:', err);
         return;

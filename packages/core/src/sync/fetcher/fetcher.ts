@@ -1,8 +1,10 @@
 import { Address, BN } from 'ethereumjs-util';
-import { HChannel, PChannel, logger } from '@gxchain2/utils';
+import { HChannel, PChannel, logger, nowTimestamp } from '@gxchain2/utils';
 import { emptyTxTrie, BlockHeader, Block } from '@gxchain2/structure';
 import { Node } from '../../node';
 import { PeerRequestTimeoutError, WireProtocol, WireProtocolHandler } from '../../protocols';
+
+const allowedFutureBlockTimeSeconds = 15;
 
 export interface FetcherOptions {
   node: Node;
@@ -145,6 +147,10 @@ export class Fetcher {
           // additional check for gasLimit
           if (!header.gasLimit.eq(this.node.miner.gasLimit)) {
             throw new Error('invalid header(gas limit)');
+          }
+          // additional check for timestamp
+          if (!header.timestamp.gtn(nowTimestamp() + allowedFutureBlockTimeSeconds)) {
+            throw new Error('invalid header(timestamp)');
           }
           this.totalTD.iadd(header.difficulty);
           if (index === headers.length - 1) {

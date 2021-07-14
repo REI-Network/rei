@@ -1,7 +1,6 @@
 # GXChain2.0 CLI
 
 [![NPM Version](https://img.shields.io/npm/v/@gxchain2/cli)](https://www.npmjs.org/package/@gxchain2/cli)
-[![Install Size](https://packagephobia.now.sh/badge?p=@gxchain2/cli)](https://packagephobia.now.sh/result?p=@gxchain2/cli)
 ![License](https://img.shields.io/npm/l/@gxchain2/cli)
 
 Command Line of GXChain2.0

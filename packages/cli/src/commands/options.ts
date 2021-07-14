@@ -6,6 +6,7 @@ export function installOptions(program: any) {
   let version = 'unknown';
   try {
     version = JSON.parse(fs.readFileSync(path.join(__dirname, '../../package.json')).toString()).version;
+    version = version ?? 'unknown';
   } catch (err) {}
   program.version(version);
   program.option('--rpc', 'open rpc server');

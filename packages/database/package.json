@@ -5,8 +5,7 @@
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
     "scripts": {
-        "build": "tsc",
-        "gen:lock": "npm i --package-lock-only"
+        "build": "tsc"
     },
     "devDependencies": {
         "@types/levelup": "^4.3.0",

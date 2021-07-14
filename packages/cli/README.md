@@ -17,7 +17,7 @@ npm install @gxchain2/cli --global
 ## Usage
 
 ```
-Usage: index [options] [command]
+Usage: gxchain2 [options] [command]
 
 Options:
   -V, --version                    output the version number
@@ -64,4 +64,10 @@ Bootnode startup
 
 ```
 gxchain2 --p2p-nat 1.2.3.4
+```
+
+Testnet node startup
+
+```
+gxchain2 --chain gxc2-testnet
 ```

@@ -32,7 +32,7 @@ npm install @gxchain2/cli --global
 ### Usage
 
 ```
-Usage: index [options] [command]
+Usage: gxchain2 [options] [command]
 
 Options:
   -V, --version                    output the version number
@@ -81,6 +81,12 @@ Bootnode startup
 gxchain2 --p2p-nat 1.2.3.4
 ```
 
+Testnet node startup
+
+```
+gxchain2 --chain gxc2-testnet
+```
+
 [More](./packages/cli)
 
 ## Build
@@ -122,6 +128,70 @@ Only remove `dist` directories for each monorepo packages.
 ### `npm run lint`, `npm run lint:fix`
 
 These scripts execute lint and lint:fix respectively, to all monorepo packages.
+
+## FAQ
+
+- `EACCES: permission denied` or `node-gyp: Permission denied` when install
+
+  <details><summary> like this </summary>
+
+  ```
+  > bigint-buffer@1.1.5 install /xxx/v14.16.1/lib/node_modules/@gxchain2/cli/node_modules/bigint-buffer
+  > npm run rebuild || echo "Couldn't build bindings. Non-native version used."
+
+  Error: EACCES: permission denied, scandir '/xxx/v14.16.1/lib/node_modules/@gxchain2/cli/node_modules/bigint-buffer'
+
+  > bcrypto@5.4.0 install /xxx/v14.16.1/lib/node_modules/@gxchain2/cli/node_modules/bcrypto
+  > node-gyp rebuild
+
+  sh: 1: node-gyp: Permission denied
+  npm ERR! code ELIFECYCLE
+  npm ERR! syscall spawn
+  npm ERR! file sh
+  npm ERR! errno ENOENT
+  npm ERR! bcrypto@5.4.0 install: `node-gyp rebuild`
+  npm ERR! spawn ENOENT
+  npm ERR!
+  npm ERR! Failed at the bcrypto@5.4.0 install script.
+  npm ERR! This is probably not a problem with npm. There is likely additional logging output above.
+
+  npm ERR! A complete log of this run can be found in:
+  npm ERR!     /xxx/.npm/_logs/2021-07-14T02_24_45_172Z-debug.log
+  ```
+
+  </details>
+
+  Please run
+
+  ```
+  npm install @gxchain2/cli -g --unsafe-perm=true --allow-root
+  ```
+
+- `SyntaxError: Unexpected token '?'` when run node
+
+  <details><summary> like this </summary>
+
+  ```
+  /xxx/v12.20.0/lib/node_modules/@gxchain2/cli/node_modules/@gxchain2/discv5/lib/service/addrVotes.js:44
+          let best = [tiebreakerStr, this.tallies[tiebreakerStr] ?? 0];
+                                                                  ^
+
+  SyntaxError: Unexpected token '?'
+      at wrapSafe (internal/modules/cjs/loader.js:915:16)
+      at Module._compile (internal/modules/cjs/loader.js:963:27)
+      at Object.Module._extensions..js (internal/modules/cjs/loader.js:1027:10)
+      at Module.load (internal/modules/cjs/loader.js:863:32)
+      at Function.Module._load (internal/modules/cjs/loader.js:708:14)
+      at Module.require (internal/modules/cjs/loader.js:887:19)
+      at require (internal/modules/cjs/helpers.js:74:18)
+      at Object.<anonymous> (/xxx/v12.20.0/lib/node_modules/@gxchain2/cli/node_modules/@gxchain2/discv5/lib/service/service.js:18:21)
+      at Module._compile (internal/modules/cjs/loader.js:999:30)
+      at Object.Module._extensions..js (internal/modules/cjs/loader.js:1027:10)
+  ```
+
+  </details>
+
+  Please update the node version to 14.0.0 or higher. [nvm](https://github.com/nvm-sh/nvm) may be able to help you
 
 ## License
 

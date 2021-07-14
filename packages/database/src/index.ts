@@ -28,7 +28,7 @@ const DBTarget_TxLookup = 101;
 const DBTarget_BloomBits = 102;
 
 // TODO: improve types.
-function new_DBOp(operationTarget: DBTarget, key?: DatabaseKey): DBOp {
+function new_DBOp(operationTarget: number, key?: DatabaseKey): DBOp {
   let cacheString: string;
   let baseDBOpKey: Buffer;
   if (operationTarget === DBTarget_Receipts) {
@@ -71,7 +71,7 @@ function new_DBOp(operationTarget: DBTarget, key?: DatabaseKey): DBOp {
   return op;
 }
 
-export function DBOp_get(operationTarget: DBTarget, key?: DatabaseKey): DBOp {
+export function DBOp_get(operationTarget: number, key?: DatabaseKey): DBOp {
   if (operationTarget !== DBTarget_Receipts && operationTarget !== DBTarget_TxLookup && operationTarget !== DBTarget_BloomBits) {
     return DBOp.get(operationTarget, key);
   } else {
@@ -79,7 +79,7 @@ export function DBOp_get(operationTarget: DBTarget, key?: DatabaseKey): DBOp {
   }
 }
 
-export function DBOp_set(operationTarget: DBTarget, value: Buffer | object, key?: DatabaseKey): DBOp {
+export function DBOp_set(operationTarget: number, value: Buffer | object, key?: DatabaseKey): DBOp {
   if (operationTarget !== DBTarget_Receipts && operationTarget !== DBTarget_TxLookup && operationTarget !== DBTarget_BloomBits) {
     return DBOp.set(operationTarget, value, key);
   } else {
@@ -90,7 +90,7 @@ export function DBOp_set(operationTarget: DBTarget, value: Buffer | object, key?
     } else {
       dbOperation.baseDBOp.value = value;
     }
-    if (operationTarget == DBTarget.Heads) {
+    if (operationTarget === (DBTarget.Heads as number)) {
       dbOperation.baseDBOp.valueEncoding = 'json';
     } else {
       dbOperation.baseDBOp.valueEncoding = 'binary';
@@ -100,7 +100,7 @@ export function DBOp_set(operationTarget: DBTarget, value: Buffer | object, key?
   }
 }
 
-export function DBOp_del(operationTarget: DBTarget, key?: DatabaseKey): DBOp {
+export function DBOp_del(operationTarget: number, key?: DatabaseKey): DBOp {
   if (operationTarget !== DBTarget_Receipts && operationTarget !== DBTarget_TxLookup && operationTarget !== DBTarget_BloomBits) {
     return DBOp.del(operationTarget, key);
   } else {

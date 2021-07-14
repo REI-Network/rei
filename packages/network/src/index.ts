@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import PeerId from 'peer-id';
-import Multiaddr from 'multiaddr';
+import { Multiaddr } from 'multiaddr';
 import { LevelUp } from 'levelup';
 import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';

@@ -1,8 +1,13 @@
 import os from 'os';
+import fs from 'fs';
 import path from 'path';
 
 export function installOptions(program: any) {
-  program.version('0.0.1');
+  let version = 'unknown';
+  try {
+    version = JSON.parse(fs.readFileSync(path.join(__dirname, '../../package.json')).toString()).version;
+  } catch (err) {}
+  program.version(version);
   program.option('--rpc', 'open rpc server');
   program.option('--rpc-port <port>', 'rpc server port');
   program.option('--rpc-host <port>', 'rpc server host');

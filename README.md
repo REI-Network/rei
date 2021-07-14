@@ -87,8 +87,6 @@ Testnet node startup
 gxchain2 --chain gxc2-testnet
 ```
 
-[More](./packages/cli)
-
 ## Build
 
 This monorepo uses Lerna. Please install lerna first.
@@ -131,7 +129,7 @@ These scripts execute lint and lint:fix respectively, to all monorepo packages.
 
 ## FAQ
 
-- `EACCES: permission denied` or `node-gyp: Permission denied` when install
+- Q: Why do I get `EACCES: permission denied` or `node-gyp: Permission denied` when I install `@gxchain2/cli`?
 
   <details><summary> like this </summary>
 
@@ -161,13 +159,13 @@ These scripts execute lint and lint:fix respectively, to all monorepo packages.
 
   </details>
 
-  Please run
+  A: Please run
 
   ```
   npm install @gxchain2/cli -g --unsafe-perm=true --allow-root
   ```
 
-- `SyntaxError: Unexpected token '?'` when run node
+- Q: Why do I get `SyntaxError: Unexpected token '?'` when I run `gxchain2`?
 
   <details><summary> like this </summary>
 
@@ -191,7 +189,7 @@ These scripts execute lint and lint:fix respectively, to all monorepo packages.
 
   </details>
 
-  Please update the node version to 14.0.0 or higher. [nvm](https://github.com/nvm-sh/nvm) may be able to help you
+  A: Please update the node version to 14.0.0 or higher. [nvm](https://github.com/nvm-sh/nvm) may be able to help you
 
 ## License
 

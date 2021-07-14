@@ -5,7 +5,8 @@
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
     "scripts": {
-        "build": "tsc"
+        "build": "tsc",
+        "gen:lock": "npm i --package-lock-only"
     },
     "dependencies": {
         "@gxchain2/utils": "^0.0.3-alpha.0",

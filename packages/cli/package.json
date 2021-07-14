@@ -8,7 +8,8 @@
         "gxchain2": "dist/index.js"
     },
     "scripts": {
-        "build": "tsc"
+        "build": "tsc",
+        "gen:lock": "npm i --package-lock-only"
     },
     "devDependencies": {
         "@types/node": "^14.14.9",

@@ -43,6 +43,7 @@ export interface NodeOptions {
     coinbase?: string;
   };
   p2p: {
+    enable: boolean;
     tcpPort?: number;
     udpPort?: number;
     nat?: string;

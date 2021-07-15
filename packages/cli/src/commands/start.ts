@@ -22,6 +22,7 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     unlock: addresses.map((address, i): [string, string] => [address, passphrase[i]])
   };
   const p2p = {
+    enable: !opts.disableP2p,
     tcpPort: opts.p2pTcpPort ? Number(opts.p2pTcpPort) : undefined,
     udpPort: opts.p2pUdpPort ? Number(opts.p2pUdpPort) : undefined,
     bootnodes: opts.bootnodes ? ((opts.bootnodes as unknown) as string[]) : undefined,

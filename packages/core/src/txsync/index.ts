@@ -89,6 +89,9 @@ export class TxFetcher {
     this.enqueueTransactionLoop();
   }
 
+  /**
+   * Circulate processing of newly entered transactions in the pool
+   */
   private async newPooledTransactionLoop() {
     try {
       for await (const message of this.newPooledTransactionQueue.generator()) {
@@ -346,6 +349,10 @@ export class TxFetcher {
     }
   }
 
+  /**
+   * Detect and delete timed out requests
+   * @param peer peer name
+   */
   private requestTimeout(peer: string) {
     const req = this.requests.get(peer);
     if (!req) {

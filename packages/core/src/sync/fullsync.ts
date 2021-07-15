@@ -119,6 +119,13 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
+  /**
+   * Try to get the block header, if an error occurs, ban the node
+   * @param handler WireProtocol Handler
+   * @param latestHeight Start block number
+   * @param count Wanted blocks number
+   * @returns The block headers
+   */
   private async _tryToGetHeader(handler: WireProtocolHandler, latestHeight: number, count: number) {
     try {
       const headers = await handler.getBlockHeaders(latestHeight, this.count);
@@ -129,6 +136,13 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
+  /**
+   * Find the same highest block with the local and target node
+   * @param handler WireProtocol handler
+   * @param latestHeight Recent block height
+   * @param counter Wanted blocks number
+   * @returns `-1` if not found, else the block number
+   */
   private async _findAncient(handler: WireProtocolHandler, latestHeight: number, counter: number): Promise<number> {
     while (counter > 0) {
       const count = latestHeight >= this.count ? this.count : latestHeight;
@@ -156,7 +170,6 @@ export class FullSynchronizer extends Synchronizer {
    * @param handler WireProtocolHandler of peer
    * @returns The number of block
    */
-  // TODO: binary search.
   private async findAncient(handler: WireProtocolHandler): Promise<number> {
     let latestHeight = this.node.blockchain.latestHeight;
     if (latestHeight === 0) {

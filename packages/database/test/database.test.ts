@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { expect, assert } from 'chai';
+import { expect } from 'chai';
 import { LevelUp } from 'levelup';
 import { generateAddress } from 'ethereumjs-util';
 import { hexStringToBN, hexStringToBuffer } from '@gxchain2/utils';

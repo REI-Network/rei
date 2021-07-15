@@ -63,22 +63,10 @@ describe('Database', () => {
       const receipt = testreceipts[i];
       const transaction = testblock.transactions[i];
       expect(r.transactionHash!.equals(transaction.hash()), 'receipt tx hash should be equal').be.true;
+      expect(r.serialize().equals(receipt.serialize()), 'receipt serialize should be equal').be.true;
       if (!transaction.to) {
         expect(r.contractAddress!.equals(generateAddress(transaction.getSenderAddress().buf, transaction.nonce.toArrayLike(Buffer))), 'receipt contractAddress should be equal').be.true;
       }
-      expect(r.cumulativeGasUsed.equals(receipt.cumulativeGasUsed), 'receipt cumulativeGasUsed should be equal').be.true;
-      expect(r.bitvector.equals(receipt.bitvector), 'receipt bitvector should be equal').be.true;
-      expect(r.status, 'receipt status should be equal').be.equal(receipt.status);
-      r.logs.forEach((l, i) => {
-        const log = receipt.logs[i];
-        expect(l.address.equals(log.address), 'log address should be equal');
-        expect(l.data.equals(log.data), 'log data should be equal');
-        l.topics.forEach((t, i) => {
-          expect(t.equals(log.topics[i]), 'log topics should be equal').be.true;
-        });
-        expect(l.topics.length, 'log topics length should be equal').be.equal(log.topics.length);
-      });
-      expect(r.logs.length, 'log length should be equal').be.equal(receipt.logs.length);
     });
     expect(rs.length, 'receipt length should be equal').be.equal(testreceipts.length);
   });

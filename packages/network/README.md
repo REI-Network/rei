@@ -3,7 +3,7 @@
 [![NPM Version](https://img.shields.io/npm/v/@gxchain2/network)](https://www.npmjs.org/package/@gxchain2/network)
 ![License](https://img.shields.io/npm/l/@gxchain2/network)
 
-Realize a decentralized p2p network between nodes, based on `libp2p`
+Implement a decentralized p2p network between nodes, based on `libp2p`
 
 ## INSTALL
 

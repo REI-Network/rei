@@ -37,7 +37,7 @@ export class Blockchain extends EthereumBlockchain {
   }
 
   /**
-   * Return blockchain's latest block's hash, if not exsit, return '00'
+   * Return blockchain's latest block's hash with '0x' prefix, if not exsit, return '0x00'
    */
   get latestHash() {
     return '0x' + (this._latestBlock?.header?.hash()?.toString('hex') || '00');
@@ -51,7 +51,7 @@ export class Blockchain extends EthereumBlockchain {
   }
 
   /**
-   * This method check and update the latestBlock, totalDifficulty of blockchain, issue the 'update' event
+   * This method check and update the latestBlock and totalDifficulty of blockchain
    */
   private async updateLatest() {
     const latestBlock = await this.getLatestBlock();
@@ -81,7 +81,7 @@ export class Blockchain extends EthereumBlockchain {
   }
 
   /**
-   * Get active clique signers in a certain blocknumber, return addresses
+   * Get active clique signers by block number, return signer addresses
    * @param number - The number of block
    * @returns Active clique signers
    */
@@ -97,6 +97,12 @@ export class Blockchain extends EthereumBlockchain {
     return [];
   }
 
+  /**
+   * Check if the signer can sign the next block
+   * @param currentHeader - current block header
+   * @param signer - the signer of next block
+   * @returns
+   */
   cliqueCheckNextRecentlySigned(currentHeader: BlockHeader, signer: Address): boolean {
     if (currentHeader.isGenesis()) {
       return false;

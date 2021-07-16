@@ -58,6 +58,11 @@ export interface NodeOptions {
   };
 }
 
+export interface ProcessBlockOptions {
+  generate: boolean;
+  broadcast: boolean;
+}
+
 type PendingTxs = {
   txs: Transaction[];
   resolve: (results: boolean[]) => void;
@@ -65,8 +70,7 @@ type PendingTxs = {
 
 type ProcessBlock = {
   block: Block;
-  generate: boolean;
-  broadcast: boolean;
+  options: ProcessBlockOptions;
   resolve: (block: Block) => void;
   reject: (reason?: any) => void;
 };
@@ -290,19 +294,19 @@ export class Node {
 
   private async processLoop() {
     await this.initPromise;
-    for await (let { block, generate, broadcast, resolve, reject } of this.processQueue.generator()) {
+    for await (let { block, options, resolve, reject } of this.processQueue.generator()) {
       try {
         for (const tx of block.transactions) {
           tx.common.getHardforkByBlockNumber(block.header.number);
         }
         const lastHeader = await this.db.getHeader(block.header.parentHash, block.header.number.subn(1));
-        const opts = {
+        const runBlockOptions = {
+          ...options,
           block,
-          generate,
           root: lastHeader.stateRoot,
-          cliqueSigner: generate ? this.accMngr.getPrivateKey(block.header.cliqueSigner().buf) : undefined
+          cliqueSigner: options.generate ? this.accMngr.getPrivateKey(block.header.cliqueSigner().buf) : undefined
         };
-        const { result, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot, lastHeader.number)).runBlock(opts);
+        const { result, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot, lastHeader.number)).runBlock(runBlockOptions);
         block = newBlock || block;
         logger.info('✨ Process block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
         const before = this.blockchain.latestBlock.hash();
@@ -313,7 +317,7 @@ export class Node {
         if (!before.equals(after)) {
           await this.txPool.newBlock(block);
           const promises = [this.miner.newBlockHeader(block.header), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
-          if (broadcast) {
+          if (options.broadcast) {
             promises.push(this.broadcastNewBlock(block));
           }
           await Promise.all(promises);
@@ -351,10 +355,10 @@ export class Node {
    * @param block - Block data
    * @param generate - Judgment criteria for root verification
    */
-  async processBlock(block: Block, generate: boolean, broadcast: boolean) {
+  async processBlock(block: Block, options: ProcessBlockOptions) {
     await this.initPromise;
     return new Promise<Block>((resolve, reject) => {
-      this.processQueue.push({ block, generate, broadcast, resolve, reject });
+      this.processQueue.push({ block, options, resolve, reject });
     });
   }
 
@@ -389,6 +393,9 @@ export class Node {
     await this.txPool.abort();
     await this.taskLoopPromise;
     await this.processLoopPromise;
+    await this.chaindb.close();
+    await this.nodedb.close();
+    await this.networkdb.close();
   }
 
   async banPeer(peerId: string, reason: 'invalid' | 'timeout') {

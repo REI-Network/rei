@@ -292,7 +292,7 @@ export class Miner {
         this.lock.release();
       }
       this.node
-        .processBlock(pendingBlock, true, true)
+        .processBlock(pendingBlock, { generate: true, broadcast: true })
         .then((newBlock) => {
           logger.info('⛏️  Mine block, height:', newBlock.header.number.toString(), 'hash:', bufferToHex(newBlock.hash()));
         })

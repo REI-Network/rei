@@ -1,5 +1,5 @@
 import { Address, bnToHex, bufferToHex, toBuffer, hashPersonalMessage, toRpcSig, ecsign } from 'ethereumjs-util';
-import { TransactionFactory, WrappedTransaction, WrappedBlock, Log } from '@gxchain2/structure';
+import { TransactionFactory, WrappedTransaction, WrappedBlock, Log, Transaction } from '@gxchain2/structure';
 import { hexStringToBuffer } from '@gxchain2/utils';
 import * as helper from '../helper';
 import { RpcContext } from '../index';
@@ -43,7 +43,7 @@ export class ETHController extends Controller {
     if (!this.node.sync.isSyncing) {
       return false;
     }
-    const status = this.node.sync.syncStatus;
+    const status = this.node.sync.status;
     return {
       startingBlock: bufferToHex(toBuffer(status.startingBlock)),
       currentBlock: bnToHex(this.node.blockchain.latestBlock.header.number),
@@ -54,7 +54,7 @@ export class ETHController extends Controller {
     return bufferToHex(this.node.getCommon(0).chainIdBN().toBuffer());
   }
   eth_coinbase() {
-    return bufferToHex(this.node.miner.coinbase);
+    return this.node.miner.coinbase.toString();
   }
   eth_mining() {
     return this.node.miner.isMining;
@@ -139,15 +139,25 @@ export class ETHController extends Controller {
     return unsignedTx.sign(privateKey);
   }
   async eth_signTransaction([data]: [CallData]) {
-    return bufferToHex((await this.makeTxForUnlockedAccount(data)).serialize());
+    const tx = await this.makeTxForUnlockedAccount(data);
+    if (!(tx instanceof Transaction)) {
+      return null;
+    }
+    return bufferToHex(tx.serialize());
   }
   async eth_sendTransaction([data]: [CallData]) {
     const tx = await this.makeTxForUnlockedAccount(data);
+    if (!(tx instanceof Transaction)) {
+      return null;
+    }
     const results = await this.node.addPendingTxs([tx]);
     return results.length > 0 && results[0] ? bufferToHex(tx.hash()) : null;
   }
   async eth_sendRawTransaction([rawtx]: [string]) {
     const tx = TransactionFactory.fromSerializedData(hexStringToBuffer(rawtx), { common: this.node.getCommon(0) });
+    if (!(tx instanceof Transaction)) {
+      return null;
+    }
     const results = await this.node.addPendingTxs([tx]);
     return results.length > 0 && results[0] ? bufferToHex(tx.hash()) : null;
   }
@@ -191,7 +201,7 @@ export class ETHController extends Controller {
   async eth_getTransactionByBlockHashAndIndex([hash, index]: [string, string]) {
     try {
       const block = await this.node.db.getBlock(hexStringToBuffer(hash));
-      const wtx = new WrappedTransaction(block.transactions[Number(index)]);
+      const wtx = new WrappedTransaction(block.transactions[Number(index)] as Transaction);
       wtx.installProperties(block, Number(index));
       return wtx.toRPCJSON();
     } catch (err) {
@@ -201,7 +211,7 @@ export class ETHController extends Controller {
   async eth_getTransactionByBlockNumberAndIndex([tag, index]: [string, string]) {
     try {
       const block = await this.getBlockByTag(tag);
-      const wtx = new WrappedTransaction(block.transactions[Number(index)]);
+      const wtx = new WrappedTransaction(block.transactions[Number(index)] as Transaction);
       wtx.installProperties(block, Number(index));
       return wtx.toRPCJSON();
     } catch (err) {
@@ -295,12 +305,12 @@ export class ETHController extends Controller {
     if (!context.client) {
       helper.throwRpcErr('eth_subscribe is only supported on websocket!');
       // for types.
-      return;
+      throw new Error();
     }
     if (type !== 'newHeads' && type !== 'logs' && type !== 'newPendingTransactions' && type !== 'syncing') {
       helper.throwRpcErr('eth_subscribe, invalid subscription type!');
       // for types.
-      return;
+      throw new Error();
     }
     if (type === 'logs') {
       return this.filterSystem.subscribe(context.client, type, parseAddressesAndTopics(options?.address, options?.topics));

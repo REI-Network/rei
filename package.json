@@ -10,17 +10,21 @@
   "devDependencies": {
     "@commitlint/cli": "^11.0.0",
     "@commitlint/config-angular": "^11.0.0",
+    "@types/chai": "^4.2.21",
+    "@types/mocha": "^8.2.3",
     "@typescript-eslint/parser": "^4.8.1",
+    "chai": "^4.3.4",
     "eslint": "^7.14.0",
     "eslint-config-prettier": "^6.15.0",
     "eslint-plugin-prettier": "^3.1.4",
     "husky": "^4.3.0",
     "lerna": "^3.22.1",
     "lint-staged": "^10.5.1",
+    "mocha": "^9.0.2",
     "prettier": "^2.2.0"
   },
   "scripts": {
-    "bootstrap": "lerna bootstrap --ignore-scripts --include-dependencies --no-ci --hoist && npm run build",
+    "bootstrap": "lerna bootstrap --ignore-scripts --include-dependencies --no-ci --hoist && npm rebuild && npm run build",
     "build": "lerna run build --stream",
     "build:structure": "npm run build -- --scope @gxchain2/structure",
     "build:blockchain": "npm run build -- --scope @gxchain2/blockchain",
@@ -33,18 +37,19 @@
     "build:utils": "npm run build -- --scope @gxchain2/utils",
     "build:vm": "npm run build -- --scope @gxchain2/vm",
     "build:wallet": "npm run build -- --scope @gxchain2/wallet",
+    "test": "lerna run test --stream",
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/package-lock.json",
     "clean:build": "rm -rf packages/*/dist",
-    "test:prompts": "node -r ts-node/register ./packages/gxchain-cli/test/prompts.ts",
+    "test:prompts": "node -r ts-node/register ./packages/cli/test/prompts.ts",
     "postinstall": "npm run bootstrap",
     "lint": "eslint packages/*/src/**.ts packages/*/test/**.ts --format=codeframe",
     "lint:fix": "eslint packages/*/src/**.ts packages/*/test/**.ts --fix",
     "publish:preview": "lerna version --conventional-commits --no-git-tag-version -y",
-    "publish:prepatch": "lerna publish prepatch --no-git-tag-version --no-push",
+    "publish:prepatch": "lerna publish prepatch --no-git-tag-version --no-push -- --access public",
     "publish:main": "lerna publish --no-git-tag-version --no-push",
     "release": "lerna version --conventional-commits",
     "release:prepatch": "lerna version prepatch --conventional-commits",
-    "cli": "node -r ts-node/register ./packages/gxchain-cli/src/index.ts"
+    "cli": "node -r ts-node/register ./packages/cli/src/index.ts"
   },
   "lint-staged": {
     "*.{js,ts}": [

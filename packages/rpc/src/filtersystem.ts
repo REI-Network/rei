@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Aborter, Channel, logger } from '@gxchain2/utils';
 import { Topics, BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
 import { Node } from '@gxchain2/core';
-import { TypedTransaction, Log, BlockHeader } from '@gxchain2/structure';
+import { Transaction, Log, BlockHeader } from '@gxchain2/structure';
 import { WsClient } from './client';
 import { SyncingStatus } from './types';
 
@@ -19,7 +19,7 @@ const deadline = 5 * 60 * 1000;
 type Filter = {
   hashes: Buffer[];
   logs: Log[];
-  createtime?: number;
+  creationTime?: number;
   query?: Query;
   client?: WsClient;
 };
@@ -76,42 +76,55 @@ export class FilterSystem {
     this.node = node;
     this.timeoutLoop();
     this.taskLoop();
-    this.node.bcMonitor.on('logs', (logs) => {
-      this.taskQueue.push(new LogsTask(logs));
-    });
-    this.node.bcMonitor.on('removedLogs', (logs) => {
-      this.taskQueue.push(new LogsTask(logs));
-    });
-    this.node.bcMonitor.on('newHeads', (hashes) => {
-      this.taskQueue.push(new HeadsTask(hashes));
-    });
-    this.node.sync.on('start synchronize', () => {
-      const status = this.node.sync.syncStatus;
-      const syncingStatus: SyncingStatus = {
-        syncing: true,
-        status: {
-          startingBlock: bufferToHex(toBuffer(status.startingBlock)),
-          currentBlock: bnToHex(this.node.blockchain.latestBlock.header.number),
-          highestBlock: bufferToHex(toBuffer(status.highestBlock))
-        }
-      };
-      this.taskQueue.push(new SyncingTask(syncingStatus));
-    });
-    this.node.sync.on('synchronize failed', () => {
-      this.taskQueue.push(new SyncingTask(false));
-    });
-    this.node.sync.on('synchronized', () => {
-      this.taskQueue.push(new SyncingTask(false));
-    });
-    this.node.txPool.on('readies', (readies: TypedTransaction[]) => {
-      this.taskQueue.push(new PendingTxTask(readies.map((tx) => tx.hash())));
-    });
+    this.node.bcMonitor.on('logs', this.onLogs);
+    this.node.bcMonitor.on('removedLogs', this.onRemovedLogs);
+    this.node.bcMonitor.on('newHeads', this.onNewHeads);
+    this.node.sync.on('start', this.onStart);
+    this.node.sync.on('failed', this.onFailed);
+    this.node.sync.on('synchronized', this.onSynchronized);
+    this.node.txPool.on('readies', this.onReadies);
   }
 
-  private cycleDelete(map: Map<string, Filter>) {
-    const timenow = Date.now();
+  private onLogs = (logs) => {
+    this.taskQueue.push(new LogsTask(logs));
+  };
+
+  private onRemovedLogs = (logs) => {
+    this.taskQueue.push(new LogsTask(logs));
+  };
+
+  private onNewHeads = (hashes) => {
+    this.taskQueue.push(new HeadsTask(hashes));
+  };
+
+  private onStart = () => {
+    const status = this.node.sync.status;
+    const syncingStatus: SyncingStatus = {
+      syncing: true,
+      status: {
+        startingBlock: bufferToHex(toBuffer(status.startingBlock)),
+        currentBlock: bnToHex(this.node.blockchain.latestBlock.header.number),
+        highestBlock: bufferToHex(toBuffer(status.highestBlock))
+      }
+    };
+    this.taskQueue.push(new SyncingTask(syncingStatus));
+  };
+
+  private onFailed = () => {
+    this.taskQueue.push(new SyncingTask(false));
+  };
+
+  private onSynchronized = () => {
+    this.taskQueue.push(new SyncingTask(false));
+  };
+
+  private onReadies = (readies: Transaction[]) => {
+    this.taskQueue.push(new PendingTxTask(readies.map((tx) => tx.hash())));
+  };
+
+  private deleteTimeout(map: Map<string, Filter>, now: number) {
     for (const [key, filter] of map) {
-      if (timenow - filter.createtime! > deadline) {
+      if (now - filter.creationTime! > deadline) {
         map.delete(key);
         this.filterType.delete(key);
       }
@@ -119,6 +132,14 @@ export class FilterSystem {
   }
 
   async abort() {
+    this.taskQueue.abort();
+    this.node.bcMonitor.removeListener('logs', this.onLogs);
+    this.node.bcMonitor.removeListener('removedLogs', this.onRemovedLogs);
+    this.node.bcMonitor.removeListener('newHeads', this.onNewHeads);
+    this.node.sync.removeListener('start', this.onStart);
+    this.node.sync.removeListener('failed', this.onFailed);
+    this.node.sync.removeListener('synchronized', this.onSynchronized);
+    this.node.txPool.removeListener('readies', this.onReadies);
     await this.aborter.abort();
   }
 
@@ -128,9 +149,10 @@ export class FilterSystem {
       if (this.aborter.isAborted) {
         break;
       }
-      this.cycleDelete(this.filterHeads);
-      this.cycleDelete(this.filterLogs);
-      this.cycleDelete(this.filterPendingTransactions);
+      const now = Date.now();
+      this.deleteTimeout(this.filterHeads, now);
+      this.deleteTimeout(this.filterLogs, now);
+      this.deleteTimeout(this.filterPendingTransactions, now);
     }
   }
 
@@ -179,7 +201,7 @@ export class FilterSystem {
 
   newFilter(type: string, query?: Query): string {
     const uid = genSubscriptionId();
-    const filter = { hashes: [], logs: [], createtime: Date.now(), query };
+    const filter = { hashes: [], logs: [], creationTime: Date.now(), query };
     switch (type) {
       case 'newHeads': {
         this.filterHeads.set(uid, filter);

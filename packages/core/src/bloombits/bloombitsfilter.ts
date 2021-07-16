@@ -1,8 +1,8 @@
 import { Address, BN, keccak256 } from 'ethereumjs-util';
-import { constants } from '@gxchain2/common';
 import { Block, Log } from '@gxchain2/structure';
-import { createBNFunctionalMap, createBNFunctionalSet } from '@gxchain2/utils';
+import { createBNFunctionalMap, createBNFunctionalSet, decompressBytes } from '@gxchain2/utils';
 import { Node } from '../node';
+import { BloomBitsBlocks } from './index';
 
 export function calcBloomIndexes(data: Buffer) {
   data = keccak256(data);
@@ -142,8 +142,8 @@ export class BloomBitsFilter {
     let maxSection = await this.node.db.getStoredSectionCount();
     if (maxSection !== undefined) {
       // query indexed logs.
-      let fromSection = from.divn(constants.BloomBitsBlocks);
-      let toSection = to.divn(constants.BloomBitsBlocks);
+      let fromSection = from.divn(BloomBitsBlocks);
+      let toSection = to.divn(BloomBitsBlocks);
       fromSection = fromSection.gt(maxSection) ? maxSection : fromSection;
       toSection = toSection.gt(maxSection) ? maxSection : toSection;
       for (const section = fromSection.clone(); section.lte(toSection); section.iaddn(1)) {
@@ -167,6 +167,7 @@ export class BloomBitsFilter {
             let bits = bitsCache.get(bit);
             if (!bits) {
               bits = (await this.node.db.getBloomBits(bit, section, await getSenctionHash(section))) as Buffer;
+              bits = decompressBytes(bits, Math.floor(BloomBitsBlocks / 8));
               bitsCache.set(bit, bits);
             }
             bitsArray.push(bits);
@@ -201,7 +202,7 @@ export class BloomBitsFilter {
     }
 
     // query unindexed logs.
-    const maxIndexedBlockNumber = maxSection ? maxSection.addn(1).muln(constants.BloomBitsBlocks).subn(1) : new BN(0);
+    const maxIndexedBlockNumber = maxSection ? maxSection.addn(1).muln(BloomBitsBlocks).subn(1) : new BN(0);
     for (const num = maxIndexedBlockNumber.addn(1); num.lte(to) && num.lte(latestHeader.number); num.iaddn(1)) {
       append(await this.filterBlock(num, addresses, topics));
     }

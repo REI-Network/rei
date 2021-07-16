@@ -1,18 +1,18 @@
-import WebSockets from 'libp2p-websockets';
 import MPLEX from 'libp2p-mplex';
 import PeerId from 'peer-id';
-import KadDHT from 'libp2p-kad-dht';
 import TCP from 'libp2p-tcp';
 import secio from 'libp2p-secio';
-import Bootstrap from 'libp2p-bootstrap';
+import { Discv5Discovery, ENR } from '@gxchain2/discv5';
 const Libp2p = require('libp2p');
 
 export interface Libp2pNodeOptions {
   peerId: PeerId;
+  enr: ENR;
+  tcpPort: number;
+  udpPort: number;
+  maxConnections: number;
+  bootnodes: string[];
   datastore?: any;
-  tcpPort?: number;
-  wsPort?: number;
-  bootnodes?: string[];
 }
 
 export class Libp2pNode extends Libp2p {
@@ -20,37 +20,33 @@ export class Libp2pNode extends Libp2p {
     super({
       peerId: options.peerId,
       addresses: {
-        listen: [`/ip4/0.0.0.0/tcp/${options.tcpPort || 0}`, `/ip4/0.0.0.0/tcp/${options.wsPort || 0}/ws`]
+        listen: [`/ip4/0.0.0.0/tcp/${options.tcpPort}`]
       },
       modules: {
-        transport: [TCP, WebSockets],
+        transport: [TCP],
         streamMuxer: [MPLEX],
         connEncryption: [secio],
-        peerDiscovery: options.bootnodes !== undefined ? [Bootstrap] : [],
-        dht: KadDHT
+        peerDiscovery: [Discv5Discovery]
       },
       config: {
+        relay: {
+          enabled: false
+        },
         peerDiscovery: {
-          autoDial: true,
-          bootstrap: {
-            interval: 2000,
-            enabled: true,
-            list: options.bootnodes || []
+          autoDial: false,
+          discv5: {
+            enr: options.enr,
+            bindAddr: `/ip4/0.0.0.0/udp/${options.udpPort}`,
+            bootEnrs: options.bootnodes || []
           }
-        },
-        dht: {
-          kBucketSize: 20,
-          enabled: true,
-          randomWalk: {
-            enabled: true,
-            interval: 3e3,
-            timeout: 10e3
-          }
-        },
-        EXPERIMENTAL: {
-          dht: false,
-          pubsub: false
         }
+      },
+      connectionManager: {
+        maxConnections: options.maxConnections,
+        minConnections: 0
+      },
+      dialer: {
+        dialTimeout: 5e3
       },
       datastore: options.datastore,
       peerStore: {
@@ -58,5 +54,9 @@ export class Libp2pNode extends Libp2p {
         threshold: 0
       }
     });
+  }
+
+  get discv5(): Discv5Discovery {
+    return this._discovery.get(Discv5Discovery.tag);
   }
 }

@@ -2,7 +2,6 @@ import './install';
 import EthereumCommon from '@ethereumjs/common';
 import { BNLike } from 'ethereumjs-util';
 import { getChain } from './chains';
-import * as constants from './constants';
 
 export class Common extends EthereumCommon {
   static createChainStartCommon(chain: number | string | Object) {
@@ -21,8 +20,19 @@ export class Common extends EthereumCommon {
     common.setHardforkByBlockNumber(num);
     return common;
   }
+
+  // ensure onlyActive is always true
+  hardforkGteHardfork(
+    hardfork1: string | null,
+    hardfork2: string,
+    opts?: {
+      onlySupported?: boolean;
+      onlyActive?: boolean;
+    }
+  ) {
+    return super.hardforkGteHardfork(hardfork1, hardfork2, { ...opts, onlyActive: true });
+  }
 }
 
-export { constants };
 export * from './genesisStates';
 export * from './chains';

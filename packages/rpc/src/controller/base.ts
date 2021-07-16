@@ -47,7 +47,7 @@ export class Controller {
     } else if (tag === 'latest' || tag === undefined) {
       block = this.node.blockchain.latestBlock;
     } else if (tag === 'pending') {
-      block = await this.node.miner.worker.getPendingBlock();
+      block = await this.node.miner.getPendingBlock();
     } else if (Number.isInteger(Number(tag))) {
       block = await this.node.blockchain.getBlock(Number(tag));
     } else {
@@ -62,7 +62,7 @@ export class Controller {
 
   protected async getStateManagerByTag(tag: string): Promise<StateManager> {
     if (tag === 'pending') {
-      return await this.node.miner.worker.getPendingStateManager();
+      return await this.node.miner.getPendingStateManager();
     } else {
       const block = await this.getBlockByTag(tag);
       return this.node.getStateManager(block.header.stateRoot, block.header.number);

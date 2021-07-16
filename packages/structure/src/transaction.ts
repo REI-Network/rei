@@ -1,9 +1,9 @@
-import { TypedTransaction, TxOptions, Transaction, AccessListEIP2930Transaction, AccessListEIP2930ValuesArray } from '@ethereumjs/tx';
+import { TxOptions, Transaction } from '@ethereumjs/tx';
 import { BN, bufferToHex, bnToHex, intToHex, rlp } from 'ethereumjs-util';
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { Block } from './block';
 
-export function txSize(tx: TypedTransaction) {
+export function txSize(tx: Transaction) {
   const raw = tx.raw();
   let size = 0;
   for (const b of raw) {
@@ -14,14 +14,17 @@ export function txSize(tx: TypedTransaction) {
   return size;
 }
 
-export function TxFromValuesArray(values: Buffer[], opts?: TxOptions) {
-  return values.length === 6 || values.length === 9 ? Transaction.fromValuesArray(values, opts) : AccessListEIP2930Transaction.fromValuesArray(values as AccessListEIP2930ValuesArray, opts);
+export function mustParseTransction(values: Buffer[], opts?: TxOptions) {
+  if (values.length === 6 || values.length === 9) {
+    return Transaction.fromValuesArray(values, opts);
+  }
+  throw new Error('invalid tx data');
 }
 
 export class WrappedTransaction {
-  public readonly transaction: TypedTransaction;
+  public readonly transaction: Transaction;
 
-  constructor(transaction: TypedTransaction) {
+  constructor(transaction: Transaction) {
     this.transaction = transaction;
   }
 
@@ -69,7 +72,7 @@ export class WrappedTransaction {
 
 export const emptyTxTrie = Buffer.from('56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421', 'hex');
 
-export async function calculateTransactionTrie(transactions: TypedTransaction[]): Promise<Buffer> {
+export async function calculateTransactionTrie(transactions: Transaction[]): Promise<Buffer> {
   if (transactions.length === 0) {
     return emptyTxTrie;
   }
@@ -83,7 +86,7 @@ export async function calculateTransactionTrie(transactions: TypedTransaction[])
   return txTrie.root;
 }
 
-export function calculateIntrinsicGas(tx: TypedTransaction) {
+export function calculateIntrinsicGas(tx: Transaction) {
   const gas = tx.toCreationAddress() ? new BN(53000) : new BN(21000);
   const nz = new BN(0);
   const z = new BN(0);

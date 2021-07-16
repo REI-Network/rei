@@ -1,28 +1,31 @@
 import { rlp, toBuffer, unpadBuffer, bufferToInt, BN, bufferToHex, bnToHex, intToHex, generateAddress } from 'ethereumjs-util';
 import { Block } from './block';
-import { TypedTransaction } from './transaction';
+import { Transaction } from './transaction';
 import { LogRawValues, Log } from './log';
 
 export type ReceiptRawValue = (Buffer | LogRawValues[])[];
 
 export class Receipt {
-  // TODO: this should be cumulativeGasUsed.
-  gasUsed: Buffer;
+  cumulativeGasUsed: Buffer;
   bitvector: Buffer;
   logs: Log[];
   status: 0 | 1;
 
+  gasUsed?: BN;
   blockHash?: Buffer;
   blockNumber?: BN;
   contractAddress?: Buffer;
-  cumulativeGasUsed?: BN;
   from?: Buffer;
   to?: Buffer;
   transactionHash?: Buffer;
   transactionIndex?: number;
 
-  constructor(gasUsed: Buffer, bitvector: Buffer, logs: Log[], status: 0 | 1) {
-    this.gasUsed = gasUsed;
+  get bnCumulativeGasUsed() {
+    return new BN(this.cumulativeGasUsed);
+  }
+
+  constructor(cumulativeGasUsed: Buffer, bitvector: Buffer, logs: Log[], status: 0 | 1) {
+    this.cumulativeGasUsed = cumulativeGasUsed;
     this.bitvector = bitvector;
     this.logs = logs;
     this.status = status;
@@ -40,9 +43,9 @@ export class Receipt {
     if (values.length !== 4) {
       throw new Error('Invalid receipt. Only expecting 4 values.');
     }
-    const [status, gasUsed, bitvector, rawLogs] = values as [Buffer, Buffer, Buffer, LogRawValues[]];
+    const [status, cumulativeGasUsed, bitvector, rawLogs] = values as [Buffer, Buffer, Buffer, LogRawValues[]];
     return new Receipt(
-      gasUsed,
+      cumulativeGasUsed,
       bitvector,
       rawLogs.map((rawLog) => Log.fromValuesArray(rawLog)),
       bufferToInt(status) === 0 ? 0 : 1
@@ -50,19 +53,19 @@ export class Receipt {
   }
 
   raw(): ReceiptRawValue {
-    return [unpadBuffer(toBuffer(this.status)), this.gasUsed, this.bitvector, this.logs.map((l) => l.raw())];
+    return [unpadBuffer(toBuffer(this.status)), this.cumulativeGasUsed, this.bitvector, this.logs.map((l) => l.raw())];
   }
 
   serialize(): Buffer {
     return rlp.encode(this.raw());
   }
 
-  installProperties(block: Block, tx: TypedTransaction, cumulativeGasUsed: BN, txIndex: number) {
+  installProperties(block: Block, tx: Transaction, gasUsed: BN, txIndex: number) {
     this.blockHash = block.hash();
     this.blockNumber = block.header.number;
     this.from = tx.getSenderAddress().toBuffer();
     this.contractAddress = tx.to ? undefined : generateAddress(this.from!, tx.nonce.toArrayLike(Buffer));
-    this.cumulativeGasUsed = cumulativeGasUsed;
+    this.gasUsed = gasUsed;
     this.to = tx?.to?.toBuffer();
     this.transactionHash = tx.hash();
     this.transactionIndex = txIndex;
@@ -75,9 +78,9 @@ export class Receipt {
       blockHash: this.blockHash ? bufferToHex(this.blockHash) : undefined,
       blockNumber: this.blockNumber ? bnToHex(this.blockNumber) : undefined,
       contractAddress: this.contractAddress ? bufferToHex(this.contractAddress) : null,
-      cumulativeGasUsed: this.cumulativeGasUsed ? bnToHex(this.cumulativeGasUsed) : undefined,
+      cumulativeGasUsed: bufferToHex(this.cumulativeGasUsed),
       from: this.from ? bufferToHex(this.from) : undefined,
-      gasUsed: bufferToHex(this.gasUsed),
+      gasUsed: this.gasUsed ? bnToHex(this.gasUsed) : undefined,
       logs: this.logs.map((log) => log.toRPCJSON()),
       logsBloom: bufferToHex(this.bitvector),
       status: intToHex(this.status),

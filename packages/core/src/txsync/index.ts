@@ -1,9 +1,8 @@
-import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Channel, Aborter, logger } from '@gxchain2/utils';
-import { EventEmitter } from 'events';
-import { TypedTransaction } from '@gxchain2/structure';
-import { PeerRequestTimeoutError } from '@gxchain2/network';
-import { Node } from '../node';
 import { bufferToHex } from 'ethereumjs-util';
+import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Channel, Aborter, logger } from '@gxchain2/utils';
+import { Transaction } from '@gxchain2/structure';
+import { WireProtocol, PeerRequestTimeoutError, maxTxRetrievals } from '../protocols';
+import { Node } from '../node';
 
 type NewPooledTransactionMessage = {
   hashes: Buffer[];
@@ -11,7 +10,7 @@ type NewPooledTransactionMessage = {
 };
 
 type EnqueuePooledTransactionMessage = {
-  txs: TypedTransaction[];
+  txs: Transaction[];
   origin: string;
 };
 
@@ -53,12 +52,11 @@ function panicError(...args: any[]) {
 const txArriveTimeout = 500;
 const gatherSlack = 100;
 const txGatherSlack = 100;
-const maxTxRetrievals = 256;
 const maxTxAnnounces = 4096;
 
 type Request = { hashes: Buffer[]; stolen?: FunctionalSet<Buffer> };
 
-export class TxFetcher extends EventEmitter {
+export class TxFetcher {
   private waitingList = createBufferFunctionalMap<Set<string>>();
   private waitingTime = createBufferFunctionalMap<number>();
   private watingSlots = new Map<string, FunctionalSet<Buffer>>();
@@ -79,7 +77,6 @@ export class TxFetcher extends EventEmitter {
   private waitTimeout?: NodeJS.Timeout;
 
   constructor(node: Node) {
-    super();
     this.node = node;
     this.aborter = node.aborter;
     this.newPooledTransactionQueue = new Channel<NewPooledTransactionMessage>();
@@ -146,7 +143,7 @@ export class TxFetcher extends EventEmitter {
         }
       }
     } catch (err) {
-      this.emit('error', err);
+      logger.error('TxFetcher::newPooledTransactionLoop, catch error:', err);
     }
   }
 
@@ -154,7 +151,7 @@ export class TxFetcher extends EventEmitter {
     try {
       for await (const message of this.enqueueTransactionQueue.generator()) {
         // TODO: check underpriced and duplicate and etc.
-        const added = (await this.node.addPendingTxs(message.txs)).map((result, i) => (result ? message.txs[i] : null)).filter((ele) => ele !== null) as TypedTransaction[];
+        const added = (await this.node.addPendingTxs(message.txs)).map((result, i) => (result ? message.txs[i] : null)).filter((ele) => ele !== null) as Transaction[];
         for (const tx of added) {
           const hash = tx.hash();
           const set = this.waitingList.get(hash);
@@ -226,7 +223,7 @@ export class TxFetcher extends EventEmitter {
         this.scheduleFetches();
       }
     } catch (err) {
-      this.emit('error', err);
+      logger.error('TxFetcher::enqueueTransactionLoop, catch error:', err);
     }
   }
 
@@ -314,7 +311,8 @@ export class TxFetcher extends EventEmitter {
         if (!p) {
           this.dropPeer(peer);
         } else {
-          p.getPooledTransactions(hashes)
+          WireProtocol.getHandler(p)
+            .getPooledTransactions(hashes)
             .then((txs) => {
               this.enqueueTransaction(peer, txs);
             })
@@ -324,7 +322,7 @@ export class TxFetcher extends EventEmitter {
               } else {
                 this.dropPeer(peer);
               }
-              this.emit('error', err);
+              logger.error('TxFetcher::getPooledTransactions, catch error:', err);
             });
         }
       }
@@ -436,7 +434,7 @@ export class TxFetcher extends EventEmitter {
    * @param origin - the peer
    * @param txs - transactions
    */
-  enqueueTransaction(origin: string, txs: TypedTransaction[]) {
+  enqueueTransaction(origin: string, txs: Transaction[]) {
     if (!this.aborter.isAborted) {
       this.enqueueTransactionQueue.push({ txs, origin });
     }

@@ -76,8 +76,8 @@
       "block": 0
     },
     {
-      "name": "qaraqorum",
-      "block": 10
+      "name": "london",
+      "block": null
     }
   ],
   "bootstrapNodes": []

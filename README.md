@@ -32,29 +32,33 @@ npm install @gxchain2/cli --global
 ### Usage
 
 ```
-Usage: index [options] [command]
+Usage: gxchain2 [options] [command]
 
 Options:
-  -V, --version               output the version number
-  --rpc                       open rpc server
-  --rpc-port <port>           rpc server port (default: "12358")
-  --rpc-host <port>           rpc server host (default: "127.0.0.1")
-  --rpc-api <apis>            rpc server apis: debug, eth, net, txpool, web3 (default: "eth,net,web3")
-  --p2p-tcp-port <port>       p2p server tcp port (default: "11451")
-  --p2p-ws-port <port>        p2p server websocket port (default: "41919")
-  --bootnodes <bootnodes...>  bootnodes list
-  --datadir <path>            chain data dir path (default: "~/.gxchain2")
-  --keystore <keystore>       The datadir for keystore (default: "keystore")
-  --unlock <unlock>           Comma separated list of accounts to unlock
-  --password <password>       Password file to use for non-interactive password input
-  --chain <chain>             chain name: gxc2-mainnet, gxc2-testnet
-  --mine                      mine block
-  --coinbase <address>        miner address
-  --verbosity <verbosity>     logging verbosity: silent, error, warn, info, debug, detail (default: "info")
-  -h, --help                  display help for command
+  -V, --version                    output the version number
+  --rpc                            open rpc server
+  --rpc-port <port>                rpc server port
+  --rpc-host <port>                rpc server host
+  --rpc-api <apis>                 rpc server apis: debug, eth, net, txpool, web3
+  --p2p-tcp-port <port>            p2p server tcp port
+  --p2p-udp-port <port>            p2p server udp port
+  --p2p-nat <ip>                   p2p server nat ip
+  --max-peers <peers>              max p2p peers count
+  --max-connections <connections>  max p2p connections count
+  --max-dials <dials>              max p2p dials count
+  --bootnodes <bootnodes...>       comma separated list of bootnodes
+  --datadir <path>                 chain data dir path (default: "~/.gxchain2")
+  --keystore <keystore>            the datadir for keystore (default: "keystore")
+  --unlock <unlock>                comma separated list of accounts to unlock
+  --password <password>            password file to use for non-interactive password input
+  --chain <chain>                  chain name: gxc2-mainnet, gxc2-testnet
+  --mine                           mine block
+  --coinbase <address>             miner address
+  --verbosity <verbosity>          logging verbosity: silent, error, warn, info, debug, detail (default: "info")
+  -h, --help                       display help for command
 
 Commands:
-  account                     Manage accounts
+  account                          Manage accounts
 ```
 
 ### Example
@@ -62,16 +66,26 @@ Commands:
 Block producer startup
 
 ```
-gxc2 --mine --coinbase 0x...abc --unlock 0x...abc --password ./password
+gxchain2 --mine --coinbase 0x...abc --unlock 0x...abc --password ./password
 ```
 
 Normal node startup
 
 ```
-gxc2 --rpc --rpc-host 0.0.0.0
+gxchain2 --rpc --rpc-host 0.0.0.0
 ```
 
-[More](./packages/cli)
+Bootnode startup
+
+```
+gxchain2 --p2p-nat 1.2.3.4
+```
+
+Testnet node startup
+
+```
+gxchain2 --chain gxc2-testnet
+```
 
 ## Build
 
@@ -112,6 +126,70 @@ Only remove `dist` directories for each monorepo packages.
 ### `npm run lint`, `npm run lint:fix`
 
 These scripts execute lint and lint:fix respectively, to all monorepo packages.
+
+## FAQ
+
+- Q: Why do I get `EACCES: permission denied` or `node-gyp: Permission denied` when I install `@gxchain2/cli`?
+
+  <details><summary> like this </summary>
+
+  ```
+  > bigint-buffer@1.1.5 install /xxx/v14.16.1/lib/node_modules/@gxchain2/cli/node_modules/bigint-buffer
+  > npm run rebuild || echo "Couldn't build bindings. Non-native version used."
+
+  Error: EACCES: permission denied, scandir '/xxx/v14.16.1/lib/node_modules/@gxchain2/cli/node_modules/bigint-buffer'
+
+  > bcrypto@5.4.0 install /xxx/v14.16.1/lib/node_modules/@gxchain2/cli/node_modules/bcrypto
+  > node-gyp rebuild
+
+  sh: 1: node-gyp: Permission denied
+  npm ERR! code ELIFECYCLE
+  npm ERR! syscall spawn
+  npm ERR! file sh
+  npm ERR! errno ENOENT
+  npm ERR! bcrypto@5.4.0 install: `node-gyp rebuild`
+  npm ERR! spawn ENOENT
+  npm ERR!
+  npm ERR! Failed at the bcrypto@5.4.0 install script.
+  npm ERR! This is probably not a problem with npm. There is likely additional logging output above.
+
+  npm ERR! A complete log of this run can be found in:
+  npm ERR!     /xxx/.npm/_logs/2021-07-14T02_24_45_172Z-debug.log
+  ```
+
+  </details>
+
+  A: Please run
+
+  ```
+  npm install @gxchain2/cli -g --unsafe-perm=true --allow-root
+  ```
+
+- Q: Why do I get `SyntaxError: Unexpected token '?'` when I run `gxchain2`?
+
+  <details><summary> like this </summary>
+
+  ```
+  /xxx/v12.20.0/lib/node_modules/@gxchain2/cli/node_modules/@gxchain2/discv5/lib/service/addrVotes.js:44
+          let best = [tiebreakerStr, this.tallies[tiebreakerStr] ?? 0];
+                                                                  ^
+
+  SyntaxError: Unexpected token '?'
+      at wrapSafe (internal/modules/cjs/loader.js:915:16)
+      at Module._compile (internal/modules/cjs/loader.js:963:27)
+      at Object.Module._extensions..js (internal/modules/cjs/loader.js:1027:10)
+      at Module.load (internal/modules/cjs/loader.js:863:32)
+      at Function.Module._load (internal/modules/cjs/loader.js:708:14)
+      at Module.require (internal/modules/cjs/loader.js:887:19)
+      at require (internal/modules/cjs/helpers.js:74:18)
+      at Object.<anonymous> (/xxx/v12.20.0/lib/node_modules/@gxchain2/cli/node_modules/@gxchain2/discv5/lib/service/service.js:18:21)
+      at Module._compile (internal/modules/cjs/loader.js:999:30)
+      at Object.Module._extensions..js (internal/modules/cjs/loader.js:1027:10)
+  ```
+
+  </details>
+
+  A: Please update the node version to 14.0.0 or higher. [nvm](https://github.com/nvm-sh/nvm) may be able to help you
 
 ## License
 

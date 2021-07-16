@@ -3,14 +3,17 @@ import util from 'util';
 import prompts from 'prompts';
 import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
+import { program } from 'commander';
+import { ENR } from '@gxchain2/discv5';
+import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
 import { Node } from '@gxchain2/core';
-import { constants } from '@gxchain2/common';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
-import { BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
-import { startNode } from '../src/start';
-import program from '../src/program';
+import { startNode, installOptions } from '../src/commands';
 import { SIGINT } from '../src/process';
+import { WrappedBlock } from '../../database/node_modules/@gxchain2/structure/dist';
+
+installOptions(program);
 
 // addresses, a list of address, splited by `,`
 // topics, a list of topic, splited by `,` and each subTopic splited by `;`.
@@ -37,18 +40,30 @@ const handler: {
       handler.add(node, str);
     }
   },
-  send: (node: Node, peerId: string, message: string) => {
-    const peer = node.networkMngr.getPeer(peerId);
-    if (peer) {
-      peer.send(constants.GXC2_ETHWIRE, 'Echo', message);
-    } else {
-      logger.warn('Can not find peer');
-    }
+  rmpeer: async (node: Node, peerId: string) => {
+    await node.networkMngr.removePeer(peerId);
+    logger.info('removed');
   },
-  lsp2p: (node: Node) => {
+  ban: async (node: Node, peerId: string) => {
+    await node.networkMngr.ban(peerId);
+    logger.info('removed');
+  },
+  lsenr: (node: Node, multiaddr: string) => {
+    const ma = new Multiaddr(multiaddr);
+    const peerId: PeerId = (node.networkMngr as any).libp2pNode.peerId;
+    const keypair = createKeypairFromPeerId(peerId);
+    const enr = ENR.createV4(keypair.publicKey);
+    enr.setLocationMultiaddr(ma as any);
+    logger.info('local:', enr.encodeTxt(keypair.privateKey));
+  },
+  lspeers: (node: Node) => {
     for (const peer of node.networkMngr.peers) {
       logger.info(peer.peerId);
     }
+  },
+  lsp2p: (node: Node) => {
+    logger.info(Array.from((node.networkMngr as any).libp2pNode.connectionManager.connections.keys()));
+    logger.info('size:', (node.networkMngr as any).libp2pNode.connectionManager.size);
   },
   lsreceipt: async (node: Node, hash: string) => {
     try {
@@ -73,23 +88,13 @@ const handler: {
     }
   },
   lsblock: async (node: Node, hashOrHeight: string) => {
-    const printBlock = async (key: number | Buffer) => {
-      try {
-        const block = await node.db.getBlock(key);
-        logger.info('block', bufferToHex(block.hash()), 'on height', block.header.number.toString(), ':', block.toJSON());
-        for (const tx of block.transactions) {
-          logger.info('tx', bufferToHex(tx.hash()));
-        }
-        logger.info('---------------');
-      } catch (err) {
-        if (err.type === 'NotFoundError') {
-          return;
-        }
-        throw err;
-      }
-      return;
-    };
-    await printBlock(hashOrHeight.indexOf('0x') !== 0 ? Number(hashOrHeight) : hexStringToBuffer(hashOrHeight));
+    const key = hashOrHeight.indexOf('0x') !== 0 ? Number(hashOrHeight) : hexStringToBuffer(hashOrHeight);
+    const block = await node.db.getBlock(key);
+    logger.info('block', bufferToHex(block.hash()), 'on height', block.header.number.toString(), ':', new WrappedBlock(block).toRPCJSON(true));
+  },
+  lsblock2: async (node: Node, hash: string, height: string) => {
+    const block = await node.db.getBlockByHashAndNumber(hexStringToBuffer(hash), new BN(height));
+    logger.info('block', bufferToHex(block.hash()), 'on height', block.header.number.toString(), ':', new WrappedBlock(block).toRPCJSON(true));
   },
   lsheight: (node: Node) => {
     const height = node.blockchain.latestHeight;
@@ -109,21 +114,15 @@ const handler: {
   },
   filterblock: async (node: Node, number: string, addresses: string, topics: string) => {
     const { addressArray, topicArray } = parseAddressAndTopic(addresses, topics);
-    const filter = new BloomBitsFilter({ node, sectionSize: constants.BloomBitsBlocks });
+    const filter = node.getFilter();
     const logs = await filter.filterBlock(new BN(number), addressArray, topicArray);
     logs.forEach((log) => logger.info(log.toRPCJSON()));
   },
   filterrange: async (node: Node, from: string, to: string, addresses: string, topics: string) => {
     const { addressArray, topicArray } = parseAddressAndTopic(addresses, topics);
-    const filter = new BloomBitsFilter({ node, sectionSize: constants.BloomBitsBlocks });
+    const filter = node.getFilter();
     const logs = await filter.filterRange(new BN(from), new BN(to), addressArray, topicArray);
     logs.forEach((log) => logger.info(log.toRPCJSON()));
-  },
-  lsbits: async (node: Node, strBit: string, strSection: string, strHead: string) => {
-    const section = new BN(strSection);
-    const headHash = strHead ? Buffer.from(strHead, 'hex') : (await node.db.getCanonicalHeader(section.addn(1).muln(constants.BloomBitsBlocks).subn(1))).hash();
-    const bits = await node.db.getBloomBits(Number(strBit), section, headHash);
-    logger.info('bits', Buffer.from(bits).toString('hex'));
   }
 };
 
@@ -157,11 +156,8 @@ const startPrompts = async (node: Node) => {
     program.parse(process.argv);
     const opts = program.opts();
     opts.datadir = path.isAbsolute(opts.datadir) ? opts.datadir : path.join(__dirname, './test-dir/', opts.datadir);
-    const [node, sever] = await startNode(opts);
+    const [node] = await startNode(opts);
     SIGINT(node);
-    if (opts.mine !== true) {
-      node.miner.setCoinbase('0x3289621709f5b35d09b4335e129907ac367a0593');
-    }
     await startPrompts(node);
   } catch (err) {
     logger.error('Prompts start error:', err);

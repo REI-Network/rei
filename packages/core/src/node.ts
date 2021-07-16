@@ -1,15 +1,16 @@
 import path from 'path';
 import fs from 'fs';
 import type { LevelUp } from 'levelup';
+import LevelStore from 'datastore-level';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
-import { Database, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchain2/database';
-import { NetworkManager } from '@gxchain2/network';
-import { Common, constants, getGenesisState, getChain } from '@gxchain2/common';
+import { Database, createEncodingLevelDB, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchain2/database';
+import { NetworkManager, Peer } from '@gxchain2/network';
+import { Common, getGenesisState, getChain } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import { VM, WrappedVM, StateManager } from '@gxchain2/vm';
-import { TypedTransaction, Block } from '@gxchain2/structure';
+import { Transaction, Block } from '@gxchain2/structure';
 import { Channel, Aborter, logger } from '@gxchain2/utils';
 import { AccountManager } from '@gxchain2/wallet';
 import { TxPool } from './txpool';
@@ -17,20 +18,39 @@ import { FullSynchronizer, Synchronizer } from './sync';
 import { TxFetcher } from './txsync';
 import { Miner } from './miner';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
-import { BloomBitsFilter } from './bloombits';
+import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
 import { BlockchainMonitor } from './blockchainmonitor';
+import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
+
+const timeoutBanTime = 60 * 5 * 1000;
+const invalidBanTime = 60 * 10 * 1000;
+
+const defaultChainName = 'gxc2-mainnet';
+
+export type NodeStatus = {
+  networkId: number;
+  totalDifficulty: Buffer;
+  height: number;
+  bestHash: Buffer;
+  genesisHash: Buffer;
+};
 
 export interface NodeOptions {
   databasePath: string;
   chain?: string;
-  mine?: {
-    coinbase: string;
-    gasLimit: string;
+  mine: {
+    enable: boolean;
+    coinbase?: string;
   };
-  p2p?: {
+  p2p: {
+    enable: boolean;
     tcpPort?: number;
-    wsPort?: number;
+    udpPort?: number;
+    nat?: string;
     bootnodes?: string[];
+    maxPeers?: number;
+    maxConnections?: number;
+    maxDials?: number;
   };
   account: {
     keyStorePath: string;
@@ -38,31 +58,27 @@ export interface NodeOptions {
   };
 }
 
-class NewPendingTxsTask {
-  txs: TypedTransaction[];
+export interface ProcessBlockOptions {
+  generate: boolean;
+  broadcast: boolean;
+}
+
+type PendingTxs = {
+  txs: Transaction[];
   resolve: (results: boolean[]) => void;
-  constructor(txs: TypedTransaction[], resolve: (results: boolean[]) => void) {
-    this.txs = txs;
-    this.resolve = resolve;
-  }
-}
-class NewBlockTask {
-  block: Block;
-  constructor(block: Block) {
-    this.block = block;
-  }
-}
-type Task = NewPendingTxsTask | NewBlockTask;
+};
 
 type ProcessBlock = {
   block: Block;
-  generate: boolean;
+  options: ProcessBlockOptions;
   resolve: (block: Block) => void;
   reject: (reason?: any) => void;
 };
 
 export class Node {
   public readonly chaindb: LevelUp;
+  public readonly nodedb: LevelUp;
+  public readonly networkdb: LevelStore;
   public readonly aborter = new Aborter();
 
   public db!: Database;
@@ -79,7 +95,7 @@ export class Node {
   private readonly initPromise: Promise<void>;
   private readonly taskLoopPromise: Promise<void>;
   private readonly processLoopPromise: Promise<void>;
-  private readonly taskQueue = new Channel<Task>();
+  private readonly taskQueue = new Channel<PendingTxs>();
   private readonly processQueue = new Channel<ProcessBlock>();
 
   private chain!: string | { chain: any; genesisState?: any };
@@ -87,7 +103,9 @@ export class Node {
   private genesisHash!: Buffer;
 
   constructor(options: NodeOptions) {
-    this.chaindb = createLevelDB(path.join(options.databasePath, 'chaindb'));
+    this.chaindb = createEncodingLevelDB(path.join(options.databasePath, 'chaindb'));
+    this.nodedb = createLevelDB(path.join(options.databasePath, 'nodes'));
+    this.networkdb = new LevelStore(path.join(options.databasePath, 'networkdb'), { createIfMissing: true });
     this.initPromise = this.init(options);
     this.taskLoopPromise = this.taskLoop();
     this.processLoopPromise = this.processLoop();
@@ -96,7 +114,7 @@ export class Node {
   /**
    * Get the status of the node syncing
    */
-  get status() {
+  get status(): NodeStatus {
     return {
       networkId: this.networkId,
       totalDifficulty: this.blockchain.totalDifficulty.toBuffer(),
@@ -104,6 +122,20 @@ export class Node {
       bestHash: this.blockchain.latestBlock.hash(),
       genesisHash: this.genesisHash
     };
+  }
+
+  private async loadPeerId(databasePath: string) {
+    let peerId!: PeerId;
+    const nodeKeyPath = path.join(databasePath, 'nodekey');
+    try {
+      const key = fs.readFileSync(nodeKeyPath);
+      peerId = await PeerId.createFromPrivKey(key);
+    } catch (err) {
+      logger.warn('Read nodekey faild, generate a new key');
+      peerId = await PeerId.create({ keyType: 'secp256k1' });
+      fs.writeFileSync(nodeKeyPath, peerId.privKey.bytes);
+    }
+    return peerId;
   }
 
   /**
@@ -128,7 +160,7 @@ export class Node {
         }
       }
     }
-    if (options?.mine?.coinbase && !this.accMngr.hasUnlockedAccount(options.mine.coinbase)) {
+    if (options.mine.coinbase && !this.accMngr.hasUnlockedAccount(options.mine.coinbase)) {
       throw new Error(`Unlock coin account ${options.mine.coinbase} failed!`);
     }
 
@@ -139,8 +171,8 @@ export class Node {
       try {
         this.chain = JSON.parse(fs.readFileSync(path.join(options.databasePath, 'genesis.json')).toString());
       } catch (err) {
-        logger.warn('Read genesis.json faild, use default chain(gxc2-mainnet)');
-        this.chain = 'gxc2-mainnet';
+        logger.warn(`Read genesis.json faild, use default chain(${defaultChainName})`);
+        this.chain = defaultChainName;
       }
     } else if (getChain(this.chain as string) === undefined) {
       throw new Error(`Unknow chain: ${this.chain}`);
@@ -185,54 +217,45 @@ export class Node {
     });
     await this.blockchain.init();
 
-    this.sync = new FullSynchronizer({ node: this })
-      .on('error', (err) => {
-        logger.error('Sync error:', err);
-      })
-      .on('synchronized', () => {
-        const block = this.blockchain.latestBlock;
-        this.newBlock(block);
-      });
-
+    this.sync = new FullSynchronizer({ node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
     this.txPool = new TxPool({ node: this, journal: options.databasePath });
 
-    let peerId!: PeerId;
-    try {
-      const key = fs.readFileSync(path.join(options.databasePath, 'peer-key'));
-      peerId = await PeerId.createFromPrivKey(key);
-    } catch (err) {
-      logger.warn('Read peer-key faild, generate a new key');
-      peerId = await PeerId.create({ bits: 1024, keyType: 'Ed25519' });
-      fs.writeFileSync(path.join(options.databasePath, 'peer-key'), peerId.privKey.bytes);
-    }
+    const peerId = await this.loadPeerId(options.databasePath);
+    await this.networkdb.open();
 
     this.txSync = new TxFetcher(this);
+    let bootnodes = options.p2p.bootnodes || [];
+    bootnodes = bootnodes.concat(common.bootstrapNodes());
     this.networkMngr = new NetworkManager({
-      node: this,
+      protocols: createProtocolsByNames(this, [NetworkProtocol.GXC2_ETHWIRE]),
+      datastore: this.networkdb,
+      nodedb: this.nodedb,
       peerId,
-      dbPath: path.join(options.databasePath, 'networkdb'),
-      ...options?.p2p
+      ...options.p2p,
+      bootnodes
     })
-      .on('added', (peer) => {
-        const status = peer.getStatus(constants.GXC2_ETHWIRE);
-        if (status && status.height !== undefined) {
-          this.sync.announce(peer, status.height, new BN(status.totalDifficulty));
-          peer.announceTx(this.txPool.getPooledTransactionHashes());
-        }
-      })
-      .on('removed', (peer) => {
-        this.txSync.dropPeer(peer.peerId);
-      });
+      .on('installed', this.onPeerInstalled)
+      .on('removed', this.onPeerRemoved);
     await this.networkMngr.init();
-
-    this.sync.start();
-    this.miner = new Miner(this, options.mine);
+    this.miner = new Miner({ node: this, ...options.mine });
     await this.txPool.init();
-    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: constants.BloomBitsBlocks, confirmsBlockNumber: constants.ConfirmsBlockNumber });
+    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: BloomBitsBlocks, confirmsBlockNumber: ConfirmsBlockNumber });
     await this.bloomBitsIndexer.init();
     this.bcMonitor = new BlockchainMonitor(this);
     await this.bcMonitor.init();
   }
+
+  private onPeerInstalled = (peer: Peer) => {
+    this.sync.announce(peer);
+  };
+
+  private onPeerRemoved = (peer: Peer) => {
+    this.txSync.dropPeer(peer.peerId);
+  };
+
+  private onSyncOver = () => {
+    this.miner.startMint(this.blockchain.latestBlock.header);
+  };
 
   getCommon(num: BNLike) {
     return Common.createCommonByBlockNumber(num, typeof this.chain === 'string' ? this.chain : this.chain.chain);
@@ -266,34 +289,40 @@ export class Node {
   }
 
   getFilter() {
-    return new BloomBitsFilter({ node: this, sectionSize: constants.BloomBitsBlocks });
+    return new BloomBitsFilter({ node: this, sectionSize: BloomBitsBlocks });
   }
 
   private async processLoop() {
     await this.initPromise;
-    for await (let { block, generate, resolve, reject } of this.processQueue.generator()) {
+    for await (let { block, options, resolve, reject } of this.processQueue.generator()) {
       try {
         for (const tx of block.transactions) {
           tx.common.getHardforkByBlockNumber(block.header.number);
         }
         const lastHeader = await this.db.getHeader(block.header.parentHash, block.header.number.subn(1));
-        const opts = {
+        const runBlockOptions = {
+          ...options,
           block,
-          generate,
           root: lastHeader.stateRoot,
-          cliqueSigner: generate ? this.accMngr.getPrivateKey(block.header.cliqueSigner().buf) : undefined
+          cliqueSigner: options.generate ? this.accMngr.getPrivateKey(block.header.cliqueSigner().buf) : undefined
         };
-        const { result, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot, lastHeader.number)).runBlock(opts);
+        const { result, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot, lastHeader.number)).runBlock(runBlockOptions);
         block = newBlock || block;
         logger.info('✨ Process block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
-        if (block._common.param('vm', 'debugConsole')) {
-          logger.debug('Node::processLoop, process on hardfork:', block._common.hardfork());
-        }
+        const before = this.blockchain.latestBlock.hash();
         await this.blockchain.putBlock(block);
         await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(result.receipts, block.hash(), block.header.number)));
+        const after = this.blockchain.latestBlock.hash();
         resolve(block);
+        if (!before.equals(after)) {
+          await this.txPool.newBlock(block);
+          const promises = [this.miner.newBlockHeader(block.header), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
+          if (options.broadcast) {
+            promises.push(this.broadcastNewBlock(block));
+          }
+          await Promise.all(promises);
+        }
       } catch (err) {
-        logger.error('Node::processLoop, process block error:', err);
         reject(err);
       }
     }
@@ -303,37 +332,19 @@ export class Node {
     await this.initPromise;
     for await (const task of this.taskQueue.generator()) {
       try {
-        if (task instanceof NewPendingTxsTask) {
-          try {
-            const { results, readies } = await this.txPool.addTxs(task.txs);
-            if (readies && readies.size > 0) {
-              const hashes = Array.from(readies.values())
-                .reduce((a, b) => a.concat(b), [])
-                .map((tx) => tx.hash());
-              for (const peer of this.networkMngr.peers) {
-                if (peer.isSupport(constants.GXC2_ETHWIRE)) {
-                  peer.announceTx(hashes);
-                }
-              }
-              await this.miner.worker.addTxs(readies);
-            }
-            task.resolve(results);
-          } catch (err) {
-            task.resolve(new Array<boolean>(task.txs.length).fill(false));
-            logger.error('Node::taskLoop, NewPendingTxsTask, catch error:', err);
+        const { results, readies } = await this.txPool.addTxs(task.txs);
+        if (readies && readies.size > 0) {
+          const hashes = Array.from(readies.values())
+            .reduce((a, b) => a.concat(b), [])
+            .map((tx) => tx.hash());
+          for (const handler of WireProtocol.getPool().handlers) {
+            handler.announceTx(hashes);
           }
-        } else if (task instanceof NewBlockTask) {
-          const { block } = task;
-          const td = await this.db.getTotalDifficulty(block.hash(), block.header.number);
-          for (const peer of this.networkMngr.peers) {
-            if (peer.isSupport(constants.GXC2_ETHWIRE)) {
-              peer.announceNewBlock(block, td);
-            }
-          }
-          await this.txPool.newBlock(block);
-          await Promise.all([this.miner.worker.newBlockHeader(block.header), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)]);
+          await this.miner.addTxs(readies);
         }
+        task.resolve(results);
       } catch (err) {
+        task.resolve(new Array<boolean>(task.txs.length).fill(false));
         logger.error('Node::taskLoop, catch error:', err);
       }
     }
@@ -344,34 +355,36 @@ export class Node {
    * @param block - Block data
    * @param generate - Judgment criteria for root verification
    */
-  async processBlock(block: Block, generate: boolean = true) {
+  async processBlock(block: Block, options: ProcessBlockOptions) {
     await this.initPromise;
     return new Promise<Block>((resolve, reject) => {
-      this.processQueue.push({ block, generate, resolve, reject });
+      this.processQueue.push({ block, options, resolve, reject });
     });
-  }
-
-  /**
-   * Push a new block task to the taskQueue
-   * @param block - Block data
-   */
-  async newBlock(block: Block) {
-    await this.initPromise;
-    this.taskQueue.push(new NewBlockTask(block));
   }
 
   /**
    * Push pending transactions to the taskQueue
    * @param txs - transactions
    */
-  async addPendingTxs(txs: TypedTransaction[]) {
+  async addPendingTxs(txs: Transaction[]) {
     await this.initPromise;
     return new Promise<boolean[]>((resolve) => {
-      this.taskQueue.push(new NewPendingTxsTask(txs, resolve));
+      this.taskQueue.push({ txs, resolve });
     });
   }
 
+  async broadcastNewBlock(block: Block) {
+    const td = await this.db.getTotalDifficulty(block.hash(), block.header.number);
+    for (const handler of WireProtocol.getPool().handlers) {
+      handler.announceNewBlock(block, td);
+    }
+  }
+
   async abort() {
+    this.sync.removeListener('synchronized', this.onSyncOver);
+    this.sync.removeListener('failed', this.onSyncOver);
+    this.networkMngr.removeListener('installed', this.onPeerInstalled);
+    this.networkMngr.removeListener('removed', this.onPeerRemoved);
     this.taskQueue.abort();
     this.processQueue.abort();
     await this.aborter.abort();
@@ -380,5 +393,16 @@ export class Node {
     await this.txPool.abort();
     await this.taskLoopPromise;
     await this.processLoopPromise;
+    await this.chaindb.close();
+    await this.nodedb.close();
+    await this.networkdb.close();
+  }
+
+  async banPeer(peerId: string, reason: 'invalid' | 'timeout') {
+    if (reason === 'invalid') {
+      await this.networkMngr.ban(peerId, invalidBanTime);
+    } else {
+      await this.networkMngr.ban(peerId, timeoutBanTime);
+    }
   }
 }

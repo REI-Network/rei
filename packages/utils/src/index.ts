@@ -43,6 +43,10 @@ export function hexStringToBN(hex: string): BN {
   return hex.indexOf('0x') === 0 ? new BN(hex.substr(2), 'hex') : new BN(hex, 'hex');
 }
 
+export function nowTimestamp() {
+  return Math.floor(Date.now() / 1000);
+}
+
 export const logger = tracer.colorConsole({
   format: '{{title}} [{{timestamp}}] {{message}}',
   level: 'detail',

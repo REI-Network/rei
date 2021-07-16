@@ -1,12 +1,17 @@
 import express from 'express';
 import expressws from 'express-ws';
 import * as http from 'http';
+import bodyParse from 'body-parser';
 import { Node } from '@gxchain2/core';
+import { logger } from '@gxchain2/utils';
 import { JsonRPCMiddleware } from './jsonrpcmiddleware';
 import { api } from './controller';
-import { logger } from '@gxchain2/utils';
 import { WsClient } from './client';
 import { FilterSystem } from './filtersystem';
+
+const defaultPort = 11451;
+const defaultHost = '127.0.0.1';
+const defaultApis = 'eth,net,web3';
 
 export class RpcContext {
   public readonly client?: WsClient;
@@ -22,6 +27,13 @@ export class RpcContext {
 
 export const emptyContext = new RpcContext();
 
+export interface RpcServerOptions {
+  node: Node;
+  port?: number;
+  host?: string;
+  apis?: string;
+}
+
 export class RpcServer {
   private readonly port: number;
   private readonly host: string;
@@ -32,15 +44,16 @@ export class RpcServer {
     return this.running;
   }
 
-  constructor(port: number, host: string, apis: string, node: Node) {
-    this.port = port;
-    this.host = host;
-    const filterSystem = new FilterSystem(node);
+  constructor(options: RpcServerOptions) {
+    this.port = options.port || defaultPort;
+    this.host = options.host || defaultHost;
+    const apis = options.apis || defaultApis;
+    const filterSystem = new FilterSystem(options.node);
     this.controllers = apis.split(',').map((name) => {
       if (!(name in api)) {
         throw new Error('RpcServer, Unknow api:' + name);
       }
-      return new api[name](node, filterSystem);
+      return new api[name](options.node, filterSystem);
     });
   }
 
@@ -58,7 +71,7 @@ export class RpcServer {
         expressws(app, server);
         const jsonmid = new JsonRPCMiddleware({ methods: this.controllers });
 
-        app.use(express.json({ type: '*/*' }));
+        app.use(bodyParse.json({ type: '*/*', limit: '5mb' }));
         app.use(jsonmid.makeMiddleWare());
         app.ws('/', (ws) => {
           const context = new RpcContext(new WsClient(ws));
@@ -90,4 +103,6 @@ export class RpcServer {
       }
     });
   }
+
+  abort() {}
 }

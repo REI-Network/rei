@@ -1,11 +1,11 @@
 import EventEmitter from 'events';
 import { BN } from 'ethereumjs-util';
-import { TxFromValuesArray, TypedTransaction, Block, BlockHeader, BlockBodyBuffer, Log } from '@gxchain2/structure';
+import { Transaction, Block, BlockHeader, Log } from '@gxchain2/structure';
 import { createBufferFunctionalMap, logger } from '@gxchain2/utils';
 import { Node } from '../node';
 
 // record block hash and block number for quering receipt.
-type TransactionInfo = { tx: TypedTransaction; blockHash: Buffer; blockNumber: BN };
+type TransactionInfo = { tx: Transaction; blockHash: Buffer; blockNumber: BN };
 
 export declare interface BlockchainMonitor {
   on(event: 'logs' | 'removedLogs', listener: (logs: Log[]) => void): this;
@@ -38,63 +38,43 @@ export class BlockchainMonitor extends EventEmitter {
   async newBlock(block: Block) {
     await this.initPromise;
     try {
-      const getBlock = async (hash: Buffer, number: BN) => {
-        const header = await this.node.db.getHeader(hash, number);
-        let bodyBuffer: BlockBodyBuffer | undefined;
-        try {
-          bodyBuffer = await this.node.db.getBody(hash, number);
-        } catch (err) {
-          if (err.type !== 'NotFoundError') {
-            throw err;
-          }
-        }
-
-        return Block.fromBlockData(
-          {
-            header: header,
-            transactions: bodyBuffer ? bodyBuffer[0].map((rawTx) => TxFromValuesArray(rawTx, { common: this.node.getCommon(number) })) : []
-          },
-          { common: this.node.getCommon(number) }
-        );
-      };
-
       const originalNewBlock = block;
       const newHeads: BlockHeader[] = [];
-      let oldBlock = await getBlock(this.currentHeader.hash(), this.currentHeader.number);
+      let oldBlock = await this.node.db.getBlockByHashAndNumber(this.currentHeader.hash(), this.currentHeader.number);
       const discarded = createBufferFunctionalMap<TransactionInfo>();
       const included = createBufferFunctionalMap<TransactionInfo>();
       while (oldBlock.header.number.gt(block.header.number)) {
         const blockHash = oldBlock.hash();
-        for (const tx of oldBlock.transactions) {
+        for (const tx of oldBlock.transactions as Transaction[]) {
           discarded.set(tx.hash(), { tx, blockHash, blockNumber: oldBlock.header.number });
         }
-        oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
+        oldBlock = await this.node.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
       }
       while (block.header.number.gt(oldBlock.header.number)) {
         newHeads.push(block.header);
         const blockHash = block.hash();
-        for (const tx of block.transactions) {
+        for (const tx of block.transactions as Transaction[]) {
           included.set(tx.hash(), { tx, blockHash, blockNumber: block.header.number });
         }
-        block = await getBlock(block.header.parentHash, block.header.number.subn(1));
+        block = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
       }
       while (!oldBlock.hash().equals(block.hash()) && oldBlock.header.number.gtn(0) && block.header.number.gtn(0)) {
         {
           const blockHash = oldBlock.hash();
-          for (const tx of oldBlock.transactions) {
+          for (const tx of oldBlock.transactions as Transaction[]) {
             discarded.set(tx.hash(), { tx, blockHash, blockNumber: oldBlock.header.number });
           }
         }
-        oldBlock = await getBlock(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
+        oldBlock = await this.node.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
 
         {
           newHeads.push(block.header);
           const blockHash = block.hash();
-          for (const tx of block.transactions) {
+          for (const tx of block.transactions as Transaction[]) {
             included.set(tx.hash(), { tx, blockHash, blockNumber: block.header.number });
           }
         }
-        block = await getBlock(block.header.parentHash, block.header.number.subn(1));
+        block = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
       }
       if (!oldBlock.hash().equals(block.hash())) {
         throw new Error('reorg failed');

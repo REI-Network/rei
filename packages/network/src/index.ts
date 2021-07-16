@@ -61,6 +61,7 @@ export interface NetworkManagerOptions {
   peerId: PeerId;
   protocols: Protocol[];
   nodedb: LevelUp;
+  enable: boolean;
   datastore?: any;
   tcpPort?: number;
   udpPort?: number;
@@ -106,8 +107,10 @@ export class NetworkManager extends EventEmitter {
     this.protocols = options.protocols;
     this.nodedb = new NodeDB(options.nodedb);
     this.initPromise = this.init(options);
-    this.dialLoop();
-    this.timeoutLoop();
+    if (options.enable) {
+      this.dialLoop();
+      this.timeoutLoop();
+    }
   }
 
   get peers() {
@@ -232,6 +235,9 @@ export class NetworkManager extends EventEmitter {
     }
     if (!options) {
       throw new Error('NetworkManager missing init options');
+    }
+    if (!options.enable) {
+      return;
     }
 
     const { enr, keypair } = await this.loadLocalENR(options);
@@ -469,12 +475,12 @@ export class NetworkManager extends EventEmitter {
 
   async abort() {
     this.aborted = true;
-    this.libp2pNode.unhandle(this.protocols.map(({ protocolString }) => protocolString));
-    this.libp2pNode.removeListener('peer:discovery', this.onDiscovered);
-    this.libp2pNode.connectionManager.removeListener('peer:connect', this.onConnect);
-    this.libp2pNode.connectionManager.removeListener('peer:disconnect', this.onDisconnect);
-    this.libp2pNode.discv5.discv5.removeListener('enrAdded', this.onENRAdded);
-    this.libp2pNode.discv5.discv5.removeListener('multiaddrUpdated', this.onMultiaddrUpdated);
+    this.libp2pNode?.unhandle(this.protocols.map(({ protocolString }) => protocolString));
+    this.libp2pNode?.removeListener('peer:discovery', this.onDiscovered);
+    this.libp2pNode?.connectionManager.removeListener('peer:connect', this.onConnect);
+    this.libp2pNode?.connectionManager.removeListener('peer:disconnect', this.onDisconnect);
+    this.libp2pNode?.discv5?.discv5.removeListener('enrAdded', this.onENRAdded);
+    this.libp2pNode?.discv5?.discv5.removeListener('multiaddrUpdated', this.onMultiaddrUpdated);
     await Promise.all(Array.from(this.installed.values()).map((peer) => peer.abort()));
     await Promise.all(Array.from(this.installing.values()).map((peer) => peer.abort()));
     this.connected.clear();
@@ -482,6 +488,6 @@ export class NetworkManager extends EventEmitter {
     this.installing.clear();
     this.installed.clear();
     this.removeAllListeners();
-    await this.libp2pNode.stop();
+    await this.libp2pNode?.stop();
   }
 }

@@ -1,10 +1,11 @@
 import process from 'process';
-import { Block } from '@gxchain2/structure';
+import { Block, Log } from '@gxchain2/structure';
 import { hexStringToBuffer, setLevel } from '@gxchain2/utils';
 import { DBSaveTxLookup, DBSaveReceipts } from '@gxchain2/database';
 import { RunBlockDebugOpts } from '@gxchain2/vm/dist/runBlock';
 import { Node } from '../../src';
 import { createNode, destroyNode, loadBlocksFromTestData } from '../util';
+import { keccak256 } from 'ethereumjs-util';
 
 setLevel('silent');
 const dirname = 'blockchainMonitor';
@@ -21,7 +22,7 @@ describe('BlockchainMonitor', async () => {
       block,
       root: lastHeader.stateRoot,
       generate: true,
-      skipNonce: true,
+      skipNonce: false,
       skipBlockValidation: true,
       skipBalance: true
     };
@@ -46,13 +47,17 @@ describe('BlockchainMonitor', async () => {
     fork1 = loadBlocksFromTestData(dirname, 'fork1', 'gxc2-testnet', hexStringToBuffer(privateKey));
   });
 
-  it("should emit 'newHeads' event", async () => {
+  it("should emit 'newHeads' and 'logs' event", async () => {
     const newBlockHashSet = new Set<string>();
     const eventSet = new Set<string>();
+    let logs: Log[] = [];
     node.bcMonitor.on('newHeads', (hashes) => {
       hashes.forEach((hash) => {
         eventSet.add(hash.toString('hex'));
       });
+    });
+    node.bcMonitor.on('logs', (_logs) => {
+      logs = logs.concat(_logs);
     });
     for (const block of fork1) {
       const newBlock = await processBlock(block);
@@ -68,6 +73,9 @@ describe('BlockchainMonitor', async () => {
     }
     if (newBlockHashSet.size !== 0 || eventSet.size !== 0) {
       throw new Error("missing 'newHeads' event");
+    }
+    if (logs.length !== 1 || !keccak256(logs[0].serialize()).equals(hexStringToBuffer('81a93f1b18562fe496865812f8cff49db870421fe889ffb11b3fc13aacc8d125'))) {
+      throw new Error('missing or invalid log');
     }
   });
 

@@ -8,7 +8,7 @@ import { Common } from '@gxchain2/common';
 import { compressBytes } from '@gxchain2/utils';
 const level = require('level-mem');
 
-// constants for txLookup and receipts
+// constants prefix for receipts, txLookup and bloomBits.
 const RECEIPTS_PREFIX = Buffer.from('r');
 const TX_LOOKUP_PREFIX = Buffer.from('l');
 const BLOOM_BITS_PREFIX = Buffer.from('B');
@@ -29,12 +29,10 @@ const DBTarget_BloomBits = 102;
 
 // TODO: improve types.
 /**
- * New database operation which type are `receipt`, `txLookup`
- * and `bloomBits`
- * @param operationTarget The type of data to be operated
- * @param key Used to generate database, identified by a block
- * hash, a block number, or both
- * @returns New operation
+ * Create a new database operation which type are `receipt`, `txLookup` or `bloomBits`
+ * @param operationTarget - The type of data to be operated
+ * @param key - Used to generate database key
+ * @returns New database operation
  */
 function new_DBOp(operationTarget: number, key?: DatabaseKey): DBOp {
   let cacheString: string;
@@ -80,11 +78,10 @@ function new_DBOp(operationTarget: number, key?: DatabaseKey): DBOp {
 }
 
 /**
- * Create new operation which can get data from database
- * @param operationTarget The type of data to be operated
- * @param key Used to generate database, identified by a block
- * hash, a block number, or both
- * @returns New operation
+ * Create a new database operation which can get data from database
+ * @param operationTarget - The type of data to be operated
+ * @param key - Used to generate database key
+ * @returns New database operation
  */
 export function DBOp_get(operationTarget: number, key?: DatabaseKey): DBOp {
   if (operationTarget !== DBTarget_Receipts && operationTarget !== DBTarget_TxLookup && operationTarget !== DBTarget_BloomBits) {
@@ -95,12 +92,11 @@ export function DBOp_get(operationTarget: number, key?: DatabaseKey): DBOp {
 }
 
 /**
- * Create new operation which can set data into database
- * @param operationTarget The type of data to be operated
- * @param value The data to be inserted
- * @param key Used to generate database, identified by a block
- * hash, a block number, or both
- * @returns New operation
+ * Create a new database operation which can put data into database
+ * @param operationTarget - The type of data to be operated
+ * @param value - The data to be inserted
+ * @param key - Used to generate database key
+ * @returns New database operation
  */
 export function DBOp_set(operationTarget: number, value: Buffer | object, key?: DatabaseKey): DBOp {
   if (operationTarget !== DBTarget_Receipts && operationTarget !== DBTarget_TxLookup && operationTarget !== DBTarget_BloomBits) {
@@ -124,11 +120,10 @@ export function DBOp_set(operationTarget: number, value: Buffer | object, key?: 
 }
 
 /**
- * Create new operation which deleted database data
- * @param operationTarget The type of data to be operated
- * @param key Used to generate database, identified by a block
- * hash, a block number, or both
- * @returns New operation
+ * Create a new database operation which can delete data from database
+ * @param operationTarget - The type of data to be operated
+ * @param key - Used to generate database key
+ * @returns New database operation
  */
 export function DBOp_del(operationTarget: number, key?: DatabaseKey): DBOp {
   if (operationTarget !== DBTarget_Receipts && operationTarget !== DBTarget_TxLookup && operationTarget !== DBTarget_BloomBits) {
@@ -141,9 +136,8 @@ export function DBOp_del(operationTarget: number, key?: DatabaseKey): DBOp {
 }
 
 /**
- * Create DBTarget_TxLookup operations for all transactions of
- * the given block
- * @param block Block
+ * Create DBTarget_TxLookup operations for all transactions of the given block
+ * @param block - Target block
  * @returns Array of operations
  */
 export function DBSaveTxLookup(block: Block): DBOp[] {
@@ -162,11 +156,11 @@ export function DBSaveTxLookup(block: Block): DBOp[] {
 }
 
 /**
- * Create DBTarget_Receipts operations for given receipts
- * @param receipts Given Receipts
- * @param blockHash BlockHash
- * @param blockNumber BlockNumebr
- * @returns Array of operations
+ * Create DBTarget_Receipts operation for the given receipts
+ * @param receipts - Target receipts
+ * @param blockHash - Block hash
+ * @param blockNumber - Block number
+ * @returns New operation
  */
 export function DBSaveReceipts(receipts: Receipt[], blockHash: Buffer, blockNumber: BN) {
   return DBOp_set(DBTarget_Receipts, rlp.encode(receipts.map((r) => r.raw())), {
@@ -176,11 +170,11 @@ export function DBSaveReceipts(receipts: Receipt[], blockHash: Buffer, blockNumb
 }
 
 /**
- * Create DBTarget_BloomBits operations
- * @param bit Bit location
- * @param section Block section number
- * @param hash HeaderHash
- * @param bits Bloombit data
+ * Create DBTarget_BloomBits operation for the given section
+ * @param bit - Bit index of target section
+ * @param section - Section number
+ * @param hash - Hash of the last block header of the target section
+ * @param bits - Bloom bits data
  * @returns New operation
  */
 export function DBSaveBloomBits(bit: number, section: BN, hash: Buffer, bits: Buffer) {
@@ -188,9 +182,8 @@ export function DBSaveBloomBits(bit: number, section: BN, hash: Buffer, bits: Bu
 }
 
 /**
- * Database is based on Ethereum DBManager , storing/fetching
- * blockchain-related data,such as blocks and headers, indices,
- * and the head block
+ * Database is based on `@ethereumjs/blockchain`,
+ * provides a lot of interfaces for operating leveldb
  */
 export class Database extends DBManager {
   constructor(db: LevelUp, common: Common) {
@@ -208,10 +201,10 @@ export class Database extends DBManager {
   }
 
   /**
-   * Get the value in the database according to the given type and key
-   * @param dbOperationTarget The type of data to be operated
-   * @param key Used to generate database, identified by a block
-   * hash, a block number, or both
+   * Get the value in the database according to the given target type and key
+   * Overwrite from super class to impl get or put custom data
+   * @param dbOperationTarget - The type of data to be operated
+   * @param key - Used to generate database key
    * @returns
    */
   async get(dbOperationTarget: DBTarget, key?: DatabaseKey): Promise<any> {
@@ -240,8 +233,8 @@ export class Database extends DBManager {
   }
 
   /**
-   * Get transaction from database by transaction hash
-   * @param txHash Transaction hash
+   * Get transaction by transaction hash
+   * @param txHash - Transaction hash
    * @returns Transaction
    */
   async getTransaction(txHash: Buffer): Promise<Transaction> {
@@ -258,10 +251,10 @@ export class Database extends DBManager {
   }
 
   /**
-   * Get transaction from database by transaction hash, then
-   * new a WrappedTransaction
-   * @param txHash Transaction hash
-   * @returns Wrapped Transaction
+   * Get WrappedTransaction by transaction hash
+   * WrappedTransaction includes addtional information from block
+   * @param txHash - Transaction hash
+   * @returns WrappedTransaction
    */
   async getWrappedTransaction(txHash: Buffer): Promise<WrappedTransaction> {
     const blockHeightBuffer = await this.get(DBTarget_TxLookup, { txHash } as any);
@@ -277,9 +270,9 @@ export class Database extends DBManager {
   }
 
   /**
-   * Get transaction receipt from database by transaction hash
-   * @param txHash Transaction hash
-   * @returns Transaction recript
+   * Get transaction receipt by transaction hash
+   * @param txHash - Transaction hash
+   * @returns Receipt
    */
   async getReceipt(txHash: Buffer): Promise<Receipt> {
     const blockHeightBuffer = await this.get(DBTarget_TxLookup, { txHash } as any);
@@ -302,12 +295,11 @@ export class Database extends DBManager {
   }
 
   /**
-   * Get transaction receipt from database by transaction hash,
-   * blcokhash and blocknumber
-   * @param txHash Transaction hash
-   * @param blockHash Block hash
-   * @param blockNumber Block number
-   * @returns Transaction recript
+   * Get transaction receipt by block hash and block number
+   * @param txHash - Transaction hash
+   * @param blockHash - Block hash
+   * @param blockNumber - Block number
+   * @returns Transaction
    */
   async getReceiptByHashAndNumber(txHash: Buffer, blockHash: Buffer, blockNumber: BN): Promise<Receipt> {
     const header: BlockHeaderBuffer = rlp.decode(await this.get(DBTarget.Header, { blockHash, blockNumber })) as any;
@@ -330,9 +322,9 @@ export class Database extends DBManager {
   }
 
   /**
-   * Get block from database by blockHash and blockNumber
-   * @param blockHash  BlockHash
-   * @param blockNumber BlockNumber
+   * Get block by block hash and block number
+   * @param blockHash - Block hash
+   * @param blockNumber - Block number
    * @returns Block
    */
   async getBlockByHashAndNumber(blockHash: Buffer, blockNumber: BN): Promise<Block> {
@@ -349,19 +341,20 @@ export class Database extends DBManager {
   }
 
   /**
-   * Get BloomBits from database
-   * @param bit Bit location
-   * @param section Block section number
-   * @param hash Header hash
-   * @returns BloomBits
+   * Get bloom bits by section information
+   * @param bit - Bit index of target section
+   * @param section - Section number
+   * @param hash - Hash of the last block header of the target section
+   * @returns Bloom bits data
    */
   getBloomBits(bit: number, section: BN, hash: Buffer) {
     return this.get(DBTarget_BloomBits, { bit, section, hash } as any);
   }
 
   /**
-   * Get Canonical block header
-   * @param hash Block header hash
+   * Try to get canonical chain block header by block hash
+   * If it doesn't exist, return `undefined`
+   * @param hash - Block header hash
    * @returns Block header
    */
   async tryToGetCanonicalHeader(hash: Buffer) {
@@ -377,15 +370,20 @@ export class Database extends DBManager {
     }
   }
 
+  /**
+   * Get canonical chain block header by block number
+   * @param num - Target block number
+   * @returns Block header
+   */
   async getCanonicalHeader(num: BN) {
     const hash = await this.numberToHash(num);
     return await this.getHeader(hash, num);
   }
 
   /**
-   * Find the common ancestor block of two blocks
-   * @param header1 The header of block1
-   * @param header2 The header of block2
+   * Find the common ancestor block of two forks
+   * @param header1 - Header of fork1
+   * @param header2 - Header of fork2
    * @returns Ancestor block header
    */
   async findCommonAncestor(header1: BlockHeader, header2: BlockHeader) {
@@ -407,7 +405,7 @@ export class Database extends DBManager {
 
   /**
    * Get section count of database
-   * @returns Max section
+   * @returns section count
    */
   async getStoredSectionCount() {
     try {
@@ -422,7 +420,7 @@ export class Database extends DBManager {
 
   /**
    * Set section count of database
-   * @param section
+   * @param section - Section count
    */
   async setStoredSectionCount(section: BN | undefined) {
     section === undefined ? await this.rawdb.del('scount') : await this.rawdb.put('scount', section.toString());

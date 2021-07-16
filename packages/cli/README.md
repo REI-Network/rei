@@ -5,7 +5,7 @@
 
 Command Line of GXChain2.0
 
-**This project is currently under development, so no default bootnodes is currently provided.**
+**This project is currently under development, only testnet provides bootnode.**
 
 ## Install
 

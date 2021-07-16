@@ -6,6 +6,11 @@ import { setLevel, logger } from '@gxchain2/utils';
 import { SIGINT } from '../process';
 import { getPassphrase, getKeyStorePath } from './account';
 
+/**
+ * Start gxchain2.0 node
+ * @param opts - Commander options
+ * @returns node and rpc server instance
+ */
 export async function startNode(opts: { [option: string]: string }): Promise<[Node, undefined | RpcServer]> {
   setLevel(opts.verbosity);
   if (!fs.existsSync(opts.datadir)) {

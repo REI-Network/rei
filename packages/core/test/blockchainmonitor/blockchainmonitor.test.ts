@@ -1,11 +1,11 @@
 import process from 'process';
+import { expect } from 'chai';
 import { Block, Log } from '@gxchain2/structure';
 import { hexStringToBuffer, setLevel } from '@gxchain2/utils';
 import { DBSaveTxLookup, DBSaveReceipts } from '@gxchain2/database';
 import { RunBlockDebugOpts } from '@gxchain2/vm/dist/runBlock';
 import { Node } from '../../src';
 import { createNode, destroyNode, loadBlocksFromTestData } from '../util';
-import { keccak256 } from 'ethereumjs-util';
 
 setLevel('silent');
 const dirname = 'blockchainMonitor';
@@ -72,16 +72,15 @@ describe('BlockchainMonitor', async () => {
         console.log(newBlockHashSet, eventSet);
         throw new Error("missing 'newHeads' event");
       }
+      expect(newBlockHashSet.size, 'set size should be equal').be.equal(eventSet.size);
       for (const hash of newBlockHashSet) {
         newBlockHashSet.delete(hash);
         eventSet.delete(hash);
       }
-      if (newBlockHashSet.size !== 0 || eventSet.size !== 0) {
-        throw new Error("missing 'newHeads' event");
-      }
-      if (logs.length !== 1 || logs[0].removed !== false || !keccak256(logs[0].serialize()).equals(hexStringToBuffer('81a93f1b18562fe496865812f8cff49db870421fe889ffb11b3fc13aacc8d125'))) {
-        throw new Error('missing or invalid log');
-      }
+      expect(newBlockHashSet.size, 'set size should be zero').be.equal(0);
+      expect(eventSet.size, 'set size should be zero').be.equal(0);
+      expect(logs.length, 'logs length should be 1').be.equal(1);
+      expect(logs[0].removed === false, "log shouldn't be removed").be.true;
     } finally {
       node.bcMonitor.off('newHeads', onNewHeads);
       node.bcMonitor.off('logs', onLogs);
@@ -98,9 +97,8 @@ describe('BlockchainMonitor', async () => {
       for (const block of fork2) {
         await processBlock(block);
       }
-      if (removedLogs.length !== 1 || removedLogs[0].removed !== true || !keccak256(removedLogs[0].serialize()).equals(hexStringToBuffer('81a93f1b18562fe496865812f8cff49db870421fe889ffb11b3fc13aacc8d125'))) {
-        throw new Error('missing or invalid log');
-      }
+      expect(removedLogs.length, 'removedLogs length should be 1').be.equal(1);
+      expect(removedLogs[0].removed === true, 'log should be removed').be.true;
     } finally {
       node.bcMonitor.off('removedLogs', onRemovedLogs);
     }

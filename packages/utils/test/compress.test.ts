@@ -1,25 +1,23 @@
-import fs from 'fs';
-import path from 'path';
 import { expect } from 'chai';
 import { hexStringToBuffer, compressBytes, decompressBytes } from '../src';
 
-describe('compress', () => {
-  let testdata: Buffer;
-  let compressed: Buffer;
-  let decompressed: Buffer;
-  let testdir: string;
+const testdata = ['0x0000000000000000000000000000000000000000000000000de0b6b3a7640000', '0x6dccc565ee3296e533e4be98733e284a45dz7ca72883935f418c11f284354a3c'];
 
-  before(() => {
-    testdir = path.join(__dirname, './compress-test-data.json');
-    const filedata = JSON.parse(fs.readFileSync(testdir).toString());
-    testdata = hexStringToBuffer(filedata.testdata);
-    compressed = compressBytes(testdata);
-    decompressed = decompressBytes(compressed, testdata.length);
-    console.log(testdata);
-    console.log(compressed.toJSON().data);
+describe('Compress', () => {
+  it('should shorter than the original data', () => {
+    const compressed = compressBytes(hexStringToBuffer(testdata[0]));
+    expect(compressed.length, 'compressed should be shorter').be.lt(hexStringToBuffer(testdata[0]).length);
   });
 
-  it('should decompress directly', () => {
-    expect(decompressed.equals(testdata), 'The decompressed data needs to be equal to the original data').be.true;
+  it('should equal raw data', () => {
+    const compressed = compressBytes(hexStringToBuffer(testdata[1]));
+    expect(compressed.equals(hexStringToBuffer(testdata[1])), 'should be equal').be.true;
+  });
+
+  it('should decompress correctly', () => {
+    const testbuffer = hexStringToBuffer(testdata[0]);
+    const compressed = compressBytes(testbuffer);
+    const decompressed = decompressBytes(compressed, testbuffer.length);
+    expect(decompressed.equals(testbuffer), 'The decompressed data needs to be equal to the original data').be.true;
   });
 });

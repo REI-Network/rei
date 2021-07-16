@@ -3,6 +3,9 @@ import { Channel, logger } from '@gxchain2/utils';
 import { NetworkManager, logNetworkError } from './index';
 import { Protocol, ProtocolHandler } from './types';
 
+/**
+ * MsgQueue has the protocol processing method and maintain a message transmission queue
+ */
 export class MsgQueue {
   readonly handler: ProtocolHandler;
   private readonly peer: Peer;
@@ -26,6 +29,11 @@ export class MsgQueue {
     });
   }
 
+  /**
+   * Push the coding results of methods and data into the queue
+   * @param method The method's name
+   * @param data The data
+   */
   send(method: string | number, data: any) {
     if (this.aborted) {
       throw new Error('MsgQueue already aborted');
@@ -34,6 +42,10 @@ export class MsgQueue {
     this.queue.push(data);
   }
 
+  /**
+   * Iterator function, used to get the message data in the queue
+   * @returns Empty array if no data left
+   */
   private async *generator() {
     const gen = this.queue.generator();
     while (true) {
@@ -46,6 +58,10 @@ export class MsgQueue {
     }
   }
 
+  /**
+   * Pipe transmission of stream information, then handle the data
+   * @param stream Information transmission structure
+   */
   pipeStream(stream: any) {
     if (this.aborted) {
       throw new Error('MsgQueue already aborted');
@@ -94,6 +110,9 @@ export class MsgQueue {
   }
 }
 
+/**
+ * Peer is a class manage communications
+ */
 export class Peer {
   readonly peerId: string;
   private readonly networkMngr: NetworkManager;
@@ -104,6 +123,11 @@ export class Peer {
     this.networkMngr = networkMngr;
   }
 
+  /**
+   * Create a MsgQueue object, and push it into the queueMap
+   * @param protocol Protocol information
+   * @returns The object of MsgQueue and ProtocolHandler
+   */
   private async makeMsgQueue(protocol: Protocol) {
     const oldQueue = this.queueMap.get(protocol.name);
     if (oldQueue) {
@@ -115,6 +139,11 @@ export class Peer {
     return { queue, handler };
   }
 
+  /**
+   * Get the MsgQueue from the queue map
+   * @param name The protocol's name
+   * @returns The MsgQueue object
+   */
   getMsgQueue(name: string) {
     const queue = this.queueMap.get(name);
     if (!queue) {
@@ -123,6 +152,9 @@ export class Peer {
     return queue;
   }
 
+  /**
+   * Close node communication and remove the peer
+   */
   async close() {
     await this.networkMngr.removePeer(this.peerId);
   }
@@ -132,10 +164,23 @@ export class Peer {
     this.queueMap.clear();
   }
 
+  /**
+   * Query whether a certain protocol is supported
+   * @param name The protocol's name
+   * @returns `true` if supported, `false` not
+   */
   isSupport(name: string): boolean {
     return this.queueMap.has(name);
   }
 
+  /**
+   * Receive protocol and stream information, install protocol, determine
+   * and return whether the handshake is successful
+   * @param protocol Protocol information
+   * @param stream Information transmission structure
+   * @returns `true` if the protocol is installed successfully, `false`
+   * if not
+   */
   async installProtocol(protocol: Protocol, stream: any) {
     const { queue, handler } = await this.makeMsgQueue(protocol);
     queue.pipeStream(stream);

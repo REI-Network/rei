@@ -4,6 +4,9 @@ import { Receipt } from './receipt';
 export type LogRawValue = Buffer | Buffer[];
 export type LogRawValues = LogRawValue[];
 
+/**
+ * The transaction log records the details of the transaction
+ */
 export class Log {
   address: Buffer;
   topics: Buffer[];
@@ -22,6 +25,11 @@ export class Log {
     this.data = data;
   }
 
+  /**
+   * Generate Log object by given serialized data
+   * @param serialized Serialized data
+   * @returns A new Log object
+   */
   public static fromRlpSerializedLog(serialized: Buffer) {
     const values = rlp.decode(serialized);
     if (!Array.isArray(values)) {
@@ -30,6 +38,11 @@ export class Log {
     return Log.fromValuesArray(values);
   }
 
+  /**
+   * Generate Log object by given values
+   * @param values Given values
+   * @returns A new Log object
+   */
   public static fromValuesArray(values: LogRawValues): Log {
     if (values.length !== 3) {
       throw new Error('Invalid log. Only expecting 3 values.');
@@ -38,14 +51,27 @@ export class Log {
     return new Log(address, topics, data);
   }
 
+  /**
+   * Get the row data in the log information
+   * @returns The object of address topics and data
+   */
   raw(): LogRawValues {
     return [this.address, this.topics, this.data];
   }
 
+  /**
+   * Serialize transaction log information
+   * @returns Encoded data
+   */
   serialize(): Buffer {
     return rlp.encode(this.raw());
   }
 
+  /**
+   * Assign values to other members based on transaction receipt
+   * @param receipt Transaction receip
+   * @param logIndex Index of log
+   */
   installProperties(receipt: Receipt, logIndex: number) {
     this.blockHash = receipt.blockHash;
     this.blockNumber = receipt.blockNumber;
@@ -54,6 +80,10 @@ export class Log {
     this.logIndex = logIndex;
   }
 
+  /**
+   * Convert the log into json form so that can be transported by rpc port
+   * @returns Converted Json object
+   */
   toRPCJSON() {
     return {
       address: bufferToHex(this.address),

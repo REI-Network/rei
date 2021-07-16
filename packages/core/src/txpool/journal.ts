@@ -7,6 +7,10 @@ import { Node } from '../node';
 
 const bufferSplit = Buffer.from('\r\n');
 
+/**
+ * Journal is a rotating log of transactions with the aim of storing locally
+ * created transactions to allow non-executed ones to survive node restarts.
+ */
 export class Journal {
   private path: string;
   private dir: string;
@@ -19,12 +23,18 @@ export class Journal {
     this.node = node;
   }
 
+  /**
+   * create stream writter If not exists
+   */
   private createWritterIfNotExists() {
     if (!this.writer) {
       this.writer = fs.createWriteStream(this.path, { flags: 'a' });
     }
   }
 
+  /**
+   * Close stream witter
+   */
   private async closeWritter() {
     if (this.writer) {
       await new Promise((r) => {

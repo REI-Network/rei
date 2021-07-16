@@ -3,6 +3,15 @@ import { Block } from '@ethereumjs/block';
 import { CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@ethereumjs/block/dist/clique';
 import { txSize, WrappedTransaction, Transaction } from './transaction';
 
+/**
+ * Calculate clique difficulty and `inturn` , if `inturn` is true,
+ * generate a block with a difficulty of 2, else generate a block
+ * with a difficulty of 1
+ * @param activeSigners Actives Singers now
+ * @param signer All singers
+ * @param number The block number
+ * @returns The object of inTurn and difficulty
+ */
 export function calcCliqueDifficulty(activeSigners: Address[], signer: Address, number: BN): [boolean, BN] {
   if (activeSigners.length === 0) {
     throw new Error('Missing active signers information');
@@ -12,6 +21,9 @@ export function calcCliqueDifficulty(activeSigners: Address[], signer: Address, 
   return [inTurn, (inTurn ? CLIQUE_DIFF_INTURN : CLIQUE_DIFF_NOTURN).clone()];
 }
 
+/**
+ * WrappedBlock based on Ethereum block.
+ */
 export class WrappedBlock {
   readonly block: Block;
   private readonly isPending: boolean;
@@ -22,6 +34,9 @@ export class WrappedBlock {
     this.isPending = isPending;
   }
 
+  /**
+   * Get the size of the total block
+   */
   get size() {
     if (this._size) {
       return this._size;
@@ -33,6 +48,11 @@ export class WrappedBlock {
     return this._size;
   }
 
+  /**
+   * Convert the block into json form so that can be transported by rpc port
+   * @param fullTransactions Whether to load all transaction information
+   * @returns Converted Json object
+   */
   toRPCJSON(fullTransactions: boolean = false) {
     return {
       number: this.isPending ? null : bnToHex(this.block.header.number),

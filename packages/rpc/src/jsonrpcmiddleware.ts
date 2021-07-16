@@ -22,6 +22,9 @@ export interface JsonMiddlewareOption {
   onError?: (err: any, body: JsonRPCBody) => void;
 }
 
+/**
+ * JsonRPCMiddleware is used to process incoming rpc requests
+ */
 export class JsonRPCMiddleware {
   private readonly config: JsonMiddlewareOption;
 
@@ -31,9 +34,10 @@ export class JsonRPCMiddleware {
   }
 
   /**
-   * JSON RPC request handler
-   * @param {object} body
-   * @return {Promise}
+   * Deal with a single RPC request
+   * @param {object} body Request body
+   * @param context Running context https or websocket
+   * @returns Handled result
    */
   private async handleSingleReq(body: JsonRPCBody, context: RpcContext): Promise<any> {
     const { id, method, jsonrpc, params } = body;
@@ -69,6 +73,12 @@ export class JsonRPCMiddleware {
     }
   }
 
+  /**
+   * Process a series of requests
+   * @param bachBody Request body
+   * @param context Running context https or websocket
+   * @returns Array of Handled results
+   */
   private handleBatchReq(bachBody: any[], context: RpcContext): Promise<any[]> {
     return Promise.all(
       bachBody.reduce((memo, body) => {
@@ -79,6 +89,10 @@ export class JsonRPCMiddleware {
     );
   }
 
+  /**
+   * Create PARSE_ERROR object
+   * @returns
+   */
   private makeParseError() {
     return {
       jsonrpc: JSONRPC_VERSION,
@@ -96,6 +110,10 @@ export class JsonRPCMiddleware {
     }
   }
 
+  /**
+   * Format the rpc request passed in by websocket and then process it
+   * @param context Websocket context
+   */
   wrapWs(context: RpcContext) {
     context.client!.ws.addEventListener('message', (msg) => {
       let rpcData: any;
@@ -109,6 +127,9 @@ export class JsonRPCMiddleware {
     });
   }
 
+  /**
+   * Format the rpc request passed in by http and then process it
+   */
   makeMiddleWare() {
     return (req: any, res: any, next: any) => {
       if (req.ws) {

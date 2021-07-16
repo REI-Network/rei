@@ -3,13 +3,66 @@
 [![Install Size](https://packagephobia.now.sh/badge?p=@gxchain2/blockchain)](https://packagephobia.now.sh/result?p=@gxchain2/blockchain)
 ![License](https://img.shields.io/npm/l/@gxchain2/blockchain)
 
-
+<font size=3>
  Definition of blockchain structure and rules, based on `@ethereumjs/blockchain`, fixed the incorrect calculation of total difficult difficulty under clique consensus,optimized the function to get the latest block `latestBlock`.
+</font>
+
 
 ## INSTALL
 
 ```sh
 npm install @gxchain2/blockchain
+```
+
+## STRUCTURE
+```ts
+/**
+ * Blockchain represents the canonical chain given a database with a genesis
+ * block. The Blockchain manages chain imports, reverts, chain reorganisations.
+ */
+export declare class Blockchain extends EthereumBlockchain {
+    dbManager: Database;
+    private _latestBlock;
+    private _totalDifficulty;
+    constructor(opts: BlockchainOptions);
+    /**
+     * Return blockchain's latest block
+     */
+    get latestBlock(): Block;
+    /**
+     * Return blockchain's latest block's number, if not exsit, return 0
+     */
+    get latestHeight(): number;
+    /**
+     * Return blockchain's latest block's hash, if not exsit, return '00'
+     */
+    get latestHash(): string;
+    /**
+     * Return blockchain's totalDifficulty
+     */
+    get totalDifficulty(): BN;
+    /**
+     * This method check and update the latestBlock, totalDifficulty of blockchain, issue the 'update' event
+     */
+    private updateLatest;
+    /**
+     * Initialize
+     */
+    init(): Promise<void>;
+    /**
+     * Adds a block to the blockchain by calling the method 'putBlock' of parent class
+     * Update the blockchain's latest status
+     *
+     * @param block - The block to be added to the blockchain
+     */
+    putBlock(block: Block): Promise<void>;
+    /**
+     * Get active clique signers in a certain blocknumber, return addresses
+     * @param number - The number of block
+     * @returns Active clique signers
+     */
+    cliqueActiveSignersByBlockNumber(number: BN): Address[];
+}
 ```
 
 ## USAGE

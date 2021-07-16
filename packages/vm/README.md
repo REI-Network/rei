@@ -19,6 +19,30 @@ Virtual machine based on `@ethereumjs/vm`, added logic about `runblock` and `run
 ```sh
 npm install @gxchain2/vm
 ```
+## STRUCTURE
+```ts
+/**
+ * WrappedVM contains a evm, responsible for executing an EVM message fully
+ * (including any nested calls and creates), processing the results and
+ * storing them to state (or discarding changes in case of exceptions).
+ */
+export declare class WrappedVM {
+    readonly vm: VM;
+    constructor(vm: VM);
+    /**
+     * The method call the runBlock method and redirect it to the vm
+     * @param opts Options for running block.
+     * @returns
+     */
+    runBlock(opts: RunBlockDebugOpts): Promise<RunBlockResult>;
+    /**
+     * The method call the runCall method and redirect it to the vm
+     * @param opts Options for running call.
+     * @returns
+     */
+    runCall(opts: RunCallDebugOpts): Promise<import("@ethereumjs/vm/dist/evm/evm").EVMResult>;
+}
+```
 
 ## USAGE
 

@@ -17,6 +17,29 @@ The basic settings of gxchain2, based on '@ethereumjs/common' including paramete
 npm install @gxchain2/common
 ```
 
+## STRUCTURE
+```ts
+/**
+ * Common class to access chain and hardfork parameters, based on 'EthereumCommon'
+ */
+export declare class Common extends EthereumCommon {
+    /**
+     * Static method to create a Common object based on 'EthereumCommon'
+     * @param chain The name (`mainnet`) or id (`1`)  or a object of a standard chain used to base the custom
+     * chain params on.
+     * @returns Common objcet
+     */
+    static createChainStartCommon(chain: number | string | Object): Common;
+    /**
+     * Static method to create a Common object and sets a new hardfork based on the block number provided
+     * @param num block number
+     * @param chain The name (`mainnet`) or id (`1`)  or a object of a standard chain used to base the custom
+     * chain params on.
+     * @returns Common objcet
+     */
+    static createCommonByBlockNumber(num: BNLike, chain: number | string | Object): Common;
+}
+```
 ## USAGE
 
 ```ts

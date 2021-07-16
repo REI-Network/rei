@@ -1,10 +1,19 @@
 import fs from 'fs';
 import path from 'path';
 
+/**
+ * FileCache is a cache of files seen during scan of keystore.
+ */
 export class FileCache {
   private all: string[] = [];
   private lastMod: number = Date.now();
 
+  /**
+   * scan performs a new scan on the given directory, compares against the already
+   * cached filenames, and returns file sets: creates, deletes, updates.
+   * @param keydir The Given directory
+   * @returns Three arraies of files: creates, deletes, updates
+   */
   scan(keydir: string): [string[], string[], string[]] {
     try {
       const files = fs.readdirSync(keydir).filter((item) => !/(^|\/)\.[^\/\.]/g.test(item));

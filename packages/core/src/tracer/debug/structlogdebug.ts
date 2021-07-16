@@ -32,6 +32,12 @@ export class StructLogDebug implements IDebugImpl {
     this.hash = hash;
   }
 
+  /**
+   * captureLog logs a new structured log message and pushes it out to the environment
+   * @param step Step state
+   * @param cost Cost value
+   * @param error Error message
+   */
   private async captureLog(step: InterpreterStep, cost: BN, error?: string) {
     let memory: string[] = [];
     if (!this.config.disableMemory && step.memoryWordCount.gtn(0)) {
@@ -92,12 +98,36 @@ export class StructLogDebug implements IDebugImpl {
     this.logs.push(log);
   }
 
+  /**
+   * CaptureStart implements the Tracer interface to initialize the tracing operation.
+   * @param from From address
+   * @param to To address
+   * @param create Create or call
+   * @param input Input data
+   * @param gas GasLimit
+   * @param gasPrice  gasPrice
+   * @param intrinsicGas Intrinsic gas
+   * @param value Sent to it from it's caller
+   * @param number Blocknumber
+   * @param stateManager state trie manager
+   */
   async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, gasPrice: BN, intrinsicGas: BN, value: BN, number: BN, stateManager: StateManager) {}
 
+  /**
+   * captureState call the captureLog function
+   * @param step Step state
+   * @param cost Cost value
+   */
   async captureState(step: InterpreterStep, cost: BN) {
     await this.captureLog(step, cost);
   }
 
+  /**
+   * captureFault implements the Tracer interface to trace an execution fault
+   * @param step Step state
+   * @param cost Cost value
+   * @param err Error message
+   */
   async captureFault(step: InterpreterStep, cost: BN, err: any) {
     let errString: string;
     if (err instanceof VmError) {
@@ -113,6 +143,12 @@ export class StructLogDebug implements IDebugImpl {
     await this.captureLog(step, cost, errString);
   }
 
+  /**
+   * CaptureEnd Set output value and gasused
+   * @param output Output result
+   * @param gasUsed Gas used
+   * @param time Running time
+   */
   async captureEnd(output: Buffer, gasUsed: BN, time: number) {
     this.output = output;
     this.gasUsed = gasUsed.clone();

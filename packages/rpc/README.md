@@ -23,6 +23,45 @@ Rpc call interface of websocket and http.
 npm install @gxchain2/rpc
 ```
 
+## STRUCTURE
+```ts
+/**
+ * RPC running context, https or websocket
+ */
+export declare class RpcContext {
+    readonly client?: WsClient;
+    /**
+     * Determine whether it is a websock connection
+     */
+    get isWebsocket(): boolean;
+    constructor(client?: WsClient);
+}
+export declare const emptyContext: RpcContext;
+export interface RpcServerOptions {
+    node: Node;
+    port?: number;
+    host?: string;
+    apis?: string;
+}
+/**
+ * Manage rpc server
+ */
+export declare class RpcServer {
+    private readonly port;
+    private readonly host;
+    private running;
+    private readonly controllers;
+    /**
+     * Determine whether the rpc server is running
+     */
+    get isRunning(): boolean;
+    constructor(options: RpcServerOptions);
+    /**
+     * start rpc service, listening on the rpc request
+     */
+    start(): Promise<void>;
+}
+```
 ## USAGE
 
 ```sh

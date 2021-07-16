@@ -37,6 +37,11 @@ export declare interface NetworkManager {
 
 const ignoredErrors = new RegExp(['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED', '1 bytes', 'abort'].join('|'));
 
+/**
+ * Handle errors other than predicted errors or errors without error messages
+ * @param err Pending errors
+ */
+
 export function logNetworkError(prefix: string, err: any) {
   if (err.message && ignoredErrors.test(err.message)) {
     return;
@@ -72,6 +77,10 @@ export interface NetworkManagerOptions {
   bootnodes?: string[];
 }
 
+/**
+ * NetworkManager manages nodes and node communications protocols connected
+ * with local node
+ */
 export class NetworkManager extends EventEmitter {
   private readonly protocols: Protocol[];
   private readonly initPromise: Promise<void>;
@@ -113,6 +122,9 @@ export class NetworkManager extends EventEmitter {
     }
   }
 
+  /**
+   * Return all nodes recorded
+   */
   get peers() {
     return Array.from(this.installed.values());
   }
@@ -140,10 +152,22 @@ export class NetworkManager extends EventEmitter {
     }
   }
 
+  /**
+   * Set the node status to prohibited and remove from the map
+   * @param peerId The peer to be banned
+   * @param maxAge Prohibited duration
+   * @returns
+   */
   async ban(peerId: string, maxAge = 60000) {
     this.banned.set(peerId, Date.now() + maxAge);
     await this.removePeer(peerId);
   }
+
+  /**
+   * Determine whether a peer is banned
+   * @param peerId peer's information
+   * @returns `true` if the peer is banned, `false` if the peer is active
+   */
 
   isBanned(peerId: string): boolean {
     const expireTime = this.banned.get(peerId);
@@ -473,6 +497,9 @@ export class NetworkManager extends EventEmitter {
     }
   }
 
+  /**
+   * Stop all node connections and delete data
+   */
   async abort() {
     this.aborted = true;
     this.libp2pNode?.unhandle(this.protocols.map(({ protocolString }) => protocolString));

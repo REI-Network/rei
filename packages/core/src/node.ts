@@ -275,7 +275,7 @@ export class Node {
   /**
    * Assemble the Wrapped VM
    * @param root - The state root
-   * @returns new VM
+   * @returns new VM object
    */
   async getWrappedVM(root: Buffer, num: BNLike) {
     const stateManager = await this.getStateManager(root, num);
@@ -288,6 +288,10 @@ export class Node {
     );
   }
 
+  /**
+   * Create a new Bloom Filter
+   * @returns A BloomBitsFilter object
+   */
   getFilter() {
     return new BloomBitsFilter({ node: this, sectionSize: BloomBitsBlocks });
   }

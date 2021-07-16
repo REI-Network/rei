@@ -9,6 +9,10 @@ export interface BlockchainOptions extends EthereumBlockchainOptions {
   database: Database;
 }
 
+/**
+ * Blockchain represents the canonical chain given a database with a genesis
+ * block. The Blockchain manages chain imports, reverts, chain reorganisations.
+ */
 export class Blockchain extends EthereumBlockchain {
   dbManager: Database;
   private _latestBlock!: Block;
@@ -18,23 +22,37 @@ export class Blockchain extends EthereumBlockchain {
     super(opts);
     this.dbManager = opts.database;
   }
-
+  /**
+   * Return blockchain's latest block
+   */
   get latestBlock() {
     return this._latestBlock;
   }
 
+  /**
+   * Return blockchain's latest block's number, if not exsit, return 0
+   */
   get latestHeight() {
     return this._latestBlock?.header?.number?.toNumber() || 0;
   }
 
+  /**
+   * Return blockchain's latest block's hash, if not exsit, return '00'
+   */
   get latestHash() {
     return '0x' + (this._latestBlock?.header?.hash()?.toString('hex') || '00');
   }
 
+  /**
+   * Return blockchain's totalDifficulty
+   */
   get totalDifficulty() {
     return this._totalDifficulty.clone();
   }
 
+  /**
+   * This method check and update the latestBlock, totalDifficulty of blockchain, issue the 'update' event
+   */
   private async updateLatest() {
     const latestBlock = await this.getLatestBlock();
     if (!this._latestBlock || !latestBlock.header.hash().equals(this._latestBlock.header.hash())) {
@@ -43,16 +61,30 @@ export class Blockchain extends EthereumBlockchain {
     }
   }
 
+  /**
+   * Initialize
+   */
   async init() {
     await this.initPromise;
     await this.updateLatest();
   }
 
+  /**
+   * Adds a block to the blockchain by calling the method 'putBlock' of parent class
+   * Update the blockchain's latest status
+   *
+   * @param block - The block to be added to the blockchain
+   */
   async putBlock(block: Block) {
     await super.putBlock(block);
     await this.updateLatest();
   }
 
+  /**
+   * Get active clique signers in a certain blocknumber, return addresses
+   * @param number - The number of block
+   * @returns Active clique signers
+   */
   cliqueActiveSignersByBlockNumber(number: BN): Address[] {
     const _cliqueLatestSignerStates: CliqueLatestSignerStates = (this as any)._cliqueLatestSignerStates;
     for (let i = _cliqueLatestSignerStates.length - 1; i >= 0; i--) {

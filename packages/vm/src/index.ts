@@ -18,8 +18,8 @@ export class WrappedVM {
   }
 
   /**
-   * The method call the runBlock method and redirect it to the vm
-   * @param opts Options for running block.
+   * Run block with options
+   * @param opts - Options
    * @returns
    */
   async runBlock(opts: RunBlockDebugOpts): Promise<RunBlockResult> {
@@ -28,8 +28,8 @@ export class WrappedVM {
   }
 
   /**
-   * The method call the runCall method and redirect it to the vm
-   * @param opts Options for running call.
+   * Run call with options
+   * @param opts - Options
    * @returns
    */
   async runCall(opts: RunCallDebugOpts) {

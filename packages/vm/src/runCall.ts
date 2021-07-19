@@ -13,7 +13,10 @@ export interface RunCallDebugOpts extends RunCallOpts {
 }
 
 /**
- * @ignore
+ * Run a message call
+ * @param this - Ethereum VM
+ * @param opts - Options
+ * @returns
  */
 export default async function runCall(this: VM, opts: RunCallDebugOpts): Promise<EVMResult> {
   const block = opts.block || new Block();

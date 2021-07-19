@@ -21,13 +21,13 @@ export interface RunBlockDebugOpts extends RunBlockOpts {
    */
   debug?: IDebug;
   /**
-   * Custom validate block
+   * Clique signer for generating new block
    */
   cliqueSigner?: Buffer;
 }
 
 /**
- * Result of [[runBlock]]
+ * Result of `runBlock`
  */
 export interface RunBlockResult {
   result: PromisResultType<ReturnType<typeof applyBlock>>;
@@ -42,12 +42,11 @@ export interface AfterBlockEvent extends RunBlockResult {
 /**
  * Processes the `block` running all of the transactions it contains and updating the miner's
  * account
- * This method modifies the state. If `generate` is `true`, the state modifications will be
- * reverted if an exception is raised. If it's `false`, it won't revert if the block's header is
- * invalid. If an error is thrown from an event handler, the state may or may not be reverted.
- * @param this Execution engine
- * @param opts Options for running a block.
- * @returns
+ * This method modifies the state. If `generate` is `true`, it will generate a new block, if `false`,
+ * it will check whether transaction trie, receipt trie and state root match
+ * @param this - Ethereum VM
+ * @param opts - Options
+ * @returns RunBlockResult and new block(if generate)
  */
 export default async function runBlock(this: VM, opts: RunBlockDebugOpts): Promise<{ result: PromisResultType<ReturnType<typeof applyBlock>>; block?: Block }> {
   const state = this.stateManager;
@@ -312,13 +311,6 @@ async function assignBlockRewards(this: VM, block: Block): Promise<void> {
   await rewardAccount(state, block.header.cliqueSigner(), reward);
 }
 
-/**
- * Calculate reward for ommer block miner
- * @param ommerBlockNumber The number of ommer block
- * @param blockNumber The number of block
- * @param minerReward
- * @returns Reward amount
- */
 function calculateOmmerReward(ommerBlockNumber: BN, blockNumber: BN, minerReward: BN): BN {
   const heightDiff = blockNumber.sub(ommerBlockNumber);
   let reward = new BN(8).sub(heightDiff).mul(minerReward.divn(8));
@@ -328,12 +320,6 @@ function calculateOmmerReward(ommerBlockNumber: BN, blockNumber: BN, minerReward
   return reward;
 }
 
-/**
- * Calculate reward for mining block
- * @param minerReward Total reward of a block
- * @param ommersNum Amount of ommer blocks
- * @returns The final reward amount
- */
 function calculateMinerReward(minerReward: BN, ommersNum: number): BN {
   // calculate nibling reward
   const niblingReward = minerReward.divn(32);
@@ -342,12 +328,6 @@ function calculateMinerReward(minerReward: BN, ommersNum: number): BN {
   return reward;
 }
 
-/**
- * Distribute rewards and change account state
- * @param state State manager
- * @param address account address
- * @param reward Reward amount
- */
 async function rewardAccount(state: StateManager, address: Address, reward: BN): Promise<void> {
   const account = await state.getAccount(address);
   account.balance.iadd(reward);

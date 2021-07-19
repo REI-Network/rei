@@ -25,8 +25,8 @@ type Filter = {
 };
 
 /**
- * Generate subscription Id
- * @returns Buffer of id
+ * Generate subscription id
+ * @returns Subscription id
  */
 function genSubscriptionId() {
   return bufferToHex(uuidv4({}, Buffer.alloc(16, 0)));
@@ -63,7 +63,7 @@ class SyncingTask {
 type Task = LogsTask | HeadsTask | PendingTxTask | SyncingTask;
 
 /**
- * FilterSystem used to filter and send subscription data
+ * Filter subscribe information for client
  */
 export class FilterSystem {
   private readonly node: Node;
@@ -151,7 +151,7 @@ export class FilterSystem {
   }
 
   /**
-   * Recycle all subscriptions once in a while and delete the timeout ones
+   * A loop to delete timeout filter
    */
   private async timeoutLoop() {
     while (!this.aborter.isAborted) {
@@ -167,7 +167,7 @@ export class FilterSystem {
   }
 
   /**
-   * Task loop used to push messages cyclically to subscribers
+   * A loop to handle blockchain event
    */
   private async taskLoop() {
     for await (const task of this.taskQueue.generator()) {
@@ -192,10 +192,10 @@ export class FilterSystem {
    * Subscription operation, categorize subscription types, including
    * `newHeads`, `logs`, `newPendingTransactions`, `syncing`, then set
    * into map
-   * @param client Websocket client
-   * @param type Subscription types
-   * @param query Query option
-   * @returns Subscription Id
+   * @param client - Websocket client
+   * @param type - Subscription type
+   * @param query - Query option
+   * @returns Subscription id
    */
   subscribe(client: WsClient, type: string, query?: Query): string {
     const uid = genSubscriptionId();
@@ -222,10 +222,10 @@ export class FilterSystem {
   }
 
   /**
-   * Creates a filter object, based on filter options, to notify when the state changes
-   * @param type Filter type
-   * @param query Query option
-   * @returns Filter Id
+   * Creates a filter object, based on filter options
+   * @param type - Filter type
+   * @param query - Query option
+   * @returns Filter id
    */
   newFilter(type: string, query?: Query): string {
     const uid = genSubscriptionId();
@@ -249,8 +249,8 @@ export class FilterSystem {
   }
 
   /**
-   * Unsubscribe, delete from subscription maps
-   * @param id  Subscription Id
+   * Unsubscribe subscription
+   * @param id - Subscription id
    * @returns `true` if sucessfully deleted
    */
   unsubscribe(id: string) {
@@ -262,8 +262,8 @@ export class FilterSystem {
   }
 
   /**
-   * uninstall, delete from filter maps
-   * @param id Filter id
+   * Uninstall filter
+   * @param id - Filter id
    * @returns `true` if sucessfully deleted
    */
   uninstall(id: string) {
@@ -275,8 +275,8 @@ export class FilterSystem {
   }
 
   /**
-   * Get the query of filter
-   * @param id Filter id
+   * Get the query information of filter
+   * @param id - Filter id
    * @returns Query object
    */
   getFilterQuery(id: string) {
@@ -298,9 +298,8 @@ export class FilterSystem {
   }
 
   /**
-   * Polling method for a filter, which returns an array of
-   * specified type of datawhich occurred since last poll.
-   * @param id Filter id
+   * Get the data changed in the filter
+   * @param id - Filter id
    * @returns Changed data
    */
   filterChanges(id: string) {
@@ -337,9 +336,8 @@ export class FilterSystem {
   }
 
   /**
-   * Send new pending transactions to all subscription which
-   * subscribe PendingTransaction
-   * @param hashs Transaction Hashs
+   * Notify new pending transactions to all subscribed client
+   * @param hashs - Transaction hashes
    */
   private newPendingTransactions(hashs: Buffer[]) {
     for (const [id, filter] of this.subscribePendingTransactions) {
@@ -355,9 +353,8 @@ export class FilterSystem {
   }
 
   /**
-   * Send new block headers to all subscription which
-   * subscribe Heads
-   * @param heads Block headers
+   * Notify new heads to all subscribed client
+   * @param heads - Block headers
    */
   private newHeads(heads: BlockHeader[]) {
     for (const [id, filter] of this.subscribeHeads) {
@@ -373,9 +370,8 @@ export class FilterSystem {
   }
 
   /**
-   * Send new logs to all subscription which
-   * subscribe Logs
-   * @param logs Transaction logs
+   * Notify new logs to all subscribed client
+   * @param logs - Transaction logs
    */
   private newLogs(logs: Log[]) {
     for (const [id, filter] of this.subscribeLogs) {
@@ -397,9 +393,8 @@ export class FilterSystem {
   }
 
   /**
-   * Send Syncing state to all subscription which
-   * subscribe Syncing
-   * @param state Syncing state
+   * Notify sync status to all subscribed client
+   * @param state - Sync state
    */
   private newSyncing(state: SyncingStatus) {
     for (const [id, filter] of this.subscribeSyncing) {

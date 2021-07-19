@@ -22,9 +22,6 @@ export interface JsonMiddlewareOption {
   onError?: (err: any, body: JsonRPCBody) => void;
 }
 
-/**
- * JsonRPCMiddleware is used to process incoming rpc requests
- */
 export class JsonRPCMiddleware {
   private readonly config: JsonMiddlewareOption;
 

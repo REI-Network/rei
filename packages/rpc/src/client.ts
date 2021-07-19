@@ -10,7 +10,7 @@ export class WsClient {
   private closed = false;
 
   /**
-   * Determine whether the connection is disconnected
+   * Whether the connection is disconnected
    */
   get isClosed() {
     return this.closed;
@@ -21,8 +21,8 @@ export class WsClient {
   }
 
   /**
-   * Used to send Json message
-   * @param data Data
+   * Send message to remote client
+   * @param data - Data
    */
   send(data: any) {
     if (!this.closed) {
@@ -40,9 +40,9 @@ export class WsClient {
   }
 
   /**
-   * Used to send block headers for subscription
-   * @param subscription Subscription identity
-   * @param heads Block headers
+   * Notify block headers to remote client
+   * @param subscription - Subscription identity
+   * @param heads - Block headers
    */
   notifyHeader(subscription: string, heads: BlockHeader[]) {
     for (const header of heads) {
@@ -58,9 +58,9 @@ export class WsClient {
   }
 
   /**
-   * Used to send log information for subscription
-   * @param subscription Subscription identity
-   * @param logs Logs information
+   * Notify logs to remote client
+   * @param subscription - Subscription identity
+   * @param logs - Logs
    */
   notifyLogs(subscription: string, logs: Log[]) {
     for (const log of logs) {
@@ -76,9 +76,9 @@ export class WsClient {
   }
 
   /**
-   * Used to send pending transactions for subscription
-   * @param subscription Subscription identity
-   * @param hashes Transactions hashes
+   * Notify pending transactions to remote client
+   * @param subscription - Subscription identity
+   * @param hashes - Transactions hashes
    */
   notifyPendingTransactions(subscription: string, hashes: Buffer[]) {
     for (const hash of hashes) {
@@ -94,9 +94,9 @@ export class WsClient {
   }
 
   /**
-   * Used to send Syncing state for subscription
-   * @param subscription Subscription identity
-   * @param status Syncing state
+   * Notify sync state to remote client
+   * @param subscription - Subscription identity
+   * @param status - Sync state
    */
   notifySyncing(subscription: string, status: SyncingStatus) {
     this.send({

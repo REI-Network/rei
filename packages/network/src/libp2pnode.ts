@@ -16,7 +16,7 @@ export interface Libp2pNodeOptions {
 }
 
 /**
- * The Libp2pNode inherits the libp2p class and initializes settings.
+ * `libp2p` node
  */
 export class Libp2pNode extends Libp2p {
   constructor(options: Libp2pNodeOptions) {
@@ -59,6 +59,9 @@ export class Libp2pNode extends Libp2p {
     });
   }
 
+  /**
+   * Only can get value after libp2p has been started
+   */
   get discv5(): Discv5Discovery {
     return this._discovery.get(Discv5Discovery.tag);
   }

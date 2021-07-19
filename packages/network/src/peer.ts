@@ -4,7 +4,7 @@ import { NetworkManager, logNetworkError } from './index';
 import { Protocol, ProtocolHandler } from './types';
 
 /**
- * MsgQueue has the protocol processing method and maintain a message transmission queue
+ * A message queue for a single protocol
  */
 export class MsgQueue {
   readonly handler: ProtocolHandler;
@@ -30,9 +30,9 @@ export class MsgQueue {
   }
 
   /**
-   * Push the coding results of methods and data into the queue
-   * @param method The method's name
-   * @param data The data
+   * Encode and push a data to message queue
+   * @param method - Method name or code
+   * @param data - Method data
    */
   send(method: string | number, data: any) {
     if (this.aborted) {
@@ -43,8 +43,7 @@ export class MsgQueue {
   }
 
   /**
-   * Iterator function, used to get the message data in the queue
-   * @returns Empty array if no data left
+   * Return an async generator for writing data from message queue to to the `libp2p` stream
    */
   private async *generator() {
     const gen = this.queue.generator();
@@ -59,8 +58,8 @@ export class MsgQueue {
   }
 
   /**
-   * Pipe transmission of stream information, then handle the data
-   * @param stream Information transmission structure
+   * Pipe `libp2p` stream's sink and source
+   * @param stream - `libp2p` stream
    */
   pipeStream(stream: any) {
     if (this.aborted) {
@@ -111,7 +110,7 @@ export class MsgQueue {
 }
 
 /**
- * Peer is a class manage communications
+ * Peer class manages a single remote peer instance
  */
 export class Peer {
   readonly peerId: string;
@@ -124,9 +123,9 @@ export class Peer {
   }
 
   /**
-   * Create a MsgQueue object, and push it into the queueMap
-   * @param protocol Protocol information
-   * @returns The object of MsgQueue and ProtocolHandler
+   * Create a message queue object by protocol
+   * @param protocol - Protocol object
+   * @returns Message queue and protocol handler
    */
   private async makeMsgQueue(protocol: Protocol) {
     const oldQueue = this.queueMap.get(protocol.name);
@@ -140,9 +139,9 @@ export class Peer {
   }
 
   /**
-   * Get the MsgQueue from the queue map
-   * @param name The protocol's name
-   * @returns The MsgQueue object
+   * Get the message queue by protocol name
+   * @param name - Protocol name
+   * @returns Message queue
    */
   getMsgQueue(name: string) {
     const queue = this.queueMap.get(name);
@@ -153,7 +152,7 @@ export class Peer {
   }
 
   /**
-   * Close node communication and remove the peer
+   * Close self
    */
   async close() {
     await this.networkMngr.removePeer(this.peerId);
@@ -165,21 +164,19 @@ export class Peer {
   }
 
   /**
-   * Query whether a certain protocol is supported
-   * @param name The protocol's name
-   * @returns `true` if supported, `false` not
+   * Query whether a protocol is supported
+   * @param name - Protocol name
+   * @returns `true` if supported, `false` if not
    */
   isSupport(name: string): boolean {
     return this.queueMap.has(name);
   }
 
   /**
-   * Receive protocol and stream information, install protocol, determine
-   * and return whether the handshake is successful
-   * @param protocol Protocol information
-   * @param stream Information transmission structure
-   * @returns `true` if the protocol is installed successfully, `false`
-   * if not
+   * Make message queue for protocol and handshake
+   * @param protocol - Protocol object
+   * @param stream - `libp2p` stream
+   * @returns Whether the handshake was successful
    */
   async installProtocol(protocol: Protocol, stream: any) {
     const { queue, handler } = await this.makeMsgQueue(protocol);

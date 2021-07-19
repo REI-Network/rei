@@ -1,8 +1,5 @@
 import { Peer } from './peer';
 
-/**
- * Base interface for all wire protocols
- */
 export interface Protocol {
   name: string;
   protocolString: string;

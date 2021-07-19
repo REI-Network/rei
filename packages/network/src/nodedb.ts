@@ -25,6 +25,9 @@ async function* iteratorToAsyncGenerator<K, V>(itr: AbstractIterator<K, V>) {
   itr.end(() => {});
 }
 
+/**
+ * A simple database class for persisting and loading enr information
+ */
 export class NodeDB {
   private db: DB;
 
@@ -32,6 +35,9 @@ export class NodeDB {
     this.db = db;
   }
 
+  /**
+   * Load local node enr information
+   */
   async loadLocal() {
     try {
       return ENR.decode(await this.db.get(Buffer.from('local')));
@@ -43,6 +49,9 @@ export class NodeDB {
     }
   }
 
+  /**
+   * Load all remote node enr information
+   */
   async load(onData: (enr: ENR) => void) {
     const itr = this.db.iterator({ keys: true, values: true });
     for await (const [nodeId, serialized] of iteratorToAsyncGenerator(itr)) {
@@ -53,10 +62,16 @@ export class NodeDB {
     }
   }
 
+  /**
+   * Persist local node enr information
+   */
   persistLocal(enr: ENR, privateKey?: Buffer) {
     return this.db.put(Buffer.from('local'), enr.encode(privateKey));
   }
 
+  /**
+   * Persist remote node enr information
+   */
   persist(enr: ENR) {
     return this.db.put(Buffer.from(enr.nodeId), enr.encode());
   }

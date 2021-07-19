@@ -36,24 +36,68 @@ export type NodeStatus = {
 };
 
 export interface NodeOptions {
+  /**
+   * Full path of database
+   */
   databasePath: string;
+  /**
+   * Chain name, default is `gxc2-mainnet`
+   */
   chain?: string;
   mine: {
+    /**
+     * Enable miner
+     */
     enable: boolean;
+    /**
+     * Miner coinbase,
+     * if miner is enable, this option must be passed in
+     */
     coinbase?: string;
   };
   p2p: {
+    /**
+     * Enable p2p server
+     */
     enable: boolean;
+    /**
+     * TCP listening port
+     */
     tcpPort?: number;
+    /**
+     * Discv5 UDP listening port
+     */
     udpPort?: number;
+    /**
+     * NAT ip address
+     */
     nat?: string;
+    /**
+     * Bootnodes list
+     */
     bootnodes?: string[];
+    /**
+     * Maximum number of peers
+     */
     maxPeers?: number;
+    /**
+     * Maximum number of connections
+     */
     maxConnections?: number;
+    /**
+     * Maximum number of simultaneous dialing
+     */
     maxDials?: number;
   };
   account: {
+    /**
+     * Keystore full path
+     */
     keyStorePath: string;
+    /**
+     * Unlock account list,
+     * [[address, passphrase], [address, passphrase], ...]
+     */
     unlock: [string, string][];
   };
 }
@@ -140,7 +184,6 @@ export class Node {
 
   /**
    * Initialize the node
-   * @returns
    */
   async init(options?: NodeOptions) {
     if (this.initPromise) {
@@ -257,14 +300,20 @@ export class Node {
     this.miner.startMint(this.blockchain.latestBlock.header);
   };
 
+  /**
+   * Get common object by block number
+   * @param num - Block number
+   * @returns common object
+   */
   getCommon(num: BNLike) {
     return Common.createCommonByBlockNumber(num, typeof this.chain === 'string' ? this.chain : this.chain.chain);
   }
 
   /**
-   * Get data from an underlying state trie
-   * @param root - The state root
-   * @returns The state manager
+   * Get state manager object by state root
+   * @param root - State root
+   * @param num - Block number, used to set common
+   * @returns State manager object
    */
   async getStateManager(root: Buffer, num: BNLike) {
     const stateManager = new StateManager({ common: this.getCommon(num), trie: new Trie(this.chaindb) });
@@ -273,9 +322,10 @@ export class Node {
   }
 
   /**
-   * Assemble the Wrapped VM
+   * Get wrapped vm object by state root
    * @param root - The state root
-   * @returns new VM object
+   * @param num - Block number, used to set common
+   * @returns Wrapped vm object
    */
   async getWrappedVM(root: Buffer, num: BNLike) {
     const stateManager = await this.getStateManager(root, num);
@@ -289,13 +339,16 @@ export class Node {
   }
 
   /**
-   * Create a new Bloom Filter
-   * @returns A BloomBitsFilter object
+   * Create a new bloom filter
+   * @returns Bloom filter object
    */
   getFilter() {
     return new BloomBitsFilter({ node: this, sectionSize: BloomBitsBlocks });
   }
 
+  /**
+   * A loop to execute blocks sequentially
+   */
   private async processLoop() {
     await this.initPromise;
     for await (let { block, options, resolve, reject } of this.processQueue.generator()) {
@@ -318,6 +371,8 @@ export class Node {
         await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(result.receipts, block.hash(), block.header.number)));
         const after = this.blockchain.latestBlock.hash();
         resolve(block);
+
+        // If canonical chain changes, notify to sub modules
         if (!before.equals(after)) {
           await this.txPool.newBlock(block);
           const promises = [this.miner.newBlockHeader(block.header), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
@@ -332,6 +387,9 @@ export class Node {
     }
   }
 
+  /**
+   * A loop to add pending transaction to memory
+   */
   private async taskLoop() {
     await this.initPromise;
     for await (const task of this.taskQueue.generator()) {
@@ -355,9 +413,10 @@ export class Node {
   }
 
   /**
-   * Push a block to the queue of blocks to be processed
-   * @param block - Block data
-   * @param generate - Judgment criteria for root verification
+   * Push a block to the block queue
+   * @param block - Block
+   * @param generate - Generate new block or not
+   * @returns New block
    */
   async processBlock(block: Block, options: ProcessBlockOptions) {
     await this.initPromise;
@@ -367,8 +426,9 @@ export class Node {
   }
 
   /**
-   * Push pending transactions to the taskQueue
-   * @param txs - transactions
+   * Push pending transactions to the transaction queue
+   * @param txs - Transactions
+   * @returns Insert result of each transaction
    */
   async addPendingTxs(txs: Transaction[]) {
     await this.initPromise;
@@ -377,6 +437,10 @@ export class Node {
     });
   }
 
+  /**
+   * Broadcast new block to all connected peers
+   * @param block - Block
+   */
   async broadcastNewBlock(block: Block) {
     const td = await this.db.getTotalDifficulty(block.hash(), block.header.number);
     for (const handler of WireProtocol.getPool().handlers) {
@@ -384,6 +448,22 @@ export class Node {
     }
   }
 
+  /**
+   * Ban peer
+   * @param peerId - Target peer
+   * @param reason - Ban reason
+   */
+  async banPeer(peerId: string, reason: 'invalid' | 'timeout') {
+    if (reason === 'invalid') {
+      await this.networkMngr.ban(peerId, invalidBanTime);
+    } else {
+      await this.networkMngr.ban(peerId, timeoutBanTime);
+    }
+  }
+
+  /**
+   * Abort node
+   */
   async abort() {
     this.sync.removeListener('synchronized', this.onSyncOver);
     this.sync.removeListener('failed', this.onSyncOver);
@@ -400,13 +480,5 @@ export class Node {
     await this.chaindb.close();
     await this.nodedb.close();
     await this.networkdb.close();
-  }
-
-  async banPeer(peerId: string, reason: 'invalid' | 'timeout') {
-    if (reason === 'invalid') {
-      await this.networkMngr.ban(peerId, invalidBanTime);
-    } else {
-      await this.networkMngr.ban(peerId, timeoutBanTime);
-    }
   }
 }

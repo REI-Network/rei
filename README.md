@@ -189,7 +189,7 @@ These scripts execute lint and lint:fix respectively, to all monorepo packages.
 
   </details>
 
-  A: Please update the node version to 14.0.0 or higher. [nvm](https://github.com/nvm-sh/nvm) may be able to help you
+  A: Please update the node version to **14.0.0** or higher. [nvm](https://github.com/nvm-sh/nvm) may be able to help you
 
 ## License
 

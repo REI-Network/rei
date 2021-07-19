@@ -4,13 +4,11 @@ import { CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@ethereumjs/block/dist/c
 import { txSize, WrappedTransaction, Transaction } from './transaction';
 
 /**
- * Calculate clique difficulty and `inturn` , if `inturn` is true,
- * generate a block with a difficulty of 2, else generate a block
- * with a difficulty of 1
- * @param activeSigners Actives Singers now
- * @param signer All singers
- * @param number The block number
- * @returns The object of inTurn and difficulty
+ * Calculate clique difficulty and whether the signer is an `inturn` signer
+ * @param activeSigners - Active signers
+ * @param signer - Target signer
+ * @param number - Current block number
+ * @returns Whether the signer is an `inturn` signer and the difficulty
  */
 export function calcCliqueDifficulty(activeSigners: Address[], signer: Address, number: BN): [boolean, BN] {
   if (activeSigners.length === 0) {
@@ -22,7 +20,7 @@ export function calcCliqueDifficulty(activeSigners: Address[], signer: Address, 
 }
 
 /**
- * WrappedBlock based on Ethereum block.
+ * WrappedBlock based on `@ethereumjs/block`
  */
 export class WrappedBlock {
   readonly block: Block;
@@ -49,9 +47,9 @@ export class WrappedBlock {
   }
 
   /**
-   * Convert the block into json form so that can be transported by rpc port
-   * @param fullTransactions Whether to load all transaction information
-   * @returns Converted Json object
+   * Convert block information to json format
+   * @param fullTransactions - `true` load full transactions information, `false` only load transaction hash, default `false`
+   * @returns JSON format block
    */
   toRPCJSON(fullTransactions: boolean = false) {
     return {

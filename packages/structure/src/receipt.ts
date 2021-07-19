@@ -6,7 +6,7 @@ import { LogRawValues, Log } from './log';
 export type ReceiptRawValue = (Buffer | LogRawValues[])[];
 
 /**
- * Receipt represents the results of a transaction.
+ * Transaction receipt class
  */
 export class Receipt {
   cumulativeGasUsed: Buffer;
@@ -24,7 +24,7 @@ export class Receipt {
   transactionIndex?: number;
 
   /**
-   * Return the cumulative gas used of type bn
+   * Return the cumulative gas in `BN` type
    */
   get bnCumulativeGasUsed() {
     return new BN(this.cumulativeGasUsed);
@@ -39,8 +39,8 @@ export class Receipt {
 
   /**
    * Generate receipt object by given serialized data
-   * @param serialized Serialized data
-   * @returns A receipt object
+   * @param serialized - Serialized data
+   * @returns Receipt object
    */
   public static fromRlpSerializedReceipt(serialized: Buffer) {
     const values = rlp.decode(serialized);
@@ -52,8 +52,8 @@ export class Receipt {
 
   /**
    * Generate receipt object by given values
-   * @param values Given values
-   * @returns A new receipt object
+   * @param values - Values
+   * @returns Receipt object
    */
   public static fromValuesArray(values: ReceiptRawValue): Receipt {
     if (values.length !== 4) {
@@ -85,11 +85,11 @@ export class Receipt {
   }
 
   /**
-   * Assemble receipt according to the given value
-   * @param block block
-   * @param tx Transaction
-   * @param gasUsed Gas used
-   * @param txIndex Transaction index
+   * Add addtional information for receipt
+   * @param block - Block
+   * @param tx - Transaction
+   * @param gasUsed - Transaction gas used
+   * @param txIndex - Transaction index
    */
   installProperties(block: Block, tx: Transaction, gasUsed: BN, txIndex: number) {
     this.blockHash = block.hash();
@@ -105,8 +105,8 @@ export class Receipt {
   }
 
   /**
-   * Convert the receipt into json form so that can be transported by rpc port
-   * @returns Converted Json object
+   * Convert receipt information to json format
+   * @returns JSON format receipt
    */
   toRPCJSON() {
     return {

@@ -5,7 +5,7 @@ export type LogRawValue = Buffer | Buffer[];
 export type LogRawValues = LogRawValue[];
 
 /**
- * The transaction log records the details of the transaction
+ * Transaction log class
  */
 export class Log {
   address: Buffer;
@@ -27,8 +27,8 @@ export class Log {
 
   /**
    * Generate Log object by given serialized data
-   * @param serialized Serialized data
-   * @returns A new Log object
+   * @param serialized - Serialized data
+   * @returns Log object
    */
   public static fromRlpSerializedLog(serialized: Buffer) {
     const values = rlp.decode(serialized);
@@ -40,8 +40,8 @@ export class Log {
 
   /**
    * Generate Log object by given values
-   * @param values Given values
-   * @returns A new Log object
+   * @param values - Values
+   * @returns Log object
    */
   public static fromValuesArray(values: LogRawValues): Log {
     if (values.length !== 3) {
@@ -68,9 +68,9 @@ export class Log {
   }
 
   /**
-   * Assign values to other members based on transaction receipt
-   * @param receipt Transaction receip
-   * @param logIndex Index of log
+   * Add additional information from receipt
+   * @param receipt - Transaction receipt
+   * @param logIndex - Log index
    */
   installProperties(receipt: Receipt, logIndex: number) {
     this.blockHash = receipt.blockHash;
@@ -81,8 +81,8 @@ export class Log {
   }
 
   /**
-   * Convert the log into json form so that can be transported by rpc port
-   * @returns Converted Json object
+   * Convert log information to json format
+   * @returns JSON format log
    */
   toRPCJSON() {
     return {

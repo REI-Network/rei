@@ -25,7 +25,7 @@ Common.createChainStartCommon('gxc2-mainnet');
 Common.createCommonByBlockNumber(0, 12347);
 // create with chain name
 Common.createCommonByBlockNumber(0, 'goerli');
-// Created with an object containing chain information
+// create with an object containing chain information
 Common.createCommonByBlockNumber(0, {
   chain: 'mychain',
   networkId: 100,

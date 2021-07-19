@@ -5,10 +5,9 @@ const errZeroContent = new Error('zero byte in input content');
 
 /**
  * The method is to compress buffer data
- * @param data The data to be compressed
+ * @param data - The data to be compressed
  * @returns If the compressed data is less than the original
- * length after compression, otherwise return to the original
- * data
+ * length after compression, otherwise return to the original data
  */
 export function compressBytes(data: Buffer): Buffer {
   const out = bitsetEncodeBytes(data);
@@ -19,8 +18,8 @@ export function compressBytes(data: Buffer): Buffer {
 }
 
 /**
- * Bit compress method, eight bits are compressed as a group
- * @param data The data to be compressed
+ * Bit compress method, 8 bits are compressed as a group
+ * @param data - The data to be compressed
  * @returns Return the compressed data, or undefined if error
  */
 function bitsetEncodeBytes(data: Buffer): Buffer | undefined {
@@ -58,9 +57,9 @@ function bitsetEncodeBytes(data: Buffer): Buffer | undefined {
 
 /**
  * Decompress data according to a given length
- * @param data Data that needs to be decompressed
- * @param target The length that the data should have after decompression
- * @returns Data after decompression
+ * @param data - Data that needs to be decompressed
+ * @param target - The length that the data should have after decompression
+ * @returns Decompressed data
  */
 export function decompressBytes(data: Buffer, target: number) {
   if (data.length > target) {
@@ -74,9 +73,9 @@ export function decompressBytes(data: Buffer, target: number) {
 
 /**
  * Determine whether the decompressed data meets the length requirement
- * @param data Data that needs to be decompressed
- * @param target The length that the data should have after decompression
- * @returns Data after decompression
+ * @param data - Data that needs to be decompressed
+ * @param target - The length that the data should have after decompression
+ * @returns Decompressed data
  */
 function bitsetDecodeBytes(data: Buffer, target: number) {
   const [out, size] = bitsetDecodePartialBytes(data, target);
@@ -88,9 +87,9 @@ function bitsetDecodeBytes(data: Buffer, target: number) {
 
 /**
  * The underlying implementation of the decompression method
- * @param data Data that needs to be decompressed
- * @param target The length that the data should have after decompression
- * @returns Data after decompression
+ * @param data - Data that needs to be decompressed
+ * @param target - The length that the data should have after decompression
+ * @returns Decompressed data
  */
 function bitsetDecodePartialBytes(data: Buffer, target: number): [Buffer, number] {
   if (target === 0) {

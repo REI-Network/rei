@@ -9,10 +9,9 @@ export class FileCache {
   private lastMod: number = Date.now();
 
   /**
-   * scan performs a new scan on the given directory, compares against the already
-   * cached filenames, and returns file sets: creates, deletes, updates.
-   * @param keydir The Given directory
-   * @returns Three arraies of files: creates, deletes, updates
+   * Scan target dir, compare with the cache in memory, and return three array: creates, deletes, updates
+   * @param keydir - Keystore dir full path
+   * @returns Creates, deletes and updates
    */
   scan(keydir: string): [string[], string[], string[]] {
     try {

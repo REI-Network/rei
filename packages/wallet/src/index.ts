@@ -8,9 +8,9 @@ import { KeyStore, keyStoreFileName } from './keystore';
 type AddrType = Address | string | Buffer;
 
 /**
- * Convert address to buffer type
- * @param addr Address
- * @returns Buffer of address
+ * Convert address to buffer
+ * @param addr - Address
+ * @returns Buffer
  */
 function addrToBuffer(addr: AddrType) {
   if (!Buffer.isBuffer(addr)) {
@@ -20,9 +20,9 @@ function addrToBuffer(addr: AddrType) {
 }
 
 /**
- * Convert the address to string type
- * @param addr
- * @returns
+ * Convert the address to string
+ * @param addr - Address
+ * @returns String with `0x` prefix
  */
 function addrToString(addr: AddrType) {
   if (Buffer.isBuffer(addr)) {
@@ -33,15 +33,14 @@ function addrToString(addr: AddrType) {
   return (addr.startsWith('0x') ? addr : '0x' + addr).toLowerCase();
 }
 
-/**
- * AccountManager is an overarching manager that contain all
- * accounts' information
- */
 export class AccountManager {
   private storage: KeyStore;
   private cache: AccountCache;
   private unlocked = createBufferFunctionalMap<Buffer>();
 
+  /**
+   * @param keydir - Keystore dir full path
+   */
   constructor(keydir: string) {
     if (!path.isAbsolute(keydir)) {
       keydir = path.join(process.cwd(), keydir);
@@ -53,9 +52,9 @@ export class AccountManager {
 
   /**
    * Loads and decrypts the key from disk.
-   * @param addr Address
-   * @param passphrase Decryption password
-   * @returns The private key
+   * @param addr - Address
+   * @param passphrase - Decryption password
+   * @returns Private key
    */
   private async getDecryptedKey(addr: AddrType, passphrase: string) {
     this.cache.accounts();
@@ -75,8 +74,8 @@ export class AccountManager {
   }
 
   /**
-   * Determine whether the account exists in cache
-   * @param addr Address
+   * Whether the account exists in cache
+   * @param addr - Address
    * @returns `true` if exists
    */
   hasAccount(addr: AddrType) {
@@ -92,8 +91,8 @@ export class AccountManager {
   }
 
   /**
-   * Determine whether the unlocked account exists in cache
-   * @param addr unlocked account address
+   * Whether the unlocked account exists in cache
+   * @param addr - Unlocked account address
    * @returns `true` if exists
    */
   hasUnlockedAccount(addr: AddrType) {
@@ -101,8 +100,8 @@ export class AccountManager {
   }
 
   /**
-   * Get privatekey from the unlocked map
-   * @param addr Account address
+   * Get private key from the unlocked map
+   * @param addr - Unlocked account address
    */
   getPrivateKey(addr: AddrType) {
     const privateKey = this.unlocked.get(addrToBuffer(addr));
@@ -114,7 +113,7 @@ export class AccountManager {
 
   /**
    * Lock account and delete the account from the map
-   * @param addr Account address
+   * @param addr - Unlocked account address
    */
   lock(addr: AddrType) {
     this.unlocked.delete(addrToBuffer(addr));
@@ -122,9 +121,9 @@ export class AccountManager {
 
   /**
    * Unlock account, add account information to the map
-   * @param addr Account address
-   * @param passphrase Decryption password
-   * @returns `true` if sucessfully unlock
+   * @param addr - Account address
+   * @param passphrase - Decryption password
+   * @returns `true` if unlock succed
    */
   async unlock(addr: AddrType, passphrase: string) {
     try {
@@ -143,9 +142,9 @@ export class AccountManager {
   /**
    * ImportKey stores the given account into the key directory and
    * add into the cache
-   * @param path The storage path
-   * @param passphrase Decryption password
-   * @returns account address
+   * @param path - The storage path
+   * @param passphrase - Decryption password
+   * @returns Account address
    */
   async importKey(path: string, passphrase: string) {
     const { address, privateKey } = await this.storage.getKey(path, passphrase);
@@ -156,10 +155,9 @@ export class AccountManager {
   }
 
   /**
-   * Import account by privateKey, store it in disk and add it into
-   * cache
-   * @param privateKey
-   * @param passphrase Encryption password
+   * Import account by privateKey, store it in disk and add it to cache
+   * @param privateKey - Private key
+   * @param passphrase - Encryption password
    * @returns Account address
    */
   async importKeyByPrivateKey(privateKey: string, passphrase: string) {
@@ -171,10 +169,10 @@ export class AccountManager {
   }
 
   /**
-   * Update account Encryption password
-   * @param addr  Account address
-   * @param passphrase Old passphrase
-   * @param newPassphrase New passphrase
+   * Update account passphrase
+   * @param addr - Account address
+   * @param passphrase - Old passphrase
+   * @param newPassphrase - New passphrase
    */
   async update(addr: AddrType, passphrase: string, newPassphrase: string) {
     const { privateKey, path } = await this.getDecryptedKey(addr, passphrase);
@@ -183,8 +181,8 @@ export class AccountManager {
 
   /**
    * Create a account, store it with encryption passphrase
-   * @param passphrase Encryption password
-   * @returns The account address and storage path
+   * @param passphrase - Encryption password
+   * @returns New Account address and storage path
    */
   async newAccount(passphrase: string) {
     const wallet = Wallet.generate();

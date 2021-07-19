@@ -34,8 +34,8 @@ export class AccountCache {
   }
 
   /**
-   * Determine whether the account exists in cache
-   * @param addrBuf Buffer of address
+   * Whether the account exists in cache
+   * @param addrBuf - Buffer of address
    * @returns `true` if exist
    */
   has(addrBuf: Buffer): boolean {
@@ -45,7 +45,7 @@ export class AccountCache {
 
   /**
    * Get account information of an address where it is stored
-   * @param addrBuf The Buffer of address
+   * @param addrBuf - The Buffer of address
    * @returns Storage path of the account
    */
   get(addrBuf: Buffer) {
@@ -54,8 +54,8 @@ export class AccountCache {
 
   /**
    * Add address and storage path of the account to map
-   * @param addrBuf The Buffer of address
-   * @param path Storage path of the account
+   * @param addrBuf - The Buffer of address
+   * @param path - Storage path of the account
    */
   add(addrBuf: Buffer, path: string) {
     this.addrToPath.set(addrBuf, path);
@@ -64,7 +64,7 @@ export class AccountCache {
   /**
    * According to the storage path of the account file,
    * put the account information into the memory
-   * @param path Storage path of the account
+   * @param path - Storage path of the account
    */
   private addByPath(path: string) {
     const keyjson = JSON.parse(fs.readFileSync(path).toString());
@@ -74,8 +74,7 @@ export class AccountCache {
   /**
    * According to the storage path of the account file,
    * delete the account information from the memory
-   * @param addrPath
-   * @returns
+   * @param addrPath - Address full path
    */
   private deleteByPath(addrPath: string) {
     for (const [addrBuf, path] of this.addrToPath) {

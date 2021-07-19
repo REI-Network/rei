@@ -13,7 +13,7 @@ const testBufferSorted = testdataSorted.map((element) => {
 describe('FunctionalMap', () => {
   const bufferToStringMap = createBufferFunctionalMap<string>();
   before(() => {
-    testdata.map((blockhash, i) => {
+    testdata.forEach((blockhash, i) => {
       bufferToStringMap.set(testBuffer[i], blockhash);
     });
   });
@@ -56,6 +56,7 @@ describe('FunctionalMap', () => {
   it('should delete element', () => {
     const key = testBuffer[0];
     expect(bufferToStringMap.delete(key), 'function result should be true').be.true;
+    expect(bufferToStringMap.has(key), 'function result should be false').be.false;
     expect(bufferToStringMap.size, 'map size should be equal').be.equal(testBuffer.length - 1);
   });
 
@@ -105,6 +106,7 @@ describe('FunctionalSet', () => {
   it('should delete element', () => {
     const key = testBuffer[0];
     expect(bufferSet.delete(key), 'function result should be true').be.true;
+    expect(bufferSet.has(key), 'function result should be false').be.false;
     expect(bufferSet.size, 'set size should be equal').be.equal(testdata.length - 1);
   });
 

@@ -16,7 +16,7 @@ describe('Channel', () => {
     });
   });
 
-  it('should get generator', async () => {
+  it('should generator takes effect', async () => {
     let i = 0;
     for await (const element of stringChannel.generator()) {
       expect(element, 'array member should be euqal').be.equal(testdata[i++]);
@@ -49,7 +49,7 @@ describe('HChannel', () => {
     });
   });
 
-  it('should get generator', async () => {
+  it('should generator takes effect', async () => {
     let i = 0;
     for await (const element of stringHChannel.generator()) {
       expect(element, 'heap member should be euqal').be.equal(testdata[i++]);
@@ -71,8 +71,41 @@ describe('HChannel', () => {
 describe('PChannel', () => {
   const stringPChannel = new PChannel<string>();
   before(() => {
-    testdata.map((hash) => {
-      // stringPChannel.push();
+    testdata.map((hash, i) => {
+      const element = { data: hash, index: i };
+      stringPChannel.push(element);
     });
+    testdata.map((hash, i) => {
+      const element = { data: hash, index: i + 9 };
+      stringPChannel.push(element);
+    });
+  });
+
+  it('should get array', () => {
+    stringPChannel.array.map((element, i) => {
+      expect(element.data, 'array member should be euqal').be.equal(testdata[i]);
+    });
+  });
+
+  it('should get heap', () => {
+    stringPChannel.heap._list.map((element, i) => {
+      expect(element.data, 'heap member should be euqal').be.equal(testdata[i - 1]);
+    });
+  });
+
+  it('should generator takes effect', async () => {
+    let i = 0;
+    for await (const element of stringPChannel.generator()) {
+      expect(element.data, 'heap member should be euqal').be.equal(testdata[i++]);
+      if (stringPChannel.array.length == 0) {
+        break;
+      }
+    }
+  });
+
+  it('should clear', () => {
+    stringPChannel.clear();
+    expect(stringPChannel.array.length, 'PChannel array should be empty').be.equal(0);
+    expect(stringPChannel.heap.length, 'PChannel heap should be empty').be.equal(0);
   });
 });

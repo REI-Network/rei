@@ -132,6 +132,10 @@ export class Channel<T = any> {
 }
 
 export interface HChannelOption<T> extends ChannelOption<T> {
+  /**
+   * Customizable heap compare function,
+   * default is less operator
+   */
   compare?: (a: T, b: T) => boolean;
 }
 

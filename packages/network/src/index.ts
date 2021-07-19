@@ -38,10 +38,8 @@ export declare interface NetworkManager {
 const ignoredErrors = new RegExp(['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED', '1 bytes', 'abort'].join('|'));
 
 /**
- * Handle errors other than predicted errors or errors without error messages
- * @param err Pending errors
+ * Handle errors, ignore not important errors
  */
-
 export function logNetworkError(prefix: string, err: any) {
   if (err.message && ignoredErrors.test(err.message)) {
     return;
@@ -78,8 +76,7 @@ export interface NetworkManagerOptions {
 }
 
 /**
- * NetworkManager manages nodes and node communications protocols connected
- * with local node
+ * Implement a decentralized p2p network between nodes, based on `libp2p`
  */
 export class NetworkManager extends EventEmitter {
   private readonly protocols: Protocol[];
@@ -123,20 +120,36 @@ export class NetworkManager extends EventEmitter {
   }
 
   /**
-   * Return all nodes recorded
+   * Return all installed peers
    */
   get peers() {
     return Array.from(this.installed.values());
   }
 
+  /**
+   * Set peer value
+   * When `libp2p` disconnects a node, it will determine the order according to the peer value
+   * @param peerId - Target peer
+   * @param value - Peer value
+   */
   private setPeerValue(peerId: string, value: 'installed' | 'connected' | 'useless') {
     this.libp2pNode.connectionManager.setPeerValue(peerId, value === 'installed' ? installedPeerValue : value === 'connected' ? connectedPeerValue : uselessPeerValue);
   }
 
+  /**
+   * Get installed peer by id
+   * @param peerId - Target peer
+   * @returns Peer or `undefined`
+   */
   getPeer(peerId: string) {
     return this.installed.get(peerId);
   }
 
+  /**
+   * Disconnect peer by peer id
+   * This will emit a `removed` event
+   * @param peerId - Target peer
+   */
   async removePeer(peerId: string) {
     const peer = this.installed.get(peerId);
     if (peer) {
@@ -153,10 +166,9 @@ export class NetworkManager extends EventEmitter {
   }
 
   /**
-   * Set the node status to prohibited and remove from the map
-   * @param peerId The peer to be banned
-   * @param maxAge Prohibited duration
-   * @returns
+   * Ban peer by peer id
+   * @param peerId - Target peer
+   * @param maxAge - Ban time
    */
   async ban(peerId: string, maxAge = 60000) {
     this.banned.set(peerId, Date.now() + maxAge);
@@ -164,11 +176,10 @@ export class NetworkManager extends EventEmitter {
   }
 
   /**
-   * Determine whether a peer is banned
-   * @param peerId peer's information
-   * @returns `true` if the peer is banned, `false` if the peer is active
+   * Return peer ban status
+   * @param peerId - Target peer
+   * @returns `true` if the peer is banned, `false` if not
    */
-
   isBanned(peerId: string): boolean {
     const expireTime = this.banned.get(peerId);
     if (expireTime && expireTime > Date.now()) {
@@ -186,6 +197,9 @@ export class NetworkManager extends EventEmitter {
     return this.libp2pNode.hangUp(PeerId.createFromB58String(peerId));
   }
 
+  /**
+   * Execute when a new node is discovered
+   */
   private onDiscovered = (id: PeerId) => {
     const peerId: string = id.toB58String();
     if (!this.discovered.includes(peerId)) {
@@ -197,6 +211,9 @@ export class NetworkManager extends EventEmitter {
     }
   };
 
+  /**
+   * Execute when a new node is connected
+   */
   private onConnect = (connect) => {
     const peerId: string = connect.remotePeer.toB58String();
     if (this.isBanned(peerId)) {
@@ -214,6 +231,9 @@ export class NetworkManager extends EventEmitter {
     }
   };
 
+  /**
+   * Execute when a node is disconnected
+   */
   private onDisconnect = (connect) => {
     const peerId: string = connect.remotePeer.toB58String();
     logger.info('🤐 Peer disconnected:', peerId);
@@ -227,14 +247,28 @@ export class NetworkManager extends EventEmitter {
     this.removePeer(peerId);
   };
 
+  /**
+   * Execute when a new enr is discovered
+   * Persist new enr to db
+   */
   private onENRAdded = (enr: ENR) => {
     this.nodedb.persist(enr);
   };
 
+  /**
+   * Execute when the enr of local node changed
+   * Persist local node enr to db
+   */
   private onMultiaddrUpdated = () => {
     this.nodedb.persistLocal(this.libp2pNode.discv5.discv5.enr, this.privateKey);
   };
 
+  /**
+   * Load local node enr from db
+   * If the node id changes or the user-specified ip changes, then update it
+   * @param options - User option
+   * @returns enr and keypair
+   */
   private async loadLocalENR(options: NetworkManagerOptions) {
     const keypair = createKeypairFromPeerId(options.peerId);
     let enr = ENR.createV4(keypair.publicKey);
@@ -349,6 +383,13 @@ export class NetworkManager extends EventEmitter {
     this.setupOutboundTimer(now);
   }
 
+  /**
+   * Install a peer and emit a `installed` event when successful
+   * @param peerId - Target peer id
+   * @param protocols - Array of protocols that need to be installed
+   * @param streams - `libp2p` stream array
+   * @returns Whether succeed
+   */
   private async install(peerId: string, protocols: Protocol[], streams: any[]) {
     if (this.isBanned(peerId) || this.installing.has(peerId)) {
       return false;
@@ -377,6 +418,12 @@ export class NetworkManager extends EventEmitter {
     return false;
   }
 
+  /**
+   * Try to dial a remote peer
+   * @param peerId - Target peer id
+   * @param protocols - Array of protocols that need to be dial
+   * @returns Whether succeed and a `libp2p` stream array
+   */
   private async dial(peerId: string, protocols: Protocol[]) {
     if (this.isBanned(peerId) || this.dialing.has(peerId)) {
       return { success: false, streams: [] };
@@ -406,6 +453,10 @@ export class NetworkManager extends EventEmitter {
     return this.libp2pNode.connectionManager.get(PeerId.createFromB58String(peerId)) !== null;
   }
 
+  /**
+   * A loop to keep the number of node connections
+   * Automatically load peer information from db or memory and try to dial
+   */
   private async dialLoop() {
     await this.initPromise;
     while (!this.aborted) {
@@ -475,10 +526,19 @@ export class NetworkManager extends EventEmitter {
     }
   }
 
+  /**
+   * Update target peer's timestamp
+   * Should be called when a message from the target peer is received
+   * @param peerId - Target peer
+   * @param timestamp - Timestamp
+   */
   updateTimestamp(peerId: string, timestamp: number = Date.now()) {
     this.timeout.set(peerId, timestamp);
   }
 
+  /**
+   * A loop to disconnect timeout remote peer
+   */
   private async timeoutLoop() {
     await this.initPromise;
     while (!this.aborted) {
@@ -498,7 +558,7 @@ export class NetworkManager extends EventEmitter {
   }
 
   /**
-   * Stop all node connections and delete data
+   * Abort all remote peers and stop `libp2p`
    */
   async abort() {
     this.aborted = true;

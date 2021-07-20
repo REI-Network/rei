@@ -24,7 +24,6 @@ const inboundThrottleTime = 30e3;
 const outboundThrottleTime = 35e3;
 
 const defaultMaxPeers = 50;
-const defaultMaxConnections = 50;
 const defaultMaxDials = 4;
 const defaultTcpPort = 4191;
 const defaultUdpPort = 9810;
@@ -70,7 +69,6 @@ export interface NetworkManagerOptions {
   udpPort?: number;
   nat?: string;
   maxPeers?: number;
-  maxConnections?: number;
   maxDials?: number;
   bootnodes?: string[];
 }
@@ -87,7 +85,6 @@ export class NetworkManager extends EventEmitter {
   private aborted: boolean = false;
 
   private readonly maxPeers: number;
-  private readonly maxConnections: number;
   private readonly maxDials: number;
 
   private readonly discovered: string[] = [];
@@ -105,10 +102,6 @@ export class NetworkManager extends EventEmitter {
   constructor(options: NetworkManagerOptions) {
     super();
     this.maxPeers = options.maxPeers || defaultMaxPeers;
-    this.maxConnections = options.maxConnections || defaultMaxConnections;
-    if (this.maxPeers > this.maxConnections) {
-      throw new Error('invalid maxPeers or maxConnections');
-    }
     this.maxDials = options.maxDials || defaultMaxDials;
     this.protocols = options.protocols;
     this.nodedb = new NodeDB(options.nodedb);
@@ -220,7 +213,7 @@ export class NetworkManager extends EventEmitter {
       connect.close();
       return;
     }
-    if (this.libp2pNode.connectionManager.size > this.maxConnections) {
+    if (this.libp2pNode.connectionManager.size > this.maxPeers) {
       this.setPeerValue(peerId, 'useless');
     } else {
       logger.info('💬 Peer connect:', peerId);
@@ -309,7 +302,7 @@ export class NetworkManager extends EventEmitter {
       udpPort: options.udpPort || defaultUdpPort,
       bootnodes: options.bootnodes || [],
       enr,
-      maxConnections: this.maxConnections
+      maxConnections: this.maxPeers
     });
     this.protocols.forEach((protocol) => {
       this.libp2pNode.handle(protocol.protocolString, ({ connection, stream }) => {

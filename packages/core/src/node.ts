@@ -81,10 +81,6 @@ export interface NodeOptions {
      */
     maxPeers?: number;
     /**
-     * Maximum number of connections
-     */
-    maxConnections?: number;
-    /**
      * Maximum number of simultaneous dialing
      */
     maxDials?: number;

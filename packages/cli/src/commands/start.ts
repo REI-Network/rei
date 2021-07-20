@@ -33,7 +33,6 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     bootnodes: opts.bootnodes ? ((opts.bootnodes as unknown) as string[]) : undefined,
     nat: opts.p2pNat,
     maxPeers: opts.maxPeers ? Number(opts.maxPeers) : undefined,
-    maxConnections: opts.maxConnections ? Number(opts.maxConnections) : undefined,
     maxDials: opts.maxDials ? Number(opts.maxDials) : undefined
   };
   const mine = {

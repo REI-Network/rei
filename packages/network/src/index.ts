@@ -463,27 +463,19 @@ export class NetworkManager extends EventEmitter {
       try {
         if (this.installed.size < this.maxPeers && this.dialing.size < this.maxDials) {
           let peerId: string | undefined;
-          if (this.connected.size > 0) {
-            const filtered = Array.from(this.connected.values()).filter((peerId) => !this.isBanned(peerId) && this.checkOutbound(peerId));
-            if (filtered.length > 0) {
-              peerId = this.randomOne(filtered);
-              this.connected.delete(peerId);
-              logger.debug('NetworkManager::dialLoop, use a connected peer:', peerId);
-            }
-          }
-          if (!peerId) {
-            while (this.discovered.length > 0) {
-              const id = this.discovered.shift()!;
-              if (this.checkOutbound(id) && this.isIdle(id) && !this.isBanned(id)) {
-                const addresses: { multiaddr: Multiaddr }[] | undefined = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(id));
-                if (addresses && addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp').length > 0) {
-                  peerId = id;
-                  logger.debug('NetworkManager::dialLoop, use a discovered peer:', peerId);
-                  break;
-                }
+          // search discovered peer in memory
+          while (this.discovered.length > 0) {
+            const id = this.discovered.shift()!;
+            if (this.checkOutbound(id) && this.isIdle(id) && !this.isBanned(id)) {
+              const addresses: { multiaddr: Multiaddr }[] | undefined = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(id));
+              if (addresses && addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp').length > 0) {
+                peerId = id;
+                logger.debug('NetworkManager::dialLoop, use a discovered peer:', peerId);
+                break;
               }
             }
           }
+          // search discovered peer in database
           if (!peerId) {
             let peers: {
               id: PeerId;
@@ -504,6 +496,7 @@ export class NetworkManager extends EventEmitter {
             }
           }
 
+          // try to dial discovered peer
           if (peerId) {
             this.updateOutbound(peerId);
             this.dial(peerId, this.protocols).then(async ({ success, streams }) => {

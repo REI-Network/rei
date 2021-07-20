@@ -1,0 +1,13 @@
+{
+    "name": "mainnet-chainstart",
+    "comment": "gxc2-mainnet chainstart hardfork",
+    "gasConfig": {
+        "gasLimit": {
+            "v": "0xbe5c8b",
+            "d": "chainstart gas limit"
+        }
+    },
+    "gasPrices": {},
+    "vm": {},
+    "pow": {}
+}

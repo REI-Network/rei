@@ -11,7 +11,6 @@ import { Node } from '../node';
 const emptyUncleHash = '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347';
 const noTurnSignerDelay = 500;
 const maxHistoryLength = 10;
-const defaultGasLimit = hexStringToBN('0xf4240');
 
 export interface MinerOptions {
   node: Node;
@@ -28,7 +27,6 @@ export class Miner {
 
   private enable: boolean;
   private _coinbase: Address;
-  private _gasLimit: BN;
   private wvm!: WrappedVM;
   private pendingTxs: Transaction[] = [];
   private pendingHeader!: BlockHeader;
@@ -42,7 +40,6 @@ export class Miner {
     this.node = options.node;
     this.enable = options.enable;
     this._coinbase = options.coinbase ? Address.fromString(options.coinbase) : Address.zero();
-    this._gasLimit = defaultGasLimit.clone();
     this.initPromise = this.init();
   }
 
@@ -61,10 +58,10 @@ export class Miner {
   }
 
   /**
-   * Get the limit of gas
+   * Get current block gas limit
    */
-  get gasLimit() {
-    return this._gasLimit.clone();
+  get currentGasLimit() {
+    return this.pendingHeader.gasLimit.clone();
   }
 
   /**
@@ -80,14 +77,6 @@ export class Miner {
     } finally {
       this.lock.release();
     }
-  }
-
-  /**
-   * Set the gas limit
-   * @param gasLimit
-   */
-  setGasLimit(gasLimit: BN) {
-    this._gasLimit = gasLimit.clone();
   }
 
   private _shouldMintNextBlock(currentHeader: BlockHeader) {
@@ -140,6 +129,8 @@ export class Miner {
   }
 
   private makeHeader(timestamp: number, parentHash: Buffer, number: BN): [boolean, BlockHeader] {
+    const common = this.node.getCommon(number);
+    const gasLimit = hexStringToBN(common.param('gasConfig', 'gasLimit'));
     if (this.isMining) {
       const [inTurn, difficulty] = calcCliqueDifficulty(this.node.blockchain.cliqueActiveSigners(), this.coinbase, number);
       const header = BlockHeader.fromHeaderData(
@@ -147,7 +138,7 @@ export class Miner {
           // TODO: add beneficiary.
           coinbase: Address.zero(),
           difficulty,
-          gasLimit: this.gasLimit,
+          gasLimit,
           // TODO: add beneficiary.
           nonce: Buffer.alloc(8),
           number,
@@ -163,7 +154,7 @@ export class Miner {
         {
           coinbase: Address.zero(),
           difficulty: CLIQUE_DIFF_NOTURN.clone(),
-          gasLimit: this.gasLimit,
+          gasLimit,
           nonce: Buffer.alloc(8),
           number,
           parentHash,

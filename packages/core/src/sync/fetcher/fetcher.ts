@@ -1,5 +1,5 @@
 import { Address, BN } from 'ethereumjs-util';
-import { HChannel, PChannel, logger, nowTimestamp } from '@gxchain2/utils';
+import { HChannel, PChannel, logger, nowTimestamp, hexStringToBN } from '@gxchain2/utils';
 import { emptyTxTrie, BlockHeader, Block } from '@gxchain2/structure';
 import { Node } from '../../node';
 import { PeerRequestTimeoutError, WireProtocol, WireProtocolHandler } from '../../protocols';
@@ -160,7 +160,7 @@ export class Fetcher {
             throw new Error('invalid header(nonce or coinbase), currently does not support beneficiary');
           }
           // additional check for gasLimit
-          if (!header.gasLimit.eq(this.node.miner.gasLimit)) {
+          if (!header.gasLimit.eq(hexStringToBN(header._common.param('gasConfig', 'gasLimit')))) {
             throw new Error('invalid header(gas limit)');
           }
           // additional check for timestamp

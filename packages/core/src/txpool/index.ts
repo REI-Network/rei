@@ -555,8 +555,8 @@ export class TxPool extends EventEmitter {
         logger.warn('Txpool drop tx', bufferToHex(tx.hash()), 'is not signed');
         return false;
       }
-      if (this.node.miner.gasLimit.lt(tx.gasLimit)) {
-        logger.warn('Txpool drop tx', bufferToHex(tx.hash()), 'reach block gasLimit:', tx.gasLimit.toString(), 'limit:', this.node.miner.gasLimit.toString());
+      if (this.node.miner.currentGasLimit.lt(tx.gasLimit)) {
+        logger.warn('Txpool drop tx', bufferToHex(tx.hash()), 'reach block gasLimit:', tx.gasLimit.toString(), 'limit:', this.node.miner.currentGasLimit.toString());
         return false;
       }
       const senderAddr = tx.getSenderAddress();

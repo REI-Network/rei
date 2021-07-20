@@ -6,7 +6,7 @@
     "license": "GPL-3.0-or-later",
     "scripts": {
         "build": "tsc",
-        "test":"mocha -r ts-node/register 'test/**/*.test.ts' --timeout 10000"
+        "test":"mocha -r ts-node/register 'test/**/*.test.ts' --timeout 60000"
     },
     "dependencies": {
         "@gxchain2/utils": "^0.0.5-alpha.0",

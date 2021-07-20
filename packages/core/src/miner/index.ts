@@ -264,7 +264,7 @@ export class Miner {
   }
 
   private _updateTimestamp(block: Block, timestamp: number) {
-    return block.header.timestamp.toNumber() === timestamp
+    return block.header.timestamp.toNumber() >= timestamp
       ? block
       : Block.fromBlockData(
           {

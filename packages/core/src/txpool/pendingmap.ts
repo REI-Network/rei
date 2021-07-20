@@ -10,9 +10,9 @@ export class PendingTxMap {
   private txs = createBufferFunctionalMap<Transaction[]>();
 
   /**
-   * Push record into the map
-   * @param sender Transaction sender
-   * @param sortedTxs Transactions sorted by nonce
+   * Push record to the map
+   * @param sender - Transaction sender
+   * @param sortedTxs - Transactions sorted by nonce
    */
   push(sender: Buffer, sortedTxs: Transaction[]) {
     if (sortedTxs.length > 0) {
@@ -24,7 +24,7 @@ export class PendingTxMap {
   }
 
   /**
-   * Returns the value at the beginning of a collection
+   * Return the value at the top of the heap
    * @returns Transaction
    */
   peek(): Transaction | undefined {
@@ -32,9 +32,9 @@ export class PendingTxMap {
   }
 
   /**
-   * Delete the value at the beginning of a collection, if
+   * Delete the value at the top of the heap, if
    * the transaction sender has other transactions in the map,
-   * push first into heap, else delete the sender from map
+   * push first to the heap, else delete the sender from map
    */
   shift() {
     const tx: Transaction | undefined = this.heap.remove();
@@ -51,7 +51,7 @@ export class PendingTxMap {
   }
 
   /**
-   * Removes a value from the end of a collection, and returns that value.
+   * Removes a value from the top of the heap, and returns that value
    */
   pop() {
     this.heap.remove();

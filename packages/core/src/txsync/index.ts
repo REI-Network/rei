@@ -15,10 +15,10 @@ type EnqueuePooledTransactionMessage = {
 };
 
 /**
- * Add the key and value to the map
- * @param map
- * @param key
- * @param value
+ * Add the key the map, add the value to set
+ * @param map - Target map
+ * @param key - Key
+ * @param value - Set value
  */
 function forceAdd<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer | string) {
   let set = map.get(key);
@@ -30,10 +30,10 @@ function forceAdd<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer | 
 }
 
 /**
- * Delete the value according to the key from the map
- * @param map
- * @param key
- * @param value
+ * Delete the value in the set according to the key in the map
+ * @param map - Target map
+ * @param key - Key
+ * @param value - Delete value
  */
 function autoDelete<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer | string) {
   let set = map.get(key);
@@ -57,7 +57,7 @@ const maxTxAnnounces = 4096;
 type Request = { hashes: Buffer[]; stolen?: FunctionalSet<Buffer> };
 
 /**
- * TxFetcher is responsible for retrieving new transaction based on announcements.
+ * TxFetcher retrieves all new pooled transaction
  */
 export class TxFetcher {
   private waitingList = createBufferFunctionalMap<Set<string>>();
@@ -89,7 +89,7 @@ export class TxFetcher {
   }
 
   /**
-   * Circulate processing of newly entered transactions in the pool
+   * A loop to process new pooled transaction sequentially
    */
   private async newPooledTransactionLoop() {
     try {
@@ -154,8 +154,7 @@ export class TxFetcher {
   }
 
   /**
-   * enqueueTransactionLoop imports a batch of received transaction into the transaction pool
-   * and the fetcher
+   * A loop to process enqueue transaction sequentially
    */
   private async enqueueTransactionLoop() {
     try {
@@ -237,10 +236,6 @@ export class TxFetcher {
     }
   }
 
-  /**
-   * rescheduleWait iterates over all the transactions currently in the waitlist
-   * and schedules the movement into the fetcher for the earliest.
-   */
   private rescheduleWait() {
     if (this.waitTimeout) {
       clearTimeout(this.waitTimeout);
@@ -284,11 +279,6 @@ export class TxFetcher {
     }, txArriveTimeout - (now - earliest));
   }
 
-  /**
-   * scheduleFetches starts a batch of retrievals for all available idle peers.
-   * @param whiteList Given set of active peers
-   * @returns
-   */
   private scheduleFetches(whiteList?: Set<string>) {
     const actives = whiteList ? new Set<string>(whiteList) : new Set<string>(this.announces.keys());
     if (actives.size === 0) {
@@ -348,10 +338,6 @@ export class TxFetcher {
     }
   }
 
-  /**
-   * Detect and delete timed out requests
-   * @param peer peer name
-   */
   private requestTimeout(peer: string) {
     const req = this.requests.get(peer);
     if (!req) {
@@ -383,9 +369,9 @@ export class TxFetcher {
   }
 
   /**
-   * dropPeer should be called when a peer disconnects. It cleans up all the internal
-   * data structures of the given node
-   * @param peer
+   * dropPeer should be called when a peer disconnects
+   * It will clean up all the internal data of the given peer
+   * @param peer - Disconnected peer
    */
   dropPeer(peer: string) {
     {
@@ -442,9 +428,9 @@ export class TxFetcher {
   }
 
   /**
-   * Imports a batch of received transactions' hashes into the transaction pool
-   * @param origin - the peer
-   * @param hashes - transactions' hashes
+   * Add transaction hashes to the new pooled transaction queue
+   * @param origin - Remote peer
+   * @param hashes - Transaction hashes
    */
   newPooledTransactionHashes(origin: string, hashes: Buffer[]) {
     if (!this.aborter.isAborted) {
@@ -453,9 +439,9 @@ export class TxFetcher {
   }
 
   /**
-   * Imports a batch of received transaction into the transaction pool
-   * @param origin - the peer
-   * @param txs - transactions
+   * Add transaction to the enqueue transaction queue
+   * @param origin - Remote peer
+   * @param txs - Transactions
    */
   enqueueTransaction(origin: string, txs: Transaction[]) {
     if (!this.aborter.isAborted) {

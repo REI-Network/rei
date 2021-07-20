@@ -303,7 +303,7 @@ export class Node {
   /**
    * Get common object by block number
    * @param num - Block number
-   * @returns common object
+   * @returns Common object
    */
   getCommon(num: BNLike) {
     return Common.createCommonByBlockNumber(num, typeof this.chain === 'string' ? this.chain : this.chain.chain);

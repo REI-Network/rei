@@ -11,27 +11,27 @@ import { Journal } from './journal';
 import { Node } from '../node';
 
 /**
- * Calculate the slots of the transaction
- * @param tx - transaction
- * @returns the number of transaction's slots
+ * Calculate the transaction slots
+ * @param tx - Transaction
+ * @returns Transaction slots
  */
 export function txSlots(tx: Transaction) {
   return Math.ceil(new WrappedTransaction(tx).size / 32768);
 }
 
 /**
- * Calulate the cost gas
- * @param tx - transcation
- * @returns The value of transaction cost
+ * Calulate the transaction cost
+ * @param tx - Transaction
+ * @returns Transaction cost
  */
 export function txCost(tx: Transaction) {
   return tx.value.add(tx.gasPrice.mul(tx.gasLimit));
 }
 
 /**
- * Check whether the IntrinsicGas of transaction up to the standard
- * @param tx - transcation
- * @returns return ture if gas is between the maximum and minimum gas
+ * Check transaction intrinsic gas
+ * @param tx - Transaction
+ * @returns `true` if valid, `false` if not
  */
 export function checkTxIntrinsicGas(tx: Transaction) {
   const gas = calculateIntrinsicGas(tx);
@@ -59,6 +59,9 @@ export interface TxPoolOptions {
   rejournalInterval?: number;
 }
 
+/**
+ * TxPoolAccount contains pending, queued transaction and pending nonce of each account
+ */
 class TxPoolAccount {
   private readonly getNonce: () => Promise<BN>;
   private _pending?: TxSortedMap;
@@ -109,7 +112,7 @@ export declare interface TxPool {
 /**
  * TxPool contains all currently known transactions. Transactions
  * enter the pool when they are received from the network or submitted
- * locally. They exit the pool when they are included in the blockchain.
+ * locally
  */
 export class TxPool extends EventEmitter {
   private aborter: Aborter;
@@ -204,6 +207,9 @@ export class TxPool extends EventEmitter {
     return txs;
   }
 
+  /**
+   * A loop to remove timeout queued transaction
+   */
   private async timeoutLoop() {
     await this.initPromise;
     while (!this.aborter.isAborted) {
@@ -220,6 +226,9 @@ export class TxPool extends EventEmitter {
     }
   }
 
+  /**
+   * A loop to rejournal transaction to disk
+   */
   private async rejournalLoop() {
     await this.initPromise;
     while (!this.aborter.isAborted) {
@@ -242,7 +251,7 @@ export class TxPool extends EventEmitter {
   }
 
   /**
-   * Initialize the tx-pool
+   * Initialize the transaction pool
    * @returns
    */
   async init() {
@@ -291,8 +300,9 @@ export class TxPool extends EventEmitter {
   }
 
   /**
-   * New a block
-   * @param newBlock - Block to create
+   * This should be called when canonical chain changes
+   * It will update pending and queued transactions for each account with new block
+   * @param newBlock - New block
    */
   async newBlock(newBlock: Block) {
     await this.initPromise;
@@ -360,9 +370,9 @@ export class TxPool extends EventEmitter {
   }
 
   /**
-   * Add the transactions into the pool
-   * @param txs - transaction or transactions
-   * @returns The array of judgments of whether was successfully added
+   * Add the transactions to the transaction pool
+   * @param txs - Transactions
+   * @returns A boolean array represents the insertion result of each transaction
    */
   async addTxs(txs: Transaction | Transaction[]) {
     await this.initPromise;
@@ -380,8 +390,8 @@ export class TxPool extends EventEmitter {
   }
 
   /**
-   * Obtain the pending transactions in the pool
-   * @returns The map of accounts and pending transactions
+   * Get all pending transactions in the pool
+   * @returns A PendingTxMap object
    */
   async getPendingTxMap(number: BN, hash: Buffer) {
     await this.initPromise;
@@ -399,7 +409,7 @@ export class TxPool extends EventEmitter {
   }
 
   /**
-   * Obtain transactions' hashes in the pool
+   * Get all pending transaction hashes
    * @returns The array of hashes
    */
   getPooledTransactionHashes() {
@@ -414,14 +424,18 @@ export class TxPool extends EventEmitter {
   }
 
   /**
-   * Obtain the transaction in the pool
-   * @param hash - the hash of transaction
-   * @returns The transaction
+   * Get transaction by hash
+   * @param hash - Transaction hash
+   * @returns Transaction
    */
   getTransaction(hash: Buffer) {
     return this.txs.get(hash);
   }
 
+  /**
+   * Get total pool content(for txpool api)
+   * @returns An object containing all transactions in the pool
+   */
   getPoolContent() {
     const result: { pending: { [address: string]: { [nonce: string]: any } }; queued: { [address: string]: { [nonce: string]: any } } } = { pending: {}, queued: {} };
     function forceGet<T>(obj: { [name: string]: T }, name: string) {
@@ -456,10 +470,6 @@ export class TxPool extends EventEmitter {
       }
     }
     return result;
-  }
-
-  getCurrentHeader(): [BN, Buffer] {
-    return [this.currentHeader.number, this.currentHeader.hash()];
   }
 
   private async _addTxs(txs: Transaction[], force: boolean): Promise<{ results: boolean[]; readies?: Map<Buffer, Transaction[]> }> {

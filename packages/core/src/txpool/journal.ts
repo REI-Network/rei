@@ -8,8 +8,7 @@ import { Node } from '../node';
 const bufferSplit = Buffer.from('\r\n');
 
 /**
- * Journal is a rotating log of transactions with the aim of storing locally
- * created transactions to allow non-executed ones to survive node restarts.
+ * Journal manage local transaction rlp record
  */
 export class Journal {
   private path: string;
@@ -17,6 +16,11 @@ export class Journal {
   private lock = new Semaphore(1);
   private writer?: fs.WriteStream;
   private readonly node: Node;
+
+  /**
+   * @param dir - Node database full path
+   * @param node - Node instance
+   */
   constructor(dir: string, node: Node) {
     this.dir = dir;
     this.path = path.join(dir, 'transactions.rlp');
@@ -24,7 +28,7 @@ export class Journal {
   }
 
   /**
-   * create stream writter If not exists
+   * Create write stream if not exists
    */
   private createWritterIfNotExists() {
     if (!this.writer) {
@@ -33,7 +37,7 @@ export class Journal {
   }
 
   /**
-   * Close stream witter
+   * Close write stream
    */
   private async closeWritter() {
     if (this.writer) {
@@ -45,8 +49,8 @@ export class Journal {
   }
 
   /**
-   * load parses a transaction journal dump from `disk`, loading its contents into the specified pool.
-   * @param add - Callback for adding transactions
+   * Load and parse all transactions from disk
+   * @param add - Callback for each transaction
    */
   load(add: (transactions: Transaction[]) => Promise<void>) {
     if (!fs.existsSync(this.path)) {
@@ -101,8 +105,8 @@ export class Journal {
   }
 
   /**
-   * insert adds the specified transaction to the local disk journal.
-   * @param tx - transaction to insert
+   * Write transaction rlp to the disk
+   * @param tx - Transaction
    */
   async insert(tx: Transaction) {
     await this.lock.acquire();
@@ -119,9 +123,8 @@ export class Journal {
   }
 
   /**
-   *rotate regenerates the transaction journal based on the current contents of
-   *the transaction pool.
-   * @param all - The map containing the information to be rotated
+   * Rotate all transactions in memory
+   * @param all - The map contains all transactions
    */
   async rotate(all: Map<Buffer, Transaction[]>) {
     await this.lock.acquire();

@@ -35,7 +35,9 @@ describe('Accountcache', () => {
   });
 
   it('should get accounts', () => {
-    const addressSorted = [...addressArr].sort();
+    const addressSorted = [...addressArr].sort((a, b) => {
+      return a.compare(b);
+    });
     const accounts = accountcache.accounts();
     accounts.forEach((element, i) => {
       expect(element.addrBuf.equals(addressSorted[i]), 'address should be equal').be.true;

@@ -403,8 +403,13 @@ export class WireProtocolHandler implements ProtocolHandler {
    */
   handshakeResponse(status: NodeStatus) {
     if (this.handshakeResolve) {
-      this.updateStatus(status);
-      this.handshakeResolve(true);
+      const localStatus = this.node.status;
+      if (!localStatus.genesisHash.equals(status.genesisHash) || localStatus.networkId !== status.networkId) {
+        this.handshakeResolve(false);
+      } else {
+        this.updateStatus(status);
+        this.handshakeResolve(true);
+      }
       this.handshakeResolve = undefined;
       if (this.handshakeTimeout) {
         clearTimeout(this.handshakeTimeout);

@@ -79,6 +79,10 @@ export class Miner {
     }
   }
 
+  private _isValidSigner(signer: Address, blockNumber: BN) {
+    return this.node.blockchain.cliqueActiveSignersByBlockNumber(blockNumber).filter((s) => s.equals(signer)).length > 0;
+  }
+
   private _shouldMintNextBlock(currentHeader: BlockHeader) {
     return this.isMining && !this.node.sync.isSyncing && !this.node.blockchain.cliqueCheckNextRecentlySigned(currentHeader, this.coinbase);
   }
@@ -128,10 +132,11 @@ export class Miner {
     await this._startMint(header);
   }
 
-  private makeHeader(timestamp: number, parentHash: Buffer, number: BN): [boolean, BlockHeader] {
+  private makeHeader(timestamp: number, parentHash: Buffer, number: BN): { inTurn: boolean; validSigner: boolean; header: BlockHeader } {
     const common = this.node.getCommon(number);
     const gasLimit = hexStringToBN(common.param('gasConfig', 'gasLimit'));
-    if (this.isMining) {
+    const validSigner = this._isValidSigner(this.coinbase, number);
+    if (this.isMining && validSigner) {
       const [inTurn, difficulty] = calcCliqueDifficulty(this.node.blockchain.cliqueActiveSigners(), this.coinbase, number);
       const header = BlockHeader.fromHeaderData(
         {
@@ -148,7 +153,7 @@ export class Miner {
         },
         { common: this.node.getCommon(number), cliqueSigner: this.node.accMngr.getPrivateKey(this.coinbase) }
       );
-      return [inTurn, header];
+      return { inTurn, header, validSigner };
     } else {
       const header = BlockHeader.fromHeaderData(
         {
@@ -163,7 +168,7 @@ export class Miner {
         },
         { common: this.node.getCommon(number) }
       );
-      return [false, header];
+      return { inTurn: false, header, validSigner };
     }
   }
 
@@ -184,7 +189,7 @@ export class Miner {
       const period: number = header._common.consensusConfig().period;
       const timestamp = header.timestamp.toNumber() + period;
       const now = nowTimestamp();
-      const [inTurn, newHeader] = this.makeHeader(now > timestamp ? now : timestamp, header.hash(), newNumber);
+      const { inTurn, header: newHeader, validSigner } = this.makeHeader(now > timestamp ? now : timestamp, header.hash(), newNumber);
       this.pendingHeader = newHeader;
       const currentTd = await this.node.db.getTotalDifficulty(header.hash(), header.number);
       const nextTd = currentTd.add(newHeader.difficulty);
@@ -193,7 +198,7 @@ export class Miner {
       this.wvm = await this.node.getWrappedVM(header.stateRoot, newNumber);
       await this.wvm.vm.stateManager.checkpoint();
       await this._commit(await this.node.txPool.getPendingTxMap(header.number, header.hash()));
-      if (this._shouldMintNextBlock(header)) {
+      if (validSigner && this._shouldMintNextBlock(header)) {
         this.nextTd = nextTd.clone();
         this._mint(header.hash(), this._calcTimeout(timestamp, inTurn));
       }

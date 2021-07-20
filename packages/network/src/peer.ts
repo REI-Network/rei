@@ -30,16 +30,14 @@ export class MsgQueue {
   }
 
   /**
-   * Encode and push a data to message queue
+   * Push a data to message queue
    * @param method - Method name or code
    * @param data - Method data
    */
-  send(method: string | number, data: any) {
-    if (this.aborted) {
-      throw new Error('MsgQueue already aborted');
+  send(data: any) {
+    if (!this.aborted) {
+      this.queue.push(data);
     }
-    data = this.handler.encode(method, data);
-    this.queue.push(data);
   }
 
   /**
@@ -152,12 +150,24 @@ export class Peer {
   }
 
   /**
+   * Send data for target protocol
+   * @param name - Target protocol name
+   * @param data - Data
+   */
+  send(name: string, data: any) {
+    this.getMsgQueue(name).send(data);
+  }
+
+  /**
    * Close self
    */
   async close() {
     await this.networkMngr.removePeer(this.peerId);
   }
 
+  /**
+   * Abort peer
+   */
   async abort() {
     await Promise.all(Array.from(this.queueMap.values()).map((queue) => queue.abort()));
     this.queueMap.clear();
@@ -181,12 +191,17 @@ export class Peer {
   async installProtocol(protocol: Protocol, stream: any) {
     const { queue, handler } = await this.makeMsgQueue(protocol);
     queue.pipeStream(stream);
+    let handshakeResult: undefined | boolean;
     try {
-      if (!(await handler.handshake())) {
+      handshakeResult = await handler.handshake();
+      if (!handshakeResult) {
         throw new Error(`protocol ${protocol.name}, handshake failed`);
       }
       return true;
     } catch (err) {
+      if (handshakeResult === undefined) {
+        logger.warn('Peer::installProtocol, handshake failed with remote peer:', this.peerId);
+      }
       await queue.abort();
       this.queueMap.delete(protocol.name);
       return false;

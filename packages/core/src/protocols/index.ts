@@ -56,6 +56,9 @@ export class WireProtocol implements Protocol {
     return NetworkProtocol.GXC2_ETHWIRE;
   }
 
+  /**
+   * Get the protocol string
+   */
   get protocolString() {
     return `/${this.name}/1`;
   }

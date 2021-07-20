@@ -8,7 +8,6 @@ export interface Protocol {
 
 export interface ProtocolHandler {
   handshake(): boolean | Promise<boolean>;
-  handle(data: Buffer): Promise<void>;
-  encode(method: string | number, data: any): any;
+  handle(data: Buffer): void | Promise<void>;
   abort(): void;
 }

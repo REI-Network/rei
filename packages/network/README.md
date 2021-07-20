@@ -3,7 +3,7 @@
 [![NPM Version](https://img.shields.io/npm/v/@gxchain2/network)](https://www.npmjs.org/package/@gxchain2/network)
 ![License](https://img.shields.io/npm/l/@gxchain2/network)
 
-Implement a decentralized p2p network between nodes, based on `libp2p`
+Implement a decentralized p2p network between nodes, based on `libp2p` and `discv5`. Protocol logic is abstracted out through `Protocol` and `ProtocolHandler`
 
 ## INSTALL
 
@@ -14,18 +14,36 @@ npm install @gxchain2/network
 ## USAGE
 
 ```ts
+/**
+ * Implements `Protocol` interface to custom your protocol
+ */
 class MyProtocol implements Protocol {
+  /**
+   * Should return protocol name
+   */
   get name() {
     return 'MyProtocol';
   }
+
+  /**
+   * Should return protocol string
+   */
   get protocolString() {
     return '/MyProtocol/1';
   }
+
+  /**
+   * Should be called when new peer connected
+   * Should create and return a new `ProtocolHandler` instance for the target new peer
+   */
   makeHandler(peer: Peer) {
     return new MyProtocolHandler(peer, this.name);
   }
 }
 
+/**
+ * Implements `ProtocolHandler` interface to custom your protocol logic
+ */
 class MyProtocolHandler implements ProtocolHandler {
   private peer: Peer;
   private name: string;
@@ -40,11 +58,18 @@ class MyProtocolHandler implements ProtocolHandler {
     return this.queue ? this.queue : (this.queue = this.peer.getMsgQueue(this.name));
   }
 
+  /**
+   * Should be called when new peer connected
+   * Return `false` if handshake failed
+   */
   handshake(): boolean | Promise<boolean> {
     this.getMsgQueue().send(0, 'ping');
     return true;
   }
 
+  /**
+   * Should be called when receive message from remote peer
+   */
   async handle(data: Buffer) {
     const [method, payload] = data;
     if (method === 0) {
@@ -55,13 +80,25 @@ class MyProtocolHandler implements ProtocolHandler {
     }
   }
 
+  /**
+   * Should be called before send message to remote peer
+   */
   encode(method: string | number, data: any) {
     return Buffer.from([method as number, ...Buffer.from(data)]);
   }
 
+  /**
+   * Should be called when remote peer disconnted
+   */
   abort() {}
 }
+```
 
+```ts
+/**
+ * Provide your protocol instance to `NetworkManager` in the constructor
+ * and `NetworkManager` will take care of the rest
+ */
 const networkMngr = new NetworkManager({
   protocols: [new MyProtocol()],
   datastore: datastore,

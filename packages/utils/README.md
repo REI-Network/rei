@@ -44,8 +44,8 @@ setTimeout(() => {
 
 ```ts
 const bufferMap = new FunctionalMap<Buffer, string>((a: Buffer, b: Buffer) => a.compare(b));
-bufferTobuffer.set(Buffer.from('aaaaaa', 'hex'), 'aaaaaa');
-console.log(bufferTobuffer.get(Buffer.from('aaaaaa', 'hex')) === 'aaaaaa'); // true
+bufferMap.set(Buffer.from('aaaaaa', 'hex'), 'aaaaaa');
+console.log(bufferMap.get(Buffer.from('aaaaaa', 'hex')) === 'aaaaaa'); // true
 ```
 
 ## License

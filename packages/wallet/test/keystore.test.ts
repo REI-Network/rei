@@ -26,11 +26,11 @@ describe('Keystore', () => {
   });
 
   it('should store key', async () => {
-    const files1 = fs.readdirSync(testdir).filter((item) => !/(^|\/)\.[^\/\.]/g.test(item));
+    const files1 = fs.readdirSync(testdir);
     expect(files1.length, 'keystore should be empty').be.equal(0);
     await keystore.storeKey(localPath, privateKey, passphrase);
-    const files2 = fs.readdirSync(testdir).filter((item) => !/(^|\/)\.[^\/\.]/g.test(item));
-    expect(files2.length, 'keystore should not be empty').be.equal(1);
+    const files2 = fs.readdirSync(testdir);
+    expect(path.join(testdir, files2[0]), 'file name should be equal').be.equal(localPath);
   });
 
   it('should get key', async () => {

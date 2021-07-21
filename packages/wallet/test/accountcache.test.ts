@@ -4,7 +4,7 @@ import Wallet from 'ethereumjs-wallet';
 import { hexStringToBuffer } from '../../utils';
 import { expect } from 'chai';
 import { KeyStore, keyStoreFileName } from '../src/keystore';
-import { AccountCache, AccountInfo } from '../src/accountcache';
+import { AccountCache } from '../src/accountcache';
 
 describe('Accountcache', () => {
   let testdir: string;

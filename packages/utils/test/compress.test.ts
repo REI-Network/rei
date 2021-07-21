@@ -18,6 +18,6 @@ describe('Compress', () => {
     const testbuffer = hexStringToBuffer(testdata[0]);
     const compressed = compressBytes(testbuffer);
     const decompressed = decompressBytes(compressed, testbuffer.length);
-    expect(decompressed.equals(testbuffer), 'The decompressed data needs to be equal to the original data').be.true;
+    expect(decompressed.equals(testbuffer), 'the decompressed data needs to be equal to the original data').be.true;
   });
 });

@@ -12,10 +12,9 @@ describe('FileCache', () => {
   const change = ['white', 'red', 'purple'].sort();
 
   before(() => {
-    testdir = path.join(__dirname, './test-dir-filecache');
-    if (!fs.existsSync(testdir)) {
-      fs.mkdirSync(testdir, { recursive: true });
-    }
+    testdir = path.join(__dirname, './test-dir');
+    fs.rmdirSync(testdir, { recursive: true });
+    fs.mkdirSync(testdir, { recursive: true });
     filesname.forEach((color) => {
       const filename = path.join(testdir, color);
       fs.writeFileSync(filename, color);

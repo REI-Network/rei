@@ -15,10 +15,9 @@ describe('Accountcache', () => {
   const pathArr: string[] = [];
 
   before(async () => {
-    testdir = path.join(__dirname, './test-dir-accountcache');
-    if (!fs.existsSync(testdir)) {
-      fs.mkdirSync(testdir, { recursive: true });
-    }
+    testdir = path.join(__dirname, './test-dir');
+    fs.rmdirSync(testdir, { recursive: true });
+    fs.mkdirSync(testdir, { recursive: true });
     keystore = new KeyStore(testdir);
     let i = 3;
     while (i > 0) {

@@ -17,14 +17,12 @@ describe('AccountManager', () => {
   const newpassphrase = 'newpassphrase';
 
   before(async () => {
-    testdir = path.join(__dirname, './test-dir-index');
-    testdir2 = path.join(__dirname, './test-dir-index2');
-    if (!fs.existsSync(testdir)) {
-      fs.mkdirSync(testdir, { recursive: true });
-    }
-    if (!fs.existsSync(testdir2)) {
-      fs.mkdirSync(testdir, { recursive: true });
-    }
+    testdir = path.join(__dirname, './test-dir');
+    testdir2 = path.join(__dirname, './test-dir2');
+    fs.rmdirSync(testdir, { recursive: true });
+    fs.rmdirSync(testdir2, { recursive: true });
+    fs.mkdirSync(testdir, { recursive: true });
+    fs.mkdirSync(testdir2, { recursive: true });
     accountManager = new AccountManager(testdir);
     keystore = new KeyStore(testdir2);
   });

@@ -16,6 +16,7 @@
     "dependencies": {
         "@ethereumjs/block": "^3.4.0",
         "@ethereumjs/tx": "^3.3.0",
-        "@gxchain2/common": "^0.0.5-alpha.0"
+        "@gxchain2/common": "^0.0.5-alpha.0",
+        "@gxchain2/utils": "^0.0.5-alpha.0"
     }
 }

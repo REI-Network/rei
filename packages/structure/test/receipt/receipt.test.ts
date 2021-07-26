@@ -27,7 +27,9 @@ describe('Recipt', () => {
       const logs = (r.logs as { address: string; data: string; topics: string[] }[]).map((l) => {
         return new Log(
           hexStringToBuffer(l.address),
-          l.topics.map((t) => hexStringToBuffer(t)),
+          l.topics.map((t) => {
+            return hexStringToBuffer(t);
+          }),
           hexStringToBuffer(l.data)
         );
       });
@@ -52,7 +54,7 @@ describe('Recipt', () => {
   });
 
   it('shoud fromValuesArray correctly', () => {
-    const fromValuesReceipts: Receipt[] = testdata.receipst_raw.map((r) => {
+    const fromValuesReceipts: Receipt[] = testdata.receipts_raw.map((r) => {
       const valuesArray: ReceiptRawValue = [hexStringToBuffer(r.status), hexStringToBuffer(r.cumulativeGasUsed), hexStringToBuffer(r.bitvector), r.rawLogs];
       return Receipt.fromValuesArray(valuesArray);
     });
@@ -67,11 +69,11 @@ describe('Recipt', () => {
   it('should get raw', () => {
     testreceipts.forEach((r, i) => {
       const raw = r.raw();
-      expect((raw[0] as Buffer).equals(hexStringToBuffer(testdata.receipst_raw[i].status)), 'status should be equal').be.true;
-      expect((raw[1] as Buffer).equals(hexStringToBuffer(testdata.receipst_raw[i].cumulativeGasUsed)), 'cumulativeGasUsed should be equal').be.true;
-      expect((raw[2] as Buffer).equals(hexStringToBuffer(testdata.receipst_raw[i].bitvector)), 'bitvector should be equal').be.true;
+      expect((raw[0] as Buffer).equals(hexStringToBuffer(testdata.receipts_raw[i].status)), 'status should be equal').be.true;
+      expect((raw[1] as Buffer).equals(hexStringToBuffer(testdata.receipts_raw[i].cumulativeGasUsed)), 'cumulativeGasUsed should be equal').be.true;
+      expect((raw[2] as Buffer).equals(hexStringToBuffer(testdata.receipts_raw[i].bitvector)), 'bitvector should be equal').be.true;
       raw[3].forEach((r, j) => {
-        expect(r.equals(testdata.receipst_raw[i].rawLogs[j]), 'log member should be equal');
+        expect(r.equals(testdata.receipts_raw[i].rawLogs[j]), 'log member should be equal');
       });
     });
   });
@@ -83,7 +85,7 @@ describe('Recipt', () => {
     });
   });
 
-  it('should convert to rpcjson ', () => {
+  it('should convert to rpcjson', () => {
     const receipt1 = testreceipts[0].toRPCJSON();
     const testreceipt1 = testdata.receipts[0];
     expect(receipt1.blockHash, 'blockHash should be equal').be.equal(testreceipt1.blockHash);

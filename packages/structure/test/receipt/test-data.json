@@ -83,7 +83,7 @@
     "blockNumber" : "0x207a2"
  }
 ],
-"receipst_raw" : [
+"receipts_raw" : [
    {
     "status":"0x01",
     "cumulativeGasUsed":"0x5208",

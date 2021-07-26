@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { Block } from '@ethereumjs/block';
-import { WrappedBlock } from '../../src/block';
+import { WrappedBlock, Block } from '../../dist';
 import { Common } from '@gxchain2/common';
 import { expect } from 'chai';
 

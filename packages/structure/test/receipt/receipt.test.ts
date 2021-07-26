@@ -1,11 +1,8 @@
 import path from 'path';
 import fs from 'fs';
 import { Common } from '@gxchain2/common';
-import { Receipt, ReceiptRawValue } from '../../src/receipt';
-import { Block } from '@ethereumjs/block';
-import { Log } from '../../src/log';
+import { Block, Transaction, Log, Receipt, ReceiptRawValue } from '../../dist';
 import { hexStringToBuffer, hexStringToBN } from '@gxchain2/utils';
-import { Transaction } from '@ethereumjs/tx';
 import { BN, generateAddress } from 'ethereumjs-util';
 import { expect } from 'chai';
 

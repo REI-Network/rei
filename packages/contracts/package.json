@@ -6,7 +6,8 @@
     "scripts": {
         "build": "npx hardhat compile",
         "node": "npx hardhat node",
-        "test": "npx hardhat test"
+        "test": "npx hardhat test",
+        "docgen": "solidity-docgen -i ./src -t ./templates -H ./helper.js"
     },
     "dependencies": {
         "@openzeppelin/contracts": "3.2.0"

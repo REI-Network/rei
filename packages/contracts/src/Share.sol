@@ -79,6 +79,8 @@ contract Share is ERC20, IShare {
         }
     }
     
+    // slash logic will be handled by the blockchain
+    /*
     function slash(uint8 factor) external override onlyStakeManager returns (uint256 amount) {
         uint256 balance = address(this).balance;
         if (balance > 0) {
@@ -91,4 +93,5 @@ contract Share is ERC20, IShare {
             }
         }
     }
+    */
 }

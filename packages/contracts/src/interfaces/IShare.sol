@@ -15,6 +15,4 @@ interface IShare is IERC20 {
     function mint(address to) external payable returns (uint256);
     
     function burn(uint256 shares, address payable to) external returns (uint256);
-    
-    function slash(uint8 factor) external returns (uint256);
 }

@@ -15,7 +15,7 @@ task('init', 'Initialize config').setAction(async (taskArgs, { deployments, web3
   console.log('Initialize config finished');
 });
 
-task('getStakeManager', 'get stake manager address').setAction(async (taskArgs, { deployments, web3 }) => {
+task('getStakeManager', 'Get stake manager address').setAction(async (taskArgs, { deployments, web3 }) => {
   const { contract: config } = await createWeb3Contract({ name: 'Config', deployments, web3 });
   console.log('Stake manager address:', await config.methods.stakeManager().call());
 });

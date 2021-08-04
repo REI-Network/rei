@@ -41,7 +41,7 @@ contract LockedStake {
     using SafeMath for uint256;
 
     // lock the shares until 4 weeks later
-    uint256 public unstakeDelay = 4 weeks;
+    uint256 public lockTime = 4 weeks;
     address public validator;
     Candy public candy;
     IStakeManager public sm;
@@ -54,10 +54,10 @@ contract LockedStake {
 
     event Stake(address indexed staker, uint256 indexed id, uint256 amount, uint256 shares);
 
-    constructor(address _validator, Candy _candy, IStakeManager _sm) public {
+    constructor(address _validator, Candy _candy) public {
         validator = _validator;
         candy = _candy;
-        sm = _sm;
+        sm = IStakeManager(0x0000000000000000000000000000000000001001);
     }
 
     function stake() external payable returns (uint256 id) {
@@ -73,10 +73,12 @@ contract LockedStake {
 
     function unstake(address payable to, uint256 id) external {
         uint256 timestamp = stakeTimestampOf[id];
-        require(timestamp != 0 && timestamp.add(unstakeDelay) >= block.timestamp, "LockedStake: invalid id or timestamp");
+        require(timestamp != 0 && timestamp.add(lockTime) >= block.timestamp, "LockedStake: invalid id or timestamp");
         require(stakeOwnerOf[id] == msg.sender, "LockedStake: invalid stake owner");
         uint256 _shares = stakeSharesOf[id];
+        // we should approve the shares to stake manager before starting unstake
         IShare(sm.getShareContractAddress(validator, true)).approve(address(sm), _shares);
+        // stake manager will burn the shares and return the GXC after `config.unstakeDelay`
         sm.startUnstake(validator, to, _shares);
         delete stakeTimestampOf[id];
         delete stakeSharesOf[id];

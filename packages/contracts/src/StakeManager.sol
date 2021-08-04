@@ -5,6 +5,7 @@ pragma solidity 0.6.2;
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/IConfig.sol";
+import "./interfaces/IStakeManager.sol";
 import "./Share.sol";
 
 struct Unstake {
@@ -14,7 +15,7 @@ struct Unstake {
     uint256 timestamp;
 }
 
-contract StakeManager is ReentrancyGuard {
+contract StakeManager is ReentrancyGuard, IStakeManager {
     using SafeMath for uint256;
     
     IConfig public config;
@@ -35,18 +36,18 @@ contract StakeManager is ReentrancyGuard {
         config = IConfig(_config);
     }
     
-    function validatorsLength() external view returns (uint256) {
+    function validatorsLength() external view override returns (uint256) {
         return validators.length;
     }
     
-    function getVotingPowerByIndex(uint256 index) external view returns (uint256) {
+    function getVotingPowerByIndex(uint256 index) external view override returns (uint256) {
         require(index < validators.length, "StakeManager: invalid validator index");
         address share = validatorToShare[validators[index]];
         require(share != address(0), "StakeManager: invalid validator");
         return share.balance.div(config.amountPerVotingPower());
     }
 
-    function estimateMinStakeAmount(address validator) external view returns (uint256 amount) {
+    function estimateMinStakeAmount(address validator) external view override returns (uint256 amount) {
         address share = validatorToShare[validator];
         require(share != address(0), "StakeManager: invalid validator");
         amount = Share(share).estimateStakeAmount(1);
@@ -55,27 +56,27 @@ contract StakeManager is ReentrancyGuard {
         }
     }
 
-    function estimateStakeAmount(address validator, uint256 shares) external view returns (uint256) {
+    function estimateStakeAmount(address validator, uint256 shares) external view override returns (uint256) {
         address share = validatorToShare[validator];
         require(share != address(0), "StakeManager: invalid validator");
         return Share(share).estimateStakeAmount(shares);
     }
 
-    function estimateMinUnstakeShares(address validator) external view returns (uint256) {
+    function estimateMinUnstakeShares(address validator) external view override returns (uint256) {
         address share = validatorToShare[validator];
         require(share != address(0), "StakeManager: invalid validator");
         return Share(share).estimateUnstakeShares(config.minUnstakeAmount());
     }
     
-    function estimateUnstakeShares(address validator, uint256 amount) external view returns (uint256) {
+    function estimateUnstakeShares(address validator, uint256 amount) external view override returns (uint256) {
         address share = validatorToShare[validator];
         require(share != address(0), "StakeManager: invalid validator");
         return Share(share).estimateUnstakeShares(amount);
     }
     
-    receive() external payable {}
+    receive() external payable override {}
     
-    function stake(address validator, address to) external payable nonReentrant returns (uint256 shares) {
+    function stake(address validator, address to) external payable nonReentrant override returns (uint256 shares) {
         require(uint160(validator) > 20000, "StakeManager: invalid validator");
         require(uint160(to) > 20000, "StakeManager: invalid receiver");
         require(msg.value >= config.minStakeAmount(), "StakeManager: invalid stake amount");
@@ -90,7 +91,7 @@ contract StakeManager is ReentrancyGuard {
         emit Stake(validator, to, msg.value, shares);
     }
     
-    function startUnstake(address validator, address payable to, uint256 shares) external nonReentrant returns (uint256 id) {
+    function startUnstake(address validator, address payable to, uint256 shares) external override nonReentrant returns (uint256 id) {
         require(uint160(to) > 20000, "StakeManager: invalid receiver");
         require(shares > 0, "StakeManager: invalid shares");
         address share = validatorToShare[validator];
@@ -113,7 +114,7 @@ contract StakeManager is ReentrancyGuard {
         emit StartUnstake(id, validator, to, shares, timestamp);
     }
     
-    function doUnstake() external nonReentrant {
+    function doUnstake() external override nonReentrant {
         uint256 _lastId = lastId;
         uint256 _firstId = firstId;
         for (; _firstId < _lastId; _firstId = _firstId.add(1)) {
@@ -130,6 +131,7 @@ contract StakeManager is ReentrancyGuard {
         firstId = _firstId;
     }
     
+    // TODO: remove `slash`
     function slash(address validator, uint8 reason) external nonReentrant returns (uint256 amount) {
         require(uint160(validator) > 20000, "StakeManager: invalid validator");
         address share = validatorToShare[validator];

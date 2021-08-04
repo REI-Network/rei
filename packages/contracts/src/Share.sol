@@ -4,8 +4,9 @@ pragma solidity 0.6.2;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./interfaces/IConfig.sol";
+import "./interfaces/IShare.sol";
 
-contract Share is ERC20 {
+contract Share is ERC20, IShare {
     using SafeMath  for uint256;
     
     IConfig public config;
@@ -23,7 +24,7 @@ contract Share is ERC20 {
         isStake = _isStake;
     }
 
-    function estimateStakeAmount(uint256 shares) external view returns (uint256 amount) {
+    function estimateStakeAmount(uint256 shares) external view override returns (uint256 amount) {
         require(shares > 0, "Share: insufficient shares");
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) {
@@ -33,7 +34,7 @@ contract Share is ERC20 {
         }
     }
     
-    function estimateUnstakeShares(uint256 amount) external view returns (uint256 shares) {
+    function estimateUnstakeShares(uint256 amount) external view override returns (uint256 shares) {
         require(amount > 0, "Share: insufficient amount");
         uint256 balance = address(this).balance;
         uint256 _totalSupply = totalSupply();
@@ -41,7 +42,7 @@ contract Share is ERC20 {
         shares = amount.mul(_totalSupply).div(balance);
     }
 
-    function mint(address to) external payable onlyStakeManager returns (uint256 shares) {
+    function mint(address to) external payable override onlyStakeManager returns (uint256 shares) {
         uint256 amount = msg.value;
         uint256 reserve = address(this).balance.sub(amount);
         uint256 _totalSupply = totalSupply();
@@ -54,7 +55,7 @@ contract Share is ERC20 {
         _mint(to, shares);
     }
     
-    function burn(uint256 shares, address payable to) external onlyStakeManager returns (uint256 amount) {
+    function burn(uint256 shares, address payable to) external override onlyStakeManager returns (uint256 amount) {
         require(shares > 0, "Share: insufficient shares");
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) {
@@ -68,7 +69,7 @@ contract Share is ERC20 {
         }
     }
     
-    function slash(uint8 factor) external onlyStakeManager returns (uint256 amount) {
+    function slash(uint8 factor) external override onlyStakeManager returns (uint256 amount) {
         uint256 balance = address(this).balance;
         if (balance > 0) {
             amount = balance.mul(factor).div(100);

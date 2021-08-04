@@ -3,6 +3,7 @@
 pragma solidity 0.6.2;
 
 interface IConfig {
+    
     function stakeManager() external view returns(address);
     
     function unstakeDelay() external view returns(uint256);

@@ -42,6 +42,16 @@ contract Share is ERC20, IShare {
         shares = amount.mul(_totalSupply).div(balance);
     }
 
+    function estimateUnStakeAmount(uint256 shares) external view override returns (uint256 amount) {
+        require(shares > 0, "Share: insufficient shares");
+        uint256 _totalSupply = totalSupply();
+        if (_totalSupply == 0) {
+            amount = 0;
+        } else {
+            amount = address(this).balance.mul(shares).div(_totalSupply);
+        }
+    }
+
     function mint(address to) external payable override onlyStakeManager returns (uint256 shares) {
         uint256 amount = msg.value;
         uint256 reserve = address(this).balance.sub(amount);

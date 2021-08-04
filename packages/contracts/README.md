@@ -72,7 +72,7 @@ contract LockedStake {
     }
 
     function unstake(address payable to, uint256 id) external {
-        require(stakeTimestampOf[id].sub(unstakeDelay) >= block.timestamp, "LockedStake: invalid id or timestamp");
+        require(stakeTimestampOf[id].add(unstakeDelay) >= block.timestamp, "LockedStake: invalid id or timestamp");
         require(stakeOwnerOf[id] == msg.sender, "LockedStake: invalid stake owner");
         uint256 _shares = stakeSharesOf[id];
         IShare(sm.getShareContractAddress(validator, true)).approve(address(sm), _shares);

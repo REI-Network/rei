@@ -58,7 +58,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     /**
         @dev Get the stake or unstake share contract address of the validator
         @param validator    Validator address
-        @param isStake      Return stake share contract addres if `true`, unstake share contract address if `false`
+        @param isStake      Return stake share contract address if `true`, unstake share contract address if `false`
      */
     function getShareContractAddress(address validator, bool isStake) external view override returns (address share) {
         share = isStake ? validatorToShare[validator] : validatorToUnstakeShare[validator];
@@ -136,7 +136,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
 
     /**
-        @dev Estimate how much GXC can be claim, if unstake the number of shares(when unstake time out)
+        @dev Estimate how much GXC can be claim, if unstake the number of shares(when unstake timeout)
         @param validator    Validator address
         @param shares       Number of shares
      */

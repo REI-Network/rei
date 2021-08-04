@@ -23,9 +23,7 @@ describe('StakeManger', () => {
   }
 
   function toBN(data: number | string) {
-    if (typeof data === 'number') {
-      return new BN(data);
-    } else if (data.startsWith('0x')) {
+    if (typeof data === 'string' && data.startsWith('0x')) {
       return new BN(data.substr(2), 'hex');
     }
     return new BN(data);
@@ -36,7 +34,6 @@ describe('StakeManger', () => {
     delpoyer = accounts[0];
     validator = accounts[1];
     receiver = accounts[2];
-    console.log('receiver:', receiver, await web3.eth.getBalance(receiver));
   });
 
   it('should deploy succeed', async () => {
@@ -84,7 +81,7 @@ describe('StakeManger', () => {
     expect(await share.methods.totalSupply().call(), 'total supply should be equal').to.equal(shrAfterUnstake.toString());
 
     // sleep until unstake delay
-    await new Promise((r) => setTimeout(r, unstakeDelay * 1000 + 100));
+    await new Promise((r) => setTimeout(r, unstakeDelay * 1000 + 10));
 
     // send a transaction to update blockchain timestamp
     await web3.eth.sendTransaction({

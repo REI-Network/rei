@@ -19,3 +19,16 @@ task('getStakeManager', 'Get stake manager address').setAction(async (taskArgs, 
   const { contract: config } = await createWeb3Contract({ name: 'Config', deployments, web3 });
   console.log('Stake manager address:', await config.methods.stakeManager().call());
 });
+
+task('transfer', 'Transfer value to target address')
+  .addParam('to', 'to address')
+  .addParam('value', 'transfer value')
+  .setAction(async (taskArgs, { web3, getNamedAccounts }) => {
+    const { deployer } = await getNamedAccounts();
+    await web3.eth.sendTransaction({
+      from: deployer,
+      to: taskArgs.to,
+      value: taskArgs.value
+    });
+    console.log('Transfer succeed');
+  });

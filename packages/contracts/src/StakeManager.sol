@@ -74,7 +74,9 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         return Share(share).estimateUnstakeShares(amount);
     }
     
-    receive() external payable override {}
+    receive() external payable override {
+        require(validatorToShare[Share(msg.sender).validator()] == msg.sender, "StakeManager: invalid validator");
+    }
     
     function stake(address validator, address to) external payable nonReentrant override returns (uint256 shares) {
         require(uint160(validator) > 20000, "StakeManager: invalid validator");

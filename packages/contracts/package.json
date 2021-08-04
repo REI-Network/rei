@@ -4,7 +4,8 @@
     "main": "hardhat.config.ts",
     "license": "GPL-3.0-or-later",
     "scripts": {
-        "build": "npx hardhat compile"
+        "build": "npx hardhat compile",
+        "node": "npx hardhat node"
     },
     "devDependencies": {
         "@nomiclabs/hardhat-etherscan": "^2.1.4",

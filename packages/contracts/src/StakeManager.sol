@@ -36,17 +36,17 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
     
     /**
-        @dev Get the validators length
+     * @dev Get the validators length.
      */
     function validatorsLength() external view override returns (uint256) {
         return validators.length;
     }
     
     /**
-        @dev Get the voting power by validator index
-        @dev Index shouldn't be out of range
-        @dev Validator must exist
-        @param index    The validator index
+     * @dev Get the voting power by validator index.
+     *      Index shouldn't be out of range.
+     *      Validator must exist.
+     * @param index    The validator index
      */
     function getVotingPowerByIndex(uint256 index) external view override returns (uint256) {
         require(index < validators.length, "StakeManager: invalid validator index");
@@ -56,9 +56,9 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
 
     /**
-        @dev Get the stake or unstake share contract address of the validator
-        @param validator    Validator address
-        @param isStake      Return stake share contract address if `true`, unstake share contract address if `false`
+     * @dev Get the stake or unstake share contract address of the validator.
+     * @param validator    Validator address
+     * @param isStake      Return stake share contract address if `true`, unstake share contract address if `false`
      */
     function getShareContractAddress(address validator, bool isStake) external view override returns (address share) {
         share = isStake ? validatorToShare[validator] : validatorToUnstakeShare[validator];
@@ -66,8 +66,8 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
 
     /**
-        @dev Get the queued unstake information by unstake id
-        @param id   Unstake id
+     * @dev Get the queued unstake information by unstake id.
+     * @param id   Unstake id
      */
     function getQueuedUnstakeById(uint256 id) external view override returns (Unstake memory u) {
         u = unstakeQueue[id];
@@ -75,23 +75,23 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
 
     /**
-        @dev Get the first unstake id
+     * @dev Get the first unstake id.
      */
     function getFirstId() external view override returns (uint256) {
         return firstId;
     }
 
     /**
-        @dev Get the last unstake id
+     * @dev Get the last unstake id.
      */
     function getLastId() external view override returns (uint256) {
         return lastId;
     }
 
     /**
-        @dev Estimate the mininual stake amount for validator
-        @dev If the stake amount is less than this value, transaction will fail
-        @param validator    Validator address
+     * @dev Estimate the mininual stake amount for validator.
+     *      If the stake amount is less than this value, transaction will fail.
+     * @param validator    Validator address
      */
     function estimateMinStakeAmount(address validator) external view override returns (uint256 amount) {
         address share = validatorToShare[validator];
@@ -103,9 +103,9 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
 
     /**
-        @dev Estimate how much GXC should be stake, if user wants to get the number of shares
-        @param validator    Validator address
-        @param shares       Number of shares
+     * @dev Estimate how much GXC should be stake, if user wants to get the number of shares.
+     * @param validator    Validator address
+     * @param shares       Number of shares
      */
     function estimateStakeAmount(address validator, uint256 shares) external view override returns (uint256) {
         address share = validatorToShare[validator];
@@ -114,9 +114,9 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
 
     /**
-        @dev Estimate the mininual unstake shares for validator
-        @dev If the unstake shares is less than this value, transaction will fail
-        @param validator    Validator address
+     * @dev Estimate the mininual unstake shares for validator.
+     *      If the unstake shares is less than this value, transaction will fail.
+     * @param validator    Validator address
      */
     function estimateMinUnstakeShares(address validator) external view override returns (uint256) {
         address share = validatorToShare[validator];
@@ -125,9 +125,9 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
     
     /**
-        @dev Estimate how much shares should be unstake, if user wants to get the amount of GXC
-        @param validator    Validator address
-        @param amount       Number of GXC
+     * @dev Estimate how much shares should be unstake, if user wants to get the amount of GXC.
+     * @param validator    Validator address
+     * @param amount       Number of GXC
      */
     function estimateUnstakeShares(address validator, uint256 amount) external view override returns (uint256) {
         address share = validatorToShare[validator];
@@ -136,9 +136,9 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
 
     /**
-        @dev Estimate how much GXC can be claim, if unstake the number of shares(when unstake timeout)
-        @param validator    Validator address
-        @param shares       Number of shares
+     * @dev Estimate how much GXC can be claim, if unstake the number of shares(when unstake timeout).
+     * @param validator    Validator address
+     * @param shares       Number of shares
      */
     function estimateUnStakeAmount(address validator, uint256 shares) external view override returns (uint256) {
         address share = validatorToUnstakeShare[validator];
@@ -154,10 +154,10 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     
 
     /**
-        @dev Stake for validator and mint share token to `to` address
-        @dev It will emit `Stake` event
-        @param validator    Validator address
-        @param to           Receiver address
+     * @dev Stake for validator and mint share token to `to` address.
+     *      It will emit `Stake` event.
+     * @param validator    Validator address
+     * @param to           Receiver address
      */
     function stake(address validator, address to) external payable nonReentrant override returns (uint256 shares) {
         require(uint160(validator) > 2000, "StakeManager: invalid validator");
@@ -175,12 +175,12 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
     
     /**
-        @dev Start unstaking shares for validator
-        @dev Stake manager will burn the shares immediately, but return GXC to `to` address after `config.unstakeDelay`
-        @dev It will emit `StartUnstake` event
-        @param validator    Validator address
-        @param to           Receiver address
-        @param shares       Number of shares to be burned
+     * @dev Start unstaking shares for validator.
+     *      Stake manager will burn the shares immediately, but return GXC to `to` address after `config.unstakeDelay`.
+     *      It will emit `StartUnstake` event.
+     * @param validator    Validator address
+     * @param to           Receiver address
+     * @param shares       Number of shares to be burned
      */
     function startUnstake(address validator, address payable to, uint256 shares) external override nonReentrant returns (uint256 id) {
         require(uint160(to) > 2000, "StakeManager: invalid receiver");
@@ -206,8 +206,8 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
     
     /**
-        @dev Do unstake for all timeout unstake
-        @dev This can be called by anyone
+     * @dev Do unstake for all timeout unstake.
+     *      This can be called by anyone.
      */
     function doUnstake() external override nonReentrant {
         uint256 _lastId = lastId;

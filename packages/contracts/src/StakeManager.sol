@@ -80,9 +80,11 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         return Share(share).estimateUnStakeAmount(shares);
     }
     
-    receive() external payable override {
+    fallback() external payable {
         require(validatorToShare[Share(msg.sender).validator()] == msg.sender, "StakeManager: invalid validator");
     }
+
+    receive() external payable {}
     
     function stake(address validator, address to) external payable nonReentrant override returns (uint256 shares) {
         require(uint160(validator) > 20000, "StakeManager: invalid validator");
@@ -110,7 +112,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         uint256 amount = Share(share).burn(shares, address(this));
         require(amount >= config.minUnstakeAmount(), "StakeManager: invalid unstake amount");
         uint256 unstakeShares = Share(unstakeShare).mint{ value: amount }(address(this));
-        
+
         id = lastId;
         lastId = id.add(1);
         uint256 timestamp = block.timestamp + config.unstakeDelay();
@@ -139,7 +141,8 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         firstId = _firstId;
     }
     
-    // TODO: remove `slash`
+    // slash logic will be handled by the blockchain
+    /*
     function slash(address validator, uint8 reason) external nonReentrant returns (uint256 amount) {
         require(uint160(validator) > 20000, "StakeManager: invalid validator");
         address share = validatorToShare[validator];
@@ -148,4 +151,5 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         uint8 factor = config.getFactorByReason(reason);
         amount = Share(share).slash(factor).add(Share(unstakeShare).slash(factor));
     }
+    */
 }

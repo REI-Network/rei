@@ -1,8 +1,6 @@
-// import '@nomiclabs/hardhat-waffle';
 import '@nomiclabs/hardhat-etherscan';
 import '@nomiclabs/hardhat-truffle5';
 import 'hardhat-deploy';
-// import 'hardhat-deploy-ethers';
 import './tasks';
 
 // You need to export an object to set up your config

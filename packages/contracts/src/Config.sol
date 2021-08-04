@@ -28,9 +28,12 @@ contract Config is IConfig {
         return 5;
     }
     
-    // TODO: return factor by reason
     function getFactorByReason(uint8 reason) external view override returns(uint8) {
-        return 40;
+        if (reason == 0) {
+            return 40;
+        } else {
+            revert("Config: invalid reason");
+        }
     }
     
     function amountPerVotingPower() external view override returns(uint256) {

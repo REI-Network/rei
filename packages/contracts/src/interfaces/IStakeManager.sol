@@ -1,12 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 pragma solidity 0.6.2;
+pragma experimental ABIEncoderV2;
+
+struct Unstake {
+    address validator;
+    address payable to;
+    uint256 unstakeShares;
+    uint256 timestamp;
+}
 
 interface IStakeManager {
     
     function validatorsLength() external view returns (uint256);
     
     function getVotingPowerByIndex(uint256 index) external view returns (uint256);
+
+    function getShareContractAddress(address validator, bool isStake) external view returns (address);
+
+    function getQueuedUnstakeById(uint256 id) external view returns (Unstake memory u);
+
+    function getFirstId() external view returns (uint256);
+
+    function getLastId() external view returns (uint256);
 
     function estimateMinStakeAmount(address validator) external view returns (uint256);
 

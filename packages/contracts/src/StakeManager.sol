@@ -1,19 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 pragma solidity 0.6.2;
+pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/IConfig.sol";
 import "./interfaces/IStakeManager.sol";
 import "./Share.sol";
-
-struct Unstake {
-    address validator;
-    address payable to;
-    uint256 unstakeShares;
-    uint256 timestamp;
-}
 
 contract StakeManager is ReentrancyGuard, IStakeManager {
     using SafeMath for uint256;
@@ -45,6 +39,24 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         address share = validatorToShare[validators[index]];
         require(share != address(0), "StakeManager: invalid validator");
         return share.balance.div(config.amountPerVotingPower());
+    }
+
+    function getShareContractAddress(address validator, bool isStake) external view override returns (address share) {
+        share = isStake ? validatorToShare[validator] : validatorToUnstakeShare[validator];
+        require(share != address(0), "StakeManager: invalid validator");
+    }
+
+    function getQueuedUnstakeById(uint256 id) external view override returns (Unstake memory u) {
+        u = unstakeQueue[id];
+        require(u.validator != address(0), "StakeManager: invalid id");
+    }
+
+    function getFirstId() external view override returns (uint256) {
+        return firstId;
+    }
+
+    function getLastId() external view override returns (uint256) {
+        return lastId;
     }
 
     function estimateMinStakeAmount(address validator) external view override returns (uint256 amount) {

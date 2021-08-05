@@ -66,10 +66,10 @@ describe('StakeManger', () => {
   it('should match validator info', async () => {
     const share = await createShareContract(validator);
     expect(await share.methods.validator().call(), 'validator address should be equal').to.equal(validator);
-    expect(await share.methods.isStake().call(), 'validator address should be equal').be.true;
+    expect(await share.methods.isStake().call(), 'should be stake share contract').be.true;
     const unstakeShare = await createShareContract(validator, false);
     expect(await unstakeShare.methods.validator().call(), 'validator address should be equal').to.equal(validator);
-    expect(await unstakeShare.methods.isStake().call(), 'validator address should be equal').be.false;
+    expect(await unstakeShare.methods.isStake().call(), 'should be unstake share contract').be.false;
   });
 
   it('should approve succeed', async () => {

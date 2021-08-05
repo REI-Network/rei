@@ -79,7 +79,7 @@ task('approve', 'Approve share')
     if (taskArgs.amount === undefined) {
       taskArgs.amount = MAX_INTEGER.toString();
     }
-    await share.methods.approve(taskArgs.spender ? taskArgs.spender : stakeManager.options.address, taskArgs.amount).send();
+    await share.methods.approve(taskArgs.spender ?? stakeManager.options.address, taskArgs.amount).send();
     console.log('Approve succeed, amount:', taskArgs.amount);
   });
 
@@ -118,20 +118,43 @@ task('unstake', 'Start unstake')
         return;
       }
     }
-    await stakeManager.methods.startUnstake(taskArgs.validator, deployer, taskArgs.shares).send();
-    console.log('Unstake succeed, shares:', taskArgs.shares);
-  });
-
-task('dounstake', 'Do unstake').setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
-  const { deployer } = await getNamedAccounts();
-  const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer });
-  const { events } = await stakeManager.methods.doUnstake().send();
-  console.log('Do unstake succeed');
-  if (events) {
-    for (const event in events) {
-      if (event === 'DoUnstake') {
-        console.log(events[event].raw);
+    const { events } = await stakeManager.methods.startUnstake(taskArgs.validator, deployer, taskArgs.shares).send();
+    let id;
+    if (events) {
+      for (const key in events) {
+        if (key === 'StartUnstake') {
+          id = toBN(events[key].raw.topics[1]).toNumber();
+        }
       }
     }
-  }
-});
+    console.log('Unstake succeed, shares:', taskArgs.shares, 'id:', id);
+  });
+
+task('dounstake', 'Do unstake')
+  .addOptionalParam('limit', 'gas limit(max 12450000)')
+  .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
+    const { deployer } = await getNamedAccounts();
+    const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer });
+    const { events } = await stakeManager.methods.doUnstake().send({ gasLimit: taskArgs.limit ?? '12450000' });
+    if (events) {
+      for (const key in events) {
+        if (key === 'DoUnstake') {
+          let arr;
+          if (!Array.isArray(events[key])) {
+            arr = [events[key]];
+          } else {
+            arr = events[key];
+          }
+          for (const event of arr) {
+            const data: string = event.raw.data;
+            const amount = toBN('0x' + data.substr(66));
+            let address: string = event.raw.topics[2];
+            address = '0x' + address.substr(26);
+            const id = toBN(event.raw.topics[1]).toNumber();
+            console.log('Do unstake address:', address, 'amount:', amount.toString(), 'id:', id);
+          }
+        }
+      }
+    }
+    console.log('Do unstake succeed');
+  });

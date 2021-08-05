@@ -13,13 +13,13 @@ const StakeManager = artifacts.require('StakeManager');
 describe('StakeManger', () => {
   let config: any;
   let stakeManager: any;
-  let delpoyer: string;
+  let deployer: string;
   let validator: string;
   let receiver: string;
 
   async function createShareContract(validator: string, isStake = true) {
     const address = isStake ? await stakeManager.methods.validatorToShare(validator).call() : await stakeManager.methods.validatorToUnstakeShare(validator).call();
-    return new web3.eth.Contract(Share.abi, address, { from: delpoyer });
+    return new web3.eth.Contract(Share.abi, address, { from: deployer });
   }
 
   function toBN(data: number | string) {
@@ -31,14 +31,14 @@ describe('StakeManger', () => {
 
   before(async () => {
     const accounts = await web3.eth.getAccounts();
-    delpoyer = accounts[0];
+    deployer = accounts[0];
     validator = accounts[1];
     receiver = accounts[2];
   });
 
   it('should deploy succeed', async () => {
-    config = new web3.eth.Contract(Config.abi, (await Config.new()).address, { from: delpoyer });
-    stakeManager = new web3.eth.Contract(StakeManager.abi, (await StakeManager.new(config.options.address)).address, { from: delpoyer });
+    config = new web3.eth.Contract(Config.abi, (await Config.new()).address, { from: deployer });
+    stakeManager = new web3.eth.Contract(StakeManager.abi, (await StakeManager.new(config.options.address)).address, { from: deployer });
     await config.methods.setStakeManager(stakeManager.options.address).send();
   });
 
@@ -51,15 +51,15 @@ describe('StakeManger', () => {
   it('should stake failed(min stake amount)', async () => {
     const minStakeAmount = toBN(await config.methods.minStakeAmount().call());
     try {
-      await stakeManager.methods.stake(validator, delpoyer).send({ value: minStakeAmount.subn(1).toString() });
+      await stakeManager.methods.stake(validator, deployer).send({ value: minStakeAmount.subn(1).toString() });
       assert.fail("shouldn't stake succeed");
     } catch (err) {}
   });
 
   it('should stake succeed', async () => {
     const minStakeAmount = toBN(await config.methods.minStakeAmount().call());
-    await stakeManager.methods.stake(validator, delpoyer).send({ value: minStakeAmount.toString() });
-    const shares = await (await createShareContract(validator)).methods.balanceOf(delpoyer).call();
+    await stakeManager.methods.stake(validator, deployer).send({ value: minStakeAmount.toString() });
+    const shares = await (await createShareContract(validator)).methods.balanceOf(deployer).call();
     expect(shares, 'shares should be equal to amount at the time of the first staking').to.equal(minStakeAmount.toString());
   });
 
@@ -82,9 +82,9 @@ describe('StakeManger', () => {
     const minUnstakeShares = toBN(await stakeManager.methods.estimateMinUnstakeShares(validator).call());
 
     const share = await createShareContract(validator);
-    const shrBeforeUnstake = toBN(await share.methods.balanceOf(delpoyer).call());
+    const shrBeforeUnstake = toBN(await share.methods.balanceOf(deployer).call());
     await stakeManager.methods.startUnstake(validator, receiver, minUnstakeShares.toString()).send();
-    const shrAfterUnstake = toBN(await share.methods.balanceOf(delpoyer).call());
+    const shrAfterUnstake = toBN(await share.methods.balanceOf(deployer).call());
 
     expect(shrBeforeUnstake.sub(minUnstakeShares).toString(), 'shares should be equal').to.equal(shrAfterUnstake.toString());
     expect(await share.methods.totalSupply().call(), 'total supply should be equal').to.equal(shrAfterUnstake.toString());
@@ -94,8 +94,8 @@ describe('StakeManger', () => {
 
     // send a transaction to update blockchain timestamp
     await web3.eth.sendTransaction({
-      from: delpoyer,
-      to: delpoyer,
+      from: deployer,
+      to: deployer,
       value: 0
     });
 

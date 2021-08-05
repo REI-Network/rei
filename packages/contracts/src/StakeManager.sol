@@ -15,17 +15,17 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     // config
     IConfig public config;
     
-    mapping(address => address) public _validatorToShare;
-    mapping(address => address) public _validatorToUnstakeShare;
+    mapping(address => address) private _validatorToShare;
+    mapping(address => address) private _validatorToUnstakeShare;
     // all _validators, will not be deleted forever
-    address[] public _validators;
+    address[] private _validators;
     
     // first unstake id
-    uint256 public _firstId = 0;
+    uint256 private _firstId = 0;
     // last unstake id
-    uint256 public _lastId = 0;
+    uint256 private _lastId = 0;
     // unstake information, delete after `do unstake`
-    mapping(uint256 => Unstake) public _unstakeQueue;
+    mapping(uint256 => Unstake) private _unstakeQueue;
     
     /**
      * @dev Emit when the user stakes

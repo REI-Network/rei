@@ -108,6 +108,7 @@ task('balance', 'Get balance')
 task('unstake', 'Start unstake')
   .addParam('validator', 'validator address')
   .addOptionalParam('shares', 'unstake shares')
+  .addFlag('ether', 'use ether as unit')
   .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
     const { deployer } = await getNamedAccounts();
     const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer });
@@ -117,6 +118,10 @@ task('unstake', 'Start unstake')
         console.log("validator doesn't exsit!");
         return;
       }
+    } else if (taskArgs.ether) {
+      taskArgs.shares = toBN(taskArgs.shares)
+        .mul(new BN(10).pow(new BN(18)))
+        .toString();
     }
     const { events } = await stakeManager.methods.startUnstake(taskArgs.validator, deployer, taskArgs.shares).send();
     let id;

@@ -109,6 +109,7 @@ task('unstake', 'Start unstake')
   .addParam('validator', 'validator address')
   .addOptionalParam('shares', 'unstake shares')
   .addFlag('ether', 'use ether as unit')
+  .addOptionalParam('repeat', 'repeat times')
   .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
     const { deployer } = await getNamedAccounts();
     const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer });
@@ -123,16 +124,19 @@ task('unstake', 'Start unstake')
         .mul(new BN(10).pow(new BN(18)))
         .toString();
     }
-    const { events } = await stakeManager.methods.startUnstake(taskArgs.validator, deployer, taskArgs.shares).send();
-    let id;
-    if (events) {
-      for (const key in events) {
-        if (key === 'StartUnstake') {
-          id = toBN(events[key].raw.topics[1]).toNumber();
+    const repeat = taskArgs.repeat ?? 1;
+    for (let i = 0; i < repeat; i++) {
+      const { events } = await stakeManager.methods.startUnstake(taskArgs.validator, deployer, taskArgs.shares).send();
+      let id;
+      if (events) {
+        for (const key in events) {
+          if (key === 'StartUnstake') {
+            id = toBN(events[key].raw.topics[1]).toNumber();
+          }
         }
       }
+      console.log('Unstake succeed, shares:', taskArgs.shares, 'id:', id);
     }
-    console.log('Unstake succeed, shares:', taskArgs.shares, 'id:', id);
   });
 
 task('dounstake', 'Do unstake')

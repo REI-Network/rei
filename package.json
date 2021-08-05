@@ -21,7 +21,8 @@
     "lerna": "^3.22.1",
     "lint-staged": "^10.5.1",
     "mocha": "^9.0.2",
-    "prettier": "^2.2.0"
+    "prettier": "^2.2.0",
+    "prettier-plugin-solidity": "1.0.0-beta.6"
   },
   "scripts": {
     "bootstrap": "lerna bootstrap --ignore-scripts --include-dependencies --no-ci --hoist && npm rebuild && npm run build",

@@ -7,19 +7,23 @@ import "./interfaces/IConfig.sol";
 import "./interfaces/IShare.sol";
 
 contract Share is ERC20, IShare {
-    using SafeMath  for uint256;
-    
+    using SafeMath for uint256;
+
     IConfig public config;
 
     address private _validator;
     bool private _isStake;
-    
+
     modifier onlyStakeManager() {
         require(msg.sender == config.stakeManager(), "Share: only stake manager");
         _;
     }
-    
-    constructor(address _config, address validator, bool isStake) public ERC20("Share", "S") {
+
+    constructor(
+        address _config,
+        address validator,
+        bool isStake
+    ) public ERC20("Share", "S") {
         config = IConfig(_config);
         _validator = validator;
         _isStake = isStake;
@@ -52,7 +56,7 @@ contract Share is ERC20, IShare {
             amount = address(this).balance.mul(shares).div(_totalSupply);
         }
     }
-    
+
     /**
      * @dev Estimate how much shares should be unstake, if user wants to get the amount of GXC.
      * @param amount    Number of GXC
@@ -96,7 +100,7 @@ contract Share is ERC20, IShare {
         require(shares > 0, "Share: insufficient shares");
         _mint(to, shares);
     }
-    
+
     /**
      * @dev Burn shares and return GXC to `to` address.
      *      Can only be called by stake manager.
@@ -116,7 +120,7 @@ contract Share is ERC20, IShare {
             to.transfer(amount);
         }
     }
-    
+
     // slash logic will be handled by the blockchain
     /*
     function slash(uint8 factor) external override onlyStakeManager returns (uint256 amount) {

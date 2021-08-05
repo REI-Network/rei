@@ -11,7 +11,6 @@ struct Unstake {
 }
 
 interface IStakeManager {
-    
     function validatorToShare(address validator) external view returns (address);
 
     function validatorToUnstakeShare(address validator) external view returns (address);
@@ -19,7 +18,7 @@ interface IStakeManager {
     function validators(uint256 index) external view returns (address);
 
     function validatorsLength() external view returns (uint256);
-    
+
     function getVotingPowerByIndex(uint256 index) external view returns (uint256);
 
     function getVotingPowerByAddess(address validator) external view returns (uint256);
@@ -39,10 +38,14 @@ interface IStakeManager {
     function estimateUnstakeShares(address validator, uint256 amount) external view returns (uint256);
 
     function estimateUnStakeAmount(address validator, uint256 shares) external view returns (uint256);
-    
+
     function stake(address validator, address to) external payable returns (uint256);
-    
-    function startUnstake(address validator, address payable to, uint256 shares) external returns (uint256);
-    
+
+    function startUnstake(
+        address validator,
+        address payable to,
+        uint256 shares
+    ) external returns (uint256);
+
     function doUnstake() external;
 }

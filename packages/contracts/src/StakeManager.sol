@@ -11,22 +11,22 @@ import "./Share.sol";
 
 contract StakeManager is ReentrancyGuard, IStakeManager {
     using SafeMath for uint256;
-    
+
     // config
     IConfig public config;
-    
+
     mapping(address => address) private _validatorToShare;
     mapping(address => address) private _validatorToUnstakeShare;
     // all _validators, will not be deleted forever
     address[] private _validators;
-    
+
     // first unstake id
     uint256 private _firstId = 0;
     // last unstake id
     uint256 private _lastId = 0;
     // unstake information, delete after `do unstake`
     mapping(uint256 => Unstake) private _unstakeQueue;
-    
+
     /**
      * @dev Emit when the user stakes
      * @param validator     Validator address
@@ -54,7 +54,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      * @param amount        GXC Released
      */
     event DoUnstake(uint256 indexed id, address indexed validator, address to, uint256 amount);
-    
+
     constructor(address _config) public {
         config = IConfig(_config);
     }
@@ -79,14 +79,14 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     function validators(uint256 index) external view override returns (address) {
         return _validators[index];
     }
-    
+
     /**
      * @dev Get the _validators length.
      */
     function validatorsLength() external view override returns (uint256) {
         return _validators.length;
     }
-    
+
     /**
      * @dev Get the voting power by validator index.
      *      If index is out of range or validator doesn't exist, return 0
@@ -145,10 +145,13 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      */
     function estimateMinStakeAmount(address validator) external view override returns (uint256 amount) {
         address share = _validatorToShare[validator];
-        require(share != address(0), "StakeManager: invalid validator");
-        amount = Share(share).estimateStakeAmount(1);
-        if (amount < config.minStakeAmount()) {
+        if (share == address(0)) {
             amount = config.minStakeAmount();
+        } else {
+            amount = Share(share).estimateStakeAmount(1);
+            if (amount < config.minStakeAmount()) {
+                amount = config.minStakeAmount();
+            }
         }
     }
 
@@ -159,40 +162,51 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      */
     function estimateStakeAmount(address validator, uint256 shares) external view override returns (uint256) {
         address share = _validatorToShare[validator];
-        require(share != address(0), "StakeManager: invalid validator");
+        if (share == address(0)) {
+            return shares;
+        }
         return Share(share).estimateStakeAmount(shares);
     }
 
     /**
      * @dev Estimate the mininual unstake shares for validator.
      *      If the unstake shares is less than this value, transaction will fail.
+     *      If the validator doesn't exist, return 0.
      * @param validator    Validator address
      */
     function estimateMinUnstakeShares(address validator) external view override returns (uint256) {
         address share = _validatorToShare[validator];
-        require(share != address(0), "StakeManager: invalid validator");
+        if (share == address(0)) {
+            return 0;
+        }
         return Share(share).estimateUnstakeShares(config.minUnstakeAmount());
     }
-    
+
     /**
      * @dev Estimate how much shares should be unstake, if user wants to get the amount of GXC.
+     *      If the validator doesn't exist, return 0.
      * @param validator    Validator address
      * @param amount       Number of GXC
      */
     function estimateUnstakeShares(address validator, uint256 amount) external view override returns (uint256) {
         address share = _validatorToShare[validator];
-        require(share != address(0), "StakeManager: invalid validator");
+        if (share == address(0)) {
+            return 0;
+        }
         return Share(share).estimateUnstakeShares(amount);
     }
 
     /**
      * @dev Estimate how much GXC can be claim, if unstake the number of shares(when unstake timeout).
+     *      If the validator doesn't exist, return 0.
      * @param validator    Validator address
      * @param shares       Number of shares
      */
     function estimateUnStakeAmount(address validator, uint256 shares) external view override returns (uint256) {
         address share = _validatorToUnstakeShare[validator];
-        require(share != address(0), "StakeManager: invalid validator");
+        if (share == address(0)) {
+            return 0;
+        }
         return Share(share).estimateUnStakeAmount(shares);
     }
 
@@ -205,7 +219,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      * @param validator    Validator address
      * @param to           Receiver address
      */
-    function stake(address validator, address to) external payable nonReentrant override returns (uint256 shares) {
+    function stake(address validator, address to) external payable override nonReentrant returns (uint256 shares) {
         require(uint160(validator) > 2000, "StakeManager: invalid validator");
         require(uint160(to) > 2000, "StakeManager: invalid receiver");
         require(msg.value >= config.minStakeAmount(), "StakeManager: invalid stake amount");
@@ -219,7 +233,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         shares = Share(share).mint{ value: msg.value }(to);
         emit Stake(validator, to, msg.value, shares);
     }
-    
+
     /**
      * @dev Start unstaking shares for validator.
      *      Stake manager will burn the shares immediately, but return GXC to `to` address after `config.unstakeDelay`.
@@ -228,13 +242,17 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      * @param to           Receiver address
      * @param shares       Number of shares to be burned
      */
-    function startUnstake(address validator, address payable to, uint256 shares) external override nonReentrant returns (uint256 id) {
+    function startUnstake(
+        address validator,
+        address payable to,
+        uint256 shares
+    ) external override nonReentrant returns (uint256 id) {
         require(uint160(to) > 2000, "StakeManager: invalid receiver");
         require(shares > 0, "StakeManager: invalid shares");
         address share = _validatorToShare[validator];
         address unstakeShare = _validatorToUnstakeShare[validator];
         require(share != address(0) && unstakeShare != address(0), "StakeManager: invalid validator");
-        
+
         Share(share).transferFrom(msg.sender, address(this), shares);
         uint256 amount = Share(share).burn(shares, address(this));
         require(amount >= config.minUnstakeAmount(), "StakeManager: invalid unstake amount");
@@ -250,7 +268,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         _unstakeQueue[id] = Unstake(validator, to, unstakeShares, timestamp);
         emit StartUnstake(id, validator, to, shares, timestamp);
     }
-    
+
     /**
      * @dev Do unstake for all timeout unstake.
      *      This can be called by anyone.
@@ -271,7 +289,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         }
         _firstId = id;
     }
-    
+
     // slash logic will be handled by the blockchain
     /*
     function slash(address validator, uint8 reason) external nonReentrant returns (uint256 amount) {

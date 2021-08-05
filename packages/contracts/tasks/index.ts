@@ -35,7 +35,7 @@ task('transfer', 'Transfer value to target address')
 task('init', 'Initialize config').setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
   const { deployer } = await getNamedAccounts();
   const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts });
-  const config = await createWeb3Contract({ name: 'Config', deployments, web3, from: deployer });
+  const config = await createWeb3Contract({ name: 'Config', deployments, web3, artifacts, from: deployer });
   await config.methods.setStakeManager(stakeManager.options.address).send();
   console.log('Initialize config finished');
 });
@@ -168,4 +168,13 @@ task('dounstake', 'Do unstake')
       }
     }
     console.log('Do unstake succeed, process count:', count, 'gas used:', gasUsed);
+  });
+
+task('vu', 'Visit unstake info by id')
+  .addParam('id', 'unstake id')
+  .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
+    const { deployer } = await getNamedAccounts();
+    const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer });
+    const u = await stakeManager.methods.unstakeQueue(taskArgs.id).call();
+    console.log('\nvalidator:', u.validator, '\nto:', u.to, '\nunstakeShares:', u.unstakeShares, '\ntimestamp:', u.timestamp);
   });

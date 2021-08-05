@@ -131,11 +131,12 @@ task('unstake', 'Start unstake')
   });
 
 task('dounstake', 'Do unstake')
-  .addOptionalParam('limit', 'gas limit(max 12450000)')
+  .addOptionalParam('limit', 'gas limit(default max 12450000)')
   .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
     const { deployer } = await getNamedAccounts();
     const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer });
-    const { events } = await stakeManager.methods.doUnstake().send({ gasLimit: taskArgs.limit ?? '12450000' });
+    const { events, gasUsed } = await stakeManager.methods.doUnstake().send({ gasLimit: taskArgs.limit ?? '12450000' });
+    let count = 0;
     if (events) {
       for (const key in events) {
         if (key === 'DoUnstake') {
@@ -152,9 +153,10 @@ task('dounstake', 'Do unstake')
             address = '0x' + address.substr(26);
             const id = toBN(event.raw.topics[1]).toNumber();
             console.log('Do unstake address:', address, 'amount:', amount.toString(), 'id:', id);
+            count++;
           }
         }
       }
     }
-    console.log('Do unstake succeed');
+    console.log('Do unstake succeed, process count:', count, 'gas used:', gasUsed);
   });

@@ -7,15 +7,15 @@ GXChain2.0 genesis contracts
 
 - `Config` Global config contract, deployed at `0x0000000000000000000000000000000000001000`
 - `Share` User share contract, dynamically deployed for each validator
-- `StakeManger` Stake manager contract, deployed at `0x0000000000000000000000000000000000001001`
+- `StakeManager` Stake manager contract, deployed at `0x0000000000000000000000000000000000001001`
 
-## INSTALL
+## Install
 
 ```sh
 npm install @gxchain2/contracts
 ```
 
-## USAGE
+## Usage
 
 ```solidity
 // SPDX-License-Identifier: GPL-3.0-or-later

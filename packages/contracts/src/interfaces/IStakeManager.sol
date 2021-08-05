@@ -37,7 +37,7 @@ interface IStakeManager {
 
     function estimateUnstakeShares(address validator, uint256 amount) external view returns (uint256);
 
-    function estimateUnStakeAmount(address validator, uint256 shares) external view returns (uint256);
+    function estimateUnstakeAmount(address validator, uint256 shares) external view returns (uint256);
 
     function stake(address validator, address to) external payable returns (uint256);
 

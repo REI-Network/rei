@@ -73,7 +73,7 @@ contract Share is ERC20, IShare {
      * @dev Estimate how much GXC can be claim, if unstake the number of shares(when unstake timeout).
      * @param shares    Number of shares
      */
-    function estimateUnStakeAmount(uint256 shares) external view override returns (uint256 amount) {
+    function estimateUnstakeAmount(uint256 shares) external view override returns (uint256 amount) {
         require(shares > 0, "Share: insufficient shares");
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) {

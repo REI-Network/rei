@@ -13,7 +13,7 @@ interface IShare is IERC20 {
 
     function estimateUnstakeShares(uint256 amount) external view returns (uint256);
 
-    function estimateUnStakeAmount(uint256 shares) external view returns (uint256);
+    function estimateUnstakeAmount(uint256 shares) external view returns (uint256);
 
     function mint(address to) external payable returns (uint256);
 

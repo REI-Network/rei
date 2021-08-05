@@ -174,12 +174,16 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      *      If the validator doesn't exist, return 0.
      * @param validator    Validator address
      */
-    function estimateMinUnstakeShares(address validator) external view override returns (uint256) {
+    function estimateMinUnstakeShares(address validator) external view override returns (uint256 shares) {
         address share = _validatorToShare[validator];
         if (share == address(0)) {
-            return 0;
+            shares = 0;
+        } else {
+            shares = Share(share).estimateUnstakeShares(config.minUnstakeAmount());
+            if (shares == 0) {
+                shares = 1;
+            }
         }
-        return Share(share).estimateUnstakeShares(config.minUnstakeAmount());
     }
 
     /**
@@ -188,12 +192,16 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      * @param validator    Validator address
      * @param amount       Number of GXC
      */
-    function estimateUnstakeShares(address validator, uint256 amount) external view override returns (uint256) {
+    function estimateUnstakeShares(address validator, uint256 amount) external view override returns (uint256 shares) {
         address share = _validatorToShare[validator];
         if (share == address(0)) {
-            return 0;
+            shares = 0;
+        } else {
+            shares = Share(share).estimateUnstakeShares(amount);
+            if (shares == 0) {
+                shares = 1;
+            }
         }
-        return Share(share).estimateUnstakeShares(amount);
     }
 
     /**
@@ -202,12 +210,12 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      * @param validator    Validator address
      * @param shares       Number of shares
      */
-    function estimateUnStakeAmount(address validator, uint256 shares) external view override returns (uint256) {
+    function estimateUnstakeAmount(address validator, uint256 shares) external view override returns (uint256) {
         address share = _validatorToUnstakeShare[validator];
         if (share == address(0)) {
             return 0;
         }
-        return Share(share).estimateUnStakeAmount(shares);
+        return Share(share).estimateUnstakeAmount(shares);
     }
 
     // receive GXC transfer

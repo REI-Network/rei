@@ -1,6 +1,7 @@
 import { task } from 'hardhat/config';
+import type { Artifacts } from 'hardhat/types';
 import type Web3 from 'web3';
-import { BN } from 'ethereumjs-util';
+import { BN, MAX_INTEGER } from 'ethereumjs-util';
 
 function toBN(data: number | string) {
   if (typeof data === 'string' && data.startsWith('0x')) {
@@ -9,9 +10,9 @@ function toBN(data: number | string) {
   return new BN(data);
 }
 
-async function createWeb3Contract({ name, artifactName, address, deployments, web3, from }: any) {
-  const { getArtifact, get } = deployments;
-  return new (web3 as Web3).eth.Contract((await getArtifact(artifactName ? artifactName : name)).abi, address ? address : (await get(name)).address, from ? { from } : undefined);
+async function createWeb3Contract({ name, artifactName, address, deployments, web3, from, artifacts }: any) {
+  const { get } = deployments;
+  return new (web3 as Web3).eth.Contract((artifacts as Artifacts).require(artifactName ?? name).abi, address ?? (await get(name)).address, from ? { from } : undefined);
 }
 
 task('accounts', 'List accounts').setAction(async (taskArgs, { web3 }) => {
@@ -31,16 +32,16 @@ task('transfer', 'Transfer value to target address')
     console.log('Transfer succeed');
   });
 
-task('init', 'Initialize config').setAction(async (taskArgs, { deployments, web3, getNamedAccounts }) => {
+task('init', 'Initialize config').setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
   const { deployer } = await getNamedAccounts();
-  const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3 });
+  const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts });
   const config = await createWeb3Contract({ name: 'Config', deployments, web3, from: deployer });
   await config.methods.setStakeManager(stakeManager.options.address).send();
   console.log('Initialize config finished');
 });
 
-task('getsm', 'Get stake manager address').setAction(async (taskArgs, { deployments, web3 }) => {
-  const config = await createWeb3Contract({ name: 'Config', deployments, web3 });
+task('getsm', 'Get stake manager address').setAction(async (taskArgs, { deployments, web3, artifacts }) => {
+  const config = await createWeb3Contract({ name: 'Config', deployments, web3, artifacts });
   console.log('Stake manager address:', await config.methods.stakeManager().call());
 });
 
@@ -48,9 +49,9 @@ task('stake', 'Stake to validator')
   .addParam('validator', 'validator address')
   .addOptionalParam('value', 'stake value')
   .addFlag('ether', 'use ether as unit')
-  .setAction(async (taskArgs, { deployments, web3, getNamedAccounts }) => {
+  .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
     const { deployer } = await getNamedAccounts();
-    const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, from: deployer });
+    const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer });
     if (taskArgs.value === undefined) {
       taskArgs.value = await stakeManager.methods.estimateMinStakeAmount(taskArgs.validator).call();
     } else if (taskArgs.ether) {
@@ -61,3 +62,76 @@ task('stake', 'Stake to validator')
     await stakeManager.methods.stake(taskArgs.validator, deployer).send({ value: taskArgs.value });
     console.log('Stake succeed, value:', taskArgs.value);
   });
+
+task('approve', 'Approve share')
+  .addParam('validator', 'validator address')
+  .addOptionalParam('spender', 'approve spender')
+  .addOptionalParam('amount', 'approve amount')
+  .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
+    const { deployer } = await getNamedAccounts();
+    const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer });
+    const shareAddress = await stakeManager.methods.validatorToShare(taskArgs.validator).call();
+    if (shareAddress === '0x0000000000000000000000000000000000000000') {
+      console.log("validator doesn't exsit!");
+      return;
+    }
+    const share = await createWeb3Contract({ name: 'Share', address: shareAddress, deployments, web3, artifacts, from: deployer });
+    if (taskArgs.amount === undefined) {
+      taskArgs.amount = MAX_INTEGER.toString();
+    }
+    await share.methods.approve(taskArgs.spender ? taskArgs.spender : stakeManager.options.address, taskArgs.amount).send();
+    console.log('Approve succeed, amount:', taskArgs.amount);
+  });
+
+task('balance', 'Get balance')
+  .addParam('address', 'address')
+  .addOptionalParam('validator', 'validator address')
+  .addOptionalParam('contract', 'ERC20 contract address')
+  .setAction(async (taskArgs, { deployments, web3, artifacts }) => {
+    if (taskArgs.contract === undefined) {
+      console.log('GXC balance:', await (web3 as Web3).eth.getBalance(taskArgs.address));
+    } else if (taskArgs.validator === undefined) {
+      const share = await createWeb3Contract({ name: 'Share', deployments, web3, artifacts, address: taskArgs.contract });
+      console.log(await share.methods.name().call(), 'balance:', await share.methods.balanceOf(taskArgs.address).call());
+    } else {
+      const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts });
+      const shareAddress = await stakeManager.methods.validatorToShare(taskArgs.validator).call();
+      if (shareAddress === '0x0000000000000000000000000000000000000000') {
+        console.log("validator doesn't exsit!");
+        return;
+      }
+      const share = await createWeb3Contract({ name: 'Share', address: shareAddress, deployments, web3, artifacts });
+      console.log(await share.methods.name().call(), 'balance:', await share.methods.balanceOf(taskArgs.address).call());
+    }
+  });
+
+task('unstake', 'Start unstake')
+  .addParam('validator', 'validator address')
+  .addOptionalParam('shares', 'unstake shares')
+  .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
+    const { deployer } = await getNamedAccounts();
+    const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer });
+    if (taskArgs.shares === undefined) {
+      taskArgs.shares = await stakeManager.methods.estimateMinUnstakeShares(taskArgs.validator).call();
+      if (taskArgs.shares === '0') {
+        console.log("validator doesn't exsit!");
+        return;
+      }
+    }
+    await stakeManager.methods.startUnstake(taskArgs.validator, deployer, taskArgs.shares).send();
+    console.log('Unstake succeed, shares:', taskArgs.shares);
+  });
+
+task('dounstake', 'Do unstake').setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
+  const { deployer } = await getNamedAccounts();
+  const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer });
+  const { events } = await stakeManager.methods.doUnstake().send();
+  console.log('Do unstake succeed');
+  if (events) {
+    for (const event in events) {
+      if (event === 'DoUnstake') {
+        console.log(events[event].raw);
+      }
+    }
+  }
+});

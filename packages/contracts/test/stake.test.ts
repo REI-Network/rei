@@ -101,11 +101,11 @@ describe('StakeManger', () => {
 
     // the unstake id should be `0`, so we directly use `0` to get `unstakeShares`
     const unstakeShares = (await stakeManager.methods.unstakeQueue(0).call()).unstakeShares;
-    const estimateUnStakeAmount = toBN(await stakeManager.methods.estimateUnStakeAmount(validator, unstakeShares).call());
+    const estimateUnstakeAmount = toBN(await stakeManager.methods.estimateUnstakeAmount(validator, unstakeShares).call());
     const balBeforeUnstake = toBN(await web3.eth.getBalance(receiver));
     await stakeManager.methods.doUnstake().send();
     const balAfterUnstake = toBN(await web3.eth.getBalance(receiver));
 
-    expect(balBeforeUnstake.add(estimateUnStakeAmount).toString(), 'receiver balance should be equal to the estimated value').to.equal(balAfterUnstake.toString());
+    expect(balBeforeUnstake.add(estimateUnstakeAmount).toString(), 'receiver balance should be equal to the estimated value').to.equal(balAfterUnstake.toString());
   });
 });

@@ -145,13 +145,9 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         require(share != address(0), "StakeManager: invalid validator");
         return Share(share).estimateUnStakeAmount(shares);
     }
-    
-    fallback() external payable {
-        require(validatorToShare[Share(msg.sender).validator()] == msg.sender, "StakeManager: invalid validator");
-    }
 
+    // receive GXC transfer
     receive() external payable {}
-    
 
     /**
      * @dev Stake for validator and mint share token to `to` address.

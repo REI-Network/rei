@@ -12,17 +12,23 @@ struct Unstake {
 
 interface IStakeManager {
     
+    function validatorToShare(address validator) external view returns (address);
+
+    function validatorToUnstakeShare(address validator) external view returns (address);
+
+    function validators(uint256 index) external view returns (address);
+
     function validatorsLength() external view returns (uint256);
     
     function getVotingPowerByIndex(uint256 index) external view returns (uint256);
 
-    function getShareContractAddress(address validator, bool isStake) external view returns (address);
+    function getVotingPowerByAddess(address validator) external view returns (uint256);
 
-    function getQueuedUnstakeById(uint256 id) external view returns (Unstake memory u);
+    function firstId() external view returns (uint256);
 
-    function getFirstId() external view returns (uint256);
+    function lastId() external view returns (uint256);
 
-    function getLastId() external view returns (uint256);
+    function unstakeQueue(uint256 index) external view returns (Unstake memory);
 
     function estimateMinStakeAmount(address validator) external view returns (uint256);
 

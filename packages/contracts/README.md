@@ -77,7 +77,7 @@ contract LockedStake {
         require(stakeOwnerOf[id] == msg.sender, "LockedStake: invalid stake owner");
         uint256 _shares = stakeSharesOf[id];
         // we should approve the shares to stake manager before starting unstake
-        IShare(sm.getShareContractAddress(validator, true)).approve(address(sm), _shares);
+        IShare(sm.validatorToShare(validator)).approve(address(sm), _shares);
         // stake manager will burn the shares and return the GXC after `config.unstakeDelay`
         sm.startUnstake(validator, to, _shares);
         delete stakeTimestampOf[id];

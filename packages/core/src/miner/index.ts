@@ -4,7 +4,7 @@ import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN, calculate
 import { WrappedVM } from '@gxchain2/vm';
 import { logger, getRandomIntInclusive, hexStringToBN, nowTimestamp } from '@gxchain2/utils';
 import { StateManager } from '@gxchain2/vm';
-import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
+import { RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
 import { PendingTxMap } from '../txpool';
 import { Node } from '../node';
 

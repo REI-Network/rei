@@ -1,7 +1,7 @@
 import type { LevelUp } from 'levelup';
-import { DBManager, CacheMap } from '@ethereumjs/blockchain/dist/db/manager';
-import { DBOp, DBTarget, DatabaseKey, DBOpData } from '@ethereumjs/blockchain/dist/db/operation';
-import Cache from '@ethereumjs/blockchain/dist/db/cache';
+import { DBManager, CacheMap } from '@gxchain2-ethereumjs/blockchain/dist/db/manager';
+import { DBOp, DBTarget, DatabaseKey, DBOpData } from '@gxchain2-ethereumjs/blockchain/dist/db/operation';
+import Cache from '@gxchain2-ethereumjs/blockchain/dist/db/cache';
 import { BN, rlp, toBuffer } from 'ethereumjs-util';
 import { Block, BlockBodyBuffer, BlockHeader, BlockHeaderBuffer, WrappedTransaction, Receipt, Transaction } from '@gxchain2/structure';
 import { Common } from '@gxchain2/common';

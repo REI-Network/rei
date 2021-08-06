@@ -1,6 +1,6 @@
 import { bnToHex, bufferToHex, BN, Address } from 'ethereumjs-util';
-import { Block } from '@ethereumjs/block';
-import { CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@ethereumjs/block/dist/clique';
+import { Block } from '@gxchain2-ethereumjs/block';
+import { CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@gxchain2-ethereumjs/block/dist/clique';
 import { txSize, WrappedTransaction, Transaction } from './transaction';
 
 /**
@@ -83,5 +83,5 @@ export class WrappedBlock {
   }
 }
 
-export * from '@ethereumjs/block';
+export * from '@gxchain2-ethereumjs/block';
 export { CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN };

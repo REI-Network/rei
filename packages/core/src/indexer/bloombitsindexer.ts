@@ -1,5 +1,5 @@
-import { BlockHeader } from '@ethereumjs/block';
 import { BN } from 'ethereumjs-util';
+import { BlockHeader } from '@gxchain2/structure';
 import { DBSaveBloomBits, DBOp } from '@gxchain2/database';
 import { ChainIndexer, ChainIndexerBackend } from './chainindexer';
 import { BloomBitsGenerator } from '../bloombits';

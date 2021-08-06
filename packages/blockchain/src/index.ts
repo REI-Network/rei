@@ -1,7 +1,7 @@
 import { BN, Address } from 'ethereumjs-util';
-import EthereumBlockchain, { BlockchainOptions as EthereumBlockchainOptions } from '@ethereumjs/blockchain';
-import { CliqueLatestBlockSigners } from '@ethereumjs/blockchain/dist/clique';
-import { CliqueLatestSignerStates } from '@ethereumjs/blockchain/dist/clique';
+import EthereumBlockchain, { BlockchainOptions as EthereumBlockchainOptions } from '@gxchain2-ethereumjs/blockchain';
+import { CliqueLatestBlockSigners } from '@gxchain2-ethereumjs/blockchain/dist/clique';
+import { CliqueLatestSignerStates } from '@gxchain2-ethereumjs/blockchain/dist/clique';
 import { Block, BlockHeader } from '@gxchain2/structure';
 import { Database } from '@gxchain2/database';
 

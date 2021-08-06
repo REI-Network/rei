@@ -1,5 +1,5 @@
 import { BN, setLengthLeft } from 'ethereumjs-util';
-import { StateManager } from '@ethereumjs/vm/dist/state';
+import { StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { InterpreterStep, VmError } from '@gxchain2/vm';
 import { createBufferFunctionalMap } from '@gxchain2/utils';
 import { TraceConfig, IDebugImpl } from '../tracer';
@@ -35,10 +35,9 @@ export class StructLogDebug implements IDebugImpl {
   /**
    * captureLog logs a new structured log message and pushes it out to the environment
    * @param step Step state
-   * @param cost Cost value
    * @param error Error message
    */
-  private async captureLog(step: InterpreterStep, cost: BN, error?: string) {
+  private async captureLog(step: InterpreterStep, error?: string) {
     let memory: string[] = [];
     if (!this.config.disableMemory && step.memoryWordCount.gtn(0)) {
       const memoryLength = new BN(step.memory.length).div(step.memoryWordCount).toNumber();
@@ -88,7 +87,7 @@ export class StructLogDebug implements IDebugImpl {
       depth: step.depth + 1,
       error,
       gas: step.gasLeft.toNumber(),
-      gasCost: cost.toNumber(),
+      gasCost: step.opcode.fee,
       memory,
       op: step.opcode.name,
       pc: step.pc,
@@ -106,29 +105,26 @@ export class StructLogDebug implements IDebugImpl {
    * @param input Input data
    * @param gas GasLimit
    * @param gasPrice  gasPrice
-   * @param intrinsicGas Intrinsic gas
    * @param value Sent to it from it's caller
    * @param number Blocknumber
    * @param stateManager state trie manager
    */
-  async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, gasPrice: BN, intrinsicGas: BN, value: BN, number: BN, stateManager: StateManager) {}
+  async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, gasPrice: BN, value: BN, number: BN, stateManager: StateManager) {}
 
   /**
    * captureState call the captureLog function
    * @param step Step state
-   * @param cost Cost value
    */
-  async captureState(step: InterpreterStep, cost: BN) {
-    await this.captureLog(step, cost);
+  async captureState(step: InterpreterStep) {
+    await this.captureLog(step);
   }
 
   /**
    * captureFault implements the Tracer interface to trace an execution fault
    * @param step Step state
-   * @param cost Cost value
    * @param err Error message
    */
-  async captureFault(step: InterpreterStep, cost: BN, err: any) {
+  async captureFault(step: InterpreterStep, err: any) {
     let errString: string;
     if (err instanceof VmError) {
       errString = err.error;
@@ -140,7 +136,7 @@ export class StructLogDebug implements IDebugImpl {
       errString = 'unkonw error';
     }
     this.failed = true;
-    await this.captureLog(step, cost, errString);
+    await this.captureLog(step, errString);
   }
 
   /**

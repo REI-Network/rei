@@ -92,7 +92,7 @@ export class Controller {
     const wvm = await this.node.getWrappedVM(block.header.stateRoot, block.header.number);
     await wvm.vm.stateManager.checkpoint();
     try {
-      const result = await wvm.runCall({
+      const result = await wvm.vm.runCall({
         block,
         gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
         origin: data.from ? Address.fromString(data.from) : Address.zero(),

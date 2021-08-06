@@ -1,4 +1,4 @@
-import { TxOptions, Transaction } from '@ethereumjs/tx';
+import { TxOptions, Transaction } from '@gxchain2-ethereumjs/tx';
 import { BN, bufferToHex, bnToHex, intToHex, rlp } from 'ethereumjs-util';
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { Block } from './block';
@@ -136,4 +136,4 @@ export class WrappedTransaction {
   }
 }
 
-export * from '@ethereumjs/tx';
+export * from '@gxchain2-ethereumjs/tx';

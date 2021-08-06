@@ -25,7 +25,8 @@
     "prettier-plugin-solidity": "1.0.0-beta.6"
   },
   "scripts": {
-    "bootstrap": "lerna bootstrap --ignore-scripts --include-dependencies --no-ci --hoist && npm rebuild && npm run build",
+    "bootstrap": "lerna bootstrap --ignore-scripts --include-dependencies --no-ci --hoist && npm run temporaryClientFixes && npm run build",
+    "temporaryClientFixes": "cd node_modules/bcrypto && test -d 'build' && echo 'Exists' || npm i",
     "build": "lerna run build --stream",
     "build:structure": "npm run build -- --scope @gxchain2/structure",
     "build:blockchain": "npm run build -- --scope @gxchain2/blockchain",

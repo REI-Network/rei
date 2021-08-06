@@ -1,5 +1,5 @@
-import { hardforks as EthereumHF } from '@ethereumjs/common/dist/hardforks';
-import { EIPs } from '@ethereumjs/common/dist/eips';
+import { hardforks as EthereumHF } from '@gxchain2-ethereumjs/common/dist/hardforks';
+import { EIPs } from '@gxchain2-ethereumjs/common/dist/eips';
 import { hardforks } from './hardforks';
 import { GIPs } from './gips';
 

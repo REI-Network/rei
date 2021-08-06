@@ -2,15 +2,15 @@ import path from 'path';
 import fs from 'fs';
 import type { LevelUp } from 'levelup';
 import LevelStore from 'datastore-level';
-import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
-import { SecureTrie as Trie } from 'merkle-patricia-tree';
+import { bufferToHex, BN, BNLike, toBuffer } from 'ethereumjs-util';
+import { SecureTrie as Trie, BaseTrie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
 import { Database, createEncodingLevelDB, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchain2/database';
 import { NetworkManager, Peer } from '@gxchain2/network';
 import { Common, getGenesisState, getChain } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
-import { VM, WrappedVM, StateManager } from '@gxchain2/vm';
-import { Transaction, Block } from '@gxchain2/structure';
+import { VM, WrappedVM, StateManager, PostByzantiumTxReceipt, TxReceipt, encodeReceipt } from '@gxchain2/vm';
+import { Transaction, Block, Receipt, Log, BlockHeader, TypedTransaction } from '@gxchain2/structure';
 import { Channel, Aborter, logger } from '@gxchain2/utils';
 import { AccountManager } from '@gxchain2/wallet';
 import { TxPool } from './txpool';
@@ -26,6 +26,30 @@ const timeoutBanTime = 60 * 5 * 1000;
 const invalidBanTime = 60 * 10 * 1000;
 
 const defaultChainName = 'gxc2-mainnet';
+
+function postByzantiumTxReceiptsToReceipts(receipts: PostByzantiumTxReceipt[]) {
+  return receipts.map(
+    (r) =>
+      new Receipt(
+        r.gasUsed,
+        r.bitvector,
+        r.logs.map((l) => new Log(l[0], l[1], l[2])),
+        r.status
+      )
+  );
+}
+
+async function cliqueGetBlockRewardAddress(header: BlockHeader) {
+  return header.cliqueSigner();
+}
+
+async function fixedGenReceiptTrie(transactions: TypedTransaction[], receipts: TxReceipt[]) {
+  const trie = new BaseTrie();
+  for (let i = 0; i < receipts.length; i++) {
+    await trie.put(toBuffer(i), encodeReceipt(transactions[i], receipts[i]));
+  }
+  return trie.root;
+}
 
 export type NodeStatus = {
   networkId: number;
@@ -357,14 +381,17 @@ export class Node {
           ...options,
           block,
           root: lastHeader.stateRoot,
-          cliqueSigner: options.generate ? this.accMngr.getPrivateKey(block.header.cliqueSigner().buf) : undefined
+          cliqueSigner: options.generate ? this.accMngr.getPrivateKey(block.header.cliqueSigner().buf) : undefined,
+          getBlockRewardAddress: cliqueGetBlockRewardAddress,
+          // If the current hardfork is less than `hardfork1`, then use the old logic `fixedGenReceiptTrie`
+          genReceiptTrie: block._common.gteHardfork('testnet-hf1') || block._common.gteHardfork('mainnet-hf1') ? undefined : fixedGenReceiptTrie
         };
-        const { result, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot, lastHeader.number)).runBlock(runBlockOptions);
+        const { receipts, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot, lastHeader.number)).vm.runBlock(runBlockOptions);
         block = newBlock || block;
         logger.info('✨ Process block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
         const before = this.blockchain.latestBlock.hash();
         await this.blockchain.putBlock(block);
-        await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(result.receipts, block.hash(), block.header.number)));
+        await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(postByzantiumTxReceiptsToReceipts(receipts as PostByzantiumTxReceipt[]), block.hash(), block.header.number)));
         const after = this.blockchain.latestBlock.hash();
         resolve(block);
 

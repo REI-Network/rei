@@ -1,6 +1,6 @@
 import util from 'util';
 import { Address } from 'ethereumjs-util';
-import { OpcodeList } from '@ethereumjs/vm/dist/evm/opcodes';
+import { OpcodeList } from '@gxchain2-ethereumjs/vm/dist/evm/opcodes';
 import { Block } from '@gxchain2/structure';
 import { IDebug } from '@gxchain2/vm';
 import { hexStringToBN, hexStringToBuffer } from '@gxchain2/utils';
@@ -73,7 +73,7 @@ export class Tracer {
         const parent = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
         const wvm = await this.node.getWrappedVM(parent.header.stateRoot, block.header.number);
         const debug = this.createDebugImpl((wvm.vm as any)._opcodes, reject, config, hash);
-        await wvm.runBlock({ block, debug, skipBlockValidation: true });
+        await wvm.vm.runBlock({ block, debug, skipBlockValidation: true });
         const result = debug.result();
         resolve(util.types.isPromise(result) ? await result : result);
       } catch (err) {
@@ -131,7 +131,7 @@ export class Tracer {
         const parent = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
         const wvm = await this.node.getWrappedVM(parent.header.stateRoot, block.header.number.subn(1));
         const debug = this.createDebugImpl((wvm.vm as any)._opcodes, reject, config);
-        await wvm.runCall({
+        await wvm.vm.runCall({
           block,
           debug,
           gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,

@@ -1,8 +1,8 @@
 import vm from 'vm';
 import bi, { BigInteger } from 'big-integer';
-import { StateManager } from '@ethereumjs/vm/dist/state';
-import { getPrecompile } from '@ethereumjs/vm/dist/evm/precompiles';
-import { OpcodeList } from '@ethereumjs/vm/dist/evm/opcodes';
+import { StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import { getPrecompile } from '@gxchain2-ethereumjs/vm/dist/evm/precompiles';
+import { OpcodeList } from '@gxchain2-ethereumjs/vm/dist/evm/opcodes';
 import { Address, BN, bufferToHex, setLengthLeft, generateAddress, generateAddress2, keccak256 } from 'ethereumjs-util';
 import { InterpreterStep, VmError } from '@gxchain2/vm';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
@@ -150,11 +150,10 @@ function makeDB(stateManager: StateManager) {
  * @param ctx Contract transaction information
  * @param opcodes Opcodes collection
  * @param step Step state
- * @param cost Transaction cost
  * @param error Error message
  * @returns A object for get contract parameter
  */
-function makeLog(ctx: { [key: string]: any }, opcodes: OpcodeList, step: InterpreterStep, cost: BN, error?: string) {
+function makeLog(ctx: { [key: string]: any }, opcodes: OpcodeList, step: InterpreterStep, error?: string) {
   const stack = step.stack.map((bn) => bi(bn.toString()));
   Object.defineProperty(stack, 'peek', {
     value: (idx: number) => {
@@ -176,7 +175,7 @@ function makeLog(ctx: { [key: string]: any }, opcodes: OpcodeList, step: Interpr
       return step.gasLeft.toNumber();
     },
     getCost() {
-      return cost.toNumber();
+      return step.opcode.fee;
     },
     getDepth() {
       return step.depth + 1;
@@ -271,19 +270,18 @@ export class JSDebug implements IDebugImpl {
    * @param input Input data
    * @param gas GasLimit
    * @param gasPrice  gasPrice
-   * @param intrinsicGas Intrinsic gas
    * @param value Sent to it from it's caller
    * @param number Blocknumber
    * @param stateManager state trie manager
    */
-  async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, gasPrice: BN, intrinsicGas: BN, value: BN, number: BN, stateManager: StateManager) {
+  async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, gasPrice: BN, value: BN, number: BN, stateManager: StateManager) {
     this.debugContext['type'] = create ? 'CREATE' : 'CALL';
     this.debugContext['from'] = from;
     this.debugContext['to'] = to;
     this.debugContext['input'] = input;
     this.debugContext['gas'] = gas.toNumber();
     this.debugContext['gasPrice'] = gasPrice.toNumber();
-    this.debugContext['intrinsicGas'] = intrinsicGas.toNumber();
+    // this.debugContext['intrinsicGas'] = intrinsicGas.toNumber();
     this.debugContext['value'] = bi(value.toString());
     this.debugContext['block'] = number.toNumber();
     this.vmContextObj.globalDB = makeDB(stateManager);
@@ -292,16 +290,15 @@ export class JSDebug implements IDebugImpl {
   /**
    * captureLog implements the Tracer interface to trace a single step of VM execution.
    * @param step Step state
-   * @param cost Cost value
    * @param error Error message
    * @returns
    */
-  private async captureLog(step: InterpreterStep, cost: BN, error?: string) {
+  private async captureLog(step: InterpreterStep, error?: string) {
     if (this.rejected) {
       return;
     }
     try {
-      this.vmContextObj.globalLog = makeLog(this.debugContext, this.opcodes, step, cost, error);
+      this.vmContextObj.globalLog = makeLog(this.debugContext, this.opcodes, step, error);
       const script = error ? new vm.Script('globalPromise = obj.fault.call(obj, globalLog, globalDB)') : new vm.Script('globalPromise = obj.step.call(obj, globalLog, globalDB)');
       script.runInContext(this.vmContext, { timeout: this.config.timeout ? Number(this.config.timeout) : undefined, breakOnSigint: true });
       if (this.vmContextObj.globalPromise) {
@@ -318,17 +315,16 @@ export class JSDebug implements IDebugImpl {
    * @param step Step state
    * @param cost Cost value
    */
-  async captureState(step: InterpreterStep, cost: BN) {
-    await this.captureLog(step, cost);
+  async captureState(step: InterpreterStep) {
+    await this.captureLog(step);
   }
 
   /**
    * captureFault implements the Tracer interface to trace an execution fault
    * @param step Step state
-   * @param cost Cost value
    * @param err Error message
    */
-  async captureFault(step: InterpreterStep, cost: BN, err: any) {
+  async captureFault(step: InterpreterStep, err: any) {
     let errString: string;
     if (err instanceof VmError) {
       errString = err.error;
@@ -339,7 +335,7 @@ export class JSDebug implements IDebugImpl {
     } else {
       errString = 'unkonw error';
     }
-    await this.captureLog(step, cost, errString);
+    await this.captureLog(step, errString);
   }
 
   /**

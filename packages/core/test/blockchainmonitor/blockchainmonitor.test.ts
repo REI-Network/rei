@@ -106,6 +106,5 @@ describe('BlockchainMonitor', async () => {
 
   after(async () => {
     await destroyNode(dirname, node);
-    process.exit(0);
   });
 });

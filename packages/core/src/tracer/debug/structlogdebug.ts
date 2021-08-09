@@ -1,6 +1,7 @@
 import { BN, setLengthLeft } from 'ethereumjs-util';
 import { StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
-import { InterpreterStep, VmError } from '@gxchain2/vm';
+import { InterpreterStep } from '@gxchain2-ethereumjs/vm/dist/evm/interpreter';
+import { VmError } from '@gxchain2-ethereumjs/vm/dist/exceptions';
 import { createBufferFunctionalMap } from '@gxchain2/utils';
 import { TraceConfig, IDebugImpl } from '../tracer';
 

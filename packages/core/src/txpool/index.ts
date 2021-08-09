@@ -3,7 +3,7 @@ import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Heap from 'qheap';
 import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Aborter, logger } from '@gxchain2/utils';
 import { Transaction, WrappedTransaction, calculateIntrinsicGas, BlockHeader, Block } from '@gxchain2/structure';
-import { StateManager } from '@gxchain2/vm';
+import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { TxSortedMap } from './txmap';
 import { PendingTxMap } from './pendingmap';
 import { TxPricedList } from './txpricedlist';

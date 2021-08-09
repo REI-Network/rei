@@ -2,7 +2,7 @@ import { Address, BN } from 'ethereumjs-util';
 import { Node } from '@gxchain2/core';
 import { Block, WrappedBlock } from '@gxchain2/structure';
 import { hexStringToBuffer, hexStringToBN, logger } from '@gxchain2/utils';
-import { StateManager } from '@gxchain2/vm';
+import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import * as helper from '../helper';
 import { FilterSystem } from '../filtersystem';
 
@@ -89,10 +89,10 @@ export class Controller {
 
   protected async runCall(data: CallData, tag: string) {
     const block = await this.getBlockByTag(tag);
-    const wvm = await this.node.getWrappedVM(block.header.stateRoot, block.header.number);
-    await wvm.vm.stateManager.checkpoint();
+    const vm = await this.node.getVM(block.header.stateRoot, block.header.number);
+    await vm.stateManager.checkpoint();
     try {
-      const result = await wvm.vm.runCall({
+      const result = await vm.runCall({
         block,
         gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
         origin: data.from ? Address.fromString(data.from) : Address.zero(),
@@ -105,11 +105,11 @@ export class Controller {
       if (result.execResult.exceptionError) {
         throw result.execResult.exceptionError;
       }
-      await wvm.vm.stateManager.revert();
+      await vm.stateManager.revert();
       result.gasUsed.iadd(this.calculateBaseFee(data, block.header.number));
       return result;
     } catch (err) {
-      await wvm.vm.stateManager.revert();
+      await vm.stateManager.revert();
       logger.warn('Controller::runCall, catch error:', err);
       throw err;
     }

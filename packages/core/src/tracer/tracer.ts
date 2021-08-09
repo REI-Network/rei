@@ -2,7 +2,7 @@ import util from 'util';
 import { Address } from 'ethereumjs-util';
 import { OpcodeList } from '@gxchain2-ethereumjs/vm/dist/evm/opcodes';
 import { Block } from '@gxchain2/structure';
-import { IDebug } from '@gxchain2/vm';
+import { IDebug } from '@gxchain2-ethereumjs/vm/dist/types';
 import { hexStringToBN, hexStringToBuffer } from '@gxchain2/utils';
 import { Node } from '../node';
 import { StructLogDebug, JSDebug } from './debug';
@@ -71,9 +71,9 @@ export class Tracer {
       try {
         block = block as Block;
         const parent = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
-        const wvm = await this.node.getWrappedVM(parent.header.stateRoot, block.header.number);
-        const debug = this.createDebugImpl((wvm.vm as any)._opcodes, reject, config, hash);
-        await wvm.vm.runBlock({ block, debug, skipBlockValidation: true });
+        const vm = await this.node.getVM(parent.header.stateRoot, block.header.number);
+        const debug = this.createDebugImpl((vm as any)._opcodes, reject, config, hash);
+        await vm.runBlock({ block, debug, skipBlockValidation: true });
         const result = debug.result();
         resolve(util.types.isPromise(result) ? await result : result);
       } catch (err) {
@@ -129,9 +129,9 @@ export class Tracer {
     return new Promise<any>(async (resolve, reject) => {
       try {
         const parent = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
-        const wvm = await this.node.getWrappedVM(parent.header.stateRoot, block.header.number.subn(1));
-        const debug = this.createDebugImpl((wvm.vm as any)._opcodes, reject, config);
-        await wvm.vm.runCall({
+        const vm = await this.node.getVM(parent.header.stateRoot, block.header.number.subn(1));
+        const debug = this.createDebugImpl((vm as any)._opcodes, reject, config);
+        await vm.runCall({
           block,
           debug,
           gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,

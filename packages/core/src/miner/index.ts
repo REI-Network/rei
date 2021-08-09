@@ -1,10 +1,10 @@
 import { Address, BN, bufferToHex } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
 import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN, calculateTransactionTrie, Transaction } from '@gxchain2/structure';
-import { WrappedVM } from '@gxchain2/vm';
-import { logger, getRandomIntInclusive, hexStringToBN, nowTimestamp } from '@gxchain2/utils';
-import { StateManager } from '@gxchain2/vm';
+import VM from '@gxchain2-ethereumjs/vm';
+import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
+import { logger, getRandomIntInclusive, hexStringToBN, nowTimestamp } from '@gxchain2/utils';
 import { PendingTxMap } from '../txpool';
 import { Node } from '../node';
 
@@ -27,7 +27,7 @@ export class Miner {
 
   private enable: boolean;
   private _coinbase: Address;
-  private wvm!: WrappedVM;
+  private vm!: VM;
   private pendingTxs: Transaction[] = [];
   private pendingHeader!: BlockHeader;
   private gasUsed = new BN(0);
@@ -175,8 +175,8 @@ export class Miner {
   private async _newBlockHeader(header: BlockHeader) {
     try {
       await this.lock.acquire();
-      if (this.wvm) {
-        await this.wvm.vm.stateManager.revert();
+      if (this.vm) {
+        await this.vm.stateManager.revert();
       }
 
       if (this.pendingHeader !== undefined && this.pendingHeader.number.gtn(0)) {
@@ -195,8 +195,8 @@ export class Miner {
       const nextTd = currentTd.add(newHeader.difficulty);
 
       this._cancel(nextTd);
-      this.wvm = await this.node.getWrappedVM(header.stateRoot, newNumber);
-      await this.wvm.vm.stateManager.checkpoint();
+      this.vm = await this.node.getVM(header.stateRoot, newNumber);
+      await this.vm.stateManager.checkpoint();
       await this._commit(await this.node.txPool.getPendingTxMap(header.number, header.hash()));
       if (validSigner && this._shouldMintNextBlock(header)) {
         this.nextTd = nextTd.clone();
@@ -338,8 +338,8 @@ export class Miner {
 
   async getPendingStateManager() {
     await this.initPromise;
-    if (this.wvm) {
-      const stateManager: any = this.wvm.vm.stateManager;
+    if (this.vm) {
+      const stateManager: any = this.vm.stateManager;
       return new StateManager({ common: stateManager._common, trie: stateManager._trie.copy(false) });
     }
     return await this.node.getStateManager(this.node.blockchain.latestBlock.header.stateRoot, this.node.blockchain.latestHeight);
@@ -381,29 +381,29 @@ export class Miner {
     let tx = pendingMap.peek();
     while (tx) {
       try {
-        await this.wvm.vm.stateManager.checkpoint();
+        await this.vm.stateManager.checkpoint();
 
         let txRes: RunTxResult;
         tx.common.setHardforkByBlockNumber(this.pendingHeader.number);
         try {
-          txRes = await this.wvm.vm.runTx({
+          txRes = await this.vm.runTx({
             tx,
-            block: Block.fromBlockData({ header: this.pendingHeader }, { common: (this.wvm.vm.stateManager as any)._common }),
+            block: Block.fromBlockData({ header: this.pendingHeader }, { common: (this.vm.stateManager as any)._common }),
             skipBalance: false,
             skipNonce: false
           });
         } catch (err) {
-          await this.wvm.vm.stateManager.revert();
+          await this.vm.stateManager.revert();
           pendingMap.pop();
           tx = pendingMap.peek();
           continue;
         }
 
         if (this.pendingHeader.gasLimit.lt(txRes.gasUsed.add(this.gasUsed))) {
-          await this.wvm.vm.stateManager.revert();
+          await this.vm.stateManager.revert();
           pendingMap.pop();
         } else {
-          await this.wvm.vm.stateManager.commit();
+          await this.vm.stateManager.commit();
           await this._putTx(tx);
           this.gasUsed.iadd(txRes.gasUsed);
           pendingMap.shift();

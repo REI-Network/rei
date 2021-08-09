@@ -9,7 +9,10 @@ import { Database, createEncodingLevelDB, createLevelDB, DBSaveReceipts, DBSaveT
 import { NetworkManager, Peer } from '@gxchain2/network';
 import { Common, getGenesisState, getChain } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
-import { VM, WrappedVM, StateManager, PostByzantiumTxReceipt, TxReceipt, encodeReceipt } from '@gxchain2/vm';
+import VM from '@gxchain2-ethereumjs/vm';
+import { PostByzantiumTxReceipt, TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
+import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
+import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Transaction, Block, Receipt, Log, BlockHeader, TypedTransaction } from '@gxchain2/structure';
 import { Channel, Aborter, logger } from '@gxchain2/utils';
 import { AccountManager } from '@gxchain2/wallet';
@@ -27,7 +30,7 @@ const invalidBanTime = 60 * 10 * 1000;
 
 const defaultChainName = 'gxc2-mainnet';
 
-function postByzantiumTxReceiptsToReceipts(receipts: PostByzantiumTxReceipt[]) {
+export function postByzantiumTxReceiptsToReceipts(receipts: PostByzantiumTxReceipt[]) {
   return receipts.map(
     (r) =>
       new Receipt(
@@ -342,20 +345,18 @@ export class Node {
   }
 
   /**
-   * Get wrapped vm object by state root
+   * Get a VM object by state root
    * @param root - The state root
    * @param num - Block number, used to set common
-   * @returns Wrapped vm object
+   * @returns VM object
    */
-  async getWrappedVM(root: Buffer, num: BNLike) {
+  async getVM(root: Buffer, num: BNLike) {
     const stateManager = await this.getStateManager(root, num);
-    return new WrappedVM(
-      new VM({
-        common: stateManager._common,
-        stateManager,
-        blockchain: this.blockchain
-      })
-    );
+    return new VM({
+      common: stateManager._common,
+      stateManager,
+      blockchain: this.blockchain
+    });
   }
 
   /**
@@ -386,7 +387,7 @@ export class Node {
           // If the current hardfork is less than `hardfork1`, then use the old logic `fixedGenReceiptTrie`
           genReceiptTrie: block._common.gteHardfork('testnet-hf1') || block._common.gteHardfork('mainnet-hf1') ? undefined : fixedGenReceiptTrie
         };
-        const { receipts, block: newBlock } = await (await this.getWrappedVM(lastHeader.stateRoot, lastHeader.number)).vm.runBlock(runBlockOptions);
+        const { receipts, block: newBlock } = await (await this.getVM(lastHeader.stateRoot, lastHeader.number)).runBlock(runBlockOptions);
         block = newBlock || block;
         logger.info('✨ Process block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
         const before = this.blockchain.latestBlock.hash();

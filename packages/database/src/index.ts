@@ -440,4 +440,4 @@ export const createLevelDB = (path: string) => {
 };
 
 export { DBTarget, DBOp };
-export * from '@ethereumjs/blockchain/dist/db/helpers';
+export * from '@gxchain2-ethereumjs/blockchain/dist/db/helpers';

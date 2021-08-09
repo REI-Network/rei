@@ -23,7 +23,7 @@ npm install @gxchain2/rpc
 ## USAGE
 
 ```ts
-const server = new RpcServer(34456, '127.0.0.1', 'eth,net,txpool,web3', node);
+const server = new RpcServer(34456, "127.0.0.1", "eth,net,txpool,web3", node);
 await server.start();
 await server.abort();
 ```

@@ -3,7 +3,7 @@
 [![NPM Version](https://img.shields.io/npm/v/@gxchain2/blockchain)](https://www.npmjs.org/package/@gxchain2/blockchain)
 ![License](https://img.shields.io/npm/l/@gxchain2/blockchain)
 
-Definition of blockchain structure and rules, based on `@ethereumjs/blockchain`
+Definition of blockchain structure and rules, based on `@gxchain2-ethereumjs/blockchain`
 
 ## INSTALL
 
@@ -15,9 +15,9 @@ npm install @gxchain2/blockchain
 
 ```ts
 blockchain = new Blockchain({
-  db: chaindb, // Database to store blocks and metadata. Should be an abstract-leveldown compliant store.
+  db: chaindb, // Database to store blocks and metadata. Should be an abstract-leveldown compliant store
   database: database,
-  genesisBlock // Messages of genesis block to initialize blockchain
+  genesisBlock, // Messages of genesis block to initialize blockchain
 });
 
 await blockchain.putBlock(block);

@@ -22,14 +22,14 @@ class MyProtocol implements Protocol {
    * Should return protocol name
    */
   get name() {
-    return 'MyProtocol';
+    return "MyProtocol";
   }
 
   /**
    * Should return protocol string
    */
   get protocolString() {
-    return '/MyProtocol/1';
+    return "/MyProtocol/1";
   }
 
   /**
@@ -47,15 +47,18 @@ class MyProtocol implements Protocol {
 class MyProtocolHandler implements ProtocolHandler {
   private peer: Peer;
   private name: string;
-  private queue?: MsgQueue;
 
   constructor(peer: Peer, name: string) {
     this.peer = peer;
     this.name = name;
   }
 
-  private getMsgQueue() {
-    return this.queue ? this.queue : (this.queue = this.peer.getMsgQueue(this.name));
+  private encode(method: number, data: any) {
+    return Buffer.from([method as number, ...Buffer.from(data)]);
+  }
+
+  private send(method: number, data: any) {
+    this.peer.send(this.name, this.encode(method, data));
   }
 
   /**
@@ -63,7 +66,7 @@ class MyProtocolHandler implements ProtocolHandler {
    * Return `false` if handshake failed
    */
   handshake(): boolean | Promise<boolean> {
-    this.getMsgQueue().send(0, 'ping');
+    this.send(0, "ping");
     return true;
   }
 
@@ -73,24 +76,19 @@ class MyProtocolHandler implements ProtocolHandler {
   async handle(data: Buffer) {
     const [method, payload] = data;
     if (method === 0) {
-      this.getMsgQueue().send(1, 'pong');
-      console.log('receive ping from:', this.peer.peerId);
+      this.send(1, "pong");
+      console.log("receive ping from:", this.peer.peerId);
     } else if (method === 1) {
-      console.log('receive pong from:', this.peer.peerId);
+      console.log("receive pong from:", this.peer.peerId);
     }
-  }
-
-  /**
-   * Should be called before send message to remote peer
-   */
-  encode(method: string | number, data: any) {
-    return Buffer.from([method as number, ...Buffer.from(data)]);
   }
 
   /**
    * Should be called when remote peer disconnted
    */
-  abort() {}
+  abort() {
+    console.log("abort");
+  }
 }
 ```
 
@@ -104,7 +102,7 @@ const networkMngr = new NetworkManager({
   datastore: datastore,
   nodedb: nodedb,
   peerId: peerId,
-  bootnodes: ['...', '...']
+  bootnodes: ["...", "..."],
 });
 await networkMngr.init();
 await networkMngr.abort();

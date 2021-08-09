@@ -17,7 +17,7 @@ npm install @gxchain2/database
 const db = new Database(levelDB, common);
 console.log((await db.getTransaction(txHash)).toJSON());
 console.log((await db.getReceipt(txHash)).toRPCJson());
-console.log((await db.getBloomBits(bit, section, hash)).toString('hex'));
+console.log((await db.getBloomBits(bit, section, hash)).toString("hex"));
 ```
 
 ## License

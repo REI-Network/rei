@@ -276,8 +276,7 @@ export class Node {
 
     common.setHardforkByBlockNumber(0);
     this.blockchain = new Blockchain({
-      db: this.chaindb,
-      database: this.db,
+      dbManager: this.db,
       common,
       genesisBlock
     });

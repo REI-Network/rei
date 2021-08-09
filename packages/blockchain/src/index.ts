@@ -5,23 +5,14 @@ import { CliqueLatestSignerStates } from '@gxchain2-ethereumjs/blockchain/dist/c
 import { Block, BlockHeader } from '@gxchain2/structure';
 import { Database } from '@gxchain2/database';
 
-export interface BlockchainOptions extends EthereumBlockchainOptions {
-  database: Database;
-}
-
 /**
  * Blockchain represents the canonical chain given a database with a genesis
  * block. The Blockchain manages chain imports, reverts, chain reorganisations.
  */
 export class Blockchain extends EthereumBlockchain {
-  dbManager: Database;
   private _latestBlock!: Block;
   private _totalDifficulty!: BN;
 
-  constructor(opts: BlockchainOptions) {
-    super(opts);
-    this.dbManager = opts.database;
-  }
   /**
    * Return blockchain's latest block
    */

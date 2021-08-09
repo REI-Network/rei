@@ -4,8 +4,9 @@ import { Common } from '@gxchain2/common';
 import { Journal } from '../../src/txpool/journal';
 import { Transaction } from '@gxchain2/structure';
 import { expect } from 'chai';
-import { createBufferFunctionalMap, hexStringToBuffer } from '@gxchain2/utils';
+import { createBufferFunctionalMap, hexStringToBuffer, setLevel } from '@gxchain2/utils';
 
+setLevel('silent');
 class testnode {
   getCommon(num: number) {
     return Common.createCommonByBlockNumber(0, 'gxc2-testnet');

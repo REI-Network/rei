@@ -70,16 +70,16 @@ task('approve', 'Approve share')
   .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
     const { deployer } = await getNamedAccounts();
     const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer });
-    const shareAddress = await stakeManager.methods.validatorToShare(taskArgs.validator).call();
+    const shareAddress = (await stakeManager.methods.validators(taskArgs.validator).call()).commissionShare;
     if (shareAddress === '0x0000000000000000000000000000000000000000') {
       console.log("validator doesn't exsit!");
       return;
     }
-    const share = await createWeb3Contract({ name: 'Share', address: shareAddress, deployments, web3, artifacts, from: deployer });
+    const commissionShare = await createWeb3Contract({ name: 'Share', address: shareAddress, deployments, web3, artifacts, from: deployer });
     if (taskArgs.amount === undefined) {
       taskArgs.amount = MAX_INTEGER.toString();
     }
-    await share.methods.approve(taskArgs.spender ?? stakeManager.options.address, taskArgs.amount).send();
+    await commissionShare.methods.approve(taskArgs.spender ?? stakeManager.options.address, taskArgs.amount).send();
     console.log('Approve succeed, amount:', taskArgs.amount);
   });
 
@@ -95,13 +95,13 @@ task('balance', 'Get balance')
       console.log(await share.methods.name().call(), 'balance:', await share.methods.balanceOf(taskArgs.address).call());
     } else {
       const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts });
-      const shareAddress = await stakeManager.methods.validatorToShare(taskArgs.validator).call();
+      const shareAddress = (await stakeManager.methods.validators(taskArgs.validator).call()).commissionShare;
       if (shareAddress === '0x0000000000000000000000000000000000000000') {
         console.log("validator doesn't exsit!");
         return;
       }
-      const share = await createWeb3Contract({ name: 'Share', address: shareAddress, deployments, web3, artifacts });
-      console.log(await share.methods.name().call(), 'balance:', await share.methods.balanceOf(taskArgs.address).call());
+      const commissionShare = await createWeb3Contract({ name: 'Share', address: shareAddress, deployments, web3, artifacts });
+      console.log(await commissionShare.methods.name().call(), 'balance:', await commissionShare.methods.balanceOf(taskArgs.address).call());
     }
   });
 

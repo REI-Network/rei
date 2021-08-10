@@ -12,6 +12,6 @@ export default async function ({ deployments, getNamedAccounts }) {
     from: deployer,
     log: true,
     deterministicDeployment: false,
-    args: [config.address]
+    args: [config.address, [deployer]]
   });
 }

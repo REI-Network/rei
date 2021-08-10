@@ -374,7 +374,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
 
             Unstake memory u = _unstakeQueue[id];
             if (u.timestamp <= block.timestamp) {
-                address unstakeShare = _validators[msg.sender].unstakeShare;
+                address unstakeShare = _validators[u.validator].unstakeShare;
                 require(unstakeShare != address(0), "StakeManager: invalid validator");
                 emit DoUnstake(id, u.validator, u.to, Share(unstakeShare).burn(u.unstakeShares, u.to));
                 delete _unstakeQueue[id];

@@ -72,7 +72,11 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         return _indexedValidators.length();
     }
 
-    function indexedValidators(uint256 id) external view override returns (address) {
+    function indexedValidatorsByIndex(uint256 index) external view override returns (address validator) {
+        (, validator) = _indexedValidators.at(index);
+    }
+
+    function indexedValidatorsById(uint256 id) external view override returns (address) {
         return _indexedValidators.get(id);
     }
 

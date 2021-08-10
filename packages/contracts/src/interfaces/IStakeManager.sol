@@ -24,7 +24,9 @@ interface IStakeManager {
 
     function indexedValidatorsLength() external view returns (uint256);
 
-    function indexedValidators(uint256 id) external view returns (address);
+    function indexedValidatorsByIndex(uint256 index) external view returns (address);
+
+    function indexedValidatorsById(uint256 id) external view returns (address);
 
     function getVotingPowerByIndex(uint256 index) external view returns (uint256);
 

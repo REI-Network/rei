@@ -4,29 +4,24 @@ pragma solidity ^0.6.0;
 
 import "./interfaces/IConfig.sol";
 
-// This is just a contract used during testing.
-// The officially released contract is in `Config_prod.sol`.
-contract Config is IConfig {
-    address private s;
-
-    function setStakeManager(address _s) external {
-        s = _s;
-    }
-
+// TODO: DAO logic
+contract Config_prod is IConfig {
     function stakeManager() external view override returns (address) {
-        return s;
+        return 0x0000000000000000000000000000000000001001;
     }
 
     function unstakeDelay() external view override returns (uint256) {
-        return 1 seconds;
+        return 3 weeks;
     }
 
     function minStakeAmount() external view override returns (uint256) {
-        return 10;
+        // 10 GXC
+        return 10e18;
     }
 
     function minUnstakeAmount() external view override returns (uint256) {
-        return 5;
+        // 5 GXC
+        return 5e18;
     }
 
     function getFactorByReason(uint8 reason) external view override returns (uint8) {

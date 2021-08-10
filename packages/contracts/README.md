@@ -26,7 +26,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@gxchain2/contracts/src/interfaces/IStakeManager.sol";
-import "@gxchain2/contracts/src/interfaces/IShare.sol";
+import "@gxchain2/contracts/src/interfaces/ICommissionShare.sol";
 
 // candy token for stake user
 contract Candy is ERC20Burnable, Ownable {
@@ -85,7 +85,7 @@ contract LockedStake {
     require(stakeOwnerOf[id] == msg.sender, "LockedStake: invalid stake owner");
     uint256 _shares = stakeSharesOf[id];
     // we should approve the shares to stake manager before starting unstake
-    IShare(sm.validators(validator).commissionShare).approve(
+    ICommissionShare(sm.validators(validator).commissionShare).approve(
       address(sm),
       _shares
     );

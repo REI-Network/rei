@@ -282,6 +282,8 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         // v.updateTimestamp = 0;
         _validatorId = id.add(1);
         if (!isGenesis) {
+            // if the validator isn't a genesis validator, it means he has balance
+            // so add him to `_indexedValidators`
             _indexedValidators.set(id, validator);
         }
     }
@@ -353,6 +355,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         uint256 amount = CommissionShare(commissionShare).burn(shares, address(this));
         require(amount >= config.minUnstakeAmount(), "StakeManager: invalid unstake amount");
         if (commissionShare.balance == 0) {
+            // if the validator's balance is 0, remove him from `_indexedValidators`
             _indexedValidators.remove(v.id);
         }
         return doStartUnstake(validator, unstakeKeeper, to, amount);
@@ -360,7 +363,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
 
     /**
      * @dev Start claim validator reward.
-     *      Stake claim GXC from keeper immediately, but return GXC to `to` address after `config.unstakeDelay`.
+     *      Stake manager will claim GXC from validator keeper immediately, but return GXC to `to` address after `config.unstakeDelay`.
      *      It will emit `StartUnstake` event.
      * @param to           Receiver address
      * @param amount       Number of GXC

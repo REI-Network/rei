@@ -9,10 +9,14 @@ import "./Keeper.sol";
 contract UnstakeKeeper is Keeper, IUnstakeKeeper {
     using SafeMath for uint256;
 
+    // shares total supply
     uint256 private _totalSupply;
 
     constructor(address _config, address validator) public Keeper(_config, validator) {}
 
+    /**
+     * @dev Get total supply
+     */
     function totalSupply() external view override returns (uint256) {
         return _totalSupply;
     }
@@ -35,6 +39,10 @@ contract UnstakeKeeper is Keeper, IUnstakeKeeper {
         _totalSupply = _totalSupply.add(amount);
     }
 
+    /**
+     * @dev Mint shares.
+     *      Can only be called by stake manager.
+     */
     function mint() external payable override onlyStakeManager returns (uint256 shares) {
         uint256 amount = msg.value;
         uint256 balance = address(this).balance;
@@ -54,6 +62,12 @@ contract UnstakeKeeper is Keeper, IUnstakeKeeper {
         _totalSupply = _totalSupply.sub(amount);
     }
 
+    /**
+     * @dev Burn shares and return GXC to `to` address.
+     *      Can only be called by stake manager.
+     * @param shares    Number of shares to be burned
+     * @param to        Receiver address
+     */
     function burn(uint256 shares, address payable to) external override onlyStakeManager returns (uint256 amount) {
         require(shares > 0, "UnstakeKeeper: insufficient shares");
         uint256 total = _totalSupply;

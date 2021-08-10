@@ -10,6 +10,8 @@ contract ValidatorKeeper is Keeper, IValidatorKeeper {
 
     /**
      * @dev Claim amount
+     * @param amount    Claim amount
+     * @param to        Receiver address
      */
     function claim(uint256 amount, address payable to) external override onlyStakeManager {
         require(address(this).balance >= amount, "Keeper: insufficient balance");

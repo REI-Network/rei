@@ -75,7 +75,7 @@ task('approve', 'Approve share')
       console.log("validator doesn't exsit!");
       return;
     }
-    const commissionShare = await createWeb3Contract({ name: 'Share', address: shareAddress, deployments, web3, artifacts, from: deployer });
+    const commissionShare = await createWeb3Contract({ name: 'CommissionShare', address: shareAddress, deployments, web3, artifacts, from: deployer });
     if (taskArgs.amount === undefined) {
       taskArgs.amount = MAX_INTEGER.toString();
     }
@@ -91,7 +91,7 @@ task('balance', 'Get balance')
     if (taskArgs.contract === undefined) {
       console.log('GXC balance:', await (web3 as Web3).eth.getBalance(taskArgs.address));
     } else if (taskArgs.validator === undefined) {
-      const share = await createWeb3Contract({ name: 'Share', deployments, web3, artifacts, address: taskArgs.contract });
+      const share = await createWeb3Contract({ name: 'CommissionShare', deployments, web3, artifacts, address: taskArgs.contract });
       console.log(await share.methods.name().call(), 'balance:', await share.methods.balanceOf(taskArgs.address).call());
     } else {
       const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts });
@@ -100,7 +100,7 @@ task('balance', 'Get balance')
         console.log("validator doesn't exsit!");
         return;
       }
-      const commissionShare = await createWeb3Contract({ name: 'Share', address: shareAddress, deployments, web3, artifacts });
+      const commissionShare = await createWeb3Contract({ name: 'CommissionShare', address: shareAddress, deployments, web3, artifacts });
       console.log(await commissionShare.methods.name().call(), 'balance:', await commissionShare.methods.balanceOf(taskArgs.address).call());
     }
   });

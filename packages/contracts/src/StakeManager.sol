@@ -68,18 +68,33 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         }
     }
 
+    /**
+     * @dev Get the validator information by validator address.
+     * @param validator     Validator address
+     */
     function validators(address validator) external view override returns (Validator memory) {
         return _validators[validator];
     }
 
+    /**
+     * @dev Get the indexed validators length.
+     */
     function indexedValidatorsLength() external view override returns (uint256) {
         return _indexedValidators.length();
     }
 
+    /**
+     * @dev Get indexed validator address by index.
+     * @param index         The validator index
+     */
     function indexedValidatorsByIndex(uint256 index) external view override returns (address validator) {
         (, validator) = _indexedValidators.at(index);
     }
 
+    /**
+     * @dev Get indexed validator address by id.
+     * @param id            The validator id
+     */
     function indexedValidatorsById(uint256 id) external view override returns (address) {
         return _indexedValidators.get(id);
     }
@@ -288,6 +303,10 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         emit Stake(validator, to, msg.value, shares);
     }
 
+    /**
+     * @dev Do start unstake.
+     *      It will mint unstake shares to self and add a record to `_unstakeQueue`
+     */
     function doStartUnstake(
         address validator,
         address unstakeShare,
@@ -338,6 +357,13 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         return doStartUnstake(validator, unstakeShare, to, amount);
     }
 
+    /**
+     * @dev Start claim validator reward.
+     *      Stake claim GXC from keeper immediately, but return GXC to `to` address after `config.unstakeDelay`.
+     *      It will emit `StartUnstake` event.
+     * @param to           Receiver address
+     * @param amount       Number of GXC
+     */
     function startClaim(address payable to, uint256 amount) external override nonReentrant returns (uint256) {
         require(uint160(to) > 2000, "StakeManager: invalid receiver");
         require(amount >= config.minUnstakeAmount(), "StakeManager: invalid unstake amount");
@@ -350,12 +376,17 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         return doStartUnstake(msg.sender, unstakeShare, to, amount);
     }
 
+    /**
+     * @dev Set validator commission rate.
+     * @param rate         New commission rate
+     */
     function setCommissionRate(uint256 rate) external override {
         require(rate <= config.maxCommissionRate(), "StakeManager: commission rate is too high");
         Validator storage v = _validators[msg.sender];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint256 updateTimestamp = v.updateTimestamp;
         require(updateTimestamp == 0 || block.timestamp.sub(updateTimestamp) >= 24 hours, "StakeManager: update commission rate too frequently");
+        require(v.commissionRate != rate, "StakeManager: repeatedly set commission rate");
         v.commissionRate = rate;
         v.updateTimestamp = block.timestamp;
     }

@@ -3,8 +3,9 @@
 pragma solidity ^0.6.0;
 
 import "./interfaces/IConfig.sol";
+import "./interfaces/IKeeper.sol";
 
-contract Keeper {
+contract Keeper is IKeeper {
     IConfig public config;
 
     address private _validator;
@@ -22,15 +23,7 @@ contract Keeper {
     /**
      * @dev Get validator address
      */
-    function validator() external view returns (address) {
+    function validator() external view override returns (address) {
         return _validator;
-    }
-
-    /**
-     * @dev Claim amount
-     */
-    function claim(uint256 amount, address payable to) external onlyStakeManager {
-        require(address(this).balance >= amount, "Keeper: insufficient balance");
-        to.transfer(amount);
     }
 }

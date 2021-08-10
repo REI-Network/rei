@@ -7,7 +7,8 @@ declare var artifacts: Artifacts;
 declare var web3: Web3;
 
 const Config = artifacts.require('Config');
-const Share = artifacts.require('Share');
+const CommissionShare = artifacts.require('CommissionShare');
+const UnstakeKeeper = artifacts.require('UnstakeKeeper');
 const StakeManager = artifacts.require('StakeManager');
 
 describe('StakeManger', () => {
@@ -20,10 +21,14 @@ describe('StakeManger', () => {
   let genesis2: string;
   let genesis3: string;
 
-  async function createShareContract(validator: string, isCommission = true) {
+  async function createCommissionShareContract(validator: string) {
     const v = await stakeManager.methods.validators(validator).call();
-    const address = isCommission ? v.commissionShare : v.unstakeShare;
-    return new web3.eth.Contract(Share.abi, address, { from: deployer });
+    return new web3.eth.Contract(CommissionShare.abi, v.commissionShare, { from: deployer });
+  }
+
+  async function createUnstakeKeeperContract(validator: string) {
+    const v = await stakeManager.methods.validators(validator).call();
+    return new web3.eth.Contract(UnstakeKeeper.abi, v.unstakeKeeper, { from: deployer });
   }
 
   function toBN(data: number | string) {
@@ -69,21 +74,19 @@ describe('StakeManger', () => {
   it('should stake succeed', async () => {
     const minStakeAmount = toBN(await config.methods.minStakeAmount().call());
     await stakeManager.methods.stake(validator, deployer).send({ value: minStakeAmount.toString() });
-    const shares = await (await createShareContract(validator)).methods.balanceOf(deployer).call();
+    const shares = await (await createCommissionShareContract(validator)).methods.balanceOf(deployer).call();
     expect(shares, 'shares should be equal to amount at the time of the first staking').to.equal(minStakeAmount.toString());
   });
 
   it('should match validator info', async () => {
-    const commissionShare = await createShareContract(validator);
+    const commissionShare = await createCommissionShareContract(validator);
     expect(await commissionShare.methods.validator().call(), 'validator address should be equal').to.equal(validator);
-    expect(await commissionShare.methods.shareType().call(), 'should be commission share contract').to.equal('0');
-    const unstakeShare = await createShareContract(validator, false);
-    expect(await unstakeShare.methods.validator().call(), 'validator address should be equal').to.equal(validator);
-    expect(await unstakeShare.methods.shareType().call(), 'should be unstake share contract').to.equal('1');
+    const unstakeKeeper = await createUnstakeKeeperContract(validator);
+    expect(await unstakeKeeper.methods.validator().call(), 'validator address should be equal').to.equal(validator);
   });
 
   it('should approve succeed', async () => {
-    const commissionShare = await createShareContract(validator);
+    const commissionShare = await createCommissionShareContract(validator);
     await commissionShare.methods.approve(stakeManager.options.address, MAX_INTEGER.toString()).send();
   });
 
@@ -91,7 +94,7 @@ describe('StakeManger', () => {
     const unstakeDelay = toBN(await config.methods.unstakeDelay().call()).toNumber();
     const minUnstakeShares = toBN(await stakeManager.methods.estimateMinUnstakeShares(validator).call());
 
-    const commissionShare = await createShareContract(validator);
+    const commissionShare = await createCommissionShareContract(validator);
     const shrBeforeUnstake = toBN(await commissionShare.methods.balanceOf(deployer).call());
     await stakeManager.methods.startUnstake(validator, receiver, minUnstakeShares.toString()).send();
     const shrAfterUnstake = toBN(await commissionShare.methods.balanceOf(deployer).call());

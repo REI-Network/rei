@@ -3,24 +3,39 @@
 pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "./interfaces/IUnstakeKeeper.sol";
 import "./Keeper.sol";
 
-contract UnstakeKeeper is Keeper {
+contract UnstakeKeeper is Keeper, IUnstakeKeeper {
     using SafeMath for uint256;
 
     uint256 private _totalSupply;
 
     constructor(address _config, address validator) public Keeper(_config, validator) {}
 
-    function totalSupply() external view returns (uint256) {
+    function totalSupply() external view override returns (uint256) {
         return _totalSupply;
+    }
+
+    /**
+     * @dev Estimate how much GXC can be claim, if unstake the number of shares(when unstake timeout).
+     * @param shares    Number of shares
+     */
+    function estimateUnstakeAmount(uint256 shares) external view override returns (uint256 amount) {
+        require(shares > 0, "Share: insufficient shares");
+        uint256 total = _totalSupply;
+        if (total == 0) {
+            amount = 0;
+        } else {
+            amount = address(this).balance.mul(shares).div(total);
+        }
     }
 
     function _mint(uint256 amount) private {
         _totalSupply = _totalSupply.add(amount);
     }
 
-    function mint() external payable onlyStakeManager returns (uint256 shares) {
+    function mint() external payable override onlyStakeManager returns (uint256 shares) {
         uint256 amount = msg.value;
         uint256 balance = address(this).balance;
         uint256 reserve = balance.sub(amount);
@@ -39,7 +54,7 @@ contract UnstakeKeeper is Keeper {
         _totalSupply = _totalSupply.sub(amount);
     }
 
-    function burn(uint256 shares, address payable to) external onlyStakeManager returns (uint256 amount) {
+    function burn(uint256 shares, address payable to) external override onlyStakeManager returns (uint256 amount) {
         require(shares > 0, "UnstakeKeeper: insufficient shares");
         uint256 total = _totalSupply;
         if (total == 0) {

@@ -4,29 +4,22 @@ pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./interfaces/IConfig.sol";
-import "./interfaces/IShare.sol";
+import "./interfaces/ICommissionShare.sol";
 
-contract Share is ERC20, IShare {
+contract CommissionShare is ERC20, ICommissionShare {
     using SafeMath for uint256;
 
     IConfig public config;
 
     address private _validator;
-    ShareType private _shareType;
-
     modifier onlyStakeManager() {
         require(msg.sender == config.stakeManager(), "Share: only stake manager");
         _;
     }
 
-    constructor(
-        address _config,
-        address validator,
-        ShareType shareType
-    ) public ERC20("Share", "S") {
+    constructor(address _config, address validator) public ERC20("Share", "S") {
         config = IConfig(_config);
         _validator = validator;
-        _shareType = shareType;
     }
 
     /**
@@ -34,13 +27,6 @@ contract Share is ERC20, IShare {
      */
     function validator() external view override returns (address) {
         return _validator;
-    }
-
-    /**
-     * @dev Get share type
-     */
-    function shareType() external view override returns (ShareType) {
-        return _shareType;
     }
 
     /**
@@ -68,20 +54,6 @@ contract Share is ERC20, IShare {
             shares = 0;
         } else {
             shares = amount.mul(totalSupply()).div(balance);
-        }
-    }
-
-    /**
-     * @dev Estimate how much GXC can be claim, if unstake the number of shares(when unstake timeout).
-     * @param shares    Number of shares
-     */
-    function estimateUnstakeAmount(uint256 shares) external view override returns (uint256 amount) {
-        require(shares > 0, "Share: insufficient shares");
-        uint256 _totalSupply = totalSupply();
-        if (_totalSupply == 0) {
-            amount = 0;
-        } else {
-            amount = address(this).balance.mul(shares).div(_totalSupply);
         }
     }
 

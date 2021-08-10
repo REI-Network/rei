@@ -8,8 +8,9 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/EnumerableMap.sol";
 import "./interfaces/IConfig.sol";
 import "./interfaces/IStakeManager.sol";
-import "./Share.sol";
-import "./Keeper.sol";
+import "./CommissionShare.sol";
+import "./ValidatorKeeper.sol";
+import "./UnstakeKeeper.sol";
 
 contract StakeManager is ReentrancyGuard, IStakeManager {
     using SafeMath for uint256;
@@ -175,8 +176,8 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         if (commissionShare == address(0)) {
             amount = config.minStakeAmount();
         } else {
-            amount = Share(commissionShare).estimateStakeAmount(1);
-            uint256 shares = Share(commissionShare).estimateUnstakeShares(amount);
+            amount = CommissionShare(commissionShare).estimateStakeAmount(1);
+            uint256 shares = CommissionShare(commissionShare).estimateUnstakeShares(amount);
             if (shares == 0) {
                 amount = amount.add(1);
             }
@@ -196,8 +197,8 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         if (commissionShare == address(0)) {
             return shares;
         }
-        amount = Share(commissionShare).estimateStakeAmount(shares);
-        uint256 shares2 = Share(commissionShare).estimateUnstakeShares(amount);
+        amount = CommissionShare(commissionShare).estimateStakeAmount(shares);
+        uint256 shares2 = CommissionShare(commissionShare).estimateUnstakeShares(amount);
         if (shares2 < shares) {
             amount = amount.add(1);
         }
@@ -214,11 +215,11 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         if (commissionShare == address(0)) {
             shares = 0;
         } else {
-            shares = Share(commissionShare).estimateUnstakeShares(config.minUnstakeAmount());
+            shares = CommissionShare(commissionShare).estimateUnstakeShares(config.minUnstakeAmount());
             if (shares == 0) {
                 shares = 1;
             } else {
-                uint256 amount = Share(commissionShare).estimateStakeAmount(shares);
+                uint256 amount = CommissionShare(commissionShare).estimateStakeAmount(shares);
                 if (amount < config.minUnstakeAmount()) {
                     shares = shares.add(1);
                 }
@@ -237,11 +238,11 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         if (commissionShare == address(0)) {
             shares = 0;
         } else {
-            shares = Share(commissionShare).estimateUnstakeShares(amount);
+            shares = CommissionShare(commissionShare).estimateUnstakeShares(amount);
             if (shares == 0) {
                 shares = 1;
             } else {
-                uint256 amount2 = Share(commissionShare).estimateStakeAmount(shares);
+                uint256 amount2 = CommissionShare(commissionShare).estimateStakeAmount(shares);
                 if (amount2 < amount) {
                     shares = shares.add(1);
                 }
@@ -256,11 +257,11 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      * @param shares       Number of shares
      */
     function estimateUnstakeAmount(address validator, uint256 shares) external view override returns (uint256) {
-        address unstakeShare = _validators[validator].unstakeShare;
-        if (unstakeShare == address(0)) {
+        address unstakeKeeper = _validators[validator].unstakeKeeper;
+        if (unstakeKeeper == address(0)) {
             return 0;
         }
-        return Share(unstakeShare).estimateUnstakeAmount(shares);
+        return UnstakeKeeper(unstakeKeeper).estimateUnstakeAmount(shares);
     }
 
     // receive GXC transfer
@@ -271,10 +272,10 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         uint256 id = _validatorId;
         Validator storage v = _validators[validator];
         v.id = id;
-        v.keeper = address(new Keeper(address(config), validator));
-        commissionShare = address(new Share(address(config), validator, ShareType.Commission));
+        v.validatorKeeper = address(new ValidatorKeeper(address(config), validator));
+        commissionShare = address(new CommissionShare(address(config), validator));
         v.commissionShare = commissionShare;
-        v.unstakeShare = address(new Share(address(config), validator, ShareType.Unstake));
+        v.unstakeKeeper = address(new UnstakeKeeper(address(config), validator));
         // don't change the commision rate and the update timestamp
         // the validator may want to set commission rate immediately
         // v.commissionRate = 0;
@@ -299,7 +300,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         if (commissionShare == address(0)) {
             commissionShare = createValidator(validator, false);
         }
-        shares = Share(commissionShare).mint{ value: msg.value }(to);
+        shares = CommissionShare(commissionShare).mint{ value: msg.value }(to);
         emit Stake(validator, to, msg.value, shares);
     }
 
@@ -309,11 +310,11 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      */
     function doStartUnstake(
         address validator,
-        address unstakeShare,
+        address unstakeKeeper,
         address payable to,
         uint256 amount
     ) private returns (uint256 id) {
-        uint256 unstakeShares = Share(unstakeShare).mint{ value: amount }(address(this));
+        uint256 unstakeShares = UnstakeKeeper(unstakeKeeper).mint{ value: amount }();
 
         id = _lastUnstakeId;
         uint256 timestamp = block.timestamp + config.unstakeDelay();
@@ -345,16 +346,16 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         require(shares > 0, "StakeManager: invalid shares");
         Validator memory v = _validators[validator];
         address commissionShare = v.commissionShare;
-        address unstakeShare = v.unstakeShare;
-        require(commissionShare != address(0) && unstakeShare != address(0), "StakeManager: invalid validator");
+        address unstakeKeeper = v.unstakeKeeper;
+        require(commissionShare != address(0) && unstakeKeeper != address(0), "StakeManager: invalid validator");
 
-        Share(commissionShare).transferFrom(msg.sender, address(this), shares);
-        uint256 amount = Share(commissionShare).burn(shares, address(this));
+        CommissionShare(commissionShare).transferFrom(msg.sender, address(this), shares);
+        uint256 amount = CommissionShare(commissionShare).burn(shares, address(this));
         require(amount >= config.minUnstakeAmount(), "StakeManager: invalid unstake amount");
         if (commissionShare.balance == 0) {
             _indexedValidators.remove(v.id);
         }
-        return doStartUnstake(validator, unstakeShare, to, amount);
+        return doStartUnstake(validator, unstakeKeeper, to, amount);
     }
 
     /**
@@ -368,12 +369,12 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         require(uint160(to) > 2000, "StakeManager: invalid receiver");
         require(amount >= config.minUnstakeAmount(), "StakeManager: invalid unstake amount");
         Validator memory v = _validators[msg.sender];
-        address keeper = v.keeper;
-        address unstakeShare = v.unstakeShare;
-        require(unstakeShare != address(0) && keeper != address(0), "StakeManager: invalid validator");
+        address validatorKeeper = v.validatorKeeper;
+        address unstakeKeeper = v.unstakeKeeper;
+        require(validatorKeeper != address(0) && unstakeKeeper != address(0), "StakeManager: invalid validator");
 
-        Keeper(keeper).claim(amount, address(this));
-        return doStartUnstake(msg.sender, unstakeShare, to, amount);
+        ValidatorKeeper(validatorKeeper).claim(amount, address(this));
+        return doStartUnstake(msg.sender, unstakeKeeper, to, amount);
     }
 
     /**
@@ -405,14 +406,15 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
 
             Unstake memory u = _unstakeQueue[id];
             if (u.timestamp <= block.timestamp) {
-                address unstakeShare = _validators[u.validator].unstakeShare;
-                require(unstakeShare != address(0), "StakeManager: invalid validator");
-                emit DoUnstake(id, u.validator, u.to, Share(unstakeShare).burn(u.unstakeShares, u.to));
+                address unstakeKeeper = _validators[u.validator].unstakeKeeper;
+                require(unstakeKeeper != address(0), "StakeManager: invalid validator");
+                emit DoUnstake(id, u.validator, u.to, UnstakeKeeper(unstakeKeeper).burn(u.unstakeShares, u.to));
                 delete _unstakeQueue[id];
             } else {
                 break;
             }
         }
+        require(id != _firstUnstakeId, "StakeManager: useless call, revert");
         _firstUnstakeId = id;
     }
 }

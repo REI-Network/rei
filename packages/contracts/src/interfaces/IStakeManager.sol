@@ -12,9 +12,9 @@ struct Unstake {
 
 struct Validator {
     uint256 id;
-    address keeper;
+    address validatorKeeper;
     address commissionShare;
-    address unstakeShare;
+    address unstakeKeeper;
     uint256 commissionRate;
     uint256 updateTimestamp;
 }

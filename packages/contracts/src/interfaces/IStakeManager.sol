@@ -10,22 +10,25 @@ struct Unstake {
     uint256 timestamp;
 }
 
+struct Validator {
+    uint256 id;
+    address keeper;
+    address commissionShare;
+    address unstakeShare;
+    uint256 commissionRate;
+    uint256 updateTimestamp;
+}
+
 interface IStakeManager {
-    function validatorToShare(address validator) external view returns (address);
-
-    function validatorToUnstakeShare(address validator) external view returns (address);
-
-    function validators(uint256 index) external view returns (address);
-
-    function validatorsLength() external view returns (uint256);
+    function indexedValidatorsLength() external view returns (uint256);
 
     function getVotingPowerByIndex(uint256 index) external view returns (uint256);
 
     function getVotingPowerByAddess(address validator) external view returns (uint256);
 
-    function firstId() external view returns (uint256);
+    function firstUnstakeId() external view returns (uint256);
 
-    function lastId() external view returns (uint256);
+    function lastUnstakeId() external view returns (uint256);
 
     function unstakeQueue(uint256 index) external view returns (Unstake memory);
 
@@ -46,6 +49,10 @@ interface IStakeManager {
         address payable to,
         uint256 shares
     ) external returns (uint256);
+
+    function startClaim(address payable to, uint256 amount) external returns (uint256);
+
+    function setCommissionRate(uint256 rate) external;
 
     function doUnstake() external;
 }

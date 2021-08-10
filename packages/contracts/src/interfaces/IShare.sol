@@ -4,10 +4,12 @@ pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+enum ShareType { Commission, Unstake }
+
 interface IShare is IERC20 {
     function validator() external view returns (address);
 
-    function isStake() external view returns (bool);
+    function shareType() external view returns (ShareType);
 
     function estimateStakeAmount(uint256 shares) external view returns (uint256);
 

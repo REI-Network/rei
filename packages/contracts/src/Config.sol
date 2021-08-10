@@ -39,4 +39,8 @@ contract Config is IConfig {
     function amountPerVotingPower() external view override returns (uint256) {
         return 1;
     }
+
+    function maxCommissionRate() external view override returns (uint256) {
+        return 100;
+    }
 }

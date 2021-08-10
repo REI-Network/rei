@@ -12,7 +12,7 @@ contract Share is ERC20, IShare {
     IConfig public config;
 
     address private _validator;
-    bool private _isStake;
+    ShareType private _shareType;
 
     modifier onlyStakeManager() {
         require(msg.sender == config.stakeManager(), "Share: only stake manager");
@@ -22,11 +22,11 @@ contract Share is ERC20, IShare {
     constructor(
         address _config,
         address validator,
-        bool isStake
+        ShareType shareType
     ) public ERC20("Share", "S") {
         config = IConfig(_config);
         _validator = validator;
-        _isStake = isStake;
+        _shareType = shareType;
     }
 
     /**
@@ -37,10 +37,10 @@ contract Share is ERC20, IShare {
     }
 
     /**
-     * @dev Is it a stake share contract
+     * @dev Get share type
      */
-    function isStake() external view override returns (bool) {
-        return _isStake;
+    function shareType() external view override returns (ShareType) {
+        return _shareType;
     }
 
     /**
@@ -64,9 +64,11 @@ contract Share is ERC20, IShare {
     function estimateUnstakeShares(uint256 amount) external view override returns (uint256 shares) {
         require(amount > 0, "Share: insufficient amount");
         uint256 balance = address(this).balance;
-        uint256 _totalSupply = totalSupply();
-        require(_totalSupply != 0 && amount <= balance, "Share: invalid total supply or amount");
-        shares = amount.mul(_totalSupply).div(balance);
+        if (balance == 0) {
+            shares = 0;
+        } else {
+            shares = amount.mul(totalSupply()).div(balance);
+        }
     }
 
     /**
@@ -120,20 +122,4 @@ contract Share is ERC20, IShare {
             to.transfer(amount);
         }
     }
-
-    // slash logic will be handled by the blockchain
-    /*
-    function slash(uint8 factor) external override onlyStakeManager returns (uint256 amount) {
-        uint256 balance = address(this).balance;
-        if (balance > 0) {
-            amount = balance.mul(factor).div(100);
-            if (balance == amount) {
-                amount = amount.sub(1);
-            }
-            if (amount > 0) {
-                address(0).transfer(amount);
-            }
-        }
-    }
-    */
 }

@@ -20,9 +20,15 @@ struct Validator {
 }
 
 interface IStakeManager {
+    function validators(address validator) external view returns (Validator memory);
+
     function indexedValidatorsLength() external view returns (uint256);
 
+    function indexedValidators(uint256 id) external view returns (address);
+
     function getVotingPowerByIndex(uint256 index) external view returns (uint256);
+
+    function getVotingPowerById(uint256 index) external view returns (uint256);
 
     function getVotingPowerByAddess(address validator) external view returns (uint256);
 

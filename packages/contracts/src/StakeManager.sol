@@ -64,8 +64,16 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         config = IConfig(_config);
     }
 
+    function validators(address validator) external view override returns (Validator memory) {
+        return _validators[validator];
+    }
+
     function indexedValidatorsLength() external view override returns (uint256) {
         return _indexedValidators.length();
+    }
+
+    function indexedValidators(uint256 id) external view override returns (address) {
+        return _indexedValidators.get(id);
     }
 
     /**
@@ -80,6 +88,19 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         address validator;
         (, validator) = _indexedValidators.at(index);
         address commissionShare = _validators[validator].commissionShare;
+        if (commissionShare == address(0)) {
+            return 0;
+        }
+        return commissionShare.balance.div(config.amountPerVotingPower());
+    }
+
+    /**
+     * @dev Get the voting power by validator id.
+     *      If doesn't exist, return 0
+     * @param id            The validator id
+     */
+    function getVotingPowerById(uint256 id) external view override returns (uint256) {
+        address commissionShare = _validators[_indexedValidators.get(id)].commissionShare;
         if (commissionShare == address(0)) {
             return 0;
         }
@@ -319,7 +340,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         return doStartUnstake(msg.sender, unstakeShare, to, amount);
     }
 
-    function setCommissionRate(uint256 rate) external override nonReentrant {
+    function setCommissionRate(uint256 rate) external override {
         require(rate <= config.maxCommissionRate(), "StakeManager: commission rate is too high");
         Validator storage v = _validators[msg.sender];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");

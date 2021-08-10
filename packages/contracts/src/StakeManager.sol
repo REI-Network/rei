@@ -63,8 +63,8 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     constructor(address _config, address[] memory genesisValidators) public {
         config = IConfig(_config);
         for (uint256 i = 0; i < genesisValidators.length; i = i.add(1)) {
-            // although the validator's balance is 0 here, the validator is still added to _indexedValidators
-            createValidator(genesisValidators[i]);
+            // the validator was created, but not added to _indexedValidators
+            createValidator(genesisValidators[i], true);
         }
     }
 
@@ -252,7 +252,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     receive() external payable {}
 
     // create a new validator
-    function createValidator(address validator) private returns (address commissionShare) {
+    function createValidator(address validator, bool isGenesis) private returns (address commissionShare) {
         uint256 id = _validatorId;
         Validator storage v = _validators[validator];
         v.id = id;
@@ -265,7 +265,9 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         // v.commissionRate = 0;
         // v.updateTimestamp = 0;
         _validatorId = id.add(1);
-        _indexedValidators.set(id, validator);
+        if (!isGenesis) {
+            _indexedValidators.set(id, validator);
+        }
     }
 
     /**
@@ -280,7 +282,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         require(msg.value >= config.minStakeAmount(), "StakeManager: invalid stake amount");
         address commissionShare = _validators[validator].commissionShare;
         if (commissionShare == address(0)) {
-            commissionShare = createValidator(validator);
+            commissionShare = createValidator(validator, false);
         }
         shares = Share(commissionShare).mint{ value: msg.value }(to);
         emit Stake(validator, to, msg.value, shares);

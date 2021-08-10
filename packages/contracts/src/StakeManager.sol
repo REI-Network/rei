@@ -60,8 +60,12 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      */
     event DoUnstake(uint256 indexed id, address indexed validator, address to, uint256 amount);
 
-    constructor(address _config) public {
+    constructor(address _config, address[] memory genesisValidators) public {
         config = IConfig(_config);
+        for (uint256 i = 0; i < genesisValidators.length; i = i.add(1)) {
+            // although the validator's balance is 0 here, the validator is still added to _indexedValidators
+            createValidator(genesisValidators[i]);
+        }
     }
 
     function validators(address validator) external view override returns (Validator memory) {

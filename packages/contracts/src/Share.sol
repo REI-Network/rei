@@ -92,10 +92,12 @@ contract Share is ERC20, IShare {
      */
     function mint(address to) external payable override onlyStakeManager returns (uint256 shares) {
         uint256 amount = msg.value;
-        uint256 reserve = address(this).balance.sub(amount);
+        uint256 balance = address(this).balance;
+        uint256 reserve = balance.sub(amount);
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) {
-            shares = amount;
+            // if there is a balance before the stake, allocate all the balance to the first stake user
+            shares = balance;
         } else {
             shares = amount.mul(_totalSupply).div(reserve);
         }

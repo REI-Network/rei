@@ -27,7 +27,7 @@ contract Keeper {
     }
 
     /**
-     * @dev Withdraw balance
+     * @dev Claim amount
      */
     function claim(uint256 amount, address payable to) external onlyStakeManager {
         require(address(this).balance >= amount, "Keeper: insufficient balance");

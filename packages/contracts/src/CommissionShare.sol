@@ -71,7 +71,8 @@ contract CommissionShare is ERC20, ICommissionShare {
             // if there is a balance before the stake, allocate all the balance to the first stake user
             shares = balance;
         } else {
-            shares = amount.mul(_totalSupply).div(reserve);
+            require(reserve > 0, "Share: insufficient validator balance");
+            shares = amount.mul(_totalSupply) / reserve;
         }
         require(shares > 0, "Share: insufficient shares");
         _mint(to, shares);

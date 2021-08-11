@@ -404,6 +404,22 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         _firstUnstakeId = id;
     }
 
+    function removeValidator(address validator) external override {
+        Validator memory v = _validators[validator];
+        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && _indexedValidators.contains(v.id), "StakeManager: invalid validator");
+        if (v.commissionShare.balance == 0 && v.validatorKeeper.balance == 0) {
+            _indexedValidators.remove(v.id);
+        }
+    }
+
+    function addValidator(address validator) external override {
+        Validator memory v = _validators[validator];
+        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && !_indexedValidators.contains(v.id), "StakeManager: invalid validator");
+        if (v.commissionShare.balance > 0 || v.validatorKeeper.balance > 0) {
+            _indexedValidators.set(v.id, validator);
+        }
+    }
+
     ///////////////////// only for test /////////////////////
 
     function reward(address validator) external payable returns (uint256 validatorReward, uint256 commissionReward) {

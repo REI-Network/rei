@@ -63,4 +63,8 @@ interface IStakeManager {
     function setCommissionRate(uint256 rate) external;
 
     function doUnstake() external;
+
+    function removeValidator(address validator) external;
+
+    function addValidator(address validator) external;
 }

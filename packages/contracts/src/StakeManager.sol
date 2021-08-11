@@ -177,12 +177,6 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
             amount = config.minStakeAmount();
         } else {
             amount = CommissionShare(commissionShare).estimateStakeAmount(1);
-            if (amount != 0) {
-                uint256 shares = CommissionShare(commissionShare).estimateUnstakeShares(amount);
-                if (shares == 0) {
-                    amount = amount.add(1);
-                }
-            }
             if (amount < config.minStakeAmount()) {
                 amount = config.minStakeAmount();
             }
@@ -197,14 +191,9 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     function estimateStakeAmount(address validator, uint256 shares) external view override returns (uint256 amount) {
         address commissionShare = _validators[validator].commissionShare;
         if (commissionShare == address(0)) {
-            return shares;
-        }
-        amount = CommissionShare(commissionShare).estimateStakeAmount(shares);
-        if (amount != 0) {
-            uint256 shares2 = CommissionShare(commissionShare).estimateUnstakeShares(amount);
-            if (shares2 < shares) {
-                amount = amount.add(1);
-            }
+            amount = shares;
+        } else {
+            amount = CommissionShare(commissionShare).estimateStakeAmount(shares);
         }
     }
 
@@ -220,14 +209,6 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
             shares = 0;
         } else {
             shares = CommissionShare(commissionShare).estimateUnstakeShares(config.minUnstakeAmount());
-            if (shares == 0) {
-                shares = 1;
-            } else {
-                uint256 amount = CommissionShare(commissionShare).estimateStakeAmount(shares);
-                if (amount < config.minUnstakeAmount()) {
-                    shares = shares.add(1);
-                }
-            }
         }
     }
 
@@ -243,14 +224,6 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
             shares = 0;
         } else {
             shares = CommissionShare(commissionShare).estimateUnstakeShares(amount);
-            if (shares == 0) {
-                shares = 1;
-            } else {
-                uint256 amount2 = CommissionShare(commissionShare).estimateStakeAmount(shares);
-                if (amount2 < amount) {
-                    shares = shares.add(1);
-                }
-            }
         }
     }
 
@@ -260,12 +233,13 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      * @param validator    Validator address
      * @param shares       Number of shares
      */
-    function estimateUnstakeAmount(address validator, uint256 shares) external view override returns (uint256) {
+    function estimateUnstakeAmount(address validator, uint256 shares) external view override returns (uint256 amount) {
         address unstakeKeeper = _validators[validator].unstakeKeeper;
         if (unstakeKeeper == address(0)) {
-            return 0;
+            amount = 0;
+        } else {
+            amount = UnstakeKeeper(unstakeKeeper).estimateUnstakeAmount(shares);
         }
-        return UnstakeKeeper(unstakeKeeper).estimateUnstakeAmount(shares);
     }
 
     // receive GXC transfer

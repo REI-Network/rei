@@ -5,9 +5,11 @@ pragma solidity ^0.6.0;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./interfaces/IConfig.sol";
 import "./interfaces/ICommissionShare.sol";
+import "./libraries/Math.sol";
 
 contract CommissionShare is ERC20, ICommissionShare {
     using SafeMath for uint256;
+    using Math for uint256;
 
     IConfig public config;
 
@@ -39,7 +41,7 @@ contract CommissionShare is ERC20, ICommissionShare {
         if (_totalSupply == 0) {
             amount = shares;
         } else {
-            amount = address(this).balance.mul(shares).div(_totalSupply);
+            amount = address(this).balance.mul(shares).ceilDiv(_totalSupply);
         }
     }
 
@@ -53,7 +55,7 @@ contract CommissionShare is ERC20, ICommissionShare {
         if (balance == 0) {
             shares = 0;
         } else {
-            shares = amount.mul(totalSupply()).div(balance);
+            shares = amount.mul(totalSupply()).ceilDiv(balance);
         }
     }
 

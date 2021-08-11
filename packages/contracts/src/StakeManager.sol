@@ -111,11 +111,11 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         }
         address validator;
         (, validator) = _indexedValidators.at(index);
-        address commissionShare = _validators[validator].commissionShare;
-        if (commissionShare == address(0)) {
+        Validator memory v = _validators[validator];
+        if (v.commissionShare == address(0) || v.validatorKeeper == address(0)) {
             return 0;
         }
-        return commissionShare.balance.div(config.amountPerVotingPower());
+        return v.commissionShare.balance.add(v.validatorKeeper.balance).div(config.amountPerVotingPower());
     }
 
     /**
@@ -124,11 +124,11 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      * @param id            The validator id
      */
     function getVotingPowerById(uint256 id) external view override returns (uint256) {
-        address commissionShare = _validators[_indexedValidators.get(id)].commissionShare;
-        if (commissionShare == address(0)) {
+        Validator memory v = _validators[_indexedValidators.get(id)];
+        if (v.commissionShare == address(0) || v.validatorKeeper == address(0)) {
             return 0;
         }
-        return commissionShare.balance.div(config.amountPerVotingPower());
+        return v.commissionShare.balance.add(v.validatorKeeper.balance).div(config.amountPerVotingPower());
     }
 
     /**
@@ -137,11 +137,11 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      * @param validator     Validator address
      */
     function getVotingPowerByAddess(address validator) external view override returns (uint256) {
-        address commissionShare = _validators[validator].commissionShare;
-        if (commissionShare == address(0)) {
+        Validator memory v = _validators[validator];
+        if (v.commissionShare == address(0) || v.validatorKeeper == address(0)) {
             return 0;
         }
-        return commissionShare.balance.div(config.amountPerVotingPower());
+        return v.commissionShare.balance.add(v.validatorKeeper.balance).div(config.amountPerVotingPower());
     }
 
     /**

@@ -19,7 +19,6 @@ describe('StakeManger', () => {
   let receiver: string;
   let genesis1: string;
   let genesis2: string;
-  let genesis3: string;
 
   async function createCommissionShareContract(validator: string) {
     const v = await stakeManager.methods.validators(validator).call();

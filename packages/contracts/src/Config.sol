@@ -32,6 +32,8 @@ contract Config is IConfig {
     function getFactorByReason(uint8 reason) external view override returns (uint8) {
         if (reason == 0) {
             return 40;
+        } else if (reason == 1) {
+            return 100;
         } else {
             revert("Config: invalid reason");
         }

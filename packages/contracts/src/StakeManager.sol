@@ -64,7 +64,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     constructor(address _config, address[] memory genesisValidators) public {
         config = IConfig(_config);
         for (uint256 i = 0; i < genesisValidators.length; i = i.add(1)) {
-            // the validator was created, but not added to _indexedValidators
+            // the validator was created, but not added to `_indexedValidators`
             createValidator(genesisValidators[i], true);
         }
     }
@@ -302,9 +302,13 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         require(uint160(validator) > 2000, "StakeManager: invalid validator");
         require(uint160(to) > 2000, "StakeManager: invalid receiver");
         require(msg.value >= config.minStakeAmount(), "StakeManager: invalid stake amount");
-        address commissionShare = _validators[validator].commissionShare;
+        Validator memory v = _validators[validator];
+        address commissionShare = v.commissionShare;
         if (commissionShare == address(0)) {
             commissionShare = createValidator(validator, false);
+        } else if (commissionShare.balance == 0) {
+            // if the validator is exists but the balance is 0, add it back to `_indexedValidators`
+            _indexedValidators.set(v.id, validator);
         }
         shares = CommissionShare(commissionShare).mint{ value: msg.value }(to);
         emit Stake(validator, to, msg.value, shares);

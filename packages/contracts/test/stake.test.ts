@@ -45,12 +45,11 @@ describe('StakeManger', () => {
     receiver = accounts[2];
     genesis1 = accounts[3];
     genesis2 = accounts[4];
-    genesis3 = accounts[5];
   });
 
   it('should deploy succeed', async () => {
     config = new web3.eth.Contract(Config.abi, (await Config.new()).address, { from: deployer });
-    stakeManager = new web3.eth.Contract(StakeManager.abi, (await StakeManager.new(config.options.address, [genesis1, genesis2, genesis3])).address, { from: deployer });
+    stakeManager = new web3.eth.Contract(StakeManager.abi, (await StakeManager.new(config.options.address, [genesis1, genesis2])).address, { from: deployer });
     await config.methods.setStakeManager(stakeManager.options.address).send();
   });
 
@@ -60,7 +59,6 @@ describe('StakeManger', () => {
     expect(await stakeManager.methods.indexedValidatorsLength().call(), 'indexedValidatorsLength should be equal to 0').to.equal('0');
     expect((await stakeManager.methods.validators(genesis1).call()).id, 'genesis validator id should match').to.equal('0');
     expect((await stakeManager.methods.validators(genesis2).call()).id, 'genesis validator id should match').to.equal('1');
-    expect((await stakeManager.methods.validators(genesis3).call()).id, 'genesis validator id should match').to.equal('2');
   });
 
   it('should stake failed(min stake amount)', async () => {

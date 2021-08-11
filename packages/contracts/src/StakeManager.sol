@@ -424,4 +424,28 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         require(id != _firstUnstakeId, "StakeManager: useless call, revert");
         _firstUnstakeId = id;
     }
+
+    ///////////////////// only for test /////////////////////
+
+    function reward(address validator) external payable returns (uint256 validatorReward, uint256 commissionReward) {
+        Validator memory v = _validators[validator];
+        require(v.commissionShare != address(0), "StakeManager: invalid validator");
+        commissionReward = msg.value.mul(v.commissionRate).div(config.maxCommissionRate());
+        validatorReward = msg.value.sub(commissionReward);
+        if (commissionReward > 0) {
+            CommissionShare(v.commissionShare).reward{ value: commissionReward }();
+        }
+        if (validatorReward > 0) {
+            ValidatorKeeper(v.validatorKeeper).reward{ value: validatorReward }();
+        }
+    }
+
+    function slash(address validator, uint8 reason) external returns (uint256 amount) {
+        Validator memory v = _validators[validator];
+        require(v.commissionShare != address(0), "StakeManager: invalid validator");
+        amount = CommissionShare(v.commissionShare).slash(reason).add(ValidatorKeeper(v.validatorKeeper).slash(reason)).add(UnstakeKeeper(v.unstakeKeeper).slash(reason));
+        if (amount > 0) {
+            msg.sender.transfer(amount);
+        }
+    }
 }

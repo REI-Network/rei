@@ -177,9 +177,11 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
             amount = config.minStakeAmount();
         } else {
             amount = CommissionShare(commissionShare).estimateStakeAmount(1);
-            uint256 shares = CommissionShare(commissionShare).estimateUnstakeShares(amount);
-            if (shares == 0) {
-                amount = amount.add(1);
+            if (amount != 0) {
+                uint256 shares = CommissionShare(commissionShare).estimateUnstakeShares(amount);
+                if (shares == 0) {
+                    amount = amount.add(1);
+                }
             }
             if (amount < config.minStakeAmount()) {
                 amount = config.minStakeAmount();
@@ -198,9 +200,11 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
             return shares;
         }
         amount = CommissionShare(commissionShare).estimateStakeAmount(shares);
-        uint256 shares2 = CommissionShare(commissionShare).estimateUnstakeShares(amount);
-        if (shares2 < shares) {
-            amount = amount.add(1);
+        if (amount != 0) {
+            uint256 shares2 = CommissionShare(commissionShare).estimateUnstakeShares(amount);
+            if (shares2 < shares) {
+                amount = amount.add(1);
+            }
         }
     }
 

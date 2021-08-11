@@ -64,7 +64,7 @@ interface IStakeManager {
 
     function doUnstake() external;
 
-    function removeValidator(address validator) external;
+    function removeIndexedValidator(address validator) external;
 
-    function addValidator(address validator) external;
+    function addIndexedValidator(address validator) external;
 }

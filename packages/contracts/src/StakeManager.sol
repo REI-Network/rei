@@ -136,7 +136,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      *      If the validator doesn't exist, return 0
      * @param validator     Validator address
      */
-    function getVotingPowerByAddess(address validator) external view override returns (uint256) {
+    function getVotingPowerByAddress(address validator) external view override returns (uint256) {
         Validator memory v = _validators[validator];
         if (v.commissionShare == address(0) || v.validatorKeeper == address(0)) {
             return 0;

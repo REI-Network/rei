@@ -32,7 +32,7 @@ interface IStakeManager {
 
     function getVotingPowerById(uint256 index) external view returns (uint256);
 
-    function getVotingPowerByAddess(address validator) external view returns (uint256);
+    function getVotingPowerByAddress(address validator) external view returns (uint256);
 
     function firstUnstakeId() external view returns (uint256);
 

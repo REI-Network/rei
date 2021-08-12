@@ -4,12 +4,10 @@ pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/IUnstakeKeeper.sol";
-import "./libraries/Math.sol";
 import "./Keeper.sol";
 
 contract UnstakeKeeper is Keeper, IUnstakeKeeper {
     using SafeMath for uint256;
-    using Math for uint256;
 
     // shares total supply
     uint256 private _totalSupply;
@@ -33,7 +31,7 @@ contract UnstakeKeeper is Keeper, IUnstakeKeeper {
         if (total == 0) {
             amount = 0;
         } else {
-            amount = address(this).balance.mul(shares).ceilDiv(total);
+            amount = address(this).balance.mul(shares).div(total);
         }
     }
 

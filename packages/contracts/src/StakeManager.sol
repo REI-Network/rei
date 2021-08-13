@@ -62,6 +62,14 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      */
     event DoUnstake(uint256 indexed id, address indexed validator, address to, uint256 amount);
 
+    /**
+     * @dev Emit when validator set commission rate
+     * @param validator     Validator address
+     * @param rate          New commission rate
+     * @param timestamp     Update timestamp
+     */
+    event SetCommissionRate(address indexed validator, uint256 indexed rate, uint256 indexed timestamp);
+
     constructor(address _config, address[] memory genesisValidators) public {
         config = IConfig(_config);
         for (uint256 i = 0; i < genesisValidators.length; i = i.add(1)) {
@@ -377,6 +385,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         require(v.commissionRate != rate, "StakeManager: repeatedly set commission rate");
         v.commissionRate = rate;
         v.updateTimestamp = block.timestamp;
+        emit SetCommissionRate(msg.sender, rate, block.timestamp);
     }
 
     /**

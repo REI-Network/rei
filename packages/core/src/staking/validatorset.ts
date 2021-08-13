@@ -138,6 +138,14 @@ export class ValidatorSet {
     }
   }
 
+  async getActiveValidatorDetail(validator: Address, sm: StakeManager) {
+    let index = this.active.findIndex(({ validator: v }) => v.equals(validator));
+    if (index === -1) {
+      return undefined;
+    }
+    return this.active[index].detail ?? (this.active[index].detail = await sm.validators(validator));
+  }
+
   async activeValidators(sm: StakeManager) {
     for (const v of this.active) {
       if (!v.detail) {

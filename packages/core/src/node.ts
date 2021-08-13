@@ -2,7 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import type { LevelUp } from 'levelup';
 import LevelStore from 'datastore-level';
-import { bufferToHex, BN, BNLike, toBuffer } from 'ethereumjs-util';
+import { bufferToHex, BN, BNLike, toBuffer, Address } from 'ethereumjs-util';
 import { SecureTrie as Trie, BaseTrie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
 import { Database, createEncodingLevelDB, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchain2/database';
@@ -10,10 +10,12 @@ import { NetworkManager, Peer } from '@gxchain2/network';
 import { Common, getGenesisState, getChain } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import VM from '@gxchain2-ethereumjs/vm';
+import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
+import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
 import { PostByzantiumTxReceipt, TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
-import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
-import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
-import { Transaction, Block, Receipt, Log, BlockHeader, TypedTransaction } from '@gxchain2/structure';
+import { encodeReceipt, RunBlockOpts, rewardAccount } from '@gxchain2-ethereumjs/vm/dist/runBlock';
+import { DefaultStateManager as StateManager, StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import { Transaction, Block, Receipt, Log, TypedTransaction } from '@gxchain2/structure';
 import { Channel, Aborter, logger } from '@gxchain2/utils';
 import { AccountManager } from '@gxchain2/wallet';
 import { TxPool } from './txpool';
@@ -24,6 +26,7 @@ import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
 import { BlockchainMonitor } from './blockchainmonitor';
 import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
+import { StakeManager, ValidatorSet, Validator } from './staking';
 
 const timeoutBanTime = 60 * 5 * 1000;
 const invalidBanTime = 60 * 10 * 1000;
@@ -40,10 +43,6 @@ export function postByzantiumTxReceiptsToReceipts(receipts: PostByzantiumTxRecei
         r.status
       )
   );
-}
-
-async function cliqueGetBlockRewardAddress(header: BlockHeader) {
-  return header.cliqueSigner();
 }
 
 async function fixedGenReceiptTrie(transactions: TypedTransaction[], receipts: TxReceipt[]) {
@@ -168,6 +167,7 @@ export class Node {
   private chain!: string | { chain: any; genesisState?: any };
   private networkId!: number;
   private genesisHash!: Buffer;
+  private validatorSet!: ValidatorSet;
 
   constructor(options: NodeOptions) {
     this.chaindb = createEncodingLevelDB(path.join(options.databasePath, 'chaindb'));
@@ -334,11 +334,11 @@ export class Node {
   /**
    * Get state manager object by state root
    * @param root - State root
-   * @param num - Block number, used to set common
+   * @param num - Block number or Common
    * @returns State manager object
    */
-  async getStateManager(root: Buffer, num: BNLike) {
-    const stateManager = new StateManager({ common: this.getCommon(num), trie: new Trie(this.chaindb) });
+  async getStateManager(root: Buffer, num: BNLike | Common) {
+    const stateManager = new StateManager({ common: num instanceof Common ? num : this.getCommon(num), trie: new Trie(this.chaindb) });
     await stateManager.setStateRoot(root);
     return stateManager;
   }
@@ -346,16 +346,22 @@ export class Node {
   /**
    * Get a VM object by state root
    * @param root - The state root
-   * @param num - Block number, used to set common
+   * @param num - Block number or Common
    * @returns VM object
    */
-  async getVM(root: Buffer, num: BNLike) {
+  async getVM(root: Buffer, num: BNLike | Common) {
     const stateManager = await this.getStateManager(root, num);
     return new VM({
       common: stateManager._common,
       stateManager,
       blockchain: this.blockchain
     });
+  }
+
+  async getStakeManager(root: Buffer, block: Block) {
+    const vm = await this.getVM(root, block._common);
+    const evm = new EVM(vm, new TxContext(new BN(0), Address.zero()), block);
+    return new StakeManager(evm, block._common);
   }
 
   /**
@@ -376,21 +382,63 @@ export class Node {
         for (const tx of block.transactions) {
           tx.common.getHardforkByBlockNumber(block.header.number);
         }
-        const lastHeader = await this.db.getHeader(block.header.parentHash, block.header.number.subn(1));
-        const runBlockOptions = {
+        const parent = await this.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
+        let parentSM: StakeManager | undefined;
+        let detail: Validator | undefined;
+        const getParentSM = async () => {
+          return parentSM ?? (await this.getStakeManager(parent.header.stateRoot, block));
+        };
+
+        const parentGteHF1 = parent._common.gteHardfork('testnet-hf1') || parent._common.gteHardfork('mainnet-hf1');
+        const gteHF1 = block._common.gteHardfork('testnet-hf1') || block._common.gteHardfork('mainnet-hf1');
+
+        const runBlockOptions: RunBlockOpts = {
           ...options,
           block,
-          root: lastHeader.stateRoot,
+          root: parent.header.stateRoot,
           cliqueSigner: options.generate ? this.accMngr.getPrivateKey(block.header.cliqueSigner().buf) : undefined,
-          getBlockRewardAddress: cliqueGetBlockRewardAddress,
           // If the current hardfork is less than `hardfork1`, then use the old logic `fixedGenReceiptTrie`
-          genReceiptTrie: block._common.gteHardfork('testnet-hf1') || block._common.gteHardfork('mainnet-hf1') ? undefined : fixedGenReceiptTrie
+          genReceiptTrie: gteHF1 ? undefined : fixedGenReceiptTrie,
+          rewardAddress: async (state: IStateManager, reward: BN) => {
+            const miner = block.header.cliqueSigner();
+            if (gteHF1) {
+              if (!this.validatorSet) {
+                if (!parentGteHF1) {
+                  this.validatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
+                } else {
+                  this.validatorSet = await (await getParentSM()).createValidatorSet();
+                }
+              }
+
+              // if the miner detail information doesn't exist, load from storage
+              if (!detail) {
+                detail = await this.validatorSet.getActiveValidatorDetail(miner, await getParentSM());
+                if (!detail) {
+                  // this shouldn't happen
+                  throw new Error('invalid validator');
+                }
+              }
+
+              const commissionReward = reward.mul(detail.commissionRate).divn(100);
+              if (commissionReward.gtn(0)) {
+                await rewardAccount(state, detail.commissionShare, commissionReward);
+              }
+              const validatorReward = reward.sub(commissionReward);
+              if (validatorReward.gtn(0)) {
+                await rewardAccount(state, detail.validatorKeeper, validatorReward);
+              }
+            } else {
+              await rewardAccount(state, miner, reward);
+            }
+          }
         };
-        const { receipts, block: newBlock } = await (await this.getVM(lastHeader.stateRoot, lastHeader.number)).runBlock(runBlockOptions);
-        block = newBlock || block;
+
+        const { receipts, block: newBlock } = await (await this.getVM(parent.header.stateRoot, parent._common)).runBlock(runBlockOptions);
+        block = newBlock ?? block;
         logger.info('✨ Process block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
         const before = this.blockchain.latestBlock.hash();
         await this.blockchain.putBlock(block);
+        // persist receipts
         await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(postByzantiumTxReceiptsToReceipts(receipts as PostByzantiumTxReceipt[]), block.hash(), block.header.number)));
         const after = this.blockchain.latestBlock.hash();
         resolve(block);

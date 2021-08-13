@@ -280,7 +280,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
             (id, commissionShare) = createValidator(validator);
             // add the new validator to `_indexedValidators`
             _indexedValidators.set(id, validator);
-        } else if (commissionShare.balance == 0 && v.validatorKeeper.balance == 0) {
+        } else if (!_indexedValidators.contains(id)) {
             // if the validator is exists but the voting power is 0, add it back to `_indexedValidators`
             _indexedValidators.set(id, validator);
         }
@@ -406,18 +406,14 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
 
     function removeIndexedValidator(address validator) external override {
         Validator memory v = _validators[validator];
-        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && _indexedValidators.contains(v.id), "StakeManager: invalid validator");
-        if (v.commissionShare.balance == 0 && v.validatorKeeper.balance == 0) {
-            _indexedValidators.remove(v.id);
-        }
+        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && _indexedValidators.contains(v.id) && v.commissionShare.balance == 0 && v.validatorKeeper.balance == 0, "StakeManager: invalid validator");
+        _indexedValidators.remove(v.id);
     }
 
     function addIndexedValidator(address validator) external override {
         Validator memory v = _validators[validator];
-        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && !_indexedValidators.contains(v.id), "StakeManager: invalid validator");
-        if (v.commissionShare.balance > 0 || v.validatorKeeper.balance > 0) {
-            _indexedValidators.set(v.id, validator);
-        }
+        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && !_indexedValidators.contains(v.id) && (v.commissionShare.balance > 0 || v.validatorKeeper.balance > 0), "StakeManager: invalid validator");
+        _indexedValidators.set(v.id, validator);
     }
 
     ///////////////////// only for test /////////////////////

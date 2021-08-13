@@ -36,21 +36,22 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     /**
      * @dev Emit when the user stakes
      * @param validator     Validator address
-     * @param to            Receiver address
      * @param value         Stake value
+     * @param to            Receiver address
      * @param shares        Number of shares minted
      */
-    event Stake(address indexed validator, address to, uint256 value, uint256 shares);
+    event Stake(address indexed validator, uint256 indexed value, address to, uint256 shares);
 
     /**
      * @dev Emit when the user starts unstake
      * @param id            Unique unstake id
      * @param validator     Validator address
+     * @param value         Stake value
      * @param to            Receiver address
      * @param unstakeShares Number of unstake shares to be burned
      * @param timestamp     Release timestamp
      */
-    event StartUnstake(uint256 indexed id, address indexed validator, address to, uint256 unstakeShares, uint256 timestamp);
+    event StartUnstake(uint256 indexed id, address indexed validator, uint256 indexed value, address to, uint256 unstakeShares, uint256 timestamp);
 
     /**
      * @dev Emit when stake manager `do unstake`
@@ -286,7 +287,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         }
 
         shares = CommissionShare(commissionShare).mint{ value: msg.value }(to);
-        emit Stake(validator, to, msg.value, shares);
+        emit Stake(validator, msg.value, to, shares);
     }
 
     /**
@@ -311,7 +312,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         }
         _unstakeQueue[id] = Unstake(validator, to, unstakeShares, timestamp);
         _lastUnstakeId = id.add(1);
-        emit StartUnstake(id, validator, to, unstakeShares, timestamp);
+        emit StartUnstake(id, validator, amount, to, unstakeShares, timestamp);
     }
 
     /**

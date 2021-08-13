@@ -12,4 +12,6 @@ interface IConfig {
     function minUnstakeAmount() external view returns (uint256);
 
     function getFactorByReason(uint8 reason) external view returns (uint8);
+
+    function setCommissionRateInterval() external view returns (uint256);
 }

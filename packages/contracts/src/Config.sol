@@ -38,4 +38,8 @@ contract Config is IConfig {
             revert("Config: invalid reason");
         }
     }
+
+    function setCommissionRateInterval() external view returns (uint256) {
+        return 5;
+    }
 }

@@ -373,7 +373,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         Validator storage v = _validators[msg.sender];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint256 updateTimestamp = v.updateTimestamp;
-        require(updateTimestamp == 0 || block.timestamp.sub(updateTimestamp) >= 24 hours, "StakeManager: update commission rate too frequently");
+        require(updateTimestamp == 0 || block.timestamp.sub(updateTimestamp) >= config.setCommissionRateInterval(), "StakeManager: update commission rate too frequently");
         require(v.commissionRate != rate, "StakeManager: repeatedly set commission rate");
         v.commissionRate = rate;
         v.updateTimestamp = block.timestamp;

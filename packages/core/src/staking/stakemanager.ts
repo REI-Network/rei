@@ -2,19 +2,17 @@ import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import Message from '@gxchain2-ethereumjs/vm/dist/evm/message';
 import { Address, BN, MAX_INTEGER, setLengthLeft, toBuffer } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
+import { hexStringToBuffer } from '@gxchain2/utils';
 import { ValidatorInfo, ValidatorSet } from './validatorset';
+import { bufferToAddress } from './utils';
 
 // function selecot of stake manager
 const methods = {
-  indexedValidatorsLength: '74a1c64a',
-  indexedValidatorsByIndex: 'af6a80e2',
-  validators: 'fa52c7d8',
-  getVotingPowerByIndex: '9b8c4c88'
+  indexedValidatorsLength: toBuffer('74a1c64a'),
+  indexedValidatorsByIndex: toBuffer('af6a80e2'),
+  validators: toBuffer('fa52c7d8'),
+  getVotingPowerByIndex: toBuffer('9b8c4c88')
 };
-
-function bufferToAddress(buf: Buffer) {
-  return new Address(buf.slice(buf.length - 20));
-}
 
 export type Validator = {
   id: BN;
@@ -39,8 +37,22 @@ export class StakeManager {
       caller: Address.zero(),
       to: Address.fromString(this.common.param('vm', 'smaddr')),
       gasLimit: MAX_INTEGER,
-      data: Buffer.concat([toBuffer(methods[method]), ...data])
+      data: Buffer.concat([methods[method], ...data])
     });
+  }
+
+  async deploy() {
+    const result = await this.evm.executeMessage(
+      new Message({
+        contractAddress: Address.fromString(this.common.param('vm', 'smaddr')),
+        gasLimit: MAX_INTEGER,
+        // stakeManger code + configAddress + 000...40(rlp list) + genesisValidator1 + genesisValidator2 + ...
+        data: Buffer.concat([hexStringToBuffer(this.common.param('vm', 'smcode')), hexStringToBuffer(this.common.param('vm', 'configaddr')), setLengthLeft(new Buffer('40', 'hex'), 32), ...(this.common.param('vm', 'genesisValidators') as string[]).map((addr) => setLengthLeft(hexStringToBuffer(addr), 32))])
+      })
+    );
+    if (result.execResult.exceptionError) {
+      throw result.execResult.exceptionError;
+    }
   }
 
   async indexedValidatorsLength() {

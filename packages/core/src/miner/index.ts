@@ -1,6 +1,6 @@
 import { Address, BN, bufferToHex } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
-import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN, calculateTransactionTrie, Transaction } from '@gxchain2/structure';
+import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN, Transaction } from '@gxchain2/structure';
 import VM from '@gxchain2-ethereumjs/vm';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
@@ -140,11 +140,11 @@ export class Miner {
       const [inTurn, difficulty] = calcCliqueDifficulty(this.node.blockchain.cliqueActiveSigners(), this.coinbase, number);
       const header = BlockHeader.fromHeaderData(
         {
-          // TODO: add beneficiary.
+          // coinbase is always zero
           coinbase: Address.zero(),
           difficulty,
           gasLimit,
-          // TODO: add beneficiary.
+          // nonce is always zero
           nonce: Buffer.alloc(8),
           number,
           parentHash,
@@ -157,9 +157,11 @@ export class Miner {
     } else {
       const header = BlockHeader.fromHeaderData(
         {
+          // coinbase is always zero
           coinbase: Address.zero(),
           difficulty: CLIQUE_DIFF_NOTURN.clone(),
           gasLimit,
+          // nonce is always zero
           nonce: Buffer.alloc(8),
           number,
           parentHash,
@@ -351,25 +353,25 @@ export class Miner {
    */
   private async _putTx(tx: Transaction) {
     this.pendingTxs.push(tx);
-    const txs = [...this.pendingTxs];
-    const header = { ...this.pendingHeader };
-    if (this.isMining) {
-      this.pendingHeader = BlockHeader.fromHeaderData(
-        {
-          ...header,
-          transactionsTrie: await calculateTransactionTrie(txs)
-        },
-        { common: header._common, cliqueSigner: this.node.accMngr.getPrivateKey(this.coinbase) }
-      );
-    } else {
-      this.pendingHeader = BlockHeader.fromHeaderData(
-        {
-          ...header,
-          transactionsTrie: await calculateTransactionTrie(txs)
-        },
-        { common: header._common }
-      );
-    }
+    // const txs = [...this.pendingTxs];
+    // const header = { ...this.pendingHeader };
+    // if (this.isMining) {
+    //   this.pendingHeader = BlockHeader.fromHeaderData(
+    //     {
+    //       ...header,
+    //       transactionsTrie: await calculateTransactionTrie(txs)
+    //     },
+    //     { common: header._common, cliqueSigner: this.node.accMngr.getPrivateKey(this.coinbase) }
+    //   );
+    // } else {
+    //   this.pendingHeader = BlockHeader.fromHeaderData(
+    //     {
+    //       ...header,
+    //       transactionsTrie: await calculateTransactionTrie(txs)
+    //     },
+    //     { common: header._common }
+    //   );
+    // }
   }
 
   /**

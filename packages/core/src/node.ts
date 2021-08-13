@@ -26,7 +26,8 @@ import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
 import { BlockchainMonitor } from './blockchainmonitor';
 import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
-import { StakeManager, ValidatorSet, Validator } from './staking';
+import { StakeManager, Config, ValidatorSet, Validator } from './staking';
+import { consensusValidateHeader } from './validation';
 
 const timeoutBanTime = 60 * 5 * 1000;
 const invalidBanTime = 60 * 10 * 1000;
@@ -358,10 +359,14 @@ export class Node {
     });
   }
 
-  async getStakeManager(root: Buffer, block: Block) {
-    const vm = await this.getVM(root, block._common);
+  getStakeManager(vm: VM, block: Block) {
     const evm = new EVM(vm, new TxContext(new BN(0), Address.zero()), block);
     return new StakeManager(evm, block._common);
+  }
+
+  getConfig(vm: VM, block: Block) {
+    const evm = new EVM(vm, new TxContext(new BN(0), Address.zero()), block);
+    return new Config(evm, block._common);
   }
 
   /**
@@ -379,68 +384,89 @@ export class Node {
     await this.initPromise;
     for await (let { block, options, resolve, reject } of this.processQueue.generator()) {
       try {
+        // ensure that every transaction is in the right common
         for (const tx of block.transactions) {
           tx.common.getHardforkByBlockNumber(block.header.number);
         }
-        const parent = await this.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
-        let parentSM: StakeManager | undefined;
-        let detail: Validator | undefined;
-        const getParentSM = async () => {
-          return parentSM ?? (await this.getStakeManager(parent.header.stateRoot, block));
-        };
 
+        // get parent block
+        const parent = await this.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
+        // create a vm instance
+        const vm = await this.getVM(parent.header.stateRoot, block._common);
+        // check hardfork
         const parentGteHF1 = parent._common.gteHardfork('testnet-hf1') || parent._common.gteHardfork('mainnet-hf1');
         const gteHF1 = block._common.gteHardfork('testnet-hf1') || block._common.gteHardfork('mainnet-hf1');
+
+        const miner = block.header.cliqueSigner();
+        let detail: Validator | undefined;
+        if (gteHF1) {
+          const parentSM = this.getStakeManager(vm, block);
+          if (!parentGteHF1) {
+            // deploy config contract
+            await this.getConfig(vm, block).deploy();
+            // deploy stake manager contract
+            await parentSM.deploy();
+          }
+
+          // if `validatorSet` doesn't exist, create
+          if (!this.validatorSet) {
+            if (!parentGteHF1) {
+              this.validatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
+            } else {
+              this.validatorSet = await parentSM.createValidatorSet();
+            }
+          }
+
+          // get validator detail information
+          detail = await this.validatorSet.getActiveValidatorDetail(miner, parentSM);
+          if (!detail) {
+            // this shouldn't happen
+            throw new Error('invalid validator');
+          }
+
+          // check signer
+          await consensusValidateHeader.call(block.header, this.validatorSet.activeSigners());
+        }
 
         const runBlockOptions: RunBlockOpts = {
           ...options,
           block,
           root: parent.header.stateRoot,
           cliqueSigner: options.generate ? this.accMngr.getPrivateKey(block.header.cliqueSigner().buf) : undefined,
-          // If the current hardfork is less than `hardfork1`, then use the old logic `fixedGenReceiptTrie`
+          // if the current hardfork is less than `hardfork1`, then use the old logic `fixedGenReceiptTrie`
           genReceiptTrie: gteHF1 ? undefined : fixedGenReceiptTrie,
           rewardAddress: async (state: IStateManager, reward: BN) => {
-            const miner = block.header.cliqueSigner();
             if (gteHF1) {
-              if (!this.validatorSet) {
-                if (!parentGteHF1) {
-                  this.validatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
-                } else {
-                  this.validatorSet = await (await getParentSM()).createValidatorSet();
-                }
-              }
-
-              // if the miner detail information doesn't exist, load from storage
-              if (!detail) {
-                detail = await this.validatorSet.getActiveValidatorDetail(miner, await getParentSM());
-                if (!detail) {
-                  // this shouldn't happen
-                  throw new Error('invalid validator');
-                }
-              }
-
-              const commissionReward = reward.mul(detail.commissionRate).divn(100);
+              // if `hf1` is active, assign reward to contract adddress
+              const commissionReward = reward.mul(detail!.commissionRate).divn(100);
               if (commissionReward.gtn(0)) {
-                await rewardAccount(state, detail.commissionShare, commissionReward);
+                await rewardAccount(state, detail!.commissionShare, commissionReward);
               }
               const validatorReward = reward.sub(commissionReward);
               if (validatorReward.gtn(0)) {
-                await rewardAccount(state, detail.validatorKeeper, validatorReward);
+                await rewardAccount(state, detail!.validatorKeeper, validatorReward);
               }
             } else {
+              // directly reward miner
               await rewardAccount(state, miner, reward);
             }
           }
         };
 
-        const { receipts, block: newBlock } = await (await this.getVM(parent.header.stateRoot, parent._common)).runBlock(runBlockOptions);
+        const { receipts: postByzantiumTxReceipts, block: newBlock } = await vm.runBlock(runBlockOptions);
         block = newBlock ?? block;
         logger.info('✨ Process block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
         const before = this.blockchain.latestBlock.hash();
         await this.blockchain.putBlock(block);
         // persist receipts
-        await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(postByzantiumTxReceiptsToReceipts(receipts as PostByzantiumTxReceipt[]), block.hash(), block.header.number)));
+        const receipts = postByzantiumTxReceiptsToReceipts(postByzantiumTxReceipts as PostByzantiumTxReceipt[]);
+        await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, block.hash(), block.header.number)));
         const after = this.blockchain.latestBlock.hash();
+
+        if (gteHF1) {
+          // TODO: validator changes
+        }
+
         resolve(block);
 
         // If canonical chain changes, notify to sub modules

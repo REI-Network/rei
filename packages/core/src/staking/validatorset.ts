@@ -2,16 +2,22 @@ import Heap from 'qheap';
 import { Address, BN } from 'ethereumjs-util';
 import { createBufferFunctionalMap, logger } from '@gxchain2/utils';
 import { Common } from '@gxchain2/common';
+import { StakeManager, Validator } from './stakemanager';
 
 export type ValidatorInfo = {
   validator: Address;
   votingPower: BN;
+  detail?: Validator;
 };
 
 export type ValidatorChange = {
   validator: Address;
   stake: BN[];
   unstake: BN[];
+  commissionChange?: {
+    commissionRate: BN;
+    updateTimestamp: BN;
+  };
 };
 
 export class ValidatorSet {
@@ -47,7 +53,9 @@ export class ValidatorSet {
       heap.push(v);
       // if the heap size is too large, remove the minimum one
       while (heap.size > max) {
-        heap.remove();
+        const droped: ValidatorInfo = heap.remove();
+        // delete the detail information of the removed validator to save memory
+        droped.detail = undefined;
       }
     }
     this.active = [];
@@ -81,33 +89,47 @@ export class ValidatorSet {
   // TODO: if the changed validator is an active validator, the active list maybe not be dirty
   processChanges(changes: ValidatorChange[]) {
     let dirty = false;
-    for (const cv of changes) {
-      const stake = cv.stake.reduce((sum, v) => sum.add(v), new BN(0));
-      const unstake = cv.unstake.reduce((sum, v) => sum.add(v), new BN(0));
+    for (const vc of changes) {
+      const stake = vc.stake.reduce((sum, v) => sum.add(v), new BN(0));
+      const unstake = vc.unstake.reduce((sum, v) => sum.add(v), new BN(0));
       let v: ValidatorInfo | undefined;
       if (stake.gt(unstake)) {
         dirty = true;
-        v = this.map.get(cv.validator.buf);
+        v = this.map.get(vc.validator.buf);
         if (!v) {
           v = {
-            validator: cv.validator,
+            validator: vc.validator,
             votingPower: stake.sub(unstake)
           };
         } else {
           v.votingPower.iadd(stake.sub(unstake));
         }
       } else if (stake.lt(unstake)) {
-        v = this.map.get(cv.validator.buf);
+        v = this.map.get(vc.validator.buf);
         if (!v) {
           // this shouldn't happen
-          logger.warn(`ValidatorSet::processChanges, missing validator information: ${cv.validator.toString()}`);
+          logger.warn(`ValidatorSet::processChanges, missing validator information: ${vc.validator.toString()}`);
         } else {
           dirty = true;
           v.votingPower.isub(unstake.sub(stake));
           if (v.votingPower.isZero()) {
-            this.map.delete(cv.validator.buf);
+            this.map.delete(vc.validator.buf);
           }
         }
+      }
+
+      if (!v && vc.commissionChange) {
+        v = this.map.get(vc.validator.buf);
+        if (!v) {
+          // this shouldn't happen
+          logger.warn(`ValidatorSet::processChanges, missing validator information: ${vc.validator.toString()}`);
+        }
+      }
+
+      // only care about validators with detailed information
+      if (vc.commissionChange && v && v.detail) {
+        v.detail.commissionRate = vc.commissionChange.commissionRate;
+        v.detail.updateTimestamp = vc.commissionChange.updateTimestamp;
       }
     }
 
@@ -116,7 +138,12 @@ export class ValidatorSet {
     }
   }
 
-  activeValidators() {
+  async activeValidators(sm: StakeManager) {
+    for (const v of this.active) {
+      if (!v.detail) {
+        v.detail = await sm.validators(v.validator);
+      }
+    }
     return [...this.active];
   }
 

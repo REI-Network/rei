@@ -52,6 +52,7 @@ contract UnstakeKeeper is Keeper, IUnstakeKeeper {
             // if there is a balance before the stake, allocate all the balance to the first stake user
             shares = balance;
         } else {
+            require(reserve > 0, "UnstakeKeeper: insufficient validator balance");
             shares = amount.mul(total).div(reserve);
         }
         require(shares > 0, "UnstakeKeeper: insufficient shares");

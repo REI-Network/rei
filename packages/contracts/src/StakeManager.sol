@@ -86,6 +86,14 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
 
     /**
+     * @dev Judge indexed validator existed or not by id.
+     * @param id            The validator id
+     */
+    function indexedValidatorsExisted(uint256 id) external view override returns (bool) {
+        return _indexedValidators.contains(id);
+    }
+
+    /**
      * @dev Get indexed validator address by index.
      * @param index         The validator index
      */
@@ -405,12 +413,22 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         _firstUnstakeId = id;
     }
 
+    /**
+     * @dev Remove validator form map _indexedValidators if the balance of commissionShare and validatorKeeper are both zero
+     *      This can be called by anyone.
+     * @param validator           Receiver address
+     */
     function removeIndexedValidator(address validator) external override {
         Validator memory v = _validators[validator];
         require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && _indexedValidators.contains(v.id) && v.commissionShare.balance == 0 && v.validatorKeeper.balance == 0, "StakeManager: invalid validator");
         _indexedValidators.remove(v.id);
     }
 
+    /**
+     * @dev Add validator into map _indexedValidators if it not in the map and the balance of commissionShare and validatorKeeper are not both zero
+     *      This can be called by anyone.
+     * @param validator
+     */
     function addIndexedValidator(address validator) external override {
         Validator memory v = _validators[validator];
         require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && !_indexedValidators.contains(v.id) && (v.commissionShare.balance > 0 || v.validatorKeeper.balance > 0), "StakeManager: invalid validator");

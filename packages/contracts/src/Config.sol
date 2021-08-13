@@ -38,12 +38,4 @@ contract Config is IConfig {
             revert("Config: invalid reason");
         }
     }
-
-    function amountPerVotingPower() external view override returns (uint256) {
-        return 1;
-    }
-
-    function maxCommissionRate() external view override returns (uint256) {
-        return 100;
-    }
 }

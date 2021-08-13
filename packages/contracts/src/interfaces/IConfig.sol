@@ -12,8 +12,4 @@ interface IConfig {
     function minUnstakeAmount() external view returns (uint256);
 
     function getFactorByReason(uint8 reason) external view returns (uint8);
-
-    function amountPerVotingPower() external view returns (uint256);
-
-    function maxCommissionRate() external view returns (uint256);
 }

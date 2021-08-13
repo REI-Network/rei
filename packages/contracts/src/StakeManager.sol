@@ -36,21 +36,22 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     /**
      * @dev Emit when the user stakes
      * @param validator     Validator address
-     * @param to            Receiver address
      * @param value         Stake value
+     * @param to            Receiver address
      * @param shares        Number of shares minted
      */
-    event Stake(address indexed validator, address to, uint256 value, uint256 shares);
+    event Stake(address indexed validator, uint256 indexed value, address to, uint256 shares);
 
     /**
      * @dev Emit when the user starts unstake
      * @param id            Unique unstake id
      * @param validator     Validator address
+     * @param value         Stake value
      * @param to            Receiver address
      * @param unstakeShares Number of unstake shares to be burned
      * @param timestamp     Release timestamp
      */
-    event StartUnstake(uint256 indexed id, address indexed validator, address to, uint256 unstakeShares, uint256 timestamp);
+    event StartUnstake(uint256 indexed id, address indexed validator, uint256 indexed value, address to, uint256 unstakeShares, uint256 timestamp);
 
     /**
      * @dev Emit when stake manager `do unstake`
@@ -115,7 +116,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         if (v.commissionShare == address(0) || v.validatorKeeper == address(0)) {
             return 0;
         }
-        return v.commissionShare.balance.add(v.validatorKeeper.balance).div(config.amountPerVotingPower());
+        return v.commissionShare.balance.add(v.validatorKeeper.balance);
     }
 
     /**
@@ -128,7 +129,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         if (v.commissionShare == address(0) || v.validatorKeeper == address(0)) {
             return 0;
         }
-        return v.commissionShare.balance.add(v.validatorKeeper.balance).div(config.amountPerVotingPower());
+        return v.commissionShare.balance.add(v.validatorKeeper.balance);
     }
 
     /**
@@ -141,7 +142,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         if (v.commissionShare == address(0) || v.validatorKeeper == address(0)) {
             return 0;
         }
-        return v.commissionShare.balance.add(v.validatorKeeper.balance).div(config.amountPerVotingPower());
+        return v.commissionShare.balance.add(v.validatorKeeper.balance);
     }
 
     /**
@@ -280,13 +281,13 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
             (id, commissionShare) = createValidator(validator);
             // add the new validator to `_indexedValidators`
             _indexedValidators.set(id, validator);
-        } else if (commissionShare.balance == 0 && v.validatorKeeper.balance == 0) {
+        } else if (!_indexedValidators.contains(id)) {
             // if the validator is exists but the voting power is 0, add it back to `_indexedValidators`
             _indexedValidators.set(id, validator);
         }
 
         shares = CommissionShare(commissionShare).mint{ value: msg.value }(to);
-        emit Stake(validator, to, msg.value, shares);
+        emit Stake(validator, msg.value, to, shares);
     }
 
     /**
@@ -311,7 +312,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         }
         _unstakeQueue[id] = Unstake(validator, to, unstakeShares, timestamp);
         _lastUnstakeId = id.add(1);
-        emit StartUnstake(id, validator, to, unstakeShares, timestamp);
+        emit StartUnstake(id, validator, amount, to, unstakeShares, timestamp);
     }
 
     /**
@@ -368,7 +369,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      * @param rate         New commission rate
      */
     function setCommissionRate(uint256 rate) external override {
-        require(rate <= config.maxCommissionRate(), "StakeManager: commission rate is too high");
+        require(rate <= 100, "StakeManager: commission rate is too high");
         Validator storage v = _validators[msg.sender];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint256 updateTimestamp = v.updateTimestamp;
@@ -406,18 +407,14 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
 
     function removeIndexedValidator(address validator) external override {
         Validator memory v = _validators[validator];
-        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && _indexedValidators.contains(v.id), "StakeManager: invalid validator");
-        if (v.commissionShare.balance == 0 && v.validatorKeeper.balance == 0) {
-            _indexedValidators.remove(v.id);
-        }
+        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && _indexedValidators.contains(v.id) && v.commissionShare.balance == 0 && v.validatorKeeper.balance == 0, "StakeManager: invalid validator");
+        _indexedValidators.remove(v.id);
     }
 
     function addIndexedValidator(address validator) external override {
         Validator memory v = _validators[validator];
-        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && !_indexedValidators.contains(v.id), "StakeManager: invalid validator");
-        if (v.commissionShare.balance > 0 || v.validatorKeeper.balance > 0) {
-            _indexedValidators.set(v.id, validator);
-        }
+        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && !_indexedValidators.contains(v.id) && (v.commissionShare.balance > 0 || v.validatorKeeper.balance > 0), "StakeManager: invalid validator");
+        _indexedValidators.set(v.id, validator);
     }
 
     ///////////////////// only for test /////////////////////
@@ -425,7 +422,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     function reward(address validator) external payable returns (uint256 validatorReward, uint256 commissionReward) {
         Validator memory v = _validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
-        commissionReward = msg.value.mul(v.commissionRate).div(config.maxCommissionRate());
+        commissionReward = msg.value.mul(v.commissionRate).div(100);
         validatorReward = msg.value.sub(commissionReward);
         if (commissionReward > 0) {
             CommissionShare(v.commissionShare).reward{ value: commissionReward }();

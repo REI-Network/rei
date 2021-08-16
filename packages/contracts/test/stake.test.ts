@@ -24,6 +24,8 @@ describe('StakeManger', () => {
   let validator2: string;
   let validator3: string;
   let unstakeDelay: number;
+  let minStakeAmount: BN;
+  let minUnstakeAmount: BN;
 
   async function createCommissionShareContract(validator: string) {
     const v = await stakeManager.methods.validators(validator).call();
@@ -40,12 +42,12 @@ describe('StakeManger', () => {
     return new web3.eth.Contract(ValidatorKeeper.abi, v.validatorKeeper, { from: deployer });
   }
 
-  async function upTimestamp(waittime: number, address: string) {
+  async function upTimestamp(waittime: number) {
     // wait some time and send a transaction to update blockchain timestamp
     await new Promise((r) => setTimeout(r, waittime * 1000 + 10));
     await web3.eth.sendTransaction({
-      from: address,
-      to: address,
+      from: deployer,
+      to: deployer,
       value: 0
     });
   }
@@ -74,6 +76,8 @@ describe('StakeManger', () => {
     stakeManager = new web3.eth.Contract(StakeManager.abi, (await StakeManager.new(config.options.address, [genesis1, genesis2])).address, { from: deployer });
     await config.methods.setStakeManager(stakeManager.options.address).send();
     unstakeDelay = toBN(await config.methods.unstakeDelay().call()).toNumber();
+    minStakeAmount = toBN(await config.methods.minStakeAmount().call());
+    minUnstakeAmount = toBN(await config.methods.minUnstakeAmount().call());
   });
 
   it('should initialize succeed', async () => {
@@ -85,7 +89,6 @@ describe('StakeManger', () => {
   });
 
   it('should stake failed(min stake amount)', async () => {
-    const minStakeAmount = toBN(await config.methods.minStakeAmount().call());
     try {
       await stakeManager.methods.stake(validator1, deployer).send({ value: minStakeAmount.subn(1).toString() });
       assert.fail("shouldn't stake succeed");
@@ -93,7 +96,6 @@ describe('StakeManger', () => {
   });
 
   it('should stake succeed', async () => {
-    const minStakeAmount = toBN(await config.methods.minStakeAmount().call());
     await stakeManager.methods.stake(validator1, deployer).send({ value: minStakeAmount.toString() });
     const shares = await (await createCommissionShareContract(validator1)).methods.balanceOf(deployer).call();
     expect(shares, 'shares should be equal to amount at the time of the first staking').to.equal(minStakeAmount.toString());
@@ -105,11 +107,11 @@ describe('StakeManger', () => {
 
   it('should get voting power', async () => {
     const votingPower1 = await stakeManager.methods.getVotingPowerByIndex(0).call();
-    expect(votingPower1, 'votingPower1 should be euqal').be.equal('10');
+    expect(votingPower1, 'votingPower1 should be euqal').be.equal(minStakeAmount.toString());
     const votingPower2 = await stakeManager.methods.getVotingPowerById(2).call();
-    expect(votingPower2, 'votingPower2 should be euqal').be.equal('10');
+    expect(votingPower2, 'votingPower2 should be euqal').be.equal(minStakeAmount.toString());
     const votingPower3 = await stakeManager.methods.getVotingPowerByAddress(validator1).call();
-    expect(votingPower3, 'votingPower3 should be euqal').be.equal('10');
+    expect(votingPower3, 'votingPower3 should be euqal').be.equal(minStakeAmount.toString());
   });
 
   it('should match validator info', async () => {
@@ -117,6 +119,8 @@ describe('StakeManger', () => {
     expect(await commissionShare.methods.validator().call(), 'validator address should be equal').to.equal(validator1);
     const unstakeKeeper = await createUnstakeKeeperContract(validator1);
     expect(await unstakeKeeper.methods.validator().call(), 'validator address should be equal').to.equal(validator1);
+    const validatorKeeper = await createValidatorKeeperContract(validator1);
+    expect(await validatorKeeper.methods.validator().call(), 'validator address should be equal').to.equal(validator1);
   });
 
   it('should approve succeed', async () => {
@@ -125,26 +129,30 @@ describe('StakeManger', () => {
   });
 
   it('should get first and last id', async () => {
-    const stakeAmount = toBN(100);
-    const unstakeAmount = toBN(110);
+    const stakeAmount = toBN(200);
+    const unstakeAmount1 = toBN(100);
+    const unstakeAmount2 = toBN(100).add(minStakeAmount);
+    const unstakeAmountArray = [unstakeAmount1, unstakeAmount2];
+    //at stake step, minStake amount token has been staked
     const firstId = await stakeManager.methods.firstUnstakeId().call();
     const lastId = await stakeManager.methods.lastUnstakeId().call();
     expect(firstId, 'first id should be equal').equal('0');
     expect(lastId, 'last id should be equal').equal('0');
     await stakeManager.methods.stake(validator1, deployer).send({ value: stakeAmount });
-    await stakeManager.methods.stake(validator1, deployer).send({ value: stakeAmount });
-    await stakeManager.methods.startUnstake(validator1, deployer, stakeAmount.toString()).send();
-    await stakeManager.methods.startUnstake(validator1, deployer, unstakeAmount.toString()).send();
+    await stakeManager.methods.startUnstake(validator1, deployer, unstakeAmount1.toString()).send();
+    await stakeManager.methods.startUnstake(validator1, deployer, unstakeAmount2.toString()).send();
     const firstId1 = await stakeManager.methods.firstUnstakeId().call();
     const lastId1 = await stakeManager.methods.lastUnstakeId().call();
     expect(firstId1, 'first id should be equal').equal('0');
     expect(lastId1, 'last id should be equal').equal('2');
-    const unstakeInfo = await stakeManager.methods.unstakeQueue(1).call();
-    expect(unstakeInfo.validator, 'validator address should be equal').be.equal(validator1);
-    expect(unstakeInfo.to, 'to address should be equal').be.equal(deployer);
-    expect(unstakeInfo.unstakeShares, 'unStakeAmount address should be equal').be.equal(unstakeAmount.toString());
+    unstakeAmountArray.forEach(async (element, i) => {
+      const unstakeInfo = await stakeManager.methods.unstakeQueue(i).call();
+      expect(unstakeInfo.validator, 'validator address should be equal').be.equal(validator1);
+      expect(unstakeInfo.to, 'to address should be equal').be.equal(deployer);
+      expect(unstakeInfo.unstakeShares, 'unStakeAmount address should be equal').be.equal(element.toString());
+    });
     await stakeManager.methods.doUnstake().send();
-    await upTimestamp(unstakeDelay, deployer);
+    await upTimestamp(unstakeDelay);
     const firstId2 = await stakeManager.methods.firstUnstakeId().call();
     const lastId2 = await stakeManager.methods.lastUnstakeId().call();
     expect(firstId2, 'first id should be equal').equal('2');
@@ -152,29 +160,37 @@ describe('StakeManger', () => {
   });
 
   it('should set commission rate correctly', async () => {
+    const oldCommissionRate = 0;
+    const newCommissionRate = 50;
+    const setInterval = await config.methods.setCommissionRateInterval().call();
     const validatorInfoBefore = await stakeManager.methods.validators(validator1).call();
-    expect(validatorInfoBefore.commissionRate, 'commissionRate should be 0').be.equal('0');
-    const commissionRate = 50;
-    await stakeManager.methods.setCommissionRate(commissionRate).send({ from: validator1 });
+    expect(validatorInfoBefore.commissionRate, 'commissionRate should be 0').be.equal(oldCommissionRate.toString());
+    await stakeManager.methods.setCommissionRate(newCommissionRate).send({ from: validator1 });
     const validatorInfoAfter = await stakeManager.methods.validators(validator1).call();
-    expect(validatorInfoAfter.commissionRate, 'commissionShare should be 0').be.equal(commissionRate.toString());
+    expect(validatorInfoAfter.commissionRate, 'commissionRare should be new commissionRate').be.equal(newCommissionRate.toString());
+
+    await upTimestamp(setInterval);
     try {
-      await stakeManager.methods.setCommissionRate(commissionRate).send({ from: validator1 });
-    } catch (err) {
-      expect(err.message, 'error message should be equal').be.equal("VM Exception while processing transaction: reverted with reason string 'StakeManager: update commission rate too frequently'");
-    }
+      await stakeManager.methods.setCommissionRate(newCommissionRate).send({ from: validator1 });
+      assert.fail('repeatedly set commission rate');
+    } catch (err) {}
+
+    await upTimestamp(setInterval - 1);
+    try {
+      await stakeManager.methods.setCommissionRate(newCommissionRate).send({ from: validator1 });
+      assert.fail('update commission rate too frequently');
+    } catch (err) {}
   });
 
   it('should estimate correctly', async () => {
-    const minStakeAmount = toBN(await config.methods.minStakeAmount().call());
     const estimateMinStake = await stakeManager.methods.estimateMinStakeAmount(validator1).call();
     expect(estimateMinStake, 'mininual stake amount should be equal').equal(minStakeAmount.toString());
     const wantedShares = toBN('97');
     const estimateStake = await stakeManager.methods.estimateStakeAmount(validator1, wantedShares).call();
     expect(estimateStake, 'estimate shares amount should be equal').be.equal(wantedShares.toString());
+
     await stakeManager.methods.stake(validator1, deployer).send({ value: estimateStake });
     await stakeManager.methods.slash(validator1, 1).send();
-
     await stakeManager.methods.reward(validator1).send({ value: 2000 });
     const estimateMinStake1 = await stakeManager.methods.estimateMinStakeAmount(validator1).call();
     expect(estimateMinStake1, 'mininual stake amount should be equal').be.equal('11');
@@ -195,75 +211,80 @@ describe('StakeManger', () => {
     await stakeManager.methods.reward(validator1).send({ value: 1000 });
     const estimateUnstakeShare = await stakeManager.methods.estimateMinUnstakeShares(validator1).call();
     expect(estimateUnstakeShare, 'estimateUnstakeShare should be equal').be.equal('1');
-    const estimateUnstakeShare1 = await stakeManager.methods.estimateUnstakeShares(validator1, 5).call();
+    const estimateUnstakeShare1 = await stakeManager.methods.estimateUnstakeShares(validator1, minUnstakeAmount.toString()).call();
     expect(estimateUnstakeShare1, 'estimateUnstakeShare1 should be equal').be.equal('1');
   });
 
   it('should remove and add indexed validator correctly', async () => {
-    const validatorsLength = await stakeManager.methods.indexedValidatorsLength().call();
-    expect(validatorsLength, 'validators length should be equal').be.equal('1');
+    const ifValidatorExisted1 = await stakeManager.methods.indexedValidatorsExisted(3).call();
+    expect(ifValidatorExisted1, 'should not existed').be.equal(false);
 
     const stakeAmount = toBN('100');
     await stakeManager.methods.stake(validator2, deployer).send({ value: stakeAmount.toString() });
     const validatorInfo = await stakeManager.methods.validators(validator2).call();
     const validatorAddress = await stakeManager.methods.indexedValidatorsById(validatorInfo.id).call();
-    const validatorsLength1 = await stakeManager.methods.indexedValidatorsLength().call();
-    expect(validatorsLength1, 'validators length should be added').be.equal('2');
+    const ifValidatorExisted2 = await stakeManager.methods.indexedValidatorsExisted(validatorInfo.id).call();
+    expect(ifValidatorExisted2, 'validator2 should existed').be.equal(true);
     expect(validatorAddress, 'address should be equal').be.equal(validator2);
 
     const commissionShare = await createCommissionShareContract(validator2);
     await commissionShare.methods.approve(stakeManager.options.address, MAX_INTEGER.toString()).send();
     await stakeManager.methods.startUnstake(validator2, deployer, stakeAmount.toString()).send();
     await stakeManager.methods.doUnstake().send();
-    await upTimestamp(unstakeDelay, deployer);
-    const validatorsLength2 = await stakeManager.methods.indexedValidatorsLength().call();
-    expect(validatorsLength2, 'validators length should be discreased').be.equal('1');
+    await upTimestamp(unstakeDelay);
+    const ifValidatorExisted3 = await stakeManager.methods.indexedValidatorsExisted(validatorInfo.id).call();
+    expect(ifValidatorExisted3, 'validator2 should be removed').be.equal(false);
 
     await stakeManager.methods.reward(validator2).send({ value: toBN(1000) });
     await stakeManager.methods.addIndexedValidator(validator2).send();
-    const validatorsLength3 = await stakeManager.methods.indexedValidatorsLength().call();
-    expect(validatorsLength3, 'validators length should be added').be.equal('2');
+    const ifValidatorExisted4 = await stakeManager.methods.indexedValidatorsExisted(validatorInfo.id).call();
+    expect(ifValidatorExisted4, 'validator2 should be added').be.equal(true);
 
     await stakeManager.methods.slash(validator2, 1).send();
     await stakeManager.methods.removeIndexedValidator(validator2).send();
-    const validatorsLength4 = await stakeManager.methods.indexedValidatorsLength().call();
-    expect(validatorsLength4, 'validators length should be discreased').be.equal('1');
+    const ifValidatorExisted5 = await stakeManager.methods.indexedValidatorsExisted(validatorInfo.id).call();
+    expect(ifValidatorExisted5, 'validator2 should be removed').be.equal(false);
   });
 
   it('should unstake and claim correctky', async () => {
     const stakeAmount = toBN(100);
-    const stakeHalfAmount = toBN(50);
+    const unstakeAmount = toBN(16);
     const rewardAmount = toBN(97);
-    const receiver1BlaBefore = toBN(await web3.eth.getBalance(receiver1));
-    const receiver2BlaBefore = toBN(await web3.eth.getBalance(receiver2));
+    const commissionRate = 33;
+    const receiver1BalStart = toBN(await web3.eth.getBalance(receiver1));
+    const receiver2BalStart = toBN(await web3.eth.getBalance(receiver2));
     await stakeManager.methods.stake(validator3, deployer).send({ value: stakeAmount.toString() });
     const commissionShare = await createCommissionShareContract(validator3);
     const validatorKeeper = await createValidatorKeeperContract(validator3);
-    const commissionRate = 33;
     await stakeManager.methods.setCommissionRate(commissionRate).send({ from: validator3 });
     await commissionShare.methods.approve(stakeManager.options.address, MAX_INTEGER.toString()).send();
+    expect(await web3.eth.getBalance(commissionShare.options.address), 'commissionShare balance should be equal').be.equal(stakeAmount.toString());
 
     await stakeManager.methods.reward(validator3).send({ value: rewardAmount });
-    const commisonAmount = rewardAmount.muln(commissionRate).divn(100);
+    const commissonAmount = rewardAmount.muln(commissionRate).divn(100);
+    const commissonTotalSup = toBN(await commissionShare.methods.totalSupply().call());
+    const validatorKeeperAmount = rewardAmount.sub(commissonAmount);
     const claimAmount = toBN(await web3.eth.getBalance(validatorKeeper.options.address));
-    await stakeManager.methods.startUnstake(validator3, receiver1, stakeHalfAmount.toString()).send();
-    await stakeManager.methods.startClaim(receiver2, claimAmount).send({ from: validator3 });
-    await upTimestamp(unstakeDelay, deployer);
-    await stakeManager.methods.doUnstake().send();
+    expect(claimAmount.eq(validatorKeeperAmount), 'validatorKeeper balance should be equal').be.true;
 
-    const receiver1BlaAfter = toBN(await web3.eth.getBalance(receiver1));
-    const receiver2BlaAfter = toBN(await web3.eth.getBalance(receiver2));
-    const shrAfterUnstake = toBN(await commissionShare.methods.balanceOf(deployer).call());
-    const receiver1Change = receiver1BlaAfter.sub(receiver1BlaBefore);
-    const receiver2Change = receiver2BlaAfter.sub(receiver2BlaBefore);
-    expect(receiver1Change.eq(stakeHalfAmount.add(commisonAmount.divn(2))), 'unstake amount should be equal').be.true;
-    expect(receiver2Change.eq(claimAmount), 'validator reward amount should be equal').be.true;
-    expect(shrAfterUnstake.eq(stakeAmount.sub(stakeHalfAmount)), 'shares should be equal').be.true;
-    const commistionBlance = await web3.eth.getBalance(commissionShare.options.address);
-    expect(commistionBlance, 'commistion blance should be equal').be.equal(stakeAmount.sub(stakeHalfAmount).add(commisonAmount.divn(2)).toString());
-    const rewardTotal = receiver1Change.add(receiver2Change).add(commisonAmount.divn(2)).sub(stakeHalfAmount);
-    expect(rewardTotal.eq(rewardAmount), 'reward amount should be equal').be.true;
-    const validatorKeeperBla = toBN(await web3.eth.getBalance(validatorKeeper.options.address));
-    expect(validatorKeeperBla.eqn(0), 'validatorKeeper balance should be 0').be.true;
+    const commissionBal = toBN(await web3.eth.getBalance(commissionShare.options.address));
+    await stakeManager.methods.startUnstake(validator3, receiver1, unstakeAmount.toString()).send();
+    await stakeManager.methods.doUnstake().send();
+    await upTimestamp(unstakeDelay);
+    const receiver1BalAfter = toBN(await web3.eth.getBalance(receiver1));
+    const receiver1Change = receiver1BalAfter.sub(receiver1BalStart);
+    const unstakeReward = unstakeAmount.mul(commissionBal).div(commissonTotalSup);
+    expect(receiver1Change.eq(unstakeReward), 'receiver1Change should be equal').be.true;
+
+    await stakeManager.methods.startClaim(receiver2, claimAmount).send({ from: validator3 });
+    await stakeManager.methods.doUnstake().send();
+    await upTimestamp(unstakeDelay);
+    const receiver2BalAfter = toBN(await web3.eth.getBalance(receiver2));
+    const receiver2Change = receiver2BalAfter.sub(receiver2BalStart);
+    expect(receiver2Change.eq(claimAmount), 'receiver2Change should be equal').be.true;
+
+    const totalAmount = rewardAmount.add(stakeAmount);
+    const totalCalAmount = receiver2Change.add(receiver1Change).add(toBN(await web3.eth.getBalance(commissionShare.options.address)));
+    expect(totalAmount.eq(totalCalAmount), 'totalAmount should be equal').be.true;
   });
 });

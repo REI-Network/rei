@@ -31,4 +31,8 @@ contract Config_prod is IConfig {
             revert("Config: invalid reason");
         }
     }
+
+    function setCommissionRateInterval() external view override returns (uint256) {
+        return 5;
+    }
 }

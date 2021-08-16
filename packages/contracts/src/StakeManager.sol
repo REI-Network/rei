@@ -425,7 +425,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     /**
      * @dev Remove validator form map _indexedValidators if the balance of commissionShare and validatorKeeper are both zero
      *      This can be called by anyone.
-     * @param validator           Receiver address
+     * @param validator           to deleted address
      */
     function removeIndexedValidator(address validator) external override {
         Validator memory v = _validators[validator];
@@ -436,7 +436,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     /**
      * @dev Add validator into map _indexedValidators if it not in the map and the balance of commissionShare and validatorKeeper are not both zero
      *      This can be called by anyone.
-     * @param validator
+     * @param validator          to added address
      */
     function addIndexedValidator(address validator) external override {
         Validator memory v = _validators[validator];

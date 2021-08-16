@@ -190,7 +190,7 @@ const wireHandlers: Handler[] = [
       return [8, txs.map((tx) => tx.raw() as Buffer[])];
     },
     decode(this: WireProtocolHandler, raws: TransactionsBuffer) {
-      return raws.map((raw) => mustParseTransction(raw, { common: this.node.getCommon(0) }));
+      return raws.map((raw) => mustParseTransction(raw, { common: this.node.getLatestCommon() }));
     }
   }
 ];

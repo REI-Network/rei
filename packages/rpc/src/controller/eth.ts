@@ -133,7 +133,7 @@ export class ETHController extends Controller {
         ...data,
         gasLimit: data.gas
       },
-      { common: this.node.getCommon(0) }
+      { common: this.node.getLatestCommon() }
     );
     const privateKey = this.node.accMngr.getPrivateKey(data.from);
     return unsignedTx.sign(privateKey);
@@ -154,7 +154,7 @@ export class ETHController extends Controller {
     return results.length > 0 && results[0] ? bufferToHex(tx.hash()) : null;
   }
   async eth_sendRawTransaction([rawtx]: [string]) {
-    const tx = TransactionFactory.fromSerializedData(hexStringToBuffer(rawtx), { common: this.node.getCommon(0) });
+    const tx = TransactionFactory.fromSerializedData(hexStringToBuffer(rawtx), { common: this.node.getLatestCommon() });
     if (!(tx instanceof Transaction)) {
       return null;
     }

@@ -336,6 +336,10 @@ export class Node {
     return Common.createCommonByBlockNumber(num, typeof this.chain === 'string' ? this.chain : this.chain.chain);
   }
 
+  getLatestCommon() {
+    return this.blockchain.latestBlock._common;
+  }
+
   /**
    * Get state manager object by state root
    * @param root - State root
@@ -426,7 +430,7 @@ export class Node {
           }
         }
 
-        const runBlockOptions: any = {
+        const runBlockOptions: RunBlockOpts = {
           ...options,
           block,
           skipBlockValidation: true,
@@ -450,7 +454,7 @@ export class Node {
               await rewardAccount(state, miner, reward);
             }
           },
-          beforeApply: async () => {
+          afterApply: async () => {
             if (gteHF1 && !parentGteHF1) {
               // deploy config contract
               await this.getConfig(vm, block).deploy();

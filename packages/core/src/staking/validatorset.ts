@@ -22,19 +22,33 @@ export type ValidatorChange = {
 
 export class ValidatorSet {
   private map = createBufferFunctionalMap<ValidatorInfo>();
-  private active!: ValidatorInfo[];
+  private active: ValidatorInfo[] = [];
   private common: Common;
 
-  constructor(set: ValidatorInfo[], common: Common) {
+  constructor(common: Common) {
     this.common = common;
-    for (const v of set) {
-      this.map.set(v.validator.buf, v);
+  }
+
+  static createFromValidatorSet(old: ValidatorSet, common: Common) {
+    const vs = new ValidatorSet(common);
+    for (const [validator, info] of old.map) {
+      vs.map.set(validator, info);
     }
-    this.sort();
+    vs.active = [...old.active];
+    return vs;
+  }
+
+  static createFromValidatorInfo(info: ValidatorInfo[], common: Common) {
+    const vs = new ValidatorSet(common);
+    for (const v of info) {
+      vs.map.set(v.validator.buf, v);
+    }
+    vs.sort();
+    return vs;
   }
 
   static createGenesisValidatorSet(common: Common) {
-    return new ValidatorSet([], common);
+    return ValidatorSet.createFromValidatorInfo([], common);
   }
 
   private sort() {
@@ -157,5 +171,9 @@ export class ValidatorSet {
 
   activeSigners() {
     return this.active.map(({ validator }) => validator);
+  }
+
+  copy(common: Common) {
+    return ValidatorSet.createFromValidatorSet(this, common);
   }
 }

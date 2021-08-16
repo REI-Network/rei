@@ -2,16 +2,24 @@ import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import Message from '@gxchain2-ethereumjs/vm/dist/evm/message';
 import { Address, BN, MAX_INTEGER, setLengthLeft, toBuffer } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
-import { hexStringToBuffer } from '@gxchain2/utils';
-import { ValidatorInfo, ValidatorSet } from './validatorset';
+import { Receipt } from '@gxchain2/structure';
+import { createBufferFunctionalMap, hexStringToBuffer } from '@gxchain2/utils';
+import { ValidatorInfo, ValidatorSet, ValidatorChange } from './validatorset';
 import { bufferToAddress } from './utils';
 
-// function selecot of stake manager
+// function selector of stake manager
 const methods = {
   indexedValidatorsLength: toBuffer('74a1c64a'),
   indexedValidatorsByIndex: toBuffer('af6a80e2'),
   validators: toBuffer('fa52c7d8'),
   getVotingPowerByIndex: toBuffer('9b8c4c88')
+};
+
+// event topic
+const events = {
+  Stake: toBuffer('1bd1eb6b4fd3f08e718d7a241c54c4641c9f36004b6949383f48d15a2fcc8f52'),
+  StartUnstake: toBuffer('020b3ba91672f551cfd1f7abf4794b3fb292f61fd70ffd5a34a60cdd04078e50'),
+  SetCommissionRate: toBuffer('aa2933ee3941c066bda0e3f51e3e6ce63f33379daee1ef99baf018764d321e54')
 };
 
 export type Validator = {
@@ -30,6 +38,55 @@ export class StakeManager {
   constructor(evm: EVM, common: Common) {
     this.evm = evm;
     this.common = common;
+  }
+
+  static filterValidatorChanges(receipts: Receipt[], common: Common) {
+    const map = createBufferFunctionalMap<ValidatorChange>();
+    const getVC = (validator: Address) => {
+      let vc = map.get(validator.buf);
+      if (!vc) {
+        vc = {
+          validator: validator,
+          stake: [],
+          unstake: []
+        };
+        map.set(validator.buf, vc);
+      }
+      return vc;
+    };
+
+    const smaddr = hexStringToBuffer(common.param('vm', 'smaddr'));
+    for (const receipt of receipts) {
+      for (const log of receipt.logs) {
+        if (log.address.equals(smaddr)) {
+          if (log.topics.length === 3 && log.topics[0].equals(events['Stake'])) {
+            // Stake event
+            const value = new BN(log.topics[2]);
+            const validator = bufferToAddress(log.topics[1]);
+            const vc = getVC(validator);
+            vc.stake.push(value);
+          } else if (log.topics.length === 4 && log.topics[0].equals(events['StartUnstake'])) {
+            // StartUnstake event
+            const value = new BN(log.topics[3]);
+            const validator = bufferToAddress(log.topics[2]);
+            const vc = getVC(validator);
+            vc.unstake.push(value);
+          } else if (log.topics.length === 4 && log.topics[0].equals(events['SetCommissionRate'])) {
+            // SetCommissionRate event
+            const commissionRate = new BN(log.topics[2]);
+            const updateTimestamp = new BN(log.topics[3]);
+            const validator = bufferToAddress(log.topics[1]);
+            const vc = getVC(validator);
+            vc.commissionChange = {
+              commissionRate,
+              updateTimestamp
+            };
+          }
+        }
+      }
+    }
+
+    return Array.from(map.values());
   }
 
   private makeMessage(method: string, data: Buffer[]) {
@@ -104,6 +161,6 @@ export class StakeManager {
         validators.push({ validator, votingPower });
       }
     }
-    return new ValidatorSet(validators, this.common);
+    return ValidatorSet.createFromValidatorInfo(validators, this.common);
   }
 }

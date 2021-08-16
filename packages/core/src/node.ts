@@ -26,7 +26,7 @@ import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
 import { BlockchainMonitor } from './blockchainmonitor';
 import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
-import { StakeManager, Config, ValidatorSet, Validator } from './staking';
+import { StakeManager, Config, ValidatorSet, ValidatorSets, Validator } from './staking';
 import { consensusValidateHeader } from './validation';
 
 const timeoutBanTime = 60 * 5 * 1000;
@@ -168,7 +168,9 @@ export class Node {
   private chain!: string | { chain: any; genesisState?: any };
   private networkId!: number;
   private genesisHash!: Buffer;
-  private validatorSet!: ValidatorSet;
+
+  // TODO: remove this after tendermint
+  private validatorSets: ValidatorSets;
 
   constructor(options: NodeOptions) {
     this.chaindb = createEncodingLevelDB(path.join(options.databasePath, 'chaindb'));
@@ -177,6 +179,7 @@ export class Node {
     this.initPromise = this.init(options);
     this.taskLoopPromise = this.taskLoop();
     this.processLoopPromise = this.processLoop();
+    this.validatorSets = new ValidatorSets();
   }
 
   /**
@@ -398,6 +401,7 @@ export class Node {
         const gteHF1 = block._common.gteHardfork('testnet-hf1') || block._common.gteHardfork('mainnet-hf1');
 
         const miner = block.header.cliqueSigner();
+        let validatorSet: ValidatorSet | undefined;
         let detail: Validator | undefined;
         if (gteHF1) {
           const parentSM = this.getStakeManager(vm, block);
@@ -408,24 +412,21 @@ export class Node {
             await parentSM.deploy();
           }
 
-          // if `validatorSet` doesn't exist, create
-          if (!this.validatorSet) {
-            if (!parentGteHF1) {
-              this.validatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
-            } else {
-              this.validatorSet = await parentSM.createValidatorSet();
-            }
+          if (!parentGteHF1) {
+            validatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
+          } else {
+            validatorSet = await parentSM.createValidatorSet();
           }
 
           // get validator detail information
-          detail = await this.validatorSet.getActiveValidatorDetail(miner, parentSM);
+          detail = await validatorSet.getActiveValidatorDetail(miner, parentSM);
           if (!detail) {
             // this shouldn't happen
             throw new Error('invalid validator');
           }
 
           // check signer
-          await consensusValidateHeader.call(block.header, this.validatorSet.activeSigners());
+          await consensusValidateHeader.call(block.header, validatorSet.activeSigners());
         }
 
         const runBlockOptions: RunBlockOpts = {
@@ -464,7 +465,10 @@ export class Node {
         const after = this.blockchain.latestBlock.hash();
 
         if (gteHF1) {
-          // TODO: validator changes
+          // filter changes and save validator set
+          const currentValidatorSet = validatorSet!.copy(block._common);
+          currentValidatorSet.processChanges(StakeManager.filterValidatorChanges(receipts, block._common));
+          this.validatorSets.set(block.header.stateRoot, currentValidatorSet);
         }
 
         resolve(block);

@@ -9,17 +9,17 @@ import { bufferToAddress } from './utils';
 
 // function selector of stake manager
 const methods = {
-  indexedValidatorsLength: toBuffer('74a1c64a'),
-  indexedValidatorsByIndex: toBuffer('af6a80e2'),
-  validators: toBuffer('fa52c7d8'),
-  getVotingPowerByIndex: toBuffer('9b8c4c88')
+  indexedValidatorsLength: toBuffer('0x74a1c64a'),
+  indexedValidatorsByIndex: toBuffer('0xaf6a80e2'),
+  validators: toBuffer('0xfa52c7d8'),
+  getVotingPowerByIndex: toBuffer('0x9b8c4c88')
 };
 
 // event topic
 const events = {
-  Stake: toBuffer('1bd1eb6b4fd3f08e718d7a241c54c4641c9f36004b6949383f48d15a2fcc8f52'),
-  StartUnstake: toBuffer('020b3ba91672f551cfd1f7abf4794b3fb292f61fd70ffd5a34a60cdd04078e50'),
-  SetCommissionRate: toBuffer('aa2933ee3941c066bda0e3f51e3e6ce63f33379daee1ef99baf018764d321e54')
+  Stake: toBuffer('0x1bd1eb6b4fd3f08e718d7a241c54c4641c9f36004b6949383f48d15a2fcc8f52'),
+  StartUnstake: toBuffer('0x020b3ba91672f551cfd1f7abf4794b3fb292f61fd70ffd5a34a60cdd04078e50'),
+  SetCommissionRate: toBuffer('0xaa2933ee3941c066bda0e3f51e3e6ce63f33379daee1ef99baf018764d321e54')
 };
 
 export type Validator = {
@@ -99,12 +99,14 @@ export class StakeManager {
   }
 
   async deploy() {
+    const smaddr = Address.fromString(this.common.param('vm', 'smaddr'));
     const result = await this.evm.executeMessage(
       new Message({
-        contractAddress: Address.fromString(this.common.param('vm', 'smaddr')),
+        contractAddress: smaddr,
+        to: smaddr,
         gasLimit: MAX_INTEGER,
-        // stakeManger code + configAddress + 000...40(rlp list) + genesisValidator1 + genesisValidator2 + ...
-        data: Buffer.concat([hexStringToBuffer(this.common.param('vm', 'smcode')), hexStringToBuffer(this.common.param('vm', 'configaddr')), setLengthLeft(new Buffer('40', 'hex'), 32), ...(this.common.param('vm', 'genesisValidators') as string[]).map((addr) => setLengthLeft(hexStringToBuffer(addr), 32))])
+        // stakeManger code + configAddress + 000...40(rlp list) + 000...03(list length) + genesisValidator1 + genesisValidator2 + ...
+        data: Buffer.concat([hexStringToBuffer(this.common.param('vm', 'smcode')), setLengthLeft(hexStringToBuffer(this.common.param('vm', 'cfgaddr')), 32), setLengthLeft(Buffer.from('40', 'hex'), 32), setLengthLeft(Buffer.from('03', 'hex'), 32), ...(this.common.param('vm', 'genesisValidators') as string[]).map((addr) => setLengthLeft(hexStringToBuffer(addr), 32))])
       })
     );
     if (result.execResult.exceptionError) {
@@ -129,8 +131,9 @@ export class StakeManager {
   async validators(validator: Address): Promise<Validator> {
     const {
       execResult: { returnValue }
-    } = await this.evm.executeMessage(this.makeMessage('indexedValidatorsByIndex', [setLengthLeft(validator.buf, 32)]));
+    } = await this.evm.executeMessage(this.makeMessage('validators', [setLengthLeft(validator.buf, 32)]));
     if (returnValue.length !== 6 * 32) {
+      // console.log(returnValue.length, 'returnValue:', returnValue.toString('hex'), 'contractCode:', await this.evm._state.getContractCode(Address.fromString(this.common.param('vm', 'smaddr'))));
       throw new Error('invalid return value length');
     }
     let i = 0;

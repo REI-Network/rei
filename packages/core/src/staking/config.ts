@@ -20,19 +20,21 @@ export class Config {
   //   private makeMessage(method: string, data: Buffer[]) {
   //     return new Message({
   //       caller: Address.zero(),
-  //       to: Address.fromString(this.common.param('vm', 'configaddr')),
+  //       to: Address.fromString(this.common.param('vm', 'cfgaddr')),
   //       gasLimit: MAX_INTEGER,
   //       data: Buffer.concat([methods[method], ...data])
   //     });
   //   }
 
   async deploy() {
+    const cfgaddr = Address.fromString(this.common.param('vm', 'cfgaddr'));
     const result = await this.evm.executeMessage(
       new Message({
-        contractAddress: Address.fromString(this.common.param('vm', 'configaddr')),
+        contractAddress: cfgaddr,
+        to: cfgaddr,
         gasLimit: MAX_INTEGER,
         // config code
-        data: hexStringToBuffer(this.common.param('vm', 'configcode'))
+        data: hexStringToBuffer(this.common.param('vm', 'cfgcode'))
       })
     );
     if (result.execResult.exceptionError) {

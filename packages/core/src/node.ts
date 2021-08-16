@@ -159,6 +159,9 @@ export class Node {
   public bcMonitor!: BlockchainMonitor;
   public accMngr!: AccountManager;
 
+  // TODO: remove this after tendermint
+  public validatorSets: ValidatorSets;
+
   private readonly initPromise: Promise<void>;
   private readonly taskLoopPromise: Promise<void>;
   private readonly processLoopPromise: Promise<void>;
@@ -168,9 +171,6 @@ export class Node {
   private chain!: string | { chain: any; genesisState?: any };
   private networkId!: number;
   private genesisHash!: Buffer;
-
-  // TODO: remove this after tendermint
-  private validatorSets: ValidatorSets;
 
   constructor(options: NodeOptions) {
     this.chaindb = createEncodingLevelDB(path.join(options.databasePath, 'chaindb'));
@@ -282,7 +282,8 @@ export class Node {
     this.blockchain = new Blockchain({
       dbManager: this.db,
       common,
-      genesisBlock
+      genesisBlock,
+      validateBlocks: false
     });
     await this.blockchain.init();
 
@@ -323,7 +324,7 @@ export class Node {
   };
 
   private onSyncOver = () => {
-    this.miner.startMint(this.blockchain.latestBlock.header);
+    this.miner.startMint(this.blockchain.latestBlock);
   };
 
   /**
@@ -399,9 +400,10 @@ export class Node {
         // check hardfork
         const parentGteHF1 = parent._common.gteHardfork('testnet-hf1') || parent._common.gteHardfork('mainnet-hf1');
         const gteHF1 = block._common.gteHardfork('testnet-hf1') || block._common.gteHardfork('mainnet-hf1');
+        // console.log('prepare process:', block.header.number.toNumber(), 'parentGteHF1:', parentGteHF1, 'gteHF1:', gteHF1);
 
         const miner = block.header.cliqueSigner();
-        let validatorSet: ValidatorSet | undefined;
+        let parentValidatorSet: ValidatorSet | undefined;
         let detail: Validator | undefined;
         if (gteHF1) {
           const parentSM = this.getStakeManager(vm, block);
@@ -413,31 +415,36 @@ export class Node {
           }
 
           if (!parentGteHF1) {
-            validatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
+            parentValidatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
           } else {
-            validatorSet = await parentSM.createValidatorSet();
+            parentValidatorSet = await parentSM.createValidatorSet();
           }
 
           // get validator detail information
-          detail = await validatorSet.getActiveValidatorDetail(miner, parentSM);
+          detail = await parentValidatorSet.getActiveValidatorDetail(miner, parentSM);
           if (!detail) {
             // this shouldn't happen
             throw new Error('invalid validator');
           }
 
           // check signer
-          await consensusValidateHeader.call(block.header, validatorSet.activeSigners());
+          if (!parentGteHF1) {
+            consensusValidateHeader.call(block.header, this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number));
+          } else {
+            consensusValidateHeader.call(block.header, parentValidatorSet.activeSigners());
+          }
         }
 
         const runBlockOptions: RunBlockOpts = {
           ...options,
           block,
+          skipBlockValidation: true,
           root: parent.header.stateRoot,
           cliqueSigner: options.generate ? this.accMngr.getPrivateKey(block.header.cliqueSigner().buf) : undefined,
           // if the current hardfork is less than `hardfork1`, then use the old logic `fixedGenReceiptTrie`
           genReceiptTrie: gteHF1 ? undefined : fixedGenReceiptTrie,
           rewardAddress: async (state: IStateManager, reward: BN) => {
-            if (gteHF1) {
+            if (parentGteHF1) {
               // if `hf1` is active, assign reward to contract adddress
               const commissionReward = reward.mul(detail!.commissionRate).divn(100);
               if (commissionReward.gtn(0)) {
@@ -464,19 +471,28 @@ export class Node {
         await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, block.hash(), block.header.number)));
         const after = this.blockchain.latestBlock.hash();
 
+        let validatorSet: ValidatorSet | undefined;
+        let activeSigners: Address[];
         if (gteHF1) {
           // filter changes and save validator set
-          const currentValidatorSet = validatorSet!.copy(block._common);
-          currentValidatorSet.processChanges(StakeManager.filterValidatorChanges(receipts, block._common));
-          this.validatorSets.set(block.header.stateRoot, currentValidatorSet);
+          validatorSet = parentValidatorSet!.copy(block._common);
+          validatorSet.processChanges(StakeManager.filterValidatorChanges(receipts, block._common));
+          this.validatorSets.set(block.header.stateRoot, validatorSet);
+          activeSigners = validatorSet.activeSigners();
+        } else {
+          activeSigners = this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number);
         }
+        // console.log(
+        //   'node::process, activeSigners:',
+        //   activeSigners.map((a) => a.toString())
+        // );
 
         resolve(block);
 
         // If canonical chain changes, notify to sub modules
         if (!before.equals(after)) {
           await this.txPool.newBlock(block);
-          const promises = [this.miner.newBlockHeader(block.header), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
+          const promises = [this.miner.newBlockHeader(block.header, activeSigners), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
           if (options.broadcast) {
             promises.push(this.broadcastNewBlock(block));
           }

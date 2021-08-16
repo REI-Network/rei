@@ -11,6 +11,10 @@ export class ValidatorSets {
   private sets = createBufferFunctionalMap<ValidatorSet>();
   private roots: Buffer[] = [];
 
+  has(stateRoot: Buffer) {
+    return this.sets.has(stateRoot);
+  }
+
   async get(stateRoot: Buffer, sm: StakeManager) {
     let set = this.sets.get(stateRoot);
     if (!set) {

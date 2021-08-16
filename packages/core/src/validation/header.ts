@@ -1,9 +1,9 @@
 import { BN, Address } from 'ethereumjs-util';
 import { hexStringToBN, nowTimestamp } from '@gxchain2/utils';
 import { BlockHeader, CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL, calcCliqueDifficulty } from '@gxchain2/structure';
-import { ValidatorSet } from '../staking';
 
 const allowedFutureBlockTimeSeconds = 15;
+const maxGasLimit = new BN('8000000000000000', 16);
 
 export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) {
   if (this.isGenesis()) {
@@ -49,6 +49,9 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
     //   const msg = 'invalid clique difficulty';
     //   throw this._error(msg);
     // }
+    if (this.gasLimit.gte(maxGasLimit)) {
+      throw this._error('invalid block with gas limit greater than (2^63 - 1)');
+    }
     // additional check for beneficiary
     if (!this.nonce.equals(Buffer.alloc(8)) || !this.coinbase.equals(Address.zero())) {
       throw this._error('invalid header(nonce or coinbase), currently does not support beneficiary');

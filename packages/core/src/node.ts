@@ -295,7 +295,7 @@ export class Node {
 
     this.txSync = new TxFetcher(this);
     let bootnodes = options.p2p.bootnodes || [];
-    bootnodes = bootnodes.concat(common.bootstrapNodes());
+    // bootnodes = bootnodes.concat(common.bootstrapNodes());
     this.networkMngr = new NetworkManager({
       protocols: createProtocolsByNames(this, [NetworkProtocol.GXC2_ETHWIRE]),
       datastore: this.networkdb,
@@ -400,42 +400,33 @@ export class Node {
         // check hardfork
         const parentGteHF1 = parent._common.gteHardfork('testnet-hf1') || parent._common.gteHardfork('mainnet-hf1');
         const gteHF1 = block._common.gteHardfork('testnet-hf1') || block._common.gteHardfork('mainnet-hf1');
-        // console.log('prepare process:', block.header.number.toNumber(), 'parentGteHF1:', parentGteHF1, 'gteHF1:', gteHF1);
+        console.log('prepare process:', block.header.number.toNumber(), 'parentGteHF1:', parentGteHF1, 'gteHF1:', gteHF1);
 
         const miner = block.header.cliqueSigner();
         let parentValidatorSet: ValidatorSet | undefined;
+        let parentSM: StakeManager | undefined;
         let detail: Validator | undefined;
         if (gteHF1) {
-          const parentSM = this.getStakeManager(vm, block);
-          if (!parentGteHF1) {
-            // deploy config contract
-            await this.getConfig(vm, block).deploy();
-            // deploy stake manager contract
-            await parentSM.deploy();
-          }
+          parentSM = this.getStakeManager(vm, block);
 
           if (!parentGteHF1) {
             parentValidatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
-          } else {
-            parentValidatorSet = await parentSM.createValidatorSet();
-          }
-
-          // get validator detail information
-          detail = await parentValidatorSet.getActiveValidatorDetail(miner, parentSM);
-          if (!detail) {
-            // this shouldn't happen
-            throw new Error('invalid validator');
-          }
-
-          // check signer
-          if (!parentGteHF1) {
             consensusValidateHeader.call(block.header, this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number));
           } else {
+            parentValidatorSet = await parentSM.createValidatorSet();
+
+            // get validator detail information
+            detail = await parentValidatorSet.getActiveValidatorDetail(miner, parentSM);
+            if (!detail) {
+              // this shouldn't happen
+              throw new Error('invalid validator');
+            }
+
             consensusValidateHeader.call(block.header, parentValidatorSet.activeSigners());
           }
         }
 
-        const runBlockOptions: RunBlockOpts = {
+        const runBlockOptions: any = {
           ...options,
           block,
           skipBlockValidation: true,
@@ -458,6 +449,14 @@ export class Node {
               // directly reward miner
               await rewardAccount(state, miner, reward);
             }
+          },
+          beforeApply: async () => {
+            if (gteHF1 && !parentGteHF1) {
+              // deploy config contract
+              await this.getConfig(vm, block).deploy();
+              // deploy stake manager contract
+              await parentSM!.deploy();
+            }
           }
         };
 
@@ -476,16 +475,18 @@ export class Node {
         if (gteHF1) {
           // filter changes and save validator set
           validatorSet = parentValidatorSet!.copy(block._common);
-          validatorSet.processChanges(StakeManager.filterValidatorChanges(receipts, block._common));
+          const changes = StakeManager.filterValidatorChanges(receipts, block._common);
+          console.log('changes:', changes);
+          validatorSet.mergeChanges(changes);
           this.validatorSets.set(block.header.stateRoot, validatorSet);
           activeSigners = validatorSet.activeSigners();
         } else {
           activeSigners = this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number);
         }
-        // console.log(
-        //   'node::process, activeSigners:',
-        //   activeSigners.map((a) => a.toString())
-        // );
+        console.log(
+          'node::process, activeSigners:',
+          activeSigners.map((a) => a.toString())
+        );
 
         resolve(block);
 

@@ -55,10 +55,11 @@ export class StakeManager {
       return vc;
     };
 
-    const smaddr = hexStringToBuffer(common.param('vm', 'smaddr'));
+    const smaddr = bufferToAddress(hexStringToBuffer(common.param('vm', 'smaddr')));
     for (const receipt of receipts) {
       for (const log of receipt.logs) {
-        if (log.address.equals(smaddr)) {
+        console.log('log:', log);
+        if (log.address.equals(smaddr.buf)) {
           if (log.topics.length === 3 && log.topics[0].equals(events['Stake'])) {
             // Stake event
             const value = new BN(log.topics[2]);
@@ -133,7 +134,6 @@ export class StakeManager {
       execResult: { returnValue }
     } = await this.evm.executeMessage(this.makeMessage('validators', [setLengthLeft(validator.buf, 32)]));
     if (returnValue.length !== 6 * 32) {
-      // console.log(returnValue.length, 'returnValue:', returnValue.toString('hex'), 'contractCode:', await this.evm._state.getContractCode(Address.fromString(this.common.param('vm', 'smaddr'))));
       throw new Error('invalid return value length');
     }
     let i = 0;

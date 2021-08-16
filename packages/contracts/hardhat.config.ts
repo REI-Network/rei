@@ -43,6 +43,13 @@ export default {
       url: 'http://127.0.0.1:8545',
       loggingEnabled: true
     },
+    'gxc2-localhost': {
+      live: false,
+      saveDeployments: true,
+      url: 'http://127.0.0.1:11451',
+      accounts,
+      chainId: 12357
+    },
     mainnet: {
       url: `https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`,
       accounts,

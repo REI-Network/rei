@@ -76,7 +76,7 @@ const wireHandlers: Handler[] = [
       return [2, headers.map((h) => h.raw())];
     },
     decode(this: WireProtocolHandler, headers: BlockHeaderBuffer[]) {
-      return headers.map((h) => BlockHeader.fromValuesArray(h, { common: this.node.getCommon(0) }));
+      return headers.map((h) => BlockHeader.fromValuesArray(h, { common: this.node.getCommon(0), hardforkByBlockNumber: true }));
     }
   },
   {

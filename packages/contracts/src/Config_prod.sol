@@ -11,17 +11,17 @@ contract Config_prod is IConfig {
     }
 
     function unstakeDelay() external view override returns (uint256) {
-        return 3 weeks;
+        return 1 minutes;
     }
 
     function minStakeAmount() external view override returns (uint256) {
-        // 10 GXC
-        return 10e18;
+        // 1 GXC
+        return 1e18;
     }
 
     function minUnstakeAmount() external view override returns (uint256) {
-        // 5 GXC
-        return 5e18;
+        // 0.5 GXC
+        return 5e17;
     }
 
     function getFactorByReason(uint8 reason) external view override returns (uint8) {

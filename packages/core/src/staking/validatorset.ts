@@ -73,7 +73,7 @@ export class ValidatorSet {
       }
     }
     this.active = [];
-    while (heap.size > 0) {
+    while (heap.length > 0) {
       this.active.push(heap.remove());
     }
     if (this.active.length < max) {
@@ -101,7 +101,7 @@ export class ValidatorSet {
   }
 
   // TODO: if the changed validator is an active validator, the active list maybe not be dirty
-  processChanges(changes: ValidatorChange[]) {
+  mergeChanges(changes: ValidatorChange[]) {
     let dirty = false;
     for (const vc of changes) {
       const stake = vc.stake.reduce((sum, v) => sum.add(v), new BN(0));
@@ -115,6 +115,7 @@ export class ValidatorSet {
             validator: vc.validator,
             votingPower: stake.sub(unstake)
           };
+          this.map.set(vc.validator.buf, v);
         } else {
           v.votingPower.iadd(stake.sub(unstake));
         }

@@ -132,10 +132,10 @@ export class Miner {
     }
 
     const activeSigners = await this._getActiveSigersByBlock(this.node.blockchain.latestBlock);
-    // console.log(
-    //   'miner::init, activeSigners:',
-    //   activeSigners.map((a) => a.toString())
-    // );
+    console.log(
+      'miner::init, activeSigners:',
+      activeSigners.map((a) => a.toString())
+    );
     await this._newBlockHeader(this.node.blockchain.latestBlock.header, activeSigners);
   }
 
@@ -375,25 +375,6 @@ export class Miner {
    */
   private async _putTx(tx: Transaction) {
     this.pendingTxs.push(tx);
-    // const txs = [...this.pendingTxs];
-    // const header = { ...this.pendingHeader };
-    // if (this.isMining) {
-    //   this.pendingHeader = BlockHeader.fromHeaderData(
-    //     {
-    //       ...header,
-    //       transactionsTrie: await calculateTransactionTrie(txs)
-    //     },
-    //     { common: header._common, cliqueSigner: this.node.accMngr.getPrivateKey(this.coinbase) }
-    //   );
-    // } else {
-    //   this.pendingHeader = BlockHeader.fromHeaderData(
-    //     {
-    //       ...header,
-    //       transactionsTrie: await calculateTransactionTrie(txs)
-    //     },
-    //     { common: header._common }
-    //   );
-    // }
   }
 
   /**

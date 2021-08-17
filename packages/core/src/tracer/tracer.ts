@@ -101,7 +101,7 @@ export class Tracer {
    */
   async traceTx(hash: Buffer, config?: TraceConfig) {
     const wtx = await this.node.db.getWrappedTransaction(hash);
-    return await this.traceBlock(await this.node.db.getBlockByHashAndNumber(wtx.extension.blockHash!, wtx.extension.blockNumber!), config, hash);
+    return await this.traceBlock(await this.node.db.getBlockByHashAndNumber(wtx.blockHash!, wtx.blockNumber!), config, hash);
   }
 
   /**

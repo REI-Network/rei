@@ -1,7 +1,10 @@
 import { bnToHex, bufferToHex, BN, Address } from 'ethereumjs-util';
 import { Block } from '@gxchain2-ethereumjs/block';
 import { CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@gxchain2-ethereumjs/block/dist/clique';
-import { txSize, WrappedTransaction, Transaction } from './transaction';
+import { calcTxSize, WrappedTransaction, Transaction } from './transaction';
+
+export * from '@gxchain2-ethereumjs/block';
+export * from '@gxchain2-ethereumjs/block/dist/clique';
 
 /**
  * Calculate clique difficulty and whether the signer is an `inturn` signer
@@ -41,7 +44,7 @@ export class WrappedBlock {
     }
     this._size = this.block.header.raw().length;
     for (const tx of this.block.transactions) {
-      this._size += txSize(tx as Transaction);
+      this._size += calcTxSize(tx as Transaction);
     }
     return this._size;
   }
@@ -82,6 +85,3 @@ export class WrappedBlock {
     };
   }
 }
-
-export * from '@gxchain2-ethereumjs/block';
-export { CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN };

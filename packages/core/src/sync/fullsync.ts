@@ -1,15 +1,13 @@
 import { BN } from 'ethereumjs-util';
 import { Peer } from '@gxchain2/network';
 import { BlockHeader } from '@gxchain2/structure';
-import { logger, hexStringToBN } from '@gxchain2/utils';
+import { logger } from '@gxchain2/utils';
 import { Synchronizer, SynchronizerOptions } from './sync';
 import { Fetcher } from './fetcher';
 import { WireProtocol, WireProtocolHandler, PeerRequestTimeoutError, maxGetBlockHeaders } from '../protocols';
 
 const defaultMaxLimit = 16;
 const minSyncPeers = 3;
-
-const mult = 10;
 
 export interface FullSynchronizerOptions extends SynchronizerOptions {
   limit?: number;
@@ -105,12 +103,13 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
-  private genesis(): [number, Buffer, BN] {
-    return [0, this.node.status.genesisHash, hexStringToBN(this.node.getCommon(0).genesis().difficulty)];
+  private async genesis(): Promise<[BlockHeader, BN]> {
+    const { header } = await this.node.db.getBlock(0);
+    return [header, header.difficulty];
   }
 
   // TODO: binary search.
-  private async findAncient(handler: WireProtocolHandler): Promise<[number, Buffer, BN]> {
+  private async findAncient(handler: WireProtocolHandler): Promise<[BlockHeader, BN]> {
     let latestHeight = this.node.blockchain.latestHeight;
     if (latestHeight === 0) {
       return this.genesis();
@@ -135,7 +134,7 @@ export class FullSynchronizer extends Synchronizer {
           const hash = remoteHeader.hash();
           const localHeader = await this.node.db.getHeader(hash, remoteHeader.number);
           const localTD = await this.node.db.getTotalDifficulty(hash, remoteHeader.number);
-          return [localHeader.number.toNumber(), hash, localTD];
+          return [localHeader, localTD];
         } catch (err) {
           if (err.type === 'NotFoundError') {
             continue;
@@ -158,15 +157,15 @@ export class FullSynchronizer extends Synchronizer {
    * @return Resolves when sync completed
    */
   private async syncWithPeerHandler(handler: WireProtocolHandler, bestHeight: number, bestTD: BN): Promise<boolean> {
-    const [localHeight, localHash, localTD] = await this.findAncient(handler);
-    if (localHeight >= bestHeight) {
+    const [localHeader, localTD] = await this.findAncient(handler);
+    const localNumber = localHeader.number.toNumber();
+    if (localNumber >= bestHeight) {
       return false;
     }
-    logger.info('💡 Get best height from:', handler.peer.peerId, 'best height:', bestHeight, 'local height:', localHeight);
-    this.startSyncHook(localHeight, bestHeight);
-
+    logger.info('💡 Get best height from:', handler.peer.peerId, 'best height:', bestHeight, 'local height:', localNumber);
+    this.startSyncHook(localNumber, bestHeight);
     this.fetcher.reset();
-    await this.fetcher.fetch(localHeight, localHash, localTD, bestHeight, bestTD, handler);
+    await this.fetcher.fetch(localHeader, localTD, bestHeight, bestTD, handler);
     return true;
   }
 }

@@ -2,7 +2,7 @@ import EventEmitter from 'events';
 import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Heap from 'qheap';
 import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Aborter, logger } from '@gxchain2/utils';
-import { Transaction, WrappedTransaction, calculateIntrinsicGas, BlockHeader, Block } from '@gxchain2/structure';
+import { Transaction, WrappedTransaction, calcIntrinsicGasByTx, BlockHeader, Block } from '@gxchain2/structure';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { TxSortedMap } from './txmap';
 import { PendingTxMap } from './pendingmap';
@@ -34,7 +34,7 @@ export function txCost(tx: Transaction) {
  * @returns `true` if valid, `false` if not
  */
 export function checkTxIntrinsicGas(tx: Transaction) {
-  const gas = calculateIntrinsicGas(tx);
+  const gas = calcIntrinsicGasByTx(tx);
   return gas.lte(uint64Max) && gas.lte(tx.gasLimit);
 }
 

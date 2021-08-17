@@ -74,7 +74,7 @@ export class Journal {
             if (i === -1) {
               break;
             }
-            const tx = TransactionFactory.fromSerializedData(bufferInput.slice(0, i), { common: this.node.getCommon(0) });
+            const tx = TransactionFactory.fromSerializedData(bufferInput.slice(0, i), { common: this.node.getLatestCommon() });
             if (tx instanceof Transaction) {
               batch.push(tx);
               if (batch.length > 1024) {

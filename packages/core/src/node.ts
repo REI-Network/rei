@@ -2,18 +2,20 @@ import path from 'path';
 import fs from 'fs';
 import type { LevelUp } from 'levelup';
 import LevelStore from 'datastore-level';
-import { bufferToHex, BN, BNLike, toBuffer } from 'ethereumjs-util';
-import { SecureTrie as Trie, BaseTrie } from 'merkle-patricia-tree';
+import { bufferToHex, BN, BNLike, Address } from 'ethereumjs-util';
+import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
 import { Database, createEncodingLevelDB, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchain2/database';
 import { NetworkManager, Peer } from '@gxchain2/network';
 import { Common, getGenesisState, getChain } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
 import VM from '@gxchain2-ethereumjs/vm';
-import { PostByzantiumTxReceipt, TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
-import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
-import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
-import { Transaction, Block, Receipt, Log, BlockHeader, TypedTransaction } from '@gxchain2/structure';
+import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
+import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
+import { PostByzantiumTxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
+import { RunBlockOpts, rewardAccount } from '@gxchain2-ethereumjs/vm/dist/runBlock';
+import { DefaultStateManager as StateManager, StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import { Transaction, Block, Receipt, Log } from '@gxchain2/structure';
 import { Channel, Aborter, logger } from '@gxchain2/utils';
 import { AccountManager } from '@gxchain2/wallet';
 import { TxPool } from './txpool';
@@ -24,6 +26,10 @@ import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
 import { BlockchainMonitor } from './blockchainmonitor';
 import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
+import { ValidatorSet, ValidatorSets } from './staking';
+import { StakeManager, Config, Validator } from './contracts';
+import { consensusValidateHeader } from './validation';
+import { isEnableReceiptRootFix, isEnableStaking, preHF1GenReceiptTrie } from './hardforks';
 
 const timeoutBanTime = 60 * 5 * 1000;
 const invalidBanTime = 60 * 10 * 1000;
@@ -40,18 +46,6 @@ export function postByzantiumTxReceiptsToReceipts(receipts: PostByzantiumTxRecei
         r.status
       )
   );
-}
-
-async function cliqueGetBlockRewardAddress(header: BlockHeader) {
-  return header.cliqueSigner();
-}
-
-async function fixedGenReceiptTrie(transactions: TypedTransaction[], receipts: TxReceipt[]) {
-  const trie = new BaseTrie();
-  for (let i = 0; i < receipts.length; i++) {
-    await trie.put(toBuffer(i), encodeReceipt(transactions[i], receipts[i]));
-  }
-  return trie.root;
 }
 
 export type NodeStatus = {
@@ -159,6 +153,9 @@ export class Node {
   public bcMonitor!: BlockchainMonitor;
   public accMngr!: AccountManager;
 
+  // TODO: remove this after tendermint
+  public validatorSets: ValidatorSets;
+
   private readonly initPromise: Promise<void>;
   private readonly taskLoopPromise: Promise<void>;
   private readonly processLoopPromise: Promise<void>;
@@ -176,6 +173,7 @@ export class Node {
     this.initPromise = this.init(options);
     this.taskLoopPromise = this.taskLoop();
     this.processLoopPromise = this.processLoop();
+    this.validatorSets = new ValidatorSets();
   }
 
   /**
@@ -278,7 +276,8 @@ export class Node {
     this.blockchain = new Blockchain({
       dbManager: this.db,
       common,
-      genesisBlock
+      genesisBlock,
+      validateBlocks: false
     });
     await this.blockchain.init();
 
@@ -290,7 +289,7 @@ export class Node {
 
     this.txSync = new TxFetcher(this);
     let bootnodes = options.p2p.bootnodes || [];
-    bootnodes = bootnodes.concat(common.bootstrapNodes());
+    // bootnodes = bootnodes.concat(common.bootstrapNodes());
     this.networkMngr = new NetworkManager({
       protocols: createProtocolsByNames(this, [NetworkProtocol.GXC2_ETHWIRE]),
       datastore: this.networkdb,
@@ -319,7 +318,7 @@ export class Node {
   };
 
   private onSyncOver = () => {
-    this.miner.startMint(this.blockchain.latestBlock.header);
+    this.miner.startMint(this.blockchain.latestBlock);
   };
 
   /**
@@ -331,14 +330,18 @@ export class Node {
     return Common.createCommonByBlockNumber(num, typeof this.chain === 'string' ? this.chain : this.chain.chain);
   }
 
+  getLatestCommon() {
+    return this.blockchain.latestBlock._common;
+  }
+
   /**
    * Get state manager object by state root
    * @param root - State root
-   * @param num - Block number, used to set common
+   * @param num - Block number or Common
    * @returns State manager object
    */
-  async getStateManager(root: Buffer, num: BNLike) {
-    const stateManager = new StateManager({ common: this.getCommon(num), trie: new Trie(this.chaindb) });
+  async getStateManager(root: Buffer, num: BNLike | Common) {
+    const stateManager = new StateManager({ common: num instanceof Common ? num : this.getCommon(num), trie: new Trie(this.chaindb) });
     await stateManager.setStateRoot(root);
     return stateManager;
   }
@@ -346,16 +349,26 @@ export class Node {
   /**
    * Get a VM object by state root
    * @param root - The state root
-   * @param num - Block number, used to set common
+   * @param num - Block number or Common
    * @returns VM object
    */
-  async getVM(root: Buffer, num: BNLike) {
+  async getVM(root: Buffer, num: BNLike | Common) {
     const stateManager = await this.getStateManager(root, num);
     return new VM({
       common: stateManager._common,
       stateManager,
       blockchain: this.blockchain
     });
+  }
+
+  getStakeManager(vm: VM, block: Block) {
+    const evm = new EVM(vm, new TxContext(new BN(0), Address.zero()), block);
+    return new StakeManager(evm, block._common);
+  }
+
+  getConfig(vm: VM, block: Block) {
+    const evm = new EVM(vm, new TxContext(new BN(0), Address.zero()), block);
+    return new Config(evm, block._common);
   }
 
   /**
@@ -373,32 +386,111 @@ export class Node {
     await this.initPromise;
     for await (let { block, options, resolve, reject } of this.processQueue.generator()) {
       try {
+        // ensure that every transaction is in the right common
         for (const tx of block.transactions) {
           tx.common.getHardforkByBlockNumber(block.header.number);
         }
-        const lastHeader = await this.db.getHeader(block.header.parentHash, block.header.number.subn(1));
-        const runBlockOptions = {
+
+        // get parent block
+        const parent = await this.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
+        // create a vm instance
+        const vm = await this.getVM(parent.header.stateRoot, block._common);
+        // check hardfork
+        const parentEnableStaking = isEnableStaking(parent._common);
+        const enableStaking = isEnableStaking(block._common);
+
+        const miner = block.header.cliqueSigner();
+        let parentValidatorSet: ValidatorSet | undefined;
+        let parentSM: StakeManager | undefined;
+        let detail: Validator | undefined;
+        if (enableStaking) {
+          parentSM = this.getStakeManager(vm, block);
+
+          if (!parentEnableStaking) {
+            parentValidatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
+            consensusValidateHeader.call(block.header, this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number));
+          } else {
+            parentValidatorSet = await ValidatorSet.createFromStakeManager(parentSM);
+
+            // get validator detail information
+            detail = await parentValidatorSet.getActiveValidatorDetail(miner, parentSM);
+            if (!detail) {
+              // this shouldn't happen
+              throw new Error('invalid validator');
+            }
+
+            consensusValidateHeader.call(block.header, parentValidatorSet.activeSigners());
+          }
+        }
+
+        const runBlockOptions: RunBlockOpts = {
           ...options,
           block,
-          root: lastHeader.stateRoot,
+          skipBlockValidation: true,
+          root: parent.header.stateRoot,
           cliqueSigner: options.generate ? this.accMngr.getPrivateKey(block.header.cliqueSigner().buf) : undefined,
-          getBlockRewardAddress: cliqueGetBlockRewardAddress,
-          // If the current hardfork is less than `hardfork1`, then use the old logic `fixedGenReceiptTrie`
-          genReceiptTrie: block._common.gteHardfork('testnet-hf1') || block._common.gteHardfork('mainnet-hf1') ? undefined : fixedGenReceiptTrie
+          // if the current hardfork is less than `hardfork1`, then use the old logic `fixedGenReceiptTrie`
+          genReceiptTrie: isEnableReceiptRootFix(block._common) ? undefined : preHF1GenReceiptTrie,
+          rewardAddress: async (state: IStateManager, reward: BN) => {
+            if (parentEnableStaking) {
+              // if `hf1` is active, assign reward to contract adddress
+              const commissionReward = reward.mul(detail!.commissionRate).divn(100);
+              if (commissionReward.gtn(0)) {
+                await rewardAccount(state, detail!.commissionShare, commissionReward);
+              }
+              const validatorReward = reward.sub(commissionReward);
+              if (validatorReward.gtn(0)) {
+                await rewardAccount(state, detail!.validatorKeeper, validatorReward);
+              }
+            } else {
+              // directly reward miner
+              await rewardAccount(state, miner, reward);
+            }
+          },
+          afterApply: async () => {
+            if (enableStaking && !parentEnableStaking) {
+              // deploy config contract
+              await this.getConfig(vm, block).deploy();
+              // deploy stake manager contract
+              await parentSM!.deploy();
+            }
+          }
         };
-        const { receipts, block: newBlock } = await (await this.getVM(lastHeader.stateRoot, lastHeader.number)).runBlock(runBlockOptions);
-        block = newBlock || block;
+
+        const { receipts: postByzantiumTxReceipts, block: newBlock } = await vm.runBlock(runBlockOptions);
+        block = newBlock ?? block;
         logger.info('✨ Process block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
         const before = this.blockchain.latestBlock.hash();
         await this.blockchain.putBlock(block);
-        await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(postByzantiumTxReceiptsToReceipts(receipts as PostByzantiumTxReceipt[]), block.hash(), block.header.number)));
+        // persist receipts
+        const receipts = postByzantiumTxReceiptsToReceipts(postByzantiumTxReceipts as PostByzantiumTxReceipt[]);
+        await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, block.hash(), block.header.number)));
         const after = this.blockchain.latestBlock.hash();
+
+        let validatorSet: ValidatorSet | undefined;
+        let activeSigners: Address[];
+        if (enableStaking) {
+          // filter changes and save validator set
+          validatorSet = parentValidatorSet!.copy(block._common);
+          const changes = StakeManager.filterValidatorChanges(receipts, block._common);
+          logger.debug('Node::processLoop, changes:', changes);
+          validatorSet.mergeChanges(changes);
+          this.validatorSets.set(block.header.stateRoot, validatorSet);
+          activeSigners = validatorSet.activeSigners();
+        } else {
+          activeSigners = this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number);
+        }
+        logger.debug(
+          'Node::processLoop, activeSigners:',
+          activeSigners.map((a) => a.toString())
+        );
+
         resolve(block);
 
         // If canonical chain changes, notify to sub modules
         if (!before.equals(after)) {
           await this.txPool.newBlock(block);
-          const promises = [this.miner.newBlockHeader(block.header), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
+          const promises = [this.miner.newBlockHeader(block.header, activeSigners), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
           if (options.broadcast) {
             promises.push(this.broadcastNewBlock(block));
           }

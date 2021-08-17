@@ -76,7 +76,7 @@ const wireHandlers: Handler[] = [
       return [2, headers.map((h) => h.raw())];
     },
     decode(this: WireProtocolHandler, headers: BlockHeaderBuffer[]) {
-      return headers.map((h) => BlockHeader.fromValuesArray(h, { common: this.node.getCommon(0) }));
+      return headers.map((h) => BlockHeader.fromValuesArray(h, { common: this.node.getCommon(0), hardforkByBlockNumber: true }));
     }
   },
   {
@@ -190,7 +190,7 @@ const wireHandlers: Handler[] = [
       return [8, txs.map((tx) => tx.raw() as Buffer[])];
     },
     decode(this: WireProtocolHandler, raws: TransactionsBuffer) {
-      return raws.map((raw) => mustParseTransction(raw, { common: this.node.getCommon(0) }));
+      return raws.map((raw) => mustParseTransction(raw, { common: this.node.getLatestCommon() }));
     }
   }
 ];

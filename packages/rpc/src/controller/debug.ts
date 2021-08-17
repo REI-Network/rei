@@ -1,5 +1,5 @@
 import { hexStringToBuffer } from '@gxchain2/utils';
-import { Tracer, TraceConfig } from '@gxchain2/core/dist/tracer';
+import { Tracer, TraceConfig } from '@gxchain2/core';
 import { Controller, CallData } from './base';
 
 export class DebugController extends Controller {

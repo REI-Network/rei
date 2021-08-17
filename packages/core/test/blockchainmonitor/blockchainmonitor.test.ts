@@ -70,7 +70,6 @@ describe('BlockchainMonitor', async () => {
         newBlockHashSet.add(newBlock.hash().toString('hex'));
       }
       if (newBlockHashSet.size !== eventSet.size) {
-        console.log(newBlockHashSet, eventSet);
         throw new Error("missing 'newHeads' event");
       }
       expect(newBlockHashSet.size, 'set size should be equal').be.equal(eventSet.size);

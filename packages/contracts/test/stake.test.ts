@@ -26,6 +26,7 @@ describe('StakeManger', () => {
   let unstakeDelay: number;
   let minStakeAmount: BN;
   let minUnstakeAmount: BN;
+  let minIndexVotingPower: BN;
 
   async function createCommissionShareContract(validator: string) {
     const v = await stakeManager.methods.validators(validator).call();
@@ -78,6 +79,7 @@ describe('StakeManger', () => {
     unstakeDelay = toBN(await config.methods.unstakeDelay().call()).toNumber();
     minStakeAmount = toBN(await config.methods.minStakeAmount().call());
     minUnstakeAmount = toBN(await config.methods.minUnstakeAmount().call());
+    minIndexVotingPower = toBN(await config.methods.minIndexVotingPower().call());
   });
 
   it('should initialize succeed', async () => {
@@ -96,9 +98,13 @@ describe('StakeManger', () => {
   });
 
   it('should stake succeed', async () => {
+    // stake minStakeAmount
     await stakeManager.methods.stake(validator1, deployer).send({ value: minStakeAmount.toString() });
     const shares = await (await createCommissionShareContract(validator1)).methods.balanceOf(deployer).call();
     expect(shares, 'shares should be equal to amount at the time of the first staking').to.equal(minStakeAmount.toString());
+
+    // stake minIndexVotingPower - minStakeAmount
+    await stakeManager.methods.stake(validator1, deployer).send({ value: minIndexVotingPower.sub(minStakeAmount).toString() });
     const validatorAddress = await stakeManager.methods.indexedValidatorsById(2).call();
     expect(validatorAddress, 'address should be equal').be.equal(validator1);
     const validatorAddress2 = await stakeManager.methods.indexedValidatorsByIndex(0).call();
@@ -107,11 +113,11 @@ describe('StakeManger', () => {
 
   it('should get voting power', async () => {
     const votingPower1 = await stakeManager.methods.getVotingPowerByIndex(0).call();
-    expect(votingPower1, 'votingPower1 should be euqal').be.equal(minStakeAmount.toString());
+    expect(votingPower1, 'votingPower1 should be euqal').be.equal(minIndexVotingPower.toString());
     const votingPower2 = await stakeManager.methods.getVotingPowerById(2).call();
-    expect(votingPower2, 'votingPower2 should be euqal').be.equal(minStakeAmount.toString());
+    expect(votingPower2, 'votingPower2 should be euqal').be.equal(minIndexVotingPower.toString());
     const votingPower3 = await stakeManager.methods.getVotingPowerByAddress(validator1).call();
-    expect(votingPower3, 'votingPower3 should be euqal').be.equal(minStakeAmount.toString());
+    expect(votingPower3, 'votingPower3 should be euqal').be.equal(minIndexVotingPower.toString());
   });
 
   it('should match validator info', async () => {
@@ -129,22 +135,26 @@ describe('StakeManger', () => {
   });
 
   it('should get first and last id', async () => {
-    //at stake step, minStake amount token has been staked
-    const stakeAmount = toBN(200);
-    const unstakeAmount1 = toBN(100);
-    const unstakeAmount2 = toBN(100).add(minStakeAmount);
+    // currently, user amount should be minIndexVotingPower
+    const stakeAmount = minStakeAmount;
+    const unstakeAmount1 = minStakeAmount;
+    const unstakeAmount2 = minIndexVotingPower;
     const unstakeAmountArray = [unstakeAmount1, unstakeAmount2];
+
     const firstId = await stakeManager.methods.firstUnstakeId().call();
     const lastId = await stakeManager.methods.lastUnstakeId().call();
     expect(firstId, 'first id should be equal').equal('0');
     expect(lastId, 'last id should be equal').equal('0');
+
     await stakeManager.methods.stake(validator1, deployer).send({ value: stakeAmount });
     await stakeManager.methods.startUnstake(validator1, deployer, unstakeAmount1.toString()).send();
     await stakeManager.methods.startUnstake(validator1, deployer, unstakeAmount2.toString()).send();
+
     const firstId1 = await stakeManager.methods.firstUnstakeId().call();
     const lastId1 = await stakeManager.methods.lastUnstakeId().call();
     expect(firstId1, 'first id should be equal').equal('0');
     expect(lastId1, 'last id should be equal').equal('2');
+
     await Promise.all(
       unstakeAmountArray.map(async (element, i) => {
         const unstakeInfo = await stakeManager.methods.unstakeQueue(i).call();
@@ -153,8 +163,10 @@ describe('StakeManger', () => {
         expect(unstakeInfo.unstakeShares, 'unStakeAmount address should be equal').be.equal(element.toString());
       })
     );
+
     await upTimestamp(unstakeDelay);
     await stakeManager.methods.doUnstake().send();
+
     const firstId2 = await stakeManager.methods.firstUnstakeId().call();
     const lastId2 = await stakeManager.methods.lastUnstakeId().call();
     expect(firstId2, 'first id should be equal').equal('2');
@@ -218,34 +230,53 @@ describe('StakeManger', () => {
   });
 
   it('should remove and add indexed validator correctly', async () => {
-    const ifValidatorExisted1 = await stakeManager.methods.indexedValidatorsExists(3).call();
-    expect(ifValidatorExisted1, 'should not exist').be.equal(false);
+    const isExist = (): Promise<boolean> => {
+      return stakeManager.methods.indexedValidatorsExists(3).call();
+    };
 
-    const stakeAmount = toBN('100');
+    // id 3 shouldn't exist
+    expect(await isExist(), 'validator2 should not exist').be.false;
+
+    // stake minIndexVotingPower * 2
+    const stakeAmount = minIndexVotingPower.muln(2);
     await stakeManager.methods.stake(validator2, deployer).send({ value: stakeAmount.toString() });
     const validatorInfo = await stakeManager.methods.validators(validator2).call();
-    const validatorAddress = await stakeManager.methods.indexedValidatorsById(validatorInfo.id).call();
-    const ifValidatorExisted2 = await stakeManager.methods.indexedValidatorsExists(validatorInfo.id).call();
-    expect(ifValidatorExisted2, 'validator2 should exist').be.equal(true);
-    expect(validatorAddress, 'address should be equal').be.equal(validator2);
+    expect(validatorInfo.id, 'validator2 id should be 3').be.equal('3');
+    expect(await isExist(), 'validator2 should exist').be.true;
 
+    // approve
     const commissionShare = await createCommissionShareContract(validator2);
     await commissionShare.methods.approve(stakeManager.options.address, MAX_INTEGER.toString()).send();
-    await stakeManager.methods.startUnstake(validator2, deployer, stakeAmount.toString()).send();
-    await upTimestamp(unstakeDelay);
-    await stakeManager.methods.doUnstake().send();
-    const ifValidatorExisted3 = await stakeManager.methods.indexedValidatorsExists(validatorInfo.id).call();
-    expect(ifValidatorExisted3, 'validator2 should be removed').be.equal(false);
 
-    await stakeManager.methods.reward(validator2).send({ value: toBN(1000) });
+    // unstake minIndexVotingPower
+    await stakeManager.methods.startUnstake(validator2, deployer, minIndexVotingPower).send();
+    // current amount: minIndexVotingPower
+    expect(await isExist(), 'validator2 should still exist').be.true;
+
+    // unstake minUnstakeAmount
+    await stakeManager.methods.startUnstake(validator2, deployer, minUnstakeAmount).send();
+    // current amount: minIndexVotingPower - minUnstakeAmount
+    expect(await isExist(), "validator2 shouldn't exist").be.false;
+
+    // stake minStakeAmount
+    await stakeManager.methods.stake(validator2, deployer).send({ value: minStakeAmount.toString() });
+    // current amount: minIndexVotingPower - minUnstakeAmount + minStakeAmount
+    expect(await isExist(), 'validator2 should exist').be.true;
+
+    // unstake minIndexVotingPower - minUnstakeAmount + minStakeAmount
+    await stakeManager.methods.startUnstake(validator2, deployer, minIndexVotingPower.sub(minUnstakeAmount).add(minStakeAmount).toString()).send();
+    // current amount: 0
+    expect(await isExist(), "validator2 shouldn't exist").be.false;
+
+    // reward
+    await stakeManager.methods.reward(validator2).send({ value: minIndexVotingPower });
     await stakeManager.methods.addIndexedValidator(validator2).send();
-    const ifValidatorExisted4 = await stakeManager.methods.indexedValidatorsExists(validatorInfo.id).call();
-    expect(ifValidatorExisted4, 'validator2 should be added').be.equal(true);
+    expect(await isExist(), 'validator2 should be added').be.true;
 
+    // slash
     await stakeManager.methods.slash(validator2, 1).send();
     await stakeManager.methods.removeIndexedValidator(validator2).send();
-    const ifValidatorExisted5 = await stakeManager.methods.indexedValidatorsExists(validatorInfo.id).call();
-    expect(ifValidatorExisted5, 'validator2 should be removed').be.equal(false);
+    expect(await isExist(), 'validator2 should be removed').be.false;
   });
 
   it('should unstake and claim correctky', async () => {

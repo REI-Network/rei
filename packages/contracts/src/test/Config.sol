@@ -30,7 +30,7 @@ contract Config is IConfig {
     }
 
     function minIndexVotingPower() external view override returns (uint256) {
-        return 10;
+        return 100;
     }
 
     function getFactorByReason(uint8 reason) external view override returns (uint8) {

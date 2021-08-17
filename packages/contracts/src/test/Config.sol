@@ -44,6 +44,6 @@ contract Config is IConfig {
     }
 
     function setCommissionRateInterval() external view override returns (uint256) {
-        return 5;
+        return 5 seconds;
     }
 }

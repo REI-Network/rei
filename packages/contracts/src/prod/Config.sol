@@ -38,6 +38,6 @@ contract Config_prod is IConfig {
     }
 
     function setCommissionRateInterval() external view override returns (uint256) {
-        return 5;
+        return 1 minutes;
     }
 }

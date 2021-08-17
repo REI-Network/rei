@@ -1,4 +1,4 @@
-import { Address, BN, bufferToHex } from 'ethereumjs-util';
+import { Address, BN, bufferToHex, KECCAK256_RLP_ARRAY } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
 import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN, Transaction } from '@gxchain2/structure';
 import VM from '@gxchain2-ethereumjs/vm';
@@ -9,7 +9,6 @@ import { PendingTxMap } from '../txpool';
 import { Node } from '../node';
 import { isEnableStaking } from '../hardforks';
 
-const emptyUncleHash = '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347';
 const noTurnSignerDelay = 500;
 const maxHistoryLength = 10;
 
@@ -133,8 +132,8 @@ export class Miner {
     }
 
     const activeSigners = await this._getActiveSigersByBlock(this.node.blockchain.latestBlock);
-    console.log(
-      'miner::init, activeSigners:',
+    logger.debug(
+      'Miner::init, activeSigners:',
       activeSigners.map((a) => a.toString())
     );
     await this._newBlockHeader(this.node.blockchain.latestBlock.header, activeSigners);
@@ -171,7 +170,7 @@ export class Miner {
           number,
           parentHash,
           timestamp,
-          uncleHash: emptyUncleHash
+          uncleHash: KECCAK256_RLP_ARRAY
         },
         { common: this.node.getCommon(number), cliqueSigner: this.node.accMngr.getPrivateKey(this.coinbase) }
       );
@@ -188,7 +187,7 @@ export class Miner {
           number,
           parentHash,
           timestamp,
-          uncleHash: emptyUncleHash
+          uncleHash: KECCAK256_RLP_ARRAY
         },
         { common: this.node.getCommon(number) }
       );

@@ -99,18 +99,4 @@ contract CommissionShare is ERC20, ICommissionShare {
             to.transfer(amount);
         }
     }
-
-    ///////////////////// only for test /////////////////////
-
-    // reward validator
-    function reward() external payable onlyStakeManager {}
-
-    // slash validator
-    function slash(uint8 reason) external onlyStakeManager returns (uint256 amount) {
-        uint8 factor = config.getFactorByReason(reason);
-        amount = address(this).balance.mul(factor).div(100);
-        if (amount > 0) {
-            msg.sender.transfer(amount);
-        }
-    }
 }

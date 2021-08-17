@@ -6,7 +6,7 @@ import "../interfaces/IConfig.sol";
 
 // This is just a contract used during testing.
 // The officially released contract is in `Config_prod.sol`.
-contract Config is IConfig {
+contract Config_test is IConfig {
     address private s;
 
     function setStakeManager(address _s) external {

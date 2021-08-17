@@ -4,9 +4,10 @@
     "main": "hardhat.config.ts",
     "license": "GPL-3.0-or-later",
     "scripts": {
-        "build": "npx hardhat compile",
-        "node": "npx hardhat node",
-        "test": "npx hardhat test",
+        "before":"ts-node ./scripts/before.ts",
+        "build": "npm run before && npx hardhat compile",
+        "node": "npm run before && npx hardhat node",
+        "test": "npm run before && npx hardhat test",
         "docgen": "solidity-docgen -i ./src -t ./templates -H ./helper.js",
         "clean": "rm -rf ./artifacts ./cache ./deployments ./docs"
     },
@@ -16,6 +17,7 @@
     "devDependencies": {
         "@nomiclabs/hardhat-etherscan": "^2.1.4",
         "@nomiclabs/hardhat-truffle5": "^2.0.0",
+        "@nomiclabs/hardhat-web3": "^2.0.0",
         "hardhat": "^2.5.0",
         "hardhat-deploy": "^0.8.11",
         "solidity-docgen": "^0.5.13"

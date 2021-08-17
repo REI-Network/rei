@@ -6,11 +6,11 @@ import { BN, MAX_INTEGER } from 'ethereumjs-util';
 declare var artifacts: Artifacts;
 declare var web3: Web3;
 
-const Config = artifacts.require('Config');
-const CommissionShare = artifacts.require('CommissionShare');
-const UnstakeKeeper = artifacts.require('UnstakeKeeper');
-const StakeManager = artifacts.require('StakeManager');
-const ValidatorKeeper = artifacts.require('ValidatorKeeper');
+const Config = artifacts.require('Config_test');
+const CommissionShare = artifacts.require('CommissionShare_test');
+const UnstakeKeeper = artifacts.require('UnstakeKeeper_test');
+const StakeManager = artifacts.require('StakeManager_test');
+const ValidatorKeeper = artifacts.require('ValidatorKeeper_test');
 
 describe('StakeManger', () => {
   let config: any;

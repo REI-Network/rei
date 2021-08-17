@@ -1,7 +1,7 @@
 export default async function ({ deployments, getNamedAccounts }) {
   const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
-  const config = await deploy('Config', {
+  const config = await deploy('Config_test', {
     from: deployer,
     log: true,
     deterministicDeployment: false,

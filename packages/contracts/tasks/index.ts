@@ -35,7 +35,7 @@ task('transfer', 'Transfer value to target address')
 task('init', 'Initialize config').setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
   const { deployer } = await getNamedAccounts();
   const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts });
-  const config = await createWeb3Contract({ name: 'Config', deployments, web3, artifacts, from: deployer });
+  const config = await createWeb3Contract({ name: 'Config_test', deployments, web3, artifacts, from: deployer });
   await config.methods.setStakeManager(stakeManager.options.address).send();
   console.log('Initialize config finished');
 });
@@ -43,7 +43,7 @@ task('init', 'Initialize config').setAction(async (taskArgs, { deployments, web3
 task('getsmaddr', 'Get stake manager address')
   .addOptionalParam('address', 'config contract address')
   .setAction(async (taskArgs, { deployments, web3, artifacts }) => {
-    const config = await createWeb3Contract({ name: 'Config', deployments, web3, artifacts, address: taskArgs.address });
+    const config = await createWeb3Contract({ name: 'Config_test', deployments, web3, artifacts, address: taskArgs.address });
     console.log('Stake manager address:', await config.methods.stakeManager().call());
   });
 

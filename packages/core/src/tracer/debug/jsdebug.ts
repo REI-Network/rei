@@ -7,6 +7,7 @@ import { Address, BN, bufferToHex, setLengthLeft, generateAddress, generateAddre
 import { InterpreterStep } from '@gxchain2-ethereumjs/vm/dist/evm/interpreter';
 import { VmError } from '@gxchain2-ethereumjs/vm/dist/exceptions';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
+import { calcIntrinsicGas } from '@gxchain2/structure';
 import { IDebugImpl, TraceConfig } from '../tracer';
 import { Node } from '../../node';
 
@@ -282,7 +283,7 @@ export class JSDebug implements IDebugImpl {
     this.debugContext['input'] = input;
     this.debugContext['gas'] = gas.toNumber();
     this.debugContext['gasPrice'] = gasPrice.toNumber();
-    // this.debugContext['intrinsicGas'] = intrinsicGas.toNumber();
+    this.debugContext['intrinsicGas'] = calcIntrinsicGas(create, input).toNumber();
     this.debugContext['value'] = bi(value.toString());
     this.debugContext['block'] = number.toNumber();
     this.vmContextObj.globalDB = makeDB(stateManager);

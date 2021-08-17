@@ -2,8 +2,8 @@ import path from 'path';
 import fs from 'fs';
 import type { LevelUp } from 'levelup';
 import LevelStore from 'datastore-level';
-import { bufferToHex, BN, BNLike, toBuffer, Address } from 'ethereumjs-util';
-import { SecureTrie as Trie, BaseTrie } from 'merkle-patricia-tree';
+import { bufferToHex, BN, BNLike, Address } from 'ethereumjs-util';
+import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
 import { Database, createEncodingLevelDB, createLevelDB, DBSaveReceipts, DBSaveTxLookup } from '@gxchain2/database';
 import { NetworkManager, Peer } from '@gxchain2/network';
@@ -12,10 +12,10 @@ import { Blockchain } from '@gxchain2/blockchain';
 import VM from '@gxchain2-ethereumjs/vm';
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
-import { PostByzantiumTxReceipt, TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
-import { encodeReceipt, RunBlockOpts, rewardAccount } from '@gxchain2-ethereumjs/vm/dist/runBlock';
+import { PostByzantiumTxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
+import { RunBlockOpts, rewardAccount } from '@gxchain2-ethereumjs/vm/dist/runBlock';
 import { DefaultStateManager as StateManager, StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
-import { Transaction, Block, Receipt, Log, TypedTransaction } from '@gxchain2/structure';
+import { Transaction, Block, Receipt, Log } from '@gxchain2/structure';
 import { Channel, Aborter, logger } from '@gxchain2/utils';
 import { AccountManager } from '@gxchain2/wallet';
 import { TxPool } from './txpool';
@@ -29,6 +29,7 @@ import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protoco
 import { ValidatorSet, ValidatorSets } from './staking';
 import { StakeManager, Config, Validator } from './contracts';
 import { consensusValidateHeader } from './validation';
+import { isEnableReceiptRootFix, isEnableStaking, preHF1GenReceiptTrie } from './hardforks';
 
 const timeoutBanTime = 60 * 5 * 1000;
 const invalidBanTime = 60 * 10 * 1000;
@@ -45,14 +46,6 @@ export function postByzantiumTxReceiptsToReceipts(receipts: PostByzantiumTxRecei
         r.status
       )
   );
-}
-
-async function fixedGenReceiptTrie(transactions: TypedTransaction[], receipts: TxReceipt[]) {
-  const trie = new BaseTrie();
-  for (let i = 0; i < receipts.length; i++) {
-    await trie.put(toBuffer(i), encodeReceipt(transactions[i], receipts[i]));
-  }
-  return trie.root;
 }
 
 export type NodeStatus = {
@@ -403,18 +396,17 @@ export class Node {
         // create a vm instance
         const vm = await this.getVM(parent.header.stateRoot, block._common);
         // check hardfork
-        const parentGteHF1 = parent._common.gteHardfork('testnet-hf1') || parent._common.gteHardfork('mainnet-hf1');
-        const gteHF1 = block._common.gteHardfork('testnet-hf1') || block._common.gteHardfork('mainnet-hf1');
-        console.log('prepare process:', block.header.number.toNumber(), 'parentGteHF1:', parentGteHF1, 'gteHF1:', gteHF1);
+        const parentEnableStaking = isEnableStaking(parent._common);
+        const enableStaking = isEnableStaking(block._common);
 
         const miner = block.header.cliqueSigner();
         let parentValidatorSet: ValidatorSet | undefined;
         let parentSM: StakeManager | undefined;
         let detail: Validator | undefined;
-        if (gteHF1) {
+        if (enableStaking) {
           parentSM = this.getStakeManager(vm, block);
 
-          if (!parentGteHF1) {
+          if (!parentEnableStaking) {
             parentValidatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
             consensusValidateHeader.call(block.header, this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number));
           } else {
@@ -438,9 +430,9 @@ export class Node {
           root: parent.header.stateRoot,
           cliqueSigner: options.generate ? this.accMngr.getPrivateKey(block.header.cliqueSigner().buf) : undefined,
           // if the current hardfork is less than `hardfork1`, then use the old logic `fixedGenReceiptTrie`
-          genReceiptTrie: gteHF1 ? undefined : fixedGenReceiptTrie,
+          genReceiptTrie: isEnableReceiptRootFix(block._common) ? undefined : preHF1GenReceiptTrie,
           rewardAddress: async (state: IStateManager, reward: BN) => {
-            if (parentGteHF1) {
+            if (parentEnableStaking) {
               // if `hf1` is active, assign reward to contract adddress
               const commissionReward = reward.mul(detail!.commissionRate).divn(100);
               if (commissionReward.gtn(0)) {
@@ -456,7 +448,7 @@ export class Node {
             }
           },
           afterApply: async () => {
-            if (gteHF1 && !parentGteHF1) {
+            if (enableStaking && !parentEnableStaking) {
               // deploy config contract
               await this.getConfig(vm, block).deploy();
               // deploy stake manager contract
@@ -477,19 +469,19 @@ export class Node {
 
         let validatorSet: ValidatorSet | undefined;
         let activeSigners: Address[];
-        if (gteHF1) {
+        if (enableStaking) {
           // filter changes and save validator set
           validatorSet = parentValidatorSet!.copy(block._common);
           const changes = StakeManager.filterValidatorChanges(receipts, block._common);
-          console.log('changes:', changes);
+          logger.debug('Node::processLoop, changes:', changes);
           validatorSet.mergeChanges(changes);
           this.validatorSets.set(block.header.stateRoot, validatorSet);
           activeSigners = validatorSet.activeSigners();
         } else {
           activeSigners = this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number);
         }
-        console.log(
-          'node::process, activeSigners:',
+        logger.debug(
+          'Node::processLoop, activeSigners:',
           activeSigners.map((a) => a.toString())
         );
 

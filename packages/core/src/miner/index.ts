@@ -7,6 +7,7 @@ import { RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
 import { logger, getRandomIntInclusive, hexStringToBN, nowTimestamp } from '@gxchain2/utils';
 import { PendingTxMap } from '../txpool';
 import { Node } from '../node';
+import { isEnableStaking } from '../hardforks';
 
 const emptyUncleHash = '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347';
 const noTurnSignerDelay = 500;
@@ -110,7 +111,7 @@ export class Miner {
     const header = block.header;
     const common = header._common;
     let activeSigners: Address[];
-    if (common.gteHardfork('testnet-hf1') || common.gteHardfork('mainnet-hf1')) {
+    if (isEnableStaking(common)) {
       const vm = await this.node.getVM(header.stateRoot, common);
       const sm = this.node.getStakeManager(vm, block);
       const set = await this.node.validatorSets.get(header.stateRoot, sm);

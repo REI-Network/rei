@@ -6,7 +6,7 @@
     "scripts": {
         "before":"ts-node ./scripts/before.ts",
         "build": "npm run before && npx hardhat compile",
-        "node": "npx hardhat node",
+        "node": "npm run before && npx hardhat node",
         "test": "npm run before && npx hardhat test",
         "docgen": "solidity-docgen -i ./src -t ./templates -H ./helper.js",
         "clean": "rm -rf ./artifacts ./cache ./deployments ./docs"

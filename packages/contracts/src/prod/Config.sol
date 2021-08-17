@@ -5,7 +5,7 @@ pragma solidity ^0.6.0;
 import "../interfaces/IConfig.sol";
 
 // TODO: DAO logic
-contract Config_prod is IConfig {
+contract Config is IConfig {
     function stakeManager() external view override returns (address) {
         return 0x0000000000000000000000000000000000001001;
     }

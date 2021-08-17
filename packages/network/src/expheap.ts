@@ -5,6 +5,9 @@ export type ExpItem = {
   exp: number;
 };
 
+/**
+ * A heap used to manage the expire timestamp of remote peer
+ */
 export class ExpHeap {
   private heap: Heap;
   constructor() {
@@ -13,14 +16,27 @@ export class ExpHeap {
     });
   }
 
+  /**
+   * Return the expire timestamp of the next element
+   */
   nextExpiry(): undefined | number {
     return this.heap.peek()?.exp;
   }
 
+  /**
+   * Add peer to heap
+   * @param peerId - Target peer
+   * @param exp - Expire timestamp
+   */
   add(peerId: string, exp: number) {
     this.heap.insert({ peerId, exp });
   }
 
+  /**
+   * Find whether the target peer exists
+   * @param peerId - Target peer
+   * @returns Whether exists
+   */
   contains(peerId: string) {
     for (let i = 1; i <= this.heap.length; i++) {
       const item: undefined | ExpItem = this.heap._list[i];
@@ -31,6 +47,10 @@ export class ExpHeap {
     return false;
   }
 
+  /**
+   * Remove elements by timestamp
+   * @param now - Timestamp
+   */
   expire(now: number) {
     let item: undefined | ExpItem;
     while ((item = this.heap.peek()) && item !== undefined && item.exp <= now) {

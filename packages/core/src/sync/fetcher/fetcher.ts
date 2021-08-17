@@ -1,10 +1,9 @@
-import { Address, BN } from 'ethereumjs-util';
-import { HChannel, PChannel, logger, nowTimestamp } from '@gxchain2/utils';
-import { emptyTxTrie, BlockHeader, Block } from '@gxchain2/structure';
+import { BN, KECCAK256_RLP } from 'ethereumjs-util';
+import { HChannel, PChannel, logger } from '@gxchain2/utils';
+import { BlockHeader, Block } from '@gxchain2/structure';
 import { Node } from '../../node';
 import { PeerRequestTimeoutError, WireProtocol, WireProtocolHandler } from '../../protocols';
-
-const allowedFutureBlockTimeSeconds = 15;
+import { preValidateBlock, preValidateHeader } from '../../validation';
 
 export interface FetcherOptions {
   node: Node;
@@ -12,6 +11,9 @@ export interface FetcherOptions {
   limit: number;
 }
 
+/**
+ * Fetcher is responsible for retrieving new blocks based on announcements.
+ */
 export class Fetcher {
   private aborted: boolean = false;
   private node: Node;
@@ -32,6 +34,7 @@ export class Fetcher {
   private bestHeight!: number;
   private totalTD!: BN;
   private bestTD!: BN;
+  private localHeader!: BlockHeader;
 
   private blockQueue: PChannel<Block>;
   private downloadBodiesQueue: HChannel<BlockHeader>;
@@ -50,14 +53,15 @@ export class Fetcher {
   /**
    * Fetch blocks from specified peer
    */
-  async fetch(localHeight: number, localHash: Buffer, localTD: BN, bestHeight: number, bestTD: BN, handler: WireProtocolHandler) {
+  async fetch(localHeader: BlockHeader, localTD: BN, bestHeight: number, bestTD: BN, handler: WireProtocolHandler) {
     this.remote = handler.peer.peerId;
-    this.localHeight = localHeight;
+    this.localHeader = localHeader;
+    this.localHeight = localHeader.number.toNumber();
     this.bestHeight = bestHeight;
     this.totalTD = localTD.clone();
     this.bestTD = bestTD.clone();
     try {
-      await Promise.all([this.downloadHeader(localHeight, localHash, bestHeight - localHeight, handler), this.downloadBodiesLoop(), this.processBlockLoop()]);
+      await Promise.all([this.downloadHeader(handler), this.downloadBodiesLoop(), this.processBlockLoop()]);
       await Promise.all(Array.from(this.downloadBodiesPromises));
     } catch (err) {
       throw err;
@@ -69,12 +73,18 @@ export class Fetcher {
     }
   }
 
+  /**
+   * Reset fetch, clear up Queues
+   */
   reset() {
     this.aborted = false;
     this.downloadBodiesQueue.reset();
     this.blockQueue.reset();
   }
 
+  /**
+   * Abort fetch
+   */
   abort() {
     logger.debug('Fetcher::abort');
     this.aborted = true;
@@ -91,19 +101,26 @@ export class Fetcher {
     this.blockQueue.abort();
   }
 
-  private async downloadHeader(localHeight: number, localHash: Buffer, totalCount: number, handler: WireProtocolHandler) {
+  /**
+   * Download block headers
+   * @param start Start block height
+   * @param count Total blockheaders amount
+   * @param handler Peer's WireProtocolHandler
+   */
+  private async downloadHeader(handler: WireProtocolHandler) {
     let i = 0;
+    let totalCount = this.bestHeight - this.localHeight;
     const headerTaskQueue: { start: number; count: number }[] = [];
     while (totalCount > 0) {
       headerTaskQueue.push({
-        start: i * this.count + localHeight + 1,
+        start: i * this.count + this.localHeight + 1,
         count: totalCount > this.count ? this.count : totalCount
       });
       i++;
       totalCount -= this.count;
     }
 
-    let lastHash = localHash;
+    let parentHeader = this.localHeader;
     for (const { start, count } of headerTaskQueue) {
       if (this.aborted) {
         return;
@@ -127,34 +144,13 @@ export class Fetcher {
         for (let index = 0; i < headers.length; i++) {
           const header = headers[index];
           if (index > 0) {
-            if (!headers[index - 1].hash().equals(header.parentHash)) {
-              throw new Error('invalid header(parentHash)');
-            }
+            preValidateHeader.call(header, headers[index - 1]);
           } else {
-            if (!header.parentHash.equals(lastHash)) {
-              throw new Error('invalid header(parentHash)');
-            }
-          }
-          await header.validate(this.node.blockchain);
-          // additional check for signer
-          if (!header.cliqueVerifySignature(this.node.blockchain.cliqueActiveSigners())) {
-            throw new Error('invalid header(signers)');
-          }
-          // additional check for beneficiary
-          if (!header.nonce.equals(Buffer.alloc(8)) || !header.coinbase.equals(Address.zero())) {
-            throw new Error('invalid header(nonce or coinbase), currently does not support beneficiary');
-          }
-          // additional check for gasLimit
-          if (!header.gasLimit.eq(this.node.miner.gasLimit)) {
-            throw new Error('invalid header(gas limit)');
-          }
-          // additional check for timestamp
-          if (!header.timestamp.gtn(nowTimestamp() + allowedFutureBlockTimeSeconds)) {
-            throw new Error('invalid header(timestamp)');
+            preValidateHeader.call(header, parentHeader);
           }
           this.totalTD.iadd(header.difficulty);
           if (index === headers.length - 1) {
-            lastHash = header.hash();
+            parentHeader = header;
             if (header.number.toNumber() === this.bestHeight) {
               if (this.totalTD.lt(this.bestTD)) {
                 throw new Error('invalid header(total difficulty)');
@@ -178,6 +174,9 @@ export class Fetcher {
     }
   }
 
+  /**
+   * Download blockbodies according to the block headers
+   */
   private async downloadBodiesLoop() {
     let headersCache: BlockHeader[] = [];
     for await (const header of this.downloadBodiesQueue.generator()) {
@@ -241,16 +240,12 @@ export class Fetcher {
             const header = headers[i];
             const block = Block.fromBlockData({ header, transactions }, { common: this.node.getCommon(header.number), hardforkByBlockNumber: true });
             // the target peer does not have the block body, so it is marked as a useless peer.
-            if (!block.header.transactionsTrie.equals(emptyTxTrie) && transactions.length === 0) {
+            if (!block.header.transactionsTrie.equals(KECCAK256_RLP) && transactions.length === 0) {
               this.uselessHandlers.add(handler);
               logger.debug('Fetcher, ', handler.peer.peerId, 'add to useless peer');
               return retry();
             }
-            await block.validateData();
-            // additional check for uncle headers
-            if (block.uncleHeaders.length !== 0) {
-              throw new Error('invalid block(uncle headers)');
-            }
+            await preValidateBlock.call(block);
             blocks.push(block);
           } catch (err) {
             logger.warn('Fetcher::downloadBodies, catch error:', err);

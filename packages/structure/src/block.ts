@@ -1,8 +1,18 @@
 import { bnToHex, bufferToHex, BN, Address } from 'ethereumjs-util';
-import { Block } from '@ethereumjs/block';
-import { CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@ethereumjs/block/dist/clique';
-import { txSize, WrappedTransaction, Transaction } from './transaction';
+import { Block } from '@gxchain2-ethereumjs/block';
+import { CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@gxchain2-ethereumjs/block/dist/clique';
+import { calcTxSize, WrappedTransaction, Transaction } from './transaction';
 
+export * from '@gxchain2-ethereumjs/block';
+export * from '@gxchain2-ethereumjs/block/dist/clique';
+
+/**
+ * Calculate clique difficulty and whether the signer is an `inturn` signer
+ * @param activeSigners - Active signers
+ * @param signer - Target signer
+ * @param number - Current block number
+ * @returns Whether the signer is an `inturn` signer and the difficulty
+ */
 export function calcCliqueDifficulty(activeSigners: Address[], signer: Address, number: BN): [boolean, BN] {
   if (activeSigners.length === 0) {
     throw new Error('Missing active signers information');
@@ -12,6 +22,9 @@ export function calcCliqueDifficulty(activeSigners: Address[], signer: Address, 
   return [inTurn, (inTurn ? CLIQUE_DIFF_INTURN : CLIQUE_DIFF_NOTURN).clone()];
 }
 
+/**
+ * WrappedBlock based on `@ethereumjs/block`
+ */
 export class WrappedBlock {
   readonly block: Block;
   private readonly isPending: boolean;
@@ -22,17 +35,25 @@ export class WrappedBlock {
     this.isPending = isPending;
   }
 
+  /**
+   * Get the size of the total block
+   */
   get size() {
     if (this._size) {
       return this._size;
     }
     this._size = this.block.header.raw().length;
     for (const tx of this.block.transactions) {
-      this._size += txSize(tx as Transaction);
+      this._size += calcTxSize(tx as Transaction);
     }
     return this._size;
   }
 
+  /**
+   * Convert block information to json format
+   * @param fullTransactions - `true` load full transactions information, `false` only load transaction hash, default `false`
+   * @returns JSON format block
+   */
   toRPCJSON(fullTransactions: boolean = false) {
     return {
       number: this.isPending ? null : bnToHex(this.block.header.number),
@@ -64,6 +85,3 @@ export class WrappedBlock {
     };
   }
 }
-
-export * from '@ethereumjs/block';
-export { CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN };

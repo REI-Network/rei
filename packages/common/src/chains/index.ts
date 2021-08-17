@@ -1,4 +1,4 @@
-import { chainsType } from '@ethereumjs/common/dist/types';
+import { chainsType } from '@gxchain2-ethereumjs/common/dist/types';
 
 const chains: chainsType = {
   names: {

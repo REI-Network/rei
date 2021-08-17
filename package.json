@@ -21,10 +21,12 @@
     "lerna": "^3.22.1",
     "lint-staged": "^10.5.1",
     "mocha": "^9.0.2",
-    "prettier": "^2.2.0"
+    "prettier": "^2.2.0",
+    "prettier-plugin-solidity": "1.0.0-beta.6"
   },
   "scripts": {
-    "bootstrap": "lerna bootstrap --ignore-scripts --include-dependencies --no-ci --hoist && npm rebuild && npm run build",
+    "bootstrap": "lerna bootstrap --ignore-scripts --include-dependencies --no-ci --hoist && npm run temporaryClientFixes && npm run build",
+    "temporaryClientFixes": "cd node_modules/bcrypto && test -d 'build' && echo 'Exists' || npm i",
     "build": "lerna run build --stream",
     "build:structure": "npm run build -- --scope @gxchain2/structure",
     "build:blockchain": "npm run build -- --scope @gxchain2/blockchain",
@@ -35,11 +37,10 @@
     "build:network": "npm run build -- --scope @gxchain2/network",
     "build:rpc": "npm run build -- --scope @gxchain2/rpc",
     "build:utils": "npm run build -- --scope @gxchain2/utils",
-    "build:vm": "npm run build -- --scope @gxchain2/vm",
     "build:wallet": "npm run build -- --scope @gxchain2/wallet",
     "test": "lerna run test --stream",
-    "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/package-lock.json",
-    "clean:build": "rm -rf packages/*/dist",
+    "clean": "rm -rf node_modules packages/*/node_modules packages/*/package-lock.json && npm run clean:build",
+    "clean:build": "rm -rf packages/*/dist && cd packages/contracts && npm run clean",
     "test:prompts": "node -r ts-node/register ./packages/cli/test/prompts.ts",
     "postinstall": "npm run bootstrap",
     "lint": "eslint packages/*/src/**.ts packages/*/test/**.ts --format=codeframe",

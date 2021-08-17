@@ -1,4 +1,4 @@
-import { genesisStatesType } from '@ethereumjs/common/dist/types';
+import { genesisStatesType } from '@gxchain2-ethereumjs/common/dist/types';
 
 const genesisStates: genesisStatesType = {
   names: {

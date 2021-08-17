@@ -12,7 +12,7 @@ Nodejs implementation of GXChain2.0 protocols
 | [@gxchain2/structure][structure-package]   | [![NPM Version][structure-npm-version]][structure-npm-url]   | [![Block Issues][structure-issues]][structure-issues-url]        |
 | [@gxchain2/blockchain][blockchain-package] | [![NPM Version][blockchain-npm-version]][blockchain-npm-url] | [![Blockchain Issues][blockchain-issues]][blockchain-issues-url] |
 | [@gxchain2/cli][cli-package]               | [![NPM Version][cli-npm-version]][cli-npm-url]               | [![Cli Issues][cli-issues]][cli-issues-url]                      |
-| [@gxchain2/vm][vm-package]                 | [![NPM Version][vm-npm-version]][vm-npm-url]                 | [![Vm Issues][vm-issues]][vm-issues-url]                         |
+| [@gxchain2/contracts][contracts-package]   | [![NPM Version][contracts-npm-version]][contracts-npm-url]   | [![Contracts Issues][contracts-issues]][contracts-issues-url]    |
 | [@gxchain2/utils][utils-package]           | [![NPM Version][utils-npm-version]][utils-npm-url]           | [![Utils Issues][utils-issues]][utils-issues-url]                |
 | [@gxchain2/core][core-package]             | [![NPM Version][core-npm-version]][core-npm-url]             | [![Core Issues][core-issues]][core-issues-url]                   |
 | [@gxchain2/common][common-package]         | [![NPM Version][common-npm-version]][common-npm-url]         | [![Common Issues][common-issues]][common-issues-url]             |
@@ -111,7 +111,7 @@ Installs dependencies for all sub-packages, and links them to create an integrat
 
 Builds all monorepo packages.
 
-### `npm run build:core`, `npm run build:vm`, `...`
+### `npm run build:core`, `npm run build:contracts`, `...`
 
 Only build single monorepo package.
 
@@ -189,7 +189,7 @@ These scripts execute lint and lint:fix respectively, to all monorepo packages.
 
   </details>
 
-  A: Please update the node version to 14.0.0 or higher. [nvm](https://github.com/nvm-sh/nvm) may be able to help you
+  A: Please update the node version to **14.0.0** or higher. [nvm](https://github.com/nvm-sh/nvm) may be able to help you
 
 ## License
 
@@ -210,11 +210,11 @@ These scripts execute lint and lint:fix respectively, to all monorepo packages.
 [cli-npm-url]: https://www.npmjs.org/package/@gxchain2/cli
 [cli-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20cli?label=issues
 [cli-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+cli"
-[vm-package]: ./packages/vm
-[vm-npm-version]: https://img.shields.io/npm/v/@gxchain2/vm
-[vm-npm-url]: https://www.npmjs.org/package/@gxchain2/vm
-[vm-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20vm?label=issues
-[vm-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+vm"
+[contracts-package]: ./packages/contracts
+[contracts-npm-version]: https://img.shields.io/npm/v/@gxchain2/contracts
+[contracts-npm-url]: https://www.npmjs.org/package/@gxchain2/contracts
+[contracts-issues]: https://img.shields.io/github/issues/gxchain/gxchain2/package:%20contracts?label=issues
+[contracts-issues-url]: https://github.com/gxchain/gxchain2/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+contracts"
 [utils-package]: ./packages/utils
 [utils-npm-version]: https://img.shields.io/npm/v/@gxchain2/utils
 [utils-npm-url]: https://www.npmjs.org/package/@gxchain2/utils

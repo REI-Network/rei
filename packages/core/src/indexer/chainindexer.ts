@@ -3,13 +3,35 @@ import { BlockHeader } from '@gxchain2/structure';
 import { Channel, logger } from '@gxchain2/utils';
 import { Node } from '../node';
 
+/**
+ * ChainIndexerBackend defines the methods needed to process chain segments in
+ * the background and write the segment results into the database. These can be
+ * used to create filter blooms.
+ */
 export interface ChainIndexerBackend {
+  /**
+   * Reset initiates the processing of a new chain segment, potentially terminating
+   * any partially completed operations (in case of a reorg).
+   * @param section The label of the regenerated section
+   */
   reset(section: BN): void;
 
+  /**
+   * Process crunches through the next header in the chain segment. The caller
+   * will ensure a sequential order of headers.
+   * @param header
+   */
   process(header: BlockHeader): void;
 
+  /**
+   * Commit finalizes the section metadata and stores it into the database.
+   */
   commit(): Promise<void>;
 
+  /**
+   * Prune deletes the chain index older than the given threshold.
+   * @param section Larger than the section will be deleted
+   */
   prune(section: BN): Promise<void>;
 }
 
@@ -20,6 +42,14 @@ export interface ChainIndexerOptions {
   backend: ChainIndexerBackend;
 }
 
+/**
+ * ChainIndexer does a post-processing job for equally sized sections of the canonical chain
+ * (like BlooomBits).
+ *
+ * Further child ChainIndexers can be added which use the output of the parent section indexer.
+ * These child indexers receive new head notifications only after an entire section has been finished
+ * or in case of rollbacks that might affect already finished sections.
+ */
 export class ChainIndexer {
   private readonly sectionSize: number;
   private readonly confirmsBlockNumber: number;
@@ -59,6 +89,9 @@ export class ChainIndexer {
     this.headerQueue.push(header);
   }
 
+  /**
+   * Process new block header, if it forks, do reorganize
+   */
   private async processHeaderLoop() {
     await this.initPromise;
     let preHeader: BlockHeader | undefined;
@@ -76,6 +109,11 @@ export class ChainIndexer {
     }
   }
 
+  /**
+   * NewHeader notifies the indexer about new chain heads and/or reorgs.
+   * @param number Block number of newheader
+   * @param reorg If a reorg happened, invalidate all sections until that point
+   */
   private async newHeader(number: BN, reorg: boolean) {
     let confirmedSections: BN | undefined = number.gtn(this.confirmsBlockNumber) ? number.subn(this.confirmsBlockNumber).divn(this.sectionSize) : new BN(0);
     confirmedSections = confirmedSections.gtn(0) ? confirmedSections.subn(1) : undefined;

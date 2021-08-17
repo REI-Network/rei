@@ -15,10 +15,10 @@ type EnqueuePooledTransactionMessage = {
 };
 
 /**
- * Add the key and value to the map
- * @param map
- * @param key
- * @param value
+ * Add the key the map, add the value to set
+ * @param map - Target map
+ * @param key - Key
+ * @param value - Set value
  */
 function forceAdd<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer | string) {
   let set = map.get(key);
@@ -30,10 +30,10 @@ function forceAdd<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer | 
 }
 
 /**
- * Delete the value according to the key from the map
- * @param map
- * @param key
- * @param value
+ * Delete the value in the set according to the key in the map
+ * @param map - Target map
+ * @param key - Key
+ * @param value - Delete value
  */
 function autoDelete<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer | string) {
   let set = map.get(key);
@@ -56,6 +56,9 @@ const maxTxAnnounces = 4096;
 
 type Request = { hashes: Buffer[]; stolen?: FunctionalSet<Buffer> };
 
+/**
+ * TxFetcher retrieves all new pooled transaction
+ */
 export class TxFetcher {
   private waitingList = createBufferFunctionalMap<Set<string>>();
   private waitingTime = createBufferFunctionalMap<number>();
@@ -85,6 +88,9 @@ export class TxFetcher {
     this.enqueueTransactionLoop();
   }
 
+  /**
+   * A loop to process new pooled transaction sequentially
+   */
   private async newPooledTransactionLoop() {
     try {
       for await (const message of this.newPooledTransactionQueue.generator()) {
@@ -137,9 +143,7 @@ export class TxFetcher {
         }
         const set = this.announces.get(message.origin);
         if (!oldPeer && set && set.size > 0) {
-          this.scheduleFetches(
-            new Set<string>([message.origin])
-          );
+          this.scheduleFetches(new Set<string>([message.origin]));
         }
       }
     } catch (err) {
@@ -147,6 +151,9 @@ export class TxFetcher {
     }
   }
 
+  /**
+   * A loop to process enqueue transaction sequentially
+   */
   private async enqueueTransactionLoop() {
     try {
       for await (const message of this.enqueueTransactionQueue.generator()) {
@@ -360,9 +367,9 @@ export class TxFetcher {
   }
 
   /**
-   * dropPeer should be called when a peer disconnects. It cleans up all the internal
-   * data structures of the given node
-   * @param peer
+   * dropPeer should be called when a peer disconnects
+   * It will clean up all the internal data of the given peer
+   * @param peer - Disconnected peer
    */
   dropPeer(peer: string) {
     {
@@ -419,9 +426,9 @@ export class TxFetcher {
   }
 
   /**
-   * Imports a batch of received transactions' hashes into the transaction pool
-   * @param origin - the peer
-   * @param hashes - transactions' hashes
+   * Add transaction hashes to the new pooled transaction queue
+   * @param origin - Remote peer
+   * @param hashes - Transaction hashes
    */
   newPooledTransactionHashes(origin: string, hashes: Buffer[]) {
     if (!this.aborter.isAborted) {
@@ -430,9 +437,9 @@ export class TxFetcher {
   }
 
   /**
-   * Imports a batch of received transaction into the transaction pool
-   * @param origin - the peer
-   * @param txs - transactions
+   * Add transaction to the enqueue transaction queue
+   * @param origin - Remote peer
+   * @param txs - Transactions
    */
   enqueueTransaction(origin: string, txs: Transaction[]) {
     if (!this.aborter.isAborted) {

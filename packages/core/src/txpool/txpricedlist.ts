@@ -113,6 +113,9 @@ export class TxPricedList {
     return [drop, true];
   }
 
+  /**
+   * Reset heap
+   */
   reheap() {
     const reheap = new Heap({ comparBefore: (a: Transaction, b: Transaction) => b.gasPrice.gt(a.gasPrice) });
     this.stales = 0;

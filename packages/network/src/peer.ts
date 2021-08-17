@@ -3,6 +3,9 @@ import { Channel, logger } from '@gxchain2/utils';
 import { NetworkManager, logNetworkError } from './index';
 import { Protocol, ProtocolHandler } from './types';
 
+/**
+ * A message queue for a single protocol
+ */
 export class MsgQueue {
   readonly handler: ProtocolHandler;
   private readonly peer: Peer;
@@ -26,14 +29,20 @@ export class MsgQueue {
     });
   }
 
-  send(method: string | number, data: any) {
-    if (this.aborted) {
-      throw new Error('MsgQueue already aborted');
+  /**
+   * Push a data to message queue
+   * @param method - Method name or code
+   * @param data - Method data
+   */
+  send(data: any) {
+    if (!this.aborted) {
+      this.queue.push(data);
     }
-    data = this.handler.encode(method, data);
-    this.queue.push(data);
   }
 
+  /**
+   * Return an async generator for writing data from message queue to to the `libp2p` stream
+   */
   private async *generator() {
     const gen = this.queue.generator();
     while (true) {
@@ -46,6 +55,10 @@ export class MsgQueue {
     }
   }
 
+  /**
+   * Pipe `libp2p` stream's sink and source
+   * @param stream - `libp2p` stream
+   */
   pipeStream(stream: any) {
     if (this.aborted) {
       throw new Error('MsgQueue already aborted');
@@ -94,6 +107,9 @@ export class MsgQueue {
   }
 }
 
+/**
+ * Peer class manages a single remote peer instance
+ */
 export class Peer {
   readonly peerId: string;
   private readonly networkMngr: NetworkManager;
@@ -104,6 +120,11 @@ export class Peer {
     this.networkMngr = networkMngr;
   }
 
+  /**
+   * Create a message queue object by protocol
+   * @param protocol - Protocol object
+   * @returns Message queue and protocol handler
+   */
   private async makeMsgQueue(protocol: Protocol) {
     const oldQueue = this.queueMap.get(protocol.name);
     if (oldQueue) {
@@ -115,6 +136,11 @@ export class Peer {
     return { queue, handler };
   }
 
+  /**
+   * Get the message queue by protocol name
+   * @param name - Protocol name
+   * @returns Message queue
+   */
   getMsgQueue(name: string) {
     const queue = this.queueMap.get(name);
     if (!queue) {
@@ -123,28 +149,59 @@ export class Peer {
     return queue;
   }
 
+  /**
+   * Send data for target protocol
+   * @param name - Target protocol name
+   * @param data - Data
+   */
+  send(name: string, data: any) {
+    this.getMsgQueue(name).send(data);
+  }
+
+  /**
+   * Close self
+   */
   async close() {
     await this.networkMngr.removePeer(this.peerId);
   }
 
+  /**
+   * Abort peer
+   */
   async abort() {
     await Promise.all(Array.from(this.queueMap.values()).map((queue) => queue.abort()));
     this.queueMap.clear();
   }
 
+  /**
+   * Query whether a protocol is supported
+   * @param name - Protocol name
+   * @returns `true` if supported, `false` if not
+   */
   isSupport(name: string): boolean {
     return this.queueMap.has(name);
   }
 
+  /**
+   * Make message queue for protocol and handshake
+   * @param protocol - Protocol object
+   * @param stream - `libp2p` stream
+   * @returns Whether the handshake was successful
+   */
   async installProtocol(protocol: Protocol, stream: any) {
     const { queue, handler } = await this.makeMsgQueue(protocol);
     queue.pipeStream(stream);
+    let handshakeResult: undefined | boolean;
     try {
-      if (!(await handler.handshake())) {
+      handshakeResult = await handler.handshake();
+      if (!handshakeResult) {
         throw new Error(`protocol ${protocol.name}, handshake failed`);
       }
       return true;
     } catch (err) {
+      if (handshakeResult === undefined) {
+        logger.warn('Peer::installProtocol, handshake failed with remote peer:', this.peerId);
+      }
       await queue.abort();
       this.queueMap.delete(protocol.name);
       return false;

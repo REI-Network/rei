@@ -1,17 +1,16 @@
-import { Address, BN, bufferToHex } from 'ethereumjs-util';
+import { Address, BN, bufferToHex, KECCAK256_RLP_ARRAY } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
-import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN, calculateTransactionTrie, Transaction } from '@gxchain2/structure';
-import { WrappedVM } from '@gxchain2/vm';
+import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN, Transaction } from '@gxchain2/structure';
+import VM from '@gxchain2-ethereumjs/vm';
+import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import { RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
 import { logger, getRandomIntInclusive, hexStringToBN, nowTimestamp } from '@gxchain2/utils';
-import { StateManager } from '@gxchain2/vm';
-import { RunTxResult } from '@ethereumjs/vm/dist/runTx';
 import { PendingTxMap } from '../txpool';
 import { Node } from '../node';
+import { isEnableStaking } from '../hardforks';
 
-const emptyUncleHash = '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347';
 const noTurnSignerDelay = 500;
 const maxHistoryLength = 10;
-const defaultGasLimit = hexStringToBN('0xf4240');
 
 export interface MinerOptions {
   node: Node;
@@ -19,14 +18,16 @@ export interface MinerOptions {
   coinbase?: string;
 }
 
+/**
+ * Miner creates blocks and searches for proof-of-work values.
+ */
 export class Miner {
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
 
   private enable: boolean;
   private _coinbase: Address;
-  private _gasLimit: BN;
-  private wvm!: WrappedVM;
+  private vm!: VM;
   private pendingTxs: Transaction[] = [];
   private pendingHeader!: BlockHeader;
   private gasUsed = new BN(0);
@@ -39,7 +40,6 @@ export class Miner {
     this.node = options.node;
     this.enable = options.enable;
     this._coinbase = options.coinbase ? Address.fromString(options.coinbase) : Address.zero();
-    this._gasLimit = defaultGasLimit.clone();
     this.initPromise = this.init();
   }
 
@@ -58,10 +58,10 @@ export class Miner {
   }
 
   /**
-   * Get the limit of gas
+   * Get current block gas limit
    */
-  get gasLimit() {
-    return this._gasLimit.clone();
+  get currentGasLimit() {
+    return this.pendingHeader.gasLimit.clone();
   }
 
   /**
@@ -79,12 +79,8 @@ export class Miner {
     }
   }
 
-  /**
-   * Set the gas limit
-   * @param gasLimit
-   */
-  setGasLimit(gasLimit: BN) {
-    this._gasLimit = gasLimit.clone();
+  private _isValidSigner(signer: Address, activeSigners: Address[]) {
+    return activeSigners.filter((s) => s.equals(signer)).length > 0;
   }
 
   private _shouldMintNextBlock(currentHeader: BlockHeader) {
@@ -110,8 +106,23 @@ export class Miner {
     }
   }
 
+  private async _getActiveSigersByBlock(block: Block) {
+    const header = block.header;
+    const common = header._common;
+    let activeSigners: Address[];
+    if (isEnableStaking(common)) {
+      const vm = await this.node.getVM(header.stateRoot, common);
+      const sm = this.node.getStakeManager(vm, block);
+      const set = await this.node.validatorSets.get(header.stateRoot, sm);
+      activeSigners = set.activeSigners();
+    } else {
+      activeSigners = this.node.blockchain.cliqueActiveSignersByBlockNumber(header.number);
+    }
+    return activeSigners;
+  }
+
   /**
-   * Initialize the worker
+   * Initialize the miner
    * @returns
    */
   async init() {
@@ -119,65 +130,76 @@ export class Miner {
       await this.initPromise;
       return;
     }
-    await this._newBlockHeader(this.node.blockchain.latestBlock.header);
+
+    const activeSigners = await this._getActiveSigersByBlock(this.node.blockchain.latestBlock);
+    logger.debug(
+      'Miner::init, activeSigners:',
+      activeSigners.map((a) => a.toString())
+    );
+    await this._newBlockHeader(this.node.blockchain.latestBlock.header, activeSigners);
   }
 
   /**
    * Assembles the new block
    * @param header
    */
-  async newBlockHeader(header: BlockHeader) {
+  async newBlockHeader(header: BlockHeader, activeSigners: Address[]) {
     await this.initPromise;
-    await this._newBlockHeader(header);
+    await this._newBlockHeader(header, activeSigners);
   }
 
-  async startMint(header: BlockHeader) {
+  async startMint(block: Block) {
     await this.initPromise;
-    await this._startMint(header);
+    await this._startMint(block);
   }
 
-  private makeHeader(timestamp: number, parentHash: Buffer, number: BN): [boolean, BlockHeader] {
-    if (this.isMining) {
-      const [inTurn, difficulty] = calcCliqueDifficulty(this.node.blockchain.cliqueActiveSigners(), this.coinbase, number);
+  private makeHeader(timestamp: number, parentHash: Buffer, number: BN, activeSigners: Address[]): { inTurn: boolean; validSigner: boolean; header: BlockHeader } {
+    const common = this.node.getCommon(number);
+    const gasLimit = hexStringToBN(common.param('gasConfig', 'gasLimit'));
+    const validSigner = this._isValidSigner(this.coinbase, activeSigners);
+    if (this.isMining && validSigner) {
+      const [inTurn, difficulty] = calcCliqueDifficulty(activeSigners, this.coinbase, number);
       const header = BlockHeader.fromHeaderData(
         {
-          // TODO: add beneficiary.
+          // coinbase is always zero
           coinbase: Address.zero(),
           difficulty,
-          gasLimit: this.gasLimit,
-          // TODO: add beneficiary.
+          gasLimit,
+          // nonce is always zero
           nonce: Buffer.alloc(8),
           number,
           parentHash,
           timestamp,
-          uncleHash: emptyUncleHash
+          uncleHash: KECCAK256_RLP_ARRAY
         },
         { common: this.node.getCommon(number), cliqueSigner: this.node.accMngr.getPrivateKey(this.coinbase) }
       );
-      return [inTurn, header];
+      return { inTurn, header, validSigner };
     } else {
       const header = BlockHeader.fromHeaderData(
         {
+          // coinbase is always zero
           coinbase: Address.zero(),
           difficulty: CLIQUE_DIFF_NOTURN.clone(),
-          gasLimit: this.gasLimit,
+          gasLimit,
+          // nonce is always zero
           nonce: Buffer.alloc(8),
           number,
           parentHash,
           timestamp,
-          uncleHash: emptyUncleHash
+          uncleHash: KECCAK256_RLP_ARRAY
         },
         { common: this.node.getCommon(number) }
       );
-      return [false, header];
+      return { inTurn: false, header, validSigner };
     }
   }
 
-  private async _newBlockHeader(header: BlockHeader) {
+  private async _newBlockHeader(header: BlockHeader, activeSigners: Address[]) {
     try {
       await this.lock.acquire();
-      if (this.wvm) {
-        await this.wvm.vm.stateManager.revert();
+      if (this.vm) {
+        await this.vm.stateManager.revert();
       }
 
       if (this.pendingHeader !== undefined && this.pendingHeader.number.gtn(0)) {
@@ -190,18 +212,18 @@ export class Miner {
       const period: number = header._common.consensusConfig().period;
       const timestamp = header.timestamp.toNumber() + period;
       const now = nowTimestamp();
-      const [inTurn, newHeader] = this.makeHeader(now > timestamp ? now : timestamp, header.hash(), newNumber);
+      const { inTurn, header: newHeader, validSigner } = this.makeHeader(now > timestamp ? now : timestamp, header.hash(), newNumber, activeSigners);
       this.pendingHeader = newHeader;
       const currentTd = await this.node.db.getTotalDifficulty(header.hash(), header.number);
       const nextTd = currentTd.add(newHeader.difficulty);
 
       this._cancel(nextTd);
-      this.wvm = await this.node.getWrappedVM(header.stateRoot, newNumber);
-      await this.wvm.vm.stateManager.checkpoint();
+      this.vm = await this.node.getVM(header.stateRoot, newNumber);
+      await this.vm.stateManager.checkpoint();
       await this._commit(await this.node.txPool.getPendingTxMap(header.number, header.hash()));
-      if (this._shouldMintNextBlock(header)) {
+      if (validSigner && this._shouldMintNextBlock(header)) {
         this.nextTd = nextTd.clone();
-        this._mint(header.hash(), this._calcTimeout(timestamp, inTurn));
+        this._mint(header.hash(), this._calcTimeout(timestamp, inTurn, activeSigners.length));
       }
     } catch (err) {
       logger.error('Miner::_newBlock, catch error:', err);
@@ -210,8 +232,9 @@ export class Miner {
     }
   }
 
-  private async _startMint(header: BlockHeader) {
+  private async _startMint(block: Block) {
     try {
+      const header = block.header;
       await this.lock.acquire();
 
       if (!header.hash().equals(this.pendingHeader.parentHash)) {
@@ -221,14 +244,15 @@ export class Miner {
       const newNumber = header.number.addn(1);
       const period: number = header._common.consensusConfig().period;
       const timestamp = header.timestamp.toNumber() + period;
-      const [inTurn, difficulty] = calcCliqueDifficulty(this.node.blockchain.cliqueActiveSigners(), this.coinbase, newNumber);
+      const activeSigners = await this._getActiveSigersByBlock(block);
+      const [inTurn, difficulty] = calcCliqueDifficulty(activeSigners, this.coinbase, newNumber);
       const currentTd = await this.node.db.getTotalDifficulty(header.hash(), header.number);
       const nextTd = currentTd.add(difficulty);
 
       this._cancel(nextTd);
       if (this._shouldMintNextBlock(header)) {
         this.nextTd = nextTd.clone();
-        this._mint(header.hash(), this._calcTimeout(timestamp, inTurn));
+        this._mint(header.hash(), this._calcTimeout(timestamp, inTurn, activeSigners.length));
       }
     } catch (err) {
       logger.error('Miner::_startMint, catch error:', err);
@@ -249,19 +273,18 @@ export class Miner {
     }
   }
 
-  private _calcTimeout(nextBlockTimestamp: number, inTurn: boolean) {
+  private _calcTimeout(nextBlockTimestamp: number, inTurn: boolean, activeSignerCount: number) {
     const now = nowTimestamp();
     let timeout = now > nextBlockTimestamp ? 0 : nextBlockTimestamp - now;
     timeout *= 1000;
     if (!inTurn) {
-      const signerCount = this.node.blockchain.cliqueActiveSigners().length;
-      timeout += getRandomIntInclusive(1, signerCount + 1) * noTurnSignerDelay;
+      timeout += getRandomIntInclusive(1, activeSignerCount + 1) * noTurnSignerDelay;
     }
     return timeout;
   }
 
   private _updateTimestamp(block: Block, timestamp: number) {
-    return block.header.timestamp.toNumber() === timestamp
+    return block.header.timestamp.toNumber() >= timestamp
       ? block
       : Block.fromBlockData(
           {
@@ -303,7 +326,7 @@ export class Miner {
   }
 
   /**
-   * Add transactions for c
+   * Add transactions for commit
    * @param txs - The map of Buffer and array of transactions
    */
   async addTxs(txs: Map<Buffer, Transaction[]>) {
@@ -339,62 +362,53 @@ export class Miner {
 
   async getPendingStateManager() {
     await this.initPromise;
-    if (this.wvm) {
-      const stateManager: any = this.wvm.vm.stateManager;
+    if (this.vm) {
+      const stateManager: any = this.vm.stateManager;
       return new StateManager({ common: stateManager._common, trie: stateManager._trie.copy(false) });
     }
     return await this.node.getStateManager(this.node.blockchain.latestBlock.header.stateRoot, this.node.blockchain.latestHeight);
   }
+
+  /**
+   * Pack different pending block headers according to whether the node produces blocks
+   * @param tx
+   */
   private async _putTx(tx: Transaction) {
     this.pendingTxs.push(tx);
-    const txs = [...this.pendingTxs];
-    const header = { ...this.pendingHeader };
-    if (this.isMining) {
-      this.pendingHeader = BlockHeader.fromHeaderData(
-        {
-          ...header,
-          transactionsTrie: await calculateTransactionTrie(txs)
-        },
-        { common: header._common, cliqueSigner: this.node.accMngr.getPrivateKey(this.coinbase) }
-      );
-    } else {
-      this.pendingHeader = BlockHeader.fromHeaderData(
-        {
-          ...header,
-          transactionsTrie: await calculateTransactionTrie(txs)
-        },
-        { common: header._common }
-      );
-    }
   }
 
+  /**
+   * _commit runs any post-transaction state modifications,
+   * check whether the fees of all transactions exceed the standard
+   * @param pendingMap All pending transactions
+   */
   private async _commit(pendingMap: PendingTxMap) {
     let tx = pendingMap.peek();
     while (tx) {
       try {
-        await this.wvm.vm.stateManager.checkpoint();
+        await this.vm.stateManager.checkpoint();
 
         let txRes: RunTxResult;
         tx.common.setHardforkByBlockNumber(this.pendingHeader.number);
         try {
-          txRes = await this.wvm.vm.runTx({
+          txRes = await this.vm.runTx({
             tx,
-            block: Block.fromBlockData({ header: this.pendingHeader }, { common: (this.wvm.vm.stateManager as any)._common }),
+            block: Block.fromBlockData({ header: this.pendingHeader }, { common: (this.vm.stateManager as any)._common }),
             skipBalance: false,
             skipNonce: false
           });
         } catch (err) {
-          await this.wvm.vm.stateManager.revert();
+          await this.vm.stateManager.revert();
           pendingMap.pop();
           tx = pendingMap.peek();
           continue;
         }
 
         if (this.pendingHeader.gasLimit.lt(txRes.gasUsed.add(this.gasUsed))) {
-          await this.wvm.vm.stateManager.revert();
+          await this.vm.stateManager.revert();
           pendingMap.pop();
         } else {
-          await this.wvm.vm.stateManager.commit();
+          await this.vm.stateManager.commit();
           await this._putTx(tx);
           this.gasUsed.iadd(txRes.gasUsed);
           pendingMap.shift();

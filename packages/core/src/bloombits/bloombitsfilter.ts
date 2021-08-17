@@ -4,6 +4,11 @@ import { createBNFunctionalMap, createBNFunctionalSet, decompressBytes } from '@
 import { Node } from '../node';
 import { BloomBitsBlocks } from './index';
 
+/**
+ * calcBloomIndexes returns the bloom filter bit indexes belonging to the given key
+ * @param data - Data message, type must be Buffer
+ * @returns Calculated result
+ */
 export function calcBloomIndexes(data: Buffer) {
   data = keccak256(data);
   const mask = 2047; // binary 11111111111
@@ -20,6 +25,12 @@ export function calcBloomIndexes(data: Buffer) {
 
 export type Topics = (Buffer | null | (Buffer | null)[])[];
 
+/**
+ * Checks if multiple topics are in the logtopics
+ * @param normalizedTopics The multiple topics to be checked
+ * @param logTopics
+ * @returns `true` if every topic is in the log
+ */
 function topicMatched(normalizedTopics: Topics, logTopics: Buffer[]): boolean {
   for (let i = 0; i < normalizedTopics.length; i++) {
     if (normalizedTopics.length > logTopics.length) {
@@ -50,6 +61,13 @@ function topicMatched(normalizedTopics: Topics, logTopics: Buffer[]): boolean {
   return true;
 }
 
+/**
+ * Check the single bit in the given position of bits is one or zero
+ * @param bits Target data
+ * @param sectionStart The section start index number
+ * @param num The index of bit be checked
+ * @returns `true` if the bit is `1`, `false` if the bit is `0`
+ */
 function checkSingleNumber(bits: Buffer, sectionStart: BN, num: BN) {
   const numOfSection = num.sub(sectionStart).toNumber();
   const byte = bits[Math.floor(numOfSection / 8)];
@@ -67,6 +85,9 @@ export interface BloomBitsFilterOptions {
   sectionSize: number;
 }
 
+/**
+ * Represents a Bloom filter.
+ */
 export class BloomBitsFilter {
   private readonly node: Node;
   private readonly sectionSize: number;
@@ -76,6 +97,12 @@ export class BloomBitsFilter {
     this.sectionSize = options.sectionSize;
   }
 
+  /**
+   * Check if log is mactched in the given range
+   * @param log The log to be checked
+   * @param param1 Range parameter, inlcude address, topics, start block number, endb block number
+   * @returns `true` if matched
+   */
   static checkLogMatches(log: Log, { addresses, topics, from, to }: { addresses: Address[]; topics: Topics; from?: BN; to?: BN }): boolean {
     if (from && (!log.blockNumber || from.gt(log.blockNumber))) {
       return false;
@@ -92,6 +119,13 @@ export class BloomBitsFilter {
     return true;
   }
 
+  /**
+   * Find logs which are matched by given range in this block
+   * @param block Blcok to be checked
+   * @param addresses Given address range
+   * @param topics Given topics range
+   * @returns The logs meet the conditions
+   */
   private async checkBlockMatches(block: Block, addresses: Address[], topics: Topics) {
     const logs: Log[] = [];
     for (const tx of block.transactions) {
@@ -105,6 +139,14 @@ export class BloomBitsFilter {
     return logs;
   }
 
+  /**
+   * Returns an array of all logs matching filter with given range
+   * @param from Number of block at beginning of range
+   * @param to The end block number
+   * @param addresses Addresses which meet the requirements
+   * @param topics Topics which meet the requirements
+   * @returns All logs that meet the conditions
+   */
   async filterRange(from: BN, to: BN, addresses: Address[], topics: Topics) {
     let logs: Log[] = [];
     const append = (_logs: Log[]) => {
@@ -209,6 +251,13 @@ export class BloomBitsFilter {
     return logs;
   }
 
+  /**
+   * Get the qualified logs in a block
+   * @param blockHashOrNumber The block to be filtered
+   * @param addresses Addresses which meet the requirements
+   * @param topics Topics which meet the requirements
+   * @returns All logs that meet the conditions
+   */
   async filterBlock(blockHashOrNumber: Buffer | BN | number, addresses: Address[], topics: Topics) {
     const block = await this.node.db.getBlock(blockHashOrNumber);
     const logs = await this.checkBlockMatches(block, addresses, topics);

@@ -24,6 +24,10 @@ type Filter = {
   client?: WsClient;
 };
 
+/**
+ * Generate subscription id
+ * @returns Subscription id
+ */
 function genSubscriptionId() {
   return bufferToHex(uuidv4({}, Buffer.alloc(16, 0)));
 }
@@ -58,6 +62,9 @@ class SyncingTask {
 
 type Task = LogsTask | HeadsTask | PendingTxTask | SyncingTask;
 
+/**
+ * Filter subscribe information for client
+ */
 export class FilterSystem {
   private readonly node: Node;
   private aborter = new Aborter();
@@ -143,6 +150,9 @@ export class FilterSystem {
     await this.aborter.abort();
   }
 
+  /**
+   * A loop to delete timeout filter
+   */
   private async timeoutLoop() {
     while (!this.aborter.isAborted) {
       await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, deadline)));
@@ -156,6 +166,9 @@ export class FilterSystem {
     }
   }
 
+  /**
+   * A loop to handle blockchain event
+   */
   private async taskLoop() {
     for await (const task of this.taskQueue.generator()) {
       try {
@@ -175,6 +188,15 @@ export class FilterSystem {
     }
   }
 
+  /**
+   * Subscription operation, categorize subscription types, including
+   * `newHeads`, `logs`, `newPendingTransactions`, `syncing`, then set
+   * into map
+   * @param client - Websocket client
+   * @param type - Subscription type
+   * @param query - Query option
+   * @returns Subscription id
+   */
   subscribe(client: WsClient, type: string, query?: Query): string {
     const uid = genSubscriptionId();
     const filter = { hashes: [], logs: [], query, client };
@@ -199,6 +221,12 @@ export class FilterSystem {
     return uid;
   }
 
+  /**
+   * Creates a filter object, based on filter options
+   * @param type - Filter type
+   * @param query - Query option
+   * @returns Filter id
+   */
   newFilter(type: string, query?: Query): string {
     const uid = genSubscriptionId();
     const filter = { hashes: [], logs: [], creationTime: Date.now(), query };
@@ -220,6 +248,11 @@ export class FilterSystem {
     return uid;
   }
 
+  /**
+   * Unsubscribe subscription
+   * @param id - Subscription id
+   * @returns `true` if sucessfully deleted
+   */
   unsubscribe(id: string) {
     let result = this.subscribeHeads.delete(id);
     result = this.subscribeLogs.delete(id) || result;
@@ -228,6 +261,11 @@ export class FilterSystem {
     return result;
   }
 
+  /**
+   * Uninstall filter
+   * @param id - Filter id
+   * @returns `true` if sucessfully deleted
+   */
   uninstall(id: string) {
     let result = this.filterHeads.delete(id);
     result = this.filterLogs.delete(id) || result;
@@ -236,6 +274,11 @@ export class FilterSystem {
     return result;
   }
 
+  /**
+   * Get the query information of filter
+   * @param id - Filter id
+   * @returns Query object
+   */
   getFilterQuery(id: string) {
     const type = this.filterType.get(id);
     if (!type) {
@@ -254,6 +297,11 @@ export class FilterSystem {
     }
   }
 
+  /**
+   * Get the data changed in the filter
+   * @param id - Filter id
+   * @returns Changed data
+   */
   filterChanges(id: string) {
     const type = this.filterType.get(id);
     if (!type) {
@@ -287,6 +335,10 @@ export class FilterSystem {
     }
   }
 
+  /**
+   * Notify new pending transactions to all subscribed client
+   * @param hashs - Transaction hashes
+   */
   private newPendingTransactions(hashs: Buffer[]) {
     for (const [id, filter] of this.subscribePendingTransactions) {
       if (filter.client!.isClosed) {
@@ -300,6 +352,10 @@ export class FilterSystem {
     }
   }
 
+  /**
+   * Notify new heads to all subscribed client
+   * @param heads - Block headers
+   */
   private newHeads(heads: BlockHeader[]) {
     for (const [id, filter] of this.subscribeHeads) {
       if (filter.client!.isClosed) {
@@ -313,6 +369,10 @@ export class FilterSystem {
     }
   }
 
+  /**
+   * Notify new logs to all subscribed client
+   * @param logs - Transaction logs
+   */
   private newLogs(logs: Log[]) {
     for (const [id, filter] of this.subscribeLogs) {
       if (filter.client!.isClosed) {
@@ -332,6 +392,10 @@ export class FilterSystem {
     }
   }
 
+  /**
+   * Notify sync status to all subscribed client
+   * @param state - Sync state
+   */
   private newSyncing(state: SyncingStatus) {
     for (const [id, filter] of this.subscribeSyncing) {
       if (filter.client!.isClosed) {

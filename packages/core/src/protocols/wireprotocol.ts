@@ -76,7 +76,7 @@ const wireHandlers: Handler[] = [
       return [2, headers.map((h) => h.raw())];
     },
     decode(this: WireProtocolHandler, headers: BlockHeaderBuffer[]) {
-      return headers.map((h) => BlockHeader.fromValuesArray(h, { common: this.node.getCommon(0) }));
+      return headers.map((h) => BlockHeader.fromValuesArray(h, { common: this.node.getCommon(0), hardforkByBlockNumber: true }));
     }
   },
   {
@@ -190,11 +190,16 @@ const wireHandlers: Handler[] = [
       return [8, txs.map((tx) => tx.raw() as Buffer[])];
     },
     decode(this: WireProtocolHandler, raws: TransactionsBuffer) {
-      return raws.map((raw) => mustParseTransction(raw, { common: this.node.getCommon(0) }));
+      return raws.map((raw) => mustParseTransction(raw, { common: this.node.getLatestCommon() }));
     }
   }
 ];
 
+/**
+ * Get method hander according to method name
+ * @param method Method name
+ * @returns
+ */
 function findHandler(method: string | number) {
   const handler = wireHandlers.find((h) => (typeof method === 'string' ? h.name === method : h.code === method));
   if (!handler) {
@@ -203,13 +208,15 @@ function findHandler(method: string | number) {
   return handler;
 }
 
+/**
+ * WireProtocolHandler is used to manage protocol communication between nodes
+ */
 export class WireProtocolHandler implements ProtocolHandler {
   readonly node: Node;
   readonly peer: Peer;
   readonly name: string;
   private _status?: NodeStatus;
 
-  private queue?: MsgQueue;
   private readonly waitingRequests = new Map<
     number,
     {
@@ -251,6 +258,9 @@ export class WireProtocolHandler implements ProtocolHandler {
     this.txAnnouncesLoop();
   }
 
+  /**
+   * Rotate and broadcast newly generated blocks
+   */
   private async newBlockAnnouncesLoop() {
     if (!(await this.handshakePromise)) {
       return;
@@ -264,6 +274,9 @@ export class WireProtocolHandler implements ProtocolHandler {
     }
   }
 
+  /**
+   * Rotate and broadcast newly generated transcations
+   */
   private async txAnnouncesLoop() {
     if (!(await this.handshakePromise)) {
       return;
@@ -283,10 +296,17 @@ export class WireProtocolHandler implements ProtocolHandler {
     }
   }
 
-  private getMsgQueue() {
-    return this.queue ? this.queue : (this.queue = this.peer.getMsgQueue(this.name));
+  private send(method: string | number, data: any) {
+    this.peer.send(this.name, this.encode(method, data));
   }
 
+  /**
+   * Filter out known data
+   * @param know Known data
+   * @param data All data
+   * @param toHash function convert data into buffer
+   * @returns Filtered data
+   */
   private filterHash<T>(know: Set<Buffer>, data: T[], toHash?: (t: T) => Buffer) {
     const filtered: T[] = [];
     for (const t of data) {
@@ -298,14 +318,32 @@ export class WireProtocolHandler implements ProtocolHandler {
     return filtered;
   }
 
+  /**
+   * Call filterHash, filter out known transactions
+   * @param data All transactions
+   * @param toHash function convert data into buffer
+   * @returns Filtered transactions
+   */
   private filterTxs<T>(data: T[], toHash?: (t: T) => Buffer) {
     return this.filterHash(this._knowTxs, data, toHash);
   }
 
+  /**
+   * Call filterHash, filter out known blocks
+   * @param data All blocks
+   * @param toHash function convert data into buffer
+   * @returns Filtered blocks
+   */
   private filterBlocks<T>(data: T[], toHash?: (t: T) => Buffer) {
     return this.filterHash(this._knowBlocks, data, toHash);
   }
 
+  /**
+   * Add known data information
+   * @param know Previous data set
+   * @param max Maximum number of messages allowed to be stored
+   * @param hashs Data to be added
+   */
   private knowHash(know: Set<Buffer>, max: number, hashs: Buffer[]) {
     if (hashs.length >= max) {
       throw new Error(`WireProtocolHandler invalid hash length: ${hashs.length}`);
@@ -319,23 +357,37 @@ export class WireProtocolHandler implements ProtocolHandler {
     }
   }
 
+  /**
+   * Call knowHash, add known transactions
+   * @param hashs Transactions to be added
+   */
   knowTxs(hashs: Buffer[]) {
     this.knowHash(this._knowTxs, maxKnownTxs, hashs);
   }
 
+  /**
+   * Call knowHash, add known blocks
+   * @param hashs Blocks to be added
+   */
   knowBlocks(hashs: Buffer[]) {
     this.knowHash(this._knowBlocks, maxKnownBlocks, hashs);
   }
-
+  /**
+   * Update node status
+   * @param newStatus New status
+   */
   updateStatus(newStatus: Partial<NodeStatus>) {
     this._status = { ...this._status!, ...newStatus };
   }
 
+  /**
+   * Node handshake and establish connection
+   */
   handshake() {
     if (!this.handshakeResolve) {
       throw new Error('WireProtocolHandler repeat handshake');
     }
-    this.getMsgQueue().send(0, this.node.status);
+    this.send(0, this.node.status);
     this.handshakeTimeout = setTimeout(() => {
       if (this.handshakeResolve) {
         this.handshakeResolve(false);
@@ -345,10 +397,19 @@ export class WireProtocolHandler implements ProtocolHandler {
     return this.handshakePromise;
   }
 
+  /**
+   * Response to handshake and update status
+   * @param status Node Status
+   */
   handshakeResponse(status: NodeStatus) {
     if (this.handshakeResolve) {
-      this.updateStatus(status);
-      this.handshakeResolve(true);
+      const localStatus = this.node.status;
+      if (!localStatus.genesisHash.equals(status.genesisHash) || localStatus.networkId !== status.networkId) {
+        this.handshakeResolve(false);
+      } else {
+        this.updateStatus(status);
+        this.handshakeResolve(true);
+      }
       this.handshakeResolve = undefined;
       if (this.handshakeTimeout) {
         clearTimeout(this.handshakeTimeout);
@@ -357,6 +418,11 @@ export class WireProtocolHandler implements ProtocolHandler {
     }
   }
 
+  /**
+   * Send protocol request call method to get information
+   * @param method Method name
+   * @param data Data
+   */
   request(method: string, data: any) {
     const handler = findHandler(method);
     if (!handler.response) {
@@ -374,7 +440,7 @@ export class WireProtocolHandler implements ProtocolHandler {
           reject(new PeerRequestTimeoutError(`WireProtocolHandler timeout request: ${method}`));
         }, 8000)
       });
-      this.getMsgQueue().send(method, data);
+      this.send(method, data);
     });
   }
 
@@ -397,10 +463,20 @@ export class WireProtocolHandler implements ProtocolHandler {
     WireProtocol.getPool().remove(this);
   }
 
+  /**
+   * Call the handler's encode function
+   * @param method Handler name
+   * @param data Data to be encode
+   * @returns Encoded data
+   */
   encode(method: string | number, data: any) {
     return rlp.encode(findHandler(method).encode.call(this, data));
   }
 
+  /**
+   * Handle requests by handler's process function
+   * @param data Data to be processed
+   */
   async handle(data: Buffer) {
     const [code, payload]: any = rlp.decode(data);
     const numCode = bufferToInt(code);
@@ -421,13 +497,13 @@ export class WireProtocolHandler implements ProtocolHandler {
       if (result) {
         if (Array.isArray(result)) {
           const [method, resps] = result;
-          this.getMsgQueue().send(method, resps);
+          this.send(method, resps);
         } else {
           result
             .then((response) => {
               if (response) {
                 const [method, resps] = response;
-                this.getMsgQueue().send(method, resps);
+                this.send(method, resps);
               }
             })
             .catch((err) => {
@@ -438,10 +514,16 @@ export class WireProtocolHandler implements ProtocolHandler {
     }
   }
 
+  /**
+   * Send new block message and add new block message to
+   * the set of known set
+   * @param block New block
+   * @param td Total difficulty
+   */
   private newBlock(block: Block, td: BN) {
     const filtered = this.filterBlocks([block], (b) => b.hash());
     if (filtered.length > 0) {
-      this.getMsgQueue().send('NewBlock', { block, td });
+      this.send('NewBlock', { block, td });
       this.knowBlocks([block.hash()]);
     }
   }
@@ -449,37 +531,68 @@ export class WireProtocolHandler implements ProtocolHandler {
   private newBlockHashes(hashes: Buffer[]) {
     const filtered = this.filterBlocks(hashes, (h) => h);
     if (filtered.length > 0) {
-      this.getMsgQueue().send('NewBlockHashes', filtered);
+      this.send('NewBlockHashes', filtered);
       this.knowBlocks(filtered);
     }
   }
 
+  /**
+   * Send new transactions which added to the pool
+   * and add them to the known transactions set
+   * the set of known set
+   * @param hashes
+   */
   private newPooledTransactionHashes(hashes: Buffer[]) {
     const filtered = this.filterTxs(hashes, (h) => h);
     if (filtered.length > 0) {
-      this.getMsgQueue().send('NewPooledTransactionHashes', filtered);
+      this.send('NewPooledTransactionHashes', filtered);
       this.knowTxs(filtered);
     }
   }
 
+  /**
+   * Make a request to get block headers
+   * @param start Start block number
+   * @param count Wanted blocks number
+   * @returns The block headers
+   */
   getBlockHeaders(start: number, count: number): Promise<BlockHeader[]> {
     return this.request('GetBlockHeaders', { start, count });
   }
 
+  /**
+   * Make a request to get block bodies
+   * @param headers Headers of blocks which wanted
+   * @returns The block bodies
+   */
   getBlockBodies(headers: BlockHeader[]): Promise<Transaction[][]> {
     return this.request('GetBlockBodies', headers);
   }
 
+  /**
+   * Make a request to get pooled transactions
+   * @param hashes Transactions hashes
+   * @returns Transactions
+   */
   getPooledTransactions(hashes: Buffer[]): Promise<Transaction[]> {
     return this.request('GetPooledTransactions', hashes);
   }
 
+  /**
+   * Push transactions into txAnnouncesQueue
+   * @param hashes Transactions' hashes
+   */
   announceTx(hashes: Buffer[]) {
     for (const hash of hashes) {
       this.txAnnouncesQueue.push(hash);
     }
   }
 
+  /**
+   * Push block into newBlockAnnouncesQueue
+   * @param block Block object
+   * @param td Totol difficulty
+   */
   announceNewBlock(block: Block, td: BN) {
     this.newBlockAnnouncesQueue.push({ block, td });
   }

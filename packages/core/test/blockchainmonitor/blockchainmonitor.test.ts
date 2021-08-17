@@ -3,8 +3,9 @@ import { expect } from 'chai';
 import { Block, Log } from '@gxchain2/structure';
 import { hexStringToBuffer, setLevel } from '@gxchain2/utils';
 import { DBSaveTxLookup, DBSaveReceipts } from '@gxchain2/database';
-import { RunBlockDebugOpts } from '@gxchain2/vm/dist/runBlock';
-import { Node } from '../../src';
+import { RunBlockOpts } from '@gxchain2-ethereumjs/vm/dist/runBlock';
+import { PostByzantiumTxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
+import { Node, postByzantiumTxReceiptsToReceipts } from '../../src';
 import { createNode, destroyNode, loadBlocksFromTestData } from '../util';
 
 setLevel('silent');
@@ -19,7 +20,7 @@ describe('BlockchainMonitor', async () => {
 
   async function processBlock(block: Block) {
     const lastHeader = await node.db.getHeader(block.header.parentHash, block.header.number.subn(1));
-    const runBlockOptions: RunBlockDebugOpts = {
+    const runBlockOptions: RunBlockOpts = {
       block,
       root: lastHeader.stateRoot,
       generate: true,
@@ -27,11 +28,11 @@ describe('BlockchainMonitor', async () => {
       skipBlockValidation: true,
       skipBalance: true
     };
-    const { result, block: newBlock } = await (await node.getWrappedVM(lastHeader.stateRoot, lastHeader.number)).runBlock(runBlockOptions);
+    const { receipts, block: newBlock } = await (await node.getVM(lastHeader.stateRoot, lastHeader.number)).runBlock(runBlockOptions);
     block = newBlock || block;
     const before = node.blockchain.latestBlock.hash();
     await node.blockchain.putBlock(block);
-    await node.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(result.receipts, block.hash(), block.header.number)));
+    await node.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(postByzantiumTxReceiptsToReceipts(receipts as PostByzantiumTxReceipt[]), block.hash(), block.header.number)));
     const after = node.blockchain.latestBlock.hash();
     if (!before.equals(after)) {
       await node.bcMonitor.newBlock(block);
@@ -69,7 +70,6 @@ describe('BlockchainMonitor', async () => {
         newBlockHashSet.add(newBlock.hash().toString('hex'));
       }
       if (newBlockHashSet.size !== eventSet.size) {
-        console.log(newBlockHashSet, eventSet);
         throw new Error("missing 'newHeads' event");
       }
       expect(newBlockHashSet.size, 'set size should be equal').be.equal(eventSet.size);

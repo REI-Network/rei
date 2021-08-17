@@ -2,10 +2,16 @@ import { bufferToHex } from 'ethereumjs-util';
 import { BlockHeader, Log } from '@gxchain2/structure';
 import { SyncingStatus, JSONRPC_VERSION } from './types';
 
+/**
+ * Websocket client, used to manage websocket connections
+ */
 export class WsClient {
   public readonly ws: WebSocket;
   private closed = false;
 
+  /**
+   * Whether the connection is disconnected
+   */
   get isClosed() {
     return this.closed;
   }
@@ -14,6 +20,10 @@ export class WsClient {
     this.ws = ws;
   }
 
+  /**
+   * Send message to remote client
+   * @param data - Data
+   */
   send(data: any) {
     if (!this.closed) {
       try {
@@ -22,10 +32,18 @@ export class WsClient {
     }
   }
 
+  /**
+   * Close connection
+   */
   close() {
     this.closed = true;
   }
 
+  /**
+   * Notify block headers to remote client
+   * @param subscription - Subscription identity
+   * @param heads - Block headers
+   */
   notifyHeader(subscription: string, heads: BlockHeader[]) {
     for (const header of heads) {
       this.send({
@@ -39,6 +57,11 @@ export class WsClient {
     }
   }
 
+  /**
+   * Notify logs to remote client
+   * @param subscription - Subscription identity
+   * @param logs - Logs
+   */
   notifyLogs(subscription: string, logs: Log[]) {
     for (const log of logs) {
       this.send({
@@ -52,6 +75,11 @@ export class WsClient {
     }
   }
 
+  /**
+   * Notify pending transactions to remote client
+   * @param subscription - Subscription identity
+   * @param hashes - Transactions hashes
+   */
   notifyPendingTransactions(subscription: string, hashes: Buffer[]) {
     for (const hash of hashes) {
       this.send({
@@ -65,6 +93,11 @@ export class WsClient {
     }
   }
 
+  /**
+   * Notify sync state to remote client
+   * @param subscription - Subscription identity
+   * @param status - Sync state
+   */
   notifySyncing(subscription: string, status: SyncingStatus) {
     this.send({
       jsonrpc: JSONRPC_VERSION,

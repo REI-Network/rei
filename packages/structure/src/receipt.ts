@@ -5,6 +5,9 @@ import { LogRawValues, Log } from './log';
 
 export type ReceiptRawValue = (Buffer | LogRawValues[])[];
 
+/**
+ * Transaction receipt class
+ */
 export class Receipt {
   cumulativeGasUsed: Buffer;
   bitvector: Buffer;
@@ -20,6 +23,9 @@ export class Receipt {
   transactionHash?: Buffer;
   transactionIndex?: number;
 
+  /**
+   * Return the cumulative gas in `BN` type
+   */
   get bnCumulativeGasUsed() {
     return new BN(this.cumulativeGasUsed);
   }
@@ -31,6 +37,11 @@ export class Receipt {
     this.status = status;
   }
 
+  /**
+   * Generate receipt object by given serialized data
+   * @param serialized - Serialized data
+   * @returns Receipt object
+   */
   public static fromRlpSerializedReceipt(serialized: Buffer) {
     const values = rlp.decode(serialized);
     if (!Array.isArray(values)) {
@@ -39,6 +50,11 @@ export class Receipt {
     return Receipt.fromValuesArray(values);
   }
 
+  /**
+   * Generate receipt object by given values
+   * @param values - Values
+   * @returns Receipt object
+   */
   public static fromValuesArray(values: ReceiptRawValue): Receipt {
     if (values.length !== 4) {
       throw new Error('Invalid receipt. Only expecting 4 values.');
@@ -52,14 +68,29 @@ export class Receipt {
     );
   }
 
+  /**
+   * Get the row data from receipt
+   * @returns
+   */
   raw(): ReceiptRawValue {
     return [unpadBuffer(toBuffer(this.status)), this.cumulativeGasUsed, this.bitvector, this.logs.map((l) => l.raw())];
   }
 
+  /**
+   * Serialize data
+   * @returns Encoded data
+   */
   serialize(): Buffer {
     return rlp.encode(this.raw());
   }
 
+  /**
+   * Add addtional information for receipt
+   * @param block - Block
+   * @param tx - Transaction
+   * @param gasUsed - Transaction gas used
+   * @param txIndex - Transaction index
+   */
   installProperties(block: Block, tx: Transaction, gasUsed: BN, txIndex: number) {
     this.blockHash = block.hash();
     this.blockNumber = block.header.number;
@@ -73,6 +104,10 @@ export class Receipt {
     this.logs.forEach((log, i) => log.installProperties(this, i));
   }
 
+  /**
+   * Convert receipt information to json format
+   * @returns JSON format receipt
+   */
   toRPCJSON() {
     return {
       blockHash: this.blockHash ? bufferToHex(this.blockHash) : undefined,

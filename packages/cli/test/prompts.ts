@@ -2,7 +2,7 @@ import path from 'path';
 import util from 'util';
 import prompts from 'prompts';
 import PeerId from 'peer-id';
-import Multiaddr from 'multiaddr';
+import { Multiaddr } from 'multiaddr';
 import { program } from 'commander';
 import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
@@ -47,14 +47,6 @@ const handler: {
   ban: async (node: Node, peerId: string) => {
     await node.networkMngr.ban(peerId);
     logger.info('removed');
-  },
-  lsenr: (node: Node, multiaddr: string) => {
-    const ma = new Multiaddr(multiaddr);
-    const peerId: PeerId = (node.networkMngr as any).libp2pNode.peerId;
-    const keypair = createKeypairFromPeerId(peerId);
-    const enr = ENR.createV4(keypair.publicKey);
-    enr.setLocationMultiaddr(ma as any);
-    logger.info('local:', enr.encodeTxt(keypair.privateKey));
   },
   lspeers: (node: Node) => {
     for (const peer of node.networkMngr.peers) {
@@ -107,22 +99,6 @@ const handler: {
   },
   lstxpool: async (node: Node) => {
     await node.txPool.ls();
-  },
-  lsscount: async (node: Node) => {
-    const scount = await node.db.getStoredSectionCount();
-    logger.info('scount', scount ? scount.toString() : 'undefined');
-  },
-  filterblock: async (node: Node, number: string, addresses: string, topics: string) => {
-    const { addressArray, topicArray } = parseAddressAndTopic(addresses, topics);
-    const filter = node.getFilter();
-    const logs = await filter.filterBlock(new BN(number), addressArray, topicArray);
-    logs.forEach((log) => logger.info(log.toRPCJSON()));
-  },
-  filterrange: async (node: Node, from: string, to: string, addresses: string, topics: string) => {
-    const { addressArray, topicArray } = parseAddressAndTopic(addresses, topics);
-    const filter = node.getFilter();
-    const logs = await filter.filterRange(new BN(from), new BN(to), addressArray, topicArray);
-    logs.forEach((log) => logger.info(log.toRPCJSON()));
   }
 };
 

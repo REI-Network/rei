@@ -302,6 +302,7 @@ export class Node {
       .on('removed', this.onPeerRemoved);
     await this.networkMngr.init();
     this.miner = new Miner({ node: this, ...options.mine });
+    await this.miner.init();
     await this.txPool.init();
     this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: BloomBitsBlocks, confirmsBlockNumber: ConfirmsBlockNumber });
     await this.bloomBitsIndexer.init();
@@ -403,6 +404,7 @@ export class Node {
         let parentValidatorSet: ValidatorSet | undefined;
         let parentSM: StakeManager | undefined;
         let detail: Validator | undefined;
+        let addedVotingPower = new BN(0);
         if (enableStaking) {
           parentSM = this.getStakeManager(vm, block);
 
@@ -429,11 +431,11 @@ export class Node {
           skipBlockValidation: true,
           root: parent.header.stateRoot,
           cliqueSigner: options.generate ? this.accMngr.getPrivateKey(block.header.cliqueSigner().buf) : undefined,
-          // if the current hardfork is less than `hardfork1`, then use the old logic `fixedGenReceiptTrie`
+          // if the current hardfork is less than `hardfork1`, then use the old logic `preHF1GenReceiptTrie`
           genReceiptTrie: isEnableReceiptRootFix(block._common) ? undefined : preHF1GenReceiptTrie,
           rewardAddress: async (state: IStateManager, reward: BN) => {
             if (parentEnableStaking) {
-              // if `hf1` is active, assign reward to contract adddress
+              // if staking is active, assign reward to contract adddress
               const commissionReward = reward.mul(detail!.commissionRate).divn(100);
               if (commissionReward.gtn(0)) {
                 await rewardAccount(state, detail!.commissionShare, commissionReward);
@@ -442,6 +444,8 @@ export class Node {
               if (validatorReward.gtn(0)) {
                 await rewardAccount(state, detail!.validatorKeeper, validatorReward);
               }
+              // add miner's voting power
+              addedVotingPower.iadd(reward);
             } else {
               // directly reward miner
               await rewardAccount(state, miner, reward);
@@ -473,7 +477,13 @@ export class Node {
           // filter changes and save validator set
           validatorSet = parentValidatorSet!.copy(block._common);
           const changes = StakeManager.filterValidatorChanges(receipts, block._common);
-          logger.debug('Node::processLoop, changes:', changes);
+          // if `addedVotingPower` is greater than 0, add stake value
+          if (addedVotingPower.gtn(0)) {
+            changes.stake(miner, addedVotingPower);
+          }
+          changes.forEach((vc) => {
+            logger.debug('Node::processLoop, change, address:', vc.validator.toString(), 'stake:', vc.stake.toString(), 'unstake:', vc.unstake.toString(), 'rate:', vc.commissionChange?.commissionRate.toString());
+          });
           validatorSet.mergeChanges(changes);
           this.validatorSets.set(block.header.stateRoot, validatorSet);
           activeSigners = validatorSet.activeSigners();
@@ -540,11 +550,6 @@ export class Node {
     });
   }
 
-  /**
-   * Push pending transactions to the transaction queue
-   * @param txs - Transactions
-   * @returns Insert result of each transaction
-   */
   async addPendingTxs(txs: Transaction[]) {
     await this.initPromise;
     return new Promise<boolean[]>((resolve) => {

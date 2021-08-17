@@ -3,8 +3,8 @@ import Message from '@gxchain2-ethereumjs/vm/dist/evm/message';
 import { Address, BN, MAX_INTEGER, setLengthLeft, toBuffer } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
 import { Receipt } from '@gxchain2/structure';
-import { createBufferFunctionalMap, hexStringToBuffer } from '@gxchain2/utils';
-import { ValidatorChange } from '../staking/validatorset';
+import { hexStringToBuffer } from '@gxchain2/utils';
+import { ValidatorChanges } from '../staking';
 import { bufferToAddress } from './utils';
 
 // function selector of stake manager
@@ -41,19 +41,7 @@ export class StakeManager {
   }
 
   static filterValidatorChanges(receipts: Receipt[], common: Common) {
-    const map = createBufferFunctionalMap<ValidatorChange>();
-    const getVC = (validator: Address) => {
-      let vc = map.get(validator.buf);
-      if (!vc) {
-        vc = {
-          validator: validator,
-          stake: [],
-          unstake: []
-        };
-        map.set(validator.buf, vc);
-      }
-      return vc;
-    };
+    const changes = new ValidatorChanges();
 
     const smaddr = bufferToAddress(hexStringToBuffer(common.param('vm', 'smaddr')));
     for (const receipt of receipts) {
@@ -61,32 +49,19 @@ export class StakeManager {
         if (log.address.equals(smaddr.buf)) {
           if (log.topics.length === 3 && log.topics[0].equals(events['Stake'])) {
             // Stake event
-            const value = new BN(log.topics[2]);
-            const validator = bufferToAddress(log.topics[1]);
-            const vc = getVC(validator);
-            vc.stake.push(value);
+            changes.stake(bufferToAddress(log.topics[1]), new BN(log.topics[2]));
           } else if (log.topics.length === 4 && log.topics[0].equals(events['StartUnstake'])) {
             // StartUnstake event
-            const value = new BN(log.topics[3]);
-            const validator = bufferToAddress(log.topics[2]);
-            const vc = getVC(validator);
-            vc.unstake.push(value);
+            changes.unstake(bufferToAddress(log.topics[2]), new BN(log.topics[3]));
           } else if (log.topics.length === 4 && log.topics[0].equals(events['SetCommissionRate'])) {
             // SetCommissionRate event
-            const commissionRate = new BN(log.topics[2]);
-            const updateTimestamp = new BN(log.topics[3]);
-            const validator = bufferToAddress(log.topics[1]);
-            const vc = getVC(validator);
-            vc.commissionChange = {
-              commissionRate,
-              updateTimestamp
-            };
+            changes.setCommissionRate(bufferToAddress(log.topics[1]), new BN(log.topics[2]), new BN(log.topics[3]));
           }
         }
       }
     }
 
-    return Array.from(map.values());
+    return changes;
   }
 
   private makeMessage(method: string, data: Buffer[]) {

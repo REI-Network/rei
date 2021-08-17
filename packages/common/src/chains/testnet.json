@@ -7,7 +7,7 @@
       "epoch": 30000
     }
   },
-  "name": "gxc2-testnest",
+  "name": "gxc2-testnet",
   "chainId": 12357,
   "networkId": 12357,
   "comment": "The gxchain2.0 test net",

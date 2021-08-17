@@ -3,6 +3,7 @@ import { Address, BN } from 'ethereumjs-util';
 import { createBufferFunctionalMap, logger } from '@gxchain2/utils';
 import { Common } from '@gxchain2/common';
 import { StakeManager, Validator } from '../contracts';
+import { ValidatorChanges } from './validatorchanges';
 
 export type ValidatorInfo = {
   validator: Address;
@@ -12,8 +13,8 @@ export type ValidatorInfo = {
 
 export type ValidatorChange = {
   validator: Address;
-  stake: BN[];
-  unstake: BN[];
+  stake: BN;
+  unstake: BN;
   commissionChange?: {
     commissionRate: BN;
     updateTimestamp: BN;
@@ -114,11 +115,11 @@ export class ValidatorSet {
   }
 
   // TODO: if the changed validator is an active validator, the active list maybe not be dirty
-  mergeChanges(changes: ValidatorChange[]) {
+  mergeChanges(changes: ValidatorChanges) {
     let dirty = false;
-    for (const vc of changes) {
-      const stake = vc.stake.reduce((sum, v) => sum.add(v), new BN(0));
-      const unstake = vc.unstake.reduce((sum, v) => sum.add(v), new BN(0));
+    changes.forEach((vc) => {
+      const stake = vc.stake;
+      const unstake = vc.unstake;
       let v: ValidatorInfo | undefined;
       if (stake.gt(unstake)) {
         dirty = true;
@@ -159,7 +160,7 @@ export class ValidatorSet {
         v.detail.commissionRate = vc.commissionChange.commissionRate;
         v.detail.updateTimestamp = vc.commissionChange.updateTimestamp;
       }
-    }
+    });
 
     if (dirty) {
       this.sort();

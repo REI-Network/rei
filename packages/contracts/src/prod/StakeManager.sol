@@ -78,7 +78,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     event IndexedValidator(address indexed validator, uint256 indexed votingPower);
 
     /**
-     * @dev Emit when a new validator is indexed
+     * @dev Emit when a new validator is unindexed
      * @param validator     Validator address
      */
     event UnindexedValidator(address indexed validator);

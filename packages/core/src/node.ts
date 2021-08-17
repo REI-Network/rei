@@ -26,7 +26,8 @@ import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
 import { BlockchainMonitor } from './blockchainmonitor';
 import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
-import { StakeManager, Config, ValidatorSet, ValidatorSets, Validator } from './staking';
+import { ValidatorSet, ValidatorSets } from './staking';
+import { StakeManager, Config, Validator } from './contracts';
 import { consensusValidateHeader } from './validation';
 
 const timeoutBanTime = 60 * 5 * 1000;
@@ -417,7 +418,7 @@ export class Node {
             parentValidatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
             consensusValidateHeader.call(block.header, this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number));
           } else {
-            parentValidatorSet = await parentSM.createValidatorSet();
+            parentValidatorSet = await ValidatorSet.createFromStakeManager(parentSM);
 
             // get validator detail information
             detail = await parentValidatorSet.getActiveValidatorDetail(miner, parentSM);

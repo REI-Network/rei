@@ -4,7 +4,7 @@ import { Address, BN, MAX_INTEGER, setLengthLeft, toBuffer } from 'ethereumjs-ut
 import { Common } from '@gxchain2/common';
 import { Receipt } from '@gxchain2/structure';
 import { createBufferFunctionalMap, hexStringToBuffer } from '@gxchain2/utils';
-import { ValidatorInfo, ValidatorSet, ValidatorChange } from './validatorset';
+import { ValidatorChange } from '../staking/validatorset';
 import { bufferToAddress } from './utils';
 
 // function selector of stake manager
@@ -32,8 +32,8 @@ export type Validator = {
 };
 
 export class StakeManager {
-  private evm!: EVM;
-  private common!: Common;
+  evm!: EVM;
+  common!: Common;
 
   constructor(evm: EVM, common: Common) {
     this.evm = evm;
@@ -58,7 +58,6 @@ export class StakeManager {
     const smaddr = bufferToAddress(hexStringToBuffer(common.param('vm', 'smaddr')));
     for (const receipt of receipts) {
       for (const log of receipt.logs) {
-        console.log('log:', log);
         if (log.address.equals(smaddr.buf)) {
           if (log.topics.length === 3 && log.topics[0].equals(events['Stake'])) {
             // Stake event
@@ -152,18 +151,5 @@ export class StakeManager {
       execResult: { returnValue }
     } = await this.evm.executeMessage(this.makeMessage('getVotingPowerByIndex', [setLengthLeft(index.toBuffer(), 32)]));
     return new BN(returnValue);
-  }
-
-  async createValidatorSet() {
-    const validators: ValidatorInfo[] = [];
-    const length = await this.indexedValidatorsLength();
-    for (let i = new BN(0); i.lt(length); i.iaddn(1)) {
-      const validator = await this.indexedValidatorsByIndex(i);
-      const votingPower = await this.getVotingPowerByIndex(i);
-      if (votingPower.gtn(0)) {
-        validators.push({ validator, votingPower });
-      }
-    }
-    return ValidatorSet.createFromValidatorInfo(validators, this.common);
   }
 }

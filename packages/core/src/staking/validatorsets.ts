@@ -1,6 +1,6 @@
 import { createBufferFunctionalMap } from '@gxchain2/utils';
 import { ValidatorSet } from './validatorset';
-import { StakeManager } from './stakemanager';
+import { StakeManager } from '../contracts';
 
 const maxSize = 101;
 
@@ -18,7 +18,7 @@ export class ValidatorSets {
   async get(stateRoot: Buffer, sm: StakeManager) {
     let set = this.sets.get(stateRoot);
     if (!set) {
-      set = await sm.createValidatorSet();
+      set = await ValidatorSet.createFromStakeManager(sm);
       this.set(stateRoot, set);
     }
     return set;

@@ -2,7 +2,7 @@ import Heap from 'qheap';
 import { Address, BN } from 'ethereumjs-util';
 import { createBufferFunctionalMap, logger } from '@gxchain2/utils';
 import { Common } from '@gxchain2/common';
-import { StakeManager, Validator } from './stakemanager';
+import { StakeManager, Validator } from '../contracts';
 
 export type ValidatorInfo = {
   validator: Address;
@@ -45,6 +45,19 @@ export class ValidatorSet {
     }
     vs.sort();
     return vs;
+  }
+
+  static async createFromStakeManager(sm: StakeManager) {
+    const validators: ValidatorInfo[] = [];
+    const length = await sm.indexedValidatorsLength();
+    for (let i = new BN(0); i.lt(length); i.iaddn(1)) {
+      const validator = await sm.indexedValidatorsByIndex(i);
+      const votingPower = await sm.getVotingPowerByIndex(i);
+      if (votingPower.gtn(0)) {
+        validators.push({ validator, votingPower });
+      }
+    }
+    return ValidatorSet.createFromValidatorInfo(validators, sm.common);
   }
 
   static createGenesisValidatorSet(common: Common) {

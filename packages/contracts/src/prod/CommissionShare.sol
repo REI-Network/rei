@@ -3,9 +3,9 @@
 pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "./interfaces/IConfig.sol";
-import "./interfaces/ICommissionShare.sol";
-import "./libraries/Math.sol";
+import "../interfaces/IConfig.sol";
+import "../interfaces/ICommissionShare.sol";
+import "../libraries/Math.sol";
 
 contract CommissionShare is ERC20, ICommissionShare {
     using SafeMath for uint256;

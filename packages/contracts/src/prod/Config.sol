@@ -2,7 +2,7 @@
 
 pragma solidity ^0.6.0;
 
-import "./interfaces/IConfig.sol";
+import "../interfaces/IConfig.sol";
 
 // TODO: DAO logic
 contract Config_prod is IConfig {

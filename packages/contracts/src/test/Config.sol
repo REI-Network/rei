@@ -2,7 +2,7 @@
 
 pragma solidity ^0.6.0;
 
-import "./interfaces/IConfig.sol";
+import "../interfaces/IConfig.sol";
 
 // This is just a contract used during testing.
 // The officially released contract is in `Config_prod.sol`.

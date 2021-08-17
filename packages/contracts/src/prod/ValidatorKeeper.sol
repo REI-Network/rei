@@ -2,7 +2,7 @@
 
 pragma solidity ^0.6.0;
 
-import "./interfaces/IValidatorKeeper.sol";
+import "../interfaces/IValidatorKeeper.sol";
 import "./Keeper.sol";
 
 ///////////////////// only for test /////////////////////

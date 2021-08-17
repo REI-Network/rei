@@ -70,6 +70,19 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      */
     event SetCommissionRate(address indexed validator, uint256 indexed rate, uint256 indexed timestamp);
 
+    /**
+     * @dev Emit when a new validator is indexed
+     * @param validator     Validator address
+     * @param votingPower   Validator voting power
+     */
+    event IndexedValidator(address indexed validator, uint256 indexed votingPower);
+
+    /**
+     * @dev Emit when a new validator is indexed
+     * @param validator     Validator address
+     */
+    event UnindexedValidator(address indexed validator);
+
     constructor(address _config, address[] memory genesisValidators) public {
         config = IConfig(_config);
         for (uint256 i = 0; i < genesisValidators.length; i = i.add(1)) {
@@ -301,8 +314,10 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         shares = CommissionShare(v.commissionShare).mint{ value: msg.value }(to);
         // if validator voting power is greater than `minIndexVotingPower`,
         // add it to `_indexedValidators`
-        if (!_indexedValidators.contains(v.id) && getVotingPower(v) >= config.minIndexVotingPower()) {
+        uint256 votingPower = getVotingPower(v);
+        if (!_indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
             _indexedValidators.set(v.id, validator);
+            emit IndexedValidator(validator, votingPower);
         }
         emit Stake(validator, msg.value, to, shares);
     }
@@ -353,9 +368,10 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         CommissionShare(v.commissionShare).transferFrom(msg.sender, address(this), shares);
         uint256 amount = CommissionShare(v.commissionShare).burn(shares, address(this));
         require(amount >= config.minUnstakeAmount(), "StakeManager: invalid unstake amount");
-        if (getVotingPower(v) < config.minIndexVotingPower()) {
+        if (_indexedValidators.contains(v.id) && getVotingPower(v) < config.minIndexVotingPower()) {
             // if the validator's voting power is less than `minIndexVotingPower`, remove him from `_indexedValidators`
             _indexedValidators.remove(v.id);
+            emit UnindexedValidator(validator);
         }
         return doStartUnstake(validator, v.unstakeKeeper, to, amount);
     }
@@ -374,9 +390,10 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         require(v.validatorKeeper != address(0) && v.unstakeKeeper != address(0), "StakeManager: invalid validator");
 
         ValidatorKeeper(v.validatorKeeper).claim(amount, address(this));
-        if (getVotingPower(v) < config.minIndexVotingPower()) {
+        if (_indexedValidators.contains(v.id) && getVotingPower(v) < config.minIndexVotingPower()) {
             // if the validator's voting power is less than `minIndexVotingPower`, remove him from `_indexedValidators`
             _indexedValidators.remove(v.id);
+            emit UnindexedValidator(msg.sender);
         }
         return doStartUnstake(msg.sender, v.unstakeKeeper, to, amount);
     }
@@ -430,8 +447,9 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      */
     function removeIndexedValidator(address validator) external override {
         Validator memory v = _validators[validator];
-        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && _indexedValidators.contains(v.id) && getVotingPower(v) < config.minIndexVotingPower(), "StakeManager: invalid validator");
+        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && _indexedValidators.contains(v.id) && getVotingPower(v) < config.minIndexVotingPower());
         _indexedValidators.remove(v.id);
+        emit UnindexedValidator(validator);
     }
 
     /**
@@ -441,8 +459,11 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      */
     function addIndexedValidator(address validator) external override {
         Validator memory v = _validators[validator];
-        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && !_indexedValidators.contains(v.id) && getVotingPower(v) >= config.minIndexVotingPower(), "StakeManager: invalid validator");
+        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && !_indexedValidators.contains(v.id));
+        uint256 votingPower = getVotingPower(v);
+        require(votingPower >= config.minIndexVotingPower());
         _indexedValidators.set(v.id, validator);
+        emit IndexedValidator(validator, votingPower);
     }
 
     ///////////////////// only for test /////////////////////

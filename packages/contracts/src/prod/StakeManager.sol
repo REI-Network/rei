@@ -299,7 +299,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
             v = createValidator(validator);
         }
         shares = CommissionShare(v.commissionShare).mint{ value: msg.value }(to);
-        // if validator voting power is large than `minIndexVotingPower`,
+        // if validator voting power is greater than `minIndexVotingPower`,
         // add it to `_indexedValidators`
         if (!_indexedValidators.contains(v.id) && getVotingPower(v) >= config.minIndexVotingPower()) {
             _indexedValidators.set(v.id, validator);
@@ -424,9 +424,9 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
 
     /**
-     * @dev Remove validator form map _indexedValidators if the balance of commissionShare and validatorKeeper are both zero
+     * @dev Remove the validator from `_indexedValidators` if the voting power is less than `minIndexVotingPower`
      *      This can be called by anyone.
-     * @param validator           to deleted address
+     * @param validator           Validator address
      */
     function removeIndexedValidator(address validator) external override {
         Validator memory v = _validators[validator];
@@ -435,9 +435,9 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
 
     /**
-     * @dev Add validator into map _indexedValidators if it not in the map and the balance of commissionShare and validatorKeeper are not both zero
+     * @dev Add the validator to `_indexedValidators` if the voting power is greater than `minIndexVotingPower`
      *      This can be called by anyone.
-     * @param validator          to added address
+     * @param validator          Validator address
      */
     function addIndexedValidator(address validator) external override {
         Validator memory v = _validators[validator];

@@ -218,15 +218,15 @@ describe('StakeManger', () => {
   });
 
   it('should remove and add indexed validator correctly', async () => {
-    const ifValidatorExisted1 = await stakeManager.methods.indexedValidatorsExisted(3).call();
-    expect(ifValidatorExisted1, 'should not existed').be.equal(false);
+    const ifValidatorExisted1 = await stakeManager.methods.indexedValidatorsExists(3).call();
+    expect(ifValidatorExisted1, 'should not exist').be.equal(false);
 
     const stakeAmount = toBN('100');
     await stakeManager.methods.stake(validator2, deployer).send({ value: stakeAmount.toString() });
     const validatorInfo = await stakeManager.methods.validators(validator2).call();
     const validatorAddress = await stakeManager.methods.indexedValidatorsById(validatorInfo.id).call();
-    const ifValidatorExisted2 = await stakeManager.methods.indexedValidatorsExisted(validatorInfo.id).call();
-    expect(ifValidatorExisted2, 'validator2 should existed').be.equal(true);
+    const ifValidatorExisted2 = await stakeManager.methods.indexedValidatorsExists(validatorInfo.id).call();
+    expect(ifValidatorExisted2, 'validator2 should exist').be.equal(true);
     expect(validatorAddress, 'address should be equal').be.equal(validator2);
 
     const commissionShare = await createCommissionShareContract(validator2);
@@ -234,17 +234,17 @@ describe('StakeManger', () => {
     await stakeManager.methods.startUnstake(validator2, deployer, stakeAmount.toString()).send();
     await upTimestamp(unstakeDelay);
     await stakeManager.methods.doUnstake().send();
-    const ifValidatorExisted3 = await stakeManager.methods.indexedValidatorsExisted(validatorInfo.id).call();
+    const ifValidatorExisted3 = await stakeManager.methods.indexedValidatorsExists(validatorInfo.id).call();
     expect(ifValidatorExisted3, 'validator2 should be removed').be.equal(false);
 
     await stakeManager.methods.reward(validator2).send({ value: toBN(1000) });
     await stakeManager.methods.addIndexedValidator(validator2).send();
-    const ifValidatorExisted4 = await stakeManager.methods.indexedValidatorsExisted(validatorInfo.id).call();
+    const ifValidatorExisted4 = await stakeManager.methods.indexedValidatorsExists(validatorInfo.id).call();
     expect(ifValidatorExisted4, 'validator2 should be added').be.equal(true);
 
     await stakeManager.methods.slash(validator2, 1).send();
     await stakeManager.methods.removeIndexedValidator(validator2).send();
-    const ifValidatorExisted5 = await stakeManager.methods.indexedValidatorsExisted(validatorInfo.id).call();
+    const ifValidatorExisted5 = await stakeManager.methods.indexedValidatorsExists(validatorInfo.id).call();
     expect(ifValidatorExisted5, 'validator2 should be removed').be.equal(false);
   });
 

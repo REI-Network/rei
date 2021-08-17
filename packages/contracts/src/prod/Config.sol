@@ -24,6 +24,11 @@ contract Config_prod is IConfig {
         return 5e17;
     }
 
+    function minIndexVotingPower() external view override returns (uint256) {
+        // 10 GXC
+        return 10e18;
+    }
+
     function getFactorByReason(uint8 reason) external view override returns (uint8) {
         if (reason == 0) {
             return 40;

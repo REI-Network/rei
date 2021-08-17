@@ -94,10 +94,10 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
 
     /**
-     * @dev Judge indexed validator existed or not by id.
+     * @dev Determine whether the index validator exists by id.
      * @param id            The validator id
      */
-    function indexedValidatorsExisted(uint256 id) external view override returns (bool) {
+    function indexedValidatorsExists(uint256 id) external view override returns (bool) {
         return _indexedValidators.contains(id);
     }
 
@@ -141,11 +141,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      * @param id            The validator id
      */
     function getVotingPowerById(uint256 id) external view override returns (uint256) {
-        Validator memory v = _validators[_indexedValidators.get(id)];
-        if (v.commissionShare == address(0) || v.validatorKeeper == address(0)) {
-            return 0;
-        }
-        return v.commissionShare.balance.add(v.validatorKeeper.balance);
+        return getVotingPower(_validators[_indexedValidators.get(id)]);
     }
 
     /**
@@ -154,7 +150,15 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      * @param validator     Validator address
      */
     function getVotingPowerByAddress(address validator) external view override returns (uint256) {
-        Validator memory v = _validators[validator];
+        return getVotingPower(_validators[validator]);
+    }
+
+    /**
+     * @dev Get the voting power by validator address.
+     *      If the validator doesn't exist, return 0
+     * @param v              Validator
+     */
+    function getVotingPower(Validator memory v) private view returns (uint256) {
         if (v.commissionShare == address(0) || v.validatorKeeper == address(0)) {
             return 0;
         }
@@ -263,19 +267,19 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     receive() external payable {}
 
     // create a new validator
-    function createValidator(address validator) private returns (uint256 id, address commissionShare) {
-        id = _validatorId;
+    function createValidator(address validator) private returns (Validator memory) {
+        uint256 id = _validatorId;
         Validator storage v = _validators[validator];
         v.id = id;
         v.validatorKeeper = address(new ValidatorKeeper(address(config), validator));
-        commissionShare = address(new CommissionShare(address(config), validator));
-        v.commissionShare = commissionShare;
+        v.commissionShare = address(new CommissionShare(address(config), validator));
         v.unstakeKeeper = address(new UnstakeKeeper(address(config), validator));
         // don't change the commision rate and the update timestamp
         // the validator may want to set commission rate immediately
         // v.commissionRate = 0;
         // v.updateTimestamp = 0;
         _validatorId = id.add(1);
+        return v;
     }
 
     /**
@@ -290,19 +294,16 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         require(msg.value >= config.minStakeAmount(), "StakeManager: invalid stake amount");
 
         Validator memory v = _validators[validator];
-        uint256 id = v.id;
-        address commissionShare = v.commissionShare;
-        if (commissionShare == address(0)) {
-            // if the validator doesn't exist, create a new one
-            (id, commissionShare) = createValidator(validator);
-            // add the new validator to `_indexedValidators`
-            _indexedValidators.set(id, validator);
-        } else if (!_indexedValidators.contains(id)) {
-            // if the validator is exists but the voting power is 0, add it back to `_indexedValidators`
-            _indexedValidators.set(id, validator);
+        // if the validator doesn't exist, create a new one
+        if (v.commissionShare == address(0)) {
+            v = createValidator(validator);
         }
-
-        shares = CommissionShare(commissionShare).mint{ value: msg.value }(to);
+        shares = CommissionShare(v.commissionShare).mint{ value: msg.value }(to);
+        // if validator voting power is large than `minIndexVotingPower`,
+        // add it to `_indexedValidators`
+        if (!_indexedValidators.contains(v.id) && getVotingPower(v) >= config.minIndexVotingPower()) {
+            _indexedValidators.set(v.id, validator);
+        }
         emit Stake(validator, msg.value, to, shares);
     }
 
@@ -352,8 +353,8 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         CommissionShare(v.commissionShare).transferFrom(msg.sender, address(this), shares);
         uint256 amount = CommissionShare(v.commissionShare).burn(shares, address(this));
         require(amount >= config.minUnstakeAmount(), "StakeManager: invalid unstake amount");
-        if (v.commissionShare.balance == 0 && v.validatorKeeper.balance == 0) {
-            // if the validator's voting power is 0, remove him from `_indexedValidators`
+        if (getVotingPower(v) < config.minIndexVotingPower()) {
+            // if the validator's voting power is less than `minIndexVotingPower`, remove him from `_indexedValidators`
             _indexedValidators.remove(v.id);
         }
         return doStartUnstake(validator, v.unstakeKeeper, to, amount);
@@ -373,8 +374,8 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         require(v.validatorKeeper != address(0) && v.unstakeKeeper != address(0), "StakeManager: invalid validator");
 
         ValidatorKeeper(v.validatorKeeper).claim(amount, address(this));
-        if (v.commissionShare.balance == 0 && v.validatorKeeper.balance == 0) {
-            // if the validator's voting power is 0, remove him from `_indexedValidators`
+        if (getVotingPower(v) < config.minIndexVotingPower()) {
+            // if the validator's voting power is less than `minIndexVotingPower`, remove him from `_indexedValidators`
             _indexedValidators.remove(v.id);
         }
         return doStartUnstake(msg.sender, v.unstakeKeeper, to, amount);
@@ -429,7 +430,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      */
     function removeIndexedValidator(address validator) external override {
         Validator memory v = _validators[validator];
-        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && _indexedValidators.contains(v.id) && v.commissionShare.balance == 0 && v.validatorKeeper.balance == 0, "StakeManager: invalid validator");
+        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && _indexedValidators.contains(v.id) && getVotingPower(v) < config.minIndexVotingPower(), "StakeManager: invalid validator");
         _indexedValidators.remove(v.id);
     }
 
@@ -440,7 +441,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      */
     function addIndexedValidator(address validator) external override {
         Validator memory v = _validators[validator];
-        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && !_indexedValidators.contains(v.id) && (v.commissionShare.balance > 0 || v.validatorKeeper.balance > 0), "StakeManager: invalid validator");
+        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && !_indexedValidators.contains(v.id) && getVotingPower(v) >= config.minIndexVotingPower(), "StakeManager: invalid validator");
         _indexedValidators.set(v.id, validator);
     }
 

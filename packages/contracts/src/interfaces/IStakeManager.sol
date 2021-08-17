@@ -24,7 +24,7 @@ interface IStakeManager {
 
     function indexedValidatorsLength() external view returns (uint256);
 
-    function indexedValidatorsExisted(uint256 id) external view returns (bool);
+    function indexedValidatorsExists(uint256 id) external view returns (bool);
 
     function indexedValidatorsByIndex(uint256 index) external view returns (address);
 

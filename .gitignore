@@ -14,5 +14,5 @@ packages/contracts/deployments
 packages/contracts/docs
 
 # Test contracts
-!packages/contracts/test/Config.sol 
-packages/contracts/test
+!packages/contracts/src/test/Config.sol 
+packages/contracts/src/test

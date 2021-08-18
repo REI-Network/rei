@@ -222,3 +222,20 @@ task('vp', 'Get validator voting power by address')
     const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
     console.log(await stakeManager.methods.getVotingPowerByAddress(taskArgs.validator).call());
   });
+
+task('reward', 'Reward validator')
+  .addParam('validator', 'validator address')
+  .addParam('value', 'reward amount')
+  .addFlag('ether', 'use ether as unit')
+  .addOptionalParam('address', 'stake manager contract address')
+  .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
+    const { deployer } = await getNamedAccounts();
+    const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
+    if (taskArgs.ether) {
+      taskArgs.value = toBN(taskArgs.value)
+        .mul(new BN(10).pow(new BN(18)))
+        .toString();
+    }
+    await stakeManager.methods.reward(taskArgs.validator).send({ value: taskArgs.value });
+    console.log('Reward succeed');
+  });

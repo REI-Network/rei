@@ -33,17 +33,23 @@ export class ValidatorChanges {
   }
 
   stake(validator: Address, value: BN) {
-    this.getChange(validator).stake.iadd(value);
+    if (!this.unindexedValidators.has(validator)) {
+      this.getChange(validator).stake.iadd(value);
+    }
   }
 
   unstake(validator: Address, value: BN) {
-    this.getChange(validator).unstake.iadd(value);
+    if (!this.unindexedValidators.has(validator)) {
+      this.getChange(validator).unstake.iadd(value);
+    }
   }
 
   setCommissionRate(validator: Address, commissionRate: BN, updateTimestamp: BN) {
-    this.getChange(validator).commissionChange = {
-      commissionRate,
-      updateTimestamp
-    };
+    if (!this.unindexedValidators.has(validator)) {
+      this.getChange(validator).commissionChange = {
+        commissionRate,
+        updateTimestamp
+      };
+    }
   }
 }

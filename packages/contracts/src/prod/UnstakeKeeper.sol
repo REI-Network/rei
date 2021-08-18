@@ -2,13 +2,10 @@
 
 pragma solidity ^0.6.0;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../interfaces/IUnstakeKeeper.sol";
 import "./Keeper.sol";
 
 contract UnstakeKeeper is Keeper, IUnstakeKeeper {
-    using SafeMath for uint256;
-
     // shares total supply
     uint256 private _totalSupply;
 

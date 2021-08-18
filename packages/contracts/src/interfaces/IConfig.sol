@@ -5,6 +5,8 @@ pragma solidity ^0.6.0;
 interface IConfig {
     function stakeManager() external view returns (address);
 
+    function systemCaller() external view returns (address);
+
     function unstakeDelay() external view returns (uint256);
 
     function minStakeAmount() external view returns (uint256);

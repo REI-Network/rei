@@ -8,13 +8,22 @@ import "../interfaces/IConfig.sol";
 // The officially released contract is in `Config_prod.sol`.
 contract Config_test is IConfig {
     address private s;
+    address private c;
 
     function setStakeManager(address _s) external {
         s = _s;
     }
 
+    function setSystemCaller(address _c) external {
+        c = _c;
+    }
+
     function stakeManager() external view override returns (address) {
         return s;
+    }
+
+    function systemCaller() external view override returns (address) {
+        return c;
     }
 
     function unstakeDelay() external view override returns (uint256) {

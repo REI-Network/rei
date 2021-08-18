@@ -91,6 +91,11 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         }
     }
 
+    modifier onlySystemCaller() {
+        require(msg.sender == config.systemCaller(), "StakeManager: invalid caller");
+        _;
+    }
+
     /**
      * @dev Get the validator information by validator address.
      * @param validator     Validator address
@@ -198,82 +203,6 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      */
     function unstakeQueue(uint256 index) external view override returns (Unstake memory) {
         return _unstakeQueue[index];
-    }
-
-    /**
-     * @dev Estimate the mininual stake amount for validator.
-     *      If the stake amount is less than this value, transaction will fail.
-     * @param validator    Validator address
-     */
-    function estimateMinStakeAmount(address validator) external view override returns (uint256 amount) {
-        address commissionShare = _validators[validator].commissionShare;
-        if (commissionShare == address(0)) {
-            amount = config.minStakeAmount();
-        } else {
-            amount = CommissionShare(commissionShare).estimateStakeAmount(1);
-            if (amount < config.minStakeAmount()) {
-                amount = config.minStakeAmount();
-            }
-        }
-    }
-
-    /**
-     * @dev Estimate how much GXC should be stake, if user wants to get the number of shares.
-     * @param validator    Validator address
-     * @param shares       Number of shares
-     */
-    function estimateStakeAmount(address validator, uint256 shares) external view override returns (uint256 amount) {
-        address commissionShare = _validators[validator].commissionShare;
-        if (commissionShare == address(0)) {
-            amount = shares;
-        } else {
-            amount = CommissionShare(commissionShare).estimateStakeAmount(shares);
-        }
-    }
-
-    /**
-     * @dev Estimate the mininual unstake shares for validator.
-     *      If the unstake shares is less than this value, transaction will fail.
-     *      If the validator doesn't exist, return 0.
-     * @param validator    Validator address
-     */
-    function estimateMinUnstakeShares(address validator) external view override returns (uint256 shares) {
-        address commissionShare = _validators[validator].commissionShare;
-        if (commissionShare == address(0)) {
-            shares = 0;
-        } else {
-            shares = CommissionShare(commissionShare).estimateUnstakeShares(config.minUnstakeAmount());
-        }
-    }
-
-    /**
-     * @dev Estimate how much shares should be unstake, if user wants to get the amount of GXC.
-     *      If the validator doesn't exist, return 0.
-     * @param validator    Validator address
-     * @param amount       Number of GXC
-     */
-    function estimateUnstakeShares(address validator, uint256 amount) external view override returns (uint256 shares) {
-        address commissionShare = _validators[validator].commissionShare;
-        if (commissionShare == address(0)) {
-            shares = 0;
-        } else {
-            shares = CommissionShare(commissionShare).estimateUnstakeShares(amount);
-        }
-    }
-
-    /**
-     * @dev Estimate how much GXC can be claim, if unstake the number of shares(when unstake timeout).
-     *      If the validator doesn't exist, return 0.
-     * @param validator    Validator address
-     * @param shares       Number of shares
-     */
-    function estimateUnstakeAmount(address validator, uint256 shares) external view override returns (uint256 amount) {
-        address unstakeKeeper = _validators[validator].unstakeKeeper;
-        if (unstakeKeeper == address(0)) {
-            amount = 0;
-        } else {
-            amount = UnstakeKeeper(unstakeKeeper).estimateUnstakeAmount(shares);
-        }
     }
 
     // receive GXC transfer
@@ -447,7 +376,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      */
     function removeIndexedValidator(address validator) external override {
         Validator memory v = _validators[validator];
-        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && _indexedValidators.contains(v.id) && getVotingPower(v) < config.minIndexVotingPower());
+        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && _indexedValidators.contains(v.id) && getVotingPower(v) < config.minIndexVotingPower(), "StakeManager: invalid validator");
         _indexedValidators.remove(v.id);
         emit UnindexedValidator(validator);
     }
@@ -459,10 +388,52 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      */
     function addIndexedValidator(address validator) external override {
         Validator memory v = _validators[validator];
-        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && !_indexedValidators.contains(v.id));
+        require(v.commissionShare != address(0) && v.validatorKeeper != address(0) && !_indexedValidators.contains(v.id), "StakeManager: invalid validator");
         uint256 votingPower = getVotingPower(v);
         require(votingPower >= config.minIndexVotingPower());
         _indexedValidators.set(v.id, validator);
         emit IndexedValidator(validator, votingPower);
+    }
+
+    /**
+     * @dev Reward validator, only can be called by system caller
+     * @param validator         Validator address
+     */
+    function reward(address validator) external payable onlySystemCaller returns (uint256 validatorReward, uint256 commissionReward) {
+        Validator memory v = _validators[validator];
+        require(v.commissionShare != address(0), "StakeManager: invalid validator");
+        commissionReward = msg.value.mul(v.commissionRate).div(100);
+        validatorReward = msg.value.sub(commissionReward);
+        if (commissionReward > 0) {
+            CommissionShare(v.commissionShare).reward{ value: commissionReward }();
+        }
+        if (validatorReward > 0) {
+            ValidatorKeeper(v.validatorKeeper).reward{ value: validatorReward }();
+        }
+        if (!_indexedValidators.contains(v.id)) {
+            uint256 votingPower = getVotingPower(v);
+            if (votingPower >= config.minIndexVotingPower()) {
+                _indexedValidators.set(v.id, validator);
+                emit IndexedValidator(validator, votingPower);
+            }
+        }
+    }
+
+    /**
+     * @dev Slash validator, only can be called by system caller
+     *      After all keepers slash themselves and transfer reduced amount to the stake manager,
+     *      blockchain will burn the balance of stake manager
+     * @param validator         Validator address
+     * @param reason            Slash reason
+     */
+    function slash(address validator, uint8 reason) external onlySystemCaller returns (uint256 amount) {
+        Validator memory v = _validators[validator];
+        require(v.commissionShare != address(0), "StakeManager: invalid validator");
+        uint8 factor = config.getFactorByReason(reason);
+        amount = CommissionShare(v.commissionShare).slash(factor).add(ValidatorKeeper(v.validatorKeeper).slash(factor)).add(UnstakeKeeper(v.unstakeKeeper).slash(factor));
+        if (_indexedValidators.contains(v.id) && getVotingPower(v) < config.minIndexVotingPower()) {
+            _indexedValidators.remove(v.id);
+            emit UnindexedValidator(validator);
+        }
     }
 }

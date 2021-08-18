@@ -4,19 +4,12 @@ pragma solidity ^0.6.0;
 
 import "../interfaces/IConfig.sol";
 import "../interfaces/IKeeper.sol";
+import "./Variable.sol";
 
-contract Keeper is IKeeper {
-    IConfig public config;
-
+abstract contract Keeper is Variable, IKeeper {
     address private _validator;
 
-    modifier onlyStakeManager() {
-        require(msg.sender == config.stakeManager(), "Keeper: only stake manager");
-        _;
-    }
-
-    constructor(address _config, address validator) public {
-        config = IConfig(_config);
+    constructor(address config, address validator) public Variable(config) {
         _validator = validator;
     }
 

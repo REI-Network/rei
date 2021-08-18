@@ -42,16 +42,6 @@ interface IStakeManager {
 
     function unstakeQueue(uint256 index) external view returns (Unstake memory);
 
-    function estimateMinStakeAmount(address validator) external view returns (uint256);
-
-    function estimateStakeAmount(address validator, uint256 shares) external view returns (uint256);
-
-    function estimateMinUnstakeShares(address validator) external view returns (uint256);
-
-    function estimateUnstakeShares(address validator, uint256 amount) external view returns (uint256);
-
-    function estimateUnstakeAmount(address validator, uint256 shares) external view returns (uint256);
-
     function stake(address validator, address to) external payable returns (uint256);
 
     function startUnstake(

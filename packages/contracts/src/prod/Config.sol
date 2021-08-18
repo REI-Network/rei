@@ -10,6 +10,10 @@ contract Config is IConfig {
         return 0x0000000000000000000000000000000000001001;
     }
 
+    function systemCaller() external view override returns (address) {
+        return 0x0000000000000000000000000000000000001002;
+    }
+
     function unstakeDelay() external view override returns (uint256) {
         return 1 minutes;
     }

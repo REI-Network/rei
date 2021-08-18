@@ -6,30 +6,12 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../interfaces/IConfig.sol";
 import "../interfaces/ICommissionShare.sol";
 import "../libraries/Math.sol";
+import "./Keeper.sol";
 
-contract CommissionShare is ERC20, ICommissionShare {
-    using SafeMath for uint256;
+contract CommissionShare is ERC20, Keeper, ICommissionShare {
     using Math for uint256;
 
-    IConfig public config;
-
-    address private _validator;
-    modifier onlyStakeManager() {
-        require(msg.sender == config.stakeManager(), "Share: only stake manager");
-        _;
-    }
-
-    constructor(address _config, address validator) public ERC20("Share", "S") {
-        config = IConfig(_config);
-        _validator = validator;
-    }
-
-    /**
-     * @dev Get validator address
-     */
-    function validator() external view override returns (address) {
-        return _validator;
-    }
+    constructor(address config, address validator) public ERC20("Share", "S") Keeper(config, validator) {}
 
     /**
      * @dev Estimate how much GXC should be stake, if user wants to get the number of shares.

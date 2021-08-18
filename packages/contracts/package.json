@@ -4,10 +4,9 @@
     "main": "hardhat.config.ts",
     "license": "GPL-3.0-or-later",
     "scripts": {
-        "before":"ts-node ./scripts/before.ts",
-        "build": "npm run before && npx hardhat compile",
-        "node": "npm run before && npx hardhat node",
-        "test": "npm run before && npx hardhat test",
+        "build": "npx hardhat compile",
+        "node": "npx hardhat node",
+        "test": "npx hardhat test",
         "docgen": "solidity-docgen -i ./src -t ./templates -H ./helper.js",
         "clean": "rm -rf ./artifacts ./cache ./deployments ./docs"
     },

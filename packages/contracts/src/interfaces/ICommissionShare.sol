@@ -3,10 +3,9 @@
 pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./IKeeper.sol";
 
-interface ICommissionShare is IERC20 {
-    function validator() external view returns (address);
-
+interface ICommissionShare is IERC20, IKeeper {
     function estimateStakeAmount(uint256 shares) external view returns (uint256);
 
     function estimateUnstakeShares(uint256 amount) external view returns (uint256);

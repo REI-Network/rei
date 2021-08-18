@@ -6,8 +6,8 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/EnumerableMap.sol";
-import "../interfaces/IConfig.sol";
-import "../interfaces/IStakeManager.sol";
+import "./interfaces/IConfig.sol";
+import "./interfaces/IStakeManager.sol";
 import "./CommissionShare.sol";
 import "./ValidatorKeeper.sol";
 import "./UnstakeKeeper.sol";
@@ -399,7 +399,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      * @dev Reward validator, only can be called by system caller
      * @param validator         Validator address
      */
-    function reward(address validator) external payable onlySystemCaller returns (uint256 validatorReward, uint256 commissionReward) {
+    function reward(address validator) external payable override onlySystemCaller returns (uint256 validatorReward, uint256 commissionReward) {
         Validator memory v = _validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         commissionReward = msg.value.mul(v.commissionRate).div(100);
@@ -426,7 +426,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      * @param validator         Validator address
      * @param reason            Slash reason
      */
-    function slash(address validator, uint8 reason) external onlySystemCaller returns (uint256 amount) {
+    function slash(address validator, uint8 reason) external override onlySystemCaller returns (uint256 amount) {
         Validator memory v = _validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint8 factor = config.getFactorByReason(reason);

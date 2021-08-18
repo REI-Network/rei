@@ -2,8 +2,8 @@
 
 pragma solidity ^0.6.0;
 
-import "../interfaces/IConfig.sol";
-import "../interfaces/IKeeper.sol";
+import "./interfaces/IConfig.sol";
+import "./interfaces/IKeeper.sol";
 import "./Variable.sol";
 
 abstract contract Keeper is Variable, IKeeper {

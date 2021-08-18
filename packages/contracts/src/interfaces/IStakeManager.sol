@@ -59,4 +59,8 @@ interface IStakeManager {
     function removeIndexedValidator(address validator) external;
 
     function addIndexedValidator(address validator) external;
+
+    function reward(address validator) external payable returns (uint256, uint256);
+
+    function slash(address validator, uint8 reason) external returns (uint256);
 }

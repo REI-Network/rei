@@ -2,7 +2,7 @@
 
 pragma solidity ^0.6.0;
 
-import "../interfaces/IUnstakeKeeper.sol";
+import "./interfaces/IUnstakeKeeper.sol";
 import "./Keeper.sol";
 
 contract UnstakeKeeper is Keeper, IUnstakeKeeper {

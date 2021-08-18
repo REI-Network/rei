@@ -3,9 +3,10 @@
 pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "../interfaces/IConfig.sol";
+import "./interfaces/IConfig.sol";
+import "./interfaces/IVariable.sol";
 
-abstract contract Variable {
+abstract contract Variable is IVariable {
     using SafeMath for uint256;
 
     IConfig public config;
@@ -22,12 +23,12 @@ abstract contract Variable {
     /**
      * @dev Reward validator, only can be called by stake manager
      */
-    function reward() external payable onlyStakeManager {}
+    function reward() external payable override onlyStakeManager {}
 
     /**
      * @dev Slash validator by factor, only can be called by stake manager
      */
-    function slash(uint8 factor) external onlyStakeManager returns (uint256 amount) {
+    function slash(uint8 factor) external override onlyStakeManager returns (uint256 amount) {
         require(factor <= 100, "Variable: invalid factor");
         amount = address(this).balance.mul(factor).div(100);
         if (amount > 0) {

@@ -15,6 +15,11 @@ async function createWeb3Contract({ name, artifactName, address, deployments, we
   return new (web3 as Web3).eth.Contract((artifacts as Artifacts).require(artifactName ?? name).abi, address ?? (await get(name)).address, from ? { from } : undefined);
 }
 
+async function createEstimatorContract({ stakeManager, deployments, web3, from, artifacts }: any) {
+  const address = await stakeManager.methods.estimator().call();
+  return await createWeb3Contract({ name: 'Estimator', address, deployments, web3, from, artifacts });
+}
+
 task('accounts', 'List accounts').setAction(async (taskArgs, { web3 }) => {
   console.log(await web3.eth.getAccounts());
 });
@@ -37,6 +42,7 @@ task('init', 'Initialize config').setAction(async (taskArgs, { deployments, web3
   const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts });
   const config = await createWeb3Contract({ name: 'Config_test', deployments, web3, artifacts, from: deployer });
   await config.methods.setStakeManager(stakeManager.options.address).send();
+  await config.methods.setSystemCaller(deployer).send();
   console.log('Initialize config finished');
 });
 
@@ -56,7 +62,8 @@ task('stake', 'Stake to validator')
     const { deployer } = await getNamedAccounts();
     const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
     if (taskArgs.value === undefined) {
-      taskArgs.value = await stakeManager.methods.estimateMinStakeAmount(taskArgs.validator).call();
+      const estimator = await createEstimatorContract({ stakeManager, deployments, web3, artifacts, from: deployer });
+      taskArgs.value = await estimator.methods.estimateMinStakeAmount(taskArgs.validator).call();
     } else if (taskArgs.ether) {
       taskArgs.value = toBN(taskArgs.value)
         .mul(new BN(10).pow(new BN(18)))
@@ -120,7 +127,8 @@ task('unstake', 'Start unstake')
     const { deployer } = await getNamedAccounts();
     const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
     if (taskArgs.shares === undefined) {
-      taskArgs.shares = await stakeManager.methods.estimateMinUnstakeShares(taskArgs.validator).call();
+      const estimator = await createEstimatorContract({ stakeManager, deployments, web3, artifacts, from: deployer });
+      taskArgs.shares = await estimator.methods.estimateMinUnstakeShares(taskArgs.validator).call();
       if (taskArgs.shares === '0') {
         console.log("validator doesn't exsit!");
         return;

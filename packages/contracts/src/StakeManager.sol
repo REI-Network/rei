@@ -146,11 +146,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         }
         address validator;
         (, validator) = _indexedValidators.at(index);
-        Validator memory v = _validators[validator];
-        if (v.commissionShare == address(0) || v.validatorKeeper == address(0)) {
-            return 0;
-        }
-        return v.commissionShare.balance.add(v.validatorKeeper.balance);
+        return getVotingPower(_validators[validator]);
     }
 
     /**

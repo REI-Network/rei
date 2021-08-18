@@ -415,7 +415,7 @@ export class Node {
             parentValidatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
             consensusValidateHeader.call(block.header, this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number));
           } else {
-            parentValidatorSet = await ValidatorSet.createFromStakeManager(parentSM);
+            parentValidatorSet = await this.validatorSets.get(parent.header.stateRoot, parentSM);
 
             // get validator detail information
             detail = await parentValidatorSet.getActiveValidatorDetail(miner, parentSM);
@@ -484,6 +484,8 @@ export class Node {
             validatorSet = parentValidatorSet!.copy(block._common);
             const changes = new ValidatorChanges();
             StakeManager.filterReceiptsChanges(changes, receipts, block._common);
+            // assign block reward to miner
+            changes.stake(miner, totalRewardAmount);
             if (logs) {
               StakeManager.filterLogsChanges(changes, logs, block._common);
             }

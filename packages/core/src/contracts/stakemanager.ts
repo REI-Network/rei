@@ -54,7 +54,6 @@ export class StakeManager {
   static filterLogsChanges(changes: ValidatorChanges, logs: Log[], common: Common) {
     const smaddr = Address.fromString(common.param('vm', 'smaddr'));
     for (const log of logs) {
-      console.log('log:', log.toRPCJSON());
       if (log.address.equals(smaddr.buf)) {
         if (log.topics.length === 3 && log.topics[0].equals(events['Stake'])) {
           // Stake event

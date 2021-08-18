@@ -253,7 +253,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
         uint256 votingPower = getVotingPower(v);
         if (!_indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
             _indexedValidators.set(v.id, validator);
-            emit IndexedValidator(validator, votingPower);
+            emit IndexedValidator(validator, votingPower.sub(msg.value));
         }
         emit Stake(validator, msg.value, to, shares);
     }

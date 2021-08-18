@@ -2,7 +2,7 @@ import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import Message from '@gxchain2-ethereumjs/vm/dist/evm/message';
 import { Address, BN, MAX_INTEGER, setLengthLeft, toBuffer } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
-import { Receipt } from '@gxchain2/structure';
+import { Log, Receipt } from '@gxchain2/structure';
 import { hexStringToBuffer } from '@gxchain2/utils';
 import { ValidatorChanges } from '../staking';
 import { bufferToAddress } from './utils';
@@ -12,14 +12,17 @@ const methods = {
   indexedValidatorsLength: toBuffer('0x74a1c64a'),
   indexedValidatorsByIndex: toBuffer('0xaf6a80e2'),
   validators: toBuffer('0xfa52c7d8'),
-  getVotingPowerByIndex: toBuffer('0x9b8c4c88')
+  getVotingPowerByIndex: toBuffer('0x9b8c4c88'),
+  reward: toBuffer('0x6353586b')
 };
 
 // event topic
 const events = {
   Stake: toBuffer('0x1bd1eb6b4fd3f08e718d7a241c54c4641c9f36004b6949383f48d15a2fcc8f52'),
   StartUnstake: toBuffer('0x020b3ba91672f551cfd1f7abf4794b3fb292f61fd70ffd5a34a60cdd04078e50'),
-  SetCommissionRate: toBuffer('0xaa2933ee3941c066bda0e3f51e3e6ce63f33379daee1ef99baf018764d321e54')
+  SetCommissionRate: toBuffer('0xaa2933ee3941c066bda0e3f51e3e6ce63f33379daee1ef99baf018764d321e54'),
+  IndexedValidator: toBuffer('0x07c18d1e961213770ba59e4b4001fc312f17def9ba35867316edefe029c5dd18'),
+  UnindexedValidator: toBuffer('0xa37745de139b774fe502f6f6da1c791e290244eb016b146816e3bcd8b13bc999')
 };
 
 export type Validator = {
@@ -40,28 +43,36 @@ export class StakeManager {
     this.common = common;
   }
 
-  static filterValidatorChanges(receipts: Receipt[], common: Common) {
-    const changes = new ValidatorChanges();
-
-    const smaddr = bufferToAddress(hexStringToBuffer(common.param('vm', 'smaddr')));
+  static filterReceiptsChanges(changes: ValidatorChanges, receipts: Receipt[], common: Common) {
     for (const receipt of receipts) {
-      for (const log of receipt.logs) {
-        if (log.address.equals(smaddr.buf)) {
-          if (log.topics.length === 3 && log.topics[0].equals(events['Stake'])) {
-            // Stake event
-            changes.stake(bufferToAddress(log.topics[1]), new BN(log.topics[2]));
-          } else if (log.topics.length === 4 && log.topics[0].equals(events['StartUnstake'])) {
-            // StartUnstake event
-            changes.unstake(bufferToAddress(log.topics[2]), new BN(log.topics[3]));
-          } else if (log.topics.length === 4 && log.topics[0].equals(events['SetCommissionRate'])) {
-            // SetCommissionRate event
-            changes.setCommissionRate(bufferToAddress(log.topics[1]), new BN(log.topics[2]), new BN(log.topics[3]));
-          }
+      if (receipt.logs.length > 0) {
+        StakeManager.filterLogsChanges(changes, receipt.logs, common);
+      }
+    }
+  }
+
+  static filterLogsChanges(changes: ValidatorChanges, logs: Log[], common: Common) {
+    const smaddr = Address.fromString(common.param('vm', 'smaddr'));
+    for (const log of logs) {
+      if (log.address.equals(smaddr.buf)) {
+        if (log.topics.length === 3 && log.topics[0].equals(events['Stake'])) {
+          // Stake event
+          changes.stake(bufferToAddress(log.topics[1]), new BN(log.topics[2]));
+        } else if (log.topics.length === 4 && log.topics[0].equals(events['StartUnstake'])) {
+          // StartUnstake event
+          changes.unstake(bufferToAddress(log.topics[2]), new BN(log.topics[3]));
+        } else if (log.topics.length === 4 && log.topics[0].equals(events['SetCommissionRate'])) {
+          // SetCommissionRate event
+          changes.setCommissionRate(bufferToAddress(log.topics[1]), new BN(log.topics[2]), new BN(log.topics[3]));
+        } else if (log.topics.length === 3 && log.topics[0].equals(events['IndexedValidator'])) {
+          // IndexedValidator event
+          changes.index(bufferToAddress(log.topics[1]), new BN(log.topics[2]));
+        } else if (log.topics.length === 2 && log.topics[0].equals(events['UnindexedValidator'])) {
+          // UnindexedValidator event
+          changes.unindex(bufferToAddress(log.topics[1]));
         }
       }
     }
-
-    return changes;
   }
 
   private makeMessage(method: string, data: Buffer[]) {
@@ -126,5 +137,19 @@ export class StakeManager {
       execResult: { returnValue }
     } = await this.evm.executeMessage(this.makeMessage('getVotingPowerByIndex', [setLengthLeft(index.toBuffer(), 32)]));
     return new BN(returnValue);
+  }
+
+  async reward(validator: Address, amount: BN) {
+    const message = new Message({
+      caller: Address.fromString(this.common.param('vm', 'scaddr')),
+      to: Address.fromString(this.common.param('vm', 'smaddr')),
+      gasLimit: MAX_INTEGER,
+      value: amount,
+      data: Buffer.concat([methods['reward'], setLengthLeft(validator.toBuffer(), 32)])
+    });
+    const {
+      execResult: { logs }
+    } = await this.evm.executeMessage(message);
+    return logs;
   }
 }

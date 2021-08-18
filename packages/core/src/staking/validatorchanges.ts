@@ -1,21 +1,35 @@
 import { BN, Address } from 'ethereumjs-util';
-import { createBufferFunctionalMap } from '@gxchain2/utils';
+import { createBufferFunctionalMap, FunctionalSet } from '@gxchain2/utils';
 import { ValidatorChange } from './validatorset';
 
 export class ValidatorChanges {
-  private map = createBufferFunctionalMap<ValidatorChange>();
+  changes = createBufferFunctionalMap<ValidatorChange>();
+  unindexedValidators = new FunctionalSet<Address>((a: Address, b: Address) => a.buf.compare(b.buf));
 
   private getChange(validator: Address) {
-    let c = this.map.get(validator.buf);
+    let c = this.changes.get(validator.buf);
     if (!c) {
       c = {
         validator: validator,
         stake: new BN(0),
         unstake: new BN(0)
       };
-      this.map.set(validator.buf, c);
+      this.changes.set(validator.buf, c);
     }
     return c;
+  }
+
+  index(validator: Address, votingPower: BN) {
+    this.unindexedValidators.delete(validator);
+    const vc = this.getChange(validator);
+    vc.votingPower = votingPower;
+    vc.stake = new BN(0);
+    vc.unstake = new BN(0);
+  }
+
+  unindex(validator: Address) {
+    this.unindexedValidators.add(validator);
+    this.changes.delete(validator.buf);
   }
 
   stake(validator: Address, value: BN) {
@@ -31,9 +45,5 @@ export class ValidatorChanges {
       commissionRate,
       updateTimestamp
     };
-  }
-
-  forEach(cb: (vc: ValidatorChange) => void) {
-    this.map.forEach((vc) => cb(vc));
   }
 }

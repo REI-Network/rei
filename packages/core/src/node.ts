@@ -26,7 +26,7 @@ import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
 import { BlockchainMonitor } from './blockchainmonitor';
 import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
-import { ValidatorSet, ValidatorSets } from './staking';
+import { ValidatorChanges, ValidatorSet, ValidatorSets } from './staking';
 import { StakeManager, Config, Validator } from './contracts';
 import { consensusValidateHeader } from './validation';
 import { isEnableReceiptRootFix, isEnableStaking, preHF1GenReceiptTrie } from './hardforks';
@@ -404,8 +404,11 @@ export class Node {
         let parentValidatorSet: ValidatorSet | undefined;
         let parentSM: StakeManager | undefined;
         let detail: Validator | undefined;
-        let addedVotingPower = new BN(0);
+        let systemCaller: Address | undefined;
+        let totalRewardAmount = new BN(0);
+        let logs: Log[] | undefined;
         if (enableStaking) {
+          systemCaller = Address.fromString(block._common.param('vm', 'scaddr'));
           parentSM = this.getStakeManager(vm, block);
 
           if (!parentEnableStaking) {
@@ -435,17 +438,9 @@ export class Node {
           genReceiptTrie: isEnableReceiptRootFix(block._common) ? undefined : preHF1GenReceiptTrie,
           rewardAddress: async (state: IStateManager, reward: BN) => {
             if (parentEnableStaking) {
-              // if staking is active, assign reward to contract adddress
-              const commissionReward = reward.mul(detail!.commissionRate).divn(100);
-              if (commissionReward.gtn(0)) {
-                await rewardAccount(state, detail!.commissionShare, commissionReward);
-              }
-              const validatorReward = reward.sub(commissionReward);
-              if (validatorReward.gtn(0)) {
-                await rewardAccount(state, detail!.validatorKeeper, validatorReward);
-              }
-              // add miner's voting power
-              addedVotingPower.iadd(reward);
+              // if staking is active, assign reward to system caller address
+              await rewardAccount(state, systemCaller!, reward);
+              totalRewardAmount.iadd(reward);
             } else {
               // directly reward miner
               await rewardAccount(state, miner, reward);
@@ -457,6 +452,13 @@ export class Node {
               await this.getConfig(vm, block).deploy();
               // deploy stake manager contract
               await parentSM!.deploy();
+            }
+
+            if (parentEnableStaking) {
+              const ethLogs = await parentSM!.reward(miner, totalRewardAmount);
+              if (ethLogs && ethLogs.length > 0) {
+                logs = ethLogs.map((raw) => Log.fromValuesArray(raw));
+              }
             }
           }
         };
@@ -474,17 +476,26 @@ export class Node {
         let validatorSet: ValidatorSet | undefined;
         let activeSigners: Address[];
         if (enableStaking) {
-          // filter changes and save validator set
-          validatorSet = parentValidatorSet!.copy(block._common);
-          const changes = StakeManager.filterValidatorChanges(receipts, block._common);
-          // if `addedVotingPower` is greater than 0, add stake value
-          if (addedVotingPower.gtn(0)) {
-            changes.stake(miner, addedVotingPower);
+          if (!parentEnableStaking) {
+            // directly use genesis validator set
+            validatorSet = parentValidatorSet!;
+          } else {
+            // filter changes and save validator set
+            validatorSet = parentValidatorSet!.copy(block._common);
+            const changes = new ValidatorChanges();
+            StakeManager.filterReceiptsChanges(changes, receipts, block._common);
+            if (logs) {
+              StakeManager.filterLogsChanges(changes, logs, block._common);
+            }
+            for (const uv of changes.unindexedValidators) {
+              logger.debug('Node::processLoop, unindexedValidators, address:', uv.toString());
+            }
+            for (const vc of changes.changes.values()) {
+              logger.debug('Node::processLoop, change, address:', vc.validator.toString(), 'stake:', vc.stake.toString(), 'unstake:', vc.unstake.toString(), 'rate:', vc.commissionChange?.commissionRate.toString());
+            }
+            validatorSet.mergeChanges(changes);
           }
-          changes.forEach((vc) => {
-            logger.debug('Node::processLoop, change, address:', vc.validator.toString(), 'stake:', vc.stake.toString(), 'unstake:', vc.unstake.toString(), 'rate:', vc.commissionChange?.commissionRate.toString());
-          });
-          validatorSet.mergeChanges(changes);
+
           this.validatorSets.set(block.header.stateRoot, validatorSet);
           activeSigners = validatorSet.activeSigners();
         } else {

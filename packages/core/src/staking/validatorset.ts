@@ -1,6 +1,6 @@
 import Heap from 'qheap';
 import { Address, BN } from 'ethereumjs-util';
-import { createBufferFunctionalMap, logger } from '@gxchain2/utils';
+import { createBufferFunctionalMap, logger, hexStringToBN } from '@gxchain2/utils';
 import { Common } from '@gxchain2/common';
 import { StakeManager, Validator } from '../contracts';
 import { ValidatorChanges } from './validatorchanges';
@@ -15,6 +15,7 @@ export type ValidatorChange = {
   validator: Address;
   stake: BN;
   unstake: BN;
+  votingPower?: BN;
   commissionChange?: {
     commissionRate: BN;
     updateTimestamp: BN;
@@ -66,7 +67,7 @@ export class ValidatorSet {
   }
 
   private sort() {
-    const max = this.common.param('vm', 'maxValidatorsCount');
+    const maxCount = this.common.param('vm', 'maxValidatorsCount');
     // create a heap to keep the maximum count validator
     const heap = new Heap({
       comparBefore: (a: ValidatorInfo, b: ValidatorInfo) => {
@@ -80,7 +81,7 @@ export class ValidatorSet {
     for (const v of this.map.values()) {
       heap.push(v);
       // if the heap size is too large, remove the minimum one
-      while (heap.size > max) {
+      while (heap.size > maxCount) {
         const droped: ValidatorInfo = heap.remove();
         // delete the detail information of the removed validator to save memory
         droped.detail = undefined;
@@ -90,14 +91,14 @@ export class ValidatorSet {
     while (heap.length > 0) {
       this.active.push(heap.remove());
     }
-    if (this.active.length < max) {
+    if (this.active.length < maxCount) {
       // get genesis validators from common
       let genesisValidators: Address[] = this.common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr));
       // filter the genesis validator that already exist in `this.active`
       genesisValidators = genesisValidators.filter((addr) => this.active.filter(({ validator }) => validator.equals(addr)).length === 0);
       genesisValidators.sort((a, b) => -1 * (a.buf.compare(b.buf) as 1 | -1 | 0));
       // if the validator is not enough, push the genesis validator to the active list
-      while (genesisValidators.length > 0 && this.active.length < max) {
+      while (genesisValidators.length > 0 && this.active.length < maxCount) {
         this.active.push({
           validator: genesisValidators.shift()!,
           votingPower: new BN(0)
@@ -114,45 +115,51 @@ export class ValidatorSet {
     });
   }
 
+  private getValidator(validator: Address) {
+    let v = this.map.get(validator.buf);
+    if (!v) {
+      v = {
+        validator: validator,
+        votingPower: new BN(0)
+      };
+      this.map.set(validator.buf, v);
+    }
+    return v;
+  }
+
   // TODO: if the changed validator is an active validator, the active list maybe not be dirty
   mergeChanges(changes: ValidatorChanges) {
     let dirty = false;
-    changes.forEach((vc) => {
+
+    for (const uv of changes.unindexedValidators) {
+      this.map.delete(uv.buf);
+    }
+
+    for (const vc of changes.changes.values()) {
       const stake = vc.stake;
       const unstake = vc.unstake;
       let v: ValidatorInfo | undefined;
+      if (vc.votingPower) {
+        dirty = true;
+        v = this.getValidator(vc.validator);
+        v.votingPower = vc.votingPower;
+      }
+
       if (stake.gt(unstake)) {
         dirty = true;
-        v = this.map.get(vc.validator.buf);
-        if (!v) {
-          v = {
-            validator: vc.validator,
-            votingPower: stake.sub(unstake)
-          };
-          this.map.set(vc.validator.buf, v);
-        } else {
-          v.votingPower.iadd(stake.sub(unstake));
-        }
+        v = v ?? this.getValidator(vc.validator);
+        v.votingPower.iadd(stake.sub(unstake));
       } else if (stake.lt(unstake)) {
-        v = this.map.get(vc.validator.buf);
-        if (!v) {
-          // this shouldn't happen
-          logger.warn(`ValidatorSet::processChanges, missing validator information: ${vc.validator.toString()}`);
-        } else {
-          dirty = true;
-          v.votingPower.isub(unstake.sub(stake));
-          if (v.votingPower.isZero()) {
-            this.map.delete(vc.validator.buf);
-          }
+        dirty = true;
+        v = v ?? this.getValidator(vc.validator);
+        v.votingPower.isub(unstake.sub(stake));
+        if (v.votingPower.isZero()) {
+          this.map.delete(vc.validator.buf);
         }
       }
 
       if (!v && vc.commissionChange) {
         v = this.map.get(vc.validator.buf);
-        if (!v) {
-          // this shouldn't happen
-          logger.warn(`ValidatorSet::processChanges, missing validator information: ${vc.validator.toString()}`);
-        }
       }
 
       // only care about validators with detailed information
@@ -160,7 +167,7 @@ export class ValidatorSet {
         v.detail.commissionRate = vc.commissionChange.commissionRate;
         v.detail.updateTimestamp = vc.commissionChange.updateTimestamp;
       }
-    });
+    }
 
     if (dirty) {
       this.sort();

@@ -20,6 +20,8 @@ struct Validator {
 }
 
 interface IStakeManager {
+    function estimator() external view returns (address);
+
     function validators(address validator) external view returns (Validator memory);
 
     function indexedValidatorsLength() external view returns (uint256);

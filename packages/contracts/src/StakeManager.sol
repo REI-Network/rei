@@ -11,6 +11,7 @@ import "./interfaces/IStakeManager.sol";
 import "./CommissionShare.sol";
 import "./ValidatorKeeper.sol";
 import "./UnstakeKeeper.sol";
+import "./Estimator.sol";
 
 contract StakeManager is ReentrancyGuard, IStakeManager {
     using SafeMath for uint256;
@@ -18,6 +19,8 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
 
     // config
     IConfig public config;
+    // estimator
+    address private _estimator;
 
     // auto increment validator id
     uint256 private _validatorId = 0;
@@ -85,6 +88,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
 
     constructor(address _config, address[] memory genesisValidators) public {
         config = IConfig(_config);
+        _estimator = address(new Estimator(_config, address(this)));
         for (uint256 i = 0; i < genesisValidators.length; i = i.add(1)) {
             // the validator was created, but not added to `_indexedValidators`
             createValidator(genesisValidators[i]);
@@ -94,6 +98,13 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     modifier onlySystemCaller() {
         require(msg.sender == config.systemCaller(), "StakeManager: invalid caller");
         _;
+    }
+
+    /**
+     * @dev Get the estimator address.
+     */
+    function estimator() external view override returns (address) {
+        return _estimator;
     }
 
     /**

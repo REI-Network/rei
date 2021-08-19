@@ -11,8 +11,7 @@ export class ValidatorChanges {
     if (!c) {
       c = {
         validator: validator,
-        stake: new BN(0),
-        unstake: new BN(0)
+        update: new BN(0)
       };
       this.changes.set(validator.buf, c);
     }
@@ -23,8 +22,7 @@ export class ValidatorChanges {
     this.unindexedValidators.delete(validator);
     const vc = this.getChange(validator);
     vc.votingPower = votingPower;
-    vc.stake = new BN(0);
-    vc.unstake = new BN(0);
+    vc.update = new BN(0);
   }
 
   unindex(validator: Address) {
@@ -34,13 +32,13 @@ export class ValidatorChanges {
 
   stake(validator: Address, value: BN) {
     if (!this.unindexedValidators.has(validator)) {
-      this.getChange(validator).stake.iadd(value);
+      this.getChange(validator).update.iadd(value);
     }
   }
 
   unstake(validator: Address, value: BN) {
     if (!this.unindexedValidators.has(validator)) {
-      this.getChange(validator).unstake.iadd(value);
+      this.getChange(validator).update.isub(value);
     }
   }
 

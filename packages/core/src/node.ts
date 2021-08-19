@@ -493,7 +493,7 @@ export class Node {
               logger.debug('Node::processLoop, unindexedValidators, address:', uv.toString());
             }
             for (const vc of changes.changes.values()) {
-              logger.debug('Node::processLoop, change, address:', vc.validator.toString(), 'votingPower:', vc?.votingPower?.toString(), 'stake:', vc.stake.toString(), 'unstake:', vc.unstake.toString(), 'rate:', vc.commissionChange?.commissionRate.toString());
+              logger.debug('Node::processLoop, change, address:', vc.validator.toString(), 'votingPower:', vc?.votingPower?.toString(), 'update:', vc.update.toString(), 'rate:', vc.commissionChange?.commissionRate.toString());
             }
             validatorSet.mergeChanges(changes);
           }

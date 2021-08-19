@@ -22,8 +22,7 @@ function cloneInfo(info: ValidatorInfo) {
 
 export type ValidatorChange = {
   validator: Address;
-  stake: BN;
-  unstake: BN;
+  update: BN;
   votingPower?: BN;
   commissionChange?: {
     commissionRate: BN;
@@ -32,7 +31,7 @@ export type ValidatorChange = {
 };
 
 export class ValidatorSet {
-  private map = createBufferFunctionalMap<ValidatorInfo>();
+  private validators = createBufferFunctionalMap<ValidatorInfo>();
   private active: Address[] = [];
   private common: Common;
 
@@ -42,8 +41,8 @@ export class ValidatorSet {
 
   static createFromValidatorSet(old: ValidatorSet, common: Common) {
     const vs = new ValidatorSet(common);
-    for (const [validator, info] of old.map) {
-      vs.map.set(validator, cloneInfo(info));
+    for (const [validator, info] of old.validators) {
+      vs.validators.set(validator, cloneInfo(info));
     }
     vs.active = [...old.active];
     return vs;
@@ -52,7 +51,7 @@ export class ValidatorSet {
   static createFromValidatorInfo(info: ValidatorInfo[], common: Common) {
     const vs = new ValidatorSet(common);
     for (const v of info) {
-      vs.map.set(v.validator.buf, v);
+      vs.validators.set(v.validator.buf, v);
     }
     vs.sort();
     return vs;
@@ -87,7 +86,7 @@ export class ValidatorSet {
         return num;
       }
     });
-    for (const v of this.map.values()) {
+    for (const v of this.validators.values()) {
       heap.push(v);
       // if the heap size is too large, remove the minimum one
       while (heap.size > maxCount) {
@@ -118,13 +117,13 @@ export class ValidatorSet {
   }
 
   private getValidator(validator: Address) {
-    let v = this.map.get(validator.buf);
+    let v = this.validators.get(validator.buf);
     if (!v) {
       v = {
         validator: validator,
         votingPower: new BN(0)
       };
-      this.map.set(validator.buf, v);
+      this.validators.set(validator.buf, v);
     }
     return v;
   }
@@ -134,12 +133,10 @@ export class ValidatorSet {
     let dirty = false;
 
     for (const uv of changes.unindexedValidators) {
-      this.map.delete(uv.buf);
+      this.validators.delete(uv.buf);
     }
 
     for (const vc of changes.changes.values()) {
-      const stake = vc.stake;
-      const unstake = vc.unstake;
       let v: ValidatorInfo | undefined;
       if (vc.votingPower) {
         dirty = true;
@@ -147,21 +144,17 @@ export class ValidatorSet {
         v.votingPower = vc.votingPower;
       }
 
-      if (stake.gt(unstake)) {
+      if (!vc.update.eqn(0)) {
         dirty = true;
         v = v ?? this.getValidator(vc.validator);
-        v.votingPower.iadd(stake.sub(unstake));
-      } else if (stake.lt(unstake)) {
-        dirty = true;
-        v = v ?? this.getValidator(vc.validator);
-        v.votingPower.isub(unstake.sub(stake));
+        v.votingPower.iadd(vc.update);
         if (v.votingPower.isZero()) {
-          this.map.delete(vc.validator.buf);
+          this.validators.delete(vc.validator.buf);
         }
       }
 
       if (!v && vc.commissionChange) {
-        v = this.map.get(vc.validator.buf);
+        v = this.validators.get(vc.validator.buf);
       }
 
       // only care about validators with detailed information
@@ -176,12 +169,16 @@ export class ValidatorSet {
     }
   }
 
-  async getActiveValidatorDetail(validator: Address, sm: StakeManager) {
+  private isActive(validator: Address) {
     const index = this.active.findIndex((v) => v.equals(validator));
-    if (index === -1) {
+    return index !== -1;
+  }
+
+  async getActiveValidatorDetail(validator: Address, sm: StakeManager) {
+    if (!this.isActive(validator)) {
       return undefined;
     }
-    const v = this.map.get(validator.buf);
+    const v = this.validators.get(validator.buf);
     return v ? v.detail ?? (v.detail = await sm.validators(validator)) : await sm.validators(validator);
   }
 

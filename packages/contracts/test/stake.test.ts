@@ -307,4 +307,26 @@ describe('StakeManger', () => {
     const totalCalAmount = receiver2Change.add(receiver1Change).add(toBN(await web3.eth.getBalance(commissionShare.options.address)));
     expect(totalAmount.eq(totalCalAmount), 'totalAmount should be equal').be.true;
   });
+
+  it('should correctly set active validators', async () => {
+    let vs = [validator1, validator2, validator3];
+    let ps = ['-1', '1', '-100'];
+    await stakeManager.methods.afterBlock(validator3, [validator1, validator2, validator3], ps).send();
+    expect(await stakeManager.methods.activeValidatorsLength().call(), 'length should be equal').be.equal('3');
+    for (let i = 0; i < 3; i++) {
+      const v = await stakeManager.methods.activeValidators(i).call();
+      expect(v.validator, 'validator address should be equal').be.equal(vs[i]);
+      expect(v.priority, 'validator priority should be equal').be.equal(ps[i]);
+    }
+
+    vs = [validator3, validator2];
+    ps = ['-1', '1'];
+    await stakeManager.methods.afterBlock(validator3, vs, ps).send();
+    expect(await stakeManager.methods.activeValidatorsLength().call(), 'length should be equal').be.equal('2');
+    for (let i = 0; i < 2; i++) {
+      const v = await stakeManager.methods.activeValidators(i).call();
+      expect(v.validator, 'validator address should be equal').be.equal(vs[i]);
+      expect(v.priority, 'validator priority should be equal').be.equal(ps[i]);
+    }
+  });
 });

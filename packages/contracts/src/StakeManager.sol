@@ -430,10 +430,16 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
             uint256 orignLength = _activeValidators.length;
             uint256 i = 0;
             for (; i < priorities.length; i = i.add(1)) {
-                _activeValidators[i] = ActiveValidator(acValidators[i], priorities[i]);
+                if (i < orignLength) {
+                    ActiveValidator storage acValidator = _activeValidators[i];
+                    acValidator.validator = acValidators[i];
+                    acValidator.priority = priorities[i];
+                } else {
+                    _activeValidators.push(ActiveValidator(acValidators[i], priorities[i]));
+                }
             }
             for (; i < orignLength; i = i.add(1)) {
-                delete _activeValidators[i];
+                _activeValidators.pop();
             }
         }
     }

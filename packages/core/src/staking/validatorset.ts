@@ -1,15 +1,24 @@
 import Heap from 'qheap';
 import { Address, BN } from 'ethereumjs-util';
-import { createBufferFunctionalMap, logger, hexStringToBN } from '@gxchain2/utils';
+import { createBufferFunctionalMap } from '@gxchain2/utils';
 import { Common } from '@gxchain2/common';
 import { StakeManager, Validator } from '../contracts';
 import { ValidatorChanges } from './validatorchanges';
+
+let genesisValidators: Address[] | undefined;
 
 export type ValidatorInfo = {
   validator: Address;
   votingPower: BN;
   detail?: Validator;
 };
+
+function cloneInfo(info: ValidatorInfo) {
+  return {
+    ...info,
+    votingPower: info.votingPower.clone()
+  };
+}
 
 export type ValidatorChange = {
   validator: Address;
@@ -24,7 +33,7 @@ export type ValidatorChange = {
 
 export class ValidatorSet {
   private map = createBufferFunctionalMap<ValidatorInfo>();
-  private active: ValidatorInfo[] = [];
+  private active: Address[] = [];
   private common: Common;
 
   constructor(common: Common) {
@@ -34,7 +43,7 @@ export class ValidatorSet {
   static createFromValidatorSet(old: ValidatorSet, common: Common) {
     const vs = new ValidatorSet(common);
     for (const [validator, info] of old.map) {
-      vs.map.set(validator, info);
+      vs.map.set(validator, cloneInfo(info));
     }
     vs.active = [...old.active];
     return vs;
@@ -89,30 +98,23 @@ export class ValidatorSet {
     }
     this.active = [];
     while (heap.length > 0) {
-      this.active.push(heap.remove());
+      this.active.unshift(heap.remove().validator);
     }
-    if (this.active.length < maxCount) {
-      // get genesis validators from common
-      let genesisValidators: Address[] = this.common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr));
-      // filter the genesis validator that already exist in `this.active`
-      genesisValidators = genesisValidators.filter((addr) => this.active.filter(({ validator }) => validator.equals(addr)).length === 0);
+    // get genesis validators from common
+    if (!genesisValidators) {
+      genesisValidators = this.common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr)) as Address[];
+      // sort by address
       genesisValidators.sort((a, b) => -1 * (a.buf.compare(b.buf) as 1 | -1 | 0));
-      // if the validator is not enough, push the genesis validator to the active list
-      while (genesisValidators.length > 0 && this.active.length < maxCount) {
-        this.active.push({
-          validator: genesisValidators.shift()!,
-          votingPower: new BN(0)
-        });
+    }
+    const gvs = [...genesisValidators];
+    // if the validator is not enough, push the genesis validator to the active list,
+    // the genesis validator sorted by address and has nothing to do with voting power
+    while (gvs.length > 0 && this.active.length < maxCount) {
+      const gv = gvs.shift()!;
+      if (this.active.filter((validator) => validator.equals(gv)).length === 0) {
+        this.active.push(gv);
       }
     }
-    // sort
-    this.active.sort((a: ValidatorInfo, b: ValidatorInfo) => {
-      let num = a.votingPower.cmp(b.votingPower) * -1;
-      if (num === 0) {
-        num = -1 * (a.validator.buf.compare(b.validator.buf) as 1 | -1 | 0);
-      }
-      return num;
-    });
   }
 
   private getValidator(validator: Address) {
@@ -175,24 +177,16 @@ export class ValidatorSet {
   }
 
   async getActiveValidatorDetail(validator: Address, sm: StakeManager) {
-    let index = this.active.findIndex(({ validator: v }) => v.equals(validator));
+    const index = this.active.findIndex((v) => v.equals(validator));
     if (index === -1) {
       return undefined;
     }
-    return this.active[index].detail ?? (this.active[index].detail = await sm.validators(validator));
-  }
-
-  async activeValidators(sm: StakeManager) {
-    for (const v of this.active) {
-      if (!v.detail) {
-        v.detail = await sm.validators(v.validator);
-      }
-    }
-    return [...this.active];
+    const v = this.map.get(validator.buf);
+    return v ? v.detail ?? (v.detail = await sm.validators(validator)) : await sm.validators(validator);
   }
 
   activeSigners() {
-    return this.active.map(({ validator }) => validator);
+    return [...this.active];
   }
 
   copy(common: Common) {

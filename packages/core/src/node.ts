@@ -484,11 +484,11 @@ export class Node {
             validatorSet = parentValidatorSet!.copy(block._common);
             const changes = new ValidatorChanges();
             StakeManager.filterReceiptsChanges(changes, receipts, block._common);
-            // assign block reward to miner
-            changes.stake(miner, totalRewardAmount);
             if (logs) {
               StakeManager.filterLogsChanges(changes, logs, block._common);
             }
+            // assign block reward to miner
+            changes.stake(miner, totalRewardAmount);
             for (const uv of changes.unindexedValidators) {
               logger.debug('Node::processLoop, unindexedValidators, address:', uv.toString());
             }

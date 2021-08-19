@@ -38,10 +38,6 @@ interface IStakeManager {
 
     function getVotingPowerByAddress(address validator) external view returns (uint256);
 
-    function firstUnstakeId() external view returns (uint256);
-
-    function lastUnstakeId() external view returns (uint256);
-
     function unstakeQueue(uint256 index) external view returns (Unstake memory);
 
     function stake(address validator, address to) external payable returns (uint256);
@@ -56,7 +52,7 @@ interface IStakeManager {
 
     function setCommissionRate(uint256 rate) external;
 
-    function doUnstake() external;
+    function unstake(uint256 id) external returns (uint256);
 
     function removeIndexedValidator(address validator) external;
 

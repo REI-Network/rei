@@ -29,10 +29,8 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     // validator mapping, including all validators
     mapping(address => Validator) private _validators;
 
-    // first unstake id
-    uint256 private _firstUnstakeId = 0;
-    // last unstake id
-    uint256 private _lastUnstakeId = 0;
+    // auto increment unstake id
+    uint256 private _unstakeId = 0;
     // unstake information, delete after `do unstake`
     mapping(uint256 => Unstake) private _unstakeQueue;
 
@@ -191,25 +189,11 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
 
     /**
-     * @dev Get the first unstake id.
+     * @dev Get the queued unstake information by unstake id.
+     * @param id            Unstake id
      */
-    function firstUnstakeId() external view override returns (uint256) {
-        return _firstUnstakeId;
-    }
-
-    /**
-     * @dev Get the last unstake id.
-     */
-    function lastUnstakeId() external view override returns (uint256) {
-        return _lastUnstakeId;
-    }
-
-    /**
-     * @dev Get the queued unstake information by unstake index.
-     * @param index         Unstake index
-     */
-    function unstakeQueue(uint256 index) external view override returns (Unstake memory) {
-        return _unstakeQueue[index];
+    function unstakeQueue(uint256 id) external view override returns (Unstake memory) {
+        return _unstakeQueue[id];
     }
 
     // receive GXC transfer
@@ -270,7 +254,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     ) private returns (uint256 id) {
         uint256 unstakeShares = UnstakeKeeper(unstakeKeeper).mint{ value: amount }();
 
-        id = _lastUnstakeId;
+        id = _unstakeId;
         uint256 timestamp = block.timestamp + config.unstakeDelay();
         if (id > 0) {
             Unstake memory u = _unstakeQueue[id.sub(1)];
@@ -279,7 +263,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
             }
         }
         _unstakeQueue[id] = Unstake(validator, to, unstakeShares, timestamp);
-        _lastUnstakeId = id.add(1);
+        _unstakeId = id.add(1);
         emit StartUnstake(id, validator, amount, to, unstakeShares, timestamp);
     }
 
@@ -351,29 +335,17 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
 
     /**
-     * @dev Do unstake for all timeout unstake.
-     *      This can be called by anyone.
+     * @dev Unstake by id, return unstake amount.
+     * @param id            Unstake id
      */
-    function doUnstake() external override nonReentrant {
-        uint256 max = _lastUnstakeId;
-        uint256 id = _firstUnstakeId;
-        for (; id < max; id = id.add(1)) {
-            if (gasleft() < 50000) {
-                break;
-            }
-
-            Unstake memory u = _unstakeQueue[id];
-            if (u.timestamp <= block.timestamp) {
-                address unstakeKeeper = _validators[u.validator].unstakeKeeper;
-                require(unstakeKeeper != address(0), "StakeManager: invalid validator");
-                emit DoUnstake(id, u.validator, u.to, UnstakeKeeper(unstakeKeeper).burn(u.unstakeShares, u.to));
-                delete _unstakeQueue[id];
-            } else {
-                break;
-            }
-        }
-        require(id != _firstUnstakeId, "StakeManager: useless call, revert");
-        _firstUnstakeId = id;
+    function unstake(uint256 id) external override nonReentrant returns (uint256 amount) {
+        Unstake memory u = _unstakeQueue[id];
+        address unstakeKeeper = _validators[u.validator].unstakeKeeper;
+        require(unstakeKeeper != address(0), "StakeManager: invalid unstake id");
+        require(u.timestamp <= block.timestamp, "StakeManager: invalid unstake timestamp");
+        amount = UnstakeKeeper(unstakeKeeper).burn(u.unstakeShares, u.to);
+        emit DoUnstake(id, u.validator, u.to, amount);
+        delete _unstakeQueue[id];
     }
 
     /**

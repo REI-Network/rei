@@ -117,8 +117,9 @@ task('balance', 'Get balance')
     }
   });
 
-task('unstake', 'Start unstake')
+task('sunstake', 'Start unstake')
   .addParam('validator', 'validator address')
+  .addOptionalParam('receiver', 'receiver shares')
   .addOptionalParam('shares', 'unstake shares')
   .addFlag('ether', 'use ether as unit')
   .addOptionalParam('repeat', 'repeat times')
@@ -140,7 +141,7 @@ task('unstake', 'Start unstake')
     }
     const repeat = taskArgs.repeat ?? 1;
     for (let i = 0; i < repeat; i++) {
-      const { events } = await stakeManager.methods.startUnstake(taskArgs.validator, deployer, taskArgs.shares).send({ gas: 12475531 });
+      const { events } = await stakeManager.methods.startUnstake(taskArgs.validator, taskArgs.receiver ?? deployer, taskArgs.shares).send();
       let id;
       if (events) {
         for (const key in events) {
@@ -153,36 +154,13 @@ task('unstake', 'Start unstake')
     }
   });
 
-task('dounstake', 'Do unstake')
-  .addOptionalParam('limit', 'gas limit(default max 12450000)')
+task('unstake', 'Do unstake')
+  .addParam('id', 'unstake id')
   .addOptionalParam('address', 'stake manager contract address')
   .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
     const { deployer } = await getNamedAccounts();
     const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
-    const { events, gasUsed } = await stakeManager.methods.doUnstake().send({ gasLimit: taskArgs.limit ?? '12450000' });
-    let count = 0;
-    if (events) {
-      for (const key in events) {
-        if (key === 'DoUnstake') {
-          let arr;
-          if (!Array.isArray(events[key])) {
-            arr = [events[key]];
-          } else {
-            arr = events[key];
-          }
-          for (const event of arr) {
-            const data: string = event.raw.data;
-            const amount = toBN('0x' + data.substr(66));
-            let address: string = event.raw.topics[2];
-            address = '0x' + address.substr(26);
-            const id = toBN(event.raw.topics[1]).toNumber();
-            console.log('Do unstake address:', address, 'amount:', amount.toString(), 'id:', id);
-            count++;
-          }
-        }
-      }
-    }
-    console.log('Do unstake succeed, process count:', count, 'gas used:', gasUsed);
+    await stakeManager.methods.unstake(taskArgs.id).send();
   });
 
 task('vu', 'Visit unstake info by id')
@@ -223,7 +201,7 @@ task('vp', 'Get validator voting power by address')
     console.log(await stakeManager.methods.getVotingPowerByAddress(taskArgs.validator).call());
   });
 
-task('reward', 'Reward validator')
+task('reward', 'Reward validator(impl through `afterBlock`)')
   .addParam('validator', 'validator address')
   .addParam('value', 'reward amount')
   .addFlag('ether', 'use ether as unit')
@@ -236,6 +214,6 @@ task('reward', 'Reward validator')
         .mul(new BN(10).pow(new BN(18)))
         .toString();
     }
-    await stakeManager.methods.reward(taskArgs.validator).send({ value: taskArgs.value });
+    await stakeManager.methods.afterBlock(taskArgs.validator, [], []).send({ value: taskArgs.value });
     console.log('Reward succeed');
   });

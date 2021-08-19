@@ -19,6 +19,11 @@ struct Validator {
     uint256 updateTimestamp;
 }
 
+struct ActiveValidator {
+    address validator;
+    int256 priority;
+}
+
 interface IStakeManager {
     function estimator() external view returns (address);
 
@@ -40,6 +45,10 @@ interface IStakeManager {
 
     function unstakeQueue(uint256 index) external view returns (Unstake memory);
 
+    function activeValidatorsLength() external view returns (uint256);
+
+    function activeValidators(uint256 index) external view returns (ActiveValidator memory);
+
     function stake(address validator, address to) external payable returns (uint256);
 
     function startUnstake(
@@ -58,7 +67,9 @@ interface IStakeManager {
 
     function addIndexedValidator(address validator) external;
 
-    function reward(address validator) external payable returns (uint256, uint256);
-
-    function slash(address validator, uint8 reason) external returns (uint256);
+    function afterBlock(
+        address validator,
+        address[] calldata acValidators,
+        int256[] calldata priorities
+    ) external payable;
 }

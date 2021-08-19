@@ -34,6 +34,9 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     // unstake information, delete after `do unstake`
     mapping(uint256 => Unstake) private _unstakeQueue;
 
+    // active validator list of next block
+    ActiveValidator[] private _activeValidators;
+
     /**
      * @dev Emit when the user stakes
      * @param validator     Validator address
@@ -194,6 +197,21 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      */
     function unstakeQueue(uint256 id) external view override returns (Unstake memory) {
         return _unstakeQueue[id];
+    }
+
+    /**
+     * @dev Get the active validators list length.
+     */
+    function activeValidatorsLength() external view override returns (uint256) {
+        return _activeValidators.length;
+    }
+
+    /**
+     * @dev Get the active validator by unstake index.
+     * @param index         Active validator index
+     */
+    function activeValidators(uint256 index) external view override returns (ActiveValidator memory) {
+        return _activeValidators[index];
     }
 
     // receive GXC transfer
@@ -375,44 +393,48 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
 
     /**
-     * @dev Reward validator, only can be called by system caller
-     * @param validator         Validator address
+     * @dev After block callback, it will be called by system caller after each block is processed
+     * @param validator          Miner address
+     * @param acValidators       Active validators list
+     * @param priorities         Priority list of active validators
      */
-    function reward(address validator) external payable override onlySystemCaller returns (uint256 validatorReward, uint256 commissionReward) {
-        Validator memory v = _validators[validator];
-        require(v.commissionShare != address(0), "StakeManager: invalid validator");
-        commissionReward = msg.value.mul(v.commissionRate).div(100);
-        validatorReward = msg.value.sub(commissionReward);
-        if (commissionReward > 0) {
-            CommissionShare(v.commissionShare).reward{ value: commissionReward }();
-        }
-        if (validatorReward > 0) {
-            ValidatorKeeper(v.validatorKeeper).reward{ value: validatorReward }();
-        }
-        if (!_indexedValidators.contains(v.id)) {
-            uint256 votingPower = getVotingPower(v);
-            if (votingPower >= config.minIndexVotingPower()) {
-                _indexedValidators.set(v.id, validator);
-                emit IndexedValidator(validator, votingPower.sub(msg.value));
+    function afterBlock(
+        address validator,
+        address[] calldata acValidators,
+        int256[] calldata priorities
+    ) external payable override onlySystemCaller {
+        // reward miner
+        {
+            Validator memory v = _validators[validator];
+            require(v.commissionShare != address(0), "StakeManager: invalid validator");
+            uint256 commissionReward = msg.value.mul(v.commissionRate).div(100);
+            uint256 validatorReward = msg.value.sub(commissionReward);
+            if (commissionReward > 0) {
+                CommissionShare(v.commissionShare).reward{ value: commissionReward }();
+            }
+            if (validatorReward > 0) {
+                ValidatorKeeper(v.validatorKeeper).reward{ value: validatorReward }();
+            }
+            if (!_indexedValidators.contains(v.id)) {
+                uint256 votingPower = getVotingPower(v);
+                if (votingPower >= config.minIndexVotingPower()) {
+                    _indexedValidators.set(v.id, validator);
+                    emit IndexedValidator(validator, votingPower.sub(msg.value));
+                }
             }
         }
-    }
 
-    /**
-     * @dev Slash validator, only can be called by system caller
-     *      After all keepers slash themselves and transfer reduced amount to the stake manager,
-     *      blockchain will burn the balance of stake manager
-     * @param validator         Validator address
-     * @param reason            Slash reason
-     */
-    function slash(address validator, uint8 reason) external override onlySystemCaller returns (uint256 amount) {
-        Validator memory v = _validators[validator];
-        require(v.commissionShare != address(0), "StakeManager: invalid validator");
-        uint8 factor = config.getFactorByReason(reason);
-        amount = CommissionShare(v.commissionShare).slash(factor).add(ValidatorKeeper(v.validatorKeeper).slash(factor)).add(UnstakeKeeper(v.unstakeKeeper).slash(factor));
-        if (_indexedValidators.contains(v.id) && getVotingPower(v) < config.minIndexVotingPower()) {
-            _indexedValidators.remove(v.id);
-            emit UnindexedValidator(validator);
+        // save active validator list
+        {
+            require(acValidators.length == priorities.length, "StakeManager: invalid list length");
+            uint256 orignLength = _activeValidators.length;
+            uint256 i = 0;
+            for (; i < priorities.length; i = i.add(1)) {
+                _activeValidators[i] = ActiveValidator(acValidators[i], priorities[i]);
+            }
+            for (; i < orignLength; i = i.add(1)) {
+                delete _activeValidators[i];
+            }
         }
     }
 }

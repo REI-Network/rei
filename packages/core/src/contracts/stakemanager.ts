@@ -5,7 +5,7 @@ import { Common } from '@gxchain2/common';
 import { Log, Receipt } from '@gxchain2/structure';
 import { hexStringToBuffer } from '@gxchain2/utils';
 import { ValidatorChanges } from '../staking';
-import { bufferToAddress } from './utils';
+import { bufferToAddress, toContractCallData, bnToInt256Buffer, int256BufferToBN } from './utils';
 
 // function selector of stake manager
 const methods = {
@@ -13,7 +13,9 @@ const methods = {
   indexedValidatorsByIndex: toBuffer('0xaf6a80e2'),
   validators: toBuffer('0xfa52c7d8'),
   getVotingPowerByIndex: toBuffer('0x9b8c4c88'),
-  reward: toBuffer('0x6353586b')
+  afterBlock: toBuffer('0xf3d62333'),
+  activeValidatorsLength: toBuffer('0x75bac430'),
+  activeValidators: toBuffer('0x14f64c78')
 };
 
 // event topic
@@ -23,6 +25,11 @@ const events = {
   SetCommissionRate: toBuffer('0xaa2933ee3941c066bda0e3f51e3e6ce63f33379daee1ef99baf018764d321e54'),
   IndexedValidator: toBuffer('0x07c18d1e961213770ba59e4b4001fc312f17def9ba35867316edefe029c5dd18'),
   UnindexedValidator: toBuffer('0xa37745de139b774fe502f6f6da1c791e290244eb016b146816e3bcd8b13bc999')
+};
+
+export type ActiveValidator = {
+  validator: Address;
+  priority: BN;
 };
 
 export type Validator = {
@@ -86,13 +93,14 @@ export class StakeManager {
 
   async deploy() {
     const smaddr = Address.fromString(this.common.param('vm', 'smaddr'));
+    const genesisValidator: string[] = this.common.param('vm', 'genesisValidators');
     const result = await this.evm.executeMessage(
       new Message({
         contractAddress: smaddr,
         to: smaddr,
         gasLimit: MAX_INTEGER,
         // stakeManger code + configAddress + 000...40(rlp list) + 000...03(list length) + genesisValidator1 + genesisValidator2 + ...
-        data: Buffer.concat([hexStringToBuffer(this.common.param('vm', 'smcode')), setLengthLeft(hexStringToBuffer(this.common.param('vm', 'cfgaddr')), 32), setLengthLeft(Buffer.from('40', 'hex'), 32), setLengthLeft(Buffer.from('03', 'hex'), 32), ...(this.common.param('vm', 'genesisValidators') as string[]).map((addr) => setLengthLeft(hexStringToBuffer(addr), 32))])
+        data: Buffer.concat([hexStringToBuffer(this.common.param('vm', 'smcode')), setLengthLeft(hexStringToBuffer(this.common.param('vm', 'cfgaddr')), 32), setLengthLeft(Buffer.from('40', 'hex'), 32), setLengthLeft(toBuffer(genesisValidator.length), 32), ...genesisValidator.map((addr) => setLengthLeft(hexStringToBuffer(addr), 32))])
       })
     );
     if (result.execResult.exceptionError) {
@@ -139,13 +147,35 @@ export class StakeManager {
     return new BN(returnValue);
   }
 
-  async reward(validator: Address, amount: BN) {
+  async activeValidatorsLength() {
+    const {
+      execResult: { returnValue }
+    } = await this.evm.executeMessage(this.makeMessage('activeValidatorsLength', []));
+    return new BN(returnValue);
+  }
+
+  async activeValidators(index: BN): Promise<ActiveValidator> {
+    const {
+      execResult: { returnValue }
+    } = await this.evm.executeMessage(this.makeMessage('validators', [setLengthLeft(index.toBuffer(), 32)]));
+    if (returnValue.length !== 2 * 32) {
+      throw new Error('invalid return value length');
+    }
+    let i = 0;
+    return {
+      validator: bufferToAddress(returnValue.slice(i++ * 32, i * 32)),
+      priority: int256BufferToBN(returnValue.slice(i++ * 32, i * 32))
+    };
+  }
+
+  async afterBlock(validator: Address, activeValidators: Address[], priorities: BN[], amount: BN) {
     const message = new Message({
       caller: Address.fromString(this.common.param('vm', 'scaddr')),
       to: Address.fromString(this.common.param('vm', 'smaddr')),
       gasLimit: MAX_INTEGER,
       value: amount,
-      data: Buffer.concat([methods['reward'], setLengthLeft(validator.toBuffer(), 32)])
+      // method + validator address + 60 + c0 + activeValidators.length + activeValidators... + priorities.length + priorities...
+      data: Buffer.concat([methods['reward'], ...toContractCallData([validator.toBuffer(), Buffer.from('60', 'hex'), Buffer.from('c0', 'hex'), toBuffer(activeValidators.length), ...activeValidators.map((addr) => addr.buf), toBuffer(priorities.length), ...priorities.map((p) => bnToInt256Buffer(p))])])
     });
     const {
       execResult: { logs, exceptionError }

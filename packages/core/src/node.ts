@@ -454,12 +454,12 @@ export class Node {
               await parentSM!.deploy();
             }
 
-            if (parentEnableStaking) {
-              const ethLogs = await parentSM!.reward(miner, totalRewardAmount);
-              if (ethLogs && ethLogs.length > 0) {
-                logs = ethLogs.map((raw) => Log.fromValuesArray(raw));
-              }
-            }
+            // if (parentEnableStaking) {
+            //   const ethLogs = await parentSM!.reward(miner, totalRewardAmount);
+            //   if (ethLogs && ethLogs.length > 0) {
+            //     logs = ethLogs.map((raw) => Log.fromValuesArray(raw));
+            //   }
+            // }
           }
         };
 

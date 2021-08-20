@@ -2,9 +2,10 @@ import Heap from 'qheap';
 import { Address, BN } from 'ethereumjs-util';
 import { createBufferFunctionalMap } from '@gxchain2/utils';
 import { Common } from '@gxchain2/common';
-import { StakeManager, Validator } from '../contracts';
+import { StakeManager, Validator, ActiveValidator } from '../contracts';
 import { ValidatorChanges } from './validatorchanges';
 
+const priorityWindowSizeFactor = 2;
 let genesisValidators: Address[] | undefined;
 
 export type ValidatorInfo = {
@@ -32,7 +33,8 @@ export type ValidatorChange = {
 
 export class ValidatorSet {
   private validators = createBufferFunctionalMap<ValidatorInfo>();
-  private active: Address[] = [];
+  private active: ActiveValidator[] = [];
+  private totalVotingPower = new BN(0);
   private common: Common;
 
   constructor(common: Common) {
@@ -95,23 +97,55 @@ export class ValidatorSet {
         droped.detail = undefined;
       }
     }
-    this.active = [];
+
+    // sort validators
+    const newAcitve: ActiveValidator[] = [];
+    const totalVotingPower = new BN(0);
     while (heap.length > 0) {
-      this.active.unshift(heap.remove().validator);
+      const v = heap.remove() as ValidatorInfo;
+      newAcitve.unshift({
+        validator: v.validator,
+        priority: new BN(0)
+      });
+      totalVotingPower.iadd(v.votingPower);
     }
-    // get genesis validators from common
-    if (!genesisValidators) {
-      genesisValidators = this.common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr)) as Address[];
-      // sort by address
-      genesisValidators.sort((a, b) => -1 * (a.buf.compare(b.buf) as 1 | -1 | 0));
+
+    // if the validator is not enough, push the genesis validator to the active list
+    if (newAcitve.length < maxCount) {
+      // get genesis validators from common
+      if (!genesisValidators) {
+        genesisValidators = this.common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr)) as Address[];
+        // sort by address
+        genesisValidators.sort((a, b) => -1 * (a.buf.compare(b.buf) as 1 | -1 | 0));
+      }
+      const gvs = [...genesisValidators];
+      // the genesis validator sorted by address and has nothing to do with voting power
+      while (gvs.length > 0 && newAcitve.length < maxCount) {
+        const gv = gvs.shift()!;
+        if (newAcitve.filter(({ validator }) => validator.equals(gv)).length === 0) {
+          newAcitve.push({
+            validator: gv,
+            priority: new BN(0)
+          });
+        }
+      }
     }
-    const gvs = [...genesisValidators];
-    // if the validator is not enough, push the genesis validator to the active list,
-    // the genesis validator sorted by address and has nothing to do with voting power
-    while (gvs.length > 0 && this.active.length < maxCount) {
-      const gv = gvs.shift()!;
-      if (this.active.filter((validator) => validator.equals(gv)).length === 0) {
-        this.active.push(gv);
+
+    return { newAcitve, totalVotingPower };
+  }
+
+  private computeNewPriorities(newAcitve: ActiveValidator[], tvpAfterUpdatesBeforeRemovals: BN) {
+    let newPriority: BN | undefined;
+    for (const av of newAcitve) {
+      const index = this.active.findIndex(({ validator }) => validator.equals(av.validator));
+      if (index !== -1) {
+        av.priority = this.active[index].priority;
+      } else {
+        if (newPriority === undefined) {
+          // - 1.25 * tvpAfterUpdatesBeforeRemovals
+          newPriority = tvpAfterUpdatesBeforeRemovals.muln(10).divn(8).neg();
+        }
+        av.priority = newPriority.clone();
       }
     }
   }
@@ -165,12 +199,18 @@ export class ValidatorSet {
     }
 
     if (dirty) {
-      this.sort();
+      const { newAcitve, totalVotingPower } = this.sort();
+
+      this.computeNewPriorities(newAcitve, totalVotingPower);
+
+      // save
+      this.active = newAcitve;
+      this.totalVotingPower = totalVotingPower;
     }
   }
 
-  private isActive(validator: Address) {
-    const index = this.active.findIndex((v) => v.equals(validator));
+  isActive(validator: Address) {
+    const index = this.active.findIndex(({ validator: v }) => v.equals(validator));
     return index !== -1;
   }
 
@@ -183,10 +223,76 @@ export class ValidatorSet {
   }
 
   activeSigners() {
-    return [...this.active];
+    return this.active.map(({ validator }) => validator);
   }
 
   copy(common: Common) {
     return ValidatorSet.createFromValidatorSet(this, common);
+  }
+
+  private _incrementProposerPriority() {
+    for (const av of this.active) {
+      const v = this.validators.get(av.validator.buf);
+      if (v) {
+        av.priority = av.priority.add(v.votingPower);
+      }
+    }
+
+    // we don't choose and sub most priority in clique consensus
+  }
+
+  incrementProposerPriority(times: number) {
+    const diffMax = this.totalVotingPower.muln(priorityWindowSizeFactor);
+    this.rescalePriorities(diffMax);
+    this.shiftByAvgProposerPriority();
+    for (let i = 0; i < times; i++) {
+      // TODO
+      this._incrementProposerPriority();
+    }
+  }
+
+  private calcPriorityDiff() {
+    if (this.active.length === 0) {
+      return new BN(0);
+    }
+    let max: BN | undefined;
+    let min: BN | undefined;
+    for (const av of this.active) {
+      if (max === undefined || max.lt(av.priority)) {
+        max = av.priority;
+      }
+      if (min === undefined || min.gt(av.priority)) {
+        min = av.priority;
+      }
+    }
+    return max!.sub(min!);
+  }
+
+  private calcAvgPriority() {
+    const len = this.active.length;
+    const sum = new BN(0);
+    for (const av of this.active) {
+      sum.iadd(av.priority);
+    }
+    return sum.divn(len);
+  }
+
+  private rescalePriorities(diffMax: BN) {
+    const diff = this.calcPriorityDiff();
+    if (diff.gt(diffMax)) {
+      // ceil div
+      const ratio = diff.add(diffMax).subn(1).div(diffMax);
+      // rescale
+      for (const av of this.active) {
+        av.priority = av.priority.div(ratio);
+      }
+    }
+  }
+
+  private shiftByAvgProposerPriority() {
+    const avg = this.calcAvgPriority();
+    for (const av of this.active) {
+      av.priority = av.priority.sub(avg);
+    }
   }
 }

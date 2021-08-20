@@ -1,10 +1,25 @@
 import { BN, Address } from 'ethereumjs-util';
 import { createBufferFunctionalMap, FunctionalSet } from '@gxchain2/utils';
-import { ValidatorChange } from './validatorset';
+import { ValidatorSet } from './validatorset';
+
+export type ValidatorChange = {
+  validator: Address;
+  update: BN;
+  votingPower?: BN;
+  commissionChange?: {
+    commissionRate: BN;
+    updateTimestamp: BN;
+  };
+};
 
 export class ValidatorChanges {
+  parent: ValidatorSet;
   changes = createBufferFunctionalMap<ValidatorChange>();
   unindexedValidators = new FunctionalSet<Address>((a: Address, b: Address) => a.buf.compare(b.buf));
+
+  constructor(parent: ValidatorSet) {
+    this.parent = parent;
+  }
 
   private getChange(validator: Address) {
     let c = this.changes.get(validator.buf);
@@ -31,19 +46,19 @@ export class ValidatorChanges {
   }
 
   stake(validator: Address, value: BN) {
-    if (!this.unindexedValidators.has(validator)) {
+    if (this.parent.contains(validator) && !this.unindexedValidators.has(validator)) {
       this.getChange(validator).update.iadd(value);
     }
   }
 
   unstake(validator: Address, value: BN) {
-    if (!this.unindexedValidators.has(validator)) {
+    if (this.parent.contains(validator) && !this.unindexedValidators.has(validator)) {
       this.getChange(validator).update.isub(value);
     }
   }
 
   setCommissionRate(validator: Address, commissionRate: BN, updateTimestamp: BN) {
-    if (!this.unindexedValidators.has(validator)) {
+    if (this.parent.contains(validator) && !this.unindexedValidators.has(validator)) {
       this.getChange(validator).commissionChange = {
         commissionRate,
         updateTimestamp

@@ -87,7 +87,7 @@ export class StakeManager {
       caller: Address.zero(),
       to: Address.fromString(this.common.param('vm', 'smaddr')),
       gasLimit: MAX_INTEGER,
-      data: Buffer.concat([methods[method], ...data])
+      data: Buffer.concat([methods[method], ...toContractCallData(data)])
     });
   }
 
@@ -99,8 +99,8 @@ export class StakeManager {
         contractAddress: smaddr,
         to: smaddr,
         gasLimit: MAX_INTEGER,
-        // stakeManger code + configAddress + 000...40(rlp list) + 000...03(list length) + genesisValidator1 + genesisValidator2 + ...
-        data: Buffer.concat([hexStringToBuffer(this.common.param('vm', 'smcode')), setLengthLeft(hexStringToBuffer(this.common.param('vm', 'cfgaddr')), 32), setLengthLeft(Buffer.from('40', 'hex'), 32), setLengthLeft(toBuffer(genesisValidator.length), 32), ...genesisValidator.map((addr) => setLengthLeft(hexStringToBuffer(addr), 32))])
+        // stakeManger code + configAddress + 000...40(rlp list) + genesisValidators.length(list length) + genesisValidator1 + genesisValidator2 + ...
+        data: Buffer.concat([hexStringToBuffer(this.common.param('vm', 'smcode')), ...toContractCallData([hexStringToBuffer(this.common.param('vm', 'cfgaddr')), Buffer.from('40', 'hex'), toBuffer(genesisValidator.length), ...genesisValidator.map((addr) => hexStringToBuffer(addr))])])
       })
     );
     if (result.execResult.exceptionError) {
@@ -118,14 +118,14 @@ export class StakeManager {
   async indexedValidatorsByIndex(index: BN) {
     const {
       execResult: { returnValue }
-    } = await this.evm.executeMessage(this.makeMessage('indexedValidatorsByIndex', [setLengthLeft(index.toBuffer(), 32)]));
+    } = await this.evm.executeMessage(this.makeMessage('indexedValidatorsByIndex', [index.toBuffer()]));
     return bufferToAddress(returnValue);
   }
 
   async validators(validator: Address): Promise<Validator> {
     const {
       execResult: { returnValue }
-    } = await this.evm.executeMessage(this.makeMessage('validators', [setLengthLeft(validator.buf, 32)]));
+    } = await this.evm.executeMessage(this.makeMessage('validators', [validator.buf]));
     if (returnValue.length !== 6 * 32) {
       throw new Error('invalid return value length');
     }
@@ -143,7 +143,7 @@ export class StakeManager {
   async getVotingPowerByIndex(index: BN) {
     const {
       execResult: { returnValue }
-    } = await this.evm.executeMessage(this.makeMessage('getVotingPowerByIndex', [setLengthLeft(index.toBuffer(), 32)]));
+    } = await this.evm.executeMessage(this.makeMessage('getVotingPowerByIndex', [index.toBuffer()]));
     return new BN(returnValue);
   }
 
@@ -157,7 +157,7 @@ export class StakeManager {
   async activeValidators(index: BN): Promise<ActiveValidator> {
     const {
       execResult: { returnValue }
-    } = await this.evm.executeMessage(this.makeMessage('validators', [setLengthLeft(index.toBuffer(), 32)]));
+    } = await this.evm.executeMessage(this.makeMessage('activeValidators', [index.toBuffer()]));
     if (returnValue.length !== 2 * 32) {
       throw new Error('invalid return value length');
     }
@@ -175,7 +175,7 @@ export class StakeManager {
       gasLimit: MAX_INTEGER,
       value: amount,
       // method + validator address + 60 + c0 + activeValidators.length + activeValidators... + priorities.length + priorities...
-      data: Buffer.concat([methods['reward'], ...toContractCallData([validator.toBuffer(), Buffer.from('60', 'hex'), Buffer.from('c0', 'hex'), toBuffer(activeValidators.length), ...activeValidators.map((addr) => addr.buf), toBuffer(priorities.length), ...priorities.map((p) => bnToInt256Buffer(p))])])
+      data: Buffer.concat([methods['afterBlock'], ...toContractCallData([validator.toBuffer(), Buffer.from('60', 'hex'), Buffer.from('c0', 'hex'), toBuffer(activeValidators.length), ...activeValidators.map((addr) => addr.buf), toBuffer(priorities.length), ...priorities.map((p) => bnToInt256Buffer(p))])])
     });
     const {
       execResult: { logs, exceptionError }

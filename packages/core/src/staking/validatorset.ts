@@ -14,22 +14,19 @@ export type ValidatorInfo = {
   detail?: Validator;
 };
 
-function cloneInfo(info: ValidatorInfo) {
+function cloneValidatorInfo(info: ValidatorInfo) {
   return {
     ...info,
     votingPower: info.votingPower.clone()
   };
 }
 
-export type ValidatorChange = {
-  validator: Address;
-  update: BN;
-  votingPower?: BN;
-  commissionChange?: {
-    commissionRate: BN;
-    updateTimestamp: BN;
+function cloneActiveValidator(av: ActiveValidator) {
+  return {
+    ...av,
+    priority: av.priority.clone()
   };
-};
+}
 
 export class ValidatorSet {
   private validators = createBufferFunctionalMap<ValidatorInfo>();
@@ -41,39 +38,37 @@ export class ValidatorSet {
     this.common = common;
   }
 
-  static createFromValidatorSet(old: ValidatorSet, common: Common) {
+  static createFromValidatorSet(parent: ValidatorSet, common: Common) {
     const vs = new ValidatorSet(common);
-    for (const [validator, info] of old.validators) {
-      vs.validators.set(validator, cloneInfo(info));
+    for (const [validator, info] of parent.validators) {
+      vs.validators.set(validator, cloneValidatorInfo(info));
     }
-    vs.active = [...old.active];
-    return vs;
-  }
-
-  static createFromValidatorInfo(info: ValidatorInfo[], common: Common) {
-    const vs = new ValidatorSet(common);
-    for (const v of info) {
-      vs.validators.set(v.validator.buf, v);
-    }
-    vs.sort();
+    vs.active = parent.active.map(cloneActiveValidator);
     return vs;
   }
 
   static async createFromStakeManager(sm: StakeManager) {
-    const validators: ValidatorInfo[] = [];
-    const length = await sm.indexedValidatorsLength();
+    const vs = new ValidatorSet(sm.common);
+    let length = await sm.indexedValidatorsLength();
     for (let i = new BN(0); i.lt(length); i.iaddn(1)) {
       const validator = await sm.indexedValidatorsByIndex(i);
       const votingPower = await sm.getVotingPowerByIndex(i);
       if (votingPower.gtn(0)) {
-        validators.push({ validator, votingPower });
+        vs.validators.set(validator.buf, {
+          validator,
+          votingPower
+        });
       }
     }
-    return ValidatorSet.createFromValidatorInfo(validators, sm.common);
+    length = await sm.activeValidatorsLength();
+    for (let i = new BN(0); i.lt(length); i.iaddn(1)) {
+      vs.active.push(await sm.activeValidators(i));
+    }
+    return vs;
   }
 
   static createGenesisValidatorSet(common: Common) {
-    return ValidatorSet.createFromValidatorInfo([], common);
+    return new ValidatorSet(common);
   }
 
   private sort() {
@@ -162,6 +157,32 @@ export class ValidatorSet {
     return v;
   }
 
+  private compareActiveValidators(parent: ValidatorSet, newAcitve: ActiveValidator[], totalVotingPower: BN) {
+    if (!parent.totalVotingPower.eq(totalVotingPower) || parent.active.length !== newAcitve.length) {
+      return true;
+    }
+    for (let i = 0; i < newAcitve.length; i++) {
+      const { validator: pre } = parent.active[i];
+      const { validator: curr } = newAcitve[i];
+      if (curr.equals(pre) && this.getVotingPower(curr).eq(parent.getVotingPower(pre))) {
+        // do nothing
+      } else {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private compareRemovals(parent: ValidatorSet, newAcitve: ActiveValidator[]) {
+    const removedVotingPower = new BN(0);
+    for (const pav of parent.active) {
+      if (newAcitve.filter(({ validator }) => validator.equals(pav.validator)).length === 0) {
+        removedVotingPower.iadd(parent.getVotingPower(pav.validator));
+      }
+    }
+    return removedVotingPower;
+  }
+
   // TODO: if the changed validator is an active validator, the active list maybe not be dirty
   mergeChanges(changes: ValidatorChanges) {
     let dirty = false;
@@ -198,14 +219,25 @@ export class ValidatorSet {
       }
     }
 
+    let flag = false;
     if (dirty) {
       const { newAcitve, totalVotingPower } = this.sort();
 
-      this.computeNewPriorities(newAcitve, totalVotingPower);
+      flag = this.compareActiveValidators(changes.parent, newAcitve, totalVotingPower);
+      if (flag) {
+        const removedVotingPower = this.compareRemovals(changes.parent, newAcitve);
+        const tvpAfterUpdatesBeforeRemovals = totalVotingPower.add(removedVotingPower);
+        this.computeNewPriorities(newAcitve, tvpAfterUpdatesBeforeRemovals);
 
-      // save
-      this.active = newAcitve;
-      this.totalVotingPower = totalVotingPower;
+        // update active validator list and total voting power
+        this.active = newAcitve;
+        this.totalVotingPower = totalVotingPower;
+      }
+    }
+
+    if (flag) {
+      this.rescalePriorities(this.totalVotingPower.muln(priorityWindowSizeFactor));
+      this.shiftByAvgProposerPriority();
     }
   }
 
@@ -222,6 +254,14 @@ export class ValidatorSet {
     return v ? v.detail ?? (v.detail = await sm.validators(validator)) : await sm.validators(validator);
   }
 
+  getVotingPower(validator: Address) {
+    return this.validators.get(validator.buf)?.votingPower ?? new BN(0);
+  }
+
+  contains(validator: Address) {
+    return this.validators.has(validator.buf);
+  }
+
   activeSigners() {
     return this.active.map(({ validator }) => validator);
   }
@@ -232,21 +272,22 @@ export class ValidatorSet {
 
   private _incrementProposerPriority() {
     for (const av of this.active) {
-      const v = this.validators.get(av.validator.buf);
-      if (v) {
-        av.priority = av.priority.add(v.votingPower);
-      }
+      av.priority.iadd(this.getVotingPower(av.validator));
     }
 
     // we don't choose and sub most priority in clique consensus
   }
 
   incrementProposerPriority(times: number) {
+    // in clique consensus, times must be 1
+    if (times !== 1) {
+      throw new Error('invalid times');
+    }
+
     const diffMax = this.totalVotingPower.muln(priorityWindowSizeFactor);
     this.rescalePriorities(diffMax);
     this.shiftByAvgProposerPriority();
     for (let i = 0; i < times; i++) {
-      // TODO
       this._incrementProposerPriority();
     }
   }

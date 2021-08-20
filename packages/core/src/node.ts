@@ -482,7 +482,7 @@ export class Node {
           } else {
             // filter changes and save validator set
             validatorSet = parentValidatorSet!.copy(block._common);
-            const changes = new ValidatorChanges();
+            const changes = new ValidatorChanges(parentValidatorSet!);
             StakeManager.filterReceiptsChanges(changes, receipts, block._common);
             if (logs) {
               StakeManager.filterLogsChanges(changes, logs, block._common);

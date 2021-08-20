@@ -67,9 +67,7 @@ interface IStakeManager {
 
     function addIndexedValidator(address validator) external;
 
-    function afterBlock(
-        address validator,
-        address[] calldata acValidators,
-        int256[] calldata priorities
-    ) external payable;
+    function reward(address validator) external payable;
+
+    function afterBlock(address[] calldata acValidators, int256[] calldata priorities) external payable;
 }

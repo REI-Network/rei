@@ -201,7 +201,7 @@ task('vp', 'Get validator voting power by address')
     console.log(await stakeManager.methods.getVotingPowerByAddress(taskArgs.validator).call());
   });
 
-task('reward', 'Reward validator(impl through `afterBlock`)')
+task('reward', 'Reward validator')
   .addParam('validator', 'validator address')
   .addParam('value', 'reward amount')
   .addFlag('ether', 'use ether as unit')
@@ -214,6 +214,6 @@ task('reward', 'Reward validator(impl through `afterBlock`)')
         .mul(new BN(10).pow(new BN(18)))
         .toString();
     }
-    await stakeManager.methods.afterBlock(taskArgs.validator, [], []).send({ value: taskArgs.value });
+    await stakeManager.methods.reward(taskArgs.validator).send({ value: taskArgs.value });
     console.log('Reward succeed');
   });

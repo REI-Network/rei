@@ -192,6 +192,7 @@ describe('StakeManger', () => {
     const estimateStake = await estimator.methods.estimateStakeAmount(validator1, wantedShares).call();
     expect(estimateStake, 'estimate shares amount should be equal').be.equal(wantedShares.toString());
 
+    // TODO:
     // await stakeManager.methods.stake(validator1, deployer).send({ value: estimateStake });
     // await stakeManager.methods.slash(validator1, 1).send();
     // await stakeManager.methods.reward(validator1).send({ value: 2000 });
@@ -258,7 +259,7 @@ describe('StakeManger', () => {
     expect(await isExist(), "validator2 shouldn't exist").be.false;
 
     // reward
-    await stakeManager.methods.afterBlock(validator2, [], []).send({ value: minIndexVotingPower });
+    await stakeManager.methods.reward(validator2).send({ value: minIndexVotingPower });
     expect(await isExist(), 'validator2 should be added').be.true;
 
     // slash
@@ -280,7 +281,7 @@ describe('StakeManger', () => {
     await commissionShare.methods.approve(stakeManager.options.address, MAX_INTEGER.toString()).send();
     expect(await web3.eth.getBalance(commissionShare.options.address), 'commissionShare balance should be equal').be.equal(stakeAmount.toString());
 
-    await stakeManager.methods.afterBlock(validator3, [], []).send({ value: rewardAmount });
+    await stakeManager.methods.reward(validator3).send({ value: rewardAmount });
     const commissionAmount = rewardAmount.muln(commissionRate).divn(100);
     const commissionTotalSup = toBN(await commissionShare.methods.totalSupply().call());
     const validatorKeeperAmount = rewardAmount.sub(commissionAmount);
@@ -311,7 +312,7 @@ describe('StakeManger', () => {
   it('should correctly set active validators', async () => {
     let vs = [validator1, validator2, validator3];
     let ps = ['-1', '1', '-100'];
-    await stakeManager.methods.afterBlock(validator3, [validator1, validator2, validator3], ps).send();
+    await stakeManager.methods.afterBlock(vs, ps).send();
     expect(await stakeManager.methods.activeValidatorsLength().call(), 'length should be equal').be.equal('3');
     for (let i = 0; i < 3; i++) {
       const v = await stakeManager.methods.activeValidators(i).call();
@@ -321,7 +322,7 @@ describe('StakeManger', () => {
 
     vs = [validator3, validator2];
     ps = ['-1', '1'];
-    await stakeManager.methods.afterBlock(validator3, vs, ps).send();
+    await stakeManager.methods.afterBlock(vs, ps).send();
     expect(await stakeManager.methods.activeValidatorsLength().call(), 'length should be equal').be.equal('2');
     for (let i = 0; i < 2; i++) {
       const v = await stakeManager.methods.activeValidators(i).call();

@@ -393,54 +393,49 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
     }
 
     /**
+     * @dev Reward validator, only can be called by system caller
+     * @param validator         Validator address
+     */
+    function reward(address validator) external payable override onlySystemCaller {
+        Validator memory v = _validators[validator];
+        require(v.commissionShare != address(0), "StakeManager: invalid validator");
+        uint256 commissionReward = msg.value.mul(v.commissionRate).div(100);
+        uint256 validatorReward = msg.value.sub(commissionReward);
+        if (commissionReward > 0) {
+            CommissionShare(v.commissionShare).reward{ value: commissionReward }();
+        }
+        if (validatorReward > 0) {
+            ValidatorKeeper(v.validatorKeeper).reward{ value: validatorReward }();
+        }
+        if (!_indexedValidators.contains(v.id)) {
+            uint256 votingPower = getVotingPower(v);
+            if (votingPower >= config.minIndexVotingPower()) {
+                _indexedValidators.set(v.id, validator);
+                emit IndexedValidator(validator, votingPower.sub(msg.value));
+            }
+        }
+    }
+
+    /**
      * @dev After block callback, it will be called by system caller after each block is processed
-     * @param validator          Miner address
      * @param acValidators       Active validators list
      * @param priorities         Priority list of active validators
      */
-    function afterBlock(
-        address validator,
-        address[] calldata acValidators,
-        int256[] calldata priorities
-    ) external payable override onlySystemCaller {
-        // reward miner
-        {
-            Validator memory v = _validators[validator];
-            require(v.commissionShare != address(0), "StakeManager: invalid validator");
-            uint256 commissionReward = msg.value.mul(v.commissionRate).div(100);
-            uint256 validatorReward = msg.value.sub(commissionReward);
-            if (commissionReward > 0) {
-                CommissionShare(v.commissionShare).reward{ value: commissionReward }();
-            }
-            if (validatorReward > 0) {
-                ValidatorKeeper(v.validatorKeeper).reward{ value: validatorReward }();
-            }
-            if (!_indexedValidators.contains(v.id)) {
-                uint256 votingPower = getVotingPower(v);
-                if (votingPower >= config.minIndexVotingPower()) {
-                    _indexedValidators.set(v.id, validator);
-                    emit IndexedValidator(validator, votingPower.sub(msg.value));
-                }
+    function afterBlock(address[] calldata acValidators, int256[] calldata priorities) external payable override onlySystemCaller {
+        require(acValidators.length == priorities.length, "StakeManager: invalid list length");
+        uint256 orignLength = _activeValidators.length;
+        uint256 i = 0;
+        for (; i < priorities.length; i = i.add(1)) {
+            if (i < orignLength) {
+                ActiveValidator storage acValidator = _activeValidators[i];
+                acValidator.validator = acValidators[i];
+                acValidator.priority = priorities[i];
+            } else {
+                _activeValidators.push(ActiveValidator(acValidators[i], priorities[i]));
             }
         }
-
-        // save active validator list
-        {
-            require(acValidators.length == priorities.length, "StakeManager: invalid list length");
-            uint256 orignLength = _activeValidators.length;
-            uint256 i = 0;
-            for (; i < priorities.length; i = i.add(1)) {
-                if (i < orignLength) {
-                    ActiveValidator storage acValidator = _activeValidators[i];
-                    acValidator.validator = acValidators[i];
-                    acValidator.priority = priorities[i];
-                } else {
-                    _activeValidators.push(ActiveValidator(acValidators[i], priorities[i]));
-                }
-            }
-            for (; i < orignLength; i = i.add(1)) {
-                _activeValidators.pop();
-            }
+        for (; i < orignLength; i = i.add(1)) {
+            _activeValidators.pop();
         }
     }
 }

@@ -28,6 +28,26 @@ function cloneActiveValidator(av: ActiveValidator) {
   };
 }
 
+function fillGenesisValidators(active: ActiveValidator[], maxCount: number, common: Common) {
+  // get genesis validators from common
+  if (!genesisValidators) {
+    genesisValidators = common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr)) as Address[];
+    // sort by address
+    genesisValidators.sort((a, b) => -1 * (a.buf.compare(b.buf) as 1 | -1 | 0));
+  }
+  const gvs = [...genesisValidators];
+  // the genesis validator sorted by address and has nothing to do with voting power
+  while (gvs.length > 0 && active.length < maxCount) {
+    const gv = gvs.shift()!;
+    if (active.filter(({ validator }) => validator.equals(gv)).length === 0) {
+      active.push({
+        validator: gv,
+        priority: new BN(0)
+      });
+    }
+  }
+}
+
 export class ValidatorSet {
   private validators = createBufferFunctionalMap<ValidatorInfo>();
   private active: ActiveValidator[] = [];
@@ -68,7 +88,9 @@ export class ValidatorSet {
   }
 
   static createGenesisValidatorSet(common: Common) {
-    return new ValidatorSet(common);
+    const vs = new ValidatorSet(common);
+    fillGenesisValidators(vs.active, common.param('vm', 'maxValidatorsCount'), common);
+    return vs;
   }
 
   private sort() {
@@ -107,23 +129,7 @@ export class ValidatorSet {
 
     // if the validator is not enough, push the genesis validator to the active list
     if (newAcitve.length < maxCount) {
-      // get genesis validators from common
-      if (!genesisValidators) {
-        genesisValidators = this.common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr)) as Address[];
-        // sort by address
-        genesisValidators.sort((a, b) => -1 * (a.buf.compare(b.buf) as 1 | -1 | 0));
-      }
-      const gvs = [...genesisValidators];
-      // the genesis validator sorted by address and has nothing to do with voting power
-      while (gvs.length > 0 && newAcitve.length < maxCount) {
-        const gv = gvs.shift()!;
-        if (newAcitve.filter(({ validator }) => validator.equals(gv)).length === 0) {
-          newAcitve.push({
-            validator: gv,
-            priority: new BN(0)
-          });
-        }
-      }
+      fillGenesisValidators(newAcitve, maxCount, this.common);
     }
 
     return { newAcitve, totalVotingPower };
@@ -259,7 +265,7 @@ export class ValidatorSet {
   }
 
   contains(validator: Address) {
-    return this.validators.has(validator.buf);
+    return this.isActive(validator) || this.validators.has(validator.buf);
   }
 
   activeSigners() {
@@ -294,6 +300,21 @@ export class ValidatorSet {
       throw new Error("active validator doesn't exist");
     }
     av.priority.isub(this.totalVotingPower);
+  }
+
+  proposer() {
+    if (this.active.length === 0) {
+      throw new Error('active validators list is empty');
+    }
+    let max: BN | undefined;
+    let proposer: Address | undefined;
+    for (const av of this.active) {
+      if (max === undefined || max.lt(av.priority)) {
+        max = av.priority;
+        proposer = av.validator;
+      }
+    }
+    return proposer!;
   }
 
   private _incrementProposerPriority() {

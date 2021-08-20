@@ -3,7 +3,6 @@ import Message from '@gxchain2-ethereumjs/vm/dist/evm/message';
 import { Address, MAX_INTEGER } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
 import { hexStringToBuffer } from '@gxchain2/utils';
-// import { bufferToAddress } from './utils';
 
 // TODO: add methods
 const methods = {};
@@ -16,15 +15,6 @@ export class Config {
     this.evm = evm;
     this.common = common;
   }
-
-  //   private makeMessage(method: string, data: Buffer[]) {
-  //     return new Message({
-  //       caller: Address.zero(),
-  //       to: Address.fromString(this.common.param('vm', 'cfgaddr')),
-  //       gasLimit: MAX_INTEGER,
-  //       data: Buffer.concat([methods[method], ...data])
-  //     });
-  //   }
 
   async deploy() {
     const cfgaddr = Address.fromString(this.common.param('vm', 'cfgaddr'));

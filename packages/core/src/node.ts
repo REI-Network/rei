@@ -27,8 +27,8 @@ import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombi
 import { BlockchainMonitor } from './blockchainmonitor';
 import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
 import { ValidatorChanges, ValidatorSet, ValidatorSets } from './staking';
-import { StakeManager, Config, Validator } from './contracts';
-import { consensusValidateHeader } from './validation';
+import { StakeManager, Config } from './contracts';
+import { consensusValidateHeader, preHF1ConsensusValidateHeader } from './validation';
 import { isEnableReceiptRootFix, isEnableStaking, preHF1GenReceiptTrie } from './hardforks';
 
 const timeoutBanTime = 60 * 5 * 1000;
@@ -410,13 +410,15 @@ export class Node {
 
           if (!parentEnableStaking) {
             parentValidatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
-            consensusValidateHeader.call(block.header, this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number));
+            preHF1ConsensusValidateHeader.call(block.header, this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number));
           } else {
             parentValidatorSet = await this.validatorSets.get(parent.header.stateRoot, parentSM);
-            consensusValidateHeader.call(block.header, parentValidatorSet.activeSigners());
+            consensusValidateHeader.call(block.header, parentValidatorSet.activeSigners(), parentValidatorSet.proposer());
           }
         }
 
+        let receipts!: Receipt[];
+        let proposer: Address | undefined;
         let totalRewardAmount = new BN(0);
         let activeSigners!: Address[];
         const runBlockOptions: RunBlockOpts = {
@@ -437,7 +439,8 @@ export class Node {
               await rewardAccount(state, miner, reward);
             }
           },
-          afterApply: async () => {
+          afterApply: async (state, { receipts: postByzantiumTxReceipts }) => {
+            receipts = postByzantiumTxReceiptsToReceipts(postByzantiumTxReceipts as PostByzantiumTxReceipt[]);
             if (enableStaking) {
               let validatorSet: ValidatorSet | undefined;
 
@@ -477,6 +480,12 @@ export class Node {
               }
 
               const activeValidators = validatorSet.activeValidators();
+              logger.debug(
+                'Node::processLoop, activeValidators:',
+                activeValidators.map(({ validator, priority }) => `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${validatorSet!.getVotingPower(validator).toString()}`)
+              );
+
+              proposer = validatorSet.proposer();
               activeSigners = activeValidators.map(({ validator }) => validator);
               const priorities = activeValidators.map(({ priority }) => priority);
               // call after block callback to save active validators list
@@ -487,20 +496,15 @@ export class Node {
             } else {
               activeSigners = this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number);
             }
-            logger.debug(
-              'Node::processLoop, activeSigners:',
-              activeSigners.map((a) => a.toString())
-            );
           }
         };
 
-        const { receipts: postByzantiumTxReceipts, block: newBlock } = await vm.runBlock(runBlockOptions);
+        const { block: newBlock } = await vm.runBlock(runBlockOptions);
         block = newBlock ?? block;
         logger.info('✨ Process block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
         const before = this.blockchain.latestBlock.hash();
         await this.blockchain.putBlock(block);
         // persist receipts
-        const receipts = postByzantiumTxReceiptsToReceipts(postByzantiumTxReceipts as PostByzantiumTxReceipt[]);
         await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, block.hash(), block.header.number)));
         const after = this.blockchain.latestBlock.hash();
         resolve(block);
@@ -508,7 +512,7 @@ export class Node {
         // If canonical chain changes, notify to sub modules
         if (!before.equals(after)) {
           await this.txPool.newBlock(block);
-          const promises = [this.miner.newBlockHeader(block.header, activeSigners), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
+          const promises = [this.miner.newBlockHeader(block.header, activeSigners, proposer), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
           if (options.broadcast) {
             promises.push(this.broadcastNewBlock(block));
           }

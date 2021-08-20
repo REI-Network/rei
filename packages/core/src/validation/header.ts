@@ -1,6 +1,6 @@
 import { BN, Address } from 'ethereumjs-util';
 import { hexStringToBN, nowTimestamp } from '@gxchain2/utils';
-import { BlockHeader, CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL, calcCliqueDifficulty } from '@gxchain2/structure';
+import { BlockHeader, CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL, preHF1CalcCliqueDifficulty, CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@gxchain2/structure';
 
 const allowedFutureBlockTimeSeconds = 15;
 const maxGasLimit = new BN('8000000000000000', 16);
@@ -127,13 +127,26 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
   }
 }
 
-export function consensusValidateHeader(this: BlockHeader, activeSigners: Address[]) {
+export function preHF1ConsensusValidateHeader(this: BlockHeader, activeSigners: Address[]) {
   const miner = this.cliqueSigner();
   if (activeSigners.findIndex((addr) => addr.equals(miner)) === -1) {
     throw new Error('invalid validator, missing from active signer');
   }
-  const [, diff] = calcCliqueDifficulty(activeSigners, this.cliqueSigner(), this.number);
+  const [, diff] = preHF1CalcCliqueDifficulty(activeSigners, this.cliqueSigner(), this.number);
   if (!diff.eq(this.difficulty)) {
+    throw new Error('invalid difficulty');
+  }
+}
+
+export function consensusValidateHeader(this: BlockHeader, activeSigners: Address[], proposer: Address) {
+  const miner = this.cliqueSigner();
+  if (activeSigners.findIndex((addr) => addr.equals(miner)) === -1) {
+    throw new Error('invalid validator, missing from active signer');
+  }
+  if (miner.equals(proposer) && !this.difficulty.eq(CLIQUE_DIFF_INTURN)) {
+    throw new Error('invalid difficulty');
+  }
+  if (!miner.equals(proposer) && !this.difficulty.eq(CLIQUE_DIFF_NOTURN)) {
     throw new Error('invalid difficulty');
   }
 }

@@ -1,9 +1,10 @@
 import { Address, BN, bufferToHex, KECCAK256_RLP_ARRAY } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
-import { Block, BlockHeader, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN, Transaction } from '@gxchain2/structure';
+import { Block, BlockHeader, preHF1CalcCliqueDifficulty, calcCliqueDifficulty, CLIQUE_DIFF_NOTURN, Transaction } from '@gxchain2/structure';
 import VM from '@gxchain2-ethereumjs/vm';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
+import { Common } from '@gxchain2/common';
 import { logger, getRandomIntInclusive, hexStringToBN, nowTimestamp } from '@gxchain2/utils';
 import { PendingTxMap } from '../txpool';
 import { Node } from '../node';
@@ -106,19 +107,36 @@ export class Miner {
     }
   }
 
-  private async _getActiveSigersByBlock(block: Block) {
+  private async _getActiveSigersByBlock(block: Block): Promise<{
+    activeSigners: Address[];
+    proposer?: Address;
+  }> {
     const header = block.header;
     const common = header._common;
     let activeSigners: Address[];
     if (isEnableStaking(common)) {
       const vm = await this.node.getVM(header.stateRoot, common);
-      const sm = this.node.getStakeManager(vm, block);
-      const set = await this.node.validatorSets.get(header.stateRoot, sm);
-      activeSigners = set.activeSigners();
+      const validatorSet = await this.node.validatorSets.get(header.stateRoot, this.node.getStakeManager(vm, block));
+      activeSigners = validatorSet.activeSigners();
+      return { activeSigners: validatorSet.activeSigners(), proposer: validatorSet.proposer() };
     } else {
       activeSigners = this.node.blockchain.cliqueActiveSignersByBlockNumber(header.number);
+      return { activeSigners };
     }
-    return activeSigners;
+  }
+
+  private _calcCliqueDifficulty(activeSigners: Address[], common: Common, { proposer, number }: { proposer?: Address; number?: BN }) {
+    if (!isEnableStaking(common)) {
+      if (!number) {
+        throw new Error('missing number information');
+      }
+      return preHF1CalcCliqueDifficulty(activeSigners, this.coinbase, number);
+    } else {
+      if (!proposer) {
+        throw new Error('missing proposer information');
+      }
+      return calcCliqueDifficulty(activeSigners, this.coinbase, proposer);
+    }
   }
 
   /**
@@ -131,21 +149,21 @@ export class Miner {
       return;
     }
 
-    const activeSigners = await this._getActiveSigersByBlock(this.node.blockchain.latestBlock);
+    const { activeSigners, proposer } = await this._getActiveSigersByBlock(this.node.blockchain.latestBlock);
     logger.debug(
       'Miner::init, activeSigners:',
       activeSigners.map((a) => a.toString())
     );
-    await this._newBlockHeader(this.node.blockchain.latestBlock.header, activeSigners);
+    await this._newBlockHeader(this.node.blockchain.latestBlock.header, activeSigners, proposer);
   }
 
   /**
    * Assembles the new block
    * @param header
    */
-  async newBlockHeader(header: BlockHeader, activeSigners: Address[]) {
+  async newBlockHeader(header: BlockHeader, activeSigners: Address[], proposer?: Address) {
     await this.initPromise;
-    await this._newBlockHeader(header, activeSigners);
+    await this._newBlockHeader(header, activeSigners, proposer);
   }
 
   async startMint(block: Block) {
@@ -153,12 +171,12 @@ export class Miner {
     await this._startMint(block);
   }
 
-  private makeHeader(timestamp: number, parentHash: Buffer, number: BN, activeSigners: Address[]): { inTurn: boolean; validSigner: boolean; header: BlockHeader } {
+  private makeHeader(timestamp: number, parentHash: Buffer, parentCommon: Common, number: BN, activeSigners: Address[], proposer?: Address): { inTurn: boolean; validSigner: boolean; header: BlockHeader } {
     const common = this.node.getCommon(number);
     const gasLimit = hexStringToBN(common.param('gasConfig', 'gasLimit'));
     const validSigner = this._isValidSigner(this.coinbase, activeSigners);
     if (this.isMining && validSigner) {
-      const [inTurn, difficulty] = calcCliqueDifficulty(activeSigners, this.coinbase, number);
+      const [inTurn, difficulty] = this._calcCliqueDifficulty(activeSigners, parentCommon, { number, proposer });
       const header = BlockHeader.fromHeaderData(
         {
           // coinbase is always zero
@@ -172,7 +190,7 @@ export class Miner {
           timestamp,
           uncleHash: KECCAK256_RLP_ARRAY
         },
-        { common: this.node.getCommon(number), cliqueSigner: this.node.accMngr.getPrivateKey(this.coinbase) }
+        { common, cliqueSigner: this.node.accMngr.getPrivateKey(this.coinbase) }
       );
       return { inTurn, header, validSigner };
     } else {
@@ -189,13 +207,13 @@ export class Miner {
           timestamp,
           uncleHash: KECCAK256_RLP_ARRAY
         },
-        { common: this.node.getCommon(number) }
+        { common }
       );
       return { inTurn: false, header, validSigner };
     }
   }
 
-  private async _newBlockHeader(header: BlockHeader, activeSigners: Address[]) {
+  private async _newBlockHeader(header: BlockHeader, activeSigners: Address[], proposer?: Address) {
     try {
       await this.lock.acquire();
       if (this.vm) {
@@ -212,7 +230,7 @@ export class Miner {
       const period: number = header._common.consensusConfig().period;
       const timestamp = header.timestamp.toNumber() + period;
       const now = nowTimestamp();
-      const { inTurn, header: newHeader, validSigner } = this.makeHeader(now > timestamp ? now : timestamp, header.hash(), newNumber, activeSigners);
+      const { inTurn, header: newHeader, validSigner } = this.makeHeader(now > timestamp ? now : timestamp, header.hash(), header._common, newNumber, activeSigners, proposer);
       this.pendingHeader = newHeader;
       const currentTd = await this.node.db.getTotalDifficulty(header.hash(), header.number);
       const nextTd = currentTd.add(newHeader.difficulty);
@@ -244,8 +262,8 @@ export class Miner {
       const newNumber = header.number.addn(1);
       const period: number = header._common.consensusConfig().period;
       const timestamp = header.timestamp.toNumber() + period;
-      const activeSigners = await this._getActiveSigersByBlock(block);
-      const [inTurn, difficulty] = calcCliqueDifficulty(activeSigners, this.coinbase, newNumber);
+      const { activeSigners, proposer } = await this._getActiveSigersByBlock(block);
+      const [inTurn, difficulty] = this._calcCliqueDifficulty(activeSigners, header._common, { number: newNumber, proposer });
       const currentTd = await this.node.db.getTotalDifficulty(header.hash(), header.number);
       const nextTd = currentTd.add(difficulty);
 

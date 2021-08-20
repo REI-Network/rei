@@ -141,7 +141,7 @@ task('sunstake', 'Start unstake')
     }
     const repeat = taskArgs.repeat ?? 1;
     for (let i = 0; i < repeat; i++) {
-      const { events } = await stakeManager.methods.startUnstake(taskArgs.validator, taskArgs.receiver ?? deployer, taskArgs.shares).send();
+      const { events } = await stakeManager.methods.startUnstake(taskArgs.validator, taskArgs.receiver ?? deployer, taskArgs.shares).send({ gas: 304342 });
       let id;
       if (events) {
         for (const key in events) {

@@ -5,7 +5,7 @@ import { Common } from '@gxchain2/common';
 import { Log, Receipt } from '@gxchain2/structure';
 import { hexStringToBuffer } from '@gxchain2/utils';
 import { ValidatorChanges } from '../staking';
-import { bufferToAddress, toContractCallData, bnToInt256Buffer, int256BufferToBN } from './utils';
+import { bufferToAddress, encode, decodeInt256 } from './utils';
 
 // function selector of stake manager
 const methods = {
@@ -83,50 +83,60 @@ export class StakeManager {
     }
   }
 
-  private makeMessage(method: string, data: Buffer[]) {
+  private makeMessage(method: string, types: string[], values: any[]) {
     return new Message({
       caller: Address.zero(),
       to: Address.fromString(this.common.param('vm', 'smaddr')),
       gasLimit: MAX_INTEGER,
-      data: Buffer.concat([methods[method], ...toContractCallData(data)])
+      data: Buffer.concat([methods[method], encode(types, values)])
     });
+  }
+
+  private makeSystemCallerMessage(method: string, types: string[], values: any[], amount?: BN) {
+    return new Message({
+      caller: Address.fromString(this.common.param('vm', 'scaddr')),
+      to: Address.fromString(this.common.param('vm', 'smaddr')),
+      gasLimit: MAX_INTEGER,
+      value: amount,
+      data: Buffer.concat([methods[method], encode(types, values)])
+    });
+  }
+
+  private async executeMessage(message: Message) {
+    const {
+      execResult: { logs, returnValue, exceptionError }
+    } = await this.evm.executeMessage(message);
+    if (exceptionError) {
+      throw exceptionError;
+    }
+    return { logs, returnValue };
   }
 
   async deploy() {
     const smaddr = Address.fromString(this.common.param('vm', 'smaddr'));
     const genesisValidator: string[] = this.common.param('vm', 'genesisValidators');
-    const result = await this.evm.executeMessage(
+    await this.executeMessage(
       new Message({
         contractAddress: smaddr,
         to: smaddr,
         gasLimit: MAX_INTEGER,
-        // stakeManger code + configAddress + 000...40 + genesisValidators.length(list length) + genesisValidator1 + genesisValidator2 + ...
-        data: Buffer.concat([hexStringToBuffer(this.common.param('vm', 'smcode')), ...toContractCallData([hexStringToBuffer(this.common.param('vm', 'cfgaddr')), Buffer.from('40', 'hex'), toBuffer(genesisValidator.length), ...genesisValidator.map((addr) => hexStringToBuffer(addr))])])
+        data: Buffer.concat([hexStringToBuffer(this.common.param('vm', 'smcode')), encode(['address', 'address[]'], [this.common.param('vm', 'cfgaddr'), genesisValidator])])
       })
     );
-    if (result.execResult.exceptionError) {
-      throw result.execResult.exceptionError;
-    }
   }
 
   async indexedValidatorsLength() {
-    const {
-      execResult: { returnValue }
-    } = await this.evm.executeMessage(this.makeMessage('indexedValidatorsLength', []));
+    const { returnValue } = await this.executeMessage(this.makeMessage('indexedValidatorsLength', [], []));
     return new BN(returnValue);
   }
 
   async indexedValidatorsByIndex(index: BN) {
-    const {
-      execResult: { returnValue }
-    } = await this.evm.executeMessage(this.makeMessage('indexedValidatorsByIndex', [index.toBuffer()]));
+    const { returnValue } = await this.executeMessage(this.makeMessage('indexedValidatorsByIndex', ['uint256'], [index.toString()]));
     return bufferToAddress(returnValue);
   }
 
   async validators(validator: Address): Promise<Validator> {
-    const {
-      execResult: { returnValue }
-    } = await this.evm.executeMessage(this.makeMessage('validators', [validator.buf]));
+    const { returnValue } = await this.executeMessage(this.makeMessage('validators', ['address'], [validator.toString()]));
     if (returnValue.length !== 6 * 32) {
       throw new Error('invalid return value length');
     }
@@ -142,64 +152,33 @@ export class StakeManager {
   }
 
   async getVotingPowerByIndex(index: BN) {
-    const {
-      execResult: { returnValue }
-    } = await this.evm.executeMessage(this.makeMessage('getVotingPowerByIndex', [index.toBuffer()]));
+    const { returnValue } = await this.executeMessage(this.makeMessage('getVotingPowerByIndex', ['uint256'], [index.toString()]));
     return new BN(returnValue);
   }
 
   async activeValidatorsLength() {
-    const {
-      execResult: { returnValue }
-    } = await this.evm.executeMessage(this.makeMessage('activeValidatorsLength', []));
+    const { returnValue } = await this.executeMessage(this.makeMessage('activeValidatorsLength', [], []));
     return new BN(returnValue);
   }
 
   async activeValidators(index: BN): Promise<ActiveValidator> {
-    const {
-      execResult: { returnValue }
-    } = await this.evm.executeMessage(this.makeMessage('activeValidators', [index.toBuffer()]));
+    const { returnValue } = await this.executeMessage(this.makeMessage('activeValidators', ['uint256'], [index.toString()]));
     if (returnValue.length !== 2 * 32) {
       throw new Error('invalid return value length');
     }
     let i = 0;
     return {
       validator: bufferToAddress(returnValue.slice(i++ * 32, i * 32)),
-      priority: int256BufferToBN(returnValue.slice(i++ * 32, i * 32))
+      priority: decodeInt256(returnValue.slice(i++ * 32, i * 32))
     };
   }
 
   async reward(validator: Address, amount: BN) {
-    const message = new Message({
-      caller: Address.fromString(this.common.param('vm', 'scaddr')),
-      to: Address.fromString(this.common.param('vm', 'smaddr')),
-      gasLimit: MAX_INTEGER,
-      value: amount,
-      data: Buffer.concat([methods['reward'], ...toContractCallData([validator.buf])])
-    });
-    const {
-      execResult: { logs, exceptionError }
-    } = await this.evm.executeMessage(message);
-    if (exceptionError) {
-      throw exceptionError;
-    }
+    const { logs } = await this.executeMessage(this.makeSystemCallerMessage('reward', ['address'], [validator.toString()], amount));
     return logs;
   }
 
   async afterBlock(activeValidators: Address[], priorities: BN[]) {
-    const message = new Message({
-      caller: Address.fromString(this.common.param('vm', 'scaddr')),
-      to: Address.fromString(this.common.param('vm', 'smaddr')),
-      gasLimit: MAX_INTEGER,
-      // method + 000...40 + 000...a0 + activeValidators.length + activeValidators... + priorities.length + priorities...
-      data: Buffer.concat([methods['afterBlock'], ...toContractCallData([Buffer.from('40', 'hex'), Buffer.from('a0', 'hex'), toBuffer(activeValidators.length), ...activeValidators.map((addr) => addr.buf), toBuffer(priorities.length), ...priorities.map((p) => bnToInt256Buffer(p))])])
-    });
-    const {
-      execResult: { logs, exceptionError }
-    } = await this.evm.executeMessage(message);
-    if (exceptionError) {
-      throw exceptionError;
-    }
-    return logs;
+    await this.executeMessage(this.makeSystemCallerMessage('afterBlock', ['address[]', 'int256[]'], [activeValidators.map((addr) => addr.toString()), priorities.map((p) => p.toString())]));
   }
 }

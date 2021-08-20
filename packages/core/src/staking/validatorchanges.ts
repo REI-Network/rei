@@ -15,6 +15,7 @@ export type ValidatorChange = {
 export class ValidatorChanges {
   parent: ValidatorSet;
   changes = createBufferFunctionalMap<ValidatorChange>();
+  indexedValidators = new FunctionalSet<Address>((a: Address, b: Address) => a.buf.compare(b.buf));
   unindexedValidators = new FunctionalSet<Address>((a: Address, b: Address) => a.buf.compare(b.buf));
 
   constructor(parent: ValidatorSet) {
@@ -35,6 +36,7 @@ export class ValidatorChanges {
 
   index(validator: Address, votingPower: BN) {
     this.unindexedValidators.delete(validator);
+    this.indexedValidators.add(validator);
     const vc = this.getChange(validator);
     vc.votingPower = votingPower;
     vc.update = new BN(0);
@@ -42,23 +44,28 @@ export class ValidatorChanges {
 
   unindex(validator: Address) {
     this.unindexedValidators.add(validator);
+    this.indexedValidators.delete(validator);
     this.changes.delete(validator.buf);
   }
 
+  private cannonIgnore(validator: Address) {
+    return (this.parent.contains(validator) || this.indexedValidators.has(validator)) && !this.unindexedValidators.has(validator);
+  }
+
   stake(validator: Address, value: BN) {
-    if (this.parent.contains(validator) && !this.unindexedValidators.has(validator)) {
+    if (this.cannonIgnore(validator)) {
       this.getChange(validator).update.iadd(value);
     }
   }
 
   unstake(validator: Address, value: BN) {
-    if (this.parent.contains(validator) && !this.unindexedValidators.has(validator)) {
+    if (this.cannonIgnore(validator)) {
       this.getChange(validator).update.isub(value);
     }
   }
 
   setCommissionRate(validator: Address, commissionRate: BN, updateTimestamp: BN) {
-    if (this.parent.contains(validator) && !this.unindexedValidators.has(validator)) {
+    if (this.cannonIgnore(validator)) {
       this.getChange(validator).commissionChange = {
         commissionRate,
         updateTimestamp

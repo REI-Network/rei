@@ -403,10 +403,7 @@ export class Node {
         const miner = block.header.cliqueSigner();
         let parentValidatorSet: ValidatorSet | undefined;
         let parentSM: StakeManager | undefined;
-        let detail: Validator | undefined;
         let systemCaller: Address | undefined;
-        let totalRewardAmount = new BN(0);
-        let logs: Log[] | undefined;
         if (enableStaking) {
           systemCaller = Address.fromString(block._common.param('vm', 'scaddr'));
           parentSM = this.getStakeManager(vm, block);
@@ -416,18 +413,12 @@ export class Node {
             consensusValidateHeader.call(block.header, this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number));
           } else {
             parentValidatorSet = await this.validatorSets.get(parent.header.stateRoot, parentSM);
-
-            // get validator detail information
-            detail = await parentValidatorSet.getActiveValidatorDetail(miner, parentSM);
-            if (!detail) {
-              // this shouldn't happen
-              throw new Error('invalid validator');
-            }
-
             consensusValidateHeader.call(block.header, parentValidatorSet.activeSigners());
           }
         }
 
+        let totalRewardAmount = new BN(0);
+        let activeSigners!: Address[];
         const runBlockOptions: RunBlockOpts = {
           ...options,
           block,
@@ -447,19 +438,59 @@ export class Node {
             }
           },
           afterApply: async () => {
-            if (enableStaking && !parentEnableStaking) {
-              // deploy config contract
-              await this.getConfig(vm, block).deploy();
-              // deploy stake manager contract
-              await parentSM!.deploy();
-            }
+            if (enableStaking) {
+              let validatorSet: ValidatorSet | undefined;
 
-            // if (parentEnableStaking) {
-            //   const ethLogs = await parentSM!.reward(miner, totalRewardAmount);
-            //   if (ethLogs && ethLogs.length > 0) {
-            //     logs = ethLogs.map((raw) => Log.fromValuesArray(raw));
-            //   }
-            // }
+              if (!parentEnableStaking) {
+                // directly use genesis validator set
+                validatorSet = parentValidatorSet!;
+                // deploy config contract
+                await this.getConfig(vm, block).deploy();
+                // deploy stake manager contract
+                await parentSM!.deploy();
+              } else {
+                // reward miner
+                let logs: Log[] | undefined;
+                const ethLogs = await parentSM!.reward(miner, totalRewardAmount);
+                if (ethLogs && ethLogs.length > 0) {
+                  logs = ethLogs.map((raw) => Log.fromValuesArray(raw));
+                }
+
+                // filter changes and save validator set
+                validatorSet = parentValidatorSet!.copy(block._common);
+                const changes = new ValidatorChanges(parentValidatorSet!);
+                StakeManager.filterReceiptsChanges(changes, receipts, block._common);
+                if (logs) {
+                  StakeManager.filterLogsChanges(changes, logs, block._common);
+                }
+                // assign block reward to miner
+                changes.stake(miner, totalRewardAmount);
+                for (const uv of changes.unindexedValidators) {
+                  logger.debug('Node::processLoop, unindexedValidators, address:', uv.toString());
+                }
+                for (const vc of changes.changes.values()) {
+                  logger.debug('Node::processLoop, change, address:', vc.validator.toString(), 'votingPower:', vc?.votingPower?.toString(), 'update:', vc.update.toString(), 'rate:', vc.commissionChange?.commissionRate.toString());
+                }
+                validatorSet.mergeChanges(changes);
+                validatorSet.subtractProposerPriority(miner);
+                validatorSet.incrementProposerPriority(1);
+              }
+
+              const activeValidators = validatorSet.activeValidators();
+              activeSigners = activeValidators.map(({ validator }) => validator);
+              const priorities = activeValidators.map(({ priority }) => priority);
+              // call after block callback to save active validators list
+              await parentSM!.afterBlock(activeSigners, priorities);
+
+              // save `validatorSet` to `validatorSets`
+              this.validatorSets.set(block.header.stateRoot, validatorSet);
+            } else {
+              activeSigners = this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number);
+            }
+            logger.debug(
+              'Node::processLoop, activeSigners:',
+              activeSigners.map((a) => a.toString())
+            );
           }
         };
 
@@ -472,42 +503,6 @@ export class Node {
         const receipts = postByzantiumTxReceiptsToReceipts(postByzantiumTxReceipts as PostByzantiumTxReceipt[]);
         await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, block.hash(), block.header.number)));
         const after = this.blockchain.latestBlock.hash();
-
-        let validatorSet: ValidatorSet | undefined;
-        let activeSigners: Address[];
-        if (enableStaking) {
-          if (!parentEnableStaking) {
-            // directly use genesis validator set
-            validatorSet = parentValidatorSet!;
-          } else {
-            // filter changes and save validator set
-            validatorSet = parentValidatorSet!.copy(block._common);
-            const changes = new ValidatorChanges(parentValidatorSet!);
-            StakeManager.filterReceiptsChanges(changes, receipts, block._common);
-            if (logs) {
-              StakeManager.filterLogsChanges(changes, logs, block._common);
-            }
-            // assign block reward to miner
-            changes.stake(miner, totalRewardAmount);
-            for (const uv of changes.unindexedValidators) {
-              logger.debug('Node::processLoop, unindexedValidators, address:', uv.toString());
-            }
-            for (const vc of changes.changes.values()) {
-              logger.debug('Node::processLoop, change, address:', vc.validator.toString(), 'votingPower:', vc?.votingPower?.toString(), 'update:', vc.update.toString(), 'rate:', vc.commissionChange?.commissionRate.toString());
-            }
-            validatorSet.mergeChanges(changes);
-          }
-
-          this.validatorSets.set(block.header.stateRoot, validatorSet);
-          activeSigners = validatorSet.activeSigners();
-        } else {
-          activeSigners = this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number);
-        }
-        logger.debug(
-          'Node::processLoop, activeSigners:',
-          activeSigners.map((a) => a.toString())
-        );
-
         resolve(block);
 
         // If canonical chain changes, notify to sub modules

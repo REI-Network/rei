@@ -421,7 +421,7 @@ contract StakeManager is ReentrancyGuard, IStakeManager {
      * @param acValidators       Active validators list
      * @param priorities         Priority list of active validators
      */
-    function afterBlock(address[] calldata acValidators, int256[] calldata priorities) external payable override onlySystemCaller {
+    function afterBlock(address[] calldata acValidators, int256[] calldata priorities) external override onlySystemCaller {
         require(acValidators.length == priorities.length, "StakeManager: invalid list length");
         uint256 orignLength = _activeValidators.length;
         uint256 i = 0;

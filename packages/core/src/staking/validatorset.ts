@@ -266,16 +266,12 @@ export class ValidatorSet {
     return this.active.map(({ validator }) => validator);
   }
 
-  copy(common: Common) {
-    return ValidatorSet.createFromValidatorSet(this, common);
+  activeValidators() {
+    return [...this.active];
   }
 
-  private _incrementProposerPriority() {
-    for (const av of this.active) {
-      av.priority.iadd(this.getVotingPower(av.validator));
-    }
-
-    // we don't choose and sub most priority in clique consensus
+  copy(common: Common) {
+    return ValidatorSet.createFromValidatorSet(this, common);
   }
 
   incrementProposerPriority(times: number) {
@@ -290,6 +286,23 @@ export class ValidatorSet {
     for (let i = 0; i < times; i++) {
       this._incrementProposerPriority();
     }
+  }
+
+  subtractProposerPriority(validator: Address) {
+    const av = this.active.find(({ validator: v }) => v.equals(validator));
+    if (!av) {
+      throw new Error("active validator doesn't exist");
+    }
+    av.priority.isub(this.totalVotingPower);
+  }
+
+  private _incrementProposerPriority() {
+    for (const av of this.active) {
+      av.priority.iadd(this.getVotingPower(av.validator));
+    }
+
+    // we don't choose and sub most priority in clique consensus,
+    // proposer priority will be reduce in `subtractProposerPriority`
   }
 
   private calcPriorityDiff() {

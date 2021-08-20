@@ -1,6 +1,6 @@
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import Message from '@gxchain2-ethereumjs/vm/dist/evm/message';
-import { Address, BN, MAX_INTEGER, setLengthLeft, toBuffer } from 'ethereumjs-util';
+import { Address, BN, MAX_INTEGER, toBuffer } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
 import { Log, Receipt } from '@gxchain2/structure';
 import { hexStringToBuffer } from '@gxchain2/utils';
@@ -13,7 +13,8 @@ const methods = {
   indexedValidatorsByIndex: toBuffer('0xaf6a80e2'),
   validators: toBuffer('0xfa52c7d8'),
   getVotingPowerByIndex: toBuffer('0x9b8c4c88'),
-  afterBlock: toBuffer('0xf3d62333'),
+  reward: toBuffer('0x6353586b'),
+  afterBlock: toBuffer('0xa51f8223'),
   activeValidatorsLength: toBuffer('0x75bac430'),
   activeValidators: toBuffer('0x14f64c78')
 };
@@ -99,7 +100,7 @@ export class StakeManager {
         contractAddress: smaddr,
         to: smaddr,
         gasLimit: MAX_INTEGER,
-        // stakeManger code + configAddress + 000...40(rlp list) + genesisValidators.length(list length) + genesisValidator1 + genesisValidator2 + ...
+        // stakeManger code + configAddress + 000...40 + genesisValidators.length(list length) + genesisValidator1 + genesisValidator2 + ...
         data: Buffer.concat([hexStringToBuffer(this.common.param('vm', 'smcode')), ...toContractCallData([hexStringToBuffer(this.common.param('vm', 'cfgaddr')), Buffer.from('40', 'hex'), toBuffer(genesisValidator.length), ...genesisValidator.map((addr) => hexStringToBuffer(addr))])])
       })
     );
@@ -168,14 +169,30 @@ export class StakeManager {
     };
   }
 
-  async afterBlock(validator: Address, activeValidators: Address[], priorities: BN[], amount: BN) {
+  async reward(validator: Address, amount: BN) {
     const message = new Message({
       caller: Address.fromString(this.common.param('vm', 'scaddr')),
       to: Address.fromString(this.common.param('vm', 'smaddr')),
       gasLimit: MAX_INTEGER,
       value: amount,
-      // method + validator address + 60 + c0 + activeValidators.length + activeValidators... + priorities.length + priorities...
-      data: Buffer.concat([methods['afterBlock'], ...toContractCallData([validator.toBuffer(), Buffer.from('60', 'hex'), Buffer.from('c0', 'hex'), toBuffer(activeValidators.length), ...activeValidators.map((addr) => addr.buf), toBuffer(priorities.length), ...priorities.map((p) => bnToInt256Buffer(p))])])
+      data: Buffer.concat([methods['reward'], ...toContractCallData([validator.buf])])
+    });
+    const {
+      execResult: { logs, exceptionError }
+    } = await this.evm.executeMessage(message);
+    if (exceptionError) {
+      throw exceptionError;
+    }
+    return logs;
+  }
+
+  async afterBlock(activeValidators: Address[], priorities: BN[]) {
+    const message = new Message({
+      caller: Address.fromString(this.common.param('vm', 'scaddr')),
+      to: Address.fromString(this.common.param('vm', 'smaddr')),
+      gasLimit: MAX_INTEGER,
+      // method + 000...40 + 000...a0 + activeValidators.length + activeValidators... + priorities.length + priorities...
+      data: Buffer.concat([methods['afterBlock'], ...toContractCallData([Buffer.from('40', 'hex'), Buffer.from('a0', 'hex'), toBuffer(activeValidators.length), ...activeValidators.map((addr) => addr.buf), toBuffer(priorities.length), ...priorities.map((p) => bnToInt256Buffer(p))])])
     });
     const {
       execResult: { logs, exceptionError }

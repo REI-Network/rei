@@ -69,5 +69,5 @@ interface IStakeManager {
 
     function reward(address validator) external payable;
 
-    function afterBlock(address[] calldata acValidators, int256[] calldata priorities) external payable;
+    function afterBlock(address[] calldata acValidators, int256[] calldata priorities) external;
 }

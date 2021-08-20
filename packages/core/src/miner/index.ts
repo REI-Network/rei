@@ -268,7 +268,7 @@ export class Miner {
       const nextTd = currentTd.add(difficulty);
 
       this._cancel(nextTd);
-      if (this._shouldMintNextBlock(header)) {
+      if (this._shouldMintNextBlock(header) && this._isValidSigner(this.coinbase, activeSigners)) {
         this.nextTd = nextTd.clone();
         this._mint(header.hash(), this._calcTimeout(timestamp, inTurn, activeSigners.length));
       }

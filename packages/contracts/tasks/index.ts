@@ -96,25 +96,20 @@ task('approve', 'Approve share')
 
 task('balance', 'Get balance')
   .addParam('address', 'address')
-  .addOptionalParam('validator', 'validator address')
-  .addOptionalParam('contract', 'ERC20 contract address')
-  .addOptionalParam('sAddress', 'stake manager contract address')
+  .addParam('validator', 'validator address')
+  .addOptionalParam('saddress', 'stake manager contract address')
   .setAction(async (taskArgs, { deployments, web3, artifacts }) => {
-    if (taskArgs.contract === undefined) {
-      console.log('GXC balance:', await (web3 as Web3).eth.getBalance(taskArgs.address));
-    } else if (taskArgs.validator === undefined) {
-      const share = await createWeb3Contract({ name: 'CommissionShare', deployments, web3, artifacts, address: taskArgs.contract });
-      console.log(await share.methods.name().call(), 'balance:', await share.methods.balanceOf(taskArgs.address).call());
-    } else {
-      const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, address: taskArgs.sAddress });
-      const shareAddress = (await stakeManager.methods.validators(taskArgs.validator).call()).commissionShare;
-      if (shareAddress === '0x0000000000000000000000000000000000000000') {
-        console.log("validator doesn't exsit!");
-        return;
-      }
-      const commissionShare = await createWeb3Contract({ name: 'CommissionShare', address: shareAddress, deployments, web3, artifacts });
-      console.log(await commissionShare.methods.name().call(), 'balance:', await commissionShare.methods.balanceOf(taskArgs.address).call());
+    // if (taskArgs.contract === undefined) {
+    //   console.log('GXC balance:', await (web3 as Web3).eth.getBalance(taskArgs.address));
+    // } else
+    const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, address: taskArgs.saddress });
+    const shareAddress = (await stakeManager.methods.validators(taskArgs.validator).call()).commissionShare;
+    if (shareAddress === '0x0000000000000000000000000000000000000000') {
+      console.log("validator doesn't exsit!");
+      return;
     }
+    const commissionShare = await createWeb3Contract({ name: 'CommissionShare', address: shareAddress, deployments, web3, artifacts });
+    console.log(await commissionShare.methods.name().call(), 'balance:', await commissionShare.methods.balanceOf(taskArgs.address).call());
   });
 
 task('sunstake', 'Start unstake')

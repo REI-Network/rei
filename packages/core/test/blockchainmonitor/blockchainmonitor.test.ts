@@ -19,25 +19,8 @@ describe('BlockchainMonitor', async () => {
   let fork2: Block[];
 
   async function processBlock(block: Block) {
-    const lastHeader = await node.db.getHeader(block.header.parentHash, block.header.number.subn(1));
-    const runBlockOptions: RunBlockOpts = {
-      block,
-      root: lastHeader.stateRoot,
-      generate: true,
-      skipNonce: false,
-      skipBlockValidation: true,
-      skipBalance: true
-    };
-    const { receipts, block: newBlock } = await (await node.getVM(lastHeader.stateRoot, lastHeader.number)).runBlock(runBlockOptions);
-    block = newBlock || block;
-    const before = node.blockchain.latestBlock.hash();
-    await node.blockchain.putBlock(block);
-    await node.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(postByzantiumTxReceiptsToReceipts(receipts as PostByzantiumTxReceipt[]), block.hash(), block.header.number)));
-    const after = node.blockchain.latestBlock.hash();
-    if (!before.equals(after)) {
-      await node.bcMonitor.newBlock(block);
-    }
-    return block;
+    const newBlock = await node.processBlock(block, { generate: true, broadcast: false, skipNonce: false, skipBlockValidation: true, skipBalance: true } as any);
+    return newBlock;
   }
 
   before(async () => {
@@ -69,6 +52,8 @@ describe('BlockchainMonitor', async () => {
         const newBlock = await processBlock(block);
         newBlockHashSet.add(newBlock.hash().toString('hex'));
       }
+      // sleep a while, make sure bcMonitor.newBlock has been called
+      await new Promise((r) => setTimeout(r, 200));
       if (newBlockHashSet.size !== eventSet.size) {
         throw new Error("missing 'newHeads' event");
       }
@@ -97,6 +82,8 @@ describe('BlockchainMonitor', async () => {
       for (const block of fork2) {
         await processBlock(block);
       }
+      // sleep a while, make sure bcMonitor.newBlock has been called
+      await new Promise((r) => setTimeout(r, 200));
       expect(removedLogs.length, 'removedLogs length should be 1').be.equal(1);
       expect(removedLogs[0].removed === true, 'log should be removed').be.true;
     } finally {
@@ -106,6 +93,5 @@ describe('BlockchainMonitor', async () => {
 
   after(async () => {
     await destroyNode(dirname, node);
-    process.exit(0);
   });
 });

@@ -37,7 +37,7 @@ task('transfer', 'Transfer value to target address')
     console.log('Transfer succeed');
   });
 
-task('init', 'Initialize config').setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
+task('init', 'Initialize config(only for test)').setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
   const { deployer } = await getNamedAccounts();
   const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts });
   const config = await createWeb3Contract({ name: 'Config_test', deployments, web3, artifacts, from: deployer });
@@ -46,14 +46,14 @@ task('init', 'Initialize config').setAction(async (taskArgs, { deployments, web3
   console.log('Initialize config finished');
 });
 
-task('getsmaddr', 'Get stake manager address')
+task('getsmaddr', 'Get stake manager address from config')
   .addOptionalParam('address', 'config contract address')
   .setAction(async (taskArgs, { deployments, web3, artifacts }) => {
     const config = await createWeb3Contract({ name: 'Config_test', deployments, web3, artifacts, address: taskArgs.address });
     console.log('Stake manager address:', await config.methods.stakeManager().call());
   });
 
-task('stake', 'Stake to validator')
+task('stake', 'Stake for validator')
   .addParam('validator', 'validator address')
   .addOptionalParam('value', 'stake value')
   .addOptionalParam('address', 'stake manager contract address')
@@ -73,7 +73,7 @@ task('stake', 'Stake to validator')
     console.log('Stake succeed, value:', taskArgs.value);
   });
 
-task('approve', 'Approve share')
+task('approve', 'Approve commission share')
   .addParam('validator', 'validator address')
   .addOptionalParam('spender', 'approve spender')
   .addOptionalParam('amount', 'approve amount')
@@ -95,13 +95,10 @@ task('approve', 'Approve share')
   });
 
 task('balance', 'Get balance')
-  .addParam('address', 'address')
+  .addParam('addr', 'address')
   .addParam('validator', 'validator address')
-  .addOptionalParam('saddress', 'stake manager contract address')
+  .addOptionalParam('address', 'stake manager contract address')
   .setAction(async (taskArgs, { deployments, web3, artifacts }) => {
-    // if (taskArgs.contract === undefined) {
-    //   console.log('GXC balance:', await (web3 as Web3).eth.getBalance(taskArgs.address));
-    // } else
     const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, address: taskArgs.saddress });
     const shareAddress = (await stakeManager.methods.validators(taskArgs.validator).call()).commissionShare;
     if (shareAddress === '0x0000000000000000000000000000000000000000') {
@@ -187,7 +184,7 @@ task('vvi', 'Visit validator information by index')
     console.log(await stakeManager.methods.validators(address).call());
   });
 
-task('vp', 'Get validator voting power by address')
+task('vp', 'Visit validator voting power by address')
   .addParam('validator', 'validator address')
   .addOptionalParam('address', 'stake manager contract address')
   .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {

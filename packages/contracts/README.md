@@ -109,6 +109,60 @@ contract LockedStake {
 
 ```
 
+## Hardhat tasks
+
+```
+AVAILABLE TASKS:
+
+  accounts              List accounts
+  approve               Approve commission share
+  balance               Get balance
+  getsmaddr             Get stake manager address from config
+  init                  Initialize config(only for test)
+  reward                Reward validator
+  stake                 Stake for validator
+  sunstake              Start unstake
+  test                  Runs mocha tests
+  transfer              Transfer value to target address
+  unstake               Do unstake
+  vp                    Visit validator voting power by address
+  vu                    Visit unstake info by id
+  vva                   Visit validator information by address
+  vvi                   Visit validator information by index
+```
+
+Any detailed options of the task can be obtained like this:
+
+```
+npx hardhat stake --help
+```
+
+## Hardhat tasks usage
+
+### Stake
+
+```
+npx hardhat --networkd gxc2-testnet stake --address 0x0000000000000000000000000000000000001001 --validator 0x...123 --value 100 --ether
+```
+
+stake 100 GXC for 0x...123 on gxc2-testnet
+
+### Start unstake
+
+```
+npx hardhat --networkd gxc2-testnet sunstake --address 0x0000000000000000000000000000000000001001 --validator 0x...123 --shares 100 --ether
+```
+
+start unstake 100 CommissionShares for 0x...123 on gxc2-testnet
+
+### Unstake
+
+```
+npx hardhat --networkd gxc2-testnet unstake --address 0x0000000000000000000000000000000000001001 --id 0
+```
+
+unstake for id `0`
+
 ## License
 
 [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html)

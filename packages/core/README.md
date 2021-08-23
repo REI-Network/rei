@@ -18,6 +18,8 @@ The core logic of blockchain node, including:
 - `Sync` : Synchronize blocks
 - `Txsync`: Synchronize transactions
 - `Tracer`: Tracer provides an implementation of tracing blocks or transactions
+- `Staking`: An implementation of staking logic
+- `Contracts`: Some classes are used to interact with the smart contract
 
 ## INSTALL
 

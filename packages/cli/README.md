@@ -28,7 +28,6 @@ Options:
   --p2p-udp-port <port>            p2p server udp port
   --p2p-nat <ip>                   p2p server nat ip
   --max-peers <peers>              max p2p peers count
-  --max-connections <connections>  max p2p connections count
   --max-dials <dials>              max p2p dials count
   --bootnodes <bootnodes...>       comma separated list of bootnodes
   --datadir <path>                 chain data dir path (default: "~/.gxchain2")

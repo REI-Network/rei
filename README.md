@@ -44,7 +44,6 @@ Options:
   --p2p-udp-port <port>            p2p server udp port
   --p2p-nat <ip>                   p2p server nat ip
   --max-peers <peers>              max p2p peers count
-  --max-connections <connections>  max p2p connections count
   --max-dials <dials>              max p2p dials count
   --bootnodes <bootnodes...>       comma separated list of bootnodes
   --datadir <path>                 chain data dir path (default: "~/.gxchain2")
@@ -89,13 +88,7 @@ gxchain2 --chain gxc2-testnet
 
 ## Build
 
-This monorepo uses Lerna. Please install lerna first.
-
-```
-npm install lerna --global
-```
-
-Setup and build
+This monorepo uses Lerna. Please run
 
 ```
 npm run bootstrap

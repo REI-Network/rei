@@ -3,13 +3,12 @@ import { AbiCoder } from '@ethersproject/abi';
 
 const coder = new AbiCoder();
 
-// const MAX_INTEGER_256 = new BN('7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 'hex');
-// const MIN_INTEGER_256 = new BN('8000000000000000000000000000000000000000000000000000000000000000', 'hex').neg();
-
+// convert buffer to address
 export function bufferToAddress(buf: Buffer) {
   return new Address(buf.slice(buf.length - 20));
 }
 
+// abi encode values by types
 export function encode(types: string[], values: any[]) {
   if (types.length === 0) {
     return Buffer.from([]);
@@ -17,15 +16,7 @@ export function encode(types: string[], values: any[]) {
   return toBuffer(coder.encode(types, values));
 }
 
+// decode int256 type
 export function decodeInt256(buf: Buffer) {
   return new BN(coder.decode(['int256'], buf)[0].toString());
 }
-
-// export function bnToInt256Buffer(bn: BN) {
-//   return (bn.isNeg() ? MAX_INTEGER.sub(bn).addn(1) : bn).toBuffer();
-// }
-
-// export function int256BufferToBN(buf: Buffer) {
-//   const bn = new BN(buf);
-//   return bn.gt(MAX_INTEGER_256) ? MAX_INTEGER.sub(bn).addn(1).neg() : bn;
-// }

@@ -7,6 +7,7 @@ import { hexStringToBuffer } from '@gxchain2/utils';
 // TODO: add methods
 const methods = {};
 
+// a class used to interact with the config contract
 export class Config {
   private evm!: EVM;
   private common!: Common;
@@ -16,6 +17,9 @@ export class Config {
     this.common = common;
   }
 
+  /**
+   * Deploy config contract to `common.param('vm', 'cfgaddr')`
+   */
   async deploy() {
     const cfgaddr = Address.fromString(this.common.param('vm', 'cfgaddr'));
     const result = await this.evm.executeMessage(

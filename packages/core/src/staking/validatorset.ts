@@ -6,14 +6,20 @@ import { StakeManager, Validator, ActiveValidator } from '../contracts';
 import { ValidatorChanges } from './validatorchanges';
 
 const priorityWindowSizeFactor = 2;
+// genesis validators
 let genesisValidators: Address[] | undefined;
 
+// validator information
 export type ValidatorInfo = {
+  // validator address
   validator: Address;
+  // voting power
   votingPower: BN;
+  // validator detail information
   detail?: Validator;
 };
 
+// clone a `ValidatorInfo`
 function cloneValidatorInfo(info: ValidatorInfo) {
   return {
     ...info,
@@ -21,6 +27,7 @@ function cloneValidatorInfo(info: ValidatorInfo) {
   };
 }
 
+// clone a `ActiveValidator`
 function cloneActiveValidator(av: ActiveValidator) {
   return {
     ...av,
@@ -28,6 +35,7 @@ function cloneActiveValidator(av: ActiveValidator) {
   };
 }
 
+// fill the genesis validator into the active validator list when it is not full
 function fillGenesisValidators(active: ActiveValidator[], maxCount: number, common: Common) {
   // get genesis validators from common
   if (!genesisValidators) {
@@ -48,11 +56,17 @@ function fillGenesisValidators(active: ActiveValidator[], maxCount: number, comm
   }
 }
 
+// a class used to maintain validator set
 export class ValidatorSet {
+  // indexed validator set
   private validators = createBufferFunctionalMap<ValidatorInfo>();
+  // a sorted active validator list
   private active: ActiveValidator[] = [];
+  // total voting power of active validator list
   private totalVotingPower = new BN(0);
+  // common instance
   private common: Common;
+  // whether to fill genesis validator to active validator list when it is not full, default: `true`
   private fillGenesisValidators: boolean;
 
   constructor(common: Common, fillGenesisValidators: boolean = true) {
@@ -60,6 +74,12 @@ export class ValidatorSet {
     this.fillGenesisValidators = fillGenesisValidators;
   }
 
+  /**
+   * Clone a validator set from another
+   * @param parent - Another validator set
+   * @param common - Common instance for new set
+   * @returns New validator set
+   */
   static createFromValidatorSet(parent: ValidatorSet, common: Common) {
     const vs = new ValidatorSet(common);
     for (const [validator, info] of parent.validators) {
@@ -69,6 +89,12 @@ export class ValidatorSet {
     return vs;
   }
 
+  /**
+   * Create a validator set from `StakeManager`,
+   * it will load indexed and active validator set from contract
+   * @param sm - `StakeManager` instance
+   * @returns New validator set
+   */
   static async createFromStakeManager(sm: StakeManager) {
     const vs = new ValidatorSet(sm.common);
     let length = await sm.indexedValidatorsLength();
@@ -89,6 +115,12 @@ export class ValidatorSet {
     return vs;
   }
 
+  /**
+   * Create a genesis validator set
+   * @param common - Common instance
+   * @param _fillGenesisValidators - Fill genesis validators or not
+   * @returns New validator set
+   */
   static createGenesisValidatorSet(common: Common, _fillGenesisValidators: boolean = true) {
     const vs = new ValidatorSet(common, _fillGenesisValidators);
     if (_fillGenesisValidators) {
@@ -97,6 +129,7 @@ export class ValidatorSet {
     return vs;
   }
 
+  // sort all indexed validators
   private sort() {
     const maxCount = this.common.param('vm', 'maxValidatorsCount');
     // create a heap to keep the maximum count validator
@@ -139,6 +172,7 @@ export class ValidatorSet {
     return { newAcitve, totalVotingPower };
   }
 
+  // compute priority for new active validator list
   private computeNewPriorities(newAcitve: ActiveValidator[], tvpAfterUpdatesBeforeRemovals: BN) {
     let newPriority: BN | undefined;
     for (const av of newAcitve) {
@@ -155,6 +189,7 @@ export class ValidatorSet {
     }
   }
 
+  // get validator object by address(create if it does not exist)
   private getValidator(validator: Address) {
     let v = this.validators.get(validator.buf);
     if (!v) {
@@ -167,6 +202,8 @@ export class ValidatorSet {
     return v;
   }
 
+  // compare new active validator list with parent
+  // return `true` if it is dirty
   private compareActiveValidators(parent: ValidatorSet, newAcitve: ActiveValidator[], totalVotingPower: BN) {
     if (!parent.totalVotingPower.eq(totalVotingPower) || parent.active.length !== newAcitve.length) {
       return true;
@@ -183,6 +220,7 @@ export class ValidatorSet {
     return false;
   }
 
+  // compute removed voting power
   private compareRemovals(parent: ValidatorSet, newAcitve: ActiveValidator[]) {
     const removedVotingPower = new BN(0);
     for (const pav of parent.active) {
@@ -193,8 +231,12 @@ export class ValidatorSet {
     return removedVotingPower;
   }
 
-  // TODO: if the changed validator is an active validator, the active list maybe not be dirty
+  /**
+   * Merge validator set changes
+   * @param changes - `ValidatorChanges` instance
+   */
   mergeChanges(changes: ValidatorChanges) {
+    // TODO: if the changed validator is an active validator, the active list maybe not be dirty
     let dirty = false;
 
     for (const uv of changes.unindexedValidators) {
@@ -251,11 +293,22 @@ export class ValidatorSet {
     }
   }
 
+  /**
+   * Check validator is actived
+   * @param validator - Validator address
+   * @returns `true` if it is actived
+   */
   isActive(validator: Address) {
     const index = this.active.findIndex(({ validator: v }) => v.equals(validator));
     return index !== -1;
   }
 
+  /**
+   * Get validator detail information
+   * @param validator - Validator address
+   * @param sm - `StakeManager` instance
+   * @returns Detail information
+   */
   async getActiveValidatorDetail(validator: Address, sm: StakeManager) {
     if (!this.isActive(validator)) {
       return undefined;
@@ -264,26 +317,53 @@ export class ValidatorSet {
     return v ? v.detail ?? (v.detail = await sm.validators(validator)) : await sm.validators(validator);
   }
 
+  /**
+   * Get voting power by validator address
+   * @param validator - Validator address
+   * @returns Voting power
+   */
   getVotingPower(validator: Address) {
     return this.validators.get(validator.buf)?.votingPower ?? new BN(0);
   }
 
+  /**
+   * Check whether validator is indexed
+   * @param validator - Validator address
+   * @returns `true` if it is indexed
+   */
   contains(validator: Address) {
     return this.isActive(validator) || this.validators.has(validator.buf);
   }
 
+  /**
+   * Get active validator addresses
+   * @returns List of active validator address
+   */
   activeSigners() {
     return this.active.map(({ validator }) => validator);
   }
 
+  /**
+   * Get active validator list
+   * @returns Active validator list
+   */
   activeValidators() {
     return [...this.active];
   }
 
+  /**
+   * Copy a new validator set
+   * @param common - Common instance for new set
+   * @returns New validator set
+   */
   copy(common: Common) {
     return ValidatorSet.createFromValidatorSet(this, common);
   }
 
+  /**
+   * Increase proposer priority
+   * @param times - Increase times
+   */
   incrementProposerPriority(times: number) {
     // in clique consensus, times must be 1
     if (times !== 1) {
@@ -298,6 +378,10 @@ export class ValidatorSet {
     }
   }
 
+  /**
+   * Substract proposer's priority
+   * @param validator - Proposer address
+   */
   subtractProposerPriority(validator: Address) {
     const av = this.active.find(({ validator: v }) => v.equals(validator));
     if (!av) {
@@ -306,6 +390,10 @@ export class ValidatorSet {
     av.priority.isub(this.totalVotingPower);
   }
 
+  /**
+   * Get current proposer address
+   * @returns Proposer address
+   */
   proposer() {
     if (this.active.length === 0) {
       throw new Error('active validators list is empty');

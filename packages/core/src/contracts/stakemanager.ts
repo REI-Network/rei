@@ -28,20 +28,36 @@ const events = {
   UnindexedValidator: toBuffer('0xa37745de139b774fe502f6f6da1c791e290244eb016b146816e3bcd8b13bc999')
 };
 
+// active validator information
 export type ActiveValidator = {
+  // validator address
   validator: Address;
+  // proposer priority
   priority: BN;
 };
 
+// validator information
 export type Validator = {
+  // unique validator id
   id: BN;
+  // validator keeper contract address
+  // it holds block reward for validator
   validatorKeeper: Address;
+  // validator commission share contract address
+  // it holds block reward for commission
   commissionShare: Address;
+  // validator unstake keeper contract address
+  // it holds unstake amount for no timeout unstake
   unstakeKeeper: Address;
+  // commission rate set by validator
+  // CommissionReward = BlockReward * commissionRate / 100
+  // ValidatorReward = BlockReward - CommissionReward
   commissionRate: BN;
+  // latest `commissionRate` update timestamp
   updateTimestamp: BN;
 };
 
+// a class used to interact with the stake manager contract
 export class StakeManager {
   evm!: EVM;
   common!: Common;
@@ -51,6 +67,12 @@ export class StakeManager {
     this.common = common;
   }
 
+  /**
+   * Filter validator set changes from receipts
+   * @param changes - `ValidatorChanges` instance
+   * @param receipts - List of receipt
+   * @param common - Common instance
+   */
   static filterReceiptsChanges(changes: ValidatorChanges, receipts: Receipt[], common: Common) {
     for (const receipt of receipts) {
       if (receipt.logs.length > 0) {
@@ -59,6 +81,12 @@ export class StakeManager {
     }
   }
 
+  /**
+   * Filter validator set changes from logs
+   * @param changes - `ValidatorChanges` instance
+   * @param logs - List of log
+   * @param common - Common instance
+   */
   static filterLogsChanges(changes: ValidatorChanges, logs: Log[], common: Common) {
     const smaddr = Address.fromString(common.param('vm', 'smaddr'));
     for (const log of logs) {
@@ -83,6 +111,7 @@ export class StakeManager {
     }
   }
 
+  // make a call message
   private makeMessage(method: string, types: string[], values: any[]) {
     return new Message({
       caller: Address.zero(),
@@ -92,6 +121,7 @@ export class StakeManager {
     });
   }
 
+  // make a system call message
   private makeSystemCallerMessage(method: string, types: string[], values: any[], amount?: BN) {
     return new Message({
       caller: Address.fromString(this.common.param('vm', 'scaddr')),
@@ -102,6 +132,7 @@ export class StakeManager {
     });
   }
 
+  // execute a message, throw a error if `exceptionError` is not undefined
   private async executeMessage(message: Message) {
     const {
       execResult: { logs, returnValue, exceptionError }
@@ -112,6 +143,9 @@ export class StakeManager {
     return { logs, returnValue };
   }
 
+  /**
+   * Deploy stake manager contract to `common.param('vm', 'smaddr')`
+   */
   async deploy() {
     const smaddr = Address.fromString(this.common.param('vm', 'smaddr'));
     const genesisValidator: string[] = this.common.param('vm', 'genesisValidators');
@@ -125,16 +159,30 @@ export class StakeManager {
     );
   }
 
+  /**
+   * Get indexed validator set length
+   * @returns Length
+   */
   async indexedValidatorsLength() {
     const { returnValue } = await this.executeMessage(this.makeMessage('indexedValidatorsLength', [], []));
     return new BN(returnValue);
   }
 
+  /**
+   * Get indexed validator address by index
+   * @param index - Validator index
+   * @returns Validator address
+   */
   async indexedValidatorsByIndex(index: BN) {
     const { returnValue } = await this.executeMessage(this.makeMessage('indexedValidatorsByIndex', ['uint256'], [index.toString()]));
     return bufferToAddress(returnValue);
   }
 
+  /**
+   * Get validator information by validator address
+   * @param validator - Validator address
+   * @returns Validator information
+   */
   async validators(validator: Address): Promise<Validator> {
     const { returnValue } = await this.executeMessage(this.makeMessage('validators', ['address'], [validator.toString()]));
     if (returnValue.length !== 6 * 32) {
@@ -151,16 +199,30 @@ export class StakeManager {
     };
   }
 
+  /**
+   * Get validator voting power by index
+   * @param index - Validator index
+   * @returns Voting power
+   */
   async getVotingPowerByIndex(index: BN) {
     const { returnValue } = await this.executeMessage(this.makeMessage('getVotingPowerByIndex', ['uint256'], [index.toString()]));
     return new BN(returnValue);
   }
 
+  /**
+   * Get active validator set length
+   * @returns Length
+   */
   async activeValidatorsLength() {
     const { returnValue } = await this.executeMessage(this.makeMessage('activeValidatorsLength', [], []));
     return new BN(returnValue);
   }
 
+  /**
+   * Get active validator information by index
+   * @param index - Validator index
+   * @returns Active validator information
+   */
   async activeValidators(index: BN): Promise<ActiveValidator> {
     const { returnValue } = await this.executeMessage(this.makeMessage('activeValidators', ['uint256'], [index.toString()]));
     if (returnValue.length !== 2 * 32) {
@@ -173,11 +235,22 @@ export class StakeManager {
     };
   }
 
+  /**
+   * Reward validator
+   * @param validator - Validator address
+   * @param amount - Reward amount
+   * @returns Logs emited by contract
+   */
   async reward(validator: Address, amount: BN) {
     const { logs } = await this.executeMessage(this.makeSystemCallerMessage('reward', ['address'], [validator.toString()], amount));
     return logs;
   }
 
+  /**
+   * Call `afterBlock` callback
+   * @param activeValidators - Set of sorted active validators for the next block
+   * @param priorities - Set of sorted active validators' proposer priority
+   */
   async afterBlock(activeValidators: Address[], priorities: BN[]) {
     await this.executeMessage(this.makeSystemCallerMessage('afterBlock', ['address[]', 'int256[]'], [activeValidators.map((addr) => addr.toString()), priorities.map((p) => p.toString())]));
   }

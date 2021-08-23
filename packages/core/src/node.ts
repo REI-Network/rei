@@ -289,7 +289,7 @@ export class Node {
 
     this.txSync = new TxFetcher(this);
     let bootnodes = options.p2p.bootnodes || [];
-    // bootnodes = bootnodes.concat(common.bootstrapNodes());
+    bootnodes = bootnodes.concat(common.bootstrapNodes());
     this.networkMngr = new NetworkManager({
       protocols: createProtocolsByNames(this, [NetworkProtocol.GXC2_ETHWIRE]),
       datastore: this.networkdb,
@@ -414,6 +414,11 @@ export class Node {
           } else {
             parentValidatorSet = await this.validatorSets.get(parent.header.stateRoot, parentSM);
             consensusValidateHeader.call(block.header, parentValidatorSet.activeSigners(), parentValidatorSet.proposer());
+            if (block.header.difficulty.eqn(1)) {
+              logger.debug('this block should mint by:', parentValidatorSet.proposer().toString(), ', but minted by:', miner.toString());
+            } else {
+              logger.debug('this block should mint by:', parentValidatorSet.proposer().toString());
+            }
           }
         }
 

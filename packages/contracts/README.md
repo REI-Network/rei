@@ -6,8 +6,11 @@
 GXChain2.0 genesis contracts
 
 - `Config` Global config contract, deployed at `0x0000000000000000000000000000000000001000`
-- `Share` User share contract, dynamically deployed for each validator
+- `CommmissionShare` A smart contract that keeps commission reward for all staking user, dynamically deployed for each validator
+- `ValidatorKeeper` A smart contract that keeps validator reward for validator, dynamically deployed for each validator
+- `UnstakeKeeper` A smart contract that keeps unstake amount, dynamically deployed for each validator
 - `StakeManager` Stake manager contract, deployed at `0x0000000000000000000000000000000000001001`
+- `Estimator` A smart contract that estimats staking amount
 
 ## Install
 
@@ -29,6 +32,8 @@ import "@gxchain2/contracts/src/interfaces/IStakeManager.sol";
 import "@gxchain2/contracts/src/interfaces/ICommissionShare.sol";
 
 // candy token for stake user
+// after deployment, the `transferOwnership` method should be called
+// to transfer ownership to the `LockedStake` contract
 contract Candy is ERC20Burnable, Ownable {
   constructor() public ERC20("Candy", "CD") {}
 
@@ -37,6 +42,11 @@ contract Candy is ERC20Burnable, Ownable {
   }
 }
 
+/**
+ * A locked staking smart contract,
+ * user stake for validator can get candy reward,
+ * but only can start unstake after `lockTime`
+ */
 contract LockedStake {
   using SafeMath for uint256;
 
@@ -76,7 +86,7 @@ contract LockedStake {
     emit Stake(msg.sender, id, msg.value, shares);
   }
 
-  function unstake(address payable to, uint256 id) external {
+  function unstake(uint256 id, address payable to) external {
     uint256 timestamp = stakeTimestampOf[id];
     require(
       timestamp != 0 && timestamp.add(lockTime) >= block.timestamp,

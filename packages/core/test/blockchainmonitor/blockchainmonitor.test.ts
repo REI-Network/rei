@@ -1,11 +1,7 @@
-import process from 'process';
 import { expect } from 'chai';
 import { Block, Log } from '@gxchain2/structure';
 import { hexStringToBuffer, setLevel } from '@gxchain2/utils';
-import { DBSaveTxLookup, DBSaveReceipts } from '@gxchain2/database';
-import { RunBlockOpts } from '@gxchain2-ethereumjs/vm/dist/runBlock';
-import { PostByzantiumTxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
-import { Node, postByzantiumTxReceiptsToReceipts } from '../../src';
+import { Node } from '../../src';
 import { createNode, destroyNode, loadBlocksFromTestData } from '../util';
 
 setLevel('silent');

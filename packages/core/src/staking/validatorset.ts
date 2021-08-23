@@ -53,9 +53,11 @@ export class ValidatorSet {
   private active: ActiveValidator[] = [];
   private totalVotingPower = new BN(0);
   private common: Common;
+  private fillGenesisValidators: boolean;
 
-  constructor(common: Common) {
+  constructor(common: Common, fillGenesisValidators: boolean = true) {
     this.common = common;
+    this.fillGenesisValidators = fillGenesisValidators;
   }
 
   static createFromValidatorSet(parent: ValidatorSet, common: Common) {
@@ -87,9 +89,11 @@ export class ValidatorSet {
     return vs;
   }
 
-  static createGenesisValidatorSet(common: Common) {
-    const vs = new ValidatorSet(common);
-    fillGenesisValidators(vs.active, common.param('vm', 'maxValidatorsCount'), common);
+  static createGenesisValidatorSet(common: Common, _fillGenesisValidators: boolean = true) {
+    const vs = new ValidatorSet(common, _fillGenesisValidators);
+    if (_fillGenesisValidators) {
+      fillGenesisValidators(vs.active, common.param('vm', 'maxValidatorsCount'), common);
+    }
     return vs;
   }
 
@@ -102,7 +106,7 @@ export class ValidatorSet {
         if (num === 0) {
           num = a.validator.buf.compare(b.validator.buf) as 1 | -1 | 0;
         }
-        return num;
+        return num === -1;
       }
     });
     for (const v of this.validators.values()) {
@@ -128,7 +132,7 @@ export class ValidatorSet {
     }
 
     // if the validator is not enough, push the genesis validator to the active list
-    if (newAcitve.length < maxCount) {
+    if (this.fillGenesisValidators && newAcitve.length < maxCount) {
       fillGenesisValidators(newAcitve, maxCount, this.common);
     }
 

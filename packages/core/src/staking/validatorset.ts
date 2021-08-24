@@ -41,7 +41,7 @@ function fillGenesisValidators(active: ActiveValidator[], maxCount: number, comm
   if (!genesisValidators) {
     genesisValidators = common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr)) as Address[];
     // sort by address
-    genesisValidators.sort((a, b) => -1 * (a.buf.compare(b.buf) as 1 | -1 | 0));
+    genesisValidators.sort((a, b) => a.buf.compare(b.buf) as 1 | -1 | 0);
   }
   const gvs = [...genesisValidators];
   // the genesis validator sorted by address and has nothing to do with voting power
@@ -137,7 +137,7 @@ export class ValidatorSet {
       comparBefore: (a: ValidatorInfo, b: ValidatorInfo) => {
         let num = a.votingPower.cmp(b.votingPower);
         if (num === 0) {
-          num = a.validator.buf.compare(b.validator.buf) as 1 | -1 | 0;
+          num = (-1 * a.validator.buf.compare(b.validator.buf)) as 1 | -1 | 0;
         }
         return num === -1;
       }
@@ -401,7 +401,7 @@ export class ValidatorSet {
     let max: BN | undefined;
     let proposer: Address | undefined;
     for (const av of this.active) {
-      if (max === undefined || max.lt(av.priority)) {
+      if (max === undefined || max.lt(av.priority) || (max.eq(av.priority) && proposer!.buf.compare(av.validator.buf) === 1)) {
         max = av.priority;
         proposer = av.validator;
       }

@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import { Block, txSize, calculateIntrinsicGas, mustParseTransction, WrappedTransaction, calculateTransactionTrie, Transaction } from '../../dist';
-import { Common } from '@gxchain2/common';
+import { Common } from '../../../common/src';
 import { expect } from 'chai';
 import { bufferToHex, BN } from 'ethereumjs-util';
+import { Block, calcTxSize, mustParseTransction, WrappedTransaction, calcTransactionTrie, Transaction, calcIntrinsicGasByTx } from '../../src';
 
 describe('Transaction', () => {
   let testblock: Block;
@@ -24,16 +24,16 @@ describe('Transaction', () => {
 
   it('should get size', () => {
     const trxsize = wrappedTestTrx.size;
-    expect(trxsize, 'transaction size should be equal').be.equal(txSize(testTransaction));
+    expect(trxsize, 'transaction size should be equal').be.equal(calcTxSize(testTransaction));
   });
 
   it('should calculate TransactionTrie correctly', async () => {
-    const transactionTrie = await calculateTransactionTrie([testTransaction, testTransaction2]);
+    const transactionTrie = await calcTransactionTrie([testTransaction, testTransaction2]);
     expect(bufferToHex(transactionTrie), 'transactionTrie should be equal').be.equal(testdata.header.transactionsTrie);
   });
 
   it('should calculate IntrinsicGas correctly', () => {
-    const gas = calculateIntrinsicGas(testTransaction);
+    const gas = calcIntrinsicGasByTx(testTransaction);
     expect(gas.eq(new BN(testdata.testTransaction.intrinsicgas)), 'gas should be equal').be.true;
   });
 

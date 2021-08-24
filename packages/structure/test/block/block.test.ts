@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { WrappedBlock, Block } from '../../dist';
-import { Common } from '@gxchain2/common';
+import { Common } from '../../../common/src';
 import { expect } from 'chai';
+import { WrappedBlock, Block } from '../../src';
 
 describe('Blcok', () => {
   let testblock: Block;

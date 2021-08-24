@@ -1,10 +1,10 @@
 import path from 'path';
 import fs from 'fs';
-import { Common } from '@gxchain2/common';
-import { Block, Transaction, Log, Receipt, ReceiptRawValue } from '../../dist';
-import { hexStringToBuffer, hexStringToBN } from '@gxchain2/utils';
+import { Common } from '../../../common/src';
+import { hexStringToBuffer, hexStringToBN } from '../../../utils/src';
 import { BN, generateAddress } from 'ethereumjs-util';
 import { expect } from 'chai';
+import { Block, Transaction, Log, Receipt, ReceiptRawValue } from '../../src';
 
 describe('Recipt', () => {
   let testdata: any;

@@ -1,3 +1,3 @@
 module.exports = {
-  trim: (str) => str.trim()
+  trim: (str) => str.trim(),
 };

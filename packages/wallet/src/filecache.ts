@@ -35,7 +35,7 @@ export class FileCache {
       }
 
       const deletes = this.all.filter((x) => !all.includes(x));
-      const creates = all.filter((x) => this.all.includes(x));
+      const creates = all.filter((x) => !this.all.includes(x));
       const updates = mods.filter((x) => !creates.includes(x));
 
       this.all = all;

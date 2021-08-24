@@ -143,9 +143,7 @@ export class TxFetcher {
         }
         const set = this.announces.get(message.origin);
         if (!oldPeer && set && set.size > 0) {
-          this.scheduleFetches(
-            new Set<string>([message.origin])
-          );
+          this.scheduleFetches(new Set<string>([message.origin]));
         }
       }
     } catch (err) {

@@ -5,6 +5,11 @@ import { Common } from '@gxchain2/common';
 import { StakeManager, Validator, ActiveValidator } from '../contracts';
 import { ValidatorChanges } from './validatorchanges';
 
+const maxInt256 = new BN('7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 'hex');
+const minInt256 = new BN('8000000000000000000000000000000000000000000000000000000000000000', 'hex').neg();
+export const maxProposerPriority = maxInt256;
+export const minProposerPriority = minInt256;
+
 const priorityWindowSizeFactor = 2;
 // genesis validators
 let genesisValidators: Address[] | undefined;
@@ -412,6 +417,12 @@ export class ValidatorSet {
   private _incrementProposerPriority() {
     for (const av of this.active) {
       av.priority.iadd(this.getVotingPower(av.validator));
+      if (av.priority.lt(minProposerPriority)) {
+        throw new Error('proposer priority is too small');
+      }
+      if (av.priority.gt(maxProposerPriority)) {
+        throw new Error('proposer priority is too high');
+      }
     }
 
     // we don't choose and sub most priority in clique consensus,

@@ -479,8 +479,8 @@ export class Node {
                 for (const vc of changes.changes.values()) {
                   logger.debug('Node::processLoop, change, address:', vc.validator.toString(), 'votingPower:', vc?.votingPower?.toString(), 'update:', vc.update.toString(), 'rate:', vc.commissionChange?.commissionRate.toString());
                 }
-                validatorSet.mergeChanges(changes);
                 validatorSet.subtractProposerPriority(miner);
+                validatorSet.mergeChanges(changes);
                 validatorSet.incrementProposerPriority(1);
               }
 

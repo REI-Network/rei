@@ -1,5 +1,5 @@
-import { expect } from 'chai';
-import { Address, BN, BNLike } from 'ethereumjs-util';
+import { expect, assert } from 'chai';
+import { Address, BN, BNLike, MAX_INTEGER } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
 import { FunctionalMap } from '@gxchain2/utils';
 import { ValidatorSet, ValidatorChanges } from '../../src/staking';
@@ -8,14 +8,14 @@ function createCommon(num: BNLike) {
   return Common.createCommonByBlockNumber(num, 'gxc2-testnet');
 }
 
-function createValidatorSet(validators: { [name: string]: number }, fill = false) {
+function createValidatorSet(validators: { [name: string]: number | BN }, fill = false) {
   const common = createCommon(1);
   const num = common.hardforkBlockBN('testnet-hf1');
   common.setHardforkByBlockNumber(num);
   const vs = ValidatorSet.createGenesisValidatorSet(common, fill);
   const changes = new ValidatorChanges(vs);
   for (const [name, votingPower] of Object.entries(validators)) {
-    changes.index(n2a(name), new BN(votingPower));
+    changes.index(n2a(name), typeof votingPower === 'number' ? new BN(votingPower) : votingPower);
   }
   vs.mergeChanges(changes);
   vs.incrementProposerPriority(1);
@@ -134,5 +134,14 @@ describe('ValidatorSet', () => {
     expect(times.get('foo'), 'foo proposer times should be equal').be.equal(40 * N);
     expect(times.get('bar'), 'bar proposer times should be equal').be.equal(50 * N);
     expect(times.get('baz'), 'baz proposer times should be equal').be.equal(30 * N);
+  });
+
+  it('should throw an error when the number overflows', () => {
+    try {
+      const vs = createValidatorSet({
+        foo: MAX_INTEGER
+      });
+      assert.fail('should throw an error when the number overflows');
+    } catch (err) {}
   });
 });

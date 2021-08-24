@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
 import { Peer } from '@gxchain2/network';
 import { BlockHeader } from '@gxchain2/structure';
-import { logger, hexStringToBN } from '@gxchain2/utils';
+import { logger } from '@gxchain2/utils';
 import { Synchronizer, SynchronizerOptions } from './sync';
 import { Fetcher } from './fetcher';
 import { WireProtocol, WireProtocolHandler, PeerRequestTimeoutError, maxGetBlockHeaders } from '../protocols';
@@ -14,6 +14,9 @@ export interface FullSynchronizerOptions extends SynchronizerOptions {
   count?: number;
 }
 
+/**
+ * FullSynchronizer represents full syncmode based on Synchronizer
+ */
 export class FullSynchronizer extends Synchronizer {
   private readonly count: number;
   private readonly limit: number;
@@ -38,6 +41,11 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
+  /**
+   * Fetch all blocks from current height up to highest found amongst peers
+   * @param  peer remote peer to sync with
+   * @return Resolves with true if sync successful
+   */
   protected async _sync(peer?: Peer): Promise<boolean> {
     if (this.syncingPromise) {
       return false;
@@ -95,12 +103,13 @@ export class FullSynchronizer extends Synchronizer {
     }
   }
 
-  private genesis(): [number, Buffer, BN] {
-    return [0, this.node.status.genesisHash, hexStringToBN(this.node.getCommon(0).genesis().difficulty)];
+  private async genesis(): Promise<[BlockHeader, BN]> {
+    const { header } = await this.node.db.getBlock(0);
+    return [header, header.difficulty];
   }
 
   // TODO: binary search.
-  private async findAncient(handler: WireProtocolHandler): Promise<[number, Buffer, BN]> {
+  private async findAncient(handler: WireProtocolHandler): Promise<[BlockHeader, BN]> {
     let latestHeight = this.node.blockchain.latestHeight;
     if (latestHeight === 0) {
       return this.genesis();
@@ -125,7 +134,7 @@ export class FullSynchronizer extends Synchronizer {
           const hash = remoteHeader.hash();
           const localHeader = await this.node.db.getHeader(hash, remoteHeader.number);
           const localTD = await this.node.db.getTotalDifficulty(hash, remoteHeader.number);
-          return [localHeader.number.toNumber(), hash, localTD];
+          return [localHeader, localTD];
         } catch (err) {
           if (err.type === 'NotFoundError') {
             continue;
@@ -141,16 +150,22 @@ export class FullSynchronizer extends Synchronizer {
     throw new Error('find acient failed');
   }
 
+  /**
+   * Sync all blocks and state from peer starting from current height.
+   * @param handler WireProtocolHandler of remote peer to sync with
+   * @param bestHeight The highest height of the target node
+   * @return Resolves when sync completed
+   */
   private async syncWithPeerHandler(handler: WireProtocolHandler, bestHeight: number, bestTD: BN): Promise<boolean> {
-    const [localHeight, localHash, localTD] = await this.findAncient(handler);
-    if (localHeight >= bestHeight) {
+    const [localHeader, localTD] = await this.findAncient(handler);
+    const localNumber = localHeader.number.toNumber();
+    if (localNumber >= bestHeight) {
       return false;
     }
-    logger.info('💡 Get best height from:', handler.peer.peerId, 'best height:', bestHeight, 'local height:', localHeight);
-    this.startSyncHook(localHeight, bestHeight);
-
+    logger.info('💡 Get best height from:', handler.peer.peerId, 'best height:', bestHeight, 'local height:', localNumber);
+    this.startSyncHook(localNumber, bestHeight);
     this.fetcher.reset();
-    await this.fetcher.fetch(localHeight, localHash, localTD, bestHeight, bestTD, handler);
+    await this.fetcher.fetch(localHeader, localTD, bestHeight, bestTD, handler);
     return true;
   }
 }

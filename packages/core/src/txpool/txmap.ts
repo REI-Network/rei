@@ -4,6 +4,10 @@ import { Transaction, WrappedTransaction } from '@gxchain2/structure';
 import { logger, createBNFunctionalMap } from '@gxchain2/utils';
 import { txSlots, txCost } from './index';
 
+/**
+ * TxSortedMap is a nonce->transaction hash map with a heap based index to allow
+ * iterating over the contents in a nonce-incrementing way.
+ */
 export class TxSortedMap {
   readonly nonceToTx = createBNFunctionalMap<Transaction>();
   private readonly strict: boolean;
@@ -16,6 +20,10 @@ export class TxSortedMap {
     this.resetNonceHeap();
   }
 
+  /**
+   * Increase slots by given transactions
+   * @param txs - Transactions
+   */
   private increaseSlots(txs: Transaction | Transaction[]) {
     txs = Array.isArray(txs) ? txs : [txs];
     for (const tx of txs) {
@@ -23,6 +31,10 @@ export class TxSortedMap {
     }
   }
 
+  /**
+   * Decrease slots by given transactions
+   * @param txs - Transactions
+   */
   private decreaseSlots(txs: Transaction | Transaction[]) {
     txs = Array.isArray(txs) ? txs : [txs];
     for (const tx of txs) {
@@ -33,6 +45,10 @@ export class TxSortedMap {
     }
   }
 
+  /**
+   * Reset `nonceHeap` by given nonces
+   * @param nonce - Nonces
+   */
   private resetNonceHeap(nonce?: BN[] | IterableIterator<BN>) {
     this.nonceHeap = new Heap({ comparBefore: (a: BN, b: BN) => a.lt(b) });
     if (nonce) {
@@ -42,6 +58,12 @@ export class TxSortedMap {
     }
   }
 
+  /**
+   * Strictly check transactions and delete transactions
+   * with nonce greater than the threshold
+   * @param nonce - Threshold
+   * @param invalids - Invalid transactions array
+   */
   private strictCheck(nonce: BN, invalids: Transaction[]) {
     if (this.strict) {
       for (const [key, value] of this.nonceToTx) {
@@ -65,6 +87,12 @@ export class TxSortedMap {
     return this.nonceToTx.has(nonce);
   }
 
+  /**
+   * Removes all transactions from the map with a nonce greater than or equal
+   * with the provided threshold
+   * @param nonce - Threshold
+   * @returns Removed transactions
+   */
   back(nonce: BN) {
     const removed: Transaction[] = [];
     let nonceInHeap: BN = this.nonceHeap.peek();
@@ -82,6 +110,12 @@ export class TxSortedMap {
     return removed;
   }
 
+  /**
+   * Remove all transactions from the map with a nonce lower than the
+   * provided threshold
+   * @param nonce - Threshold
+   * @returns Removed transactions
+   */
   forward(nonce: BN) {
     const removed: Transaction[] = [];
     let nonceInHeap: BN = this.nonceHeap.peek();
@@ -99,6 +133,11 @@ export class TxSortedMap {
     return removed;
   }
 
+  /**
+   * Resize this map with size, the order of deletion is in descending order of nonce
+   * @param size - New size
+   * @returns Removed transactions
+   */
   resize(size: number) {
     const removed: Transaction[] = [];
     if (this.size <= size) {
@@ -119,6 +158,13 @@ export class TxSortedMap {
     return removed;
   }
 
+  /**
+   * Push a new transaction to the map
+   * @param tx - New transaction
+   * @param priceBump - Price bump threshold, if the same nonce exsists in the map,
+   * the gasPrice of the new transaction should be greater or equal to `old.gasPrice * (1 + priceBump / 100)`
+   * @returns Whether the insertion is successful and old transaction(if exsists)
+   */
   push(tx: Transaction, priceBump: number): { inserted: boolean; old?: Transaction } {
     const nonce = tx.nonce;
     const old = this.nonceToTx.get(nonce);
@@ -141,6 +187,11 @@ export class TxSortedMap {
     };
   }
 
+  /**
+   * Delete transaction by nonce
+   * @param nonce - Transaction nonce
+   * @returns Whether to delete successful and invalid transactions
+   */
   delete(nonce: BN): { deleted: boolean; invalids?: Transaction[] } {
     const removedTx = this.nonceToTx.get(nonce);
     if (removedTx) {
@@ -160,6 +211,13 @@ export class TxSortedMap {
     };
   }
 
+  /**
+   * Filter removes all transactions from the list with a cost or gas limit higher
+   * than the provided thresholds
+   * @param balance - Cost threshold
+   * @param gasLimit - Gas limit threshold
+   * @returns Removed transactions and invalid transactions
+   */
   filter(balance: BN, gasLimit: BN): { removed: Transaction[]; invalids: Transaction[] } {
     let lowestNonce: BN | undefined;
     const removed: Transaction[] = [];
@@ -179,6 +237,11 @@ export class TxSortedMap {
     return { removed, invalids };
   }
 
+  /**
+   * Ready retrieves a list of transactions starting from the provided nonce and increasing sequentially
+   * @param start - Start nonce
+   * @returns Ready transactions
+   */
   ready(start: BN): Transaction[] {
     const nonce = start.clone();
     const readies: Transaction[] = [];
@@ -197,6 +260,10 @@ export class TxSortedMap {
     return readies;
   }
 
+  /**
+   * Clear all transactions
+   * @returns Removed transactions
+   */
   clear(): Transaction[] {
     const removed = Array.from(this.nonceToTx.values());
     this.nonceToTx.clear();
@@ -206,6 +273,10 @@ export class TxSortedMap {
     return removed;
   }
 
+  /**
+   * Return a list of transactions, order by nonce
+   * @returns Transactions
+   */
   toList(): Transaction[] {
     if (this.sortedTxCache) {
       return this.sortedTxCache;
@@ -217,6 +288,9 @@ export class TxSortedMap {
     return this.sortedTxCache;
   }
 
+  /**
+   * List all transactions in map
+   */
   ls() {
     for (const [key, value] of this.nonceToTx) {
       logger.info('---');

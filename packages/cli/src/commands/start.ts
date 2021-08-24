@@ -6,6 +6,11 @@ import { setLevel, logger } from '@gxchain2/utils';
 import { SIGINT } from '../process';
 import { getPassphrase, getKeyStorePath } from './account';
 
+/**
+ * Start gxchain2.0 node
+ * @param opts - Commander options
+ * @returns node and rpc server instance
+ */
 export async function startNode(opts: { [option: string]: string }): Promise<[Node, undefined | RpcServer]> {
   setLevel(opts.verbosity);
   if (!fs.existsSync(opts.datadir)) {
@@ -25,10 +30,9 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     enable: !opts.disableP2p,
     tcpPort: opts.p2pTcpPort ? Number(opts.p2pTcpPort) : undefined,
     udpPort: opts.p2pUdpPort ? Number(opts.p2pUdpPort) : undefined,
-    bootnodes: opts.bootnodes ? ((opts.bootnodes as unknown) as string[]) : undefined,
+    bootnodes: opts.bootnodes ? (opts.bootnodes as unknown as string[]) : undefined,
     nat: opts.p2pNat,
     maxPeers: opts.maxPeers ? Number(opts.maxPeers) : undefined,
-    maxConnections: opts.maxConnections ? Number(opts.maxConnections) : undefined,
     maxDials: opts.maxDials ? Number(opts.maxDials) : undefined
   };
   const mine = {

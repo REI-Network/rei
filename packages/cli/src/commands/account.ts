@@ -6,6 +6,15 @@ import { bufferToHex, toChecksumAddress, Address } from 'ethereumjs-util';
 import { AccountManager } from '@gxchain2/wallet';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
 
+/**
+ * Get account passphrase, if the user specifies the file, read from the file, if not, let the user input
+ * @param opts - Commander options
+ * @param options.address - Address that requires passphrase
+ * @param options.repeat - Does the user need to enter the passphrase twice
+ * @param options.message - Message displayed when the user enters the passphrase
+ * @param options.forceInput - Whether to force the user to enter the passphrase
+ * @returns
+ */
 export async function getPassphrase(opts: { [option: string]: string }, options?: { addresses?: string[]; repeat?: boolean; message?: string; forceInput?: boolean }) {
   let passphrase: string[];
   if (!options?.forceInput && opts.password) {

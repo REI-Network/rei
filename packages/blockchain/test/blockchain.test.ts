@@ -27,8 +27,7 @@ describe('Blockchain', () => {
     testsigners = genesisBlock.header.cliqueEpochTransitionSigners();
     database = new Database(testdb, common);
     blockchain = new Blockchain({
-      db: testdb,
-      database,
+      dbManager: database,
       common,
       genesisBlock
     });

@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { Block } from '@ethereumjs/block';
-import { txSize, calculateIntrinsicGas, mustParseTransction, WrappedTransaction, calculateTransactionTrie, Transaction } from '../../src/transaction';
+import { Block, txSize, calculateIntrinsicGas, mustParseTransction, WrappedTransaction, calculateTransactionTrie, Transaction } from '../../dist';
 import { Common } from '@gxchain2/common';
 import { expect } from 'chai';
 import { bufferToHex, BN } from 'ethereumjs-util';

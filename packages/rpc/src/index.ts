@@ -13,9 +13,15 @@ const defaultPort = 11451;
 const defaultHost = '127.0.0.1';
 const defaultApis = 'eth,net,web3';
 
+/**
+ * RPC running context, contain a websocket client instance
+ */
 export class RpcContext {
   public readonly client?: WsClient;
 
+  /**
+   * Whether it is a websock connection
+   */
   get isWebsocket() {
     return !!this.client;
   }
@@ -28,18 +34,28 @@ export class RpcContext {
 export const emptyContext = new RpcContext();
 
 export interface RpcServerOptions {
+  // Node instance
   node: Node;
+  // rpc server listening port
   port?: number;
+  // rpc server listening host
   host?: string;
+  // rpc server enable api
   apis?: string;
 }
 
+/**
+ * Rpc server
+ */
 export class RpcServer {
   private readonly port: number;
   private readonly host: string;
   private running: boolean = false;
   private readonly controllers: { [name: string]: any }[];
 
+  /**
+   * Whether the rpc server is running
+   */
   get isRunning() {
     return this.running;
   }
@@ -57,6 +73,9 @@ export class RpcServer {
     });
   }
 
+  /**
+   * Start rpc server
+   */
   start() {
     return new Promise<void>((resolve, reject) => {
       if (this.running) {
@@ -104,5 +123,8 @@ export class RpcServer {
     });
   }
 
+  /**
+   * Abort rpc server
+   */
   abort() {}
 }

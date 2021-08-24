@@ -1,0 +1,23 @@
+{
+    "name": "@gxchain2/contracts",
+    "version": "0.0.5-alpha.0",
+    "main": "hardhat.config.ts",
+    "license": "GPL-3.0-or-later",
+    "scripts": {
+        "build": "npx hardhat compile",
+        "node": "npx hardhat node",
+        "test": "npx hardhat test",
+        "docgen": "solidity-docgen -i ./src -t ./templates -H ./helper.js",
+        "clean": "rm -rf ./artifacts ./cache ./deployments ./docs"
+    },
+    "dependencies": {
+        "@openzeppelin/contracts": "3.2.0"
+    },
+    "devDependencies": {
+        "@nomiclabs/hardhat-etherscan": "^2.1.4",
+        "@nomiclabs/hardhat-truffle5": "^2.0.0",
+        "hardhat": "^2.5.0",
+        "hardhat-deploy": "^0.8.11",
+        "solidity-docgen": "^0.5.13"
+    }
+}

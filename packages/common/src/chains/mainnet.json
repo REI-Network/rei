@@ -78,6 +78,10 @@
     {
       "name": "london",
       "block": null
+    },
+    {
+      "name": "mainnet-chainstart",
+      "block": 0
     }
   ],
   "bootstrapNodes": []

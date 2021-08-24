@@ -19,6 +19,9 @@ export declare interface Synchronizer {
   once(event: 'failed', listener: () => void): this;
 }
 
+/**
+ * Base class for blockchain synchronizers
+ */
 export abstract class Synchronizer extends EventEmitter {
   protected readonly node: Node;
   protected readonly interval: number;
@@ -44,9 +47,6 @@ export abstract class Synchronizer extends EventEmitter {
     return { startingBlock: this.startingBlock, highestBlock: this.highestBlock };
   }
 
-  /**
-   *
-   */
   get isSyncing(): boolean {
     return this.lock.getPermits() === 0;
   }
@@ -55,19 +55,27 @@ export abstract class Synchronizer extends EventEmitter {
     throw new Error('Unimplemented');
   }
 
+  /**
+   * Set the starting block height and the highest block height
+   * @param startingBlock
+   * @param highestBlock
+   */
   protected startSyncHook(startingBlock: number, highestBlock: number) {
     this.startingBlock = startingBlock;
     this.highestBlock = highestBlock;
     this.emit('start');
   }
 
+  /**
+   * Abstract function
+   */
   protected async _sync(peer?: Peer): Promise<boolean> {
     throw new Error('Unimplemented');
   }
 
   /**
-   * Sync the blocks
-   * @param target - the sync peer and height of block
+   * Fetch all blocks from current height up to highest found amongst peers
+   * @param peer remote peer to sync with
    */
   async sync(peer?: Peer) {
     await this.lock.acquire();

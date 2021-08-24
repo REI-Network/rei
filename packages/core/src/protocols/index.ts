@@ -12,6 +12,11 @@ export enum NetworkProtocol {
 
 const pools = new Map<string, ProtocolPool<ProtocolHandler>>([[NetworkProtocol.GXC2_ETHWIRE, new ProtocolPool<WireProtocolHandler>()]]);
 
+/**
+ * Get the pool of handler according to the name of the protocol
+ * @param name Protocol name
+ * @returns Protocol Pool
+ */
 export function getProtocolPoolByName(name: string) {
   const pool = pools.get(name);
   if (!pool) {
@@ -20,6 +25,12 @@ export function getProtocolPoolByName(name: string) {
   return pool;
 }
 
+/**
+ * Create Protocols by protocal name
+ * @param node Node object
+ * @param names Protocol names
+ * @returns Protocol objects
+ */
 export function createProtocolsByNames(node: Node, names: string[]): Protocol[] {
   return names.map((name) => {
     switch (name) {
@@ -38,14 +49,25 @@ export class WireProtocol implements Protocol {
     this.node = node;
   }
 
+  /**
+   * Get the protocol name
+   */
   get name() {
     return NetworkProtocol.GXC2_ETHWIRE;
   }
 
+  /**
+   * Get the protocol string
+   */
   get protocolString() {
     return `/${this.name}/1`;
   }
 
+  /**
+   * Create protocol handler for peer
+   * @param peer Peer object
+   * @returns Handler object
+   */
   makeHandler(peer: Peer) {
     const handler = new WireProtocolHandler({
       node: this.node,
@@ -55,10 +77,18 @@ export class WireProtocol implements Protocol {
     return handler;
   }
 
+  /**
+   * Get ProtocolHandler pool
+   * @returns Protocol pool
+   */
   static getPool() {
     return getProtocolPoolByName(NetworkProtocol.GXC2_ETHWIRE) as ProtocolPool<WireProtocolHandler>;
   }
 
+  /**
+   * Get the protocol handler of the peer
+   * @param peer Peer object
+   */
   static getHandler(peer: Peer): WireProtocolHandler;
   static getHandler(peer: Peer, throwError: true): WireProtocolHandler;
   static getHandler(peer: Peer, throwError: false): WireProtocolHandler | undefined;

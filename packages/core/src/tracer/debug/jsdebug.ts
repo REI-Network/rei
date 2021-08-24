@@ -1,14 +1,22 @@
 import vm from 'vm';
 import bi, { BigInteger } from 'big-integer';
-import { StateManager } from '@ethereumjs/vm/dist/state';
-import { getPrecompile } from '@ethereumjs/vm/dist/evm/precompiles';
-import { OpcodeList } from '@ethereumjs/vm/dist/evm/opcodes';
+import { StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import { getPrecompile } from '@gxchain2-ethereumjs/vm/dist/evm/precompiles';
+import { OpcodeList } from '@gxchain2-ethereumjs/vm/dist/evm/opcodes';
 import { Address, BN, bufferToHex, setLengthLeft, generateAddress, generateAddress2, keccak256 } from 'ethereumjs-util';
-import { InterpreterStep, VmError } from '@gxchain2/vm';
+import { InterpreterStep } from '@gxchain2-ethereumjs/vm/dist/evm/interpreter';
+import { VmError } from '@gxchain2-ethereumjs/vm/dist/exceptions';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
+import { calcIntrinsicGas } from '@gxchain2/structure';
 import { IDebugImpl, TraceConfig } from '../tracer';
 import { Node } from '../../node';
 
+/**
+ * Convert operation name to number
+ * @param opcodes Opcodes collection
+ * @param name Opcode name
+ * @returns Opcode number
+ */
 function opNameToNumber(opcodes: OpcodeList, name: string) {
   if (name.indexOf('LOG') === 0) {
     return Number(name.substr(3)) + 0xa0;
@@ -30,6 +38,9 @@ function opNameToNumber(opcodes: OpcodeList, name: string) {
   throw new Error(`unknow opcode: ${name}`);
 }
 
+/**
+ * Used to manage an operation object
+ */
 class Op {
   name: string;
   constructor(opcodes: OpcodeList, name: string) {
@@ -64,6 +75,10 @@ class Memory {
   }
 }
 
+/**
+ * Contract represents an ethereum contract in the state database. It contains
+ * the contract code, calling arguments.
+ */
 class Contract {
   caller: Buffer;
   address: Buffer;
@@ -75,20 +90,43 @@ class Contract {
     this.value = value;
     this.input = input;
   }
+  /**
+   * getCaller returns the caller of the contract.
+   * @returns Contract caller
+   */
   getCaller() {
     return this.caller;
   }
+
+  /**
+   * getAddress returns the contracts address
+   * @returns contracts address
+   */
   getAddress() {
     return this.address;
   }
+
+  /**
+   * getValue returns the contract's value (sent to it from it's caller)
+   * @returns contract's value
+   */
   getValue() {
     return this.value;
   }
+  /**
+   * getInput return the input data
+   * @returns Input data
+   */
   getInput() {
     return this.input;
   }
 }
 
+/**
+ * Generate and return the operation method of the database
+ * @param stateManager state trie manager
+ * @returns A object of functions
+ */
 function makeDB(stateManager: StateManager) {
   return {
     async getBalance(address: Buffer) {
@@ -109,7 +147,15 @@ function makeDB(stateManager: StateManager) {
   };
 }
 
-function makeLog(ctx: { [key: string]: any }, opcodes: OpcodeList, step: InterpreterStep, cost: BN, error?: string) {
+/**
+ * Generate and return the operation method of the log
+ * @param ctx Contract transaction information
+ * @param opcodes Opcodes collection
+ * @param step Step state
+ * @param error Error message
+ * @returns A object for get contract parameter
+ */
+function makeLog(ctx: { [key: string]: any }, opcodes: OpcodeList, step: InterpreterStep, error?: string) {
   const stack = step.stack.map((bn) => bi(bn.toString()));
   Object.defineProperty(stack, 'peek', {
     value: (idx: number) => {
@@ -131,7 +177,7 @@ function makeLog(ctx: { [key: string]: any }, opcodes: OpcodeList, step: Interpr
       return step.gasLeft.toNumber();
     },
     getCost() {
-      return cost.toNumber();
+      return step.opcode.fee;
     },
     getDepth() {
       return step.depth + 1;
@@ -218,25 +264,43 @@ export class JSDebug implements IDebugImpl {
     }
   }
 
-  async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, gasPrice: BN, intrinsicGas: BN, value: BN, number: BN, stateManager: StateManager) {
+  /**
+   * CaptureStart implements the Tracer interface to initialize the tracing operation.
+   * @param from From address
+   * @param to To address
+   * @param create Create or call
+   * @param input Input data
+   * @param gas GasLimit
+   * @param gasPrice  gasPrice
+   * @param value Sent to it from it's caller
+   * @param number Blocknumber
+   * @param stateManager state trie manager
+   */
+  async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, gasPrice: BN, value: BN, number: BN, stateManager: StateManager) {
     this.debugContext['type'] = create ? 'CREATE' : 'CALL';
     this.debugContext['from'] = from;
     this.debugContext['to'] = to;
     this.debugContext['input'] = input;
     this.debugContext['gas'] = gas.toNumber();
     this.debugContext['gasPrice'] = gasPrice.toNumber();
-    this.debugContext['intrinsicGas'] = intrinsicGas.toNumber();
+    this.debugContext['intrinsicGas'] = calcIntrinsicGas(create, input).toNumber();
     this.debugContext['value'] = bi(value.toString());
     this.debugContext['block'] = number.toNumber();
     this.vmContextObj.globalDB = makeDB(stateManager);
   }
 
-  private async captureLog(step: InterpreterStep, cost: BN, error?: string) {
+  /**
+   * captureLog implements the Tracer interface to trace a single step of VM execution.
+   * @param step Step state
+   * @param error Error message
+   * @returns
+   */
+  private async captureLog(step: InterpreterStep, error?: string) {
     if (this.rejected) {
       return;
     }
     try {
-      this.vmContextObj.globalLog = makeLog(this.debugContext, this.opcodes, step, cost, error);
+      this.vmContextObj.globalLog = makeLog(this.debugContext, this.opcodes, step, error);
       const script = error ? new vm.Script('globalPromise = obj.fault.call(obj, globalLog, globalDB)') : new vm.Script('globalPromise = obj.step.call(obj, globalLog, globalDB)');
       script.runInContext(this.vmContext, { timeout: this.config.timeout ? Number(this.config.timeout) : undefined, breakOnSigint: true });
       if (this.vmContextObj.globalPromise) {
@@ -248,11 +312,21 @@ export class JSDebug implements IDebugImpl {
     }
   }
 
-  async captureState(step: InterpreterStep, cost: BN) {
-    await this.captureLog(step, cost);
+  /**
+   * captureState call the captureLog function
+   * @param step Step state
+   * @param cost Cost value
+   */
+  async captureState(step: InterpreterStep) {
+    await this.captureLog(step);
   }
 
-  async captureFault(step: InterpreterStep, cost: BN, err: any) {
+  /**
+   * captureFault implements the Tracer interface to trace an execution fault
+   * @param step Step state
+   * @param err Error message
+   */
+  async captureFault(step: InterpreterStep, err: any) {
     let errString: string;
     if (err instanceof VmError) {
       errString = err.error;
@@ -263,15 +337,25 @@ export class JSDebug implements IDebugImpl {
     } else {
       errString = 'unkonw error';
     }
-    await this.captureLog(step, cost, errString);
+    await this.captureLog(step, errString);
   }
 
+  /**
+   * CaptureEnd is called after the call finishes to finalize the tracing.
+   * @param output Output result
+   * @param gasUsed Gas used
+   * @param time Running time
+   */
   async captureEnd(output: Buffer, gasUsed: BN, time: number) {
     this.debugContext['output'] = output;
     this.debugContext['gasUsed'] = gasUsed.toNumber();
     this.debugContext['time'] = time;
   }
 
+  /**
+   * GetResult calls the Javascript 'result' function and returns its value, or any accumulated error
+   * @returns
+   */
   async result() {
     if (this.rejected) {
       return;

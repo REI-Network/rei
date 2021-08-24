@@ -1,0 +1,14 @@
+{
+    "name": "testnet-chainstart",
+    "comment": "gxc2-testnet chainstart hardfork",
+    "gasConfig": {
+        "gasLimit": {
+            "v": "0xf4240",
+            "d": "chainstart gas limit"
+        }
+    },
+    "gasPrices": {},
+    "vm": {},
+    "pow": {}
+}
+  

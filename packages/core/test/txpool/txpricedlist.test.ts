@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { Transaction } from '@gxchain2/structure';
 import { TxPricedList } from '../../src/txpool/txpricedlist';
-import { hexStringToBuffer, hexStringToBN, createBufferFunctionalMap } from '@gxchain2/utils';
+import { hexStringToBN, createBufferFunctionalMap } from '@gxchain2/utils';
 import { expect } from 'chai';
 
 describe('TxPricedList', () => {

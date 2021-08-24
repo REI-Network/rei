@@ -22,7 +22,7 @@ describe('FileCache', () => {
     filecache.scan(testdir);
   });
 
-  it('should sacn created files correctly', () => {
+  it('should scan created files correctly', () => {
     fs.writeFileSync(path.join(testdir, newcreate), newcreate);
     const result = filecache.scan(testdir);
     expect(result[0].length, 'created length should be equal').be.equal(1);
@@ -31,7 +31,7 @@ describe('FileCache', () => {
     expect(result[0][0], 'created file name should be euqal').be.equal(path.join(testdir, newcreate));
   });
 
-  it('should sacn deleted files correctly', () => {
+  it('should scan deleted files correctly', () => {
     remove.forEach((color) => {
       fs.unlinkSync(path.join(testdir, color));
     });

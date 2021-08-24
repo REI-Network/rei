@@ -19,34 +19,29 @@ class HChanneltest {
 
 describe('Channel', () => {
   const numberChannel = new Channel<number>();
-  before(() => {
+
+  it('should get array', () => {
     testdata.forEach((hash) => {
       numberChannel.push(hash);
     });
-  });
-
-  it('should get array', () => {
     numberChannel.array.forEach((element, i) => {
       expect(element, 'array member should be euqal').be.equal(testdata[i]);
     });
+    numberChannel.clear();
   });
 
   it('should generator takes effect', async () => {
     let symbol = false;
     let i = 0;
-    const dataColletion = testdata.concat(testdata2);
     for (let j = 0; j < testdata2.length; j++) {
-      await new Promise<void>((res) => {
-        setTimeout(res, 100);
-      });
       numberChannel.push(testdata2[j]);
     }
     setTimeout(() => {
       numberChannel.abort();
       symbol = true;
-    }, 500);
+    }, 100);
     for await (const element of numberChannel.generator()) {
-      expect(element, 'array member should be euqal').be.equal(dataColletion[i++]);
+      expect(element, 'array member should be euqal').be.equal(testdata2[i++]);
     }
     expect(symbol, 'channel be aborted').be.true;
   });
@@ -63,13 +58,11 @@ describe('Channel', () => {
 
 describe('HChannel', () => {
   const numberHChannel = new HChannel<HChanneltest>({ compare: (a, b) => a.data < b.data });
-  before(() => {
+
+  it('should get heap', () => {
     testdata.forEach((element) => {
       numberHChannel.push(new HChanneltest(element));
     });
-  });
-
-  it('should get heap', () => {
     let i = 0;
     while (numberHChannel.heap.length > 0) {
       expect(numberHChannel.heap.remove().data, 'heap member should be euqal').be.equal(testdataSorted[i++]);
@@ -80,15 +73,12 @@ describe('HChannel', () => {
     let symbol = false;
     let i = 0;
     for (let j = 0; j < testdata2.length; j++) {
-      await new Promise<void>((res) => {
-        setTimeout(res, 100);
-      });
       numberHChannel.push(new HChanneltest(testdata2[j]));
     }
     setTimeout(() => {
       numberHChannel.abort();
       symbol = true;
-    }, 500);
+    }, 100);
     for await (const element of numberHChannel.generator()) {
       expect(element.data, 'heap member should be equal').equal(testdata2Sorted[i++]);
     }
@@ -107,7 +97,8 @@ describe('HChannel', () => {
 
 describe('PChannel', () => {
   const numberPChannel = new PChannel<number>();
-  before(() => {
+
+  it('should readies', () => {
     testdata.forEach((element, i) => {
       const ele = { data: element, index: i };
       numberPChannel.push(ele);
@@ -116,9 +107,6 @@ describe('PChannel', () => {
       const ele = { data: element, index: i + testdata.length + 1 };
       numberPChannel.push(ele);
     });
-  });
-
-  it('should readies', () => {
     expect(numberPChannel.heap.length, 'heap should not be empty').be.equal(testdata2.length);
     numberPChannel.push({ data: insert, index: testdata.length });
     expect(numberPChannel.heap.length, 'heap should be empty').be.equal(0);
@@ -131,15 +119,12 @@ describe('PChannel', () => {
     const testdata3 = [1212, 455];
     const dataColletion = testdata.concat(insert).concat(testdata2).concat(testdata3);
     for (let j = 0; j < testdata3.length; j++) {
-      await new Promise<void>((res) => {
-        setTimeout(res, 100);
-      });
       numberPChannel.push({ data: testdata3[j], index: testdata.length + testdata2.length + 1 + j });
     }
     setTimeout(() => {
       numberPChannel.abort();
       symbol = true;
-    }, 500);
+    }, 100);
     for await (const element of numberPChannel.generator()) {
       expect(element.data, 'array member should be euqal').be.equal(dataColletion[i++]);
     }

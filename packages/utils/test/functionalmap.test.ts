@@ -12,13 +12,11 @@ const testBufferSorted = testdataSorted.map((element) => {
 
 describe('FunctionalMap', () => {
   const bufferToStringMap = createBufferFunctionalMap<string>();
-  before(() => {
+
+  it('should get map size', () => {
     testdata.forEach((blockhash, i) => {
       bufferToStringMap.set(testBuffer[i], blockhash);
     });
-  });
-
-  it('should get map size', () => {
     expect(bufferToStringMap.size, 'map size should be equal').be.equal(testBuffer.length);
   });
 
@@ -68,13 +66,11 @@ describe('FunctionalMap', () => {
 
 describe('FunctionalSet', () => {
   const bufferSet = createBufferFunctionalSet();
-  before(() => {
+
+  it('should get set size', () => {
     testBuffer.map((blockhash) => {
       bufferSet.add(blockhash);
     });
-  });
-
-  it('should get set size', () => {
     expect(bufferSet.size, 'set size should be equal').be.equal(testdata.length);
   });
 

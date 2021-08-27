@@ -277,7 +277,8 @@ export class Node {
       dbManager: this.db,
       common,
       genesisBlock,
-      validateBlocks: false
+      validateBlocks: false,
+      validateConsensus: false
     });
     await this.blockchain.init();
 
@@ -410,7 +411,7 @@ export class Node {
 
           if (!parentEnableStaking) {
             parentValidatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
-            preHF1ConsensusValidateHeader.call(block.header, this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number));
+            preHF1ConsensusValidateHeader.call(block.header, this.blockchain);
           } else {
             parentValidatorSet = await this.validatorSets.get(parent.header.stateRoot, parentSM);
             consensusValidateHeader.call(block.header, parentValidatorSet.activeSigners(), parentValidatorSet.proposer());

@@ -328,7 +328,15 @@ export class ValidatorSet {
    * @returns Voting power
    */
   getVotingPower(validator: Address) {
-    return this.validators.get(validator.buf)?.votingPower ?? new BN(0);
+    const vp = this.validators.get(validator.buf)?.votingPower;
+    if (vp) {
+      return vp;
+    }
+    // genesis validator voting power is always zero(if it doesn't exist in `validators`)
+    if (genesisValidators && genesisValidators.filter((addr) => addr.equals(validator)).length > 0) {
+      return new BN(0);
+    }
+    throw new Error('unknown validator');
   }
 
   /**

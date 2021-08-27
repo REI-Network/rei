@@ -7,8 +7,6 @@ import "./interfaces/IEstimator.sol";
 import "./interfaces/IConfig.sol";
 import "./interfaces/IStakeManager.sol";
 import "./interfaces/ICommissionShare.sol";
-import "./interfaces/IValidatorKeeper.sol";
-import "./interfaces/IUnstakeKeeper.sol";
 
 contract Estimator is IEstimator {
     IConfig public config;
@@ -27,11 +25,11 @@ contract Estimator is IEstimator {
     function estimateMinStakeAmount(address validator) external view override returns (uint256 amount) {
         address commissionShare = stakeManager.validators(validator).commissionShare;
         if (commissionShare == address(0)) {
-            amount = config.minStakeAmount();
+            amount = 1;
         } else {
             amount = ICommissionShare(commissionShare).estimateStakeAmount(1);
-            if (amount < config.minStakeAmount()) {
-                amount = config.minStakeAmount();
+            if (amount == 0) {
+                amount = 1;
             }
         }
     }
@@ -61,7 +59,7 @@ contract Estimator is IEstimator {
         if (commissionShare == address(0)) {
             shares = 0;
         } else {
-            shares = ICommissionShare(commissionShare).estimateUnstakeShares(config.minUnstakeAmount());
+            shares = ICommissionShare(commissionShare).estimateUnstakeShares(1);
         }
     }
 
@@ -87,11 +85,11 @@ contract Estimator is IEstimator {
      * @param shares       Number of shares
      */
     function estimateUnstakeAmount(address validator, uint256 shares) external view override returns (uint256 amount) {
-        address unstakeKeeper = stakeManager.validators(validator).unstakeKeeper;
-        if (unstakeKeeper == address(0)) {
-            amount = 0;
-        } else {
-            amount = IUnstakeKeeper(unstakeKeeper).estimateUnstakeAmount(shares);
-        }
+        // address unstakeKeeper = stakeManager.validators(validator).unstakeKeeper;
+        // if (unstakeKeeper == address(0)) {
+        //     amount = 0;
+        // } else {
+        //     amount = IUnstakeKeeper(unstakeKeeper).estimateUnstakeAmount(shares);
+        // }
     }
 }

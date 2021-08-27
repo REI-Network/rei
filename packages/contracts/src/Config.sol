@@ -14,18 +14,16 @@ contract Config is IConfig {
         return 0x0000000000000000000000000000000000001002;
     }
 
+    function unstakeManager() external view override returns (address) {
+        return 0x0000000000000000000000000000000000001003;
+    }
+
+    function validatorRewardManager() external view override returns (address) {
+        return 0x0000000000000000000000000000000000001004;
+    }
+
     function unstakeDelay() external view override returns (uint256) {
         return 1 minutes;
-    }
-
-    function minStakeAmount() external view override returns (uint256) {
-        // 1 GXC
-        return 1e18;
-    }
-
-    function minUnstakeAmount() external view override returns (uint256) {
-        // 0.5 GXC
-        return 5e17;
     }
 
     function minIndexVotingPower() external view override returns (uint256) {

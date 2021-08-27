@@ -8,11 +8,18 @@ import "./Only.sol";
 contract UnstakeManager is Only {
     using SafeMath for uint256;
 
+    // balance of each validators
     mapping(address => uint256) public balanceOf;
+    // total supply of each validators
     mapping(address => uint256) public totalSupplyOf;
 
     constructor(IConfig config) public Only(config) {}
 
+    /**
+     * @dev Deposit GXC to `UnstakeManager`, only can be called by stake manager,
+     *      this will be called when user starts unstake.
+     * @param validator     Validator address.
+     */
     function deposit(address validator) external payable onlyStakeManager returns (uint256 shares) {
         uint256 balance = balanceOf[validator];
         uint256 totalSupply = totalSupplyOf[validator];
@@ -28,6 +35,13 @@ contract UnstakeManager is Only {
         totalSupplyOf[validator] = totalSupply.add(shares);
     }
 
+    /**
+     * @dev Withdraw GXC and burn shares, only can be called by stake manager,
+     *      this will be called when unstake timeout.
+     * @param validator     Validator address.
+     * @param shares        Number of shares.
+     * @param to            GXC receiver address(this value is set when the user starts unstake).
+     */
     function withdraw(
         address validator,
         uint256 shares,
@@ -47,6 +61,11 @@ contract UnstakeManager is Only {
         }
     }
 
+    /**
+     * @dev Slash validator and transfer the slashed amount to `address(0)`.
+     * @param validator     Validator address.
+     * @param factor        Slash factor.
+     */
     function slash(address validator, uint8 factor) external onlyStakeManager returns (uint256 amount) {
         require(factor <= 100, "UnstakeManager: invalid factor");
         uint256 balance = balanceOf[validator];

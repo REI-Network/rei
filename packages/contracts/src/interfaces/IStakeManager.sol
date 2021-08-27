@@ -5,25 +5,48 @@ pragma experimental ABIEncoderV2;
 
 import "./IOnly.sol";
 
+/**
+ * @dev `Unstake` records the information of each unstake request.
+ */
 struct Unstake {
+    // validator address
     address validator;
+    // GXC receiver address
     address payable to;
+    // number of shares
     uint256 unstakeShares;
+    // release timestamp
     uint256 timestamp;
 }
 
+/**
+ * @dev `Validator` records the information of each validator.
+ */
 struct Validator {
+    // validator unique id
     uint256 id;
+    // commission share contract address
     address commissionShare;
+    // commission rate
     uint256 commissionRate;
+    // latest commission rate update timestamp
     uint256 updateTimestamp;
 }
 
+/**
+ * @dev `ActiveValidator` records the information of each active validator,
+ *      it will be updated by system in `StakeManager.afterBlock`.
+ */
 struct ActiveValidator {
+    // validator address
     address validator;
+    // proposer priority
     int256 priority;
 }
 
+/**
+ * @dev see {StakeManager}
+ */
 interface IStakeManager is IOnly {
     function validatorId() external view returns (uint256);
 

@@ -4,6 +4,9 @@ pragma solidity ^0.6.0;
 
 import "./IOnly.sol";
 
+/**
+ * @dev see {ValidatorRewardManager}
+ */
 interface IValidatorRewardManager is IOnly {
     function balanceOf(address validator) external view returns (uint256 amount);
 

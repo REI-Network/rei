@@ -2,6 +2,9 @@
 
 pragma solidity ^0.6.0;
 
+/**
+ * @dev see {Config}
+ */
 interface IConfig {
     function stakeManager() external view returns (address);
 

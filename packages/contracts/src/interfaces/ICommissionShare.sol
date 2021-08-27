@@ -5,6 +5,9 @@ pragma solidity ^0.6.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./IOnly.sol";
 
+/**
+ * @dev see {CommissionShare}
+ */
 interface ICommissionShare is IERC20, IOnly {
     function estimateStakeAmount(uint256 shares) external view returns (uint256);
 

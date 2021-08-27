@@ -9,6 +9,7 @@ import "./Only.sol";
 contract CommissionShare is ERC20, Only {
     using Math for uint256;
 
+    // validator address
     address public validator;
 
     constructor(IConfig config, address _validator) public ERC20("Share", "S") Only(config) {
@@ -83,12 +84,13 @@ contract CommissionShare is ERC20, Only {
     }
 
     /**
-     * @dev Reward validator, only can be called by stake manager
+     * @dev Reward validator.
      */
     function reward() external payable onlyStakeManager {}
 
     /**
-     * @dev Slash validator by factor, only can be called by stake manager
+     * @dev Slash validator and transfer the slashed amount to `address(0)`.
+     * @param factor        Slash factor.
      */
     function slash(uint8 factor) external onlyStakeManager returns (uint256 amount) {
         require(factor <= 100, "CommissionShare: invalid factor");

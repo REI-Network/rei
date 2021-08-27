@@ -187,6 +187,70 @@ contract StakeManager is ReentrancyGuard, Only {
         return activeValidators.length;
     }
 
+    /**
+     * @dev Estimate the mininual stake amount for validator.
+     *      If the stake amount is less than this value, transaction will fail.
+     * @param validator    Validator address
+     */
+    function estimateMinStakeAmount(address validator) external view returns (uint256 amount) {
+        return estimateStakeAmount(validator, 1);
+    }
+
+    /**
+     * @dev Estimate how much GXC should be stake, if user wants to get the number of shares.
+     * @param validator    Validator address
+     * @param shares       Number of shares
+     */
+    function estimateStakeAmount(address validator, uint256 shares) public view returns (uint256 amount) {
+        address commissionShare = validators[validator].commissionShare;
+        if (commissionShare == address(0)) {
+            amount = shares;
+        } else {
+            amount = CommissionShare(commissionShare).estimateStakeAmount(shares);
+        }
+    }
+
+    /**
+     * @dev Estimate the mininual unstake shares for validator.
+     *      If the unstake shares is less than this value, transaction will fail.
+     *      If the validator doesn't exist, return 0.
+     * @param validator    Validator address
+     */
+    function estimateMinUnstakeShares(address validator) external view returns (uint256 shares) {
+        return estimateUnstakeShares(validator, 1);
+    }
+
+    /**
+     * @dev Estimate how much shares should be unstake, if user wants to get the amount of GXC.
+     *      If the validator doesn't exist, return 0.
+     * @param validator    Validator address
+     * @param amount       Number of GXC
+     */
+    function estimateUnstakeShares(address validator, uint256 amount) public view returns (uint256 shares) {
+        address commissionShare = validators[validator].commissionShare;
+        if (commissionShare == address(0)) {
+            shares = 0;
+        } else {
+            shares = CommissionShare(commissionShare).estimateUnstakeShares(amount);
+        }
+    }
+
+    /**
+     * @dev Estimate how much GXC can be claim, if unstake the number of shares(when unstake timeout).
+     *      If the validator doesn't exist, return 0.
+     * @param validator    Validator address
+     * @param shares       Number of shares
+     */
+    function estimateUnstakeAmount(address validator, uint256 shares) external view returns (uint256 amount) {
+        uint256 balance = unstakeManager.balanceOf(validator);
+        uint256 totalSupply = unstakeManager.totalSupplyOf(validator);
+        if (totalSupply == 0) {
+            amount = 0;
+        } else {
+            amount = shares.mul(balance).div(totalSupply);
+        }
+    }
+
     // receive GXC transfer
     receive() external payable {}
 
@@ -393,6 +457,23 @@ contract StakeManager is ReentrancyGuard, Only {
                 indexedValidators.set(v.id, validator);
                 emit IndexedValidator(validator, votingPower.sub(msg.value));
             }
+        }
+    }
+
+    /**
+     * @dev Slash validator, only can be called by system caller
+     * @param validator         Validator address
+     * @param reason            Slash reason
+     */
+    function slash(address validator, uint8 reason) external onlySystemCaller returns (uint256 amount) {
+        Validator memory v = validators[validator];
+        require(v.commissionShare != address(0), "StakeManager: invalid validator");
+        uint8 factor = config.getFactorByReason(reason);
+        amount = CommissionShare(v.commissionShare).slash(factor).add(unstakeManager.slash(validator, factor)).add(validatorRewardManager.slash(validator, factor));
+        if (indexedValidators.contains(v.id) && getVotingPower(v.commissionShare, validator) < config.minIndexVotingPower()) {
+            // if the validator's voting power is less than `minIndexVotingPower`, remove him from `_indexedValidators`
+            indexedValidators.remove(v.id);
+            emit UnindexedValidator(validator);
         }
     }
 

@@ -27,5 +27,6 @@ contract ValidatorRewardManager is Only {
         uint256 balance = balanceOf[validator];
         amount = balance.mul(factor).div(100);
         balanceOf[validator] = balance.sub(amount);
+        address(0).transfer(amount);
     }
 }

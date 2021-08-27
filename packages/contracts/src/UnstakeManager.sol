@@ -33,7 +33,6 @@ contract UnstakeManager is Only {
         uint256 shares,
         address payable to
     ) external onlyStakeManager returns (uint256 amount) {
-        require(shares > 0, "UnstakeManager: insufficient shares");
         uint256 balance = balanceOf[validator];
         uint256 totalSupply = totalSupplyOf[validator];
         if (totalSupply == 0) {
@@ -41,7 +40,7 @@ contract UnstakeManager is Only {
         } else {
             amount = shares.mul(balance).div(totalSupply);
         }
-        totalSupplyOf[validator] = totalSupply.sub(shares, "UnstakeManager: insufficient supply");
+        totalSupplyOf[validator] = totalSupply.sub(shares, "UnstakeManager: insufficient total supply");
         if (amount > 0) {
             balanceOf[validator] = balance.sub(amount);
             to.transfer(amount);

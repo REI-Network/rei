@@ -15,9 +15,6 @@ contract StakeManager is ReentrancyGuard, Only {
     using SafeMath for uint256;
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
-    // estimator
-    // address public estimator;
-
     // auto increment validator id
     uint256 public validatorId = 0;
     // indexed validator, including all validators with balance
@@ -30,9 +27,9 @@ contract StakeManager is ReentrancyGuard, Only {
     // unstake information, delete after `do unstake`
     mapping(uint256 => Unstake) public unstakeQueue;
 
-    // init this!!!!
+    // unstake manager
     IUnstakeManager public unstakeManager;
-    // init this!!!!
+    // validator reward manager
     IValidatorRewardManager public validatorRewardManager;
 
     // active validator list of next block
@@ -91,7 +88,6 @@ contract StakeManager is ReentrancyGuard, Only {
     constructor(IConfig _config, address[] memory genesisValidators) public Only(_config) {
         unstakeManager = IUnstakeManager(config.unstakeManager());
         validatorRewardManager = IValidatorRewardManager(config.validatorRewardManager());
-        // estimator = address(new Estimator(address(config), address(this)));
         for (uint256 i = 0; i < genesisValidators.length; i = i.add(1)) {
             // the validator was created, but not added to `_indexedValidators`
             createValidator(genesisValidators[i]);
@@ -140,7 +136,11 @@ contract StakeManager is ReentrancyGuard, Only {
         }
         address validator;
         (, validator) = indexedValidators.at(index);
-        return getVotingPower(validators[validator], validator);
+        address commissionShare = validators[validator].commissionShare;
+        if (commissionShare == address(0)) {
+            return 0;
+        }
+        return getVotingPower(commissionShare, validator);
     }
 
     /**
@@ -150,7 +150,11 @@ contract StakeManager is ReentrancyGuard, Only {
      */
     function getVotingPowerById(uint256 id) external view returns (uint256) {
         address validator = indexedValidators.get(id);
-        return getVotingPower(validators[validator], validator);
+        address commissionShare = validators[validator].commissionShare;
+        if (commissionShare == address(0)) {
+            return 0;
+        }
+        return getVotingPower(commissionShare, validator);
     }
 
     /**
@@ -159,19 +163,21 @@ contract StakeManager is ReentrancyGuard, Only {
      * @param validator     Validator address
      */
     function getVotingPowerByAddress(address validator) external view returns (uint256) {
-        return getVotingPower(validators[validator], validator);
+        address commissionShare = validators[validator].commissionShare;
+        if (commissionShare == address(0)) {
+            return 0;
+        }
+        return getVotingPower(commissionShare, validator);
     }
 
     /**
      * @dev Get the voting power by validator address.
      *      If the validator doesn't exist, return 0
-     * @param v              Validator
+     * @param commissionShare Validator commission share address
+     * @param validator       Validator address
      */
-    function getVotingPower(Validator memory v, address validator) private view returns (uint256) {
-        if (v.commissionShare == address(0)) {
-            return 0;
-        }
-        return v.commissionShare.balance.add(validatorRewardManager.balanceOf(validator));
+    function getVotingPower(address commissionShare, address validator) private view returns (uint256) {
+        return commissionShare.balance.add(validatorRewardManager.balanceOf(validator));
     }
 
     /**
@@ -184,8 +190,18 @@ contract StakeManager is ReentrancyGuard, Only {
     // receive GXC transfer
     receive() external payable {}
 
+    // check if the address is a contract
+    function isContract(address addr) private view returns (bool) {
+        uint256 size;
+        assembly {
+            size := extcodesize(addr)
+        }
+        return size > 0;
+    }
+
     // create a new validator
     function createValidator(address validator) private returns (Validator memory) {
+        require(!isContract(validator), "StakeManager: validator can not be a contract");
         uint256 id = validatorId;
         Validator storage v = validators[validator];
         v.id = id;
@@ -217,7 +233,7 @@ contract StakeManager is ReentrancyGuard, Only {
         shares = CommissionShare(v.commissionShare).mint{ value: msg.value }(to);
         // if validator voting power is greater than `minIndexVotingPower`,
         // add it to `_indexedValidators`
-        uint256 votingPower = getVotingPower(v, validator);
+        uint256 votingPower = getVotingPower(v.commissionShare, validator);
         if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
             indexedValidators.set(v.id, validator);
             emit IndexedValidator(validator, votingPower.sub(msg.value));
@@ -227,18 +243,27 @@ contract StakeManager is ReentrancyGuard, Only {
 
     /**
      * @dev Do start unstake.
-     *      It will mint unstake shares to self and add a record to `_unstakeQueue`
+     *      It will mint unstake shares to self and add a record to `unstakeQueue`
      */
     function _startUnstake(
         address validator,
+        Validator memory v,
         address payable to,
         uint256 amount
     ) private returns (uint256 id) {
+        if (indexedValidators.contains(v.id) && getVotingPower(v.commissionShare, validator) < config.minIndexVotingPower()) {
+            // if the validator's voting power is less than `minIndexVotingPower`, remove him from `_indexedValidators`
+            indexedValidators.remove(v.id);
+            emit UnindexedValidator(validator);
+        }
+
+        // deposit unstake amount to `unstakeManager`
         uint256 unstakeShares = unstakeManager.deposit{ value: amount }(validator);
 
+        // create a `Unstake`
         id = unstakeId;
         uint256 timestamp = block.timestamp + config.unstakeDelay();
-        // ensure
+        // make sure the timestamp is greater than the last
         if (id > 0) {
             Unstake memory u = unstakeQueue[id.sub(1)];
             if (u.validator != address(0) && u.timestamp > timestamp) {
@@ -268,13 +293,12 @@ contract StakeManager is ReentrancyGuard, Only {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         CommissionShare(v.commissionShare).transferFrom(msg.sender, address(this), shares);
-        uint256 amount = CommissionShare(v.commissionShare).burn(shares, address(this));
-        if (indexedValidators.contains(v.id) && getVotingPower(v, validator) < config.minIndexVotingPower()) {
-            // if the validator's voting power is less than `minIndexVotingPower`, remove him from `_indexedValidators`
-            indexedValidators.remove(v.id);
-            emit UnindexedValidator(validator);
+        uint256 amount = CommissionShare(v.commissionShare).burn(shares);
+        if (amount > 0) {
+            return _startUnstake(validator, v, to, amount);
+        } else {
+            return uint256(0) - 1;
         }
-        return _startUnstake(validator, to, amount);
     }
 
     /**
@@ -287,14 +311,10 @@ contract StakeManager is ReentrancyGuard, Only {
     function startClaim(address payable to, uint256 amount) external nonReentrant returns (uint256) {
         require(uint160(to) > 2000, "StakeManager: invalid receiver");
         require(amount > 0, "StakeManager: invalid amount");
-        validatorRewardManager.claim(msg.sender, amount);
         Validator memory v = validators[msg.sender];
-        if (indexedValidators.contains(v.id) && getVotingPower(v, msg.sender) < config.minIndexVotingPower()) {
-            // if the validator's voting power is less than `minIndexVotingPower`, remove him from `_indexedValidators`
-            indexedValidators.remove(v.id);
-            emit UnindexedValidator(msg.sender);
-        }
-        return _startUnstake(msg.sender, to, amount);
+        require(v.commissionShare != address(0), "StakeManager: invalid validator");
+        validatorRewardManager.claim(msg.sender, amount);
+        return _startUnstake(msg.sender, v, to, amount);
     }
 
     /**
@@ -333,7 +353,7 @@ contract StakeManager is ReentrancyGuard, Only {
      */
     function removeIndexedValidator(address validator) external {
         Validator memory v = validators[validator];
-        require(v.commissionShare != address(0) && indexedValidators.contains(v.id) && getVotingPower(v, validator) < config.minIndexVotingPower(), "StakeManager: invalid validator");
+        require(v.commissionShare != address(0) && indexedValidators.contains(v.id) && getVotingPower(v.commissionShare, validator) < config.minIndexVotingPower(), "StakeManager: invalid validator");
         indexedValidators.remove(v.id);
         emit UnindexedValidator(validator);
     }
@@ -346,7 +366,7 @@ contract StakeManager is ReentrancyGuard, Only {
     function addIndexedValidator(address validator) external {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0) && !indexedValidators.contains(v.id), "StakeManager: invalid validator");
-        uint256 votingPower = getVotingPower(v, validator);
+        uint256 votingPower = getVotingPower(v.commissionShare, validator);
         require(votingPower >= config.minIndexVotingPower());
         indexedValidators.set(v.id, validator);
         emit IndexedValidator(validator, votingPower);
@@ -368,7 +388,7 @@ contract StakeManager is ReentrancyGuard, Only {
             validatorRewardManager.reward{ value: validatorReward }(validator);
         }
         if (!indexedValidators.contains(v.id)) {
-            uint256 votingPower = getVotingPower(v, validator);
+            uint256 votingPower = getVotingPower(v.commissionShare, validator);
             if (votingPower >= config.minIndexVotingPower()) {
                 indexedValidators.set(v.id, validator);
                 emit IndexedValidator(validator, votingPower.sub(msg.value));

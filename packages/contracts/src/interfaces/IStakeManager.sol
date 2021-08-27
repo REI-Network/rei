@@ -3,6 +3,8 @@
 pragma solidity ^0.6.0;
 pragma experimental ABIEncoderV2;
 
+import "./IOnly.sol";
+
 struct Unstake {
     address validator;
     address payable to;
@@ -22,10 +24,20 @@ struct ActiveValidator {
     int256 priority;
 }
 
-interface IStakeManager {
-    function estimator() external view returns (address);
+interface IStakeManager is IOnly {
+    function validatorId() external view returns (uint256);
 
     function validators(address validator) external view returns (Validator memory);
+
+    function unstakeId() external view returns (uint256);
+
+    function unstakeQueue(uint256 id) external view returns (Unstake memory);
+
+    function unstakeManager() external view returns (address);
+
+    function validatorRewardManager() external view returns (address);
+
+    function activeValidators(uint256 index) external view returns (ActiveValidator memory);
 
     function indexedValidatorsLength() external view returns (uint256);
 
@@ -41,11 +53,7 @@ interface IStakeManager {
 
     function getVotingPowerByAddress(address validator) external view returns (uint256);
 
-    function unstakeQueue(uint256 index) external view returns (Unstake memory);
-
     function activeValidatorsLength() external view returns (uint256);
-
-    function activeValidators(uint256 index) external view returns (ActiveValidator memory);
 
     function stake(address validator, address to) external payable returns (uint256);
 

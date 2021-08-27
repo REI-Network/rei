@@ -2,14 +2,20 @@
 
 pragma solidity ^0.6.0;
 
-interface IUnstakeManager {
-    function deposit(address validator) external payable returns (uint256 shares);
+import "./IOnly.sol";
+
+interface IUnstakeManager is IOnly {
+    function balanceOf(address addr) external view returns (uint256);
+
+    function totalSupplyOf(address addr) external view returns (uint256);
+
+    function deposit(address validator) external payable returns (uint256);
 
     function withdraw(
         address validator,
         uint256 shares,
         address payable to
-    ) external returns (uint256 amount);
+    ) external returns (uint256);
 
-    function slash(address validator, uint8 factor) external returns (uint256 amount);
+    function slash(address validator, uint8 factor) external returns (uint256);
 }

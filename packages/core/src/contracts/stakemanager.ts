@@ -1,4 +1,3 @@
-import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import Message from '@gxchain2-ethereumjs/vm/dist/evm/message';
 import { Address, BN, MAX_INTEGER, toBuffer } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
@@ -6,6 +5,7 @@ import { Log, Receipt } from '@gxchain2/structure';
 import { hexStringToBuffer } from '@gxchain2/utils';
 import { ValidatorChanges } from '../staking';
 import { bufferToAddress, encode, decodeInt256 } from './utils';
+import { Contract } from './contract';
 
 // function selector of stake manager
 const methods = {
@@ -58,15 +58,7 @@ export type Validator = {
 };
 
 // a class used to interact with the stake manager contract
-export class StakeManager {
-  evm!: EVM;
-  common!: Common;
-
-  constructor(evm: EVM, common: Common) {
-    this.evm = evm;
-    this.common = common;
-  }
-
+export class StakeManager extends Contract {
   /**
    * Filter validator set changes from receipts
    * @param changes - `ValidatorChanges` instance

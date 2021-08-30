@@ -5,6 +5,11 @@ import { Common } from '@gxchain2/common';
 import { StakeManager, Validator, ActiveValidator } from '../contracts';
 import { ValidatorChanges } from './validatorchanges';
 
+const maxInt256 = new BN('7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 'hex');
+const minInt256 = new BN('8000000000000000000000000000000000000000000000000000000000000000', 'hex').neg();
+export const maxProposerPriority = maxInt256;
+export const minProposerPriority = minInt256;
+
 const priorityWindowSizeFactor = 2;
 // genesis validators
 let genesisValidators: Address[] | undefined;
@@ -41,7 +46,7 @@ function fillGenesisValidators(active: ActiveValidator[], maxCount: number, comm
   if (!genesisValidators) {
     genesisValidators = common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr)) as Address[];
     // sort by address
-    genesisValidators.sort((a, b) => -1 * (a.buf.compare(b.buf) as 1 | -1 | 0));
+    genesisValidators.sort((a, b) => a.buf.compare(b.buf) as 1 | -1 | 0);
   }
   const gvs = [...genesisValidators];
   // the genesis validator sorted by address and has nothing to do with voting power
@@ -86,6 +91,7 @@ export class ValidatorSet {
       vs.validators.set(validator, cloneValidatorInfo(info));
     }
     vs.active = parent.active.map(cloneActiveValidator);
+    vs.totalVotingPower = parent.totalVotingPower.clone();
     return vs;
   }
 
@@ -112,6 +118,7 @@ export class ValidatorSet {
     for (let i = new BN(0); i.lt(length); i.iaddn(1)) {
       vs.active.push(await sm.activeValidators(i));
     }
+    vs.totalVotingPower = vs.calcTotalVotingPower(vs.active);
     return vs;
   }
 
@@ -126,6 +133,7 @@ export class ValidatorSet {
     if (_fillGenesisValidators) {
       fillGenesisValidators(vs.active, common.param('vm', 'maxValidatorsCount'), common);
     }
+    vs.totalVotingPower = vs.calcTotalVotingPower(vs.active);
     return vs;
   }
 
@@ -137,7 +145,7 @@ export class ValidatorSet {
       comparBefore: (a: ValidatorInfo, b: ValidatorInfo) => {
         let num = a.votingPower.cmp(b.votingPower);
         if (num === 0) {
-          num = a.validator.buf.compare(b.validator.buf) as 1 | -1 | 0;
+          num = (-1 * a.validator.buf.compare(b.validator.buf)) as 1 | -1 | 0;
         }
         return num === -1;
       }
@@ -154,14 +162,12 @@ export class ValidatorSet {
 
     // sort validators
     const newAcitve: ActiveValidator[] = [];
-    const totalVotingPower = new BN(0);
     while (heap.length > 0) {
       const v = heap.remove() as ValidatorInfo;
       newAcitve.unshift({
         validator: v.validator,
         priority: new BN(0)
       });
-      totalVotingPower.iadd(v.votingPower);
     }
 
     // if the validator is not enough, push the genesis validator to the active list
@@ -169,7 +175,7 @@ export class ValidatorSet {
       fillGenesisValidators(newAcitve, maxCount, this.common);
     }
 
-    return { newAcitve, totalVotingPower };
+    return { newAcitve, totalVotingPower: this.calcTotalVotingPower(newAcitve) };
   }
 
   // compute priority for new active validator list
@@ -323,7 +329,15 @@ export class ValidatorSet {
    * @returns Voting power
    */
   getVotingPower(validator: Address) {
-    return this.validators.get(validator.buf)?.votingPower ?? new BN(0);
+    const vp = this.validators.get(validator.buf)?.votingPower;
+    if (vp) {
+      return vp;
+    }
+    // genesis validator voting power is always zero(if it doesn't exist in `validators`)
+    if (genesisValidators && genesisValidators.filter((addr) => addr.equals(validator)).length > 0) {
+      return new BN(0);
+    }
+    throw new Error('unknown validator');
   }
 
   /**
@@ -387,6 +401,7 @@ export class ValidatorSet {
     if (!av) {
       throw new Error("active validator doesn't exist");
     }
+    // console.log('subtractProposerPriority for', validator.toString(), av.priority.toString(), this.totalVotingPower.toString());
     av.priority.isub(this.totalVotingPower);
   }
 
@@ -401,7 +416,7 @@ export class ValidatorSet {
     let max: BN | undefined;
     let proposer: Address | undefined;
     for (const av of this.active) {
-      if (max === undefined || max.lt(av.priority)) {
+      if (max === undefined || max.lt(av.priority) || (max.eq(av.priority) && proposer!.buf.compare(av.validator.buf) === 1)) {
         max = av.priority;
         proposer = av.validator;
       }
@@ -412,10 +427,24 @@ export class ValidatorSet {
   private _incrementProposerPriority() {
     for (const av of this.active) {
       av.priority.iadd(this.getVotingPower(av.validator));
+      if (av.priority.lt(minProposerPriority)) {
+        throw new Error('proposer priority is too small');
+      }
+      if (av.priority.gt(maxProposerPriority)) {
+        throw new Error('proposer priority is too high');
+      }
     }
 
     // we don't choose and sub most priority in clique consensus,
     // proposer priority will be reduce in `subtractProposerPriority`
+  }
+
+  private calcTotalVotingPower(active: ActiveValidator[]) {
+    const totalVotingPower = new BN(0);
+    for (const { validator } of active) {
+      totalVotingPower.iadd(this.getVotingPower(validator));
+    }
+    return totalVotingPower;
   }
 
   private calcPriorityDiff() {

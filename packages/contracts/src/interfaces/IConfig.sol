@@ -2,16 +2,19 @@
 
 pragma solidity ^0.6.0;
 
+/**
+ * @dev see {Config}
+ */
 interface IConfig {
     function stakeManager() external view returns (address);
 
     function systemCaller() external view returns (address);
 
+    function unstakeManager() external view returns (address);
+
+    function validatorRewardManager() external view returns (address);
+
     function unstakeDelay() external view returns (uint256);
-
-    function minStakeAmount() external view returns (uint256);
-
-    function minUnstakeAmount() external view returns (uint256);
 
     function minIndexVotingPower() external view returns (uint256);
 

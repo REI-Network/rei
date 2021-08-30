@@ -84,8 +84,15 @@ export class Miner {
     return activeSigners.filter((s) => s.equals(signer)).length > 0;
   }
 
-  private _shouldMintNextBlock(currentHeader: BlockHeader) {
-    return this.isMining && !this.node.sync.isSyncing && !this.node.blockchain.cliqueCheckNextRecentlySigned(currentHeader, this.coinbase);
+  private _shouldMintNextBlock(header: BlockHeader) {
+    const flag = this.isMining && !this.node.sync.isSyncing;
+    if (!flag) {
+      return flag;
+    }
+    if (!isEnableStaking(header._common)) {
+      return !this.node.blockchain.cliqueCheckNextRecentlySigned(header, this.coinbase);
+    }
+    return true;
   }
 
   private _pushToHistory(block: Block) {

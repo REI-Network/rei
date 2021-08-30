@@ -5,10 +5,11 @@ pragma solidity ^0.6.0;
 import "./interfaces/IConfig.sol";
 
 // This is just a contract used during testing.
-// The officially released contract is in `Config_prod.sol`.
 contract Config_test is IConfig {
     address private s;
     address private c;
+    address private u;
+    address private v;
 
     function setStakeManager(address _s) external {
         s = _s;
@@ -16,6 +17,14 @@ contract Config_test is IConfig {
 
     function setSystemCaller(address _c) external {
         c = _c;
+    }
+
+    function setUnstakeManager(address _u) external {
+        u = _u;
+    }
+
+    function setValidatorRewardManager(address _v) external {
+        v = _v;
     }
 
     function stakeManager() external view override returns (address) {
@@ -26,20 +35,20 @@ contract Config_test is IConfig {
         return c;
     }
 
+    function unstakeManager() external view override returns (address) {
+        return u;
+    }
+
+    function validatorRewardManager() external view override returns (address) {
+        return v;
+    }
+
     function unstakeDelay() external view override returns (uint256) {
         return 1 seconds;
     }
 
-    function minStakeAmount() external view override returns (uint256) {
-        return 10;
-    }
-
-    function minUnstakeAmount() external view override returns (uint256) {
-        return 5;
-    }
-
     function minIndexVotingPower() external view override returns (uint256) {
-        return 100;
+        return 10000;
     }
 
     function getFactorByReason(uint8 reason) external view override returns (uint8) {

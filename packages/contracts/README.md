@@ -6,11 +6,10 @@
 GXChain2.0 genesis contracts
 
 - `Config` Global config contract, deployed at `0x0000000000000000000000000000000000001000`
-- `CommmissionShare` A smart contract that keeps commission reward for all staking user, dynamically deployed for each validator
-- `ValidatorKeeper` A smart contract that keeps validator reward for validator, dynamically deployed for each validator
-- `UnstakeKeeper` A smart contract that keeps unstake amount, dynamically deployed for each validator
 - `StakeManager` Stake manager contract, deployed at `0x0000000000000000000000000000000000001001`
-- `Estimator` A smart contract that estimats staking amount
+- `UnstakeManager` A smart contract that keeps unstake amount, deployed at `0x0000000000000000000000000000000000001003`
+- `ValidatorRewardManager` A smart contract that keeps validator reward for validator, deployed at `0x0000000000000000000000000000000000001004`
+- `CommmissionShare` A smart contract that keeps commission reward for all staking user, dynamically deployed for each validator
 
 ## Install
 
@@ -69,6 +68,8 @@ contract LockedStake {
     uint256 shares
   );
 
+  event Unstake(uint256 indexed unstakeId);
+
   constructor(address _validator, Candy _candy) public {
     validator = _validator;
     candy = _candy;
@@ -86,7 +87,10 @@ contract LockedStake {
     emit Stake(msg.sender, id, msg.value, shares);
   }
 
-  function unstake(uint256 id, address payable to) external {
+  function unstake(uint256 id, address payable to)
+    external
+    returns (uint256 unstakeId)
+  {
     uint256 timestamp = stakeTimestampOf[id];
     require(
       timestamp != 0 && timestamp.add(lockTime) >= block.timestamp,
@@ -100,10 +104,11 @@ contract LockedStake {
       _shares
     );
     // stake manager will burn the shares and return the GXC after `config.unstakeDelay`
-    sm.startUnstake(validator, to, _shares);
+    unstakeId = sm.startUnstake(validator, to, _shares);
     delete stakeTimestampOf[id];
     delete stakeSharesOf[id];
     delete stakeOwnerOf[id];
+    emit Unstake(unstakeId);
   }
 }
 
@@ -117,9 +122,9 @@ AVAILABLE TASKS:
   accounts              List accounts
   approve               Approve commission share
   balance               Get balance
-  getsmaddr             Get stake manager address from config
-  init                  Initialize config(only for test)
+  lscfgaddr             List config addresses
   reward                Reward validator
+  scr                   Set commission rate
   stake                 Stake for validator
   sunstake              Start unstake
   test                  Runs mocha tests

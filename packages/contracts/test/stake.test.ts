@@ -252,8 +252,8 @@ describe('StakeManger', () => {
     expect(await isExist(), 'validator2 should be added').be.true;
 
     // slash
-    // await stakeManager.methods.slash(validator2, 1).send();
-    // expect(await isExist(), 'validator2 should be removed').be.false;
+    await stakeManager.methods.slash(validator2, 1).send();
+    expect(await isExist(), 'validator2 should be removed').be.false;
   });
 
   it('should unstake and claim correctly', async () => {

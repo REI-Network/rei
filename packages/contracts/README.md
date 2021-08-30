@@ -122,9 +122,9 @@ AVAILABLE TASKS:
   accounts              List accounts
   approve               Approve commission share
   balance               Get balance
-  getsmaddr             Get stake manager address from config
-  init                  Initialize config(only for test)
+  lscfgaddr             List config addresses
   reward                Reward validator
+  scr                   Set commission rate
   stake                 Stake for validator
   sunstake              Start unstake
   test                  Runs mocha tests

@@ -91,6 +91,7 @@ export class ValidatorSet {
       vs.validators.set(validator, cloneValidatorInfo(info));
     }
     vs.active = parent.active.map(cloneActiveValidator);
+    vs.totalVotingPower = parent.totalVotingPower.clone();
     return vs;
   }
 
@@ -117,6 +118,7 @@ export class ValidatorSet {
     for (let i = new BN(0); i.lt(length); i.iaddn(1)) {
       vs.active.push(await sm.activeValidators(i));
     }
+    vs.totalVotingPower = vs.calcTotalVotingPower(vs.active);
     return vs;
   }
 
@@ -131,6 +133,7 @@ export class ValidatorSet {
     if (_fillGenesisValidators) {
       fillGenesisValidators(vs.active, common.param('vm', 'maxValidatorsCount'), common);
     }
+    vs.totalVotingPower = vs.calcTotalVotingPower(vs.active);
     return vs;
   }
 
@@ -159,14 +162,12 @@ export class ValidatorSet {
 
     // sort validators
     const newAcitve: ActiveValidator[] = [];
-    const totalVotingPower = new BN(0);
     while (heap.length > 0) {
       const v = heap.remove() as ValidatorInfo;
       newAcitve.unshift({
         validator: v.validator,
         priority: new BN(0)
       });
-      totalVotingPower.iadd(v.votingPower);
     }
 
     // if the validator is not enough, push the genesis validator to the active list
@@ -174,7 +175,7 @@ export class ValidatorSet {
       fillGenesisValidators(newAcitve, maxCount, this.common);
     }
 
-    return { newAcitve, totalVotingPower };
+    return { newAcitve, totalVotingPower: this.calcTotalVotingPower(newAcitve) };
   }
 
   // compute priority for new active validator list
@@ -400,6 +401,7 @@ export class ValidatorSet {
     if (!av) {
       throw new Error("active validator doesn't exist");
     }
+    // console.log('subtractProposerPriority for', validator.toString(), av.priority.toString(), this.totalVotingPower.toString());
     av.priority.isub(this.totalVotingPower);
   }
 
@@ -435,6 +437,14 @@ export class ValidatorSet {
 
     // we don't choose and sub most priority in clique consensus,
     // proposer priority will be reduce in `subtractProposerPriority`
+  }
+
+  private calcTotalVotingPower(active: ActiveValidator[]) {
+    const totalVotingPower = new BN(0);
+    for (const { validator } of active) {
+      totalVotingPower.iadd(this.getVotingPower(validator));
+    }
+    return totalVotingPower;
   }
 
   private calcPriorityDiff() {

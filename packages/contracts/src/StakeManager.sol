@@ -24,7 +24,7 @@ contract StakeManager is ReentrancyGuard, Only {
 
     // auto increment unstake id
     uint256 public unstakeId = 0;
-    // unstake information, delete after `do unstake`
+    // unstake information, create at `startUnstake`, delete after `unstake`
     mapping(uint256 => Unstake) public unstakeQueue;
 
     // unstake manager
@@ -32,7 +32,8 @@ contract StakeManager is ReentrancyGuard, Only {
     // validator reward manager
     IValidatorRewardManager public validatorRewardManager;
 
-    // active validator list of next block
+    // active validator list of next block,
+    // this will be set in `afterBlock`
     ActiveValidator[] public activeValidators;
 
     /**
@@ -56,7 +57,7 @@ contract StakeManager is ReentrancyGuard, Only {
     event StartUnstake(uint256 indexed id, address indexed validator, uint256 indexed value, address to, uint256 unstakeShares, uint256 timestamp);
 
     /**
-     * @dev Emit when stake manager `do unstake`
+     * @dev Emit when stake manager `unstake`
      * @param id            Unique unstake id
      * @param validator     Validator address
      * @param to            Receiver address
@@ -89,7 +90,7 @@ contract StakeManager is ReentrancyGuard, Only {
         unstakeManager = IUnstakeManager(config.unstakeManager());
         validatorRewardManager = IValidatorRewardManager(config.validatorRewardManager());
         for (uint256 i = 0; i < genesisValidators.length; i = i.add(1)) {
-            // the validator was created, but not added to `_indexedValidators`
+            // the validator was created, but not added to `indexedValidators`
             createValidator(genesisValidators[i]);
         }
     }
@@ -172,7 +173,6 @@ contract StakeManager is ReentrancyGuard, Only {
 
     /**
      * @dev Get the voting power by validator address.
-     *      If the validator doesn't exist, return 0
      * @param commissionShare Validator commission share address
      * @param validator       Validator address
      */
@@ -296,7 +296,7 @@ contract StakeManager is ReentrancyGuard, Only {
         }
         shares = CommissionShare(v.commissionShare).mint{ value: msg.value }(to);
         // if validator voting power is greater than `minIndexVotingPower`,
-        // add it to `_indexedValidators`
+        // add it to `indexedValidators`
         uint256 votingPower = getVotingPower(v.commissionShare, validator);
         if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
             indexedValidators.set(v.id, validator);
@@ -307,7 +307,7 @@ contract StakeManager is ReentrancyGuard, Only {
 
     /**
      * @dev Do start unstake.
-     *      It will mint unstake shares to self and add a record to `unstakeQueue`
+     *      It will mint unstake shares and add a record to `unstakeQueue`
      */
     function _startUnstake(
         address validator,
@@ -316,7 +316,7 @@ contract StakeManager is ReentrancyGuard, Only {
         uint256 amount
     ) private returns (uint256 id) {
         if (indexedValidators.contains(v.id) && getVotingPower(v.commissionShare, validator) < config.minIndexVotingPower()) {
-            // if the validator's voting power is less than `minIndexVotingPower`, remove him from `_indexedValidators`
+            // if the validator's voting power is less than `minIndexVotingPower`, remove him from `indexedValidators`
             indexedValidators.remove(v.id);
             emit UnindexedValidator(validator);
         }
@@ -340,12 +340,13 @@ contract StakeManager is ReentrancyGuard, Only {
     }
 
     /**
-     * @dev Start unstaking shares for validator.
+     * @dev Start unstake shares for validator.
      *      Stake manager will burn the shares immediately, but return GXC to `to` address after `config.unstakeDelay`.
      *      It will emit `StartUnstake` event.
      * @param validator    Validator address
      * @param to           Receiver address
      * @param shares       Number of shares to be burned
+     * @return             Unstake id(if amount is zero, return MAX_UINT256)
      */
     function startUnstake(
         address validator,
@@ -367,10 +368,11 @@ contract StakeManager is ReentrancyGuard, Only {
 
     /**
      * @dev Start claim validator reward.
-     *      Stake manager will claim GXC from validator keeper immediately, but return GXC to `to` address after `config.unstakeDelay`.
+     *      Stake manager will claim GXC from validator reward manager immediately, but return GXC to `to` address after `config.unstakeDelay`.
      *      It will emit `StartUnstake` event.
      * @param to           Receiver address
      * @param amount       Number of GXC
+     * @return             Unstake id
      */
     function startClaim(address payable to, uint256 amount) external nonReentrant returns (uint256) {
         require(uint160(to) > 2000, "StakeManager: invalid receiver");
@@ -411,7 +413,7 @@ contract StakeManager is ReentrancyGuard, Only {
     }
 
     /**
-     * @dev Remove the validator from `_indexedValidators` if the voting power is less than `minIndexVotingPower`
+     * @dev Remove the validator from `indexedValidators` if the voting power is less than `minIndexVotingPower`
      *      This can be called by anyone.
      * @param validator           Validator address
      */
@@ -423,7 +425,7 @@ contract StakeManager is ReentrancyGuard, Only {
     }
 
     /**
-     * @dev Add the validator to `_indexedValidators` if the voting power is greater than `minIndexVotingPower`
+     * @dev Add the validator to `indexedValidators` if the voting power is greater than `minIndexVotingPower`
      *      This can be called by anyone.
      * @param validator          Validator address
      */

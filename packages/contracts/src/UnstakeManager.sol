@@ -70,7 +70,9 @@ contract UnstakeManager is Only {
         require(factor <= 100, "UnstakeManager: invalid factor");
         uint256 balance = balanceOf[validator];
         amount = balance.mul(factor).div(100);
-        balanceOf[validator] = balance.sub(amount);
-        address(0).transfer(amount);
+        if (amount > 0) {
+            balanceOf[validator] = balance.sub(amount);
+            address(0).transfer(amount);
+        }
     }
 }

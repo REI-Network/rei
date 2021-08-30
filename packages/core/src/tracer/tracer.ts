@@ -73,7 +73,7 @@ export class Tracer {
         const parent = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
         const vm = await this.node.getVM(parent.header.stateRoot, block.header.number);
         const debug = this.createDebugImpl((vm as any)._opcodes, reject, config, hash);
-        await vm.runBlock({ block, debug, skipBlockValidation: true });
+        await vm.runBlock({ generate: true, block, debug, skipBlockValidation: true });
         const result = debug.result();
         resolve(util.types.isPromise(result) ? await result : result);
       } catch (err) {

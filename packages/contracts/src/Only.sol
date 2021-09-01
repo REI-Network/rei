@@ -8,12 +8,12 @@ abstract contract Only {
     IConfig public config;
 
     modifier onlyStakeManager() {
-        require(msg.sender == config.stakeManager(), "OnlyStakeManager: only stake manager");
+        require(msg.sender == config.stakeManager(), "Only: only stake manager");
         _;
     }
 
     modifier onlySystemCaller() {
-        require(msg.sender == config.systemCaller(), "OnlyStakeManager: only system caller");
+        require(msg.sender == config.systemCaller(), "Only: only system caller");
         _;
     }
 

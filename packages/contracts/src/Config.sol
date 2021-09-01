@@ -26,9 +26,25 @@ contract Config is IConfig {
         return 0x0000000000000000000000000000000000001004;
     }
 
+    function feeManager() external view override returns (address) {
+        return 0x0000000000000000000000000000000000001005;
+    }
+
     // get unstake delay
     function unstakeDelay() external view override returns (uint256) {
         return 1 minutes;
+    }
+
+    function withdrawDelay() external view override returns (uint256) {
+        return 3 days;
+    }
+
+    function dailyFee() external view override returns (uint256) {
+        return 1728e17;
+    }
+
+    function feeRecoverInterval() external view override returns (uint256) {
+        return 1 days;
     }
 
     /**

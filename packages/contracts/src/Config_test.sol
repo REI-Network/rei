@@ -10,6 +10,7 @@ contract Config_test is IConfig {
     address private c;
     address private u;
     address private v;
+    address private f;
 
     function setStakeManager(address _s) external {
         s = _s;
@@ -25,6 +26,10 @@ contract Config_test is IConfig {
 
     function setValidatorRewardManager(address _v) external {
         v = _v;
+    }
+
+    function setFeeManager(address _f) external {
+        f = _f;
     }
 
     function stakeManager() external view override returns (address) {
@@ -43,8 +48,24 @@ contract Config_test is IConfig {
         return v;
     }
 
+    function feeManager() external view override returns (address) {
+        return f;
+    }
+
     function unstakeDelay() external view override returns (uint256) {
         return 1 seconds;
+    }
+
+    function withdrawDelay() external view override returns (uint256) {
+        return 1 seconds;
+    }
+
+    function dailyFee() external view override returns (uint256) {
+        return 12e16;
+    }
+
+    function feeRecoverInterval() external view override returns (uint256) {
+        return 1 minutes;
     }
 
     function minIndexVotingPower() external view override returns (uint256) {

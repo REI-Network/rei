@@ -1,7 +1,7 @@
 import type { Artifacts } from 'hardhat/types';
 import type Web3 from 'web3';
 import { assert, expect } from 'chai';
-import { BN } from 'ethereumjs-util';
+import { upTimestamp } from './utils';
 
 declare var artifacts: Artifacts;
 declare var web3: Web3;
@@ -16,6 +16,7 @@ describe('Fee', () => {
   let feeManager: any;
   let deployer: any;
   let user: any;
+  let withdrawDelay: any;
 
   before(async () => {
     const accounts = await web3.eth.getAccounts();
@@ -25,9 +26,43 @@ describe('Fee', () => {
 
   it('should deploy succeed', async () => {
     config = new web3.eth.Contract(Config.abi, (await Config.new()).address, { from: deployer });
+    await config.methods.setSystemCaller(deployer).send();
     fee = new web3.eth.Contract(Fee.abi, (await Fee.new(config.options.address)).address, { from: deployer });
     feeManager = new web3.eth.Contract(FeeManager.abi, (await FeeManager.new(config.options.address)).address, { from: deployer });
     await config.methods.setFeeManager(feeManager.options.address).send();
     expect(await config.methods.feeManager().call(), 'fee manager address should be equal').be.equal(feeManager.options.address);
+    withdrawDelay = Number(await config.methods.withdrawDelay().call());
+  });
+
+  it('should deposit succeed', async () => {
+    await feeManager.methods.deposit().send({ value: 100 });
+  });
+
+  it('should withdraw failed', async () => {
+    try {
+      await feeManager.methods.withdraw(100).send();
+      assert.fail("shouldn't succeed");
+    } catch (err) {}
+  });
+
+  it('should withdraw succeed', async () => {
+    await upTimestamp(deployer, withdrawDelay);
+    await feeManager.methods.withdraw(100).send();
+  });
+
+  it('should deposit succeed(depositTo)', async () => {
+    await feeManager.methods.depositTo(user).send({ value: 100 });
+  });
+
+  it('should withdraw failed(withdrawFrom)', async () => {
+    try {
+      await feeManager.methods.withdrawFrom(100, user).send();
+      assert.fail("shouldn't succeed");
+    } catch (err) {}
+  });
+
+  it('should withdraw succeed(withdrawFrom)', async () => {
+    await upTimestamp(deployer, withdrawDelay);
+    await feeManager.methods.withdrawFrom(100, user).send();
   });
 });

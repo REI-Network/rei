@@ -2,6 +2,7 @@ import type { Artifacts } from 'hardhat/types';
 import type Web3 from 'web3';
 import { assert, expect } from 'chai';
 import { BN, MAX_INTEGER } from 'ethereumjs-util';
+import { upTimestamp, toBN } from './utils';
 
 declare var artifacts: Artifacts;
 declare var web3: Web3;
@@ -31,23 +32,6 @@ describe('StakeManger', () => {
   async function createCommissionShareContract(validator: string) {
     const v = await stakeManager.methods.validators(validator).call();
     return new web3.eth.Contract(CommissionShare.abi, v.commissionShare, { from: deployer });
-  }
-
-  async function upTimestamp(waittime: number) {
-    // wait some time and send a transaction to update blockchain timestamp
-    await new Promise((r) => setTimeout(r, waittime * 1000 + 10));
-    await web3.eth.sendTransaction({
-      from: deployer,
-      to: deployer,
-      value: 0
-    });
-  }
-
-  function toBN(data: number | string) {
-    if (typeof data === 'string' && data.startsWith('0x')) {
-      return new BN(data.substr(2), 'hex');
-    }
-    return new BN(data);
   }
 
   before(async () => {
@@ -142,7 +126,7 @@ describe('StakeManger', () => {
       })
     );
 
-    await upTimestamp(unstakeDelay);
+    await upTimestamp(deployer, unstakeDelay);
     await stakeManager.methods.unstake(0).send();
     await stakeManager.methods.unstake(1).send();
     // TODO: check amount
@@ -158,13 +142,13 @@ describe('StakeManger', () => {
     const validatorInfoAfter = await stakeManager.methods.validators(validator1).call();
     expect(validatorInfoAfter.commissionRate, 'commissionRare should be new commissionRate').be.equal(newCommissionRate.toString());
 
-    await upTimestamp(setInterval - 3);
+    await upTimestamp(deployer, setInterval - 3);
     try {
       await stakeManager.methods.setCommissionRate(oldCommissionRate).send({ from: validator1 });
       assert.fail('update commission rate too frequently');
     } catch (err) {}
 
-    await upTimestamp(3);
+    await upTimestamp(deployer, 3);
     try {
       await stakeManager.methods.setCommissionRate(newCommissionRate).send({ from: validator1 });
       assert.fail('repeatedly set commission rate');
@@ -279,7 +263,7 @@ describe('StakeManger', () => {
 
     const commissionBal = toBN(await web3.eth.getBalance(commissionShare.options.address));
     await stakeManager.methods.startUnstake(validator3, receiver1, unstakeAmount.toString()).send();
-    await upTimestamp(unstakeDelay);
+    await upTimestamp(deployer, unstakeDelay);
     await stakeManager.methods.unstake(id1).send();
     const receiver1BalAfter = toBN(await web3.eth.getBalance(receiver1));
     const receiver1Change = receiver1BalAfter.sub(receiver1BalStart);
@@ -288,7 +272,7 @@ describe('StakeManger', () => {
 
     const id2 = stakeId++;
     await stakeManager.methods.startClaim(receiver2, claimAmount).send({ from: validator3 });
-    await upTimestamp(unstakeDelay);
+    await upTimestamp(deployer, unstakeDelay);
     await stakeManager.methods.unstake(id2).send();
     const receiver2BalAfter = toBN(await web3.eth.getBalance(receiver2));
     const receiver2Change = receiver2BalAfter.sub(receiver2BalStart);

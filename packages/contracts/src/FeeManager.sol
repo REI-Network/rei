@@ -3,12 +3,13 @@
 pragma solidity ^0.6.0;
 pragma experimental ABIEncoderV2;
 
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/IFeeManager.sol";
 import "./libraries/Math.sol";
 import "./Only.sol";
 
-contract FeeManager is Only {
+contract FeeManager is ReentrancyGuard, Only {
     using SafeMath for uint256;
 
     // user total amount
@@ -44,7 +45,7 @@ contract FeeManager is Only {
     /**
      * @dev Deposit to yourself.
      */
-    function deposit() external payable {
+    function deposit() external payable nonReentrant {
         require(msg.value > 0, "FeeManager: invalid value");
         userTotalAmount[msg.sender] = userTotalAmount[msg.sender].add(msg.value);
         DepositInfo storage di = userDeposit[msg.sender];
@@ -58,7 +59,7 @@ contract FeeManager is Only {
      * @dev Deposit to another user.
      * @param user      Target user address
      */
-    function depositTo(address user) external payable {
+    function depositTo(address user) external payable nonReentrant {
         require(msg.value > 0, "FeeManager: invalid value");
         require(msg.sender != user, "FeeManager: invalid user");
         userTotalAmount[user] = userTotalAmount[user].add(msg.value);
@@ -73,8 +74,9 @@ contract FeeManager is Only {
      * @dev Withdraw amount from yourself.
      * @param amount    Withdraw amount
      */
-    function withdraw(uint256 amount) external {
+    function withdraw(uint256 amount) external nonReentrant {
         require(amount > 0, "FeeManager: invalid amount");
+        require(whetherPayOffDebt(msg.sender), "FeeManager: user debt");
         DepositInfo storage di = userDeposit[msg.sender];
         // adding two timestamps will never overflow
         require(di.timestamp + config.withdrawDelay() < block.timestamp, "FeeManager: invalid withdraw delay");
@@ -90,9 +92,10 @@ contract FeeManager is Only {
      * @param amount    Withdraw amount
      * @param user      Target user address
      */
-    function withdrawFrom(uint256 amount, address user) external {
+    function withdrawFrom(uint256 amount, address user) external nonReentrant {
         require(amount > 0, "FeeManager: invalid amount");
         require(msg.sender != user, "FeeManager: invalid user");
+        require(whetherPayOffDebt(user), "FeeManager: user debt");
         DepositInfo storage di = delegatedUserDeposit[user][msg.sender];
         // adding two timestamps will never overflow
         require(di.timestamp + config.withdrawDelay() < block.timestamp, "FeeManager: invalid withdraw delay");
@@ -101,6 +104,16 @@ contract FeeManager is Only {
         totalAmount = totalAmount.sub(amount);
         msg.sender.transfer(amount);
         emit Withdraw(msg.sender, user, amount);
+    }
+
+    /**
+     * @dev Estimate whether the debt has been paid off
+     * @param user      Target user address
+     */
+    function whetherPayOffDebt(address user) public view returns (bool) {
+        uint256 fee = userTotalAmount[user].mul(config.dailyFee()).div(totalAmount);
+        uint256 usage = estimateUsage(userUsage[user]);
+        return fee >= usage;
     }
 
     /**

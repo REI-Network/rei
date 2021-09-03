@@ -35,7 +35,9 @@ describe('Fee', () => {
   });
 
   it('should deposit succeed', async () => {
-    await feeManager.methods.deposit(deployer).send({ value: 100 });
+    await feeManager.methods.deposit(deployer).send({ value: '100' });
+    expect((await feeManager.methods.userDeposit(deployer, deployer).call()).amount, 'amount should be equal').be.equal('100');
+    expect(await feeManager.methods.totalAmount().call(), 'total amount should be equal').be.equal('100');
   });
 
   it('should withdraw failed', async () => {
@@ -48,10 +50,14 @@ describe('Fee', () => {
   it('should withdraw succeed', async () => {
     await upTimestamp(deployer, withdrawDelay);
     await feeManager.methods.withdraw(100, deployer).send();
+    expect((await feeManager.methods.userDeposit(deployer, deployer).call()).amount, 'amount should be equal').be.equal('0');
+    expect(await feeManager.methods.totalAmount().call(), 'total amount should be equal').be.equal('0');
   });
 
   it('should deposit succeed(depositTo)', async () => {
     await feeManager.methods.deposit(user).send({ value: 100 });
+    expect((await feeManager.methods.userDeposit(user, deployer).call()).amount, 'amount should be equal').be.equal('100');
+    expect(await feeManager.methods.totalAmount().call(), 'total amount should be equal').be.equal('100');
   });
 
   it('should withdraw failed(withdrawFrom)', async () => {
@@ -64,5 +70,7 @@ describe('Fee', () => {
   it('should withdraw succeed(withdrawFrom)', async () => {
     await upTimestamp(deployer, withdrawDelay);
     await feeManager.methods.withdraw(100, user).send();
+    expect((await feeManager.methods.userDeposit(deployer, deployer).call()).amount, 'amount should be equal').be.equal('0');
+    expect(await feeManager.methods.totalAmount().call(), 'total amount should be equal').be.equal('0');
   });
 });

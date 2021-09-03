@@ -9,20 +9,18 @@ import "./interfaces/IFeeManager.sol";
 import "./libraries/Math.sol";
 import "./Only.sol";
 
-contract FeeManager is ReentrancyGuard, Only {
+contract FeeManager is ReentrancyGuard, Only, IFeeManager {
     using SafeMath for uint256;
 
     // user total amount
-    mapping(address => uint256) public userTotalAmount;
+    mapping(address => uint256) public override userTotalAmount;
     // user usage information
-    mapping(address => UsageInfo) public userUsage;
+    mapping(address => UsageInfo) public override userUsage;
     // user deposit information
-    mapping(address => DepositInfo) public userDeposit;
-    // delegated user deposit information
-    mapping(address => mapping(address => DepositInfo)) public delegatedUserDeposit;
+    mapping(address => mapping(address => DepositInfo)) public override userDeposit;
 
     // total deposit amount
-    uint256 public totalAmount;
+    uint256 public override totalAmount;
 
     /**
      * @dev Emit when user deposits.
@@ -43,60 +41,28 @@ contract FeeManager is ReentrancyGuard, Only {
     constructor(IConfig config) public Only(config) {}
 
     /**
-     * @dev Deposit to yourself.
-     */
-    function deposit() external payable nonReentrant {
-        require(msg.value > 0, "FeeManager: invalid value");
-        userTotalAmount[msg.sender] = userTotalAmount[msg.sender].add(msg.value);
-        DepositInfo storage di = userDeposit[msg.sender];
-        di.amount = di.amount.add(msg.value);
-        di.timestamp = block.timestamp;
-        totalAmount = totalAmount.add(msg.value);
-        emit Deposit(msg.sender, msg.sender, msg.value);
-    }
-
-    /**
-     * @dev Deposit to another user.
+     * @dev Deposit amount to target user.
      * @param user      Target user address
      */
-    function depositTo(address user) external payable nonReentrant {
+    function deposit(address user) external payable override nonReentrant {
         require(msg.value > 0, "FeeManager: invalid value");
-        require(msg.sender != user, "FeeManager: invalid user");
-        userTotalAmount[user] = userTotalAmount[user].add(msg.value);
-        DepositInfo storage di = delegatedUserDeposit[user][msg.sender];
+        DepositInfo storage di = userDeposit[user][msg.sender];
         di.amount = di.amount.add(msg.value);
         di.timestamp = block.timestamp;
+        userTotalAmount[user] = userTotalAmount[user].add(msg.value);
         totalAmount = totalAmount.add(msg.value);
         emit Deposit(msg.sender, user, msg.value);
     }
 
     /**
-     * @dev Withdraw amount from yourself.
-     * @param amount    Withdraw amount
-     */
-    function withdraw(uint256 amount) external nonReentrant {
-        require(amount > 0, "FeeManager: invalid amount");
-        require(whetherPayOffDebt(msg.sender), "FeeManager: user debt");
-        DepositInfo storage di = userDeposit[msg.sender];
-        // adding two timestamps will never overflow
-        require(di.timestamp + config.withdrawDelay() < block.timestamp, "FeeManager: invalid withdraw delay");
-        di.amount = di.amount.sub(amount);
-        userTotalAmount[msg.sender] = userTotalAmount[msg.sender].sub(amount);
-        totalAmount = totalAmount.sub(amount);
-        msg.sender.transfer(amount);
-        emit Withdraw(msg.sender, msg.sender, amount);
-    }
-
-    /**
-     * @dev Withdraw amount from another user.
+     * @dev Withdraw amount from target user.
      * @param amount    Withdraw amount
      * @param user      Target user address
      */
-    function withdrawFrom(uint256 amount, address user) external nonReentrant {
+    function withdraw(uint256 amount, address user) external override nonReentrant {
         require(amount > 0, "FeeManager: invalid amount");
-        require(msg.sender != user, "FeeManager: invalid user");
         require(whetherPayOffDebt(user), "FeeManager: user debt");
-        DepositInfo storage di = delegatedUserDeposit[user][msg.sender];
+        DepositInfo storage di = userDeposit[user][msg.sender];
         // adding two timestamps will never overflow
         require(di.timestamp + config.withdrawDelay() < block.timestamp, "FeeManager: invalid withdraw delay");
         di.amount = di.amount.sub(amount);
@@ -110,7 +76,7 @@ contract FeeManager is ReentrancyGuard, Only {
      * @dev Estimate whether the debt has been paid off
      * @param user      Target user address
      */
-    function whetherPayOffDebt(address user) public view returns (bool) {
+    function whetherPayOffDebt(address user) public view override returns (bool) {
         uint256 fee = userTotalAmount[user].mul(config.dailyFee()).div(totalAmount);
         uint256 usage = estimateUsage(userUsage[user]);
         return fee >= usage;
@@ -121,7 +87,7 @@ contract FeeManager is ReentrancyGuard, Only {
      *      userFee = userTotalAmount * dailyFee / totalAmount - userUsage
      * @param user      User address
      */
-    function estimateFee(address user) external view returns (uint256 fee) {
+    function estimateFee(address user) external view override returns (uint256 fee) {
         fee = userTotalAmount[user].mul(config.dailyFee()).div(totalAmount);
         uint256 usage = estimateUsage(userUsage[user]);
         fee = fee > usage ? fee - usage : 0;
@@ -141,29 +107,24 @@ contract FeeManager is ReentrancyGuard, Only {
      *
      * @param ui        Usage information
      */
-    function estimateUsage(UsageInfo memory ui) public view returns (uint256 usage) {
+    function estimateUsage(UsageInfo memory ui) public view override returns (uint256 usage) {
         uint256 interval = block.timestamp.sub(ui.timestamp);
         if (ui.usage > 0 && interval < config.feeRecoverInterval()) {
             usage = ui.usage.sub(interval.mul(ui.usage).div(config.feeRecoverInterval()));
         }
     }
 
+    // TODO: add a event for receipt
     /**
      * @dev Consume user fee, can only be called by the system caller.
      * @param user      User address
      * @param usage     Number of usage fee
      */
-    function consume(address user, uint256 usage) external onlySystemCaller {
+    function consume(address user, uint256 usage) external override onlySystemCaller {
         require(usage > 0, "FeeManager: invalid usage");
         UsageInfo storage ui = userUsage[user];
-        // adding two timestamps will never overflow
-        if (ui.timestamp + config.feeRecoverInterval() < block.timestamp) {
-            ui.usage = usage;
-        } else {
-            ui.usage = ui.usage.add(usage);
-        }
-        // always update timestamp,
-        // because we want to record the latest timestamp in the last 24 hours
+        ui.usage = estimateUsage(ui).add(usage);
+        // update timestamp, because we want to record the latest timestamp in the last 24 hours
         ui.timestamp = block.timestamp;
     }
 }

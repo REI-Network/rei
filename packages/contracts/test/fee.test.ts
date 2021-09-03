@@ -35,34 +35,34 @@ describe('Fee', () => {
   });
 
   it('should deposit succeed', async () => {
-    await feeManager.methods.deposit().send({ value: 100 });
+    await feeManager.methods.deposit(deployer).send({ value: 100 });
   });
 
   it('should withdraw failed', async () => {
     try {
-      await feeManager.methods.withdraw(100).send();
+      await feeManager.methods.withdraw(100, deployer).send();
       assert.fail("shouldn't succeed");
     } catch (err) {}
   });
 
   it('should withdraw succeed', async () => {
     await upTimestamp(deployer, withdrawDelay);
-    await feeManager.methods.withdraw(100).send();
+    await feeManager.methods.withdraw(100, deployer).send();
   });
 
   it('should deposit succeed(depositTo)', async () => {
-    await feeManager.methods.depositTo(user).send({ value: 100 });
+    await feeManager.methods.deposit(user).send({ value: 100 });
   });
 
   it('should withdraw failed(withdrawFrom)', async () => {
     try {
-      await feeManager.methods.withdrawFrom(100, user).send();
+      await feeManager.methods.withdraw(100, user).send();
       assert.fail("shouldn't succeed");
     } catch (err) {}
   });
 
   it('should withdraw succeed(withdrawFrom)', async () => {
     await upTimestamp(deployer, withdrawDelay);
-    await feeManager.methods.withdrawFrom(100, user).send();
+    await feeManager.methods.withdraw(100, user).send();
   });
 });

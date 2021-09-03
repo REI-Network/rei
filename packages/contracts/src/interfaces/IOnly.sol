@@ -2,6 +2,8 @@
 
 pragma solidity ^0.6.0;
 
+import "./IConfig.sol";
+
 interface IOnly {
-    function config() external view returns (address);
+    function config() external view returns (IConfig);
 }

@@ -19,6 +19,7 @@ struct DepositInfo {
  *      Otherwise it will be cleared
  */
 struct UsageInfo {
+    // avg gas usage index
     uint256 usage;
     uint256 timestamp;
 }
@@ -29,21 +30,17 @@ struct UsageInfo {
 interface IFeeManager is IOnly {
     function userTotalAmount(address user) external view returns (uint256);
 
-    function userUsage(address user) external view returns (UsageInfo memory);
+    function userUsage(address user) external view returns (uint256, uint256);
 
-    function userDeposit(address user) external view returns (DepositInfo memory);
-
-    function delegatedUserDeposit(address user1, address user2) external view returns (DepositInfo memory);
+    function userDeposit(address user1, address user2) external view returns (uint256, uint256);
 
     function totalAmount() external view returns (uint256);
 
-    function deposit() external payable;
+    function deposit(address user) external payable;
 
-    function depositTo(address user) external payable;
+    function withdraw(uint256 amount, address user) external;
 
-    function withdraw(uint256 amount) external;
-
-    function withdrawFrom(uint256 amount, address user) external;
+    function whetherPayOffDebt(address user) external view returns (bool);
 
     function estimateFee(address user) external view returns (uint256);
 

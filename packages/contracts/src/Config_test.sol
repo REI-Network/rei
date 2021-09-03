@@ -65,7 +65,7 @@ contract Config_test is IConfig {
     }
 
     function feeRecoverInterval() external view override returns (uint256) {
-        return 1 minutes;
+        return 10 seconds;
     }
 
     function minIndexVotingPower() external view override returns (uint256) {

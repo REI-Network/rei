@@ -109,8 +109,12 @@ contract FeeManager is ReentrancyGuard, Only, IFeeManager {
      */
     function estimateUsage(UsageInfo memory ui) public view override returns (uint256 usage) {
         uint256 interval = block.timestamp.sub(ui.timestamp);
-        if (ui.usage > 0 && interval < config.feeRecoverInterval()) {
-            usage = ui.usage.sub(interval.mul(ui.usage).div(config.feeRecoverInterval()));
+        if (interval == 0) {
+            return ui.usage;
+        }
+        uint256 recoverInterval = config.feeRecoverInterval();
+        if (ui.usage > 0 && interval < recoverInterval) {
+            usage = recoverInterval.sub(interval).mul(ui.usage).div(recoverInterval);
         }
     }
 

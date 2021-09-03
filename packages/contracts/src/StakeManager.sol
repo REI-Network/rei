@@ -477,6 +477,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         }
     }
 
+    // TODO: if the active validators list is exactly the same as the last list, don't modify the storage
     /**
      * @dev After block callback, it will be called by system caller after each block is processed
      * @param acValidators       Active validators list
@@ -484,10 +485,10 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      */
     function afterBlock(address[] calldata acValidators, int256[] calldata priorities) external override onlySystemCaller {
         require(acValidators.length == priorities.length, "StakeManager: invalid list length");
-        uint256 orignLength = activeValidators.length;
+        uint256 originLength = activeValidators.length;
         uint256 i = 0;
         for (; i < priorities.length; i = i.add(1)) {
-            if (i < orignLength) {
+            if (i < originLength) {
                 ActiveValidator storage acValidator = activeValidators[i];
                 acValidator.validator = acValidators[i];
                 acValidator.priority = priorities[i];
@@ -495,7 +496,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
                 activeValidators.push(ActiveValidator(acValidators[i], priorities[i]));
             }
         }
-        for (; i < orignLength; i = i.add(1)) {
+        for (; i < originLength; i = i.add(1)) {
             activeValidators.pop();
         }
     }

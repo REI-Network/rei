@@ -48,7 +48,7 @@ contract Config_test is IConfig {
         return v;
     }
 
-    function feeManager() external view override returns (address) {
+    function fee() external view override returns (address) {
         return f;
     }
 
@@ -64,7 +64,19 @@ contract Config_test is IConfig {
         return 12e16;
     }
 
+    function dailyFreeFee() external view override returns (uint256) {
+        return 12e15;
+    }
+
+    function userFreeFeeLimit() external view override returns (uint256) {
+        return 12e14;
+    }
+
     function feeRecoverInterval() external view override returns (uint256) {
+        return 10 seconds;
+    }
+
+    function freeFeeRecoverInterval() external view override returns (uint256) {
         return 10 seconds;
     }
 
@@ -84,5 +96,9 @@ contract Config_test is IConfig {
 
     function setCommissionRateInterval() external view override returns (uint256) {
         return 5 seconds;
+    }
+
+    function blockTimestamp() external view returns (uint256) {
+        return block.timestamp;
     }
 }

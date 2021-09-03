@@ -26,7 +26,7 @@ contract Config is IConfig {
         return 0x0000000000000000000000000000000000001004;
     }
 
-    function feeManager() external view override returns (address) {
+    function fee() external view override returns (address) {
         return 0x0000000000000000000000000000000000001005;
     }
 
@@ -43,7 +43,19 @@ contract Config is IConfig {
         return 1728e17;
     }
 
+    function dailyFreeFee() external view override returns (uint256) {
+        return 1728e16;
+    }
+
+    function userFreeFeeLimit() external view override returns (uint256) {
+        return 1728e15;
+    }
+
     function feeRecoverInterval() external view override returns (uint256) {
+        return 1 days;
+    }
+
+    function freeFeeRecoverInterval() external view override returns (uint256) {
         return 1 days;
     }
 

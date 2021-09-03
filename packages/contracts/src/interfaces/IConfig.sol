@@ -14,7 +14,7 @@ interface IConfig {
 
     function validatorRewardManager() external view returns (address);
 
-    function feeManager() external view returns (address);
+    function fee() external view returns (address);
 
     function unstakeDelay() external view returns (uint256);
 
@@ -22,7 +22,13 @@ interface IConfig {
 
     function dailyFee() external view returns (uint256);
 
+    function dailyFreeFee() external view returns (uint256);
+
+    function userFreeFeeLimit() external view returns (uint256);
+
     function feeRecoverInterval() external view returns (uint256);
+
+    function freeFeeRecoverInterval() external view returns (uint256);
 
     function minIndexVotingPower() external view returns (uint256);
 

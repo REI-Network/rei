@@ -6,35 +6,33 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/EnumerableMap.sol";
 import "./interfaces/IStakeManager.sol";
-import "./interfaces/IUnstakeManager.sol";
-import "./interfaces/IValidatorRewardManager.sol";
 import "./CommissionShare.sol";
 import "./Only.sol";
 
-contract StakeManager is ReentrancyGuard, Only {
+contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     using SafeMath for uint256;
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     // auto increment validator id
-    uint256 public validatorId = 0;
+    uint256 public override validatorId = 0;
     // indexed validator, including all validators with balance
     EnumerableMap.UintToAddressMap private indexedValidators;
     // validator mapping, including all validators
-    mapping(address => Validator) public validators;
+    mapping(address => Validator) public override validators;
 
     // auto increment unstake id
-    uint256 public unstakeId = 0;
+    uint256 public override unstakeId = 0;
     // unstake information, create at `startUnstake`, delete after `unstake`
-    mapping(uint256 => Unstake) public unstakeQueue;
+    mapping(uint256 => Unstake) public override unstakeQueue;
 
     // unstake manager
-    IUnstakeManager public unstakeManager;
+    IUnstakeManager public override unstakeManager;
     // validator reward manager
-    IValidatorRewardManager public validatorRewardManager;
+    IValidatorRewardManager public override validatorRewardManager;
 
     // active validator list of next block,
     // this will be set in `afterBlock`
-    ActiveValidator[] public activeValidators;
+    ActiveValidator[] public override activeValidators;
 
     /**
      * @dev Emit when the user stakes
@@ -98,7 +96,7 @@ contract StakeManager is ReentrancyGuard, Only {
     /**
      * @dev Get the indexed validators length.
      */
-    function indexedValidatorsLength() external view returns (uint256) {
+    function indexedValidatorsLength() external view override returns (uint256) {
         return indexedValidators.length();
     }
 
@@ -106,7 +104,7 @@ contract StakeManager is ReentrancyGuard, Only {
      * @dev Determine whether the index validator exists by id.
      * @param id            The validator id
      */
-    function indexedValidatorsExists(uint256 id) external view returns (bool) {
+    function indexedValidatorsExists(uint256 id) external view override returns (bool) {
         return indexedValidators.contains(id);
     }
 
@@ -114,7 +112,7 @@ contract StakeManager is ReentrancyGuard, Only {
      * @dev Get indexed validator address by index.
      * @param index         The validator index
      */
-    function indexedValidatorsByIndex(uint256 index) external view returns (address validator) {
+    function indexedValidatorsByIndex(uint256 index) external view override returns (address validator) {
         (, validator) = indexedValidators.at(index);
     }
 
@@ -122,7 +120,7 @@ contract StakeManager is ReentrancyGuard, Only {
      * @dev Get indexed validator address by id.
      * @param id            The validator id
      */
-    function indexedValidatorsById(uint256 id) external view returns (address) {
+    function indexedValidatorsById(uint256 id) external view override returns (address) {
         return indexedValidators.get(id);
     }
 
@@ -131,7 +129,7 @@ contract StakeManager is ReentrancyGuard, Only {
      *      If index is out of range or validator doesn't exist, return 0
      * @param index         The validator index
      */
-    function getVotingPowerByIndex(uint256 index) external view returns (uint256) {
+    function getVotingPowerByIndex(uint256 index) external view override returns (uint256) {
         if (indexedValidators.length() <= index) {
             return 0;
         }
@@ -149,7 +147,7 @@ contract StakeManager is ReentrancyGuard, Only {
      *      If doesn't exist, return 0
      * @param id            The validator id
      */
-    function getVotingPowerById(uint256 id) external view returns (uint256) {
+    function getVotingPowerById(uint256 id) external view override returns (uint256) {
         address validator = indexedValidators.get(id);
         address commissionShare = validators[validator].commissionShare;
         if (commissionShare == address(0)) {
@@ -163,7 +161,7 @@ contract StakeManager is ReentrancyGuard, Only {
      *      If the validator doesn't exist, return 0
      * @param validator     Validator address
      */
-    function getVotingPowerByAddress(address validator) external view returns (uint256) {
+    function getVotingPowerByAddress(address validator) external view override returns (uint256) {
         address commissionShare = validators[validator].commissionShare;
         if (commissionShare == address(0)) {
             return 0;
@@ -183,7 +181,7 @@ contract StakeManager is ReentrancyGuard, Only {
     /**
      * @dev Get the active validators list length.
      */
-    function activeValidatorsLength() external view returns (uint256) {
+    function activeValidatorsLength() external view override returns (uint256) {
         return activeValidators.length;
     }
 
@@ -192,7 +190,7 @@ contract StakeManager is ReentrancyGuard, Only {
      *      If the stake amount is less than this value, transaction will fail.
      * @param validator    Validator address
      */
-    function estimateMinStakeAmount(address validator) external view returns (uint256 amount) {
+    function estimateMinStakeAmount(address validator) external view override returns (uint256 amount) {
         return estimateStakeAmount(validator, 1);
     }
 
@@ -201,7 +199,7 @@ contract StakeManager is ReentrancyGuard, Only {
      * @param validator    Validator address
      * @param shares       Number of shares
      */
-    function estimateStakeAmount(address validator, uint256 shares) public view returns (uint256 amount) {
+    function estimateStakeAmount(address validator, uint256 shares) public view override returns (uint256 amount) {
         address commissionShare = validators[validator].commissionShare;
         if (commissionShare == address(0)) {
             amount = shares;
@@ -216,7 +214,7 @@ contract StakeManager is ReentrancyGuard, Only {
      *      If the validator doesn't exist, return 0.
      * @param validator    Validator address
      */
-    function estimateMinUnstakeShares(address validator) external view returns (uint256 shares) {
+    function estimateMinUnstakeShares(address validator) external view override returns (uint256 shares) {
         return estimateUnstakeShares(validator, 1);
     }
 
@@ -226,7 +224,7 @@ contract StakeManager is ReentrancyGuard, Only {
      * @param validator    Validator address
      * @param amount       Number of GXC
      */
-    function estimateUnstakeShares(address validator, uint256 amount) public view returns (uint256 shares) {
+    function estimateUnstakeShares(address validator, uint256 amount) public view override returns (uint256 shares) {
         address commissionShare = validators[validator].commissionShare;
         if (commissionShare == address(0)) {
             shares = 0;
@@ -241,7 +239,7 @@ contract StakeManager is ReentrancyGuard, Only {
      * @param validator    Validator address
      * @param shares       Number of shares
      */
-    function estimateUnstakeAmount(address validator, uint256 shares) external view returns (uint256 amount) {
+    function estimateUnstakeAmount(address validator, uint256 shares) external view override returns (uint256 amount) {
         uint256 balance = unstakeManager.balanceOf(validator);
         uint256 totalSupply = unstakeManager.totalSupplyOf(validator);
         if (totalSupply == 0) {
@@ -284,7 +282,7 @@ contract StakeManager is ReentrancyGuard, Only {
      * @param validator    Validator address
      * @param to           Receiver address
      */
-    function stake(address validator, address to) external payable nonReentrant returns (uint256 shares) {
+    function stake(address validator, address to) external payable override nonReentrant returns (uint256 shares) {
         require(uint160(validator) > 2000, "StakeManager: invalid validator");
         require(uint160(to) > 2000, "StakeManager: invalid receiver");
         require(msg.value > 0, "StakeManager: invalid value");
@@ -352,7 +350,7 @@ contract StakeManager is ReentrancyGuard, Only {
         address validator,
         address payable to,
         uint256 shares
-    ) external nonReentrant returns (uint256) {
+    ) external override nonReentrant returns (uint256) {
         require(uint160(to) > 2000, "StakeManager: invalid receiver");
         require(shares > 0, "StakeManager: invalid shares");
         Validator memory v = validators[validator];
@@ -374,7 +372,7 @@ contract StakeManager is ReentrancyGuard, Only {
      * @param amount       Number of GXC
      * @return             Unstake id
      */
-    function startClaim(address payable to, uint256 amount) external nonReentrant returns (uint256) {
+    function startClaim(address payable to, uint256 amount) external override nonReentrant returns (uint256) {
         require(uint160(to) > 2000, "StakeManager: invalid receiver");
         require(amount > 0, "StakeManager: invalid amount");
         Validator memory v = validators[msg.sender];
@@ -387,7 +385,7 @@ contract StakeManager is ReentrancyGuard, Only {
      * @dev Set validator commission rate.
      * @param rate         New commission rate
      */
-    function setCommissionRate(uint256 rate) external {
+    function setCommissionRate(uint256 rate) external override {
         require(rate <= 100, "StakeManager: commission rate is too high");
         Validator storage v = validators[msg.sender];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
@@ -403,7 +401,7 @@ contract StakeManager is ReentrancyGuard, Only {
      * @dev Unstake by id, return unstake amount.
      * @param id            Unstake id
      */
-    function unstake(uint256 id) external nonReentrant returns (uint256 amount) {
+    function unstake(uint256 id) external override nonReentrant returns (uint256 amount) {
         Unstake memory u = unstakeQueue[id];
         require(u.validator != address(0), "StakeManager: invalid unstake id");
         require(u.timestamp <= block.timestamp, "StakeManager: invalid unstake timestamp");
@@ -417,7 +415,7 @@ contract StakeManager is ReentrancyGuard, Only {
      *      This can be called by anyone.
      * @param validator           Validator address
      */
-    function removeIndexedValidator(address validator) external {
+    function removeIndexedValidator(address validator) external override {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0) && indexedValidators.contains(v.id) && getVotingPower(v.commissionShare, validator) < config.minIndexVotingPower(), "StakeManager: invalid validator");
         indexedValidators.remove(v.id);
@@ -429,7 +427,7 @@ contract StakeManager is ReentrancyGuard, Only {
      *      This can be called by anyone.
      * @param validator          Validator address
      */
-    function addIndexedValidator(address validator) external {
+    function addIndexedValidator(address validator) external override {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0) && !indexedValidators.contains(v.id), "StakeManager: invalid validator");
         uint256 votingPower = getVotingPower(v.commissionShare, validator);
@@ -442,7 +440,7 @@ contract StakeManager is ReentrancyGuard, Only {
      * @dev Reward validator, only can be called by system caller
      * @param validator         Validator address
      */
-    function reward(address validator) external payable onlySystemCaller {
+    function reward(address validator) external payable override onlySystemCaller {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint256 commissionReward = msg.value.mul(v.commissionRate).div(100);
@@ -467,7 +465,7 @@ contract StakeManager is ReentrancyGuard, Only {
      * @param validator         Validator address
      * @param reason            Slash reason
      */
-    function slash(address validator, uint8 reason) external onlySystemCaller returns (uint256 amount) {
+    function slash(address validator, uint8 reason) external override onlySystemCaller returns (uint256 amount) {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint8 factor = config.getFactorByReason(reason);
@@ -484,7 +482,7 @@ contract StakeManager is ReentrancyGuard, Only {
      * @param acValidators       Active validators list
      * @param priorities         Priority list of active validators
      */
-    function afterBlock(address[] calldata acValidators, int256[] calldata priorities) external onlySystemCaller {
+    function afterBlock(address[] calldata acValidators, int256[] calldata priorities) external override onlySystemCaller {
         require(acValidators.length == priorities.length, "StakeManager: invalid list length");
         uint256 orignLength = activeValidators.length;
         uint256 i = 0;

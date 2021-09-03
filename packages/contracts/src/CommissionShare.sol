@@ -3,10 +3,11 @@
 pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "./interfaces/ICommissionShare.sol";
 import "./libraries/Math.sol";
 import "./Only.sol";
 
-contract CommissionShare is ERC20, Only {
+contract CommissionShare is ERC20, Only, ICommissionShare {
     using Math for uint256;
 
     // validator address
@@ -20,7 +21,7 @@ contract CommissionShare is ERC20, Only {
      * @dev Estimate how much GXC should be stake, if user wants to get the number of shares.
      * @param shares    Number of shares
      */
-    function estimateStakeAmount(uint256 shares) external view returns (uint256 amount) {
+    function estimateStakeAmount(uint256 shares) external view override returns (uint256 amount) {
         require(shares > 0, "CommissionShare: insufficient shares");
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) {
@@ -34,7 +35,7 @@ contract CommissionShare is ERC20, Only {
      * @dev Estimate how much shares should be unstake, if user wants to get the amount of GXC.
      * @param amount    Number of GXC
      */
-    function estimateUnstakeShares(uint256 amount) external view returns (uint256 shares) {
+    function estimateUnstakeShares(uint256 amount) external view override returns (uint256 shares) {
         require(amount > 0, "CommissionShare: insufficient amount");
         uint256 balance = address(this).balance;
         if (balance == 0) {
@@ -49,7 +50,7 @@ contract CommissionShare is ERC20, Only {
      *      Can only be called by stake manager.
      * @param to        Receiver address
      */
-    function mint(address to) external payable onlyStakeManager returns (uint256 shares) {
+    function mint(address to) external payable override onlyStakeManager returns (uint256 shares) {
         uint256 balance = address(this).balance;
         uint256 reserve = balance.sub(msg.value);
         uint256 _totalSupply = totalSupply();
@@ -69,7 +70,7 @@ contract CommissionShare is ERC20, Only {
      *      Can only be called by stake manager.
      * @param shares    Number of shares to be burned
      */
-    function burn(uint256 shares) external onlyStakeManager returns (uint256 amount) {
+    function burn(uint256 shares) external override onlyStakeManager returns (uint256 amount) {
         require(shares > 0, "CommissionShare: insufficient shares");
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) {
@@ -86,13 +87,13 @@ contract CommissionShare is ERC20, Only {
     /**
      * @dev Reward validator.
      */
-    function reward() external payable onlyStakeManager {}
+    function reward() external payable override onlyStakeManager {}
 
     /**
      * @dev Slash validator and transfer the slashed amount to `address(0)`.
      * @param factor        Slash factor.
      */
-    function slash(uint8 factor) external onlyStakeManager returns (uint256 amount) {
+    function slash(uint8 factor) external override onlyStakeManager returns (uint256 amount) {
         require(factor <= 100, "CommissionShare: invalid factor");
         amount = address(this).balance.mul(factor).div(100);
         if (amount > 0) {

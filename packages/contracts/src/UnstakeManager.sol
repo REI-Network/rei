@@ -3,15 +3,16 @@
 pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "./interfaces/IUnstakeManager.sol";
 import "./Only.sol";
 
-contract UnstakeManager is Only {
+contract UnstakeManager is Only, IUnstakeManager {
     using SafeMath for uint256;
 
     // balance of each validators
-    mapping(address => uint256) public balanceOf;
+    mapping(address => uint256) public override balanceOf;
     // total supply of each validators
-    mapping(address => uint256) public totalSupplyOf;
+    mapping(address => uint256) public override totalSupplyOf;
 
     constructor(IConfig config) public Only(config) {}
 
@@ -20,7 +21,7 @@ contract UnstakeManager is Only {
      *      this will be called when user starts unstake.
      * @param validator     Validator address.
      */
-    function deposit(address validator) external payable onlyStakeManager returns (uint256 shares) {
+    function deposit(address validator) external payable override onlyStakeManager returns (uint256 shares) {
         uint256 balance = balanceOf[validator];
         uint256 totalSupply = totalSupplyOf[validator];
         if (totalSupply == 0) {
@@ -46,7 +47,7 @@ contract UnstakeManager is Only {
         address validator,
         uint256 shares,
         address payable to
-    ) external onlyStakeManager returns (uint256 amount) {
+    ) external override onlyStakeManager returns (uint256 amount) {
         uint256 balance = balanceOf[validator];
         uint256 totalSupply = totalSupplyOf[validator];
         if (totalSupply == 0) {
@@ -66,7 +67,7 @@ contract UnstakeManager is Only {
      * @param validator     Validator address.
      * @param factor        Slash factor.
      */
-    function slash(address validator, uint8 factor) external onlyStakeManager returns (uint256 amount) {
+    function slash(address validator, uint8 factor) external override onlyStakeManager returns (uint256 amount) {
         require(factor <= 100, "UnstakeManager: invalid factor");
         uint256 balance = balanceOf[validator];
         amount = balance.mul(factor).div(100);

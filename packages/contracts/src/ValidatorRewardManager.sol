@@ -3,13 +3,14 @@
 pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "./interfaces/IValidatorRewardManager.sol";
 import "./Only.sol";
 
-contract ValidatorRewardManager is Only {
+contract ValidatorRewardManager is Only, IValidatorRewardManager {
     using SafeMath for uint256;
 
     // balance of each validator
-    mapping(address => uint256) public balanceOf;
+    mapping(address => uint256) public override balanceOf;
 
     constructor(IConfig config) public Only(config) {}
 
@@ -18,7 +19,7 @@ contract ValidatorRewardManager is Only {
      * @param validator     Validator address.
      * @param amount        Claim amount.
      */
-    function claim(address validator, uint256 amount) external onlyStakeManager {
+    function claim(address validator, uint256 amount) external override onlyStakeManager {
         balanceOf[validator] = balanceOf[validator].sub(amount, "ValidatorRewardManager: insufficient balance");
         msg.sender.transfer(amount);
     }
@@ -27,7 +28,7 @@ contract ValidatorRewardManager is Only {
      * @dev Reward validator.
      * @param validator     Validator address.
      */
-    function reward(address validator) external payable onlyStakeManager {
+    function reward(address validator) external payable override onlyStakeManager {
         require(msg.value > 0, "ValidatorRewardManager: insufficient value");
         balanceOf[validator] = balanceOf[validator].add(msg.value);
     }
@@ -37,7 +38,7 @@ contract ValidatorRewardManager is Only {
      * @param validator     Validator address.
      * @param factor        Slash factor.
      */
-    function slash(address validator, uint8 factor) external onlyStakeManager returns (uint256 amount) {
+    function slash(address validator, uint8 factor) external override onlyStakeManager returns (uint256 amount) {
         require(factor <= 100, "ValidatorRewardManager: invalid factor");
         uint256 balance = balanceOf[validator];
         amount = balance.mul(factor).div(100);

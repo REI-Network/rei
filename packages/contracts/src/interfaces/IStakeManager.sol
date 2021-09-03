@@ -4,6 +4,8 @@ pragma solidity ^0.6.0;
 pragma experimental ABIEncoderV2;
 
 import "./IOnly.sol";
+import "./IUnstakeManager.sol";
+import "./IValidatorRewardManager.sol";
 
 /**
  * @dev `Unstake` records the information of each unstake request.
@@ -50,17 +52,33 @@ struct ActiveValidator {
 interface IStakeManager is IOnly {
     function validatorId() external view returns (uint256);
 
-    function validators(address validator) external view returns (Validator memory);
+    function validators(address validator)
+        external
+        view
+        returns (
+            uint256,
+            address,
+            uint256,
+            uint256
+        );
 
     function unstakeId() external view returns (uint256);
 
-    function unstakeQueue(uint256 id) external view returns (Unstake memory);
+    function unstakeQueue(uint256 id)
+        external
+        view
+        returns (
+            address,
+            address payable,
+            uint256,
+            uint256
+        );
 
-    function unstakeManager() external view returns (address);
+    function unstakeManager() external view returns (IUnstakeManager);
 
-    function validatorRewardManager() external view returns (address);
+    function validatorRewardManager() external view returns (IValidatorRewardManager);
 
-    function activeValidators(uint256 index) external view returns (ActiveValidator memory);
+    function activeValidators(uint256 index) external view returns (address, int256);
 
     function indexedValidatorsLength() external view returns (uint256);
 
@@ -107,6 +125,8 @@ interface IStakeManager is IOnly {
     function addIndexedValidator(address validator) external;
 
     function reward(address validator) external payable;
+
+    function slash(address validator, uint8 reason) external returns (uint256);
 
     function afterBlock(address[] calldata acValidators, int256[] calldata priorities) external;
 }

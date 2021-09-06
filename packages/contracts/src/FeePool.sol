@@ -11,15 +11,19 @@ import "./Only.sol";
 contract FeePool is ReentrancyGuard, Only, IFeePool {
     using SafeMath for uint256;
 
-    mapping(address => uint256) public sharesOf;
+    mapping(address => uint256) public override sharesOf;
 
-    uint256 public totalShares;
-    uint256 public accTxFee;
-    uint256 public globalTimestamp;
+    uint256 public override totalShares;
+    uint256 public override accTxFee;
+    uint256 public override globalTimestamp;
 
-    address[] public validators;
+    address[] public override validators;
 
     constructor(IConfig config) public Only(config) {}
+
+    function validatorsLength() external view override returns (uint256) {
+        return validators.length;
+    }
 
     function earn(address validator, uint256 earned) external override nonReentrant onlyRouter {
         uint256 shares = sharesOf[validator];

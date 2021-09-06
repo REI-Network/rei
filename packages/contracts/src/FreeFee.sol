@@ -10,14 +10,14 @@ import "./Only.sol";
 contract FreeFee is ReentrancyGuard, Only, IFreeFee {
     using SafeMath for uint256;
 
-    mapping(address => UsageInfo) public userUsage;
+    mapping(address => UsageInfo) public override userUsage;
 
-    uint256 public totalUsage;
-    uint256 public globalTimestamp;
+    uint256 public override totalUsage;
+    uint256 public override globalTimestamp;
 
     constructor(IConfig config) public Only(config) {}
 
-    function estimateTotalLeft(uint256 timestamp) public view returns (uint256 totalLeft) {
+    function estimateTotalLeft(uint256 timestamp) public view override returns (uint256 totalLeft) {
         uint256 _totalUsage = totalUsage;
         if (globalTimestamp.add(config.freeFeeRecoverInterval()) < timestamp) {
             _totalUsage = 0;

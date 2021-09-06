@@ -5,6 +5,8 @@ pragma solidity ^0.6.0;
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/EnumerableMap.sol";
+import "./interfaces/IUnstakePool.sol";
+import "./interfaces/IValidatorRewardPool.sol";
 import "./interfaces/IStakeManager.sol";
 import "./CommissionShare.sol";
 import "./Only.sol";
@@ -24,11 +26,6 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     uint256 public override unstakeId = 0;
     // unstake information, create at `startUnstake`, delete after `unstake`
     mapping(uint256 => Unstake) public override unstakeQueue;
-
-    // unstake manager
-    IUnstakeManager public override unstakeManager;
-    // validator reward manager
-    IValidatorRewardManager public override validatorRewardManager;
 
     // active validator list of next block,
     // this will be set in `afterBlock`
@@ -85,12 +82,15 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     event UnindexedValidator(address indexed validator);
 
     constructor(IConfig _config, address[] memory genesisValidators) public Only(_config) {
-        unstakeManager = IUnstakeManager(config.unstakeManager());
-        validatorRewardManager = IValidatorRewardManager(config.validatorRewardManager());
         for (uint256 i = 0; i < genesisValidators.length; i = i.add(1)) {
             // the validator was created, but not added to `indexedValidators`
             createValidator(genesisValidators[i]);
         }
+    }
+
+    modifier onlyRouterOrFeePool() {
+        require(msg.sender == config.router() || msg.sender == config.feePool(), "StakeManager: only router or fee pool");
+        _;
     }
 
     /**
@@ -175,7 +175,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * @param validator       Validator address
      */
     function getVotingPower(address commissionShare, address validator) private view returns (uint256) {
-        return commissionShare.balance.add(validatorRewardManager.balanceOf(validator));
+        return commissionShare.balance.add(IValidatorRewardPool(config.validatorRewardPool()).balanceOf(validator));
     }
 
     /**
@@ -240,8 +240,9 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * @param shares       Number of shares
      */
     function estimateUnstakeAmount(address validator, uint256 shares) external view override returns (uint256 amount) {
-        uint256 balance = unstakeManager.balanceOf(validator);
-        uint256 totalSupply = unstakeManager.totalSupplyOf(validator);
+        IUnstakePool up = IUnstakePool(config.unstakePool());
+        uint256 balance = up.balanceOf(validator);
+        uint256 totalSupply = up.totalSupplyOf(validator);
         if (totalSupply == 0) {
             amount = 0;
         } else {
@@ -319,21 +320,14 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
             emit UnindexedValidator(validator);
         }
 
-        // deposit unstake amount to `unstakeManager`
-        uint256 unstakeShares = unstakeManager.deposit{ value: amount }(validator);
+        // deposit unstake amount to `unstakePool`
+        uint256 unstakeShares = IUnstakePool(config.unstakePool()).deposit{ value: amount }(validator);
 
         // create a `Unstake`
         id = unstakeId;
-        uint256 timestamp = block.timestamp + config.unstakeDelay();
-        // make sure the timestamp is greater than the last
-        if (id > 0) {
-            Unstake memory u = unstakeQueue[id.sub(1)];
-            if (u.validator != address(0) && u.timestamp > timestamp) {
-                timestamp = u.timestamp;
-            }
-        }
-        unstakeQueue[id] = Unstake(validator, to, unstakeShares, timestamp);
         unstakeId = id.add(1);
+        uint256 timestamp = block.timestamp + config.unstakeDelay();
+        unstakeQueue[id] = Unstake(validator, to, unstakeShares, timestamp);
         emit StartUnstake(id, validator, amount, to, unstakeShares, timestamp);
     }
 
@@ -377,7 +371,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         require(amount > 0, "StakeManager: invalid amount");
         Validator memory v = validators[msg.sender];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
-        validatorRewardManager.claim(msg.sender, amount);
+        IValidatorRewardPool(config.validatorRewardPool()).claim(msg.sender, amount);
         return _startUnstake(msg.sender, v, to, amount);
     }
 
@@ -385,7 +379,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * @dev Set validator commission rate.
      * @param rate         New commission rate
      */
-    function setCommissionRate(uint256 rate) external override {
+    function setCommissionRate(uint256 rate) external override nonReentrant {
         require(rate <= 100, "StakeManager: commission rate is too high");
         Validator storage v = validators[msg.sender];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
@@ -405,7 +399,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         Unstake memory u = unstakeQueue[id];
         require(u.validator != address(0), "StakeManager: invalid unstake id");
         require(u.timestamp <= block.timestamp, "StakeManager: invalid unstake timestamp");
-        amount = unstakeManager.withdraw(u.validator, u.unstakeShares, u.to);
+        amount = IUnstakePool(config.unstakePool()).withdraw(u.validator, u.unstakeShares, u.to);
         emit DoUnstake(id, u.validator, u.to, amount);
         delete unstakeQueue[id];
     }
@@ -415,7 +409,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      *      This can be called by anyone.
      * @param validator           Validator address
      */
-    function removeIndexedValidator(address validator) external override {
+    function removeIndexedValidator(address validator) external override nonReentrant {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0) && indexedValidators.contains(v.id) && getVotingPower(v.commissionShare, validator) < config.minIndexVotingPower(), "StakeManager: invalid validator");
         indexedValidators.remove(v.id);
@@ -427,7 +421,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      *      This can be called by anyone.
      * @param validator          Validator address
      */
-    function addIndexedValidator(address validator) external override {
+    function addIndexedValidator(address validator) external override nonReentrant {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0) && !indexedValidators.contains(v.id), "StakeManager: invalid validator");
         uint256 votingPower = getVotingPower(v.commissionShare, validator);
@@ -440,7 +434,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * @dev Reward validator, only can be called by system caller
      * @param validator         Validator address
      */
-    function reward(address validator) external payable override onlySystemCaller {
+    function reward(address validator) external payable override nonReentrant onlyRouterOrFeePool {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint256 commissionReward = msg.value.mul(v.commissionRate).div(100);
@@ -449,7 +443,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
             CommissionShare(v.commissionShare).reward{ value: commissionReward }();
         }
         if (validatorReward > 0) {
-            validatorRewardManager.reward{ value: validatorReward }(validator);
+            IValidatorRewardPool(config.validatorRewardPool()).reward{ value: validatorReward }(validator);
         }
         if (!indexedValidators.contains(v.id)) {
             uint256 votingPower = getVotingPower(v.commissionShare, validator);
@@ -465,11 +459,11 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * @param validator         Validator address
      * @param reason            Slash reason
      */
-    function slash(address validator, uint8 reason) external override onlySystemCaller returns (uint256 amount) {
+    function slash(address validator, uint8 reason) external override nonReentrant onlyRouter returns (uint256 amount) {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint8 factor = config.getFactorByReason(reason);
-        amount = CommissionShare(v.commissionShare).slash(factor).add(unstakeManager.slash(validator, factor)).add(validatorRewardManager.slash(validator, factor));
+        amount = CommissionShare(v.commissionShare).slash(factor).add(IUnstakePool(config.unstakePool()).slash(validator, factor)).add(IValidatorRewardPool(config.validatorRewardPool()).slash(validator, factor));
         if (indexedValidators.contains(v.id) && getVotingPower(v.commissionShare, validator) < config.minIndexVotingPower()) {
             // if the validator's voting power is less than `minIndexVotingPower`, remove him from `_indexedValidators`
             indexedValidators.remove(v.id);
@@ -483,7 +477,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * @param acValidators       Active validators list
      * @param priorities         Priority list of active validators
      */
-    function afterBlock(address[] calldata acValidators, int256[] calldata priorities) external override onlySystemCaller {
+    function onAfterBlock(address[] calldata acValidators, int256[] calldata priorities) external override nonReentrant onlyRouter {
         require(acValidators.length == priorities.length, "StakeManager: invalid list length");
         uint256 originLength = activeValidators.length;
         uint256 i = 0;

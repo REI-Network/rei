@@ -2,15 +2,12 @@
 
 pragma solidity ^0.6.0;
 
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "./interfaces/IFreeFee.sol";
 import "./Only.sol";
 
-struct UsageInfo {
-    uint256 usage;
-    uint256 timestamp;
-}
-
-contract FreeFee is Only {
+contract FreeFee is ReentrancyGuard, Only, IFreeFee {
     using SafeMath for uint256;
 
     mapping(address => UsageInfo) public userUsage;
@@ -29,7 +26,7 @@ contract FreeFee is Only {
         totalLeft = dailyFreeFee > _totalUsage ? dailyFreeFee - _totalUsage : 0;
     }
 
-    function estimateFee(address user, uint256 timestamp) external view returns (uint256) {
+    function estimateFreeFee(address user, uint256 timestamp) external view override returns (uint256) {
         uint256 totalLeft = estimateTotalLeft(timestamp);
         if (totalLeft == 0) {
             return 0;
@@ -45,7 +42,7 @@ contract FreeFee is Only {
         return userLeft > totalLeft ? totalLeft : userLeft;
     }
 
-    function consume(address user, uint256 usage) external onlySystemCaller {
+    function consume(address user, uint256 usage) external override nonReentrant onlyRouter {
         UsageInfo storage ui = userUsage[user];
         if (ui.timestamp < globalTimestamp) {
             ui.usage = usage;
@@ -56,7 +53,7 @@ contract FreeFee is Only {
         totalUsage = totalUsage.add(usage);
     }
 
-    function afterBlock() external onlySystemCaller {
+    function onAfterBlock() external override nonReentrant onlyRouter {
         if (globalTimestamp.add(config.freeFeeRecoverInterval()) < block.timestamp) {
             totalUsage = 0;
             globalTimestamp = block.timestamp;

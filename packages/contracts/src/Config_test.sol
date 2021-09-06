@@ -11,6 +11,9 @@ contract Config_test is IConfig {
     address private u;
     address private v;
     address private f;
+    address private ff;
+    address private fp;
+    address private r;
 
     function setStakeManager(address _s) external {
         s = _s;
@@ -20,16 +23,28 @@ contract Config_test is IConfig {
         c = _c;
     }
 
-    function setUnstakeManager(address _u) external {
+    function setUnstakePool(address _u) external {
         u = _u;
     }
 
-    function setValidatorRewardManager(address _v) external {
+    function setValidatorRewardPool(address _v) external {
         v = _v;
     }
 
-    function setFeeManager(address _f) external {
+    function setFee(address _f) external {
         f = _f;
+    }
+
+    function setFreeFee(address _ff) external {
+        ff = _ff;
+    }
+
+    function setFeePool(address _fp) external {
+        fp = _fp;
+    }
+
+    function setRouter(address _r) external {
+        r = _r;
     }
 
     function stakeManager() external view override returns (address) {
@@ -40,16 +55,28 @@ contract Config_test is IConfig {
         return c;
     }
 
-    function unstakeManager() external view override returns (address) {
+    function unstakePool() external view override returns (address) {
         return u;
     }
 
-    function validatorRewardManager() external view override returns (address) {
+    function validatorRewardPool() external view override returns (address) {
         return v;
     }
 
     function fee() external view override returns (address) {
         return f;
+    }
+
+    function freeFee() external view override returns (address) {
+        return ff;
+    }
+
+    function feePool() external view override returns (address) {
+        return fp;
+    }
+
+    function router() external view override returns (address) {
+        return r;
     }
 
     function unstakeDelay() external view override returns (uint256) {
@@ -80,6 +107,10 @@ contract Config_test is IConfig {
         return 10 seconds;
     }
 
+    function feePoolLiquidateInterval() external view override returns (uint256) {
+        return 10 seconds;
+    }
+
     function minIndexVotingPower() external view override returns (uint256) {
         return 10000;
     }
@@ -98,6 +129,11 @@ contract Config_test is IConfig {
         return 5 seconds;
     }
 
+    function minerRewardFactor() external view override returns (uint8) {
+        return 90;
+    }
+
+    // a simple function to get blockchain timestamp for test
     function blockTimestamp() external view returns (uint256) {
         return block.timestamp;
     }

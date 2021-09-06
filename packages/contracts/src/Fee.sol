@@ -126,7 +126,7 @@ contract Fee is ReentrancyGuard, Only, IFee {
      * @param user      User address
      * @param usage     Number of usage fee
      */
-    function consume(address user, uint256 usage) external override onlySystemCaller {
+    function consume(address user, uint256 usage) external override nonReentrant onlyRouter {
         require(usage > 0, "FeeManager: invalid usage");
         UsageInfo storage ui = userUsage[user];
         ui.usage = estimateUsage(ui, block.timestamp).add(usage);

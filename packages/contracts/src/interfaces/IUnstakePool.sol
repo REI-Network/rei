@@ -5,9 +5,9 @@ pragma solidity ^0.6.0;
 import "./IOnly.sol";
 
 /**
- * @dev see {UnstakeManager}
+ * @dev see {UnstakePool}
  */
-interface IUnstakeManager is IOnly {
+interface IUnstakePool is IOnly {
     function balanceOf(address addr) external view returns (uint256);
 
     function totalSupplyOf(address addr) external view returns (uint256);

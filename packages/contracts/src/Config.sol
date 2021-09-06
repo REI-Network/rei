@@ -16,18 +16,30 @@ contract Config is IConfig {
         return 0x0000000000000000000000000000000000001002;
     }
 
-    // get unstake manager address
-    function unstakeManager() external view override returns (address) {
+    // get unstake pool address
+    function unstakePool() external view override returns (address) {
         return 0x0000000000000000000000000000000000001003;
     }
 
-    // get validator reward manager address
-    function validatorRewardManager() external view override returns (address) {
+    // get validator reward pool address
+    function validatorRewardPool() external view override returns (address) {
         return 0x0000000000000000000000000000000000001004;
     }
 
     function fee() external view override returns (address) {
         return 0x0000000000000000000000000000000000001005;
+    }
+
+    function freeFee() external view override returns (address) {
+        return 0x0000000000000000000000000000000000001006;
+    }
+
+    function feePool() external view override returns (address) {
+        return 0x0000000000000000000000000000000000001007;
+    }
+
+    function router() external view override returns (address) {
+        return 0x0000000000000000000000000000000000001008;
     }
 
     // get unstake delay
@@ -59,6 +71,10 @@ contract Config is IConfig {
         return 1 days;
     }
 
+    function feePoolLiquidateInterval() external view override returns (uint256) {
+        return 1 days;
+    }
+
     /**
      * @dev Get min index voting power.
      *      Only when the validator's voting power is greater than this value, will the index be created for him.
@@ -85,5 +101,9 @@ contract Config is IConfig {
     // set commission rate interval
     function setCommissionRateInterval() external view override returns (uint256) {
         return 1 minutes;
+    }
+
+    function minerRewardFactor() external view override returns (uint8) {
+        return 90;
     }
 }

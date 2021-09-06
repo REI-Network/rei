@@ -4,8 +4,6 @@ pragma solidity ^0.6.0;
 pragma experimental ABIEncoderV2;
 
 import "./IOnly.sol";
-import "./IUnstakeManager.sol";
-import "./IValidatorRewardManager.sol";
 
 /**
  * @dev `Unstake` records the information of each unstake request.
@@ -74,10 +72,6 @@ interface IStakeManager is IOnly {
             uint256
         );
 
-    function unstakeManager() external view returns (IUnstakeManager);
-
-    function validatorRewardManager() external view returns (IValidatorRewardManager);
-
     function activeValidators(uint256 index) external view returns (address, int256);
 
     function indexedValidatorsLength() external view returns (uint256);
@@ -128,5 +122,5 @@ interface IStakeManager is IOnly {
 
     function slash(address validator, uint8 reason) external returns (uint256);
 
-    function afterBlock(address[] calldata acValidators, int256[] calldata priorities) external;
+    function onAfterBlock(address[] calldata acValidators, int256[] calldata priorities) external;
 }

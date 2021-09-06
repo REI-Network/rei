@@ -2,11 +2,12 @@
 
 pragma solidity ^0.6.0;
 
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "./interfaces/IUnstakeManager.sol";
+import "./interfaces/IUnstakePool.sol";
 import "./Only.sol";
 
-contract UnstakeManager is Only, IUnstakeManager {
+contract UnstakePool is ReentrancyGuard, Only, IUnstakePool {
     using SafeMath for uint256;
 
     // balance of each validators
@@ -17,21 +18,21 @@ contract UnstakeManager is Only, IUnstakeManager {
     constructor(IConfig config) public Only(config) {}
 
     /**
-     * @dev Deposit GXC to `UnstakeManager`, only can be called by stake manager,
+     * @dev Deposit GXC to `UnstakePool`, only can be called by stake manager,
      *      this will be called when user starts unstake.
      * @param validator     Validator address.
      */
-    function deposit(address validator) external payable override onlyStakeManager returns (uint256 shares) {
+    function deposit(address validator) external payable override nonReentrant onlyStakeManager returns (uint256 shares) {
         uint256 balance = balanceOf[validator];
         uint256 totalSupply = totalSupplyOf[validator];
         if (totalSupply == 0) {
             // if there is a balance before the stake, allocate all the balance to the first stake user
             shares = balance.add(msg.value);
         } else {
-            require(balance > 0, "UnstakeManager: insufficient validator balance");
+            require(balance > 0, "UnstakePool: insufficient validator balance");
             shares = msg.value.mul(totalSupply).div(balance);
         }
-        require(shares > 0, "UnstakeManager: insufficient shares");
+        require(shares > 0, "UnstakePool: insufficient shares");
         balanceOf[validator] = balance.add(msg.value);
         totalSupplyOf[validator] = totalSupply.add(shares);
     }
@@ -47,7 +48,7 @@ contract UnstakeManager is Only, IUnstakeManager {
         address validator,
         uint256 shares,
         address payable to
-    ) external override onlyStakeManager returns (uint256 amount) {
+    ) external override nonReentrant onlyStakeManager returns (uint256 amount) {
         uint256 balance = balanceOf[validator];
         uint256 totalSupply = totalSupplyOf[validator];
         if (totalSupply == 0) {
@@ -55,7 +56,7 @@ contract UnstakeManager is Only, IUnstakeManager {
         } else {
             amount = shares.mul(balance).div(totalSupply);
         }
-        totalSupplyOf[validator] = totalSupply.sub(shares, "UnstakeManager: insufficient total supply");
+        totalSupplyOf[validator] = totalSupply.sub(shares, "UnstakePool: insufficient total supply");
         if (amount > 0) {
             balanceOf[validator] = balance.sub(amount);
             to.transfer(amount);
@@ -67,8 +68,8 @@ contract UnstakeManager is Only, IUnstakeManager {
      * @param validator     Validator address.
      * @param factor        Slash factor.
      */
-    function slash(address validator, uint8 factor) external override onlyStakeManager returns (uint256 amount) {
-        require(factor <= 100, "UnstakeManager: invalid factor");
+    function slash(address validator, uint8 factor) external override nonReentrant onlyStakeManager returns (uint256 amount) {
+        require(factor <= 100, "UnstakePool: invalid factor");
         uint256 balance = balanceOf[validator];
         amount = balance.mul(factor).div(100);
         if (amount > 0) {

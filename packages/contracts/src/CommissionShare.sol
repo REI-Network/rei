@@ -2,18 +2,19 @@
 
 pragma solidity ^0.6.0;
 
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./interfaces/ICommissionShare.sol";
 import "./libraries/Math.sol";
 import "./Only.sol";
 
-contract CommissionShare is ERC20, Only, ICommissionShare {
+contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
     using Math for uint256;
 
     // validator address
     address public validator;
 
-    constructor(IConfig config, address _validator) public ERC20("Share", "S") Only(config) {
+    constructor(IConfig config, address _validator) public ERC20("CommissionShare", "CS") Only(config) {
         validator = _validator;
     }
 
@@ -50,7 +51,7 @@ contract CommissionShare is ERC20, Only, ICommissionShare {
      *      Can only be called by stake manager.
      * @param to        Receiver address
      */
-    function mint(address to) external payable override onlyStakeManager returns (uint256 shares) {
+    function mint(address to) external payable override nonReentrant onlyStakeManager returns (uint256 shares) {
         uint256 balance = address(this).balance;
         uint256 reserve = balance.sub(msg.value);
         uint256 _totalSupply = totalSupply();
@@ -70,7 +71,7 @@ contract CommissionShare is ERC20, Only, ICommissionShare {
      *      Can only be called by stake manager.
      * @param shares    Number of shares to be burned
      */
-    function burn(uint256 shares) external override onlyStakeManager returns (uint256 amount) {
+    function burn(uint256 shares) external override nonReentrant onlyStakeManager returns (uint256 amount) {
         require(shares > 0, "CommissionShare: insufficient shares");
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) {
@@ -87,13 +88,13 @@ contract CommissionShare is ERC20, Only, ICommissionShare {
     /**
      * @dev Reward validator.
      */
-    function reward() external payable override onlyStakeManager {}
+    function reward() external payable override nonReentrant onlyStakeManager {}
 
     /**
      * @dev Slash validator and transfer the slashed amount to `address(0)`.
      * @param factor        Slash factor.
      */
-    function slash(uint8 factor) external override onlyStakeManager returns (uint256 amount) {
+    function slash(uint8 factor) external override nonReentrant onlyStakeManager returns (uint256 amount) {
         require(factor <= 100, "CommissionShare: invalid factor");
         amount = address(this).balance.mul(factor).div(100);
         if (amount > 0) {

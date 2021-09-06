@@ -10,11 +10,17 @@ interface IConfig {
 
     function systemCaller() external view returns (address);
 
-    function unstakeManager() external view returns (address);
+    function unstakePool() external view returns (address);
 
-    function validatorRewardManager() external view returns (address);
+    function validatorRewardPool() external view returns (address);
 
     function fee() external view returns (address);
+
+    function freeFee() external view returns (address);
+
+    function feePool() external view returns (address);
+
+    function router() external view returns (address);
 
     function unstakeDelay() external view returns (uint256);
 
@@ -30,9 +36,13 @@ interface IConfig {
 
     function freeFeeRecoverInterval() external view returns (uint256);
 
+    function feePoolLiquidateInterval() external view returns (uint256);
+
     function minIndexVotingPower() external view returns (uint256);
 
     function getFactorByReason(uint8 reason) external view returns (uint8);
 
     function setCommissionRateInterval() external view returns (uint256);
+
+    function minerRewardFactor() external view returns (uint8);
 }

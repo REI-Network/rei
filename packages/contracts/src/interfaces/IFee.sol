@@ -6,27 +6,27 @@ pragma experimental ABIEncoderV2;
 import "./IOnly.sol";
 
 /**
- * @dev `DepositInfo` records the information about deposit.
- */
-struct DepositInfo {
-    uint256 amount;
-    uint256 timestamp;
-}
-
-/**
- * @dev `DepositInfo` records the information about usage.
- *      If the timestamp interval is less than `feeRecoverInterval`, the usage will accumulate,
- *      Otherwise it will be cleared
- */
-struct UsageInfo {
-    uint256 usage;
-    uint256 timestamp;
-}
-
-/**
  * @dev see {Fee}
  */
 interface IFee is IOnly {
+    /**
+     * @dev `DepositInfo` records the information about deposit.
+     */
+    struct DepositInfo {
+        uint256 amount;
+        uint256 timestamp;
+    }
+
+    /**
+     * @dev `DepositInfo` records the information about usage.
+     *      If the timestamp interval is less than `feeRecoverInterval`, the usage will accumulate,
+     *      Otherwise it will be cleared
+     */
+    struct UsageInfo {
+        uint256 usage;
+        uint256 timestamp;
+    }
+
     function userTotalAmount(address user) external view returns (uint256);
 
     function userUsage(address user) external view returns (uint256, uint256);

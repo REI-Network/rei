@@ -2,11 +2,12 @@
 
 pragma solidity ^0.6.0;
 
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "./interfaces/IValidatorRewardManager.sol";
+import "./interfaces/IValidatorRewardPool.sol";
 import "./Only.sol";
 
-contract ValidatorRewardManager is Only, IValidatorRewardManager {
+contract ValidatorRewardPool is ReentrancyGuard, Only, IValidatorRewardPool {
     using SafeMath for uint256;
 
     // balance of each validator
@@ -19,8 +20,8 @@ contract ValidatorRewardManager is Only, IValidatorRewardManager {
      * @param validator     Validator address.
      * @param amount        Claim amount.
      */
-    function claim(address validator, uint256 amount) external override onlyStakeManager {
-        balanceOf[validator] = balanceOf[validator].sub(amount, "ValidatorRewardManager: insufficient balance");
+    function claim(address validator, uint256 amount) external override nonReentrant onlyStakeManager {
+        balanceOf[validator] = balanceOf[validator].sub(amount, "ValidatorRewardPool: insufficient balance");
         msg.sender.transfer(amount);
     }
 
@@ -28,8 +29,8 @@ contract ValidatorRewardManager is Only, IValidatorRewardManager {
      * @dev Reward validator.
      * @param validator     Validator address.
      */
-    function reward(address validator) external payable override onlyStakeManager {
-        require(msg.value > 0, "ValidatorRewardManager: insufficient value");
+    function reward(address validator) external payable override nonReentrant onlyStakeManager {
+        require(msg.value > 0, "ValidatorRewardPool: insufficient value");
         balanceOf[validator] = balanceOf[validator].add(msg.value);
     }
 
@@ -38,8 +39,8 @@ contract ValidatorRewardManager is Only, IValidatorRewardManager {
      * @param validator     Validator address.
      * @param factor        Slash factor.
      */
-    function slash(address validator, uint8 factor) external override onlyStakeManager returns (uint256 amount) {
-        require(factor <= 100, "ValidatorRewardManager: invalid factor");
+    function slash(address validator, uint8 factor) external override nonReentrant onlyStakeManager returns (uint256 amount) {
+        require(factor <= 100, "ValidatorRewardPool: invalid factor");
         uint256 balance = balanceOf[validator];
         amount = balance.mul(factor).div(100);
         if (amount > 0) {

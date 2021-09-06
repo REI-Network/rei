@@ -24,5 +24,5 @@ interface IFeePool is IOnly {
 
     function accumulate(bool isTxFee) external payable;
 
-    function onAfterBlock() external;
+    function onAssignBlockReward() external;
 }

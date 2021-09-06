@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 pragma solidity ^0.6.0;
+pragma experimental ABIEncoderV2;
 
 import "./IOnly.sol";
 
@@ -20,6 +21,8 @@ interface IFreeFee is IOnly {
     function globalTimestamp() external view returns (uint256);
 
     function estimateTotalLeft(uint256 timestamp) external view returns (uint256);
+
+    function estimateUsage(UsageInfo calldata ui) external view returns (uint256);
 
     function estimateFreeFee(address user, uint256 timestamp) external view returns (uint256);
 

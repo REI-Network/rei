@@ -120,7 +120,6 @@ contract Fee is ReentrancyGuard, Only, IFee {
         }
     }
 
-    // TODO: add a event for receipt
     /**
      * @dev Consume user fee, can only be called by the system caller.
      * @param user      User address

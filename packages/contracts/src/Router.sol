@@ -13,6 +13,15 @@ import "./Only.sol";
 contract Router is ReentrancyGuard, Only {
     using SafeMath for uint256;
 
+    /**
+     * @dev `UsageInfo` event contains the usage information of tx,
+     *      It will be automatically appended to the end of the transaction log.
+     * @param feeUsag           `dailyFee` usage
+     * @param freeFeeUsage      `dailyFreeFee` usage
+     * @param balanceUsage      Transaction sender's balance usage
+     */
+    event UsageInfo(uint256 feeUsag, uint256 freeFeeUsage, uint256 balanceUsage);
+
     constructor(IConfig config) public Only(config) {}
 
     modifier onlySystemCaller() {
@@ -20,6 +29,17 @@ contract Router is ReentrancyGuard, Only {
         _;
     }
 
+    /**
+     * @dev Assign transaction reward to miner, and emit the `UsageInfo` event,
+     *      if the consumed fee is `dailyFee` or `dailyFreeFee`,
+     *      it will only increase miner's share of the fee pool,
+     *      otherwise, if the consumed fee is user's balance,
+     *      it will add the fee to the fee pool and increase miner's share of the fee pool.
+     * @param validator         Block miner
+     * @param user              Transaction sender
+     * @param feeUsage          `dailyFee` usage
+     * @param freeFeeUsage      `dailyFreeFee` usage
+     */
     function assignTransactionReward(
         address validator,
         address user,
@@ -36,8 +56,16 @@ contract Router is ReentrancyGuard, Only {
             IFeePool(config.feePool()).accumulate{ value: msg.value }(true);
         }
         IFeePool(config.feePool()).earn(validator, feeUsage.add(freeFeeUsage).add(msg.value));
+        emit UsageInfo(feeUsage, freeFeeUsage, msg.value);
     }
 
+    /**
+     * @dev Assign block reward, and call `onAssignBlockReward` callback,
+     *      it will split the block reward into two parts according to the `minerRewardFactor`,
+     *      one part will be directly distributed to miners as a reward,
+     *      and the other part will be added to the transaction fee pool.
+     * @param validator         Block miner
+     */
     function assignBlockReward(address validator) external payable nonReentrant onlySystemCaller {
         require(msg.value > 0, "Router: invalid msg.value");
         uint8 factor = config.minerRewardFactor();
@@ -50,11 +78,17 @@ contract Router is ReentrancyGuard, Only {
         if (feePoolReward > 0) {
             IFeePool(config.feePool()).accumulate{ value: feePoolReward }(false);
         }
+
+        IFeePool(config.feePool()).onAssignBlockReward();
     }
 
+    /**
+     * @dev After block callback, it only can be called by system caller
+     * @param acValidators      Parameter of StakeManager.onAfterBlock
+     * @param priorities        Parameter of StakeManager.onAfterBlock
+     */
     function onAfterBlock(address[] calldata acValidators, int256[] calldata priorities) external nonReentrant onlySystemCaller {
         IStakeManager(config.stakeManager()).onAfterBlock(acValidators, priorities);
         IFreeFee(config.freeFee()).onAfterBlock();
-        IFeePool(config.feePool()).onAfterBlock();
     }
 }

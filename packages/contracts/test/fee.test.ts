@@ -10,11 +10,13 @@ declare var web3: Web3;
 const Config = artifacts.require('Config_test');
 const FeeToken = artifacts.require('FeeToken');
 const Fee = artifacts.require('Fee');
+const FreeFee = artifacts.require('FreeFee');
 
 describe('Fee', () => {
   let config: any;
   let feeToken: any;
   let fee: any;
+  let freeFee: any;
   let deployer: any;
   let user1: any;
   let withdrawDelay: any;
@@ -35,9 +37,15 @@ describe('Fee', () => {
     config = new web3.eth.Contract(Config.abi, (await Config.new()).address, { from: deployer });
     await config.methods.setRouter(deployer).send();
     feeToken = new web3.eth.Contract(FeeToken.abi, (await FeeToken.new(config.options.address)).address, { from: deployer });
+
     fee = new web3.eth.Contract(Fee.abi, (await Fee.new(config.options.address)).address, { from: deployer });
     await config.methods.setFee(fee.options.address).send();
-    expect(await config.methods.fee().call(), 'fee manager address should be equal').be.equal(fee.options.address);
+    expect(await config.methods.fee().call(), 'fee address should be equal').be.equal(fee.options.address);
+
+    freeFee = new web3.eth.Contract(FreeFee.abi, (await FreeFee.new(config.options.address)).address, { from: deployer });
+    await config.methods.setFreeFee(freeFee.options.address).send();
+    expect(await config.methods.freeFee().call(), 'free fee address should be equal').be.equal(freeFee.options.address);
+
     withdrawDelay = Number(await config.methods.withdrawDelay().call());
     dailyFee = toBN(await config.methods.dailyFee().call());
     feeRecoverInterval = Number(await config.methods.feeRecoverInterval().call());

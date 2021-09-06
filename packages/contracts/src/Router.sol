@@ -16,11 +16,11 @@ contract Router is ReentrancyGuard, Only {
     /**
      * @dev `UsageInfo` event contains the usage information of tx,
      *      It will be automatically appended to the end of the transaction log.
-     * @param feeUsag           `dailyFee` usage
+     * @param feeUsage          `dailyFee` usage
      * @param freeFeeUsage      `dailyFreeFee` usage
      * @param balanceUsage      Transaction sender's balance usage
      */
-    event UsageInfo(uint256 feeUsag, uint256 freeFeeUsage, uint256 balanceUsage);
+    event UsageInfo(uint256 feeUsage, uint256 freeFeeUsage, uint256 balanceUsage);
 
     constructor(IConfig config) public Only(config) {}
 

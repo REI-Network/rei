@@ -33,10 +33,10 @@ describe('Fee', () => {
 
   it('should deploy succeed', async () => {
     config = new web3.eth.Contract(Config.abi, (await Config.new()).address, { from: deployer });
-    await config.methods.setSystemCaller(deployer).send();
+    await config.methods.setRouter(deployer).send();
     feeToken = new web3.eth.Contract(FeeToken.abi, (await FeeToken.new(config.options.address)).address, { from: deployer });
     fee = new web3.eth.Contract(Fee.abi, (await Fee.new(config.options.address)).address, { from: deployer });
-    await config.methods.setFeeManager(fee.options.address).send();
+    await config.methods.setFee(fee.options.address).send();
     expect(await config.methods.fee().call(), 'fee manager address should be equal').be.equal(fee.options.address);
     withdrawDelay = Number(await config.methods.withdrawDelay().call());
     dailyFee = toBN(await config.methods.dailyFee().call());

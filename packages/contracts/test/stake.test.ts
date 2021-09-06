@@ -10,13 +10,13 @@ declare var web3: Web3;
 const Config = artifacts.require('Config_test');
 const CommissionShare = artifacts.require('CommissionShare');
 const StakeManager = artifacts.require('StakeManager');
-const ValidatorRewardManager = artifacts.require('ValidatorRewardManager');
-const UnstakeManager = artifacts.require('UnstakeManager');
+const ValidatorRewardPool = artifacts.require('ValidatorRewardPool');
+const UnstakePool = artifacts.require('UnstakePool');
 
 describe('StakeManger', () => {
   let config: any;
   let stakeManager: any;
-  let validatorRewardManager: any;
+  let validatorRewardPool: any;
   let deployer: string;
   let validator1: string;
   let receiver1: string;
@@ -48,11 +48,11 @@ describe('StakeManger', () => {
 
   it('should deploy succeed', async () => {
     config = new web3.eth.Contract(Config.abi, (await Config.new()).address, { from: deployer });
-    await config.methods.setSystemCaller(deployer).send();
-    validatorRewardManager = new web3.eth.Contract(ValidatorRewardManager.abi, (await ValidatorRewardManager.new(config.options.address)).address, { from: deployer });
-    await config.methods.setValidatorRewardManager(validatorRewardManager.options.address).send();
-    let unstakeManager = new web3.eth.Contract(UnstakeManager.abi, (await UnstakeManager.new(config.options.address)).address, { from: deployer });
-    await config.methods.setUnstakeManager(unstakeManager.options.address).send();
+    await config.methods.setRouter(deployer).send();
+    validatorRewardPool = new web3.eth.Contract(ValidatorRewardPool.abi, (await ValidatorRewardPool.new(config.options.address)).address, { from: deployer });
+    await config.methods.setValidatorRewardPool(validatorRewardPool.options.address).send();
+    let unstakePool = new web3.eth.Contract(UnstakePool.abi, (await UnstakePool.new(config.options.address)).address, { from: deployer });
+    await config.methods.setUnstakePool(unstakePool.options.address).send();
     stakeManager = new web3.eth.Contract(StakeManager.abi, (await StakeManager.new(config.options.address, [genesis1, genesis2])).address, { from: deployer });
     await config.methods.setStakeManager(stakeManager.options.address).send();
     unstakeDelay = toBN(await config.methods.unstakeDelay().call()).toNumber();
@@ -258,7 +258,7 @@ describe('StakeManger', () => {
     const commissionAmount = rewardAmount.muln(commissionRate).divn(100);
     const commissionTotalSup = toBN(await commissionShare.methods.totalSupply().call());
     const validatorKeeperAmount = rewardAmount.sub(commissionAmount);
-    const claimAmount = toBN(await validatorRewardManager.methods.balanceOf(validator3).call());
+    const claimAmount = toBN(await validatorRewardPool.methods.balanceOf(validator3).call());
     expect(claimAmount.eq(validatorKeeperAmount), 'validatorKeeper balance should be equal').be.true;
 
     const commissionBal = toBN(await web3.eth.getBalance(commissionShare.options.address));
@@ -286,7 +286,7 @@ describe('StakeManger', () => {
   it('should correctly set active validators', async () => {
     let vs = [validator1, validator2, validator3];
     let ps = ['-1', '1', '-100'];
-    await stakeManager.methods.afterBlock(vs, ps).send();
+    await stakeManager.methods.onAfterBlock(vs, ps).send();
     expect(await stakeManager.methods.activeValidatorsLength().call(), 'length should be equal').be.equal('3');
     for (let i = 0; i < 3; i++) {
       const v = await stakeManager.methods.activeValidators(i).call();
@@ -296,7 +296,7 @@ describe('StakeManger', () => {
 
     vs = [validator3, validator2];
     ps = ['-1', '1'];
-    await stakeManager.methods.afterBlock(vs, ps).send();
+    await stakeManager.methods.onAfterBlock(vs, ps).send();
     expect(await stakeManager.methods.activeValidatorsLength().call(), 'length should be equal').be.equal('2');
     for (let i = 0; i < 2; i++) {
       const v = await stakeManager.methods.activeValidators(i).call();

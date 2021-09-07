@@ -98,18 +98,28 @@ describe('Fee', () => {
     expect(feeAmount.toString(), 'user fee should be equal').be.equal(dailyFee.divn(2).toString());
 
     await fee.methods.consume(deployer, feeAmount.divn(4).toString()).send();
-    const feeAmount2 = toBN(await fee.methods.estimateFee(deployer, await timestamp()).call());
+    const timeSign1 = (await fee.methods.userUsage(deployer).call()).timestamp;
+    const feeAmount2 = toBN(await fee.methods.estimateFee(deployer, timeSign1).call());
     expect(feeAmount2.toString(), 'user fee should be equal').be.equal(dailyFee.divn(2).sub(feeAmount.divn(4)).toString());
 
     // sleep a while
     await upTimestamp(deployer, feeRecoverInterval / 2);
     // after sleep feeRecoverInterval / 2, userUsage should be userAccUsage / 2
     const userUsage = feeAmount.divn(4).divn(2);
-    const feeAmount3 = toBN(await fee.methods.estimateFee(deployer, await timestamp()).call());
+    const feeAmount3 = toBN(await fee.methods.estimateFee(deployer, Number(timeSign1) + feeRecoverInterval / 2).call());
     expect(feeAmount3.toString(), 'user fee should be equal').be.equal(dailyFee.divn(2).sub(userUsage).toString());
 
     await fee.methods.consume(deployer, feeAmount.divn(4).toString()).send();
-    const feeAmount4 = toBN(await fee.methods.estimateFee(deployer, await timestamp()).call());
-    expect(feeAmount4.gte(feeAmount3.sub(feeAmount.divn(4))), 'user fee should be greater than estimated value').be.true;
+    const timeSign2 = (await fee.methods.userUsage(deployer).call()).timestamp;
+    const userUsage2 = feeAmount.divn(4).add(
+      feeAmount.divn(4).sub(
+        feeAmount
+          .divn(4)
+          .muln(Number(timeSign2) - Number(timeSign1))
+          .divn(feeRecoverInterval)
+      )
+    );
+    const feeAmount4 = toBN(await fee.methods.estimateFee(deployer, Number(timeSign2)).call());
+    expect(feeAmount4.eq(dailyFee.divn(2).sub(userUsage2)), 'user fee should be equal').be.true;
   });
 });

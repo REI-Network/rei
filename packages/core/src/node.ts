@@ -451,7 +451,7 @@ export class Node {
           cliqueSigner: options.generate ? this.accMngr.getPrivateKey(block.header.cliqueSigner().buf) : undefined,
           // if the current hardfork is less than `hardfork1`, then use the old logic `preHF1GenReceiptTrie`
           genReceiptTrie: isEnableReceiptRootFix(block._common) ? undefined : preHF1GenReceiptTrie,
-          rewardAddress: async (state: IStateManager, reward: BN) => {
+          assignBlockReward: async (state: IStateManager, reward: BN) => {
             if (parentEnableStaking) {
               // if staking is active, assign reward to system caller address
               await rewardAccount(state, systemCaller!, reward);

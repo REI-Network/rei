@@ -3,6 +3,10 @@ import EthereumCommon from '@gxchain2-ethereumjs/common';
 import { BNLike } from 'ethereumjs-util';
 import { getChain } from './chains';
 
+export * from './genesisStates';
+export * from './chains';
+export { ConsensusAlgorithm, ConsensusType } from '@gxchain2-ethereumjs/common';
+
 /**
  * Common class to access chain and hardfork parameters, based on `@ethereumjs/common`
  */
@@ -34,7 +38,19 @@ export class Common extends EthereumCommon {
     common.setHardforkByBlockNumber(num);
     return common;
   }
-}
 
-export * from './genesisStates';
-export * from './chains';
+  // consensusType will never change, we just read directly from `_chainParams`
+  consensusType() {
+    return (this as any)._chainParams['consensus']['type'];
+  }
+
+  // consensusAlgorithm will never change, we just read directly from `_chainParams`
+  consensusAlgorithm() {
+    return (this as any)._chainParams['consensus']['algorithm'];
+  }
+
+  // consensusConfig will never change, we just read directly from `_chainParams`
+  consensusConfig() {
+    return (this as any)._chainParams['consensus'][this.consensusAlgorithm()];
+  }
+}

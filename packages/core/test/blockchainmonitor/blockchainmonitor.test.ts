@@ -15,7 +15,7 @@ describe('BlockchainMonitor', async () => {
   let fork2: Block[];
 
   async function processBlock(block: Block) {
-    const newBlock = await node.processBlock(block, { generate: true, broadcast: false, skipNonce: false, skipBlockValidation: true, skipBalance: true } as any);
+    const newBlock = await node.processBlock(block, { generate: true, broadcast: false, skipBlockValidation: true, runTxOpts: { skipNonce: false, skipBalance: true } } as any);
     return newBlock;
   }
 

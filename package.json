@@ -39,6 +39,7 @@
     "build:utils": "npm run build -- --scope @gxchain2/utils",
     "build:wallet": "npm run build -- --scope @gxchain2/wallet",
     "test": "lerna run test --stream",
+    "test:structure": "npm run test -- --scope @gxchain2/structure",
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/package-lock.json && npm run clean:build",
     "clean:build": "rm -rf packages/*/dist && cd packages/contracts && npm run clean",
     "test:prompts": "node -r ts-node/register ./packages/cli/test/prompts.ts",

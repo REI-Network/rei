@@ -1,4 +1,5 @@
 import { BN, Address } from 'ethereumjs-util';
+import { ConsensusAlgorithm } from '@gxchain2/common';
 import { hexStringToBN, nowTimestamp } from '@gxchain2/utils';
 import { BlockHeader, CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL, preHF1CalcCliqueDifficulty, CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@gxchain2/structure';
 import { Blockchain } from '@gxchain2/blockchain';
@@ -12,7 +13,7 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
   }
   const hardfork: string = (this as any)._getHardfork();
   // Consensus type dependent checks
-  if (this._common.consensusAlgorithm() !== 'clique') {
+  if (this._common.consensusAlgorithm() !== ConsensusAlgorithm.Clique) {
     // PoW/Ethash
     if (this.extraData.length > this._common.paramByHardfork('vm', 'maxExtraDataSize', hardfork)) {
       const msg = 'invalid amount of extra data';
@@ -111,7 +112,8 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
     if (!this.baseFeePerGas) {
       throw new Error('EIP1559 block has no base fee field');
     }
-    const isInitialEIP1559Block = this.number.eq(this._common.hardforkBlockBN('london'));
+    const block = this._common.hardforkBlockBN('london');
+    const isInitialEIP1559Block = block && this.number.eq(block);
     if (isInitialEIP1559Block) {
       const initialBaseFee = new BN(this._common.param('gasConfig', 'initialBaseFee'));
       if (!this.baseFeePerGas!.eq(initialBaseFee)) {

@@ -354,7 +354,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         if (amount > 0) {
             return _startUnstake(validator, v, to, amount);
         } else {
-            return uint256(0) - 1;
+            return uint256(-1);
         }
     }
 
@@ -452,6 +452,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
                 emit IndexedValidator(validator, votingPower.sub(msg.value));
             }
         }
+        emit Stake(validator, msg.value, address(0), 0);
     }
 
     /**
@@ -469,6 +470,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
             indexedValidators.remove(v.id);
             emit UnindexedValidator(validator);
         }
+        // TODO: emit a event
     }
 
     // TODO: if the active validators list is exactly the same as the last list, don't modify the storage

@@ -44,11 +44,11 @@ contract Config is IConfig {
 
     // get unstake delay
     function unstakeDelay() external view override returns (uint256) {
-        return 1 minutes;
+        return 30 seconds;
     }
 
     function withdrawDelay() external view override returns (uint256) {
-        return 3 days;
+        return 30 seconds;
     }
 
     function dailyFee() external view override returns (uint256) {
@@ -64,15 +64,15 @@ contract Config is IConfig {
     }
 
     function feeRecoverInterval() external view override returns (uint256) {
-        return 1 days;
+        return 10 seconds;
     }
 
     function freeFeeRecoverInterval() external view override returns (uint256) {
-        return 1 days;
+        return 10 seconds;
     }
 
     function feePoolLiquidateInterval() external view override returns (uint256) {
-        return 1 days;
+        return 10 seconds;
     }
 
     /**

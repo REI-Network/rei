@@ -1,11 +1,12 @@
 import { BN, Address } from 'ethereumjs-util';
-import { ConsensusAlgorithm } from '@gxchain2/common';
+import { ConsensusAlgorithm, ConsensusType } from '@gxchain2/common';
 import { hexStringToBN, nowTimestamp } from '@gxchain2/utils';
 import { BlockHeader, CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL, preHF1CalcCliqueDifficulty, CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@gxchain2/structure';
 import { Blockchain } from '@gxchain2/blockchain';
 
 const allowedFutureBlockTimeSeconds = 15;
 const maxGasLimit = new BN('8000000000000000', 16);
+let testnetHF1Number: BN | null = null;
 
 export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) {
   if (this.isGenesis()) {
@@ -77,7 +78,7 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
     throw new Error('invalid timestamp');
   }
 
-  if (this._common.consensusAlgorithm() === 'clique') {
+  if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique) {
     const period = this._common.consensusConfig().period;
     // Timestamp diff between blocks is lower than PERIOD (clique)
     if (parentHeader.timestamp.addn(period).gt(this.timestamp)) {
@@ -85,13 +86,21 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
     }
   }
 
-  if (this._common.consensusType() === 'pow') {
+  if (this._common.consensusType() === ConsensusType.ProofOfWork) {
     if (!this.validateDifficulty(parentHeader)) {
       throw new Error('invalid difficulty');
     }
   }
 
-  if (!this.validateGasLimit(parentHeader)) {
+  if (testnetHF1Number === null) {
+    try {
+      testnetHF1Number = this._common.hardforkBlockBN('testnet-hf1');
+    } catch (err) {}
+  }
+  if (testnetHF1Number !== null && this.number.eq(testnetHF1Number)) {
+    // do noting, don't check gas limit,
+    // because hardfork will chang block gas limit
+  } else if (!this.validateGasLimit(parentHeader)) {
     throw new Error('invalid gas limit');
   }
 

@@ -9,6 +9,7 @@ import { logger, getRandomIntInclusive, hexStringToBN, nowTimestamp } from '@gxc
 import { PendingTxMap } from '../txpool';
 import { Node } from '../node';
 import { isEnableStaking } from '../hardforks';
+import { processTx } from '../vm';
 
 const noTurnSignerDelay = 500;
 const maxHistoryLength = 10;
@@ -29,6 +30,7 @@ export class Miner {
   private enable: boolean;
   private _coinbase: Address;
   private vm!: VM;
+  private parentEnableStaking: boolean = false;
   private pendingTxs: Transaction[] = [];
   private pendingHeader!: BlockHeader;
   private gasUsed = new BN(0);
@@ -233,6 +235,7 @@ export class Miner {
 
       this.pendingTxs = [];
       this.gasUsed = new BN(0);
+      this.parentEnableStaking = isEnableStaking(header._common);
       const newNumber = header.number.addn(1);
       const period: number = header._common.consensusConfig().period;
       const timestamp = header.timestamp.toNumber() + period;
@@ -416,11 +419,11 @@ export class Miner {
         let txRes: RunTxResult;
         tx.common.setHardforkByBlockNumber(this.pendingHeader.number);
         try {
-          txRes = await this.vm.runTx({
+          txRes = await processTx.bind(this.node)({
+            vm: this.vm,
             tx,
-            block: Block.fromBlockData({ header: this.pendingHeader }, { common: (this.vm.stateManager as any)._common }),
-            skipBalance: false,
-            skipNonce: false
+            parentEnableStaking: this.parentEnableStaking,
+            block: Block.fromBlockData({ header: this.pendingHeader }, { common: (this.vm.stateManager as any)._common })
           });
         } catch (err) {
           await this.vm.stateManager.revert();

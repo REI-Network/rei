@@ -10,13 +10,6 @@ export type ValidatorChange = {
   update: BN;
   // new indexed validator voting power
   votingPower?: BN;
-  // commission rate change information
-  commissionChange?: {
-    // new commission rate
-    commissionRate: BN;
-    // new commission rate update timestamp
-    updateTimestamp: BN;
-  };
 };
 
 // a class used to record validator changes
@@ -98,21 +91,6 @@ export class ValidatorChanges {
   unstake(validator: Address, value: BN) {
     if (this.cannonIgnore(validator)) {
       this.getChange(validator).update.isub(value);
-    }
-  }
-
-  /**
-   * Validator set a new commission rate
-   * @param validator - Validator address
-   * @param commissionRate - New commission rate
-   * @param updateTimestamp - New update timestamp
-   */
-  setCommissionRate(validator: Address, commissionRate: BN, updateTimestamp: BN) {
-    if (this.cannonIgnore(validator)) {
-      this.getChange(validator).commissionChange = {
-        commissionRate,
-        updateTimestamp
-      };
     }
   }
 }

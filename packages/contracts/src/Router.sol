@@ -30,6 +30,15 @@ contract Router is ReentrancyGuard, Only {
     }
 
     /**
+     * @dev Estimate daily fee and free fee left.
+     * @param user              User address
+     * @param timestamp         Timestamp
+     */
+    function estimateTotalFee(address user, uint256 timestamp) external view returns (uint256) {
+        return IFee(config.fee()).estimateFee(user, timestamp).add(IFreeFee(config.freeFee()).estimateFreeFee(user, timestamp));
+    }
+
+    /**
      * @dev Assign transaction reward to miner, and emit the `UsageInfo` event,
      *      if the consumed fee is `dailyFee` or `dailyFreeFee`,
      *      it will only increase miner's share of the fee pool,

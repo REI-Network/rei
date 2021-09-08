@@ -44,7 +44,8 @@ contract Fee is ReentrancyGuard, Only, IFee {
      * @param user      Target user address
      */
     function deposit(address user) external payable override nonReentrant {
-        require(msg.value > 0, "FeeManager: invalid value");
+        require(msg.value > 0, "Fee: invalid value");
+        require(uint160(user) > 2000, "Fee: invalid user");
         DepositInfo storage di = userDeposit[user][msg.sender];
         di.amount = di.amount.add(msg.value);
         di.timestamp = block.timestamp;
@@ -59,11 +60,11 @@ contract Fee is ReentrancyGuard, Only, IFee {
      * @param user      Target user address
      */
     function withdraw(uint256 amount, address user) external override nonReentrant {
-        require(amount > 0, "FeeManager: invalid amount");
-        require(whetherPayOffDebt(user, block.timestamp), "FeeManager: user debt");
+        require(amount > 0, "Fee: invalid amount");
+        require(whetherPayOffDebt(user, block.timestamp), "Fee: user debt");
         DepositInfo storage di = userDeposit[user][msg.sender];
         // adding two timestamps will never overflow
-        require(di.timestamp + config.withdrawDelay() < block.timestamp, "FeeManager: invalid withdraw delay");
+        require(di.timestamp + config.withdrawDelay() < block.timestamp, "Fee: invalid withdraw delay");
         di.amount = di.amount.sub(amount);
         userTotalAmount[user] = userTotalAmount[user].sub(amount);
         totalAmount = totalAmount.sub(amount);
@@ -126,7 +127,7 @@ contract Fee is ReentrancyGuard, Only, IFee {
      * @param usage     Number of usage fee
      */
     function consume(address user, uint256 usage) external override nonReentrant onlyRouter {
-        require(usage > 0, "FeeManager: invalid usage");
+        require(usage > 0, "Fee: invalid usage");
         UsageInfo storage ui = userUsage[user];
         ui.usage = estimateUsage(ui, block.timestamp).add(usage);
         // update timestamp, because we want to record the latest timestamp in the last 24 hours

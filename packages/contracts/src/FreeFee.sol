@@ -65,6 +65,7 @@ contract FreeFee is ReentrancyGuard, Only, IFreeFee {
      * @param usage             Usage amount
      */
     function consume(address user, uint256 usage) external override nonReentrant onlyRouter {
+        require(usage > 0, "FreeFee: invalid usage");
         UsageInfo storage ui = userUsage[user];
         if (ui.timestamp < globalTimestamp) {
             ui.usage = usage;

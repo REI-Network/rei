@@ -10,7 +10,7 @@ function createCommon(num: BNLike) {
 
 function createValidatorSet(validators: { [name: string]: number | BN }, fill = false) {
   const common = createCommon(1);
-  const num = common.hardforkBlockBN('testnet-hf1');
+  const num = common.hardforkBlockBN('testnet-hf1')!;
   common.setHardforkByBlockNumber(num);
   const vs = ValidatorSet.createGenesisValidatorSet(common, fill);
   const changes = new ValidatorChanges(vs);

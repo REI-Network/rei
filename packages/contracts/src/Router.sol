@@ -34,8 +34,9 @@ contract Router is ReentrancyGuard, Only {
      * @param user              User address
      * @param timestamp         Timestamp
      */
-    function estimateTotalFee(address user, uint256 timestamp) external view returns (uint256) {
-        return IFee(config.fee()).estimateFee(user, timestamp).add(IFreeFee(config.freeFee()).estimateFreeFee(user, timestamp));
+    function estimateTotalFee(address user, uint256 timestamp) external view returns (uint256 fee, uint256 freeFee) {
+        fee = IFee(config.fee()).estimateFee(user, timestamp);
+        freeFee = IFreeFee(config.freeFee()).estimateFreeFee(user, timestamp);
     }
 
     /**

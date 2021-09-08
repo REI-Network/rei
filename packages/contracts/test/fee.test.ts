@@ -61,94 +61,94 @@ describe('Fee', () => {
     freeFeeRecoverInterval = Number(await config.methods.freeFeeRecoverInterval().call());
   });
 
-  // it('should deposit succeed', async () => {
-  //   await fee.methods.deposit(deployer).send({ value: '100' });
-  //   expect((await fee.methods.userDeposit(deployer, deployer).call()).amount, 'amount should be equal').be.equal('100');
-  //   expect(await fee.methods.totalAmount().call(), 'total amount should be equal').be.equal('100');
-  // });
+  it('should deposit succeed', async () => {
+    await fee.methods.deposit(deployer).send({ value: '100' });
+    expect((await fee.methods.userDeposit(deployer, deployer).call()).amount, 'amount should be equal').be.equal('100');
+    expect(await fee.methods.totalAmount().call(), 'total amount should be equal').be.equal('100');
+  });
 
-  // it('should withdraw failed', async () => {
-  //   try {
-  //     await fee.methods.withdraw(100, deployer).send();
-  //     assert.fail("shouldn't succeed");
-  //   } catch (err) {}
-  // });
+  it('should withdraw failed', async () => {
+    try {
+      await fee.methods.withdraw(100, deployer).send();
+      assert.fail("shouldn't succeed");
+    } catch (err) {}
+  });
 
-  // it('should withdraw succeed', async () => {
-  //   await upTimestamp(deployer, withdrawDelay);
-  //   await fee.methods.withdraw(100, deployer).send();
-  //   expect((await fee.methods.userDeposit(deployer, deployer).call()).amount, 'amount should be equal').be.equal('0');
-  //   expect(await fee.methods.totalAmount().call(), 'total amount should be equal').be.equal('0');
-  // });
+  it('should withdraw succeed', async () => {
+    await upTimestamp(deployer, withdrawDelay);
+    await fee.methods.withdraw(100, deployer).send();
+    expect((await fee.methods.userDeposit(deployer, deployer).call()).amount, 'amount should be equal').be.equal('0');
+    expect(await fee.methods.totalAmount().call(), 'total amount should be equal').be.equal('0');
+  });
 
-  // it('should deposit succeed(depositTo)', async () => {
-  //   await fee.methods.deposit(user1).send({ value: 100 });
-  //   expect((await fee.methods.userDeposit(user1, deployer).call()).amount, 'amount should be equal').be.equal('100');
-  //   expect(await fee.methods.totalAmount().call(), 'total amount should be equal').be.equal('100');
-  // });
+  it('should deposit succeed(depositTo)', async () => {
+    await fee.methods.deposit(user1).send({ value: 100 });
+    expect((await fee.methods.userDeposit(user1, deployer).call()).amount, 'amount should be equal').be.equal('100');
+    expect(await fee.methods.totalAmount().call(), 'total amount should be equal').be.equal('100');
+  });
 
-  // it('should withdraw failed(withdrawFrom)', async () => {
-  //   try {
-  //     await fee.methods.withdraw(100, user1).send();
-  //     assert.fail("shouldn't succeed");
-  //   } catch (err) {}
-  // });
+  it('should withdraw failed(withdrawFrom)', async () => {
+    try {
+      await fee.methods.withdraw(100, user1).send();
+      assert.fail("shouldn't succeed");
+    } catch (err) {}
+  });
 
-  // it('should withdraw succeed(withdrawFrom)', async () => {
-  //   await upTimestamp(deployer, withdrawDelay);
-  //   await fee.methods.withdraw(100, user1).send();
-  //   expect((await fee.methods.userDeposit(user1, deployer).call()).amount, 'amount should be equal').be.equal('0');
-  //   expect(await fee.methods.totalAmount().call(), 'total amount should be equal').be.equal('0');
-  // });
+  it('should withdraw succeed(withdrawFrom)', async () => {
+    await upTimestamp(deployer, withdrawDelay);
+    await fee.methods.withdraw(100, user1).send();
+    expect((await fee.methods.userDeposit(user1, deployer).call()).amount, 'amount should be equal').be.equal('0');
+    expect(await fee.methods.totalAmount().call(), 'total amount should be equal').be.equal('0');
+  });
 
-  // it('should withdraw failed(can not pay off debt)', async () => {
-  //   await fee.methods.deposit(deployer).send({ value: '100' });
-  //   await fee.methods.deposit(user1).send({ value: '100' });
-  //   await upTimestamp(deployer, withdrawDelay);
-  //   await fee.methods.consume(deployer, dailyFee.divn(2).toString()).send();
-  //   await fee.methods.consume(user1, dailyFee.divn(2).toString()).send();
-  //   await fee.methods.deposit(user2).send({ value: '200' });
-  //   try {
-  //     await fee.methods.withdraw(100, user1).send();
-  //     assert.fail("shouldn't succeed");
-  //   } catch (err) {}
-  //   await upTimestamp(deployer, feeRecoverInterval);
-  //   await fee.methods.withdraw(100, deployer).send();
-  //   await fee.methods.withdraw(100, user1).send();
-  //   await fee.methods.withdraw(200, user2).send();
-  // });
+  it('should withdraw failed(can not pay off debt)', async () => {
+    await fee.methods.deposit(deployer).send({ value: '100' });
+    await fee.methods.deposit(user1).send({ value: '100' });
+    await upTimestamp(deployer, withdrawDelay);
+    await fee.methods.consume(deployer, dailyFee.divn(2).toString()).send();
+    await fee.methods.consume(user1, dailyFee.divn(2).toString()).send();
+    await fee.methods.deposit(user2).send({ value: '200' });
+    try {
+      await fee.methods.withdraw(100, user1).send();
+      assert.fail("shouldn't succeed");
+    } catch (err) {}
+    await upTimestamp(deployer, feeRecoverInterval);
+    await fee.methods.withdraw(100, deployer).send();
+    await fee.methods.withdraw(100, user1).send();
+    await fee.methods.withdraw(200, user2).send();
+  });
 
-  // it('should estimate correctly', async () => {
-  //   await fee.methods.deposit(deployer).send({ value: '100' });
-  //   await fee.methods.deposit(user1).send({ value: '100' });
-  //   const feeAmount = toBN(await fee.methods.estimateFee(deployer, await timestamp()).call());
-  //   expect(feeAmount.toString(), 'user fee should be equal').be.equal(dailyFee.divn(2).toString());
+  it('should estimate correctly', async () => {
+    await fee.methods.deposit(deployer).send({ value: '100' });
+    await fee.methods.deposit(user1).send({ value: '100' });
+    const feeAmount = toBN(await fee.methods.estimateFee(deployer, await timestamp()).call());
+    expect(feeAmount.toString(), 'user fee should be equal').be.equal(dailyFee.divn(2).toString());
 
-  //   await fee.methods.consume(deployer, feeAmount.divn(4).toString()).send();
-  //   const timeSign1 = (await fee.methods.userUsage(deployer).call()).timestamp;
-  //   const feeAmount2 = toBN(await fee.methods.estimateFee(deployer, timeSign1).call());
-  //   expect(feeAmount2.toString(), 'user fee should be equal').be.equal(dailyFee.divn(2).sub(feeAmount.divn(4)).toString());
+    await fee.methods.consume(deployer, feeAmount.divn(4).toString()).send();
+    const timeSign1 = (await fee.methods.userUsage(deployer).call()).timestamp;
+    const feeAmount2 = toBN(await fee.methods.estimateFee(deployer, timeSign1).call());
+    expect(feeAmount2.toString(), 'user fee should be equal').be.equal(dailyFee.divn(2).sub(feeAmount.divn(4)).toString());
 
-  //   // sleep a while
-  //   await upTimestamp(deployer, feeRecoverInterval / 2);
-  //   // after sleep feeRecoverInterval / 2, userUsage should be userAccUsage / 2
-  //   const userUsage = feeAmount.divn(4).divn(2);
-  //   const feeAmount3 = toBN(await fee.methods.estimateFee(deployer, Number(timeSign1) + feeRecoverInterval / 2).call());
-  //   expect(feeAmount3.toString(), 'user fee should be equal').be.equal(dailyFee.divn(2).sub(userUsage).toString());
+    // sleep a while
+    await upTimestamp(deployer, feeRecoverInterval / 2);
+    // after sleep feeRecoverInterval / 2, userUsage should be userAccUsage / 2
+    const userUsage = feeAmount.divn(4).divn(2);
+    const feeAmount3 = toBN(await fee.methods.estimateFee(deployer, Number(timeSign1) + feeRecoverInterval / 2).call());
+    expect(feeAmount3.toString(), 'user fee should be equal').be.equal(dailyFee.divn(2).sub(userUsage).toString());
 
-  //   await fee.methods.consume(deployer, feeAmount.divn(4).toString()).send();
-  //   const timeSign2 = (await fee.methods.userUsage(deployer).call()).timestamp;
-  //   const userUsage2 = feeAmount.divn(4).add(
-  //     feeAmount.divn(4).sub(
-  //       feeAmount
-  //         .divn(4)
-  //         .muln(Number(timeSign2) - Number(timeSign1))
-  //         .divn(feeRecoverInterval)
-  //     )
-  //   );
-  //   const feeAmount4 = toBN(await fee.methods.estimateFee(deployer, Number(timeSign2)).call());
-  //   expect(feeAmount4.eq(dailyFee.divn(2).sub(userUsage2)), 'user fee should be equal').be.true;
-  // });
+    await fee.methods.consume(deployer, feeAmount.divn(4).toString()).send();
+    const timeSign2 = (await fee.methods.userUsage(deployer).call()).timestamp;
+    const userUsage2 = feeAmount.divn(4).add(
+      feeAmount.divn(4).sub(
+        feeAmount
+          .divn(4)
+          .muln(Number(timeSign2) - Number(timeSign1))
+          .divn(feeRecoverInterval)
+      )
+    );
+    const feeAmount4 = toBN(await fee.methods.estimateFee(deployer, Number(timeSign2)).call());
+    expect(feeAmount4.eq(dailyFee.divn(2).sub(userUsage2)), 'user fee should be equal').be.true;
+  });
 
   it('should estimate TotalLeft correctly', async () => {
     let timeSign = await timestamp();

@@ -96,7 +96,7 @@ contract Config_test is IConfig {
     }
 
     function userFreeFeeLimit() external view override returns (uint256) {
-        return 12e14;
+        return 6e15;
     }
 
     function feeRecoverInterval() external view override returns (uint256) {

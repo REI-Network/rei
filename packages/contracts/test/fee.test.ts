@@ -186,19 +186,19 @@ describe('Fee', () => {
 
     await freeFee.methods.consume(deployer, dailyFreeFee.divn(4).toString()).send();
     let ui = await freeFee.methods.userUsage(deployer).call();
-    const usage1 = toBN(await freeFee.methods.estimateUsage(ui).call());
+    const usage1 = toBN(await freeFee.methods.estimateUsage(ui, await timestamp()).call());
     expect(usage1.eq(dailyFreeFee.divn(4)), 'usage should be equal');
 
     await freeFee.methods.onAfterBlock().call();
     await freeFee.methods.consume(deployer, dailyFreeFee.divn(8).toString()).send();
     ui = await freeFee.methods.userUsage(deployer).call();
-    const usage2 = toBN(await freeFee.methods.estimateUsage(ui).call());
+    const usage2 = toBN(await freeFee.methods.estimateUsage(ui, await timestamp()).call());
     expect(usage2.eq(dailyFreeFee.divn(8).add(dailyFreeFee.divn(4))), 'usage should be equal');
 
     await upTimestamp(deployer, freeFeeRecoverInterval);
     await freeFee.methods.onAfterBlock().call();
     ui = await freeFee.methods.userUsage(deployer).call();
-    const usage3 = toBN(await freeFee.methods.estimateUsage(ui).call());
+    const usage3 = toBN(await freeFee.methods.estimateUsage(ui, await timestamp()).call());
     expect(usage3.eqn(0), 'usage should be equal');
   });
 

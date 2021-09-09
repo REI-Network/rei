@@ -8,7 +8,7 @@ function createCommon(num: BNLike) {
   return Common.createCommonByBlockNumber(num, 'gxc2-testnet');
 }
 
-function createValidatorSet(validators: { [name: string]: number | BN }, fill = false) {
+async function createValidatorSet(validators: { [name: string]: number | BN }, fill = false) {
   const common = createCommon(1);
   const num = common.hardforkBlockBN('testnet-hf1')!;
   common.setHardforkByBlockNumber(num);
@@ -17,7 +17,7 @@ function createValidatorSet(validators: { [name: string]: number | BN }, fill = 
   for (const [name, votingPower] of Object.entries(validators)) {
     changes.index(n2a(name), typeof votingPower === 'number' ? new BN(votingPower) : votingPower);
   }
-  vs.mergeChanges(changes);
+  await vs.mergeChanges(changes);
   vs.incrementProposerPriority(1);
   return vs;
 }
@@ -41,9 +41,9 @@ function a2n(address: Address) {
   return addressToName.get(address)!;
 }
 
-describe('ValidatorSet', () => {
-  it('should fill genesis validators', () => {
-    const vs = createValidatorSet({}, true) as any;
+describe('ValidatorSet', async () => {
+  it('should fill genesis validators', async () => {
+    const vs = (await createValidatorSet({}, true)) as any;
     const genesisValidators = vs.common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr)) as Address[];
     genesisValidators.sort((a, b) => a.buf.compare(b.buf) as 1 | -1 | 0);
     for (let i = 0; i < genesisValidators.length; i++) {
@@ -51,8 +51,8 @@ describe('ValidatorSet', () => {
     }
   });
 
-  it('should increment proposer priority succeed', () => {
-    const vs = createValidatorSet({
+  it('should increment proposer priority succeed', async () => {
+    const vs = await createValidatorSet({
       foo: 1000,
       bar: 300,
       baz: 330
@@ -67,8 +67,8 @@ describe('ValidatorSet', () => {
     expect(proposers.join(' '), 'sequence of proposers should be equal').be.equal('foo baz foo bar foo foo baz foo bar foo foo baz foo foo bar foo baz foo foo bar foo foo baz foo bar foo foo baz foo bar foo foo baz foo foo bar foo baz foo foo bar foo baz foo foo bar foo baz foo foo bar foo baz foo foo foo baz bar foo foo foo baz foo bar foo foo baz foo bar foo foo baz foo bar foo foo baz foo bar foo foo baz foo foo bar foo baz foo foo bar foo baz foo foo bar foo baz foo foo');
   });
 
-  it('should sort by address when voting power is equal', () => {
-    const vs = createValidatorSet({
+  it('should sort by address when voting power is equal', async () => {
+    const vs = await createValidatorSet({
       foo: 1000,
       bar: 1000,
       baz: 1000
@@ -83,8 +83,8 @@ describe('ValidatorSet', () => {
     expect(proposers.join(' ') + ' ', 'sequence of proposers should be equal').be.equal('foo bar baz '.repeat(5));
   });
 
-  it('should be first proposer but not enough to propose twice in a row', () => {
-    const vs = createValidatorSet({
+  it('should be first proposer but not enough to propose twice in a row', async () => {
+    const vs = await createValidatorSet({
       foo: 100,
       bar: 100,
       baz: 400
@@ -98,8 +98,8 @@ describe('ValidatorSet', () => {
     expect(proposer.equals(n2a('baz')), "shouldn't be proposer twice in a row").be.false;
   });
 
-  it('should be proposer twice in a row', () => {
-    const vs = createValidatorSet({
+  it('should be proposer twice in a row', async () => {
+    const vs = await createValidatorSet({
       foo: 100,
       bar: 100,
       baz: 401
@@ -116,8 +116,8 @@ describe('ValidatorSet', () => {
     expect(proposer.equals(n2a('baz')), "shouldn't be proposer again").be.false;
   });
 
-  it('each validator should be the proposer a proportional number of times', () => {
-    const vs = createValidatorSet({
+  it('each validator should be the proposer a proportional number of times', async () => {
+    const vs = await createValidatorSet({
       foo: 4,
       bar: 5,
       baz: 3
@@ -136,9 +136,9 @@ describe('ValidatorSet', () => {
     expect(times.get('baz'), 'baz proposer times should be equal').be.equal(30 * N);
   });
 
-  it('should throw an error when the number overflows', () => {
+  it('should throw an error when the number overflows', async () => {
     try {
-      const vs = createValidatorSet({
+      const vs = await createValidatorSet({
         foo: MAX_INTEGER
       });
       assert.fail('should throw an error when the number overflows');

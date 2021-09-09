@@ -273,7 +273,7 @@ export class ValidatorSet {
    * Merge validator set changes
    * @param changes - `ValidatorChanges` instance
    */
-  async mergeChanges(changes: ValidatorChanges, sm: StakeManager) {
+  async mergeChanges(changes: ValidatorChanges, sm?: StakeManager) {
     // TODO: if the changed validator is an active validator, the active list maybe not be dirty
     let dirty = false;
 
@@ -301,15 +301,17 @@ export class ValidatorSet {
 
     // TODO: improve this logic
     // make sure genesis validator exists in the map
-    for (const gv of getGenesisValidators(this.common)) {
-      const origin = this.validators.get(gv.buf);
-      const currentVotingPower = await sm.getVotingPowerByAddress(gv);
-      if ((origin !== undefined && !origin.votingPower.eq(currentVotingPower)) || origin === undefined) {
-        dirty = true;
-        this.validators.set(gv.buf, {
-          validator: gv,
-          votingPower: currentVotingPower
-        });
+    if (this.fillGenesisValidators) {
+      for (const gv of getGenesisValidators(this.common)) {
+        const origin = this.validators.get(gv.buf);
+        const currentVotingPower = await sm!.getVotingPowerByAddress(gv);
+        if ((origin !== undefined && !origin.votingPower.eq(currentVotingPower)) || origin === undefined) {
+          dirty = true;
+          this.validators.set(gv.buf, {
+            validator: gv,
+            votingPower: currentVotingPower
+          });
+        }
       }
     }
 

@@ -67,6 +67,6 @@ contract FreeFeeToken is AbstractToken {
     constructor(IConfig _config) public AbstractToken(_config, "FreeFee", "FreeFee") {}
 
     function balanceOf(address account) public view virtual override returns (uint256) {
-        return IFreeFee(config.fee()).estimateFreeFee(account, block.timestamp);
+        return IFreeFee(config.freeFee()).estimateFreeFee(account, block.timestamp);
     }
 }

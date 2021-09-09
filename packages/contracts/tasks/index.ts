@@ -192,7 +192,7 @@ task('vp', 'Visit validator voting power by address')
     console.log(await stakeManager.methods.getVotingPowerByAddress(taskArgs.validator).call());
   });
 
-task('abr', 'assign block reward')
+task('abr', 'Assign block reward')
   .addParam('validator', 'validator address')
   .addParam('value', 'reward amount')
   .addFlag('ether', 'use ether as unit')
@@ -207,7 +207,7 @@ task('abr', 'assign block reward')
     console.log('Assign block reward succeed');
   });
 
-task('deposit', 'deposit GXC for fee')
+task('deposit', 'Deposit GXC for fee')
   .addParam('user', 'user address')
   .addParam('value', 'reward amount')
   .addFlag('ether', 'use ether as unit')
@@ -222,7 +222,7 @@ task('deposit', 'deposit GXC for fee')
     console.log('Deposit succeed');
   });
 
-task('withdraw', 'withdraw GXC from fee contract')
+task('withdraw', 'Withdraw GXC from fee contract')
   .addParam('user', 'user address')
   .addParam('value', 'reward amount')
   .addFlag('ether', 'use ether as unit')
@@ -247,7 +247,7 @@ task('fee', 'Query user fee and free fee info')
     console.log('fee:', fee, 'freeFee:', freeFee);
   });
 
-task('afb', 'call onAfterBlock callback')
+task('afb', 'Call onAfterBlock callback')
   .addOptionalParam('address', 'router contract address')
   .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
     const { deployer } = await getNamedAccounts();
@@ -257,7 +257,7 @@ task('afb', 'call onAfterBlock callback')
     console.log('onAfterBlock succeed');
   });
 
-task('gb', 'get gxc balance')
+task('gb', 'Get gxc balance')
   .addParam('user', 'target user')
   .setAction(async (taskArgs, { web3 }) => {
     console.log('GXC:', await web3.eth.getBalance(taskArgs.user));

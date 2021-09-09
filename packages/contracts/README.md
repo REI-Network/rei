@@ -7,9 +7,15 @@ GXChain2.0 genesis contracts
 
 - `Config` Global config contract, deployed at `0x0000000000000000000000000000000000001000`
 - `StakeManager` Stake manager contract, deployed at `0x0000000000000000000000000000000000001001`
-- `UnstakeManager` A smart contract that keeps unstake amount, deployed at `0x0000000000000000000000000000000000001003`
-- `ValidatorRewardManager` A smart contract that keeps validator reward for validator, deployed at `0x0000000000000000000000000000000000001004`
+- `UnstakePool` A smart contract that keeps unstake amount, deployed at `0x0000000000000000000000000000000000001003`
+- `ValidatorRewardPool` A smart contract that keeps validator reward for validator, deployed at `0x0000000000000000000000000000000000001004`
 - `CommmissionShare` A smart contract that keeps commission reward for all staking user, dynamically deployed for each validator
+- `Fee` A smart contract that accepts GXC deposit and calculates user fees, deployed at `0x0000000000000000000000000000000000001005`
+- `FreeFee` A smart contract that calculates user daily free fees, deployed at `0x0000000000000000000000000000000000001006`
+- `FeePool` A smart contract that assigns GXC rewards to miners according to miner shares every 24 hours, deployed at `0x0000000000000000000000000000000000001007`
+- `Router` A router smart contract, blockchain will only interact with router contract, deployed at `0x0000000000000000000000000000000000001008`
+- `FeeToken` An ERC20 smart contract, only provides `balanceOf` method for users to query the fee balance, deployed at `0x0000000000000000000000000000000000001009`
+- `FreeFeeToken` An ERC20 smart contract, only provides `balanceOf` method for users to query the free fee balance, deployed at `0x000000000000000000000000000000000000100a`
 
 ## Install
 
@@ -119,21 +125,27 @@ contract LockedStake {
 ```
 AVAILABLE TASKS:
 
+  abr                   Assign block reward
   accounts              List accounts
+  afb                   Call onAfterBlock callback
   approve               Approve commission share
   balance               Get balance
+  deploy                Deploy contracts
+  deposit               Deposit GXC for fee
+  fee                   Query user fee and free fee info
+  gb                    Get gxc balance
   lscfgaddr             List config addresses
-  reward                Reward validator
   scr                   Set commission rate
   stake                 Stake for validator
   sunstake              Start unstake
-  test                  Runs mocha tests
   transfer              Transfer value to target address
   unstake               Do unstake
+  verify                Verifies contract on Etherscan
   vp                    Visit validator voting power by address
   vu                    Visit unstake info by id
   vva                   Visit validator information by address
   vvi                   Visit validator information by index
+  withdraw              Withdraw GXC from fee contract
 ```
 
 Any detailed options of the task can be obtained like this:

@@ -9,33 +9,29 @@ const func: DeployFunction = async function ({ deployments, getNamedAccounts }) 
     deterministicDeployment: false,
     args: []
   });
-
-  const unstakeManager = await deploy('UnstakeManager', {
-    from: deployer,
-    log: true,
-    deterministicDeployment: false,
-    args: [config.address]
-  });
-
-  const validatorRewardManager = await deploy('ValidatorRewardManager', {
-    from: deployer,
-    log: true,
-    deterministicDeployment: false,
-    args: [config.address]
-  });
-
-  await execute('Config_test', { from: deployer }, 'setUnstakeManager', unstakeManager.address);
-  await execute('Config_test', { from: deployer }, 'setValidatorRewardManager', validatorRewardManager.address);
-
-  const stakeManager = await deploy('StakeManager', {
-    from: deployer,
-    log: true,
-    deterministicDeployment: false,
-    args: [config.address, []]
-  });
-
-  await execute('Config_test', { from: deployer }, 'setStakeManager', stakeManager.address);
   await execute('Config_test', { from: deployer }, 'setSystemCaller', deployer);
+
+  const deployContract = async (name: string, set: boolean = true, args: any[] = [config.address]) => {
+    const contract = await deploy(name, {
+      from: deployer,
+      log: true,
+      deterministicDeployment: false,
+      args: args
+    });
+    if (set) {
+      await execute('Config_test', { from: deployer }, `set${name}`, contract.address);
+    }
+  };
+
+  await deployContract('UnstakePool');
+  await deployContract('ValidatorRewardPool');
+  await deployContract('Fee');
+  await deployContract('FeePool');
+  await deployContract('FreeFee');
+  await deployContract('FeeToken', false);
+  await deployContract('FreeFeeToken', false);
+  await deployContract('Router');
+  await deployContract('StakeManager', true, [config.address, []]);
 };
 
 export default func;

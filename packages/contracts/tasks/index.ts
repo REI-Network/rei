@@ -10,6 +10,12 @@ function toBN(data: number | string) {
   return new BN(data);
 }
 
+function toEther(value: string) {
+  return toBN(value)
+    .mul(new BN(10).pow(new BN(18)))
+    .toString();
+}
+
 async function createWeb3Contract({ name, artifactName, address, deployments, web3, from, artifacts }: any) {
   const { get } = deployments;
   return new (web3 as Web3).eth.Contract((artifacts as Artifacts).require(artifactName ?? name).abi, address ?? (await get(name)).address, from ? { from } : undefined);
@@ -37,8 +43,8 @@ task('lscfgaddr', 'List config addresses')
   .setAction(async (taskArgs, { deployments, web3, artifacts }) => {
     const config = await createWeb3Contract({ name: 'Config_test', deployments, web3, artifacts, address: taskArgs.address });
     console.log('Stake manager address:', await config.methods.stakeManager().call());
-    console.log('Unstake manager address:', await config.methods.unstakeManager().call());
-    console.log('Validator reward manager address:', await config.methods.validatorRewardManager().call());
+    console.log('Unstake pool address:', await config.methods.unstakePool().call());
+    console.log('Validator reward pool address:', await config.methods.validatorRewardPool().call());
   });
 
 task('stake', 'Stake for validator')
@@ -52,9 +58,7 @@ task('stake', 'Stake for validator')
     if (taskArgs.value === undefined) {
       taskArgs.value = await stakeManager.methods.estimateMinStakeAmount(taskArgs.validator).call();
     } else if (taskArgs.ether) {
-      taskArgs.value = toBN(taskArgs.value)
-        .mul(new BN(10).pow(new BN(18)))
-        .toString();
+      taskArgs.value = toEther(taskArgs.value);
     }
     await stakeManager.methods.stake(taskArgs.validator, deployer).send({ value: taskArgs.value, gas: 12475531 });
     console.log('Stake succeed, value:', taskArgs.value);
@@ -113,9 +117,7 @@ task('sunstake', 'Start unstake')
         return;
       }
     } else if (taskArgs.ether) {
-      taskArgs.shares = toBN(taskArgs.shares)
-        .mul(new BN(10).pow(new BN(18)))
-        .toString();
+      taskArgs.value = toEther(taskArgs.value);
     }
     const repeat = taskArgs.repeat ?? 1;
     for (let i = 0; i < repeat; i++) {
@@ -190,19 +192,66 @@ task('vp', 'Visit validator voting power by address')
     console.log(await stakeManager.methods.getVotingPowerByAddress(taskArgs.validator).call());
   });
 
-task('reward', 'Reward validator')
+task('abr', 'assign block reward')
   .addParam('validator', 'validator address')
   .addParam('value', 'reward amount')
   .addFlag('ether', 'use ether as unit')
-  .addOptionalParam('address', 'stake manager contract address')
+  .addOptionalParam('address', 'router contract address')
   .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
     const { deployer } = await getNamedAccounts();
-    const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
+    const router = await createWeb3Contract({ name: 'Router', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
     if (taskArgs.ether) {
-      taskArgs.value = toBN(taskArgs.value)
-        .mul(new BN(10).pow(new BN(18)))
-        .toString();
+      taskArgs.value = toEther(taskArgs.value);
     }
-    await stakeManager.methods.reward(taskArgs.validator).send({ value: taskArgs.value });
-    console.log('Reward succeed');
+    await router.methods.reward(taskArgs.validator).send({ value: taskArgs.value });
+    console.log('Assign block reward succeed');
+  });
+
+task('deposit', 'deposit GXC for fee')
+  .addParam('user', 'user address')
+  .addParam('value', 'reward amount')
+  .addFlag('ether', 'use ether as unit')
+  .addOptionalParam('address', 'fee contract address')
+  .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
+    const { deployer } = await getNamedAccounts();
+    const fee = await createWeb3Contract({ name: 'Fee', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
+    if (taskArgs.ether) {
+      taskArgs.value = toEther(taskArgs.value);
+    }
+    await fee.methods.deposit(taskArgs.user).send({ value: taskArgs.value });
+    console.log('Deposit succeed');
+  });
+
+task('withdraw', 'withdraw GXC from fee contract')
+  .addParam('user', 'user address')
+  .addParam('value', 'reward amount')
+  .addFlag('ether', 'use ether as unit')
+  .addOptionalParam('address', 'fee contract address')
+  .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
+    const { deployer } = await getNamedAccounts();
+    const fee = await createWeb3Contract({ name: 'Fee', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
+    if (taskArgs.ether) {
+      taskArgs.value = toEther(taskArgs.value);
+    }
+    await fee.methods.withdraw(taskArgs.value, taskArgs.user).send();
+    console.log('Withdraw succeed');
+  });
+
+task('fee', 'Query user fee and free fee info')
+  .addParam('user', 'user address')
+  .addOptionalParam('address', 'router contract address')
+  .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
+    const { deployer } = await getNamedAccounts();
+    const router = await createWeb3Contract({ name: 'Router', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
+    console.log(await router.methods.estimateTotalFee(taskArgs.user, Math.ceil(Date.now() / 1000)).call());
+  });
+
+task('afb', 'call onAfterBlock callback')
+  .addOptionalParam('address', 'router contract address')
+  .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
+    const { deployer } = await getNamedAccounts();
+    const router = await createWeb3Contract({ name: 'Router', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
+    // we don't care about active validators
+    await router.methods.onAfterBlock([], []).send();
+    console.log('onAfterBlock succeed');
   });

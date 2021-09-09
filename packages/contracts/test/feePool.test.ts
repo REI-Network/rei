@@ -1,8 +1,7 @@
 import type { Artifacts } from 'hardhat/types';
 import type Web3 from 'web3';
-import { assert, expect } from 'chai';
-import { BN } from 'ethereumjs-util';
-import { toBN, upTimestamp } from './utils';
+import { expect } from 'chai';
+import { toBN } from './utils';
 
 declare var artifacts: Artifacts;
 declare var web3: Web3;
@@ -107,7 +106,7 @@ describe('FeePool', () => {
     expect(accTxFee.eqn(accumulateAmount), 'accTxFee should be euqal').be.true;
   });
 
-  it('should onAssignBlockReward correctly', async () => {
+  it('should assign block reward correctly', async () => {
     const validator1Rate = 40;
     const validator2Rate = 50;
     const validator3Rate = 60;

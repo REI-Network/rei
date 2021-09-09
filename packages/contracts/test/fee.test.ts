@@ -150,7 +150,7 @@ describe('Fee', () => {
     expect(feeAmount4.eq(dailyFee.divn(2).sub(userUsage2)), 'user fee should be equal').be.true;
   });
 
-  it('should estimate TotalLeft correctly', async () => {
+  it('should estimate total left correctly', async () => {
     let timeSign = await timestamp();
     const totalLeft1 = toBN(await freeFee.methods.estimateTotalLeft(timeSign).call());
     expect(totalLeft1.eq(dailyFreeFee), 'total left free fee should be equal').be.true;
@@ -181,7 +181,7 @@ describe('Fee', () => {
     expect(totalLeft5.eq(dailyFreeFee), 'total left free fee should be equal').be.true;
   });
 
-  it('should estimate Usage correctly', async () => {
+  it('should estimate usage correctly', async () => {
     await freeFee.methods.onAfterBlock().call();
 
     await freeFee.methods.consume(deployer, dailyFreeFee.divn(4).toString()).send();
@@ -202,7 +202,7 @@ describe('Fee', () => {
     expect(usage3.eqn(0), 'usage should be equal');
   });
 
-  it('should estimate FreeFee correctly', async () => {
+  it('should estimate free fee correctly', async () => {
     await freeFee.methods.onAfterBlock().call();
     let timeSign = await timestamp();
     const deployerFee1 = toBN(await freeFee.methods.estimateFreeFee(deployer, timeSign).call());

@@ -83,9 +83,11 @@ export class StakeManager extends Contract {
    * Get indexed validator set length
    * @returns Length
    */
-  async indexedValidatorsLength() {
-    const { returnValue } = await this.executeMessage(this.makeCallMessage('indexedValidatorsLength', [], []));
-    return new BN(returnValue);
+  indexedValidatorsLength() {
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('indexedValidatorsLength', [], []));
+      return new BN(returnValue);
+    });
   }
 
   /**
@@ -93,9 +95,11 @@ export class StakeManager extends Contract {
    * @param index - Validator index
    * @returns Validator address
    */
-  async indexedValidatorsByIndex(index: BN) {
-    const { returnValue } = await this.executeMessage(this.makeCallMessage('indexedValidatorsByIndex', ['uint256'], [index.toString()]));
-    return bufferToAddress(returnValue);
+  indexedValidatorsByIndex(index: BN) {
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('indexedValidatorsByIndex', ['uint256'], [index.toString()]));
+      return bufferToAddress(returnValue);
+    });
   }
 
   /**
@@ -103,9 +107,11 @@ export class StakeManager extends Contract {
    * @param index - Validator index
    * @returns Voting power
    */
-  async getVotingPowerByIndex(index: BN) {
-    const { returnValue } = await this.executeMessage(this.makeCallMessage('getVotingPowerByIndex', ['uint256'], [index.toString()]));
-    return new BN(returnValue);
+  getVotingPowerByIndex(index: BN) {
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('getVotingPowerByIndex', ['uint256'], [index.toString()]));
+      return new BN(returnValue);
+    });
   }
 
   /**
@@ -113,18 +119,22 @@ export class StakeManager extends Contract {
    * @param address - Address
    * @returns Voting power
    */
-  async getVotingPowerByAddress(address: Address) {
-    const { returnValue } = await this.executeMessage(this.makeCallMessage('getVotingPowerByAddress', ['address'], [address.toString()]));
-    return new BN(returnValue);
+  getVotingPowerByAddress(address: Address) {
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('getVotingPowerByAddress', ['address'], [address.toString()]));
+      return new BN(returnValue);
+    });
   }
 
   /**
    * Get active validator set length
    * @returns Length
    */
-  async activeValidatorsLength() {
-    const { returnValue } = await this.executeMessage(this.makeCallMessage('activeValidatorsLength', [], []));
-    return new BN(returnValue);
+  activeValidatorsLength() {
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('activeValidatorsLength', [], []));
+      return new BN(returnValue);
+    });
   }
 
   /**
@@ -132,15 +142,17 @@ export class StakeManager extends Contract {
    * @param index - Validator index
    * @returns Active validator information
    */
-  async activeValidators(index: BN): Promise<ActiveValidator> {
-    const { returnValue } = await this.executeMessage(this.makeCallMessage('activeValidators', ['uint256'], [index.toString()]));
-    if (returnValue.length !== 2 * 32) {
-      throw new Error('invalid return value length');
-    }
-    let i = 0;
-    return {
-      validator: bufferToAddress(returnValue.slice(i++ * 32, i * 32)),
-      priority: decodeInt256(returnValue.slice(i++ * 32, i * 32))
-    };
+  activeValidators(index: BN): Promise<ActiveValidator> {
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('activeValidators', ['uint256'], [index.toString()]));
+      if (returnValue.length !== 2 * 32) {
+        throw new Error('invalid return value length');
+      }
+      let i = 0;
+      return {
+        validator: bufferToAddress(returnValue.slice(i++ * 32, i * 32)),
+        priority: decodeInt256(returnValue.slice(i++ * 32, i * 32))
+      };
+    });
   }
 }

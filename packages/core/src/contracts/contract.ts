@@ -2,7 +2,7 @@ import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import { Address, BN, MAX_INTEGER } from 'ethereumjs-util';
 import Message from '@gxchain2-ethereumjs/vm/dist/evm/message';
 import { Common } from '@gxchain2/common';
-import { hexStringToBuffer } from '@gxchain2/utils';
+import { hexStringToBuffer, logger } from '@gxchain2/utils';
 import { encode } from './utils';
 
 export abstract class Contract {
@@ -95,5 +95,15 @@ export abstract class Contract {
   // execute a message, throw a error if `exceptionError` is not undefined
   protected executeMessage(message: Message) {
     return Contract.executeMessage(this.evm, message);
+  }
+
+  // make sure it will output the error message
+  protected async runWithLogger<T>(func: () => Promise<T>) {
+    try {
+      return await func();
+    } catch (err) {
+      logger.error('Contract::runWithLogger, catch error:', err);
+      throw err;
+    }
   }
 }

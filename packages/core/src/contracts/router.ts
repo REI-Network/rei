@@ -16,26 +16,34 @@ export class Router extends Contract {
     super(evm, common, methods, Address.fromString(common.param('vm', 'raddr')));
   }
 
-  async estimateTotalFee(user: Address, timestamp: number) {
-    const { returnValue } = await this.executeMessage(this.makeCallMessage('estimateTotalFee', ['address', 'uint256'], [user.toString(), timestamp]));
-    let i = 0;
-    return {
-      fee: new BN(returnValue.slice(i++ * 32, i * 32)),
-      freeFee: new BN(returnValue.slice(i++ * 32, i * 32))
-    };
+  estimateTotalFee(user: Address, timestamp: number) {
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('estimateTotalFee', ['address', 'uint256'], [user.toString(), timestamp]));
+      let i = 0;
+      return {
+        fee: new BN(returnValue.slice(i++ * 32, i * 32)),
+        freeFee: new BN(returnValue.slice(i++ * 32, i * 32))
+      };
+    });
   }
 
-  async assignTransactionReward(validator: Address, user: Address, feeUsage: BN, freeFeeUsage: BN, amount: BN) {
-    const { logs } = await this.executeMessage(this.makeSystemCallerMessage('assignTransactionReward', ['address', 'address', 'uint256', 'uint256'], [validator.toString(), user.toString(), feeUsage.toString(), freeFeeUsage.toString()], amount));
-    return logs!;
+  assignTransactionReward(validator: Address, user: Address, feeUsage: BN, freeFeeUsage: BN, amount: BN) {
+    return this.runWithLogger(async () => {
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('assignTransactionReward', ['address', 'address', 'uint256', 'uint256'], [validator.toString(), user.toString(), feeUsage.toString(), freeFeeUsage.toString()], amount));
+      return logs!;
+    });
   }
 
-  async assignBlockReward(validator: Address, amount: BN) {
-    const { logs } = await this.executeMessage(this.makeSystemCallerMessage('assignBlockReward', ['address'], [validator.toString()], amount));
-    return logs;
+  assignBlockReward(validator: Address, amount: BN) {
+    return this.runWithLogger(async () => {
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('assignBlockReward', ['address'], [validator.toString()], amount));
+      return logs;
+    });
   }
 
-  async onAfterBlock(activeValidators: Address[], priorities: BN[]) {
-    await this.executeMessage(this.makeSystemCallerMessage('onAfterBlock', ['address[]', 'int256[]'], [activeValidators.map((addr) => addr.toString()), priorities.map((p) => p.toString())]));
+  onAfterBlock(activeValidators: Address[], priorities: BN[]) {
+    return this.runWithLogger(async () => {
+      await this.executeMessage(this.makeSystemCallerMessage('onAfterBlock', ['address[]', 'int256[]'], [activeValidators.map((addr) => addr.toString()), priorities.map((p) => p.toString())]));
+    });
   }
 }

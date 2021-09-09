@@ -126,17 +126,15 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
           }
           validatorSet.subtractProposerPriority(miner);
           await validatorSet.mergeChanges(changes, parentStakeManager!);
-          await validatorSet.incrementProposerPriority(1, parentStakeManager!);
+          validatorSet.incrementProposerPriority(1);
         }
 
         const activeValidators = validatorSet.activeValidators();
         logger.debug(
           'Node::processLoop, activeValidators:',
-          await Promise.all(
-            activeValidators.map(async ({ validator, priority }) => {
-              return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${(await validatorSet!.getVotingPower(validator, parentStakeManager!)).toString()}`;
-            })
-          )
+          activeValidators.map(({ validator, priority }) => {
+            return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${validatorSet!.getVotingPower(validator).toString()}`;
+          })
         );
 
         proposer = validatorSet.proposer();

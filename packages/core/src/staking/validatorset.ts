@@ -14,13 +14,26 @@ const priorityWindowSizeFactor = 2;
 // genesis validators
 let genesisValidators: Address[] | undefined;
 
-function initGenesisValidators(common: Common) {
+function getGenesisValidators(common: Common) {
   // get genesis validators from common
   if (!genesisValidators) {
     genesisValidators = common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr)) as Address[];
     // sort by address
     genesisValidators.sort((a, b) => a.buf.compare(b.buf) as 1 | -1 | 0);
   }
+  return [...genesisValidators];
+}
+
+// get append genesis validator when the validator set is not full
+function getAppendGenesisValidators(contains: (address: Address) => boolean, currentCount: number, maxCount: number, gvs: Address[]) {
+  const append: Address[] = [];
+  while (gvs.length > 0 && currentCount < maxCount) {
+    const gv = gvs.shift()!;
+    if (!contains(gv)) {
+      append.push(gv);
+    }
+  }
+  return append;
 }
 
 // validator information
@@ -45,22 +58,6 @@ function cloneActiveValidator(av: ActiveValidator) {
     ...av,
     priority: av.priority.clone()
   };
-}
-
-// fill the genesis validator into the active validator list when it is not full
-function fillGenesisValidators(active: ActiveValidator[], maxCount: number, common: Common) {
-  initGenesisValidators(common);
-  const gvs = [...genesisValidators!];
-  // the genesis validator sorted by address and has nothing to do with voting power
-  while (gvs.length > 0 && active.length < maxCount) {
-    const gv = gvs.shift()!;
-    if (active.filter(({ validator }) => validator.equals(gv)).length === 0) {
-      active.push({
-        validator: gv,
-        priority: new BN(0)
-      });
-    }
-  }
 }
 
 // a class used to maintain validator set
@@ -88,7 +85,7 @@ export class ValidatorSet {
    * @returns New validator set
    */
   static createFromValidatorSet(parent: ValidatorSet, common: Common) {
-    const vs = new ValidatorSet(common);
+    const vs = new ValidatorSet(common, parent.fillGenesisValidators);
     for (const [validator, info] of parent.validators) {
       vs.validators.set(validator, cloneValidatorInfo(info));
     }
@@ -101,10 +98,11 @@ export class ValidatorSet {
    * Create a validator set from `StakeManager`,
    * it will load indexed and active validator set from contract
    * @param sm - `StakeManager` instance
+   * @param fillGenesisValidators - Fill genesis validators or not
    * @returns New validator set
    */
-  static async createFromStakeManager(sm: StakeManager) {
-    const vs = new ValidatorSet(sm.common);
+  static async createFromStakeManager(sm: StakeManager, fillGenesisValidators: boolean = true) {
+    const vs = new ValidatorSet(sm.common, fillGenesisValidators);
     let length = await sm.indexedValidatorsLength();
     for (let i = new BN(0); i.lt(length); i.iaddn(1)) {
       const validator = await sm.indexedValidatorsByIndex(i);
@@ -118,28 +116,46 @@ export class ValidatorSet {
     }
     length = await sm.activeValidatorsLength();
     for (let i = new BN(0); i.lt(length); i.iaddn(1)) {
-      vs.active.push(await sm.activeValidators(i));
+      const av = await sm.activeValidators(i);
+      vs.active.push(av);
+      // make sure every validator exists in the map
+      if (!vs.validators.has(av.validator.buf)) {
+        vs.validators.set(av.validator.buf, {
+          validator: av.validator,
+          votingPower: await sm.getVotingPowerByAddress(av.validator)
+        });
+      }
     }
-    vs.totalVotingPower = await vs.calcTotalVotingPower(vs.active, sm);
+    vs.totalVotingPower = vs.calcTotalVotingPower(vs.active);
     return vs;
   }
 
   /**
    * Create a genesis validator set
    * @param common - Common instance
-   * @param _fillGenesisValidators - Fill genesis validators or not
+   * @param fillGenesisValidators - Fill genesis validators or not
    * @returns New validator set
    */
-  static createGenesisValidatorSet(common: Common, _fillGenesisValidators: boolean = true) {
-    const vs = new ValidatorSet(common, _fillGenesisValidators);
-    if (_fillGenesisValidators) {
-      fillGenesisValidators(vs.active, common.param('vm', 'maxValidatorsCount'), common);
+  static createGenesisValidatorSet(common: Common, fillGenesisValidators: boolean = true) {
+    const vs = new ValidatorSet(common, fillGenesisValidators);
+    if (fillGenesisValidators) {
+      const append = getAppendGenesisValidators(() => false, 0, common.param('vm', 'maxValidatorsCount'), getGenesisValidators(common));
+      for (const validator of append) {
+        vs.validators.set(validator.buf, {
+          validator,
+          votingPower: new BN(0)
+        });
+        vs.active.push({
+          validator,
+          priority: new BN(0)
+        });
+      }
     }
     return vs;
   }
 
   // sort all indexed validators
-  private async sort(sm: StakeManager) {
+  private sort() {
     const maxCount = this.common.param('vm', 'maxValidatorsCount');
     // create a heap to keep the maximum count validator
     const heap = new Heap({
@@ -159,6 +175,28 @@ export class ValidatorSet {
       }
     }
 
+    // if the validator is not enough, push the genesis validator to the heap
+    // if (this.fillGenesisValidators && heap.size < maxCount) {
+    //   const contains = (address: Address) => {
+    //     for (let i = 1; i <= heap.size; i++) {
+    //       const v: ValidatorInfo = heap._list[i];
+    //       if (v && v.validator.equals(address)) {
+    //         return true;
+    //       }
+    //     }
+    //     return false;
+    //   };
+    //   const append = getAppendGenesisValidators(contains, heap.size, maxCount, getGenesisValidators(this.common));
+    //   while (append.length > 0) {
+    //     const validator = append.shift()!;
+    //     const v: ValidatorInfo = {
+    //       validator,
+    //       votingPower: this.getVotingPower(validator)
+    //     };
+    //     heap.push(v);
+    //   }
+    // }
+
     // sort validators
     const newAcitve: ActiveValidator[] = [];
     while (heap.length > 0) {
@@ -169,12 +207,7 @@ export class ValidatorSet {
       });
     }
 
-    // if the validator is not enough, push the genesis validator to the active list
-    if (this.fillGenesisValidators && newAcitve.length < maxCount) {
-      fillGenesisValidators(newAcitve, maxCount, this.common);
-    }
-
-    return { newAcitve, totalVotingPower: await this.calcTotalVotingPower(newAcitve, sm) };
+    return { newAcitve, totalVotingPower: this.calcTotalVotingPower(newAcitve) };
   }
 
   // compute priority for new active validator list
@@ -209,14 +242,14 @@ export class ValidatorSet {
 
   // compare new active validator list with parent
   // return `true` if it is dirty
-  private async compareActiveValidators(parent: ValidatorSet, newAcitve: ActiveValidator[], totalVotingPower: BN, sm: StakeManager) {
+  private compareActiveValidators(parent: ValidatorSet, newAcitve: ActiveValidator[], totalVotingPower: BN) {
     if (!parent.totalVotingPower.eq(totalVotingPower) || parent.active.length !== newAcitve.length) {
       return true;
     }
     for (let i = 0; i < newAcitve.length; i++) {
       const { validator: pre } = parent.active[i];
       const { validator: curr } = newAcitve[i];
-      if (curr.equals(pre) && (await this.getVotingPower(curr, sm)).eq(await parent.getVotingPower(pre, sm))) {
+      if (curr.equals(pre) && this.getVotingPower(curr).eq(parent.getVotingPower(pre))) {
         // do nothing
       } else {
         return true;
@@ -226,11 +259,11 @@ export class ValidatorSet {
   }
 
   // compute removed voting power
-  private async compareRemovals(parent: ValidatorSet, newAcitve: ActiveValidator[], sm: StakeManager) {
+  private compareRemovals(parent: ValidatorSet, newAcitve: ActiveValidator[]) {
     const removedVotingPower = new BN(0);
     for (const pav of parent.active) {
       if (newAcitve.filter(({ validator }) => validator.equals(pav.validator)).length === 0) {
-        removedVotingPower.iadd(await parent.getVotingPower(pav.validator, sm));
+        removedVotingPower.iadd(parent.getVotingPower(pav.validator));
       }
     }
     return removedVotingPower;
@@ -266,13 +299,27 @@ export class ValidatorSet {
       }
     }
 
+    // TODO: improve this logic
+    // make sure genesis validator exists in the map
+    for (const gv of getGenesisValidators(this.common)) {
+      const origin = this.validators.get(gv.buf);
+      const currentVotingPower = await sm.getVotingPowerByAddress(gv);
+      if ((origin !== undefined && !origin.votingPower.eq(currentVotingPower)) || origin === undefined) {
+        dirty = true;
+        this.validators.set(gv.buf, {
+          validator: gv,
+          votingPower: currentVotingPower
+        });
+      }
+    }
+
     let flag = false;
     if (dirty) {
-      const { newAcitve, totalVotingPower } = await this.sort(sm);
+      const { newAcitve, totalVotingPower } = this.sort();
 
-      flag = await this.compareActiveValidators(changes.parent, newAcitve, totalVotingPower, sm);
+      flag = this.compareActiveValidators(changes.parent, newAcitve, totalVotingPower);
       if (flag) {
-        const removedVotingPower = await this.compareRemovals(changes.parent, newAcitve, sm);
+        const removedVotingPower = this.compareRemovals(changes.parent, newAcitve);
         const tvpAfterUpdatesBeforeRemovals = totalVotingPower.add(removedVotingPower);
         this.computeNewPriorities(newAcitve, tvpAfterUpdatesBeforeRemovals);
 
@@ -303,16 +350,16 @@ export class ValidatorSet {
    * @param validator - Validator address
    * @returns Voting power
    */
-  async getVotingPower(validator: Address, sm: StakeManager) {
+  getVotingPower(validator: Address) {
     const vp = this.validators.get(validator.buf)?.votingPower;
     if (vp) {
-      return vp;
+      return vp.clone();
     }
-    initGenesisValidators(this.common);
+    // const gvs = getGenesisValidators(this.common);
     // genesis validator voting power is always zero(if it doesn't exist in `validators`)
-    if (genesisValidators && genesisValidators.filter((addr) => addr.equals(validator)).length > 0) {
-      return await sm.getVotingPowerByAddress(validator);
-    }
+    // if (gvs.filter((addr) => addr.equals(validator)).length > 0) {
+    //   return await sm.getVotingPowerByAddress(validator);
+    // }
     throw new Error('unknown validator, ' + validator.toString());
   }
 
@@ -354,7 +401,7 @@ export class ValidatorSet {
    * Increase proposer priority
    * @param times - Increase times
    */
-  async incrementProposerPriority(times: number, sm: StakeManager) {
+  incrementProposerPriority(times: number) {
     // in clique consensus, times must be 1
     if (times !== 1) {
       throw new Error('invalid times');
@@ -364,7 +411,7 @@ export class ValidatorSet {
     this.rescalePriorities(diffMax);
     this.shiftByAvgProposerPriority();
     for (let i = 0; i < times; i++) {
-      await this._incrementProposerPriority(sm);
+      this._incrementProposerPriority();
     }
   }
 
@@ -399,9 +446,9 @@ export class ValidatorSet {
     return proposer!;
   }
 
-  private async _incrementProposerPriority(sm: StakeManager) {
+  private _incrementProposerPriority() {
     for (const av of this.active) {
-      av.priority.iadd(await this.getVotingPower(av.validator, sm));
+      av.priority.iadd(this.getVotingPower(av.validator));
       if (av.priority.lt(minProposerPriority)) {
         throw new Error('proposer priority is too small');
       }
@@ -414,10 +461,10 @@ export class ValidatorSet {
     // proposer priority will be reduce in `subtractProposerPriority`
   }
 
-  private async calcTotalVotingPower(active: ActiveValidator[], sm: StakeManager) {
+  private calcTotalVotingPower(active: ActiveValidator[]) {
     const totalVotingPower = new BN(0);
     for (const { validator } of active) {
-      totalVotingPower.iadd(await this.getVotingPower(validator, sm));
+      totalVotingPower.iadd(this.getVotingPower(validator));
     }
     return totalVotingPower;
   }

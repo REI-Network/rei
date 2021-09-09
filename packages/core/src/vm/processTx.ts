@@ -7,6 +7,7 @@ import { Log } from '@gxchain2-ethereumjs/vm/dist/evm/types';
 import { TypedTransaction, Transaction, Block } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
 import { Router } from '../contracts';
+import { validateTx } from '../validation';
 import { Node } from '../node';
 
 // After HF1 function
@@ -18,25 +19,12 @@ export function makeRunTxCallback(router: Router, systemCaller: Address, miner: 
 
   const beforeTx = async (state: IStateManager, tx: TypedTransaction, txCost: BN) => {
     const caller = tx.getSenderAddress();
-    // estimate user fee and free fee
-    const result = await router.estimateTotalFee(caller, timestamp);
+    const fromAccount = await state.getAccount(caller);
+    const result = await validateTx(tx as Transaction, router, caller, timestamp, fromAccount.balance);
+
     feeLeft = result.fee;
     freeFeeLeft = result.freeFee;
-    // totalFeeLeft = feeLeft + freeFeeLeft
-    const totalFeeLeft = feeLeft.add(freeFeeLeft);
-    const fromAccount = await state.getAccount(caller);
-    if (fromAccount.balance.lt(tx.value)) {
-      throw new Error(`sender doesn't have enough funds to send tx. The msg.value is: ${tx.value.toString()} and the sender's account only has: ${fromAccount.balance.toString()}`);
-    }
     balanceLeft = fromAccount.balance.sub(tx.value);
-    // maxCostLimit = totalFeeLeft + user.balance
-    const maxCostLimit = fromAccount.balance.sub(tx.value).add(totalFeeLeft);
-    const cost = (tx as Transaction).getUpfrontCost();
-    // balance check
-    // if the maxCostLimit is less than UpfrontCost, throw a error
-    if (maxCostLimit.lt(cost)) {
-      throw new Error(`sender doesn't have enough funds to send tx. The upfront cost is: ${cost.toString()} and the sender's account only has: ${maxCostLimit.toString()}`);
-    }
 
     // update caller's nonce
     fromAccount.nonce.iaddn(1);
@@ -72,7 +60,7 @@ export function makeRunTxCallback(router: Router, systemCaller: Address, miner: 
       balanceUsage = actualTxCost.clone();
       actualTxCost = new BN(0);
     }
-    logger.debug('processTx::makeRunTxCallback::afterTx, tx:', '0x' + tx.hash().toString('hex'), 'actualTxCost:', _actualTxCost.toString(), 'feeUsage:', feeUsage.toString(), 'freeFeeUsage:', freeFeeUsage.toString(), 'balanceUsage:', balanceUsage.toString());
+    logger.debug('Node::processTx, makeRunTxCallback::afterTx, tx:', '0x' + tx.hash().toString('hex'), 'actualTxCost:', _actualTxCost.toString(), 'feeUsage:', feeUsage.toString(), 'freeFeeUsage:', freeFeeUsage.toString(), 'balanceUsage:', balanceUsage.toString());
 
     const caller = tx.getSenderAddress();
     if (balanceUsage.gtn(0)) {

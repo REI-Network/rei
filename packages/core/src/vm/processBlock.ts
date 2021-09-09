@@ -60,9 +60,9 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
       parentValidatorSet = await this.validatorSets.get(parent.header.stateRoot, parentStakeManager);
       consensusValidateHeader.call(block.header, parentValidatorSet.activeSigners(), parentValidatorSet.proposer());
       if (block.header.difficulty.eqn(1)) {
-        logger.debug(block.header.number.toString(), 'this block should mint by:', parentValidatorSet.proposer().toString(), ', but minted by:', miner.toString());
+        logger.debug('Node::processBlock, number:', block.header.number.toString(), 'this block should mint by:', parentValidatorSet.proposer().toString(), ', but minted by:', miner.toString());
       } else {
-        logger.debug(block.header.number.toString(), 'this block should mint by:', parentValidatorSet.proposer().toString());
+        logger.debug('Node::processBlock, number:', block.header.number.toString(), 'this block should mint by:', parentValidatorSet.proposer().toString());
       }
     }
   } else {
@@ -86,7 +86,6 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
         // if staking is active, assign reward to system caller address
         await rewardAccount(state, systemCaller!, reward);
         blockReward.iadd(reward);
-        logger.debug('assignBlockReward:', blockReward.toString(), reward.toString());
       } else {
         // directly reward miner
         await rewardAccount(state, miner, reward);
@@ -119,10 +118,10 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
             StakeManager.filterLogsChanges(changes, logs, block._common);
           }
           for (const uv of changes.unindexedValidators) {
-            logger.debug('Node::processLoop, unindexedValidators, address:', uv.toString());
+            logger.debug('Node::processBlock, unindexedValidators, address:', uv.toString());
           }
           for (const vc of changes.changes.values()) {
-            logger.debug('Node::processLoop, change, address:', vc.validator.toString(), 'votingPower:', vc?.votingPower?.toString(), 'update:', vc.update.toString());
+            logger.debug('Node::processBlock, change, address:', vc.validator.toString(), 'votingPower:', vc?.votingPower?.toString(), 'update:', vc.update.toString());
           }
           validatorSet.subtractProposerPriority(miner);
           await validatorSet.mergeChanges(changes, parentStakeManager!);
@@ -131,7 +130,7 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
 
         const activeValidators = validatorSet.activeValidators();
         logger.debug(
-          'Node::processLoop, activeValidators:',
+          'Node::processBlock, activeValidators:',
           activeValidators.map(({ validator, priority }) => {
             return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${validatorSet!.getVotingPower(validator).toString()}`;
           })

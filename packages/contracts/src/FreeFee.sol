@@ -23,7 +23,7 @@ contract FreeFee is ReentrancyGuard, Only, IFreeFee {
 
     /**
      * @dev Estimate total daily free fee left.
-     * @param timestamp         Current timestamp
+     * @param timestamp        Current timestamp
      */
     function estimateTotalLeft(uint256 timestamp) public view override returns (uint256 totalLeft) {
         uint256 _totalUsage = totalUsage;
@@ -36,10 +36,15 @@ contract FreeFee is ReentrancyGuard, Only, IFreeFee {
 
     /**
      * @dev Estimate user daily free fee usage.
-     * @param ui                 User usage information
+     * @param ui                User usage information
+     * @param timestamp         Current timestamp
      */
-    function estimateUsage(UsageInfo memory ui) public view override returns (uint256) {
-        return ui.timestamp >= globalTimestamp ? ui.usage : 0;
+    function estimateUsage(UsageInfo memory ui, uint256 timestamp) public view override returns (uint256) {
+        uint256 _globalTimestamp = globalTimestamp;
+        if (_globalTimestamp.add(config.freeFeeRecoverInterval()) < timestamp) {
+            _globalTimestamp = timestamp;
+        }
+        return ui.timestamp >= _globalTimestamp ? ui.usage : 0;
     }
 
     /**
@@ -53,7 +58,7 @@ contract FreeFee is ReentrancyGuard, Only, IFreeFee {
             return 0;
         }
 
-        uint256 _userUsage = estimateUsage(userUsage[user]);
+        uint256 _userUsage = estimateUsage(userUsage[user], timestamp);
         uint256 userFreeFeeLimit = config.userFreeFeeLimit();
         uint256 userLeft = userFreeFeeLimit > _userUsage ? userFreeFeeLimit - _userUsage : 0;
         return userLeft > totalLeft ? totalLeft : userLeft;

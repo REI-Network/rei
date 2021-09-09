@@ -78,7 +78,11 @@ contract Fee is ReentrancyGuard, Only, IFee {
      * @param timestamp Current timestamp
      */
     function whetherPayOffDebt(address user, uint256 timestamp) public view override returns (bool) {
-        uint256 fee = userTotalAmount[user].mul(config.dailyFee()).div(totalAmount);
+        if (totalAmount == 0) {
+            return true;
+        }
+
+        uint256 fee = userTotalAmount[user].mul(config.dailyFee()) / totalAmount;
         uint256 usage = estimateUsage(userUsage[user], timestamp);
         return fee >= usage;
     }
@@ -90,7 +94,11 @@ contract Fee is ReentrancyGuard, Only, IFee {
      * @param timestamp Current timestamp
      */
     function estimateFee(address user, uint256 timestamp) external view override returns (uint256 fee) {
-        fee = userTotalAmount[user].mul(config.dailyFee()).div(totalAmount);
+        if (totalAmount == 0) {
+            return 0;
+        }
+
+        fee = userTotalAmount[user].mul(config.dailyFee()) / totalAmount;
         uint256 usage = estimateUsage(userUsage[user], timestamp);
         fee = fee > usage ? fee - usage : 0;
     }
@@ -117,7 +125,7 @@ contract Fee is ReentrancyGuard, Only, IFee {
         }
         uint256 recoverInterval = config.feeRecoverInterval();
         if (ui.usage > 0 && interval < recoverInterval) {
-            usage = recoverInterval.sub(interval).mul(ui.usage).div(recoverInterval);
+            usage = recoverInterval.sub(interval).mul(ui.usage) / recoverInterval;
         }
     }
 

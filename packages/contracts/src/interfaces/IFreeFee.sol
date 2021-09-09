@@ -22,7 +22,7 @@ interface IFreeFee is IOnly {
 
     function estimateTotalLeft(uint256 timestamp) external view returns (uint256);
 
-    function estimateUsage(UsageInfo calldata ui) external view returns (uint256);
+    function estimateUsage(UsageInfo calldata ui, uint256 timestamp) external view returns (uint256);
 
     function estimateFreeFee(address user, uint256 timestamp) external view returns (uint256);
 

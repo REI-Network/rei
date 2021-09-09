@@ -1,6 +1,7 @@
 import EventEmitter from 'events';
 import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Heap from 'qheap';
+import VM from '@gxchain2-ethereumjs/vm';
 import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Aborter, logger } from '@gxchain2/utils';
 import { Transaction, WrappedTransaction, calcIntrinsicGasByTx, BlockHeader, Block } from '@gxchain2/structure';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
@@ -9,6 +10,7 @@ import { PendingTxMap } from './pendingmap';
 import { TxPricedList } from './txpricedlist';
 import { Journal } from './journal';
 import { Node } from '../node';
+import { validateTx } from '../validation';
 
 /**
  * Calculate the transaction slots
@@ -124,7 +126,9 @@ export class TxPool extends EventEmitter {
   private readonly initPromise: Promise<void>;
   private readonly rejournalLoopPromise: undefined | Promise<void>;
 
+  private currentBlock!: Block;
   private currentHeader!: BlockHeader;
+  private currentVM!: VM;
   private currentStateManager!: StateManager;
 
   private txMaxSize: number;
@@ -259,8 +263,10 @@ export class TxPool extends EventEmitter {
       await this.initPromise;
       return;
     }
-    this.currentHeader = this.node.blockchain.latestBlock.header;
-    this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, 0);
+    this.currentBlock = this.node.blockchain.latestBlock;
+    this.currentHeader = this.currentBlock.header;
+    this.currentVM = await this.node.getVM(this.currentHeader.stateRoot, 0);
+    this.currentStateManager = this.currentVM.stateManager as StateManager;
     if (this.journal) {
       await this.journal.load(async (txs: Transaction[]) => {
         let news: Transaction[] = [];
@@ -338,8 +344,10 @@ export class TxPool extends EventEmitter {
           reinject.push(tx);
         }
       }
+      this.currentBlock = originalNewBlock;
       this.currentHeader = originalNewBlock.header;
-      this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, this.currentHeader.number);
+      this.currentVM = await this.node.getVM(this.currentHeader.stateRoot, this.currentHeader.number);
+      this.currentStateManager = this.currentVM.stateManager as StateManager;
       const reinjectAccounts = createBufferFunctionalMap<TxPoolAccount>();
       const getAccount = (addr: Address) => {
         let account = reinjectAccounts.get(addr.buf);
@@ -548,39 +556,35 @@ export class TxPool extends EventEmitter {
     try {
       const txSize = new WrappedTransaction(tx).size;
       if (txSize > this.txMaxSize) {
-        logger.warn('Txpool drop tx', bufferToHex(tx.hash()), 'size too large:', txSize, 'max:', this.txMaxSize);
-        return false;
+        throw new Error(`size too large: ${txSize} max: ${this.txMaxSize}`);
       }
       if (!tx.isSigned()) {
-        logger.warn('Txpool drop tx', bufferToHex(tx.hash()), 'is not signed');
-        return false;
+        throw new Error('not signed');
       }
       if (this.node.miner.currentGasLimit.lt(tx.gasLimit)) {
-        logger.warn('Txpool drop tx', bufferToHex(tx.hash()), 'reach block gasLimit:', tx.gasLimit.toString(), 'limit:', this.node.miner.currentGasLimit.toString());
-        return false;
+        throw new Error(`each block gasLimit: ${tx.gasLimit.toString()} limit: ${this.node.miner.currentGasLimit.toString()}`);
       }
       const senderAddr = tx.getSenderAddress();
       const sender = senderAddr.buf;
       if (!this.locals.has(sender) && tx.gasPrice.lt(this.priceLimit)) {
-        logger.warn('Txpool drop tx', bufferToHex(tx.hash()), 'gasPrice too low:', tx.gasPrice.toString(), 'limit:', this.priceLimit.toString());
-        return false;
+        throw new Error(`gasPrice too low: ${tx.gasPrice.toString()} limit: ${this.priceLimit.toString()}`);
       }
-      const accountInDB = await this.currentStateManager.getAccount(senderAddr);
-      if (accountInDB.nonce.gt(tx.nonce)) {
-        logger.warn('Txpool drop tx', bufferToHex(tx.hash()), 'nonce too low:', tx.nonce.toString(), 'account:', accountInDB.nonce.toString());
-        return false;
+      const account = await this.currentStateManager.getAccount(senderAddr);
+      if (account.nonce.gt(tx.nonce)) {
+        throw new Error(`nonce too low: ${tx.nonce.toString()} account: ${account.nonce.toString()}`);
       }
-      if (accountInDB.balance.lt(txCost(tx))) {
-        logger.warn('Txpool drop tx', bufferToHex(tx.hash()), 'balance not enough:', txCost(tx).toString(), 'account:', accountInDB.balance.toString());
-        return false;
-      }
+      // estimate next block's timestamp
+      const period: number = this.currentHeader._common.consensusConfig().period;
+      const currentTimestamp = this.currentHeader.timestamp.toNumber();
+      // check whether the user's fee can cover tx costs
+      await validateTx(tx, this.node.getRouter(this.currentVM, this.currentBlock), senderAddr, currentTimestamp + period, account.balance);
+
       if (!checkTxIntrinsicGas(tx)) {
-        logger.warn('Txpool drop tx', bufferToHex(tx.hash()), 'checkTxIntrinsicGas failed');
-        return false;
+        throw new Error('checkTxIntrinsicGas failed');
       }
       return true;
     } catch (err) {
-      logger.warn('Txpool drop tx', bufferToHex(tx.hash()), 'validateTx failed:', err);
+      logger.warn('Txpool drop tx', bufferToHex(tx.hash()), 'validateTx failed:', err.message);
       return false;
     }
   }

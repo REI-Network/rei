@@ -243,7 +243,8 @@ task('fee', 'Query user fee and free fee info')
   .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
     const { deployer } = await getNamedAccounts();
     const router = await createWeb3Contract({ name: 'Router', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
-    console.log(await router.methods.estimateTotalFee(taskArgs.user, Math.ceil(Date.now() / 1000)).call());
+    const { fee, freeFee } = await router.methods.estimateTotalFee(taskArgs.user, Math.ceil(Date.now() / 1000)).call();
+    console.log('fee:', fee, 'freeFee:', freeFee);
   });
 
 task('afb', 'call onAfterBlock callback')
@@ -254,4 +255,10 @@ task('afb', 'call onAfterBlock callback')
     // we don't care about active validators
     await router.methods.onAfterBlock([], []).send();
     console.log('onAfterBlock succeed');
+  });
+
+task('gb', 'get gxc balance')
+  .addParam('user', 'target user')
+  .setAction(async (taskArgs, { web3 }) => {
+    console.log('GXC:', await web3.eth.getBalance(taskArgs.user));
   });

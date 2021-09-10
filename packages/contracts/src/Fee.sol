@@ -56,35 +56,86 @@ contract Fee is ReentrancyGuard, Only, IFee {
 
     /**
      * @dev Withdraw amount from target user.
-     * @param amount    Withdraw amount
-     * @param user      Target user address
+     * @param user              Target user address
+     * @param desiredAmount     Desired withdraw amount
+     * @param minAmount         Min withdraw amount
      */
-    function withdraw(uint256 amount, address user) external override nonReentrant {
-        require(amount > 0, "Fee: invalid amount");
-        require(whetherPayOffDebt(user, block.timestamp), "Fee: user debt");
+    function withdraw(
+        address user,
+        uint256 desiredAmount,
+        uint256 minAmount
+    ) external override nonReentrant {
+        require(minAmount > 0 && desiredAmount >= minAmount, "Fee: invalid desired amount or min amount");
+        uint256 withdrawableAmount = estimateWithdrawableAmount(user, block.timestamp);
+        if (desiredAmount < withdrawableAmount) {
+            withdrawableAmount = desiredAmount;
+        } else {
+            require(withdrawableAmount >= minAmount, "Fee: withdrawable amount is too small");
+        }
+
         DepositInfo storage di = userDeposit[user][msg.sender];
         // adding two timestamps will never overflow
         require(di.timestamp + config.withdrawDelay() < block.timestamp, "Fee: invalid withdraw delay");
-        di.amount = di.amount.sub(amount);
-        userTotalAmount[user] = userTotalAmount[user].sub(amount);
-        totalAmount = totalAmount.sub(amount);
-        msg.sender.transfer(amount);
-        emit Withdraw(msg.sender, user, amount);
+        di.amount = di.amount.sub(withdrawableAmount);
+        userTotalAmount[user] = userTotalAmount[user].sub(withdrawableAmount);
+        totalAmount = totalAmount.sub(withdrawableAmount);
+        msg.sender.transfer(withdrawableAmount);
+        emit Withdraw(msg.sender, user, withdrawableAmount);
     }
 
     /**
-     * @dev Estimate whether the debt has been paid off
+     * @dev Estimate wtihdrawable timestamp,
+     *      if the estimation fails, return 0.
+     * @param user      Target user address
+     * @param from      From user address
+     */
+    function estimateWithdrawableTimestamp(address user, address from) external view override returns (uint256 timestamp) {
+        DepositInfo memory di = userDeposit[user][from];
+        if (di.timestamp == 0) {
+            return 0;
+        }
+        timestamp = di.timestamp + config.withdrawDelay();
+
+        if (totalAmount == 0) {
+            return 0;
+        }
+        UsageInfo memory ui = userUsage[user];
+        uint256 usage = estimateUsage(ui, block.timestamp);
+        uint256 fee = userTotalAmount[user].mul(config.dailyFee()) / totalAmount;
+        // if the usage is greater than the fee, it means that the user has debts that need to be repaid
+        if (usage > fee) {
+            uint256 recoverInterval = config.feeRecoverInterval();
+            /**
+             * userUsage = (1 - (block.timestamp - ui.timestamp) / recoverInterval) * ui.usage
+             * userUsage' = (1 - (repayTimestamp - ui.timestamp) / recoverInterval) * ui.usage
+             * debt = usage - fee = userUsage - userUsage'
+             * repayTimestamp = debt * recoverInterval / ui.usage + block.timestamp
+             */
+            uint256 repayTimestamp = ((usage - fee).mul(recoverInterval) / ui.usage).add(block.timestamp); // if usage is greater than fee, ui.usage will never be zero
+            uint256 maxRepayTimestamp = block.timestamp.add(recoverInterval);
+            if (repayTimestamp > maxRepayTimestamp) {
+                // this shouldn't happen, we just make sure this
+                repayTimestamp = maxRepayTimestamp;
+            }
+            // if the time required to repay the debt is greater than withdrawDelay, then we use repayTimestamp
+            if (repayTimestamp > timestamp) {
+                timestamp = repayTimestamp;
+            }
+        }
+    }
+
+    /**
+     * @dev Estimate wtihdrawable amount.
      * @param user      Target user address
      * @param timestamp Current timestamp
      */
-    function whetherPayOffDebt(address user, uint256 timestamp) public view override returns (bool) {
-        if (totalAmount == 0) {
-            return true;
+    function estimateWithdrawableAmount(address user, uint256 timestamp) public view override returns (uint256) {
+        uint256 fee = estimateFee(user, timestamp);
+        uint256 dailyFee = config.dailyFee();
+        if (fee == 0 || dailyFee == 0) {
+            return 0;
         }
-
-        uint256 fee = userTotalAmount[user].mul(config.dailyFee()) / totalAmount;
-        uint256 usage = estimateUsage(userUsage[user], timestamp);
-        return fee >= usage;
+        return fee.mul(totalAmount) / dailyFee;
     }
 
     /**
@@ -93,11 +144,10 @@ contract Fee is ReentrancyGuard, Only, IFee {
      * @param user      User address
      * @param timestamp Current timestamp
      */
-    function estimateFee(address user, uint256 timestamp) external view override returns (uint256 fee) {
+    function estimateFee(address user, uint256 timestamp) public view override returns (uint256 fee) {
         if (totalAmount == 0) {
             return 0;
         }
-
         fee = userTotalAmount[user].mul(config.dailyFee()) / totalAmount;
         uint256 usage = estimateUsage(userUsage[user], timestamp);
         fee = fee > usage ? fee - usage : 0;

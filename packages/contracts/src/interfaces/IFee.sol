@@ -37,13 +37,19 @@ interface IFee is IOnly {
 
     function deposit(address user) external payable;
 
-    function withdraw(uint256 amount, address user) external;
+    function withdraw(
+        address user,
+        uint256 desiredAmount,
+        uint256 minAmount
+    ) external;
 
-    function whetherPayOffDebt(address user, uint256 timestamp) external view returns (bool);
+    function estimateWithdrawableTimestamp(address user, address from) external view returns (uint256);
+
+    function estimateWithdrawableAmount(address user, uint256 timestamp) external view returns (uint256);
 
     function estimateFee(address user, uint256 timestamp) external view returns (uint256);
 
-    function estimateUsage(UsageInfo calldata ui, uint256 timestamp) external view returns (uint256 usage);
+    function estimateUsage(UsageInfo calldata ui, uint256 timestamp) external view returns (uint256);
 
     function consume(address user, uint256 usage) external;
 }

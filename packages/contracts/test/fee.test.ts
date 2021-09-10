@@ -69,14 +69,14 @@ describe('Fee', () => {
 
   it('should withdraw failed', async () => {
     try {
-      await fee.methods.withdraw(100, deployer).send();
+      await fee.methods.withdraw(deployer, 100, 100).send();
       assert.fail("shouldn't succeed");
     } catch (err) {}
   });
 
   it('should withdraw succeed', async () => {
     await upTimestamp(deployer, withdrawDelay);
-    await fee.methods.withdraw(100, deployer).send();
+    await fee.methods.withdraw(deployer, 100, 100).send();
     expect((await fee.methods.userDeposit(deployer, deployer).call()).amount, 'amount should be equal').be.equal('0');
     expect(await fee.methods.totalAmount().call(), 'total amount should be equal').be.equal('0');
   });
@@ -89,14 +89,14 @@ describe('Fee', () => {
 
   it('should withdraw failed(withdrawFrom)', async () => {
     try {
-      await fee.methods.withdraw(100, user1).send();
+      await fee.methods.withdraw(user1, 100, 100).send();
       assert.fail("shouldn't succeed");
     } catch (err) {}
   });
 
   it('should withdraw succeed(withdrawFrom)', async () => {
     await upTimestamp(deployer, withdrawDelay);
-    await fee.methods.withdraw(100, user1).send();
+    await fee.methods.withdraw(user1, 100, 100).send();
     expect((await fee.methods.userDeposit(user1, deployer).call()).amount, 'amount should be equal').be.equal('0');
     expect(await fee.methods.totalAmount().call(), 'total amount should be equal').be.equal('0');
   });
@@ -109,13 +109,13 @@ describe('Fee', () => {
     await fee.methods.consume(user1, dailyFee.divn(2).toString()).send();
     await fee.methods.deposit(user2).send({ value: '200' });
     try {
-      await fee.methods.withdraw(100, user1).send();
+      await fee.methods.withdraw(user1, 100, 100).send();
       assert.fail("shouldn't succeed");
     } catch (err) {}
     await upTimestamp(deployer, feeRecoverInterval);
-    await fee.methods.withdraw(100, deployer).send();
-    await fee.methods.withdraw(100, user1).send();
-    await fee.methods.withdraw(200, user2).send();
+    await fee.methods.withdraw(deployer, 100, 100).send();
+    await fee.methods.withdraw(user1, 100, 100).send();
+    await fee.methods.withdraw(user2, 200, 200).send();
   });
 
   it('should estimate correctly', async () => {

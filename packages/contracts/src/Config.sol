@@ -42,6 +42,10 @@ contract Config is IConfig {
         return 0x0000000000000000000000000000000000001008;
     }
 
+    function contractFee() external view override returns (address) {
+        return 0x000000000000000000000000000000000000100b;
+    }
+
     // get unstake delay
     function unstakeDelay() external view override returns (uint256) {
         return 30 seconds;

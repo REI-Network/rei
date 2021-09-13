@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/utils/EnumerableMap.sol";
 import "./interfaces/IUnstakePool.sol";
 import "./interfaces/IValidatorRewardPool.sol";
 import "./interfaces/IStakeManager.sol";
+import "./libraries/Util.sol";
 import "./CommissionShare.sol";
 import "./Only.sol";
 
@@ -253,18 +254,9 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     // receive GXC transfer
     receive() external payable {}
 
-    // check if the address is a contract
-    function isContract(address addr) private view returns (bool) {
-        uint256 size;
-        assembly {
-            size := extcodesize(addr)
-        }
-        return size > 0;
-    }
-
     // create a new validator
     function createValidator(address validator) private returns (Validator memory) {
-        require(!isContract(validator), "StakeManager: validator can not be a contract");
+        require(!Util.isContract(validator), "StakeManager: validator can not be a contract");
         uint256 id = validatorId;
         Validator storage v = validators[validator];
         v.id = id;

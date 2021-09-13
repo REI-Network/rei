@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/IFee.sol";
 import "./interfaces/IFreeFee.sol";
 import "./interfaces/IFeePool.sol";
+import "./interfaces/IContractFee.sol";
 import "./interfaces/IStakeManager.sol";
 import "./Only.sol";
 
@@ -18,9 +19,10 @@ contract Router is ReentrancyGuard, Only {
      *      It will be automatically appended to the end of the transaction log.
      * @param feeUsage          `dailyFee` usage
      * @param freeFeeUsage      `dailyFreeFee` usage
+     * @param contractFeeUsage  Contract fee usage
      * @param balanceUsage      Transaction sender's balance usage
      */
-    event UsageInfo(uint256 feeUsage, uint256 freeFeeUsage, uint256 balanceUsage);
+    event UsageInfo(uint256 feeUsage, uint256 freeFeeUsage, uint256 contractFeeUsage, uint256 balanceUsage);
 
     constructor(IConfig config) public Only(config) {}
 
@@ -31,12 +33,38 @@ contract Router is ReentrancyGuard, Only {
 
     /**
      * @dev Estimate daily fee and free fee left.
-     * @param user              User address
+     * @param from              Transaction sender
+     * @param to                Transaction receiver(if contract creation, address(0))
      * @param timestamp         Timestamp
      */
-    function estimateTotalFee(address user, uint256 timestamp) external view returns (uint256 fee, uint256 freeFee) {
-        fee = IFee(config.fee()).estimateFee(user, timestamp);
-        freeFee = IFreeFee(config.freeFee()).estimateFreeFee(user, timestamp);
+    function estimateTotalFee(
+        address from,
+        address to,
+        uint256 timestamp
+    )
+        external
+        view
+        returns (
+            uint256 fee,
+            uint256 freeFee,
+            uint256 contractFee
+        )
+    {
+        IFee _fee = IFee(config.fee());
+        fee = _fee.estimateFee(from, timestamp);
+        freeFee = IFreeFee(config.freeFee()).estimateFreeFee(from, timestamp);
+        // if the transaction is a contract creation, to address will be zero
+        // if the transaction isn't a contract creation and tx.to is address(0), it still doesn't matter,
+        // because address(0) will never be a contract address
+        if (to != address(0)) {
+            contractFee = IContractFee(config.contractFee()).feeOf(to);
+            if (contractFee > 0) {
+                uint256 availableContractFee = _fee.estimateFee(to, timestamp);
+                if (contractFee > availableContractFee) {
+                    contractFee = availableContractFee;
+                }
+            }
+        }
     }
 
     /**
@@ -46,27 +74,36 @@ contract Router is ReentrancyGuard, Only {
      *      otherwise, if the consumed fee is user's balance,
      *      it will add the fee to the fee pool and increase miner's share of the fee pool.
      * @param validator         Block miner
-     * @param user              Transaction sender
+     * @param from              Transaction sender
+     * @param to                Transaction receiver(if contract creation, address(0))
      * @param feeUsage          `dailyFee` usage
      * @param freeFeeUsage      `dailyFreeFee` usage
+     * @param contractFeeUsage  Contract fee usage
      */
     function assignTransactionReward(
         address validator,
-        address user,
+        address from,
+        address to,
         uint256 feeUsage,
-        uint256 freeFeeUsage
+        uint256 freeFeeUsage,
+        uint256 contractFeeUsage
     ) external payable nonReentrant onlySystemCaller {
+        IFee fee = IFee(config.fee());
+        IFeePool feePool = IFeePool(config.feePool());
         if (feeUsage > 0) {
-            IFee(config.fee()).consume(user, feeUsage);
+            fee.consume(from, feeUsage);
         }
         if (freeFeeUsage > 0) {
-            IFreeFee(config.freeFee()).consume(user, freeFeeUsage);
+            IFreeFee(config.freeFee()).consume(from, freeFeeUsage);
         }
         if (msg.value > 0) {
-            IFeePool(config.feePool()).accumulate{ value: msg.value }(true);
+            feePool.accumulate{ value: msg.value }(true);
         }
-        IFeePool(config.feePool()).earn(validator, feeUsage.add(freeFeeUsage).add(msg.value));
-        emit UsageInfo(feeUsage, freeFeeUsage, msg.value);
+        if (contractFeeUsage > 0) {
+            fee.consume(to, contractFeeUsage);
+        }
+        feePool.earn(validator, feeUsage.add(freeFeeUsage).add(contractFeeUsage).add(msg.value));
+        emit UsageInfo(feeUsage, freeFeeUsage, contractFeeUsage, msg.value);
     }
 
     /**
@@ -89,6 +126,7 @@ contract Router is ReentrancyGuard, Only {
             IFeePool(config.feePool()).accumulate{ value: feePoolReward }(false);
         }
 
+        // call onAssignBlockReward callback
         IFeePool(config.feePool()).onAssignBlockReward();
     }
 

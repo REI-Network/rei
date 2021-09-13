@@ -5,12 +5,10 @@ pragma solidity ^0.6.0;
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./interfaces/ICommissionShare.sol";
-import "./libraries/Math.sol";
+import "./libraries/Util.sol";
 import "./Only.sol";
 
 contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
-    using Math for uint256;
-
     // validator address
     address public validator;
 
@@ -28,7 +26,7 @@ contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
         if (_totalSupply == 0) {
             amount = shares;
         } else {
-            amount = address(this).balance.mul(shares).ceilDiv(_totalSupply);
+            amount = Util.divCeil(address(this).balance.mul(shares), _totalSupply);
         }
     }
 
@@ -42,7 +40,7 @@ contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
         if (balance == 0) {
             shares = 0;
         } else {
-            shares = amount.mul(totalSupply()).ceilDiv(balance);
+            shares = Util.divCeil(amount.mul(totalSupply()), balance);
         }
     }
 

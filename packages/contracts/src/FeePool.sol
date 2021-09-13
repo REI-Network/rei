@@ -83,9 +83,9 @@ contract FeePool is ReentrancyGuard, Only, IFeePool {
                         break;
                     }
                 }
+                accTxFee = 0;
             }
             totalShares = 0;
-            accTxFee = 0;
             globalTimestamp = block.timestamp;
         }
     }

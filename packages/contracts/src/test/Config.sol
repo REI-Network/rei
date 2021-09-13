@@ -2,7 +2,7 @@
 
 pragma solidity ^0.6.0;
 
-import "./interfaces/IConfig.sol";
+import "../interfaces/IConfig.sol";
 
 // This is just a contract used during testing.
 contract Config_test is IConfig {
@@ -14,6 +14,7 @@ contract Config_test is IConfig {
     address private ff;
     address private fp;
     address private r;
+    address private cf;
 
     function setStakeManager(address _s) external {
         s = _s;
@@ -47,6 +48,10 @@ contract Config_test is IConfig {
         r = _r;
     }
 
+    function setContractFee(address _cf) external {
+        cf = _cf;
+    }
+
     function stakeManager() external view override returns (address) {
         return s;
     }
@@ -77,6 +82,10 @@ contract Config_test is IConfig {
 
     function router() external view override returns (address) {
         return r;
+    }
+
+    function contractFee() external view override returns (address) {
+        return cf;
     }
 
     function unstakeDelay() external view override returns (uint256) {

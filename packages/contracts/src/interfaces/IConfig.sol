@@ -22,6 +22,8 @@ interface IConfig {
 
     function router() external view returns (address);
 
+    function contractFee() external view returns (address);
+
     function unstakeDelay() external view returns (uint256);
 
     function withdrawDelay() external view returns (uint256);

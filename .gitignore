@@ -12,7 +12,3 @@ packages/contracts/deployments
 
 # Solidity doc gen files
 packages/contracts/docs
-
-# Test contracts
-!packages/contracts/src/test/Config.sol 
-packages/contracts/src/test

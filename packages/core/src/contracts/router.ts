@@ -5,8 +5,8 @@ import { Contract } from './contract';
 
 // function selector of router
 const methods = {
-  estimateTotalFee: toBuffer('0x15e8cc34'),
-  assignTransactionReward: toBuffer('0xf49cd323'),
+  estimateTotalFee: toBuffer('0xab124206'),
+  assignTransactionReward: toBuffer('0xcec7a83e'),
   assignBlockReward: toBuffer('0x0cccae70'),
   onAfterBlock: toBuffer('0xf4cfad16')
 };
@@ -16,20 +16,21 @@ export class Router extends Contract {
     super(evm, common, methods, Address.fromString(common.param('vm', 'raddr')));
   }
 
-  estimateTotalFee(user: Address, timestamp: number) {
+  estimateTotalFee(sender: Address, to: Address, timestamp: number) {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('estimateTotalFee', ['address', 'uint256'], [user.toString(), timestamp]));
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('estimateTotalFee', ['address', 'address', 'uint256'], [sender.toString(), to.toString(), timestamp]));
       let i = 0;
       return {
         fee: new BN(returnValue.slice(i++ * 32, i * 32)),
-        freeFee: new BN(returnValue.slice(i++ * 32, i * 32))
+        freeFee: new BN(returnValue.slice(i++ * 32, i * 32)),
+        contractFee: new BN(returnValue.slice(i++ * 32, i * 32))
       };
     });
   }
 
-  assignTransactionReward(validator: Address, user: Address, feeUsage: BN, freeFeeUsage: BN, amount: BN) {
+  assignTransactionReward(validator: Address, sender: Address, to: Address, feeUsage: BN, freeFeeUsage: BN, amount: BN, contractFee: BN) {
     return this.runWithLogger(async () => {
-      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('assignTransactionReward', ['address', 'address', 'uint256', 'uint256'], [validator.toString(), user.toString(), feeUsage.toString(), freeFeeUsage.toString()], amount));
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('assignTransactionReward', ['address', 'address', 'address', 'uint256', 'uint256', 'uint256'], [validator.toString(), sender.toString(), to.toString(), feeUsage.toString(), freeFeeUsage.toString(), contractFee.toString()], amount));
       return logs!;
     });
   }

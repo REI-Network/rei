@@ -23,12 +23,10 @@ contract Product {
 
 contract Factory {
     IConfig public config;
-    address public deployer;
 
     event NewProduct(address indexed product);
 
     constructor(IConfig _config) public {
-        deployer = msg.sender;
         config = _config;
     }
 

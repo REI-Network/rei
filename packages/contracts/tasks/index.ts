@@ -1,7 +1,7 @@
 import { task } from 'hardhat/config';
 import type { Artifacts } from 'hardhat/types';
 import type Web3 from 'web3';
-import { BN, MAX_INTEGER } from 'ethereumjs-util';
+import { Address, BN, MAX_INTEGER } from 'ethereumjs-util';
 
 function toBN(data: number | string) {
   if (typeof data === 'string' && data.startsWith('0x')) {
@@ -239,12 +239,13 @@ task('withdraw', 'Withdraw GXC from fee contract')
 
 task('fee', 'Query user fee and free fee info')
   .addParam('user', 'user address')
+  .addOptionalParam('to', 'receiver address')
   .addOptionalParam('address', 'router contract address')
   .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
     const { deployer } = await getNamedAccounts();
     const router = await createWeb3Contract({ name: 'Router', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
-    const { fee, freeFee } = await router.methods.estimateTotalFee(taskArgs.user, Math.ceil(Date.now() / 1000)).call();
-    console.log('fee:', fee, 'freeFee:', freeFee);
+    const { fee, freeFee, contractFee } = await router.methods.estimateTotalFee(taskArgs.user, taskArgs.to ?? Address.zero().toString(), Math.ceil(Date.now() / 1000)).call();
+    console.log('fee:', fee, 'freeFee:', freeFee, 'contractFee:', contractFee);
   });
 
 task('afb', 'Call onAfterBlock callback')
@@ -261,4 +262,78 @@ task('gb', 'Get gxc balance')
   .addParam('user', 'target user')
   .setAction(async (taskArgs, { web3 }) => {
     console.log('GXC:', await web3.eth.getBalance(taskArgs.user));
+  });
+
+task('register', 'Register contract creator')
+  .addOptionalParam('parent', 'Root creator address')
+  .addOptionalParam('path0', 'Path 0, if it is a `create`, the value should be nonce(eg: 127), otherwise the value should be `${salt},${codeHash}`(eg: 0x12324124,0x12312321)')
+  .addOptionalParam('path1', 'Path 1, if it is a `create`, the value should be nonce(eg: 127), otherwise the value should be `${salt},${codeHash}`(eg: 0x12324124,0x12312321)')
+  .addOptionalParam('path2', 'Path 2, if it is a `create`, the value should be nonce(eg: 127), otherwise the value should be `${salt},${codeHash}`(eg: 0x12324124,0x12312321)')
+  .addOptionalParam('path3', 'Path 3, if it is a `create`, the value should be nonce(eg: 127), otherwise the value should be `${salt},${codeHash}`(eg: 0x12324124,0x12312321)')
+  .addOptionalParam('path4', 'Path 4, if it is a `create`, the value should be nonce(eg: 127), otherwise the value should be `${salt},${codeHash}`(eg: 0x12324124,0x12312321)')
+  .addOptionalParam('address', 'contract fee address')
+  .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
+    const { deployer } = await getNamedAccounts();
+    const contractFee = await createWeb3Contract({ name: 'ContractFee', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
+    const flags: boolean[] = [];
+    const nonces: string[] = [];
+    const c2is: {
+      salt: string;
+      deployCodeHash: string;
+    }[] = [];
+    for (let i = 0; i < 5; i++) {
+      const value: string = taskArgs[`path${i}`];
+      if (!value) {
+        break;
+      }
+      if (value.includes(',')) {
+        // it is a `create2`
+        if (value.length !== 64 + 2 + 64 + 2 + 1) {
+          throw new Error('invalid value: ' + value);
+        }
+        c2is.push({
+          salt: value.substr(0, 66),
+          deployCodeHash: value.substr(67)
+        });
+        flags.push(false);
+      } else {
+        // it is a `create`
+        nonces.push(toBN(value).toString());
+        flags.push(true);
+      }
+    }
+    if (flags.length === 0) {
+      throw new Error('missing path');
+    }
+    await contractFee.methods.register(taskArgs.parent ?? deployer, flags, nonces, c2is).send();
+    console.log('Register succeed');
+  });
+
+task('setfee', 'Set contract fee')
+  .addParam('contract', 'Contract address')
+  .addParam('fee', 'Contract fee')
+  .addOptionalParam('address', 'contract fee address')
+  .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
+    const { deployer } = await getNamedAccounts();
+    const contractFee = await createWeb3Contract({ name: 'ContractFee', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
+    await contractFee.methods.setFee(taskArgs.contract, taskArgs.fee).send();
+    console.log('Set contract fee succeed');
+  });
+
+task('sf', 'Get contract fee')
+  .addParam('contract', 'Contract address')
+  .addOptionalParam('address', 'contract fee address')
+  .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
+    const { deployer } = await getNamedAccounts();
+    const contractFee = await createWeb3Contract({ name: 'ContractFee', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
+    console.log('The fee of', taskArgs.contract, 'is', await contractFee.methods.feeOf(taskArgs.contract).call());
+  });
+
+task('cf', 'Get contract creator')
+  .addParam('contract', 'Contract address')
+  .addOptionalParam('address', 'contract fee address')
+  .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
+    const { deployer } = await getNamedAccounts();
+    const contractFee = await createWeb3Contract({ name: 'ContractFee', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
+    console.log('The creator of', taskArgs.contract, 'is', await contractFee.methods.creatorOf(taskArgs.contract).call());
   });

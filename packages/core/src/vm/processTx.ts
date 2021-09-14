@@ -14,6 +14,7 @@ import { Node } from '../node';
 export function makeRunTxCallback(router: Router, systemCaller: Address, miner: Address, timestamp: number) {
   let feeLeft!: BN;
   let freeFeeLeft!: BN;
+  let contractFeeLeft!: BN;
   let balanceLeft!: BN;
   let logs!: Log[];
 
@@ -24,6 +25,7 @@ export function makeRunTxCallback(router: Router, systemCaller: Address, miner: 
 
     feeLeft = result.fee;
     freeFeeLeft = result.freeFee;
+    contractFeeLeft = result.contractFee;
     balanceLeft = fromAccount.balance.sub(tx.value);
 
     // update caller's nonce
@@ -38,14 +40,25 @@ export function makeRunTxCallback(router: Router, systemCaller: Address, miner: 
     let actualTxCost = _actualTxCost.clone();
     let feeUsage = new BN(0);
     let freeFeeUsage = new BN(0);
+    let contractFeeUsage = new BN(0);
     let balanceUsage = new BN(0);
+    // 1. consume contract fee
+    if (actualTxCost.gte(contractFeeLeft)) {
+      contractFeeUsage = contractFeeLeft.clone();
+      actualTxCost.isub(contractFeeLeft);
+    } else {
+      contractFeeUsage = actualTxCost.clone();
+      actualTxCost = new BN(0);
+    }
+    // 2. consume user's fee
     if (actualTxCost.gte(feeLeft)) {
       feeUsage = feeLeft.clone();
       actualTxCost.isub(feeLeft);
-    } else {
+    } else if (actualTxCost.gtn(0)) {
       feeUsage = actualTxCost.clone();
       actualTxCost = new BN(0);
     }
+    // 3. consume user's free fee
     if (actualTxCost.gt(freeFeeLeft)) {
       freeFeeUsage = freeFeeLeft.clone();
       actualTxCost.isub(freeFeeLeft);
@@ -53,6 +66,7 @@ export function makeRunTxCallback(router: Router, systemCaller: Address, miner: 
       freeFeeUsage = actualTxCost.clone();
       actualTxCost = new BN(0);
     }
+    // 4. consume user's balance
     if (actualTxCost.gt(balanceLeft)) {
       // this shouldn't happened
       throw new Error('balance left is not enough for actualTxCost, revert tx');
@@ -60,7 +74,7 @@ export function makeRunTxCallback(router: Router, systemCaller: Address, miner: 
       balanceUsage = actualTxCost.clone();
       actualTxCost = new BN(0);
     }
-    logger.debug('Node::processTx, makeRunTxCallback::afterTx, tx:', '0x' + tx.hash().toString('hex'), 'actualTxCost:', _actualTxCost.toString(), 'feeUsage:', feeUsage.toString(), 'freeFeeUsage:', freeFeeUsage.toString(), 'balanceUsage:', balanceUsage.toString());
+    logger.debug('Node::processTx, makeRunTxCallback::afterTx, tx:', '0x' + tx.hash().toString('hex'), 'actualTxCost:', _actualTxCost.toString(), 'feeUsage:', feeUsage.toString(), 'freeFeeUsage:', freeFeeUsage.toString(), 'contractFeeUsage:', contractFeeUsage.toString(), 'balanceUsage:', balanceUsage.toString());
 
     const caller = tx.getSenderAddress();
     if (balanceUsage.gtn(0)) {
@@ -79,7 +93,7 @@ export function makeRunTxCallback(router: Router, systemCaller: Address, miner: 
       await state.putAccount(systemCaller, systemCallerAccount);
     }
     // call the router contract and collect logs
-    logs = await router.assignTransactionReward(miner, caller, feeUsage, freeFeeUsage, balanceUsage);
+    logs = await router.assignTransactionReward(miner, caller, tx.to ?? Address.zero(), feeUsage, freeFeeUsage, balanceUsage, contractFeeUsage);
   };
 
   async function generateTxReceipt(this: VM, tx: TypedTransaction, txResult: RunTxResult, cumulativeGasUsed: BN): Promise<TxReceipt> {

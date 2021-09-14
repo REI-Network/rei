@@ -53,6 +53,8 @@ export abstract class Contract {
     await deploy('fft', defaultArgs);
     // deploy free fee contract
     await deploy('ff', defaultArgs);
+    // deploy contract fee contract
+    await deploy('cf');
     // deploy router contract
     await deploy('r', defaultArgs);
     // deploy unstake pool contract

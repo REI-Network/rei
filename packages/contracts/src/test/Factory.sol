@@ -6,18 +6,8 @@ import "../interfaces/IContractFee.sol";
 import "../interfaces/IConfig.sol";
 
 contract Product {
-    IConfig public config;
-
-    constructor() public {}
-
-    function init(IConfig _config) external {
-        config = _config;
-    }
-
-    function exists() external pure returns (bool) {}
-
-    function setFee(uint256 fee) external {
-        IContractFee(config.contractFee()).setFee(address(this), fee);
+    function exists() external pure returns (bool) {
+        return true;
     }
 }
 
@@ -32,7 +22,6 @@ contract Factory {
 
     function produce() external {
         Product product = new Product();
-        product.init(config);
         emit NewProduct(address(product));
     }
 
@@ -42,7 +31,6 @@ contract Factory {
         assembly {
             product := create2(0, add(bytecode, 32), mload(bytecode), salt)
         }
-        Product(product).init(config);
         emit NewProduct(product);
     }
 

@@ -164,20 +164,20 @@ contract ContractFee is IContractFee {
 
     /**
      * @dev Set contract fee.
-     *      The contract fee can be set only when the sender is the creator of the contract or the contract itself.
+     *      The contract fee can be set only when the sender is the creator of the contract.
      * @param contractAddress       Target contract address
      * @param fee                   Contract fee
      */
     function setFee(address contractAddress, uint256 fee) external override {
-        if (contractAddress == msg.sender) {
-            require(Util.isContract(contractAddress), "ContractFee: invalid sender");
-        } else {
-            address creator = creatorOf[contractAddress];
-            while (creator != address(0) && creator != msg.sender) {
-                creator = creatorOf[creator];
-            }
-            require(creator != address(0), "ContractFee: invalid sender");
+        // this will cause some problems, when delegate call
+        // if (contractAddress == msg.sender) {
+        //     require(Util.isContract(contractAddress), "ContractFee: invalid sender");
+        // }
+        address creator = creatorOf[contractAddress];
+        while (creator != address(0) && creator != msg.sender) {
+            creator = creatorOf[creator];
         }
+        require(creator != address(0), "ContractFee: invalid sender");
         feeOf[contractAddress] = fee;
     }
 }

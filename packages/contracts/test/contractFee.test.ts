@@ -73,6 +73,7 @@ describe('ContractFee', () => {
     } = await factory.methods.produce().send();
     // a new contract address' nonce will be 1 instead of 0
     expect((product as string).toLocaleLowerCase(), 'should produce succeed').be.equal(create(new BN(1)));
+    expect(await createProductContract(product).methods.exists().call(), 'should exist').be.true;
     product1 = product;
   });
 
@@ -85,6 +86,7 @@ describe('ContractFee', () => {
       }
     } = await factory.methods.produce2(bufferToHex(salt)).send();
     expect((product as string).toLocaleLowerCase(), 'should produce2 succeed').be.equal(create2(salt));
+    expect(await createProductContract(product).methods.exists().call(), 'should exist').be.true;
     product2 = product;
   });
 
@@ -105,15 +107,8 @@ describe('ContractFee', () => {
 
   it('should set contract fee failed(2)', async () => {
     try {
-      await createProductContract(product1).methods.setFee('40000').send();
-      assert.fail('should fail(2)');
-    } catch (err) {}
-  });
-
-  it('should set contract fee failed(3)', async () => {
-    try {
       await factory.methods.setFeeFor(product2, '50000').send();
-      assert.fail('should fail(3)');
+      assert.fail('should fail(2)');
     } catch (err) {}
   });
 
@@ -154,11 +149,6 @@ describe('ContractFee', () => {
   });
 
   it('should set contract fee succeed(2)', async () => {
-    await createProductContract(product1).methods.setFee('40000').send();
-    expect(await contractFee.methods.feeOf(product1).call(), 'contract fee should be equal').be.equal('40000');
-  });
-
-  it('should set contract fee succeed(3)', async () => {
     await factory.methods.setFeeFor(product2, '50000').send();
     expect(await contractFee.methods.feeOf(product2).call(), 'contract fee should be equal').be.equal('50000');
   });

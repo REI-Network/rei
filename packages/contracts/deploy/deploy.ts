@@ -25,6 +25,7 @@ const func: DeployFunction = async function ({ deployments, getNamedAccounts }) 
 
   await deployContract('UnstakePool');
   await deployContract('ValidatorRewardPool');
+  await deployContract('ContractFee', true, []);
   await deployContract('Fee');
   await deployContract('FeePool');
   await deployContract('FreeFee');

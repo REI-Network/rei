@@ -6,7 +6,6 @@ pragma experimental ABIEncoderV2;
 struct Create2Info {
     bytes32 salt;
     bytes32 deployCodeHash;
-    bytes32 codeHash;
 }
 
 /**
@@ -16,6 +15,14 @@ interface IContractFee {
     function feeOf(address contractAddress) external view returns (uint256);
 
     function creatorOf(address contractAddress) external view returns (address);
+
+    function generateAddress(address from, uint256 nonce) external pure returns (address);
+
+    function generateAddress2(
+        address from,
+        bytes32 salt,
+        bytes32 codeHash
+    ) external pure returns (address);
 
     function register(
         address from,

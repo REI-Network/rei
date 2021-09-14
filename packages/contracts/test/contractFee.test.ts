@@ -2,7 +2,6 @@ import type { Artifacts } from 'hardhat/types';
 import type Web3 from 'web3';
 import { assert, expect } from 'chai';
 import { BN, generateAddress, generateAddress2, Address, keccak256, MAX_INTEGER, bufferToHex } from 'ethereumjs-util';
-import { toBN } from './utils';
 
 declare var artifacts: Artifacts;
 declare var web3: Web3;
@@ -89,6 +88,35 @@ describe('ContractFee', () => {
     product2 = product;
   });
 
+  it('should set contract fee failed(0)', async () => {
+    try {
+      await contractFee.methods.setFee(factory.options.address, '10000').send();
+      assert.fail('should fail(0)');
+    } catch (err) {}
+  });
+
+  it('should set contract fee failed(1)', async () => {
+    try {
+      await contractFee.methods.setFee(product1, '20000').send();
+      await contractFee.methods.setFee(product2, '30000').send();
+      assert.fail('should fail(1)');
+    } catch (err) {}
+  });
+
+  it('should set contract fee failed(2)', async () => {
+    try {
+      await createProductContract(product1).methods.setFee('40000').send();
+      assert.fail('should fail(2)');
+    } catch (err) {}
+  });
+
+  it('should set contract fee failed(3)', async () => {
+    try {
+      await factory.methods.setFeeFor(product2, '50000').send();
+      assert.fail('should fail(3)');
+    } catch (err) {}
+  });
+
   it('should register succeed(produce)', async () => {
     await contractFee.methods.register(deployer, [true, true], [2, 1], []).send();
     expect(await contractFee.methods.creatorOf(factory.options.address).call(), 'creator of factory should be deployer').be.equal(deployer);
@@ -104,13 +132,34 @@ describe('ContractFee', () => {
         [
           {
             salt,
-            deployCodeHash: salt,
-            codeHash: keccak256(productBytecode.slice(32))
+            deployCodeHash: salt
           }
         ]
       )
       .send();
     expect(await contractFee.methods.creatorOf(factory.options.address).call(), 'creator of factory should be deployer').be.equal(deployer);
     expect(await contractFee.methods.creatorOf(product2).call(), 'creator of product2 should be factory').be.equal(factory.options.address);
+  });
+
+  it('should set contract fee succeed(0)', async () => {
+    await contractFee.methods.setFee(factory.options.address, '10000').send();
+    expect(await contractFee.methods.feeOf(factory.options.address).call(), 'contract fee should be equal').be.equal('10000');
+  });
+
+  it('should set contract fee succeed(1)', async () => {
+    await contractFee.methods.setFee(product1, '20000').send();
+    await contractFee.methods.setFee(product2, '30000').send();
+    expect(await contractFee.methods.feeOf(product1).call(), 'contract fee should be equal').be.equal('20000');
+    expect(await contractFee.methods.feeOf(product2).call(), 'contract fee should be equal').be.equal('30000');
+  });
+
+  it('should set contract fee succeed(2)', async () => {
+    await createProductContract(product1).methods.setFee('40000').send();
+    expect(await contractFee.methods.feeOf(product1).call(), 'contract fee should be equal').be.equal('40000');
+  });
+
+  it('should set contract fee succeed(3)', async () => {
+    await factory.methods.setFeeFor(product2, '50000').send();
+    expect(await contractFee.methods.feeOf(product2).call(), 'contract fee should be equal').be.equal('50000');
   });
 });

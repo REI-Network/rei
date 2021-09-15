@@ -11,6 +11,7 @@ import { TxPricedList } from './txpricedlist';
 import { Journal } from './journal';
 import { Node } from '../node';
 import { validateTx } from '../validation';
+import { isEnableStaking } from '../hardforks';
 
 /**
  * Calculate the transaction slots
@@ -577,14 +578,18 @@ export class TxPool extends EventEmitter {
       const period: number = this.currentHeader._common.consensusConfig().period;
       const currentTimestamp = this.currentHeader.timestamp.toNumber();
       // check whether the user's fee can cover tx costs
-      await validateTx(tx, this.node.getRouter(this.currentVM, this.currentBlock), senderAddr, currentTimestamp + period, account.balance);
+      if (isEnableStaking(this.currentBlock._common)) {
+        await validateTx(tx, this.node.getRouter(this.currentVM, this.currentBlock), senderAddr, currentTimestamp + period, account.balance);
+      } else if (account.balance.lt(tx.getUpfrontCost())) {
+        throw new Error(`balance is not enough: ${tx.getUpfrontCost().toString()} account: ${account.balance.toString()}`);
+      }
 
       if (!checkTxIntrinsicGas(tx)) {
         throw new Error('checkTxIntrinsicGas failed');
       }
       return true;
     } catch (err) {
-      logger.warn('Txpool drop tx', bufferToHex(tx.hash()), 'validateTx failed:', err.message);
+      logger.warn('Txpool drop tx', bufferToHex(tx.hash()), 'validateTx failed:', err);
       return false;
     }
   }

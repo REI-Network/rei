@@ -116,7 +116,7 @@ export class Miner {
     }
   }
 
-  private async _getActiveSigersByBlock(block: Block): Promise<{
+  private async _getActiveSignersByBlock(block: Block): Promise<{
     activeSigners: Address[];
     proposer?: Address;
   }> {
@@ -158,7 +158,7 @@ export class Miner {
       return;
     }
 
-    const { activeSigners, proposer } = await this._getActiveSigersByBlock(this.node.blockchain.latestBlock);
+    const { activeSigners, proposer } = await this._getActiveSignersByBlock(this.node.blockchain.latestBlock);
     logger.debug(
       'Miner::init, activeSigners:',
       activeSigners.map((a) => a.toString())
@@ -272,7 +272,7 @@ export class Miner {
       const newNumber = header.number.addn(1);
       const period: number = header._common.consensusConfig().period;
       const timestamp = header.timestamp.toNumber() + period;
-      const { activeSigners, proposer } = await this._getActiveSigersByBlock(block);
+      const { activeSigners, proposer } = await this._getActiveSignersByBlock(block);
       const [inTurn, difficulty] = this._calcCliqueDifficulty(activeSigners, header._common, { number: newNumber, proposer });
       const currentTd = await this.node.db.getTotalDifficulty(header.hash(), header.number);
       const nextTd = currentTd.add(difficulty);

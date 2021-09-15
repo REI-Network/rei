@@ -26,7 +26,9 @@ function postByzantiumTxReceiptsToReceipts(receipts: PostByzantiumTxReceipt[]) {
   );
 }
 
-export interface ProcessBlockOpts extends Pick<RunBlockOpts, 'generate' | 'block'> {}
+export interface ProcessBlockOpts extends Pick<RunBlockOpts, 'generate' | 'block'> {
+  skipConsensusValidation?: boolean;
+}
 
 export async function processBlock(this: Node, options: ProcessBlockOpts) {
   let { block, generate } = options;
@@ -55,10 +57,14 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
 
     if (!parentEnableStaking) {
       parentValidatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
-      preHF1ConsensusValidateHeader.call(block.header, this.blockchain);
+      if (!options.skipConsensusValidation) {
+        preHF1ConsensusValidateHeader.call(block.header, this.blockchain);
+      }
     } else {
       parentValidatorSet = await this.validatorSets.get(parent.header.stateRoot, parentStakeManager);
-      consensusValidateHeader.call(block.header, parentValidatorSet.activeSigners(), parentValidatorSet.proposer());
+      if (!options.skipConsensusValidation) {
+        consensusValidateHeader.call(block.header, parentValidatorSet.activeSigners(), parentValidatorSet.proposer());
+      }
       if (block.header.difficulty.eqn(1)) {
         logger.debug('Node::processBlock, number:', block.header.number.toString(), 'this block should mint by:', parentValidatorSet.proposer().toString(), ', but minted by:', miner.toString());
       } else {
@@ -66,7 +72,9 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
       }
     }
   } else {
-    preHF1ConsensusValidateHeader.call(block.header, this.blockchain);
+    if (!options.skipConsensusValidation) {
+      preHF1ConsensusValidateHeader.call(block.header, this.blockchain);
+    }
   }
 
   let receipts!: Receipt[];

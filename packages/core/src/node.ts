@@ -26,7 +26,7 @@ import { BlockchainMonitor } from './blockchainmonitor';
 import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
 import { ValidatorSets } from './staking';
 import { StakeManager, Router } from './contracts';
-import { processBlock } from './vm';
+import { processBlock, ProcessBlockOpts } from './vm';
 
 const timeoutBanTime = 60 * 5 * 1000;
 const invalidBanTime = 60 * 10 * 1000;
@@ -49,7 +49,7 @@ export interface NodeOptions {
   /**
    * Chain name, default is `gxc2-mainnet`
    */
-  chain?: string;
+  chain?: string | { chain: any; genesisState?: any };
   mine: {
     /**
      * Enable miner
@@ -104,8 +104,7 @@ export interface NodeOptions {
   };
 }
 
-export interface ProcessBlockOptions {
-  generate: boolean;
+export interface ProcessBlockOptions extends Pick<ProcessBlockOpts, 'generate' | 'skipConsensusValidation'> {
   broadcast: boolean;
 }
 
@@ -389,7 +388,7 @@ export class Node {
     await this.initPromise;
     for await (let { block, options, resolve, reject } of this.processQueue.generator()) {
       try {
-        const { proposer, activeSigners, reorged, block: newBlock } = await processBlock.bind(this)({ block, generate: options.generate });
+        const { proposer, activeSigners, reorged, block: newBlock } = await processBlock.bind(this)({ ...options, block });
         block = newBlock;
         resolve(block);
 

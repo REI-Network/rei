@@ -2,8 +2,13 @@
 
 pragma solidity ^0.6.0;
 
-import "../interfaces/IContractFee.sol";
-import "../interfaces/IConfig.sol";
+interface IConfig {
+    function contractFee() external view returns (address);
+}
+
+interface IContractFee {
+    function setFee(address, uint256) external;
+}
 
 contract Product {
     function exists() external pure returns (bool) {

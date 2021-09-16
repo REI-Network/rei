@@ -26,7 +26,9 @@
     "prettier-plugin-solidity": "1.0.0-beta.6"
   },
   "scripts": {
+    "preinstall": "npm run checkNpmVersion",
     "postinstall": "npm run build -ws",
+    "checkNpmVersion": "./scripts/check-npm-version.sh",
     "build:structure": "npm run build -w @gxchain2/structure",
     "build:blockchain": "npm run build -w @gxchain2/blockchain",
     "build:cli": "npm run build -w @gxchain2/cli",

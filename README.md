@@ -88,7 +88,7 @@ gxchain2 --chain gxc2-testnet
 
 ## Build
 
-This monorepo [npm workspaces](https://docs.npmjs.com/cli/v7/using-npm/workspaces). It links the local packages together, making development a lot easier.
+This monorepo uses [npm workspaces](https://docs.npmjs.com/cli/v7/using-npm/workspaces). It links the local packages together, making development a lot easier.
 
 Install:
 

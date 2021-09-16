@@ -13,15 +13,18 @@ describe('BlockchainMonitor', async () => {
   let fork2: Block[];
 
   async function processBlock(block: Block) {
-    await new Promise<void>(async (resolve) => {
-      block = await node.processBlock(block, {
-        onFinished: () => {
-          resolve();
-        },
-        broadcast: false,
-        skipConsensusValidation: true,
-        runTxOpts: { skipNonce: true }
-      });
+    await new Promise<void>(async (resolve, reject) => {
+      try {
+        block = await node.processBlock(block, {
+          onFinished: () => {
+            resolve();
+          },
+          broadcast: false,
+          skipConsensusValidation: true
+        });
+      } catch (err) {
+        reject(err);
+      }
     });
     return block;
   }
@@ -64,6 +67,8 @@ describe('BlockchainMonitor', async () => {
       expect(logs.length, 'logs length should be 1').be.equal(2);
       expect(logs[0].removed === false, "log shouldn't be removed").be.true;
       expect(logs[1].removed === false, "log shouldn't be removed").be.true;
+    } catch (err) {
+      throw err;
     } finally {
       node.bcMonitor.off('newHeads', onNewHeads);
       node.bcMonitor.off('logs', onLogs);
@@ -83,6 +88,8 @@ describe('BlockchainMonitor', async () => {
       expect(removedLogs.length, 'removedLogs length should be 1').be.equal(2);
       expect(removedLogs[0].removed === true, 'log should be removed').be.true;
       expect(removedLogs[1].removed === true, 'log should be removed').be.true;
+    } catch (err) {
+      throw err;
     } finally {
       node.bcMonitor.off('removedLogs', onRemovedLogs);
     }

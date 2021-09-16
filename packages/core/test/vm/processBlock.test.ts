@@ -51,8 +51,6 @@ describe('VM', () => {
 
   before(async () => {
     node = await createNode(dirname, 'gxc2-testnet');
-    // await node.accMngr.importKeyByPrivateKey(privateKey1, '123');
-    // await node.accMngr.unlock(address1, '123');
     blocks = loadBlocksFromTestData(dirname, 'blocks', 'gxc2-testnet');
   });
 

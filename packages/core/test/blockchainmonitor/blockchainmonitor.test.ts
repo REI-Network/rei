@@ -1,14 +1,11 @@
 import { expect } from 'chai';
 import { Block, Log } from '@gxchain2/structure';
-import { hexStringToBuffer, setLevel } from '@gxchain2/utils';
+import { setLevel } from '@gxchain2/utils';
 import { Node } from '../../src';
 import { createNode, destroyNode, loadBlocksFromTestData } from '../util';
-import { Address } from 'ethereumjs-util';
 
 setLevel('silent');
 const dirname = 'blockchainMonitor';
-// const address = '0x3289621709F5B35D09B4335E129907aC367A0593';
-// const privateKey = '0xd8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0';
 
 describe('BlockchainMonitor', async () => {
   let node: Node;
@@ -31,7 +28,6 @@ describe('BlockchainMonitor', async () => {
 
   before(async () => {
     node = await createNode(dirname, 'gxc2-testnet');
-    // (node.accMngr as any).unlocked.set(Address.fromString(address).buf, hexStringToBuffer(privateKey));
     fork1 = loadBlocksFromTestData(dirname, 'fork1', 'gxc2-testnet');
     fork2 = loadBlocksFromTestData(dirname, 'fork2', 'gxc2-testnet');
   });

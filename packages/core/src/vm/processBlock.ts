@@ -26,7 +26,7 @@ function postByzantiumTxReceiptsToReceipts(receipts: PostByzantiumTxReceipt[]) {
   );
 }
 
-export interface ProcessBlockOpts extends Pick<RunBlockOpts, 'generate' | 'block'> {
+export interface ProcessBlockOpts extends Pick<RunBlockOpts, 'generate' | 'block' | 'runTxOpts'> {
   skipConsensusValidation?: boolean;
 }
 
@@ -157,7 +157,7 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
       }
     },
     // if parent block is enable staking, we should use new run tx logic
-    runTxOpts: parentEnableStaking ? makeRunTxCallback(parentRouter!, systemCaller!, miner, block.header.timestamp.toNumber()) : undefined
+    runTxOpts: { ...(parentEnableStaking ? makeRunTxCallback(parentRouter!, systemCaller!, miner, block.header.timestamp.toNumber()) : undefined), ...options.runTxOpts }
   };
 
   const { block: newBlock } = await vm.runBlock(runBlockOptions);

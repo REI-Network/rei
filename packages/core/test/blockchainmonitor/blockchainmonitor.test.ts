@@ -3,11 +3,12 @@ import { Block, Log } from '@gxchain2/structure';
 import { hexStringToBuffer, setLevel } from '@gxchain2/utils';
 import { Node } from '../../src';
 import { createNode, destroyNode, loadBlocksFromTestData } from '../util';
+import { Address } from 'ethereumjs-util';
 
 setLevel('silent');
 const dirname = 'blockchainMonitor';
-const address = '0x3289621709f5b35d09b4335e129907ac367a0593';
-const privateKey = '0xd8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0';
+// const address = '0x3289621709F5B35D09B4335E129907aC367A0593';
+// const privateKey = '0xd8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0';
 
 describe('BlockchainMonitor', async () => {
   let node: Node;
@@ -15,18 +16,24 @@ describe('BlockchainMonitor', async () => {
   let fork2: Block[];
 
   async function processBlock(block: Block) {
-    const newBlock = await node.processBlock(block, { generate: true, broadcast: false, skipBlockValidation: true, runTxOpts: { skipNonce: false, skipBalance: true } } as any);
-    return newBlock;
+    await new Promise<void>(async (resolve) => {
+      block = await node.processBlock(block, {
+        onFinished: () => {
+          resolve();
+        },
+        broadcast: false,
+        skipConsensusValidation: true,
+        runTxOpts: { skipNonce: true }
+      });
+    });
+    return block;
   }
 
   before(async () => {
     node = await createNode(dirname, 'gxc2-testnet');
-    (node.blockchain as any)._validateBlocks = false;
-    (node.blockchain as any)._validateConsensus = false;
-    await node.accMngr.importKeyByPrivateKey(privateKey, '123');
-    await node.accMngr.unlock(address, '123');
-    fork1 = loadBlocksFromTestData(dirname, 'fork1', 'gxc2-testnet', hexStringToBuffer(privateKey));
-    fork2 = loadBlocksFromTestData(dirname, 'fork2', 'gxc2-testnet', hexStringToBuffer(privateKey));
+    // (node.accMngr as any).unlocked.set(Address.fromString(address).buf, hexStringToBuffer(privateKey));
+    fork1 = loadBlocksFromTestData(dirname, 'fork1', 'gxc2-testnet');
+    fork2 = loadBlocksFromTestData(dirname, 'fork2', 'gxc2-testnet');
   });
 
   it("should emit 'newHeads' and 'logs' event", async () => {
@@ -48,8 +55,6 @@ describe('BlockchainMonitor', async () => {
         const newBlock = await processBlock(block);
         newBlockHashSet.add(newBlock.hash().toString('hex'));
       }
-      // sleep a while, make sure bcMonitor.newBlock has been called
-      await new Promise((r) => setTimeout(r, 200));
       if (newBlockHashSet.size !== eventSet.size) {
         throw new Error("missing 'newHeads' event");
       }
@@ -60,8 +65,9 @@ describe('BlockchainMonitor', async () => {
       }
       expect(newBlockHashSet.size, 'set size should be zero').be.equal(0);
       expect(eventSet.size, 'set size should be zero').be.equal(0);
-      expect(logs.length, 'logs length should be 1').be.equal(1);
+      expect(logs.length, 'logs length should be 1').be.equal(2);
       expect(logs[0].removed === false, "log shouldn't be removed").be.true;
+      expect(logs[1].removed === false, "log shouldn't be removed").be.true;
     } finally {
       node.bcMonitor.off('newHeads', onNewHeads);
       node.bcMonitor.off('logs', onLogs);
@@ -78,10 +84,9 @@ describe('BlockchainMonitor', async () => {
       for (const block of fork2) {
         await processBlock(block);
       }
-      // sleep a while, make sure bcMonitor.newBlock has been called
-      await new Promise((r) => setTimeout(r, 200));
-      expect(removedLogs.length, 'removedLogs length should be 1').be.equal(1);
+      expect(removedLogs.length, 'removedLogs length should be 1').be.equal(2);
       expect(removedLogs[0].removed === true, 'log should be removed').be.true;
+      expect(removedLogs[1].removed === true, 'log should be removed').be.true;
     } finally {
       node.bcMonitor.off('removedLogs', onRemovedLogs);
     }

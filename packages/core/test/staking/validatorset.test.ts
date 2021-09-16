@@ -8,6 +8,12 @@ function createCommon(num: BNLike) {
   return Common.createCommonByBlockNumber(num, 'gxc2-testnet');
 }
 
+const stakeManager: any = {
+  getVotingPowerByAddress: async () => {
+    return new BN(0);
+  }
+};
+
 async function createValidatorSet(validators: { [name: string]: number | BN }, fill = false) {
   const common = createCommon(1);
   const num = common.hardforkBlockBN('testnet-hf1')!;
@@ -17,7 +23,7 @@ async function createValidatorSet(validators: { [name: string]: number | BN }, f
   for (const [name, votingPower] of Object.entries(validators)) {
     changes.index(n2a(name), typeof votingPower === 'number' ? new BN(votingPower) : votingPower);
   }
-  await vs.mergeChanges(changes);
+  await vs.mergeChanges(changes, stakeManager);
   vs.incrementProposerPriority(1);
   return vs;
 }

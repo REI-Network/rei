@@ -17,6 +17,7 @@ const maxHistoryLength = 10;
 export interface MinerOptions {
   node: Node;
   enable: boolean;
+  debug?: boolean;
   coinbase?: string;
 }
 
@@ -35,6 +36,7 @@ export class Miner {
   private pendingHeader!: BlockHeader;
   private gasUsed = new BN(0);
   private lock = new Semaphore(1);
+  private debug?: boolean;
   private timeout?: NodeJS.Timeout;
   private nextTd?: BN;
   private history: Block[] = [];
@@ -42,6 +44,7 @@ export class Miner {
   constructor(options: MinerOptions) {
     this.node = options.node;
     this.enable = options.enable;
+    this.debug = options.debug;
     this._coinbase = options.coinbase ? Address.fromString(options.coinbase) : Address.zero();
     this.initPromise = this.init();
   }
@@ -328,6 +331,7 @@ export class Miner {
 
   private _mint(parentHash: Buffer, timeout: number) {
     this.timeout = setTimeout(async () => {
+      this.timeout = undefined;
       let pendingBlock: Block | undefined;
       try {
         await this.lock.acquire();
@@ -341,6 +345,13 @@ export class Miner {
         return;
       } finally {
         this.lock.release();
+      }
+      if (this.debug) {
+        // if there is no transactions, we don't mint the block
+        if (pendingBlock.transactions.length === 0) {
+          logger.warn('Miner::_mint, empty transactions, return');
+          return;
+        }
       }
       this.node
         .processBlock(pendingBlock, { generate: true, broadcast: true })
@@ -371,6 +382,12 @@ export class Miner {
     } finally {
       this.lock.release();
     }
+    if (this.debug) {
+      // if we are not minting the block, re-awaken the minting
+      if (this.timeout === undefined) {
+        this._startMint(this.node.blockchain.latestBlock);
+      }
+    }
   }
 
   /**
@@ -386,15 +403,6 @@ export class Miner {
       },
       { common: this.pendingHeader._common, hardforkByBlockNumber: true }
     );
-  }
-
-  async getPendingStateManager() {
-    await this.initPromise;
-    if (this.vm) {
-      const stateManager: any = this.vm.stateManager;
-      return new StateManager({ common: stateManager._common, trie: stateManager._trie.copy(false) });
-    }
-    return await this.node.getStateManager(this.node.blockchain.latestBlock.header.stateRoot, this.node.blockchain.latestHeight);
   }
 
   /**

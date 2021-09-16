@@ -56,6 +56,11 @@ export interface NodeOptions {
      */
     enable: boolean;
     /**
+     * Enable miner debug mode,
+     * in debug mode, miners will not mint empty block
+     */
+    debug?: boolean;
+    /**
      * Miner coinbase,
      * if miner is enable, this option must be passed in
      */
@@ -104,8 +109,9 @@ export interface NodeOptions {
   };
 }
 
-export interface ProcessBlockOptions extends Pick<ProcessBlockOpts, 'generate' | 'skipConsensusValidation'> {
+export interface ProcessBlockOptions extends Omit<ProcessBlockOpts, 'block'> {
   broadcast: boolean;
+  onFinished?: () => void;
 }
 
 type PendingTxs = {
@@ -401,6 +407,7 @@ export class Node {
           }
           await Promise.all(promises);
         }
+        options.onFinished && options.onFinished();
       } catch (err) {
         reject(err);
       }

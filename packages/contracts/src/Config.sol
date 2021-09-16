@@ -56,27 +56,27 @@ contract Config is IConfig {
     }
 
     function dailyFee() external view override returns (uint256) {
-        return 1728e17;
+        return 50000;
     }
 
     function dailyFreeFee() external view override returns (uint256) {
-        return 1728e16;
+        return 30000;
     }
 
     function userFreeFeeLimit() external view override returns (uint256) {
-        return 1728e15;
+        return 10000;
     }
 
     function feeRecoverInterval() external view override returns (uint256) {
-        return 10 seconds;
+        return 30 seconds;
     }
 
     function freeFeeRecoverInterval() external view override returns (uint256) {
-        return 10 seconds;
+        return 30 seconds;
     }
 
     function feePoolLiquidateInterval() external view override returns (uint256) {
-        return 10 seconds;
+        return 30 seconds;
     }
 
     /**

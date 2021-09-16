@@ -1,7 +1,7 @@
 # GXChain2.0-Alpha
 
 ![Node Version](https://img.shields.io/badge/node-%e2%89%a5v14.0.0-blue)
-![NPM Version](https://img.shields.io/badge/npm-%E2%89%A5v6.0.0-blue)
+![NPM Version](https://img.shields.io/badge/npm-%E2%89%A5v7.0.0-blue)
 
 Nodejs implementation of GXChain2.0 protocols
 
@@ -88,21 +88,46 @@ gxchain2 --chain gxc2-testnet
 
 ## Build
 
-This monorepo uses Lerna. Please run
+This monorepo [npm workspaces](https://docs.npmjs.com/cli/v7/using-npm/workspaces). It links the local packages together, making development a lot easier.
+
+Install:
 
 ```
-npm run bootstrap
+npm i -g node-gyp-build
+npm i --no-bin-links
+```
+
+Build:
+
+```
+npm run build -ws
+```
+
+### ℹ️ Note for Windows users:
+
+Windows users might run into the following error when trying to install the repo: `'.' is not recognized as an internal or external command`. To remediate for this, you can force Windows to use Git bash to run scripts (you'll need to install [Git for Windows](https://git-scm.com/download/win) for this) with the following command:
+
+```sh
+npm config set script-shell "C:\\Program Files (x86)\\git\\bin\\bash.exe"
+```
+
+If you ever need to reset this change, you can do so with this command:
+
+```sh
+npm config delete script-shell
 ```
 
 ## Project scripts — run from repository root
 
-### `npm run bootstrap`
+### `npm install` (alias: `npm i`)
 
-Installs dependencies for all sub-packages, and links them to create an integrated development environment.
+Adds dependencies listed in the root package.
 
-### `npm run build`
+### `npm run build -ws`
 
 Builds all monorepo packages.
+
+To build a specific package, use `npm run build -w @gxchain2/contracts`
 
 ### `npm run build:core`, `npm run build:contracts`, `...`
 

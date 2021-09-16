@@ -8,7 +8,7 @@ describe('Helper', () => {
     const message = 'JSON-RPC error';
     try {
       throwRpcErr();
-    } catch (e) {
+    } catch (e: any) {
       expect(e.code, 'error code should be equal').be.equal(code);
       expect(e.message, 'error message should be equal').be.equal(message);
     }
@@ -20,7 +20,7 @@ describe('Helper', () => {
     const errorMessage = `${error.INVALID_REQUEST.message}, wrong version - ${version}`;
     try {
       validateJsonRpcVersion(version, requiredVersion);
-    } catch (e) {
+    } catch (e: any) {
       expect(e.code, 'error code should be equal').be.equal(error.INVALID_REQUEST.code);
       expect(e.message, 'error message should be equal').be.equal(errorMessage);
     }
@@ -33,7 +33,7 @@ describe('Helper', () => {
     validateJsonRpcMethod(method1, controllers);
     try {
       validateJsonRpcMethod(method4, controllers);
-    } catch (e) {
+    } catch (e: any) {
       expect(e.code, 'error code should be equal').be.equal(error.METHOD_NOT_FOUND.code);
       expect(e.message, 'error message should be equal').be.equal(`${error.METHOD_NOT_FOUND.message} - ${method4}`);
     }
@@ -63,37 +63,37 @@ describe('Helper', () => {
     const config7 = { methods: [], onError: 'hello' };
     try {
       validateConfig(config1);
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message, 'error message should be equal').be.equal('JSON-RPC error: userConfig should be an object.');
     }
     try {
       validateConfig(config2);
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message, 'error message should be equal').be.equal('JSON-RPC error: methods should be an array');
     }
     try {
       validateConfig(config3);
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message, 'error message should be equal').be.equal('JSON-RPC error: beforeMethods should be an object');
     }
     try {
       validateConfig(config4);
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message, 'error message should be equal').be.equal(`JSON-RPC error: beforeMethod should have the same name as method, passed: ${Object.keys(config4.beforeMethods)[0]}`);
     }
     try {
       validateConfig(config5);
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message, 'error message should be equal').be.equal('JSON-RPC error: afterMethods should be an object');
     }
     try {
       validateConfig(config6);
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message, 'error message should be equal').be.equal(`JSON-RPC error: afterMethods should have the same name as method, passed: ${Object.keys(config6.afterMethods)[0]}`);
     }
     try {
       validateConfig(config7);
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message, 'error message should be equal').be.equal('JSON-RPC error: onError should be a function');
     }
   });
@@ -115,7 +115,7 @@ describe('Helper', () => {
     expect(result[1], 'function result should be equal').be.equal(1);
     try {
       executeHook(hook3, 1, 1);
-    } catch (error) {
+    } catch (error: any) {
       expect(error.message, 'error message should be equal').be.equal('JSON-RPC error: wrong hook type passed');
     }
   });

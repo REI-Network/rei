@@ -62,7 +62,8 @@ export class Controller {
 
   protected async getStateManagerByTag(tag: string): Promise<StateManager> {
     if (tag === 'pending') {
-      return await this.node.miner.getPendingStateManager();
+      // return await this.node.miner.getPendingStateManager();
+      return undefined as any;
     } else {
       const block = await this.getBlockByTag(tag);
       return this.node.getStateManager(block.header.stateRoot, block.header.number);

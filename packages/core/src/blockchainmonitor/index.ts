@@ -117,7 +117,7 @@ export class BlockchainMonitor extends EventEmitter {
             const receipt = await this.node.db.getReceiptByHashAndNumber(txInfo.tx.hash(), txInfo.blockHash, txInfo.blockNumber);
             receipt.logs.forEach((log) => (log.removed = true));
             removedLogs = removedLogs.concat(receipt.logs);
-          } catch (err) {
+          } catch (err: any) {
             if (err.type === 'NotFoundError') {
               continue;
             }
@@ -135,7 +135,7 @@ export class BlockchainMonitor extends EventEmitter {
             const receipt = await this.node.db.getReceipt(txInfo.tx.hash());
             receipt.logs.forEach((log) => (log.removed = false));
             logs = logs.concat(receipt.logs);
-          } catch (err) {
+          } catch (err: any) {
             if (err.type === 'NotFoundError') {
               continue;
             }

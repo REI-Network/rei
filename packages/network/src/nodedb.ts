@@ -41,7 +41,7 @@ export class NodeDB {
   async loadLocal() {
     try {
       return ENR.decode(await this.db.get(Buffer.from('local')));
-    } catch (err) {
+    } catch (err: any) {
       if (err.type === 'NotFoundError') {
         return;
       }

@@ -58,7 +58,7 @@ export class JsonRPCMiddleware {
       if (!helper.isNil(id)) {
         return { jsonrpc, result, id };
       }
-    } catch (err) {
+    } catch (err: any) {
       if (helper.isFunction(this.config.onError)) this.config.onError && this.config.onError(err, body);
       const error = {
         code: Number(err.code || err.status || errors.INTERNAL_ERROR.code),

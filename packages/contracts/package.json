@@ -4,11 +4,12 @@
     "main": "hardhat.config.ts",
     "license": "GPL-3.0-or-later",
     "scripts": {
-        "build": "npx hardhat compile",
-        "node": "npx hardhat node",
-        "test": "npx hardhat test",
+        "hardhat": "node ../../node_modules/hardhat/internal/cli/cli.js",
+        "build": "npm run hardhat -- compile",
+        "node": "npm run hardhat -- node",
+        "test": "npm run hardhat -- test",
         "docgen": "solidity-docgen -i ./src -t ./templates -H ./helper.js",
-        "clean": "rm -rf ./artifacts ./cache ./deployments ./docs"
+        "clean:build": "rm -rf ./artifacts ./cache ./deployments ./docs"
     },
     "dependencies": {
         "@openzeppelin/contracts": "3.2.0"
@@ -19,6 +20,8 @@
         "@nomiclabs/hardhat-web3": "^2.0.0",
         "hardhat": "^2.5.0",
         "hardhat-deploy": "^0.8.11",
-        "solidity-docgen": "^0.5.13"
+        "solidity-docgen": "^0.5.13",
+        "@types/chai": "^4.2.21",
+        "@types/mocha": "^8.2.3"
     }
 }

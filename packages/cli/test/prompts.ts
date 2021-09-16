@@ -4,28 +4,14 @@ import prompts from 'prompts';
 import PeerId from 'peer-id';
 import { Multiaddr } from 'multiaddr';
 import { program } from 'commander';
-import { ENR } from '@gxchain2/discv5';
-import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
 import { Node } from '@gxchain2/core';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
 import { startNode, installOptions } from '../src/commands';
 import { SIGINT } from '../src/process';
-import { WrappedBlock } from '../../database/node_modules/@gxchain2/structure/dist';
+import { WrappedBlock } from '../../structure/dist';
 
 installOptions(program);
-
-// addresses, a list of address, splited by `,`
-// topics, a list of topic, splited by `,` and each subTopic splited by `;`.
-const parseAddressAndTopic = (addresses: string, topics: string) => {
-  const addressArray = addresses ? addresses.split(',').map((addr) => Address.fromString(addr)) : [];
-  const topicArray = topics
-    ? topics.split(',').map((topic): Buffer[] | null => {
-        return topic === 'null' ? null : topic.split(';').map((subTopic) => hexStringToBuffer(subTopic));
-      })
-    : [];
-  return { addressArray, topicArray };
-};
 
 const handler: {
   [method: string]: (node: Node, ...args: string[]) => any;
@@ -61,7 +47,7 @@ const handler: {
     try {
       const receipt = await node.db.getReceipt(hexStringToBuffer(hash));
       logger.info(JSON.stringify(receipt.toRPCJSON()));
-    } catch (err) {
+    } catch (err: any) {
       if (err.type === 'NotFoundError') {
         return;
       }
@@ -72,7 +58,7 @@ const handler: {
     try {
       const tx = await node.db.getWrappedTransaction(hexStringToBuffer(hash));
       logger.info(tx.toRPCJSON());
-    } catch (err) {
+    } catch (err: any) {
       if (err.type === 'NotFoundError') {
         return;
       }

@@ -187,7 +187,7 @@ export class ETHController extends Controller {
     const hashBuffer = hexStringToBuffer(hash);
     try {
       return (await this.node.db.getWrappedTransaction(hashBuffer)).toRPCJSON();
-    } catch (err) {
+    } catch (err: any) {
       if (err.type !== 'NotFoundError') {
         throw err;
       }

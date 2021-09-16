@@ -135,7 +135,7 @@ export class FullSynchronizer extends Synchronizer {
           const localHeader = await this.node.db.getHeader(hash, remoteHeader.number);
           const localTD = await this.node.db.getTotalDifficulty(hash, remoteHeader.number);
           return [localHeader, localTD];
-        } catch (err) {
+        } catch (err: any) {
           if (err.type === 'NotFoundError') {
             continue;
           }

@@ -332,7 +332,7 @@ export class Database extends DBManager {
     let body: BlockBodyBuffer = [[], []];
     try {
       body = await this.getBody(blockHash, blockNumber);
-    } catch (err) {
+    } catch (err: any) {
       if (err.type !== 'NotFoundError') {
         throw err;
       }
@@ -362,7 +362,7 @@ export class Database extends DBManager {
       const num = await this.hashToNumber(hash);
       const hashInDB = await this.numberToHash(num);
       return hashInDB.equals(hash) ? await this.getHeader(hash, num) : undefined;
-    } catch (err) {
+    } catch (err: any) {
       if (err.type === 'NotFoundError') {
         return;
       }
@@ -410,7 +410,7 @@ export class Database extends DBManager {
   async getStoredSectionCount() {
     try {
       return new BN(await this.rawdb.get('scount'));
-    } catch (err) {
+    } catch (err: any) {
       if (err.type === 'NotFoundError') {
         return undefined;
       }

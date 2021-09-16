@@ -99,7 +99,7 @@ const wireHandlers: Handler[] = [
         try {
           const block = await this.node.db.getBlock(hash);
           bodies.push(block.transactions as Transaction[]);
-        } catch (err) {
+        } catch (err: any) {
           if (err.type !== 'NotFoundError') {
             throw err;
           }

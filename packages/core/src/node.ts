@@ -241,7 +241,7 @@ export class Node {
       const genesisHash = await this.db.numberToHash(new BN(0));
       genesisBlock = await this.db.getBlock(genesisHash);
       logger.info('Find genesis block in db', bufferToHex(genesisHash));
-    } catch (error) {
+    } catch (error: any) {
       if (error.type !== 'NotFoundError') {
         throw error;
       }

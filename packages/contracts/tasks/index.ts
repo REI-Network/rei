@@ -26,12 +26,17 @@ task('accounts', 'List accounts').setAction(async (taskArgs, { web3 }) => {
 });
 
 task('transfer', 'Transfer value to target address')
-  .addParam('from', 'from address')
+  .addOptionalParam('from', 'from address')
   .addParam('to', 'to address')
   .addParam('value', 'transfer value')
-  .setAction(async (taskArgs, { web3 }) => {
+  .addFlag('ether', 'use ether as unit')
+  .setAction(async (taskArgs, { web3, getNamedAccounts }) => {
+    if (taskArgs.ether) {
+      taskArgs.value = toEther(taskArgs.value);
+    }
+    const { deployer } = await getNamedAccounts();
     await web3.eth.sendTransaction({
-      from: taskArgs.from,
+      from: taskArgs.from ?? deployer,
       to: taskArgs.to,
       value: taskArgs.value
     });

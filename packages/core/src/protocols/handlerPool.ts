@@ -11,7 +11,7 @@ export class GetHandlerTimeoutError extends Error {}
 /**
  * ProtocolPool is used to manage all the handlers
  */
-export class ProtocolPool<T> {
+export class HandlerPool<T> {
   private idlePool = new Set<T>();
   private busyPool = new Set<T>();
   private getterQueue: Getter<T>[] = [];

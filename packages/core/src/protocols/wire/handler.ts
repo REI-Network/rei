@@ -1,9 +1,9 @@
 import { bufferToInt, rlp, BN } from 'ethereumjs-util';
 import { mustParseTransction, Transaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/structure';
 import { logger, Channel, createBufferFunctionalSet } from '@gxchain2/utils';
-import { ProtocolHandler, Peer, MsgQueue } from '@gxchain2/network';
-import { Node, NodeStatus } from '../node';
-import { WireProtocol } from './index';
+import { ProtocolHandler, Peer } from '@gxchain2/network';
+import { Node, NodeStatus } from '../../node';
+import { WireProtocol } from './protocol';
 
 const maxTxPacketSize = 102400;
 const maxKnownTxs = 32768;

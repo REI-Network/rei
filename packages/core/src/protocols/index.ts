@@ -4,6 +4,7 @@ import { HandlerPool } from './handlerPool';
 import { WireProtocolHandler, WireProtocol } from './wire';
 
 export * from './handlerPool';
+export * from './handlerBase';
 export * from './wire';
 
 export enum NetworkProtocol {

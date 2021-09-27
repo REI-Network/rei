@@ -1,8 +1,8 @@
 import { bufferToInt, rlp, BN } from 'ethereumjs-util';
 import { mustParseTransction, Transaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/structure';
 import { logger, Channel, createBufferFunctionalSet } from '@gxchain2/utils';
-import { ProtocolHandler, Peer } from '@gxchain2/network';
-import { Node, NodeStatus } from '../../node';
+import { NodeStatus } from '../../node';
+import { HandlerBase, HandlerFunc, HandlerBaseOptions } from '../handlerBase';
 import { WireProtocol } from './protocol';
 
 const maxTxPacketSize = 102400;
@@ -14,18 +14,7 @@ const maxQueuedBlocks = 4;
 export const maxGetBlockHeaders = 128;
 export const maxTxRetrievals = 256;
 
-export class PeerRequestTimeoutError extends Error {}
-
-type Handler = {
-  name: string;
-  code: number;
-  response?: number;
-  encode(data: any): any;
-  decode(data: any): any;
-  process?: (data: any) => Promise<[string, any]> | Promise<[string, any] | void> | [string, any] | void;
-};
-
-const wireHandlers: Handler[] = [
+const wireHandlerFuncs: HandlerFunc[] = [
   {
     name: 'Status',
     code: 0,
@@ -195,63 +184,44 @@ const wireHandlers: Handler[] = [
   }
 ];
 
-/**
- * Get method hander according to method name
- * @param method Method name
- * @returns
- */
-function findHandler(method: string | number) {
-  const handler = wireHandlers.find((h) => (typeof method === 'string' ? h.name === method : h.code === method));
-  if (!handler) {
-    throw new Error(`Missing handler, method: ${method}`);
-  }
-  return handler;
-}
+export interface WireProtocolHandlerOptions extends Omit<HandlerBaseOptions, 'handlerFuncs'> {}
 
 /**
  * WireProtocolHandler is used to manage protocol communication between nodes
  */
-export class WireProtocolHandler implements ProtocolHandler {
-  readonly node: Node;
-  readonly peer: Peer;
-  readonly name: string;
-  private _status?: NodeStatus;
-
-  private readonly waitingRequests = new Map<
-    number,
-    {
-      resolve: (data: any) => void;
-      reject: (reason?: any) => void;
-      timeout: NodeJS.Timeout;
-    }
-  >();
+export class WireProtocolHandler extends HandlerBase<NodeStatus> {
   private _knowTxs = createBufferFunctionalSet();
   private _knowBlocks = createBufferFunctionalSet();
-
-  private handshakeResolve?: (result: boolean) => void;
-  private handshakeTimeout?: NodeJS.Timeout;
-  private readonly handshakePromise: Promise<boolean>;
 
   private newBlockAnnouncesQueue: Channel<{ block: Block; td: BN }>;
   private txAnnouncesQueue: Channel<Buffer>;
 
-  get status() {
-    return this._status;
+  protected onHandshakeSucceed() {
+    WireProtocol.getPool().add(this);
+    this.announceTx(this.node.txPool.getPooledTransactionHashes());
+  }
+  protected onHandshake() {
+    this.send(0, this.node.status);
+  }
+  protected onHandshakeResponse(status: NodeStatus) {
+    const localStatus = this.node.status;
+    return localStatus.genesisHash.equals(status.genesisHash) && localStatus.networkId === status.networkId;
+  }
+  protected onAbort() {
+    this.newBlockAnnouncesQueue.abort();
+    this.txAnnouncesQueue.abort();
+    WireProtocol.getPool().remove(this);
   }
 
-  constructor(options: { node: Node; name: string; peer: Peer }) {
-    this.node = options.node;
-    this.peer = options.peer;
-    this.name = options.name;
-    this.handshakePromise = new Promise<boolean>((resolve) => {
-      this.handshakeResolve = resolve;
-    });
-    this.handshakePromise.then((result) => {
-      if (result) {
-        WireProtocol.getPool().add(this);
-        this.announceTx(this.node.txPool.getPooledTransactionHashes());
-      }
-    });
+  protected encode(method: string | number, data: any) {
+    return rlp.encode(this.findHandler(method).encode.call(this, data));
+  }
+  protected decode(data: Buffer) {
+    return rlp.decode(data) as unknown as [number, any];
+  }
+
+  constructor(options: WireProtocolHandlerOptions) {
+    super({ ...options, handlerFuncs: wireHandlerFuncs });
     this.newBlockAnnouncesQueue = new Channel<{ block: Block; td: BN }>({ max: maxQueuedBlocks });
     this.txAnnouncesQueue = new Channel<Buffer>({ max: maxQueuedTxs });
     this.newBlockAnnouncesLoop();
@@ -294,10 +264,6 @@ export class WireProtocolHandler implements ProtocolHandler {
       }
       hashesCache = [];
     }
-  }
-
-  private send(method: string | number, data: any) {
-    this.peer.send(this.name, this.encode(method, data));
   }
 
   /**
@@ -371,147 +337,6 @@ export class WireProtocolHandler implements ProtocolHandler {
    */
   knowBlocks(hashs: Buffer[]) {
     this.knowHash(this._knowBlocks, maxKnownBlocks, hashs);
-  }
-  /**
-   * Update node status
-   * @param newStatus New status
-   */
-  updateStatus(newStatus: Partial<NodeStatus>) {
-    this._status = { ...this._status!, ...newStatus };
-  }
-
-  /**
-   * Node handshake and establish connection
-   */
-  handshake() {
-    if (!this.handshakeResolve) {
-      throw new Error('WireProtocolHandler repeat handshake');
-    }
-    this.send(0, this.node.status);
-    this.handshakeTimeout = setTimeout(() => {
-      if (this.handshakeResolve) {
-        this.handshakeResolve(false);
-        this.handshakeResolve = undefined;
-      }
-    }, 8000);
-    return this.handshakePromise;
-  }
-
-  /**
-   * Response to handshake and update status
-   * @param status Node Status
-   */
-  handshakeResponse(status: NodeStatus) {
-    if (this.handshakeResolve) {
-      const localStatus = this.node.status;
-      if (!localStatus.genesisHash.equals(status.genesisHash) || localStatus.networkId !== status.networkId) {
-        this.handshakeResolve(false);
-      } else {
-        this.updateStatus(status);
-        this.handshakeResolve(true);
-      }
-      this.handshakeResolve = undefined;
-      if (this.handshakeTimeout) {
-        clearTimeout(this.handshakeTimeout);
-        this.handshakeTimeout = undefined;
-      }
-    }
-  }
-
-  /**
-   * Send protocol request call method to get information
-   * @param method Method name
-   * @param data Data
-   */
-  request(method: string, data: any) {
-    const handler = findHandler(method);
-    if (!handler.response) {
-      throw new Error(`WireProtocolHandler invalid request: ${method}`);
-    }
-    if (this.waitingRequests.has(handler.response!)) {
-      throw new Error(`WireProtocolHandler repeated request: ${method}`);
-    }
-    return new Promise<any>((resolve, reject) => {
-      this.waitingRequests.set(handler.response!, {
-        reject,
-        resolve,
-        timeout: setTimeout(() => {
-          this.waitingRequests.delete(handler.response!);
-          reject(new PeerRequestTimeoutError(`WireProtocolHandler timeout request: ${method}`));
-        }, 8000)
-      });
-      this.send(method, data);
-    });
-  }
-
-  abort() {
-    if (this.handshakeResolve) {
-      this.handshakeResolve(false);
-      this.handshakeResolve = undefined;
-      if (this.handshakeTimeout) {
-        clearTimeout(this.handshakeTimeout);
-        this.handshakeTimeout = undefined;
-      }
-    }
-    for (const [response, request] of this.waitingRequests) {
-      clearTimeout(request.timeout);
-      request.reject(new Error('WireProtocolHandler abort'));
-    }
-    this.waitingRequests.clear();
-    this.newBlockAnnouncesQueue.abort();
-    this.txAnnouncesQueue.abort();
-    WireProtocol.getPool().remove(this);
-  }
-
-  /**
-   * Call the handler's encode function
-   * @param method Handler name
-   * @param data Data to be encode
-   * @returns Encoded data
-   */
-  encode(method: string | number, data: any) {
-    return rlp.encode(findHandler(method).encode.call(this, data));
-  }
-
-  /**
-   * Handle requests by handler's process function
-   * @param data Data to be processed
-   */
-  async handle(data: Buffer) {
-    const [code, payload]: any = rlp.decode(data);
-    const numCode = bufferToInt(code);
-    const handler = findHandler(numCode);
-    data = handler.decode.call(this, payload);
-
-    const request = this.waitingRequests.get(numCode);
-    if (request) {
-      clearTimeout(request.timeout);
-      this.waitingRequests.delete(numCode);
-      request.resolve(data);
-    } else if (handler.process) {
-      if (numCode !== 0 && !(await this.handshakePromise)) {
-        logger.warn('WireProtocolHandler::handle, handshake failed');
-        return;
-      }
-      const result = handler.process.call(this, data);
-      if (result) {
-        if (Array.isArray(result)) {
-          const [method, resps] = result;
-          this.send(method, resps);
-        } else {
-          result
-            .then((response) => {
-              if (response) {
-                const [method, resps] = response;
-                this.send(method, resps);
-              }
-            })
-            .catch((err) => {
-              logger.error('WireProtocolHandler::process, catch error:', err);
-            });
-        }
-      }
-    }
   }
 
   /**

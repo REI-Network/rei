@@ -134,3 +134,4 @@ export * from './channel';
 export * from './compress';
 export * from './functionalmap';
 export * from './functionalset';
+export * from './timeoutQueue';

@@ -4,8 +4,8 @@ import { HandlerBase, HandlerFunc, HandlerBaseOptions } from '../handlerBase';
 import { ConsensusProtocol } from './protocol';
 
 //////////////////// types ////////////////////
-import { Proposal } from '../../consensus/state';
-import { BitArray, VoteType, Vote } from '../../consensus/types';
+import { Proposal } from '../../consensus/reimint/state';
+import { BitArray, VoteType, Vote } from '../../consensus/reimint/types';
 
 type NewRoundStepMsg = {
   height: BN;

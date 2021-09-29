@@ -19,7 +19,6 @@ import { AccountManager } from '@gxchain2/wallet';
 import { TxPool } from './txpool';
 import { FullSynchronizer, Synchronizer } from './sync';
 import { TxFetcher } from './txsync';
-import { Miner } from './miner';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
 import { BlockchainMonitor } from './blockchainmonitor';
@@ -27,6 +26,7 @@ import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protoco
 import { ValidatorSets } from './staking';
 import { StakeManager, Router } from './contracts';
 import { processBlock, ProcessBlockOpts } from './vm';
+import { CliqueConsensusEngine } from './consensus';
 
 const timeoutBanTime = 60 * 5 * 1000;
 const invalidBanTime = 60 * 10 * 1000;
@@ -111,7 +111,6 @@ export interface NodeOptions {
 
 export interface ProcessBlockOptions extends Omit<ProcessBlockOpts, 'block'> {
   broadcast: boolean;
-  onFinished?: () => void;
 }
 
 type PendingTxs = {
@@ -122,7 +121,7 @@ type PendingTxs = {
 type ProcessBlock = {
   block: Block;
   options: ProcessBlockOptions;
-  resolve: (block: Block) => void;
+  resolve: (result: { block: Block; reorged: boolean }) => void;
   reject: (reason?: any) => void;
 };
 
@@ -137,11 +136,11 @@ export class Node {
   public blockchain!: Blockchain;
   public sync!: Synchronizer;
   public txPool!: TxPool;
-  public miner!: Miner;
   public txSync!: TxFetcher;
   public bloomBitsIndexer!: ChainIndexer;
   public bcMonitor!: BlockchainMonitor;
   public accMngr!: AccountManager;
+  public engine!: CliqueConsensusEngine;
 
   // TODO: remove this after tendermint
   public validatorSets: ValidatorSets;
@@ -279,6 +278,7 @@ export class Node {
     await this.networkdb.open();
 
     this.txSync = new TxFetcher(this);
+
     let bootnodes = options.p2p.bootnodes || [];
     bootnodes = bootnodes.concat(common.bootstrapNodes());
     this.networkMngr = new NetworkManager({
@@ -292,11 +292,15 @@ export class Node {
       .on('installed', this.onPeerInstalled)
       .on('removed', this.onPeerRemoved);
     await this.networkMngr.init();
-    this.miner = new Miner({ node: this, ...options.mine });
-    await this.miner.init();
+
     await this.txPool.init();
+
+    this.engine = new CliqueConsensusEngine({ node: this, enable: options.mine.enable, coinbase: options.mine.coinbase ? Address.fromString(options.mine.coinbase) : undefined });
+    await this.engine.init();
+
     this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: BloomBitsBlocks, confirmsBlockNumber: ConfirmsBlockNumber });
     await this.bloomBitsIndexer.init();
+
     this.bcMonitor = new BlockchainMonitor(this);
     await this.bcMonitor.init();
   }
@@ -310,7 +314,7 @@ export class Node {
   };
 
   private onSyncOver = () => {
-    this.miner.startMint(this.blockchain.latestBlock);
+    this.engine.newBlockHeader(this.blockchain.latestBlock.header);
   };
 
   /**
@@ -394,20 +398,19 @@ export class Node {
     await this.initPromise;
     for await (let { block, options, resolve, reject } of this.processQueue.generator()) {
       try {
-        const { proposer, activeSigners, reorged, block: newBlock } = await processBlock.bind(this)({ ...options, block });
+        const { reorged, block: newBlock } = await processBlock.bind(this)({ ...options, block });
         block = newBlock;
-        resolve(block);
 
         // if canonical chain changes, notify to other modules
         if (reorged) {
-          await this.txPool.newBlock(block);
-          const promises = [this.miner.newBlockHeader(block.header, activeSigners, proposer), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
+          const promises = [this.txPool.newBlock(block), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
           if (options.broadcast) {
             promises.push(this.broadcastNewBlock(block));
           }
           await Promise.all(promises);
         }
-        options.onFinished && options.onFinished();
+
+        resolve({ reorged, block });
       } catch (err) {
         reject(err);
       }
@@ -429,7 +432,7 @@ export class Node {
           for (const handler of WireProtocol.getPool().handlers) {
             handler.announceTx(hashes);
           }
-          await this.miner.addTxs(readies);
+          await this.engine.worker.addTxs(readies);
         }
         task.resolve(results);
       } catch (err) {
@@ -447,7 +450,7 @@ export class Node {
    */
   async processBlock(block: Block, options: ProcessBlockOptions) {
     await this.initPromise;
-    return new Promise<Block>((resolve, reject) => {
+    return new Promise<{ block: Block; reorged: boolean }>((resolve, reject) => {
       this.processQueue.push({ block, options, resolve, reject });
     });
   }
@@ -494,6 +497,7 @@ export class Node {
     this.taskQueue.abort();
     this.processQueue.abort();
     await this.aborter.abort();
+    await this.engine.abort();
     await this.networkMngr.abort();
     await this.bloomBitsIndexer.abort();
     await this.txPool.abort();

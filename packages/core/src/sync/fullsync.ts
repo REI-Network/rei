@@ -25,8 +25,8 @@ export class FullSynchronizer extends Synchronizer {
 
   constructor(options: FullSynchronizerOptions) {
     super(options);
-    this.count = options.count || maxGetBlockHeaders;
-    this.limit = options.limit || defaultMaxLimit;
+    this.count = options.count ?? maxGetBlockHeaders;
+    this.limit = options.limit ?? defaultMaxLimit;
     this.fetcher = new Fetcher({ node: this.node, count: this.count, limit: this.limit });
   }
 
@@ -38,6 +38,16 @@ export class FullSynchronizer extends Synchronizer {
     const handler = WireProtocol.getHandler(peer);
     if (handler && !this.isSyncing && this.node.blockchain.totalDifficulty.lt(new BN(handler.status!.totalDifficulty))) {
       this.sync(peer);
+    }
+  }
+
+  /**
+   * Abort the sync
+   */
+  async abort() {
+    this.fetcher.abort();
+    if (this.syncingPromise) {
+      await this.syncingPromise;
     }
   }
 
@@ -91,16 +101,6 @@ export class FullSynchronizer extends Synchronizer {
     }));
     this.syncingPromise = undefined;
     return result;
-  }
-
-  /**
-   * Abort the sync
-   */
-  async abort() {
-    this.fetcher.abort();
-    if (this.syncingPromise) {
-      await this.syncingPromise;
-    }
   }
 
   private async genesis(): Promise<[BlockHeader, BN]> {

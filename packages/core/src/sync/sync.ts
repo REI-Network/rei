@@ -25,10 +25,16 @@ export declare interface Synchronizer {
 export abstract class Synchronizer extends EventEmitter {
   protected readonly node: Node;
   protected readonly interval: number;
-  private lock = new Semaphore(1);
+  private readonly lock = new Semaphore(1);
+
   protected forceSync: boolean = false;
+  protected _isSyncing: boolean = false;
   protected startingBlock: number = 0;
   protected highestBlock: number = 0;
+
+  abstract announce(peer: Peer): void;
+  abstract abort(): Promise<void>;
+  protected abstract _sync(peer?: Peer): Promise<boolean>;
 
   constructor(options: SynchronizerOptions) {
     super();
@@ -48,11 +54,7 @@ export abstract class Synchronizer extends EventEmitter {
   }
 
   get isSyncing(): boolean {
-    return this.lock.getPermits() === 0;
-  }
-
-  announce(peer: Peer) {
-    throw new Error('Unimplemented');
+    return this._isSyncing;
   }
 
   /**
@@ -64,13 +66,7 @@ export abstract class Synchronizer extends EventEmitter {
     this.startingBlock = startingBlock;
     this.highestBlock = highestBlock;
     this.emit('start');
-  }
-
-  /**
-   * Abstract function
-   */
-  protected async _sync(peer?: Peer): Promise<boolean> {
-    throw new Error('Unimplemented');
+    this._isSyncing = true;
   }
 
   /**
@@ -84,6 +80,7 @@ export abstract class Synchronizer extends EventEmitter {
     const after = this.node.blockchain.latestBlock.hash();
     this.lock.release();
 
+    this._isSyncing = false;
     if (!before.equals(after)) {
       if (result) {
         logger.info('💫 Synchronized');
@@ -106,9 +103,5 @@ export abstract class Synchronizer extends EventEmitter {
       }
       await this.node.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.interval)));
     }
-  }
-
-  async abort() {
-    throw new Error('Unimplemented');
   }
 }

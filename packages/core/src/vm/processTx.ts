@@ -8,6 +8,7 @@ import { TypedTransaction, Transaction, Block } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
 import { Router } from '../contracts';
 import { validateTx } from '../validation';
+import { isEnableStaking } from '../hardforks';
 import { Node } from '../node';
 
 // After HF1 function
@@ -112,13 +113,13 @@ export function makeRunTxCallback(router: Router, systemCaller: Address, miner: 
 }
 
 export interface ProcessTxOptions extends Omit<RunTxOpts, 'block' | 'beforeTx' | 'afterTx' | 'assignTxReward' | 'generateTxReceipt' | 'skipBalance'> {
-  parentEnableStaking: boolean;
   block: Block;
   vm: VM;
 }
 
 export function processTx(this: Node, options: ProcessTxOptions) {
-  const { vm, block, parentEnableStaking } = options;
+  const { vm, block } = options;
+  const parentEnableStaking = !block.isGenesis() && isEnableStaking(this.getCommon(block.header.number.subn(1)));
   if (parentEnableStaking) {
     const systemCaller = Address.fromString(block._common.param('vm', 'scaddr'));
     const router = this.getRouter(vm, block);

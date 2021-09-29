@@ -392,7 +392,7 @@ export class Node {
   }
 
   /**
-   * A loop to execute blocks sequentially
+   * A loop that executes blocks sequentially
    */
   private async processLoop() {
     await this.initPromise;
@@ -418,7 +418,7 @@ export class Node {
   }
 
   /**
-   * A loop to add pending transaction to memory
+   * A loop that adds pending transaction
    */
   private async taskLoop() {
     await this.initPromise;

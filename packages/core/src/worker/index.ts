@@ -16,12 +16,14 @@ const defaultTimeoutDuration = 1000;
 export interface WorkerOptions {
   node: Node;
   ce: ConsensusEngine;
+  // max pending block cache size
   maxCacheSize?: number;
+  // the timeout duration for getting a pending block
   timeoutDuration?: number;
 }
 
 /**
- * Miner creates blocks and searches for proof-of-work values.
+ * Worker is responsible for making blocks.
  */
 export class Worker {
   private readonly node: Node;
@@ -43,6 +45,9 @@ export class Worker {
     this.initPromise = this.init();
   }
 
+  /**
+   * Initialize worker.
+   */
   async init() {
     if (this.initPromise) {
       await this.initPromise;
@@ -52,11 +57,21 @@ export class Worker {
     await this._newBlockHeader(this.node.blockchain.latestBlock.header);
   }
 
+  /**
+   * Handler the latest block header.
+   * @param header - Latest block header.
+   */
   async newBlockHeader(header: BlockHeader) {
     await this.initPromise;
     await this._newBlockHeader(header);
   }
 
+  /**
+   * Handler the latest block header.
+   * Commit pending transaction and save
+   * the pending block to `this.abr`.
+   * @param header - Latest block header.
+   */
   private async _newBlockHeader(header: BlockHeader) {
     const parentHash = header.hash();
     if (this.abr.has(parentHash)) {
@@ -115,14 +130,18 @@ export class Worker {
   }
 
   /**
-   * Assembles the pending block from block data
-   * @returns
+   * Get pending block by parent block hash.
+   * @returns Pending block.
    */
   async getPendingBlockByParentHash(hash: Buffer) {
     await this.initPromise;
     return this.abr.retrieve(hash);
   }
 
+  /**
+   * Get latest pending block.
+   * @returns Pending block, return `undefined` if it doesn't exist
+   */
   async getLastPendingBlock() {
     await this.initPromise;
     return this.abr.last();

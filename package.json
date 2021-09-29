@@ -46,15 +46,9 @@
     "cli": "node -r ts-node/register ./packages/cli/src/index.ts",
     "test:prompts": "node -r ts-node/register ./packages/cli/test/prompts.ts"
   },
-  "lint-staged": {
-    "*.{js,ts}": [
-      "eslint --format=codeframe"
-    ]
-  },
   "husky": {
     "hooks": {
-      "commit-msg": "node node_modules/@commitlint/cli/cli.js -E HUSKY_GIT_PARAMS",
-      "pre-commit": "lint-staged"
+      "pre-push": "npm run lint"
     }
   }
 }

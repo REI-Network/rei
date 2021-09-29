@@ -1,4 +1,4 @@
-import { Address, bufferToHex, BN } from 'ethereumjs-util';
+import { Address, bufferToHex, BN, KECCAK256_RLP_ARRAY } from 'ethereumjs-util';
 import { Block, BlockHeader, BlockData, HeaderData, BlockBuffer, BlockHeaderBuffer, BlockOptions, preHF1CalcCliqueDifficulty, CLIQUE_DIFF_NOTURN } from '@gxchain2/structure';
 import { Common } from '@gxchain2/common';
 import { hexStringToBN, Channel, logger, nowTimestamp, getRandomIntInclusive } from '@gxchain2/utils';
@@ -54,7 +54,9 @@ export class CliqueConsensusEngine implements ConsensusEngine {
 
     const parentHash = header.hash();
     const parentTD = await this.node.db.getTotalDifficulty(parentHash, header.number);
-    this.cancel(parentTD);
+    if (!this.cancel(parentTD)) {
+      return;
+    }
 
     const activeSigners = this.node.blockchain.cliqueActiveSignersByBlockNumber(header.number);
     const recentlyCheck = this.node.blockchain.cliqueCheckNextRecentlySigned(header, this.coinbase);
@@ -63,65 +65,51 @@ export class CliqueConsensusEngine implements ConsensusEngine {
     }
 
     await this.worker.newBlockHeader(header);
-    const pendingTxs = await this.worker.getPendingTxsByParentHash(parentHash);
+    const pendingBlock = await this.worker.getPendingBlockByParentHash(parentHash);
     if (!this.enable || this.node.sync.isSyncing) {
       return;
     }
 
-    const pendingNumber = header.number.addn(1);
-    const [inTurn, difficulty] = preHF1CalcCliqueDifficulty(activeSigners, this.coinbase, pendingNumber);
-    const period: number = header._common.consensusConfig().period;
-    const timestamp = header.timestamp.toNumber() + period;
-    const pendingCommon = this.node.getCommon(pendingNumber);
+    if (this.timeout === undefined && this.nextTd === undefined) {
+      this.nextTd = parentTD.add(pendingBlock.header.difficulty);
+      this.timeout = setTimeout(() => {
+        this.nextTd = undefined;
+        this.timeout = undefined;
 
-    this.nextTd = parentTD.add(difficulty);
-    this.timeout = setTimeout(() => {
-      this.nextTd = undefined;
-      this.timeout = undefined;
-
-      const now = nowTimestamp();
-      const pendingBlock = this.Block_fromBlockData(
-        {
-          header: {
-            parentHash,
-            difficulty,
-            number: pendingNumber,
-            gasLimit: this.getGasLimitByCommon(pendingCommon),
-            timestamp: now > timestamp ? now : timestamp
-          },
-          transactions: pendingTxs
-        },
-        { common: pendingCommon, hardforkByBlockNumber: true }
-      );
-
-      this.node
-        .processBlock(pendingBlock, {
-          generate: true,
-          broadcast: true
-        })
-        .then(({ reorged, block }) => {
-          if (reorged) {
-            logger.info('⛏️  Mine block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
-            // try to continue mint
-            if (this.enable && !this.node.sync.isSyncing) {
-              this.newBlockHeader(this.node.blockchain.latestBlock.header);
+        this.node
+          .processBlock(pendingBlock, {
+            generate: true,
+            broadcast: true
+          })
+          .then(({ reorged, block }) => {
+            if (reorged) {
+              logger.info('⛏️  Mine block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
+              // try to continue mint
+              if (this.enable && !this.node.sync.isSyncing) {
+                this.newBlockHeader(this.node.blockchain.latestBlock.header);
+              }
             }
-          }
-        })
-        .catch((err) => {
-          logger.error('CliqueConsensusEngine::newBlockHeader, processBlock, catch error:', err);
-        });
-    }, this.calcTimeout(timestamp, inTurn, activeSigners.length));
+          })
+          .catch((err) => {
+            logger.error('CliqueConsensusEngine::newBlockHeader, processBlock, catch error:', err);
+          });
+      }, this.calcTimeout(pendingBlock.header.timestamp.toNumber(), !pendingBlock.header.difficulty.eq(CLIQUE_DIFF_NOTURN), activeSigners.length));
+    }
   }
 
   private cancel(nextTd: BN) {
-    if (this.nextTd && this.nextTd.lte(nextTd)) {
+    if (!this.nextTd) {
+      return true;
+    }
+    if (this.nextTd.lte(nextTd)) {
       this.nextTd = undefined;
       if (this.timeout) {
         clearTimeout(this.timeout);
         this.timeout = undefined;
       }
+      return true;
     }
+    return false;
   }
 
   private calcTimeout(nextBlockTimestamp: number, inTurn: boolean, activeSignerCount: number) {
@@ -190,55 +178,37 @@ export class CliqueConsensusEngine implements ConsensusEngine {
     return hexStringToBN(limit === null ? common.genesis().gasLimit : limit);
   }
 
-  async getPendingBlock() {
-    const { header } = this.node.blockchain.latestBlock;
-    const parentHash = header.hash();
-    const period: number = header._common.consensusConfig().period;
-    const timestamp = header.timestamp.toNumber() + period;
-    const pendingNumber = header.number.addn(1);
-    const pendingCommon = this.node.getCommon(pendingNumber);
-    const now = nowTimestamp();
+  getPendingBlockHeader({ parentHash, number, timestamp }: HeaderData) {
+    if (number === undefined || !(number instanceof BN)) {
+      throw new Error('invalid header data');
+    }
 
     let difficulty: BN;
-    const activeSigners = this.node.blockchain.cliqueActiveSignersByBlockNumber(header.number);
+    const activeSigners = this.node.blockchain.cliqueActiveSignersByBlockNumber(number);
     if (this.isValidSigner(activeSigners)) {
-      difficulty = preHF1CalcCliqueDifficulty(activeSigners, this.coinbase, header.number)[1];
+      difficulty = preHF1CalcCliqueDifficulty(activeSigners, this.coinbase, number)[1];
     } else {
       difficulty = CLIQUE_DIFF_NOTURN.clone();
     }
 
-    try {
-      await this.worker.newBlockHeader(header);
-      const pendingTxs = await this.worker.getPendingTxsByParentHash(parentHash);
+    const common = this.node.getCommon(number);
+    return this.BlockHeader_fromHeaderData(
+      {
+        parentHash,
+        uncleHash: KECCAK256_RLP_ARRAY,
+        coinbase: EMPTY_ADDRESS,
+        number,
+        timestamp,
+        difficulty,
+        gasLimit: this.getGasLimitByCommon(common)
+      },
+      { common }
+    );
+  }
 
-      return this.Block_fromBlockData(
-        {
-          header: {
-            parentHash,
-            difficulty,
-            number: pendingNumber,
-            gasLimit: this.getGasLimitByCommon(pendingCommon),
-            timestamp: now > timestamp ? now : timestamp
-          },
-          transactions: pendingTxs
-        },
-        { common: pendingCommon, hardforkByBlockNumber: true }
-      );
-    } catch (err) {
-      logger.debug('CliqueConsensusEngine::getPendingBlock, catch error:', err);
-      return this.Block_fromBlockData(
-        {
-          header: {
-            parentHash,
-            difficulty,
-            number: pendingNumber,
-            gasLimit: this.getGasLimitByCommon(pendingCommon),
-            timestamp: now > timestamp ? now : timestamp
-          },
-          transactions: []
-        },
-        { common: pendingCommon, hardforkByBlockNumber: true }
-      );
-    }
+  async getPendingBlock() {
+    await this.initPromise;
+    const pendingBlock = await this.worker.getLastPendingBlock();
+    return pendingBlock ?? this.Block_fromBlockData({}, { common: this.node.getCommon(0) });
   }
 }

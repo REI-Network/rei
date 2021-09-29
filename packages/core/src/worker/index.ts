@@ -1,9 +1,9 @@
 import { BN } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
-import { BlockHeader, Transaction } from '@gxchain2/structure';
+import { BlockHeader, Transaction, Block } from '@gxchain2/structure';
 import VM from '@gxchain2-ethereumjs/vm';
 import { RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
-import { logger } from '@gxchain2/utils';
+import { logger, nowTimestamp } from '@gxchain2/utils';
 import { PendingTxMap } from '../txpool';
 import { Node } from '../node';
 import { processTx } from '../vm';
@@ -27,19 +27,19 @@ export class Worker {
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
   private readonly ce: ConsensusEngine;
-  private readonly abr: AsyncBufferRetriever<Transaction[]>;
+  private readonly abr: AsyncBufferRetriever<Block>;
   private readonly lock = new Semaphore(1);
 
   private vm!: VM;
   private parentHash!: Buffer;
-  private pendingNumber!: BN;
+  private pendingHeader!: BlockHeader;
   private pendingTxs!: Transaction[];
   private pendingGasUsed!: BN;
 
   constructor(options: WorkerOptions) {
     this.node = options.node;
     this.ce = options.ce;
-    this.abr = new AsyncBufferRetriever<Transaction[]>(options.maxCacheSize ?? defaultMaxCacheSize, options.timeoutDuration ?? defaultTimeoutDuration);
+    this.abr = new AsyncBufferRetriever<Block>(options.maxCacheSize ?? defaultMaxCacheSize, options.timeoutDuration ?? defaultTimeoutDuration);
     this.initPromise = this.init();
   }
 
@@ -69,15 +69,23 @@ export class Worker {
         await this.vm.stateManager.revert();
       }
 
+      this.parentHash = parentHash;
       this.pendingTxs = [];
       this.pendingGasUsed = new BN(0);
-      this.parentHash = parentHash;
-      this.pendingNumber = header.number.addn(1);
 
-      this.vm = await this.node.getVM(header.stateRoot, this.pendingNumber);
+      const pendingNumber = header.number.addn(1);
+      const period: number = header._common.consensusConfig().period;
+      const now = nowTimestamp();
+      let timestamp = header.timestamp.toNumber() + period;
+      if (now > timestamp) {
+        timestamp = now;
+      }
+      this.pendingHeader = this.ce.getPendingBlockHeader({ parentHash, number: pendingNumber, timestamp });
+
+      this.vm = await this.node.getVM(header.stateRoot, pendingNumber);
       await this.vm.stateManager.checkpoint();
-      await this._commit(await this.node.txPool.getPendingTxMap(header.number, this.parentHash));
-      this.abr.push(this.parentHash, [...this.pendingTxs]);
+      const pendingBlock = await this._commit(await this.node.txPool.getPendingTxMap(header.number, this.parentHash));
+      this.abr.push(parentHash, pendingBlock);
     } catch (err) {
       logger.error('Worker::_newBlockHeader, catch error:', err);
     } finally {
@@ -97,8 +105,8 @@ export class Worker {
       for (const [sender, sortedTxs] of txs) {
         pendingMap.push(sender, sortedTxs);
       }
-      await this._commit(pendingMap);
-      this.abr.update(this.parentHash, [...this.pendingTxs]);
+      const pendingBlock = await this._commit(pendingMap);
+      this.abr.push(this.parentHash, pendingBlock);
     } catch (err) {
       logger.error('Worker::addTxs, catch error:', err);
     } finally {
@@ -110,9 +118,14 @@ export class Worker {
    * Assembles the pending block from block data
    * @returns
    */
-  async getPendingTxsByParentHash(hash: Buffer) {
+  async getPendingBlockByParentHash(hash: Buffer) {
     await this.initPromise;
     return this.abr.retrieve(hash);
+  }
+
+  async getLastPendingBlock() {
+    await this.initPromise;
+    return this.abr.last();
   }
 
   /**
@@ -121,18 +134,19 @@ export class Worker {
    * @param pendingMap All pending transactions
    */
   private async _commit(pendingMap: PendingTxMap) {
+    let pendingBlock = this.ce.Block_fromBlockData({ header: this.pendingHeader }, { common: this.pendingHeader._common });
     let tx = pendingMap.peek();
     while (tx) {
       try {
         await this.vm.stateManager.checkpoint();
 
         let txRes: RunTxResult;
-        tx.common.setHardforkByBlockNumber(this.pendingNumber);
+        tx = Transaction.fromTxData({ ...tx }, { common: this.pendingHeader._common });
         try {
           txRes = await processTx.bind(this.node)({
             vm: this.vm,
             tx,
-            block: this.ce.Block_fromBlockData({}, { common: tx.common })
+            block: pendingBlock
           });
         } catch (err) {
           await this.vm.stateManager.revert();
@@ -141,7 +155,7 @@ export class Worker {
           continue;
         }
 
-        if (this.ce.getGasLimitByCommon(tx.common).lt(txRes.gasUsed.add(this.pendingGasUsed))) {
+        if (pendingBlock.header.gasLimit.lt(txRes.gasUsed.add(this.pendingGasUsed))) {
           await this.vm.stateManager.revert();
           pendingMap.pop();
         } else {
@@ -157,5 +171,6 @@ export class Worker {
         tx = pendingMap.peek();
       }
     }
+    return this.ce.Block_fromBlockData({ header: { ...this.pendingHeader }, transactions: [...this.pendingTxs] }, { common: this.pendingHeader._common });
   }
 }

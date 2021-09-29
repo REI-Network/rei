@@ -10,4 +10,6 @@ export interface ConsensusEngine {
   Block_fromValuesArray(data: BlockBuffer, options?: BlockOptions): Block;
   Block_fromBlockData(data: BlockData, options?: BlockOptions): Block;
   getGasLimitByCommon(common: Common): BN;
+  getPendingBlockHeader(data: HeaderData): BlockHeader;
+  getPendingBlock(): Promise<Block>;
 }

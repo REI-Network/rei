@@ -94,6 +94,12 @@ export abstract class AsyncRetriever<K, V> {
     }
     return false;
   }
+
+  last() {
+    if (this.cache.length > 0) {
+      return this.cache[0][1];
+    }
+  }
 }
 
 export class AsyncBufferRetriever<V> extends AsyncRetriever<Buffer, V> {

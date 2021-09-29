@@ -2,6 +2,15 @@
   "extends": "../../tsconfig.json",
   "include": ["src/**/*.ts"],
   "compilerOptions": {
-    "outDir": "./dist"
-  }
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "composite": true
+  },
+  "references": [
+    { "path": "../common/tsconfig.json" },
+    { "path": "../core/tsconfig.json" },
+    { "path": "../rpc/tsconfig.json" },
+    { "path": "../utils/tsconfig.json" },
+    { "path": "../wallet/tsconfig.json" }
+  ]
 }

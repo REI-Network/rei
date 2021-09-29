@@ -12,3 +12,6 @@ packages/contracts/deployments
 
 # Solidity doc gen files
 packages/contracts/docs
+
+# TypeScript cache
+*.tsbuildinfo

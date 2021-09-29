@@ -5,7 +5,7 @@
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
     "scripts": {
-        "build": "tsc",
+        "build": "tsc --build tsconfig.json",
         "test": "echo @gxchain2/network has not test cases"
     },
     "devDependencies": {

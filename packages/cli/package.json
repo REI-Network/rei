@@ -8,7 +8,7 @@
         "gxchain2": "dist/index.js"
     },
     "scripts": {
-        "build": "tsc",
+        "build": "tsc --build tsconfig.json",
         "test": "echo @gxchain2/cli has not test cases"
     },
     "devDependencies": {

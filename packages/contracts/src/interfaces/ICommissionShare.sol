@@ -9,9 +9,9 @@ import "./IOnly.sol";
  * @dev see {CommissionShare}
  */
 interface ICommissionShare is IERC20, IOnly {
-    function estimateStakeAmount(uint256 shares) external view returns (uint256);
+    function estimateSharesToAmount(uint256 shares) external view returns (uint256);
 
-    function estimateUnstakeShares(uint256 amount) external view returns (uint256);
+    function estimateAmountToShares(uint256 amount) external view returns (uint256);
 
     function mint(address to) external payable returns (uint256);
 

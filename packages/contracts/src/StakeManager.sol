@@ -187,50 +187,33 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Estimate the mininual stake amount for validator.
-     *      If the stake amount is less than this value, transaction will fail.
-     * @param validator    Validator address
-     */
-    function estimateMinStakeAmount(address validator) external view override returns (uint256 amount) {
-        return estimateStakeAmount(validator, 1);
-    }
-
-    /**
      * @dev Estimate how much GXC should be stake, if user wants to get the number of shares.
+     *      Or Estimate how much GXC can be obtained, if user unstake the amount of GXC.
      * @param validator    Validator address
      * @param shares       Number of shares
      */
-    function estimateStakeAmount(address validator, uint256 shares) public view override returns (uint256 amount) {
+    function estimateSharesToAmount(address validator, uint256 shares) public view override returns (uint256 amount) {
         address commissionShare = validators[validator].commissionShare;
         if (commissionShare == address(0)) {
             amount = shares;
         } else {
-            amount = CommissionShare(commissionShare).estimateStakeAmount(shares);
+            amount = CommissionShare(commissionShare).estimateSharesToAmount(shares);
         }
     }
 
     /**
-     * @dev Estimate the mininual unstake shares for validator.
-     *      If the unstake shares is less than this value, transaction will fail.
-     *      If the validator doesn't exist, return 0.
-     * @param validator    Validator address
-     */
-    function estimateMinUnstakeShares(address validator) external view override returns (uint256 shares) {
-        return estimateUnstakeShares(validator, 1);
-    }
-
-    /**
      * @dev Estimate how much shares should be unstake, if user wants to get the amount of GXC.
+     *      Or estimate how much shares can be obtained, if user stake the amount of GXC.
      *      If the validator doesn't exist, return 0.
      * @param validator    Validator address
      * @param amount       Number of GXC
      */
-    function estimateUnstakeShares(address validator, uint256 amount) public view override returns (uint256 shares) {
+    function estimateAmountToShares(address validator, uint256 amount) public view override returns (uint256 shares) {
         address commissionShare = validators[validator].commissionShare;
         if (commissionShare == address(0)) {
             shares = 0;
         } else {
-            shares = CommissionShare(commissionShare).estimateUnstakeShares(amount);
+            shares = CommissionShare(commissionShare).estimateAmountToShares(amount);
         }
     }
 

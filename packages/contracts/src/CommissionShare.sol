@@ -18,9 +18,10 @@ contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
 
     /**
      * @dev Estimate how much GXC should be stake, if user wants to get the number of shares.
+     *      Or Estimate how much GXC can be obtained, if user unstake the amount of GXC.
      * @param shares    Number of shares
      */
-    function estimateStakeAmount(uint256 shares) external view override returns (uint256 amount) {
+    function estimateSharesToAmount(uint256 shares) external view override returns (uint256 amount) {
         require(shares > 0, "CommissionShare: insufficient shares");
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) {
@@ -32,9 +33,10 @@ contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
 
     /**
      * @dev Estimate how much shares should be unstake, if user wants to get the amount of GXC.
+     *      Or estimate how much shares can be obtained, if user stake the amount of GXC.
      * @param amount    Number of GXC
      */
-    function estimateUnstakeShares(uint256 amount) external view override returns (uint256 shares) {
+    function estimateAmountToShares(uint256 amount) external view override returns (uint256 shares) {
         require(amount > 0, "CommissionShare: insufficient amount");
         uint256 balance = address(this).balance;
         if (balance == 0) {

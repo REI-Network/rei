@@ -156,20 +156,18 @@ describe('StakeManger', () => {
   });
 
   it('should estimate correctly', async () => {
-    const estimateMinStake = await stakeManager.methods.estimateMinStakeAmount(validator1).call();
+    const estimateMinStake = await stakeManager.methods.estimateSharesToAmount(validator1, 1).call();
     expect(estimateMinStake, 'mininual stake amount should be equal').equal('1');
     const wantedShares = toBN('97');
-    const estimateStake = await stakeManager.methods.estimateStakeAmount(validator1, wantedShares).call();
+    const estimateStake = await stakeManager.methods.estimateSharesToAmount(validator1, wantedShares).call();
     expect(estimateStake, 'estimate shares amount should be equal').be.equal(wantedShares.toString());
 
     stakeId++;
     await stakeManager.methods.stake(validator1, deployer).send({ value: estimateStake });
     await stakeManager.methods.slash(validator1, 1).send();
     await stakeManager.methods.reward(validator1).send({ value: 2000 });
-    const estimateMinStake1 = await stakeManager.methods.estimateMinStakeAmount(validator1).call();
+    const estimateMinStake1 = await stakeManager.methods.estimateSharesToAmount(validator1, 1).call();
     expect(estimateMinStake1, 'mininual stake amount should be equal').be.equal('11');
-    const estimateStake1 = await stakeManager.methods.estimateStakeAmount(validator1, '1').call();
-    expect(estimateStake1, 'estimate stake amount should be equal').be.equal(estimateStake1);
 
     await stakeManager.methods.startUnstake(validator1, deployer, wantedShares.toString()).send();
     const estimateAmount = await stakeManager.methods.estimateUnstakeAmount(validator1, wantedShares).call();
@@ -184,10 +182,8 @@ describe('StakeManger', () => {
     await stakeManager.methods.stake(validator1, deployer).send({ value: wantedAmount.toString() });
     await stakeManager.methods.slash(validator1, 1).send();
     await stakeManager.methods.reward(validator1).send({ value: 1000 });
-    const estimateUnstakeShare = await stakeManager.methods.estimateMinUnstakeShares(validator1).call();
+    const estimateUnstakeShare = await stakeManager.methods.estimateAmountToShares(validator1, 1).call();
     expect(estimateUnstakeShare, 'estimateUnstakeShare should be equal').be.equal('1');
-    const estimateUnstakeShare1 = await stakeManager.methods.estimateUnstakeShares(validator1, '1').call();
-    expect(estimateUnstakeShare1, 'estimateUnstakeShare1 should be equal').be.equal('1');
   });
 
   it('should remove and add indexed validator correctly', async () => {

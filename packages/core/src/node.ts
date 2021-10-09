@@ -304,6 +304,7 @@ export class Node {
     await this.bcMonitor.init();
 
     // start mint
+    this.getLastestEngine().start();
     this.getLastestEngine().newBlockHeader(this.blockchain.latestBlock.header);
   }
 

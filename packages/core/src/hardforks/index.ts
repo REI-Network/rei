@@ -4,6 +4,17 @@ import { BaseTrie } from 'merkle-patricia-tree';
 import { toBuffer } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
 import { TypedTransaction } from '@gxchain2/structure';
+import { ConsensusType } from '../consensus';
+
+export function getConsensusType(common: Common) {
+  if (common.chainName() === 'gxc2-testnet') {
+    return common.gteHardfork('testnet-hf1') ? ConsensusType.Reimint : ConsensusType.Clique;
+  } else if (common.chainName() === 'gxc2-mainnet') {
+    return common.gteHardfork('mainnet-hf1') ? ConsensusType.Reimint : ConsensusType.Clique;
+  } else {
+    throw new Error('unknown chain');
+  }
+}
 
 /**
  * Check whether staking logic is enabled

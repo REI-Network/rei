@@ -54,10 +54,10 @@ export class ETHController extends Controller {
     return bufferToHex(this.node.getCommon(0).chainIdBN().toBuffer());
   }
   eth_coinbase() {
-    return this.node.engine.coinbase.toString();
+    return this.node.getLastestEngine().coinbase.toString();
   }
   eth_mining() {
-    return this.node.engine.enable;
+    return this.node.getLastestEngine().enable;
   }
   eth_hashrate() {
     return bufferToHex(toBuffer(0));

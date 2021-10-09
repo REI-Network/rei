@@ -15,7 +15,7 @@ const defaultTimeoutDuration = 1000;
 
 export interface WorkerOptions {
   node: Node;
-  ce: ConsensusEngine;
+  consensusEngine: ConsensusEngine;
   // max pending block cache size
   maxCacheSize?: number;
   // the timeout duration for getting a pending block
@@ -27,9 +27,8 @@ export interface WorkerOptions {
  */
 export class Worker {
   private readonly node: Node;
-  private readonly initPromise: Promise<void>;
-  private readonly ce: ConsensusEngine;
-  private readonly abr: AsyncBufferRetriever<Block>;
+  private readonly consensusEngine: ConsensusEngine;
+  private readonly asyncRetriever: AsyncBufferRetriever<Block>;
   private readonly lock = new Semaphore(1);
 
   private vm!: VM;
@@ -40,41 +39,19 @@ export class Worker {
 
   constructor(options: WorkerOptions) {
     this.node = options.node;
-    this.ce = options.ce;
-    this.abr = new AsyncBufferRetriever<Block>(options.maxCacheSize ?? defaultMaxCacheSize, options.timeoutDuration ?? defaultTimeoutDuration);
-    this.initPromise = this.init();
-  }
-
-  /**
-   * Initialize worker.
-   */
-  async init() {
-    if (this.initPromise) {
-      await this.initPromise;
-      return;
-    }
-
-    await this._newBlockHeader(this.node.blockchain.latestBlock.header);
-  }
-
-  /**
-   * Handler the latest block header.
-   * @param header - Latest block header.
-   */
-  async newBlockHeader(header: BlockHeader) {
-    await this.initPromise;
-    await this._newBlockHeader(header);
+    this.consensusEngine = options.consensusEngine;
+    this.asyncRetriever = new AsyncBufferRetriever<Block>(options.maxCacheSize ?? defaultMaxCacheSize, options.timeoutDuration ?? defaultTimeoutDuration);
   }
 
   /**
    * Handler the latest block header.
    * Commit pending transaction and save
-   * the pending block to `this.abr`.
+   * the pending block to `this.asyncRetriever`.
    * @param header - Latest block header.
    */
-  private async _newBlockHeader(header: BlockHeader) {
+  async newBlockHeader(header: BlockHeader) {
     const parentHash = header.hash();
-    if (this.abr.has(parentHash)) {
+    if (this.asyncRetriever.has(parentHash)) {
       return;
     }
 
@@ -95,12 +72,12 @@ export class Worker {
       if (now > timestamp) {
         timestamp = now;
       }
-      this.pendingHeader = this.ce.getPendingBlockHeader({ parentHash, number: pendingNumber, timestamp });
+      this.pendingHeader = this.consensusEngine.getEmptyPendingBlockHeader({ parentHash, number: pendingNumber, timestamp });
 
       this.vm = await this.node.getVM(header.stateRoot, pendingNumber);
       await this.vm.stateManager.checkpoint();
       const pendingBlock = await this._commit(await this.node.txPool.getPendingTxMap(header.number, this.parentHash));
-      this.abr.push(parentHash, pendingBlock);
+      this.asyncRetriever.push(parentHash, pendingBlock);
     } catch (err) {
       logger.error('Worker::_newBlockHeader, catch error:', err);
     } finally {
@@ -113,7 +90,6 @@ export class Worker {
    * @param txs - The map of Buffer and array of transactions
    */
   async addTxs(txs: Map<Buffer, Transaction[]>) {
-    await this.initPromise;
     try {
       await this.lock.acquire();
       const pendingMap = new PendingTxMap();
@@ -121,7 +97,7 @@ export class Worker {
         pendingMap.push(sender, sortedTxs);
       }
       const pendingBlock = await this._commit(pendingMap);
-      this.abr.push(this.parentHash, pendingBlock);
+      this.asyncRetriever.push(this.parentHash, pendingBlock);
     } catch (err) {
       logger.error('Worker::addTxs, catch error:', err);
     } finally {
@@ -133,18 +109,24 @@ export class Worker {
    * Get pending block by parent block hash.
    * @returns Pending block.
    */
-  async getPendingBlockByParentHash(hash: Buffer) {
-    await this.initPromise;
-    return this.abr.retrieve(hash);
+  getPendingBlockByParentHash(hash: Buffer) {
+    return this.asyncRetriever.retrieve(hash);
+  }
+
+  /**
+   * Directly get pending block by parent block hash.
+   * @returns Pending block.
+   */
+  directlyGetPendingBlockByParentHash(hash: Buffer) {
+    return this.asyncRetriever.directlyRetrieve(hash);
   }
 
   /**
    * Get latest pending block.
    * @returns Pending block, return `undefined` if it doesn't exist
    */
-  async getLastPendingBlock() {
-    await this.initPromise;
-    return this.abr.last();
+  getLastPendingBlock() {
+    return this.asyncRetriever.last();
   }
 
   /**
@@ -153,7 +135,7 @@ export class Worker {
    * @param pendingMap All pending transactions
    */
   private async _commit(pendingMap: PendingTxMap) {
-    let pendingBlock = this.ce.Block_fromBlockData({ header: this.pendingHeader }, { common: this.pendingHeader._common });
+    const pendingBlock = this.consensusEngine.Block_fromBlockData({ header: this.pendingHeader }, { common: this.pendingHeader._common });
     let tx = pendingMap.peek();
     while (tx) {
       try {
@@ -190,6 +172,6 @@ export class Worker {
         tx = pendingMap.peek();
       }
     }
-    return this.ce.Block_fromBlockData({ header: { ...this.pendingHeader }, transactions: [...this.pendingTxs] }, { common: this.pendingHeader._common });
+    return this.consensusEngine.Block_fromBlockData({ header: { ...this.pendingHeader }, transactions: [...this.pendingTxs] }, { common: this.pendingHeader._common });
   }
 }

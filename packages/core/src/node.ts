@@ -26,11 +26,11 @@ import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protoco
 import { ValidatorSets } from './staking';
 import { StakeManager, Router } from './contracts';
 import { processBlock, ProcessBlockOpts } from './vm';
-import { CliqueConsensusEngine } from './consensus';
+import { createEnginesByConsensusTypes, ConsensusEngine, ConsensusType } from './consensus';
+import { getConsensusType } from './hardforks';
 
-const timeoutBanTime = 60 * 5 * 1000;
-const invalidBanTime = 60 * 10 * 1000;
-
+const defaultTimeoutBanTime = 60 * 5 * 1000;
+const defaultInvalidBanTime = 60 * 10 * 1000;
 const defaultChainName = 'gxc2-mainnet';
 
 export type NodeStatus = {
@@ -140,10 +140,9 @@ export class Node {
   public bloomBitsIndexer!: ChainIndexer;
   public bcMonitor!: BlockchainMonitor;
   public accMngr!: AccountManager;
-  public engine!: CliqueConsensusEngine;
 
-  // TODO: remove this after tendermint
-  public validatorSets: ValidatorSets;
+  public readonly validatorSets: ValidatorSets = new ValidatorSets();
+  public readonly engines: Map<ConsensusType, ConsensusEngine>;
 
   private readonly initPromise: Promise<void>;
   private readonly taskLoopPromise: Promise<void>;
@@ -153,16 +152,18 @@ export class Node {
 
   private chain!: string | { chain: any; genesisState?: any };
   private networkId!: number;
+  private chainId!: number;
   private genesisHash!: Buffer;
 
   constructor(options: NodeOptions) {
     this.chaindb = createEncodingLevelDB(path.join(options.databasePath, 'chaindb'));
     this.nodedb = createLevelDB(path.join(options.databasePath, 'nodes'));
     this.networkdb = new LevelStore(path.join(options.databasePath, 'networkdb'), { createIfMissing: true });
+    const engineOptions = { node: this, enable: options.mine.enable, coinbase: options.mine.coinbase ? Address.fromString(options.mine.coinbase) : undefined };
+    this.engines = createEnginesByConsensusTypes([ConsensusType.Clique, ConsensusType.Reimint], engineOptions);
     this.initPromise = this.init(options);
     this.taskLoopPromise = this.taskLoop();
     this.processLoopPromise = this.processLoop();
-    this.validatorSets = new ValidatorSets();
   }
 
   /**
@@ -234,6 +235,7 @@ export class Node {
     const common = Common.createChainStartCommon(typeof this.chain === 'string' ? this.chain : this.chain.chain);
     this.db = new Database(this.chaindb, common);
     this.networkId = common.networkIdBN().toNumber();
+    this.chainId = common.chainIdBN().toNumber();
 
     let genesisBlock!: Block;
     try {
@@ -295,14 +297,14 @@ export class Node {
 
     await this.txPool.init();
 
-    this.engine = new CliqueConsensusEngine({ node: this, enable: options.mine.enable, coinbase: options.mine.coinbase ? Address.fromString(options.mine.coinbase) : undefined });
-    await this.engine.init();
-
     this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: BloomBitsBlocks, confirmsBlockNumber: ConfirmsBlockNumber });
     await this.bloomBitsIndexer.init();
 
     this.bcMonitor = new BlockchainMonitor(this);
     await this.bcMonitor.init();
+
+    // start mint
+    this.getLastestEngine().newBlockHeader(this.blockchain.latestBlock.header);
   }
 
   private onPeerInstalled = (peer: Peer) => {
@@ -314,7 +316,7 @@ export class Node {
   };
 
   private onSyncOver = () => {
-    this.engine.newBlockHeader(this.blockchain.latestBlock.header);
+    this.getLastestEngine().newBlockHeader(this.blockchain.latestBlock.header);
   };
 
   /**
@@ -332,6 +334,23 @@ export class Node {
    */
   getLatestCommon() {
     return this.blockchain.latestBlock._common;
+  }
+
+  /**
+   * Get consensus engine by common instance
+   * @param common - Common instance
+   * @returns Consensus engine
+   */
+  getEngineByCommon(common: Common) {
+    return this.engines.get(getConsensusType(common))!;
+  }
+
+  /**
+   * Get lastest consensus engine
+   * @returns Consensus engine
+   */
+  getLastestEngine() {
+    return this.getEngineByCommon(this.getLatestCommon());
   }
 
   /**
@@ -392,6 +411,14 @@ export class Node {
   }
 
   /**
+   * Get chain id
+   * @returns Chain id
+   */
+  getChainId() {
+    return this.chainId;
+  }
+
+  /**
    * A loop that executes blocks sequentially
    */
   private async processLoop() {
@@ -432,7 +459,7 @@ export class Node {
           for (const handler of WireProtocol.getPool().handlers) {
             handler.announceTx(hashes);
           }
-          await this.engine.worker.addTxs(readies);
+          await this.getLastestEngine().addTxs(readies);
         }
         task.resolve(results);
       } catch (err) {
@@ -480,9 +507,9 @@ export class Node {
    */
   async banPeer(peerId: string, reason: 'invalid' | 'timeout') {
     if (reason === 'invalid') {
-      await this.networkMngr.ban(peerId, invalidBanTime);
+      await this.networkMngr.ban(peerId, defaultInvalidBanTime);
     } else {
-      await this.networkMngr.ban(peerId, timeoutBanTime);
+      await this.networkMngr.ban(peerId, defaultTimeoutBanTime);
     }
   }
 
@@ -497,7 +524,7 @@ export class Node {
     this.taskQueue.abort();
     this.processQueue.abort();
     await this.aborter.abort();
-    await this.engine.abort();
+    await Promise.all(Array.from(this.engines.values()).map((engine) => engine.abort()));
     await this.networkMngr.abort();
     await this.bloomBitsIndexer.abort();
     await this.txPool.abort();

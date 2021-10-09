@@ -75,6 +75,14 @@ export abstract class AsyncRetriever<K, V> {
     });
   }
 
+  directlyRetrieve(k: K) {
+    for (const [_k, _v] of this.cache) {
+      if (this.kEqual(k, _k)) {
+        return _v;
+      }
+    }
+  }
+
   /**
    * Push a new value to the cache.
    * If the key currently exists in `this.cache`, it will update the value,

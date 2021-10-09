@@ -20,7 +20,7 @@ const wireHandlerFuncs: HandlerFunc[] = [
     code: 0,
     encode(this: WireProtocolHandler, data: NodeStatus) {
       const payload: any = Object.entries(data).map(([k, v]) => [k, v]);
-      return [0, payload];
+      return payload;
     },
     decode(this: WireProtocolHandler, data): NodeStatus {
       const status: any = {};
@@ -44,7 +44,7 @@ const wireHandlerFuncs: HandlerFunc[] = [
     code: 1,
     response: 2,
     encode(this: WireProtocolHandler, { start, count }: { start: number; count: number }) {
-      return [1, [start, count]];
+      return [start, count];
     },
     decode(this: WireProtocolHandler, [start, count]: Buffer[]) {
       return { start: bufferToInt(start), count: bufferToInt(count) };
@@ -62,7 +62,7 @@ const wireHandlerFuncs: HandlerFunc[] = [
     name: 'BlockHeaders',
     code: 2,
     encode(this: WireProtocolHandler, headers: BlockHeader[]) {
-      return [2, headers.map((h) => h.raw())];
+      return headers.map((h) => h.raw());
     },
     decode(this: WireProtocolHandler, headers: BlockHeaderBuffer[]) {
       return headers.map((h) => BlockHeader.fromValuesArray(h, { common: this.node.getCommon(0), hardforkByBlockNumber: true }));
@@ -73,7 +73,7 @@ const wireHandlerFuncs: HandlerFunc[] = [
     code: 3,
     response: 4,
     encode(this: WireProtocolHandler, headers: BlockHeader[]) {
-      return [3, headers.map((h) => h.hash())];
+      return headers.map((h) => h.hash());
     },
     decode(this: WireProtocolHandler, headerHashs: Buffer[]) {
       return headerHashs;
@@ -102,12 +102,9 @@ const wireHandlerFuncs: HandlerFunc[] = [
     name: 'BlockBodies',
     code: 4,
     encode(this: WireProtocolHandler, bodies: Transaction[][]) {
-      return [
-        4,
-        bodies.map((txs) => {
-          return txs.map((tx) => tx.raw() as Buffer[]);
-        })
-      ];
+      return bodies.map((txs) => {
+        return txs.map((tx) => tx.raw() as Buffer[]);
+      });
     },
     decode(this: WireProtocolHandler, bodies: TransactionsBuffer[]): Transaction[][] {
       return bodies.map((txs) => {
@@ -119,7 +116,7 @@ const wireHandlerFuncs: HandlerFunc[] = [
     name: 'NewBlock',
     code: 5,
     encode(this: WireProtocolHandler, { block, td }: { block: Block; td: BN }) {
-      return [5, [[block.header.raw(), block.transactions.map((tx) => tx.raw() as Buffer[])], td.toBuffer()]];
+      return [[block.header.raw(), block.transactions.map((tx) => tx.raw() as Buffer[])], td.toBuffer()];
     },
     decode(this: WireProtocolHandler, raw): { block: Block; td: BN } {
       return {
@@ -140,7 +137,7 @@ const wireHandlerFuncs: HandlerFunc[] = [
     name: 'NewPooledTransactionHashes',
     code: 6,
     encode(this: WireProtocolHandler, hashes: Buffer[]) {
-      return [6, [...hashes]];
+      return [...hashes];
     },
     decode(this: WireProtocolHandler, hashes): Buffer[] {
       return hashes;
@@ -159,7 +156,7 @@ const wireHandlerFuncs: HandlerFunc[] = [
     code: 7,
     response: 8,
     encode(this: WireProtocolHandler, hashes: Buffer[]) {
-      return [7, [...hashes]];
+      return [...hashes];
     },
     decode(this: WireProtocolHandler, hashes): Buffer[] {
       return hashes;
@@ -176,7 +173,7 @@ const wireHandlerFuncs: HandlerFunc[] = [
     name: 'PooledTransactions',
     code: 8,
     encode(this: WireProtocolHandler, txs: Transaction[]) {
-      return [8, txs.map((tx) => tx.raw() as Buffer[])];
+      return txs.map((tx) => tx.raw() as Buffer[]);
     },
     decode(this: WireProtocolHandler, raws: TransactionsBuffer) {
       return raws.map((raw) => mustParseTransction(raw, { common: this.node.getLatestCommon() }));
@@ -214,7 +211,8 @@ export class WireProtocolHandler extends HandlerBase<NodeStatus> {
   }
 
   protected encode(method: string | number, data: any) {
-    return rlp.encode(this.findHandler(method).encode.call(this, data));
+    const handler = this.findHandler(method);
+    return rlp.encode([handler.code, handler.encode.call(this, data)]);
   }
   protected decode(data: Buffer) {
     return rlp.decode(data) as unknown as [number, any];

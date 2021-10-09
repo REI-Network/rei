@@ -119,7 +119,7 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
           }
 
           // filter changes and save validator set
-          validatorSet = parentValidatorSet!.copy(block._common);
+          validatorSet = parentValidatorSet!.copy();
           const changes = new ValidatorChanges(parentValidatorSet!);
           StakeManager.filterReceiptsChanges(changes, receipts, block._common);
           if (logs) {

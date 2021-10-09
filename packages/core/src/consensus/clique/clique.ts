@@ -1,40 +1,29 @@
 import { Address, bufferToHex, BN, KECCAK256_RLP_ARRAY } from 'ethereumjs-util';
-import { Block, BlockHeader, BlockData, HeaderData, BlockBuffer, BlockHeaderBuffer, BlockOptions, preHF1CalcCliqueDifficulty, CLIQUE_DIFF_NOTURN } from '@gxchain2/structure';
+import { Block, BlockHeader, BlockData, HeaderData, BlockBuffer, BlockHeaderBuffer, Transaction, preHF1CalcCliqueDifficulty, CLIQUE_DIFF_NOTURN } from '@gxchain2/structure';
 import { Common } from '@gxchain2/common';
 import { hexStringToBN, Channel, logger, nowTimestamp, getRandomIntInclusive } from '@gxchain2/utils';
-import { ConsensusEngine } from '../consensusEngine';
+import { ConsensusEngine, ConsensusEngineOptions, CEBlockOptions } from '../consensusEngine';
 import { Node } from '../../node';
 import { Worker } from '../../worker';
 
 const EMPTY_ADDRESS = Address.zero();
 const noTurnSignerDelay = 500;
 
-export interface CliqueConsensusEngineOptions {
-  node: Node;
-  enable: boolean;
-  coinbase?: Address;
-}
-
 export class CliqueConsensusEngine implements ConsensusEngine {
-  readonly worker: Worker;
-
+  private worker: Worker;
   private node: Node;
   private msgQueue = new Channel<BlockHeader>({ max: 1 });
-  private msgLoopPromise: Promise<void>;
-  private initPromise: Promise<void>;
-
+  private msgLoopPromise?: Promise<void>;
   private _enable: boolean;
   private _coinbase: Address;
   private nextTd?: BN;
   private timeout?: NodeJS.Timeout;
 
-  constructor(options: CliqueConsensusEngineOptions) {
+  constructor(options: ConsensusEngineOptions) {
     this.node = options.node;
     this._enable = options.enable;
     this._coinbase = options.coinbase ?? EMPTY_ADDRESS;
-    this.worker = new Worker({ node: this.node, ce: this });
-    this.initPromise = this.init();
-    this.msgLoopPromise = this.msgLoop();
+    this.worker = new Worker({ node: this.node, consensusEngine: this });
   }
 
   private async msgLoop() {
@@ -44,6 +33,30 @@ export class CliqueConsensusEngine implements ConsensusEngine {
       } catch (err) {
         logger.error('CliqueConsensusEngine::msgLoop, catch error:', err);
       }
+    }
+  }
+
+  newBlockHeader(header: BlockHeader) {
+    this.msgQueue.push(header);
+  }
+
+  addTxs(txs: Map<Buffer, Transaction[]>) {
+    return this.worker.addTxs(txs);
+  }
+
+  start() {
+    if (this.msgLoopPromise) {
+      throw new Error('CliqueConsensusEngine has started');
+    }
+
+    this.msgLoopPromise = this.msgLoop();
+  }
+
+  async abort() {
+    if (this.msgLoopPromise) {
+      this.msgQueue.abort();
+      await this.msgLoopPromise;
+      this.msgLoopPromise = undefined;
     }
   }
 
@@ -72,7 +85,10 @@ export class CliqueConsensusEngine implements ConsensusEngine {
 
     // create a new pending block through worker
     await this.worker.newBlockHeader(header);
-    let pendingBlock = await this.worker.getPendingBlockByParentHash(parentHash);
+    let pendingBlock = this.worker.directlyGetPendingBlockByParentHash(parentHash);
+    if (!pendingBlock) {
+      throw new Error('missing pending block');
+    }
     if (!this.enable || this.node.sync.isSyncing) {
       return;
     }
@@ -96,7 +112,7 @@ export class CliqueConsensusEngine implements ConsensusEngine {
           });
           if (reorged) {
             logger.info('⛏️  Mine block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
-            // try to continue mint
+            // try to continue minting
             if (this.enable && !this.node.sync.isSyncing) {
               this.newBlockHeader(this.node.blockchain.latestBlock.header);
             }
@@ -139,9 +155,12 @@ export class CliqueConsensusEngine implements ConsensusEngine {
     return activeSigners.filter((s) => s.equals(this.coinbase)).length > 0;
   }
 
-  private cliqueSigner() {
-    return this.enable ? this.node.accMngr.getPrivateKey(this.coinbase) : undefined;
+  private cliqueSigner(options?: CEBlockOptions) {
+    const sign = options?.sign ?? true;
+    return sign && this.enable ? this.node.accMngr.getPrivateKey(this.coinbase) : undefined;
   }
+
+  ////////////////////////////////
 
   get coinbase() {
     return this._coinbase;
@@ -151,51 +170,40 @@ export class CliqueConsensusEngine implements ConsensusEngine {
     return this._enable && !this._coinbase.equals(EMPTY_ADDRESS) && this.node.accMngr.hasUnlockedAccount(this._coinbase);
   }
 
-  newBlockHeader(header: BlockHeader) {
-    this.msgQueue.push(header);
-  }
-
-  async init() {
-    if (this.initPromise) {
-      await this.initPromise;
-      return;
-    }
-
-    await this.worker.init();
-    await this._newBlockHeader(this.node.blockchain.latestBlock.header);
-  }
-
-  async abort() {
-    this.msgQueue.abort();
-    await this.msgLoopPromise;
+  BlockHeader_miner(header: BlockHeader): Address {
+    return header.cliqueSigner();
   }
 
   /**
    * {@link ConsensusEngine.BlockHeader_fromValuesArray}
    */
-  BlockHeader_fromValuesArray(data: BlockHeaderBuffer, options?: BlockOptions) {
-    return BlockHeader.fromValuesArray(data, { cliqueSigner: this.cliqueSigner(), ...options });
+  BlockHeader_fromValuesArray(data: BlockHeaderBuffer, options?: CEBlockOptions) {
+    return BlockHeader.fromValuesArray(data, { cliqueSigner: this.cliqueSigner(options), ...options });
   }
 
   /**
    * {@link ConsensusEngine.BlockHeader_fromHeaderData}
    */
-  BlockHeader_fromHeaderData(data: HeaderData, options?: BlockOptions) {
-    return BlockHeader.fromHeaderData(data, { cliqueSigner: this.cliqueSigner(), ...options });
+  BlockHeader_fromHeaderData(data: HeaderData, options?: CEBlockOptions) {
+    return BlockHeader.fromHeaderData(data, { cliqueSigner: this.cliqueSigner(options), ...options });
+  }
+
+  Block_miner(block: Block) {
+    return block.header.cliqueSigner();
   }
 
   /**
    * {@link ConsensusEngine.Block_fromValuesArray}
    */
-  Block_fromValuesArray(data: BlockBuffer, options?: BlockOptions) {
-    return Block.fromValuesArray(data, { cliqueSigner: this.cliqueSigner(), ...options });
+  Block_fromValuesArray(data: BlockBuffer, options?: CEBlockOptions) {
+    return Block.fromValuesArray(data, { cliqueSigner: this.cliqueSigner(options), ...options });
   }
 
   /**
    * {@link ConsensusEngine.Block_fromBlockData}
    */
-  Block_fromBlockData(data: BlockData, options?: BlockOptions) {
-    return Block.fromBlockData(data, { cliqueSigner: this.cliqueSigner(), ...options });
+  Block_fromBlockData(data: BlockData, options?: CEBlockOptions) {
+    return Block.fromBlockData(data, { cliqueSigner: this.cliqueSigner(options), ...options });
   }
 
   /**
@@ -207,9 +215,9 @@ export class CliqueConsensusEngine implements ConsensusEngine {
   }
 
   /**
-   * {@link ConsensusEngine.getPendingBlockHeader}
+   * {@link ConsensusEngine.getEmptyPendingBlockHeader}
    */
-  getPendingBlockHeader({ parentHash, number, timestamp }: HeaderData) {
+  getEmptyPendingBlockHeader({ parentHash, number, timestamp }: HeaderData) {
     if (number === undefined || !(number instanceof BN)) {
       throw new Error('invalid header data');
     }
@@ -238,11 +246,10 @@ export class CliqueConsensusEngine implements ConsensusEngine {
   }
 
   /**
-   * {@link ConsensusEngine.getPendingBlock}
+   * {@link ConsensusEngine.getLastPendingBlock}
    */
-  async getPendingBlock() {
-    await this.initPromise;
-    const pendingBlock = await this.worker.getLastPendingBlock();
+  getLastPendingBlock() {
+    const pendingBlock = this.worker.getLastPendingBlock();
     return pendingBlock ?? this.Block_fromBlockData({}, { common: this.node.getCommon(0) });
   }
 }

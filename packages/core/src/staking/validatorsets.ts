@@ -36,6 +36,10 @@ export class ValidatorSets {
     return set;
   }
 
+  directlyGet(stateRoot: Buffer) {
+    return this.sets.get(stateRoot);
+  }
+
   /**
    * Set validator set with state root
    * @param stateRoot - Target state root

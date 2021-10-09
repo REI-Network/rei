@@ -90,9 +90,25 @@ export interface ConsensusEngine {
    */
   getLastPendingBlock(): Block;
 
+  /**
+   * Process the target block header, try to mint a new block after the block header
+   * @param header - Target header
+   */
   newBlockHeader(header: BlockHeader): void;
 
+  /**
+   * Add pending transactions to worker
+   * @param txs - Pending transactions
+   */
   addTxs(txs: Map<Buffer, Transaction[]>): Promise<void>;
 
+  /**
+   * Start working
+   */
+  start(): void;
+
+  /**
+   * Stop working
+   */
   abort(): Promise<void>;
 }

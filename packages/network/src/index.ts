@@ -4,8 +4,8 @@ import { Multiaddr } from 'multiaddr';
 import { LevelUp } from 'levelup';
 import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
-import { getRandomIntInclusive, logger } from '@gxchain2/utils';
-import { Peer } from './peer';
+import { getRandomIntInclusive, logger, TimeoutQueue } from '@gxchain2/utils';
+import { Peer, PeerStatus } from './peer';
 import { Libp2pNode } from './libp2pnode';
 import { Protocol } from './types';
 import { ExpHeap } from './expheap';
@@ -14,14 +14,12 @@ import { NodeDB } from './nodedb';
 export * from './peer';
 export * from './types';
 
-const installedPeerValue = 1;
-const connectedPeerValue = 0.5;
-const uselessPeerValue = 0;
 const timeoutLoopInterval = 30e3;
 const dialLoopInterval1 = 2e3;
 const dialLoopInterval2 = 10e3;
 const inboundThrottleTime = 30e3;
 const outboundThrottleTime = 35e3;
+const installTimeoutDuration = 3e3;
 
 const defaultMaxPeers = 50;
 const defaultMaxDials = 4;
@@ -32,6 +30,16 @@ const defaultNat = '127.0.0.1';
 export declare interface NetworkManager {
   on(event: 'installed' | 'removed', listener: (peer: Peer) => void): this;
   once(event: 'installed' | 'removed', listener: (peer: Peer) => void): this;
+}
+
+enum Libp2pPeerValue {
+  installed = 1,
+  connected = 0.5,
+  incoming = 0
+}
+
+function randomOne<T>(array: T[]) {
+  return array[getRandomIntInclusive(0, array.length - 1)];
 }
 
 const ignoredErrors = new RegExp(['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED', 'EHOSTDOWN', '1 bytes', 'abort'].join('|'));
@@ -87,17 +95,27 @@ export class NetworkManager extends EventEmitter {
   private readonly maxPeers: number;
   private readonly maxDials: number;
 
+  // a cache list that records all discovered peer,
+  // the max size of this list is `this.maxPeers`
   private readonly discovered: string[] = [];
-  private readonly connected = new Set<string>();
+  // set that records all dialing peer id
   private readonly dialing = new Set<string>();
-  private readonly installing = new Map<string, { peer: Peer; count: number }>();
-  private readonly installed = new Map<string, Peer>();
+  // map that records all peers
+  private readonly _peers = new Map<string, Peer>();
+  // map that records all banned peers
   private readonly banned = new Map<string, number>();
+  // map that records the latest message timestamp from the remote peer
   private readonly timeout = new Map<string, number>();
 
+  // inbound and outbound history contains connection timestamp,
+  // in order to prevent too frequent connections
   private readonly inboundHistory = new ExpHeap();
   private readonly outboundHistory = new ExpHeap();
   private outboundTimer: undefined | NodeJS.Timeout;
+
+  // queue that records the timeout information of the remote peer
+  private readonly installTimeoutQueue = new TimeoutQueue(installTimeoutDuration);
+  private readonly installTimeoutId = new Map<string, number>();
 
   constructor(options: NetworkManagerOptions) {
     super();
@@ -116,41 +134,7 @@ export class NetworkManager extends EventEmitter {
    * Return all installed peers
    */
   get peers() {
-    return Array.from(this.installed.values());
-  }
-
-  private increaseInstalling(peer: Peer) {
-    const installing = this.installing.get(peer.peerId);
-    if (!installing) {
-      this.installing.set(peer.peerId, {
-        peer,
-        count: 1
-      });
-    } else {
-      installing.count++;
-    }
-  }
-
-  private decreaseInstalling(peer: Peer) {
-    const installing = this.installing.get(peer.peerId);
-    if (!installing) {
-      return {
-        deleted: false,
-        left: false
-      };
-    }
-    installing.count--;
-    if (--installing.count <= 0) {
-      this.installing.delete(peer.peerId);
-      return {
-        deleted: true,
-        left: false
-      };
-    }
-    return {
-      deleted: true,
-      left: true
-    };
+    return Array.from(this._peers.values()).filter((p) => p.status === PeerStatus.Installed);
   }
 
   /**
@@ -159,8 +143,8 @@ export class NetworkManager extends EventEmitter {
    * @param peerId - Target peer
    * @param value - Peer value
    */
-  private setPeerValue(peerId: string, value: 'installed' | 'connected' | 'useless') {
-    this.libp2pNode.connectionManager.setPeerValue(peerId, value === 'installed' ? installedPeerValue : value === 'connected' ? connectedPeerValue : uselessPeerValue);
+  private setPeerValue(peerId: string, value: Libp2pPeerValue) {
+    this.libp2pNode.connectionManager.setPeerValue(peerId, value);
   }
 
   /**
@@ -169,26 +153,21 @@ export class NetworkManager extends EventEmitter {
    * @returns Peer or `undefined`
    */
   getPeer(peerId: string) {
-    return this.installed.get(peerId);
+    return this._peers.get(peerId);
   }
 
   /**
-   * Disconnect peer by peer id
+   * Disconnect a installing or installled peer by peer id
    * This will emit a `removed` event
    * @param peerId - Target peer
    */
   async removePeer(peerId: string) {
-    const peer = this.installed.get(peerId);
+    const peer = this._peers.get(peerId);
     if (peer) {
-      if (this.installed.delete(peerId)) {
-        this.emit('removed', peer);
-        if (this.isConnected(peerId)) {
-          this.connected.add(peerId);
-          this.setPeerValue(peerId, 'connected');
-        }
-      }
+      this._peers.delete(peerId);
       await peer.abort();
       await this.disconnect(peerId);
+      this.emit('removed', peer);
     }
   }
 
@@ -216,12 +195,35 @@ export class NetworkManager extends EventEmitter {
     return false;
   }
 
-  private isIdle(peerId: string) {
-    return !this.dialing.has(peerId) && !this.installing.has(peerId) && !this.installed.has(peerId);
+  private isDialAble(peerId: string) {
+    return !this.dialing.has(peerId) && !this._peers.has(peerId);
   }
 
   private disconnect(peerId: string): Promise<void> {
     return this.libp2pNode.hangUp(PeerId.createFromB58String(peerId));
+  }
+
+  // clear peer install timeout,
+  // this will be called when a peer
+  // disconnected or installed
+  private clearInstallTimeout(peerId: string) {
+    let id = this.installTimeoutId.get(peerId);
+    if (id) {
+      this.installTimeoutId.delete(peerId);
+      this.installTimeoutQueue.clearTimeout(id);
+    }
+  }
+
+  // create install timeout for a incoming peer,
+  // disconnect the remote peer, if the remote peer
+  // not installed after `installTimeoutDuration`
+  private createInstallTimeout(peerId: string) {
+    this.clearInstallTimeout(peerId);
+    const id = this.installTimeoutQueue.setTimeout(() => {
+      logger.debug('Network::createInstallTimeout, disconnect peerId:', peerId, ', because the installation timed out');
+      this.disconnect(peerId);
+    });
+    this.installTimeoutId.set(peerId, id);
   }
 
   /**
@@ -245,16 +247,21 @@ export class NetworkManager extends EventEmitter {
     const peerId: string = connect.remotePeer.toB58String();
     if (this.isBanned(peerId)) {
       connect.close();
+      logger.debug('Network::onConnect, peerId:', peerId, 'is banned');
+      return;
+    }
+    if (!this.checkInbound(peerId)) {
+      connect.close();
+      logger.debug('Network::onConnect, too many connection attempts');
       return;
     }
     if (this.libp2pNode.connectionManager.size > this.maxPeers) {
-      this.setPeerValue(peerId, 'useless');
+      this.setPeerValue(peerId, Libp2pPeerValue.incoming);
+      logger.debug('Network::onConnect, too many incoming connections');
     } else {
       logger.info('💬 Peer connect:', peerId);
-      this.setPeerValue(peerId, 'connected');
-    }
-    if (this.isIdle(peerId)) {
-      this.connected.add(peerId);
+      this.setPeerValue(peerId, Libp2pPeerValue.connected);
+      this.createInstallTimeout(peerId);
     }
   };
 
@@ -264,13 +271,8 @@ export class NetworkManager extends EventEmitter {
   private onDisconnect = (connect) => {
     const peerId: string = connect.remotePeer.toB58String();
     logger.info('🤐 Peer disconnected:', peerId);
-    this.connected.delete(peerId);
     this.dialing.delete(peerId);
-    const installing = this.installing.get(peerId);
-    if (installing) {
-      this.installing.delete(peerId);
-      installing.peer.abort();
-    }
+    this.clearInstallTimeout(peerId);
     this.removePeer(peerId);
   };
 
@@ -332,30 +334,20 @@ export class NetworkManager extends EventEmitter {
 
     this.libp2pNode = new Libp2pNode({
       ...options,
-      tcpPort: options.tcpPort || defaultTcpPort,
-      udpPort: options.udpPort || defaultUdpPort,
-      bootnodes: options.bootnodes || [],
+      tcpPort: options.tcpPort ?? defaultTcpPort,
+      udpPort: options.udpPort ?? defaultUdpPort,
+      bootnodes: options.bootnodes ?? [],
       enr,
       maxConnections: this.maxPeers
     });
     this.protocols.forEach((protocol) => {
       this.libp2pNode.handle(protocol.protocolString, ({ connection, stream }) => {
         const peerId: string = connection.remotePeer.toB58String();
-        if (this.checkInbound(peerId)) {
-          this.connected.delete(peerId);
-          this.install(peerId, [protocol], [stream]).then((result) => {
-            if (!result) {
-              stream.close();
-              if (this.isConnected(peerId)) {
-                this.connected.add(peerId);
-              }
-              this.disconnect(peerId);
-            }
-          });
-        } else {
-          stream.close();
-          this.disconnect(peerId);
-        }
+        this.install(peerId, protocol, stream).then((result) => {
+          if (!result) {
+            stream.close();
+          }
+        });
       });
     });
     this.libp2pNode.on('peer:discovery', this.onDiscovered);
@@ -372,9 +364,6 @@ export class NetworkManager extends EventEmitter {
   }
 
   private checkInbound(peerId: string) {
-    if (this.isConnected(peerId)) {
-      return true;
-    }
     const now = Date.now();
     this.inboundHistory.expire(now);
     if (this.inboundHistory.contains(peerId)) {
@@ -416,60 +405,46 @@ export class NetworkManager extends EventEmitter {
   /**
    * Install a peer and emit a `installed` event when successful
    * @param peerId - Target peer id
-   * @param protocols - Array of protocols that need to be installed
+   * @param protocol - Array of protocols that need to be installed
    * @param streams - `libp2p` stream array
    * @returns Whether succeed
    */
-  private async install(peerId: string, protocols: Protocol[], streams: any[]) {
+  private async install(peerId: string, protocol: Protocol, stream: any) {
     if (this.isBanned(peerId)) {
+      logger.debug('Network::install, failed due to peerId:', peerId, 'is banned');
       return false;
     }
 
     // if the peer doesn't exsit in `installing` or `installed`,
     // create a new one
-    let peer: undefined | Peer;
-    const installing = this.installing.get(peerId);
-    if (installing) {
-      peer = installing.peer;
-    } else {
-      peer = this.installed.get(peerId);
-      if (!peer) {
-        if (this.installed.size + 1 > this.maxPeers) {
-          return false;
-        }
-        peer = new Peer(peerId, this);
+    let peer = this._peers.get(peerId);
+    if (!peer) {
+      if (this.peers.length >= this.maxPeers) {
+        logger.debug('Network::install, peerId:', peerId, 'failed due to too many peers installed');
+        return false;
       }
+      peer = new Peer(peerId, this);
+      this._peers.set(peerId, peer);
     }
-    // increase installing count
-    this.increaseInstalling(peer);
 
-    const results = await Promise.all(
-      protocols.map((protocol, i) => {
-        return streams[i] ? peer!.installProtocol(protocol, streams[i]) : false;
-      })
-    );
-    // decrease installing count
-    const { deleted, left } = this.decreaseInstalling(peer);
-
-    if (deleted && results.reduce((a, b) => a || b, false)) {
+    if (peer.status === PeerStatus.Connected) {
+      peer.status = PeerStatus.Installing;
+    }
+    const success = await peer.installProtocol(protocol, stream);
+    if (success) {
       // if at least one protocol is installed, we think the handshake is successful
-      results.forEach((result, i) => {
-        if (result) {
-          logger.info('💬 Peer installed:', peerId, 'protocol:', protocols[i].name);
-        }
-      });
-      this.installed.set(peerId, peer);
-      this.setPeerValue(peerId, 'installed');
+      peer.status = PeerStatus.Installed;
+      this.setPeerValue(peerId, Libp2pPeerValue.installed);
+      this.clearInstallTimeout(peerId);
       this.emit('installed', peer);
-      return true;
-    } else if (left) {
-      // if this time is failed, but there is another protocol is still installing, we don't think the handshake failed
-      return true;
+      logger.info('💬 Peer installed:', peerId, 'protocol:', protocol.name);
     } else {
-      // no another protocols is working, failed
-      await peer.abort();
-      return false;
+      if (peer.status === PeerStatus.Installing) {
+        peer.status = PeerStatus.Connected;
+      }
+      logger.debug('Network::install, install protocol:', protocol.name, 'for peerId:', peerId, 'failed');
     }
+    return success;
   }
 
   /**
@@ -499,14 +474,6 @@ export class NetworkManager extends EventEmitter {
     return { success: true, streams };
   }
 
-  private randomOne<T>(array: T[]) {
-    return array[getRandomIntInclusive(0, array.length - 1)];
-  }
-
-  private isConnected(peerId: string) {
-    return this.libp2pNode.connectionManager.get(PeerId.createFromB58String(peerId)) !== null;
-  }
-
   /**
    * A loop to keep the number of node connections
    * Automatically load peer information from db or memory and try to dial
@@ -515,12 +482,12 @@ export class NetworkManager extends EventEmitter {
     await this.initPromise;
     while (!this.aborted) {
       try {
-        if (this.installed.size < this.maxPeers && this.dialing.size < this.maxDials) {
+        if (this.peers.length < this.maxPeers && this.dialing.size < this.maxDials) {
           let peerId: string | undefined;
           // search discovered peer in memory
           while (this.discovered.length > 0) {
             const id = this.discovered.shift()!;
-            if (this.checkOutbound(id) && this.isIdle(id) && !this.isBanned(id)) {
+            if (this.checkOutbound(id) && this.isDialAble(id) && !this.isBanned(id)) {
               const addresses: { multiaddr: Multiaddr }[] | undefined = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(id));
               if (addresses && addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp').length > 0) {
                 peerId = id;
@@ -529,6 +496,7 @@ export class NetworkManager extends EventEmitter {
               }
             }
           }
+
           // search discovered peer in database
           if (!peerId) {
             let peers: {
@@ -538,13 +506,13 @@ export class NetworkManager extends EventEmitter {
             peers = peers.filter((peer) => {
               const id = peer.id.toB58String();
               let b = peer.addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp').length > 0;
-              b &&= this.isIdle(id);
+              b &&= this.isDialAble(id);
               b &&= !this.isBanned(id);
               b &&= this.checkOutbound(id);
               return b;
             });
             if (peers.length > 0) {
-              const { id } = this.randomOne(peers);
+              const { id } = randomOne(peers);
               peerId = id.toB58String();
               logger.debug('NetworkManager::dialLoop, use a stored peer:', peerId);
             }
@@ -555,13 +523,11 @@ export class NetworkManager extends EventEmitter {
             this.updateOutbound(peerId);
             this.dial(peerId, this.protocols).then(async ({ success, streams }) => {
               if (success) {
-                if (!(await this.install(peerId!, this.protocols, streams))) {
-                  streams.forEach((stream) => stream.close());
-                  if (this.isConnected(peerId!)) {
-                    this.connected.add(peerId!);
+                streams.forEach((stream, i) => {
+                  if (stream !== null) {
+                    this.install(peerId!, this.protocols[i], stream);
                   }
-                  await this.disconnect(peerId!);
-                }
+                });
               }
             });
           }
@@ -569,7 +535,7 @@ export class NetworkManager extends EventEmitter {
       } catch (err) {
         logger.error('NetworkManager::dialLoop, catch error:', err);
       }
-      await new Promise((r) => setTimeout(r, this.installed.size < this.maxPeers ? dialLoopInterval1 : dialLoopInterval2));
+      await new Promise((r) => setTimeout(r, this.peers.length < this.maxPeers ? dialLoopInterval1 : dialLoopInterval2));
     }
   }
 
@@ -584,7 +550,7 @@ export class NetworkManager extends EventEmitter {
   }
 
   /**
-   * A loop to disconnect timeout remote peer
+   * A loop to disconnect the remote node that has not had a message for too long
    */
   private async timeoutLoop() {
     await this.initPromise;
@@ -615,13 +581,9 @@ export class NetworkManager extends EventEmitter {
     this.libp2pNode?.connectionManager.removeListener('peer:disconnect', this.onDisconnect);
     this.libp2pNode?.discv5?.discv5.removeListener('enrAdded', this.onENRAdded);
     this.libp2pNode?.discv5?.discv5.removeListener('multiaddrUpdated', this.onMultiaddrUpdated);
-    await Promise.all(Array.from(this.installed.values()).map((peer) => peer.abort()));
-    await Promise.all(Array.from(this.installing.values()).map(({ peer }) => peer.abort()));
-    this.connected.clear();
+    await Promise.all(Array.from(this._peers.values()).map((peer) => this.removePeer(peer.peerId)));
     this.dialing.clear();
-    this.installing.clear();
-    this.installed.clear();
-    this.removeAllListeners();
+    this._peers.clear();
     await this.libp2pNode?.stop();
   }
 }

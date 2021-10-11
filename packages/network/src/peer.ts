@@ -107,11 +107,18 @@ export class MsgQueue {
   }
 }
 
+export enum PeerStatus {
+  Connected,
+  Installing,
+  Installed
+}
+
 /**
  * Peer class manages a single remote peer instance
  */
 export class Peer {
   readonly peerId: string;
+  status: PeerStatus = PeerStatus.Connected;
   private readonly networkMngr: NetworkManager;
   private readonly queueMap = new Map<string, MsgQueue>();
 

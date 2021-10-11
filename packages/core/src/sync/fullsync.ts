@@ -35,7 +35,7 @@ export class FullSynchronizer extends Synchronizer {
    * @param peer - remote peer
    */
   announce(peer: Peer) {
-    const handler = WireProtocol.getHandler(peer);
+    const handler = WireProtocol.getHandler(peer, false);
     if (handler && !this.isSyncing && this.node.blockchain.totalDifficulty.lt(new BN(handler.status!.totalDifficulty))) {
       this.sync(peer);
     }

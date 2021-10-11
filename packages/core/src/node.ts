@@ -284,7 +284,7 @@ export class Node {
     let bootnodes = options.p2p.bootnodes || [];
     bootnodes = bootnodes.concat(common.bootstrapNodes());
     this.networkMngr = new NetworkManager({
-      protocols: createProtocolsByNames(this, [NetworkProtocol.GXC2_ETHWIRE]),
+      protocols: createProtocolsByNames(this, [NetworkProtocol.GXC2_ETHWIRE, NetworkProtocol.GXC2_CONSENSUS]),
       datastore: this.networkdb,
       nodedb: this.nodedb,
       peerId,

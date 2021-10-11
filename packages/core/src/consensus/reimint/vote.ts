@@ -1,7 +1,7 @@
 import { Address, BN, ecsign, ecrecover, rlp, intToBuffer, bnToUnpaddedBuffer, rlphash } from 'ethereumjs-util';
 import { createBufferFunctionalMap } from '@gxchain2/utils';
-import { BitArray } from './bitArray';
 import { ValidatorSet } from '../../staking';
+import { BitArray } from './bitArray';
 
 export class ConflictingVotesError extends Error {
   voteA: Vote;

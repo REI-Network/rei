@@ -7,6 +7,7 @@ import { ConsensusProtocolHander, ConsensusProtocol } from './consensus';
 export * from './handlerPool';
 export * from './handlerBase';
 export * from './wire';
+export * from './consensus';
 
 export enum NetworkProtocol {
   GXC2_ETHWIRE = 'gxc2-ethwire',

@@ -1,5 +1,6 @@
 import { rlp, BN, bnToUnpaddedBuffer, intToBuffer } from 'ethereumjs-util';
 import { Block } from '@gxchain2/structure';
+import { logger } from '@gxchain2/utils';
 import { NewRoundStepMessage, NewValidBlockMessage, HasVoteMessage, Proposal, Vote, ProposalPOLMessage, VoteSetMaj23Message, VoteSetBitsMessage, GetProposalBlockMessage, ProposalBlockMessage, BitArray } from '../../consensus/reimint';
 import { HandlerBase, HandlerFunc, HandlerBaseOptions } from '../handlerBase';
 import { ConsensusProtocol } from './protocol';
@@ -17,6 +18,9 @@ const consensusHandlerFuncs: HandlerFunc[] = [
       }
       const [height, round, step, secondsSinceStartTime, lastCommitRound] = data;
       return new NewRoundStepMessage(new BN(height), round, step, secondsSinceStartTime, lastCommitRound);
+    },
+    process(this: ConsensusProtocolHander, status: NewRoundStepMessage) {
+      this.handshakeResponse(status);
     }
   },
   {
@@ -146,6 +150,17 @@ const consensusHandlerFuncs: HandlerFunc[] = [
       }
       return new ProposalBlockMessage(Block.fromValuesArray(data[0], { common: this.node.getCommon(0), hardforkByBlockNumber: true }));
     }
+  },
+  {
+    name: 'hellow',
+    code: 10,
+    encode(this: ConsensusProtocolHander, data: string) {
+      return Buffer.from(data);
+    },
+    decode(this: ConsensusProtocolHander, data: Buffer): string {
+      logger.debug('receive hellow, data:', data.toString());
+      return data.toString();
+    }
   }
 ];
 
@@ -155,8 +170,14 @@ export class ConsensusProtocolHander extends HandlerBase<any> {
   protected onHandshakeSucceed() {
     ConsensusProtocol.getPool().add(this);
   }
-  protected onHandshake() {}
-  protected onHandshakeResponse(status: any) {
+  protected onHandshake() {
+    const roundStep = new NewRoundStepMessage(new BN(0), 1, 2, 3, 4);
+    this.send(0, roundStep);
+  }
+  protected onHandshakeResponse(roundStep: any) {
+    if (!(roundStep instanceof NewRoundStepMessage)) {
+      return false;
+    }
     return true;
   }
   protected onAbort() {
@@ -173,5 +194,9 @@ export class ConsensusProtocolHander extends HandlerBase<any> {
 
   constructor(options: ConsensusProtocolHanderOptions) {
     super({ ...options, handlerFuncs: consensusHandlerFuncs });
+  }
+
+  sayHellow() {
+    this.send(10, 'wuhu');
   }
 }

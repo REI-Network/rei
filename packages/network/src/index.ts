@@ -39,6 +39,11 @@ enum Libp2pPeerValue {
 }
 
 function randomOne<T>(array: T[]) {
+  if (array.length === 1) {
+    return array[0];
+  } else if (array.length === 0) {
+    throw new Error('empty array');
+  }
   return array[getRandomIntInclusive(0, array.length - 1)];
 }
 
@@ -119,8 +124,8 @@ export class NetworkManager extends EventEmitter {
 
   constructor(options: NetworkManagerOptions) {
     super();
-    this.maxPeers = options.maxPeers || defaultMaxPeers;
-    this.maxDials = options.maxDials || defaultMaxDials;
+    this.maxPeers = options.maxPeers ?? defaultMaxPeers;
+    this.maxDials = options.maxDials ?? defaultMaxDials;
     this.protocols = options.protocols;
     this.nodedb = new NodeDB(options.nodedb);
     this.initPromise = this.init(options);
@@ -301,9 +306,9 @@ export class NetworkManager extends EventEmitter {
   private async loadLocalENR(options: NetworkManagerOptions) {
     const keypair = createKeypairFromPeerId(options.peerId);
     let enr = ENR.createV4(keypair.publicKey);
-    enr.tcp = options.tcpPort || defaultTcpPort;
-    enr.udp = options.udpPort || defaultUdpPort;
-    enr.ip = options.nat || defaultNat;
+    enr.tcp = options.tcpPort ?? defaultTcpPort;
+    enr.udp = options.udpPort ?? defaultUdpPort;
+    enr.ip = options.nat ?? defaultNat;
     const setNAT = !!options.nat;
 
     const localENR = await this.nodedb.loadLocal();

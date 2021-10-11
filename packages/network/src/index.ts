@@ -34,7 +34,7 @@ export declare interface NetworkManager {
   once(event: 'installed' | 'removed', listener: (peer: Peer) => void): this;
 }
 
-const ignoredErrors = new RegExp(['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED', '1 bytes', 'abort'].join('|'));
+const ignoredErrors = new RegExp(['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED', 'EHOSTDOWN', '1 bytes', 'abort'].join('|'));
 
 /**
  * Handle errors, ignore not important errors
@@ -90,7 +90,7 @@ export class NetworkManager extends EventEmitter {
   private readonly discovered: string[] = [];
   private readonly connected = new Set<string>();
   private readonly dialing = new Set<string>();
-  private readonly installing = new Map<string, Peer>();
+  private readonly installing = new Map<string, { peer: Peer; count: number }>();
   private readonly installed = new Map<string, Peer>();
   private readonly banned = new Map<string, number>();
   private readonly timeout = new Map<string, number>();
@@ -117,6 +117,40 @@ export class NetworkManager extends EventEmitter {
    */
   get peers() {
     return Array.from(this.installed.values());
+  }
+
+  private increaseInstalling(peer: Peer) {
+    const installing = this.installing.get(peer.peerId);
+    if (!installing) {
+      this.installing.set(peer.peerId, {
+        peer,
+        count: 1
+      });
+    } else {
+      installing.count++;
+    }
+  }
+
+  private decreaseInstalling(peer: Peer) {
+    const installing = this.installing.get(peer.peerId);
+    if (!installing) {
+      return {
+        deleted: false,
+        left: false
+      };
+    }
+    installing.count--;
+    if (--installing.count <= 0) {
+      this.installing.delete(peer.peerId);
+      return {
+        deleted: true,
+        left: false
+      };
+    }
+    return {
+      deleted: true,
+      left: true
+    };
   }
 
   /**
@@ -232,10 +266,10 @@ export class NetworkManager extends EventEmitter {
     logger.info('🤐 Peer disconnected:', peerId);
     this.connected.delete(peerId);
     this.dialing.delete(peerId);
-    const peer = this.installing.get(peerId);
-    if (peer) {
+    const installing = this.installing.get(peerId);
+    if (installing) {
       this.installing.delete(peerId);
-      peer.abort();
+      installing.peer.abort();
     }
     this.removePeer(peerId);
   };
@@ -338,6 +372,9 @@ export class NetworkManager extends EventEmitter {
   }
 
   private checkInbound(peerId: string) {
+    if (this.isConnected(peerId)) {
+      return true;
+    }
     const now = Date.now();
     this.inboundHistory.expire(now);
     if (this.inboundHistory.contains(peerId)) {
@@ -384,31 +421,55 @@ export class NetworkManager extends EventEmitter {
    * @returns Whether succeed
    */
   private async install(peerId: string, protocols: Protocol[], streams: any[]) {
-    if (this.isBanned(peerId) || this.installing.has(peerId)) {
+    if (this.isBanned(peerId)) {
       return false;
     }
-    let peer = this.installed.get(peerId);
-    if (!peer) {
-      if (this.installed.size + 1 > this.maxPeers) {
-        return false;
+
+    // if the peer doesn't exsit in `installing` or `installed`,
+    // create a new one
+    let peer: undefined | Peer;
+    const installing = this.installing.get(peerId);
+    if (installing) {
+      peer = installing.peer;
+    } else {
+      peer = this.installed.get(peerId);
+      if (!peer) {
+        if (this.installed.size + 1 > this.maxPeers) {
+          return false;
+        }
+        peer = new Peer(peerId, this);
       }
-      peer = new Peer(peerId, this);
     }
-    this.installing.set(peerId, peer);
+    // increase installing count
+    this.increaseInstalling(peer);
+
     const results = await Promise.all(
       protocols.map((protocol, i) => {
         return streams[i] ? peer!.installProtocol(protocol, streams[i]) : false;
       })
     );
-    if (this.installing.delete(peerId) && results.reduce((a, b) => a || b, false)) {
-      logger.info('💬 Peer installed:', peerId);
+    // decrease installing count
+    const { deleted, left } = this.decreaseInstalling(peer);
+
+    if (deleted && results.reduce((a, b) => a || b, false)) {
+      // if at least one protocol is installed, we think the handshake is successful
+      results.forEach((result, i) => {
+        if (result) {
+          logger.info('💬 Peer installed:', peerId, 'protocol:', protocols[i].name);
+        }
+      });
       this.installed.set(peerId, peer);
       this.setPeerValue(peerId, 'installed');
       this.emit('installed', peer);
       return true;
+    } else if (left) {
+      // if this time is failed, but there is another protocol is still installing, we don't think the handshake failed
+      return true;
+    } else {
+      // no another protocols is working, failed
+      await peer.abort();
+      return false;
     }
-    await peer.abort();
-    return false;
   }
 
   /**
@@ -555,7 +616,7 @@ export class NetworkManager extends EventEmitter {
     this.libp2pNode?.discv5?.discv5.removeListener('enrAdded', this.onENRAdded);
     this.libp2pNode?.discv5?.discv5.removeListener('multiaddrUpdated', this.onMultiaddrUpdated);
     await Promise.all(Array.from(this.installed.values()).map((peer) => peer.abort()));
-    await Promise.all(Array.from(this.installing.values()).map((peer) => peer.abort()));
+    await Promise.all(Array.from(this.installing.values()).map(({ peer }) => peer.abort()));
     this.connected.clear();
     this.dialing.clear();
     this.installing.clear();

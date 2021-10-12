@@ -208,7 +208,7 @@ task('abr', 'Assign block reward')
     if (taskArgs.ether) {
       taskArgs.value = toEther(taskArgs.value);
     }
-    await router.methods.reward(taskArgs.validator).send({ value: taskArgs.value });
+    await router.methods.assignBlockReward(taskArgs.validator).send({ value: taskArgs.value });
     console.log('Assign block reward succeed');
   });
 

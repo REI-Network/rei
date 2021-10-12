@@ -1,10 +1,21 @@
 import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
 import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
 import { BaseTrie } from 'merkle-patricia-tree';
-import { toBuffer } from 'ethereumjs-util';
+import { rlphash, toBuffer } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
-import { TypedTransaction } from '@gxchain2/structure';
+import { TypedTransaction, BlockHeader, HashFunction, setCustomHashFunction } from '@gxchain2/structure';
 import { ConsensusType } from '../consensus';
+import { BlockHeader_hash } from '../consensus/reimint/extraData';
+
+const customHashFunction: HashFunction = (header: BlockHeader) => {
+  if (getConsensusType(header._common) === ConsensusType.Clique) {
+    return rlphash(header.raw());
+  } else {
+    return BlockHeader_hash(header);
+  }
+};
+
+setCustomHashFunction(customHashFunction);
 
 export function getConsensusType(common: Common) {
   if (common.chainName() === 'gxc2-testnet') {

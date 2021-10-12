@@ -135,7 +135,7 @@ export class Worker {
    * @param pendingMap All pending transactions
    */
   private async _commit(pendingMap: PendingTxMap) {
-    const pendingBlock = this.consensusEngine.Block_fromBlockData({ header: this.pendingHeader }, { common: this.pendingHeader._common });
+    const pendingBlock = this.consensusEngine.Block_fromBlockData({ header: { ...this.pendingHeader } }, { common: this.pendingHeader._common });
     let tx = pendingMap.peek();
     while (tx) {
       try {

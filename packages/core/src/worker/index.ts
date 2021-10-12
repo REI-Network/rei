@@ -90,6 +90,11 @@ export class Worker {
    * @param txs - The map of Buffer and array of transactions
    */
   async addTxs(txs: Map<Buffer, Transaction[]>) {
+    // if the pendingHeader doesn't exsit,
+    // ignore new pending transaction
+    if (!this.pendingHeader) {
+      return;
+    }
     try {
       await this.lock.acquire();
       const pendingMap = new PendingTxMap();

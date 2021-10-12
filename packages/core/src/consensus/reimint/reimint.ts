@@ -106,12 +106,9 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
    * @param header - New block header
    */
   protected async _newBlockHeader(header: BlockHeader) {
-    if (!this.enable || this.node.sync.isSyncing) {
-      return;
-    }
-
     // create a new pending block through worker
     await this.worker.newBlockHeader(header);
+
     if (!this.enable || this.node.sync.isSyncing) {
       return;
     }

@@ -71,6 +71,9 @@ export class CliqueConsensusEngine extends ConsensusEngineBase implements Consen
    * @param header - New block header
    */
   protected async _newBlockHeader(header: BlockHeader) {
+    // create a new pending block through worker
+    await this.worker.newBlockHeader(header);
+
     if (!this.enable || this.node.sync.isSyncing) {
       return;
     }
@@ -89,8 +92,6 @@ export class CliqueConsensusEngine extends ConsensusEngineBase implements Consen
       return;
     }
 
-    // create a new pending block through worker
-    await this.worker.newBlockHeader(header);
     let pendingBlock = this.worker.directlyGetPendingBlockByParentHash(parentHash);
     if (!pendingBlock) {
       throw new Error('missing pending block');

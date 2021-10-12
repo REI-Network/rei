@@ -4,7 +4,7 @@ import { BaseTrie } from 'merkle-patricia-tree';
 import { rlphash, toBuffer } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
 import { TypedTransaction, BlockHeader, HashFunction, setCustomHashFunction } from '@gxchain2/structure';
-import { ConsensusType } from '../consensus';
+import { ConsensusType } from '../consensus/types';
 import { BlockHeader_hash } from '../consensus/reimint/extraData';
 
 const customHashFunction: HashFunction = (header: BlockHeader) => {

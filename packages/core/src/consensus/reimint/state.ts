@@ -8,7 +8,7 @@ import { HeightVoteSet, Vote, VoteType, ConflictingVotesError } from './vote';
 import { TimeoutTicker } from './timeoutTicker';
 import { ReimintConsensusEngine } from './reimint';
 import { Block_hash, BlockHeader_hash } from './extraData';
-import { isEmptyHash, EMPTY_HASH } from './utils';
+import { isEmptyHash, EMPTY_HASH } from '../utils';
 import { Proposal } from './proposal';
 import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage } from './messages';
 

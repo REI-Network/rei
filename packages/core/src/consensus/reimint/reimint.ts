@@ -1,46 +1,57 @@
-import { Address, BN, toBuffer, setLengthLeft } from 'ethereumjs-util';
-import { Block, BlockHeader, BlockData, HeaderData, BlockBuffer, BlockHeaderBuffer, CLIQUE_EXTRA_VANITY, TransactionFactory, TypedTransaction, TxOptions, Transaction } from '@gxchain2/structure';
-import { Common } from '@gxchain2/common';
-import { hexStringToBN, Channel, logger } from '@gxchain2/utils';
-import { ConsensusEngine, ConsensusEngineOptions, CEBlockOptions } from '../consensusEngine';
-import { Node } from '../../node';
-import { Worker } from '../../worker';
-import { EMPTY_ADDRESS, EMPTY_EXTRA_DATA } from './utils';
+import { Address, BN, toBuffer, setLengthLeft, KECCAK256_RLP_ARRAY } from 'ethereumjs-util';
+import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@gxchain2/structure';
+import { logger } from '@gxchain2/utils';
+import { ConsensusEngine, ConsensusEngineOptions } from '../consensusEngine';
+import { EMPTY_ADDRESS, EMPTY_EXTRA_DATA } from '../utils';
+import { ConsensusEngineBase } from '../consensusEngineBase';
 import { ExtraData, calcBlockHeaderHash } from './extraData';
 import { Proposal } from './proposal';
 import { StateMachine } from './state';
-import { VoteType } from './vote';
+import { VoteType, VoteSet } from './vote';
 
 const defaultRound = 0;
 const defaultPOLRound = -1;
 const defaultProposalTimestamp = 0;
 const defaultValidaterSetSize = 1;
 
-export class ReimintConsensusEngine implements ConsensusEngine {
-  private worker: Worker;
-  private node: Node;
-  private msgQueue = new Channel<BlockHeader>({ max: 1 });
-  private msgLoopPromise?: Promise<void>;
+export interface ReimintBlockOptions extends BlockOptions {
+  // whether try to sign the block,
+  // default: true
+  sign?: boolean;
+
+  // reimint round
+  round?: number;
+
+  // POLRound, default: -1
+  POLRound?: number;
+
+  // vote set,
+  // it must be a precommit vote set
+  // and already have `maj23`
+  voteSet?: VoteSet;
+
+  // if voteSet is not passed in,
+  // validatorSetSize must be passed in,
+  // it will be used to determine the size of the validator set
+  validatorSetSize?: number;
+
+  // proposal timestamp
+  proposalTimestamp?: number;
+}
+
+export class ReimintConsensusEngine extends ConsensusEngineBase implements ConsensusEngine {
   private state: StateMachine;
-  private _coinbase: Address;
-  private _enable: boolean;
 
   constructor(options: ConsensusEngineOptions) {
-    this.node = options.node;
-    this._enable = options.enable;
-    this._coinbase = options.coinbase ?? EMPTY_ADDRESS;
-    this.worker = new Worker({ node: this.node, consensusEngine: this });
+    super(options);
     this.state = new StateMachine(options.node, this);
   }
 
-  get coinbase() {
-    return this._coinbase;
-  }
+  /////////////////////////////////
 
-  get enable() {
-    return this._enable && !this._coinbase.equals(EMPTY_ADDRESS) && this.node.accMngr.hasUnlockedAccount(this._coinbase);
-  }
-
+  /**
+   * {@link ConsensusEngine.BlockHeader_miner}
+   */
   BlockHeader_miner(header: BlockHeader) {
     if (header.extraData.length > CLIQUE_EXTRA_VANITY) {
       return ExtraData.fromBlockHeader(header).proposal.proposer();
@@ -49,127 +60,52 @@ export class ReimintConsensusEngine implements ConsensusEngine {
     }
   }
 
-  BlockHeader_fromValuesArray(values: BlockHeaderBuffer, options?: CEBlockOptions): BlockHeader {
-    const [parentHash, uncleHash, coinbase, stateRoot, transactionsTrie, receiptTrie, bloom, difficulty, number, gasLimit, gasUsed, timestamp, extraData, mixHash, nonce] = values;
-
-    if (values.length > 16) {
-      throw new Error('invalid header. More values than expected were received');
-    }
-    if (values.length < 15) {
-      throw new Error('invalid header. Less values than expected were received');
-    }
-
-    return this.BlockHeader_fromHeaderData(
-      {
-        parentHash,
-        uncleHash,
-        coinbase,
-        stateRoot,
-        transactionsTrie,
-        receiptTrie,
-        bloom,
-        difficulty,
-        number,
-        gasLimit,
-        gasUsed,
-        timestamp,
-        extraData,
-        mixHash,
-        nonce
-      },
-      options
-    );
-  }
-
-  BlockHeader_fromHeaderData(data?: HeaderData, options?: CEBlockOptions): BlockHeader {
-    const { header } = this.generateBlockHeaderAndProposal(data, options);
-    return header;
-  }
-
+  /**
+   * {@link ConsensusEngine.Block_miner}
+   */
   Block_miner(block: Block): Address {
     return this.BlockHeader_miner(block.header);
   }
 
-  Block_fromValuesArray(values: BlockBuffer, options?: CEBlockOptions): Block {
-    const [headerBuffer, transactionBuffer] = values;
-    const header = this.BlockHeader_fromValuesArray(headerBuffer, options);
-    const transactions: TypedTransaction[] = [];
-    for (const txData of transactionBuffer ?? []) {
-      const tx = TransactionFactory.fromBlockBodyData(txData, {
-        ...options,
-        // Use header common in case of hardforkByBlockNumber being activated
-        common: header._common
-      } as TxOptions);
-      transactions.push(tx);
+  /**
+   * {@link ConsensusEngine.getPendingBlockHeader}
+   */
+  getPendingBlockHeader({ number, parentHash, timestamp }: HeaderData): BlockHeader {
+    if (number === undefined || !(number instanceof BN)) {
+      throw new Error('invalid header data');
     }
-    return new Block(header, transactions, undefined, options);
-  }
 
-  Block_fromBlockData(data: BlockData, options?: CEBlockOptions): Block {
-    const header = this.BlockHeader_fromHeaderData(data.header, options);
-    const transactions: TypedTransaction[] = [];
-    const txsData = data?.transactions ?? [];
-    for (const txData of txsData) {
-      const tx = TransactionFactory.fromTxData(txData, { ...options, common: header._common });
-      transactions.push(tx);
-    }
-    return new Block(header, transactions, undefined, options);
-  }
-
-  getGasLimitByCommon(common: Common): BN {
-    const limit = common.param('vm', 'gasLimit');
-    return hexStringToBN(limit === null ? common.genesis().gasLimit : limit);
-  }
-
-  getEmptyPendingBlockHeader(data: HeaderData): BlockHeader {
-    const common = this.node.getCommon(data?.number ?? new BN(0));
-    return this.BlockHeader_fromHeaderData(data, { common });
-  }
-
-  getLastPendingBlock() {
-    const pendingBlock = this.worker.getLastPendingBlock();
-    return pendingBlock ?? this.Block_fromBlockData({}, { common: this.node.getCommon(0) });
+    const common = this.node.getCommon(number);
+    const { header } = this.generateBlockHeaderAndProposal(
+      {
+        parentHash,
+        uncleHash: KECCAK256_RLP_ARRAY,
+        coinbase: EMPTY_ADDRESS,
+        number,
+        timestamp,
+        difficulty: new BN(1),
+        gasLimit: this.getGasLimitByCommon(common)
+      },
+      { common }
+    );
+    return header;
   }
 
   //////////////////////////
 
-  newBlockHeader(header: BlockHeader) {
-    this.msgQueue.push(header);
-  }
-
-  addTxs(txs: Map<Buffer, Transaction[]>) {
-    return this.worker.addTxs(txs);
-  }
-
-  start() {
-    if (this.msgLoopPromise) {
-      throw new Error('ReimintConsensusEngine has started');
-    }
-
-    this.msgLoopPromise = this.msgLoop();
+  protected _start() {
     this.state.start();
   }
 
-  async abort() {
-    if (this.msgLoopPromise) {
-      this.msgQueue.abort();
-      await this.msgLoopPromise;
-      this.msgLoopPromise = undefined;
-      await this.state.abort();
-    }
+  protected async _abort() {
+    await this.state.abort();
   }
 
-  private async msgLoop() {
-    for await (const header of this.msgQueue.generator()) {
-      try {
-        await this._newBlockHeader(header);
-      } catch (err) {
-        logger.error('ReimintConsensusEngine::msgLoop, catch error:', err);
-      }
-    }
-  }
-
-  private async _newBlockHeader(header: BlockHeader) {
+  /**
+   * Process a new block header, try to mint a block after this block
+   * @param header - New block header
+   */
+  protected async _newBlockHeader(header: BlockHeader) {
     if (!this.enable || this.node.sync.isSyncing) {
       return;
     }
@@ -190,7 +126,13 @@ export class ReimintConsensusEngine implements ConsensusEngine {
     this.state.newBlockHeader(header, validators);
   }
 
-  generateBlockHeaderAndProposal(data?: HeaderData, options?: CEBlockOptions): { header: BlockHeader; proposal?: Proposal } {
+  /**
+   * Generate block header, proposal and fill extra data by options
+   * @param data - Block header data
+   * @param options - Reimint block options
+   * @returns Header and proposal
+   */
+  generateBlockHeaderAndProposal(data?: HeaderData, options?: ReimintBlockOptions): { header: BlockHeader; proposal?: Proposal } {
     const header = BlockHeader.fromHeaderData(data, options);
     const sign = options?.sign ?? true;
 
@@ -236,8 +178,15 @@ export class ReimintConsensusEngine implements ConsensusEngine {
     }
   }
 
-  generateBlockAndProposal(data?: HeaderData, transactions?: TypedTransaction[], options?: CEBlockOptions): { block: Block; proposal?: Proposal } {
+  /**
+   * Generate block, proposal and fill extra data by options
+   * @param data - Block data
+   * @param transactions - Transactions
+   * @param options - Reimint block options
+   * @returns Block and proposal
+   */
+  generateBlockAndProposal(data?: HeaderData, transactions?: TypedTransaction[], options?: ReimintBlockOptions): { block: Block; proposal?: Proposal } {
     const { header, proposal } = this.generateBlockHeaderAndProposal(data, options);
-    return { block: new Block(header, transactions, undefined, { common: header._common }), proposal: proposal };
+    return { block: new Block(header, transactions, undefined, { common: header._common }), proposal };
   }
 }

@@ -1,18 +1,7 @@
 import { Address, BN } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
-import { BlockData, HeaderData, BlockBuffer, BlockHeaderBuffer, BlockOptions, BlockHeader, Block, Transaction } from '@gxchain2/structure';
-import { VoteSet } from './reimint/vote';
+import { BlockData, HeaderData, BlockHeader, Block, Transaction } from '@gxchain2/structure';
 import { Node } from '../node';
-
-export interface CEBlockOptions extends BlockOptions {
-  sign?: boolean;
-
-  round?: number;
-  POLRound?: number;
-  voteSet?: VoteSet;
-  validatorSetSize?: number;
-  proposalTimestamp?: number;
-}
 
 export interface ConsensusEngineOptions {
   node: Node;
@@ -37,38 +26,10 @@ export interface ConsensusEngine {
   BlockHeader_miner(header: BlockHeader): Address;
 
   /**
-   * Create a block header from values array
-   * @param data - Block header buffer
-   * @param options - Block options
-   */
-  BlockHeader_fromValuesArray(data: BlockHeaderBuffer, options?: CEBlockOptions): BlockHeader;
-
-  /**
-   * Create a block header from data
-   * @param data - Block header data
-   * @param options - Block options
-   */
-  BlockHeader_fromHeaderData(data: HeaderData, options?: CEBlockOptions): BlockHeader;
-
-  /**
    * Get miner address from block
    * @param header- Block
    */
   Block_miner(block: Block): Address;
-
-  /**
-   * Create a block from values array
-   * @param data - Block buffer
-   * @param options - Block options
-   */
-  Block_fromValuesArray(data: BlockBuffer, options?: CEBlockOptions): Block;
-
-  /**
-   * Create a block from data
-   * @param data - Block data
-   * @param options - Block options
-   */
-  Block_fromBlockData(data: BlockData, options?: CEBlockOptions): Block;
 
   /**
    * Get gas limit by common instance
@@ -78,11 +39,18 @@ export interface ConsensusEngine {
   getGasLimitByCommon(common: Common): BN;
 
   /**
-   * Get empty pending block header for worker
+   * Get pending block header for worker
    * @param data - Block header data
-   * @returns Empty pending block header
+   * @returns Pending block header
    */
-  getEmptyPendingBlockHeader(data: HeaderData): BlockHeader;
+  getPendingBlockHeader(data: HeaderData): BlockHeader;
+
+  /**
+   * Get pending block for worker
+   * @param data - Block data
+   * @returns Pending block
+   */
+  getPendingBlock(data: BlockData): Block;
 
   /**
    * Get the last pending block

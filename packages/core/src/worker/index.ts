@@ -72,7 +72,7 @@ export class Worker {
       if (now > timestamp) {
         timestamp = now;
       }
-      this.pendingHeader = this.consensusEngine.getEmptyPendingBlockHeader({ parentHash, number: pendingNumber, timestamp });
+      this.pendingHeader = this.consensusEngine.getPendingBlockHeader({ parentHash, number: pendingNumber, timestamp });
 
       this.vm = await this.node.getVM(header.stateRoot, pendingNumber);
       await this.vm.stateManager.checkpoint();
@@ -135,7 +135,7 @@ export class Worker {
    * @param pendingMap All pending transactions
    */
   private async _commit(pendingMap: PendingTxMap) {
-    const pendingBlock = this.consensusEngine.Block_fromBlockData({ header: { ...this.pendingHeader } }, { common: this.pendingHeader._common });
+    const pendingBlock = this.consensusEngine.getPendingBlock({ header: { ...this.pendingHeader } });
     let tx = pendingMap.peek();
     while (tx) {
       try {
@@ -172,6 +172,6 @@ export class Worker {
         tx = pendingMap.peek();
       }
     }
-    return this.consensusEngine.Block_fromBlockData({ header: { ...this.pendingHeader }, transactions: [...this.pendingTxs] }, { common: this.pendingHeader._common });
+    return this.consensusEngine.getPendingBlock({ header: { ...this.pendingHeader }, transactions: [...this.pendingTxs] });
   }
 }

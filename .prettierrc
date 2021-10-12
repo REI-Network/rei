@@ -8,7 +8,6 @@
         "singleQuote": true,
         "trailingComma": "none",
         "bracketSpacing": true,
-        "jsxBracketSameLine": true,
         "arrowParens": "always",
         "printWidth": 500,
         "endOfLine": "auto"
@@ -22,7 +21,6 @@
         "singleQuote": false,
         "trailingComma": "none",
         "bracketSpacing": true,
-        "jsxBracketSameLine": true,
         "arrowParens": "always",
         "printWidth": 500,
         "endOfLine": "auto"

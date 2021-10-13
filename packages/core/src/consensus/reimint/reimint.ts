@@ -3,14 +3,11 @@ import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, 
 import { logger } from '@gxchain2/utils';
 import { ConsensusEngine, ConsensusEngineOptions } from '../consensusEngine';
 import { EMPTY_ADDRESS, EMPTY_EXTRA_DATA } from '../utils';
-import { ConsensusProtocol } from '../../protocols';
 import { ConsensusEngineBase } from '../consensusEngineBase';
 import { ExtraData, calcBlockHeaderHash } from './extraData';
 import { Proposal } from './proposal';
 import { StateMachine } from './state';
 import { VoteType, VoteSet } from './vote';
-import { Message } from './messages';
-import { ProposalBlockMessage, ProposalMessage, VoteMessage } from '.';
 
 const defaultRound = 0;
 const defaultPOLRound = -1;
@@ -40,15 +37,6 @@ export interface ReimintBlockOptions extends BlockOptions {
 
   // proposal timestamp
   proposalTimestamp?: number;
-}
-
-export interface SendMessageOptions {
-  // broadcast the message but exlcude the target peers
-  exclude?: string[];
-  // send message to target peer
-  to?: string;
-  // boardcast the message to all peers
-  broadcast?: boolean;
 }
 
 export class ReimintConsensusEngine extends ConsensusEngineBase implements ConsensusEngine {
@@ -197,45 +185,5 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
   generateBlockAndProposal(data?: HeaderData, transactions?: TypedTransaction[], options?: ReimintBlockOptions): { block: Block; proposal?: Proposal } {
     const { header, proposal } = this.generateBlockHeaderAndProposal(data, options);
     return { block: new Block(header, transactions, undefined, { common: header._common }), proposal };
-  }
-
-  /**
-   * Receive p2p message from remote peer
-   * @param peerId - Remote peer id
-   * @param msg - Message
-   */
-  receiveMessage(peerId: string, msg: VoteMessage | ProposalMessage | ProposalBlockMessage) {
-    if (this.state.started) {
-      this.state.newMessage({
-        msg,
-        peerId
-      });
-    }
-  }
-
-  /**
-   * Send p2p message to remote peer
-   * @param msg - Message
-   * @param options - Send options {@link SendMessageOptions}
-   */
-  sendMessage(msg: Message, options: SendMessageOptions) {
-    if (options.broadcast) {
-      for (const handler of ConsensusProtocol.getPool().handlers) {
-        handler.sendMessage(msg);
-      }
-    } else if (options.to) {
-      const peer = this.node.networkMngr.getPeer(options.to);
-      if (peer) {
-        ConsensusProtocol.getHandler(peer, false)?.sendMessage(msg);
-      }
-    } else if (options.exclude) {
-      for (const handler of ConsensusProtocol.getPool().handlers) {
-        if (!options.exclude.includes(handler.peer.peerId)) {
-          handler.sendMessage(msg);
-        }
-      }
-    } else {
-      throw new Error('invalid send message options');
-    }
   }
 }

@@ -20,7 +20,7 @@ export abstract class ConsensusEngineBase implements ConsensusEngine {
 
   protected _coinbase: Address;
   protected _enable: boolean;
-  protected readonly node: Node;
+  readonly node: Node;
   protected readonly worker: Worker;
   protected msgLoopPromise?: Promise<void>;
   protected readonly msgQueue = new Channel<BlockHeader>({ max: 1 });

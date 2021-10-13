@@ -73,7 +73,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
     },
     process(this: ConsensusProtocolHander, msg: ProposalMessage) {
       this.setHasProposal(msg.proposal);
-      this.reimint?.receiveMessage(this.peer.peerId, msg);
+      this.reimint?.state.newMessage(this.peer.peerId, msg);
     }
   },
   {
@@ -114,7 +114,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
         const vote = msg.vote;
         this.ensureVoteBitArrays(vote.height, reimint.state.getValSetSize());
         this.setHasVote(vote.height, vote.round, vote.type, vote.index);
-        reimint.receiveMessage(this.peer.peerId, msg);
+        reimint.state.newMessage(this.peer.peerId, msg);
       }
     }
   },
@@ -190,7 +190,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
       return new ProposalBlockMessage(Block.fromValuesArray(data[0], { common: this.node.getCommon(0), hardforkByBlockNumber: true }));
     },
     process(this: ConsensusProtocolHander, msg: ProposalBlockMessage) {
-      this.reimint?.receiveMessage(this.peer.peerId, msg);
+      this.reimint?.state.newMessage(this.peer.peerId, msg);
     }
   },
   // debug code

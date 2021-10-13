@@ -1,7 +1,6 @@
 import { Address, BN, intToBuffer, ecsign, bufferToHex } from 'ethereumjs-util';
 import { Channel, logger } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/structure';
-import { EventEmitter } from 'events';
 import { Node } from '../../node';
 import { ValidatorSet } from '../../staking';
 import { HeightVoteSet, Vote, VoteType, ConflictingVotesError } from './vote';
@@ -114,7 +113,7 @@ export class StateMachine {
   // TODO:
   private readonly evpool: EvidencePool;
   private readonly timeoutTicker = new TimeoutTicker((ti) => {
-    this.newMessage(ti);
+    this._newMessage(ti);
   });
 
   private msgLoopPromise?: Promise<void>;
@@ -161,7 +160,7 @@ export class StateMachine {
   }
 
   private newStep(timestamp?: number) {
-    this.reimint.sendMessage(new NewRoundStepMessage(this.height, this.round, this.step, (timestamp ?? Date.now()) - this.startTime, 0), { broadcast: true });
+    this.reimint.node.broadcastMessage(new NewRoundStepMessage(this.height, this.round, this.step, (timestamp ?? Date.now()) - this.startTime, 0), { broadcast: true });
   }
 
   async msgLoop() {
@@ -238,7 +237,7 @@ export class StateMachine {
     this.proposal = proposal;
     this.proposalBlockHash = proposal.hash;
     if (this.proposalBlock === undefined) {
-      this.reimint.sendMessage(new GetProposalBlockMessage(proposal.hash), { to: peerId });
+      this.reimint.node.broadcastMessage(new GetProposalBlockMessage(proposal.hash), { to: peerId });
     }
   }
 
@@ -298,7 +297,7 @@ export class StateMachine {
     this.votes.addVote(vote, peerId);
     // TODO: if add failed, return
 
-    this.reimint.sendMessage(new HasVoteMessage(vote.height, vote.round, vote.type, vote.index), { exclude: [peerId] });
+    this.reimint.node.broadcastMessage(new HasVoteMessage(vote.height, vote.round, vote.type, vote.index), { exclude: [peerId] });
 
     switch (vote.type) {
       case VoteType.Prevote: {
@@ -328,7 +327,7 @@ export class StateMachine {
               this.proposalBlockHash = maj23Hash;
             }
 
-            this.reimint.sendMessage(new NewValidBlockMessage(this.height, this.round, this.proposalBlockHash, this.step === RoundStepType.Commit), { broadcast: true });
+            this.reimint.node.broadcastMessage(new NewValidBlockMessage(this.height, this.round, this.proposalBlockHash, this.step === RoundStepType.Commit), { broadcast: true });
           }
         }
 
@@ -465,11 +464,11 @@ export class StateMachine {
       proposal = result.proposal;
     }
 
-    this.newMessage({
+    this._newMessage({
       msg: new ProposalMessage(proposal),
       peerId: ''
     });
-    this.newMessage({
+    this._newMessage({
       msg: new ProposalBlockMessage(block),
       peerId: ''
     });
@@ -495,7 +494,7 @@ export class StateMachine {
       index
     });
     vote.signature = this.signer.sign(vote.getMessageToSign());
-    this.newMessage({
+    this._newMessage({
       msg: new VoteMessage(vote),
       peerId: ''
     });
@@ -768,7 +767,7 @@ export class StateMachine {
     }
   }
 
-  newMessage(smsg: StateMachineMessage) {
+  private _newMessage(smsg: StateMachineMessage) {
     this.msgQueue.push(smsg);
   }
 
@@ -803,6 +802,12 @@ export class StateMachine {
       height: this.height.clone(),
       round: 0
     });
+  }
+
+  newMessage(peerId: string, msg: Message) {
+    if (this.started) {
+      this._newMessage({ msg, peerId });
+    }
   }
 
   getProposalBlock(hash: Buffer) {

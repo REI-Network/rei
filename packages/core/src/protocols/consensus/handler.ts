@@ -2,7 +2,6 @@ import { rlp, BN, bnToUnpaddedBuffer, intToBuffer } from 'ethereumjs-util';
 import { Block } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
 import { Message, NewRoundStepMessage, NewValidBlockMessage, HasVoteMessage, Proposal, Vote, ProposalPOLMessage, VoteSetMaj23Message, VoteSetBitsMessage, GetProposalBlockMessage, ProposalBlockMessage, BitArray, ReimintConsensusEngine, RoundStepType, VoteType, ProposalMessage, VoteMessage } from '../../consensus/reimint';
-import { ConsensusType } from '../../consensus/types';
 import { HandlerBase, HandlerFunc, HandlerBaseOptions } from '../handlerBase';
 import { ConsensusProtocol } from './protocol';
 
@@ -73,7 +72,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
     },
     process(this: ConsensusProtocolHander, msg: ProposalMessage) {
       this.setHasProposal(msg.proposal);
-      this.reimint?.state.newMessage(this.peer.peerId, msg);
+      this.node.getReimintEngine()?.state.newMessage(this.peer.peerId, msg);
     }
   },
   {
@@ -109,7 +108,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
       return new VoteMessage(Vote.fromValuesArray(data as any));
     },
     process(this: ConsensusProtocolHander, msg: VoteMessage) {
-      const reimint = this.reimint;
+      const reimint = this.node.getReimintEngine();
       if (reimint) {
         const vote = msg.vote;
         this.ensureVoteBitArrays(vote.height, reimint.state.getValSetSize());
@@ -132,7 +131,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
       return new VoteSetMaj23Message(new BN(height), round, type, hash);
     },
     process(this: ConsensusProtocolHander, msg: VoteSetMaj23Message) {
-      const reimint = this.reimint;
+      const reimint = this.node.getReimintEngine();
       if (reimint) {
         reimint.state.setVoteMaj23(msg.height, msg.round, msg.type, this.peer.peerId, msg.hash);
         const response = reimint.state.genVoteSetBitsMessage(msg.height, msg.round, msg.type, msg.hash);
@@ -173,7 +172,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
       return new GetProposalBlockMessage(data[0]);
     },
     process(this: ConsensusProtocolHander, { hash }: GetProposalBlockMessage) {
-      const proposalBlock = this.reimint?.state.getProposalBlock(hash);
+      const proposalBlock = this.node.getReimintEngine()?.state.getProposalBlock(hash);
       proposalBlock && this.sendMessage(new ProposalBlockMessage(proposalBlock));
     }
   },
@@ -190,7 +189,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
       return new ProposalBlockMessage(Block.fromValuesArray(data[0], { common: this.node.getCommon(0), hardforkByBlockNumber: true }));
     },
     process(this: ConsensusProtocolHander, msg: ProposalBlockMessage) {
-      this.reimint?.state.newMessage(this.peer.peerId, msg);
+      this.node.getReimintEngine()?.state.newMessage(this.peer.peerId, msg);
     }
   },
   // debug code
@@ -257,11 +256,6 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
 
   constructor(options: ConsensusProtocolHanderOptions) {
     super({ ...options, handlerFuncs: consensusHandlerFuncs });
-  }
-
-  get reimint() {
-    const reimint = this.node.engines.get(ConsensusType.Reimint);
-    return reimint ? (reimint as ReimintConsensusEngine) : undefined;
   }
 
   sendMessage(msg: Message) {

@@ -28,6 +28,7 @@ import { StakeManager, Router } from './contracts';
 import { processBlock, ProcessBlockOpts } from './vm';
 import { createEnginesByConsensusTypes, ConsensusEngine, ConsensusType } from './consensus';
 import { Message } from './consensus/reimint/messages';
+import { ReimintConsensusEngine } from './consensus/reimint';
 import { getConsensusType } from './hardforks';
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
@@ -362,6 +363,19 @@ export class Node {
    */
   getLastestEngine() {
     return this.getEngineByCommon(this.getLatestCommon());
+  }
+
+  /**
+   * Get reimint consensus engine instance,
+   * return undefined if the current active engine
+   * is not reimint ot reimint is disable
+   * @returns ReimintConsensusEngine or undefined
+   */
+  getReimintEngine() {
+    const engine = this.getEngineByCommon(this.getLatestCommon());
+    if (engine instanceof ReimintConsensusEngine) {
+      return engine;
+    }
   }
 
   /**

@@ -306,6 +306,10 @@ export class VoteSet {
   voteCount() {
     return this.votes.filter((v) => !!v).length;
   }
+
+  bitArrayByBlockID(hash: Buffer) {
+    return this.votesByBlock.get(hash)?.bitArray.copy();
+  }
 }
 
 export type RoundVoteSet = {

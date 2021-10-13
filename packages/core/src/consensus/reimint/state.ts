@@ -10,7 +10,7 @@ import { ReimintConsensusEngine } from './reimint';
 import { Block_hash, BlockHeader_hash } from './extraData';
 import { isEmptyHash, EMPTY_HASH } from '../utils';
 import { Proposal } from './proposal';
-import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage } from './messages';
+import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from './messages';
 
 export interface Signer {
   address(): Address;
@@ -107,14 +107,14 @@ function commitTimeout(time: number) {
 
 /////////////////////// config ///////////////////////
 
-export class StateMachine extends EventEmitter {
+export class StateMachine {
   private readonly node: Node;
   // TODO:
   private readonly signer?: Signer;
   // TODO:
   private readonly evpool: EvidencePool;
   private readonly timeoutTicker = new TimeoutTicker((ti) => {
-    this.msgQueue.push(ti);
+    this.newMessage(ti);
   });
 
   private msgLoopPromise?: Promise<void>;
@@ -127,7 +127,7 @@ export class StateMachine extends EventEmitter {
 
   // statsMsgQueue = new Channel<any>();
 
-  private readonly engine: ReimintConsensusEngine;
+  private readonly reimint: ReimintConsensusEngine;
   private parentHash!: Buffer;
   private triggeredTimeoutPrecommit: boolean = false;
 
@@ -153,16 +153,15 @@ export class StateMachine extends EventEmitter {
   private commitRound: number = -1;
   /////////////// RoundState ///////////////
 
-  constructor(node: Node, engine: ReimintConsensusEngine, signer?: Signer) {
-    super();
+  constructor(node: Node, remint: ReimintConsensusEngine, signer?: Signer) {
     this.node = node;
-    this.engine = engine;
+    this.reimint = remint;
     this.evpool = new MockEvidencePool();
-    this.signer = signer ?? (this.engine.coinbase.equals(Address.zero()) ? undefined : new MockSigner(node));
+    this.signer = signer ?? (this.reimint.coinbase.equals(Address.zero()) ? undefined : new MockSigner(node));
   }
 
   private newStep(timestamp?: number) {
-    this.emit('newStep', new NewRoundStepMessage(this.height, this.round, this.step, (timestamp ?? Date.now()) - this.startTime, 0));
+    this.reimint.sendMessage(new NewRoundStepMessage(this.height, this.round, this.step, (timestamp ?? Date.now()) - this.startTime, 0), { broadcast: true });
   }
 
   async msgLoop() {
@@ -183,7 +182,7 @@ export class StateMachine extends EventEmitter {
     const { msg, peerId } = mi;
 
     if (msg instanceof ProposalMessage) {
-      this.setProposal(msg.proposal);
+      this.setProposal(msg.proposal, peerId);
     } else if (msg instanceof ProposalBlockMessage) {
       this.addProposalBlock(msg.block);
       // statsMsgQueue <- mi
@@ -221,7 +220,7 @@ export class StateMachine extends EventEmitter {
 
   // private handleTxsAvailable() {}
 
-  private setProposal(proposal: Proposal) {
+  private setProposal(proposal: Proposal, peerId: string) {
     if (this.proposal) {
       return;
     }
@@ -239,7 +238,7 @@ export class StateMachine extends EventEmitter {
     this.proposal = proposal;
     this.proposalBlockHash = proposal.hash;
     if (this.proposalBlock === undefined) {
-      this.emit('getProposalBlock', new GetProposalBlockMessage(proposal.hash));
+      this.reimint.sendMessage(new GetProposalBlockMessage(proposal.hash), { to: peerId });
     }
   }
 
@@ -299,8 +298,7 @@ export class StateMachine extends EventEmitter {
     this.votes.addVote(vote, peerId);
     // TODO: if add failed, return
 
-    // emit hasVote event
-    this.emit('hasVote', new HasVoteMessage(vote.height, vote.round, vote.type, vote.index));
+    this.reimint.sendMessage(new HasVoteMessage(vote.height, vote.round, vote.type, vote.index), { exclude: [peerId] });
 
     switch (vote.type) {
       case VoteType.Prevote: {
@@ -330,7 +328,7 @@ export class StateMachine extends EventEmitter {
               this.proposalBlockHash = maj23Hash;
             }
 
-            this.emit('newValidBlock', new NewValidBlockMessage(this.height, this.round, this.proposalBlockHash, this.step === RoundStepType.Commit));
+            this.reimint.sendMessage(new NewValidBlockMessage(this.height, this.round, this.proposalBlockHash, this.step === RoundStepType.Commit), { broadcast: true });
           }
         }
 
@@ -439,11 +437,11 @@ export class StateMachine extends EventEmitter {
   }
 
   private createBlockAndProposal() {
-    const pendingBlock = (this.engine as any).worker.directlyGetPendingBlockByParentHash(this.parentHash);
+    const pendingBlock = (this.reimint as any).worker.directlyGetPendingBlockByParentHash(this.parentHash);
     if (!pendingBlock) {
       throw new Error('missing pending block');
     }
-    return this.engine.generateBlockAndProposal({ ...pendingBlock.header }, [...pendingBlock.transactions], { common: pendingBlock._common, round: this.round, POLRound: this.validRound, validatorSetSize: this.validators.length }) as { block: Block; proposal: Proposal };
+    return this.reimint.generateBlockAndProposal({ ...pendingBlock.header }, [...pendingBlock.transactions], { common: pendingBlock._common, round: this.round, POLRound: this.validRound, validatorSetSize: this.validators.length }) as { block: Block; proposal: Proposal };
   }
 
   private decideProposal(height: BN, round: number) {
@@ -467,11 +465,11 @@ export class StateMachine extends EventEmitter {
       proposal = result.proposal;
     }
 
-    this.msgQueue.push({
+    this.newMessage({
       msg: new ProposalMessage(proposal),
       peerId: ''
     });
-    this.msgQueue.push({
+    this.newMessage({
       msg: new ProposalBlockMessage(block),
       peerId: ''
     });
@@ -497,7 +495,7 @@ export class StateMachine extends EventEmitter {
       index
     });
     vote.signature = this.signer.sign(vote.getMessageToSign());
-    this.msgQueue.push({
+    this.newMessage({
       msg: new VoteMessage(vote),
       peerId: ''
     });
@@ -748,6 +746,12 @@ export class StateMachine extends EventEmitter {
       });
   }
 
+  //////////////////////////////////////
+
+  get started() {
+    return !!this.msgLoopPromise;
+  }
+
   start() {
     if (this.msgLoopPromise) {
       throw new Error('msg loop has started');
@@ -799,5 +803,40 @@ export class StateMachine extends EventEmitter {
       height: this.height.clone(),
       round: 0
     });
+  }
+
+  getProposalBlock(hash: Buffer) {
+    if (this.proposalBlockHash && this.proposalBlockHash.equals(hash) && this.proposalBlock) {
+      return this.proposalBlock;
+    }
+  }
+
+  getValSetSize() {
+    return this.validators.length;
+  }
+
+  setVoteMaj23(height: BN, round: number, type: VoteType, peerId: string, hash: Buffer) {
+    if (height.eq(this.height)) {
+      return;
+    }
+
+    this.votes.setPeerMaj23(round, type, peerId, hash);
+  }
+
+  genVoteSetBitsMessage(height: BN, round: number, type: VoteType, hash: Buffer) {
+    if (height.eq(this.height)) {
+      return;
+    }
+
+    if (type !== VoteType.Prevote && type !== VoteType.Precommit) {
+      throw new Error('invalid vote type');
+    }
+
+    const bitArray = type === VoteType.Prevote ? this.votes.prevotes(round)?.bitArrayByBlockID(hash) : this.votes.precommits(round)?.bitArrayByBlockID(hash);
+    if (!bitArray) {
+      throw new Error('missing bit array');
+    }
+
+    return new VoteSetBitsMessage(height, round, type, hash, bitArray);
   }
 }

@@ -103,4 +103,14 @@ export class BitArray {
   serialize() {
     return rlp.encode(this.raw());
   }
+
+  update(other: BitArray) {
+    if (this.length !== other.length) {
+      throw new Error('invalid update length');
+    }
+
+    for (let i = 0; i < this.elems.length; i++) {
+      this.elems[i] = other.elems[i];
+    }
+  }
 }

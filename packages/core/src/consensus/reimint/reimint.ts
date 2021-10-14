@@ -50,9 +50,10 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
   /////////////////////////////////
 
   /**
-   * {@link ConsensusEngine.BlockHeader_miner}
+   * {@link ConsensusEngine.getMiner}
    */
-  BlockHeader_miner(header: BlockHeader) {
+  getMiner(data: BlockHeader | Block): Address {
+    const header = data instanceof Block ? data.header : data;
     if (header.extraData.length > CLIQUE_EXTRA_VANITY) {
       return ExtraData.fromBlockHeader(header).proposal.proposer();
     } else {
@@ -61,28 +62,19 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
   }
 
   /**
-   * {@link ConsensusEngine.Block_miner}
-   */
-  Block_miner(block: Block): Address {
-    return this.BlockHeader_miner(block.header);
-  }
-
-  /**
    * {@link ConsensusEngine.getPendingBlockHeader}
    */
-  getPendingBlockHeader({ number, parentHash, timestamp }: HeaderData): BlockHeader {
-    if (number === undefined || !(number instanceof BN)) {
+  getPendingBlockHeader(data: HeaderData): BlockHeader {
+    if (data.number === undefined || !(data.number instanceof BN)) {
       throw new Error('invalid header data');
     }
 
-    const common = this.node.getCommon(number);
+    const common = this.node.getCommon(data.number);
     const { header } = this.generateBlockHeaderAndProposal(
       {
-        parentHash,
+        ...data,
         uncleHash: KECCAK256_RLP_ARRAY,
         coinbase: EMPTY_ADDRESS,
-        number,
-        timestamp,
         difficulty: new BN(1),
         gasLimit: this.getGasLimitByCommon(common)
       },

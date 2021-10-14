@@ -14,44 +14,37 @@ export class CliqueConsensusEngine extends ConsensusEngineBase implements Consen
   /////////////////////////////////
 
   /**
-   * {@link ConsensusEngine.BlockHeader_miner}
+   * {@link ConsensusEngine.getMiner}
    */
-  BlockHeader_miner(header: BlockHeader): Address {
-    return header.cliqueSigner();
+  getMiner(data: BlockHeader | Block) {
+    return data instanceof Block ? data.header.cliqueSigner() : data.cliqueSigner();
   }
 
   /**
-   * {@link ConsensusEngine.Block_miner}
+   * {@link ConsensusEngine.getPendingBlockHeader}
    */
-  Block_miner(block: Block) {
-    return block.header.cliqueSigner();
-  }
-
-  /**
-   * {@link ConsensusEngine.getEmptyPendingBlockHeader}
-   */
-  getPendingBlockHeader({ parentHash, number, timestamp }: HeaderData) {
-    if (number === undefined || !(number instanceof BN)) {
+  getPendingBlockHeader(data: HeaderData) {
+    if (data.number === undefined || !(data.number instanceof BN)) {
       throw new Error('invalid header data');
     }
 
-    let difficulty: BN;
-    const activeSigners = this.node.blockchain.cliqueActiveSignersByBlockNumber(number);
-    if (this.isValidSigner(activeSigners)) {
-      difficulty = preHF1CalcCliqueDifficulty(activeSigners, this.coinbase, number)[1];
-    } else {
-      difficulty = CLIQUE_DIFF_NOTURN.clone();
+    let difficulty!: BN;
+    if (data.difficulty === undefined) {
+      const activeSigners = this.node.blockchain.cliqueActiveSignersByBlockNumber(data.number);
+      if (this.isValidSigner(activeSigners)) {
+        difficulty = preHF1CalcCliqueDifficulty(activeSigners, this.coinbase, data.number)[1];
+      } else {
+        difficulty = CLIQUE_DIFF_NOTURN.clone();
+      }
     }
 
-    const common = this.node.getCommon(number);
+    const common = this.node.getCommon(data.number);
     return BlockHeader.fromHeaderData(
       {
-        parentHash,
+        ...data,
         uncleHash: KECCAK256_RLP_ARRAY,
         coinbase: EMPTY_ADDRESS,
-        number,
-        timestamp,
-        difficulty,
+        difficulty: data.difficulty ?? difficulty,
         gasLimit: this.getGasLimitByCommon(common)
       },
       { common, cliqueSigner: this.cliqueSigner() }

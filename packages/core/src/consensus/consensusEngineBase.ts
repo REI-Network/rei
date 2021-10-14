@@ -11,18 +11,19 @@ import { ConsensusEngine, ConsensusEngineOptions } from './consensusEngine';
 import { EMPTY_ADDRESS } from './utils';
 
 export abstract class ConsensusEngineBase extends EventEmitter implements ConsensusEngine {
-  abstract BlockHeader_miner(header: BlockHeader): Address;
-  abstract Block_miner(block: Block): Address;
+  abstract getMiner(block: BlockHeader | Block): Address;
   abstract getPendingBlockHeader(data: HeaderData): BlockHeader;
 
   protected abstract _newBlockHeader(header: BlockHeader): Promise<void>;
   protected abstract _start(): void;
   protected abstract _abort(): Promise<void>;
 
+  readonly node: Node;
+  readonly worker: Worker;
+
   protected _coinbase: Address;
   protected _enable: boolean;
-  readonly node: Node;
-  protected readonly worker: Worker;
+
   protected msgLoopPromise?: Promise<void>;
   protected readonly msgQueue = new Channel<BlockHeader>({ max: 1 });
 

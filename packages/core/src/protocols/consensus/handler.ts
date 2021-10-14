@@ -7,6 +7,8 @@ import { ConsensusProtocol } from './protocol';
 
 const peerGossipSleepDuration = 100;
 
+const defaultNewRoundStepMessage = new NewRoundStepMessage(new BN(0), 0, 0, 0, 0);
+
 const consensusHandlerFuncs: HandlerFunc[] = [
   {
     name: 'NewRoundStep',
@@ -236,8 +238,7 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
     ConsensusProtocol.getPool().add(this);
   }
   protected onHandshake() {
-    const roundStep = new NewRoundStepMessage(new BN(0), 1, 2, 3, 4);
-    this.send(0, roundStep);
+    this.send(0, this.reimint?.state.genNewRoundStepMessage() ?? defaultNewRoundStepMessage);
   }
   protected onHandshakeResponse(roundStep: any) {
     if (!(roundStep instanceof NewRoundStepMessage)) {

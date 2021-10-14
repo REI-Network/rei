@@ -37,6 +37,8 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
     tx.common.getHardforkByBlockNumber(block.header.number);
   }
 
+  // get engine by block common
+  const engine = this.getEngineByCommon(block._common);
   // get parent block
   const parent = await this.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
   // create a vm instance
@@ -45,7 +47,7 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
   const parentEnableStaking = isEnableStaking(parent._common);
   const enableStaking = isEnableStaking(block._common);
 
-  const miner = block.header.cliqueSigner();
+  const miner = engine.getMiner(block);
   let parentValidatorSet: ValidatorSet | undefined;
   let parentRouter: Router | undefined;
   let parentStakeManager: StakeManager | undefined;
@@ -86,7 +88,6 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
     block,
     skipBlockValidation: true,
     root: parent.header.stateRoot,
-    cliqueSigner: options.generate ? this.accMngr.getPrivateKey(block.header.cliqueSigner().buf) : undefined,
     // if the current hardfork is less than `hardfork1`, then use the old logic `preHF1GenReceiptTrie`
     genReceiptTrie: isEnableReceiptRootFix(block._common) ? undefined : preHF1GenReceiptTrie,
     assignBlockReward: async (state: IStateManager, reward: BN) => {
@@ -110,6 +111,9 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
 
           // deploy system contracts
           await Contract.deploy(new EVM(vm, new TxContext(new BN(0), Address.zero()), block), block._common);
+
+          // start consensus engine
+          engine.start();
         } else {
           // reward miner and collect logs
           let logs: Log[] | undefined;
@@ -161,7 +165,7 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
   };
 
   const { block: newBlock } = await vm.runBlock(runBlockOptions);
-  block = newBlock ?? block;
+  block = newBlock ? engine.getPendingBlock({ header: { ...newBlock.header }, transactions: [...newBlock.transactions] }) : block;
   logger.info('✨ Process block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
   const before = this.blockchain.latestBlock.hash();
   await this.blockchain.putBlock(block);

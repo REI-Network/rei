@@ -39,16 +39,10 @@ export interface ConsensusEngine {
   off(event: 'start', cb: (engine: ConsensusEngine) => void): ConsensusEngine;
 
   /**
-   * Get miner address from block header
-   * @param header- Block header
+   * Get miner address from block header or block
+   * @param header - Block header or block
    */
-  BlockHeader_miner(header: BlockHeader): Address;
-
-  /**
-   * Get miner address from block
-   * @param header- Block
-   */
-  Block_miner(block: Block): Address;
+  getMiner(data: BlockHeader | Block): Address;
 
   /**
    * Get gas limit by common instance

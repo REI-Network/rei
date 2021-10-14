@@ -160,7 +160,7 @@ export class StateMachine {
   }
 
   private newStep(timestamp?: number) {
-    this.reimint.node.broadcastMessage(new NewRoundStepMessage(this.height, this.round, this.step, (timestamp ?? Date.now()) - this.startTime, 0), { broadcast: true });
+    this.reimint.node.broadcastMessage(this.genNewRoundStepMessage(timestamp)!, { broadcast: true });
   }
 
   async msgLoop() {
@@ -429,6 +429,12 @@ export class StateMachine {
           height: height.clone(),
           round
         });
+      } else {
+        this.reimint.worker.getPendingBlockByParentHash(this.parentHash).then(() => {
+          if (this.step === RoundStepType.NewRound) {
+            this.enterPropose(height, 0);
+          }
+        });
       }
     } else {
       this.enterPropose(height, round);
@@ -436,7 +442,7 @@ export class StateMachine {
   }
 
   private createBlockAndProposal() {
-    const pendingBlock = (this.reimint as any).worker.directlyGetPendingBlockByParentHash(this.parentHash);
+    const pendingBlock = this.reimint.worker.directlyGetPendingBlockByParentHash(this.parentHash);
     if (!pendingBlock) {
       throw new Error('missing pending block');
     }
@@ -826,6 +832,10 @@ export class StateMachine {
     }
 
     this.votes.setPeerMaj23(round, type, peerId, hash);
+  }
+
+  genNewRoundStepMessage(timestamp?: number) {
+    return this.startTime !== undefined ? new NewRoundStepMessage(this.height, this.round, this.step, (timestamp ?? Date.now()) - this.startTime, 0) : undefined;
   }
 
   genVoteSetBitsMessage(height: BN, round: number, type: VoteType, hash: Buffer) {

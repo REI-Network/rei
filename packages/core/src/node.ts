@@ -367,15 +367,12 @@ export class Node {
 
   /**
    * Get reimint consensus engine instance,
-   * return undefined if the current active engine
-   * is not reimint ot reimint is disable
+   * return undefined if reimint is disable
    * @returns ReimintConsensusEngine or undefined
    */
   getReimintEngine() {
-    const engine = this.getEngineByCommon(this.getLatestCommon());
-    if (engine instanceof ReimintConsensusEngine) {
-      return engine;
-    }
+    const engine = this.engines.get(ConsensusType.Reimint);
+    return engine ? (engine as ReimintConsensusEngine) : undefined;
   }
 
   /**

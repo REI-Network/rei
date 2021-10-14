@@ -53,12 +53,12 @@ export class BitArray {
     return result;
   }
 
-  pickRandom(): [number, boolean] {
+  pickRandom() {
     const trueIndices = this.getTrueIndices();
     if (trueIndices.length === 0) {
-      return [0, false];
+      return;
     }
-    return [trueIndices[getRandomIntInclusive(0, trueIndices.length - 1)], true];
+    return trueIndices[getRandomIntInclusive(0, trueIndices.length - 1)];
   }
 
   getTrueIndices() {

@@ -224,6 +224,10 @@ export class VoteSet {
     return this.votesByBlock.get(hash)?.getByIndex(valIndex);
   }
 
+  getVoteByIndex(index: number) {
+    return this.votes[index];
+  }
+
   addVerifiedVote(vote: Vote, votingPower: BN) {
     let conflicting: Vote | undefined;
     const idx = vote.index;
@@ -309,6 +313,10 @@ export class VoteSet {
 
   bitArrayByBlockID(hash: Buffer) {
     return this.votesByBlock.get(hash)?.bitArray.copy();
+  }
+
+  isCommit() {
+    return this.signedMsgType === VoteType.Precommit && !!this.maj23;
   }
 }
 

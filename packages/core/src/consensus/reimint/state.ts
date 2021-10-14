@@ -844,4 +844,58 @@ export class StateMachine {
 
     return new VoteSetBitsMessage(height, round, type, hash, bitArray);
   }
+
+  genProposalMessage(height: BN, round: number) {
+    if (height.eq(this.height) || round !== this.round) {
+      return;
+    }
+
+    if (!this.proposal) {
+      return;
+    }
+
+    // only gossip proposal after get the proposalBlock,
+    // because the remote peer will request for the proposalBlock immediately
+    // if he doesn't have proposalBlock
+    if (!this.proposalBlock) {
+      return;
+    }
+
+    return new ProposalMessage(this.proposal);
+  }
+
+  pickVoteSetToSend(height: BN, round: number, proposalPOLRound: number, step: RoundStepType) {
+    if (height.eq(this.height)) {
+      return;
+    }
+
+    if (step === RoundStepType.NewHeight) {
+      // TODO: return this.lastCommit
+      return;
+    }
+
+    if (step <= RoundStepType.Propose && round !== -1 && round <= this.round && proposalPOLRound !== -1) {
+      return this.votes.prevotes(proposalPOLRound);
+    }
+
+    if (step <= RoundStepType.PrevoteWait && round !== -1 && round <= this.round) {
+      return this.votes.prevotes(round);
+    }
+
+    if (step <= RoundStepType.PrecommitWait && round !== -1 && round <= this.round) {
+      return this.votes.precommits(round);
+    }
+
+    if (round !== -1 && round <= this.round) {
+      return this.votes.prevotes(round);
+    }
+
+    if (proposalPOLRound !== -1) {
+      return this.votes.prevotes(proposalPOLRound);
+    }
+  }
+
+  pickVoteSetFromDatabase(height: BN) {
+    return !height.isZero() && this.height.gt(height);
+  }
 }

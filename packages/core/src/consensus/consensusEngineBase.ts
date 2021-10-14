@@ -1,3 +1,4 @@
+import EventEmitter from 'events';
 import { Address, BN } from 'ethereumjs-util';
 import { BlockHeader, Block, HeaderData, BlockData } from '@gxchain2-ethereumjs/block';
 import { TypedTransaction, TransactionFactory } from '@gxchain2/structure';
@@ -9,7 +10,7 @@ import { Worker } from '../worker';
 import { ConsensusEngine, ConsensusEngineOptions } from './consensusEngine';
 import { EMPTY_ADDRESS } from './utils';
 
-export abstract class ConsensusEngineBase implements ConsensusEngine {
+export abstract class ConsensusEngineBase extends EventEmitter implements ConsensusEngine {
   abstract BlockHeader_miner(header: BlockHeader): Address;
   abstract Block_miner(block: Block): Address;
   abstract getPendingBlockHeader(data: HeaderData): BlockHeader;
@@ -26,6 +27,7 @@ export abstract class ConsensusEngineBase implements ConsensusEngine {
   protected readonly msgQueue = new Channel<BlockHeader>({ max: 1 });
 
   constructor(options: ConsensusEngineOptions) {
+    super();
     this.node = options.node;
     this._enable = options.enable;
     this._coinbase = options.coinbase ?? EMPTY_ADDRESS;
@@ -44,6 +46,20 @@ export abstract class ConsensusEngineBase implements ConsensusEngine {
    */
   get enable() {
     return this._enable && !this._coinbase.equals(EMPTY_ADDRESS) && this.node.accMngr.hasUnlockedAccount(this._coinbase);
+  }
+
+  /**
+   * {@link ConsensusEngine.isActivate}
+   */
+  get isActivate() {
+    return this.node.getLastestEngine() === this;
+  }
+
+  /**
+   * {@link ConsensusEngine.isStarted}
+   */
+  get isStarted() {
+    return !!this.msgLoopPromise;
   }
 
   /**
@@ -79,6 +95,7 @@ export abstract class ConsensusEngineBase implements ConsensusEngine {
     }
 
     this.msgLoopPromise = this.msgLoop();
+    this.emit('start', this);
   }
 
   /**

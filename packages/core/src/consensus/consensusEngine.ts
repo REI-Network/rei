@@ -18,6 +18,25 @@ export interface ConsensusEngine {
   coinbase: Address;
   // engine enable
   enable: boolean;
+  // engine is activate
+  isActivate: boolean;
+  // engine is started
+  isStarted: boolean;
+
+  /**
+   * Register event listener,
+   * emit the callback when engine is started
+   * @param event - Event name
+   * @param cb - Callback
+   */
+  on(event: 'start', cb: (engine: ConsensusEngine) => void): ConsensusEngine;
+
+  /**
+   * Remove event listener
+   * @param event - Event name
+   * @param cb - Callback
+   */
+  off(event: 'start', cb: (engine: ConsensusEngine) => void): ConsensusEngine;
 
   /**
    * Get miner address from block header

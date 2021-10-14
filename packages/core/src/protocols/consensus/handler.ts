@@ -1,9 +1,11 @@
 import { rlp, BN, bnToUnpaddedBuffer, intToBuffer } from 'ethereumjs-util';
-import { Block } from '@gxchain2/structure';
+import { Block, BlockHeader } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
-import { Message, NewRoundStepMessage, NewValidBlockMessage, HasVoteMessage, Proposal, Vote, ProposalPOLMessage, VoteSetMaj23Message, VoteSetBitsMessage, GetProposalBlockMessage, ProposalBlockMessage, BitArray, ReimintConsensusEngine, RoundStepType, VoteType, ProposalMessage, VoteMessage } from '../../consensus/reimint';
+import { Message, NewRoundStepMessage, NewValidBlockMessage, HasVoteMessage, Proposal, Vote, ProposalPOLMessage, VoteSetMaj23Message, VoteSetBitsMessage, GetProposalBlockMessage, ProposalBlockMessage, BitArray, RoundStepType, VoteType, ProposalMessage, VoteMessage, VoteSet, ExtraData, ReimintConsensusEngine } from '../../consensus/reimint';
 import { HandlerBase, HandlerFunc, HandlerBaseOptions } from '../handlerBase';
 import { ConsensusProtocol } from './protocol';
+
+const peerGossipSleepDuration = 100;
 
 const consensusHandlerFuncs: HandlerFunc[] = [
   {
@@ -72,7 +74,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
     },
     process(this: ConsensusProtocolHander, msg: ProposalMessage) {
       this.setHasProposal(msg.proposal);
-      this.node.getReimintEngine()?.state.newMessage(this.peer.peerId, msg);
+      this.reimint?.state.newMessage(this.peer.peerId, msg);
     }
   },
   {
@@ -108,12 +110,11 @@ const consensusHandlerFuncs: HandlerFunc[] = [
       return new VoteMessage(Vote.fromValuesArray(data as any));
     },
     process(this: ConsensusProtocolHander, msg: VoteMessage) {
-      const reimint = this.node.getReimintEngine();
-      if (reimint) {
+      if (this.reimint) {
         const vote = msg.vote;
-        this.ensureVoteBitArrays(vote.height, reimint.state.getValSetSize());
+        this.ensureVoteBitArrays(vote.height, this.reimint.state.getValSetSize());
         this.setHasVote(vote.height, vote.round, vote.type, vote.index);
-        reimint.state.newMessage(this.peer.peerId, msg);
+        this.reimint.state.newMessage(this.peer.peerId, msg);
       }
     }
   },
@@ -131,11 +132,10 @@ const consensusHandlerFuncs: HandlerFunc[] = [
       return new VoteSetMaj23Message(new BN(height), round, type, hash);
     },
     process(this: ConsensusProtocolHander, msg: VoteSetMaj23Message) {
-      const reimint = this.node.getReimintEngine();
-      if (reimint) {
-        reimint.state.setVoteMaj23(msg.height, msg.round, msg.type, this.peer.peerId, msg.hash);
-        const response = reimint.state.genVoteSetBitsMessage(msg.height, msg.round, msg.type, msg.hash);
-        response && this.sendMessage(response);
+      if (this.reimint) {
+        this.reimint.state.setVoteMaj23(msg.height, msg.round, msg.type, this.peer.peerId, msg.hash);
+        const voteSetBitsMessage = this.reimint.state.genVoteSetBitsMessage(msg.height, msg.round, msg.type, msg.hash);
+        voteSetBitsMessage && this.sendMessage(voteSetBitsMessage);
       }
     }
   },
@@ -189,7 +189,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
       return new ProposalBlockMessage(Block.fromValuesArray(data[0], { common: this.node.getCommon(0), hardforkByBlockNumber: true }));
     },
     process(this: ConsensusProtocolHander, msg: ProposalBlockMessage) {
-      this.node.getReimintEngine()?.state.newMessage(this.peer.peerId, msg);
+      this.reimint?.state.newMessage(this.peer.peerId, msg);
     }
   },
   // debug code
@@ -209,6 +209,9 @@ const consensusHandlerFuncs: HandlerFunc[] = [
 export interface ConsensusProtocolHanderOptions extends Omit<HandlerBaseOptions, 'handlerFuncs'> {}
 
 export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
+  readonly reimint?: ReimintConsensusEngine;
+  private aborted: boolean = false;
+
   /////////////// PeerRoundState ///////////////
   private height: BN = new BN(0);
   private round: number = -1;
@@ -243,6 +246,8 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
     return true;
   }
   protected onAbort() {
+    this.aborted = true;
+    this.reimint?.off('start', this.onEngineStart);
     ConsensusProtocol.getPool().remove(this);
   }
 
@@ -256,6 +261,122 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
 
   constructor(options: ConsensusProtocolHanderOptions) {
     super({ ...options, handlerFuncs: consensusHandlerFuncs });
+
+    this.reimint = this.node.getReimintEngine();
+    if (!this.reimint) {
+      return;
+    } else if (this.reimint.isStarted) {
+      this.onEngineStart();
+    } else {
+      this.reimint.on('start', this.onEngineStart);
+    }
+  }
+
+  private onEngineStart = () => {
+    this.gossipDataLoop(this.reimint!);
+    this.gossipVotesLoop(this.reimint!);
+  };
+
+  private async gossipDataLoop(reimint: ReimintConsensusEngine) {
+    // if hand shake failed, break the loop
+    if (!(await this.handshakePromise)) {
+      return;
+    }
+
+    while (!this.aborted) {
+      if (!this.proposal) {
+        const proposalMessage = reimint.state.genProposalMessage(this.height, this.round);
+        if (proposalMessage) {
+          this.sendMessage(proposalMessage);
+          this.setHasProposal(proposalMessage.proposal);
+        }
+      }
+
+      await new Promise((r) => setTimeout(r, peerGossipSleepDuration));
+    }
+  }
+
+  private async gossipVotesLoop(reimint: ReimintConsensusEngine) {
+    // if hand shake failed, break the loop
+    if (!(await this.handshakePromise)) {
+      return;
+    }
+
+    // save latest query result
+    let cachedBlockHeader: BlockHeader | undefined;
+    let cachedExtraData: ExtraData | undefined;
+    const getVoteSetByHeight = async (height: BN) => {
+      if (cachedBlockHeader && cachedBlockHeader.number.eq(height)) {
+        return cachedExtraData?.voteSet;
+      }
+
+      try {
+        cachedBlockHeader = await this.node.db.getCanonicalHeader(height);
+        const valSet = this.node.validatorSets.directlyGet(cachedBlockHeader.stateRoot);
+        if (!valSet) {
+          throw new Error('missing validator set');
+        }
+        cachedExtraData = ExtraData.fromBlockHeader(cachedBlockHeader, valSet);
+        return cachedExtraData.voteSet;
+      } catch (err: any) {
+        cachedBlockHeader = undefined;
+        cachedExtraData = undefined;
+        return;
+      }
+    };
+
+    while (!this.aborted) {
+      // pick vote from memory and send
+      const votes = reimint.state.pickVoteSetToSend(this.height, this.round, this.proposalPOLRound, this.step);
+      if (votes && this.pickAndSend(votes)) {
+        continue;
+      }
+
+      // pick vote from database and send
+      if (reimint.state.pickVoteSetFromDatabase(this.height)) {
+        const height = this.height;
+        const votes = await getVoteSetByHeight(this.height);
+        if (!this.aborted && votes && height.eq(this.height) && this.pickAndSend(votes)) {
+          continue;
+        }
+      }
+
+      await new Promise((r) => setTimeout(r, peerGossipSleepDuration));
+    }
+  }
+
+  private pickRandom(votes: VoteSet) {
+    if (votes.voteCount() === 0) {
+      return;
+    }
+
+    const { height, round, signedMsgType } = votes;
+    const valSetSize = votes.valSet.length;
+
+    if (votes.isCommit()) {
+      this.ensureCatchupCommitRound(height, round, valSetSize);
+    }
+    this.ensureVoteBitArrays(height, valSetSize);
+
+    const remotePeerVotes = this.getVoteBitArray(height, round, signedMsgType);
+    if (!remotePeerVotes) {
+      return;
+    }
+
+    const index = votes.votesBitArray.sub(remotePeerVotes).pickRandom();
+    if (index !== undefined) {
+      return votes.getVoteByIndex(index);
+    }
+  }
+
+  private pickAndSend(votes: VoteSet) {
+    const vote = this.pickRandom(votes);
+    if (vote) {
+      this.sendMessage(new VoteMessage(vote));
+      this.setHasVote(vote.height, vote.round, vote.type, vote.index);
+      return true;
+    }
+    return false;
   }
 
   sendMessage(msg: Message) {
@@ -401,6 +522,23 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
     this.proposalPOL = undefined;
 
     logger.debug('ConsensusProtocolHander::setHasProposal, peerId:', this.peer.peerId, 'applied');
+  }
+
+  ensureCatchupCommitRound(height: BN, round: number, valSetSize: number) {
+    if (!this.height.eq(height)) {
+      return;
+    }
+
+    if (this.catchupCommitRound === round) {
+      return;
+    }
+
+    this.catchupCommitRound = round;
+    if (this.round === round) {
+      this.catchupCommit = this.precommits;
+    } else {
+      this.catchupCommit = new BitArray(valSetSize);
+    }
   }
 
   ensureVoteBitArrays(height: BN, valSetSize: number) {

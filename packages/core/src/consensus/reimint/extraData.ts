@@ -81,6 +81,9 @@ export class ExtraData {
   readonly voteSet?: VoteSet;
 
   static fromBlockHeader(header: BlockHeader, valSet?: ValidatorSet) {
+    if (header.extraData.length <= CLIQUE_EXTRA_VANITY) {
+      throw new Error('invalid header');
+    }
     return ExtraData.fromSerializedData(header.extraData.slice(CLIQUE_EXTRA_VANITY), { header, chainId: header._common.chainIdBN().toNumber(), valSet });
   }
 

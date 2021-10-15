@@ -153,16 +153,3 @@ export function preHF1ConsensusValidateHeader(this: BlockHeader, blockchain: Blo
     throw new Error('clique recently signed');
   }
 }
-
-export function consensusValidateHeader(this: BlockHeader, activeSigners: Address[], proposer: Address) {
-  const miner = this.cliqueSigner();
-  if (activeSigners.findIndex((addr) => addr.equals(miner)) === -1) {
-    throw new Error('invalid validator, missing from active signer');
-  }
-  if (miner.equals(proposer) && !this.difficulty.eq(CLIQUE_DIFF_INTURN)) {
-    throw new Error('invalid difficulty');
-  }
-  if (!miner.equals(proposer) && !this.difficulty.eq(CLIQUE_DIFF_NOTURN)) {
-    throw new Error('invalid difficulty');
-  }
-}

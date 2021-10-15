@@ -9,7 +9,8 @@ import { Receipt, Log } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
 import { ValidatorChanges, ValidatorSet } from '../staking';
 import { StakeManager, Router, Contract } from '../contracts';
-import { consensusValidateHeader, preHF1ConsensusValidateHeader } from '../validation';
+import { ExtraData } from '../consensus/reimint/extraData';
+import { preHF1ConsensusValidateHeader } from '../validation';
 import { isEnableReceiptRootFix, isEnableStaking, preHF1GenReceiptTrie } from '../hardforks';
 import { Node } from '../node';
 import { makeRunTxCallback } from './processTx';
@@ -32,15 +33,16 @@ export interface ProcessBlockOpts extends Pick<RunBlockOpts, 'generate' | 'block
 
 export async function processBlock(this: Node, options: ProcessBlockOpts) {
   let { block, generate } = options;
+  let header = block.header;
   // ensure that every transaction is in the right common
   for (const tx of block.transactions) {
-    tx.common.getHardforkByBlockNumber(block.header.number);
+    tx.common.getHardforkByBlockNumber(header.number);
   }
 
   // get engine by block common
   const engine = this.getEngineByCommon(block._common);
   // get parent block
-  const parent = await this.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
+  const parent = await this.db.getBlockByHashAndNumber(header.parentHash, header.number.subn(1));
   // create a vm instance
   const vm = await this.getVM(parent.header.stateRoot, block._common);
   // check hardfork
@@ -60,22 +62,24 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
     if (!parentEnableStaking) {
       parentValidatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
       if (!options.skipConsensusValidation) {
-        preHF1ConsensusValidateHeader.call(block.header, this.blockchain);
+        preHF1ConsensusValidateHeader.call(header, this.blockchain);
       }
     } else {
       parentValidatorSet = await this.validatorSets.get(parent.header.stateRoot, parentStakeManager);
+      const extraData = ExtraData.fromBlockHeader(header, { valSet: parentValidatorSet, increaseValSet: true });
+      parentValidatorSet = extraData.validatorSet()!;
       if (!options.skipConsensusValidation) {
-        consensusValidateHeader.call(block.header, parentValidatorSet.activeSigners(), parentValidatorSet.proposer());
+        extraData.validate();
       }
-      if (block.header.difficulty.eqn(1)) {
-        logger.debug('Node::processBlock, number:', block.header.number.toString(), 'this block should mint by:', parentValidatorSet.proposer().toString(), ', but minted by:', miner.toString());
+      if (header.difficulty.eqn(1)) {
+        logger.debug('Node::processBlock, number:', header.number.toString(), 'this block should mint by:', parentValidatorSet.proposer().toString(), ', but minted by:', miner.toString());
       } else {
-        logger.debug('Node::processBlock, number:', block.header.number.toString(), 'this block should mint by:', parentValidatorSet.proposer().toString());
+        logger.debug('Node::processBlock, number:', header.number.toString(), 'this block should mint by:', parentValidatorSet.proposer().toString());
       }
     }
   } else {
     if (!options.skipConsensusValidation) {
-      preHF1ConsensusValidateHeader.call(block.header, this.blockchain);
+      preHF1ConsensusValidateHeader.call(header, this.blockchain);
     }
   }
 
@@ -155,22 +159,23 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
         await parentRouter!.onAfterBlock(activeSigners, priorities);
 
         // save `validatorSet` to `validatorSets`
-        this.validatorSets.set(block.header.stateRoot, validatorSet);
+        this.validatorSets.set(header.stateRoot, validatorSet);
       } else {
-        activeSigners = this.blockchain.cliqueActiveSignersByBlockNumber(block.header.number);
+        activeSigners = this.blockchain.cliqueActiveSignersByBlockNumber(header.number);
       }
     },
     // if parent block is enable staking, we should use new run tx logic
-    runTxOpts: { ...(parentEnableStaking ? makeRunTxCallback(parentRouter!, systemCaller!, miner, block.header.timestamp.toNumber()) : undefined), ...options.runTxOpts }
+    runTxOpts: { ...(parentEnableStaking ? makeRunTxCallback(parentRouter!, systemCaller!, miner, header.timestamp.toNumber()) : undefined), ...options.runTxOpts }
   };
 
   const { block: newBlock } = await vm.runBlock(runBlockOptions);
   block = newBlock ? engine.getPendingBlock({ header: { ...newBlock.header }, transactions: [...newBlock.transactions] }) : block;
-  logger.info('✨ Process block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
+  header = block.header;
+  logger.info('✨ Process block, height:', header.number.toString(), 'hash:', bufferToHex(block.hash()));
   const before = this.blockchain.latestBlock.hash();
   await this.blockchain.putBlock(block);
   // persist receipts
-  await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, block.hash(), block.header.number)));
+  await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, block.hash(), header.number)));
   const after = this.blockchain.latestBlock.hash();
 
   return {

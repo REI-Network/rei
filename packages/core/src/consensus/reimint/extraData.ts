@@ -1,4 +1,4 @@
-import { Address, BN, rlp, intToBuffer, rlphash } from 'ethereumjs-util';
+import { BN, rlp, intToBuffer, rlphash } from 'ethereumjs-util';
 import { Block, BlockHeader, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
 import { ValidatorSet } from '../../staking';
 import { Vote, VoteType, VoteSet } from './vote';
@@ -15,8 +15,11 @@ export function BlockHeader_hash(header: BlockHeader) {
 export interface ExtraDataOptions {
   header: BlockHeader;
   valSet?: ValidatorSet;
+  increaseValSet?: boolean;
   chainId: number;
 }
+
+export interface ExtraDataFromBlockHeaderOptions extends Omit<ExtraDataOptions, 'header' | 'chainId'> {}
 
 export type RLPVote = [Buffer, Buffer];
 export type RLPEmptyVote = [];
@@ -80,11 +83,11 @@ export class ExtraData {
   readonly proposal: Proposal;
   readonly voteSet?: VoteSet;
 
-  static fromBlockHeader(header: BlockHeader, valSet?: ValidatorSet) {
+  static fromBlockHeader(header: BlockHeader, options?: ExtraDataFromBlockHeaderOptions) {
     if (header.extraData.length <= CLIQUE_EXTRA_VANITY) {
       throw new Error('invalid header');
     }
-    return ExtraData.fromSerializedData(header.extraData.slice(CLIQUE_EXTRA_VANITY), { header, chainId: header._common.chainIdBN().toNumber(), valSet });
+    return ExtraData.fromSerializedData(header.extraData.slice(CLIQUE_EXTRA_VANITY), { ...options, header, chainId: header._common.chainIdBN().toNumber() });
   }
 
   static fromSerializedData(serialized: Buffer, options: ExtraDataOptions) {
@@ -95,7 +98,7 @@ export class ExtraData {
     return ExtraData.fromValuesArray(values, options);
   }
 
-  static fromValuesArray(values: RLPElements, { header, valSet, chainId }: ExtraDataOptions) {
+  static fromValuesArray(values: RLPElements, { header, valSet, chainId, increaseValSet }: ExtraDataOptions) {
     // the additional extra data should include at lease 3 elements(RLPRoundAndPOLRound, RLPEvidenceList, RLPVote(proposal))
     if (values.length < 3) {
       throw new Error('invliad values');
@@ -122,6 +125,12 @@ export class ExtraData {
         }
         round = value[0];
         POLRound = value[1] - 1;
+
+        // increase round
+        if (increaseValSet && valSet) {
+          valSet = valSet.copy();
+          valSet.incrementProposerPriority(round);
+        }
       } else if (i === 1) {
         if (!isRLPEvidenceList(value)) {
           throw new Error('invliad values');
@@ -148,10 +157,13 @@ export class ExtraData {
           signature
         );
         proposal.validateBasic();
+        if (valSet) {
+          proposal.validateSignature(valSet.proposer());
+        }
       } else {
         if (isRLPVote(value)) {
           if (!voteSet) {
-            throw new Error('missing validator set');
+            break;
           }
           const [timestampBuf, signature] = value;
           const vote = new Vote(
@@ -215,34 +227,26 @@ export class ExtraData {
     return rlp.encode(this.raw(validaterSetSize));
   }
 
-  validateRoundAndPOLRound() {
+  validatorSet() {
+    return this.voteSet?.valSet;
+  }
+
+  validate() {
     if (this.round < 0 || this.round >= Number.MAX_SAFE_INTEGER) {
       throw new Error('invalid round');
     }
     if (this.POLRound < -1 || this.POLRound >= Number.MAX_SAFE_INTEGER - 1) {
       throw new Error('invalid POLRound');
     }
-  }
 
-  validateProposer(proposer: Address) {
-    this.proposal.validateSignature(proposer);
-  }
-
-  validateVotes(headerHash: Buffer) {
     if (!this.voteSet || this.voteSet.voteCount() === 0) {
       throw new Error('empty vote set');
     }
     if (this.voteSet.signedMsgType !== VoteType.Precommit) {
       throw new Error('invalid vote type');
     }
-    if (!this.voteSet.maj23 || !this.voteSet.maj23.equals(headerHash)) {
+    if (!this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash)) {
       throw new Error('invalid vote set');
     }
-  }
-
-  validate(headerHash: Buffer) {
-    this.validateRoundAndPOLRound();
-    this.validateVotes(headerHash);
-    this.validateProposer(this.voteSet!.valSet.proposer());
   }
 }

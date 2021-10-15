@@ -317,7 +317,7 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
         if (!valSet) {
           throw new Error('missing validator set');
         }
-        cachedExtraData = ExtraData.fromBlockHeader(cachedBlockHeader, valSet);
+        cachedExtraData = ExtraData.fromBlockHeader(cachedBlockHeader, { valSet });
         return cachedExtraData.voteSet;
       } catch (err: any) {
         cachedBlockHeader = undefined;

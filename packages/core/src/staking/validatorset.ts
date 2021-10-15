@@ -195,24 +195,6 @@ export class ValidatorSet {
       });
     }
 
-    // fill genesis validators
-    if (newAcitve.length < maxCount && this.fillGenesisValidators) {
-      const append = getAppendGenesisValidators(
-        (address: Address) => {
-          return newAcitve.filter((av) => av.validator.equals(address)).length > 0;
-        },
-        newAcitve.length,
-        maxCount,
-        getGenesisValidators(this.common)
-      );
-      for (const validator of append) {
-        newAcitve.push({
-          validator,
-          priority: new BN(0)
-        });
-      }
-    }
-
     return { newAcitve, totalVotingPower: this.calcTotalVotingPower(newAcitve) };
   }
 

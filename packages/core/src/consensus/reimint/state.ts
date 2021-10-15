@@ -232,7 +232,7 @@ export class StateMachine {
       throw new Error('invalid proposal POL round');
     }
 
-    proposal.validateSignature(this.validators.proposer());
+    proposal.validateSignature(this.validators.proposer);
 
     this.proposal = proposal;
     this.proposalBlockHash = proposal.hash;
@@ -534,7 +534,7 @@ export class StateMachine {
       return update();
     }
 
-    if (!this.validators.proposer().equals(this.signer.address())) {
+    if (!this.validators.proposer.equals(this.signer.address())) {
       return update();
     }
 

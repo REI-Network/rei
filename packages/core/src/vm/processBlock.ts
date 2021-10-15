@@ -72,9 +72,9 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
         extraData.validate();
       }
       if (header.difficulty.eqn(1)) {
-        logger.debug('Node::processBlock, number:', header.number.toString(), 'this block should mint by:', parentValidatorSet.proposer().toString(), ', but minted by:', miner.toString());
+        logger.debug('Node::processBlock, number:', header.number.toString(), 'this block should mint by:', parentValidatorSet.proposer.toString(), ', but minted by:', miner.toString());
       } else {
-        logger.debug('Node::processBlock, number:', header.number.toString(), 'this block should mint by:', parentValidatorSet.proposer().toString());
+        logger.debug('Node::processBlock, number:', header.number.toString(), 'this block should mint by:', parentValidatorSet.proposer.toString());
       }
     }
   } else {
@@ -84,9 +84,9 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
   }
 
   let receipts!: Receipt[];
-  let proposer: Address | undefined;
+  // let proposer: Address | undefined;
   let blockReward = new BN(0);
-  let activeSigners!: Address[];
+  // let activeSigners!: Address[];
   const runBlockOptions: RunBlockOpts = {
     generate,
     block,
@@ -139,7 +139,6 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
           for (const vc of changes.changes.values()) {
             logger.debug('Node::processBlock, change, address:', vc.validator.toString(), 'votingPower:', vc?.votingPower?.toString(), 'update:', vc.update.toString());
           }
-          validatorSet.subtractProposerPriority(miner);
           await validatorSet.mergeChanges(changes, parentStakeManager!);
           validatorSet.incrementProposerPriority(1);
         }
@@ -152,8 +151,8 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
           })
         );
 
-        proposer = validatorSet.proposer();
-        activeSigners = activeValidators.map(({ validator }) => validator);
+        // proposer = validatorSet.proposer;
+        const activeSigners = activeValidators.map(({ validator }) => validator);
         const priorities = activeValidators.map(({ priority }) => priority);
         // call after block callback to save active validators list
         await parentRouter!.onAfterBlock(activeSigners, priorities);
@@ -161,7 +160,7 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
         // save `validatorSet` to `validatorSets`
         this.validatorSets.set(header.stateRoot, validatorSet);
       } else {
-        activeSigners = this.blockchain.cliqueActiveSignersByBlockNumber(header.number);
+        // activeSigners = this.blockchain.cliqueActiveSignersByBlockNumber(header.number);
       }
     },
     // if parent block is enable staking, we should use new run tx logic
@@ -180,8 +179,8 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
 
   return {
     block,
-    proposer,
-    activeSigners,
+    // proposer,
+    // activeSigners,
     reorged: !before.equals(after)
   };
 }

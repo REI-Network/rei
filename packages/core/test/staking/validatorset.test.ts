@@ -57,6 +57,14 @@ describe('ValidatorSet', async () => {
     }
   });
 
+  it('should choose correct validator', async () => {
+    const vs = (await createValidatorSet({ foo: 1000, bar: 300, baz: 330 }, true)) as any;
+    const active = vs.active;
+    expect(active[0].validator.toString()).equal(n2a('foo').toString());
+    expect(active[1].validator.toString()).equal(n2a('baz').toString());
+    expect(active[2].validator.toString()).equal(n2a('bar').toString());
+  });
+
   it('should increment proposer priority succeed', async () => {
     const vs = await createValidatorSet({
       foo: 1000,
@@ -65,9 +73,8 @@ describe('ValidatorSet', async () => {
     });
     const proposers: string[] = [];
     for (let i = 0; i < 99; i++) {
-      const proposer = vs.proposer();
+      const proposer = vs.proposer;
       proposers.push(a2n(proposer));
-      vs.subtractProposerPriority(proposer);
       vs.incrementProposerPriority(1);
     }
     expect(proposers.join(' '), 'sequence of proposers should be equal').be.equal('foo baz foo bar foo foo baz foo bar foo foo baz foo foo bar foo baz foo foo bar foo foo baz foo bar foo foo baz foo bar foo foo baz foo foo bar foo baz foo foo bar foo baz foo foo bar foo baz foo foo bar foo baz foo foo foo baz bar foo foo foo baz foo bar foo foo baz foo bar foo foo baz foo bar foo foo baz foo bar foo foo baz foo foo bar foo baz foo foo bar foo baz foo foo bar foo baz foo foo');
@@ -81,9 +88,8 @@ describe('ValidatorSet', async () => {
     });
     const proposers: string[] = [];
     for (let i = 0; i < 3 * 5; i++) {
-      const proposer = vs.proposer();
+      const proposer = vs.proposer;
       proposers.push(a2n(proposer));
-      vs.subtractProposerPriority(proposer);
       vs.incrementProposerPriority(1);
     }
     expect(proposers.join(' ') + ' ', 'sequence of proposers should be equal').be.equal('foo bar baz '.repeat(5));
@@ -95,12 +101,10 @@ describe('ValidatorSet', async () => {
       bar: 100,
       baz: 400
     });
-    let proposer = vs.proposer();
-    vs.subtractProposerPriority(proposer);
+    let proposer = vs.proposer;
     expect(proposer.equals(n2a('baz')), 'should be first proposer').be.true;
     vs.incrementProposerPriority(1);
-    proposer = vs.proposer();
-    vs.subtractProposerPriority(proposer);
+    proposer = vs.proposer;
     expect(proposer.equals(n2a('baz')), "shouldn't be proposer twice in a row").be.false;
   });
 
@@ -110,15 +114,15 @@ describe('ValidatorSet', async () => {
       bar: 100,
       baz: 401
     });
-    let proposer = vs.proposer();
-    vs.subtractProposerPriority(proposer);
+    let proposer = vs.proposer;
     expect(proposer.equals(n2a('baz')), 'should be first proposer').be.true;
+
     vs.incrementProposerPriority(1);
-    proposer = vs.proposer();
-    vs.subtractProposerPriority(proposer);
+    proposer = vs.proposer;
     expect(proposer.equals(n2a('baz')), 'should be second proposer').be.true;
-    proposer = vs.proposer();
-    vs.subtractProposerPriority(proposer);
+
+    vs.incrementProposerPriority(1);
+    proposer = vs.proposer;
     expect(proposer.equals(n2a('baz')), "shouldn't be proposer again").be.false;
   });
 
@@ -131,9 +135,8 @@ describe('ValidatorSet', async () => {
     const N = 1;
     const times = new Map<string, number>();
     for (let i = 0; i < 120 * N; i++) {
-      const proposer = vs.proposer();
+      const proposer = vs.proposer;
       const name = a2n(proposer);
-      vs.subtractProposerPriority(proposer);
       times.set(name, (times.get(name) ?? 0) + 1);
       vs.incrementProposerPriority(1);
     }

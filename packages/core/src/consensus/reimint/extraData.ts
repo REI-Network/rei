@@ -158,7 +158,7 @@ export class ExtraData {
         );
         proposal.validateBasic();
         if (valSet) {
-          proposal.validateSignature(valSet.proposer());
+          proposal.validateSignature(valSet.proposer);
         }
       } else {
         if (isRLPVote(value)) {

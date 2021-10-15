@@ -31,6 +31,7 @@ function getAppendGenesisValidators(contains: (address: Address) => boolean, cur
     const gv = gvs.shift()!;
     if (!contains(gv)) {
       append.push(gv);
+      currentCount++;
     }
   }
   return append;
@@ -63,19 +64,34 @@ function cloneActiveValidator(av: ActiveValidator) {
 // a class used to maintain validator set
 export class ValidatorSet {
   // indexed validator set
-  private validators = createBufferFunctionalMap<ValidatorInfo>();
+  private readonly validators: Map<Buffer, ValidatorInfo>;
   // a sorted active validator list
-  private active: ActiveValidator[] = [];
-  // total voting power of active validator list
-  private _totalVotingPower = new BN(0);
+  private active: ActiveValidator[];
   // common instance
   private common: Common;
   // whether to fill genesis validator to active validator list when it is not full, default: `true`
   private fillGenesisValidators: boolean;
+  // current proposer address
+  private _proposer: Address;
+  // total voting power of active validator list
+  private _totalVotingPower: BN;
 
-  constructor(common: Common, fillGenesisValidators: boolean = true) {
+  constructor(validators: Map<Buffer, ValidatorInfo>, active: ActiveValidator[], common: Common, fillGenesisValidators: boolean = true, totalVotingPower?: BN) {
+    this.validators = validators;
+    this.active = active;
     this.common = common;
     this.fillGenesisValidators = fillGenesisValidators;
+    if (active.length > 0) {
+      this._proposer = this.calcPreviousProposer().validator;
+      this._totalVotingPower = totalVotingPower ?? this.calcTotalVotingPower(active);
+    } else {
+      this._proposer = Address.zero();
+      this._totalVotingPower = new BN(0);
+    }
+  }
+
+  get proposer() {
+    return this._proposer;
   }
 
   get totalVotingPower() {
@@ -87,22 +103,6 @@ export class ValidatorSet {
   }
 
   /**
-   * Clone a validator set from another
-   * @param other - Another validator set
-   * @param common - Common instance for new set
-   * @returns New validator set
-   */
-  static createFromValidatorSet(other: ValidatorSet) {
-    const vs = new ValidatorSet(other.common, other.fillGenesisValidators);
-    for (const [validator, info] of other.validators) {
-      vs.validators.set(validator, cloneValidatorInfo(info));
-    }
-    vs.active = other.active.map(cloneActiveValidator);
-    vs._totalVotingPower = other._totalVotingPower.clone();
-    return vs;
-  }
-
-  /**
    * Create a validator set from `StakeManager`,
    * it will load indexed and active validator set from contract
    * @param sm - `StakeManager` instance
@@ -110,32 +110,32 @@ export class ValidatorSet {
    * @returns New validator set
    */
   static async createFromStakeManager(sm: StakeManager, fillGenesisValidators: boolean = true) {
-    const vs = new ValidatorSet(sm.common, fillGenesisValidators);
+    const validators = createBufferFunctionalMap<ValidatorInfo>();
     let length = await sm.indexedValidatorsLength();
     for (let i = new BN(0); i.lt(length); i.iaddn(1)) {
       const validator = await sm.indexedValidatorsByIndex(i);
       const votingPower = await sm.getVotingPowerByIndex(i);
       if (votingPower.gtn(0)) {
-        vs.validators.set(validator.buf, {
+        validators.set(validator.buf, {
           validator,
           votingPower
         });
       }
     }
+    const active: ActiveValidator[] = [];
     length = await sm.activeValidatorsLength();
     for (let i = new BN(0); i.lt(length); i.iaddn(1)) {
       const av = await sm.activeValidators(i);
-      vs.active.push(av);
+      active.push(av);
       // make sure every validator exists in the map
-      if (!vs.validators.has(av.validator.buf)) {
-        vs.validators.set(av.validator.buf, {
+      if (!validators.has(av.validator.buf)) {
+        validators.set(av.validator.buf, {
           validator: av.validator,
           votingPower: await sm.getVotingPowerByAddress(av.validator)
         });
       }
     }
-    vs._totalVotingPower = vs.calcTotalVotingPower(vs.active);
-    return vs;
+    return new ValidatorSet(validators, active, sm.common, fillGenesisValidators);
   }
 
   /**
@@ -145,21 +145,22 @@ export class ValidatorSet {
    * @returns New validator set
    */
   static createGenesisValidatorSet(common: Common, fillGenesisValidators: boolean = true) {
-    const vs = new ValidatorSet(common, fillGenesisValidators);
+    const validators = createBufferFunctionalMap<ValidatorInfo>();
+    const active: ActiveValidator[] = [];
     if (fillGenesisValidators) {
       const append = getAppendGenesisValidators(() => false, 0, common.param('vm', 'maxValidatorsCount'), getGenesisValidators(common));
       for (const validator of append) {
-        vs.validators.set(validator.buf, {
+        validators.set(validator.buf, {
           validator,
           votingPower: new BN(0)
         });
-        vs.active.push({
+        active.push({
           validator,
           priority: new BN(0)
         });
       }
     }
-    return vs;
+    return new ValidatorSet(validators, active, common, fillGenesisValidators);
   }
 
   // sort all indexed validators
@@ -170,15 +171,16 @@ export class ValidatorSet {
       comparBefore: (a: ValidatorInfo, b: ValidatorInfo) => {
         let num = a.votingPower.cmp(b.votingPower);
         if (num === 0) {
-          num = (-1 * a.validator.buf.compare(b.validator.buf)) as 1 | -1 | 0;
+          // num = (-1 * a.validator.buf.compare(b.validator.buf)) as 1 | -1 | 0;
+          num = a.validator.buf.compare(b.validator.buf) as 1 | -1 | 0;
         }
         return num === -1;
       }
     });
     for (const v of this.validators.values()) {
       heap.push(v);
-      // if the heap size is too large, remove the minimum one
-      while (heap.size > maxCount) {
+      // if the heap length is too large, remove the minimum one
+      while (heap.length > maxCount) {
         heap.remove();
       }
     }
@@ -391,7 +393,11 @@ export class ValidatorSet {
    * @returns New validator set
    */
   copy() {
-    return ValidatorSet.createFromValidatorSet(this);
+    const validators = createBufferFunctionalMap<ValidatorInfo>();
+    for (const [validator, info] of this.validators) {
+      validators.set(validator, cloneValidatorInfo(info));
+    }
+    return new ValidatorSet(validators, this.active.map(cloneActiveValidator), this.common, this.fillGenesisValidators, this.totalVotingPower);
   }
 
   /**
@@ -399,11 +405,6 @@ export class ValidatorSet {
    * @param times - Increase times
    */
   incrementProposerPriority(times: number) {
-    // in clique consensus, times must be 1
-    // if (times !== 1) {
-    //   throw new Error('invalid times');
-    // }
-
     const diffMax = this._totalVotingPower.muln(priorityWindowSizeFactor);
     this.rescalePriorities(diffMax);
     this.shiftByAvgProposerPriority();
@@ -412,32 +413,31 @@ export class ValidatorSet {
     }
   }
 
-  /**
-   * Substract proposer's priority
-   * @param validator - Proposer address
-   */
-  subtractProposerPriority(validator: Address) {
-    const av = this.active.find(({ validator: v }) => v.equals(validator));
-    if (!av) {
-      throw new Error("active validator doesn't exist");
-    }
-    av.priority.isub(this._totalVotingPower);
-  }
-
-  /**
-   * Get current proposer address
-   * @returns Proposer address
-   */
-  proposer() {
+  private calcPreviousProposer() {
     if (this.active.length === 0) {
       throw new Error('active validators list is empty');
     }
-    let max: BN | undefined;
-    let proposer: Address | undefined;
+    let previousProposer: ActiveValidator | undefined;
     for (const av of this.active) {
-      if (max === undefined || max.lt(av.priority) || (max.eq(av.priority) && proposer!.buf.compare(av.validator.buf) === 1)) {
-        max = av.priority;
-        proposer = av.validator;
+      if (previousProposer === undefined || previousProposer.priority.gt(av.priority) || (previousProposer.priority.eq(av.priority) && previousProposer!.validator.buf.compare(av.validator.buf) === -1)) {
+        previousProposer = av;
+      }
+    }
+    return previousProposer!;
+  }
+
+  /**
+   * Calculate proposer address
+   * @returns Proposer address and priority
+   */
+  private calcProposer() {
+    if (this.active.length === 0) {
+      throw new Error('active validators list is empty');
+    }
+    let proposer: ActiveValidator | undefined;
+    for (const av of this.active) {
+      if (proposer === undefined || proposer.priority.lt(av.priority) || (proposer.priority.eq(av.priority) && proposer!.validator.buf.compare(av.validator.buf) === 1)) {
+        proposer = av;
       }
     }
     return proposer!;
@@ -454,8 +454,9 @@ export class ValidatorSet {
       }
     }
 
-    // we don't choose and sub most priority in clique consensus,
-    // proposer priority will be reduce in `subtractProposerPriority`
+    const av = this.calcProposer();
+    av.priority.isub(this._totalVotingPower);
+    this._proposer = av.validator;
   }
 
   private calcTotalVotingPower(active: ActiveValidator[]) {

@@ -33,9 +33,9 @@ export class BitArray {
       return false;
     }
     if (v) {
-      this.elems[Math.floor(length / 32)] |= 1 << i % 32;
+      this.elems[Math.floor(i / 32)] |= 1 << i % 32;
     } else {
-      this.elems[Math.floor(length / 32)] &= ELEM_MAX_INTEGER - (1 << i % 32);
+      this.elems[Math.floor(i / 32)] &= ELEM_MAX_INTEGER - (1 << i % 32);
     }
     return true;
   }

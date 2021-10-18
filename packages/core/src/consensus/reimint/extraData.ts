@@ -84,6 +84,7 @@ export class ExtraData {
   readonly voteSet?: VoteSet;
 
   static fromBlockHeader(header: BlockHeader, options?: ExtraDataFromBlockHeaderOptions) {
+    console.log('ExtraData::fromBlockHeader', header.number.toNumber());
     if (header.extraData.length <= CLIQUE_EXTRA_VANITY) {
       throw new Error('invalid header');
     }

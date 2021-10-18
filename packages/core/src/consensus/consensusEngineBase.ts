@@ -97,6 +97,7 @@ export abstract class ConsensusEngineBase extends EventEmitter implements Consen
     }
 
     this.msgLoopPromise = this.msgLoop();
+    this._start();
     this.emit('start', this);
   }
 

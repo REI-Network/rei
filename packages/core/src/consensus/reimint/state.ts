@@ -6,7 +6,7 @@ import { ValidatorSet } from '../../staking';
 import { HeightVoteSet, Vote, VoteType, ConflictingVotesError } from './vote';
 import { TimeoutTicker } from './timeoutTicker';
 import { ReimintConsensusEngine } from './reimint';
-import { Block_hash, BlockHeader_hash } from './extraData';
+import { Block_hash } from './extraData';
 import { isEmptyHash, EMPTY_HASH } from '../utils';
 import { Proposal } from './proposal';
 import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from './messages';
@@ -202,16 +202,21 @@ export class StateMachine {
     switch (ti.step) {
       case RoundStepType.NewHeight:
         this.enterNewRound(ti.height, 0);
+        break;
       case RoundStepType.NewRound:
         this.enterPropose(ti.height, 0);
+        break;
       case RoundStepType.Propose:
         // TODO: emit a event
         this.enterPrevote(ti.height, ti.round);
+        break;
       case RoundStepType.PrevoteWait:
         this.enterPrecommit(ti.height, ti.round);
+        break;
       case RoundStepType.PrecommitWait:
         this.enterPrecommit(ti.height, ti.round);
         this.enterNewRound(ti.height, ti.round + 1);
+        break;
       default:
         throw new Error('invalid timeout step');
     }
@@ -236,7 +241,7 @@ export class StateMachine {
 
     this.proposal = proposal;
     this.proposalBlockHash = proposal.hash;
-    if (this.proposalBlock === undefined) {
+    if (this.proposalBlock === undefined && peerId !== '') {
       this.reimint.node.broadcastMessage(new GetProposalBlockMessage(proposal.hash), { to: peerId });
     }
   }
@@ -287,7 +292,7 @@ export class StateMachine {
   }
 
   private addVote(vote: Vote, peerId: string) {
-    logger.debug('StateMachine::addVote');
+    logger.debug('StateMachine::addVote, vote:', vote.height.toNumber(), vote.hash.toString('hex'), 'from:', peerId);
 
     if (!vote.height.eq(vote.height)) {
       logger.debug('StateMachine::addVote, unequal height, ignore, vote:', vote.height.toString(), 'state machine:', this.height.toString());
@@ -300,71 +305,75 @@ export class StateMachine {
     this.reimint.node.broadcastMessage(new HasVoteMessage(vote.height, vote.round, vote.type, vote.index), { exclude: [peerId] });
 
     switch (vote.type) {
-      case VoteType.Prevote: {
-        const prevotes = this.votes.prevotes(vote.round);
-        const maj23Hash = prevotes?.maj23;
-        if (maj23Hash) {
-          // try to unlock ourself
-          if (this.lockedBlock !== undefined && this.lockedRound < vote.round && vote.round <= this.round && !Block_hash(this.lockedBlock).equals(maj23Hash)) {
-            this.lockedRound = -1;
-            this.lockedBlock = undefined;
+      case VoteType.Prevote:
+        {
+          const prevotes = this.votes.prevotes(vote.round);
+          const maj23Hash = prevotes?.maj23;
+          if (maj23Hash) {
+            // try to unlock ourself
+            if (this.lockedBlock !== undefined && this.lockedRound < vote.round && vote.round <= this.round && !Block_hash(this.lockedBlock).equals(maj23Hash)) {
+              this.lockedRound = -1;
+              this.lockedBlock = undefined;
 
-            // TODO: emit unlock event
+              // TODO: emit unlock event
+            }
+
+            // try to update valid block
+            if (!isEmptyHash(maj23Hash) && this.validRound < vote.round && vote.round === this.round) {
+              if (this.proposalBlockHash && this.proposalBlockHash.equals(maj23Hash)) {
+                logger.debug('StateMachine::addVote, update valid block, round:', this.round, 'hash:', bufferToHex(maj23Hash));
+
+                this.validRound = vote.round;
+                this.validBlock = this.proposalBlock;
+              } else {
+                this.proposalBlock = undefined;
+              }
+
+              if (!this.proposalBlockHash || !this.proposalBlockHash.equals(maj23Hash)) {
+                this.proposalBlockHash = maj23Hash;
+              }
+
+              this.reimint.node.broadcastMessage(new NewValidBlockMessage(this.height, this.round, this.proposalBlockHash, this.step === RoundStepType.Commit), { broadcast: true });
+            }
           }
 
-          // try to update valid block
-          if (!isEmptyHash(maj23Hash) && this.validRound < vote.round && vote.round === this.round) {
-            if (this.proposalBlockHash && this.proposalBlockHash.equals(maj23Hash)) {
-              logger.debug('StateMachine::addVote, update valid block, round:', this.round, 'hash:', bufferToHex(maj23Hash));
-
-              this.validRound = vote.round;
-              this.validBlock = this.proposalBlock;
-            } else {
-              this.proposalBlock = undefined;
+          if (this.round < vote.round && prevotes?.hasTwoThirdsAny()) {
+            this.enterNewRound(this.height, vote.round);
+          } else if (this.round === vote.round && RoundStepType.Prevote <= this.step) {
+            if (maj23Hash && (this.isProposalComplete() || isEmptyHash(maj23Hash))) {
+              this.enterPrecommit(this.height, vote.round);
+            } else if (prevotes?.hasTwoThirdsAny()) {
+              this.enterPrevoteWait(this.height, vote.round);
             }
-
-            if (!this.proposalBlockHash || !this.proposalBlockHash.equals(maj23Hash)) {
-              this.proposalBlockHash = maj23Hash;
+          } else if (this.proposal !== undefined && 0 <= this.proposal.POLRound && this.proposal.POLRound === vote.round) {
+            if (this.isProposalComplete()) {
+              this.enterPrevote(this.height, this.round);
             }
-
-            this.reimint.node.broadcastMessage(new NewValidBlockMessage(this.height, this.round, this.proposalBlockHash, this.step === RoundStepType.Commit), { broadcast: true });
           }
         }
-
-        if (this.round < vote.round && prevotes?.hasTwoThirdsAny()) {
-          this.enterNewRound(this.height, vote.round);
-        } else if (this.round === vote.round && RoundStepType.Prevote <= this.step) {
-          if (maj23Hash && (this.isProposalComplete() || isEmptyHash(maj23Hash))) {
+        break;
+      case VoteType.Precommit:
+        {
+          const precommits = this.votes.precommits(vote.round);
+          const maj23Hash = precommits?.maj23;
+          if (maj23Hash) {
+            this.enterNewRound(this.height, vote.round);
             this.enterPrecommit(this.height, vote.round);
-          } else if (prevotes?.hasTwoThirdsAny()) {
-            this.enterPrevoteWait(this.height, vote.round);
-          }
-        } else if (this.proposal !== undefined && 0 <= this.proposal.POLRound && this.proposal.POLRound === vote.round) {
-          if (this.isProposalComplete()) {
-            this.enterPrevote(this.height, this.round);
-          }
-        }
-      }
-      case VoteType.Precommit: {
-        const precommits = this.votes.precommits(vote.round);
-        const maj23Hash = precommits?.maj23;
-        if (maj23Hash) {
-          this.enterNewRound(this.height, vote.round);
-          this.enterPrecommit(this.height, vote.round);
 
-          if (!isEmptyHash(maj23Hash)) {
-            this.enterCommit(this.height, vote.round);
-            if (SkipTimeoutCommit) {
-              this.enterNewRound(this.height, 0);
+            if (!isEmptyHash(maj23Hash)) {
+              this.enterCommit(this.height, vote.round);
+              if (SkipTimeoutCommit) {
+                this.enterNewRound(this.height, 0);
+              }
+            } else {
+              this.enterPrecommitWait(this.height, vote.round);
             }
-          } else {
+          } else if (this.round <= vote.round && precommits?.hasTwoThirdsAny()) {
+            this.enterNewRound(this.height, vote.round);
             this.enterPrecommitWait(this.height, vote.round);
           }
-        } else if (this.round <= vote.round && precommits?.hasTwoThirdsAny()) {
-          this.enterNewRound(this.height, vote.round);
-          this.enterPrecommitWait(this.height, vote.round);
         }
-      }
+        break;
       default:
         throw new Error('unexpected vote type');
     }

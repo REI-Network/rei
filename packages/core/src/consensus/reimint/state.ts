@@ -784,7 +784,7 @@ export class StateMachine {
     }
 
     const timestamp = Date.now();
-    this.parentHash = BlockHeader_hash(header);
+    this.parentHash = header.hash();
     this.height = header.number.addn(1);
     this.round = 0;
     this.step = RoundStepType.NewHeight;

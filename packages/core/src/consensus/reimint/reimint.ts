@@ -94,10 +94,11 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
   }
 
   /**
-   * Process a new block header, try to mint a block after this block
-   * @param header - New block header
+   * Process a new block, try to mint a block after this block
+   * @param block - New block
    */
-  protected async _newBlockHeader(header: BlockHeader) {
+  protected async _newBlock(block: Block) {
+    const header = block.header;
     // create a new pending block through worker
     await this.worker.newBlockHeader(header);
 
@@ -108,8 +109,8 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
     let validators = this.node.validatorSets.directlyGet(header.stateRoot);
     // if the validator set doesn't exist, return
     if (!validators) {
-      logger.warn('ReimintConsensusEngine::_newBlockHeader, missing validators');
-      return;
+      const vm = await this.node.getVM(header.stateRoot, header._common);
+      validators = await this.node.validatorSets.get(header.stateRoot, this.node.getStakeManager(vm, block));
     }
 
     this.state.newBlockHeader(header, validators);

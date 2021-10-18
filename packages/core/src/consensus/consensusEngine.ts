@@ -72,10 +72,10 @@ export interface ConsensusEngine {
   getLastPendingBlock(): Block;
 
   /**
-   * Process the target block header, try to mint a new block after the block header
-   * @param header - Target header
+   * Process a new block, try to mint a block after this block
+   * @param block - New block
    */
-  newBlockHeader(header: BlockHeader): void;
+  newBlock(block: Block): void;
 
   /**
    * Add pending transactions to worker

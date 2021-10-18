@@ -14,7 +14,7 @@ export abstract class ConsensusEngineBase extends EventEmitter implements Consen
   abstract getMiner(block: BlockHeader | Block): Address;
   abstract getPendingBlockHeader(data: HeaderData): BlockHeader;
 
-  protected abstract _newBlockHeader(header: BlockHeader): Promise<void>;
+  protected abstract _newBlock(header: Block): Promise<void>;
   protected abstract _start(): void;
   protected abstract _abort(): Promise<void>;
 
@@ -25,7 +25,7 @@ export abstract class ConsensusEngineBase extends EventEmitter implements Consen
   protected _enable: boolean;
 
   protected msgLoopPromise?: Promise<void>;
-  protected readonly msgQueue = new Channel<BlockHeader>({ max: 1 });
+  protected readonly msgQueue = new Channel<Block>({ max: 1 });
 
   constructor(options: ConsensusEngineOptions) {
     super();
@@ -64,10 +64,10 @@ export abstract class ConsensusEngineBase extends EventEmitter implements Consen
   }
 
   /**
-   * {@link ConsensusEngine.newBlockHeader}
+   * {@link ConsensusEngine.newBlock}
    */
-  newBlockHeader(header: BlockHeader) {
-    this.msgQueue.push(header);
+  newBlock(block: Block) {
+    this.msgQueue.push(block);
   }
 
   /**
@@ -78,9 +78,9 @@ export abstract class ConsensusEngineBase extends EventEmitter implements Consen
   }
 
   private async msgLoop() {
-    for await (const header of this.msgQueue.generator()) {
+    for await (const block of this.msgQueue.generator()) {
       try {
-        await this._newBlockHeader(header);
+        await this._newBlock(block);
       } catch (err) {
         logger.error('ConsensusEngineBase::msgLoop, catch error:', err);
       }
@@ -92,7 +92,8 @@ export abstract class ConsensusEngineBase extends EventEmitter implements Consen
    */
   start() {
     if (this.msgLoopPromise) {
-      throw new Error('CliqueConsensusEngine has started');
+      // ignore start
+      return;
     }
 
     this.msgLoopPromise = this.msgLoop();

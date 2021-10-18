@@ -1,4 +1,4 @@
-import { BN, rlp, intToBuffer, rlphash } from 'ethereumjs-util';
+import { BN, rlp, intToBuffer, rlphash, bufferToInt } from 'ethereumjs-util';
 import { Block, BlockHeader, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
 import { ValidatorSet } from '../../staking';
 import { Vote, VoteType, VoteSet } from './vote';
@@ -23,7 +23,7 @@ export interface ExtraDataFromBlockHeaderOptions extends Omit<ExtraDataOptions, 
 
 export type RLPVote = [Buffer, Buffer];
 export type RLPEmptyVote = [];
-export type RLPRoundAndPOLRound = [number, number];
+export type RLPRoundAndPOLRound = [Buffer, Buffer];
 export type RLPEvidenceList = [RLPVote, RLPVote][];
 export type RLPElement = RLPEmptyVote | RLPVote | RLPRoundAndPOLRound | RLPEvidenceList;
 export type RLPElements = RLPElement[];
@@ -49,7 +49,7 @@ function isRLPRoundAndPOLRound(ele: RLPElement): ele is RLPRoundAndPOLRound {
   if (!Array.isArray(ele) || ele.length !== 2) {
     return false;
   }
-  if (typeof ele[0] !== 'number' || typeof ele[1] !== 'number') {
+  if (!(ele[0] instanceof Buffer) || !(ele[1] instanceof Buffer)) {
     return false;
   }
   return true;
@@ -123,8 +123,8 @@ export class ExtraData {
         if (!isRLPRoundAndPOLRound(value)) {
           throw new Error('invliad values');
         }
-        round = value[0];
-        POLRound = value[1] - 1;
+        round = bufferToInt(value[0]);
+        POLRound = bufferToInt(value[1]) - 1;
 
         // increase round
         if (increaseValSet && valSet) {

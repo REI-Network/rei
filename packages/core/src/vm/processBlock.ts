@@ -40,7 +40,7 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
   }
 
   // get engine by block common
-  const engine = this.getEngineByCommon(block._common);
+  const engine = this.getEngineByHeader(block.header);
   // get parent block
   const parent = await this.db.getBlockByHashAndNumber(header.parentHash, header.number.subn(1));
   // create a vm instance
@@ -117,7 +117,7 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
           await Contract.deploy(new EVM(vm, new TxContext(new BN(0), Address.zero()), block), block._common);
 
           // start consensus engine
-          engine.start();
+          this.getReimintEngine()?.start();
         } else {
           // reward miner and collect logs
           let logs: Log[] | undefined;

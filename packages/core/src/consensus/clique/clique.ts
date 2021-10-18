@@ -60,10 +60,11 @@ export class CliqueConsensusEngine extends ConsensusEngineBase implements Consen
   }
 
   /**
-   * Process a new block header, try to mint a block after this block
-   * @param header - New block header
+   * Process a new block, try to mint a block after this block
+   * @param block - New block
    */
-  protected async _newBlockHeader(header: BlockHeader) {
+  protected async _newBlock(block: Block) {
+    const header = block.header;
     // create a new pending block through worker
     await this.worker.newBlockHeader(header);
 
@@ -114,7 +115,7 @@ export class CliqueConsensusEngine extends ConsensusEngineBase implements Consen
             logger.info('⛏️  Mine block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
             // try to continue minting
             if (this.enable && !this.node.sync.isSyncing) {
-              this.newBlockHeader(this.node.blockchain.latestBlock.header);
+              this.newBlock(this.node.blockchain.latestBlock);
             }
           }
         } catch (err) {

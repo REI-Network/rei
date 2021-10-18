@@ -13,7 +13,7 @@ import VM from '@gxchain2-ethereumjs/vm';
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
-import { Transaction, Block } from '@gxchain2/structure';
+import { Transaction, Block, BlockHeader } from '@gxchain2/structure';
 import { Channel, Aborter, logger } from '@gxchain2/utils';
 import { AccountManager } from '@gxchain2/wallet';
 import { TxPool } from './txpool';
@@ -29,7 +29,7 @@ import { processBlock, ProcessBlockOpts } from './vm';
 import { createEnginesByConsensusTypes, ConsensusEngine, ConsensusType } from './consensus';
 import { Message } from './consensus/reimint/messages';
 import { ReimintConsensusEngine } from './consensus/reimint';
-import { getConsensusType } from './hardforks';
+import { getConsensusTypeByCommon, getConsensusTypeByHeader } from './hardforks';
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;
@@ -316,7 +316,7 @@ export class Node {
 
     // start mint
     this.getLastestEngine().start();
-    this.getLastestEngine().newBlockHeader(this.blockchain.latestBlock.header);
+    this.getLastestEngine().newBlock(this.blockchain.latestBlock);
   }
 
   private onPeerInstalled = (peer: Peer) => {
@@ -328,7 +328,7 @@ export class Node {
   };
 
   private onSyncOver = () => {
-    this.getLastestEngine().newBlockHeader(this.blockchain.latestBlock.header);
+    this.getLastestEngine().newBlock(this.blockchain.latestBlock);
   };
 
   /**
@@ -354,7 +354,16 @@ export class Node {
    * @returns Consensus engine
    */
   getEngineByCommon(common: Common) {
-    return this.engines.get(getConsensusType(common))!;
+    return this.engines.get(getConsensusTypeByCommon(common))!;
+  }
+
+  /**
+   * Get consensus engine by block header
+   * @param header - Block header
+   * @returns Consensus engine
+   */
+  getEngineByHeader(header: BlockHeader) {
+    return this.engines.get(getConsensusTypeByHeader(header))!;
   }
 
   /**

@@ -260,7 +260,9 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      */
     function stake(address validator, address to) external payable override nonReentrant returns (uint256 shares) {
         require(uint160(validator) > 2000, "StakeManager: invalid validator");
-        require(uint160(to) > 2000, "StakeManager: invalid receiver");
+        if (uint160(msg.sender) > 2000) {
+            require(uint160(to) > 2000, "StakeManager: invalid receiver");
+        }
         require(msg.value > 0, "StakeManager: invalid value");
 
         Validator memory v = validators[validator];

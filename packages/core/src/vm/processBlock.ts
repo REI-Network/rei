@@ -183,6 +183,7 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
   header = block.header;
   logger.info('✨ Process block, height:', header.number.toString(), 'hash:', bufferToHex(block.hash()));
   const before = this.blockchain.latestBlock.hash();
+  console.log('beforePutBlock:', block.header.extraData.toString('hex'), block.header.number.toNumber());
   await this.blockchain.putBlock(block);
   // persist receipts
   await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, block.hash(), header.number)));

@@ -318,6 +318,7 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
 
       try {
         cachedBlockHeader = await this.node.db.getCanonicalHeader(height);
+        console.log('cachedBlockHeader.extraData:', cachedBlockHeader.extraData.toString('hex'), cachedBlockHeader.number);
         const valSet = this.node.validatorSets.directlyGet(cachedBlockHeader.stateRoot);
         if (!valSet) {
           throw new Error('missing validator set');

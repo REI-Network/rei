@@ -40,17 +40,17 @@ export class Common extends EthereumCommon {
   }
 
   // consensusType will never change, we just read directly from `_chainParams`
-  consensusType() {
-    return (this as any)._chainParams['consensus']['type'];
-  }
+  // consensusType() {
+  //   return (this as any)._chainParams['consensus']['type'];
+  // }
 
   // consensusAlgorithm will never change, we just read directly from `_chainParams`
-  consensusAlgorithm() {
-    return (this as any)._chainParams['consensus']['algorithm'];
-  }
+  // consensusAlgorithm() {
+  //   return (this as any)._chainParams['consensus']['algorithm'];
+  // }
 
   // consensusConfig will never change, we just read directly from `_chainParams`
-  consensusConfig() {
-    return (this as any)._chainParams['consensus'][this.consensusAlgorithm()];
-  }
+  // consensusConfig() {
+  //   return (this as any)._chainParams['consensus'][this.consensusAlgorithm()];
+  // }
 }

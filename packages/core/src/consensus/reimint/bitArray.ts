@@ -1,4 +1,4 @@
-import { rlp } from 'ethereumjs-util';
+import { bufferToInt, rlp } from 'ethereumjs-util';
 import { getRandomIntInclusive } from '@gxchain2/utils';
 
 const ELEM_MAX_INTEGER = Math.pow(2, 32) - 1;
@@ -15,17 +15,17 @@ export class BitArray {
     return BitArray.fromValuesArray(values as any);
   }
 
-  static fromValuesArray(values: [number, number[]]) {
+  static fromValuesArray(values: [Buffer, Buffer[]]) {
     if (values.length !== 2) {
       throw new Error('invalid values length');
     }
     const [length, elems] = values;
-    return new BitArray(length, elems);
+    return new BitArray(bufferToInt(length), elems.map(bufferToInt));
   }
 
   constructor(length: number, elems?: number[]) {
     this.length = length;
-    this.elems = elems ?? new Array<number>(Math.ceil(length / 32));
+    this.elems = elems ?? new Array<number>(Math.ceil(length / 32)).fill(0);
   }
 
   setIndex(i: number, v: boolean): boolean {

@@ -280,7 +280,8 @@ export class Node {
       common,
       genesisBlock,
       validateBlocks: false,
-      validateConsensus: false
+      validateConsensus: false,
+      hardforkByHeadBlockNumber: true
     });
     await this.blockchain.init();
 
@@ -330,6 +331,10 @@ export class Node {
   private onSyncOver = () => {
     this.getLastestEngine().newBlock(this.blockchain.latestBlock);
   };
+
+  onMintBlock() {
+    this.getLastestEngine().newBlock(this.blockchain.latestBlock);
+  }
 
   /**
    * Get common object by block number
@@ -537,6 +542,7 @@ export class Node {
    * @param options - Send options {@link SendMessageOptions}
    */
   broadcastMessage(msg: Message, options: SendMessageOptions) {
+    console.log('broadcastMessage:', msg);
     if (options.broadcast) {
       for (const handler of ConsensusProtocol.getPool().handlers) {
         handler.sendMessage(msg);

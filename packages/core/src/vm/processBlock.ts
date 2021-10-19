@@ -7,7 +7,7 @@ import { RunBlockOpts, rewardAccount } from '@gxchain2-ethereumjs/vm/dist/runBlo
 import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Receipt, Log } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
-import { ValidatorChanges, ValidatorSet } from '../staking';
+import { ValidatorChanges, ValidatorSet, getGenesisValidators } from '../staking';
 import { StakeManager, Router, Contract } from '../contracts';
 import { ExtraData } from '../consensus/reimint/extraData';
 import { preHF1ConsensusValidateHeader } from '../validation';
@@ -60,7 +60,7 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
     parentStakeManager = this.getStakeManager(vm, block);
 
     if (!parentEnableStaking) {
-      parentValidatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
+      // parentValidatorSet = ValidatorSet.createGenesisValidatorSet(block._common);
       if (!options.skipConsensusValidation) {
         preHF1ConsensusValidateHeader.call(header, this.blockchain);
       }
@@ -111,10 +111,21 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
 
         if (!parentEnableStaking) {
           // directly use genesis validator set
-          validatorSet = parentValidatorSet!;
+          // validatorSet = parentValidatorSet!;
 
           // deploy system contracts
-          await Contract.deploy(new EVM(vm, new TxContext(new BN(0), Address.zero()), block), block._common);
+          const evm = new EVM(vm, new TxContext(new BN(0), Address.zero()), block);
+          await Contract.deploy(evm, block._common);
+
+          // stake for genesis validators
+          const sm = new StakeManager(evm, block._common);
+          const genesisValidators = getGenesisValidators(block._common);
+          await rewardAccount(state, systemCaller!, new BN(100).muln(genesisValidators.length));
+          for (const genesisValidator of genesisValidators) {
+            await sm.stake(genesisValidator, new BN(100));
+          }
+
+          validatorSet = ValidatorSet.createGenesisValidatorSet(block._common, true);
 
           // start consensus engine
           this.getReimintEngine()?.start();

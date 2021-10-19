@@ -1,4 +1,4 @@
-import { Address, BN, intToBuffer, ecsign, ecrecover, rlphash, bnToUnpaddedBuffer, rlp } from 'ethereumjs-util';
+import { Address, BN, intToBuffer, ecsign, ecrecover, rlphash, bnToUnpaddedBuffer, rlp, bufferToInt } from 'ethereumjs-util';
 import { VoteType } from './vote';
 
 export interface ProposalData {
@@ -27,7 +27,7 @@ export class Proposal {
     return Proposal.fromValuesArray(values as any);
   }
 
-  static fromValuesArray(values: [number, Buffer, number, number, Buffer, number, Buffer]) {
+  static fromValuesArray(values: [Buffer, Buffer, Buffer, Buffer, Buffer, Buffer, Buffer]) {
     if (values.length !== 7) {
       throw new Error('invalid proposal');
     }
@@ -36,12 +36,12 @@ export class Proposal {
 
     return new Proposal(
       {
-        type,
+        type: bufferToInt(type),
         height: new BN(height),
-        round,
-        POLRound: POLRound - 1,
+        round: bufferToInt(round),
+        POLRound: bufferToInt(POLRound) - 1,
         hash,
-        timestamp
+        timestamp: bufferToInt(timestamp)
       },
       signature
     );

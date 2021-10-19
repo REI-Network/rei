@@ -1,4 +1,4 @@
-import { rlp, BN, bnToUnpaddedBuffer, intToBuffer } from 'ethereumjs-util';
+import { rlp, BN, bnToUnpaddedBuffer, intToBuffer, bufferToInt } from 'ethereumjs-util';
 import { Block, BlockHeader } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
 import { Message, NewRoundStepMessage, NewValidBlockMessage, HasVoteMessage, Proposal, Vote, ProposalPOLMessage, VoteSetMaj23Message, VoteSetBitsMessage, GetProposalBlockMessage, ProposalBlockMessage, BitArray, RoundStepType, VoteType, ProposalMessage, VoteMessage, VoteSet, ExtraData, ReimintConsensusEngine } from '../../consensus/reimint';
@@ -21,7 +21,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
         throw new Error('invalid values length');
       }
       const [height, round, step, secondsSinceStartTime, lastCommitRound] = data;
-      return new NewRoundStepMessage(new BN(height), round, step, secondsSinceStartTime, lastCommitRound);
+      return new NewRoundStepMessage(new BN(height), bufferToInt(round), bufferToInt(step), bufferToInt(secondsSinceStartTime), bufferToInt(lastCommitRound));
     },
     process(this: ConsensusProtocolHander, msg: NewRoundStepMessage) {
       this.handshakeResponse(msg);
@@ -39,7 +39,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
         throw new Error('invalid values length');
       }
       const [height, round, hash, isCommit] = data;
-      return new NewValidBlockMessage(new BN(height), round, hash, isCommit === 1);
+      return new NewValidBlockMessage(new BN(height), bufferToInt(round), hash, bufferToInt(isCommit) === 1);
     },
     process(this: ConsensusProtocolHander, msg: NewValidBlockMessage) {
       this.applyNewValidBlockMessage(msg);
@@ -56,7 +56,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
         throw new Error('invalid values length');
       }
       const [height, round, type, index] = data;
-      return new HasVoteMessage(new BN(height), round, type, index);
+      return new HasVoteMessage(new BN(height), bufferToInt(round), bufferToInt(type), bufferToInt(index));
     },
     process(this: ConsensusProtocolHander, msg: HasVoteMessage) {
       this.applyHasVoteMessage(msg);
@@ -93,7 +93,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
       if (!Array.isArray(proposalPOL) || proposalPOL.length !== 2) {
         throw new Error('invalid proposalPOL values length');
       }
-      return new ProposalPOLMessage(new BN(height), proposalPOLRound, BitArray.fromValuesArray(proposalPOL as [number, number[]]));
+      return new ProposalPOLMessage(new BN(height), bufferToInt(proposalPOLRound), BitArray.fromValuesArray(proposalPOL as [Buffer, Buffer[]]));
     },
     process(this: ConsensusProtocolHander, msg: ProposalPOLMessage) {
       this.applyProposalPOLMessage(msg);
@@ -131,7 +131,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
         throw new Error('invalid values length');
       }
       const [height, round, type, hash] = data;
-      return new VoteSetMaj23Message(new BN(height), round, type, hash);
+      return new VoteSetMaj23Message(new BN(height), bufferToInt(round), bufferToInt(type), hash);
     },
     process(this: ConsensusProtocolHander, msg: VoteSetMaj23Message) {
       if (this.reimint) {
@@ -155,7 +155,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
       if (!Array.isArray(votes) || votes.length !== 2) {
         throw new Error('invalid votes values length');
       }
-      return new VoteSetBitsMessage(new BN(height), round, type, hash, BitArray.fromValuesArray(votes as [number, number[]]));
+      return new VoteSetBitsMessage(new BN(height), bufferToInt(round), bufferToInt(type), hash, BitArray.fromValuesArray(votes as [Buffer, Buffer[]]));
     },
     process(this: ConsensusProtocolHander, msg: VoteSetBitsMessage) {
       this.applyVoteSetBitsMessage(msg);
@@ -285,12 +285,17 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
     }
 
     while (!this.aborted) {
-      if (!this.proposal) {
-        const proposalMessage = reimint.state.genProposalMessage(this.height, this.round);
-        if (proposalMessage) {
-          this.sendMessage(proposalMessage);
-          this.setHasProposal(proposalMessage.proposal);
+      try {
+        if (!this.proposal) {
+          const proposalMessage = reimint.state.genProposalMessage(this.height, this.round);
+          if (proposalMessage) {
+            console.log('send proposal msg to:', this.peer.peerId);
+            this.sendMessage(proposalMessage);
+            this.setHasProposal(proposalMessage.proposal);
+          }
         }
+      } catch (err) {
+        logger.error('ConsensusProtocolHander::gossipDataLoop, catch error:', err);
       }
 
       await new Promise((r) => setTimeout(r, peerGossipSleepDuration));
@@ -327,19 +332,23 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
     };
 
     while (!this.aborted) {
-      // pick vote from memory and send
-      const votes = reimint.state.pickVoteSetToSend(this.height, this.round, this.proposalPOLRound, this.step);
-      if (votes && this.pickAndSend(votes)) {
-        continue;
-      }
-
-      // pick vote from database and send
-      if (reimint.state.pickVoteSetFromDatabase(this.height)) {
-        const height = this.height;
-        const votes = await getVoteSetByHeight(this.height);
-        if (!this.aborted && votes && height.eq(this.height) && this.pickAndSend(votes)) {
+      try {
+        // pick vote from memory and send
+        const votes = reimint.state.pickVoteSetToSend(this.height, this.round, this.proposalPOLRound, this.step);
+        if (votes && this.pickAndSend(votes)) {
           continue;
         }
+
+        // pick vote from database and send
+        if (reimint.state.pickVoteSetFromDatabase(this.height)) {
+          const height = this.height;
+          const votes = await getVoteSetByHeight(this.height);
+          if (!this.aborted && votes && height.eq(this.height) && this.pickAndSend(votes)) {
+            continue;
+          }
+        }
+      } catch (err) {
+        logger.error('ConsensusProtocolHander::gossipVotesLoop, catch error:', err);
       }
 
       await new Promise((r) => setTimeout(r, peerGossipSleepDuration));
@@ -373,6 +382,7 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
   private pickAndSend(votes: VoteSet) {
     const vote = this.pickRandom(votes);
     if (vote) {
+      console.log('send vote msg to:', this.peer.peerId, vote.type);
       this.sendMessage(new VoteMessage(vote));
       this.setHasVote(vote.height, vote.round, vote.type, vote.index);
       return true;
@@ -502,6 +512,7 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
   }
 
   setHasVote(height: BN, round: number, type: VoteType, index: number) {
+    console.log('hasVote: (h,r,t,i)', height.toNumber(), round, type, index, 'peerId:', this.peer.peerId);
     this.getVoteBitArray(height, round, type)?.setIndex(index, true);
   }
 

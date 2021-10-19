@@ -114,9 +114,7 @@ export class CliqueConsensusEngine extends ConsensusEngineBase implements Consen
           if (reorged) {
             logger.info('⛏️  Mine block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
             // try to continue minting
-            if (this.enable && !this.node.sync.isSyncing) {
-              this.newBlock(this.node.blockchain.latestBlock);
-            }
+            this.node.onMintBlock();
           }
         } catch (err) {
           logger.error('CliqueConsensusEngine::newBlockHeader, processBlock, catch error:', err);

@@ -14,6 +14,24 @@ const defaultPOLRound = -1;
 const defaultProposalTimestamp = 0;
 const defaultValidaterSetSize = 1;
 
+function formatHeaderData(data?: HeaderData) {
+  if (data) {
+    if (data.extraData) {
+      const extraData = toBuffer(data.extraData);
+      if (extraData.length > CLIQUE_EXTRA_VANITY) {
+        data.extraData = extraData.slice(0, CLIQUE_EXTRA_VANITY);
+      } else {
+        data.extraData = setLengthLeft(extraData, CLIQUE_EXTRA_VANITY);
+      }
+    } else {
+      data.extraData = EMPTY_EXTRA_DATA;
+    }
+  } else {
+    data = { extraData: EMPTY_EXTRA_DATA };
+  }
+  return data;
+}
+
 export interface ReimintBlockOptions extends BlockOptions {
   // whether try to sign the block,
   // default: true
@@ -86,6 +104,7 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
   //////////////////////////
 
   protected _start() {
+    console.log('reimint start!');
     this.state.start();
   }
 
@@ -103,6 +122,7 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
     await this.worker.newBlockHeader(header);
 
     if (!this.enable || this.node.sync.isSyncing) {
+      console.log('reimint is disabled, return', this.enable, this.node.sync.isSyncing);
       return;
     }
 
@@ -127,20 +147,7 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
     const sign = options?.sign ?? true;
 
     if (sign && this.enable) {
-      if (data) {
-        if (data.extraData) {
-          const extraData = toBuffer(data.extraData);
-          if (extraData.length > CLIQUE_EXTRA_VANITY) {
-            data.extraData = extraData.slice(0, CLIQUE_EXTRA_VANITY);
-          } else {
-            data.extraData = setLengthLeft(extraData, CLIQUE_EXTRA_VANITY);
-          }
-        } else {
-          data.extraData = EMPTY_EXTRA_DATA;
-        }
-      } else {
-        data = { extraData: EMPTY_EXTRA_DATA };
-      }
+      data = formatHeaderData(data);
 
       const round = options?.round ?? defaultRound;
       const POLRound = options?.POLRound ?? defaultPOLRound;
@@ -177,6 +184,22 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
    */
   generateBlockAndProposal(data?: HeaderData, transactions?: TypedTransaction[], options?: ReimintBlockOptions): { block: Block; proposal?: Proposal } {
     const { header, proposal } = this.generateBlockHeaderAndProposal(data, options);
-    return { block: new Block(header, transactions, undefined, { common: header._common }), proposal };
+    return { block: new Block(header, transactions, undefined, options), proposal };
+  }
+
+  /**
+   * Generate block for commit
+   * @param data - Block header data
+   * @param transactions - Transactions
+   * @param proposal - Proposal
+   * @param votes - Precommit vote set
+   * @param options - Block options
+   * @returns Complete block
+   */
+  generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], proposal: Proposal, votes: VoteSet, options?: BlockOptions) {
+    const extraData = new ExtraData(proposal.round, proposal.POLRound, proposal, votes);
+    data = formatHeaderData(data);
+    const header = BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize()]) }, options);
+    return new Block(header, transactions, undefined, options);
   }
 }

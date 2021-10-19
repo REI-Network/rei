@@ -1,4 +1,4 @@
-import { Address, BN, ecsign, ecrecover, rlp, intToBuffer, bnToUnpaddedBuffer, rlphash } from 'ethereumjs-util';
+import { Address, BN, ecsign, ecrecover, rlp, intToBuffer, bnToUnpaddedBuffer, rlphash, bufferToInt } from 'ethereumjs-util';
 import { createBufferFunctionalMap } from '@gxchain2/utils';
 import { ValidatorSet } from '../../staking';
 import { BitArray } from './bitArray';
@@ -52,20 +52,20 @@ export class Vote {
     return Vote.fromValuesArray(values as any);
   }
 
-  static fromValuesArray(values: [number, number, Buffer, number, Buffer, number, number, Buffer]) {
+  static fromValuesArray(values: [Buffer, Buffer, Buffer, Buffer, Buffer, Buffer, Buffer, Buffer]) {
     if (values.length !== 8) {
       throw new Error('invalid values length');
     }
     const [chainId, type, height, round, hash, timestamp, index, signature] = values;
     return new Vote(
       {
-        chainId,
-        type,
+        chainId: bufferToInt(chainId),
+        type: bufferToInt(type),
         height: new BN(height),
-        round,
+        round: bufferToInt(round),
         hash,
-        timestamp,
-        index
+        timestamp: bufferToInt(timestamp),
+        index: bufferToInt(index)
       },
       signature
     );
@@ -206,6 +206,7 @@ export class VoteSet {
 
   addVote(vote: Vote) {
     if (!vote.height.eq(this.height) || vote.round !== this.round || vote.type !== this.signedMsgType) {
+      console.log('unexpected vote:', vote.height.toNumber(), vote.round, vote.type, 'local:', this.height.toNumber(), this.round, this.signedMsgType);
       throw new Error('unexpected vote');
     }
 
@@ -213,6 +214,7 @@ export class VoteSet {
     const validator = vote.validateSignature(this.valSet);
     const votingPower = this.valSet.getVotingPower(validator);
 
+    console.log('addVote for:', validator.toString(), 'voting power:', votingPower.toNumber());
     return this.addVerifiedVote(vote, votingPower);
   }
 
@@ -370,7 +372,7 @@ export class HeightVoteSet {
     }
     this.roundVoteSets.set(round, {
       prevotes: new VoteSet(this.chainId, this.height, round, VoteType.Prevote, this.valSet),
-      precommits: new VoteSet(this.chainId, this.height, round, VoteType.Prevote, this.valSet)
+      precommits: new VoteSet(this.chainId, this.height, round, VoteType.Precommit, this.valSet)
     });
   }
 

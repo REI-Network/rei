@@ -84,7 +84,9 @@ export class ExtraData {
   readonly voteSet?: VoteSet;
 
   static fromBlockHeader(header: BlockHeader, options?: ExtraDataFromBlockHeaderOptions) {
-    console.log('ExtraData::fromBlockHeader', header.number.toNumber());
+    // const obj = Object.create(null);
+    // Error.captureStackTrace(obj);
+    // console.log('ExtraData::fromBlockHeader', header.number.toNumber(), 'exdata:', header.extraData.toString('hex'), 'stack:', obj.stack);
     if (header.extraData.length <= CLIQUE_EXTRA_VANITY) {
       throw new Error('invalid header');
     }
@@ -115,7 +117,6 @@ export class ExtraData {
       if (values.length !== valSet.length + 3) {
         throw new Error('invalid values length');
       }
-      voteSet = new VoteSet(chainId, header.number, round, VoteType.Precommit, valSet);
     }
 
     for (let i = 0; i < values.length; i++) {
@@ -131,6 +132,9 @@ export class ExtraData {
         if (increaseValSet && valSet) {
           valSet = valSet.copy();
           valSet.incrementProposerPriority(round);
+        }
+        if (valSet) {
+          voteSet = new VoteSet(chainId, header.number, round, VoteType.Precommit, valSet);
         }
       } else if (i === 1) {
         if (!isRLPEvidenceList(value)) {
@@ -198,6 +202,9 @@ export class ExtraData {
     this.POLRound = POLRound;
     this.proposal = proposal;
     this.voteSet = voteSet;
+    if (voteSet && voteSet.signedMsgType !== VoteType.Precommit) {
+      throw new Error('invalid vote set type');
+    }
   }
 
   raw(validaterSetSize?: number) {
@@ -242,9 +249,6 @@ export class ExtraData {
 
     if (!this.voteSet || this.voteSet.voteCount() === 0) {
       throw new Error('empty vote set');
-    }
-    if (this.voteSet.signedMsgType !== VoteType.Precommit) {
-      throw new Error('invalid vote type');
     }
     if (!this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash)) {
       throw new Error('invalid vote set');

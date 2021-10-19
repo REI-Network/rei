@@ -14,7 +14,7 @@ const priorityWindowSizeFactor = 2;
 // genesis validators
 let genesisValidators: Address[] | undefined;
 
-function getGenesisValidators(common: Common) {
+export function getGenesisValidators(common: Common) {
   // get genesis validators from common
   if (!genesisValidators) {
     genesisValidators = common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr)) as Address[];
@@ -152,11 +152,11 @@ export class ValidatorSet {
       for (const validator of append) {
         validators.set(validator.buf, {
           validator,
-          votingPower: new BN(0)
+          votingPower: new BN(100)
         });
         active.push({
           validator,
-          priority: new BN(0)
+          priority: new BN(100)
         });
       }
     }

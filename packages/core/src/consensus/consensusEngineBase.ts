@@ -52,7 +52,7 @@ export abstract class ConsensusEngineBase extends EventEmitter implements Consen
   /**
    * {@link ConsensusEngine.isActivate}
    */
-  get isActivate() {
+  get isActivate(): boolean {
     return this.node.getLastestEngine() === this;
   }
 

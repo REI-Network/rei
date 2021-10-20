@@ -1,14 +1,17 @@
 import { BN } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
-import { BlockHeader, Transaction, Block } from '@gxchain2/structure';
+import { BlockHeader, Transaction, Block, calcTransactionTrie, calcReceiptTrie, preHF1CalcReceiptTrie, Receipt } from '@gxchain2/structure';
+import { PostByzantiumTxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
 import VM from '@gxchain2-ethereumjs/vm';
 import { RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
 import { logger, nowTimestamp } from '@gxchain2/utils';
+import { isEnableReceiptRootFix } from '../hardforks';
 import { PendingTxMap } from '../txpool';
 import { Node } from '../node';
 import { processTx } from '../vm';
 import { ConsensusEngine } from '../consensus';
 import { AsyncBufferRetriever } from './asyncRetriever';
+import { postByzantiumTxReceiptsToReceipts } from '../vm';
 
 const defaultMaxCacheSize = 10;
 const defaultTimeoutDuration = 1000;
@@ -35,6 +38,7 @@ export class Worker {
   private parentHash!: Buffer;
   private pendingHeader!: BlockHeader;
   private pendingTxs!: Transaction[];
+  private pendingReceipts!: Receipt[];
   private pendingGasUsed!: BN;
 
   constructor(options: WorkerOptions) {
@@ -63,18 +67,20 @@ export class Worker {
 
       this.parentHash = parentHash;
       this.pendingTxs = [];
+      this.pendingReceipts = [];
       this.pendingGasUsed = new BN(0);
 
-      const pendingNumber = header.number.addn(1);
-      const period: number = header._common.consensusConfig().period;
+      const nextNumber = header.number.addn(1);
+      const nextCommon = this.node.getCommon(nextNumber);
+      const period: number = nextCommon.consensusConfig().period;
       const now = nowTimestamp();
       let timestamp = header.timestamp.toNumber() + period;
       if (now > timestamp) {
         timestamp = now;
       }
-      this.pendingHeader = this.consensusEngine.getPendingBlockHeader({ parentHash, number: pendingNumber, timestamp });
+      this.pendingHeader = this.consensusEngine.getPendingBlockHeader({ parentHash, number: nextNumber, timestamp });
 
-      this.vm = await this.node.getVM(header.stateRoot, pendingNumber);
+      this.vm = await this.node.getVM(header.stateRoot, this.pendingHeader._common);
       await this.vm.stateManager.checkpoint();
       const pendingBlock = await this._commit(await this.node.txPool.getPendingTxMap(header.number, this.parentHash));
       this.asyncRetriever.push(parentHash, pendingBlock);
@@ -167,6 +173,7 @@ export class Worker {
         } else {
           await this.vm.stateManager.commit();
           this.pendingTxs.push(tx);
+          this.pendingReceipts.push(postByzantiumTxReceiptsToReceipts([txRes.receipt as PostByzantiumTxReceipt])[0]);
           this.pendingGasUsed.iadd(txRes.gasUsed);
           pendingMap.shift();
         }
@@ -177,6 +184,17 @@ export class Worker {
         tx = pendingMap.peek();
       }
     }
-    return this.consensusEngine.getPendingBlock({ header: { ...this.pendingHeader }, transactions: [...this.pendingTxs] });
+
+    // calculate receipt trie, state root, transaction trie
+    let receiptTrie: Buffer;
+    if (isEnableReceiptRootFix(this.pendingHeader._common)) {
+      receiptTrie = await calcReceiptTrie(this.pendingReceipts);
+    } else {
+      receiptTrie = await preHF1CalcReceiptTrie(this.pendingReceipts);
+    }
+    const transactionsTrie = await calcTransactionTrie(this.pendingTxs);
+    const stateRoot = await this.vm.stateManager.getStateRoot();
+
+    return this.consensusEngine.getPendingBlock({ header: { ...this.pendingHeader, receiptTrie, transactionsTrie, stateRoot, gasUsed: this.pendingGasUsed.clone() }, transactions: [...this.pendingTxs] });
   }
 }

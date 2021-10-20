@@ -18,8 +18,6 @@ export interface ConsensusEngine {
   coinbase: Address;
   // engine enable
   enable: boolean;
-  // engine is activate
-  isActivate: boolean;
   // engine is started
   isStarted: boolean;
 

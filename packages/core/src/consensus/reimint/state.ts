@@ -35,11 +35,11 @@ export class MockSigner implements Signer {
   }
 
   address(): Address {
-    return this.node.getLastestEngine().coinbase;
+    return this.node.getCurrentEngine().coinbase;
   }
 
   sign(msg: Buffer): Buffer {
-    const coinbase = this.node.getLastestEngine().coinbase;
+    const coinbase = this.node.getCurrentEngine().coinbase;
     if (coinbase.equals(Address.zero())) {
       throw new Error('empty coinbase');
     }

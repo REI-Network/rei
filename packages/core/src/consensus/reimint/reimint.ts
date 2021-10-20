@@ -130,7 +130,7 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
     // if the validator set doesn't exist, return
     if (!validators) {
       const vm = await this.node.getVM(header.stateRoot, header._common);
-      validators = await this.node.validatorSets.get(header.stateRoot, this.node.getStakeManager(vm, block));
+      validators = await this.node.validatorSets.get(header.stateRoot, this.node.getStakeManager(vm, block, this.node.getCommon(block.header.number.addn(1))));
     }
 
     this.state.newBlockHeader(header, validators);

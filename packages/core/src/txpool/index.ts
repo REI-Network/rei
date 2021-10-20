@@ -562,7 +562,7 @@ export class TxPool extends EventEmitter {
       if (!tx.isSigned()) {
         throw new Error('not signed');
       }
-      const limit = this.node.getLastestEngine().getGasLimitByCommon(this.node.getLatestCommon());
+      const limit = this.node.getCurrentEngine().getGasLimitByCommon(this.node.getLatestCommon());
       if (limit.lt(tx.gasLimit)) {
         throw new Error(`each block gasLimit: ${tx.gasLimit.toString()} limit: ${limit.toString()}`);
       }

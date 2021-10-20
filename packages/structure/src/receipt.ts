@@ -1,9 +1,26 @@
 import { rlp, toBuffer, unpadBuffer, bufferToInt, BN, bufferToHex, bnToHex, intToHex, generateAddress } from 'ethereumjs-util';
+import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { Block } from './block';
 import { Transaction } from './transaction';
 import { LogRawValues, Log } from './log';
 
 export type ReceiptRawValue = (Buffer | LogRawValues[])[];
+
+export async function calcReceiptTrie(receipts: Receipt[]) {
+  const trie = new Trie();
+  for (let i = 0; i < receipts.length; i++) {
+    await trie.put(rlp.encode(i), receipts[i].serialize());
+  }
+  return trie.root;
+}
+
+export async function preHF1CalcReceiptTrie(receipts: Receipt[]) {
+  const trie = new Trie();
+  for (let i = 0; i < receipts.length; i++) {
+    await trie.put(toBuffer(i), receipts[i].serialize());
+  }
+  return trie.root;
+}
 
 /**
  * Transaction receipt class

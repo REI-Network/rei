@@ -29,7 +29,7 @@ import { processBlock, ProcessBlockOpts } from './vm';
 import { createEnginesByConsensusTypes, ConsensusEngine, ConsensusType } from './consensus';
 import { Message } from './consensus/reimint/messages';
 import { ReimintConsensusEngine } from './consensus/reimint';
-import { getConsensusTypeByCommon, getConsensusTypeByHeader } from './hardforks';
+import { getConsensusTypeByCommon } from './hardforks';
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;
@@ -316,8 +316,8 @@ export class Node {
     await this.bcMonitor.init();
 
     // start mint
-    this.getLastestEngine().start();
-    this.getLastestEngine().newBlock(this.blockchain.latestBlock);
+    this.getCurrentEngine().start();
+    this.getCurrentEngine().newBlock(this.blockchain.latestBlock);
   }
 
   private onPeerInstalled = (peer: Peer) => {
@@ -329,11 +329,11 @@ export class Node {
   };
 
   private onSyncOver = () => {
-    this.getLastestEngine().newBlock(this.blockchain.latestBlock);
+    this.getCurrentEngine().newBlock(this.blockchain.latestBlock);
   };
 
   onMintBlock() {
-    this.getLastestEngine().newBlock(this.blockchain.latestBlock);
+    this.getCurrentEngine().newBlock(this.blockchain.latestBlock);
   }
 
   /**
@@ -363,20 +363,12 @@ export class Node {
   }
 
   /**
-   * Get consensus engine by block header
-   * @param header - Block header
+   * Get current working consensus engine
    * @returns Consensus engine
    */
-  getEngineByHeader(header: BlockHeader) {
-    return this.engines.get(getConsensusTypeByHeader(header))!;
-  }
-
-  /**
-   * Get lastest consensus engine
-   * @returns Consensus engine
-   */
-  getLastestEngine() {
-    return this.getEngineByCommon(this.getLatestCommon());
+  getCurrentEngine() {
+    const nextCommon = this.getCommon(this.blockchain.latestBlock.header.number.addn(1));
+    return this.engines.get(getConsensusTypeByCommon(nextCommon))!;
   }
 
   /**
@@ -420,22 +412,24 @@ export class Node {
    * Get stake manager contract object
    * @param vm - Target vm instance
    * @param block - Target block
+   * @param common - Common instance
    * @returns Stake manager contract object
    */
-  getStakeManager(vm: VM, block: Block) {
+  getStakeManager(vm: VM, block: Block, common?: Common) {
     const evm = new EVM(vm, new TxContext(new BN(0), Address.zero()), block);
-    return new StakeManager(evm, block._common);
+    return new StakeManager(evm, common ?? block._common);
   }
 
   /**
    * Get router contract object
    * @param vm - Target vm instance
    * @param block - Target block
+   * @param common - Common instance
    * @returns Router contract object
    */
-  getRouter(vm: VM, block: Block) {
+  getRouter(vm: VM, block: Block, common?: Common) {
     const evm = new EVM(vm, new TxContext(new BN(0), Address.zero()), block);
-    return new Router(evm, block._common);
+    return new Router(evm, common ?? block._common);
   }
 
   /**
@@ -495,7 +489,7 @@ export class Node {
           for (const handler of WireProtocol.getPool().handlers) {
             handler.announceTx(hashes);
           }
-          await this.getLastestEngine().addTxs(readies);
+          await this.getCurrentEngine().addTxs(readies);
         }
         task.resolve(results);
       } catch (err) {

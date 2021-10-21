@@ -14,7 +14,7 @@ import { ConsensusEngine } from '../consensus';
 import { isEnableStaking } from '../hardforks';
 
 const EMPTY_ADDRESS = Address.zero();
-const EMPTY_MIX_HASH = Buffer.alloc(20);
+const EMPTY_MIX_HASH = Buffer.alloc(32);
 const EMPTY_NONCE = Buffer.alloc(8);
 const EMPTY_EXTRA_DATA = Buffer.alloc(32);
 
@@ -260,7 +260,7 @@ export class PendingBlock {
       await vm.stateManager.checkpoint();
       try {
         await assignBlockReward(vm.stateManager, minerReward);
-        await afterApply(vm.stateManager, { receipts: this.transactionResults });
+        await afterApply(vm.stateManager, { receipts: this.transactionResults.map(({ receipt }) => receipt) });
         await vm.stateManager.commit();
         this.finalizedStateRoot = await vm.stateManager.getStateRoot();
       } catch (err) {

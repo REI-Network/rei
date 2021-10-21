@@ -69,7 +69,9 @@ export class Worker {
 
       if (txs) {
         // async append txs to pending block
-        newPendingBlock?.appendTxs(txs);
+        newPendingBlock?.appendTxs(txs).catch((err) => {
+          logger.error('Worker::newBlockHeader, appendTxs, catch error:', err);
+        });
       }
     }
   }

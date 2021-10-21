@@ -465,7 +465,8 @@ export class StateMachine {
     return this.reimint.generateBlockAndProposal(blockData.header, blockData.transactions, {
       round: this.round,
       POLRound: this.validRound,
-      validatorSetSize: this.validators.length
+      validatorSetSize: this.validators.length,
+      common: this.pendingBlock.common
     }) as { block: Block; proposal: Proposal };
   }
 

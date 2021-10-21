@@ -1,8 +1,8 @@
-import { Address, bufferToHex, BN, KECCAK256_RLP_ARRAY } from 'ethereumjs-util';
-import { Block, BlockHeader, HeaderData, preHF1CalcCliqueDifficulty, CLIQUE_DIFF_NOTURN } from '@gxchain2/structure';
+import { Address, bufferToHex, BN } from 'ethereumjs-util';
+import { Block, BlockHeader, HeaderData, preHF1CalcCliqueDifficulty, Transaction } from '@gxchain2/structure';
+import { Common } from '@gxchain2/common';
 import { logger, nowTimestamp, getRandomIntInclusive } from '@gxchain2/utils';
 import { ConsensusEngine } from '../consensusEngine';
-import { EMPTY_ADDRESS } from '../utils';
 import { ConsensusEngineBase } from '../consensusEngineBase';
 
 const NoTurnSignerDelay = 500;
@@ -21,34 +21,11 @@ export class CliqueConsensusEngine extends ConsensusEngineBase implements Consen
   }
 
   /**
-   * {@link ConsensusEngine.getPendingBlockHeader}
+   * {@link ConsensusEngine.simpleSignBlock}
    */
-  getPendingBlockHeader(data: HeaderData) {
-    if (data.number === undefined || !(data.number instanceof BN)) {
-      throw new Error('invalid header data');
-    }
-
-    let difficulty!: BN;
-    if (data.difficulty === undefined) {
-      const activeSigners = this.node.blockchain.cliqueActiveSignersByBlockNumber(data.number);
-      if (this.isValidSigner(activeSigners)) {
-        difficulty = preHF1CalcCliqueDifficulty(activeSigners, this.coinbase, data.number)[1];
-      } else {
-        difficulty = CLIQUE_DIFF_NOTURN.clone();
-      }
-    }
-
-    const common = this.node.getCommon(data.number);
-    return BlockHeader.fromHeaderData(
-      {
-        ...data,
-        uncleHash: KECCAK256_RLP_ARRAY,
-        coinbase: EMPTY_ADDRESS,
-        difficulty: data.difficulty ?? difficulty,
-        gasLimit: this.getGasLimitByCommon(common)
-      },
-      { common, cliqueSigner: this.cliqueSigner() }
-    );
+  simpleSignBlock(data: HeaderData, common: Common, transactions?: Transaction[]) {
+    const header = BlockHeader.fromHeaderData(data, { common, cliqueSigner: this.cliqueSigner() });
+    return new Block(header, transactions, undefined, { common });
   }
 
   /////////////////////////////////
@@ -66,8 +43,7 @@ export class CliqueConsensusEngine extends ConsensusEngineBase implements Consen
   protected async _newBlock(block: Block) {
     const header = block.header;
     // create a new pending block through worker
-    await this.worker.newBlockHeader(header);
-
+    const pendingBlock = await this.worker.createPendingBlock(header);
     if (!this.enable || this.node.sync.isSyncing) {
       return;
     }
@@ -86,29 +62,24 @@ export class CliqueConsensusEngine extends ConsensusEngineBase implements Consen
       return;
     }
 
-    let pendingBlock = this.worker.directlyGetPendingBlockByParentHash(parentHash);
-    if (!pendingBlock) {
-      throw new Error('missing pending block');
-    }
-    if (!this.enable || this.node.sync.isSyncing) {
-      return;
-    }
+    const [inTurn, difficulty] = preHF1CalcCliqueDifficulty(activeSigners, this.coinbase, pendingBlock.number);
+    const gasLimit = this.getGasLimitByCommon(pendingBlock.common);
+    pendingBlock.complete(difficulty, gasLimit);
 
     if (this.timeout === undefined && this.nextTd === undefined) {
       // calculate timeout duration for next block
-      const duration = this.calcTimeout(pendingBlock.header.timestamp.toNumber(), !pendingBlock.header.difficulty.eq(CLIQUE_DIFF_NOTURN), activeSigners.length);
-      this.nextTd = parentTD.add(pendingBlock.header.difficulty);
+      const duration = this.calcTimeout(pendingBlock.timestamp, inTurn, activeSigners.length);
+      this.nextTd = parentTD.add(difficulty);
       this.timeout = setTimeout(async () => {
         this.nextTd = undefined;
         this.timeout = undefined;
 
         try {
-          // get pending block by parent block hash again,
-          // because the newest pending block may contain the newest transaction
-          pendingBlock = await this.worker.getPendingBlockByParentHash(parentHash);
+          // finalize pending block
+          const { header: data, transactions } = await pendingBlock!.finalize();
+          const block = this.simpleSignBlock(data, pendingBlock.common, transactions);
 
-          const { reorged, block } = await this.node.processBlock(pendingBlock, {
-            generate: true,
+          const reorged = await this.node.processBlock(block, {
             broadcast: true
           });
           if (reorged) {

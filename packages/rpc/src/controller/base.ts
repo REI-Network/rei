@@ -47,7 +47,7 @@ export class Controller {
     } else if (tag === 'latest' || tag === undefined) {
       block = this.node.blockchain.latestBlock;
     } else if (tag === 'pending') {
-      block = this.node.getLastestEngine().getLastPendingBlock();
+      block = this.node.getCurrentEngine().getPendingBlock();
     } else if (Number.isInteger(Number(tag))) {
       block = await this.node.blockchain.getBlock(Number(tag));
     } else {

@@ -296,7 +296,7 @@ export class Fetcher {
   private async processBlockLoop() {
     for await (const { data: block } of this.blockQueue.generator()) {
       try {
-        await this.node.processBlock(block, { generate: false, broadcast: false });
+        await this.node.processBlock(block, { broadcast: false });
         this.blockProcessed();
         if (block.header.number.eqn(this.bestHeight)) {
           this.abort();

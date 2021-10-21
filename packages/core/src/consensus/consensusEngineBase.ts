@@ -1,18 +1,17 @@
 import EventEmitter from 'events';
 import { Address, BN } from 'ethereumjs-util';
-import { BlockHeader, Block, HeaderData, BlockData } from '@gxchain2-ethereumjs/block';
-import { TypedTransaction, TransactionFactory } from '@gxchain2/structure';
+import { BlockHeader, Block, HeaderData } from '@gxchain2-ethereumjs/block';
 import { Transaction } from '@gxchain2-ethereumjs/tx';
 import { Common } from '@gxchain2/common';
 import { hexStringToBN, Channel, logger } from '@gxchain2/utils';
 import { Node } from '../node';
-import { Worker } from '../worker';
+import { PendingBlock, Worker } from '../worker';
 import { ConsensusEngine, ConsensusEngineOptions } from './consensusEngine';
 import { EMPTY_ADDRESS } from './utils';
 
 export abstract class ConsensusEngineBase extends EventEmitter implements ConsensusEngine {
   abstract getMiner(block: BlockHeader | Block): Address;
-  abstract getPendingBlockHeader(data: HeaderData): BlockHeader;
+  abstract simpleSignBlock(data: HeaderData, common: Common, transactions?: Transaction[]): Block;
 
   protected abstract _newBlock(header: Block): Promise<void>;
   protected abstract _start(): void;
@@ -117,26 +116,14 @@ export abstract class ConsensusEngineBase extends EventEmitter implements Consen
   /**
    * {@link ConsensusEngine.getPendingBlock}
    */
-  getPendingBlock(data: BlockData): Block {
-    if (!data.header) {
-      throw new Error('invalid block data');
+  getPendingBlock(): Block {
+    let pendingBlock = this.worker.getPendingBlock();
+    if (!pendingBlock) {
+      const header = this.node.blockchain.latestBlock.header;
+      const nextNumber = header.number.addn(1);
+      pendingBlock = new PendingBlock(header.hash(), header.stateRoot, nextNumber, header.timestamp, this.node.getCommon(nextNumber), this, this.node);
     }
-
-    const header = this.getPendingBlockHeader(data.header);
-    const transactions: TypedTransaction[] = [];
-    const txsData = data?.transactions ?? [];
-    for (const txData of txsData) {
-      const tx = TransactionFactory.fromTxData(txData, { common: header._common });
-      transactions.push(tx);
-    }
-    return new Block(header, transactions, undefined, { common: header._common });
-  }
-
-  /**
-   * {@link ConsensusEngine.getLastPendingBlock}
-   */
-  getLastPendingBlock() {
-    const pendingBlock = this.worker.getLastPendingBlock();
-    return pendingBlock ?? this.getPendingBlock({});
+    const { header, transactions } = pendingBlock.makeBlockData();
+    return this.simpleSignBlock(header, pendingBlock.common, transactions);
   }
 }

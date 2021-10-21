@@ -29,6 +29,7 @@ import { processBlock, ProcessBlockOpts } from './vm';
 import { createEnginesByConsensusTypes, ConsensusEngine, ConsensusType } from './consensus';
 import { Message } from './consensus/reimint/messages';
 import { ReimintConsensusEngine } from './consensus/reimint';
+import { CliqueConsensusEngine } from './consensus/clique';
 import { getConsensusTypeByCommon } from './hardforks';
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
@@ -123,7 +124,7 @@ type PendingTxs = {
 type ProcessBlock = {
   block: Block;
   options: ProcessBlockOptions;
-  resolve: (result: { block: Block; reorged: boolean }) => void;
+  resolve: (result: boolean) => void;
   reject: (reason?: any) => void;
 };
 
@@ -332,6 +333,11 @@ export class Node {
     this.getCurrentEngine().newBlock(this.blockchain.latestBlock);
   };
 
+  /**
+   * Mint over callback,
+   * it will be called when local node mint a block,
+   * it will try to continue mint a new block after the latest block
+   */
   onMintBlock() {
     this.getCurrentEngine().newBlock(this.blockchain.latestBlock);
   }
@@ -369,6 +375,16 @@ export class Node {
   getCurrentEngine() {
     const nextCommon = this.getCommon(this.blockchain.latestBlock.header.number.addn(1));
     return this.engines.get(getConsensusTypeByCommon(nextCommon))!;
+  }
+
+  /**
+   * Get clique consensus engine instance,
+   * return undefined if clique is disable
+   * @returns CliqueConsensusEngine or undefined
+   */
+  getCliqueEngine() {
+    const engine = this.engines.get(ConsensusType.Clique);
+    return engine ? (engine as CliqueConsensusEngine) : undefined;
   }
 
   /**
@@ -455,8 +471,7 @@ export class Node {
     await this.initPromise;
     for await (let { block, options, resolve, reject } of this.processQueue.generator()) {
       try {
-        const { reorged, block: newBlock } = await processBlock.bind(this)({ ...options, block });
-        block = newBlock;
+        const reorged = await processBlock.bind(this)({ ...options, block });
 
         // if canonical chain changes, notify to other modules
         if (reorged) {
@@ -467,7 +482,7 @@ export class Node {
           await Promise.all(promises);
         }
 
-        resolve({ reorged, block });
+        resolve(reorged);
       } catch (err) {
         reject(err);
       }
@@ -507,7 +522,7 @@ export class Node {
    */
   async processBlock(block: Block, options: ProcessBlockOptions) {
     await this.initPromise;
-    return new Promise<{ block: Block; reorged: boolean }>((resolve, reject) => {
+    return new Promise<boolean>((resolve, reject) => {
       this.processQueue.push({ block, options, resolve, reject });
     });
   }

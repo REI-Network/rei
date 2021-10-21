@@ -1,6 +1,6 @@
 import { Address, BN } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
-import { BlockData, HeaderData, BlockHeader, Block, Transaction } from '@gxchain2/structure';
+import { HeaderData, BlockHeader, Block, Transaction } from '@gxchain2/structure';
 import { Node } from '../node';
 
 export interface ConsensusEngineOptions {
@@ -50,24 +50,22 @@ export interface ConsensusEngine {
   getGasLimitByCommon(common: Common): BN;
 
   /**
-   * Get pending block header for worker
-   * @param data - Block header data
-   * @returns Pending block header
-   */
-  getPendingBlockHeader(data: HeaderData): BlockHeader;
-
-  /**
-   * Get pending block for worker
-   * @param data - Block data
+   * Get pending block
    * @returns Pending block
    */
-  getPendingBlock(data: BlockData): Block;
+  getPendingBlock(): Block;
 
   /**
-   * Get the last pending block
-   * @returns Pending block
+   * Create a simple signed block by data,
+   * the header data can be incompleted,
+   * because the block created is only to
+   * ensure that the correct miner can be obtained during `processTx`
+   * @param data - Header data
+   * @param common - Common instance
+   * @param transactions - List of transaction
+   * @returns Block
    */
-  getLastPendingBlock(): Block;
+  simpleSignBlock(data: HeaderData, common: Common, transactions?: Transaction[]): Block;
 
   /**
    * Process a new block, try to mint a block after this block

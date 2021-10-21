@@ -3,6 +3,7 @@ import { Channel, logger } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/structure';
 import { Node } from '../../node';
 import { ValidatorSet } from '../../staking';
+import { PendingBlock } from '../../worker';
 import { HeightVoteSet, Vote, VoteType, ConflictingVotesError } from './vote';
 import { TimeoutTicker } from './timeoutTicker';
 import { ReimintConsensusEngine } from './reimint';
@@ -140,6 +141,7 @@ export class StateMachine {
   private proposal?: Proposal;
   private proposalBlockHash?: Buffer;
   private proposalBlock?: Block;
+  private pendingBlock?: PendingBlock;
 
   private lockedRound: number = -1;
   private lockedBlock?: Block;
@@ -447,32 +449,30 @@ export class StateMachine {
           round
         });
       } else {
-        this.reimint.worker.getPendingBlockByParentHash(this.parentHash).then(() => {
-          if (this.step === RoundStepType.NewRound) {
-            this.enterPropose(height, 0);
-          }
-        });
+        this.enterPropose(height, 0);
       }
     } else {
       this.enterPropose(height, round);
     }
   }
 
-  private createBlockAndProposal() {
-    const pendingBlock = this.reimint.worker.directlyGetPendingBlockByParentHash(this.parentHash);
-    if (!pendingBlock) {
+  private async createBlockAndProposal() {
+    if (!this.pendingBlock || !this.pendingBlock.parentHash.equals(this.parentHash)) {
       throw new Error('missing pending block');
     }
-    return this.reimint.generateBlockAndProposal({ ...pendingBlock.header }, [...pendingBlock.transactions], { common: pendingBlock._common, round: this.round, POLRound: this.validRound, validatorSetSize: this.validators.length }) as { block: Block; proposal: Proposal };
+
+    const blockData = await this.pendingBlock.finalize(this.round);
+    return this.reimint.generateBlockAndProposal(blockData.header, blockData.transactions, {
+      round: this.round,
+      POLRound: this.validRound,
+      validatorSetSize: this.validators.length
+    }) as { block: Block; proposal: Proposal };
   }
 
   private decideProposal(height: BN, round: number) {
-    let block: Block;
-    let proposal: Proposal;
-
     if (this.validBlock) {
-      block = this.validBlock;
-      proposal = new Proposal({
+      const block = this.validBlock;
+      const proposal = new Proposal({
         type: VoteType.Proposal,
         height,
         round,
@@ -481,20 +481,31 @@ export class StateMachine {
         timestamp: Date.now()
       });
       proposal.signature = this.signer!.sign(proposal.getMessageToSign());
-    } else {
-      const result = this.createBlockAndProposal();
-      block = result.block;
-      proposal = result.proposal;
-    }
 
-    this._newMessage({
-      msg: new ProposalMessage(proposal),
-      peerId: ''
-    });
-    this._newMessage({
-      msg: new ProposalBlockMessage(block),
-      peerId: ''
-    });
+      this._newMessage({
+        msg: new ProposalMessage(proposal),
+        peerId: ''
+      });
+      this._newMessage({
+        msg: new ProposalBlockMessage(block),
+        peerId: ''
+      });
+    } else {
+      this.createBlockAndProposal()
+        .then(({ block, proposal }) => {
+          this._newMessage({
+            msg: new ProposalMessage(proposal),
+            peerId: ''
+          });
+          this._newMessage({
+            msg: new ProposalBlockMessage(block),
+            peerId: ''
+          });
+        })
+        .catch((err) => {
+          logger.error('StateMachine::decideProposal, catch error:', err);
+        });
+    }
   }
 
   private signVote(type: VoteType, hash: Buffer) {
@@ -791,8 +802,8 @@ export class StateMachine {
     }
 
     this.node
-      .processBlock(finalizedBlock, { generate: true, broadcast: true })
-      .then(({ reorged }) => {
+      .processBlock(finalizedBlock, { broadcast: true })
+      .then((reorged) => {
         logger.debug('StateMachine::tryFinalizeCommit, mint a block');
         if (reorged) {
           // try to continue minting
@@ -830,7 +841,7 @@ export class StateMachine {
     this.msgQueue.push(smsg);
   }
 
-  newBlockHeader(header: BlockHeader, validators: ValidatorSet) {
+  newBlockHeader(header: BlockHeader, validators: ValidatorSet, pendingBlock: PendingBlock) {
     console.log('newBlockHeader', header.number.toNumber());
     // TODO: pretty this
     if (this.commitRound > -1 && this.height.gtn(0) && !this.height.eq(header.number)) {
@@ -846,6 +857,7 @@ export class StateMachine {
     this.validators = validators;
     this.proposal = undefined;
     this.proposalBlock = undefined;
+    this.pendingBlock = pendingBlock;
     this.lockedRound = -1;
     this.lockedBlock = undefined;
     this.validRound = -1;

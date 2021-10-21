@@ -119,14 +119,15 @@ export interface ProcessTxOptions extends Omit<RunTxOpts, 'block' | 'beforeTx' |
 
 export function processTx(this: Node, options: ProcessTxOptions) {
   const { vm, block } = options;
-  const parentEnableStaking = !block.isGenesis() && isEnableStaking(this.getCommon(block.header.number.subn(1)));
-  if (parentEnableStaking) {
+  const enableStaking = isEnableStaking(block._common);
+  const engine = this.getEngineByCommon(block._common);
+  if (enableStaking) {
     const systemCaller = Address.fromString(block._common.param('vm', 'scaddr'));
     const router = this.getRouter(vm, block);
     return vm.runTx({
       ...options,
       skipBalance: true,
-      ...makeRunTxCallback(router, systemCaller, block.header.cliqueSigner(), block.header.timestamp.toNumber())
+      ...makeRunTxCallback(router, systemCaller, engine.getMiner(block), block.header.timestamp.toNumber())
     });
   } else {
     return vm.runTx(options);

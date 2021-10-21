@@ -1,6 +1,6 @@
-import { Address, BN, toBuffer, setLengthLeft, KECCAK256_RLP_ARRAY } from 'ethereumjs-util';
-import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@gxchain2/structure';
-import { logger } from '@gxchain2/utils';
+import { Address, BN, toBuffer, setLengthLeft } from 'ethereumjs-util';
+import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions, Transaction } from '@gxchain2/structure';
+import { Common } from '@gxchain2/common';
 import { ConsensusEngine, ConsensusEngineOptions } from '../consensusEngine';
 import { EMPTY_ADDRESS, EMPTY_EXTRA_DATA } from '../utils';
 import { ConsensusEngineBase } from '../consensusEngineBase';
@@ -80,25 +80,11 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
   }
 
   /**
-   * {@link ConsensusEngine.getPendingBlockHeader}
+   * {@link ConsensusEngine.simpleSignBlock}
    */
-  getPendingBlockHeader(data: HeaderData): BlockHeader {
-    if (data.number === undefined || !(data.number instanceof BN)) {
-      throw new Error('invalid header data');
-    }
-
-    const common = this.node.getCommon(data.number);
-    const { header } = this.generateBlockHeaderAndProposal(
-      {
-        ...data,
-        uncleHash: KECCAK256_RLP_ARRAY,
-        coinbase: EMPTY_ADDRESS,
-        difficulty: new BN(1),
-        gasLimit: this.getGasLimitByCommon(common)
-      },
-      { common }
-    );
-    return header;
+  simpleSignBlock(data: HeaderData, common: Common, transactions?: Transaction[]) {
+    const { block } = this.generateBlockAndProposal(data, transactions, { common });
+    return block;
   }
 
   //////////////////////////
@@ -119,12 +105,15 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
   protected async _newBlock(block: Block) {
     const header = block.header;
     // create a new pending block through worker
-    await this.worker.newBlockHeader(header);
-
+    const pendingBlock = await this.worker.createPendingBlock(header);
     if (!this.enable || this.node.sync.isSyncing) {
       console.log('reimint is disabled, return', this.enable, this.node.sync.isSyncing);
       return;
     }
+
+    const difficulty = new BN(1);
+    const gasLimit = this.getGasLimitByCommon(pendingBlock.common);
+    pendingBlock.complete(difficulty, gasLimit);
 
     let validators = this.node.validatorSets.directlyGet(header.stateRoot);
     // if the validator set doesn't exist, return
@@ -133,7 +122,7 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
       validators = await this.node.validatorSets.get(header.stateRoot, this.node.getStakeManager(vm, block, this.node.getCommon(block.header.number.addn(1))));
     }
 
-    this.state.newBlockHeader(header, validators);
+    this.state.newBlockHeader(header, validators, pendingBlock);
   }
 
   /**

@@ -13,19 +13,14 @@ export class TimeoutTicker {
   }
 
   schedule(ti: TimeoutInfo) {
-    if (this.maxHeight === undefined || this.maxHeight.lte(ti.height)) {
+    if (this.maxHeight === undefined || this.maxHeight.lt(ti.height)) {
       this.maxHeight = ti.height.clone();
-    } else {
-      return;
-    }
-
-    if (this.maxRound === undefined || this.maxRound <= ti.round) {
       this.maxRound = ti.round;
-    } else {
-      return;
-    }
-
-    if (this.maxStep === undefined || this.maxStep < ti.step) {
+      this.maxStep = ti.step;
+    } else if (this.maxRound === undefined || this.maxRound < ti.round) {
+      this.maxRound = ti.round;
+      this.maxStep = ti.step;
+    } else if (this.maxStep === undefined || this.maxStep < ti.step) {
       this.maxStep = ti.step;
     } else {
       return;

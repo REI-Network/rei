@@ -318,14 +318,16 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
 
       try {
         cachedBlockHeader = await this.node.db.getCanonicalHeader(height);
-        console.log('cachedBlockHeader.extraData:', cachedBlockHeader.extraData.toString('hex'), cachedBlockHeader.number);
-        const valSet = this.node.validatorSets.directlyGet(cachedBlockHeader.stateRoot);
+        // notice: we use parent stateRoot to get validator set
+        const parentHeader = await this.node.db.getHeader(cachedBlockHeader.parentHash, cachedBlockHeader.number.subn(1));
+        const valSet = this.node.validatorSets.directlyGet(parentHeader.stateRoot);
         if (!valSet) {
           throw new Error('missing validator set');
         }
         cachedExtraData = ExtraData.fromBlockHeader(cachedBlockHeader, { valSet });
         return cachedExtraData.voteSet;
       } catch (err: any) {
+        console.log('getVoteSetByHeight, catch error:', err);
         cachedBlockHeader = undefined;
         cachedExtraData = undefined;
         return;
@@ -345,8 +347,10 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
           const height = this.height;
           const votes = await getVoteSetByHeight(this.height);
           if (!this.aborted && votes && height.eq(this.height) && this.pickAndSend(votes)) {
+            console.log('send succeed');
             continue;
           }
+          console.log('send failed', this.aborted, !!votes, height.eq(this.height));
         }
       } catch (err) {
         logger.error('ConsensusProtocolHander::gossipVotesLoop, catch error:', err);
@@ -419,9 +423,19 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
 
   applyNewRoundStepMessage(msg: NewRoundStepMessage) {
     // TODO: ValidateHeight
-    if (msg.height.lt(this.height) || msg.round < this.round || msg.step < this.step) {
+    if (msg.height.lt(this.height)) {
       logger.debug('ConsensusProtocolHander::applyNewRoundStepMessage, peerId:', this.peer.peerId, 'ignore new round step due to decrease, local:', this.height.toNumber(), this.round, this.step, 'remote:', msg.height.toNumber(), msg.round, msg.step);
       return;
+    } else if (msg.height.eq(this.height)) {
+      if (msg.round < this.round) {
+        logger.debug('ConsensusProtocolHander::applyNewRoundStepMessage, peerId:', this.peer.peerId, 'ignore new round step due to decrease, local:', this.height.toNumber(), this.round, this.step, 'remote:', msg.height.toNumber(), msg.round, msg.step);
+        return;
+      } else if (msg.round === this.round) {
+        if (msg.step < this.step) {
+          logger.debug('ConsensusProtocolHander::applyNewRoundStepMessage, peerId:', this.peer.peerId, 'ignore new round step due to decrease, local:', this.height.toNumber(), this.round, this.step, 'remote:', msg.height.toNumber(), msg.round, msg.step);
+          return;
+        }
+      }
     }
 
     if (!this.height.eq(msg.height) || this.round !== msg.round) {

@@ -136,6 +136,7 @@ export class Vote {
     }
     const validator = this.validator();
     if (!validator.equals(valSet.getValidatorByIndex(this.index))) {
+      console.log('invalid signature, (v,vs,i)', validator.toString(), valSet.getValidatorByIndex(this.index).toString(), this.index);
       throw new Error('invalid signature');
     }
     return validator;
@@ -214,7 +215,7 @@ export class VoteSet {
     const validator = vote.validateSignature(this.valSet);
     const votingPower = this.valSet.getVotingPower(validator);
 
-    console.log('addVote for:', validator.toString(), 'voting power:', votingPower.toNumber());
+    console.log('addVote for:', validator.toString(), 'voting power:', votingPower.toString());
     return this.addVerifiedVote(vote, votingPower);
   }
 

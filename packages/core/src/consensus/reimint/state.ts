@@ -197,7 +197,7 @@ export class StateMachine {
   private handleTimeout(ti: TimeoutInfo) {
     console.log('enter handleTimeout', ti);
     if (!ti.height.eq(this.height) || ti.round < this.round || (ti.round === this.round && ti.step < this.step)) {
-      logger.debug('StateMachine::handleTimeout, ignoring tock because we are ahead');
+      logger.debug('StateMachine::handleTimeout, ignoring tock because we are ahead:', ti, 'local:', this.height.toNumber(), this.round, this.step);
       return;
     }
 
@@ -855,6 +855,7 @@ export class StateMachine {
     this.round = 0;
     this.step = RoundStepType.NewHeight;
     this.startTime = commitTimeout(this.commitTime ?? timestamp);
+    console.log('startTime:', this.startTime);
     this.validators = validators;
     this.proposal = undefined;
     this.proposalBlock = undefined;
@@ -869,8 +870,10 @@ export class StateMachine {
 
     this.newStep(timestamp);
 
+    const duration = this.startTime - timestamp;
+    console.log('duration:', duration);
     this.timeoutTicker.schedule({
-      duration: this.startTime - Date.now(),
+      duration,
       step: RoundStepType.NewHeight,
       height: this.height.clone(),
       round: 0

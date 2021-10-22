@@ -28,6 +28,9 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     // unstake information, create at `startUnstake`, delete after `unstake`
     mapping(uint256 => Unstake) public override unstakeQueue;
 
+    // total locked amount
+    uint256 public override totalLockedAmount = 0;
+
     // active validator list of next block,
     // this will be set in `afterBlock`
     ActiveValidator[] public override activeValidators;
@@ -279,6 +282,9 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
             emit IndexedValidator(validator, votingPower.sub(msg.value));
         }
         emit Stake(validator, msg.value, to, shares);
+
+        // increase total locked amount
+        totalLockedAmount = totalLockedAmount.add(msg.value);
     }
 
     /**
@@ -306,6 +312,9 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         uint256 timestamp = block.timestamp + config.unstakeDelay();
         unstakeQueue[id] = Unstake(validator, to, unstakeShares, timestamp);
         emit StartUnstake(id, validator, amount, to, unstakeShares, timestamp);
+
+        // decrease total locked amount
+        totalLockedAmount = totalLockedAmount.sub(amount);
     }
 
     /**
@@ -430,6 +439,9 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
             }
         }
         emit Stake(validator, msg.value, address(0), 0);
+
+        // increase total locked amount
+        totalLockedAmount = totalLockedAmount.add(msg.value);
     }
 
     /**
@@ -441,13 +453,17 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint8 factor = config.getFactorByReason(reason);
-        amount = CommissionShare(v.commissionShare).slash(factor).add(IUnstakePool(config.unstakePool()).slash(validator, factor)).add(IValidatorRewardPool(config.validatorRewardPool()).slash(validator, factor));
+        uint256 decreasedAmount = CommissionShare(v.commissionShare).slash(factor).add(IValidatorRewardPool(config.validatorRewardPool()).slash(validator, factor));
+        amount = decreasedAmount.add(IUnstakePool(config.unstakePool()).slash(validator, factor));
         if (indexedValidators.contains(v.id) && getVotingPower(v.commissionShare, validator) < config.minIndexVotingPower()) {
             // if the validator's voting power is less than `minIndexVotingPower`, remove him from `_indexedValidators`
             indexedValidators.remove(v.id);
             emit UnindexedValidator(validator);
         }
         // TODO: emit a event
+
+        // decrease total locked amount
+        totalLockedAmount = totalLockedAmount.sub(decreasedAmount);
     }
 
     // TODO: if the active validators list is exactly the same as the last list, don't modify the storage

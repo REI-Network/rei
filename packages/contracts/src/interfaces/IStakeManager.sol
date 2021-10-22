@@ -72,6 +72,8 @@ interface IStakeManager is IOnly {
             uint256
         );
 
+    function totalLockedAmount() external view returns (uint256);
+
     function activeValidators(uint256 index) external view returns (address, int256);
 
     function indexedValidatorsLength() external view returns (uint256);

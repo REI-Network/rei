@@ -92,7 +92,7 @@ contract Config is IConfig {
     /**
      * @dev Get slash factor by reason.
      * @param reason    Reason id.
-     *                  1 - Repeated sign.
+     *                  0 - Repeated sign.
      */
     function getFactorByReason(uint8 reason) external view override returns (uint8) {
         if (reason == 0) {

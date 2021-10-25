@@ -8,7 +8,7 @@ import { Contract } from './contract';
 
 // function selector of stake manager
 const methods = {
-  stake: toBuffer('0x808615ac'),
+  totalLockedAmount: toBuffer('0x05a9f274'),
   indexedValidatorsLength: toBuffer('0x74a1c64a'),
   indexedValidatorsByIndex: toBuffer('0xaf6a80e2'),
   getVotingPowerByIndex: toBuffer('0x9b8c4c88'),
@@ -80,9 +80,14 @@ export class StakeManager extends Contract {
     super(evm, common, methods, Address.fromString(common.param('vm', 'smaddr')));
   }
 
-  stake(validator: Address, amount: BN) {
+  /**
+   * Get total locked amount
+   * @returns Total locked amount
+   */
+  totalLockedAmount() {
     return this.runWithLogger(async () => {
-      await this.executeMessage(this.makeSystemCallerMessage('stake', ['address', 'address'], [validator.toString(), this.common.param('vm', 'scaddr')], amount));
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('totalLockedAmount', [], []));
+      return new BN(returnValue);
     });
   }
 

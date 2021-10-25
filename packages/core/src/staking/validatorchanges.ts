@@ -1,6 +1,6 @@
 import { BN, Address } from 'ethereumjs-util';
 import { createBufferFunctionalMap, FunctionalSet } from '@gxchain2/utils';
-import { ValidatorSet } from './validatorset';
+import { ValidatorSet, getGenesisValidators } from './validatorset';
 
 // validator change information
 export type ValidatorChange = {
@@ -48,11 +48,13 @@ export class ValidatorChanges {
    * @param votingPower - Voting power
    */
   index(validator: Address, votingPower: BN) {
-    this.unindexedValidators.delete(validator);
-    this.indexedValidators.add(validator);
-    const vc = this.getChange(validator);
-    vc.votingPower = votingPower;
-    vc.update = new BN(0);
+    if (!this.isGenesisValidator(validator)) {
+      this.unindexedValidators.delete(validator);
+      this.indexedValidators.add(validator);
+      const vc = this.getChange(validator);
+      vc.votingPower = votingPower;
+      vc.update = new BN(0);
+    }
   }
 
   /**
@@ -62,14 +64,21 @@ export class ValidatorChanges {
    * @param validator - Validator address
    */
   unindex(validator: Address) {
-    this.unindexedValidators.add(validator);
-    this.indexedValidators.delete(validator);
-    this.changes.delete(validator.buf);
+    if (!this.isGenesisValidator(validator)) {
+      this.unindexedValidators.add(validator);
+      this.indexedValidators.delete(validator);
+      this.changes.delete(validator.buf);
+    }
   }
 
-  // check if validator changes can be ignored
+  // check if the validator is a genesis validator
+  private isGenesisValidator(validator: Address) {
+    return getGenesisValidators(this.parent.common).filter((gv) => gv.equals(validator)).length > 0;
+  }
+
+  // check if the validator changes can be ignored
   private cannonIgnore(validator: Address) {
-    return (this.parent.contains(validator) || this.indexedValidators.has(validator)) && !this.unindexedValidators.has(validator);
+    return !this.isGenesisValidator(validator) && (this.parent.contains(validator) || this.indexedValidators.has(validator)) && !this.unindexedValidators.has(validator);
   }
 
   /**

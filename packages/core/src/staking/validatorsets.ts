@@ -25,12 +25,14 @@ export class ValidatorSets {
    * create if it doesn't exist
    * @param stateRoot - Target state root
    * @param sm - `StakeManager` instance
+   * @param sortValidators - If it is true, we sort all validators loaded from the state root,
+   *                         otherwise, we directly use the list of active validators loaded from state root
    * @returns
    */
-  async get(stateRoot: Buffer, sm: StakeManager) {
+  async get(stateRoot: Buffer, sm: StakeManager, sortValidators: boolean = false) {
     let set = this.sets.get(stateRoot);
     if (!set) {
-      set = await ValidatorSet.createFromStakeManager(sm);
+      set = await ValidatorSet.createFromStakeManager(sm, sortValidators);
       this.set(stateRoot, set);
     }
     return set;

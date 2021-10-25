@@ -284,7 +284,7 @@ export class PendingBlock {
       }
       this.bloom = bloom.bitvector;
 
-      // save finalized block and times
+      // save times
       this.times = times;
       return this.makeBlockData();
     });

@@ -7,8 +7,9 @@ import { PostByzantiumTxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
 import { RunBlockOpts, rewardAccount } from '@gxchain2-ethereumjs/vm/dist/runBlock';
 import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Receipt, Log, Block } from '@gxchain2/structure';
+import { Common } from '@gxchain2/common';
 import { logger } from '@gxchain2/utils';
-import { ValidatorChanges, ValidatorSet, getGenesisValidators } from '../staking';
+import { ValidatorChanges, ValidatorSet } from '../staking';
 import { StakeManager, Router, Contract } from '../contracts';
 import { ExtraData } from '../consensus/reimint/extraData';
 import { preHF1ConsensusValidateHeader } from '../validation';
@@ -27,6 +28,26 @@ export function postByzantiumTxReceiptsToReceipts(receipts: PostByzantiumTxRecei
         r.status
       )
   );
+}
+
+export function isEnableGenesisValidators(totalLockedAmount: BN, validatorCount: number, common: Common) {
+  const minTotalLockedAmount = common.param('vm', 'minTotalLockedAmount');
+  if (typeof minTotalLockedAmount !== 'string') {
+    throw new Error('invalid minTotalLockedAmount');
+  }
+  if (totalLockedAmount.lt(new BN(minTotalLockedAmount))) {
+    return true;
+  }
+
+  const minValidatorsCount = common.param('vm', 'minValidatorsCount');
+  if (typeof minValidatorsCount !== 'number') {
+    throw new Error('invalid minValidatorsCount');
+  }
+  if (validatorCount < minValidatorsCount) {
+    return true;
+  }
+
+  return false;
 }
 
 export async function makeRunBlockCallback(node: Node, vm: VM, engine: ConsensusEngine, pendingBlock: Block, runTxOpts: any, parentStakeManager?: StakeManager, parentValidatorSet?: ValidatorSet) {
@@ -75,23 +96,51 @@ export async function makeRunBlockCallback(node: Node, vm: VM, engine: Consensus
           logs = ethLogs.map((raw) => Log.fromValuesArray(raw));
         }
 
-        // filter changes
-        const changes = new ValidatorChanges(parentValidatorSet!);
-        StakeManager.filterReceiptsChanges(changes, receipts, pendingCommon);
-        if (logs) {
-          StakeManager.filterLogsChanges(changes, logs, pendingCommon);
-        }
-        for (const uv of changes.unindexedValidators) {
-          logger.debug('Node::processBlock, unindexedValidators, address:', uv.toString());
-        }
-        for (const vc of changes.changes.values()) {
-          logger.debug('Node::processBlock, change, address:', vc.validator.toString(), 'votingPower:', vc?.votingPower?.toString(), 'update:', vc.update.toString());
+        parentValidatorSet = parentValidatorSet!;
+        const stakeManager = parentStakeManager!;
+        const totalLockedAmount = await stakeManager.totalLockedAmount();
+        const validatorCount = (await stakeManager.indexedValidatorsLength()).toNumber();
+        const enableGenesisValidators = isEnableGenesisValidators(totalLockedAmount, validatorCount, pendingCommon);
+
+        console.log('processBlock, enableGenesisValidators:', enableGenesisValidators);
+
+        if (enableGenesisValidators) {
+          if (!parentValidatorSet.isGenesisValidatorSet()) {
+            console.log('processBlock, create a new genesis validator set');
+            // if the parent validator set isn't a genesis validator set, we create a new one
+            validatorSet = ValidatorSet.createGenesisValidatorSet(pendingCommon);
+          } else {
+            console.log('processBlock, copy from parent');
+            // if the parent validator set is a genesis validator set, we copy the set from the parent
+            validatorSet = parentValidatorSet.copy();
+          }
+        } else {
+          if (parentValidatorSet.isGenesisValidatorSet()) {
+            console.log('processBlock, create a new validator set');
+            // if the parent validator set is a genesis validator set, we create a new set from state trie
+            validatorSet = await ValidatorSet.createFromStakeManager(stakeManager, true);
+          } else {
+            console.log('processBlock, copy from parent and merge changes');
+            // filter changes
+            const changes = new ValidatorChanges(parentValidatorSet);
+            StakeManager.filterReceiptsChanges(changes, receipts, pendingCommon);
+            if (logs) {
+              StakeManager.filterLogsChanges(changes, logs, pendingCommon);
+            }
+            for (const uv of changes.unindexedValidators) {
+              logger.debug('Node::processBlock, unindexedValidators, address:', uv.toString());
+            }
+            for (const vc of changes.changes.values()) {
+              logger.debug('Node::processBlock, change, address:', vc.validator.toString(), 'votingPower:', vc.votingPower?.toString(), 'update:', vc.update.toString());
+            }
+
+            // copy from parent
+            validatorSet = parentValidatorSet!.copy();
+            // merge changes
+            validatorSet.mergeChanges(changes, parentStakeManager);
+          }
         }
 
-        // copy from parent
-        validatorSet = parentValidatorSet!.copy();
-        // merge changes
-        await validatorSet.mergeChanges(changes, parentStakeManager!);
         // increase once
         validatorSet.incrementProposerPriority(1);
       } else {
@@ -101,19 +150,8 @@ export async function makeRunBlockCallback(node: Node, vm: VM, engine: Consensus
           const evm = new EVM(vm, new TxContext(new BN(0), Address.zero()), pendingBlock);
           await Contract.deploy(evm, nextCommon);
 
-          systemCaller = Address.fromString(nextCommon.param('vm', 'scaddr'));
           parentRouter = new Router(evm, nextCommon);
-          parentStakeManager = new StakeManager(evm, nextCommon);
-
-          // stake for genesis validators
-          const genesisValidators = getGenesisValidators(nextCommon);
-          // TODO: config genesis validator voting power
-          await rewardAccount(state, systemCaller, new BN(100).muln(genesisValidators.length));
-          for (const genesisValidator of genesisValidators) {
-            await parentStakeManager.stake(genesisValidator, new BN(100));
-          }
-
-          validatorSet = ValidatorSet.createGenesisValidatorSet(nextCommon, true);
+          validatorSet = ValidatorSet.createGenesisValidatorSet(nextCommon);
 
           // start consensus engine
           node.getReimintEngine()?.start();

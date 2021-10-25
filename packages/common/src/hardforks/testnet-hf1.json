@@ -114,11 +114,11 @@
             "d": "genesis validator addressess"
         },
         "maxValidatorsCount": {
-            "v": 6,
+            "v": 9,
             "d": "max validator set size"
         },
         "minValidatorsCount": {
-            "v": 3,
+            "v": 6,
             "d": "max validator set size"
         },
         "minTotalLockedAmount": {

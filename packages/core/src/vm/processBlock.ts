@@ -137,7 +137,7 @@ export async function makeRunBlockCallback(node: Node, vm: VM, engine: Consensus
             // copy from parent
             validatorSet = parentValidatorSet!.copy();
             // merge changes
-            validatorSet.mergeChanges(changes, parentStakeManager);
+            validatorSet.mergeChanges(changes);
           }
         }
 

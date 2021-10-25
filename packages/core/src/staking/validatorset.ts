@@ -134,11 +134,16 @@ export class ValidatorSet {
    */
   static async createFromStakeManager(sm: StakeManager, sortValidators: boolean = false) {
     const common = sm.common;
+    const genesisValidators = getGenesisValidators(common);
+    const isGenesis = (validator: Address) => {
+      return genesisValidators.filter((gv) => gv.equals(validator)).length > 0;
+    };
+
     const validators = createBufferFunctionalMap<ValidatorInfo>();
     let length = await sm.indexedValidatorsLength();
     for (let i = new BN(0); i.lt(length); i.iaddn(1)) {
       const validator = await sm.indexedValidatorsByIndex(i);
-      const votingPower = await sm.getVotingPowerByIndex(i);
+      const votingPower = isGenesis(validator) ? new BN(100) : await sm.getVotingPowerByIndex(i);
       if (votingPower.gtn(0)) {
         validators.set(validator.buf, {
           validator,
@@ -160,7 +165,7 @@ export class ValidatorSet {
         if (!validators.has(av.validator.buf)) {
           validators.set(av.validator.buf, {
             validator: av.validator,
-            votingPower: await sm.getVotingPowerByAddress(av.validator)
+            votingPower: isGenesis(av.validator) ? new BN(100) : await sm.getVotingPowerByAddress(av.validator)
           });
         }
       }
@@ -253,7 +258,7 @@ export class ValidatorSet {
    * Merge validator set changes
    * @param changes - `ValidatorChanges` instance
    */
-  mergeChanges(changes: ValidatorChanges, sm?: StakeManager) {
+  mergeChanges(changes: ValidatorChanges) {
     // TODO: if the changed validator is an active validator, the active list maybe not be dirty
     let dirty = false;
 

@@ -1,5 +1,6 @@
 import EventEmitter from 'events';
 import { BN, Address, bufferToHex } from 'ethereumjs-util';
+import Semaphore from 'semaphore-async-await';
 import Heap from 'qheap';
 import VM from '@gxchain2-ethereumjs/vm';
 import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Aborter, logger } from '@gxchain2/utils';
@@ -126,6 +127,7 @@ export class TxPool extends EventEmitter {
   private readonly node: Node;
   private readonly initPromise: Promise<void>;
   private readonly rejournalLoopPromise: undefined | Promise<void>;
+  private readonly lock = new Semaphore(1);
 
   private currentBlock!: Block;
   private currentHeader!: BlockHeader;
@@ -179,6 +181,17 @@ export class TxPool extends EventEmitter {
     if (options.journal) {
       this.journal = new Journal(options.journal, this.node);
       this.rejournalLoopPromise = this.rejournalLoop();
+    }
+  }
+
+  private async runWithLock<T>(fn: () => Promise<T>) {
+    try {
+      await this.lock.acquire();
+      return await fn();
+    } catch (err) {
+      throw err;
+    } finally {
+      this.lock.release();
     }
   }
 
@@ -266,7 +279,7 @@ export class TxPool extends EventEmitter {
     }
     this.currentBlock = this.node.blockchain.latestBlock;
     this.currentHeader = this.currentBlock.header;
-    this.currentVM = await this.node.getVM(this.currentHeader.stateRoot, 0);
+    this.currentVM = await this.node.getVM(this.currentHeader.stateRoot, this.currentHeader._common);
     this.currentStateManager = this.currentVM.stateManager as StateManager;
     if (this.journal) {
       await this.journal.load(async (txs: Transaction[]) => {
@@ -312,73 +325,75 @@ export class TxPool extends EventEmitter {
    * @param newBlock - New block
    */
   async newBlock(newBlock: Block) {
-    const bbb = newBlock;
-    console.log('txpool, enter newBlock', bbb.header.number.toNumber(), bbb.hash().toString('hex'));
     await this.initPromise;
-    try {
-      const originalNewBlock = newBlock;
-      let oldBlock = await this.node.db.getBlockByHashAndNumber(this.currentHeader.hash(), this.currentHeader.number);
-      let discarded: Transaction[] = [];
-      const included = createBufferFunctionalSet();
-      while (oldBlock.header.number.gt(newBlock.header.number)) {
-        discarded = discarded.concat(oldBlock.transactions as Transaction[]);
-        oldBlock = await this.node.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
-      }
-      while (newBlock.header.number.gt(oldBlock.header.number)) {
-        for (const tx of newBlock.transactions) {
-          included.add(tx.hash());
+    return await this.runWithLock(async () => {
+      const bbb = newBlock;
+      console.log('txpool, enter newBlock', bbb.header.number.toNumber(), bbb.hash().toString('hex'));
+      try {
+        const originalNewBlock = newBlock;
+        let oldBlock = await this.node.db.getBlockByHashAndNumber(this.currentHeader.hash(), this.currentHeader.number);
+        let discarded: Transaction[] = [];
+        const included = createBufferFunctionalSet();
+        while (oldBlock.header.number.gt(newBlock.header.number)) {
+          discarded = discarded.concat(oldBlock.transactions as Transaction[]);
+          oldBlock = await this.node.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
         }
-        newBlock = await this.node.db.getBlockByHashAndNumber(newBlock.header.parentHash, newBlock.header.number.subn(1));
-      }
-      while (!oldBlock.hash().equals(newBlock.hash()) && oldBlock.header.number.gtn(0) && newBlock.header.number.gtn(0)) {
-        discarded = discarded.concat(oldBlock.transactions as Transaction[]);
-        oldBlock = await this.node.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
-        for (const tx of newBlock.transactions) {
-          included.add(tx.hash());
+        while (newBlock.header.number.gt(oldBlock.header.number)) {
+          for (const tx of newBlock.transactions) {
+            included.add(tx.hash());
+          }
+          newBlock = await this.node.db.getBlockByHashAndNumber(newBlock.header.parentHash, newBlock.header.number.subn(1));
         }
-        newBlock = await this.node.db.getBlockByHashAndNumber(newBlock.header.parentHash, newBlock.header.number.subn(1));
-      }
-      if (!oldBlock.hash().equals(newBlock.hash())) {
-        throw new Error('reorg failed');
-      }
-      let reinject: Transaction[] = [];
-      for (const tx of discarded) {
-        if (!included.has(tx.hash())) {
-          reinject.push(tx);
+        while (!oldBlock.hash().equals(newBlock.hash()) && oldBlock.header.number.gtn(0) && newBlock.header.number.gtn(0)) {
+          discarded = discarded.concat(oldBlock.transactions as Transaction[]);
+          oldBlock = await this.node.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
+          for (const tx of newBlock.transactions) {
+            included.add(tx.hash());
+          }
+          newBlock = await this.node.db.getBlockByHashAndNumber(newBlock.header.parentHash, newBlock.header.number.subn(1));
         }
-      }
-      this.currentBlock = originalNewBlock;
-      this.currentHeader = originalNewBlock.header;
-      this.currentVM = await this.node.getVM(this.currentHeader.stateRoot, this.currentHeader.number);
-      this.currentStateManager = this.currentVM.stateManager as StateManager;
-      const reinjectAccounts = createBufferFunctionalMap<TxPoolAccount>();
-      const getAccount = (addr: Address) => {
-        let account = reinjectAccounts.get(addr.buf);
-        if (!account) {
-          account = this.getAccount(addr);
-          reinjectAccounts.set(addr.buf, account);
+        if (!oldBlock.hash().equals(newBlock.hash())) {
+          throw new Error('reorg failed');
         }
-        return account;
-      };
-      for (const reinjectTx of reinject) {
-        const account = getAccount(reinjectTx.getSenderAddress());
-        account.updatePendingNonce(reinjectTx.nonce, true);
-      }
-      for (const account of reinjectAccounts.values()) {
-        if (account.hasPending()) {
-          const requeue = account.pending.back(await account.getPendingNonce());
-          requeue.forEach((tx) => this.removeTxFromGlobal(tx));
-          reinject = reinject.concat(requeue);
+        let reinject: Transaction[] = [];
+        for (const tx of discarded) {
+          if (!included.has(tx.hash())) {
+            reinject.push(tx);
+          }
         }
+        this.currentBlock = originalNewBlock;
+        this.currentHeader = originalNewBlock.header;
+        this.currentVM = await this.node.getVM(this.currentHeader.stateRoot, this.currentHeader.number);
+        this.currentStateManager = this.currentVM.stateManager as StateManager;
+        const reinjectAccounts = createBufferFunctionalMap<TxPoolAccount>();
+        const getAccount = (addr: Address) => {
+          let account = reinjectAccounts.get(addr.buf);
+          if (!account) {
+            account = this.getAccount(addr);
+            reinjectAccounts.set(addr.buf, account);
+          }
+          return account;
+        };
+        for (const reinjectTx of reinject) {
+          const account = getAccount(reinjectTx.getSenderAddress());
+          account.updatePendingNonce(reinjectTx.nonce, true);
+        }
+        for (const account of reinjectAccounts.values()) {
+          if (account.hasPending()) {
+            const requeue = account.pending.back(await account.getPendingNonce());
+            requeue.forEach((tx) => this.removeTxFromGlobal(tx));
+            reinject = reinject.concat(requeue);
+          }
+        }
+        this.emitReadies((await this._addTxs(reinject, true)).readies);
+        await this.demoteUnexecutables();
+        this.truncatePending();
+        this.truncateQueue();
+      } catch (err) {
+        logger.error('TxPool::newBlock, catch error:', err);
       }
-      this.emitReadies((await this._addTxs(reinject, true)).readies);
-      await this.demoteUnexecutables();
-      this.truncatePending();
-      this.truncateQueue();
-    } catch (err) {
-      logger.error('TxPool::newBlock, catch error:', err);
-    }
-    console.log('txpool, leave newBlock', bbb.header.number.toNumber(), bbb.hash().toString('hex'));
+      console.log('txpool, leave newBlock', bbb.header.number.toNumber(), bbb.hash().toString('hex'));
+    });
   }
 
   /**
@@ -388,17 +403,19 @@ export class TxPool extends EventEmitter {
    */
   async addTxs(txs: Transaction | Transaction[]) {
     await this.initPromise;
-    txs = Array.isArray(txs) ? txs : [txs];
-    try {
-      const result = await this._addTxs(txs, false);
-      this.emitReadies(result.readies);
-      this.truncatePending();
-      this.truncateQueue();
-      return result;
-    } catch (err) {
-      logger.error('TxPool::addTxs, catch error:', err);
-      return { results: new Array<boolean>(txs.length).fill(false) };
-    }
+    return await this.runWithLock(async () => {
+      txs = Array.isArray(txs) ? txs : [txs];
+      try {
+        const result = await this._addTxs(txs, false);
+        this.emitReadies(result.readies);
+        this.truncatePending();
+        this.truncateQueue();
+        return result;
+      } catch (err) {
+        logger.error('TxPool::addTxs, catch error:', err);
+        return { results: new Array<boolean>(txs.length).fill(false) };
+      }
+    });
   }
 
   /**
@@ -406,19 +423,21 @@ export class TxPool extends EventEmitter {
    * @returns A PendingTxMap object
    */
   async getPendingTxMap(number: BN, hash: Buffer) {
-    console.log('txpool, leave getPendingTxMap', number.toNumber(), hash.toString('hex'));
     await this.initPromise;
-    if (!number.eq(this.currentHeader.number) || !hash.equals(this.currentHeader.hash())) {
-      throw new Error(`invalid number and hash, ${number.toString()}, ${bufferToHex(hash)}, current, ${this.currentHeader.number.toString()}, ${bufferToHex(this.currentHeader.hash())}`);
-    }
-    const pendingMap = new PendingTxMap();
-    for (const [sender, account] of this.accounts) {
-      if (!account.hasPending()) {
-        continue;
+    return await this.runWithLock(async () => {
+      console.log('txpool, enter getPendingTxMap', number.toNumber(), hash.toString('hex'));
+      if (!number.eq(this.currentHeader.number) || !hash.equals(this.currentHeader.hash())) {
+        throw new Error(`invalid number and hash, ${number.toString()}, ${bufferToHex(hash)}, current, ${this.currentHeader.number.toString()}, ${bufferToHex(this.currentHeader.hash())}`);
       }
-      pendingMap.push(sender, account.pending.toList());
-    }
-    return pendingMap;
+      const pendingMap = new PendingTxMap();
+      for (const [sender, account] of this.accounts) {
+        if (!account.hasPending()) {
+          continue;
+        }
+        pendingMap.push(sender, account.pending.toList());
+      }
+      return pendingMap;
+    });
   }
 
   /**

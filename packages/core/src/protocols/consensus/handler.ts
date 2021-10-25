@@ -319,10 +319,14 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
       try {
         cachedBlockHeader = await this.node.db.getCanonicalHeader(height);
         // notice: we use parent stateRoot to get validator set
-        const parentHeader = await this.node.db.getHeader(cachedBlockHeader.parentHash, cachedBlockHeader.number.subn(1));
-        const valSet = this.node.validatorSets.directlyGet(parentHeader.stateRoot);
+        const parentBlock = await this.node.db.getBlockByHashAndNumber(cachedBlockHeader.parentHash, cachedBlockHeader.number.subn(1));
+        const parentHeader = parentBlock.header;
+        const parentStateRoot = parentHeader.stateRoot;
+        const parentCommon = parentHeader._common;
+        let valSet = this.node.validatorSets.directlyGet(parentStateRoot);
         if (!valSet) {
-          throw new Error('missing validator set');
+          const vm = await this.node.getVM(parentStateRoot, parentCommon);
+          valSet = await this.node.validatorSets.get(parentStateRoot, this.node.getStakeManager(vm, parentBlock, parentCommon));
         }
         cachedExtraData = ExtraData.fromBlockHeader(cachedBlockHeader, { valSet });
         return cachedExtraData.voteSet;

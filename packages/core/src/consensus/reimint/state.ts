@@ -974,8 +974,4 @@ export class StateMachine {
       return this.votes.prevotes(proposalPOLRound);
     }
   }
-
-  pickVoteSetFromDatabase(height: BN) {
-    return !height.isZero() && this.height.gt(height);
-  }
 }

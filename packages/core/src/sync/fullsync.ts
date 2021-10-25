@@ -64,12 +64,15 @@ export class FullSynchronizer extends Synchronizer {
       return false;
     }
     const result = await (this.syncingPromise = new Promise<boolean>(async (resolve) => {
-      let bestPeerHandler!: WireProtocolHandler;
+      let bestPeerHandler: WireProtocolHandler | undefined;
       let bestHeight!: number;
       let bestTD!: BN;
 
       if (peer) {
-        bestPeerHandler = WireProtocol.getHandler(peer);
+        bestPeerHandler = WireProtocol.getHandler(peer, false);
+        if (!bestPeerHandler) {
+          return resolve(false);
+        }
         bestHeight = bestPeerHandler.status!.height;
         bestTD = new BN(bestPeerHandler.status!.totalDifficulty);
         if (bestTD.lte(this.node.blockchain.totalDifficulty)) {

@@ -77,6 +77,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
     process(this: ConsensusProtocolHander, msg: ProposalMessage) {
       this.setHasProposal(msg.proposal);
       this.reimint?.state.newMessage(this.peer.peerId, msg);
+      console.log('received proposal:', msg);
     }
   },
   {
@@ -308,53 +309,12 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
       return;
     }
 
-    // save latest query result
-    let cachedBlockHeader: BlockHeader | undefined;
-    let cachedExtraData: ExtraData | undefined;
-    const getVoteSetByHeight = async (height: BN) => {
-      if (cachedBlockHeader && cachedBlockHeader.number.eq(height)) {
-        return cachedExtraData?.voteSet;
-      }
-
-      try {
-        cachedBlockHeader = await this.node.db.getCanonicalHeader(height);
-        // notice: we use parent stateRoot to get validator set
-        const parentBlock = await this.node.db.getBlockByHashAndNumber(cachedBlockHeader.parentHash, cachedBlockHeader.number.subn(1));
-        const parentHeader = parentBlock.header;
-        const parentStateRoot = parentHeader.stateRoot;
-        const parentCommon = parentHeader._common;
-        let valSet = this.node.validatorSets.directlyGet(parentStateRoot);
-        if (!valSet) {
-          const vm = await this.node.getVM(parentStateRoot, parentCommon);
-          valSet = await this.node.validatorSets.get(parentStateRoot, this.node.getStakeManager(vm, parentBlock, parentCommon));
-        }
-        cachedExtraData = ExtraData.fromBlockHeader(cachedBlockHeader, { valSet });
-        return cachedExtraData.voteSet;
-      } catch (err: any) {
-        console.log('getVoteSetByHeight, catch error:', err);
-        cachedBlockHeader = undefined;
-        cachedExtraData = undefined;
-        return;
-      }
-    };
-
     while (!this.aborted) {
       try {
         // pick vote from memory and send
         const votes = reimint.state.pickVoteSetToSend(this.height, this.round, this.proposalPOLRound, this.step);
         if (votes && this.pickAndSend(votes)) {
           continue;
-        }
-
-        // pick vote from database and send
-        if (reimint.state.pickVoteSetFromDatabase(this.height)) {
-          const height = this.height;
-          const votes = await getVoteSetByHeight(this.height);
-          if (!this.aborted && votes && height.eq(this.height) && this.pickAndSend(votes)) {
-            console.log('send succeed');
-            continue;
-          }
-          console.log('send failed', this.aborted, !!votes, height.eq(this.height));
         }
       } catch (err) {
         logger.error('ConsensusProtocolHander::gossipVotesLoop, catch error:', err);

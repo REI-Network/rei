@@ -167,6 +167,7 @@ export class NetworkManager extends EventEmitter {
    * @param peerId - Target peer
    */
   async removePeer(peerId: string) {
+    this.timeout.delete(peerId);
     const peer = this._peers.get(peerId);
     if (peer) {
       this._peers.delete(peerId);

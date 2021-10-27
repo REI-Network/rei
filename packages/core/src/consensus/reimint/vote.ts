@@ -1,5 +1,5 @@
 import { Address, BN, ecsign, ecrecover, rlp, intToBuffer, bnToUnpaddedBuffer, rlphash, bufferToInt } from 'ethereumjs-util';
-import { createBufferFunctionalMap } from '@gxchain2/utils';
+import { createBufferFunctionalMap, logger } from '@gxchain2/utils';
 import { ValidatorSet } from '../../staking';
 import { BitArray } from './bitArray';
 
@@ -136,7 +136,6 @@ export class Vote {
     }
     const validator = this.validator();
     if (!validator.equals(valSet.getValidatorByIndex(this.index))) {
-      console.log('invalid signature, (v,vs,i)', validator.toString(), valSet.getValidatorByIndex(this.index).toString(), this.index);
       throw new Error('invalid signature');
     }
     return validator;
@@ -207,7 +206,6 @@ export class VoteSet {
 
   addVote(vote: Vote) {
     if (!vote.height.eq(this.height) || vote.round !== this.round || vote.type !== this.signedMsgType) {
-      console.log('unexpected vote:', vote.height.toNumber(), vote.round, vote.type, 'local:', this.height.toNumber(), this.round, this.signedMsgType);
       throw new Error('unexpected vote');
     }
 
@@ -215,7 +213,7 @@ export class VoteSet {
     const validator = vote.validateSignature(this.valSet);
     const votingPower = this.valSet.getVotingPower(validator);
 
-    console.log('addVote for:', validator.toString(), 'voting power:', votingPower.toString());
+    logger.debug('VoteSet::addVote, add vote for:', validator.toString(), 'voting power:', votingPower.toString());
     return this.addVerifiedVote(vote, votingPower);
   }
 

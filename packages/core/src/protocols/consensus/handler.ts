@@ -77,7 +77,6 @@ const consensusHandlerFuncs: HandlerFunc[] = [
     process(this: ConsensusProtocolHander, msg: ProposalMessage) {
       this.setHasProposal(msg.proposal);
       this.reimint?.state.newMessage(this.peer.peerId, msg);
-      console.log('received proposal:', msg);
     }
   },
   {
@@ -290,7 +289,7 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
         if (!this.proposal) {
           const proposalMessage = reimint.state.genProposalMessage(this.height, this.round);
           if (proposalMessage) {
-            console.log('send proposal msg to:', this.peer.peerId);
+            logger.debug('ConsensusProtocolHander::gossipDataLoop, send proposal to:', this.peer.peerId);
             this.sendMessage(proposalMessage);
             this.setHasProposal(proposalMessage.proposal);
           }
@@ -351,7 +350,7 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
   private pickAndSend(votes: VoteSet) {
     const vote = this.pickRandom(votes);
     if (vote) {
-      console.log('send vote msg to:', this.peer.peerId, vote.type);
+      logger.debug('ConsensusProtocolHander::gossipDataLoop, send vote:', vote.index, 'to:', this.peer.peerId);
       this.sendMessage(new VoteMessage(vote));
       this.setHasVote(vote.height, vote.round, vote.type, vote.index);
       return true;
@@ -491,7 +490,6 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
   }
 
   setHasVote(height: BN, round: number, type: VoteType, index: number) {
-    console.log('hasVote: (h,r,t,i)', height.toNumber(), round, type, index, 'peerId:', this.peer.peerId);
     this.getVoteBitArray(height, round, type)?.setIndex(index, true);
   }
 

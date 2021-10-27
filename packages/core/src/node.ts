@@ -13,7 +13,7 @@ import VM from '@gxchain2-ethereumjs/vm';
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
-import { Transaction, Block, BlockHeader } from '@gxchain2/structure';
+import { Transaction, Block } from '@gxchain2/structure';
 import { Channel, Aborter, logger } from '@gxchain2/utils';
 import { AccountManager } from '@gxchain2/wallet';
 import { TxPool } from './txpool';
@@ -551,7 +551,6 @@ export class Node {
    * @param options - Send options {@link SendMessageOptions}
    */
   broadcastMessage(msg: Message, options: SendMessageOptions) {
-    console.log('broadcastMessage:', msg);
     if (options.broadcast) {
       for (const handler of ConsensusProtocol.getPool().handlers) {
         handler.sendMessage(msg);

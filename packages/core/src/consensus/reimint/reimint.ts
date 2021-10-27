@@ -1,6 +1,7 @@
 import { Address, BN, toBuffer, setLengthLeft } from 'ethereumjs-util';
 import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions, Transaction } from '@gxchain2/structure';
 import { Common } from '@gxchain2/common';
+import { logger } from '@gxchain2/utils';
 import { ConsensusEngine, ConsensusEngineOptions } from '../consensusEngine';
 import { EMPTY_ADDRESS, EMPTY_EXTRA_DATA } from '../utils';
 import { ConsensusEngineBase } from '../consensusEngineBase';
@@ -90,7 +91,7 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
   //////////////////////////
 
   protected _start() {
-    console.log('reimint start!');
+    logger.debug('ReimintConsensusEngine::_start');
     this.state.start();
   }
 
@@ -107,7 +108,6 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
     // create a new pending block through worker
     const pendingBlock = await this.worker.createPendingBlock(header);
     if (!this.enable || this.node.sync.isSyncing) {
-      console.log('reimint is disabled, return', this.enable, this.node.sync.isSyncing);
       return;
     }
 

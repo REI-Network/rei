@@ -101,14 +101,6 @@ function precommitDutaion(round: number) {
   return 1000 + 500 * round;
 }
 
-function periodTimeout(time: number, common: Common) {
-  const period = common.consensusConfig().period;
-  if (typeof period !== 'number') {
-    throw new Error('invalid period');
-  }
-  return common.consensusConfig().period * 1e3 + time;
-}
-
 /////////////////////// config ///////////////////////
 
 export class StateMachine {
@@ -200,11 +192,11 @@ export class StateMachine {
   }
 
   private handleTimeout(ti: TimeoutInfo) {
-    console.log('enter handleTimeout', ti);
     if (!ti.height.eq(this.height) || ti.round < this.round || (ti.round === this.round && ti.step < this.step)) {
-      logger.debug('StateMachine::handleTimeout, ignoring tock because we are ahead:', ti, 'local:', this.height.toNumber(), this.round, this.step);
+      logger.debug('StateMachine::handleTimeout, ignoring tock because we are ahead:', ti, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
+    logger.debug('StateMachine::handleTimeout, timeout info:', ti);
 
     switch (ti.step) {
       case RoundStepType.NewHeight:
@@ -214,7 +206,6 @@ export class StateMachine {
         this.enterPropose(ti.height, 0);
         break;
       case RoundStepType.Propose:
-        // TODO: emit a event
         this.enterPrevote(ti.height, ti.round);
         break;
       case RoundStepType.PrevoteWait:
@@ -232,14 +223,14 @@ export class StateMachine {
   // private handleTxsAvailable() {}
 
   private setProposal(proposal: Proposal, peerId: string) {
-    console.log('enter setProposal');
+    logger.debug('StateMachine::setProposal');
     if (this.proposal) {
-      console.log('repeat setProposal');
+      logger.debug('StateMachine::setProposal, proposal already exists');
       return;
     }
 
     if (!this.height.eq(proposal.height) || this.round !== proposal.round) {
-      console.log('invalid setProposal');
+      logger.debug('StateMachine::setProposal, invalid proposal(h,r):', proposal.height.toString(), proposal.round, 'local(h,r):', this.height.toString(), this.round);
       return;
     }
 
@@ -269,9 +260,9 @@ export class StateMachine {
   }
 
   private addProposalBlock(block: Block) {
-    console.log('enter addProposalBlock');
+    logger.debug('StateMachine::addProposalBlock');
     if (this.proposalBlock) {
-      console.log('repeat addProposalBlock');
+      logger.debug('StateMachine::setProposal, proposal block already exists');
       return;
     }
     if (this.proposalBlockHash === undefined) {
@@ -282,15 +273,13 @@ export class StateMachine {
     }
     // TODO: validate block?
     this.proposalBlock = block;
-    logger.debug('StateMachine::addProposalBlock, applied');
     const prevotes = this.votes.prevotes(this.round);
     const maj23Hash = prevotes?.maj23;
     if (maj23Hash && !isEmptyHash(maj23Hash) && this.validRound < this.round) {
       if (this.proposalBlockHash.equals(maj23Hash)) {
-        logger.debug('StateMachine::addProposalBlock, update valid block, round:', this.round, 'hash:', bufferToHex(maj23Hash));
-
         this.validRound = this.round;
         this.validBlock = this.proposalBlock;
+        logger.debug('StateMachine::addProposalBlock, update valid block, round:', this.round, 'hash:', bufferToHex(maj23Hash));
       }
     }
 
@@ -305,10 +294,10 @@ export class StateMachine {
   }
 
   private addVote(vote: Vote, peerId: string) {
-    logger.debug('StateMachine::addVote, vote:', vote.height.toNumber(), 'hash:', vote.hash.toString('hex'), 'type:', vote.type, 'from:', peerId);
+    logger.debug('StateMachine::addVote, height:', vote.height.toString(), 'hash:', bufferToHex(vote.hash), 'type:', vote.type, 'from:', peerId);
 
     if (!vote.height.eq(vote.height)) {
-      logger.debug('StateMachine::addVote, unequal height, ignore, vote:', vote.height.toString(), 'state machine:', this.height.toString());
+      logger.debug('StateMachine::addVote, unequal height, ignore, height:', vote.height.toString(), 'local:', this.height.toString());
       return;
     }
 
@@ -327,8 +316,6 @@ export class StateMachine {
             if (this.lockedBlock !== undefined && this.lockedRound < vote.round && vote.round <= this.round && !this.lockedBlock.hash().equals(maj23Hash)) {
               this.lockedRound = -1;
               this.lockedBlock = undefined;
-
-              // TODO: emit unlock event
             }
 
             // try to update valid block
@@ -413,15 +400,11 @@ export class StateMachine {
   }
 
   private enterNewRound(height: BN, round: number) {
-    console.log('enter enterNewRound');
+    logger.debug('StateMachine::enterNewRound, height:', height.toString(), 'round:', round);
 
     if (!this.height.eq(height) || round < this.round || (this.round === round && this.step !== RoundStepType.NewHeight)) {
-      logger.debug('StateMachine::enterNewRound, invalid args', height.toNumber(), round, 'local:', this.height.toNumber(), this.round, this.step);
+      logger.debug('StateMachine::enterNewRound, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
-    }
-
-    if (this.startTime > Date.now()) {
-      logger.debug('...?');
     }
 
     let validators = this.validators;
@@ -515,15 +498,15 @@ export class StateMachine {
   }
 
   private signVote(type: VoteType, hash: Buffer) {
-    console.log('enter signVote, (t, hash)', type, hash.toString('hex'));
+    logger.debug('StateMachine::signVote, type:', type, 'hash:', bufferToHex(hash));
     if (!this.signer) {
-      console.log('empty signer');
+      logger.debug('StateMachine::signVote, empty signer');
       return;
     }
 
     const index = this.validators.getIndexByAddress(this.signer.address());
     if (index === undefined) {
-      console.log('empty index');
+      logger.debug('StateMachine::signVote, undefined index');
       return;
     }
 
@@ -545,10 +528,10 @@ export class StateMachine {
   }
 
   private enterPropose(height: BN, round: number) {
-    console.log('enter enterPropose');
+    logger.debug('StateMachine::enterPropose, height:', height.toString(), 'round:', round);
 
     if (!this.height.eq(height) || round < this.round || (this.round === round && RoundStepType.Propose <= this.step)) {
-      logger.debug('StateMachine::enterProposal, invalid args', height.toNumber(), round, 'local:', this.height.toNumber(), this.round, this.step);
+      logger.debug('StateMachine::enterPropose, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
 
@@ -570,12 +553,12 @@ export class StateMachine {
     });
 
     if (!this.signer) {
-      console.log('empty signer');
+      logger.debug('StateMachine::enterPropose, empty signer');
       return update();
     }
 
     if (!this.validators.proposer.equals(this.signer.address())) {
-      console.log('proposer no equal');
+      logger.debug('StateMachine::enterPropose, invalid proposer');
       return update();
     }
 
@@ -584,10 +567,10 @@ export class StateMachine {
   }
 
   private enterPrevote(height: BN, round: number) {
-    console.log('enter enterPrevote');
+    logger.debug('StateMachine::enterPrevote, height:', height.toString(), 'round:', round);
 
     if (!this.height.eq(height) || round < this.round || (this.round === round && RoundStepType.Prevote <= this.step)) {
-      logger.debug('StateMachine::enterPrevote, invalid args', height.toNumber(), round, 'local:', this.height.toNumber(), this.round, this.step);
+      logger.debug('StateMachine::enterPrevote, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
 
@@ -618,10 +601,10 @@ export class StateMachine {
   }
 
   private enterPrevoteWait(height: BN, round: number) {
-    console.log('enter enterPrevoteWait');
+    logger.debug('StateMachine::enterPrevoteWait, height:', height.toString(), 'round:', round);
 
     if (!this.height.eq(height) || round < this.round || (this.round === round && RoundStepType.PrevoteWait <= this.step)) {
-      logger.debug('StateMachine::enterPrevoteWait, invalid args', height.toNumber(), round, 'local:', this.height.toNumber(), this.round, this.step);
+      logger.debug('StateMachine::enterPrevoteWait, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
 
@@ -645,10 +628,10 @@ export class StateMachine {
   }
 
   private enterPrecommit(height: BN, round: number) {
-    console.log('enter enterPrecommit');
+    logger.debug('StateMachine::enterPrecommit, height:', height.toString(), 'round:', round);
 
     if (!this.height.eq(height) || round < this.round || (this.round === round && RoundStepType.Precommit <= this.step)) {
-      logger.debug('StateMachine::enterPrecommit, invalid args', height.toNumber(), round, 'local:', this.height.toNumber(), this.round, this.step);
+      logger.debug('StateMachine::enterPrecommit, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
 
@@ -712,10 +695,10 @@ export class StateMachine {
   }
 
   private enterPrecommitWait(height: BN, round: number) {
-    console.log('enter enterPrecommitWait');
+    logger.debug('StateMachine::enterPrecommitWait, height:', height.toString(), 'round:', round);
 
     if (!this.height.eq(height) || round < this.round || (this.round === round && this.triggeredTimeoutPrecommit)) {
-      logger.debug('StateMachine::enterPrecommitWait, invalid args', height.toNumber(), round, 'local:', this.height.toNumber(), this.round, this.step);
+      logger.debug('StateMachine::enterPrecommitWait, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
 
@@ -738,10 +721,10 @@ export class StateMachine {
   }
 
   private enterCommit(height: BN, commitRound: number) {
-    console.log('enter enterCommit');
+    logger.debug('StateMachine::enterCommit, height:', height.toString(), 'commitRound:', commitRound);
 
     if (!this.height.eq(height) || RoundStepType.Commit <= this.step) {
-      logger.debug('StateMachine::enterCommit, invalid args', height.toNumber(), commitRound, 'local:', this.height.toNumber(), this.round, this.step);
+      logger.debug('StateMachine::enterCommit, invalid args(h,r):', height.toString(), commitRound, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
 
@@ -775,7 +758,7 @@ export class StateMachine {
   }
 
   private tryFinalizeCommit(height: BN) {
-    console.log('enter tryFinalizeCommit');
+    logger.debug('StateMachine::tryFinalizeCommit, height:', height.toString());
 
     if (!this.height.eq(height) || this.step !== RoundStepType.Commit) {
       throw new Error('tryFinalizeCommit invalid args');
@@ -784,22 +767,21 @@ export class StateMachine {
     const precommits = this.votes.precommits(this.commitRound);
     const maj23Hash = precommits?.maj23;
     if (!precommits || !maj23Hash || isEmptyHash(maj23Hash)) {
-      console.log('empty maj23');
+      logger.debug('StateMachine::tryFinalizeCommit, empty maj23 hash');
       return;
     }
 
     if (!this.proposal || !this.proposal.hash.equals(maj23Hash)) {
-      console.log('empty proposal');
+      logger.debug('StateMachine::tryFinalizeCommit, invalid proposal');
       return;
     }
 
     if (!this.proposalBlock || !this.proposalBlock.hash().equals(maj23Hash)) {
-      console.log('empty proposalBlock');
+      logger.debug('StateMachine::tryFinalizeCommit, invalid proposal block');
       return;
     }
 
     // TODO: validate proposalBlock
-    // TODO: save seenCommit
 
     const finalizedBlock = this.reimint.generateFinalizedBlock({ ...this.proposalBlock.header }, [...this.proposalBlock.transactions], this.proposal, precommits, { common: this.proposalBlock._common });
     if (!finalizedBlock.hash().equals(maj23Hash)) {
@@ -810,7 +792,7 @@ export class StateMachine {
     this.node
       .processBlock(finalizedBlock, { broadcast: true })
       .then((reorged) => {
-        logger.debug('StateMachine::tryFinalizeCommit, mint a block');
+        logger.info('⛏️  Mine block, height:', finalizedBlock.header.number.toString(), 'hash:', bufferToHex(finalizedBlock.hash()));
         if (reorged) {
           // try to continue minting
           this.node.onMintBlock();
@@ -848,19 +830,18 @@ export class StateMachine {
   }
 
   newBlockHeader(header: BlockHeader, validators: ValidatorSet, pendingBlock: PendingBlock) {
-    console.log('newBlockHeader', header.number.toNumber());
     // TODO: pretty this
-    if (this.commitRound > -1 && this.height.gtn(0) && !this.height.eq(header.number)) {
-      throw new Error('newBlockHeader invalid args');
-    }
+    // if (this.commitRound > -1 && this.height.gtn(0) && !this.height.eq(header.number)) {
+    //   throw new Error('newBlockHeader invalid args');
+    // }
 
     const timestamp = Date.now();
     this.parentHash = header.hash();
     this.height = header.number.addn(1);
     this.round = 0;
     this.step = RoundStepType.NewHeight;
-    this.startTime = periodTimeout(this.commitTime ?? timestamp, header._common);
-    console.log('startTime:', this.startTime);
+    const pendingBlockTimestamp = pendingBlock.timestamp * 1e3;
+    this.startTime = timestamp > pendingBlockTimestamp ? timestamp : pendingBlockTimestamp;
     this.validators = validators;
     this.proposal = undefined;
     this.proposalBlock = undefined;
@@ -876,13 +857,14 @@ export class StateMachine {
     this.newStep(timestamp);
 
     const duration = this.startTime - timestamp;
-    console.log('duration:', duration);
     this.timeoutTicker.schedule({
       duration,
       step: RoundStepType.NewHeight,
       height: this.height.clone(),
       round: 0
     });
+
+    logger.debug('StateMachine::newBlockHeader, lastest height:', header.number.toString(), 'next round should start at:', this.startTime);
   }
 
   newMessage(peerId: string, msg: Message) {

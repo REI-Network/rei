@@ -239,13 +239,10 @@ export async function processBlock(this: Node, options: ProcessBlockOpts) {
   await vm.runBlock(runBlockOptions);
 
   logger.info('✨ Process block, height:', header.number.toString(), 'hash:', bufferToHex(block.hash()));
+
   const before = this.blockchain.latestBlock.hash();
-
   // call `onAfterRunBlock` to save receipts and block
-  console.log('beforePutBlock:', block.header.extraData.toString('hex'), block.header.number.toNumber());
   await callbacks.onAfterRunBlock(this, block);
-
   const after = this.blockchain.latestBlock.hash();
-
   return !before.equals(after);
 }

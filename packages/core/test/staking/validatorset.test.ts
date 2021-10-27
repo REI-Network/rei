@@ -1,29 +1,23 @@
 import { expect, assert } from 'chai';
 import { Address, BN, BNLike, MAX_INTEGER } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
-import { FunctionalMap } from '@gxchain2/utils';
-import { ValidatorSet, ValidatorChanges } from '../../src/staking';
+import { FunctionalMap, createBufferFunctionalMap } from '@gxchain2/utils';
+import { ValidatorSet, ValidatorChanges, ValidatorInfo } from '../../src/staking';
 
 function createCommon(num: BNLike) {
   return Common.createCommonByBlockNumber(num, 'gxc2-testnet');
 }
 
-const stakeManager: any = {
-  getVotingPowerByAddress: async () => {
-    return new BN(0);
-  }
-};
-
-async function createValidatorSet(validators: { [name: string]: number | BN }, fill = false) {
+async function createValidatorSet(validators: { [name: string]: number | BN }) {
   const common = createCommon(1);
   const num = common.hardforkBlockBN('testnet-hf1')!;
   common.setHardforkByBlockNumber(num);
-  const vs = ValidatorSet.createGenesisValidatorSet(common, fill);
+  const vs = new ValidatorSet(createBufferFunctionalMap<ValidatorInfo>(), [], common);
   const changes = new ValidatorChanges(vs);
   for (const [name, votingPower] of Object.entries(validators)) {
     changes.index(n2a(name), typeof votingPower === 'number' ? new BN(votingPower) : votingPower);
   }
-  await vs.mergeChanges(changes, stakeManager);
+  await vs.mergeChanges(changes);
   vs.incrementProposerPriority(1);
   return vs;
 }
@@ -49,16 +43,20 @@ function a2n(address: Address) {
 
 describe('ValidatorSet', async () => {
   it('should fill genesis validators', async () => {
-    const vs = (await createValidatorSet({}, true)) as any;
-    const genesisValidators = vs.common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr)) as Address[];
+    const common = createCommon(1);
+    const num = common.hardforkBlockBN('testnet-hf1')!;
+    common.setHardforkByBlockNumber(num);
+    const vs = ValidatorSet.createGenesisValidatorSet(common);
+
+    const genesisValidators = common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr)) as Address[];
     genesisValidators.sort((a, b) => a.buf.compare(b.buf) as 1 | -1 | 0);
     for (let i = 0; i < genesisValidators.length; i++) {
-      expect(vs.active[i].validator.equals(genesisValidators[i]), 'genesis validator address should be equal');
+      expect((vs as any).active[i].validator.equals(genesisValidators[i]), 'genesis validator address should be equal');
     }
   });
 
   it('should choose correct validator', async () => {
-    const vs = (await createValidatorSet({ foo: 1000, bar: 300, baz: 330 }, true)) as any;
+    const vs = (await createValidatorSet({ foo: 1000, bar: 300, baz: 330 })) as any;
     const active = vs.active;
     expect(active[0].validator.toString()).equal(n2a('foo').toString());
     expect(active[1].validator.toString()).equal(n2a('baz').toString());

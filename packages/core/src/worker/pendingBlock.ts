@@ -250,6 +250,7 @@ export class PendingBlock {
         parentStakeManager = this.node.getStakeManager(vm, pendingBlock);
         parentValidatorSet = await this.node.validatorSets.get(this.parentStateRoot, parentStakeManager);
         if (times) {
+          parentValidatorSet = parentValidatorSet.copy();
           parentValidatorSet.incrementProposerPriority(times);
         }
       }

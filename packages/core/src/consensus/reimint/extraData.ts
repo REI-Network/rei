@@ -84,9 +84,6 @@ export class ExtraData {
   readonly voteSet?: VoteSet;
 
   static fromBlockHeader(header: BlockHeader, options?: ExtraDataFromBlockHeaderOptions) {
-    // const obj = Object.create(null);
-    // Error.captureStackTrace(obj);
-    // console.log('ExtraData::fromBlockHeader', header.number.toNumber(), 'exdata:', header.extraData.toString('hex'), 'stack:', obj.stack);
     if (header.extraData.length <= CLIQUE_EXTRA_VANITY) {
       throw new Error('invalid header');
     }
@@ -115,9 +112,6 @@ export class ExtraData {
     if (valSet) {
       // validator size + 1(round and POLRound list) + 1(evidence list) + 1(proposal)
       if (values.length !== valSet.length + 3) {
-        const obj = Object.create(null);
-        Error.captureStackTrace(obj);
-        console.log('valSet.length:', valSet.length, 'values:', values, 'stack:', obj.stack);
         throw new Error('invalid values length');
       }
     }

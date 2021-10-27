@@ -327,8 +327,6 @@ export class TxPool extends EventEmitter {
   async newBlock(newBlock: Block) {
     await this.initPromise;
     return await this.runWithLock(async () => {
-      const bbb = newBlock;
-      console.log('txpool, enter newBlock', bbb.header.number.toNumber(), bbb.hash().toString('hex'));
       try {
         const originalNewBlock = newBlock;
         let oldBlock = await this.node.db.getBlockByHashAndNumber(this.currentHeader.hash(), this.currentHeader.number);
@@ -392,7 +390,6 @@ export class TxPool extends EventEmitter {
       } catch (err) {
         logger.error('TxPool::newBlock, catch error:', err);
       }
-      console.log('txpool, leave newBlock', bbb.header.number.toNumber(), bbb.hash().toString('hex'));
     });
   }
 
@@ -425,9 +422,9 @@ export class TxPool extends EventEmitter {
   async getPendingTxMap(number: BN, hash: Buffer) {
     await this.initPromise;
     return await this.runWithLock(async () => {
-      console.log('txpool, enter getPendingTxMap', number.toNumber(), hash.toString('hex'));
       if (!number.eq(this.currentHeader.number) || !hash.equals(this.currentHeader.hash())) {
-        throw new Error(`invalid number and hash, ${number.toString()}, ${bufferToHex(hash)}, current, ${this.currentHeader.number.toString()}, ${bufferToHex(this.currentHeader.hash())}`);
+        // TODO: fix this condition
+        return undefined;
       }
       const pendingMap = new PendingTxMap();
       for (const [sender, account] of this.accounts) {

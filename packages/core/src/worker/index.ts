@@ -48,32 +48,21 @@ export class Worker {
       nexTimestamp = now;
     }
 
-    const newPendingBlock = new PendingBlock(parentHash, header.stateRoot, nextNumber, new BN(nexTimestamp), nextCommon, this.consensusEngine, this.node);
+    // get pending transactions for txpool
+    const txs = await this.node.txPool.getPendingTxMap(header.number, parentHash);
 
-    let txs: PendingTxMap | undefined;
-    try {
-      await this.lock.acquire();
+    await this.lock.acquire();
+    this.pendingBlock = new PendingBlock(parentHash, header.stateRoot, nextNumber, new BN(nexTimestamp), nextCommon, this.consensusEngine, this.node);
+    this.lock.release();
 
-      // get pending transactions for txpool
-      txs = await this.node.txPool.getPendingTxMap(header.number, parentHash);
-      this.pendingBlock = newPendingBlock;
-
-      return this.pendingBlock;
-    } catch (err) {
-      logger.error('Worker::newBlockHeader, catch error:', err);
-      this.pendingBlock = undefined;
-      // return an empty pending block
-      return newPendingBlock;
-    } finally {
-      this.lock.release();
-
-      if (txs) {
-        // async append txs to pending block
-        newPendingBlock?.appendTxs(txs).catch((err) => {
-          logger.error('Worker::newBlockHeader, appendTxs, catch error:', err);
-        });
-      }
+    if (txs) {
+      // async append txs to pending block
+      this.pendingBlock.appendTxs(txs).catch((err) => {
+        logger.error('Worker::newBlockHeader, appendTxs, catch error:', err);
+      });
     }
+
+    return this.pendingBlock;
   }
 
   /**
@@ -87,13 +76,13 @@ export class Worker {
       return;
     }
 
+    const txs = new PendingTxMap();
+    for (const [sender, sortedTxs] of _txs) {
+      txs.push(sender, sortedTxs);
+    }
+
     try {
       await this.lock.acquire();
-
-      const txs = new PendingTxMap();
-      for (const [sender, sortedTxs] of _txs) {
-        txs.push(sender, sortedTxs);
-      }
       await this.pendingBlock.appendTxs(txs);
     } catch (err) {
       logger.error('Worker::addTxs, catch error:', err);

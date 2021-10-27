@@ -52,13 +52,13 @@ function cloneActiveValidator(av: ActiveValidator) {
 function sort(maxCount: number, validators: Map<Buffer, ValidatorInfo>) {
   // create a heap to keep the maximum count validator
   const heap = new Heap({
-    comparBefore: (a: ValidatorInfo, b: ValidatorInfo) => {
+    compar: (a: ValidatorInfo, b: ValidatorInfo) => {
       let num = a.votingPower.cmp(b.votingPower);
       if (num === 0) {
-        // num = (-1 * a.validator.buf.compare(b.validator.buf)) as 1 | -1 | 0;
         num = a.validator.buf.compare(b.validator.buf) as 1 | -1 | 0;
+        num *= -1;
       }
-      return num === -1;
+      return num;
     }
   });
   for (const v of validators.values()) {

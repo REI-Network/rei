@@ -1,6 +1,5 @@
 import { Address, BN, intToBuffer, ecsign, bufferToHex } from 'ethereumjs-util';
 import { Channel, logger } from '@gxchain2/utils';
-import { Common } from '@gxchain2/common';
 import { Block, BlockHeader } from '@gxchain2/structure';
 import { Node } from '../../node';
 import { ValidatorSet } from '../../staking';
@@ -294,7 +293,7 @@ export class StateMachine {
   }
 
   private addVote(vote: Vote, peerId: string) {
-    logger.debug('StateMachine::addVote, height:', vote.height.toString(), 'hash:', bufferToHex(vote.hash), 'type:', vote.type, 'from:', peerId);
+    logger.debug('StateMachine::addVote, vote(h,r,h,t):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, 'from:', peerId);
 
     if (!vote.height.eq(vote.height)) {
       logger.debug('StateMachine::addVote, unequal height, ignore, height:', vote.height.toString(), 'local:', this.height.toString());

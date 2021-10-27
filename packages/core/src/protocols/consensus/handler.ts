@@ -1,5 +1,5 @@
-import { rlp, BN, bnToUnpaddedBuffer, intToBuffer, bufferToInt } from 'ethereumjs-util';
-import { Block, BlockHeader } from '@gxchain2/structure';
+import { rlp, BN, bnToUnpaddedBuffer, intToBuffer, bufferToInt, bufferToHex } from 'ethereumjs-util';
+import { Block } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
 import { Message, NewRoundStepMessage, NewValidBlockMessage, HasVoteMessage, Proposal, Vote, ProposalPOLMessage, VoteSetMaj23Message, VoteSetBitsMessage, GetProposalBlockMessage, ProposalBlockMessage, BitArray, RoundStepType, VoteType, ProposalMessage, VoteMessage, VoteSet, ExtraData, ReimintConsensusEngine } from '../../consensus/reimint';
 import { HandlerBase, HandlerFunc, HandlerBaseOptions } from '../handlerBase';
@@ -350,7 +350,7 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
   private pickAndSend(votes: VoteSet) {
     const vote = this.pickRandom(votes);
     if (vote) {
-      logger.debug('ConsensusProtocolHander::gossipDataLoop, send vote:', vote.index, 'to:', this.peer.peerId);
+      logger.debug('ConsensusProtocolHander::gossipDataLoop, send vote(h,r,h,t):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, 'to:', this.peer.peerId);
       this.sendMessage(new VoteMessage(vote));
       this.setHasVote(vote.height, vote.round, vote.type, vote.index);
       return true;

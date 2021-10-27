@@ -1,5 +1,6 @@
 import { Address, BN, intToBuffer, ecsign, bufferToHex } from 'ethereumjs-util';
 import { Channel, logger } from '@gxchain2/utils';
+import { Common } from '@gxchain2/common';
 import { Block, BlockHeader } from '@gxchain2/structure';
 import { Node } from '../../node';
 import { ValidatorSet } from '../../staking';
@@ -100,8 +101,12 @@ function precommitDutaion(round: number) {
   return 1000 + 500 * round;
 }
 
-function commitTimeout(time: number) {
-  return 1000 + time;
+function periodTimeout(time: number, common: Common) {
+  const period = common.consensusConfig().period;
+  if (typeof period !== 'number') {
+    throw new Error('invalid period');
+  }
+  return common.consensusConfig().period * 1e3 + time;
 }
 
 /////////////////////// config ///////////////////////
@@ -854,7 +859,7 @@ export class StateMachine {
     this.height = header.number.addn(1);
     this.round = 0;
     this.step = RoundStepType.NewHeight;
-    this.startTime = commitTimeout(this.commitTime ?? timestamp);
+    this.startTime = periodTimeout(this.commitTime ?? timestamp, header._common);
     console.log('startTime:', this.startTime);
     this.validators = validators;
     this.proposal = undefined;
@@ -902,6 +907,16 @@ export class StateMachine {
     }
 
     this.votes.setPeerMaj23(round, type, peerId, hash);
+  }
+
+  hasMaj23Precommit(height: BN) {
+    if (height.eq(this.height)) {
+      const maj23 = this.votes.precommits(this.round)?.maj23;
+      if (maj23 && !isEmptyHash(maj23)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   genNewRoundStepMessage(timestamp?: number) {

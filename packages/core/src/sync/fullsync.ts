@@ -94,6 +94,12 @@ export class FullSynchronizer extends Synchronizer {
         }
       }
 
+      // add check for reimint consensus engine
+      const reimint = this.node.getReimintEngine();
+      if (reimint && reimint.isStarted && reimint.state.hasMaj23Precommit(new BN(bestHeight))) {
+        return resolve(false);
+      }
+
       try {
         resolve(await this.syncWithPeerHandler(bestPeerHandler, bestHeight, bestTD));
         logger.info('💫 Sync over, local height:', this.node.blockchain.latestHeight, 'local td:', this.node.blockchain.totalDifficulty.toString(), 'best height:', bestHeight, 'best td:', bestTD.toString());

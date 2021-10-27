@@ -387,15 +387,12 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
   applyNewRoundStepMessage(msg: NewRoundStepMessage) {
     // TODO: ValidateHeight
     if (msg.height.lt(this.height)) {
-      logger.debug('ConsensusProtocolHander::applyNewRoundStepMessage, peerId:', this.peer.peerId, 'ignore new round step due to decrease, local:', this.height.toNumber(), this.round, this.step, 'remote:', msg.height.toNumber(), msg.round, msg.step);
       return;
     } else if (msg.height.eq(this.height)) {
       if (msg.round < this.round) {
-        logger.debug('ConsensusProtocolHander::applyNewRoundStepMessage, peerId:', this.peer.peerId, 'ignore new round step due to decrease, local:', this.height.toNumber(), this.round, this.step, 'remote:', msg.height.toNumber(), msg.round, msg.step);
         return;
       } else if (msg.round === this.round) {
         if (msg.step < this.step) {
-          logger.debug('ConsensusProtocolHander::applyNewRoundStepMessage, peerId:', this.peer.peerId, 'ignore new round step due to decrease, local:', this.height.toNumber(), this.round, this.step, 'remote:', msg.height.toNumber(), msg.round, msg.step);
           return;
         }
       }
@@ -423,45 +420,34 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
     this.round = msg.round;
     this.step = msg.step;
     this.startTime = Date.now() - msg.secondsSinceStartTime;
-
-    logger.debug('ConsensusProtocolHander::applyNewRoundStepMessage, peerId:', this.peer.peerId, 'new round step:', msg.height.toNumber(), msg.round, msg.step);
   }
 
   applyNewValidBlockMessage(msg: NewValidBlockMessage) {
     if (!this.height.eq(msg.height)) {
-      logger.debug('ConsensusProtocolHander::applyNewValidBlockMessage, peerId:', this.peer.peerId, 'unequal height, local:', this.height.toNumber(), 'remote:', msg.height.toNumber());
       return;
     }
 
     if (this.round !== msg.round && !msg.isCommit) {
-      logger.debug('ConsensusProtocolHander::applyNewValidBlockMessage, peerId:', this.peer.peerId, 'unequal round, local:', this.round, 'remote:', msg.round);
       return;
     }
 
     this.proposalBlockHash = msg.hash;
-
-    logger.debug('ConsensusProtocolHander::applyNewValidBlockMessage, peerId:', this.peer.peerId, 'applied');
   }
 
   applyProposalPOLMessage(msg: ProposalPOLMessage) {
     if (!this.height.eq(msg.height)) {
-      logger.debug('ConsensusProtocolHander::applyProposalPOLMessage, peerId:', this.peer.peerId, 'unequal height, local:', this.height.toNumber(), 'remote:', msg.height.toNumber());
       return;
     }
 
     if (this.proposalPOLRound !== msg.proposalPOLRound) {
-      logger.debug('ConsensusProtocolHander::applyProposalPOLMessage, peerId:', this.peer.peerId, 'unequal proposal POL round, local:', this.proposalPOLRound, 'remote:', msg.proposalPOLRound);
       return;
     }
 
     this.proposalPOL = msg.proposalPOL;
-
-    logger.debug('ConsensusProtocolHander::applyProposalPOLMessage, peerId:', this.peer.peerId, 'applied');
   }
 
   applyHasVoteMessage(msg: HasVoteMessage) {
     if (!this.height.eq(msg.height)) {
-      logger.debug('ConsensusProtocolHander::applyHasVote, peerId:', this.peer.peerId, 'unequal height, local:', this.height.toNumber(), 'remote:', msg.height.toNumber());
       return;
     }
 
@@ -495,7 +481,6 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
 
   setHasProposal(proposal: Proposal) {
     if (!this.height.eq(proposal.height) || this.round !== proposal.round) {
-      logger.debug('ConsensusProtocolHander::setHasProposal, unequal height or round, local:', this.height.toNumber(), this.round, 'remote:', proposal.height.toNumber(), proposal.round);
       return;
     }
 
@@ -509,8 +494,6 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
     this.proposalBlockHash = proposal.hash;
     this.proposalPOLRound = proposal.POLRound;
     this.proposalPOL = undefined;
-
-    logger.debug('ConsensusProtocolHander::setHasProposal, peerId:', this.peer.peerId, 'applied');
   }
 
   ensureCatchupCommitRound(height: BN, round: number, valSetSize: number) {

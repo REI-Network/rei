@@ -113,6 +113,10 @@
             "v": ["0x4779af7e65c055979c8100f2183635e5d28c78f5", "0x116f46eb05d5e42b4cd10e70b1b49706942f5948", "0x7d8f270d34a2b78ed7e64c173f82919ac1006374"],
             "d": "genesis validator addressess"
         },
+        "maxEvidenceCount": {
+            "v": 2,
+            "d": "max evidence list size"
+        },
         "maxValidatorsCount": {
             "v": 9,
             "d": "max validator set size"

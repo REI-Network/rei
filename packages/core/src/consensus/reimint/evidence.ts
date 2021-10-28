@@ -1,4 +1,4 @@
-import { keccak256, rlp, BN, intToBuffer, toBuffer, bufferToInt } from 'ethereumjs-util';
+import { keccak256, rlp, BN, toBuffer } from 'ethereumjs-util';
 import { Vote } from './vote';
 
 export type EvidenceBuffer = DuplicateVoteEvidenceBuffer /* |  OtherEvidenceBuffer*/;

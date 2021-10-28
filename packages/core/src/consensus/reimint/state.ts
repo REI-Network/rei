@@ -465,19 +465,29 @@ export class StateMachine {
       throw new Error('missing pending block');
     }
 
-    const pendingCommon = this.pendingBlock.common;
-    const maxEvidenceCount = pendingCommon.param('vm', 'maxEvidenceCount');
+    const common = this.pendingBlock.common;
+    const maxEvidenceCount = common.param('vm', 'maxEvidenceCount');
     if (typeof maxEvidenceCount !== 'number') {
       throw new Error('invalid maxEvidenceCount');
     }
 
-    const blockData = await this.pendingBlock.finalize(this.round);
+    // save all parameters, because the parameters may change
+    const round = this.round;
+    const POLRound = this.validRound;
+    const validatorSetSize = this.validators.length;
+    const height = this.height.clone();
+    const evpool = this.evpool;
+    const pendingBlock = this.pendingBlock;
+
+    const evidence = await evpool.pickEvidence(height, maxEvidenceCount);
+    const blockData = await pendingBlock.finalize(round);
+
     return this.reimint.generateBlockAndProposal(blockData.header, blockData.transactions, {
-      round: this.round,
-      POLRound: this.validRound,
-      evidence: this.evpool.pickEvidence(this.height, maxEvidenceCount),
-      validatorSetSize: this.validators.length,
-      common: this.pendingBlock.common
+      round,
+      POLRound,
+      evidence,
+      validatorSetSize,
+      common
     }) as { block: Block; proposal: Proposal };
   }
 

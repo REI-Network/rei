@@ -101,6 +101,9 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
 
   protected _start() {
     logger.debug('ReimintConsensusEngine::_start');
+    this.evpool.init(this.node.blockchain.latestBlock.header.number).catch((err) => {
+      logger.error('ReimintConsensusEngine::_start, evpool init error:', err);
+    });
     this.state.start();
   }
 

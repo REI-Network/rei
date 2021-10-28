@@ -1,6 +1,4 @@
 import { BN } from 'ethereumjs-util';
-import { BlockHeader } from '@gxchain2/structure';
-import { ExtraData } from './extraData';
 import { Evidence } from './evidence';
 import { EvidenceDatabase } from './evdb';
 
@@ -111,9 +109,13 @@ export class EvidencePool {
     // delete from this.cachedPendingEvidence
   }
 
-  async newBlockHeader(header: BlockHeader) {
-    const extraData = ExtraData.fromBlockHeader(header);
-    const evidence = extraData.evidence;
+  /**
+   * Update evidence state, it will be called
+   * when a new block is minted
+   * @param committedEvList - Committed evidence contained in the block
+   * @param height - Block height
+   */
+  async update(committedEvList: Evidence[], height: BN) {
     // save committed evidence
     // mark pending evidences as committed
     // remove committed evidences from this.cachedPendingEvidence

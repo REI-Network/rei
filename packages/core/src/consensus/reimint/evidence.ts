@@ -5,7 +5,6 @@ export type EvidenceBuffer = DuplicateVoteEvidenceBuffer /* |  OtherEvidenceBuff
 
 export interface Evidence {
   height: BN;
-  timestamp: number;
   hash(): Buffer;
   raw(): EvidenceBuffer;
   serialize(): Buffer;
@@ -29,7 +28,7 @@ export class EvidenceFactory {
   }
 
   static fromValuesArray(values: EvidenceBuffer) {
-    if (values.length === 4) {
+    if (values.length === 3) {
       return DuplicateVoteEvidence.fromValuesArray(values);
     } else {
       throw new Error('invalid evidence values');
@@ -44,23 +43,21 @@ export type DuplicateVoteEvidenceBuffer = (Buffer | Buffer[])[];
 export class DuplicateVoteEvidence implements Evidence {
   readonly voteA: Vote;
   readonly voteB: Vote;
-  readonly timestamp: number;
   readonly height: BN;
 
-  constructor(voteA: Vote, voteB: Vote, timestamp: number, height: BN) {
-    this.timestamp = timestamp;
+  constructor(voteA: Vote, voteB: Vote, height: BN) {
     this.height = height.clone();
     this.voteA = voteA;
     this.voteB = voteB;
   }
 
   static fromValuesArray(values: DuplicateVoteEvidenceBuffer) {
-    if (values.length !== 4) {
+    if (values.length !== 3) {
       throw new Error('invalid evidence values');
     }
 
-    const [timestampBuf, heightBuf, voteABuf, voteBBuf] = values;
-    if (!(timestampBuf instanceof Buffer) || !(heightBuf instanceof Buffer)) {
+    const [heightBuf, voteABuf, voteBBuf] = values;
+    if (!(heightBuf instanceof Buffer)) {
       throw new Error('invalid evidence values');
     }
 
@@ -68,7 +65,7 @@ export class DuplicateVoteEvidence implements Evidence {
       throw new Error('invalid evidence values');
     }
 
-    return new DuplicateVoteEvidence(Vote.fromValuesArray(voteABuf), Vote.fromValuesArray(voteBBuf), bufferToInt(timestampBuf), new BN(heightBuf));
+    return new DuplicateVoteEvidence(Vote.fromValuesArray(voteABuf), Vote.fromValuesArray(voteBBuf), new BN(heightBuf));
   }
 
   hash(): Buffer {
@@ -76,7 +73,7 @@ export class DuplicateVoteEvidence implements Evidence {
   }
 
   raw(): DuplicateVoteEvidenceBuffer {
-    return [intToBuffer(this.timestamp), toBuffer(this.height), this.voteA.raw(), this.voteB.raw()];
+    return [toBuffer(this.height), this.voteA.raw(), this.voteB.raw()];
   }
 
   serialize(): Buffer {

@@ -1,3 +1,4 @@
+import { BN } from 'ethereumjs-util';
 import { BlockHeader } from '@gxchain2/structure';
 import { Evidence } from './evidence';
 import { EvidenceDatabase } from './evdb';
@@ -47,8 +48,9 @@ export class EvidencePool {
     // add pending evidence to this.cachedPendingEvidence
   }
 
-  pickEvidence(count: number) {
+  pickEvidence(height: BN, count: number): Evidence[] {
     // pick from db
+    return [];
   }
 
   private pruneExpiredPendingEvidence() {

@@ -140,6 +140,7 @@ export interface SendMessageOptions {
 export class Node {
   public readonly chaindb: LevelUp;
   public readonly nodedb: LevelUp;
+  public readonly evidencedb: LevelUp;
   public readonly networkdb: LevelStore;
   public readonly aborter = new Aborter();
 
@@ -170,6 +171,7 @@ export class Node {
   constructor(options: NodeOptions) {
     this.chaindb = createEncodingLevelDB(path.join(options.databasePath, 'chaindb'));
     this.nodedb = createLevelDB(path.join(options.databasePath, 'nodes'));
+    this.evidencedb = createLevelDB(path.join(options.databasePath, 'evidence'));
     this.networkdb = new LevelStore(path.join(options.databasePath, 'networkdb'), { createIfMissing: true });
     const engineOptions = { node: this, enable: options.mine.enable, coinbase: options.mine.coinbase ? Address.fromString(options.mine.coinbase) : undefined };
     this.engines = createEnginesByConsensusTypes([ConsensusType.Clique, ConsensusType.Reimint], engineOptions);
@@ -602,6 +604,7 @@ export class Node {
     await this.taskLoopPromise;
     await this.processLoopPromise;
     await this.chaindb.close();
+    await this.evidencedb.clear();
     await this.nodedb.close();
     await this.networkdb.close();
   }

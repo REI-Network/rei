@@ -10,6 +10,8 @@ import { Proposal } from './proposal';
 import { StateMachine } from './state';
 import { VoteType, VoteSet } from './vote';
 import { Evidence } from './evidence';
+import { EvidencePool } from './evpool';
+import { EvidenceDatabase } from './evdb';
 
 const defaultRound = 0;
 const defaultPOLRound = -1;
@@ -65,10 +67,12 @@ export interface ReimintBlockOptions extends BlockOptions {
 
 export class ReimintConsensusEngine extends ConsensusEngineBase implements ConsensusEngine {
   readonly state: StateMachine;
+  readonly evpool: EvidencePool;
 
   constructor(options: ConsensusEngineOptions) {
     super(options);
-    this.state = new StateMachine(options.node, this);
+    this.evpool = new EvidencePool(new EvidenceDatabase(options.node.evidencedb));
+    this.state = new StateMachine(this);
   }
 
   /////////////////////////////////

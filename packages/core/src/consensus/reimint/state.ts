@@ -9,7 +9,8 @@ import { TimeoutTicker } from './timeoutTicker';
 import { ReimintConsensusEngine } from './reimint';
 import { isEmptyHash, EMPTY_HASH } from '../utils';
 import { Proposal } from './proposal';
-import { Evidence } from './evidence';
+import { Evidence, DuplicateVoteEvidence } from './evidence';
+import { EvidencePool } from './evpool';
 import { ExtraData } from './extraData';
 import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from './messages';
 
@@ -18,17 +19,7 @@ export interface Signer {
   sign(msg: Buffer): Buffer;
 }
 
-export interface EvidencePool {
-  reportConflictingVotes(voteA: Vote, voteB: Vote);
-}
-
 /////////////////////// mock ///////////////////////
-
-export class MockEvidencePool implements EvidencePool {
-  reportConflictingVotes(voteA: Vote, voteB: Vote) {
-    logger.debug('receive evidence:', voteA, voteB);
-  }
-}
 
 export class MockSigner implements Signer {
   readonly node: Node;
@@ -154,11 +145,11 @@ export class StateMachine {
   private commitRound: number = -1;
   /////////////// RoundState ///////////////
 
-  constructor(node: Node, remint: ReimintConsensusEngine, signer?: Signer) {
-    this.node = node;
-    this.reimint = remint;
-    this.evpool = new MockEvidencePool();
-    this.signer = signer ?? (this.reimint.coinbase.equals(Address.zero()) ? undefined : new MockSigner(node));
+  constructor(reimint: ReimintConsensusEngine, signer?: Signer) {
+    this.reimint = reimint;
+    this.node = reimint.node;
+    this.evpool = reimint.evpool;
+    this.signer = signer ?? (this.reimint.coinbase.equals(Address.zero()) ? undefined : new MockSigner(reimint.node));
   }
 
   private newStep(timestamp?: number) {
@@ -416,7 +407,7 @@ export class StateMachine {
           return;
         }
         const { voteA, voteB } = err;
-        this.evpool.reportConflictingVotes(voteA, voteB);
+        this.evpool.addEvidence(new DuplicateVoteEvidence(voteA, voteB, voteA.height));
       } else {
         logger.warn('StateMachine::tryAddVote, catch error:', err);
       }
@@ -474,10 +465,17 @@ export class StateMachine {
       throw new Error('missing pending block');
     }
 
+    const pendingCommon = this.pendingBlock.common;
+    const maxEvidenceCount = pendingCommon.param('vm', 'maxEvidenceCount');
+    if (typeof maxEvidenceCount !== 'number') {
+      throw new Error('invalid maxEvidenceCount');
+    }
+
     const blockData = await this.pendingBlock.finalize(this.round);
     return this.reimint.generateBlockAndProposal(blockData.header, blockData.transactions, {
       round: this.round,
       POLRound: this.validRound,
+      evidence: this.evpool.pickEvidence(this.height, maxEvidenceCount),
       validatorSetSize: this.validators.length,
       common: this.pendingBlock.common
     }) as { block: Block; proposal: Proposal };

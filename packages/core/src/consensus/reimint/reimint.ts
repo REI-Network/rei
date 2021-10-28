@@ -9,11 +9,13 @@ import { ExtraData, calcBlockHeaderHash } from './extraData';
 import { Proposal } from './proposal';
 import { StateMachine } from './state';
 import { VoteType, VoteSet } from './vote';
+import { Evidence } from './evidence';
 
 const defaultRound = 0;
 const defaultPOLRound = -1;
 const defaultProposalTimestamp = 0;
 const defaultValidaterSetSize = 1;
+const defaultEvidence = [];
 
 function formatHeaderData(data?: HeaderData) {
   if (data) {
@@ -43,6 +45,9 @@ export interface ReimintBlockOptions extends BlockOptions {
 
   // POLRound, default: -1
   POLRound?: number;
+
+  // evidence list, default: []
+  evidence?: Evidence[];
 
   // vote set,
   // it must be a precommit vote set
@@ -142,9 +147,10 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
       const POLRound = options?.POLRound ?? defaultPOLRound;
       const timestamp = options?.proposalTimestamp ?? defaultProposalTimestamp;
       const validaterSetSize = options?.validatorSetSize ?? defaultValidaterSetSize;
+      const evidence = options?.evidence ?? defaultEvidence;
 
       // calculate block hash
-      const headerHash = calcBlockHeaderHash(header, round, POLRound);
+      const headerHash = calcBlockHeaderHash(header, round, POLRound, []);
       const proposal = new Proposal({
         round,
         POLRound,
@@ -154,7 +160,7 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
         timestamp
       });
       proposal.sign(this.node.accMngr.getPrivateKey(this.coinbase));
-      const extraData = new ExtraData(round, POLRound, proposal, options?.voteSet);
+      const extraData = new ExtraData(round, POLRound, evidence, proposal, options?.voteSet);
       return {
         header: BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize(validaterSetSize)]) }, options),
         proposal
@@ -180,13 +186,14 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
    * Generate block for commit
    * @param data - Block header data
    * @param transactions - Transactions
+   * @param evidence - Evidence list
    * @param proposal - Proposal
    * @param votes - Precommit vote set
    * @param options - Block options
    * @returns Complete block
    */
-  generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], proposal: Proposal, votes: VoteSet, options?: BlockOptions) {
-    const extraData = new ExtraData(proposal.round, proposal.POLRound, proposal, votes);
+  generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], evidence: Evidence[], proposal: Proposal, votes: VoteSet, options?: BlockOptions) {
+    const extraData = new ExtraData(proposal.round, proposal.POLRound, evidence, proposal, votes);
     data = formatHeaderData(data);
     const header = BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize()]) }, options);
     return new Block(header, transactions, undefined, options);

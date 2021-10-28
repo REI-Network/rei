@@ -52,7 +52,7 @@ export class Vote {
     return Vote.fromValuesArray(values as any);
   }
 
-  static fromValuesArray(values: [Buffer, Buffer, Buffer, Buffer, Buffer, Buffer, Buffer, Buffer]) {
+  static fromValuesArray(values: Buffer[]) {
     if (values.length !== 8) {
       throw new Error('invalid values length');
     }

@@ -9,6 +9,8 @@ import { TimeoutTicker } from './timeoutTicker';
 import { ReimintConsensusEngine } from './reimint';
 import { isEmptyHash, EMPTY_HASH } from '../utils';
 import { Proposal } from './proposal';
+import { Evidence } from './evidence';
+import { ExtraData } from './extraData';
 import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from './messages';
 
 export interface Signer {
@@ -134,13 +136,16 @@ export class StateMachine {
 
   private commitTime?: number;
   private validators!: ValidatorSet;
+  private pendingBlock?: PendingBlock;
+
   private proposal?: Proposal;
   private proposalBlockHash?: Buffer;
   private proposalBlock?: Block;
-  private pendingBlock?: PendingBlock;
+  private proposalEvidence?: Evidence[];
 
   private lockedRound: number = -1;
   private lockedBlock?: Block;
+  private lockedEvidence?: Evidence[];
 
   private validRound: number = -1;
   private validBlock?: Block;
@@ -247,7 +252,7 @@ export class StateMachine {
   }
 
   private isProposalComplete() {
-    if (this.proposal === undefined || this.proposalBlock === undefined) {
+    if (this.proposal === undefined || this.proposalBlock === undefined || this.proposalEvidence === undefined) {
       return false;
     }
 
@@ -264,14 +269,32 @@ export class StateMachine {
       logger.debug('StateMachine::setProposal, proposal block already exists');
       return;
     }
+
+    if (this.proposal === undefined) {
+      throw new Error('add proposal block when proposal is undefined');
+    }
+
     if (this.proposalBlockHash === undefined) {
       throw new Error('add proposal block when hash is undefined');
     }
-    if (!this.proposalBlockHash.equals(block.hash())) {
+
+    const extraData = ExtraData.fromBlockHeader(block.header);
+    const hash = extraData.proposal.hash;
+    const proposer = extraData.proposal.proposer();
+    const evidence = extraData.evidence;
+
+    if (!this.proposal.proposer().equals(proposer)) {
       throw new Error('invalid proposal block');
     }
+
+    if (!this.proposalBlockHash.equals(hash)) {
+      throw new Error('invalid proposal block');
+    }
+
     // TODO: validate block?
     this.proposalBlock = block;
+    this.proposalEvidence = evidence;
+
     const prevotes = this.votes.prevotes(this.round);
     const maj23Hash = prevotes?.maj23;
     if (maj23Hash && !isEmptyHash(maj23Hash) && this.validRound < this.round) {
@@ -315,6 +338,7 @@ export class StateMachine {
             if (this.lockedBlock !== undefined && this.lockedRound < vote.round && vote.round <= this.round && !this.lockedBlock.hash().equals(maj23Hash)) {
               this.lockedRound = -1;
               this.lockedBlock = undefined;
+              this.lockedEvidence = undefined;
             }
 
             // try to update valid block
@@ -326,6 +350,7 @@ export class StateMachine {
                 this.validBlock = this.proposalBlock;
               } else {
                 this.proposalBlock = undefined;
+                this.proposalEvidence = undefined;
               }
 
               if (!this.proposalBlockHash || !this.proposalBlockHash.equals(maj23Hash)) {
@@ -419,8 +444,9 @@ export class StateMachine {
       // do nothing
     } else {
       this.proposal = undefined;
-      this.proposalBlock = undefined;
       this.proposalBlockHash = undefined;
+      this.proposalBlock = undefined;
+      this.proposalEvidence = undefined;
     }
 
     this.votes.setRound(round + 1);
@@ -658,6 +684,7 @@ export class StateMachine {
       } else {
         this.lockedRound = -1;
         this.lockedBlock = undefined;
+        this.lockedEvidence = undefined;
       }
 
       this.signVote(VoteType.Precommit, EMPTY_HASH);
@@ -676,6 +703,7 @@ export class StateMachine {
 
       this.lockedRound = round;
       this.lockedBlock = this.proposalBlock;
+      this.lockedEvidence = this.proposalEvidence;
 
       this.signVote(VoteType.Precommit, maj23Hash);
       return update();
@@ -683,9 +711,11 @@ export class StateMachine {
 
     this.lockedRound = -1;
     this.lockedBlock = undefined;
+    this.lockedEvidence = undefined;
 
     if (!this.proposalBlock || !this.proposalBlock.hash().equals(maj23Hash)) {
       this.proposalBlock = undefined;
+      this.proposalEvidence = undefined;
       this.proposalBlockHash = maj23Hash;
     }
 
@@ -745,11 +775,13 @@ export class StateMachine {
       if (lockedHash.equals(maj23Hash)) {
         this.proposalBlockHash = this.lockedBlock.hash();
         this.proposalBlock = this.lockedBlock;
+        this.proposalEvidence = this.lockedEvidence;
       }
     }
 
     if (!this.proposalBlock || !this.proposalBlock.hash().equals(maj23Hash)) {
       this.proposalBlock = undefined;
+      this.proposalEvidence = undefined;
       this.proposalBlockHash = maj23Hash;
     }
 
@@ -780,9 +812,14 @@ export class StateMachine {
       return;
     }
 
+    if (this.proposalEvidence === undefined) {
+      logger.debug('StateMachine::tryFinalizeCommit, invalid proposal evidence');
+      return;
+    }
+
     // TODO: validate proposalBlock
 
-    const finalizedBlock = this.reimint.generateFinalizedBlock({ ...this.proposalBlock.header }, [...this.proposalBlock.transactions], this.proposal, precommits, { common: this.proposalBlock._common });
+    const finalizedBlock = this.reimint.generateFinalizedBlock({ ...this.proposalBlock.header }, [...this.proposalBlock.transactions], this.proposalEvidence, this.proposal, precommits, { common: this.proposalBlock._common });
     if (!finalizedBlock.hash().equals(maj23Hash)) {
       logger.error('StateMachine::tryFinalizeCommit, finalizedBlock hash not equal, something is wrong');
       return;
@@ -844,9 +881,11 @@ export class StateMachine {
     this.validators = validators;
     this.proposal = undefined;
     this.proposalBlock = undefined;
+    this.proposalEvidence = undefined;
     this.pendingBlock = pendingBlock;
     this.lockedRound = -1;
     this.lockedBlock = undefined;
+    this.lockedEvidence = undefined;
     this.validRound = -1;
     this.validBlock = undefined;
     this.votes = new HeightVoteSet(this.node.getChainId(), this.height, this.validators);

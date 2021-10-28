@@ -2,6 +2,7 @@ import { BN, rlp, intToBuffer, rlphash, bufferToInt } from 'ethereumjs-util';
 import { Block, BlockHeader, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
 import { ValidatorSet } from '../../staking';
 import { Vote, VoteType, VoteSet } from './vote';
+import { Evidence, EvidenceBuffer, EvidenceFactory } from './evidence';
 import { Proposal } from './proposal';
 
 export function Block_hash(block: Block) {
@@ -24,7 +25,7 @@ export interface ExtraDataFromBlockHeaderOptions extends Omit<ExtraDataOptions, 
 export type RLPVote = [Buffer, Buffer];
 export type RLPEmptyVote = [];
 export type RLPRoundAndPOLRound = [Buffer, Buffer];
-export type RLPEvidenceList = [RLPVote, RLPVote][];
+export type RLPEvidenceList = [EvidenceBuffer][];
 export type RLPElement = RLPEmptyVote | RLPVote | RLPRoundAndPOLRound | RLPEvidenceList;
 export type RLPElements = RLPElement[];
 
@@ -60,24 +61,29 @@ function isRLPEvidenceList(ele: RLPElement): ele is RLPEvidenceList {
     return false;
   }
   for (const ev of ele) {
-    if (!Array.isArray(ev) || ev.length !== 2) {
-      return false;
-    }
-    if (!isRLPVote(ev[0]) || !isRLPVote(ev[1])) {
-      return false;
+    if (!(ev instanceof Buffer)) {
+      if (!Array.isArray(ev)) {
+        return false;
+      }
+
+      for (const _ele of ev) {
+        if (!(_ele instanceof Buffer)) {
+          return false;
+        }
+      }
     }
   }
   return true;
 }
 
-export function calcBlockHeaderHash(header: BlockHeader, round: number, POLRound: number) {
+export function calcBlockHeaderHash(header: BlockHeader, round: number, POLRound: number, evidence: Evidence[]) {
   const raw = header.raw();
-  raw[12] = Buffer.concat([raw[12].slice(0, CLIQUE_EXTRA_VANITY), intToBuffer(round), intToBuffer(POLRound + 1)]);
+  raw[12] = Buffer.concat([raw[12].slice(0, CLIQUE_EXTRA_VANITY), intToBuffer(round), intToBuffer(POLRound + 1), ...evidence.map((ev) => ev.hash())]);
   return rlphash(raw);
 }
 
 export class ExtraData {
-  // evidence: any;
+  readonly evidence: Evidence[];
   readonly round: number;
   readonly POLRound: number;
   readonly proposal: Proposal;
@@ -108,6 +114,7 @@ export class ExtraData {
     let POLRound!: number;
     let headerHash!: Buffer;
     let proposal!: Proposal;
+    let evidence!: Evidence[];
     let voteSet: VoteSet | undefined;
     if (valSet) {
       // validator size + 1(round and POLRound list) + 1(evidence list) + 1(proposal)
@@ -137,10 +144,16 @@ export class ExtraData {
         if (!isRLPEvidenceList(value)) {
           throw new Error('invliad values');
         }
-        // TODO: evidence
+
+        evidence = value.map((buf) => {
+          const ev = EvidenceFactory.fromValuesArray(buf);
+          ev.validateBasic();
+          // TODO: ev.validate()
+          return ev;
+        });
 
         // calculate block hash
-        headerHash = calcBlockHeaderHash(header, round, POLRound);
+        headerHash = calcBlockHeaderHash(header, round, POLRound, evidence);
       } else if (i === 2) {
         if (!isRLPVote(value)) {
           throw new Error('invliad values');
@@ -191,13 +204,14 @@ export class ExtraData {
       }
     }
 
-    return new ExtraData(round, POLRound, proposal, voteSet);
+    return new ExtraData(round, POLRound, evidence, proposal, voteSet);
   }
 
-  constructor(round: number, POLRound: number, proposal: Proposal, voteSet?: VoteSet) {
+  constructor(round: number, POLRound: number, evidence: Evidence[], proposal: Proposal, voteSet?: VoteSet) {
     this.round = round;
     this.POLRound = POLRound;
     this.proposal = proposal;
+    this.evidence = evidence;
     this.voteSet = voteSet;
     if (voteSet && voteSet.signedMsgType !== VoteType.Precommit) {
       throw new Error('invalid vote set type');
@@ -207,7 +221,7 @@ export class ExtraData {
   raw(validaterSetSize?: number) {
     const raw: rlp.Input = [];
     raw.push([intToBuffer(this.round), intToBuffer(this.POLRound + 1)]);
-    raw.push([]); // TODO: evidence
+    raw.push(this.evidence.map((ev) => ev.raw()));
     raw.push([intToBuffer(this.proposal.timestamp), this.proposal.signature!]);
     if (this.voteSet) {
       for (const vote of this.voteSet.votes) {

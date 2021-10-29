@@ -16,11 +16,11 @@ import { EvidencePool } from './evpool';
 import { EvidenceDatabase } from './evdb';
 import { Message } from './messages';
 
-const defaultRound = 0;
-const defaultPOLRound = -1;
-const defaultProposalTimestamp = 0;
-const defaultValidaterSetSize = 1;
-const defaultEvidence = [];
+export const defaultRound = 0;
+export const defaultPOLRound = -1;
+export const defaultProposalTimestamp = 0;
+export const defaultValidaterSetSize = 1;
+export const defaultEvidence = [];
 
 /////////////////////// mock ///////////////////////
 
@@ -62,7 +62,7 @@ export class MockConfig {
 
 /////////////////////// mock ///////////////////////
 
-function formatHeaderData(data?: HeaderData) {
+export function formatHeaderData(data?: HeaderData) {
   if (data) {
     if (data.extraData) {
       const extraData = toBuffer(data.extraData);

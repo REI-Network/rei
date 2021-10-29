@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
 import { Block } from '@gxchain2/structure';
-import { RoundStepType } from './state';
+import { RoundStepType } from '../state';
 import { Proposal } from './proposal';
 import { BitArray } from './bitArray';
 import { Vote, VoteType } from './vote';

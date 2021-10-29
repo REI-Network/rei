@@ -7,14 +7,8 @@ import { ConsensusProtocol } from '../../protocols/consensus';
 import { ConsensusEngine, ConsensusEngineOptions } from '../consensusEngine';
 import { EMPTY_ADDRESS, EMPTY_EXTRA_DATA, isEmptyAddress } from '../utils';
 import { ConsensusEngineBase } from '../consensusEngineBase';
-import { ExtraData, calcBlockHeaderHash } from './extraData';
-import { Proposal } from './proposal';
-import { StateMachine } from './state';
-import { VoteType, VoteSet } from './vote';
-import { Evidence } from './evidence';
-import { EvidencePool } from './evpool';
-import { EvidenceDatabase } from './evdb';
-import { Message } from './messages';
+import { ExtraData, calcBlockHeaderHash, Proposal, VoteType, VoteSet, Evidence, EvidencePool, EvidenceDatabase, Message } from './types';
+import { StateMachine, SendMessageOptions } from './state';
 
 export const defaultRound = 0;
 export const defaultPOLRound = -1;
@@ -78,15 +72,6 @@ export function formatHeaderData(data?: HeaderData) {
     data = { extraData: EMPTY_EXTRA_DATA };
   }
   return data;
-}
-
-export interface SendMessageOptions {
-  // broadcast the message but exlcude the target peers
-  exclude?: string[];
-  // send message to target peer
-  to?: string;
-  // boardcast the message to all peers
-  broadcast?: boolean;
 }
 
 export interface ReimintBlockOptions extends BlockOptions {

@@ -2,7 +2,7 @@ import { LevelUp } from 'levelup';
 import { AbstractIterator } from 'abstract-leveldown';
 import { intToBuffer, toBuffer, BN } from 'ethereumjs-util';
 import { Evidence, EvidenceFactory } from './evidence';
-import { EMPTY_HASH } from '../utils';
+import { EMPTY_HASH } from '../../utils';
 
 const PENDING_PREFIX = 1;
 const COMMITED_PREFIX = 2;

@@ -1,7 +1,7 @@
 import { rlp, BN, bnToUnpaddedBuffer, intToBuffer, bufferToInt, bufferToHex } from 'ethereumjs-util';
 import { Block } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
-import { Message, NewRoundStepMessage, NewValidBlockMessage, HasVoteMessage, Proposal, Vote, ProposalPOLMessage, VoteSetMaj23Message, VoteSetBitsMessage, GetProposalBlockMessage, ProposalBlockMessage, BitArray, RoundStepType, VoteType, ProposalMessage, VoteMessage, VoteSet, ExtraData, ReimintConsensusEngine } from '../../consensus/reimint';
+import { Message, NewRoundStepMessage, NewValidBlockMessage, HasVoteMessage, Proposal, Vote, ProposalPOLMessage, VoteSetMaj23Message, VoteSetBitsMessage, GetProposalBlockMessage, ProposalBlockMessage, BitArray, RoundStepType, VoteType, ProposalMessage, VoteMessage, VoteSet, ReimintConsensusEngine } from '../../consensus/reimint';
 import { HandlerBase, HandlerFunc, HandlerBaseOptions } from '../handlerBase';
 import { ConsensusProtocol } from './protocol';
 

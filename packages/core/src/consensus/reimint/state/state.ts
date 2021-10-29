@@ -1,73 +1,21 @@
-import { Address, BN, bufferToHex } from 'ethereumjs-util';
+import { BN, bufferToHex } from 'ethereumjs-util';
 import { Channel, logger } from '@gxchain2/utils';
-import { Block, BlockHeader, HeaderData, TypedTransaction, BlockOptions } from '@gxchain2/structure';
-import { ProcessBlockOptions } from '../../node';
-import { ValidatorSet } from '../../staking';
-import { PendingBlock } from '../../worker';
-import { HeightVoteSet, Vote, VoteSet, VoteType, ConflictingVotesError } from './vote';
+import { Block, BlockHeader } from '@gxchain2/structure';
+import { ValidatorSet } from '../../../staking';
+import { PendingBlock } from '../../../worker';
+import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, Proposal, Evidence, DuplicateVoteEvidence, ExtraData } from '../types';
+import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from '../types/messages';
+import { isEmptyHash, EMPTY_HASH } from '../../utils';
 import { TimeoutTicker } from './timeoutTicker';
-import { ReimintBlockOptions, SendMessageOptions } from './reimint';
-import { isEmptyHash, EMPTY_HASH } from '../utils';
-import { Proposal } from './proposal';
-import { Evidence, DuplicateVoteEvidence } from './evidence';
-import { ExtraData } from './extraData';
-import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from './messages';
+import { StateMachineMessage, MessageInfo, StateMachineBackend, Signer, Config, EvidencePool, RoundStepType, TimeoutInfo } from './types';
 
 const SkipTimeoutCommit = true;
 const WaitForTxs = true;
 const CreateEmptyBlocksInterval = 0;
 const StateMachineMsgQueueMaxSize = 10;
 
-export interface Signer {
-  address(): Address;
-  sign(msg: Buffer): Buffer;
-}
-
-export interface Config {
-  proposeDuration(round: number): number;
-  prevoteDuration(round: number): number;
-  precommitDutaion(round: number): number;
-}
-
-export interface EvidencePool {
-  addEvidence(ev: Evidence): Promise<void>;
-  pickEvidence(height: BN, count: number): Promise<Evidence[]>;
-}
-
-export enum RoundStepType {
-  NewHeight = 1,
-  NewRound,
-  Propose,
-  Prevote,
-  PrevoteWait,
-  Precommit,
-  PrecommitWait,
-  Commit
-}
-
-export type StateMachineMessage = MessageInfo | TimeoutInfo;
-
-export type MessageInfo = {
-  peerId: string;
-  msg: Message;
-};
-
-export type TimeoutInfo = {
-  duration: number;
-  height: BN;
-  round: number;
-  step: RoundStepType;
-};
-
 function isMessageInfo(smsg: StateMachineMessage): smsg is MessageInfo {
   return 'peerId' in smsg;
-}
-
-export interface StateMachineBackend {
-  broadcastMessage(msg: Message, options: SendMessageOptions): void;
-  generateBlockAndProposal(data?: HeaderData, transactions?: TypedTransaction[], options?: ReimintBlockOptions): { block: Block; proposal?: Proposal };
-  generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], evidence: Evidence[], proposal: Proposal, votes: VoteSet, options?: BlockOptions);
-  processBlock(block: Block, options: ProcessBlockOptions): Promise<boolean>;
 }
 
 export class StateMachine {

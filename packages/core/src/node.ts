@@ -22,12 +22,11 @@ import { TxFetcher } from './txsync';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
 import { BlockchainMonitor } from './blockchainmonitor';
-import { createProtocolsByNames, NetworkProtocol, WireProtocol, ConsensusProtocol } from './protocols';
+import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
 import { ValidatorSets } from './staking';
 import { StakeManager, Router } from './contracts';
 import { processBlock, ProcessBlockOpts } from './vm';
 import { createEnginesByConsensusTypes, ConsensusEngine, ConsensusType } from './consensus';
-import { Message } from './consensus/reimint/messages';
 import { ReimintConsensusEngine } from './consensus/reimint';
 import { CliqueConsensusEngine } from './consensus/clique';
 import { getConsensusTypeByCommon } from './hardforks';
@@ -127,15 +126,6 @@ type ProcessBlock = {
   resolve: (result: boolean) => void;
   reject: (reason?: any) => void;
 };
-
-export interface SendMessageOptions {
-  // broadcast the message but exlcude the target peers
-  exclude?: string[];
-  // send message to target peer
-  to?: string;
-  // boardcast the message to all peers
-  broadcast?: boolean;
-}
 
 export class Node {
   public readonly chaindb: LevelUp;
@@ -544,32 +534,6 @@ export class Node {
     const td = await this.db.getTotalDifficulty(block.hash(), block.header.number);
     for (const handler of WireProtocol.getPool().handlers) {
       handler.announceNewBlock(block, td);
-    }
-  }
-
-  /**
-   * Broadcast p2p message to remote peer
-   * @param msg - Message
-   * @param options - Send options {@link SendMessageOptions}
-   */
-  broadcastMessage(msg: Message, options: SendMessageOptions) {
-    if (options.broadcast) {
-      for (const handler of ConsensusProtocol.getPool().handlers) {
-        handler.sendMessage(msg);
-      }
-    } else if (options.to) {
-      const peer = this.networkMngr.getPeer(options.to);
-      if (peer) {
-        ConsensusProtocol.getHandler(peer, false)?.sendMessage(msg);
-      }
-    } else if (options.exclude) {
-      for (const handler of ConsensusProtocol.getPool().handlers) {
-        if (!options.exclude.includes(handler.peer.peerId)) {
-          handler.sendMessage(msg);
-        }
-      }
-    } else {
-      throw new Error('invalid broadcast message options');
     }
   }
 

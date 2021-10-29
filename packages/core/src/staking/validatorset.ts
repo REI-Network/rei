@@ -7,10 +7,14 @@ import { ValidatorChanges } from './validatorchanges';
 
 const maxInt256 = new BN('7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 'hex');
 const minInt256 = new BN('8000000000000000000000000000000000000000000000000000000000000000', 'hex').neg();
-export const maxProposerPriority = maxInt256;
-export const minProposerPriority = minInt256;
+const maxProposerPriority = maxInt256;
+const minProposerPriority = minInt256;
 
 const priorityWindowSizeFactor = 2;
+
+const genesisValidatorVotingPower = new BN(1);
+const genesisValidatorPriority = new BN(1);
+
 // genesis validators
 let genesisValidators: Address[] | undefined;
 
@@ -143,7 +147,7 @@ export class ValidatorSet {
     let length = await sm.indexedValidatorsLength();
     for (let i = new BN(0); i.lt(length); i.iaddn(1)) {
       const validator = await sm.indexedValidatorsByIndex(i);
-      const votingPower = isGenesis(validator) ? new BN(100) : await sm.getVotingPowerByIndex(i);
+      const votingPower = isGenesis(validator) ? genesisValidatorVotingPower.clone() : await sm.getVotingPowerByIndex(i);
       if (votingPower.gtn(0)) {
         validators.set(validator.buf, {
           validator,
@@ -165,7 +169,7 @@ export class ValidatorSet {
         if (!validators.has(av.validator.buf)) {
           validators.set(av.validator.buf, {
             validator: av.validator,
-            votingPower: isGenesis(av.validator) ? new BN(100) : await sm.getVotingPowerByAddress(av.validator)
+            votingPower: isGenesis(av.validator) ? genesisValidatorVotingPower.clone() : await sm.getVotingPowerByAddress(av.validator)
           });
         }
       }
@@ -185,11 +189,11 @@ export class ValidatorSet {
     for (const validator of getGenesisValidators(common)) {
       validators.set(validator.buf, {
         validator,
-        votingPower: new BN(100)
+        votingPower: genesisValidatorVotingPower.clone()
       });
       active.push({
         validator,
-        priority: new BN(100)
+        priority: genesisValidatorPriority.clone()
       });
     }
     return new ValidatorSet(validators, active, common);
@@ -328,7 +332,10 @@ export class ValidatorSet {
       return false;
     }
     for (const gv of genesisValidators) {
-      if (!this.isActive(gv)) {
+      if (!this.isActive(gv) || !this.contains(gv)) {
+        return false;
+      }
+      if (!this.getVotingPower(gv).eq(genesisValidatorVotingPower)) {
         return false;
       }
     }
@@ -342,10 +349,10 @@ export class ValidatorSet {
    */
   getVotingPower(validator: Address) {
     const vp = this.validators.get(validator.buf)?.votingPower;
-    if (vp) {
-      return vp.clone();
+    if (!vp) {
+      throw new Error('unknown validator, ' + validator.toString());
     }
-    throw new Error('unknown validator, ' + validator.toString());
+    return vp.clone();
   }
 
   getValidatorByIndex(index: number) {
@@ -369,7 +376,7 @@ export class ValidatorSet {
    * @returns `true` if it is indexed
    */
   contains(validator: Address) {
-    return this.isActive(validator) || this.validators.has(validator.buf);
+    return this.validators.has(validator.buf);
   }
 
   /**

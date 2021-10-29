@@ -28,6 +28,10 @@ export class BitArray {
     this.elems = elems ?? new Array<number>(Math.ceil(length / 32)).fill(0);
   }
 
+  getIndex(i: number): boolean {
+    return (this.elems[Math.floor(i / 32)] & (1 << i % 32)) > 0;
+  }
+
   setIndex(i: number, v: boolean): boolean {
     if (i >= this.length) {
       return false;

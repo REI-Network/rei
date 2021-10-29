@@ -1,104 +1,29 @@
-import { Address, BN, intToBuffer, ecsign, bufferToHex } from 'ethereumjs-util';
+import { BN, bufferToHex } from 'ethereumjs-util';
 import { Channel, logger } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/structure';
-import { Node } from '../../node';
-import { ValidatorSet } from '../../staking';
-import { PendingBlock } from '../../worker';
-import { HeightVoteSet, Vote, VoteType, ConflictingVotesError } from './vote';
+import { ValidatorSet } from '../../../staking';
+import { PendingBlock } from '../../../worker';
+import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, Proposal, Evidence, DuplicateVoteEvidence, ExtraData } from '../types';
+import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from '../types/messages';
+import { isEmptyHash, EMPTY_HASH } from '../../utils';
 import { TimeoutTicker } from './timeoutTicker';
-import { ReimintConsensusEngine } from './reimint';
-import { isEmptyHash, EMPTY_HASH } from '../utils';
-import { Proposal } from './proposal';
-import { Evidence, DuplicateVoteEvidence } from './evidence';
-import { EvidencePool } from './evpool';
-import { ExtraData } from './extraData';
-import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from './messages';
-
-export interface Signer {
-  address(): Address;
-  sign(msg: Buffer): Buffer;
-}
-
-/////////////////////// mock ///////////////////////
-
-export class MockSigner implements Signer {
-  readonly node: Node;
-
-  constructor(node: Node) {
-    this.node = node;
-  }
-
-  address(): Address {
-    return this.node.getCurrentEngine().coinbase;
-  }
-
-  sign(msg: Buffer): Buffer {
-    const coinbase = this.node.getCurrentEngine().coinbase;
-    if (coinbase.equals(Address.zero())) {
-      throw new Error('empty coinbase');
-    }
-    const signature = ecsign(msg, this.node.accMngr.getPrivateKey(coinbase));
-    return Buffer.concat([signature.r, signature.s, intToBuffer(signature.v - 27)]);
-  }
-}
-
-/////////////////////// mock ///////////////////////
-
-export enum RoundStepType {
-  NewHeight = 1,
-  NewRound,
-  Propose,
-  Prevote,
-  PrevoteWait,
-  Precommit,
-  PrecommitWait,
-  Commit
-}
-
-export type StateMachineMessage = MessageInfo | TimeoutInfo;
-
-export type MessageInfo = {
-  peerId: string;
-  msg: Message;
-};
-
-export type TimeoutInfo = {
-  duration: number;
-  height: BN;
-  round: number;
-  step: RoundStepType;
-};
-
-function isMessageInfo(smsg: StateMachineMessage): smsg is MessageInfo {
-  return 'peerId' in smsg;
-}
-
-/////////////////////// config ///////////////////////
+import { StateMachineMessage, MessageInfo, StateMachineBackend, Signer, Config, EvidencePool, RoundStepType, TimeoutInfo } from './types';
 
 const SkipTimeoutCommit = true;
 const WaitForTxs = true;
 const CreateEmptyBlocksInterval = 0;
 const StateMachineMsgQueueMaxSize = 10;
 
-// TODO: config
-function proposeDuration(round: number) {
-  return 3000 + 500 * round;
+function isMessageInfo(smsg: StateMachineMessage): smsg is MessageInfo {
+  return 'peerId' in smsg;
 }
-
-function prevoteDuration(round: number) {
-  return 1000 + 500 * round;
-}
-
-function precommitDutaion(round: number) {
-  return 1000 + 500 * round;
-}
-
-/////////////////////// config ///////////////////////
 
 export class StateMachine {
-  private readonly node: Node;
+  private readonly chainId: number;
+  private readonly backend: StateMachineBackend;
   // TODO:
   private readonly signer?: Signer;
+  private readonly config: Config;
   // TODO:
   private readonly evpool: EvidencePool;
   private readonly timeoutTicker = new TimeoutTicker((ti) => {
@@ -113,9 +38,6 @@ export class StateMachine {
     }
   });
 
-  // statsMsgQueue = new Channel<any>();
-
-  private readonly reimint: ReimintConsensusEngine;
   private parentHash!: Buffer;
   private triggeredTimeoutPrecommit: boolean = false;
 
@@ -145,15 +67,16 @@ export class StateMachine {
   private commitRound: number = -1;
   /////////////// RoundState ///////////////
 
-  constructor(reimint: ReimintConsensusEngine, signer?: Signer) {
-    this.reimint = reimint;
-    this.node = reimint.node;
-    this.evpool = reimint.evpool;
-    this.signer = signer ?? (this.reimint.coinbase.equals(Address.zero()) ? undefined : new MockSigner(reimint.node));
+  constructor(backend: StateMachineBackend, evpool: EvidencePool, chainId: number, config: Config, signer?: Signer) {
+    this.backend = backend;
+    this.chainId = chainId;
+    this.evpool = evpool;
+    this.config = config;
+    this.signer = signer;
   }
 
   private newStep(timestamp?: number) {
-    this.reimint.node.broadcastMessage(this.genNewRoundStepMessage(timestamp)!, { broadcast: true });
+    this.backend.broadcastMessage(this.genNewRoundStepMessage(timestamp)!, { broadcast: true });
   }
 
   async msgLoop() {
@@ -215,8 +138,6 @@ export class StateMachine {
     }
   }
 
-  // private handleTxsAvailable() {}
-
   private setProposal(proposal: Proposal, peerId: string) {
     logger.debug('StateMachine::setProposal');
     if (this.proposal) {
@@ -238,7 +159,7 @@ export class StateMachine {
     this.proposal = proposal;
     this.proposalBlockHash = proposal.hash;
     if (this.proposalBlock === undefined && peerId !== '') {
-      this.reimint.node.broadcastMessage(new GetProposalBlockMessage(proposal.hash), { to: peerId });
+      this.backend.broadcastMessage(new GetProposalBlockMessage(proposal.hash), { to: peerId });
     }
   }
 
@@ -317,7 +238,7 @@ export class StateMachine {
     this.votes.addVote(vote, peerId);
     // TODO: if add failed, return
 
-    this.reimint.node.broadcastMessage(new HasVoteMessage(vote.height, vote.round, vote.type, vote.index), { exclude: [peerId] });
+    this.backend.broadcastMessage(new HasVoteMessage(vote.height, vote.round, vote.type, vote.index), { exclude: [peerId] });
 
     switch (vote.type) {
       case VoteType.Prevote:
@@ -348,7 +269,7 @@ export class StateMachine {
                 this.proposalBlockHash = maj23Hash;
               }
 
-              this.reimint.node.broadcastMessage(new NewValidBlockMessage(this.height, this.round, this.proposalBlockHash, this.step === RoundStepType.Commit), { broadcast: true });
+              this.backend.broadcastMessage(new NewValidBlockMessage(this.height, this.round, this.proposalBlockHash, this.step === RoundStepType.Commit), { broadcast: true });
             }
           }
 
@@ -482,7 +403,7 @@ export class StateMachine {
     const evidence = await evpool.pickEvidence(height, maxEvidenceCount);
     const blockData = await pendingBlock.finalize(round);
 
-    return this.reimint.generateBlockAndProposal(blockData.header, blockData.transactions, {
+    return this.backend.generateBlockAndProposal(blockData.header, blockData.transactions, {
       round,
       POLRound,
       evidence,
@@ -544,7 +465,7 @@ export class StateMachine {
     }
 
     const vote = new Vote({
-      chainId: this.node.getChainId(),
+      chainId: this.chainId,
       type,
       height: this.height,
       round: this.round,
@@ -579,7 +500,7 @@ export class StateMachine {
     };
 
     this.timeoutTicker.schedule({
-      duration: proposeDuration(round),
+      duration: this.config.proposeDuration(round),
       step: RoundStepType.Propose,
       height: height.clone(),
       round
@@ -652,7 +573,7 @@ export class StateMachine {
     };
 
     this.timeoutTicker.schedule({
-      duration: prevoteDuration(round),
+      duration: this.config.prevoteDuration(round),
       step: RoundStepType.PrevoteWait,
       height: height.clone(),
       round
@@ -749,7 +670,7 @@ export class StateMachine {
     };
 
     this.timeoutTicker.schedule({
-      duration: precommitDutaion(round),
+      duration: this.config.precommitDutaion(round),
       step: RoundStepType.PrecommitWait,
       height: height.clone(),
       round
@@ -827,20 +748,16 @@ export class StateMachine {
 
     // TODO: validate proposalBlock
 
-    const finalizedBlock = this.reimint.generateFinalizedBlock({ ...this.proposalBlock.header }, [...this.proposalBlock.transactions], this.proposalEvidence, this.proposal, precommits, { common: this.proposalBlock._common });
+    const finalizedBlock = this.backend.generateFinalizedBlock({ ...this.proposalBlock.header }, [...this.proposalBlock.transactions], this.proposalEvidence, this.proposal, precommits, { common: this.proposalBlock._common });
     if (!finalizedBlock.hash().equals(maj23Hash)) {
       logger.error('StateMachine::tryFinalizeCommit, finalizedBlock hash not equal, something is wrong');
       return;
     }
 
-    this.node
+    this.backend
       .processBlock(finalizedBlock, { broadcast: true })
-      .then((reorged) => {
+      .then(() => {
         logger.info('⛏️  Mine block, height:', finalizedBlock.header.number.toString(), 'hash:', bufferToHex(finalizedBlock.hash()));
-        if (reorged) {
-          // try to continue minting
-          this.node.onMintBlock();
-        }
       })
       .catch((err) => {
         logger.error('StateMachine::tryFinalizeCommit, catch error:', err);
@@ -896,7 +813,7 @@ export class StateMachine {
     this.lockedEvidence = undefined;
     this.validRound = -1;
     this.validBlock = undefined;
-    this.votes = new HeightVoteSet(this.node.getChainId(), this.height, this.validators);
+    this.votes = new HeightVoteSet(this.chainId, this.height, this.validators);
     this.commitRound = -1;
     this.triggeredTimeoutPrecommit = false;
 

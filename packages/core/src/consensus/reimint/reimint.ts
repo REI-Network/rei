@@ -1,25 +1,62 @@
-import { Address, BN, toBuffer, setLengthLeft } from 'ethereumjs-util';
+import { Address, BN, toBuffer, setLengthLeft, ecsign, intToBuffer } from 'ethereumjs-util';
 import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions, Transaction } from '@gxchain2/structure';
 import { Common } from '@gxchain2/common';
 import { logger } from '@gxchain2/utils';
+import { Node, ProcessBlockOptions } from '../../node';
+import { ConsensusProtocol } from '../../protocols/consensus';
 import { ConsensusEngine, ConsensusEngineOptions } from '../consensusEngine';
-import { EMPTY_ADDRESS, EMPTY_EXTRA_DATA } from '../utils';
+import { EMPTY_ADDRESS, EMPTY_EXTRA_DATA, isEmptyAddress } from '../utils';
 import { ConsensusEngineBase } from '../consensusEngineBase';
-import { ExtraData, calcBlockHeaderHash } from './extraData';
-import { Proposal } from './proposal';
-import { StateMachine } from './state';
-import { VoteType, VoteSet } from './vote';
-import { Evidence } from './evidence';
-import { EvidencePool } from './evpool';
-import { EvidenceDatabase } from './evdb';
+import { ExtraData, calcBlockHeaderHash, Proposal, VoteType, VoteSet, Evidence, EvidencePool, EvidenceDatabase, Message } from './types';
+import { StateMachine, SendMessageOptions } from './state';
 
-const defaultRound = 0;
-const defaultPOLRound = -1;
-const defaultProposalTimestamp = 0;
-const defaultValidaterSetSize = 1;
-const defaultEvidence = [];
+export const defaultRound = 0;
+export const defaultPOLRound = -1;
+export const defaultProposalTimestamp = 0;
+export const defaultValidaterSetSize = 1;
+export const defaultEvidence = [];
 
-function formatHeaderData(data?: HeaderData) {
+/////////////////////// mock ///////////////////////
+
+export class MockSigner {
+  readonly node: Node;
+
+  constructor(node: Node) {
+    this.node = node;
+  }
+
+  address(): Address {
+    return this.node.getCurrentEngine().coinbase;
+  }
+
+  sign(msg: Buffer): Buffer {
+    const coinbase = this.node.getCurrentEngine().coinbase;
+    if (coinbase.equals(Address.zero())) {
+      throw new Error('empty coinbase');
+    }
+    const signature = ecsign(msg, this.node.accMngr.getPrivateKey(coinbase));
+    return Buffer.concat([signature.r, signature.s, intToBuffer(signature.v - 27)]);
+  }
+}
+
+export class MockConfig {
+  // TODO: config
+  proposeDuration(round: number) {
+    return 3000 + 500 * round;
+  }
+
+  prevoteDuration(round: number) {
+    return 1000 + 500 * round;
+  }
+
+  precommitDutaion(round: number) {
+    return 1000 + 500 * round;
+  }
+}
+
+/////////////////////// mock ///////////////////////
+
+export function formatHeaderData(data?: HeaderData) {
   if (data) {
     if (data.extraData) {
       const extraData = toBuffer(data.extraData);
@@ -71,8 +108,14 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
 
   constructor(options: ConsensusEngineOptions) {
     super(options);
+
     this.evpool = new EvidencePool(new EvidenceDatabase(options.node.evidencedb));
-    this.state = new StateMachine(this);
+
+    let signer: MockSigner | undefined;
+    if (!isEmptyAddress(this.coinbase) && this.node.accMngr.hasUnlockedAccount(this.coinbase)) {
+      signer = new MockSigner(this.node);
+    }
+    this.state = new StateMachine(this, this.evpool, this.node.getChainId(), new MockConfig(), signer);
   }
 
   /////////////////////////////////
@@ -204,5 +247,46 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
     data = formatHeaderData(data);
     const header = BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize()]) }, options);
     return new Block(header, transactions, undefined, options);
+  }
+
+  /**
+   * Broadcast p2p message to remote peer
+   * @param msg - Message
+   * @param options - Send options {@link SendMessageOptions}
+   */
+  broadcastMessage(msg: Message, options: SendMessageOptions) {
+    if (options.broadcast) {
+      for (const handler of ConsensusProtocol.getPool().handlers) {
+        handler.sendMessage(msg);
+      }
+    } else if (options.to) {
+      const peer = this.node.networkMngr.getPeer(options.to);
+      if (peer) {
+        ConsensusProtocol.getHandler(peer, false)?.sendMessage(msg);
+      }
+    } else if (options.exclude) {
+      for (const handler of ConsensusProtocol.getPool().handlers) {
+        if (!options.exclude.includes(handler.peer.peerId)) {
+          handler.sendMessage(msg);
+        }
+      }
+    } else {
+      throw new Error('invalid broadcast message options');
+    }
+  }
+
+  /**
+   * Process single block
+   * @param block - Block
+   * @param options - Process block options
+   * @returns Reorged
+   */
+  processBlock(block: Block, options: ProcessBlockOptions) {
+    return this.node.processBlock(block, options).then((reorged) => {
+      if (reorged) {
+        this.node.onMintBlock();
+      }
+      return reorged;
+    });
   }
 }

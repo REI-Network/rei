@@ -5,7 +5,7 @@ import { rlp, rlphash, toBuffer } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
 import { TypedTransaction, BlockHeader, HashFunction, setCustomHashFunction, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
 import { ConsensusType } from '../consensus/types';
-import { BlockHeader_hash } from '../consensus/reimint/extraData';
+import { BlockHeader_hash } from '../consensus/reimint/types';
 
 const customHashFunction: HashFunction = (header: BlockHeader) => {
   if (header.extraData.length <= CLIQUE_EXTRA_VANITY || getConsensusTypeByCommon(header._common) === ConsensusType.Clique) {

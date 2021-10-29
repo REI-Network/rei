@@ -13,11 +13,11 @@ describe('BlockchainMonitor', async () => {
   let fork2: Block[];
 
   async function processBlock(block: Block) {
-    const { block: newBlock } = await node.processBlock(block, {
+    await node.processBlock(block, {
       broadcast: false,
       skipConsensusValidation: true
     });
-    return newBlock;
+    return block;
   }
 
   before(async () => {

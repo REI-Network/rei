@@ -1,6 +1,6 @@
 import { BN, rlp, intToBuffer, rlphash, bufferToInt } from 'ethereumjs-util';
 import { Block, BlockHeader, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
-import { ValidatorSet } from '../../staking';
+import { ValidatorSet } from '../../../staking';
 import { Vote, VoteType, VoteSet } from './vote';
 import { Evidence, EvidenceBuffer, EvidenceFactory } from './evidence';
 import { Proposal } from './proposal';

@@ -11,7 +11,7 @@ import { Common } from '@gxchain2/common';
 import { logger } from '@gxchain2/utils';
 import { ValidatorChanges, ValidatorSet } from '../staking';
 import { StakeManager, Router, Contract } from '../contracts';
-import { ExtraData } from '../consensus/reimint/extraData';
+import { ExtraData } from '../consensus/reimint/types';
 import { preHF1ConsensusValidateHeader } from '../validation';
 import { isEnableReceiptRootFix, isEnableStaking, genReceiptTrie, preHF1GenReceiptTrie } from '../hardforks';
 import { Node } from '../node';

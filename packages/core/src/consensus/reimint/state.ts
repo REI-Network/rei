@@ -1,7 +1,7 @@
-import { Address, BN, intToBuffer, ecsign, bufferToHex } from 'ethereumjs-util';
+import { Address, BN, bufferToHex } from 'ethereumjs-util';
 import { Channel, logger } from '@gxchain2/utils';
 import { Block, BlockHeader, HeaderData, TypedTransaction, BlockOptions } from '@gxchain2/structure';
-import { Node, ProcessBlockOptions } from '../../node';
+import { ProcessBlockOptions } from '../../node';
 import { ValidatorSet } from '../../staking';
 import { PendingBlock } from '../../worker';
 import { HeightVoteSet, Vote, VoteSet, VoteType, ConflictingVotesError } from './vote';
@@ -10,13 +10,28 @@ import { ReimintBlockOptions, SendMessageOptions } from './reimint';
 import { isEmptyHash, EMPTY_HASH } from '../utils';
 import { Proposal } from './proposal';
 import { Evidence, DuplicateVoteEvidence } from './evidence';
-import { EvidencePool } from './evpool';
 import { ExtraData } from './extraData';
 import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from './messages';
+
+const SkipTimeoutCommit = true;
+const WaitForTxs = true;
+const CreateEmptyBlocksInterval = 0;
+const StateMachineMsgQueueMaxSize = 10;
 
 export interface Signer {
   address(): Address;
   sign(msg: Buffer): Buffer;
+}
+
+export interface Config {
+  proposeDuration(round: number): number;
+  prevoteDuration(round: number): number;
+  precommitDutaion(round: number): number;
+}
+
+export interface EvidencePool {
+  addEvidence(ev: Evidence): Promise<void>;
+  pickEvidence(height: BN, count: number): Promise<Evidence[]>;
 }
 
 export enum RoundStepType {
@@ -48,28 +63,6 @@ function isMessageInfo(smsg: StateMachineMessage): smsg is MessageInfo {
   return 'peerId' in smsg;
 }
 
-/////////////////////// config ///////////////////////
-
-const SkipTimeoutCommit = true;
-const WaitForTxs = true;
-const CreateEmptyBlocksInterval = 0;
-const StateMachineMsgQueueMaxSize = 10;
-
-// TODO: config
-function proposeDuration(round: number) {
-  return 3000 + 500 * round;
-}
-
-function prevoteDuration(round: number) {
-  return 1000 + 500 * round;
-}
-
-function precommitDutaion(round: number) {
-  return 1000 + 500 * round;
-}
-
-/////////////////////// config ///////////////////////
-
 export interface StateMachineBackend {
   broadcastMessage(msg: Message, options: SendMessageOptions): void;
   generateBlockAndProposal(data?: HeaderData, transactions?: TypedTransaction[], options?: ReimintBlockOptions): { block: Block; proposal?: Proposal };
@@ -82,6 +75,7 @@ export class StateMachine {
   private readonly backend: StateMachineBackend;
   // TODO:
   private readonly signer?: Signer;
+  private readonly config: Config;
   // TODO:
   private readonly evpool: EvidencePool;
   private readonly timeoutTicker = new TimeoutTicker((ti) => {
@@ -125,10 +119,11 @@ export class StateMachine {
   private commitRound: number = -1;
   /////////////// RoundState ///////////////
 
-  constructor(backend: StateMachineBackend, evpool: EvidencePool, chainId: number, signer?: Signer) {
+  constructor(backend: StateMachineBackend, evpool: EvidencePool, chainId: number, config: Config, signer?: Signer) {
     this.backend = backend;
     this.chainId = chainId;
     this.evpool = evpool;
+    this.config = config;
     this.signer = signer;
   }
 
@@ -557,7 +552,7 @@ export class StateMachine {
     };
 
     this.timeoutTicker.schedule({
-      duration: proposeDuration(round),
+      duration: this.config.proposeDuration(round),
       step: RoundStepType.Propose,
       height: height.clone(),
       round
@@ -630,7 +625,7 @@ export class StateMachine {
     };
 
     this.timeoutTicker.schedule({
-      duration: prevoteDuration(round),
+      duration: this.config.prevoteDuration(round),
       step: RoundStepType.PrevoteWait,
       height: height.clone(),
       round
@@ -727,7 +722,7 @@ export class StateMachine {
     };
 
     this.timeoutTicker.schedule({
-      duration: precommitDutaion(round),
+      duration: this.config.precommitDutaion(round),
       step: RoundStepType.PrecommitWait,
       height: height.clone(),
       round

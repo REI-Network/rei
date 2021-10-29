@@ -9,7 +9,7 @@ import { EMPTY_ADDRESS, EMPTY_EXTRA_DATA, isEmptyAddress } from '../utils';
 import { ConsensusEngineBase } from '../consensusEngineBase';
 import { ExtraData, calcBlockHeaderHash } from './extraData';
 import { Proposal } from './proposal';
-import { StateMachine, Signer } from './state';
+import { StateMachine } from './state';
 import { VoteType, VoteSet } from './vote';
 import { Evidence } from './evidence';
 import { EvidencePool } from './evpool';
@@ -24,7 +24,7 @@ const defaultEvidence = [];
 
 /////////////////////// mock ///////////////////////
 
-export class MockSigner implements Signer {
+export class MockSigner {
   readonly node: Node;
 
   constructor(node: Node) {
@@ -42,6 +42,21 @@ export class MockSigner implements Signer {
     }
     const signature = ecsign(msg, this.node.accMngr.getPrivateKey(coinbase));
     return Buffer.concat([signature.r, signature.s, intToBuffer(signature.v - 27)]);
+  }
+}
+
+export class MockConfig {
+  // TODO: config
+  proposeDuration(round: number) {
+    return 3000 + 500 * round;
+  }
+
+  prevoteDuration(round: number) {
+    return 1000 + 500 * round;
+  }
+
+  precommitDutaion(round: number) {
+    return 1000 + 500 * round;
   }
 }
 
@@ -115,7 +130,7 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
     if (!isEmptyAddress(this.coinbase) && this.node.accMngr.hasUnlockedAccount(this.coinbase)) {
       signer = new MockSigner(this.node);
     }
-    this.state = new StateMachine(this, this.evpool, this.node.getChainId(), signer);
+    this.state = new StateMachine(this, this.evpool, this.node.getChainId(), new MockConfig(), signer);
   }
 
   /////////////////////////////////

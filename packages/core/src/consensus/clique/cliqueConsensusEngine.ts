@@ -125,10 +125,26 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
 
   ////////////////////////
 
+  /**
+   * Assign block reward to miner
+   * @param state - State manager instance
+   * @param miner - Miner address
+   * @param reward - Block rward
+   */
   async assignBlockReward(state: IStateManager, miner: Address, reward: BN) {
     await rewardAccount(state, miner, reward);
   }
 
+  /**
+   * After block apply logic,
+   * if the next block is in Reimint consensus,
+   * we should deploy all system contract and
+   * call `Router.onAfterBlock`
+   * @param vm - VM instance
+   * @param pendingBlock - Pending block
+   * @returns Genesis validator set
+   *          (if the next block is in Reimint consensus)
+   */
   async afterApply(vm: VM, pendingBlock: Block) {
     const pendingHeader = pendingBlock.header;
     let validatorSet: ValidatorSet | undefined;
@@ -162,10 +178,16 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
     return validatorSet;
   }
 
+  /**
+   * {@link ConsensusEngine.generatePendingBlock}
+   */
   generatePendingBlock(headerData: HeaderData, common: Common, transactions?: Transaction[]) {
     return Block.fromBlockData({ header: headerData, transactions }, { common, cliqueSigner: this.cliqueSigner() });
   }
 
+  /**
+   * {@link ConsensusEngine.finalize}
+   */
   async finalize(options: FinalizeOpts) {
     const { block, stateRoot, receipts, transactions } = options;
 
@@ -190,6 +212,9 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
     }
   }
 
+  /**
+   * {@link ConsensusEngine.processBlock}
+   */
   async processBlock(options: ProcessBlockOpts) {
     const { block, root } = options;
 
@@ -222,6 +247,9 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
     return { ...result, validatorSet };
   }
 
+  /**
+   * {@link ConsensusEngine.processTx}
+   */
   processTx(options: ProcessTxOptions) {
     const { vm } = options;
     return vm.runTx(options);

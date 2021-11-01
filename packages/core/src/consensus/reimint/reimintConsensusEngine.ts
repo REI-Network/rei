@@ -151,11 +151,39 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
 
   /////////////////////////////
 
+  /**
+   * Assign block reward to miner,
+   * in Reimint consensus,
+   * it will first assign all block rewards to the system caller,
+   * then the system caller will call `Router.assignBlockReward`
+   * to assign block reward to real miner
+   * @param state - State manger instance
+   * @param systemCaller - System caller address
+   * @param reward - Block reward
+   */
   async assignBlockReward(state: IStateManager, systemCaller: Address, reward: BN) {
     // if staking is active, assign reward to system caller address
     await rewardAccount(state, systemCaller, reward);
   }
 
+  /**
+   * After apply block logic,
+   * 1. call `Router.assignBlockReward`
+   * 2. collect all transaction logs
+   * 3. merge validator changes to parent validator set
+   * 4. call `Router.onAfterBlock`
+   * @param vm - VM instance
+   * @param pendingBlock - Pending block
+   * @param receipts - Transaction receipts
+   * @param miner - Miner address
+   * @param blockReward - Block reward
+   * @param parentValidatorSet - Validator set loaded from parent state trie
+   * @param parentStakeManager - Stake manager contract instance
+   *                             (used to load totalLockedAmount and validatorCount and validatorSet if need)
+   * @param parentRouter - Router contract instance
+   *                       (used to call `Router.assignBlockReward` and `Router.onAfterBlock`)
+   * @returns New validator set
+   */
   async afterApply(vm: VM, pendingBlock: Block, receipts: Receipt[], miner: Address, blockReward: BN, parentValidatorSet: ValidatorSet, parentStakeManager: StakeManager, parentRouter: Router) {
     const pendingCommon = pendingBlock._common;
 
@@ -221,11 +249,17 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     return validatorSet;
   }
 
+  /**
+   * {@link ConsensusEngine.generatePendingBlock}
+   */
   generatePendingBlock(headerData: HeaderData, common: Common) {
     const { block } = Reimint.generateBlockAndProposal(headerData, [], { common, signer: this.signer });
     return block;
   }
 
+  /**
+   * {@link ConsensusEngine.finalize}
+   */
   async finalize(options: FinalizeOpts) {
     const { block, transactions, receipts, stateRoot, parentStateRoot, round } = options;
     if (round === undefined || !parentStateRoot) {
@@ -259,6 +293,9 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     }
   }
 
+  /**
+   * {@link ConsensusEngine.processBlock}
+   */
   async processBlock(options: ProcessBlockOpts) {
     const { block, root, runTxOpts } = options;
 
@@ -303,6 +340,9 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     return { ...result, validatorSet };
   }
 
+  /**
+   * {@link ConsensusEngine.processTx}
+   */
   processTx(options: ProcessTxOptions) {
     const { vm, block } = options;
     const systemCaller = Address.fromString(block._common.param('vm', 'scaddr'));

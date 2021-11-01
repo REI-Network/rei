@@ -564,8 +564,8 @@ export class Node {
   /**
    * Push a block to the block queue
    * @param block - Block
-   * @param generate - Generate new block or not
-   * @returns New block
+   * @param options - Process block options
+   * @returns Reorged
    */
   async processBlock(block: Block, options: ProcessBlockOptions) {
     await this.initPromise;
@@ -574,6 +574,11 @@ export class Node {
     });
   }
 
+  /**
+   * Add pending transactions to consensus engine
+   * @param txs - Pending transactions
+   * @returns An array of results, one-to-one correspondence with transactions
+   */
   async addPendingTxs(txs: Transaction[]) {
     await this.initPromise;
     return new Promise<boolean[]>((resolve) => {

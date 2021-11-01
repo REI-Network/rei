@@ -9,21 +9,21 @@ import { ConsensusProtocol } from './protocol';
 
 const peerGossipSleepDuration = 100;
 
-const defaultNewRoundStepMessage = new NewRoundStepMessage(new BN(0), 0, 0, 0, 0);
+const defaultNewRoundStepMessage = new NewRoundStepMessage(new BN(0), 0, 0);
 
 const consensusHandlerFuncs: HandlerFunc[] = [
   {
     name: 'NewRoundStep',
     code: 0,
     encode(this: ConsensusProtocolHander, data: NewRoundStepMessage) {
-      return [bnToUnpaddedBuffer(data.height), intToBuffer(data.round), intToBuffer(data.step), intToBuffer(data.secondsSinceStartTime), intToBuffer(data.lastCommitRound)];
+      return [bnToUnpaddedBuffer(data.height), intToBuffer(data.round), intToBuffer(data.step)];
     },
     decode(this: ConsensusProtocolHander, data: any): NewRoundStepMessage {
       if (!Array.isArray(data) || data.length !== 5) {
         throw new Error('invalid values length');
       }
-      const [height, round, step, secondsSinceStartTime, lastCommitRound] = data;
-      return new NewRoundStepMessage(new BN(height), bufferToInt(round), bufferToInt(step), bufferToInt(secondsSinceStartTime), bufferToInt(lastCommitRound));
+      const [height, round, step] = data;
+      return new NewRoundStepMessage(new BN(height), bufferToInt(round), bufferToInt(step));
     },
     process(this: ConsensusProtocolHander, msg: NewRoundStepMessage) {
       this.handshakeResponse(msg);
@@ -220,9 +220,6 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
   private height: BN = new BN(0);
   private round: number = -1;
   private step: RoundStepType = RoundStepType.NewHeight;
-
-  // Estimated start of round 0 at this height
-  private startTime!: number;
 
   private proposal: boolean = false;
   private proposalBlockHash?: Buffer;
@@ -421,7 +418,6 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
     this.height = msg.height.clone();
     this.round = msg.round;
     this.step = msg.step;
-    this.startTime = Date.now() - msg.secondsSinceStartTime;
   }
 
   applyNewValidBlockMessage(msg: NewValidBlockMessage) {

@@ -76,8 +76,8 @@ export class StateMachine {
     this.signer = signer;
   }
 
-  private newStep(timestamp?: number) {
-    this.backend.broadcastMessage(this.genNewRoundStepMessage(timestamp)!, { broadcast: true });
+  private newStep() {
+    this.backend.broadcastMessage(this.genNewRoundStepMessage()!, { broadcast: true });
   }
 
   async msgLoop() {
@@ -822,7 +822,7 @@ export class StateMachine {
     this.commitRound = -1;
     this.triggeredTimeoutPrecommit = false;
 
-    this.newStep(timestamp);
+    this.newStep();
 
     const duration = this.startTime - timestamp;
     this.timeoutTicker.schedule({
@@ -869,8 +869,8 @@ export class StateMachine {
     return false;
   }
 
-  genNewRoundStepMessage(timestamp?: number) {
-    return this.startTime !== undefined ? new NewRoundStepMessage(this.height, this.round, this.step, (timestamp ?? Date.now()) - this.startTime, 0) : undefined;
+  genNewRoundStepMessage() {
+    return this.startTime !== undefined ? new NewRoundStepMessage(this.height, this.round, this.step) : undefined;
   }
 
   genVoteSetBitsMessage(height: BN, round: number, type: VoteType, hash: Buffer) {

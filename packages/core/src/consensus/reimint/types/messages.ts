@@ -14,15 +14,11 @@ export class NewRoundStepMessage implements Message {
   readonly height: BN;
   readonly round: number;
   readonly step: RoundStepType;
-  secondsSinceStartTime: number; // TODO
-  lastCommitRound: number; // TODO
 
-  constructor(height: BN, round: number, step: RoundStepType, secondsSinceStartTime: number, lastCommitRound: number) {
+  constructor(height: BN, round: number, step: RoundStepType) {
     this.height = height.clone();
     this.round = round;
     this.step = step;
-    this.secondsSinceStartTime = secondsSinceStartTime;
-    this.lastCommitRound = lastCommitRound;
     this.validateBasic();
   }
 

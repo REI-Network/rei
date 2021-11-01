@@ -2,6 +2,7 @@ import { Address, BN, ecsign, ecrecover, rlp, intToBuffer, bnToUnpaddedBuffer, r
 import { createBufferFunctionalMap, logger } from '@gxchain2/utils';
 import { ValidatorSet } from '../../../staking';
 import { BitArray } from './bitArray';
+import * as v from './validate';
 
 export class ConflictingVotesError extends Error {
   voteA: Vote;
@@ -33,14 +34,14 @@ export interface VoteData {
 }
 
 export class Vote {
-  chainId: number;
-  type: VoteType;
-  height: BN;
-  round: number;
-  hash: Buffer;
-  timestamp: number;
-  index: number;
-  signature?: Buffer;
+  readonly chainId: number;
+  readonly type: VoteType;
+  readonly height: BN;
+  readonly round: number;
+  readonly hash: Buffer;
+  readonly timestamp: number;
+  readonly index: number;
+  private _signature?: Buffer;
 
   static fromVoteData(data: VoteData) {
     return new Vote(data);
@@ -81,7 +82,13 @@ export class Vote {
     this.hash = data.hash;
     this.timestamp = data.timestamp;
     this.index = data.index;
-    this.signature = signature;
+    this._signature = signature;
+    this.validateBasic();
+  }
+
+  set signature(signature: Buffer) {
+    v.validateSignature(signature);
+    this._signature = signature;
   }
 
   getMessageToSign() {
@@ -89,7 +96,7 @@ export class Vote {
   }
 
   isSigned() {
-    return !!this.signature;
+    return !!this._signature;
   }
 
   sign(privateKey: Buffer) {
@@ -98,7 +105,7 @@ export class Vote {
   }
 
   raw() {
-    if (!this.signature) {
+    if (!this._signature) {
       throw new Error('missing signature');
     }
     return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.timestamp), intToBuffer(this.index), this.signature];
@@ -109,26 +116,14 @@ export class Vote {
   }
 
   validateBasic() {
-    if (this.type !== VoteType.Precommit && this.type !== VoteType.Prevote) {
-      throw new Error('invalid vote type');
-    }
-    if (this.height.isNeg()) {
-      throw new Error('invalid height');
-    }
-    if (this.round < 0 || !Number.isSafeInteger(this.round)) {
-      throw new Error('invalid round');
-    }
-    if (this.hash.length !== 32) {
-      throw new Error('invalid hash length');
-    }
-    if (this.timestamp < 0 || !Number.isSafeInteger(this.timestamp)) {
-      throw new Error('invalid timestamp');
-    }
-    if (this.index < 0) {
-      throw new Error('invalid index');
-    }
-    if (this.signature?.length !== 65) {
-      throw new Error('invalid signature length');
+    v.validateVoteType(this.type);
+    v.validateIndex(this.index);
+    v.validateHeight(this.height);
+    v.validateRound(this.round);
+    v.validateHash(this.hash);
+    v.validateTimestamp(this.timestamp);
+    if (this._signature) {
+      v.validateSignature(this._signature);
     }
   }
 
@@ -144,9 +139,12 @@ export class Vote {
   }
 
   validator() {
-    const r = this.signature!.slice(0, 32);
-    const s = this.signature!.slice(32, 64);
-    const v = new BN(this.signature!.slice(64, 65)).addn(27);
+    if (!this._signature) {
+      throw new Error('missing signature');
+    }
+    const r = this._signature.slice(0, 32);
+    const s = this._signature.slice(32, 64);
+    const v = new BN(this._signature.slice(64, 65)).addn(27);
     return Address.fromPublicKey(ecrecover(this.getMessageToSign(), v, r, s));
   }
 }

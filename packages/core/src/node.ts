@@ -111,7 +111,7 @@ export interface NodeOptions {
   };
 }
 
-export interface ProcessBlockOptions extends Omit<ProcessBlockOpts, 'block'> {
+export interface ProcessBlockOptions extends Omit<ProcessBlockOpts, 'block' | 'root'> {
   broadcast: boolean;
 }
 
@@ -488,10 +488,19 @@ export class Node {
     await this.initPromise;
     for await (let { block, options, resolve, reject } of this.processQueue.generator()) {
       try {
-        const result = await this.getCurrentEngine().processBlock({ ...options, block });
-        const receipts = postByzantiumTxReceiptsToReceipts(result.receipts);
         const hash = block.hash();
         const number = block.header.number;
+        // ensure that every transaction is in the right common
+        for (const tx of block.transactions) {
+          tx.common.getHardforkByBlockNumber(number);
+        }
+
+        // get parent header from database
+        const parent = await this.db.getHeader(block.header.parentHash, number.subn(1));
+        // process block through consensus engine
+        const { receipts: _receipts, validatorSet } = await this.getCurrentEngine().processBlock({ ...options, block, root: parent.stateRoot });
+        // convert receipts
+        const receipts = postByzantiumTxReceiptsToReceipts(_receipts);
 
         logger.info('✨ Process block, height:', number.toString(), 'hash:', bufferToHex(hash));
 
@@ -500,7 +509,7 @@ export class Node {
         // commit
         {
           // save validator set if it exists
-          // validatorSet && this.node.validatorSets.set(block.header.stateRoot, validatorSet);
+          validatorSet && this.validatorSets.set(block.header.stateRoot, validatorSet);
           // save block
           await this.blockchain.putBlock(block);
           // save receipts

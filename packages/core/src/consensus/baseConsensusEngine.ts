@@ -7,10 +7,10 @@ import { Common } from '@gxchain2/common';
 import { Channel, logger } from '@gxchain2/utils';
 import { Node } from '../node';
 import { Worker } from '../worker';
-import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from './consensusEngine';
+import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from './types';
 import { EMPTY_ADDRESS } from './utils';
 
-export abstract class ConsensusEngineBase extends EventEmitter implements ConsensusEngine {
+export abstract class BaseConsensusEngine extends EventEmitter implements ConsensusEngine {
   abstract generatePendingBlock(headerData: HeaderData, common: Common, transactions?: Transaction[]): Block;
   abstract finalize(options: FinalizeOpts): Promise<{ finalizedStateRoot: Buffer; receiptTrie: Buffer }>;
   abstract processBlock(options: ProcessBlockOpts): Promise<RunBlockResult>;
@@ -77,7 +77,7 @@ export abstract class ConsensusEngineBase extends EventEmitter implements Consen
       try {
         await this._newBlock(block);
       } catch (err) {
-        logger.error('ConsensusEngineBase::msgLoop, catch error:', err);
+        logger.error('BaseConsensusEngine::msgLoop, catch error:', err);
       }
     }
   }

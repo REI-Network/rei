@@ -1,7 +1,8 @@
-import { toBuffer, setLengthLeft, Address, rlp } from 'ethereumjs-util';
+import { toBuffer, setLengthLeft, Address, rlp, BN } from 'ethereumjs-util';
 import { BaseTrie } from 'merkle-patricia-tree';
 import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
 import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
+import { Common } from '@gxchain2/common';
 import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@gxchain2/structure';
 import { ExtraData, calcBlockHeaderHash, Proposal, VoteType, VoteSet, Evidence } from './types';
 import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../utils';
@@ -33,7 +34,7 @@ export function formatHeaderData(data?: HeaderData) {
 
 export interface ReimintBlockOptions extends BlockOptions {
   // whether try to sign the block
-  signer: Signer;
+  signer?: Signer;
 
   // reimint round
   round?: number;
@@ -58,6 +59,12 @@ export interface ReimintBlockOptions extends BlockOptions {
   proposalTimestamp?: number;
 }
 
+export interface ReimintBlockOptions_SignerExists extends Omit<ReimintBlockOptions, 'signer'> {
+  signer: Signer;
+}
+
+export interface ReimintBlockOptions_SignerNotExists extends Omit<ReimintBlockOptions, 'signer'> {}
+
 export class Reimint {
   // disable contructor
   private constructor() {}
@@ -69,6 +76,26 @@ export class Reimint {
     } else {
       return EMPTY_ADDRESS;
     }
+  }
+
+  static isEnableGenesisValidators(totalLockedAmount: BN, validatorCount: number, common: Common) {
+    const minTotalLockedAmount = common.param('vm', 'minTotalLockedAmount');
+    if (typeof minTotalLockedAmount !== 'string') {
+      throw new Error('invalid minTotalLockedAmount');
+    }
+    if (totalLockedAmount.lt(new BN(minTotalLockedAmount))) {
+      return true;
+    }
+
+    const minValidatorsCount = common.param('vm', 'minValidatorsCount');
+    if (typeof minValidatorsCount !== 'number') {
+      throw new Error('invalid minValidatorsCount');
+    }
+    if (validatorCount < minValidatorsCount) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -91,32 +118,36 @@ export class Reimint {
    * @param options - Reimint block options
    * @returns Header and proposal
    */
-  static generateBlockHeaderAndProposal(data: HeaderData, options: ReimintBlockOptions): { header: BlockHeader; proposal: Proposal } {
+  static generateBlockHeaderAndProposal(data: HeaderData, options: ReimintBlockOptions): { header: BlockHeader; proposal?: Proposal } {
     const header = BlockHeader.fromHeaderData(data, options);
-    data = formatHeaderData(data);
+    if (options.signer) {
+      data = formatHeaderData(data);
 
-    const round = options.round ?? defaultRound;
-    const POLRound = options.POLRound ?? defaultPOLRound;
-    const timestamp = options.proposalTimestamp ?? defaultProposalTimestamp;
-    const validaterSetSize = options.validatorSetSize ?? defaultValidaterSetSize;
-    const evidence = options.evidence ?? defaultEvidence;
+      const round = options.round ?? defaultRound;
+      const POLRound = options.POLRound ?? defaultPOLRound;
+      const timestamp = options.proposalTimestamp ?? defaultProposalTimestamp;
+      const validaterSetSize = options.validatorSetSize ?? defaultValidaterSetSize;
+      const evidence = options.evidence ?? defaultEvidence;
 
-    // calculate block hash
-    const headerHash = calcBlockHeaderHash(header, round, POLRound, evidence);
-    const proposal = new Proposal({
-      round,
-      POLRound,
-      height: header.number,
-      type: VoteType.Proposal,
-      hash: headerHash,
-      timestamp
-    });
-    proposal.signature = options.signer.sign(proposal.getMessageToSign());
-    const extraData = new ExtraData(round, POLRound, evidence, proposal, options?.voteSet);
-    return {
-      header: BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize(validaterSetSize)]) }, options),
-      proposal
-    };
+      // calculate block hash
+      const headerHash = calcBlockHeaderHash(header, round, POLRound, evidence);
+      const proposal = new Proposal({
+        round,
+        POLRound,
+        height: header.number,
+        type: VoteType.Proposal,
+        hash: headerHash,
+        timestamp
+      });
+      proposal.signature = options.signer.sign(proposal.getMessageToSign());
+      const extraData = new ExtraData(round, POLRound, evidence, proposal, options?.voteSet);
+      return {
+        header: BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize(validaterSetSize)]) }, options),
+        proposal
+      };
+    } else {
+      return { header };
+    }
   }
 
   /**
@@ -126,7 +157,10 @@ export class Reimint {
    * @param options - Reimint block options
    * @returns Block and proposal
    */
-  static generateBlockAndProposal(data: HeaderData, transactions: TypedTransaction[], options: ReimintBlockOptions): { block: Block; proposal: Proposal } {
+  static generateBlockAndProposal(data: HeaderData, transactions: TypedTransaction[], options: ReimintBlockOptions_SignerExists): { block: Block; proposal: Proposal };
+  static generateBlockAndProposal(data: HeaderData, transactions: TypedTransaction[], options: ReimintBlockOptions_SignerNotExists): { block: Block };
+  static generateBlockAndProposal(data: HeaderData, transactions: TypedTransaction[], options: ReimintBlockOptions): { block: Block; proposal?: Proposal };
+  static generateBlockAndProposal(data: HeaderData, transactions: TypedTransaction[], options: ReimintBlockOptions): { block: Block; proposal?: Proposal } {
     const { header, proposal } = Reimint.generateBlockHeaderAndProposal(data, options);
     return { block: new Block(header, transactions, undefined, options), proposal };
   }

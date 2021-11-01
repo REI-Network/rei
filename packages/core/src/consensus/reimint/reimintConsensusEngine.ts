@@ -9,17 +9,15 @@ import { StakeManager, Router } from '../../contracts';
 import { ValidatorSet, ValidatorChanges } from '../../staking';
 import { Node, ProcessBlockOptions } from '../../node';
 import { ConsensusProtocol } from '../../protocols/consensus';
-import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from '../consensusEngine';
+import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from '../types';
 import { isEmptyAddress, postByzantiumTxReceiptsToReceipts, getGasLimitByCommon } from '../utils';
-import { ConsensusEngineBase } from '../consensusEngineBase';
+import { BaseConsensusEngine } from '../baseConsensusEngine';
 import { ExtraData, EvidencePool, EvidenceDatabase, Message } from './types';
 import { StateMachine, SendMessageOptions } from './state';
 import { Reimint } from './reimint';
 import { makeRunTxCallback } from './makeRunTxCallback';
 
-/////////////////////// mock ///////////////////////
-
-export class MockSigner {
+export class SimpleNodeSigner {
   readonly node: Node;
 
   constructor(node: Node) {
@@ -40,7 +38,7 @@ export class MockSigner {
   }
 }
 
-export class MockConfig {
+export class SimpleConfig {
   // TODO: config
   proposeDuration(round: number) {
     return 3000 + 500 * round;
@@ -55,42 +53,21 @@ export class MockConfig {
   }
 }
 
-/////////////////////// mock ///////////////////////
-
-export function isEnableGenesisValidators(totalLockedAmount: BN, validatorCount: number, common: Common) {
-  const minTotalLockedAmount = common.param('vm', 'minTotalLockedAmount');
-  if (typeof minTotalLockedAmount !== 'string') {
-    throw new Error('invalid minTotalLockedAmount');
-  }
-  if (totalLockedAmount.lt(new BN(minTotalLockedAmount))) {
-    return true;
-  }
-
-  const minValidatorsCount = common.param('vm', 'minValidatorsCount');
-  if (typeof minValidatorsCount !== 'number') {
-    throw new Error('invalid minValidatorsCount');
-  }
-  if (validatorCount < minValidatorsCount) {
-    return true;
-  }
-
-  return false;
-}
-
-export class ReimintConsensusEngine extends ConsensusEngineBase implements ConsensusEngine {
+export class ReimintConsensusEngine extends BaseConsensusEngine implements ConsensusEngine {
   readonly state: StateMachine;
   readonly evpool: EvidencePool;
+  readonly config: SimpleConfig = new SimpleConfig();
+  readonly signer?: SimpleNodeSigner;
 
   constructor(options: ConsensusEngineOptions) {
     super(options);
 
     this.evpool = new EvidencePool(new EvidenceDatabase(options.node.evidencedb));
 
-    let signer: MockSigner | undefined;
     if (!isEmptyAddress(this.coinbase) && this.node.accMngr.hasUnlockedAccount(this.coinbase)) {
-      signer = new MockSigner(this.node);
+      this.signer = new SimpleNodeSigner(this.node);
     }
-    this.state = new StateMachine(this, this.evpool, this.node.getChainId(), new MockConfig(), signer);
+    this.state = new StateMachine(this, this.evpool, this.node.getChainId(), this.config, this.signer);
   }
 
   protected _start() {
@@ -190,7 +167,7 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
 
     const totalLockedAmount = await parentStakeManager.totalLockedAmount();
     const validatorCount = (await parentStakeManager.indexedValidatorsLength()).toNumber();
-    const enableGenesisValidators = isEnableGenesisValidators(totalLockedAmount, validatorCount, pendingCommon);
+    const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount, pendingCommon);
 
     let validatorSet: ValidatorSet;
     if (enableGenesisValidators) {
@@ -245,7 +222,7 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
   }
 
   generatePendingBlock(headerData: HeaderData, common: Common) {
-    const { block } = Reimint.generateBlockAndProposal(headerData, [], { common: common, signer: new MockSigner(this.node) });
+    const { block } = Reimint.generateBlockAndProposal(headerData, [], { common, signer: this.signer });
     return block;
   }
 
@@ -283,24 +260,17 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
   }
 
   async processBlock(options: ProcessBlockOpts) {
-    const { block, runTxOpts } = options;
-    const header = block.header;
-    // ensure that every transaction is in the right common
-    for (const tx of block.transactions) {
-      tx.common.getHardforkByBlockNumber(header.number);
-    }
+    const { block, root, runTxOpts } = options;
 
     const pendingHeader = block.header;
     const pendingCommon = block._common;
 
-    // get parent header
-    const parent = await this.node.db.getHeader(pendingHeader.parentHash, pendingHeader.number.subn(1));
-    const vm = await this.node.getVM(parent.stateRoot, pendingCommon);
+    const vm = await this.node.getVM(root, pendingCommon);
 
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.node.getStakeManager(vm, block);
     const parentRouter = this.node.getRouter(vm, block);
-    let parentValidatorSet = await this.node.validatorSets.get(parent.stateRoot, parentStakeManager);
+    let parentValidatorSet = await this.node.validatorSets.get(root, parentStakeManager);
 
     const extraData = ExtraData.fromBlockHeader(pendingHeader, { valSet: parentValidatorSet, increaseValSet: true });
     const miner = extraData.proposal.proposer();
@@ -310,13 +280,13 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
       extraData.validate();
     }
 
-    let validatorSet!: ValidatorSet; // TODO
+    let validatorSet!: ValidatorSet;
     const blockReward = new BN(0);
     const runBlockOptions: RunBlockOpts = {
-      generate: false,
       block,
+      root,
+      generate: false,
       skipBlockValidation: true,
-      root: parent.stateRoot,
       genReceiptTrie: Reimint.genReceiptTrie,
       assignBlockReward: async (state: IStateManager, reward: BN) => {
         await this.assignBlockReward(state, systemCaller, reward);
@@ -326,10 +296,11 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
         const receipts = postByzantiumTxReceiptsToReceipts(postByzantiumTxReceipts);
         validatorSet = (await this.afterApply(vm, block, receipts, miner, blockReward, parentValidatorSet, parentStakeManager, parentRouter))!;
       },
-      runTxOpts: { ...runTxOpts, ...makeRunTxCallback(parentRouter, systemCaller, miner, pendingHeader.timestamp.toNumber()) } // TODO
+      runTxOpts: { ...runTxOpts, ...makeRunTxCallback(parentRouter, systemCaller, miner, pendingHeader.timestamp.toNumber()) }
     };
 
-    return await vm.runBlock(runBlockOptions);
+    const result = await vm.runBlock(runBlockOptions);
+    return { ...result, validatorSet };
   }
 
   processTx(options: ProcessTxOptions) {

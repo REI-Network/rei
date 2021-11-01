@@ -1,9 +1,7 @@
-import { ConsensusEngine, ConsensusEngineConstructor, ConsensusEngineOptions } from './consensusEngine';
 import { CliqueConsensusEngine } from './clique';
 import { ReimintConsensusEngine } from './reimint';
-import { ConsensusType } from './types';
+import { ConsensusType, ConsensusEngine, ConsensusEngineConstructor, ConsensusEngineOptions } from './types';
 
-export * from './consensusEngine';
 export * from './pendingBlock';
 export * from './types';
 

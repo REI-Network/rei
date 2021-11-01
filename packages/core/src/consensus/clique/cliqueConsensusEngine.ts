@@ -7,17 +7,17 @@ import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/stat
 import { Block, HeaderData, Transaction } from '@gxchain2/structure';
 import { Common } from '@gxchain2/common';
 import { logger, nowTimestamp, getRandomIntInclusive } from '@gxchain2/utils';
-import { ConsensusEngine, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from '../consensusEngine';
+import { ConsensusEngine, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from '../types';
 import { Contract, Router } from '../../contracts';
 import { ValidatorSet } from '../../staking';
 import { isEnableStaking } from '../../hardforks';
-import { ConsensusEngineBase } from '../consensusEngineBase';
+import { BaseConsensusEngine } from '../baseConsensusEngine';
 import { getGasLimitByCommon } from '../utils';
 import { Clique } from './clique';
 
 const NoTurnSignerDelay = 500;
 
-export class CliqueConsensusEngine extends ConsensusEngineBase implements ConsensusEngine {
+export class CliqueConsensusEngine extends BaseConsensusEngine implements ConsensusEngine {
   private nextTd?: BN;
   private timeout?: NodeJS.Timeout;
 
@@ -172,7 +172,7 @@ export class CliqueConsensusEngine extends ConsensusEngineBase implements Consen
     const pendingCommon = block._common;
     const vm = await this.node.getVM(stateRoot, pendingCommon);
 
-    const miner = block.header.cliqueSigner();
+    const miner = Clique.getMiner(block);
     const minerReward = new BN(pendingCommon.param('pow', 'minerReward'));
 
     await vm.stateManager.checkpoint();
@@ -191,31 +191,24 @@ export class CliqueConsensusEngine extends ConsensusEngineBase implements Consen
   }
 
   async processBlock(options: ProcessBlockOpts) {
-    const { block } = options;
-    const header = block.header;
-    // ensure that every transaction is in the right common
-    for (const tx of block.transactions) {
-      tx.common.getHardforkByBlockNumber(header.number);
-    }
+    const { block, root } = options;
 
-    const miner = block.header.cliqueSigner();
+    const miner = Clique.getMiner(block);
     const pendingHeader = block.header;
     const pendingCommon = block._common;
 
-    // get parent header
-    const parent = await this.node.db.getHeader(pendingHeader.parentHash, pendingHeader.number.subn(1));
-    const vm = await this.node.getVM(parent.stateRoot, pendingCommon);
+    const vm = await this.node.getVM(root, pendingCommon);
 
     if (!options.skipConsensusValidation) {
       Clique.consensusValidateHeader.call(pendingHeader, this.node.blockchain);
     }
 
-    let validatorSet: ValidatorSet | undefined; // TODO
+    let validatorSet: ValidatorSet | undefined;
     const runBlockOptions: RunBlockOpts = {
-      generate: false,
       block,
+      root,
+      generate: false,
       skipBlockValidation: true,
-      root: parent.stateRoot,
       genReceiptTrie: Clique.genReceiptTrie,
       assignBlockReward: (state: IStateManager, reward: BN) => {
         return this.assignBlockReward(state, miner, reward);
@@ -225,7 +218,8 @@ export class CliqueConsensusEngine extends ConsensusEngineBase implements Consen
       }
     };
 
-    return await vm.runBlock(runBlockOptions);
+    const result = await vm.runBlock(runBlockOptions);
+    return { ...result, validatorSet };
   }
 
   processTx(options: ProcessTxOptions) {

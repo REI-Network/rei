@@ -3,7 +3,7 @@ import { Channel, logger } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/structure';
 import { ValidatorSet } from '../../../staking';
 import { PendingBlock } from '../../pendingBlock';
-import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, Proposal, Evidence, DuplicateVoteEvidence, ExtraData } from '../types';
+import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, DuplicateVotesError, Proposal, Evidence, DuplicateVoteEvidence, ExtraData } from '../types';
 import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from '../types/messages';
 import { isEmptyHash, EMPTY_HASH } from '../../utils';
 import { Reimint } from '../reimint';
@@ -330,6 +330,8 @@ export class StateMachine {
         }
         const { voteA, voteB } = err;
         this.evpool.addEvidence(new DuplicateVoteEvidence(voteA, voteB, voteA.height));
+      } else if (err instanceof DuplicateVotesError) {
+        logger.detail('StateMachine::tryAddVote, duplicate votes from:', peerId);
       } else {
         logger.warn('StateMachine::tryAddVote, catch error:', err);
       }

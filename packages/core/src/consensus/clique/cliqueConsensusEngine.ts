@@ -146,9 +146,8 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
    *          (if the next block is in Reimint consensus)
    */
   async afterApply(vm: VM, pendingBlock: Block) {
-    const pendingHeader = pendingBlock.header;
     let validatorSet: ValidatorSet | undefined;
-    const nextCommon = this.node.getCommon(pendingHeader.number.addn(1));
+    const nextCommon = this.node.getCommon(pendingBlock.header.number.addn(1));
     if (isEnableStaking(nextCommon)) {
       // deploy system contracts
       const evm = new EVM(vm, new TxContext(new BN(0), Address.zero()), pendingBlock);
@@ -158,14 +157,6 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
       validatorSet = ValidatorSet.createGenesisValidatorSet(nextCommon);
 
       const activeValidators = validatorSet.activeValidators();
-      logger.debug(
-        'Clique::processBlock, activeValidators:',
-        activeValidators.map(({ validator, priority }) => {
-          return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${validatorSet!.getVotingPower(validator).toString()}`;
-        })
-      );
-
-      // proposer = validatorSet.proposer;
       const activeSigners = activeValidators.map(({ validator }) => validator);
       const priorities = activeValidators.map(({ priority }) => priority);
       // call after block callback to save active validators list
@@ -242,6 +233,18 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
         validatorSet = await this.afterApply(vm, block);
       }
     };
+
+    if (validatorSet) {
+      const activeValidators = validatorSet.activeValidators();
+      logger.debug(
+        'Clique::processBlock, activeValidators:',
+        activeValidators.map(({ validator, priority }) => {
+          return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${validatorSet!.getVotingPower(validator).toString()}`;
+        }),
+        'next proposer:',
+        validatorSet.proposer.toString()
+      );
+    }
 
     const result = await vm.runBlock(runBlockOptions);
     return { ...result, validatorSet };

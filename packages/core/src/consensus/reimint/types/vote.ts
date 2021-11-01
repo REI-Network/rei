@@ -14,6 +14,8 @@ export class ConflictingVotesError extends Error {
   }
 }
 
+export class DuplicateVotesError extends Error {}
+
 export enum VoteType {
   Proposal,
   Prevote,
@@ -236,7 +238,7 @@ export class VoteSet {
     const existing = this.votes[idx];
     if (existing) {
       if (existing.hash.equals(vote.hash)) {
-        throw new Error('unexpected duplicate votes');
+        throw new DuplicateVotesError();
       } else {
         conflicting = existing;
       }

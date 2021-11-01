@@ -229,19 +229,12 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
         // merge changes
         validatorSet.mergeChanges(changes);
       }
-
-      // increase once
-      validatorSet.incrementProposerPriority(1);
     }
 
-    const activeValidators = validatorSet.activeValidators();
-    logger.debug(
-      'Reimint::processBlock, activeValidators:',
-      activeValidators.map(({ validator, priority }) => {
-        return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${validatorSet!.getVotingPower(validator).toString()}`;
-      })
-    );
+    // increase once
+    validatorSet.incrementProposerPriority(1);
 
+    const activeValidators = validatorSet.activeValidators();
     const activeSigners = activeValidators.map(({ validator }) => validator);
     const priorities = activeValidators.map(({ priority }) => priority);
     // call after block callback to save active validators list
@@ -335,6 +328,16 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
       },
       runTxOpts: { ...runTxOpts, ...makeRunTxCallback(parentRouter, systemCaller, miner, pendingHeader.timestamp.toNumber()) }
     };
+
+    const activeValidators = validatorSet.activeValidators();
+    logger.debug(
+      'Reimint::processBlock, activeValidators:',
+      activeValidators.map(({ validator, priority }) => {
+        return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${validatorSet!.getVotingPower(validator).toString()}`;
+      }),
+      'next proposer:',
+      validatorSet.proposer.toString()
+    );
 
     const result = await vm.runBlock(runBlockOptions);
     return { ...result, validatorSet };

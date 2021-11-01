@@ -2,10 +2,11 @@ import { BN, bufferToHex } from 'ethereumjs-util';
 import { Channel, logger } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/structure';
 import { ValidatorSet } from '../../../staking';
-import { PendingBlock } from '../../../worker';
+import { PendingBlock } from '../../pendingBlock';
 import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, Proposal, Evidence, DuplicateVoteEvidence, ExtraData } from '../types';
 import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from '../types/messages';
 import { isEmptyHash, EMPTY_HASH } from '../../utils';
+import { Reimint } from '../reimint';
 import { TimeoutTicker } from './timeoutTicker';
 import { StateMachineMessage, MessageInfo, StateMachineBackend, Signer, Config, EvidencePool, RoundStepType, TimeoutInfo } from './types';
 
@@ -399,17 +400,19 @@ export class StateMachine {
     const height = this.height.clone();
     const evpool = this.evpool;
     const pendingBlock = this.pendingBlock;
+    const signer = this.signer!;
 
     const evidence = await evpool.pickEvidence(height, maxEvidenceCount);
-    const blockData = await pendingBlock.finalize(round);
+    const blockData = await pendingBlock.finalize({ round });
 
-    return this.backend.generateBlockAndProposal(blockData.header, blockData.transactions, {
+    return Reimint.generateBlockAndProposal(blockData.header, blockData.transactions, {
+      signer,
       round,
       POLRound,
       evidence,
       validatorSetSize,
       common
-    }) as { block: Block; proposal: Proposal };
+    });
   }
 
   private decideProposal(height: BN, round: number) {
@@ -748,14 +751,14 @@ export class StateMachine {
 
     // TODO: validate proposalBlock
 
-    const finalizedBlock = this.backend.generateFinalizedBlock({ ...this.proposalBlock.header }, [...this.proposalBlock.transactions], this.proposalEvidence, this.proposal, precommits, { common: this.proposalBlock._common });
+    const finalizedBlock = Reimint.generateFinalizedBlock({ ...this.proposalBlock.header }, [...this.proposalBlock.transactions], [...this.proposalEvidence], this.proposal, precommits, { common: this.proposalBlock._common });
     if (!finalizedBlock.hash().equals(maj23Hash)) {
       logger.error('StateMachine::tryFinalizeCommit, finalizedBlock hash not equal, something is wrong');
       return;
     }
 
     this.backend
-      .processBlock(finalizedBlock, { broadcast: true })
+      .executeBlock(finalizedBlock, { broadcast: true })
       .then(() => {
         logger.info('⛏️  Mine block, height:', finalizedBlock.header.number.toString(), 'hash:', bufferToHex(finalizedBlock.hash()));
       })

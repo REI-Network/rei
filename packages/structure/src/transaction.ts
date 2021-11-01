@@ -76,7 +76,7 @@ export function mustParseTransction(values: Buffer[], opts?: TxOptions) {
 }
 
 /**
- * WrappedTransaction based on `@ethereumjs/tx`
+ * WrappedTransaction based on `@gxchain2-ethereumjs/tx`
  */
 export class WrappedTransaction {
   public readonly transaction: Transaction;

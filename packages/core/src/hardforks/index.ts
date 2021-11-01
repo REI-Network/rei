@@ -1,9 +1,6 @@
-import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
-import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
-import { BaseTrie } from 'merkle-patricia-tree';
-import { rlp, rlphash, toBuffer } from 'ethereumjs-util';
+import { rlphash } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
-import { TypedTransaction, BlockHeader, HashFunction, setCustomHashFunction, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
+import { BlockHeader, HashFunction, setCustomHashFunction, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
 import { ConsensusType } from '../consensus/types';
 import { BlockHeader_hash } from '../consensus/reimint/types';
 
@@ -45,47 +42,4 @@ export function isEnableStaking(common: Common) {
   } else {
     throw new Error('unknown chain');
   }
-}
-
-/**
- * Check whether the fix of generating receipt root is enabled
- * @param common - Common instance
- * @returns Enable if `true`
- */
-export function isEnableReceiptRootFix(common: Common) {
-  if (common.chainName() === 'gxc2-testnet') {
-    return common.gteHardfork('testnet-hf1');
-  } else if (common.chainName() === 'gxc2-mainnet') {
-    return common.gteHardfork('mainnet-chainstart');
-  } else {
-    throw new Error('unknown chain');
-  }
-}
-
-/**
- * Generate receipt root after `hf1`
- * @param transactions - List of transaction
- * @param receipts - List of receipt
- * @returns Receipt root
- */
-export async function genReceiptTrie(transactions: TypedTransaction[], receipts: TxReceipt[]) {
-  const trie = new BaseTrie();
-  for (let i = 0; i < receipts.length; i++) {
-    await trie.put(rlp.encode(i), encodeReceipt(transactions[i], receipts[i]));
-  }
-  return trie.root;
-}
-
-/**
- * Generate receipt root before `hf1`
- * @param transactions - List of transaction
- * @param receipts - List of receipt
- * @returns Receipt root
- */
-export async function preHF1GenReceiptTrie(transactions: TypedTransaction[], receipts: TxReceipt[]) {
-  const trie = new BaseTrie();
-  for (let i = 0; i < receipts.length; i++) {
-    await trie.put(toBuffer(i), encodeReceipt(transactions[i], receipts[i]));
-  }
-  return trie.root;
 }

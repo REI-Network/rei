@@ -1,7 +1,31 @@
-import { Address, BN } from 'ethereumjs-util';
+import { Address } from 'ethereumjs-util';
+import VM from '@gxchain2-ethereumjs/vm';
+import { RunBlockOpts, RunBlockResult } from '@gxchain2-ethereumjs/vm/dist/runBlock';
+import { RunTxOpts, RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
+import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
 import { Common } from '@gxchain2/common';
-import { HeaderData, BlockHeader, Block, Transaction } from '@gxchain2/structure';
+import { HeaderData, Block, TypedTransaction, Transaction } from '@gxchain2/structure';
 import { Node } from '../node';
+import { Worker } from '../worker';
+
+export interface FinalizeOpts {
+  block: Block;
+  stateRoot: Buffer;
+  transactions: TypedTransaction[];
+  receipts: TxReceipt[];
+
+  round?: number;
+  parentStateRoot?: Buffer;
+}
+
+export interface ProcessBlockOpts extends Pick<RunBlockOpts, 'block' | 'runTxOpts'> {
+  skipConsensusValidation?: boolean;
+}
+
+export interface ProcessTxOptions extends Omit<RunTxOpts, 'block' | 'beforeTx' | 'afterTx' | 'assignTxReward' | 'generateTxReceipt' | 'skipBalance'> {
+  block: Block;
+  vm: VM;
+}
 
 export interface ConsensusEngineOptions {
   node: Node;
@@ -14,6 +38,8 @@ export interface ConsensusEngineConstructor {
 }
 
 export interface ConsensusEngine {
+  // worker instance
+  readonly worker: Worker;
   // get current coinbase
   coinbase: Address;
   // engine enable
@@ -37,37 +63,6 @@ export interface ConsensusEngine {
   off(event: 'start', cb: (engine: ConsensusEngine) => void): ConsensusEngine;
 
   /**
-   * Get miner address from block header or block
-   * @param header - Block header or block
-   */
-  getMiner(data: BlockHeader | Block): Address;
-
-  /**
-   * Get gas limit by common instance
-   * @param common - Common instance
-   * @returns Gas limit
-   */
-  getGasLimitByCommon(common: Common): BN;
-
-  /**
-   * Get pending block
-   * @returns Pending block
-   */
-  getPendingBlock(): Block;
-
-  /**
-   * Create a simple signed block by data,
-   * the header data can be incompleted,
-   * because the block created is only to
-   * ensure that the correct miner can be obtained during `processTx`
-   * @param data - Header data
-   * @param common - Common instance
-   * @param transactions - List of transaction
-   * @returns Block
-   */
-  simpleSignBlock(data: HeaderData, common: Common, transactions?: Transaction[]): Block;
-
-  /**
    * Process a new block, try to mint a block after this block
    * @param block - New block
    */
@@ -88,4 +83,22 @@ export interface ConsensusEngine {
    * Stop working
    */
   abort(): Promise<void>;
+
+  /**
+   * Create a simple signed block by data,
+   * the header data can be incompleted,
+   * because the block created is only to
+   * ensure that the correct miner can be obtained during `processTx`
+   * @param data - Header data
+   * @param common - Common instance
+   * @param transactions - List of transaction
+   * @returns Block
+   */
+  generatePendingBlock(headerData: HeaderData, common: Common, transactions?: Transaction[]): Block;
+
+  finalize(options: FinalizeOpts): Promise<{ finalizedStateRoot: Buffer; receiptTrie: Buffer }>;
+
+  processBlock(options: ProcessBlockOpts): Promise<RunBlockResult>;
+
+  processTx(options: ProcessTxOptions): Promise<RunTxResult>;
 }

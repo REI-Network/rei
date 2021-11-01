@@ -1,23 +1,20 @@
-import { BN, Address } from 'ethereumjs-util';
-import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
-import { RunTxOpts, RunTxResult, generateTxReceipt as EthereumGenerateTxReceipt } from '@gxchain2-ethereumjs/vm/dist/runTx';
-import VM from '@gxchain2-ethereumjs/vm';
+import { Address, BN } from 'ethereumjs-util';
+import { RunTxResult, generateTxReceipt as EthereumGenerateTxReceipt } from '@gxchain2-ethereumjs/vm/dist/runTx';
 import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
-import { Log } from '@gxchain2-ethereumjs/vm/dist/evm/types';
-import { TypedTransaction, Transaction, Block } from '@gxchain2/structure';
+import { Log as EthereumLog } from '@gxchain2-ethereumjs/vm/dist/evm/types';
+import { TypedTransaction, Transaction } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
-import { Router } from '../contracts';
-import { validateTx } from '../validation';
-import { isEnableStaking } from '../hardforks';
-import { Node } from '../node';
+import VM from '@gxchain2-ethereumjs/vm';
+import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import { Router } from '../../contracts';
+import { validateTx } from '../../validation';
 
-// After HF1 function
 export function makeRunTxCallback(router: Router, systemCaller: Address, miner: Address, timestamp: number) {
   let feeLeft!: BN;
   let freeFeeLeft!: BN;
   let contractFeeLeft!: BN;
   let balanceLeft!: BN;
-  let logs!: Log[];
+  let logs!: EthereumLog[];
 
   const beforeTx = async (state: IStateManager, tx: TypedTransaction, txCost: BN) => {
     const caller = tx.getSenderAddress();
@@ -75,7 +72,7 @@ export function makeRunTxCallback(router: Router, systemCaller: Address, miner: 
       balanceUsage = actualTxCost.clone();
       actualTxCost = new BN(0);
     }
-    logger.debug('Node::processTx, makeRunTxCallback::afterTx, tx:', '0x' + tx.hash().toString('hex'), 'actualTxCost:', _actualTxCost.toString(), 'feeUsage:', feeUsage.toString(), 'freeFeeUsage:', freeFeeUsage.toString(), 'contractFeeUsage:', contractFeeUsage.toString(), 'balanceUsage:', balanceUsage.toString());
+    logger.debug('Reimint::processTx, makeRunTxCallback::afterTx, tx:', '0x' + tx.hash().toString('hex'), 'actualTxCost:', _actualTxCost.toString(), 'feeUsage:', feeUsage.toString(), 'freeFeeUsage:', freeFeeUsage.toString(), 'contractFeeUsage:', contractFeeUsage.toString(), 'balanceUsage:', balanceUsage.toString());
 
     const caller = tx.getSenderAddress();
     if (balanceUsage.gtn(0)) {
@@ -110,26 +107,4 @@ export function makeRunTxCallback(router: Router, systemCaller: Address, miner: 
     assignTxReward: async () => {},
     generateTxReceipt
   };
-}
-
-export interface ProcessTxOptions extends Omit<RunTxOpts, 'block' | 'beforeTx' | 'afterTx' | 'assignTxReward' | 'generateTxReceipt' | 'skipBalance'> {
-  block: Block;
-  vm: VM;
-}
-
-export function processTx(this: Node, options: ProcessTxOptions) {
-  const { vm, block } = options;
-  const enableStaking = isEnableStaking(block._common);
-  const engine = this.getEngineByCommon(block._common);
-  if (enableStaking) {
-    const systemCaller = Address.fromString(block._common.param('vm', 'scaddr'));
-    const router = this.getRouter(vm, block);
-    return vm.runTx({
-      ...options,
-      skipBalance: true,
-      ...makeRunTxCallback(router, systemCaller, engine.getMiner(block), block.header.timestamp.toNumber())
-    });
-  } else {
-    return vm.runTx(options);
-  }
 }

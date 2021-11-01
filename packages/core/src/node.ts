@@ -5,7 +5,7 @@ import LevelStore from 'datastore-level';
 import { bufferToHex, BN, BNLike, Address } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
-import { Database, createEncodingLevelDB, createLevelDB } from '@gxchain2/database';
+import { Database, createEncodingLevelDB, createLevelDB, DBSaveTxLookup, DBSaveReceipts } from '@gxchain2/database';
 import { NetworkManager, Peer } from '@gxchain2/network';
 import { Common, getGenesisState, getChain } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
@@ -25,10 +25,10 @@ import { BlockchainMonitor } from './blockchainmonitor';
 import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
 import { ValidatorSets } from './staking';
 import { StakeManager, Router } from './contracts';
-import { processBlock, ProcessBlockOpts } from './vm';
-import { createEnginesByConsensusTypes, ConsensusEngine, ConsensusType } from './consensus';
+import { createEnginesByConsensusTypes, ConsensusEngine, ConsensusType, ProcessBlockOpts } from './consensus';
 import { ReimintConsensusEngine } from './consensus/reimint';
 import { CliqueConsensusEngine } from './consensus/clique';
+import { postByzantiumTxReceiptsToReceipts } from './consensus/utils';
 import { getConsensusTypeByCommon } from './hardforks';
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
@@ -457,13 +457,59 @@ export class Node {
   }
 
   /**
+   * Get current pending block,
+   * if current pending block doesn't exsit,
+   * it will return an empty block
+   * @returns Pending block
+   */
+  getPendingBlock() {
+    const engine = this.getCurrentEngine();
+    const pendingBlock = engine.worker.getPendingBlock();
+    if (pendingBlock) {
+      const { header, transactions } = pendingBlock.makeBlockData();
+      return engine.generatePendingBlock(header, pendingBlock.common, transactions);
+    } else {
+      const lastest = this.blockchain.latestBlock;
+      const nextNumber = lastest.header.number.addn(1);
+      return engine.generatePendingBlock(
+        {
+          parentHash: lastest.hash(),
+          number: nextNumber
+        },
+        this.getCommon(nextNumber)
+      );
+    }
+  }
+
+  /**
    * A loop that executes blocks sequentially
    */
   private async processLoop() {
     await this.initPromise;
     for await (let { block, options, resolve, reject } of this.processQueue.generator()) {
       try {
-        const reorged = await processBlock.bind(this)({ ...options, block });
+        const result = await this.getCurrentEngine().processBlock({ ...options, block });
+        const receipts = postByzantiumTxReceiptsToReceipts(result.receipts);
+        const hash = block.hash();
+        const number = block.header.number;
+
+        logger.info('✨ Process block, height:', number.toString(), 'hash:', bufferToHex(hash));
+
+        const before = this.blockchain.latestBlock.hash();
+
+        // commit
+        {
+          // save validator set if it exists
+          // validatorSet && this.node.validatorSets.set(block.header.stateRoot, validatorSet);
+          // save block
+          await this.blockchain.putBlock(block);
+          // save receipts
+          await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, hash, number)));
+        }
+
+        const after = this.blockchain.latestBlock.hash();
+
+        const reorged = !before.equals(after);
 
         // if canonical chain changes, notify to other modules
         if (reorged) {

@@ -1,8 +1,7 @@
 import { BN, Address } from 'ethereumjs-util';
 import { ConsensusAlgorithm, ConsensusType } from '@gxchain2/common';
 import { hexStringToBN, nowTimestamp } from '@gxchain2/utils';
-import { BlockHeader, CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL, preHF1CalcCliqueDifficulty, CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@gxchain2/structure';
-import { Blockchain } from '@gxchain2/blockchain';
+import { BlockHeader, CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL } from '@gxchain2/structure';
 
 const allowedFutureBlockTimeSeconds = 15;
 const maxGasLimit = new BN('8000000000000000', 16);
@@ -136,20 +135,5 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
         throw new Error('Invalid block: base fee not correct');
       }
     }
-  }
-}
-
-export function preHF1ConsensusValidateHeader(this: BlockHeader, blockchain: Blockchain) {
-  const miner = this.cliqueSigner();
-  const activeSigners = blockchain.cliqueActiveSignersByBlockNumber(this.number);
-  if (activeSigners.findIndex((addr) => addr.equals(miner)) === -1) {
-    throw new Error('invalid validator, missing from active signer');
-  }
-  const [, diff] = preHF1CalcCliqueDifficulty(activeSigners, this.cliqueSigner(), this.number);
-  if (!diff.eq(this.difficulty)) {
-    throw new Error('invalid difficulty');
-  }
-  if ((blockchain as any).cliqueCheckRecentlySigned(this)) {
-    throw new Error('clique recently signed');
   }
 }

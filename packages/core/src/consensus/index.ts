@@ -4,6 +4,7 @@ import { ReimintConsensusEngine } from './reimint';
 import { ConsensusType } from './types';
 
 export * from './consensusEngine';
+export * from './pendingBlock';
 export * from './types';
 
 const engines = new Map<ConsensusType, ConsensusEngineConstructor>([

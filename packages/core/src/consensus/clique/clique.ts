@@ -1,134 +1,57 @@
-import { Address, bufferToHex, BN } from 'ethereumjs-util';
-import { Block, BlockHeader, HeaderData, preHF1CalcCliqueDifficulty, Transaction } from '@gxchain2/structure';
-import { Common } from '@gxchain2/common';
-import { logger, nowTimestamp, getRandomIntInclusive } from '@gxchain2/utils';
-import { ConsensusEngine } from '../consensusEngine';
-import { ConsensusEngineBase } from '../consensusEngineBase';
+import { BaseTrie } from 'merkle-patricia-tree';
+import { toBuffer, Address, BN } from 'ethereumjs-util';
+import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
+import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
+import { Blockchain } from '@gxchain2/blockchain';
+import { TypedTransaction, BlockHeader, Block, CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@gxchain2/structure';
 
-const NoTurnSignerDelay = 500;
+export class Clique {
+  // disable contructor
+  private constructor() {}
 
-export class CliqueConsensusEngine extends ConsensusEngineBase implements ConsensusEngine {
-  private nextTd?: BN;
-  private timeout?: NodeJS.Timeout;
-
-  /////////////////////////////////
-
-  /**
-   * {@link ConsensusEngine.getMiner}
-   */
-  getMiner(data: BlockHeader | Block) {
-    return data instanceof Block ? data.header.cliqueSigner() : data.cliqueSigner();
+  static getMiner(data: BlockHeader | Block): Address {
+    const header = data instanceof Block ? data.header : data;
+    return header.cliqueSigner();
   }
 
   /**
-   * {@link ConsensusEngine.simpleSignBlock}
+   * Generate receipt root before `hf1`
+   * @param transactions - List of transaction
+   * @param receipts - List of receipt
+   * @returns Receipt root
    */
-  simpleSignBlock(data: HeaderData, common: Common, transactions?: Transaction[]) {
-    const header = BlockHeader.fromHeaderData(data, { common, cliqueSigner: this.cliqueSigner() });
-    return new Block(header, transactions, undefined, { common });
+  static async genReceiptTrie(transactions: TypedTransaction[], receipts: TxReceipt[]) {
+    const trie = new BaseTrie();
+    for (let i = 0; i < receipts.length; i++) {
+      await trie.put(toBuffer(i), encodeReceipt(transactions[i], receipts[i]));
+    }
+    return trie.root;
   }
 
-  /////////////////////////////////
-
-  protected _start() {}
-
-  protected _abort() {
-    return Promise.resolve();
+  static calcCliqueDifficulty(activeSigners: Address[], signer: Address, number: BN): [boolean, BN] {
+    if (activeSigners.length === 0) {
+      throw new Error('Missing active signers information');
+    }
+    const signerIndex = activeSigners.findIndex((address: Address) => address.equals(signer));
+    if (signerIndex === -1) {
+      throw new Error('invalid signer');
+    }
+    const inTurn = number.modn(activeSigners.length) === signerIndex;
+    return [inTurn, (inTurn ? CLIQUE_DIFF_INTURN : CLIQUE_DIFF_NOTURN).clone()];
   }
 
-  /**
-   * Process a new block, try to mint a block after this block
-   * @param block - New block
-   */
-  protected async _newBlock(block: Block) {
-    const header = block.header;
-    // create a new pending block through worker
-    const pendingBlock = await this.worker.createPendingBlock(header);
-    if (!this.enable || this.node.sync.isSyncing) {
-      return;
+  static consensusValidateHeader(this: BlockHeader, blockchain: Blockchain) {
+    const miner = this.cliqueSigner();
+    const activeSigners = blockchain.cliqueActiveSignersByBlockNumber(this.number);
+    if (activeSigners.findIndex((addr) => addr.equals(miner)) === -1) {
+      throw new Error('invalid validator, missing from active signer');
     }
-
-    const parentHash = header.hash();
-    const parentTD = await this.node.db.getTotalDifficulty(parentHash, header.number);
-    // return if cancel failed
-    if (!this.cancel(parentTD)) {
-      return;
+    const [, diff] = Clique.calcCliqueDifficulty(activeSigners, this.cliqueSigner(), this.number);
+    if (!diff.eq(this.difficulty)) {
+      throw new Error('invalid difficulty');
     }
-
-    // check valid signer and recently sign
-    const activeSigners = this.node.blockchain.cliqueActiveSignersByBlockNumber(header.number);
-    const recentlyCheck = this.node.blockchain.cliqueCheckNextRecentlySigned(header, this.coinbase);
-    if (!this.isValidSigner(activeSigners) || recentlyCheck) {
-      return;
+    if ((blockchain as any).cliqueCheckRecentlySigned(this)) {
+      throw new Error('clique recently signed');
     }
-
-    const [inTurn, difficulty] = preHF1CalcCliqueDifficulty(activeSigners, this.coinbase, pendingBlock.number);
-    const gasLimit = this.getGasLimitByCommon(pendingBlock.common);
-    pendingBlock.complete(difficulty, gasLimit);
-
-    if (this.timeout === undefined && this.nextTd === undefined) {
-      // calculate timeout duration for next block
-      const duration = this.calcTimeout(pendingBlock.timestamp, inTurn, activeSigners.length);
-      this.nextTd = parentTD.add(difficulty);
-      this.timeout = setTimeout(async () => {
-        this.nextTd = undefined;
-        this.timeout = undefined;
-
-        try {
-          // finalize pending block
-          const { header: data, transactions } = await pendingBlock!.finalize();
-          const block = this.simpleSignBlock(data, pendingBlock.common, transactions);
-
-          const reorged = await this.node.processBlock(block, {
-            broadcast: true
-          });
-          if (reorged) {
-            logger.info('⛏️  Mine block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
-            // try to continue minting
-            this.node.onMintBlock();
-          }
-        } catch (err) {
-          logger.error('CliqueConsensusEngine::newBlockHeader, processBlock, catch error:', err);
-        }
-      }, duration);
-    }
-  }
-
-  // cancel the timer if the total difficulty is greater than `this.nextTD`
-  private cancel(nextTd: BN) {
-    if (!this.nextTd) {
-      return true;
-    }
-    if (this.nextTd.lte(nextTd)) {
-      this.nextTd = undefined;
-      if (this.timeout) {
-        clearTimeout(this.timeout);
-        this.timeout = undefined;
-      }
-      return true;
-    }
-    return false;
-  }
-
-  // calculate sleep duration
-  private calcTimeout(nextBlockTimestamp: number, inTurn: boolean, activeSignerCount: number) {
-    const now = nowTimestamp();
-    let timeout = now > nextBlockTimestamp ? 0 : nextBlockTimestamp - now;
-    timeout *= 1000;
-    if (!inTurn) {
-      timeout += getRandomIntInclusive(1, activeSignerCount + 1) * NoTurnSignerDelay;
-    }
-    return timeout;
-  }
-
-  // check if the local signer is included in `activeSigners`
-  private isValidSigner(activeSigners: Address[]) {
-    return activeSigners.filter((s) => s.equals(this.coinbase)).length > 0;
-  }
-
-  // try to get clique signer's private key,
-  // return undefined if it is disable
-  private cliqueSigner() {
-    return this.enable ? this.node.accMngr.getPrivateKey(this.coinbase) : undefined;
   }
 }

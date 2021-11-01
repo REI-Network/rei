@@ -1,6 +1,6 @@
 import { Address, BN } from 'ethereumjs-util';
-import { Block, HeaderData, TypedTransaction, BlockOptions } from '@gxchain2/structure';
-import { Evidence, Message, Proposal, VoteSet } from '../types';
+import { Block } from '@gxchain2/structure';
+import { Evidence, Message } from '../types';
 
 export interface Signer {
   address(): Address;
@@ -54,7 +54,5 @@ export interface SendMessageOptions {
 
 export interface StateMachineBackend {
   broadcastMessage(msg: Message, options: SendMessageOptions): void;
-  generateBlockAndProposal(data?: HeaderData, transactions?: TypedTransaction[], options?: any /*TODO*/): { block: Block; proposal?: Proposal };
-  generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], evidence: Evidence[], proposal: Proposal, votes: VoteSet, options?: BlockOptions);
-  processBlock(block: Block, options: any /*TODO*/): Promise<boolean>;
+  executeBlock(block: Block, options: any /*TODO*/): Promise<boolean>;
 }

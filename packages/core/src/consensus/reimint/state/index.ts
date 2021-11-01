@@ -1,2 +1,2 @@
 export * from './state';
-export * from './types';
+export { RoundStepType, Signer, SendMessageOptions, StateMachineBackend } from './types';

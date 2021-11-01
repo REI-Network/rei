@@ -195,18 +195,6 @@ const consensusHandlerFuncs: HandlerFunc[] = [
     process(this: ConsensusProtocolHander, msg: ProposalBlockMessage) {
       this.reimint?.state.newMessage(this.peer.peerId, msg);
     }
-  },
-  // debug code
-  {
-    name: 'hellow',
-    code: 10,
-    encode(this: ConsensusProtocolHander, data: string) {
-      return Buffer.from(data);
-    },
-    decode(this: ConsensusProtocolHander, data: Buffer): string {
-      logger.debug('receive hellow, data:', data.toString());
-      return data.toString();
-    }
   }
 ];
 
@@ -526,10 +514,5 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
         this.catchupCommit = new BitArray(valSetSize);
       }
     }
-  }
-
-  // debug code
-  sayHellow() {
-    this.send(10, 'wuhu');
   }
 }

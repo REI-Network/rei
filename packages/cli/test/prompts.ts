@@ -35,10 +35,6 @@ const handler: {
     await node.networkMngr.ban(peerId);
     logger.info('removed');
   },
-  hellow: async (node: Node, peerId: string) => {
-    const handler = ConsensusProtocol.getHandler(node.networkMngr.getPeer(peerId)!, true);
-    handler.sayHellow();
-  },
   lspeers: (node: Node) => {
     for (const peer of node.networkMngr.peers) {
       logger.info(peer.peerId);

@@ -324,10 +324,12 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
       },
       afterApply: async (state, { receipts: postByzantiumTxReceipts }) => {
         const receipts = postByzantiumTxReceiptsToReceipts(postByzantiumTxReceipts);
-        validatorSet = (await this.afterApply(vm, block, receipts, miner, blockReward, parentValidatorSet, parentStakeManager, parentRouter))!;
+        validatorSet = await this.afterApply(vm, block, receipts, miner, blockReward, parentValidatorSet, parentStakeManager, parentRouter);
       },
       runTxOpts: { ...runTxOpts, ...makeRunTxCallback(parentRouter, systemCaller, miner, pendingHeader.timestamp.toNumber()) }
     };
+
+    const result = await vm.runBlock(runBlockOptions);
 
     const activeValidators = validatorSet.activeValidators();
     logger.debug(
@@ -338,8 +340,6 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
       'next proposer:',
       validatorSet.proposer.toString()
     );
-
-    const result = await vm.runBlock(runBlockOptions);
     return { ...result, validatorSet };
   }
 

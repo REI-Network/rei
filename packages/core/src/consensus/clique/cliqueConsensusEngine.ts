@@ -234,6 +234,8 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
       }
     };
 
+    const result = await vm.runBlock(runBlockOptions);
+
     if (validatorSet) {
       const activeValidators = validatorSet.activeValidators();
       logger.debug(
@@ -245,8 +247,6 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
         validatorSet.proposer.toString()
       );
     }
-
-    const result = await vm.runBlock(runBlockOptions);
     return { ...result, validatorSet };
   }
 

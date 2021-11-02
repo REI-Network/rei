@@ -483,6 +483,21 @@ export class Node {
   }
 
   /**
+   * Get pending state manager instance
+   * @returns State manager instance
+   */
+  getPendingStakeManager() {
+    const engine = this.getCurrentEngine();
+    const pendingBlock = engine.worker.getPendingBlock();
+    if (pendingBlock) {
+      return this.getStateManager(pendingBlock.pendingStateRoot, pendingBlock.common);
+    } else {
+      const latest = this.blockchain.latestBlock;
+      return this.getStateManager(latest.header.stateRoot, latest._common);
+    }
+  }
+
+  /**
    * A loop that executes blocks sequentially
    */
   private async processLoop() {

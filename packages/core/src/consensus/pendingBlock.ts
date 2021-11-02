@@ -76,6 +76,10 @@ export class PendingBlock {
     return this._timestamp.toNumber();
   }
 
+  get pendingStateRoot() {
+    return this.finalizedStateRoot ?? this.latestStateRoot ?? this._parentStateRoot;
+  }
+
   get isCompleted() {
     return this.difficulty !== undefined && this.gasLimit !== undefined;
   }

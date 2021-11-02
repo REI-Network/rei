@@ -62,7 +62,8 @@ export class JsonRPCMiddleware {
       if (helper.isFunction(this.config.onError)) this.config.onError && this.config.onError(err, body);
       const error = {
         code: Number(err.code || err.status || errors.INTERNAL_ERROR.code),
-        message: err.message || errors.INTERNAL_ERROR.message,
+        // message: err.message || errors.INTERNAL_ERROR.message,
+        message: errors.INTERNAL_ERROR.message, // don't print the message
         data: undefined
       };
       if (err && err.data) error.data = err.data;

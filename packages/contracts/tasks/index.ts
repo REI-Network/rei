@@ -65,7 +65,7 @@ task('stake', 'Stake for validator')
     } else if (taskArgs.ether) {
       taskArgs.value = toEther(taskArgs.value);
     }
-    await stakeManager.methods.stake(taskArgs.validator, deployer).send({ value: taskArgs.value, gas: 12475531 });
+    await stakeManager.methods.stake(taskArgs.validator, deployer).send({ value: taskArgs.value });
     console.log('Stake succeed, value:', taskArgs.value);
   });
 

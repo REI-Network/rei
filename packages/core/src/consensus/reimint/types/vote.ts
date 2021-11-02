@@ -86,9 +86,15 @@ export class Vote {
     this.validateBasic();
   }
 
-  set signature(signature: Buffer) {
-    v.validateSignature(signature);
-    this._signature = signature;
+  get signature(): Buffer | undefined {
+    return this._signature;
+  }
+
+  set signature(signature: Buffer | undefined) {
+    if (signature !== undefined) {
+      v.validateSignature(signature);
+      this._signature = signature;
+    }
   }
 
   getMessageToSign() {
@@ -96,7 +102,7 @@ export class Vote {
   }
 
   isSigned() {
-    return !!this._signature;
+    return this._signature && this._signature.length > 0;
   }
 
   sign(privateKey: Buffer) {
@@ -105,10 +111,10 @@ export class Vote {
   }
 
   raw() {
-    if (!this._signature) {
+    if (!this.isSigned()) {
       throw new Error('missing signature');
     }
-    return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.timestamp), intToBuffer(this.index), this.signature];
+    return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.timestamp), intToBuffer(this.index), this._signature!];
   }
 
   serialize() {
@@ -122,8 +128,8 @@ export class Vote {
     v.validateRound(this.round);
     v.validateHash(this.hash);
     v.validateTimestamp(this.timestamp);
-    if (this._signature) {
-      v.validateSignature(this._signature);
+    if (this.isSigned()) {
+      v.validateSignature(this._signature!);
     }
   }
 
@@ -139,12 +145,12 @@ export class Vote {
   }
 
   validator() {
-    if (!this._signature) {
+    if (!this.isSigned()) {
       throw new Error('missing signature');
     }
-    const r = this._signature.slice(0, 32);
-    const s = this._signature.slice(32, 64);
-    const v = new BN(this._signature.slice(64, 65)).addn(27);
+    const r = this._signature!.slice(0, 32);
+    const s = this._signature!.slice(32, 64);
+    const v = new BN(this._signature!.slice(64, 65)).addn(27);
     return Address.fromPublicKey(ecrecover(this.getMessageToSign(), v, r, s));
   }
 }

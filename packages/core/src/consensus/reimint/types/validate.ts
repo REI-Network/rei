@@ -28,6 +28,7 @@ export function validateHash(hash: Buffer) {
 
 export function validateSignature(signature: Buffer) {
   if (signature.length !== 65) {
+    console.log('signature:', signature.toString('hex'));
     throw new Error('invalid signature');
   }
 }

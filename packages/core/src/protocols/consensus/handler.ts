@@ -9,7 +9,7 @@ import { ConsensusProtocol } from './protocol';
 
 const peerGossipSleepDuration = 100;
 
-const defaultNewRoundStepMessage = new NewRoundStepMessage(new BN(0), 0, 0);
+const defaultNewRoundStepMessage = new NewRoundStepMessage(new BN(0), 0, RoundStepType.NewHeight);
 
 const consensusHandlerFuncs: HandlerFunc[] = [
   {
@@ -19,7 +19,7 @@ const consensusHandlerFuncs: HandlerFunc[] = [
       return [bnToUnpaddedBuffer(data.height), intToBuffer(data.round), intToBuffer(data.step)];
     },
     decode(this: ConsensusProtocolHander, data: any): NewRoundStepMessage {
-      if (!Array.isArray(data) || data.length !== 5) {
+      if (!Array.isArray(data) || data.length !== 3) {
         throw new Error('invalid values length');
       }
       const [height, round, step] = data;

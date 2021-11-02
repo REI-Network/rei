@@ -147,7 +147,6 @@ export class ExtraData {
 
         evidence = value.map((buf) => {
           const ev = EvidenceFactory.fromValuesArray(buf);
-          ev.validateBasic();
           // TODO: ev.validate()
           return ev;
         });
@@ -171,7 +170,6 @@ export class ExtraData {
           },
           signature
         );
-        proposal.validateBasic();
         if (valSet) {
           proposal.validateSignature(valSet.proposer);
         }
@@ -193,7 +191,6 @@ export class ExtraData {
             },
             signature
           );
-          vote.validateBasic();
           const conflicting = voteSet.addVote(vote);
           if (conflicting) {
             throw new Error('conflicting vote');

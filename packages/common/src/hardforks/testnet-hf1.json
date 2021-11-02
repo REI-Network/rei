@@ -12,8 +12,7 @@
         "type": "dpos",
         "algorithm": "reimint",
         "reimint": {
-            "period": 5,
-            "epoch": 30000
+            "period": 3
         }
     },
     "vm": {

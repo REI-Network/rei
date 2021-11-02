@@ -365,7 +365,7 @@ export class ValidatorSet {
   getIndexByAddress(address: Address) {
     const index = this.active.findIndex(({ validator }) => validator.equals(address));
     if (index === -1) {
-      throw new Error('invalid validator');
+      return undefined;
     }
     return index;
   }

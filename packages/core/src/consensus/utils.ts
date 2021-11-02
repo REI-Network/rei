@@ -31,6 +31,6 @@ export function postByzantiumTxReceiptsToReceipts(receipts: TxReceipt[]) {
 }
 
 export function getGasLimitByCommon(common: Common): BN {
-  const limit = common.param('vm', 'gasLimit');
+  const limit = common.param('gasConfig', 'gasLimit');
   return hexStringToBN(limit === null ? common.genesis().gasLimit : limit);
 }

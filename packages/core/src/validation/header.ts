@@ -1,7 +1,8 @@
-import { BN, Address } from 'ethereumjs-util';
+import { BN } from 'ethereumjs-util';
 import { ConsensusAlgorithm, ConsensusType } from '@gxchain2/common';
-import { hexStringToBN, nowTimestamp } from '@gxchain2/utils';
+import { nowTimestamp } from '@gxchain2/utils';
 import { BlockHeader, CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL } from '@gxchain2/structure';
+import { getGasLimitByCommon, EMPTY_NONCE, EMPTY_ADDRESS } from '../consensus/utils';
 
 const allowedFutureBlockTimeSeconds = 15;
 const maxGasLimit = new BN('8000000000000000', 16);
@@ -13,7 +14,7 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
   }
   const hardfork: string = (this as any)._getHardfork();
   // Consensus type dependent checks
-  if (this._common.consensusAlgorithm() !== ConsensusAlgorithm.Clique) {
+  if (this._common.consensusAlgorithm() !== ConsensusAlgorithm.Clique && this._common.consensusAlgorithm() !== ConsensusAlgorithm.Reimint) {
     // PoW/Ethash
     if (this.extraData.length > this._common.paramByHardfork('vm', 'maxExtraDataSize', hardfork)) {
       const msg = 'invalid amount of extra data';
@@ -21,23 +22,25 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
     }
   } else {
     // PoA/Clique
-    const minLength = CLIQUE_EXTRA_VANITY + CLIQUE_EXTRA_SEAL;
-    if (!this.cliqueIsEpochTransition()) {
-      // ExtraData length on epoch transition
-      if (this.extraData.length !== minLength) {
-        const msg = `extraData must be ${minLength} bytes on non-epoch transition blocks, received ${this.extraData.length} bytes`;
-        throw this._error(msg);
-      }
-    } else {
-      const signerLength = this.extraData.length - minLength;
-      if (signerLength % 20 !== 0) {
-        const msg = `invalid signer list length in extraData, received signer length of ${signerLength} (not divisible by 20)`;
-        throw this._error(msg);
-      }
-      // coinbase (beneficiary) on epoch transition
-      if (!this.coinbase.isZero()) {
-        const msg = `coinbase must be filled with zeros on epoch transition blocks, received ${this.coinbase.toString()}`;
-        throw this._error(msg);
+    if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique) {
+      const minLength = CLIQUE_EXTRA_VANITY + CLIQUE_EXTRA_SEAL;
+      if (!this.cliqueIsEpochTransition()) {
+        // ExtraData length on epoch transition
+        if (this.extraData.length !== minLength) {
+          const msg = `extraData must be ${minLength} bytes on non-epoch transition blocks, received ${this.extraData.length} bytes`;
+          throw this._error(msg);
+        }
+      } else {
+        const signerLength = this.extraData.length - minLength;
+        if (signerLength % 20 !== 0) {
+          const msg = `invalid signer list length in extraData, received signer length of ${signerLength} (not divisible by 20)`;
+          throw this._error(msg);
+        }
+        // coinbase (beneficiary) on epoch transition
+        if (!this.coinbase.isZero()) {
+          const msg = `coinbase must be filled with zeros on epoch transition blocks, received ${this.coinbase.toString()}`;
+          throw this._error(msg);
+        }
       }
     }
     // MixHash format
@@ -55,11 +58,11 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
       throw this._error('invalid block with gas limit greater than (2^63 - 1)');
     }
     // additional check for beneficiary
-    if (!this.nonce.equals(Buffer.alloc(8)) || !this.coinbase.equals(Address.zero())) {
+    if (!this.nonce.equals(EMPTY_NONCE) || !this.coinbase.equals(EMPTY_ADDRESS)) {
       throw this._error('invalid header(nonce or coinbase), currently does not support beneficiary');
     }
     // additional check for gasLimit
-    if (!this.gasLimit.eq(hexStringToBN(this._common.param('gasConfig', 'gasLimit')))) {
+    if (!this.gasLimit.eq(getGasLimitByCommon(this._common))) {
       throw this._error('invalid header(gas limit)');
     }
     // additional check for timestamp
@@ -77,11 +80,17 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
     throw new Error('invalid timestamp');
   }
 
-  if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique) {
+  if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique || this._common.consensusAlgorithm() === ConsensusAlgorithm.Reimint) {
     const period = this._common.consensusConfig().period;
     // Timestamp diff between blocks is lower than PERIOD (clique)
     if (parentHeader.timestamp.addn(period).gt(this.timestamp)) {
       throw new Error('invalid timestamp diff (lower than period)');
+    }
+  }
+
+  if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Reimint) {
+    if (!this.difficulty.eqn(1)) {
+      throw new Error('invalid difficulty');
     }
   }
 
@@ -94,7 +103,9 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
   if (testnetHF1Number === null) {
     try {
       testnetHF1Number = this._common.hardforkBlockBN('testnet-hf1');
-    } catch (err) {}
+    } catch (err) {
+      // ignore all errors
+    }
   }
   if (testnetHF1Number !== null && this.number.eq(testnetHF1Number)) {
     // do noting, don't check gas limit,

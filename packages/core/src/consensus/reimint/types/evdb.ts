@@ -17,7 +17,7 @@ function maxKeyPending(height: BN) {
 }
 
 function keyPending(ev: Evidence) {
-  throw Buffer.concat([intToBuffer(PENDING_PREFIX), toBuffer(ev.height), ev.hash()]);
+  return Buffer.concat([intToBuffer(PENDING_PREFIX), toBuffer(ev.height), ev.hash()]);
 }
 
 function keyCommitted(ev: Evidence) {
@@ -56,15 +56,15 @@ export class EvidenceDatabase {
   }
 
   addPendingEvidence(ev: Evidence) {
-    return this.db.put(keyPending(ev), ev.raw());
+    return this.db.put(keyPending(ev), ev.serialize());
   }
 
   removePendingEvidence(ev: Evidence) {
-    return this.db.del(keyPending(ev), ev.raw());
+    return this.db.del(keyPending(ev), ev.serialize());
   }
 
   addCommittedEvidence(ev: Evidence) {
-    return this.db.put(keyCommitted(ev), ev.raw());
+    return this.db.put(keyCommitted(ev), ev.serialize());
   }
 
   /**

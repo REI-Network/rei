@@ -1,20 +1,30 @@
 import { BN } from 'ethereumjs-util';
 import { Evidence } from './evidence';
-import { EvidenceDatabase } from './evdb';
+// import { EvidenceDatabase } from './evdb';
 
-const EVPOOL_MAX_CACHE_SIZE = 100;
-const EVPOOL_MAX_AGE_NUM_BLOCKS = new BN(10000);
+export interface EvidencePoolBackend {
+  isCommitted(ev: Evidence): Promise<boolean>;
+  isPending(ev: Evidence): Promise<boolean>;
+  addPendingEvidence(ev: Evidence): void;
+  addCommittedEvidence(ev: Evidence): void;
+  removePendingEvidence(ev: Evidence): void;
+  loadPendingEvidence(any): Promise<void>;
+}
 
 export class EvidencePool {
-  private readonly db: EvidenceDatabase;
+  private readonly backend: EvidencePoolBackend;
   private initPromise?: Promise<void>;
   // cached evidence for broadcast
   private cachedPendingEvidence: Evidence[] = [];
   private height: BN = new BN(0);
   private pruningHeight: BN = new BN(0);
+  private evpoolMaxCacheSize: number;
+  private evpoolMaxAgeNumBlocks: BN;
 
-  constructor(db: EvidenceDatabase) {
-    this.db = db;
+  constructor(backend: EvidencePoolBackend, maxCacheSize?: number, maxAgeNumBlocks?: BN) {
+    this.backend = backend;
+    this.evpoolMaxCacheSize = maxCacheSize ? maxCacheSize : 100;
+    this.evpoolMaxAgeNumBlocks = maxAgeNumBlocks ? maxAgeNumBlocks : new BN(10000);
   }
 
   get pendingEvidence() {
@@ -30,7 +40,7 @@ export class EvidencePool {
 
   private addToCache(ev: Evidence) {
     this.cachedPendingEvidence.push(ev);
-    if (this.cachedPendingEvidence.length > EVPOOL_MAX_CACHE_SIZE) {
+    if (this.cachedPendingEvidence.length > this.evpoolMaxCacheSize) {
       this.cachedPendingEvidence.shift();
     }
   }
@@ -41,13 +51,13 @@ export class EvidencePool {
 
   private async _init(height: BN) {
     try {
-      await this.db.loadPendingEvidence({
+      await this.backend.loadPendingEvidence({
         // add 1 because we may have collected evidence for the next block
         to: height.addn(1),
         reverse: true,
         onData: (ev) => {
           this.addToCache(ev);
-          return this.cachedPendingEvidence.length >= EVPOOL_MAX_CACHE_SIZE;
+          return this.cachedPendingEvidence.length >= this.evpoolMaxCacheSize;
         }
       });
       this.height = height.clone();
@@ -76,7 +86,7 @@ export class EvidencePool {
    */
   async addEvidence(ev: Evidence) {
     await this._afterInit();
-    await this.db.addPendingEvidence(ev);
+    await this.backend.addPendingEvidence(ev);
     this.addToCache(ev);
   }
 
@@ -88,10 +98,10 @@ export class EvidencePool {
    */
   async pickEvidence(height: BN, count: number) {
     const evList: Evidence[] = [];
-    const from = height.gt(EVPOOL_MAX_AGE_NUM_BLOCKS) ? height.sub(EVPOOL_MAX_AGE_NUM_BLOCKS) : new BN(0);
+    const from = height.gt(this.evpoolMaxAgeNumBlocks) ? height.sub(this.evpoolMaxAgeNumBlocks) : new BN(0);
     const to = height.subn(1);
     try {
-      await this.db.loadPendingEvidence({
+      await this.backend.loadPendingEvidence({
         from,
         to,
         onData: (ev) => {
@@ -108,16 +118,19 @@ export class EvidencePool {
   private async pruneExpiredPendingEvidence() {
     const evList: Evidence[] = [];
     try {
-      await this.db.loadPendingEvidence({
+      await this.backend.loadPendingEvidence({
         from: new BN(0),
         onData: (ev) => {
           evList.push(ev);
-          return this.height.sub(ev.height).lte(EVPOOL_MAX_AGE_NUM_BLOCKS);
+          return this.height.sub(ev.height).lt(this.evpoolMaxAgeNumBlocks);
         }
       });
+      if (evList.length > 0) {
+        evList.pop();
+      }
       const promiseList = evList.map((ev) => {
         this.deleteFromCache(ev);
-        this.db.removePendingEvidence(ev);
+        this.backend.removePendingEvidence(ev);
       });
       await Promise.all(promiseList);
       if (evList.length > 0) {
@@ -143,13 +156,13 @@ export class EvidencePool {
 
       for (let i = 0; i < committedEvList.length; i++) {
         // save committed evidences
-        if (!(await this.db.isCommitted(committedEvList[i]))) {
-          await this.db.addCommittedEvidence(committedEvList[i]);
+        if (!(await this.backend.isCommitted(committedEvList[i]))) {
+          await this.backend.addCommittedEvidence(committedEvList[i]);
         }
 
-        if (await this.db.isPending(committedEvList[i])) {
+        if (await this.backend.isPending(committedEvList[i])) {
           // mark pending evidences as committed
-          await this.db.removePendingEvidence(committedEvList[i]);
+          await this.backend.removePendingEvidence(committedEvList[i]);
           // remove committed evidences from this.cachedPendingEvidence
           this.deleteFromCache(committedEvList[i]);
         }

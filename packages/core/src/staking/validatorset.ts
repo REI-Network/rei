@@ -53,7 +53,9 @@ function cloneActiveValidator(av: ActiveValidator) {
 }
 
 // sort all indexed validators, generate a list of active validator
-function sort(maxCount: number, validators: Map<Buffer, ValidatorInfo>) {
+function sort(common: Common, validators: Map<Buffer, ValidatorInfo>) {
+  const maxCount = common.param('vm', 'maxValidatorsCount');
+
   // create a heap to keep the maximum count validator
   const heap = new Heap({
     compar: (a: ValidatorInfo, b: ValidatorInfo) => {
@@ -65,6 +67,7 @@ function sort(maxCount: number, validators: Map<Buffer, ValidatorInfo>) {
       return num;
     }
   });
+
   for (const v of validators.values()) {
     heap.push(v);
     // if the heap length is too large, remove the minimum one
@@ -130,13 +133,12 @@ export class ValidatorSet {
 
   /**
    * Create a validator set from `StakeManager`,
-   * it will load indexed and active validator set from contract
+   * it will load indexed and active validator set from contract and exclude all genesis validators
    * @param sm - `StakeManager` instance
-   * @param sortValidators - If it is true, we sort all validators loaded from the state root and exclude all genesis validators,
-   *                         otherwise, we directly use the list of active validators loaded from state root
+   * @param sortValidators - Sort validators or load directly from the contract
    * @returns New validator set
    */
-  static async createFromStakeManager(sm: StakeManager, sortValidators: boolean = false) {
+  static async createFromStakeManager(sm: StakeManager, sortValidators = false) {
     const common = sm.common;
     const genesisValidators = getGenesisValidators(common);
     const isGenesis = (validator: Address) => {
@@ -145,13 +147,14 @@ export class ValidatorSet {
 
     const validators = createBufferFunctionalMap<ValidatorInfo>();
     let length = await sm.indexedValidatorsLength();
-    for (let i = new BN(0); i.lt(length); i.iaddn(1)) {
+    for (const i = new BN(0); i.lt(length); i.iaddn(1)) {
       const validator = await sm.indexedValidatorsByIndex(i);
-      const _isGenesis = isGenesis(validator);
-      if (sortValidators && _isGenesis) {
+      // exclude genesis validators
+      if (isGenesis(validator)) {
         continue;
       }
-      const votingPower = _isGenesis ? genesisValidatorVotingPower.clone() : await sm.getVotingPowerByIndex(i);
+
+      const votingPower = await sm.getVotingPowerByIndex(i);
       if (votingPower.gtn(0)) {
         validators.set(validator.buf, {
           validator,
@@ -162,24 +165,59 @@ export class ValidatorSet {
 
     let active: ActiveValidator[];
     if (sortValidators) {
-      active = sort(common.param('vm', 'maxValidatorsCount'), validators);
+      active = sort(common, validators);
     } else {
       active = [];
       length = await sm.activeValidatorsLength();
       for (const i = new BN(0); i.lt(length); i.iaddn(1)) {
         const av = await sm.activeValidators(i);
+
+        if (isGenesis(av.validator)) {
+          throw new Error('invalid genesis validator');
+        }
+
         active.push(av);
         // make sure every validator exists in the map
         if (!validators.has(av.validator.buf)) {
-          validators.set(av.validator.buf, {
-            validator: av.validator,
-            votingPower: isGenesis(av.validator) ? genesisValidatorVotingPower.clone() : await sm.getVotingPowerByAddress(av.validator)
-          });
+          throw new Error('unknown validator:' + av.validator.toString());
         }
       }
     }
 
     return new ValidatorSet(validators, active, common);
+  }
+
+  /**
+   * Create a genesis validator set from `StakeManager`,
+   * it will only load active validator set from contract
+   * @param sm - `StakeManager` instance
+   * @returns New validator set
+   */
+  static async createGenesisValidatorSetFromStakeManager(sm: StakeManager) {
+    const common = sm.common;
+    const validators = createBufferFunctionalMap<ValidatorInfo>();
+    const active: ActiveValidator[] = [];
+
+    const length = await sm.activeValidatorsLength();
+    for (const i = new BN(0); i.lt(length); i.iaddn(1)) {
+      const av = await sm.activeValidators(i);
+      active.push(av);
+      // make sure every validator exists in the map
+      if (!validators.has(av.validator.buf)) {
+        validators.set(av.validator.buf, {
+          validator: av.validator,
+          votingPower: genesisValidatorVotingPower.clone()
+        });
+      }
+    }
+
+    // make sure it is a genesis validator set
+    const set = new ValidatorSet(validators, active, common);
+    if (!set.isGenesisValidatorSet()) {
+      throw new Error('invalid genesis validator set');
+    }
+
+    return set;
   }
 
   /**
@@ -294,7 +332,7 @@ export class ValidatorSet {
 
     let flag = false;
     if (dirty) {
-      const newAcitve = sort(this.common.param('vm', 'maxValidatorsCount'), this.validators);
+      const newAcitve = sort(this.common, this.validators);
       const newTotalVotingPower = this.calcTotalVotingPower(newAcitve);
 
       flag = this.compareActiveValidators(changes.parent, newAcitve, newTotalVotingPower);

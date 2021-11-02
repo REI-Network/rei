@@ -90,6 +90,8 @@ interface IStakeManager is IOnly {
 
     function getVotingPowerByAddress(address validator) external view returns (uint256);
 
+    function getTotalLockedAmountAndValidatorCount(address[] calldata excludes) external view returns (uint256, uint256);
+
     function activeValidatorsLength() external view returns (uint256);
 
     function estimateSharesToAmount(address validator, uint256 shares) external view returns (uint256);

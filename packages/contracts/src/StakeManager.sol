@@ -183,7 +183,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      *      If the validator doesn't exist, return 0
      * @param validator     Validator address
      */
-    function getVotingPowerByAddress(address validator) external view override returns (uint256) {
+    function getVotingPowerByAddress(address validator) public view override returns (uint256) {
         address commissionShare = validators[validator].commissionShare;
         if (commissionShare == address(0)) {
             return 0;
@@ -198,6 +198,27 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      */
     function getVotingPower(address commissionShare, address validator) private view returns (uint256) {
         return commissionShare.balance.add(IValidatorRewardPool(config.validatorRewardPool()).balanceOf(validator));
+    }
+
+    /**
+     * @dev Get the total locked amount and the validator count
+     *      but no including the `excludes`
+     * @param excludes         Excluded addresses
+     */
+    function getTotalLockedAmountAndValidatorCount(address[] calldata excludes) external view override returns (uint256 _totalLockedAmount, uint256 validatorCount) {
+        _totalLockedAmount = totalLockedAmount;
+        validatorCount = indexedValidators.length();
+        uint256 minIndexVotingPower = config.minIndexVotingPower();
+        for (uint256 i = 0; i < excludes.length; i = i.add(1)) {
+            address exclude = excludes[i];
+            uint256 votingPower = getVotingPowerByAddress(exclude);
+            if (votingPower > 0) {
+                _totalLockedAmount = _totalLockedAmount.sub(votingPower);
+                if (votingPower > minIndexVotingPower) {
+                    validatorCount = validatorCount.sub(1);
+                }
+            }
+        }
     }
 
     /**

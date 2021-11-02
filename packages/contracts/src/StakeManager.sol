@@ -47,7 +47,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     /**
      * @dev Emitted when a validator is slashed
      * NOTE: this event is never shown in the block,
-     *       because the `reward` function is only called by the system caller
+     *       because the `slash` function is only called by the system caller
      * @param validator     Validator address
      * @param value         Slashed amount
      */

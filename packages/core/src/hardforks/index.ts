@@ -2,13 +2,13 @@ import { rlphash } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
 import { BlockHeader, HashFunction, setCustomHashFunction, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
 import { ConsensusType } from '../consensus/types';
-import { BlockHeader_hash } from '../consensus/reimint/types';
+import { Reimint } from '../consensus/reimint/reimint';
 
 const customHashFunction: HashFunction = (header: BlockHeader) => {
   if (header.extraData.length <= CLIQUE_EXTRA_VANITY || getConsensusTypeByCommon(header._common) === ConsensusType.Clique) {
     return rlphash(header.raw());
   } else {
-    return BlockHeader_hash(header);
+    return Reimint.calcBlockHash(header);
   }
 };
 

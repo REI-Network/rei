@@ -1,10 +1,10 @@
-import { toBuffer, setLengthLeft, Address, rlp, BN } from 'ethereumjs-util';
+import { toBuffer, setLengthLeft, Address, rlp, BN, rlphash, intToBuffer } from 'ethereumjs-util';
 import { BaseTrie } from 'merkle-patricia-tree';
 import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
 import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
 import { Common } from '@gxchain2/common';
 import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@gxchain2/structure';
-import { ExtraData, calcBlockHeaderHash, Proposal, VoteType, VoteSet, Evidence } from './types';
+import { ExtraData, Proposal, VoteType, VoteSet, Evidence } from './types';
 import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../utils';
 import { Signer } from './state';
 
@@ -69,6 +69,45 @@ export class Reimint {
   // disable contructor
   private constructor() {}
 
+  /**
+   * Calculate block or block header hash
+   * @param data - Block or block header
+   * @returns Hash
+   */
+  static calcBlockHash(data: Block | BlockHeader) {
+    const header = data instanceof Block ? data.header : data;
+    return ExtraData.fromBlockHeader(header).proposal.hash;
+  }
+
+  /**
+   * Calculate block header raw hash,
+   * in reimint consensus,
+   * blockhash = rlphash([
+   *    parentHash
+   *    uncleHash
+   *    ...
+   *    extraData(32 bytes) + round + POLRound + evidence1.hash() + evidence2.hash() + ...
+   *    ...
+   *    mixHash
+   *    nonce
+   * ])
+   * @param header - Block header
+   * @param round - Round
+   * @param POLRound - POLRound
+   * @param evidence - Evidence list
+   * @returns Hash
+   */
+  static calcBlockHeaderRawHash(header: BlockHeader, round: number, POLRound: number, evidence: Evidence[]) {
+    const raw = header.raw();
+    raw[12] = Buffer.concat([raw[12].slice(0, CLIQUE_EXTRA_VANITY), intToBuffer(round), intToBuffer(POLRound + 1), ...evidence.map((ev) => ev.hash())]);
+    return rlphash(raw);
+  }
+
+  /**
+   * Get miner address by block or block header
+   * @param data - Block or block header
+   * @returns Miner address
+   */
   static getMiner(data: BlockHeader | Block): Address {
     const header = data instanceof Block ? data.header : data;
     if (header.extraData.length > CLIQUE_EXTRA_VANITY) {
@@ -78,6 +117,16 @@ export class Reimint {
     }
   }
 
+  /**
+   * Check if the genesis validator set should be used,
+   * if totalLockedAmount is less than `minTotalLockedAmount` or
+   * validatorCount is less than `minValidatorsCount`,
+   * the genesis validator set is enabled
+   * @param totalLockedAmount - Current total locked amount
+   * @param validatorCount - Current validator count
+   * @param common - Common instance
+   * @returns `true` if we should use the genesis validator set
+   */
   static isEnableGenesisValidators(totalLockedAmount: BN, validatorCount: number, common: Common) {
     const minTotalLockedAmount = common.param('vm', 'minTotalLockedAmount');
     if (typeof minTotalLockedAmount !== 'string') {
@@ -130,7 +179,7 @@ export class Reimint {
       const evidence = options.evidence ?? defaultEvidence;
 
       // calculate block hash
-      const headerHash = calcBlockHeaderHash(header, round, POLRound, evidence);
+      const headerHash = Reimint.calcBlockHeaderRawHash(header, round, POLRound, evidence);
       const proposal = new Proposal({
         round,
         POLRound,

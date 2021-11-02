@@ -386,7 +386,6 @@ export class HeightVoteSet {
   }
 
   addVote(vote: Vote, peerId: string) {
-    vote.validateBasic();
     let voteSet = this.getVoteSet(vote.round, vote.type);
     if (voteSet === undefined) {
       let catchupRounds = this.peerCatchupRounds.get(peerId);

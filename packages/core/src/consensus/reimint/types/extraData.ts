@@ -1,17 +1,10 @@
-import { BN, rlp, intToBuffer, rlphash, bufferToInt } from 'ethereumjs-util';
-import { Block, BlockHeader, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
+import { BN, rlp, intToBuffer, bufferToInt } from 'ethereumjs-util';
+import { BlockHeader, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
 import { ValidatorSet } from '../../../staking';
+import { Reimint } from '../reimint';
 import { Vote, VoteType, VoteSet } from './vote';
 import { Evidence, EvidenceBuffer, EvidenceFactory } from './evidence';
 import { Proposal } from './proposal';
-
-export function Block_hash(block: Block) {
-  return BlockHeader_hash(block.header);
-}
-
-export function BlockHeader_hash(header: BlockHeader) {
-  return ExtraData.fromBlockHeader(header).proposal.hash;
-}
 
 export interface ExtraDataOptions {
   header: BlockHeader;
@@ -74,12 +67,6 @@ function isRLPEvidenceList(ele: RLPElement): ele is RLPEvidenceList {
     }
   }
   return true;
-}
-
-export function calcBlockHeaderHash(header: BlockHeader, round: number, POLRound: number, evidence: Evidence[]) {
-  const raw = header.raw();
-  raw[12] = Buffer.concat([raw[12].slice(0, CLIQUE_EXTRA_VANITY), intToBuffer(round), intToBuffer(POLRound + 1), ...evidence.map((ev) => ev.hash())]);
-  return rlphash(raw);
 }
 
 export class ExtraData {
@@ -152,7 +139,7 @@ export class ExtraData {
         });
 
         // calculate block hash
-        headerHash = calcBlockHeaderHash(header, round, POLRound, evidence);
+        headerHash = Reimint.calcBlockHeaderRawHash(header, round, POLRound, evidence);
       } else if (i === 2) {
         if (!isRLPVote(value)) {
           throw new Error('invliad values');

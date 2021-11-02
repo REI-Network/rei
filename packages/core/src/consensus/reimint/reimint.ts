@@ -14,6 +14,13 @@ const defaultProposalTimestamp = 0;
 const defaultValidaterSetSize = 1;
 const defaultEvidence = [];
 
+/**
+ * Format header extra data,
+ * create empty 32 bytes if it doesn't exsit,
+ * delete anything after 32 bytes
+ * @param data - Header data
+ * @returns Header data
+ */
 export function formatHeaderData(data?: HeaderData) {
   if (data) {
     if (data.extraData) {

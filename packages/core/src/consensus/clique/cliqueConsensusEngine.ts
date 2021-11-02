@@ -216,7 +216,7 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
     const vm = await this.node.getVM(root, pendingCommon);
 
     if (!options.skipConsensusValidation) {
-      Clique.consensusValidateHeader.call(pendingHeader, this.node.blockchain);
+      Clique.consensusValidateHeader(pendingHeader, this.node.blockchain);
     }
 
     let validatorSet: ValidatorSet | undefined;

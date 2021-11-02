@@ -132,7 +132,7 @@ export class ValidatorSet {
    * Create a validator set from `StakeManager`,
    * it will load indexed and active validator set from contract
    * @param sm - `StakeManager` instance
-   * @param sortValidators - If it is true, we sort all validators loaded from the state root,
+   * @param sortValidators - If it is true, we sort all validators loaded from the state root and exclude all genesis validators,
    *                         otherwise, we directly use the list of active validators loaded from state root
    * @returns New validator set
    */
@@ -147,7 +147,11 @@ export class ValidatorSet {
     let length = await sm.indexedValidatorsLength();
     for (let i = new BN(0); i.lt(length); i.iaddn(1)) {
       const validator = await sm.indexedValidatorsByIndex(i);
-      const votingPower = isGenesis(validator) ? genesisValidatorVotingPower.clone() : await sm.getVotingPowerByIndex(i);
+      const _isGenesis = isGenesis(validator);
+      if (sortValidators && _isGenesis) {
+        continue;
+      }
+      const votingPower = _isGenesis ? genesisValidatorVotingPower.clone() : await sm.getVotingPowerByIndex(i);
       if (votingPower.gtn(0)) {
         validators.set(validator.buf, {
           validator,
@@ -162,7 +166,7 @@ export class ValidatorSet {
     } else {
       active = [];
       length = await sm.activeValidatorsLength();
-      for (let i = new BN(0); i.lt(length); i.iaddn(1)) {
+      for (const i = new BN(0); i.lt(length); i.iaddn(1)) {
         const av = await sm.activeValidators(i);
         active.push(av);
         // make sure every validator exists in the map

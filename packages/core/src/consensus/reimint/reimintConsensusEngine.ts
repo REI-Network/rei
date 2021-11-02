@@ -193,24 +193,28 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
       logs = ethLogs.map((raw) => Log.fromValuesArray(raw));
     }
 
-    const totalLockedAmount = await parentStakeManager.totalLockedAmount();
-    const validatorCount = (await parentStakeManager.indexedValidatorsLength()).toNumber();
-    const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount, pendingCommon);
+    const { totalLockedAmount, validatorCount } = await parentStakeManager.getTotalLockedAmountAndValidatorCount();
+    logger.debug('Reimint::afterApply, totalLockedAmount:', totalLockedAmount.toString(), 'validatorCount:', validatorCount.toString());
+    const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), pendingCommon);
 
     let validatorSet: ValidatorSet;
     if (enableGenesisValidators) {
       if (!parentValidatorSet.isGenesisValidatorSet()) {
+        logger.debug('Reimint::afterApply, EnableGenesisValidators, create a new genesis validator set');
         // if the parent validator set isn't a genesis validator set, we create a new one
         validatorSet = ValidatorSet.createGenesisValidatorSet(pendingCommon);
       } else {
+        logger.debug('Reimint::afterApply, EnableGenesisValidators, copy from parent');
         // if the parent validator set is a genesis validator set, we copy the set from the parent
         validatorSet = parentValidatorSet.copy();
       }
     } else {
       if (parentValidatorSet.isGenesisValidatorSet()) {
+        logger.debug('Reimint::afterApply, DisableGenesisValidators, create a new normal validator set');
         // if the parent validator set is a genesis validator set, we create a new set from state trie
         validatorSet = await ValidatorSet.createFromStakeManager(parentStakeManager, true);
       } else {
+        logger.debug('Reimint::afterApply, DisableGenesisValidators, copy from parent and merge changes');
         // filter changes
         const changes = new ValidatorChanges(parentValidatorSet);
         StakeManager.filterReceiptsChanges(changes, receipts, pendingCommon);

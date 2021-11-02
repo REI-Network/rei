@@ -2,13 +2,13 @@ import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import { Address, BN, toBuffer } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
 import { Log, Receipt } from '@gxchain2/structure';
-import { ValidatorChanges } from '../staking';
+import { ValidatorChanges, getGenesisValidators } from '../staking';
 import { bufferToAddress, decodeInt256 } from './utils';
 import { Contract } from './contract';
 
 // function selector of stake manager
 const methods = {
-  totalLockedAmount: toBuffer('0x05a9f274'),
+  getTotalLockedAmountAndValidatorCount: toBuffer('0xcf6f5534'),
   indexedValidatorsLength: toBuffer('0x74a1c64a'),
   indexedValidatorsByIndex: toBuffer('0xaf6a80e2'),
   getVotingPowerByIndex: toBuffer('0x9b8c4c88'),
@@ -89,13 +89,18 @@ export class StakeManager extends Contract {
   }
 
   /**
-   * Get total locked amount
-   * @returns Total locked amount
+   * Get the total locked amount and the validator count
+   * @returns Total locked amount and validator count
    */
-  totalLockedAmount() {
+  getTotalLockedAmountAndValidatorCount() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('totalLockedAmount', [], []));
-      return new BN(returnValue);
+      const gvs = getGenesisValidators(this.common);
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('getTotalLockedAmountAndValidatorCount', ['address[]'], [gvs.map((gv) => gv.toString())]));
+      let i = 0;
+      return {
+        totalLockedAmount: new BN(returnValue.slice(i++ * 32, i * 32)),
+        validatorCount: new BN(returnValue.slice(i++ * 32, i * 32))
+      };
     });
   }
 

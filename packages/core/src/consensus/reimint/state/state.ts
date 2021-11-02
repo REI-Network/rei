@@ -115,7 +115,7 @@ export class StateMachine {
       logger.debug('StateMachine::handleTimeout, ignoring tock because we are ahead:', ti, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
-    logger.debug('StateMachine::handleTimeout, timeout info:', ti);
+    // logger.debug('StateMachine::handleTimeout, timeout info:', ti);
 
     switch (ti.step) {
       case RoundStepType.NewHeight:
@@ -140,7 +140,7 @@ export class StateMachine {
   }
 
   private setProposal(proposal: Proposal, peerId: string) {
-    logger.debug('StateMachine::setProposal');
+    // logger.debug('StateMachine::setProposal');
     if (this.proposal) {
       logger.debug('StateMachine::setProposal, proposal already exists');
       return;
@@ -177,7 +177,7 @@ export class StateMachine {
   }
 
   private addProposalBlock(block: Block) {
-    logger.debug('StateMachine::addProposalBlock');
+    // logger.debug('StateMachine::addProposalBlock');
     if (this.proposalBlock) {
       logger.debug('StateMachine::setProposal, proposal block already exists');
       return;
@@ -229,7 +229,7 @@ export class StateMachine {
   }
 
   private addVote(vote: Vote, peerId: string) {
-    logger.debug('StateMachine::addVote, vote(h,r,h,t):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, 'from:', peerId);
+    // logger.debug('StateMachine::addVote, vote(h,r,h,t):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, 'from:', peerId);
 
     if (!vote.height.eq(vote.height)) {
       logger.debug('StateMachine::addVote, unequal height, ignore, height:', vote.height.toString(), 'local:', this.height.toString());
@@ -339,10 +339,10 @@ export class StateMachine {
   }
 
   private enterNewRound(height: BN, round: number) {
-    logger.debug('StateMachine::enterNewRound, height:', height.toString(), 'round:', round);
+    // logger.debug('StateMachine::enterNewRound, height:', height.toString(), 'round:', round);
 
     if (!this.height.eq(height) || round < this.round || (this.round === round && this.step !== RoundStepType.NewHeight)) {
-      logger.debug('StateMachine::enterNewRound, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
+      // logger.debug('StateMachine::enterNewRound, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
 
@@ -457,7 +457,7 @@ export class StateMachine {
   }
 
   private signVote(type: VoteType, hash: Buffer) {
-    logger.debug('StateMachine::signVote, type:', type, 'hash:', bufferToHex(hash));
+    // logger.debug('StateMachine::signVote, type:', type, 'hash:', bufferToHex(hash));
     if (!this.signer) {
       logger.debug('StateMachine::signVote, empty signer');
       return;
@@ -487,10 +487,10 @@ export class StateMachine {
   }
 
   private enterPropose(height: BN, round: number) {
-    logger.debug('StateMachine::enterPropose, height:', height.toString(), 'round:', round);
+    // logger.debug('StateMachine::enterPropose, height:', height.toString(), 'round:', round);
 
     if (!this.height.eq(height) || round < this.round || (this.round === round && RoundStepType.Propose <= this.step)) {
-      logger.debug('StateMachine::enterPropose, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
+      // logger.debug('StateMachine::enterPropose, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
 
@@ -526,10 +526,10 @@ export class StateMachine {
   }
 
   private enterPrevote(height: BN, round: number) {
-    logger.debug('StateMachine::enterPrevote, height:', height.toString(), 'round:', round);
+    // logger.debug('StateMachine::enterPrevote, height:', height.toString(), 'round:', round);
 
     if (!this.height.eq(height) || round < this.round || (this.round === round && RoundStepType.Prevote <= this.step)) {
-      logger.debug('StateMachine::enterPrevote, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
+      // logger.debug('StateMachine::enterPrevote, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
 
@@ -560,10 +560,10 @@ export class StateMachine {
   }
 
   private enterPrevoteWait(height: BN, round: number) {
-    logger.debug('StateMachine::enterPrevoteWait, height:', height.toString(), 'round:', round);
+    // logger.debug('StateMachine::enterPrevoteWait, height:', height.toString(), 'round:', round);
 
     if (!this.height.eq(height) || round < this.round || (this.round === round && RoundStepType.PrevoteWait <= this.step)) {
-      logger.debug('StateMachine::enterPrevoteWait, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
+      // logger.debug('StateMachine::enterPrevoteWait, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
 
@@ -587,10 +587,10 @@ export class StateMachine {
   }
 
   private enterPrecommit(height: BN, round: number) {
-    logger.debug('StateMachine::enterPrecommit, height:', height.toString(), 'round:', round);
+    // logger.debug('StateMachine::enterPrecommit, height:', height.toString(), 'round:', round);
 
     if (!this.height.eq(height) || round < this.round || (this.round === round && RoundStepType.Precommit <= this.step)) {
-      logger.debug('StateMachine::enterPrecommit, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
+      // logger.debug('StateMachine::enterPrecommit, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
 
@@ -658,10 +658,10 @@ export class StateMachine {
   }
 
   private enterPrecommitWait(height: BN, round: number) {
-    logger.debug('StateMachine::enterPrecommitWait, height:', height.toString(), 'round:', round);
+    // logger.debug('StateMachine::enterPrecommitWait, height:', height.toString(), 'round:', round);
 
     if (!this.height.eq(height) || round < this.round || (this.round === round && this.triggeredTimeoutPrecommit)) {
-      logger.debug('StateMachine::enterPrecommitWait, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
+      // logger.debug('StateMachine::enterPrecommitWait, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
 
@@ -684,10 +684,10 @@ export class StateMachine {
   }
 
   private enterCommit(height: BN, commitRound: number) {
-    logger.debug('StateMachine::enterCommit, height:', height.toString(), 'commitRound:', commitRound);
+    // logger.debug('StateMachine::enterCommit, height:', height.toString(), 'commitRound:', commitRound);
 
     if (!this.height.eq(height) || RoundStepType.Commit <= this.step) {
-      logger.debug('StateMachine::enterCommit, invalid args(h,r):', height.toString(), commitRound, 'local(h,r,s):', this.height.toString(), this.round, this.step);
+      // logger.debug('StateMachine::enterCommit, invalid args(h,r):', height.toString(), commitRound, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
 
@@ -723,7 +723,7 @@ export class StateMachine {
   }
 
   private tryFinalizeCommit(height: BN) {
-    logger.debug('StateMachine::tryFinalizeCommit, height:', height.toString());
+    // logger.debug('StateMachine::tryFinalizeCommit, height:', height.toString());
 
     if (!this.height.eq(height) || this.step !== RoundStepType.Commit) {
       throw new Error('tryFinalizeCommit invalid args');

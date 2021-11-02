@@ -1,5 +1,5 @@
 import { Address, BN, ecsign, ecrecover, rlp, intToBuffer, bnToUnpaddedBuffer, rlphash, bufferToInt } from 'ethereumjs-util';
-import { createBufferFunctionalMap, logger } from '@gxchain2/utils';
+import { createBufferFunctionalMap /*, logger*/ } from '@gxchain2/utils';
 import { ValidatorSet } from '../../../staking';
 import { BitArray } from './bitArray';
 import * as v from './validate';
@@ -219,7 +219,7 @@ export class VoteSet {
     const validator = vote.validateSignature(this.valSet);
     const votingPower = this.valSet.getVotingPower(validator);
 
-    logger.debug('VoteSet::addVote, add vote for:', validator.toString(), 'voting power:', votingPower.toString());
+    // logger.debug('VoteSet::addVote, add vote for:', validator.toString(), 'voting power:', votingPower.toString());
     return this.addVerifiedVote(vote, votingPower);
   }
 

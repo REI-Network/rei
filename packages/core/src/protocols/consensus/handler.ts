@@ -276,7 +276,7 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
         if (!this.proposal) {
           const proposalMessage = reimint.state.genProposalMessage(this.height, this.round);
           if (proposalMessage) {
-            logger.debug('ConsensusProtocolHander::gossipDataLoop, send proposal to:', this.peer.peerId);
+            // logger.debug('ConsensusProtocolHander::gossipDataLoop, send proposal to:', this.peer.peerId);
             this.sendMessage(proposalMessage);
             this.setHasProposal(proposalMessage.proposal);
           }
@@ -337,7 +337,7 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
   private pickAndSend(votes: VoteSet) {
     const vote = this.pickRandom(votes);
     if (vote) {
-      logger.debug('ConsensusProtocolHander::gossipDataLoop, send vote(h,r,h,t):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, 'to:', this.peer.peerId);
+      // logger.debug('ConsensusProtocolHander::gossipDataLoop, send vote(h,r,h,t):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, 'to:', this.peer.peerId);
       this.sendMessage(new VoteMessage(vote));
       this.setHasVote(vote.height, vote.round, vote.type, vote.index);
       return true;

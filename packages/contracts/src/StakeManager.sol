@@ -36,7 +36,25 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     ActiveValidator[] public override activeValidators;
 
     /**
-     * @dev Emit when the user stakes
+     * @dev Emitted when a validator gets a reward
+     * NOTE: this event is never shown in the block,
+     *       because the `reward` function is only called by the system caller
+     * @param validator     Validator address
+     * @param value         Reward amount
+     */
+    event Reward(address indexed validator, uint256 indexed value);
+
+    /**
+     * @dev Emitted when a validator is slashed
+     * NOTE: this event is never shown in the block,
+     *       because the `reward` function is only called by the system caller
+     * @param validator     Validator address
+     * @param value         Slashed amount
+     */
+    event Slash(address indexed validator, uint256 indexed value);
+
+    /**
+     * @dev Emitted when the user stakes
      * @param validator     Validator address
      * @param value         Stake value
      * @param to            Receiver address
@@ -45,7 +63,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     event Stake(address indexed validator, uint256 indexed value, address to, uint256 shares);
 
     /**
-     * @dev Emit when the user starts unstake
+     * @dev Emitted when the user starts unstake
      * @param id            Unique unstake id
      * @param validator     Validator address
      * @param value         Stake value
@@ -56,7 +74,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     event StartUnstake(uint256 indexed id, address indexed validator, uint256 indexed value, address to, uint256 unstakeShares, uint256 timestamp);
 
     /**
-     * @dev Emit when stake manager `unstake`
+     * @dev Emitted when stake manager `unstake`
      * @param id            Unique unstake id
      * @param validator     Validator address
      * @param to            Receiver address
@@ -65,7 +83,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     event DoUnstake(uint256 indexed id, address indexed validator, address to, uint256 amount);
 
     /**
-     * @dev Emit when validator set commission rate
+     * @dev Emitted when validator set commission rate
      * @param validator     Validator address
      * @param rate          New commission rate
      * @param timestamp     Update timestamp
@@ -73,14 +91,14 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     event SetCommissionRate(address indexed validator, uint256 indexed rate, uint256 indexed timestamp);
 
     /**
-     * @dev Emit when a new validator is indexed
+     * @dev Emitted when a new validator is indexed
      * @param validator     Validator address
      * @param votingPower   Validator voting power
      */
     event IndexedValidator(address indexed validator, uint256 indexed votingPower);
 
     /**
-     * @dev Emit when a new validator is unindexed
+     * @dev Emitted when a new validator is unindexed
      * @param validator     Validator address
      */
     event UnindexedValidator(address indexed validator);
@@ -263,9 +281,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      */
     function stake(address validator, address to) external payable override nonReentrant returns (uint256 shares) {
         require(uint160(validator) > 2000, "StakeManager: invalid validator");
-        if (uint160(msg.sender) > 2000) {
-            require(uint160(to) > 2000, "StakeManager: invalid receiver");
-        }
+        require(uint160(to) > 2000, "StakeManager: invalid receiver");
         require(msg.value > 0, "StakeManager: invalid value");
 
         Validator memory v = validators[validator];
@@ -438,7 +454,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
                 emit IndexedValidator(validator, votingPower.sub(msg.value));
             }
         }
-        emit Stake(validator, msg.value, address(0), 0);
+        emit Reward(validator, msg.value);
 
         // increase total locked amount
         totalLockedAmount = totalLockedAmount.add(msg.value);
@@ -460,7 +476,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
             indexedValidators.remove(v.id);
             emit UnindexedValidator(validator);
         }
-        // TODO: emit a event
+        emit Slash(validator, decreasedAmount);
 
         // decrease total locked amount
         totalLockedAmount = totalLockedAmount.sub(decreasedAmount);

@@ -1,4 +1,3 @@
-import path from 'path';
 import util from 'util';
 import prompts from 'prompts';
 import PeerId from 'peer-id';
@@ -6,7 +5,6 @@ import { Multiaddr } from 'multiaddr';
 import { program } from 'commander';
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
 import { Node } from '@gxchain2/core';
-import { ConsensusProtocol } from '@gxchain2/core/dist/protocols';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
 import { startNode, installOptions } from '../src/commands';
 import { SIGINT } from '../src/process';
@@ -118,7 +116,6 @@ const startPrompts = async (node: Node) => {
   try {
     program.parse(process.argv);
     const opts = program.opts();
-    opts.datadir = path.isAbsolute(opts.datadir) ? opts.datadir : path.join(__dirname, './test-dir/', opts.datadir);
     const [node] = await startNode(opts);
     SIGINT(node);
     await startPrompts(node);

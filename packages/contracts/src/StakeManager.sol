@@ -34,6 +34,8 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     // active validator list of next block,
     // this will be set in `afterBlock`
     ActiveValidator[] public override activeValidators;
+    // proposer address
+    address public override proposer;
 
     /**
      * @dev Emitted when a validator gets a reward
@@ -506,11 +508,17 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     // TODO: if the active validators list is exactly the same as the last list, don't modify the storage
     /**
      * @dev After block callback, it will be called by system caller after each block is processed
+     * @param _proposer          Proposer address
      * @param acValidators       Active validators list
      * @param priorities         Priority list of active validators
      */
-    function onAfterBlock(address[] calldata acValidators, int256[] calldata priorities) external override nonReentrant onlyRouter {
+    function onAfterBlock(
+        address _proposer,
+        address[] calldata acValidators,
+        int256[] calldata priorities
+    ) external override nonReentrant onlyRouter {
         require(acValidators.length == priorities.length, "StakeManager: invalid list length");
+        proposer = _proposer;
         uint256 originLength = activeValidators.length;
         uint256 i = 0;
         for (; i < priorities.length; i = i.add(1)) {

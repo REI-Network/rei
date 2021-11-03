@@ -89,6 +89,23 @@ function sort(common: Common, validators: Map<Buffer, ValidatorInfo>) {
   return newAcitve;
 }
 
+/**
+ * Calculate proposer address
+ * @returns Proposer address and priority
+ */
+function calcProposer(active: ActiveValidator[]) {
+  if (active.length === 0) {
+    throw new Error('active validators list is empty');
+  }
+  let proposer: ActiveValidator | undefined;
+  for (const av of active) {
+    if (proposer === undefined || proposer.priority.lt(av.priority) || (proposer.priority.eq(av.priority) && proposer!.validator.buf.compare(av.validator.buf) === 1)) {
+      proposer = av;
+    }
+  }
+  return proposer!;
+}
+
 // a class used to maintain validator set
 export class ValidatorSet {
   // indexed validator set
@@ -102,17 +119,12 @@ export class ValidatorSet {
   // total voting power of active validator list
   private _totalVotingPower: BN;
 
-  constructor(validators: Map<Buffer, ValidatorInfo>, active: ActiveValidator[], common: Common) {
+  constructor(validators: Map<Buffer, ValidatorInfo>, active: ActiveValidator[], proposer: Address, common: Common) {
     this.validators = validators;
     this.active = active;
+    this._proposer = proposer;
     this._common = common;
-    if (active.length > 0) {
-      this._proposer = this.calcPreviousProposer().validator;
-      this._totalVotingPower = this.calcTotalVotingPower(active);
-    } else {
-      this._proposer = Address.zero();
-      this._totalVotingPower = new BN(0);
-    }
+    this._totalVotingPower = this.calcTotalVotingPower(active);
   }
 
   get proposer() {
@@ -163,10 +175,13 @@ export class ValidatorSet {
       }
     }
 
+    let proposer: Address;
     let active: ActiveValidator[];
     if (sortValidators) {
       active = sort(common, validators);
+      proposer = calcProposer(active).validator;
     } else {
+      proposer = await sm.proposer();
       active = [];
       length = await sm.activeValidatorsLength();
       for (const i = new BN(0); i.lt(length); i.iaddn(1)) {
@@ -184,7 +199,7 @@ export class ValidatorSet {
       }
     }
 
-    return new ValidatorSet(validators, active, common);
+    return new ValidatorSet(validators, active, proposer, common);
   }
 
   /**
@@ -212,7 +227,7 @@ export class ValidatorSet {
     }
 
     // make sure it is a genesis validator set
-    const set = new ValidatorSet(validators, active, common);
+    const set = new ValidatorSet(validators, active, await sm.proposer(), common);
     if (!set.isGenesisValidatorSet()) {
       throw new Error('invalid genesis validator set');
     }
@@ -238,7 +253,7 @@ export class ValidatorSet {
         priority: genesisValidatorPriority.clone()
       });
     }
-    return new ValidatorSet(validators, active, common);
+    return new ValidatorSet(validators, active, calcProposer(active).validator, common);
   }
 
   // compute priority for new active validator list
@@ -446,7 +461,7 @@ export class ValidatorSet {
     for (const [validator, info] of this.validators) {
       validators.set(validator, cloneValidatorInfo(info));
     }
-    return new ValidatorSet(validators, this.active.map(cloneActiveValidator), this._common);
+    return new ValidatorSet(validators, this.active.map(cloneActiveValidator), this.proposer, this._common);
   }
 
   /**
@@ -462,36 +477,6 @@ export class ValidatorSet {
     }
   }
 
-  private calcPreviousProposer() {
-    if (this.active.length === 0) {
-      throw new Error('active validators list is empty');
-    }
-    let previousProposer: ActiveValidator | undefined;
-    for (const av of this.active) {
-      if (previousProposer === undefined || previousProposer.priority.gt(av.priority) || (previousProposer.priority.eq(av.priority) && previousProposer!.validator.buf.compare(av.validator.buf) === -1)) {
-        previousProposer = av;
-      }
-    }
-    return previousProposer!;
-  }
-
-  /**
-   * Calculate proposer address
-   * @returns Proposer address and priority
-   */
-  private calcProposer() {
-    if (this.active.length === 0) {
-      throw new Error('active validators list is empty');
-    }
-    let proposer: ActiveValidator | undefined;
-    for (const av of this.active) {
-      if (proposer === undefined || proposer.priority.lt(av.priority) || (proposer.priority.eq(av.priority) && proposer!.validator.buf.compare(av.validator.buf) === 1)) {
-        proposer = av;
-      }
-    }
-    return proposer!;
-  }
-
   private _incrementProposerPriority() {
     for (const av of this.active) {
       av.priority.iadd(this.getVotingPower(av.validator));
@@ -503,7 +488,7 @@ export class ValidatorSet {
       }
     }
 
-    const av = this.calcProposer();
+    const av = calcProposer(this.active);
     av.priority.isub(this._totalVotingPower);
     this._proposer = av.validator;
   }

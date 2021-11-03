@@ -48,6 +48,8 @@ struct ActiveValidator {
  * @dev see {StakeManager}
  */
 interface IStakeManager is IOnly {
+    function proposer() external view returns (address);
+
     function validatorId() external view returns (uint256);
 
     function validators(address validator)
@@ -122,5 +124,9 @@ interface IStakeManager is IOnly {
 
     function slash(address validator, uint8 reason) external returns (uint256);
 
-    function onAfterBlock(address[] calldata acValidators, int256[] calldata priorities) external;
+    function onAfterBlock(
+        address _proposer,
+        address[] calldata acValidators,
+        int256[] calldata priorities
+    ) external;
 }

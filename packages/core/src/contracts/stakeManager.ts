@@ -14,7 +14,8 @@ const methods = {
   getVotingPowerByIndex: toBuffer('0x9b8c4c88'),
   getVotingPowerByAddress: toBuffer('0x7fdde75c'),
   activeValidatorsLength: toBuffer('0x75bac430'),
-  activeValidators: toBuffer('0x14f64c78')
+  activeValidators: toBuffer('0x14f64c78'),
+  proposer: toBuffer('0xa8e4fb90')
 };
 
 // event topic
@@ -86,6 +87,17 @@ export class StakeManager extends Contract {
 
   constructor(evm: EVM, common: Common) {
     super(evm, common, methods, Address.fromString(common.param('vm', 'smaddr')));
+  }
+
+  /**
+   * Get proposer address
+   * @returns Proposer address
+   */
+  proposer() {
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('proposer', [], []));
+      return bufferToAddress(returnValue);
+    });
   }
 
   /**

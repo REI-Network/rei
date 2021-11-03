@@ -254,12 +254,13 @@ task('fee', 'Query user fee and free fee info')
   });
 
 task('afb', 'Call onAfterBlock callback')
+  .addParam('proposer', 'proposer address')
   .addOptionalParam('address', 'router contract address')
   .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
     const { deployer } = await getNamedAccounts();
     const router = await createWeb3Contract({ name: 'Router', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
     // we don't care about active validators
-    await router.methods.onAfterBlock([], []).send();
+    await router.methods.onAfterBlock(taskArgs.proposer, [], []).send();
     console.log('onAfterBlock succeed');
   });
 

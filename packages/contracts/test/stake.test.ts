@@ -280,9 +280,11 @@ describe('StakeManger', () => {
   });
 
   it('should correctly set active validators', async () => {
+    let proposer = '0xb7e390864a90b7b923c9f9310c6f98aafe43f707';
     let vs = [validator1, validator2, validator3];
     let ps = ['-1', '1', '-100'];
-    await stakeManager.methods.onAfterBlock(vs, ps).send();
+    await stakeManager.methods.onAfterBlock(proposer, vs, ps).send();
+    expect((await stakeManager.methods.proposer().call()).toLocaleLowerCase(), 'proposer should be equal').be.equal(proposer);
     expect(await stakeManager.methods.activeValidatorsLength().call(), 'length should be equal').be.equal('3');
     for (let i = 0; i < 3; i++) {
       const v = await stakeManager.methods.activeValidators(i).call();
@@ -290,9 +292,11 @@ describe('StakeManger', () => {
       expect(v.priority, 'validator priority should be equal').be.equal(ps[i]);
     }
 
+    proposer = '0xb7e390864a90b7b923c9f9310c6f98aafe43f708';
     vs = [validator3, validator2];
     ps = ['-1', '1'];
-    await stakeManager.methods.onAfterBlock(vs, ps).send();
+    await stakeManager.methods.onAfterBlock(proposer, vs, ps).send();
+    expect((await stakeManager.methods.proposer().call()).toLocaleLowerCase(), 'proposer should be equal').be.equal(proposer);
     expect(await stakeManager.methods.activeValidatorsLength().call(), 'length should be equal').be.equal('2');
     for (let i = 0; i < 2; i++) {
       const v = await stakeManager.methods.activeValidators(i).call();

@@ -157,10 +157,14 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
       validatorSet = ValidatorSet.createGenesisValidatorSet(nextCommon);
 
       const activeValidators = validatorSet.activeValidators();
+      if (activeValidators.length === 0) {
+        throw new Error('activeValidators length is zero');
+      }
+
       const activeSigners = activeValidators.map(({ validator }) => validator);
       const priorities = activeValidators.map(({ priority }) => priority);
       // call after block callback to save active validators list
-      await parentRouter!.onAfterBlock(activeSigners, priorities);
+      await parentRouter!.onAfterBlock(validatorSet.proposer, activeSigners, priorities);
 
       // start consensus engine
       this.node.getReimintEngine()?.start();

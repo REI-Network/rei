@@ -36,10 +36,16 @@ class testBackend implements EvidencePoolBackend {
 
   addPendingEvidence(ev: Evidence) {
     this.pendingEvidence.push(ev);
+    return new Promise<void>((resolve) => {
+      resolve();
+    });
   }
 
   addCommittedEvidence(ev: Evidence) {
     this.committedEvidence.push(ev);
+    return new Promise<void>((resolve) => {
+      resolve();
+    });
   }
 
   removePendingEvidence(ev: Evidence) {
@@ -47,6 +53,13 @@ class testBackend implements EvidencePoolBackend {
     if (index != -1) {
       this.pendingEvidence.splice(index, 1);
     }
+    return new Promise<void>((resolve) => {
+      resolve();
+    });
+  }
+
+  VerifyDuplicateVote(ev: Evidence) {
+    return true;
   }
 
   loadPendingEvidence({ from, to, reverse, onData }: { from?: BN; to?: BN; reverse?: boolean; onData: (data: Evidence) => boolean }): Promise<void> {
@@ -144,7 +157,6 @@ describe('evpool', () => {
   });
 
   it('should update correctly', async () => {
-    await evpool.addEvidence(new evTest(new BN(addHeight), new BN(0)));
     const factorPick = 3;
     const factorUpdate = 9;
     const numberPick = factorPick * aborttime;

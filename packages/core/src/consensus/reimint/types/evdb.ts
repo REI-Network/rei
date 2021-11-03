@@ -67,6 +67,15 @@ export class EvidenceDatabase {
     return this.db.put(keyCommitted(ev), ev.serialize());
   }
 
+  VerifyDuplicateVote(ev: Evidence) {
+    const duplicateVoteEvidence = EvidenceFactory.fromSerializedEvidence(ev.serialize());
+    const voteA = duplicateVoteEvidence.voteA;
+    const voteB = duplicateVoteEvidence.voteB;
+    if (!voteA.height.eq(voteB.height) || voteA.round !== voteB.round || voteA.type !== voteB.type || voteA.chainId !== voteB.chainId || !voteA.validator().equals(voteB.validator())) {
+      return false;
+    }
+    return true;
+  }
   /**
    * Load pending evidence from database
    * @param from - The height at which to start the search

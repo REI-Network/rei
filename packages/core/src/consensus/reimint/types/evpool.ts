@@ -1,14 +1,14 @@
 import { BN } from 'ethereumjs-util';
 import { Evidence } from './evidence';
-// import { EvidenceDatabase } from './evdb';
 
 export interface EvidencePoolBackend {
   isCommitted(ev: Evidence): Promise<boolean>;
   isPending(ev: Evidence): Promise<boolean>;
-  addPendingEvidence(ev: Evidence): void;
-  addCommittedEvidence(ev: Evidence): void;
-  removePendingEvidence(ev: Evidence): void;
-  loadPendingEvidence(any): Promise<void>;
+  addPendingEvidence(ev: Evidence): Promise<void>;
+  addCommittedEvidence(ev: Evidence): Promise<void>;
+  removePendingEvidence(ev: Evidence): Promise<void>;
+  loadPendingEvidence({ from, to, reverse, onData }: { from?: BN; to?: BN; reverse?: boolean; onData: (data: Evidence) => boolean }): Promise<void>;
+  VerifyDuplicateVote(ev: Evidence): boolean;
 }
 
 export class EvidencePool {
@@ -46,11 +46,19 @@ export class EvidencePool {
   }
 
   private verify(ev: Evidence) {
+    const blockAge = this.height.clone().sub(ev.height);
+    if (blockAge > this.evpoolMaxAgeNumBlocks) {
+      return false;
+    }
+    if (!this.backend.VerifyDuplicateVote(ev)) {
+      return false;
+    }
     return true;
   }
 
   private async _init(height: BN) {
     try {
+      await this.pruneExpiredPendingEvidence();
       await this.backend.loadPendingEvidence({
         // add 1 because we may have collected evidence for the next block
         to: height.addn(1),
@@ -86,6 +94,17 @@ export class EvidencePool {
    */
   async addEvidence(ev: Evidence) {
     await this._afterInit();
+    if (await this.backend.isPending(ev)) {
+      console.debug('evidence already pending; ignoring', 'evidence', ev);
+      return;
+    }
+    if (await this.backend.isCommitted(ev)) {
+      console.debug('evidence was already committed; ignoring', 'evidence', ev);
+      return;
+    }
+    if (!this.verify(ev)) {
+      throw new Error('the evidence can not pass verify');
+    }
     await this.backend.addPendingEvidence(ev);
     this.addToCache(ev);
   }
@@ -117,27 +136,29 @@ export class EvidencePool {
 
   private async pruneExpiredPendingEvidence() {
     const evList: Evidence[] = [];
-    try {
-      await this.backend.loadPendingEvidence({
-        from: new BN(0),
-        onData: (ev) => {
+    const evLast: Evidence[] = [];
+    await this.backend.loadPendingEvidence({
+      from: new BN(0),
+      onData: (ev: Evidence) => {
+        const crossed = this.height.clone().sub(ev.height.clone()).lt(this.evpoolMaxAgeNumBlocks);
+        if (!crossed) {
           evList.push(ev);
-          return this.height.sub(ev.height).lt(this.evpoolMaxAgeNumBlocks);
+        } else {
+          evLast.push(ev);
         }
-      });
-      if (evList.length > 0) {
-        evList.pop();
+        return crossed;
       }
+    });
+
+    if (evLast.length > 0) {
+      this.pruningHeight = evLast[0].height.clone().add(this.evpoolMaxAgeNumBlocks).addn(1);
       const promiseList = evList.map((ev) => {
         this.deleteFromCache(ev);
-        this.backend.removePendingEvidence(ev);
+        return this.backend.removePendingEvidence(ev);
       });
       await Promise.all(promiseList);
-      if (evList.length > 0) {
-        this.pruningHeight = evList[evList.length - 1].height;
-      }
-    } catch (err) {
-      throw err;
+    } else {
+      this.pruningHeight = this.height.clone();
     }
   }
 
@@ -149,10 +170,10 @@ export class EvidencePool {
    */
   async update(committedEvList: Evidence[], height: BN) {
     if (height.lte(this.height)) {
-      throw new Error('failed EvidencePool.Update new height is less than or equal to previous height: ' + height + '<=' + this.height);
+      throw new Error('failed EvidencePool.Update new height is less than or equal to previous height: ' + height + '<=' + this.height.clone().toNumber());
     }
     try {
-      this.height = height;
+      this.height = height.clone();
 
       for (let i = 0; i < committedEvList.length; i++) {
         // save committed evidences
@@ -168,11 +189,33 @@ export class EvidencePool {
         }
       }
       // this.pruneExpiredPendingEvidences
-      if (this.height > this.pruningHeight) {
+      if (this.height.gt(this.pruningHeight)) {
         await this.pruneExpiredPendingEvidence();
       }
     } catch (err) {
       throw err;
     }
+  }
+
+  async checkeEvidence(evList: Evidence[]) {
+    const hashes = new Array<Buffer>(evList.length);
+    for (let i = 0; i < evList.length; i++) {
+      if (!(await this.backend.isPending(evList[i]))) {
+        if (await this.backend.isCommitted(evList[i])) {
+          return false;
+        }
+        if (!this.verify(evList[i])) {
+          return false;
+        }
+        await this.backend.addPendingEvidence(evList[i]);
+      }
+      hashes[i] = evList[i].hash();
+      for (let j = i - 1; j >= 0; j--) {
+        if (hashes[i].equals(hashes[j])) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 }

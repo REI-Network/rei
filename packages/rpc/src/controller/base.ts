@@ -32,7 +32,7 @@ export class Controller {
     } else if (tag === 'pending') {
       return this.node.blockchain.latestBlock.header.number.addn(1);
     } else if (tag.startsWith('0x')) {
-      return new BN(tag.substr(2));
+      return hexStringToBN(tag);
     } else {
       helper.throwRpcErr('Invalid tag value');
       // for types.
@@ -49,7 +49,7 @@ export class Controller {
     } else if (tag === 'pending') {
       block = this.node.getPendingBlock();
     } else if (tag.startsWith('0x')) {
-      block = await this.node.blockchain.getBlock(new BN(tag.substr(2)));
+      block = await this.node.blockchain.getBlock(hexStringToBN(tag));
     } else {
       helper.throwRpcErr('Invalid tag value');
     }

@@ -1,5 +1,5 @@
 import { BN } from 'ethereumjs-util';
-import { Evidence, EvidenceFactory } from './evidence';
+import { DuplicateVoteEvidence, Evidence } from './evidence';
 import { logger } from '@gxchain2/utils';
 
 export interface EvidencePoolBackend {
@@ -50,10 +50,11 @@ export class EvidencePool {
     if (blockAge.gt(this.evpoolMaxAgeNumBlocks)) {
       return false;
     }
-    const duplicateVoteEvidence = EvidenceFactory.fromSerializedEvidence(ev.serialize());
-    const voteA = duplicateVoteEvidence.voteA;
-    const voteB = duplicateVoteEvidence.voteB;
-    if (!voteA.height.eq(voteB.height) || voteA.round !== voteB.round || voteA.type !== voteB.type || voteA.chainId !== voteB.chainId || !voteA.validator().equals(voteB.validator())) {
+    if (ev instanceof DuplicateVoteEvidence) {
+      if (!ev.voteA.height.eq(ev.voteB.height) || ev.voteA.round !== ev.voteB.round || ev.voteA.type !== ev.voteB.type || ev.voteA.chainId !== ev.voteB.chainId || !ev.voteA.validator().equals(ev.voteB.validator())) {
+        return false;
+      }
+    } else {
       return false;
     }
     return true;
@@ -203,7 +204,7 @@ export class EvidencePool {
     }
   }
 
-  async checkeEvidence(evList: Evidence[]) {
+  async checkEvidence(evList: Evidence[]) {
     const hashes = new Array<Buffer>(evList.length);
     for (let i = 0; i < evList.length; i++) {
       if (!(await this.backend.isPending(evList[i]))) {

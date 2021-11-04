@@ -6,16 +6,22 @@ import { EvidencePool, EvidencePoolBackend } from '../../../src/consensus/reimin
 
 const evpoolMaxCacheSize = 40;
 const evpoolMaxAgeNumBlocks = new BN(5);
-const abortHeight = 11;
-const aborttime = 3;
-let addHeight = abortHeight + 1;
+const endHeight = 11;
+const evNumberPerHeight = 3;
 
-const voteHash = Buffer.from('this a teststring hash length 32');
+function randomBuffer(bufferLength: number) {
+  let sampleString = 'abcdefhijkmnprstwxyz2345678';
+  let result = '';
+  for (let i = 0; i < bufferLength; i++) {
+    result += sampleString.charAt(Math.floor(Math.random() * sampleString.length));
+  }
+  return Buffer.from(result);
+}
 
-const createEvidence = (height: BN, index: number) => {
-  const voteA = new Vote({ chainId: 1, type: 1, height: new BN(height), round: 1, hash: voteHash, timestamp: Date.now(), index: index });
-  voteA.sign(voteHash);
-  return new DuplicateVoteEvidence(voteA, voteA, new BN(height));
+const createEvidence = (height: BN) => {
+  const voteA = new Vote({ chainId: 1, type: 1, height: height, round: 1, hash: randomBuffer(32), timestamp: Date.now(), index: 1 });
+  voteA.sign(randomBuffer(32));
+  return new DuplicateVoteEvidence(voteA, voteA, height);
 };
 
 class MockBackend implements EvidencePoolBackend {
@@ -88,22 +94,22 @@ describe('evpool', () => {
   const evpool = new EvidencePool(testbd, evpoolMaxCacheSize, evpoolMaxAgeNumBlocks);
   before(async () => {
     await evpool.init(new BN(0));
-    for (let i = 0; i < abortHeight; i++) {
-      for (let j = 0; j < aborttime; j++) {
-        await evpool.addEvidence(createEvidence(new BN(i), j));
+    for (let i = 0; i < endHeight; i++) {
+      for (let j = 0; j < evNumberPerHeight; j++) {
+        await evpool.addEvidence(createEvidence(new BN(i)));
       }
     }
   });
 
   it('should get pendingEvidence correctly', () => {
-    expect(evpool.pendingEvidence.length, 'evidence number shoule be euqal').be.equal(abortHeight * aborttime);
+    expect(evpool.pendingEvidence.length, 'evidence number shoule be euqal').be.equal(endHeight * evNumberPerHeight);
   });
 
   it('should add Evidence correctly', async () => {
-    const evToAdd = createEvidence(new BN(addHeight), 0);
+    const evToAdd = createEvidence(new BN(endHeight + 1));
     await evpool.addEvidence(evToAdd);
-    expect(evpool.pendingEvidence.length, 'evidence number shoule be euqal').be.equal(abortHeight * aborttime + 1);
-    const evCache = evpool.pendingEvidence.slice(-1)[0];
+    expect(evpool.pendingEvidence.length, 'evidence number shoule be euqal').be.equal(endHeight * evNumberPerHeight + 1);
+    const evCache = evpool.pendingEvidence[evpool.pendingEvidence.length - 1];
     let evdatabase: Evidence[] = [];
     await testbd.loadPendingEvidence({
       reverse: true,
@@ -112,33 +118,49 @@ describe('evpool', () => {
         return true;
       }
     });
-    expect(evCache.hash().equals(evToAdd.hash()) && evCache.serialize().equals(evToAdd.serialize()), 'should add Evidence into Cache correctly').be.true;
-    expect(evdatabase[0].hash().equals(evToAdd.hash()) && evdatabase[0].serialize().equals(evToAdd.serialize()), 'should add Evidence into Database correctly').be.true;
+    expect(evCache.hash().equals(evToAdd.hash()), 'should add Evidence into Cache correctly').be.true;
+    expect(evdatabase[0].hash().equals(evToAdd.hash()), 'should add Evidence into Database correctly').be.true;
   });
 
   it('should pickEvidence correctly', async () => {
-    const factor = 3;
-    const height = new BN(factor);
-    const number = factor * aborttime;
-    const result = await evpool.pickEvidence(height, number);
-    expect((result.length = number), 'pickEvidence number should correct').be.equal;
-    expect(result.slice(-1)[0].height.eq(height.subn(1)), 'pickEvidence height should correct').be.true;
+    const height = new BN(3);
+    const evNumber = 3 * evNumberPerHeight;
+    const result = await evpool.pickEvidence(height, evNumber);
+    expect(result.length === evNumber, 'pickEvidence number should correct').be.true;
+    expect(result[result.length - 1].height.eq(height.subn(1)), 'pickEvidence height should correct').be.true;
+  });
+
+  it('should checkeEvidence correctly', async () => {
+    const evList = await evpool.pickEvidence(new BN(3), 3 * evNumberPerHeight);
+    expect(await evpool.checkEvidence(evList), 'checkEvidence should be true').be.true;
+    evList[0] = evList[1];
+    expect(await evpool.checkEvidence(evList), 'checkEvidence should be false').be.false;
   });
 
   it('should update correctly', async () => {
-    const factorPick = 3;
-    const factorUpdate = 9;
-    const numberPick = factorPick * aborttime;
-    const heightPick = new BN(factorPick);
-    const heightUpdate = new BN(factorUpdate);
-    const ev = await evpool.pickEvidence(heightPick, numberPick);
-    const committedLengthBefore = testbd.committedEvidence.length;
-    const pendingLengtgBefore = testbd.pendingEvidence.length;
-    await evpool.update(ev, heightUpdate);
+    const numberPick = 2 * evNumberPerHeight;
+    const heightPick = new BN(2);
+    const heightUpdate1 = heightPick;
+    const heightUpdate2 = new BN(9);
+    const evList = await evpool.pickEvidence(heightPick, numberPick);
 
-    const committedLengthAfter = testbd.committedEvidence.length;
-    const pendingLengtgAfter = testbd.pendingEvidence.length;
-    expect(committedLengthAfter - committedLengthBefore == ev.length, 'After update the committed evidences should be correct').be.true;
-    expect(pendingLengtgBefore - pendingLengtgAfter == (factorUpdate - evpoolMaxAgeNumBlocks.toNumber() + 1) * aborttime, 'After update the pending evidences should be correct').be.true;
+    const committedLengthBeforeUpdate1 = testbd.committedEvidence.length;
+    const pendingLengtgBeforeUpdate1 = testbd.pendingEvidence.length;
+    const cachedPendingLengtgBeforeUpdate1 = evpool.pendingEvidence.length;
+    await evpool.update(evList, heightUpdate1);
+    const committedLengthAfterUpdate1 = testbd.committedEvidence.length;
+    const pendingLengtgAfterUpdate1 = testbd.pendingEvidence.length;
+    const cachedPendingLengtgAfterUpdate1 = evpool.pendingEvidence.length;
+    expect(committedLengthAfterUpdate1 - committedLengthBeforeUpdate1 === evList.length, 'After update1 the committed evidences should be correct').be.true;
+    expect(pendingLengtgBeforeUpdate1 - pendingLengtgAfterUpdate1 === evList.length, 'After update1 the pending evidences should be correct').be.true;
+    expect(cachedPendingLengtgBeforeUpdate1 - cachedPendingLengtgAfterUpdate1 === evList.length, 'After update1 the pending evidences should be correct').be.true;
+
+    await evpool.update(evList, heightUpdate2);
+    const committedLengthAfterUpdate2 = testbd.committedEvidence.length;
+    const pendingLengtgAfterUpdate2 = testbd.pendingEvidence.length;
+    const cachedPendingLengtgAfterUpdate2 = evpool.pendingEvidence.length;
+    expect(committedLengthAfterUpdate2 - committedLengthAfterUpdate1 === 0, 'After update2 the committed evidences should be correct').be.true;
+    expect(pendingLengtgAfterUpdate1 - pendingLengtgAfterUpdate2 === (heightUpdate2.sub(heightUpdate1).toNumber() - evpoolMaxAgeNumBlocks.toNumber() + 1) * evNumberPerHeight, 'After update2 the pending evidences should be correct').be.true;
+    expect(cachedPendingLengtgAfterUpdate1 - cachedPendingLengtgAfterUpdate2 === (heightUpdate2.sub(heightUpdate1).toNumber() - evpoolMaxAgeNumBlocks.toNumber() + 1) * evNumberPerHeight, 'After update1 the pending evidences should be correct').be.true;
   });
 });

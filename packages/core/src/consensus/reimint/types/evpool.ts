@@ -1,5 +1,6 @@
 import { BN } from 'ethereumjs-util';
-import { Evidence } from './evidence';
+import { Evidence, EvidenceFactory } from './evidence';
+import { logger } from '@gxchain2/utils';
 
 export interface EvidencePoolBackend {
   isCommitted(ev: Evidence): Promise<boolean>;
@@ -8,7 +9,6 @@ export interface EvidencePoolBackend {
   addCommittedEvidence(ev: Evidence): Promise<void>;
   removePendingEvidence(ev: Evidence): Promise<void>;
   loadPendingEvidence({ from, to, reverse, onData }: { from?: BN; to?: BN; reverse?: boolean; onData: (data: Evidence) => boolean }): Promise<void>;
-  VerifyDuplicateVote(ev: Evidence): boolean;
 }
 
 export class EvidencePool {
@@ -46,11 +46,14 @@ export class EvidencePool {
   }
 
   private verify(ev: Evidence) {
-    const blockAge = this.height.clone().sub(ev.height);
-    if (blockAge > this.evpoolMaxAgeNumBlocks) {
+    const blockAge = this.height.sub(ev.height);
+    if (blockAge.gt(this.evpoolMaxAgeNumBlocks)) {
       return false;
     }
-    if (!this.backend.VerifyDuplicateVote(ev)) {
+    const duplicateVoteEvidence = EvidenceFactory.fromSerializedEvidence(ev.serialize());
+    const voteA = duplicateVoteEvidence.voteA;
+    const voteB = duplicateVoteEvidence.voteB;
+    if (!voteA.height.eq(voteB.height) || voteA.round !== voteB.round || voteA.type !== voteB.type || voteA.chainId !== voteB.chainId || !voteA.validator().equals(voteB.validator())) {
       return false;
     }
     return true;
@@ -95,11 +98,11 @@ export class EvidencePool {
   async addEvidence(ev: Evidence) {
     await this._afterInit();
     if (await this.backend.isPending(ev)) {
-      console.debug('evidence already pending; ignoring', 'evidence', ev);
+      logger.info('evidence already pending; ignoring', 'evidence', ev);
       return;
     }
     if (await this.backend.isCommitted(ev)) {
-      console.debug('evidence was already committed; ignoring', 'evidence', ev);
+      logger.info('evidence was already committed; ignoring', 'evidence', ev);
       return;
     }
     if (!this.verify(ev)) {
@@ -136,27 +139,30 @@ export class EvidencePool {
 
   private async pruneExpiredPendingEvidence() {
     const evList: Evidence[] = [];
-    const evLast: Evidence[] = [];
+    let crossedEv: Evidence | undefined = undefined;
     await this.backend.loadPendingEvidence({
       from: new BN(0),
       onData: (ev: Evidence) => {
-        const crossed = this.height.clone().sub(ev.height.clone()).lt(this.evpoolMaxAgeNumBlocks);
+        const crossed = this.height.sub(ev.height).lt(this.evpoolMaxAgeNumBlocks);
         if (!crossed) {
           evList.push(ev);
         } else {
-          evLast.push(ev);
+          crossedEv = ev;
         }
         return crossed;
       }
     });
 
-    if (evLast.length > 0) {
-      this.pruningHeight = evLast[0].height.clone().add(this.evpoolMaxAgeNumBlocks).addn(1);
-      const promiseList = evList.map((ev) => {
-        this.deleteFromCache(ev);
-        return this.backend.removePendingEvidence(ev);
-      });
-      await Promise.all(promiseList);
+    if (evList.length > 0) {
+      await Promise.all(
+        evList.map((ev) => {
+          this.deleteFromCache(ev);
+          return this.backend.removePendingEvidence(ev);
+        })
+      );
+    }
+    if (crossedEv) {
+      this.pruningHeight = (crossedEv as Evidence).height.add(this.evpoolMaxAgeNumBlocks).addn(1);
     } else {
       this.pruningHeight = this.height.clone();
     }
@@ -170,7 +176,7 @@ export class EvidencePool {
    */
   async update(committedEvList: Evidence[], height: BN) {
     if (height.lte(this.height)) {
-      throw new Error('failed EvidencePool.Update new height is less than or equal to previous height: ' + height + '<=' + this.height.clone().toNumber());
+      throw new Error('failed EvidencePool.Update new height is less than or equal to previous height: ' + height.toNumber() + '<=' + this.height.clone().toNumber());
     }
     try {
       this.height = height.clone();

@@ -1,6 +1,7 @@
 import { expect } from 'chai';
-import { BN, toBuffer } from 'ethereumjs-util';
-import { Evidence } from '../../../src/consensus/reimint/types/evidence';
+import { BN } from 'ethereumjs-util';
+import { Vote } from '../../../src/consensus/reimint/types/vote';
+import { Evidence, DuplicateVoteEvidence } from '../../../src/consensus/reimint/types/evidence';
 import { EvidencePool, EvidencePoolBackend } from '../../../src/consensus/reimint/types/evpool';
 
 const evpoolMaxCacheSize = 40;
@@ -9,57 +10,50 @@ const abortHeight = 11;
 const aborttime = 3;
 let addHeight = abortHeight + 1;
 
-class testBackend implements EvidencePoolBackend {
+const voteHash = Buffer.from('this a teststring hash length 32');
+
+const createEvidence = (height: BN, index: number) => {
+  const voteA = new Vote({ chainId: 1, type: 1, height: new BN(height), round: 1, hash: voteHash, timestamp: Date.now(), index: index });
+  voteA.sign(voteHash);
+  return new DuplicateVoteEvidence(voteA, voteA, new BN(height));
+};
+
+class MockBackend implements EvidencePoolBackend {
   pendingEvidence: Evidence[] = [];
   committedEvidence: Evidence[] = [];
-  constructor() {}
 
   isCommitted(ev: Evidence) {
-    return new Promise<boolean>((resolve) => {
-      resolve(
-        this.committedEvidence.filter((e) => {
-          return e.hash().equals(ev.hash()) && e.serialize().equals(ev.serialize());
-        }).length > 0
-      );
-    });
+    return Promise.resolve(
+      this.committedEvidence.filter((e) => {
+        return e.hash().equals(ev.hash());
+      }).length > 0
+    );
   }
 
   isPending(ev: Evidence) {
-    return new Promise<boolean>((resolve) => {
-      resolve(
-        this.pendingEvidence.filter((e) => {
-          return e.hash().equals(ev.hash()) && e.serialize().equals(ev.serialize());
-        }).length > 0
-      );
-    });
+    return Promise.resolve(
+      this.pendingEvidence.filter((e) => {
+        return e.hash().equals(ev.hash());
+      }).length > 0
+    );
   }
 
   addPendingEvidence(ev: Evidence) {
     this.pendingEvidence.push(ev);
-    return new Promise<void>((resolve) => {
-      resolve();
-    });
+    return Promise.resolve();
   }
 
   addCommittedEvidence(ev: Evidence) {
     this.committedEvidence.push(ev);
-    return new Promise<void>((resolve) => {
-      resolve();
-    });
+    return Promise.resolve();
   }
 
   removePendingEvidence(ev: Evidence) {
-    const index = this.pendingEvidence.findIndex((x) => x.hash().equals(ev.hash()) && x.serialize().equals(ev.serialize()));
+    const index = this.pendingEvidence.findIndex((x) => x.hash().equals(ev.hash()));
     if (index != -1) {
       this.pendingEvidence.splice(index, 1);
     }
-    return new Promise<void>((resolve) => {
-      resolve();
-    });
-  }
-
-  VerifyDuplicateVote(ev: Evidence) {
-    return true;
+    return Promise.resolve();
   }
 
   loadPendingEvidence({ from, to, reverse, onData }: { from?: BN; to?: BN; reverse?: boolean; onData: (data: Evidence) => boolean }): Promise<void> {
@@ -67,23 +61,21 @@ class testBackend implements EvidencePoolBackend {
     const toheight = to ? to : new BN(99999);
     const filtered = this.pendingEvidence.filter((ev) => ev.height.gte(fromheight) && ev.height.lte(toheight));
     filtered.sort((a, b) => {
-      if (reverse) {
-        const middle = b;
-        b = a;
-        a = middle;
-      }
+      let result = 0;
       if (a.height.eq(b.height)) {
-        const factorA = new BN(a.hash()).toNumber();
-        const factorB = new BN(b.hash()).toNumber();
-        return factorA - factorB;
+        result = (a as DuplicateVoteEvidence).voteA.index - (b as DuplicateVoteEvidence).voteA.index;
       } else {
-        return a.height.sub(b.height).toNumber();
+        result = a.height.cmp(b.height);
       }
+      if (reverse) {
+        result = result * -1;
+      }
+      return result;
     });
-    let index = filtered.length;
-    const filteredNum = filtered.length;
-    while (index > 0 && !onData(filtered[filteredNum - index])) {
-      index--;
+    for (let i = 0; i < filtered.length; i++) {
+      if (onData(filtered[i])) {
+        break;
+      }
     }
     return new Promise<void>((resolve) => {
       resolve();
@@ -91,37 +83,14 @@ class testBackend implements EvidencePoolBackend {
   }
 }
 
-class evTest implements Evidence {
-  height: BN;
-  factor: BN;
-  constructor(height: BN, factor: BN) {
-    this.height = height;
-    this.factor = factor;
-  }
-
-  raw() {
-    return [toBuffer(this.height), toBuffer(this.factor)];
-  }
-
-  hash(): Buffer {
-    return toBuffer(this.factor);
-  }
-
-  serialize(): Buffer {
-    return toBuffer(this.height);
-  }
-
-  validateBasic(): void {}
-}
-
 describe('evpool', () => {
-  const testbd = new testBackend();
+  const testbd = new MockBackend();
   const evpool = new EvidencePool(testbd, evpoolMaxCacheSize, evpoolMaxAgeNumBlocks);
   before(async () => {
     await evpool.init(new BN(0));
     for (let i = 0; i < abortHeight; i++) {
       for (let j = 0; j < aborttime; j++) {
-        await evpool.addEvidence(new evTest(new BN(i), new BN(j)));
+        await evpool.addEvidence(createEvidence(new BN(i), j));
       }
     }
   });
@@ -131,7 +100,7 @@ describe('evpool', () => {
   });
 
   it('should add Evidence correctly', async () => {
-    const evToAdd = new evTest(new BN(addHeight), new BN(0));
+    const evToAdd = createEvidence(new BN(addHeight), 0);
     await evpool.addEvidence(evToAdd);
     expect(evpool.pendingEvidence.length, 'evidence number shoule be euqal').be.equal(abortHeight * aborttime + 1);
     const evCache = evpool.pendingEvidence.slice(-1)[0];

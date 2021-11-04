@@ -5,7 +5,7 @@ import { ValidatorSet } from '../../../staking';
 import { PendingBlock } from '../../pendingBlock';
 import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, DuplicateVotesError, Proposal, Evidence, DuplicateVoteEvidence, ExtraData } from '../types';
 import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from '../types/messages';
-import { isEmptyHash, EMPTY_HASH } from '../../utils';
+import { isEmptyHash, EMPTY_HASH } from '../../../utils';
 import { Reimint } from '../reimint';
 import { TimeoutTicker } from './timeoutTicker';
 import { StateMachineMessage, MessageInfo, StateMachineBackend, Signer, Config, EvidencePool, RoundStepType, TimeoutInfo } from './types';

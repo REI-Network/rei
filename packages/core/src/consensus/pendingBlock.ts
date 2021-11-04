@@ -8,7 +8,7 @@ import { logger } from '@gxchain2/utils';
 import { Common } from '@gxchain2/common';
 import { PendingTxMap } from '../txpool';
 import { ConsensusEngine, FinalizeOpts } from './types';
-import { EMPTY_ADDRESS, EMPTY_NONCE, EMPTY_MIX_HASH, EMPTY_EXTRA_DATA } from './utils';
+import { EMPTY_ADDRESS, EMPTY_NONCE, EMPTY_MIX_HASH, EMPTY_EXTRA_DATA } from '../utils';
 
 export interface PendingBlockFinalizeOpts extends Pick<FinalizeOpts, 'round'> {}
 

@@ -12,7 +12,7 @@ import { Contract, Router } from '../../contracts';
 import { ValidatorSet } from '../../staking';
 import { isEnableStaking } from '../../hardforks';
 import { BaseConsensusEngine } from '../baseConsensusEngine';
-import { getGasLimitByCommon } from '../utils';
+import { getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
 import { Clique } from './clique';
 
 const NoTurnSignerDelay = 500;
@@ -150,7 +150,7 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
     const nextCommon = this.node.getCommon(pendingBlock.header.number.addn(1));
     if (isEnableStaking(nextCommon)) {
       // deploy system contracts
-      const evm = new EVM(vm, new TxContext(new BN(0), Address.zero()), pendingBlock);
+      const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deploy(evm, nextCommon);
 
       const parentRouter = new Router(evm, nextCommon);

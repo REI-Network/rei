@@ -28,7 +28,7 @@ import { StakeManager, Router } from './contracts';
 import { createEnginesByConsensusTypes, ConsensusEngine, ConsensusType, ProcessBlockOpts } from './consensus';
 import { ReimintConsensusEngine } from './consensus/reimint';
 import { CliqueConsensusEngine } from './consensus/clique';
-import { postByzantiumTxReceiptsToReceipts } from './consensus/utils';
+import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from './utils';
 import { getConsensusTypeByCommon } from './hardforks';
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
@@ -425,7 +425,7 @@ export class Node {
    * @returns Stake manager contract object
    */
   getStakeManager(vm: VM, block: Block, common?: Common) {
-    const evm = new EVM(vm, new TxContext(new BN(0), Address.zero()), block);
+    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
     return new StakeManager(evm, common ?? block._common);
   }
 
@@ -437,7 +437,7 @@ export class Node {
    * @returns Router contract object
    */
   getRouter(vm: VM, block: Block, common?: Common) {
-    const evm = new EVM(vm, new TxContext(new BN(0), Address.zero()), block);
+    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
     return new Router(evm, common ?? block._common);
   }
 

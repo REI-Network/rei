@@ -2,7 +2,7 @@ import { BN } from 'ethereumjs-util';
 import { ConsensusAlgorithm, ConsensusType } from '@gxchain2/common';
 import { nowTimestamp } from '@gxchain2/utils';
 import { BlockHeader, CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL } from '@gxchain2/structure';
-import { getGasLimitByCommon, EMPTY_NONCE, EMPTY_ADDRESS } from '../consensus/utils';
+import { getGasLimitByCommon, EMPTY_NONCE, EMPTY_ADDRESS, EMPTY_MIX_HASH } from '../utils';
 
 const allowedFutureBlockTimeSeconds = 15;
 const maxGasLimit = new BN('8000000000000000', 16);
@@ -44,7 +44,7 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
       }
     }
     // MixHash format
-    if (!this.mixHash.equals(Buffer.alloc(32))) {
+    if (!this.mixHash.equals(EMPTY_MIX_HASH)) {
       const msg = `mixHash must be filled with zeros, received ${this.mixHash}`;
       throw this._error(msg);
     }

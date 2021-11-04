@@ -13,7 +13,7 @@ import { Journal } from './journal';
 import { Node } from '../node';
 import { validateTx } from '../validation';
 import { isEnableStaking } from '../hardforks';
-import { getGasLimitByCommon } from '../consensus/utils';
+import { getGasLimitByCommon } from '../utils';
 
 /**
  * Calculate the transaction slots

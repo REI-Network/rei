@@ -8,7 +8,7 @@ import { Channel, logger } from '@gxchain2/utils';
 import { Node } from '../node';
 import { Worker } from '../worker';
 import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from './types';
-import { EMPTY_ADDRESS } from './utils';
+import { EMPTY_ADDRESS } from '../utils';
 
 export abstract class BaseConsensusEngine extends EventEmitter implements ConsensusEngine {
   abstract generatePendingBlock(headerData: HeaderData, common: Common, transactions?: Transaction[]): Block;

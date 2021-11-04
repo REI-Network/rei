@@ -10,7 +10,7 @@ import { ValidatorSet, ValidatorChanges } from '../../staking';
 import { Node, ProcessBlockOptions } from '../../node';
 import { ConsensusProtocol } from '../../protocols/consensus';
 import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from '../types';
-import { isEmptyAddress, postByzantiumTxReceiptsToReceipts, getGasLimitByCommon } from '../utils';
+import { isEmptyAddress, postByzantiumTxReceiptsToReceipts, getGasLimitByCommon } from '../../utils';
 import { BaseConsensusEngine } from '../baseConsensusEngine';
 import { ExtraData, EvidencePool, EvidenceDatabase, Message } from './types';
 import { StateMachine, SendMessageOptions } from './state';
@@ -30,7 +30,7 @@ export class SimpleNodeSigner {
 
   sign(msg: Buffer): Buffer {
     const coinbase = this.node.getCurrentEngine().coinbase;
-    if (coinbase.equals(Address.zero())) {
+    if (isEmptyAddress(coinbase)) {
       throw new Error('empty coinbase');
     }
     const signature = ecsign(msg, this.node.accMngr.getPrivateKey(coinbase));

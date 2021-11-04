@@ -5,7 +5,7 @@ import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
 import { Common } from '@gxchain2/common';
 import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@gxchain2/structure';
 import { ExtraData, Proposal, VoteType, VoteSet, Evidence } from './types';
-import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../utils';
+import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../../utils';
 import { Signer } from './state';
 
 const defaultRound = 0;

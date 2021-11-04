@@ -6,6 +6,7 @@ import { TypedTransaction, Transaction } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
 import VM from '@gxchain2-ethereumjs/vm';
 import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import { EMPTY_ADDRESS } from '../../utils';
 import { Router } from '../../contracts';
 import { validateTx } from '../../validation';
 
@@ -91,7 +92,7 @@ export function makeRunTxCallback(router: Router, systemCaller: Address, miner: 
       await state.putAccount(systemCaller, systemCallerAccount);
     }
     // call the router contract and collect logs
-    logs = await router.assignTransactionReward(miner, caller, tx.to ?? Address.zero(), feeUsage, freeFeeUsage, balanceUsage, contractFeeUsage);
+    logs = await router.assignTransactionReward(miner, caller, tx.to ?? EMPTY_ADDRESS, feeUsage, freeFeeUsage, balanceUsage, contractFeeUsage);
   };
 
   async function generateTxReceipt(this: VM, tx: TypedTransaction, txResult: RunTxResult, cumulativeGasUsed: BN): Promise<TxReceipt> {

@@ -81,7 +81,19 @@ export class MessageFactory {
    */
   static fromSerializedMessage(serialized: Buffer) {
     const values = rlp.decode(serialized);
-    if (!Array.isArray(values) || values.length !== 2) {
+    if (!Array.isArray(values)) {
+      throw new Error('invalid serialized');
+    }
+    return MessageFactory.fromValuesArray(values);
+  }
+
+  /**
+   * Create a message instance from raw value
+   * @param values - Raw value
+   * @returns Message instance
+   */
+  static fromValuesArray(values: Buffer[]) {
+    if (values.length !== 2) {
       throw new Error('invalid serialized');
     }
 
@@ -94,12 +106,21 @@ export class MessageFactory {
   }
 
   /**
+   * Convert a message instance to raw value
+   * @param _message - Message instance
+   * @returns Raw value
+   */
+  static rawMessage<T extends Message>(_message: T) {
+    const code = MessageFactory.getCodeByMessageInstance(_message);
+    return [intToBuffer(code), _message.raw()];
+  }
+
+  /**
    * Serialize a message instance to a buffer
    * @param _message - Message instance
    * @returns Serialized buffer
    */
   static serializeMessage<T extends Message>(_message: T) {
-    const code = MessageFactory.getCodeByMessageInstance(_message);
-    return rlp.encode([intToBuffer(code), _message.raw()]);
+    return rlp.encode(MessageFactory.rawMessage(_message));
   }
 }

@@ -3,6 +3,8 @@ export * from './evidence';
 export * from './evpool';
 export * from './extraData';
 export * from './messages';
+export * from './messageFactory';
 export * from './proposal';
 export * from './vote';
 export * from './bitArray';
+export * from './validate';

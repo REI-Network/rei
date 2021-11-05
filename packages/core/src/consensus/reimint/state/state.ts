@@ -8,16 +8,12 @@ import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, Propos
 import { isEmptyHash, EMPTY_HASH } from '../../../utils';
 import { Reimint } from '../reimint';
 import { TimeoutTicker } from './timeoutTicker';
-import { StateMachineMessage, MessageInfo, StateMachineBackend, Signer, Config, EvidencePool, RoundStepType, TimeoutInfo } from './types';
+import { StateMachineMessage, StateMachineTimeout, StateMachineMsg, StateMachineMsgFactory, StateMachineBackend, Signer, Config, EvidencePool, RoundStepType } from './types';
 
 const SkipTimeoutCommit = true;
 const WaitForTxs = true;
 const CreateEmptyBlocksInterval = 0;
 const StateMachineMsgQueueMaxSize = 10;
-
-function isMessageInfo(smsg: StateMachineMessage): smsg is MessageInfo {
-  return 'peerId' in smsg;
-}
 
 export class StateMachine {
   private readonly chainId: number;
@@ -32,7 +28,7 @@ export class StateMachine {
   });
 
   private msgLoopPromise?: Promise<void>;
-  private readonly msgQueue = new Channel<StateMachineMessage>({
+  private readonly msgQueue = new Channel<StateMachineMsg>({
     max: StateMachineMsgQueueMaxSize,
     drop: (smsg) => {
       logger.warn('StateMachine::drop, too many messages, drop:', smsg);
@@ -81,12 +77,12 @@ export class StateMachine {
   }
 
   async msgLoop() {
-    for await (const smsg of this.msgQueue.generator()) {
+    for await (const msg of this.msgQueue.generator()) {
       try {
-        if (isMessageInfo(smsg)) {
-          this.handleMsg(smsg);
-        } else {
-          this.handleTimeout(smsg);
+        if (msg instanceof StateMachineMessage) {
+          this.handleMsg(msg);
+        } else if (msg instanceof StateMachineTimeout) {
+          this.handleTimeout(msg);
         }
       } catch (err) {
         logger.error('State::msgLoop, catch error:', err);
@@ -94,7 +90,7 @@ export class StateMachine {
     }
   }
 
-  private handleMsg(mi: MessageInfo) {
+  private handleMsg(mi: StateMachineMessage) {
     const { msg, peerId } = mi;
 
     if (msg instanceof ProposalMessage) {
@@ -110,7 +106,7 @@ export class StateMachine {
     }
   }
 
-  private handleTimeout(ti: TimeoutInfo) {
+  private handleTimeout(ti: StateMachineTimeout) {
     if (!ti.height.eq(this.height) || ti.round < this.round || (ti.round === this.round && ti.step < this.step)) {
       logger.debug('StateMachine::handleTimeout, ignoring tock because we are ahead:', ti, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
@@ -370,12 +366,7 @@ export class StateMachine {
     const waitForTxs = WaitForTxs && round === 0;
     if (waitForTxs) {
       if (CreateEmptyBlocksInterval > 0) {
-        this.timeoutTicker.schedule({
-          duration: CreateEmptyBlocksInterval,
-          step: RoundStepType.NewRound,
-          height: height.clone(),
-          round
-        });
+        this._schedule(CreateEmptyBlocksInterval, height, round, RoundStepType.NewRound);
       } else {
         this.enterPropose(height, 0);
       }
@@ -430,25 +421,13 @@ export class StateMachine {
       });
       proposal.signature = this.signer!.sign(proposal.getMessageToSign());
 
-      this._newMessage({
-        msg: new ProposalMessage(proposal),
-        peerId: ''
-      });
-      this._newMessage({
-        msg: new ProposalBlockMessage(block),
-        peerId: ''
-      });
+      this._newMessage(new StateMachineMessage('', new ProposalMessage(proposal)));
+      this._newMessage(new StateMachineMessage('', new ProposalBlockMessage(block)));
     } else {
       this.createBlockAndProposal()
         .then(({ block, proposal }) => {
-          this._newMessage({
-            msg: new ProposalMessage(proposal),
-            peerId: ''
-          });
-          this._newMessage({
-            msg: new ProposalBlockMessage(block),
-            peerId: ''
-          });
+          this._newMessage(new StateMachineMessage('', new ProposalMessage(proposal)));
+          this._newMessage(new StateMachineMessage('', new ProposalBlockMessage(block)));
         })
         .catch((err) => {
           logger.error('StateMachine::decideProposal, catch error:', err);
@@ -479,10 +458,7 @@ export class StateMachine {
       index
     });
     vote.signature = this.signer.sign(vote.getMessageToSign());
-    this._newMessage({
-      msg: new VoteMessage(vote),
-      peerId: ''
-    });
+    this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
     return vote;
   }
 
@@ -504,12 +480,7 @@ export class StateMachine {
       }
     };
 
-    this.timeoutTicker.schedule({
-      duration: this.config.proposeDuration(round),
-      step: RoundStepType.Propose,
-      height: height.clone(),
-      round
-    });
+    this._schedule(this.config.proposeDuration(round), height, round, RoundStepType.Propose);
 
     if (!this.signer) {
       logger.debug('StateMachine::enterPropose, empty signer');
@@ -577,12 +548,7 @@ export class StateMachine {
       this.newStep();
     };
 
-    this.timeoutTicker.schedule({
-      duration: this.config.prevoteDuration(round),
-      step: RoundStepType.PrevoteWait,
-      height: height.clone(),
-      round
-    });
+    this._schedule(this.config.prevoteDuration(round), height, round, RoundStepType.PrevoteWait);
     return update();
   }
 
@@ -674,12 +640,7 @@ export class StateMachine {
       this.newStep();
     };
 
-    this.timeoutTicker.schedule({
-      duration: this.config.precommitDutaion(round),
-      step: RoundStepType.PrecommitWait,
-      height: height.clone(),
-      round
-    });
+    this._schedule(this.config.precommitDutaion(round), height, round, RoundStepType.PrecommitWait);
     return update();
   }
 
@@ -791,7 +752,11 @@ export class StateMachine {
     }
   }
 
-  private _newMessage(smsg: StateMachineMessage) {
+  private _schedule(duration: number, height: BN, round: number, step: RoundStepType) {
+    this.timeoutTicker.schedule(new StateMachineTimeout(duration, height, round, step));
+  }
+
+  private _newMessage(smsg: StateMachineMsg) {
     this.msgQueue.push(smsg);
   }
 
@@ -825,19 +790,14 @@ export class StateMachine {
     this.newStep();
 
     const duration = this.startTime - timestamp;
-    this.timeoutTicker.schedule({
-      duration,
-      step: RoundStepType.NewHeight,
-      height: this.height.clone(),
-      round: 0
-    });
+    this._schedule(duration, this.height, 0, RoundStepType.NewHeight);
 
     logger.debug('StateMachine::newBlockHeader, lastest height:', header.number.toString(), 'next round should start at:', this.startTime);
   }
 
   newMessage(peerId: string, msg: Message) {
     if (this.started) {
-      this._newMessage({ msg, peerId });
+      this._newMessage(new StateMachineMessage(peerId, msg));
     }
   }
 

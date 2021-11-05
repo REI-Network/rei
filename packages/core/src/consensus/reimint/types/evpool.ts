@@ -179,28 +179,25 @@ export class EvidencePool {
     if (height.lte(this.height)) {
       throw new Error('failed EvidencePool.Update new height is less than or equal to previous height: ' + height.toNumber() + '<=' + this.height.clone().toNumber());
     }
-    try {
-      this.height = height.clone();
 
-      for (let i = 0; i < committedEvList.length; i++) {
-        // save committed evidences
-        if (!(await this.backend.isCommitted(committedEvList[i]))) {
-          await this.backend.addCommittedEvidence(committedEvList[i]);
-        }
+    this.height = height.clone();
 
-        if (await this.backend.isPending(committedEvList[i])) {
-          // mark pending evidences as committed
-          await this.backend.removePendingEvidence(committedEvList[i]);
-          // remove committed evidences from this.cachedPendingEvidence
-          this.deleteFromCache(committedEvList[i]);
-        }
+    for (let i = 0; i < committedEvList.length; i++) {
+      // save committed evidences
+      if (!(await this.backend.isCommitted(committedEvList[i]))) {
+        await this.backend.addCommittedEvidence(committedEvList[i]);
       }
-      // this.pruneExpiredPendingEvidences
-      if (this.height.gt(this.pruningHeight)) {
-        await this.pruneExpiredPendingEvidence();
+
+      if (await this.backend.isPending(committedEvList[i])) {
+        // mark pending evidences as committed
+        await this.backend.removePendingEvidence(committedEvList[i]);
+        // remove committed evidences from this.cachedPendingEvidence
+        this.deleteFromCache(committedEvList[i]);
       }
-    } catch (err) {
-      throw err;
+    }
+    // this.pruneExpiredPendingEvidences
+    if (this.height.gt(this.pruningHeight)) {
+      await this.pruneExpiredPendingEvidence();
     }
   }
 

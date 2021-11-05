@@ -3,24 +3,16 @@ import { BN } from 'ethereumjs-util';
 import { Vote } from '../../../src/consensus/reimint/types/vote';
 import { Evidence, DuplicateVoteEvidence } from '../../../src/consensus/reimint/types/evidence';
 import { EvidencePool, EvidencePoolBackend } from '../../../src/consensus/reimint/types/evpool';
+import crypto from 'crypto';
 
 const evpoolMaxCacheSize = 40;
 const evpoolMaxAgeNumBlocks = new BN(5);
 const endHeight = 11;
 const evNumberPerHeight = 3;
 
-function randomBuffer(bufferLength: number) {
-  let sampleString = 'abcdefhijkmnprstwxyz2345678';
-  let result = '';
-  for (let i = 0; i < bufferLength; i++) {
-    result += sampleString.charAt(Math.floor(Math.random() * sampleString.length));
-  }
-  return Buffer.from(result);
-}
-
 const createEvidence = (height: BN) => {
-  const voteA = new Vote({ chainId: 1, type: 1, height: height, round: 1, hash: randomBuffer(32), timestamp: Date.now(), index: 1 });
-  voteA.sign(randomBuffer(32));
+  const voteA = new Vote({ chainId: 1, type: 1, height: height, round: 1, hash: crypto.randomBytes(32), timestamp: Date.now(), index: 1 });
+  voteA.sign(crypto.randomBytes(32));
   return new DuplicateVoteEvidence(voteA, voteA, height);
 };
 
@@ -69,7 +61,7 @@ class MockBackend implements EvidencePoolBackend {
     filtered.sort((a, b) => {
       let result = 0;
       if (a.height.eq(b.height)) {
-        result = (a as DuplicateVoteEvidence).voteA.index - (b as DuplicateVoteEvidence).voteA.index;
+        result = a.hash().compare(b.hash());
       } else {
         result = a.height.cmp(b.height);
       }

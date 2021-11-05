@@ -54,6 +54,7 @@ export class FileGroup {
   private maxFilesToRemove: number;
   private _minIndex: number = 0;
   private _maxIndex: number = 0;
+  private _isClosed = true;
   private lock = new Semaphore(1);
   private head?: fs.FileHandle;
   private timeout?: NodeJS.Timeout;
@@ -65,6 +66,13 @@ export class FileGroup {
     this.headSizeLimit = options.headSizeLimit ?? defaultHeadSizeLimit;
     this.totalSizeLimit = options.totalSizeLimit ?? defaultTotalSizeLimit;
     this.maxFilesToRemove = options.maxFilesToRemove ?? defaultMaxFilesToRemove;
+  }
+
+  /**
+   * Is FileGroup closed
+   */
+  get isClosed() {
+    return this._isClosed;
   }
 
   /**
@@ -113,6 +121,7 @@ export class FileGroup {
       this._maxIndex = maxIndex;
       this.head = await fs.open(makeGroupFilePath(this.path, this.base, 0, 0), 'a');
       this.setTimeout();
+      this._isClosed = false;
     });
   }
 
@@ -120,6 +129,7 @@ export class FileGroup {
    * Close file group
    */
   close() {
+    this._isClosed = true;
     return this.runWithLock(async () => {
       if (this.timeout) {
         clearTimeout(this.timeout);
@@ -226,24 +236,20 @@ export class FileGroup {
   }
 
   private setTimeout() {
+    if (this._isClosed) {
+      return;
+    }
+
     this.timeout = setTimeout(() => {
       this.timeout = undefined;
       this.tryToCheck()
         .then(() => {
-          this.runWithLock(async () => {
-            if (this.head) {
-              this.setTimeout();
-            }
-          });
+          this.setTimeout();
         })
         .catch((err) => {
           logger.error('FileGroup::setTimeout, catch error:', err);
           if (this.head) {
-            this.runWithLock(async () => {
-              if (this.head) {
-                this.setTimeout();
-              }
-            });
+            this.setTimeout();
           }
         });
     }, this.groupCheckDuration);

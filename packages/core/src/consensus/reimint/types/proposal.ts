@@ -28,7 +28,7 @@ export class Proposal {
     return Proposal.fromValuesArray(values as any);
   }
 
-  static fromValuesArray(values: [Buffer, Buffer, Buffer, Buffer, Buffer, Buffer, Buffer]) {
+  static fromValuesArray(values: Buffer[]) {
     if (values.length !== 7) {
       throw new Error('invalid proposal');
     }

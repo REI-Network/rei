@@ -204,6 +204,11 @@ export class EvidencePool {
     }
   }
 
+  /**
+   * CheckEvidence takes an array of evidence from a block and verifies all the evidence there
+   * @param evList Evidences to check
+   * @returns true if all evidence pass check
+   */
   async checkEvidence(evList: Evidence[]) {
     const hashes = new Array<Buffer>(evList.length);
     for (let i = 0; i < evList.length; i++) {

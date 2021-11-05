@@ -43,6 +43,7 @@ const clearup = async () => {
     // ignore all errors
   }
 };
+
 const writeData = async (index: number) => {
   const content = `${index}|0123456789`;
   await fs.writeFile(makeGroupFilePath(testDir, testBase, index, testMaxIndex), content);
@@ -62,39 +63,39 @@ describe('GroupFileReader', () => {
     }
   });
 
-  it('should read succeed(1)', async () => {
+  it('should read successfully(1)', async () => {
     const buf = Buffer.alloc(5);
-    expect(await reader.read(buf), 'should read succeed').be.true;
+    expect(await reader.read(buf), 'should read successfully').be.true;
     expect(buf.toString(), 'buffer content should be correct').be.equal(bytes.read(5));
   });
 
-  it('should read succeed(2)', async () => {
+  it('should read successfully(2)', async () => {
     const buf = Buffer.alloc(5);
-    expect(await reader.read(buf), 'should read succeed').be.true;
+    expect(await reader.read(buf), 'should read successfully').be.true;
     expect(buf.toString(), 'buffer content should be correct').be.equal(bytes.read(5));
   });
 
-  it('should read succeed(3)', async () => {
+  it('should read successfully(3)', async () => {
     const buf = Buffer.alloc(5);
-    expect(await reader.read(buf), 'should read succeed').be.true;
+    expect(await reader.read(buf), 'should read successfully').be.true;
     expect(buf.toString(), 'buffer content should be correct').be.equal(bytes.read(5));
   });
 
-  it('should read succeed(4)', async () => {
+  it('should read successfully(4)', async () => {
     const buf = Buffer.alloc(24);
-    expect(await reader.read(buf), 'should read succeed').be.true;
+    expect(await reader.read(buf), 'should read successfully').be.true;
     expect(buf.toString(), 'buffer content should be correct').be.equal(bytes.read(24));
   });
 
-  it('should read succeed(5)', async () => {
+  it('should read successfully(5)', async () => {
     const buf = Buffer.alloc(57);
-    expect(await reader.read(buf), 'should read succeed').be.true;
+    expect(await reader.read(buf), 'should read successfully').be.true;
     expect(buf.toString(), 'buffer content should be correct').be.equal(bytes.read(57));
   });
 
   it('should read faild', async () => {
     const buf = Buffer.alloc(1);
-    expect(await reader.read(buf), 'should read succeed').be.false;
+    expect(await reader.read(buf), 'should read successfully').be.false;
   });
 
   it('should close successfully', async () => {
@@ -227,7 +228,7 @@ describe('FileGroup', () => {
     expect(info.headSize, 'headSize should be correct').be.equal(0);
   });
 
-  it('should remove successfully(2)', async () => {
+  it('should remove successfully(3)', async () => {
     // current:
     // index: 4, size: 109 bytes
     await new Promise((r) => setTimeout(r, groupCheckDuration + 10));

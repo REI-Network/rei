@@ -5,7 +5,7 @@ import LevelStore from 'datastore-level';
 import { bufferToHex, BN, BNLike, Address } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import PeerId from 'peer-id';
-import { Database, createEncodingLevelDB, createLevelDB } from '@gxchain2/database';
+import { Database, createEncodingLevelDB, createLevelDB, DBSaveTxLookup, DBSaveReceipts } from '@gxchain2/database';
 import { NetworkManager, Peer } from '@gxchain2/network';
 import { Common, getGenesisState, getChain } from '@gxchain2/common';
 import { Blockchain } from '@gxchain2/blockchain';
@@ -18,17 +18,17 @@ import { Channel, Aborter, logger } from '@gxchain2/utils';
 import { AccountManager } from '@gxchain2/wallet';
 import { TxPool } from './txpool';
 import { FullSynchronizer, Synchronizer } from './sync';
-import { TxFetcher } from './txsync';
+import { TxFetcher } from './txSync';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
-import { BlockchainMonitor } from './blockchainmonitor';
+import { BlockchainMonitor } from './blockchainMonitor';
 import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
 import { ValidatorSets } from './staking';
 import { StakeManager, Router } from './contracts';
-import { processBlock, ProcessBlockOpts } from './vm';
-import { createEnginesByConsensusTypes, ConsensusEngine, ConsensusType } from './consensus';
-import { ReimintConsensusEngine } from './consensus/reimint';
-import { CliqueConsensusEngine } from './consensus/clique';
+import { createEnginesByConsensusTypes, ConsensusEngine, ConsensusType, ProcessBlockOpts } from './consensus';
+import { ReimintConsensusEngine } from './consensus/reimint/reimintConsensusEngine';
+import { CliqueConsensusEngine } from './consensus/clique/cliqueConsensusEngine';
+import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from './utils';
 import { getConsensusTypeByCommon } from './hardforks';
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
@@ -111,7 +111,7 @@ export interface NodeOptions {
   };
 }
 
-export interface ProcessBlockOptions extends Omit<ProcessBlockOpts, 'block'> {
+export interface ProcessBlockOptions extends Omit<ProcessBlockOpts, 'block' | 'root'> {
   broadcast: boolean;
 }
 
@@ -132,6 +132,7 @@ export class Node {
   public readonly nodedb: LevelUp;
   public readonly evidencedb: LevelUp;
   public readonly networkdb: LevelStore;
+  public readonly datadir: string;
   public readonly aborter = new Aborter();
 
   public db!: Database;
@@ -144,8 +145,7 @@ export class Node {
   public bcMonitor!: BlockchainMonitor;
   public accMngr!: AccountManager;
 
-  public readonly validatorSets: ValidatorSets = new ValidatorSets();
-  public readonly engines: Map<ConsensusType, ConsensusEngine>;
+  public readonly validatorSets = new ValidatorSets();
 
   private readonly initPromise: Promise<void>;
   private readonly taskLoopPromise: Promise<void>;
@@ -153,18 +153,18 @@ export class Node {
   private readonly taskQueue = new Channel<PendingTxs>();
   private readonly processQueue = new Channel<ProcessBlock>();
 
+  private engines!: Map<ConsensusType, ConsensusEngine>;
   private chain!: string | { chain: any; genesisState?: any };
   private networkId!: number;
   private chainId!: number;
   private genesisHash!: Buffer;
 
   constructor(options: NodeOptions) {
-    this.chaindb = createEncodingLevelDB(path.join(options.databasePath, 'chaindb'));
-    this.nodedb = createLevelDB(path.join(options.databasePath, 'nodes'));
-    this.evidencedb = createLevelDB(path.join(options.databasePath, 'evidence'));
-    this.networkdb = new LevelStore(path.join(options.databasePath, 'networkdb'), { createIfMissing: true });
-    const engineOptions = { node: this, enable: options.mine.enable, coinbase: options.mine.coinbase ? Address.fromString(options.mine.coinbase) : undefined };
-    this.engines = createEnginesByConsensusTypes([ConsensusType.Clique, ConsensusType.Reimint], engineOptions);
+    this.datadir = options.databasePath;
+    this.chaindb = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
+    this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));
+    this.evidencedb = createLevelDB(path.join(this.datadir, 'evidence'));
+    this.networkdb = new LevelStore(path.join(this.datadir, 'networkdb'), { createIfMissing: true });
     this.initPromise = this.init(options);
     this.taskLoopPromise = this.taskLoop();
     this.processLoopPromise = this.processLoop();
@@ -227,7 +227,7 @@ export class Node {
     }
     if (this.chain === undefined) {
       try {
-        this.chain = JSON.parse(fs.readFileSync(path.join(options.databasePath, 'genesis.json')).toString());
+        this.chain = JSON.parse(fs.readFileSync(path.join(this.datadir, 'genesis.json')).toString());
       } catch (err) {
         logger.warn(`Read genesis.json faild, use default chain(${defaultChainName})`);
         this.chain = defaultChainName;
@@ -240,6 +240,9 @@ export class Node {
     this.db = new Database(this.chaindb, common);
     this.networkId = common.networkIdBN().toNumber();
     this.chainId = common.chainIdBN().toNumber();
+
+    const engineOptions = { node: this, enable: options.mine.enable, coinbase: options.mine.coinbase ? Address.fromString(options.mine.coinbase) : undefined };
+    this.engines = createEnginesByConsensusTypes([ConsensusType.Clique, ConsensusType.Reimint], engineOptions);
 
     let genesisBlock!: Block;
     try {
@@ -279,9 +282,9 @@ export class Node {
     await this.blockchain.init();
 
     this.sync = new FullSynchronizer({ node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
-    this.txPool = new TxPool({ node: this, journal: options.databasePath });
+    this.txPool = new TxPool({ node: this, journal: this.datadir });
 
-    const peerId = await this.loadPeerId(options.databasePath);
+    const peerId = await this.loadPeerId(this.datadir);
     await this.networkdb.open();
 
     this.txSync = new TxFetcher(this);
@@ -424,7 +427,7 @@ export class Node {
    * @returns Stake manager contract object
    */
   getStakeManager(vm: VM, block: Block, common?: Common) {
-    const evm = new EVM(vm, new TxContext(new BN(0), Address.zero()), block);
+    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
     return new StakeManager(evm, common ?? block._common);
   }
 
@@ -436,7 +439,7 @@ export class Node {
    * @returns Router contract object
    */
   getRouter(vm: VM, block: Block, common?: Common) {
-    const evm = new EVM(vm, new TxContext(new BN(0), Address.zero()), block);
+    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
     return new Router(evm, common ?? block._common);
   }
 
@@ -457,13 +460,84 @@ export class Node {
   }
 
   /**
+   * Get current pending block,
+   * if current pending block doesn't exsit,
+   * it will return an empty block
+   * @returns Pending block
+   */
+  getPendingBlock() {
+    const engine = this.getCurrentEngine();
+    const pendingBlock = engine.worker.getPendingBlock();
+    if (pendingBlock) {
+      const { header, transactions } = pendingBlock.makeBlockData();
+      return engine.generatePendingBlock(header, pendingBlock.common, transactions);
+    } else {
+      const lastest = this.blockchain.latestBlock;
+      const nextNumber = lastest.header.number.addn(1);
+      return engine.generatePendingBlock(
+        {
+          parentHash: lastest.hash(),
+          number: nextNumber
+        },
+        this.getCommon(nextNumber)
+      );
+    }
+  }
+
+  /**
+   * Get pending state manager instance
+   * @returns State manager instance
+   */
+  getPendingStakeManager() {
+    const engine = this.getCurrentEngine();
+    const pendingBlock = engine.worker.getPendingBlock();
+    if (pendingBlock) {
+      return this.getStateManager(pendingBlock.pendingStateRoot, pendingBlock.common);
+    } else {
+      const latest = this.blockchain.latestBlock;
+      return this.getStateManager(latest.header.stateRoot, latest._common);
+    }
+  }
+
+  /**
    * A loop that executes blocks sequentially
    */
   private async processLoop() {
     await this.initPromise;
     for await (let { block, options, resolve, reject } of this.processQueue.generator()) {
       try {
-        const reorged = await processBlock.bind(this)({ ...options, block });
+        const hash = block.hash();
+        const number = block.header.number;
+        const common = block._common;
+        // ensure that every transaction is in the right common
+        for (const tx of block.transactions) {
+          tx.common.getHardforkByBlockNumber(number);
+        }
+
+        // get parent header from database
+        const parent = await this.db.getHeader(block.header.parentHash, number.subn(1));
+        // process block through consensus engine
+        const { receipts: _receipts, validatorSet } = await this.getEngineByCommon(common).processBlock({ ...options, block, root: parent.stateRoot });
+        // convert receipts
+        const receipts = postByzantiumTxReceiptsToReceipts(_receipts);
+
+        logger.info('✨ Process block, height:', number.toString(), 'hash:', bufferToHex(hash));
+
+        const before = this.blockchain.latestBlock.hash();
+
+        // commit
+        {
+          // save validator set if it exists
+          validatorSet && this.validatorSets.set(block.header.stateRoot, validatorSet);
+          // save block
+          await this.blockchain.putBlock(block);
+          // save receipts
+          await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, hash, number)));
+        }
+
+        const after = this.blockchain.latestBlock.hash();
+
+        const reorged = !before.equals(after);
 
         // if canonical chain changes, notify to other modules
         if (reorged) {
@@ -509,8 +583,8 @@ export class Node {
   /**
    * Push a block to the block queue
    * @param block - Block
-   * @param generate - Generate new block or not
-   * @returns New block
+   * @param options - Process block options
+   * @returns Reorged
    */
   async processBlock(block: Block, options: ProcessBlockOptions) {
     await this.initPromise;
@@ -519,6 +593,11 @@ export class Node {
     });
   }
 
+  /**
+   * Add pending transactions to consensus engine
+   * @param txs - Pending transactions
+   * @returns An array of results, one-to-one correspondence with transactions
+   */
   async addPendingTxs(txs: Transaction[]) {
     await this.initPromise;
     return new Promise<boolean[]>((resolve) => {

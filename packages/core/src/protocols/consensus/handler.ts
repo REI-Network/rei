@@ -1,29 +1,29 @@
-import { rlp, BN, bnToUnpaddedBuffer, intToBuffer, bufferToInt, bufferToHex } from 'ethereumjs-util';
-import { Block } from '@gxchain2/structure';
+import { rlp, BN } from 'ethereumjs-util';
 import { logger } from '@gxchain2/utils';
-import { Message, NewRoundStepMessage, NewValidBlockMessage, HasVoteMessage, Proposal, Vote, ProposalPOLMessage, VoteSetMaj23Message, VoteSetBitsMessage, GetProposalBlockMessage, ProposalBlockMessage, BitArray, RoundStepType, VoteType, ProposalMessage, VoteMessage, VoteSet, ReimintConsensusEngine } from '../../consensus/reimint';
+import { ReimintConsensusEngine } from '../../consensus/reimint/reimintConsensusEngine';
+import { RoundStepType, Proposal, BitArray, VoteType, VoteSet, MessageFactory } from '../../consensus/reimint/types';
+import * as m from '../../consensus/reimint/types/messages';
 import { HandlerBase, HandlerFunc, HandlerBaseOptions } from '../handlerBase';
 import { ConsensusProtocol } from './protocol';
 
 const peerGossipSleepDuration = 100;
 
-const defaultNewRoundStepMessage = new NewRoundStepMessage(new BN(0), 0, 0, 0, 0);
+const defaultNewRoundStepMessage = new m.NewRoundStepMessage(new BN(0), 0, RoundStepType.NewHeight);
 
 const consensusHandlerFuncs: HandlerFunc[] = [
   {
     name: 'NewRoundStep',
     code: 0,
-    encode(this: ConsensusProtocolHander, data: NewRoundStepMessage) {
-      return [bnToUnpaddedBuffer(data.height), intToBuffer(data.round), intToBuffer(data.step), intToBuffer(data.secondsSinceStartTime), intToBuffer(data.lastCommitRound)];
+    encode(this: ConsensusProtocolHander, data: m.NewRoundStepMessage) {
+      return data.raw();
     },
-    decode(this: ConsensusProtocolHander, data: any): NewRoundStepMessage {
-      if (!Array.isArray(data) || data.length !== 5) {
+    decode(this: ConsensusProtocolHander, data: any): m.NewRoundStepMessage {
+      if (!Array.isArray(data)) {
         throw new Error('invalid values length');
       }
-      const [height, round, step, secondsSinceStartTime, lastCommitRound] = data;
-      return new NewRoundStepMessage(new BN(height), bufferToInt(round), bufferToInt(step), bufferToInt(secondsSinceStartTime), bufferToInt(lastCommitRound));
+      return m.NewRoundStepMessage.fromValuesArray(data);
     },
-    process(this: ConsensusProtocolHander, msg: NewRoundStepMessage) {
+    process(this: ConsensusProtocolHander, msg: m.NewRoundStepMessage) {
       this.handshakeResponse(msg);
       this.applyNewRoundStepMessage(msg);
     }
@@ -31,50 +31,48 @@ const consensusHandlerFuncs: HandlerFunc[] = [
   {
     name: 'NewValidBlock',
     code: 1,
-    encode(this: ConsensusProtocolHander, data: NewValidBlockMessage) {
-      return [bnToUnpaddedBuffer(data.height), intToBuffer(data.round), data.hash, intToBuffer(data.isCommit ? 1 : 0)];
+    encode(this: ConsensusProtocolHander, data: m.NewValidBlockMessage) {
+      return data.raw();
     },
-    decode(this: ConsensusProtocolHander, data: any): NewValidBlockMessage {
-      if (!Array.isArray(data) || data.length !== 4) {
+    decode(this: ConsensusProtocolHander, data: any): m.NewValidBlockMessage {
+      if (!Array.isArray(data)) {
         throw new Error('invalid values length');
       }
-      const [height, round, hash, isCommit] = data;
-      return new NewValidBlockMessage(new BN(height), bufferToInt(round), hash, bufferToInt(isCommit) === 1);
+      return m.NewValidBlockMessage.fromValuesArray(data);
     },
-    process(this: ConsensusProtocolHander, msg: NewValidBlockMessage) {
+    process(this: ConsensusProtocolHander, msg: m.NewValidBlockMessage) {
       this.applyNewValidBlockMessage(msg);
     }
   },
   {
     name: 'HasVote',
     code: 2,
-    encode(this: ConsensusProtocolHander, data: HasVoteMessage) {
-      return [bnToUnpaddedBuffer(data.height), intToBuffer(data.round), intToBuffer(data.type), intToBuffer(data.index)];
+    encode(this: ConsensusProtocolHander, data: m.HasVoteMessage) {
+      return data.raw();
     },
-    decode(this: ConsensusProtocolHander, data: any): HasVoteMessage {
-      if (!Array.isArray(data) || data.length !== 4) {
+    decode(this: ConsensusProtocolHander, data: any): m.HasVoteMessage {
+      if (!Array.isArray(data)) {
         throw new Error('invalid values length');
       }
-      const [height, round, type, index] = data;
-      return new HasVoteMessage(new BN(height), bufferToInt(round), bufferToInt(type), bufferToInt(index));
+      return m.HasVoteMessage.fromValuesArray(data);
     },
-    process(this: ConsensusProtocolHander, msg: HasVoteMessage) {
+    process(this: ConsensusProtocolHander, msg: m.HasVoteMessage) {
       this.applyHasVoteMessage(msg);
     }
   },
   {
     name: 'Proposal',
     code: 3,
-    encode(this: ConsensusProtocolHander, data: ProposalMessage) {
-      return data.proposal.raw();
+    encode(this: ConsensusProtocolHander, data: m.ProposalMessage) {
+      return data.raw();
     },
-    decode(this: ConsensusProtocolHander, data: any): ProposalMessage {
+    decode(this: ConsensusProtocolHander, data: any): m.ProposalMessage {
       if (!Array.isArray(data)) {
         throw new Error('invalid values');
       }
-      return new ProposalMessage(Proposal.fromValuesArray(data as any));
+      return m.ProposalMessage.fromValuesArray(data);
     },
-    process(this: ConsensusProtocolHander, msg: ProposalMessage) {
+    process(this: ConsensusProtocolHander, msg: m.ProposalMessage) {
       this.setHasProposal(msg.proposal);
       this.reimint?.state.newMessage(this.peer.peerId, msg);
     }
@@ -82,36 +80,32 @@ const consensusHandlerFuncs: HandlerFunc[] = [
   {
     name: 'ProposalPOL',
     code: 4,
-    encode(this: ConsensusProtocolHander, data: ProposalPOLMessage) {
-      return [bnToUnpaddedBuffer(data.height), intToBuffer(data.proposalPOLRound), data.proposalPOL.raw()];
+    encode(this: ConsensusProtocolHander, data: m.ProposalPOLMessage) {
+      return data.raw();
     },
-    decode(this: ConsensusProtocolHander, data: any): ProposalPOLMessage {
-      if (!Array.isArray(data) || data.length !== 3) {
-        throw new Error('invalid values length');
+    decode(this: ConsensusProtocolHander, data: any): m.ProposalPOLMessage {
+      if (!Array.isArray(data)) {
+        throw new Error('invalid values');
       }
-      const [height, proposalPOLRound, proposalPOL] = data;
-      if (!Array.isArray(proposalPOL) || proposalPOL.length !== 2) {
-        throw new Error('invalid proposalPOL values length');
-      }
-      return new ProposalPOLMessage(new BN(height), bufferToInt(proposalPOLRound), BitArray.fromValuesArray(proposalPOL as [Buffer, Buffer[]]));
+      return m.ProposalPOLMessage.fromValuesArray(data);
     },
-    process(this: ConsensusProtocolHander, msg: ProposalPOLMessage) {
+    process(this: ConsensusProtocolHander, msg: m.ProposalPOLMessage) {
       this.applyProposalPOLMessage(msg);
     }
   },
   {
     name: 'Vote',
     code: 5,
-    encode(this: ConsensusProtocolHander, data: VoteMessage) {
-      return data.vote.raw();
+    encode(this: ConsensusProtocolHander, data: m.VoteMessage) {
+      return data.raw();
     },
-    decode(this: ConsensusProtocolHander, data: any): VoteMessage {
+    decode(this: ConsensusProtocolHander, data: any): m.VoteMessage {
       if (!Array.isArray(data)) {
         throw new Error('invalid values');
       }
-      return new VoteMessage(Vote.fromValuesArray(data as any));
+      return m.VoteMessage.fromValuesArray(data);
     },
-    process(this: ConsensusProtocolHander, msg: VoteMessage) {
+    process(this: ConsensusProtocolHander, msg: m.VoteMessage) {
       if (this.reimint) {
         const vote = msg.vote;
         this.ensureVoteBitArrays(vote.height, this.reimint.state.getValSetSize());
@@ -123,17 +117,16 @@ const consensusHandlerFuncs: HandlerFunc[] = [
   {
     name: 'VoteSetMaj23',
     code: 6,
-    encode(this: ConsensusProtocolHander, data: VoteSetMaj23Message) {
-      return [bnToUnpaddedBuffer(data.height), intToBuffer(data.round), intToBuffer(data.type), data.hash];
+    encode(this: ConsensusProtocolHander, data: m.VoteSetMaj23Message) {
+      return data.raw();
     },
-    decode(this: ConsensusProtocolHander, data: any): VoteSetMaj23Message {
-      if (!Array.isArray(data) || data.length !== 4) {
-        throw new Error('invalid values length');
+    decode(this: ConsensusProtocolHander, data: any): m.VoteSetMaj23Message {
+      if (!Array.isArray(data)) {
+        throw new Error('invalid values');
       }
-      const [height, round, type, hash] = data;
-      return new VoteSetMaj23Message(new BN(height), bufferToInt(round), bufferToInt(type), hash);
+      return m.VoteSetMaj23Message.fromValuesArray(data);
     },
-    process(this: ConsensusProtocolHander, msg: VoteSetMaj23Message) {
+    process(this: ConsensusProtocolHander, msg: m.VoteSetMaj23Message) {
       if (this.reimint) {
         this.reimint.state.setVoteMaj23(msg.height, msg.round, msg.type, this.peer.peerId, msg.hash);
         const voteSetBitsMessage = this.reimint.state.genVoteSetBitsMessage(msg.height, msg.round, msg.type, msg.hash);
@@ -144,73 +137,57 @@ const consensusHandlerFuncs: HandlerFunc[] = [
   {
     name: 'VoteSetBits',
     code: 7,
-    encode(this: ConsensusProtocolHander, data: VoteSetBitsMessage) {
-      return [bnToUnpaddedBuffer(data.height), intToBuffer(data.round), intToBuffer(data.type), data.hash, data.votes.raw()];
+    encode(this: ConsensusProtocolHander, data: m.VoteSetBitsMessage) {
+      return data.raw();
     },
-    decode(this: ConsensusProtocolHander, data: any): VoteSetBitsMessage {
-      if (!Array.isArray(data) || data.length !== 5) {
+    decode(this: ConsensusProtocolHander, data: any): m.VoteSetBitsMessage {
+      if (!Array.isArray(data)) {
         throw new Error('invalid values');
       }
-      const [height, round, type, hash, votes] = data;
-      if (!Array.isArray(votes) || votes.length !== 2) {
-        throw new Error('invalid votes values length');
-      }
-      return new VoteSetBitsMessage(new BN(height), bufferToInt(round), bufferToInt(type), hash, BitArray.fromValuesArray(votes as [Buffer, Buffer[]]));
+      return m.VoteSetBitsMessage.fromValuesArray(data);
     },
-    process(this: ConsensusProtocolHander, msg: VoteSetBitsMessage) {
+    process(this: ConsensusProtocolHander, msg: m.VoteSetBitsMessage) {
       this.applyVoteSetBitsMessage(msg);
     }
   },
   {
     name: 'GetProposalBlock',
     code: 8,
-    encode(this: ConsensusProtocolHander, data: GetProposalBlockMessage) {
-      return [data.hash];
+    encode(this: ConsensusProtocolHander, data: m.GetProposalBlockMessage) {
+      return data.raw();
     },
-    decode(this: ConsensusProtocolHander, data: any): GetProposalBlockMessage {
-      if (!Array.isArray(data) || data.length !== 1) {
-        throw new Error('invalid values length');
+    decode(this: ConsensusProtocolHander, data: any): m.GetProposalBlockMessage {
+      if (!Array.isArray(data)) {
+        throw new Error('invalid values');
       }
-      return new GetProposalBlockMessage(data[0]);
+      return m.GetProposalBlockMessage.fromValuesArray(data);
     },
-    process(this: ConsensusProtocolHander, { hash }: GetProposalBlockMessage) {
+    process(this: ConsensusProtocolHander, { hash }: m.GetProposalBlockMessage) {
       const proposalBlock = this.node.getReimintEngine()?.state.getProposalBlock(hash);
-      proposalBlock && this.sendMessage(new ProposalBlockMessage(proposalBlock));
+      proposalBlock && this.sendMessage(new m.ProposalBlockMessage(proposalBlock));
     }
   },
   {
     name: 'ProposalBlock',
     code: 9,
-    encode(this: ConsensusProtocolHander, data: ProposalBlockMessage) {
-      return [data.block.raw()];
+    encode(this: ConsensusProtocolHander, data: m.ProposalBlockMessage) {
+      return data.raw();
     },
-    decode(this: ConsensusProtocolHander, data: any): ProposalBlockMessage {
-      if (!Array.isArray(data) || data.length !== 1) {
-        throw new Error('invalid values length');
+    decode(this: ConsensusProtocolHander, data: any): m.ProposalBlockMessage {
+      if (!Array.isArray(data)) {
+        throw new Error('invalid values');
       }
-      return new ProposalBlockMessage(Block.fromValuesArray(data[0], { common: this.node.getCommon(0), hardforkByBlockNumber: true }));
+      return m.ProposalBlockMessage.fromValuesArray(data as any, { common: this.node.getCommon(0), hardforkByBlockNumber: true });
     },
-    process(this: ConsensusProtocolHander, msg: ProposalBlockMessage) {
+    process(this: ConsensusProtocolHander, msg: m.ProposalBlockMessage) {
       this.reimint?.state.newMessage(this.peer.peerId, msg);
-    }
-  },
-  // debug code
-  {
-    name: 'hellow',
-    code: 10,
-    encode(this: ConsensusProtocolHander, data: string) {
-      return Buffer.from(data);
-    },
-    decode(this: ConsensusProtocolHander, data: Buffer): string {
-      logger.debug('receive hellow, data:', data.toString());
-      return data.toString();
     }
   }
 ];
 
 export interface ConsensusProtocolHanderOptions extends Omit<HandlerBaseOptions, 'handlerFuncs'> {}
 
-export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
+export class ConsensusProtocolHander extends HandlerBase<m.NewRoundStepMessage> {
   readonly reimint?: ReimintConsensusEngine;
   private aborted: boolean = false;
 
@@ -218,9 +195,6 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
   private height: BN = new BN(0);
   private round: number = -1;
   private step: RoundStepType = RoundStepType.NewHeight;
-
-  // Estimated start of round 0 at this height
-  private startTime!: number;
 
   private proposal: boolean = false;
   private proposalBlockHash?: Buffer;
@@ -241,7 +215,7 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
     this.send(0, this.reimint?.state.genNewRoundStepMessage() ?? defaultNewRoundStepMessage);
   }
   protected onHandshakeResponse(roundStep: any) {
-    if (!(roundStep instanceof NewRoundStepMessage)) {
+    if (!(roundStep instanceof m.NewRoundStepMessage)) {
       return false;
     }
     return true;
@@ -289,7 +263,7 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
         if (!this.proposal) {
           const proposalMessage = reimint.state.genProposalMessage(this.height, this.round);
           if (proposalMessage) {
-            logger.debug('ConsensusProtocolHander::gossipDataLoop, send proposal to:', this.peer.peerId);
+            // logger.debug('ConsensusProtocolHander::gossipDataLoop, send proposal to:', this.peer.peerId);
             this.sendMessage(proposalMessage);
             this.setHasProposal(proposalMessage.proposal);
           }
@@ -350,41 +324,19 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
   private pickAndSend(votes: VoteSet) {
     const vote = this.pickRandom(votes);
     if (vote) {
-      logger.debug('ConsensusProtocolHander::gossipDataLoop, send vote(h,r,h,t):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, 'to:', this.peer.peerId);
-      this.sendMessage(new VoteMessage(vote));
+      // logger.debug('ConsensusProtocolHander::gossipDataLoop, send vote(h,r,h,t):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, 'to:', this.peer.peerId);
+      this.sendMessage(new m.VoteMessage(vote));
       this.setHasVote(vote.height, vote.round, vote.type, vote.index);
       return true;
     }
     return false;
   }
 
-  sendMessage(msg: Message) {
-    if (msg instanceof NewRoundStepMessage) {
-      this.send(0, msg);
-    } else if (msg instanceof NewValidBlockMessage) {
-      this.send(1, msg);
-    } else if (msg instanceof HasVoteMessage) {
-      this.send(2, msg);
-    } else if (msg instanceof ProposalMessage) {
-      this.send(3, msg);
-    } else if (msg instanceof ProposalPOLMessage) {
-      this.send(4, msg);
-    } else if (msg instanceof VoteMessage) {
-      this.send(5, msg);
-    } else if (msg instanceof VoteSetMaj23Message) {
-      this.send(6, msg);
-    } else if (msg instanceof VoteSetBitsMessage) {
-      this.send(7, msg);
-    } else if (msg instanceof GetProposalBlockMessage) {
-      this.send(8, msg);
-    } else if (msg instanceof ProposalBlockMessage) {
-      this.send(9, msg);
-    } else {
-      throw new Error('invalid message');
-    }
+  sendMessage(msg: m.Message) {
+    this.send(MessageFactory.getCodeByMessageInstance(msg), msg);
   }
 
-  applyNewRoundStepMessage(msg: NewRoundStepMessage) {
+  applyNewRoundStepMessage(msg: m.NewRoundStepMessage) {
     // TODO: ValidateHeight
     if (msg.height.lt(this.height)) {
       return;
@@ -419,10 +371,9 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
     this.height = msg.height.clone();
     this.round = msg.round;
     this.step = msg.step;
-    this.startTime = Date.now() - msg.secondsSinceStartTime;
   }
 
-  applyNewValidBlockMessage(msg: NewValidBlockMessage) {
+  applyNewValidBlockMessage(msg: m.NewValidBlockMessage) {
     if (!this.height.eq(msg.height)) {
       return;
     }
@@ -434,7 +385,7 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
     this.proposalBlockHash = msg.hash;
   }
 
-  applyProposalPOLMessage(msg: ProposalPOLMessage) {
+  applyProposalPOLMessage(msg: m.ProposalPOLMessage) {
     if (!this.height.eq(msg.height)) {
       return;
     }
@@ -446,7 +397,7 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
     this.proposalPOL = msg.proposalPOL;
   }
 
-  applyHasVoteMessage(msg: HasVoteMessage) {
+  applyHasVoteMessage(msg: m.HasVoteMessage) {
     if (!this.height.eq(msg.height)) {
       return;
     }
@@ -454,7 +405,7 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
     this.setHasVote(msg.height, msg.round, msg.type, msg.index);
   }
 
-  applyVoteSetBitsMessage(msg: VoteSetBitsMessage) {
+  applyVoteSetBitsMessage(msg: m.VoteSetBitsMessage) {
     // TODO: ourVotes??
     this.getVoteBitArray(msg.height, msg.round, msg.type)?.update(msg.votes);
   }
@@ -528,10 +479,5 @@ export class ConsensusProtocolHander extends HandlerBase<NewRoundStepMessage> {
         this.catchupCommit = new BitArray(valSetSize);
       }
     }
-  }
-
-  // debug code
-  sayHellow() {
-    this.send(10, 'wuhu');
   }
 }

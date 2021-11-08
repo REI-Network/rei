@@ -4,6 +4,7 @@ import Message from '@gxchain2-ethereumjs/vm/dist/evm/message';
 import { Common } from '@gxchain2/common';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
 import { encode } from './utils';
+import { EMPTY_ADDRESS } from '../utils';
 
 export abstract class Contract {
   evm: EVM;
@@ -76,7 +77,7 @@ export abstract class Contract {
   // make a call message
   protected makeCallMessage(method: string, types: string[], values: any[]) {
     return new Message({
-      caller: Address.zero(),
+      caller: EMPTY_ADDRESS,
       to: this.address,
       gasLimit: MAX_INTEGER,
       data: Buffer.concat([this.methods[method], encode(types, values)])

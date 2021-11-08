@@ -1,51 +1,12 @@
-import { bnToHex, bufferToHex, BN, Address } from 'ethereumjs-util';
+import { bnToHex, bufferToHex, BN } from 'ethereumjs-util';
 import { Block } from '@gxchain2-ethereumjs/block';
-import { CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@gxchain2-ethereumjs/block/dist/clique';
 import { calcTxSize, WrappedTransaction, Transaction } from './transaction';
 
 export * from '@gxchain2-ethereumjs/block';
 export * from '@gxchain2-ethereumjs/block/dist/clique';
 
 /**
- * Calculate clique difficulty and whether the signer is an `inturn` signer
- * @param activeSigners - Active signers
- * @param signer - Target signer
- * @param number - Current block number
- * @returns Whether the signer is an `inturn` signer and the difficulty
- */
-export function preHF1CalcCliqueDifficulty(activeSigners: Address[], signer: Address, number: BN): [boolean, BN] {
-  if (activeSigners.length === 0) {
-    throw new Error('Missing active signers information');
-  }
-  const signerIndex = activeSigners.findIndex((address: Address) => address.equals(signer));
-  if (signerIndex === -1) {
-    throw new Error('invalid signer');
-  }
-  const inTurn = number.modn(activeSigners.length) === signerIndex;
-  return [inTurn, (inTurn ? CLIQUE_DIFF_INTURN : CLIQUE_DIFF_NOTURN).clone()];
-}
-
-/**
- * Calculate clique difficulty and whether the signer is an `inturn` signer
- * @param activeSigners - Active signers
- * @param signer - Target signer
- * @param proposer - Current proposer
- * @returns Whether the signer is an `inturn` signer and the difficulty
- */
-export function calcCliqueDifficulty(activeSigners: Address[], signer: Address, proposer: Address): [boolean, BN] {
-  if (activeSigners.length === 0) {
-    throw new Error('Missing active signers information');
-  }
-  const signerIndex = activeSigners.findIndex((address: Address) => address.equals(signer));
-  if (signerIndex === -1) {
-    throw new Error('invalid signer');
-  }
-  const inTurn = proposer.equals(signer);
-  return [inTurn, (inTurn ? CLIQUE_DIFF_INTURN : CLIQUE_DIFF_NOTURN).clone()];
-}
-
-/**
- * WrappedBlock based on `@ethereumjs/block`
+ * WrappedBlock based on `@gxchain2-ethereumjs/block`
  */
 export class WrappedBlock {
   readonly block: Block;

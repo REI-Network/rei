@@ -2,23 +2,26 @@ import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import { Address, BN, toBuffer } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
 import { Log, Receipt } from '@gxchain2/structure';
-import { ValidatorChanges } from '../staking';
+import { ValidatorChanges, getGenesisValidators } from '../staking';
 import { bufferToAddress, decodeInt256 } from './utils';
 import { Contract } from './contract';
 
 // function selector of stake manager
 const methods = {
-  totalLockedAmount: toBuffer('0x05a9f274'),
+  getTotalLockedAmountAndValidatorCount: toBuffer('0xcf6f5534'),
   indexedValidatorsLength: toBuffer('0x74a1c64a'),
   indexedValidatorsByIndex: toBuffer('0xaf6a80e2'),
   getVotingPowerByIndex: toBuffer('0x9b8c4c88'),
   getVotingPowerByAddress: toBuffer('0x7fdde75c'),
   activeValidatorsLength: toBuffer('0x75bac430'),
-  activeValidators: toBuffer('0x14f64c78')
+  activeValidators: toBuffer('0x14f64c78'),
+  proposer: toBuffer('0xa8e4fb90')
 };
 
 // event topic
 const events = {
+  Reward: toBuffer('0x619caafabdd75649b302ba8419e48cccf64f37f1983ac4727cfb38b57703ffc9'),
+  Slash: toBuffer('0xa69f22d963cb7981f842db8c1aafcc93d915ba2a95dcf26dcc333a9c2a09be26'),
   Stake: toBuffer('0x1bd1eb6b4fd3f08e718d7a241c54c4641c9f36004b6949383f48d15a2fcc8f52'),
   StartUnstake: toBuffer('0x020b3ba91672f551cfd1f7abf4794b3fb292f61fd70ffd5a34a60cdd04078e50'),
   IndexedValidator: toBuffer('0x07c18d1e961213770ba59e4b4001fc312f17def9ba35867316edefe029c5dd18'),
@@ -59,7 +62,13 @@ export class StakeManager extends Contract {
     const smaddr = Address.fromString(common.param('vm', 'smaddr'));
     for (const log of logs) {
       if (log.address.equals(smaddr.buf)) {
-        if (log.topics.length === 3 && log.topics[0].equals(events['Stake'])) {
+        if (log.topics.length === 3 && log.topics[0].equals(events['Reward'])) {
+          // Reward event
+          changes.stake(bufferToAddress(log.topics[1]), new BN(log.topics[2]));
+        } else if (log.topics.length === 3 && log.topics[0].equals(events['Slash'])) {
+          // Slash event
+          changes.unstake(bufferToAddress(log.topics[1]), new BN(log.topics[2]));
+        } else if (log.topics.length === 3 && log.topics[0].equals(events['Stake'])) {
           // Stake event
           changes.stake(bufferToAddress(log.topics[1]), new BN(log.topics[2]));
         } else if (log.topics.length === 4 && log.topics[0].equals(events['StartUnstake'])) {
@@ -81,13 +90,29 @@ export class StakeManager extends Contract {
   }
 
   /**
-   * Get total locked amount
-   * @returns Total locked amount
+   * Get proposer address
+   * @returns Proposer address
    */
-  totalLockedAmount() {
+  proposer() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('totalLockedAmount', [], []));
-      return new BN(returnValue);
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('proposer', [], []));
+      return bufferToAddress(returnValue);
+    });
+  }
+
+  /**
+   * Get the total locked amount and the validator count
+   * @returns Total locked amount and validator count
+   */
+  getTotalLockedAmountAndValidatorCount() {
+    return this.runWithLogger(async () => {
+      const gvs = getGenesisValidators(this.common);
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('getTotalLockedAmountAndValidatorCount', ['address[]'], [gvs.map((gv) => gv.toString())]));
+      let i = 0;
+      return {
+        totalLockedAmount: new BN(returnValue.slice(i++ * 32, i * 32)),
+        validatorCount: new BN(returnValue.slice(i++ * 32, i * 32))
+      };
     });
   }
 

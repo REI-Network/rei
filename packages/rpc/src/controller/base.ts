@@ -31,8 +31,8 @@ export class Controller {
       return this.node.blockchain.latestBlock.header.number.clone();
     } else if (tag === 'pending') {
       return this.node.blockchain.latestBlock.header.number.addn(1);
-    } else if (Number.isInteger(Number(tag))) {
-      return new BN(tag);
+    } else if (tag.startsWith('0x')) {
+      return hexStringToBN(tag);
     } else {
       helper.throwRpcErr('Invalid tag value');
       // for types.
@@ -47,9 +47,9 @@ export class Controller {
     } else if (tag === 'latest' || tag === undefined) {
       block = this.node.blockchain.latestBlock;
     } else if (tag === 'pending') {
-      block = this.node.getCurrentEngine().getPendingBlock();
-    } else if (Number.isInteger(Number(tag))) {
-      block = await this.node.blockchain.getBlock(Number(tag));
+      block = this.node.getPendingBlock();
+    } else if (tag.startsWith('0x')) {
+      block = await this.node.blockchain.getBlock(hexStringToBN(tag));
     } else {
       helper.throwRpcErr('Invalid tag value');
     }
@@ -62,8 +62,7 @@ export class Controller {
 
   protected async getStateManagerByTag(tag: string): Promise<StateManager> {
     if (tag === 'pending') {
-      // return await this.node.miner.getPendingStateManager();
-      return undefined as any;
+      return this.node.getPendingStakeManager();
     } else {
       const block = await this.getBlockByTag(tag);
       return this.node.getStateManager(block.header.stateRoot, block.header.number);

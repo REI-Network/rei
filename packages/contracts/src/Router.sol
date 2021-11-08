@@ -132,11 +132,16 @@ contract Router is ReentrancyGuard, Only {
 
     /**
      * @dev After block callback, it only can be called by system caller
+     * @param _proposer         Proposer address
      * @param acValidators      Parameter of StakeManager.onAfterBlock
      * @param priorities        Parameter of StakeManager.onAfterBlock
      */
-    function onAfterBlock(address[] calldata acValidators, int256[] calldata priorities) external nonReentrant onlySystemCaller {
-        IStakeManager(config.stakeManager()).onAfterBlock(acValidators, priorities);
+    function onAfterBlock(
+        address _proposer,
+        address[] calldata acValidators,
+        int256[] calldata priorities
+    ) external nonReentrant onlySystemCaller {
+        IStakeManager(config.stakeManager()).onAfterBlock(_proposer, acValidators, priorities);
         IFreeFee(config.freeFee()).onAfterBlock();
     }
 }

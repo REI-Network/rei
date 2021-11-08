@@ -2,7 +2,7 @@ import EventEmitter from 'events';
 import { BN } from 'ethereumjs-util';
 import { Transaction, Block, BlockHeader, Log } from '@gxchain2/structure';
 import { createBufferFunctionalMap, logger } from '@gxchain2/utils';
-import { Node } from '../node';
+import { Node } from './node';
 
 // record block hash and block number for quering receipt.
 type TransactionInfo = { tx: Transaction; blockHash: Buffer; blockNumber: BN };

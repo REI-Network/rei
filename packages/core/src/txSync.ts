@@ -1,8 +1,8 @@
 import { bufferToHex } from 'ethereumjs-util';
 import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Channel, Aborter, logger } from '@gxchain2/utils';
 import { Transaction } from '@gxchain2/structure';
-import { WireProtocol, PeerRequestTimeoutError, maxTxRetrievals } from '../protocols';
-import { Node } from '../node';
+import { WireProtocol, PeerRequestTimeoutError, maxTxRetrievals } from './protocols';
+import { Node } from './node';
 
 type NewPooledTransactionMessage = {
   hashes: Buffer[];

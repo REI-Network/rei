@@ -65,7 +65,7 @@ task('stake', 'Stake for validator')
     } else if (taskArgs.ether) {
       taskArgs.value = toEther(taskArgs.value);
     }
-    await stakeManager.methods.stake(taskArgs.validator, deployer).send({ value: taskArgs.value, gas: 12475531 });
+    await stakeManager.methods.stake(taskArgs.validator, deployer).send({ value: taskArgs.value });
     console.log('Stake succeed, value:', taskArgs.value);
   });
 
@@ -254,12 +254,13 @@ task('fee', 'Query user fee and free fee info')
   });
 
 task('afb', 'Call onAfterBlock callback')
+  .addParam('proposer', 'proposer address')
   .addOptionalParam('address', 'router contract address')
   .setAction(async (taskArgs, { deployments, web3, getNamedAccounts, artifacts }) => {
     const { deployer } = await getNamedAccounts();
     const router = await createWeb3Contract({ name: 'Router', deployments, web3, artifacts, from: deployer, address: taskArgs.address });
     // we don't care about active validators
-    await router.methods.onAfterBlock([], []).send();
+    await router.methods.onAfterBlock(taskArgs.proposer, [], []).send();
     console.log('onAfterBlock succeed');
   });
 

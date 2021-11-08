@@ -1,61 +1,25 @@
-import { Address, BN, toBuffer, setLengthLeft, ecsign, intToBuffer } from 'ethereumjs-util';
-import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions, Transaction } from '@gxchain2/structure';
+import { toBuffer, setLengthLeft, Address, rlp, BN, rlphash, intToBuffer } from 'ethereumjs-util';
+import { BaseTrie } from 'merkle-patricia-tree';
+import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
+import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
 import { Common } from '@gxchain2/common';
-import { logger } from '@gxchain2/utils';
-import { Node, ProcessBlockOptions } from '../../node';
-import { ConsensusProtocol } from '../../protocols/consensus';
-import { ConsensusEngine, ConsensusEngineOptions } from '../consensusEngine';
-import { EMPTY_ADDRESS, EMPTY_EXTRA_DATA, isEmptyAddress } from '../utils';
-import { ConsensusEngineBase } from '../consensusEngineBase';
-import { ExtraData, calcBlockHeaderHash, Proposal, VoteType, VoteSet, Evidence, EvidencePool, EvidenceDatabase, Message } from './types';
-import { StateMachine, SendMessageOptions } from './state';
+import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@gxchain2/structure';
+import { ExtraData, Proposal, VoteType, VoteSet, Evidence, ISigner } from './types';
+import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../../utils';
 
-export const defaultRound = 0;
-export const defaultPOLRound = -1;
-export const defaultProposalTimestamp = 0;
-export const defaultValidaterSetSize = 1;
-export const defaultEvidence = [];
+const defaultRound = 0;
+const defaultPOLRound = -1;
+const defaultProposalTimestamp = 0;
+const defaultValidaterSetSize = 1;
+const defaultEvidence = [];
 
-/////////////////////// mock ///////////////////////
-
-export class MockSigner {
-  readonly node: Node;
-
-  constructor(node: Node) {
-    this.node = node;
-  }
-
-  address(): Address {
-    return this.node.getCurrentEngine().coinbase;
-  }
-
-  sign(msg: Buffer): Buffer {
-    const coinbase = this.node.getCurrentEngine().coinbase;
-    if (coinbase.equals(Address.zero())) {
-      throw new Error('empty coinbase');
-    }
-    const signature = ecsign(msg, this.node.accMngr.getPrivateKey(coinbase));
-    return Buffer.concat([signature.r, signature.s, intToBuffer(signature.v - 27)]);
-  }
-}
-
-export class MockConfig {
-  // TODO: config
-  proposeDuration(round: number) {
-    return 3000 + 500 * round;
-  }
-
-  prevoteDuration(round: number) {
-    return 1000 + 500 * round;
-  }
-
-  precommitDutaion(round: number) {
-    return 1000 + 500 * round;
-  }
-}
-
-/////////////////////// mock ///////////////////////
-
+/**
+ * Format header extra data,
+ * create empty 32 bytes if it doesn't exsit,
+ * delete anything after 32 bytes
+ * @param data - Header data
+ * @returns Header data
+ */
 export function formatHeaderData(data?: HeaderData) {
   if (data) {
     if (data.extraData) {
@@ -75,9 +39,8 @@ export function formatHeaderData(data?: HeaderData) {
 }
 
 export interface ReimintBlockOptions extends BlockOptions {
-  // whether try to sign the block,
-  // default: true
-  sign?: boolean;
+  // whether try to sign the block
+  signer?: ISigner;
 
   // reimint round
   round?: number;
@@ -102,28 +65,56 @@ export interface ReimintBlockOptions extends BlockOptions {
   proposalTimestamp?: number;
 }
 
-export class ReimintConsensusEngine extends ConsensusEngineBase implements ConsensusEngine {
-  readonly state: StateMachine;
-  readonly evpool: EvidencePool;
+export interface ReimintBlockOptions_SignerExists extends Omit<ReimintBlockOptions, 'signer'> {
+  signer: ISigner;
+}
 
-  constructor(options: ConsensusEngineOptions) {
-    super(options);
+export interface ReimintBlockOptions_SignerNotExists extends Omit<ReimintBlockOptions, 'signer'> {}
 
-    this.evpool = new EvidencePool(new EvidenceDatabase(options.node.evidencedb));
-
-    let signer: MockSigner | undefined;
-    if (!isEmptyAddress(this.coinbase) && this.node.accMngr.hasUnlockedAccount(this.coinbase)) {
-      signer = new MockSigner(this.node);
-    }
-    this.state = new StateMachine(this, this.evpool, this.node.getChainId(), new MockConfig(), signer);
-  }
-
-  /////////////////////////////////
+export class Reimint {
+  // disable constructor
+  private constructor() {}
 
   /**
-   * {@link ConsensusEngine.getMiner}
+   * Calculate block or block header hash
+   * @param data - Block or block header
+   * @returns Hash
    */
-  getMiner(data: BlockHeader | Block): Address {
+  static calcBlockHash(data: Block | BlockHeader) {
+    const header = data instanceof Block ? data.header : data;
+    return ExtraData.fromBlockHeader(header).proposal.hash;
+  }
+
+  /**
+   * Calculate block header raw hash,
+   * in reimint consensus,
+   * blockhash = rlphash([
+   *    parentHash
+   *    uncleHash
+   *    ...
+   *    extraData(32 bytes) + round + POLRound + evidence1.hash() + evidence2.hash() + ...
+   *    ...
+   *    mixHash
+   *    nonce
+   * ])
+   * @param header - Block header
+   * @param round - Round
+   * @param POLRound - POLRound
+   * @param evidence - Evidence list
+   * @returns Hash
+   */
+  static calcBlockHeaderRawHash(header: BlockHeader, round: number, POLRound: number, evidence: Evidence[]) {
+    const raw = header.raw();
+    raw[12] = Buffer.concat([raw[12].slice(0, CLIQUE_EXTRA_VANITY), intToBuffer(round), intToBuffer(POLRound + 1), ...evidence.map((ev) => ev.hash())]);
+    return rlphash(raw);
+  }
+
+  /**
+   * Get miner address by block or block header
+   * @param data - Block or block header
+   * @returns Miner address
+   */
+  static getMiner(data: BlockHeader | Block): Address {
     const header = data instanceof Block ? data.header : data;
     if (header.extraData.length > CLIQUE_EXTRA_VANITY) {
       return ExtraData.fromBlockHeader(header).proposal.proposer();
@@ -133,51 +124,47 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
   }
 
   /**
-   * {@link ConsensusEngine.simpleSignBlock}
+   * Check if the genesis validator set should be used,
+   * if totalLockedAmount is less than `minTotalLockedAmount` or
+   * validatorCount is less than `minValidatorsCount`,
+   * the genesis validator set is enabled
+   * @param totalLockedAmount - Current total locked amount
+   * @param validatorCount - Current validator count
+   * @param common - Common instance
+   * @returns `true` if we should use the genesis validator set
    */
-  simpleSignBlock(data: HeaderData, common: Common, transactions?: Transaction[]) {
-    const { block } = this.generateBlockAndProposal(data, transactions, { common });
-    return block;
-  }
+  static isEnableGenesisValidators(totalLockedAmount: BN, validatorCount: number, common: Common) {
+    const minTotalLockedAmount = common.param('vm', 'minTotalLockedAmount');
+    if (typeof minTotalLockedAmount !== 'string') {
+      throw new Error('invalid minTotalLockedAmount');
+    }
+    if (totalLockedAmount.lt(new BN(minTotalLockedAmount))) {
+      return true;
+    }
 
-  //////////////////////////
+    const minValidatorsCount = common.param('vm', 'minValidatorsCount');
+    if (typeof minValidatorsCount !== 'number') {
+      throw new Error('invalid minValidatorsCount');
+    }
+    if (validatorCount < minValidatorsCount) {
+      return true;
+    }
 
-  protected _start() {
-    logger.debug('ReimintConsensusEngine::_start');
-    this.evpool.init(this.node.blockchain.latestBlock.header.number).catch((err) => {
-      logger.error('ReimintConsensusEngine::_start, evpool init error:', err);
-    });
-    this.state.start();
-  }
-
-  protected async _abort() {
-    await this.state.abort();
+    return false;
   }
 
   /**
-   * Process a new block, try to mint a block after this block
-   * @param block - New block
+   * Generate receipt root after `hf1`
+   * @param transactions - List of transaction
+   * @param receipts - List of receipt
+   * @returns Receipt root
    */
-  protected async _newBlock(block: Block) {
-    const header = block.header;
-    // create a new pending block through worker
-    const pendingBlock = await this.worker.createPendingBlock(header);
-    if (!this.enable || this.node.sync.isSyncing) {
-      return;
+  static async genReceiptTrie(transactions: TypedTransaction[], receipts: TxReceipt[]) {
+    const trie = new BaseTrie();
+    for (let i = 0; i < receipts.length; i++) {
+      await trie.put(rlp.encode(i), encodeReceipt(transactions[i], receipts[i]));
     }
-
-    const difficulty = new BN(1);
-    const gasLimit = this.getGasLimitByCommon(pendingBlock.common);
-    pendingBlock.complete(difficulty, gasLimit);
-
-    let validators = this.node.validatorSets.directlyGet(header.stateRoot);
-    // if the validator set doesn't exist, return
-    if (!validators) {
-      const vm = await this.node.getVM(header.stateRoot, header._common);
-      validators = await this.node.validatorSets.get(header.stateRoot, this.node.getStakeManager(vm, block, this.node.getCommon(block.header.number.addn(1))));
-    }
-
-    this.state.newBlockHeader(header, validators, pendingBlock);
+    return trie.root;
   }
 
   /**
@@ -186,21 +173,19 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
    * @param options - Reimint block options
    * @returns Header and proposal
    */
-  generateBlockHeaderAndProposal(data?: HeaderData, options?: ReimintBlockOptions): { header: BlockHeader; proposal?: Proposal } {
+  static generateBlockHeaderAndProposal(data: HeaderData, options: ReimintBlockOptions): { header: BlockHeader; proposal?: Proposal } {
     const header = BlockHeader.fromHeaderData(data, options);
-    const sign = options?.sign ?? true;
-
-    if (sign && this.enable) {
+    if (options.signer) {
       data = formatHeaderData(data);
 
-      const round = options?.round ?? defaultRound;
-      const POLRound = options?.POLRound ?? defaultPOLRound;
-      const timestamp = options?.proposalTimestamp ?? defaultProposalTimestamp;
-      const validaterSetSize = options?.validatorSetSize ?? defaultValidaterSetSize;
-      const evidence = options?.evidence ?? defaultEvidence;
+      const round = options.round ?? defaultRound;
+      const POLRound = options.POLRound ?? defaultPOLRound;
+      const timestamp = options.proposalTimestamp ?? defaultProposalTimestamp;
+      const validaterSetSize = options.validatorSetSize ?? defaultValidaterSetSize;
+      const evidence = options.evidence ?? defaultEvidence;
 
       // calculate block hash
-      const headerHash = calcBlockHeaderHash(header, round, POLRound, []);
+      const headerHash = Reimint.calcBlockHeaderRawHash(header, round, POLRound, evidence);
       const proposal = new Proposal({
         round,
         POLRound,
@@ -209,7 +194,7 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
         hash: headerHash,
         timestamp
       });
-      proposal.sign(this.node.accMngr.getPrivateKey(this.coinbase));
+      proposal.signature = options.signer.sign(proposal.getMessageToSign());
       const extraData = new ExtraData(round, POLRound, evidence, proposal, options?.voteSet);
       return {
         header: BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize(validaterSetSize)]) }, options),
@@ -227,8 +212,11 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
    * @param options - Reimint block options
    * @returns Block and proposal
    */
-  generateBlockAndProposal(data?: HeaderData, transactions?: TypedTransaction[], options?: ReimintBlockOptions): { block: Block; proposal?: Proposal } {
-    const { header, proposal } = this.generateBlockHeaderAndProposal(data, options);
+  static generateBlockAndProposal(data: HeaderData, transactions: TypedTransaction[], options: ReimintBlockOptions_SignerExists): { block: Block; proposal: Proposal };
+  static generateBlockAndProposal(data: HeaderData, transactions: TypedTransaction[], options: ReimintBlockOptions_SignerNotExists): { block: Block };
+  static generateBlockAndProposal(data: HeaderData, transactions: TypedTransaction[], options: ReimintBlockOptions): { block: Block; proposal?: Proposal };
+  static generateBlockAndProposal(data: HeaderData, transactions: TypedTransaction[], options: ReimintBlockOptions): { block: Block; proposal?: Proposal } {
+    const { header, proposal } = Reimint.generateBlockHeaderAndProposal(data, options);
     return { block: new Block(header, transactions, undefined, options), proposal };
   }
 
@@ -242,51 +230,10 @@ export class ReimintConsensusEngine extends ConsensusEngineBase implements Conse
    * @param options - Block options
    * @returns Complete block
    */
-  generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], evidence: Evidence[], proposal: Proposal, votes: VoteSet, options?: BlockOptions) {
+  static generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], evidence: Evidence[], proposal: Proposal, votes: VoteSet, options?: BlockOptions) {
     const extraData = new ExtraData(proposal.round, proposal.POLRound, evidence, proposal, votes);
     data = formatHeaderData(data);
     const header = BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize()]) }, options);
     return new Block(header, transactions, undefined, options);
-  }
-
-  /**
-   * Broadcast p2p message to remote peer
-   * @param msg - Message
-   * @param options - Send options {@link SendMessageOptions}
-   */
-  broadcastMessage(msg: Message, options: SendMessageOptions) {
-    if (options.broadcast) {
-      for (const handler of ConsensusProtocol.getPool().handlers) {
-        handler.sendMessage(msg);
-      }
-    } else if (options.to) {
-      const peer = this.node.networkMngr.getPeer(options.to);
-      if (peer) {
-        ConsensusProtocol.getHandler(peer, false)?.sendMessage(msg);
-      }
-    } else if (options.exclude) {
-      for (const handler of ConsensusProtocol.getPool().handlers) {
-        if (!options.exclude.includes(handler.peer.peerId)) {
-          handler.sendMessage(msg);
-        }
-      }
-    } else {
-      throw new Error('invalid broadcast message options');
-    }
-  }
-
-  /**
-   * Process single block
-   * @param block - Block
-   * @param options - Process block options
-   * @returns Reorged
-   */
-  processBlock(block: Block, options: ProcessBlockOptions) {
-    return this.node.processBlock(block, options).then((reorged) => {
-      if (reorged) {
-        this.node.onMintBlock();
-      }
-      return reorged;
-    });
   }
 }

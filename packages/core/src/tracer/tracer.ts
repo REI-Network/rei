@@ -5,6 +5,7 @@ import { Block } from '@gxchain2/structure';
 import { IDebug } from '@gxchain2-ethereumjs/vm/dist/types';
 import { hexStringToBN, hexStringToBuffer } from '@gxchain2/utils';
 import { Node } from '../node';
+import { EMPTY_ADDRESS } from '../utils';
 import { StructLogDebug, JSDebug } from './debug';
 import { toAsync } from './toasync';
 import { tracers } from './tracers';
@@ -135,8 +136,8 @@ export class Tracer {
           block,
           debug,
           gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
-          origin: data.from ? Address.fromString(data.from) : Address.zero(),
-          caller: data.from ? Address.fromString(data.from) : Address.zero(),
+          origin: data.from ? Address.fromString(data.from) : EMPTY_ADDRESS,
+          caller: data.from ? Address.fromString(data.from) : EMPTY_ADDRESS,
           gasLimit: data.gas ? hexStringToBN(data.gas) : undefined,
           to: data.to ? Address.fromString(data.to) : undefined,
           value: data.value ? hexStringToBN(data.value) : undefined,

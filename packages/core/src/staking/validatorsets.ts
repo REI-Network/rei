@@ -1,6 +1,7 @@
 import { createBufferFunctionalMap } from '@gxchain2/utils';
 import { ValidatorSet } from './validatorset';
 import { StakeManager } from '../contracts';
+import { Reimint } from '../consensus/reimint/reimint';
 
 const maxSize = 120;
 
@@ -25,14 +26,14 @@ export class ValidatorSets {
    * create if it doesn't exist
    * @param stateRoot - Target state root
    * @param sm - `StakeManager` instance
-   * @param sortValidators - If it is true, we sort all validators loaded from the state root,
-   *                         otherwise, we directly use the list of active validators loaded from state root
    * @returns
    */
-  async get(stateRoot: Buffer, sm: StakeManager, sortValidators: boolean = false) {
+  async get(stateRoot: Buffer, sm: StakeManager) {
     let set = this.sets.get(stateRoot);
     if (!set) {
-      set = await ValidatorSet.createFromStakeManager(sm, sortValidators);
+      const { totalLockedAmount, validatorCount } = await sm.getTotalLockedAmountAndValidatorCount();
+      const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
+      set = enableGenesisValidators ? await ValidatorSet.createGenesisValidatorSetFromStakeManager(sm) : await ValidatorSet.createFromStakeManager(sm);
       this.set(stateRoot, set);
     }
     return set;

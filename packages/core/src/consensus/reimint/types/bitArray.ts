@@ -1,7 +1,9 @@
-import { bufferToInt, rlp } from 'ethereumjs-util';
+import { bufferToInt, rlp, intToBuffer } from 'ethereumjs-util';
 import { getRandomIntInclusive } from '@gxchain2/utils';
 
 const ELEM_MAX_INTEGER = Math.pow(2, 32) - 1;
+
+export type BitArrayRaw = (Buffer | Buffer[])[];
 
 export class BitArray {
   readonly length: number;
@@ -12,14 +14,18 @@ export class BitArray {
     if (!Array.isArray(values)) {
       throw new Error('invalid serialized bit array input. must be array');
     }
-    return BitArray.fromValuesArray(values as any);
+    return BitArray.fromValuesArray(values);
   }
 
-  static fromValuesArray(values: [Buffer, Buffer[]]) {
+  static fromValuesArray(values: BitArrayRaw) {
     if (values.length !== 2) {
       throw new Error('invalid values length');
     }
+
     const [length, elems] = values;
+    if (!(length instanceof Buffer) || !Array.isArray(elems)) {
+      throw new Error('invalid values');
+    }
     return new BitArray(bufferToInt(length), elems.map(bufferToInt));
   }
 
@@ -100,8 +106,8 @@ export class BitArray {
     return buffer;
   }
 
-  raw() {
-    return [this.length, [...this.elems]];
+  raw(): BitArrayRaw {
+    return [intToBuffer(this.length), [...this.elems.map(intToBuffer)]];
   }
 
   serialize() {

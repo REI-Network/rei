@@ -47,7 +47,7 @@ function randomOne<T>(array: T[]) {
   return array[getRandomIntInclusive(0, array.length - 1)];
 }
 
-const ignoredErrors = new RegExp(['ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED', 'EHOSTDOWN', '1 bytes', 'abort'].join('|'));
+const ignoredErrors = new RegExp(['selection', 'closed', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED', 'EHOSTDOWN', '1 bytes', 'abort'].join('|'));
 
 /**
  * Handle errors, ignore not important errors

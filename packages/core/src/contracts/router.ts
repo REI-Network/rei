@@ -8,7 +8,7 @@ const methods = {
   estimateTotalFee: toBuffer('0xab124206'),
   assignTransactionReward: toBuffer('0xcec7a83e'),
   assignBlockReward: toBuffer('0x0cccae70'),
-  onAfterBlock: toBuffer('0xf4cfad16')
+  onAfterBlock: toBuffer('0x9313f105')
 };
 
 export class Router extends Contract {
@@ -42,9 +42,9 @@ export class Router extends Contract {
     });
   }
 
-  onAfterBlock(activeValidators: Address[], priorities: BN[]) {
+  onAfterBlock(proposer: Address, activeValidators: Address[], priorities: BN[]) {
     return this.runWithLogger(async () => {
-      await this.executeMessage(this.makeSystemCallerMessage('onAfterBlock', ['address[]', 'int256[]'], [activeValidators.map((addr) => addr.toString()), priorities.map((p) => p.toString())]));
+      await this.executeMessage(this.makeSystemCallerMessage('onAfterBlock', ['address', 'address[]', 'int256[]'], [proposer.toString(), activeValidators.map((addr) => addr.toString()), priorities.map((p) => p.toString())]));
     });
   }
 }

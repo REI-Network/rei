@@ -108,15 +108,13 @@ export class Fetcher {
    * @param handler Peer's WireProtocolHandler
    */
   private async downloadHeader(handler: WireProtocolHandler) {
-    let i = 0;
     let totalCount = this.bestHeight - this.localHeight;
     const headerTaskQueue: { start: number; count: number }[] = [];
     while (totalCount > 0) {
       headerTaskQueue.push({
-        start: i * this.count + this.localHeight + 1,
+        start: headerTaskQueue.length * this.count + this.localHeight + 1,
         count: totalCount > this.count ? this.count : totalCount
       });
-      i++;
       totalCount -= this.count;
     }
 
@@ -141,7 +139,7 @@ export class Fetcher {
         if (headers.length !== count) {
           throw new Error('invalid header(length)');
         }
-        for (let index = 0; i < headers.length; i++) {
+        for (let index = 0; index < headers.length; index++) {
           const header = headers[index];
           if (index > 0) {
             preValidateHeader.call(header, headers[index - 1]);

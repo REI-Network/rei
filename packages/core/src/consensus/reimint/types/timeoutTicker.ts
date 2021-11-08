@@ -1,18 +1,18 @@
 import { BN } from 'ethereumjs-util';
-import { TimeoutInfo } from './types';
+import { StateMachineTimeout } from './stateMessages';
 
 export class TimeoutTicker {
   private maxHeight?: BN;
   private maxRound?: number;
   private maxStep?: number;
   private timeout?: NodeJS.Timeout;
-  private onTimeout: (ti: TimeoutInfo) => void;
+  private onTimeout: (ti: StateMachineTimeout) => void;
 
-  constructor(onTimeout: (ti: TimeoutInfo) => void) {
+  constructor(onTimeout: (ti: StateMachineTimeout) => void) {
     this.onTimeout = onTimeout;
   }
 
-  schedule(ti: TimeoutInfo) {
+  schedule(ti: StateMachineTimeout) {
     if (this.maxHeight === undefined || this.maxHeight.lt(ti.height)) {
       this.maxHeight = ti.height.clone();
       this.maxRound = ti.round;

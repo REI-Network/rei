@@ -25,7 +25,7 @@ const accMngr = new MockAccountManager([
 ]);
 
 function createValidatorSet(validators: { [name: string]: number | BN }) {
-  const vs = new ValidatorSet(createBufferFunctionalMap<ValidatorInfo>(), [], common);
+  const vs = new ValidatorSet(createBufferFunctionalMap<ValidatorInfo>(), [], Address.zero(), common);
   const changes = new ValidatorChanges(vs);
   for (const [name, votingPower] of Object.entries(validators)) {
     changes.index(accMngr.n2a(name), typeof votingPower === 'number' ? new BN(votingPower) : votingPower);

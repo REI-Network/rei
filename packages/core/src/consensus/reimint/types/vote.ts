@@ -1,7 +1,8 @@
 import { Address, BN, ecsign, ecrecover, rlp, intToBuffer, bnToUnpaddedBuffer, rlphash, bufferToInt } from 'ethereumjs-util';
-import { createBufferFunctionalMap, logger } from '@gxchain2/utils';
+import { createBufferFunctionalMap /*, logger*/ } from '@gxchain2/utils';
 import { ValidatorSet } from '../../../staking';
 import { BitArray } from './bitArray';
+import * as v from './validate';
 
 export class ConflictingVotesError extends Error {
   voteA: Vote;
@@ -13,6 +14,8 @@ export class ConflictingVotesError extends Error {
     this.voteB = voteB;
   }
 }
+
+export class DuplicateVotesError extends Error {}
 
 export enum VoteType {
   Proposal,
@@ -31,14 +34,14 @@ export interface VoteData {
 }
 
 export class Vote {
-  chainId: number;
-  type: VoteType;
-  height: BN;
-  round: number;
-  hash: Buffer;
-  timestamp: number;
-  index: number;
-  signature?: Buffer;
+  readonly chainId: number;
+  readonly type: VoteType;
+  readonly height: BN;
+  readonly round: number;
+  readonly hash: Buffer;
+  readonly timestamp: number;
+  readonly index: number;
+  private _signature?: Buffer;
 
   static fromVoteData(data: VoteData) {
     return new Vote(data);
@@ -79,7 +82,19 @@ export class Vote {
     this.hash = data.hash;
     this.timestamp = data.timestamp;
     this.index = data.index;
-    this.signature = signature;
+    this._signature = signature;
+    this.validateBasic();
+  }
+
+  get signature(): Buffer | undefined {
+    return this._signature;
+  }
+
+  set signature(signature: Buffer | undefined) {
+    if (signature !== undefined) {
+      v.validateSignature(signature);
+      this._signature = signature;
+    }
   }
 
   getMessageToSign() {
@@ -87,7 +102,7 @@ export class Vote {
   }
 
   isSigned() {
-    return !!this.signature;
+    return this._signature && this._signature.length > 0;
   }
 
   sign(privateKey: Buffer) {
@@ -96,10 +111,10 @@ export class Vote {
   }
 
   raw() {
-    if (!this.signature) {
+    if (!this.isSigned()) {
       throw new Error('missing signature');
     }
-    return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.timestamp), intToBuffer(this.index), this.signature];
+    return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.timestamp), intToBuffer(this.index), this._signature!];
   }
 
   serialize() {
@@ -107,26 +122,14 @@ export class Vote {
   }
 
   validateBasic() {
-    if (this.type !== VoteType.Precommit && this.type !== VoteType.Prevote) {
-      throw new Error('invalid vote type');
-    }
-    if (this.height.isNeg()) {
-      throw new Error('invalid height');
-    }
-    if (this.round < 0 || !Number.isSafeInteger(this.round)) {
-      throw new Error('invalid round');
-    }
-    if (this.hash.length !== 32) {
-      throw new Error('invalid hash length');
-    }
-    if (this.timestamp < 0 || !Number.isSafeInteger(this.timestamp)) {
-      throw new Error('invalid timestamp');
-    }
-    if (this.index < 0) {
-      throw new Error('invalid index');
-    }
-    if (this.signature?.length !== 65) {
-      throw new Error('invalid signature length');
+    v.validateVoteType(this.type);
+    v.validateIndex(this.index);
+    v.validateHeight(this.height);
+    v.validateRound(this.round);
+    v.validateHash(this.hash);
+    v.validateTimestamp(this.timestamp);
+    if (this.isSigned()) {
+      v.validateSignature(this._signature!);
     }
   }
 
@@ -142,9 +145,12 @@ export class Vote {
   }
 
   validator() {
-    const r = this.signature!.slice(0, 32);
-    const s = this.signature!.slice(32, 64);
-    const v = new BN(this.signature!.slice(64, 65)).addn(27);
+    if (!this.isSigned()) {
+      throw new Error('missing signature');
+    }
+    const r = this._signature!.slice(0, 32);
+    const s = this._signature!.slice(32, 64);
+    const v = new BN(this._signature!.slice(64, 65)).addn(27);
     return Address.fromPublicKey(ecrecover(this.getMessageToSign(), v, r, s));
   }
 }
@@ -213,7 +219,7 @@ export class VoteSet {
     const validator = vote.validateSignature(this.valSet);
     const votingPower = this.valSet.getVotingPower(validator);
 
-    logger.debug('VoteSet::addVote, add vote for:', validator.toString(), 'voting power:', votingPower.toString());
+    // logger.debug('VoteSet::addVote, add vote for:', validator.toString(), 'voting power:', votingPower.toString());
     return this.addVerifiedVote(vote, votingPower);
   }
 
@@ -236,7 +242,7 @@ export class VoteSet {
     const existing = this.votes[idx];
     if (existing) {
       if (existing.hash.equals(vote.hash)) {
-        throw new Error('unexpected duplicate votes');
+        throw new DuplicateVotesError();
       } else {
         conflicting = existing;
       }
@@ -380,7 +386,6 @@ export class HeightVoteSet {
   }
 
   addVote(vote: Vote, peerId: string) {
-    vote.validateBasic();
     let voteSet = this.getVoteSet(vote.round, vote.type);
     if (voteSet === undefined) {
       let catchupRounds = this.peerCatchupRounds.get(peerId);

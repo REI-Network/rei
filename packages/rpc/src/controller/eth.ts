@@ -7,8 +7,8 @@ import { Controller, CallData } from './base';
 
 type TopicsData = (string | null | (string | null)[])[];
 
-function parseAddressesAndTopics(_addresses?: string[], _topics?: TopicsData) {
-  const addresses: Address[] = _addresses ? _addresses.map((addr) => Address.fromString(addr)) : [];
+function parseAddressesAndTopics(_addresses?: string | string[], _topics?: TopicsData) {
+  const addresses: Address[] = typeof _addresses === 'string' ? [Address.fromString(_addresses)] : _addresses?.map((addr) => Address.fromString(addr)) ?? [];
   const topics: (Buffer | null | (Buffer | null)[])[] = _topics
     ? _topics.map((topic) => {
         if (topic === null) {
@@ -243,7 +243,7 @@ export class ETHController extends Controller {
   eth_compileSerpent() {
     helper.throwRpcErr('Unsupported compiler!');
   }
-  async eth_newFilter([{ fromBlock, toBlock, address: _addresses, topics: _topics }]: [{ fromBlock?: string; toBlock?: string; address?: string[]; topics?: TopicsData; blockhash?: string }]) {
+  async eth_newFilter([{ fromBlock, toBlock, address: _addresses, topics: _topics }]: [{ fromBlock?: string; toBlock?: string; address?: string | string[]; topics?: TopicsData; blockhash?: string }]) {
     const from = await this.getBlockNumberByTag(fromBlock ? fromBlock : 'latest');
     const to = await this.getBlockNumberByTag(toBlock ? toBlock : 'latest');
     const { addresses, topics } = parseAddressesAndTopics(_addresses, _topics);
@@ -281,7 +281,7 @@ export class ETHController extends Controller {
     const logs = await filter.filterRange(from, to, addresses, topics);
     return logs.map((log) => log.toRPCJSON());
   }
-  async eth_getLogs([{ fromBlock, toBlock, address: _addresses, topics: _topics, blockhash }]: [{ fromBlock?: string; toBlock?: string; address?: string[]; topics?: TopicsData; blockhash?: string }]) {
+  async eth_getLogs([{ fromBlock, toBlock, address: _addresses, topics: _topics, blockhash }]: [{ fromBlock?: string; toBlock?: string; address?: string | string[]; topics?: TopicsData; blockhash?: string }]) {
     const from = await this.getBlockNumberByTag(fromBlock ? fromBlock : 'latest');
     const to = await this.getBlockNumberByTag(toBlock ? toBlock : 'latest');
     const { addresses, topics } = parseAddressesAndTopics(_addresses, _topics);
@@ -301,7 +301,7 @@ export class ETHController extends Controller {
   eth_unsubscribe([id]: [string]) {
     return this.filterSystem.unsubscribe(id);
   }
-  async eth_subscribe([type, options]: [string, undefined | { address?: string[]; topics?: TopicsData }], context: RpcContext) {
+  async eth_subscribe([type, options]: [string, undefined | { address?: string | string[]; topics?: TopicsData }], context: RpcContext) {
     if (!context.client) {
       helper.throwRpcErr('eth_subscribe is only supported on websocket!');
       // for types.

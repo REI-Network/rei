@@ -1,34 +1,32 @@
-import { BN, KECCAK256_RLP_ARRAY, Address } from 'ethereumjs-util';
+import { BN, KECCAK256_RLP_ARRAY, BNLike } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
+import VM from '@gxchain2-ethereumjs/vm';
 import Bloom from '@gxchain2-ethereumjs/vm/dist/bloom';
 import { RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
 import { Transaction, calcTransactionTrie, HeaderData } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
 import { Common } from '@gxchain2/common';
 import { PendingTxMap } from '../txpool';
-import { makeRunBlockCallback, processTx } from '../vm';
-import { Node } from '../node';
-import { ValidatorSet } from '../staking';
-import { StakeManager } from '../contracts';
-import { ConsensusEngine } from '../consensus';
-import { isEnableStaking } from '../hardforks';
+import { ConsensusEngine, FinalizeOpts } from './types';
+import { EMPTY_ADDRESS, EMPTY_NONCE, EMPTY_MIX_HASH, EMPTY_EXTRA_DATA } from '../utils';
 
-const EMPTY_ADDRESS = Address.zero();
-const EMPTY_MIX_HASH = Buffer.alloc(32);
-const EMPTY_NONCE = Buffer.alloc(8);
-const EMPTY_EXTRA_DATA = Buffer.alloc(32);
+export interface PendingBlockFinalizeOpts extends Pick<FinalizeOpts, 'round'> {}
+
+export interface PendingBlockBackend {
+  getVM(root: Buffer, num: BNLike | Common): Promise<VM>;
+}
 
 export class PendingBlock {
+  private backend: PendingBlockBackend;
   private engine: ConsensusEngine;
-  private node: Node;
   private lock = new Semaphore(1);
 
   private _common: Common;
   private _parentHash: Buffer;
-  private parentStateRoot: Buffer;
+  private _parentStateRoot: Buffer;
   private _number: BN;
   private _timestamp: BN;
-  private extraData: Buffer;
+  private _extraData: Buffer;
 
   private difficulty?: BN;
   private gasLimit?: BN;
@@ -48,20 +46,18 @@ export class PendingBlock {
   private transactionsTrie?: Buffer;
   private finalizedStateRoot?: Buffer;
 
-  private times?: number;
-
-  constructor(parentHash: Buffer, parentStateRoot: Buffer, number: BN, timestamp: BN, common: Common, engine: ConsensusEngine, node: Node, extraData?: Buffer) {
+  constructor(backend: PendingBlockBackend, engine: ConsensusEngine, parentHash: Buffer, parentStateRoot: Buffer, number: BN, timestamp: BN, common: Common, extraData?: Buffer) {
     if (extraData && extraData.length !== 32) {
       throw new Error('invalid extra data length');
     }
+    this.backend = backend;
     this.engine = engine;
-    this.node = node;
     this._common = common;
     this._parentHash = parentHash;
-    this.parentStateRoot = parentStateRoot;
+    this._parentStateRoot = parentStateRoot;
     this._number = number.clone();
     this._timestamp = timestamp.clone();
-    this.extraData = extraData ?? EMPTY_EXTRA_DATA;
+    this._extraData = extraData ?? EMPTY_EXTRA_DATA;
   }
 
   get parentHash() {
@@ -80,21 +76,16 @@ export class PendingBlock {
     return this._timestamp.toNumber();
   }
 
+  get pendingStateRoot() {
+    return this.finalizedStateRoot ?? this.latestStateRoot ?? this._parentStateRoot;
+  }
+
   get isCompleted() {
     return this.difficulty !== undefined && this.gasLimit !== undefined;
   }
 
   get isFinalized() {
     return !!this.finalizedStateRoot;
-  }
-
-  /**
-   * Create a simple signed block through engine,
-   * notice: it may be incompleted
-   * @returns Block
-   */
-  toSimpleSignedBlock() {
-    return this.engine.simpleSignBlock(this.toHeaderData(), this._common);
   }
 
   /**
@@ -106,7 +97,7 @@ export class PendingBlock {
       parentHash: this._parentHash,
       number: this._number,
       timestamp: this._timestamp,
-      extraData: this.extraData,
+      extraData: this._extraData,
       difficulty: this.difficulty,
       gasLimit: this.gasLimit,
       nonce: this.nonce,
@@ -158,10 +149,10 @@ export class PendingBlock {
   appendTxs(txs: PendingTxMap) {
     return this.runWithLock(async () => {
       // create a empty block for execute transaction
-      const pendingBlock = this.toSimpleSignedBlock();
+      const pendingBlock = this.engine.generatePendingBlock(this.toHeaderData(), this._common);
       const gasLimit = pendingBlock.header.gasLimit;
       // create vm instance
-      const vm = await this.node.getVM(this.latestStateRoot ?? this.parentStateRoot, this._common);
+      const vm = await this.backend.getVM(this.latestStateRoot ?? this._parentStateRoot, this._common);
 
       let tx = txs.peek();
       while (tx) {
@@ -171,7 +162,7 @@ export class PendingBlock {
           let txRes: RunTxResult;
           tx = Transaction.fromTxData({ ...tx }, { common: this._common });
           try {
-            txRes = await processTx.bind(this.node)({
+            txRes = await this.engine.processTx({
               vm,
               tx,
               block: pendingBlock
@@ -201,7 +192,6 @@ export class PendingBlock {
             this.receiptTrie = undefined;
             this.transactionsTrie = undefined;
             this.finalizedStateRoot = undefined;
-            this.times = undefined;
 
             txs.shift();
           }
@@ -229,51 +219,27 @@ export class PendingBlock {
    * Finalize the pending block,
    * it will assign block rewards to miner
    * and do other things...
-   * @param times - Increase the number of times the proposer priority of the parent validator set,
-   *                this arg is used for reimint consensus engine
+   * @param options - Finalize options
    * @returns makeBlockData result
    */
-  finalize(times?: number) {
+  finalize(options?: PendingBlockFinalizeOpts) {
     this.requireCompleted();
     return this.runWithLock(async () => {
-      if (this.finalizedStateRoot && this.times === times) {
+      if (this.finalizedStateRoot) {
         return this.makeBlockData();
       }
 
-      const pendingBlock = this.toSimpleSignedBlock();
-      const enableStaking = isEnableStaking(this._common);
-      // create vm instance
-      const vm = await this.node.getVM(this.latestStateRoot ?? this.parentStateRoot, this._common);
-      let parentValidatorSet: ValidatorSet | undefined;
-      let parentStakeManager: StakeManager | undefined;
-      if (enableStaking) {
-        parentStakeManager = this.node.getStakeManager(vm, pendingBlock);
-        parentValidatorSet = await this.node.validatorSets.get(this.parentStateRoot, parentStakeManager);
-        if (times) {
-          parentValidatorSet = parentValidatorSet.copy();
-          parentValidatorSet.incrementProposerPriority(times);
-        }
-      }
-
-      const { genReceiptTrie, assignBlockReward, afterApply } = await makeRunBlockCallback(this.node, vm, this.engine, pendingBlock, undefined, parentStakeManager, parentValidatorSet);
-
-      const minerReward = new BN(this._common.param('pow', 'minerReward'));
-      await vm.stateManager.checkpoint();
-      try {
-        await assignBlockReward(vm.stateManager, minerReward);
-        await afterApply(vm.stateManager, { receipts: this.transactionResults.map(({ receipt }) => receipt) });
-        await vm.stateManager.commit();
-        this.finalizedStateRoot = await vm.stateManager.getStateRoot();
-      } catch (err) {
-        await vm.stateManager.revert();
-        throw err;
-      }
-
-      // calculate receipt trie
-      this.receiptTrie = await genReceiptTrie(
-        this.transactions,
-        this.transactionResults.map(({ receipt }) => receipt)
-      );
+      // calculate finalizedStateRoot and receiptTrie
+      const { finalizedStateRoot, receiptTrie } = await this.engine.finalize({
+        ...options,
+        receipts: this.transactionResults.map(({ receipt }) => receipt),
+        block: this.engine.generatePendingBlock(this.toHeaderData(), this._common),
+        stateRoot: this.latestStateRoot ?? this._parentStateRoot,
+        parentStateRoot: this._parentStateRoot,
+        transactions: this.transactions
+      });
+      this.finalizedStateRoot = finalizedStateRoot;
+      this.receiptTrie = receiptTrie;
 
       // calculate transactions trie
       this.transactionsTrie = await calcTransactionTrie(this.transactions);
@@ -285,8 +251,6 @@ export class PendingBlock {
       }
       this.bloom = bloom.bitvector;
 
-      // save times
-      this.times = times;
       return this.makeBlockData();
     });
   }

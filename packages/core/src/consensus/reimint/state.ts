@@ -5,7 +5,38 @@ import { ValidatorSet } from '../../staking';
 import { PendingBlock } from '../pendingBlock';
 import { isEmptyHash, EMPTY_HASH } from '../../utils';
 import { Reimint } from './reimint';
-import { TimeoutTicker, StateMachineMessage, StateMachineTimeout, StateMachineEndHeight, StateMachineMsg, IStateMachineBackend, ISigner, IConfig, IEvidencePool, IWAL, RoundStepType, Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage, HeightVoteSet, Vote, VoteType, ConflictingVotesError, DuplicateVotesError, Proposal, Evidence, DuplicateVoteEvidence, ExtraData } from './types';
+import {
+  TimeoutTicker,
+  StateMachineMessage,
+  StateMachineTimeout,
+  StateMachineEndHeight,
+  StateMachineMsg,
+  IStateMachineBackend,
+  ISigner,
+  IConfig,
+  IEvidencePool,
+  IWAL,
+  RoundStepType,
+  Message,
+  NewRoundStepMessage,
+  NewValidBlockMessage,
+  VoteMessage,
+  ProposalBlockMessage,
+  ProposalRawBlockMessage,
+  GetProposalBlockMessage,
+  ProposalMessage,
+  HasVoteMessage,
+  VoteSetBitsMessage,
+  HeightVoteSet,
+  Vote,
+  VoteType,
+  ConflictingVotesError,
+  DuplicateVotesError,
+  Proposal,
+  Evidence,
+  DuplicateVoteEvidence,
+  ExtraData
+} from './types';
 
 const SkipTimeoutCommit = true;
 const WaitForTxs = true;
@@ -83,10 +114,17 @@ export class StateMachine {
     for await (const msg of this.msgQueue.generator()) {
       try {
         if (msg instanceof StateMachineMessage) {
-          const result = await this.wal.write(msg);
-          if (msg.peerId === '' && !result) {
+          let writeMsg = msg;
+          if (msg.msg instanceof ProposalBlockMessage) {
+            writeMsg = new StateMachineMessage(msg.peerId, new ProposalRawBlockMessage(msg.msg.block.raw()));
+          }
+
+          const internal = msg.peerId === '';
+          const result = await this.wal.write(writeMsg, internal);
+          if (internal && !result) {
             throw new Error('internal message write failed');
           }
+
           this.handleMsg(msg);
         } else if (msg instanceof StateMachineTimeout) {
           await this.wal.write(msg);
@@ -730,14 +768,18 @@ export class StateMachine {
       return;
     }
 
-    this.backend
-      .executeBlock(finalizedBlock, { broadcast: true })
-      .then(() => {
-        logger.info('⛏️  Mine block, height:', finalizedBlock.header.number.toString(), 'hash:', bufferToHex(finalizedBlock.hash()));
-      })
-      .catch((err) => {
-        logger.error('StateMachine::tryFinalizeCommit, catch error:', err);
-      });
+    this.wal.write(new StateMachineEndHeight(height), true).then(async (succeed) => {
+      if (succeed) {
+        try {
+          await this.backend.executeBlock(finalizedBlock, { broadcast: true });
+          logger.info('⛏️  Mine block, height:', finalizedBlock.header.number.toString(), 'hash:', bufferToHex(finalizedBlock.hash()));
+        } catch (err) {
+          logger.error('StateMachine::tryFinalizeCommit, catch error:', err);
+        }
+      } else {
+        logger.error('StateMachine::tryFinalizeCommit, write ahead log failed');
+      }
+    });
   }
 
   //////////////////////////////////////
@@ -747,7 +789,7 @@ export class StateMachine {
       throw new Error('height is undefined');
     }
 
-    logger.debug('StateMachine::replay, start');
+    logger.debug('StateMachine::replay, start, local height:', this.height.toString());
 
     const height = this.height.clone();
     let reader = await this.wal.searchForEndHeight(height);
@@ -767,15 +809,34 @@ export class StateMachine {
       let message: StateMachineMsg | undefined;
       while ((message = await reader.read())) {
         if (message instanceof StateMachineMessage) {
-          this.handleMsg(message);
+          const msg = message.msg;
+
+          if (msg instanceof VoteMessage) {
+            const vote = msg.vote;
+            logger.debug('StateMachine::replay, vote, height:', vote.height.toString(), 'round:', vote.round, 'type:', vote.type, 'hash:', bufferToHex(vote.hash), 'validator:', vote.validator().toString(), 'from:', message.peerId);
+          } else if (msg instanceof ProposalRawBlockMessage) {
+            // create block instance from block buffer
+            const block = Block.fromValuesArray(msg.rawBlock, { common: this.backend.getCommon(0), hardforkByBlockNumber: true });
+            message = new StateMachineMessage(message.peerId, new ProposalBlockMessage(block));
+            logger.debug('StateMachine::replay, block, height:', block.header.number.toString(), 'from:', (message as StateMachineMessage).peerId);
+          } else if (msg instanceof ProposalMessage) {
+            const proposal = msg.proposal;
+            logger.debug('StateMachine::replay, proposal, height:', proposal.height.toString(), 'round:', proposal.round, 'hash:', bufferToHex(proposal.hash), 'proposer:', proposal.proposer().toString(), 'from:', message.peerId);
+          } else {
+            logger.warn('StateMachine::replay, something is wrong, invalid message:', message);
+            continue;
+          }
+
+          this.handleMsg(message as StateMachineMessage);
         } else if (message instanceof StateMachineTimeout) {
+          logger.debug('StateMachine::replay, timeout, height:', message.height.toString(), 'round:', message.round, 'step:', message.step);
           this.handleTimeout(message);
         } else if (message instanceof StateMachineEndHeight) {
           logger.warn('StateMachine::replay, something is wrong, read end height message of:', message.height.toString());
-          break;
+          continue;
         } else {
           logger.error('StateMachine::replay, unknown message:', message);
-          break;
+          continue;
         }
       }
       await reader.close();

@@ -27,7 +27,8 @@ registerMessage([
   [m.VoteSetMaj23Message, 6],
   [m.VoteSetBitsMessage, 7],
   [m.GetProposalBlockMessage, 8],
-  [m.ProposalBlockMessage, 9]
+  [m.ProposalBlockMessage, 9],
+  [m.ProposalRawBlockMessage, 10]
 ]);
 
 export class MessageFactory {

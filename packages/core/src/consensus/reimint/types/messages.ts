@@ -182,6 +182,31 @@ export class ProposalBlockMessage implements Message {
   }
 }
 
+export class ProposalRawBlockMessage implements Message {
+  readonly rawBlock: BlockBuffer;
+
+  constructor(rawBlock: BlockBuffer) {
+    this.rawBlock = rawBlock;
+    this.validateBasic();
+  }
+
+  static fromValuesArray(values: BlockBuffer) {
+    return new ProposalRawBlockMessage(values);
+  }
+
+  raw() {
+    return this.rawBlock;
+  }
+
+  serialize() {
+    return rlp.encode(this.raw());
+  }
+
+  validateBasic() {
+    // no thing
+  }
+}
+
 export class VoteMessage implements Message {
   readonly vote: Vote;
 

@@ -1,5 +1,6 @@
-import { Address, BN } from 'ethereumjs-util';
+import { Address, BN, BNLike } from 'ethereumjs-util';
 import { Block } from '@gxchain2/structure';
+import { Common } from '@gxchain2/common';
 import { StateMachineMsg } from './stateMessages';
 import { Message } from './messages';
 import { Evidence } from './evidence';
@@ -44,6 +45,7 @@ export interface SendMessageOptions {
 }
 
 export interface IStateMachineBackend {
+  getCommon(num: BNLike): Common;
   broadcastMessage(msg: Message, options: SendMessageOptions): void;
   executeBlock(block: Block, options: any /*TODO*/): Promise<boolean>;
 }

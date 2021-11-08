@@ -1,4 +1,5 @@
-import { Address, BN, ecsign, intToBuffer } from 'ethereumjs-util';
+import path from 'path';
+import { Address, BN, BNLike, ecsign, intToBuffer } from 'ethereumjs-util';
 import VM from '@gxchain2-ethereumjs/vm';
 import { RunBlockOpts, rewardAccount } from '@gxchain2-ethereumjs/vm/dist/runBlock';
 import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
@@ -67,7 +68,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     if (!isEmptyAddress(this.coinbase) && this.node.accMngr.hasUnlockedAccount(this.coinbase)) {
       this.signer = new SimpleNodeSigner(this.node);
     }
-    this.state = new StateMachine(this, this.evpool, new WAL({ path: options.node.datadir }), this.node.getChainId(), this.config, this.signer);
+    this.state = new StateMachine(this, this.evpool, new WAL({ path: path.join(options.node.datadir, 'WAL') }), this.node.getChainId(), this.config, this.signer);
   }
 
   protected _start() {
@@ -108,6 +109,12 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     if (!this.state.isStarted) {
       this.state.start();
     }
+  }
+
+  ///////////// Backend Logic ////////////////
+
+  getCommon(num: BNLike) {
+    return this.node.getCommon(num);
   }
 
   /**
@@ -151,7 +158,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     });
   }
 
-  /////////////////////////////
+  ///////////// Backend Logic ////////////////
 
   /**
    * Assign block reward to miner,

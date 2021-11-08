@@ -1,6 +1,7 @@
 import { bufferToInt, intToBuffer, setLengthLeft, BN } from 'ethereumjs-util';
 import { logger } from '@gxchain2/utils';
-import { StateMachineMsg, StateMachineMsgFactory, StateMachineEndHeight } from '../state/types';
+import { StateMachineMsg, StateMachineEndHeight } from './stateMessages';
+import { StateMachineMsgFactory } from './stateMessageFactory';
 import { FileGroup, GroupFileReader } from './fileGroup';
 import { crc32 } from './crc32';
 
@@ -12,6 +13,7 @@ export interface WALOptions {
   flushInterval?: number;
 }
 
+// run async function and ignore all errors
 function runAndIgnoreErrors<T>(fn: () => Promise<T>): Promise<T | void> {
   return fn().catch(() => {});
 }
@@ -48,6 +50,9 @@ export class WAL {
     }, this.flushInterval);
   }
 
+  /**
+   * Open WAL
+   */
   async open() {
     try {
       await this.group.open();
@@ -63,12 +68,18 @@ export class WAL {
     }
   }
 
+  /**
+   * Clear all files in the WAL directory
+   */
   clear() {
     return runAndIgnoreErrors(() => {
       return this.group.clear();
     });
   }
 
+  /**
+   * Close WAL and release the file handler
+   */
   async close() {
     if (this.timeout) {
       clearTimeout(this.timeout);
@@ -80,6 +91,12 @@ export class WAL {
     });
   }
 
+  /**
+   * Encode and write state machine message to WAL
+   * @param message - State machine message
+   * @param flush - Whether to flush to disk
+   * @returns Whether succeed
+   */
   async write(message: StateMachineMsg, flush?: boolean) {
     const data = StateMachineMsgFactory.serializeMessage(message);
     if (data.length > maxMsgSize) {
@@ -103,6 +120,11 @@ export class WAL {
     }));
   }
 
+  /**
+   * Search for target height EndHeightMessage from the beginning
+   * @param height - Target height
+   * @returns WALReader, if found
+   */
   async searchForEndHeight(height: BN) {
     const reader = this.newReader();
     try {
@@ -119,8 +141,13 @@ export class WAL {
     }
   }
 
-  newReader(index?: number) {
-    return new WALReader(this.group.newReader(index));
+  /**
+   * Create a new WALReader
+   * @param index
+   * @returns WALReader
+   */
+  newReader() {
+    return new WALReader(this.group.newReader());
   }
 }
 
@@ -131,12 +158,20 @@ export class WALReader {
     this.reader = reader;
   }
 
+  /**
+   * Close WALReader
+   */
   close() {
     return runAndIgnoreErrors(() => {
       return this.reader.close();
     });
   }
 
+  /**
+   * Read next state machine message from WAL,
+   * if the state machine message doesn't exist, return undefined,
+   * if the data is wrong, throw a error
+   */
   async read(): Promise<StateMachineMsg | undefined> {
     const crcBuffer = Buffer.alloc(4);
     if (!(await this.reader.read(crcBuffer))) {

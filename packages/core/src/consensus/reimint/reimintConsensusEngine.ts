@@ -9,11 +9,11 @@ import { StakeManager, Router } from '../../contracts';
 import { ValidatorSet, ValidatorChanges } from '../../staking';
 import { Node, ProcessBlockOptions } from '../../node';
 import { ConsensusProtocol } from '../../protocols/consensus';
-import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from '../types';
 import { isEmptyAddress, postByzantiumTxReceiptsToReceipts, getGasLimitByCommon } from '../../utils';
+import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from '../types';
 import { BaseConsensusEngine } from '../baseConsensusEngine';
-import { ExtraData, EvidencePool, EvidenceDatabase, Message } from './types';
-import { StateMachine, SendMessageOptions } from './state';
+import { ExtraData, EvidencePool, EvidenceDatabase, Message, SendMessageOptions } from './types';
+import { StateMachine } from './state';
 import { Reimint } from './reimint';
 import { makeRunTxCallback } from './makeRunTxCallback';
 
@@ -67,7 +67,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     if (!isEmptyAddress(this.coinbase) && this.node.accMngr.hasUnlockedAccount(this.coinbase)) {
       this.signer = new SimpleNodeSigner(this.node);
     }
-    this.state = new StateMachine(this, this.evpool, this.node.getChainId(), this.config, this.signer);
+    this.state = new StateMachine(this, this.evpool, 1 as any, this.node.getChainId(), this.config, this.signer);
   }
 
   protected _start() {
@@ -75,7 +75,6 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     this.evpool.init(this.node.blockchain.latestBlock.header.number).catch((err) => {
       logger.error('ReimintConsensusEngine::_start, evpool init error:', err);
     });
-    this.state.start();
   }
 
   protected async _abort() {
@@ -106,6 +105,9 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     }
 
     this.state.newBlockHeader(header, validators, pendingBlock);
+    if (!this.state.isStarted) {
+      this.state.start();
+    }
   }
 
   /**

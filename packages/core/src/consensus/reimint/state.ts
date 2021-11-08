@@ -1,37 +1,34 @@
 import { BN, bufferToHex } from 'ethereumjs-util';
 import { Channel, logger } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/structure';
-import { ValidatorSet } from '../../../staking';
-import { PendingBlock } from '../../pendingBlock';
-import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, DuplicateVotesError, Proposal, Evidence, DuplicateVoteEvidence, ExtraData } from '../types';
-import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from '../types/messages';
-import { isEmptyHash, EMPTY_HASH } from '../../../utils';
-import { Reimint } from '../reimint';
-import { TimeoutTicker } from './timeoutTicker';
-import { StateMachineMessage, StateMachineTimeout, StateMachineMsg, StateMachineMsgFactory, StateMachineBackend, Signer, Config, EvidencePool, RoundStepType } from './types';
+import { ValidatorSet } from '../../staking';
+import { PendingBlock } from '../pendingBlock';
+import { isEmptyHash, EMPTY_HASH } from '../../utils';
+import { Reimint } from './reimint';
+import { TimeoutTicker, StateMachineMessage, StateMachineTimeout, StateMachineEndHeight, StateMachineMsg, IStateMachineBackend, ISigner, IConfig, IEvidencePool, IWAL, RoundStepType, Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage, HeightVoteSet, Vote, VoteType, ConflictingVotesError, DuplicateVotesError, Proposal, Evidence, DuplicateVoteEvidence, ExtraData } from './types';
 
 const SkipTimeoutCommit = true;
 const WaitForTxs = true;
 const CreateEmptyBlocksInterval = 0;
-const StateMachineMsgQueueMaxSize = 10;
+const StateMachineMsgQueueMaxSize = 100;
 
 export class StateMachine {
   private readonly chainId: number;
-  private readonly backend: StateMachineBackend;
-  // TODO:
-  private readonly signer?: Signer;
-  private readonly config: Config;
-  // TODO:
-  private readonly evpool: EvidencePool;
+  private readonly backend: IStateMachineBackend;
   private readonly timeoutTicker = new TimeoutTicker((ti) => {
     this._newMessage(ti);
   });
 
+  private readonly signer?: ISigner;
+  private readonly config: IConfig;
+  private readonly evpool: IEvidencePool;
+  private readonly wal: IWAL;
+
   private msgLoopPromise?: Promise<void>;
   private readonly msgQueue = new Channel<StateMachineMsg>({
     max: StateMachineMsgQueueMaxSize,
-    drop: (smsg) => {
-      logger.warn('StateMachine::drop, too many messages, drop:', smsg);
+    drop: (message) => {
+      logger.warn('StateMachine::drop, too many messages, drop:', message);
     }
   });
 
@@ -64,10 +61,11 @@ export class StateMachine {
   private commitRound: number = -1;
   /////////////// RoundState ///////////////
 
-  constructor(backend: StateMachineBackend, evpool: EvidencePool, chainId: number, config: Config, signer?: Signer) {
+  constructor(backend: IStateMachineBackend, evpool: IEvidencePool, wal: IWAL, chainId: number, config: IConfig, signer?: ISigner) {
     this.backend = backend;
     this.chainId = chainId;
     this.evpool = evpool;
+    this.wal = wal;
     this.config = config;
     this.signer = signer;
   }
@@ -77,17 +75,26 @@ export class StateMachine {
   }
 
   async msgLoop() {
+    // open WAL
+    await this.wal.open();
+    // replay from WAL files
+    await this.replay();
+    // message loop
     for await (const msg of this.msgQueue.generator()) {
       try {
         if (msg instanceof StateMachineMessage) {
+          await this.wal.write(msg);
           this.handleMsg(msg);
         } else if (msg instanceof StateMachineTimeout) {
+          await this.wal.write(msg);
           this.handleTimeout(msg);
         }
       } catch (err) {
         logger.error('State::msgLoop, catch error:', err);
       }
     }
+    // close WAL
+    await this.wal.close();
   }
 
   private handleMsg(mi: StateMachineMessage) {
@@ -732,7 +739,56 @@ export class StateMachine {
 
   //////////////////////////////////////
 
-  get started() {
+  private async replay() {
+    if (this.height === undefined) {
+      throw new Error('height is undefined');
+    }
+
+    logger.debug('StateMachine::replay, start');
+
+    const height = this.height.clone();
+    let reader = await this.wal.searchForEndHeight(height);
+    if (reader !== undefined) {
+      await reader.close();
+      logger.debug('StateMachine::replay, height:', height.toString(), 'should not contain StateMachineEndHeightMessage');
+      return;
+    }
+
+    reader = await this.wal.searchForEndHeight(height.subn(1));
+    if (reader === undefined) {
+      logger.debug('StateMachine::replay, height:', height.subn(1).toString(), 'has nothing to replay');
+      return;
+    }
+
+    try {
+      let message: StateMachineMsg | undefined;
+      while ((message = await reader.read())) {
+        if (message instanceof StateMachineMessage) {
+          this.handleMsg(message);
+        } else if (message instanceof StateMachineTimeout) {
+          this.handleTimeout(message);
+        } else if (message instanceof StateMachineEndHeight) {
+          logger.warn('StateMachine::replay, something is wrong, read end height message of:', message.height.toString());
+          break;
+        } else {
+          logger.error('StateMachine::replay, unknown message:', message);
+          break;
+        }
+      }
+      await reader.close();
+    } catch (err: any) {
+      await reader.close();
+      // clear WAL files and reopen
+      await this.wal.clear();
+      await this.wal.open();
+      logger.error('StateMachine::replay, catch error:', err);
+    } finally {
+      logger.debug('StateMachine::replay, over');
+    }
+  }
+
+  //////////////////////////////////////
+  get isStarted() {
     return !!this.msgLoopPromise;
   }
 
@@ -756,8 +812,8 @@ export class StateMachine {
     this.timeoutTicker.schedule(new StateMachineTimeout(duration, height, round, step));
   }
 
-  private _newMessage(smsg: StateMachineMsg) {
-    this.msgQueue.push(smsg);
+  private _newMessage(message: StateMachineMsg) {
+    this.msgQueue.push(message);
   }
 
   newBlockHeader(header: BlockHeader, validators: ValidatorSet, pendingBlock: PendingBlock) {
@@ -796,7 +852,7 @@ export class StateMachine {
   }
 
   newMessage(peerId: string, msg: Message) {
-    if (this.started) {
+    if (this.isStarted) {
       this._newMessage(new StateMachineMessage(peerId, msg));
     }
   }

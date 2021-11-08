@@ -4,9 +4,8 @@ import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
 import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
 import { Common } from '@gxchain2/common';
 import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@gxchain2/structure';
-import { ExtraData, Proposal, VoteType, VoteSet, Evidence } from './types';
+import { ExtraData, Proposal, VoteType, VoteSet, Evidence, ISigner } from './types';
 import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../../utils';
-import { Signer } from './state';
 
 const defaultRound = 0;
 const defaultPOLRound = -1;
@@ -41,7 +40,7 @@ export function formatHeaderData(data?: HeaderData) {
 
 export interface ReimintBlockOptions extends BlockOptions {
   // whether try to sign the block
-  signer?: Signer;
+  signer?: ISigner;
 
   // reimint round
   round?: number;
@@ -67,13 +66,13 @@ export interface ReimintBlockOptions extends BlockOptions {
 }
 
 export interface ReimintBlockOptions_SignerExists extends Omit<ReimintBlockOptions, 'signer'> {
-  signer: Signer;
+  signer: ISigner;
 }
 
 export interface ReimintBlockOptions_SignerNotExists extends Omit<ReimintBlockOptions, 'signer'> {}
 
 export class Reimint {
-  // disable contructor
+  // disable constructor
   private constructor() {}
 
   /**

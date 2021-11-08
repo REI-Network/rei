@@ -1,6 +1,6 @@
 import { rlp, BN, bnToUnpaddedBuffer, intToBuffer, bufferToInt } from 'ethereumjs-util';
 import { Block, BlockBuffer, BlockOptions } from '@gxchain2/structure';
-import { RoundStepType } from '../state';
+import { RoundStepType } from './roundStepType';
 import { Proposal } from './proposal';
 import { BitArray, BitArrayRaw } from './bitArray';
 import { Vote, VoteType } from './vote';

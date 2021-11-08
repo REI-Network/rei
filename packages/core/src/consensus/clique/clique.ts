@@ -6,7 +6,7 @@ import { Blockchain } from '@gxchain2/blockchain';
 import { TypedTransaction, BlockHeader, Block, CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@gxchain2/structure';
 
 export class Clique {
-  // disable contructor
+  // disable constructor
   private constructor() {}
 
   /**

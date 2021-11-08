@@ -1,10 +1,8 @@
 import { rlp, BN } from 'ethereumjs-util';
 import { logger } from '@gxchain2/utils';
 import { ReimintConsensusEngine } from '../../consensus/reimint/reimintConsensusEngine';
-import { RoundStepType } from '../../consensus/reimint/state';
-import { Proposal, BitArray, VoteType, VoteSet } from '../../consensus/reimint/types';
+import { RoundStepType, Proposal, BitArray, VoteType, VoteSet, MessageFactory } from '../../consensus/reimint/types';
 import * as m from '../../consensus/reimint/types/messages';
-import { MessageFactory } from '../../consensus/reimint/types/messageFactory';
 import { HandlerBase, HandlerFunc, HandlerBaseOptions } from '../handlerBase';
 import { ConsensusProtocol } from './protocol';
 

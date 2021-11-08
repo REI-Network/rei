@@ -1,5 +1,3 @@
-console.log('enter RoundStepType');
-
 export enum RoundStepType {
   NewHeight = 1,
   NewRound,
@@ -10,5 +8,3 @@ export enum RoundStepType {
   PrecommitWait,
   Commit
 }
-
-console.log('leave RoundStepType');

@@ -26,8 +26,8 @@ import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protoco
 import { ValidatorSets } from './staking';
 import { StakeManager, Router } from './contracts';
 import { createEnginesByConsensusTypes, ConsensusEngine, ConsensusType, ProcessBlockOpts } from './consensus';
-import { ReimintConsensusEngine } from './consensus/reimint';
-import { CliqueConsensusEngine } from './consensus/clique';
+import { ReimintConsensusEngine } from './consensus/reimint/reimintConsensusEngine';
+import { CliqueConsensusEngine } from './consensus/clique/cliqueConsensusEngine';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from './utils';
 import { getConsensusTypeByCommon } from './hardforks';
 

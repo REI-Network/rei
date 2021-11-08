@@ -103,16 +103,8 @@ export class WAL {
       throw new Error('invalid data length');
     }
 
-    const crc = crc32(data);
-    const crcBuffer = intToBuffer(crc);
-    if (crcBuffer.length !== 4) {
-      throw new Error('invalid crc buffer length');
-    }
-
+    const crcBuffer = setLengthLeft(intToBuffer(crc32(data)), 4);
     const lengthBuffer = setLengthLeft(intToBuffer(data.length), 4);
-    if (lengthBuffer.length !== 4) {
-      throw new Error('invalid length buffer length');
-    }
 
     return !!(await runAndIgnoreErrors(async () => {
       await this.group.write(Buffer.concat([crcBuffer, lengthBuffer, data]), flush);

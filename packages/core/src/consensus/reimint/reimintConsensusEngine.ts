@@ -12,7 +12,7 @@ import { ConsensusProtocol } from '../../protocols/consensus';
 import { isEmptyAddress, postByzantiumTxReceiptsToReceipts, getGasLimitByCommon } from '../../utils';
 import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from '../types';
 import { BaseConsensusEngine } from '../baseConsensusEngine';
-import { ExtraData, EvidencePool, EvidenceDatabase, Message, SendMessageOptions } from './types';
+import { ExtraData, EvidencePool, EvidenceDatabase, Message, SendMessageOptions, WAL } from './types';
 import { StateMachine } from './state';
 import { Reimint } from './reimint';
 import { makeRunTxCallback } from './makeRunTxCallback';
@@ -67,7 +67,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     if (!isEmptyAddress(this.coinbase) && this.node.accMngr.hasUnlockedAccount(this.coinbase)) {
       this.signer = new SimpleNodeSigner(this.node);
     }
-    this.state = new StateMachine(this, this.evpool, 1 as any, this.node.getChainId(), this.config, this.signer);
+    this.state = new StateMachine(this, this.evpool, new WAL({ path: options.node.datadir }), this.node.getChainId(), this.config, this.signer);
   }
 
   protected _start() {

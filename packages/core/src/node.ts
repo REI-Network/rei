@@ -132,6 +132,7 @@ export class Node {
   public readonly nodedb: LevelUp;
   public readonly evidencedb: LevelUp;
   public readonly networkdb: LevelStore;
+  public readonly datadir: string;
   public readonly aborter = new Aborter();
 
   public db!: Database;
@@ -159,10 +160,11 @@ export class Node {
   private genesisHash!: Buffer;
 
   constructor(options: NodeOptions) {
-    this.chaindb = createEncodingLevelDB(path.join(options.databasePath, 'chaindb'));
-    this.nodedb = createLevelDB(path.join(options.databasePath, 'nodes'));
-    this.evidencedb = createLevelDB(path.join(options.databasePath, 'evidence'));
-    this.networkdb = new LevelStore(path.join(options.databasePath, 'networkdb'), { createIfMissing: true });
+    this.datadir = options.databasePath;
+    this.chaindb = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
+    this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));
+    this.evidencedb = createLevelDB(path.join(this.datadir, 'evidence'));
+    this.networkdb = new LevelStore(path.join(this.datadir, 'networkdb'), { createIfMissing: true });
     this.initPromise = this.init(options);
     this.taskLoopPromise = this.taskLoop();
     this.processLoopPromise = this.processLoop();
@@ -225,7 +227,7 @@ export class Node {
     }
     if (this.chain === undefined) {
       try {
-        this.chain = JSON.parse(fs.readFileSync(path.join(options.databasePath, 'genesis.json')).toString());
+        this.chain = JSON.parse(fs.readFileSync(path.join(this.datadir, 'genesis.json')).toString());
       } catch (err) {
         logger.warn(`Read genesis.json faild, use default chain(${defaultChainName})`);
         this.chain = defaultChainName;
@@ -280,9 +282,9 @@ export class Node {
     await this.blockchain.init();
 
     this.sync = new FullSynchronizer({ node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
-    this.txPool = new TxPool({ node: this, journal: options.databasePath });
+    this.txPool = new TxPool({ node: this, journal: this.datadir });
 
-    const peerId = await this.loadPeerId(options.databasePath);
+    const peerId = await this.loadPeerId(this.datadir);
     await this.networkdb.open();
 
     this.txSync = new TxFetcher(this);

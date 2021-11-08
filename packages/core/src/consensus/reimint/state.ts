@@ -83,7 +83,10 @@ export class StateMachine {
     for await (const msg of this.msgQueue.generator()) {
       try {
         if (msg instanceof StateMachineMessage) {
-          await this.wal.write(msg);
+          const result = await this.wal.write(msg);
+          if (msg.peerId === '' && !result) {
+            throw new Error('internal message write failed');
+          }
           this.handleMsg(msg);
         } else if (msg instanceof StateMachineTimeout) {
           await this.wal.write(msg);
@@ -805,6 +808,7 @@ export class StateMachine {
       await this.msgLoopPromise;
       this.msgQueue.reset();
       this.msgLoopPromise = undefined;
+      await this.wal.close();
     }
   }
 
@@ -817,10 +821,9 @@ export class StateMachine {
   }
 
   newBlockHeader(header: BlockHeader, validators: ValidatorSet, pendingBlock: PendingBlock) {
-    // TODO: pretty this
-    // if (this.commitRound > -1 && this.height.gtn(0) && !this.height.eq(header.number)) {
-    //   throw new Error('newBlockHeader invalid args');
-    // }
+    if (!this.height.eqn(0) && this.height.lt(header.number)) {
+      throw new Error('newBlockHeader invalid args');
+    }
 
     const timestamp = Date.now();
     this.parentHash = header.hash();

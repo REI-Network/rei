@@ -4,8 +4,8 @@ import Semaphore from 'semaphore-async-await';
 import { logger } from '@gxchain2/utils';
 
 const defaultGroupCheckDuration = 5 * 1000;
-const defaultHeadSizeLimit = 10 * 1024 * 1024;
-const defaultTotalSizeLimit = 1 * 1024 * 1024 * 1024;
+const defaultHeadSizeLimit = 10 * 1024 * 1024; // 10MB
+const defaultTotalSizeLimit = 1 * 1024 * 1024 * 1024; // 1GB
 const defaultMaxFilesToRemove = 4;
 
 /**
@@ -120,8 +120,8 @@ export class FileGroup {
       this._minIndex = minIndex;
       this._maxIndex = maxIndex;
       this.head = await fs.open(makeGroupFilePath(this.path, this.base, 0, 0), 'a');
-      this.setTimeout();
       this._isClosed = false;
+      this.setTimeout();
     });
   }
 
@@ -130,15 +130,35 @@ export class FileGroup {
    */
   close() {
     this._isClosed = true;
+    return this.runWithLock(this._close);
+  }
+
+  private _close = async () => {
+    if (this.timeout) {
+      clearTimeout(this.timeout);
+      this.timeout = undefined;
+    }
+    if (this.head) {
+      await this.head?.close();
+      this.head = undefined;
+    }
+  };
+
+  /**
+   * Clear group file dir
+   */
+  clear() {
     return this.runWithLock(async () => {
-      if (this.timeout) {
-        clearTimeout(this.timeout);
-        this.timeout = undefined;
+      // close file handler
+      if (!this._isClosed) {
+        this._isClosed = true;
+        await this._close();
       }
-      if (this.head) {
-        await this.head?.close();
-        this.head = undefined;
-      }
+
+      // remove dir
+      await fs.rm(this.path, { recursive: true, force: true });
+      // make dir
+      await fs.mkdir(this.path);
     });
   }
 
@@ -171,8 +191,8 @@ export class FileGroup {
    * Create a new group file reader
    * @returns Group file reader
    */
-  newReader() {
-    return new GroupFileReader(this, this.minIndex);
+  newReader(index?: number) {
+    return new GroupFileReader(this, index ?? this.minIndex);
   }
 
   /**

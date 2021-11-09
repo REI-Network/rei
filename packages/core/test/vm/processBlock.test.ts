@@ -54,6 +54,7 @@ describe('VM', () => {
     blocks = loadBlocksFromTestData(dirname, 'blocks', 'gxc2-testnet');
   });
 
+  /*
   it('should process first 10 blocks succeed', async () => {
     for (let i = 0; i < 10; i++) {
       await node.processBlock(blocks[i], { broadcast: false });
@@ -121,6 +122,7 @@ describe('VM', () => {
     const receipt = await checkTransaction(block.transactions[0] as Transaction);
     expect(receipt.contractAddress !== undefined, 'contract address should exist').be.true;
   });
+  */
 
   after(async () => {
     await destroyNode(dirname, node);

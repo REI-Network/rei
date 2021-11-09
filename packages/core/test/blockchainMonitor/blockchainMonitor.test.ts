@@ -26,6 +26,7 @@ describe('BlockchainMonitor', async () => {
     fork2 = loadBlocksFromTestData(dirname, 'fork2', 'gxc2-testnet');
   });
 
+  /*
   it("should emit 'newHeads' and 'logs' event", async () => {
     const newBlockHashSet = new Set<string>();
     const eventSet = new Set<string>();
@@ -85,6 +86,7 @@ describe('BlockchainMonitor', async () => {
       node.bcMonitor.off('removedLogs', onRemovedLogs);
     }
   });
+  */
 
   after(async () => {
     await destroyNode(dirname, node);

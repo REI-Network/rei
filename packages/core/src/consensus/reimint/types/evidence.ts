@@ -11,17 +11,6 @@ export interface Evidence {
   validateBasic(): void;
 }
 
-function sortVote(vote1: Vote, vote2: Vote): [Vote, Vote] {
-  if (!vote1.isSigned() || !vote2.isSigned()) {
-    throw new Error('unsigned vote');
-  }
-  const num = vote1.signature!.compare(vote2.signature!);
-  if (num === 0) {
-    throw new Error('invalid equal votes');
-  }
-  return [num > 0 ? vote2 : vote1, num > 0 ? vote1 : vote2];
-}
-
 export class DuplicateVoteEvidence implements Evidence {
   readonly voteA: Vote;
   readonly voteB: Vote;
@@ -36,8 +25,16 @@ export class DuplicateVoteEvidence implements Evidence {
 
   static readonly code = 0;
 
+  static sortVote(vote1: Vote, vote2: Vote): [Vote, Vote] {
+    const num = vote1.hash.compare(vote2.hash);
+    if (num === 0) {
+      throw new Error('invalid votes(same hash)');
+    }
+    return [num > 0 ? vote2 : vote1, num > 0 ? vote1 : vote2];
+  }
+
   static fromVotes(vote1: Vote, vote2: Vote) {
-    return new DuplicateVoteEvidence(...sortVote(vote1, vote2));
+    return new DuplicateVoteEvidence(...DuplicateVoteEvidence.sortVote(vote1, vote2));
   }
 
   static fromValuesArray(values: Buffer[][]) {
@@ -56,7 +53,7 @@ export class DuplicateVoteEvidence implements Evidence {
   verify(valSet: ValidatorSet) {
     const validator = valSet.getValidatorByIndex(this.voteA.index);
     if (!validator.equals(this.voteA.validator())) {
-      throw new Error('invalid validator');
+      throw new Error('invalid votes(validator index)');
     }
   }
 
@@ -73,16 +70,19 @@ export class DuplicateVoteEvidence implements Evidence {
   }
 
   validateBasic(): void {
-    if (!this.voteA.height.eq(this.voteB.height) || this.voteA.round !== this.voteB.round || this.voteA.type !== this.voteB.type || this.voteA.chainId !== this.voteB.chainId || !this.voteA.hash.equals(this.voteB.hash) || this.voteA.index !== this.voteB.index) {
+    if (!this.voteA.isSigned() || !this.voteB.isSigned()) {
+      throw new Error('invalid votes(unsigned)');
+    }
+    if (!this.voteA.height.eq(this.voteB.height) || this.voteA.round !== this.voteB.round || this.voteA.type !== this.voteB.type || this.voteA.chainId !== this.voteB.chainId || this.voteA.index !== this.voteB.index) {
       throw new Error('invalid votes(vote content)');
+    }
+    if (this.voteA.hash.equals(this.voteB.hash)) {
+      throw new Error('invalid votes(same hash)');
     }
     if (!this.voteA.validator().equals(this.voteB.validator())) {
       throw new Error('invalid votes(unequal validator)');
     }
-    if (this.voteA.signature!.equals(this.voteB.signature!)) {
-      throw new Error('invalid votes(same signature)');
-    }
-    const [voteA, voteB] = sortVote(this.voteA, this.voteB);
+    const [voteA, voteB] = DuplicateVoteEvidence.sortVote(this.voteA, this.voteB);
     if (voteA !== this.voteA || voteB !== this.voteB) {
       throw new Error('invalid votes(sort)');
     }

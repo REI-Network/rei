@@ -48,12 +48,16 @@ export function loadBlocksFromTestData(dirname: string, key: string, chain: stri
 
 export class MockAccountManager {
   private nameToAddress = new Map<string, Address>();
+  private nameToPrivKey = new Map<string, Buffer>();
   private addressToName = new FunctionalMap<Address, string>((a: Address, b: Address) => a.buf.compare(b.buf));
 
-  constructor(addresses: [string, Address][]) {
-    for (const [name, address] of addresses) {
+  constructor(addresses: [string, Address][] | [string, Address, Buffer][]) {
+    for (const [name, address, privKey] of addresses) {
       this.nameToAddress.set(name, address);
       this.addressToName.set(address, name);
+      if (privKey) {
+        this.nameToPrivKey.set(name, privKey);
+      }
     }
   }
 
@@ -71,5 +75,17 @@ export class MockAccountManager {
       throw new Error('missing address:' + address.toString());
     }
     return name;
+  }
+
+  n2p(name: string) {
+    const privKey = this.nameToPrivKey.get(name);
+    if (!privKey) {
+      throw new Error('missing name' + name);
+    }
+    return privKey;
+  }
+
+  a2p(address: Address) {
+    return this.n2p(this.a2n(address));
   }
 }

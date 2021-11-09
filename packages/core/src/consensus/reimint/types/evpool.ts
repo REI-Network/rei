@@ -55,6 +55,7 @@ export class EvidencePool {
 
   private async _init(height: BN) {
     try {
+      this.height = height.clone();
       await this.pruneExpiredPendingEvidence();
       await this.backend.loadPendingEvidence({
         // add 1 because we may have collected evidence for the next block
@@ -65,7 +66,6 @@ export class EvidencePool {
           return this.cachedPendingEvidence.length >= this.maxCacheSize;
         }
       });
-      this.height = height.clone();
     } catch (err) {
       this.cachedPendingEvidence = [];
       this.height = new BN(0);
@@ -149,7 +149,7 @@ export class EvidencePool {
     });
 
     if (notExpiredEv) {
-      this.pruningHeight = notExpiredEv.height.add(this.maxAgeNumBlocks).addn(1);
+      this.pruningHeight = notExpiredEv.height.add(this.maxAgeNumBlocks);
     } else {
       this.pruningHeight = this.height.clone();
     }
@@ -182,7 +182,7 @@ export class EvidencePool {
       }
     }
 
-    if (this.height.gt(this.pruningHeight)) {
+    if (this.height.gte(this.pruningHeight)) {
       await this.pruneExpiredPendingEvidence();
     }
   }
@@ -197,15 +197,17 @@ export class EvidencePool {
     for (let i = 0; i < evList.length; i++) {
       const ev = evList[i];
 
-      // check pending state
+      if (this.isExpired(ev)) {
+        return false;
+      }
+
+      if (await this.backend.isCommitted(ev)) {
+        return false;
+      }
+
       if (!(await this.backend.isPending(ev))) {
-        if (await this.backend.isCommitted(ev)) {
-          return false;
-        }
-        if (!this.isExpired(ev)) {
-          return false;
-        }
         await this.backend.addPendingEvidence(ev);
+        this.addToCache(ev);
       }
 
       // check for hash conflicts

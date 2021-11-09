@@ -1,8 +1,10 @@
 import { keccak256, rlp, BN } from 'ethereumjs-util';
+import { ValidatorSet } from '../../../staking';
 import { Vote } from './vote';
 
 export interface Evidence {
   height: BN;
+  verify(...args: any[]): void;
   hash(): Buffer;
   raw(): any;
   serialize(): Buffer;
@@ -49,6 +51,13 @@ export class DuplicateVoteEvidence implements Evidence {
     }
 
     return new DuplicateVoteEvidence(Vote.fromValuesArray(voteABuf), Vote.fromValuesArray(voteBBuf));
+  }
+
+  verify(valSet: ValidatorSet) {
+    const validator = valSet.getValidatorByIndex(this.voteA.index);
+    if (!validator.equals(this.voteA.validator())) {
+      throw new Error('invalid validator');
+    }
   }
 
   hash(): Buffer {

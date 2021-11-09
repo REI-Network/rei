@@ -1,79 +1,17 @@
 import { rlp, intToBuffer, bufferToInt } from 'ethereumjs-util';
+import { ContructorWithCode, Registry } from './registry';
 import * as m from './messages';
 import { Message } from './messages';
 
-export interface MessageConstructor {
-  new (...data: any[]): Message;
+export interface MessageConstructor extends ContructorWithCode<Message> {
   fromValuesArray(values: any[]): Message;
 }
-
-const messageToCode = new Map<MessageConstructor, number>();
-const codeToMessage = new Map<number, MessageConstructor>();
-
-function registerMessage(eles: [MessageConstructor, number][]) {
-  for (const [message, code] of eles) {
-    messageToCode.set(message, code);
-    codeToMessage.set(code, message);
-  }
-}
-
-registerMessage([
-  [m.NewRoundStepMessage, 0],
-  [m.NewValidBlockMessage, 1],
-  [m.HasVoteMessage, 2],
-  [m.ProposalMessage, 3],
-  [m.ProposalPOLMessage, 4],
-  [m.VoteMessage, 5],
-  [m.VoteSetMaj23Message, 6],
-  [m.VoteSetBitsMessage, 7],
-  [m.GetProposalBlockMessage, 8],
-  [m.ProposalBlockMessage, 9],
-  [m.ProposalRawBlockMessage, 10]
-]);
 
 export class MessageFactory {
   // disable constructor
   private constructor() {}
 
-  /**
-   * Get message code by message constructor
-   * @param message - Message constructor
-   * @returns Message code
-   */
-  static getCodeByMessage(message: MessageConstructor) {
-    const code = messageToCode.get(message);
-    if (code === undefined) {
-      throw new Error('unknown message');
-    }
-    return code;
-  }
-
-  /**
-   * Get message code by message instance
-   * @param _message - Message instance
-   * @returns Message code
-   */
-  static getCodeByMessageInstance<T extends Message>(_message: T) {
-    for (const [code, message] of codeToMessage) {
-      if (_message instanceof message) {
-        return code;
-      }
-    }
-    throw new Error('unknown message');
-  }
-
-  /**
-   * Get message contructor by message code
-   * @param code - Message code
-   * @returns Message constructor
-   */
-  static getMessageByCode(code: number) {
-    const message = codeToMessage.get(code);
-    if (message === undefined) {
-      throw new Error(`unknown code: ${code}`);
-    }
-    return message;
-  }
+  static registry = new Registry<Message, MessageConstructor>();
 
   /**
    * Create a message instance from a serialized buffer
@@ -103,7 +41,7 @@ export class MessageFactory {
       throw new Error('invalid serialized');
     }
 
-    return MessageFactory.getMessageByCode(bufferToInt(codeBuffer)).fromValuesArray(valuesArray);
+    return MessageFactory.registry.getCtorByCode(bufferToInt(codeBuffer)).fromValuesArray(valuesArray);
   }
 
   /**
@@ -112,7 +50,7 @@ export class MessageFactory {
    * @returns Raw value
    */
   static rawMessage<T extends Message>(_message: T) {
-    const code = MessageFactory.getCodeByMessageInstance(_message);
+    const code = MessageFactory.registry.getCodeByInstance(_message);
     return [intToBuffer(code), _message.raw()];
   }
 
@@ -125,3 +63,15 @@ export class MessageFactory {
     return rlp.encode(MessageFactory.rawMessage(_message));
   }
 }
+
+MessageFactory.registry.register(m.NewRoundStepMessage);
+MessageFactory.registry.register(m.NewValidBlockMessage);
+MessageFactory.registry.register(m.HasVoteMessage);
+MessageFactory.registry.register(m.ProposalMessage);
+MessageFactory.registry.register(m.ProposalPOLMessage);
+MessageFactory.registry.register(m.VoteMessage);
+MessageFactory.registry.register(m.VoteSetMaj23Message);
+MessageFactory.registry.register(m.VoteSetBitsMessage);
+MessageFactory.registry.register(m.GetProposalBlockMessage);
+MessageFactory.registry.register(m.ProposalBlockMessage);
+MessageFactory.registry.register(m.ProposalRawBlockMessage);

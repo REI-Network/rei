@@ -63,7 +63,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   constructor(options: ConsensusEngineOptions) {
     super(options);
 
-    this.evpool = new EvidencePool(new EvidenceDatabase(options.node.evidencedb));
+    this.evpool = new EvidencePool({ backend: new EvidenceDatabase(options.node.evidencedb) });
 
     if (!isEmptyAddress(this.coinbase) && this.node.accMngr.hasUnlockedAccount(this.coinbase)) {
       this.signer = new SimpleNodeSigner(this.node);

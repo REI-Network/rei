@@ -333,7 +333,7 @@ export class ConsensusProtocolHander extends HandlerBase<m.NewRoundStepMessage> 
   }
 
   sendMessage(msg: m.Message) {
-    this.send(MessageFactory.getCodeByMessageInstance(msg), msg);
+    this.send(MessageFactory.registry.getCodeByInstance(msg), msg);
   }
 
   applyNewRoundStepMessage(msg: m.NewRoundStepMessage) {

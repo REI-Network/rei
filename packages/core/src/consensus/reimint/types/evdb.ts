@@ -1,7 +1,8 @@
 import { LevelUp } from 'levelup';
 import { AbstractIterator } from 'abstract-leveldown';
 import { intToBuffer, BN } from 'ethereumjs-util';
-import { Evidence, EvidenceFactory } from './evidence';
+import { EvidenceFactory } from './evidencFactory';
+import { Evidence } from './evidence';
 import { EMPTY_HASH } from '../../../utils';
 
 const PENDING_PREFIX = 1;
@@ -99,7 +100,7 @@ export class EvidenceDatabase {
    * @param ev - Evidence
    */
   addPendingEvidence(ev: Evidence) {
-    return this.db.put(keyPending(ev), ev.serialize());
+    return this.db.put(keyPending(ev), EvidenceFactory.serializeEvidence(ev));
   }
 
   /**
@@ -107,7 +108,7 @@ export class EvidenceDatabase {
    * @param ev - Evidence
    */
   removePendingEvidence(ev: Evidence) {
-    return this.db.del(keyPending(ev), ev.serialize());
+    return this.db.del(keyPending(ev), EvidenceFactory.serializeEvidence(ev));
   }
 
   /**
@@ -115,7 +116,7 @@ export class EvidenceDatabase {
    * @param ev - Evidence
    */
   addCommittedEvidence(ev: Evidence) {
-    return this.db.put(keyCommitted(ev), ev.serialize());
+    return this.db.put(keyCommitted(ev), EvidenceFactory.serializeEvidence(ev));
   }
 
   /**

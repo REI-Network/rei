@@ -1,13 +1,21 @@
 import { rlp, intToBuffer, bufferToInt } from 'ethereumjs-util';
-import { StateMachineMsg, StateMachineTimeout, StateMachineMessage, StateMachineEndHeight } from './stateMessages';
+import { ContructorWithCode, Registry } from './registry';
+import * as s from './stateMessages';
+import { StateMachineMsg } from './stateMessages';
+
+export interface StateMachineMsgContrutor extends ContructorWithCode<StateMachineMsg> {
+  fromValuesArray(values: any[]): StateMachineMsg;
+}
 
 export class StateMachineMsgFactory {
   // disable constructor
   private constructor() {}
 
+  static registry = new Registry<StateMachineMsg, StateMachineMsgContrutor>();
+
   static fromSerializedMessage(serialized: Buffer): StateMachineMsg {
     const values = rlp.decode(serialized);
-    if (!Array.isArray(values) || values.length < 2) {
+    if (!Array.isArray(values) || values.length !== 2) {
       throw new Error('invalid values');
     }
 
@@ -16,30 +24,15 @@ export class StateMachineMsgFactory {
       throw new Error('invalid values');
     }
 
-    const code = bufferToInt(codeBuffer);
-    if (code === 0) {
-      return StateMachineMessage.fromValuesArray(valuesArray);
-    } else if (code === 1) {
-      return StateMachineTimeout.fromValuesArray(valuesArray);
-    } else if (code === 2) {
-      return StateMachineEndHeight.fromValuesArray(valuesArray);
-    } else {
-      throw new Error('invalid code');
-    }
+    return StateMachineMsgFactory.registry.getCtorByCode(bufferToInt(codeBuffer)).fromValuesArray(valuesArray);
   }
 
   static serializeMessage(msg: StateMachineMsg) {
-    let code: number;
-    if (msg instanceof StateMachineMessage) {
-      code = 0;
-    } else if (msg instanceof StateMachineTimeout) {
-      code = 1;
-    } else if (msg instanceof StateMachineEndHeight) {
-      code = 2;
-    } else {
-      throw new Error('invalid msg');
-    }
-
+    const code = StateMachineMsgFactory.registry.getCodeByInstance(msg);
     return rlp.encode([intToBuffer(code), msg.raw()]);
   }
 }
+
+StateMachineMsgFactory.registry.register(s.StateMachineMessage);
+StateMachineMsgFactory.registry.register(s.StateMachineTimeout);
+StateMachineMsgFactory.registry.register(s.StateMachineEndHeight);

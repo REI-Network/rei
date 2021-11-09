@@ -1,6 +1,8 @@
 import { BN } from 'ethereumjs-util';
-import { DuplicateVoteEvidence, Evidence } from './evidence';
-import { logger } from '@gxchain2/utils';
+import { Evidence } from './evidence';
+
+const defaultMaxCacheSize = 100;
+const defaultMaxAgeNumBlocks = new BN(10000);
 
 export interface EvidencePoolBackend {
   isCommitted(ev: Evidence): Promise<boolean>;
@@ -8,23 +10,29 @@ export interface EvidencePoolBackend {
   addPendingEvidence(ev: Evidence): Promise<void>;
   addCommittedEvidence(ev: Evidence): Promise<void>;
   removePendingEvidence(ev: Evidence): Promise<void>;
-  loadPendingEvidence({ from, to, reverse, onData }: { from?: BN; to?: BN; reverse?: boolean; onData: (data: Evidence) => boolean }): Promise<void>;
+  loadPendingEvidence({ from, to, reverse, onData }: { from?: BN; to?: BN; reverse?: boolean; onData: (data: Evidence) => Promise<boolean> }): Promise<void>;
+}
+
+export interface EvidencePoolOptions {
+  backend: EvidencePoolBackend;
+  maxCacheSize?: number;
+  maxAgeNumBlocks?: BN;
 }
 
 export class EvidencePool {
   private readonly backend: EvidencePoolBackend;
+  private readonly maxCacheSize: number;
+  private readonly maxAgeNumBlocks: BN;
   private initPromise?: Promise<void>;
   // cached evidence for broadcast
   private cachedPendingEvidence: Evidence[] = [];
   private height: BN = new BN(0);
   private pruningHeight: BN = new BN(0);
-  private evpoolMaxCacheSize: number;
-  private evpoolMaxAgeNumBlocks: BN;
 
-  constructor(backend: EvidencePoolBackend, maxCacheSize?: number, maxAgeNumBlocks?: BN) {
+  constructor({ backend, maxCacheSize, maxAgeNumBlocks }: EvidencePoolOptions) {
     this.backend = backend;
-    this.evpoolMaxCacheSize = maxCacheSize ? maxCacheSize : 100;
-    this.evpoolMaxAgeNumBlocks = maxAgeNumBlocks ? maxAgeNumBlocks : new BN(10000);
+    this.maxCacheSize = maxCacheSize ?? defaultMaxCacheSize;
+    this.maxAgeNumBlocks = maxAgeNumBlocks ?? defaultMaxAgeNumBlocks;
   }
 
   get pendingEvidence() {
@@ -40,24 +48,9 @@ export class EvidencePool {
 
   private addToCache(ev: Evidence) {
     this.cachedPendingEvidence.push(ev);
-    if (this.cachedPendingEvidence.length > this.evpoolMaxCacheSize) {
+    if (this.cachedPendingEvidence.length > this.maxCacheSize) {
       this.cachedPendingEvidence.shift();
     }
-  }
-
-  private verify(ev: Evidence) {
-    const blockAge = this.height.sub(ev.height);
-    if (blockAge.gt(this.evpoolMaxAgeNumBlocks)) {
-      return false;
-    }
-    if (ev instanceof DuplicateVoteEvidence) {
-      if (!ev.voteA.height.eq(ev.voteB.height) || ev.voteA.round !== ev.voteB.round || ev.voteA.type !== ev.voteB.type || ev.voteA.chainId !== ev.voteB.chainId || !ev.voteA.validator().equals(ev.voteB.validator())) {
-        return false;
-      }
-    } else {
-      return false;
-    }
-    return true;
   }
 
   private async _init(height: BN) {
@@ -67,9 +60,9 @@ export class EvidencePool {
         // add 1 because we may have collected evidence for the next block
         to: height.addn(1),
         reverse: true,
-        onData: (ev) => {
+        onData: async (ev) => {
           this.addToCache(ev);
-          return this.cachedPendingEvidence.length >= this.evpoolMaxCacheSize;
+          return this.cachedPendingEvidence.length >= this.maxCacheSize;
         }
       });
       this.height = height.clone();
@@ -99,18 +92,15 @@ export class EvidencePool {
   async addEvidence(ev: Evidence) {
     await this._afterInit();
     if (await this.backend.isPending(ev)) {
-      logger.info('evidence already pending; ignoring', 'evidence', ev);
       return;
     }
     if (await this.backend.isCommitted(ev)) {
-      logger.info('evidence was already committed; ignoring', 'evidence', ev);
       return;
     }
-    if (!this.verify(ev)) {
-      throw new Error('the evidence can not pass verify');
+    if (!this.isExpired(ev)) {
+      await this.backend.addPendingEvidence(ev);
+      this.addToCache(ev);
     }
-    await this.backend.addPendingEvidence(ev);
-    this.addToCache(ev);
   }
 
   /**
@@ -121,13 +111,13 @@ export class EvidencePool {
    */
   async pickEvidence(height: BN, count: number) {
     const evList: Evidence[] = [];
-    const from = height.gt(this.evpoolMaxAgeNumBlocks) ? height.sub(this.evpoolMaxAgeNumBlocks) : new BN(0);
+    const from = height.gt(this.maxAgeNumBlocks) ? height.sub(this.maxAgeNumBlocks) : new BN(0);
     const to = height.subn(1);
     try {
       await this.backend.loadPendingEvidence({
         from,
         to,
-        onData: (ev) => {
+        onData: async (ev) => {
           evList.push(ev);
           return evList.length >= count;
         }
@@ -138,32 +128,28 @@ export class EvidencePool {
     return evList;
   }
 
+  private isExpired(ev: Evidence) {
+    return this.height.sub(ev.height).gte(this.maxAgeNumBlocks);
+  }
+
   private async pruneExpiredPendingEvidence() {
-    const evList: Evidence[] = [];
-    let crossedEv: Evidence | undefined = undefined;
+    let notExpiredEv: Evidence | undefined;
     await this.backend.loadPendingEvidence({
       from: new BN(0),
-      onData: (ev: Evidence) => {
-        const crossed = this.height.sub(ev.height).lt(this.evpoolMaxAgeNumBlocks);
-        if (!crossed) {
-          evList.push(ev);
+      onData: async (ev: Evidence) => {
+        const isExpired = this.isExpired(ev);
+        if (!isExpired) {
+          notExpiredEv = ev;
         } else {
-          crossedEv = ev;
+          await this.backend.removePendingEvidence(ev);
+          this.deleteFromCache(ev);
         }
-        return crossed;
+        return !isExpired;
       }
     });
 
-    if (evList.length > 0) {
-      await Promise.all(
-        evList.map((ev) => {
-          this.deleteFromCache(ev);
-          return this.backend.removePendingEvidence(ev);
-        })
-      );
-    }
-    if (crossedEv) {
-      this.pruningHeight = (crossedEv as Evidence).height.add(this.evpoolMaxAgeNumBlocks).addn(1);
+    if (notExpiredEv) {
+      this.pruningHeight = notExpiredEv.height.add(this.maxAgeNumBlocks).addn(1);
     } else {
       this.pruningHeight = this.height.clone();
     }
@@ -177,25 +163,25 @@ export class EvidencePool {
    */
   async update(committedEvList: Evidence[], height: BN) {
     if (height.lte(this.height)) {
-      throw new Error('failed EvidencePool.Update new height is less than or equal to previous height: ' + height.toNumber() + '<=' + this.height.clone().toNumber());
+      throw new Error('failed EvidencePool.Update new height is less than or equal to previous height: ' + height.toNumber() + '<=' + this.height.toNumber());
     }
 
     this.height = height.clone();
 
     for (let i = 0; i < committedEvList.length; i++) {
-      // save committed evidences
-      if (!(await this.backend.isCommitted(committedEvList[i]))) {
-        await this.backend.addCommittedEvidence(committedEvList[i]);
+      const ev = committedEvList[i];
+      // save committed evidence
+      if (!(await this.backend.isCommitted(ev))) {
+        await this.backend.addCommittedEvidence(ev);
       }
 
-      if (await this.backend.isPending(committedEvList[i])) {
-        // mark pending evidences as committed
-        await this.backend.removePendingEvidence(committedEvList[i]);
-        // remove committed evidences from this.cachedPendingEvidence
-        this.deleteFromCache(committedEvList[i]);
+      // mark pending evidence as committed
+      if (await this.backend.isPending(ev)) {
+        await this.backend.removePendingEvidence(ev);
+        this.deleteFromCache(ev);
       }
     }
-    // this.pruneExpiredPendingEvidences
+
     if (this.height.gt(this.pruningHeight)) {
       await this.pruneExpiredPendingEvidence();
     }
@@ -203,28 +189,34 @@ export class EvidencePool {
 
   /**
    * CheckEvidence takes an array of evidence from a block and verifies all the evidence there
-   * @param evList Evidences to check
-   * @returns true if all evidence pass check
+   * @param evList - List of evidence
+   * @returns Return true, if check successfully
    */
   async checkEvidence(evList: Evidence[]) {
     const hashes = new Array<Buffer>(evList.length);
     for (let i = 0; i < evList.length; i++) {
-      if (!(await this.backend.isPending(evList[i]))) {
-        if (await this.backend.isCommitted(evList[i])) {
+      const ev = evList[i];
+
+      // check pending state
+      if (!(await this.backend.isPending(ev))) {
+        if (await this.backend.isCommitted(ev)) {
           return false;
         }
-        if (!this.verify(evList[i])) {
+        if (!this.isExpired(ev)) {
           return false;
         }
-        await this.backend.addPendingEvidence(evList[i]);
+        await this.backend.addPendingEvidence(ev);
       }
-      hashes[i] = evList[i].hash();
+
+      // check for hash conflicts
+      hashes[i] = ev.hash();
       for (let j = i - 1; j >= 0; j--) {
         if (hashes[i].equals(hashes[j])) {
           return false;
         }
       }
     }
+
     return true;
   }
 }

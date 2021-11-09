@@ -373,7 +373,7 @@ export class StateMachine {
           return;
         }
         const { voteA, voteB } = err;
-        this.evpool.addEvidence(new DuplicateVoteEvidence(voteA, voteB, voteA.height));
+        this.evpool.addEvidence(DuplicateVoteEvidence.fromVotes(voteA, voteB));
       } else if (err instanceof DuplicateVotesError) {
         logger.detail('StateMachine::tryAddVote, duplicate votes from:', peerId);
       } else {

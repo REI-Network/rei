@@ -20,6 +20,8 @@ export class StateMachineMessage implements StateMachineMsg {
     this.validateBasic();
   }
 
+  static readonly code = 0;
+
   static fromValuesArray(values: (Buffer | Buffer[])[]) {
     if (values.length !== 2) {
       throw new Error('invalid values');
@@ -59,6 +61,8 @@ export class StateMachineTimeout implements StateMachineMsg {
     this.validateBasic();
   }
 
+  static readonly code = 1;
+
   static fromValuesArray(values: Buffer[]) {
     if (values.length !== 4) {
       throw new Error('invalid values');
@@ -90,6 +94,8 @@ export class StateMachineEndHeight implements StateMachineMsg {
     this.height = height.clone();
     this.validateBasic();
   }
+
+  static readonly code = 2;
 
   static fromValuesArray(values: Buffer[]) {
     if (values.length !== 1) {

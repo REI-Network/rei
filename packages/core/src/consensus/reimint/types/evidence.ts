@@ -1,79 +1,62 @@
-import { keccak256, rlp, BN, toBuffer } from 'ethereumjs-util';
+import { keccak256, rlp, BN } from 'ethereumjs-util';
 import { Vote } from './vote';
-
-export type EvidenceBuffer = DuplicateVoteEvidenceBuffer /* |  OtherEvidenceBuffer*/;
 
 export interface Evidence {
   height: BN;
   hash(): Buffer;
-  raw(): EvidenceBuffer;
+  raw(): any;
   serialize(): Buffer;
   validateBasic(): void;
 }
 
-//////////////////////////////
-
-export class EvidenceFactory {
-  // disable constructor
-  private constructor() {}
-
-  static fromSerializedEvidence(serialized: Buffer) {
-    const data = rlp.decode(serialized);
-
-    if (!Array.isArray(data)) {
-      throw new Error('invalid serialized evidence');
-    }
-
-    return EvidenceFactory.fromValuesArray(data);
+function sortVote(vote1: Vote, vote2: Vote): [Vote, Vote] {
+  if (!vote1.isSigned() || !vote2.isSigned()) {
+    throw new Error('unsigned vote');
   }
-
-  static fromValuesArray(values: EvidenceBuffer) {
-    if (values.length === 3) {
-      return DuplicateVoteEvidence.fromValuesArray(values);
-    } else {
-      throw new Error('invalid evidence values');
-    }
+  const num = vote1.signature!.compare(vote2.signature!);
+  if (num === 0) {
+    throw new Error('invalid equal votes');
   }
+  return [num > 0 ? vote2 : vote1, num > 0 ? vote1 : vote2];
 }
-
-//////////////////////////////
-
-export type DuplicateVoteEvidenceBuffer = (Buffer | Buffer[])[];
 
 export class DuplicateVoteEvidence implements Evidence {
   readonly voteA: Vote;
   readonly voteB: Vote;
   readonly height: BN;
 
-  constructor(voteA: Vote, voteB: Vote, height: BN) {
-    this.height = height.clone();
+  constructor(voteA: Vote, voteB: Vote) {
+    this.height = voteA.height.clone();
     this.voteA = voteA;
     this.voteB = voteB;
+    this.validateBasic();
   }
 
-  static fromValuesArray(values: DuplicateVoteEvidenceBuffer) {
-    if (values.length !== 3) {
+  static readonly code = 0;
+
+  static fromVotes(vote1: Vote, vote2: Vote) {
+    return new DuplicateVoteEvidence(...sortVote(vote1, vote2));
+  }
+
+  static fromValuesArray(values: Buffer[][]) {
+    if (values.length !== 2) {
       throw new Error('invalid evidence values');
     }
 
-    const [heightBuf, voteABuf, voteBBuf] = values;
-    if (!(heightBuf instanceof Buffer)) {
-      throw new Error('invalid evidence values');
-    }
-
+    const [voteABuf, voteBBuf] = values;
     if (!Array.isArray(voteABuf) || !Array.isArray(voteBBuf)) {
       throw new Error('invalid evidence values');
     }
 
-    return new DuplicateVoteEvidence(Vote.fromValuesArray(voteABuf), Vote.fromValuesArray(voteBBuf), new BN(heightBuf));
+    return new DuplicateVoteEvidence(Vote.fromValuesArray(voteABuf), Vote.fromValuesArray(voteBBuf));
   }
 
   hash(): Buffer {
     return keccak256(this.serialize());
   }
 
-  raw(): DuplicateVoteEvidenceBuffer {
-    return [toBuffer(this.height), this.voteA.raw(), this.voteB.raw()];
+  raw() {
+    return [this.voteA.raw(), this.voteB.raw()];
   }
 
   serialize(): Buffer {
@@ -81,6 +64,18 @@ export class DuplicateVoteEvidence implements Evidence {
   }
 
   validateBasic(): void {
-    // TODO:
+    if (!this.voteA.height.eq(this.voteB.height) || this.voteA.round !== this.voteB.round || this.voteA.type !== this.voteB.type || this.voteA.chainId !== this.voteB.chainId || !this.voteA.hash.equals(this.voteB.hash) || this.voteA.index !== this.voteB.index) {
+      throw new Error('invalid votes(vote content)');
+    }
+    if (!this.voteA.validator().equals(this.voteB.validator())) {
+      throw new Error('invalid votes(unequal validator)');
+    }
+    if (this.voteA.signature!.equals(this.voteB.signature!)) {
+      throw new Error('invalid votes(same signature)');
+    }
+    const [voteA, voteB] = sortVote(this.voteA, this.voteB);
+    if (voteA !== this.voteA || voteB !== this.voteB) {
+      throw new Error('invalid votes(sort)');
+    }
   }
 }

@@ -3,7 +3,8 @@ import { BlockHeader, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
 import { ValidatorSet } from '../../../staking';
 import { Reimint } from '../reimint';
 import { Vote, VoteType, VoteSet } from './vote';
-import { Evidence, EvidenceBuffer, EvidenceFactory } from './evidence';
+import { EvidenceFactory } from './evidencFactory';
+import { Evidence } from './evidence';
 import { Proposal } from './proposal';
 
 export interface ExtraDataOptions {
@@ -18,7 +19,7 @@ export interface ExtraDataFromBlockHeaderOptions extends Omit<ExtraDataOptions, 
 export type RLPVote = [Buffer, Buffer];
 export type RLPEmptyVote = [];
 export type RLPRoundAndPOLRound = [Buffer, Buffer];
-export type RLPEvidenceList = [EvidenceBuffer][];
+export type RLPEvidenceList = (Buffer | Buffer[])[];
 export type RLPElement = RLPEmptyVote | RLPVote | RLPRoundAndPOLRound | RLPEvidenceList;
 export type RLPElements = RLPElement[];
 

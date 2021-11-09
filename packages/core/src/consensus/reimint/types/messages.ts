@@ -24,6 +24,8 @@ export class NewRoundStepMessage implements Message {
     this.validateBasic();
   }
 
+  static readonly code = 0;
+
   static fromValuesArray(values: Buffer[]) {
     if (values.length !== 3) {
       throw new Error('invalid values');
@@ -62,6 +64,8 @@ export class NewValidBlockMessage implements Message {
     this.validateBasic();
   }
 
+  static readonly code = 1;
+
   static fromValuesArray(values: Buffer[]) {
     if (values.length !== 4) {
       throw new Error('invalid values');
@@ -98,6 +102,8 @@ export class ProposalMessage implements Message {
     this.validateBasic();
   }
 
+  static readonly code = 3;
+
   static fromValuesArray(values: Buffer[]) {
     return new ProposalMessage(Proposal.fromValuesArray(values));
   }
@@ -128,6 +134,8 @@ export class ProposalPOLMessage implements Message {
     this.proposalPOL = proposalPOL;
     this.validateBasic();
   }
+
+  static readonly code = 4;
 
   static fromValuesArray(values: (Buffer | BitArrayRaw)[]) {
     if (values.length !== 3) {
@@ -165,6 +173,8 @@ export class ProposalBlockMessage implements Message {
     this.validateBasic();
   }
 
+  static readonly code = 9;
+
   static fromValuesArray(values: BlockBuffer, options?: BlockOptions) {
     return new ProposalBlockMessage(Block.fromValuesArray(values, options));
   }
@@ -190,6 +200,8 @@ export class ProposalRawBlockMessage implements Message {
     this.validateBasic();
   }
 
+  static readonly code = 10;
+
   static fromValuesArray(values: BlockBuffer) {
     return new ProposalRawBlockMessage(values);
   }
@@ -214,6 +226,8 @@ export class VoteMessage implements Message {
     this.vote = vote;
     this.validateBasic();
   }
+
+  static readonly code = 5;
 
   static fromValuesArray(values: Buffer[]) {
     return new VoteMessage(Vote.fromValuesArray(values));
@@ -247,6 +261,8 @@ export class HasVoteMessage implements Message {
     this.index = index;
     this.validateBasic();
   }
+
+  static readonly code = 2;
 
   static fromValuesArray(values: Buffer[]) {
     if (values.length !== 4) {
@@ -286,6 +302,8 @@ export class VoteSetMaj23Message implements Message {
     this.hash = hash;
     this.validateBasic();
   }
+
+  static readonly code = 6;
 
   static fromValuesArray(values: Buffer[]) {
     if (values.length !== 4) {
@@ -328,6 +346,8 @@ export class VoteSetBitsMessage implements Message {
     this.validateBasic();
   }
 
+  static readonly code = 7;
+
   static fromValuesArray(values: Buffer[]) {
     if (values.length !== 5) {
       throw new Error('invalid values');
@@ -363,6 +383,8 @@ export class GetProposalBlockMessage implements Message {
     this.hash = hash;
     this.validateBasic();
   }
+
+  static readonly code = 8;
 
   static fromValuesArray(values: Buffer[]) {
     if (values.length !== 1) {

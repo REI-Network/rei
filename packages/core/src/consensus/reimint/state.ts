@@ -12,6 +12,7 @@ import {
   StateMachineEndHeight,
   StateMachineMsg,
   IStateMachineBackend,
+  IStateMachineP2PBackend,
   ISigner,
   IConfig,
   IEvidencePool,
@@ -22,7 +23,6 @@ import {
   NewValidBlockMessage,
   VoteMessage,
   ProposalBlockMessage,
-  ProposalRawBlockMessage,
   GetProposalBlockMessage,
   ProposalMessage,
   HasVoteMessage,
@@ -45,11 +45,12 @@ const StateMachineMsgQueueMaxSize = 100;
 
 export class StateMachine {
   private readonly chainId: number;
-  private readonly backend: IStateMachineBackend;
   private readonly timeoutTicker = new TimeoutTicker((ti) => {
     this._newMessage(ti);
   });
 
+  private readonly backend: IStateMachineBackend;
+  private readonly p2p: IStateMachineP2PBackend;
   private readonly signer?: ISigner;
   private readonly config: IConfig;
   private readonly evpool: IEvidencePool;
@@ -92,8 +93,9 @@ export class StateMachine {
   private commitRound: number = -1;
   /////////////// RoundState ///////////////
 
-  constructor(backend: IStateMachineBackend, evpool: IEvidencePool, wal: IWAL, chainId: number, config: IConfig, signer?: ISigner) {
+  constructor(backend: IStateMachineBackend, p2p: IStateMachineP2PBackend, evpool: IEvidencePool, wal: IWAL, chainId: number, config: IConfig, signer?: ISigner) {
     this.backend = backend;
+    this.p2p = p2p;
     this.chainId = chainId;
     this.evpool = evpool;
     this.wal = wal;
@@ -102,7 +104,7 @@ export class StateMachine {
   }
 
   private newStep() {
-    this.backend.broadcastMessage(this.genNewRoundStepMessage()!, { broadcast: true });
+    this.p2p.broadcastMessage(this.genNewRoundStepMessage()!, { broadcast: true });
   }
 
   async msgLoop() {
@@ -114,13 +116,8 @@ export class StateMachine {
     for await (const msg of this.msgQueue.generator()) {
       try {
         if (msg instanceof StateMachineMessage) {
-          let writeMsg = msg;
-          if (msg.msg instanceof ProposalBlockMessage) {
-            writeMsg = new StateMachineMessage(msg.peerId, new ProposalRawBlockMessage(msg.msg.block.raw()));
-          }
-
           const internal = msg.peerId === '';
-          const result = await this.wal.write(writeMsg, internal);
+          const result = await this.wal.write(msg, internal);
           if (internal && !result) {
             throw new Error('internal message write failed');
           }
@@ -144,7 +141,7 @@ export class StateMachine {
     if (msg instanceof ProposalMessage) {
       this.setProposal(msg.proposal, peerId);
     } else if (msg instanceof ProposalBlockMessage) {
-      this.addProposalBlock(msg.block);
+      this.addProposalBlock(msg.toBlock({ common: this.backend.getCommon(0), hardforkByBlockNumber: true }));
       // statsMsgQueue <- mi
     } else if (msg instanceof VoteMessage) {
       this.tryAddVote(msg.vote, peerId);
@@ -204,7 +201,7 @@ export class StateMachine {
     this.proposal = proposal;
     this.proposalBlockHash = proposal.hash;
     if (this.proposalBlock === undefined && peerId !== '') {
-      this.backend.broadcastMessage(new GetProposalBlockMessage(proposal.hash), { to: peerId });
+      this.p2p.broadcastMessage(new GetProposalBlockMessage(proposal.hash), { to: peerId });
     }
   }
 
@@ -283,7 +280,7 @@ export class StateMachine {
     this.votes.addVote(vote, peerId);
     // TODO: if add failed, return
 
-    this.backend.broadcastMessage(new HasVoteMessage(vote.height, vote.round, vote.type, vote.index), { exclude: [peerId] });
+    this.p2p.broadcastMessage(new HasVoteMessage(vote.height, vote.round, vote.type, vote.index), { exclude: [peerId] });
 
     switch (vote.type) {
       case VoteType.Prevote:
@@ -314,7 +311,7 @@ export class StateMachine {
                 this.proposalBlockHash = maj23Hash;
               }
 
-              this.backend.broadcastMessage(new NewValidBlockMessage(this.height, this.round, this.proposalBlockHash, this.step === RoundStepType.Commit), { broadcast: true });
+              this.p2p.broadcastMessage(new NewValidBlockMessage(this.height, this.round, this.proposalBlockHash, this.step === RoundStepType.Commit), { broadcast: true });
             }
           }
 
@@ -814,10 +811,9 @@ export class StateMachine {
           if (msg instanceof VoteMessage) {
             const vote = msg.vote;
             logger.debug('StateMachine::replay, vote, height:', vote.height.toString(), 'round:', vote.round, 'type:', vote.type, 'hash:', bufferToHex(vote.hash), 'validator:', vote.validator().toString(), 'from:', message.peerId);
-          } else if (msg instanceof ProposalRawBlockMessage) {
+          } else if (msg instanceof ProposalBlockMessage) {
             // create block instance from block buffer
-            const block = Block.fromValuesArray(msg.rawBlock, { common: this.backend.getCommon(0), hardforkByBlockNumber: true });
-            message = new StateMachineMessage(message.peerId, new ProposalBlockMessage(block));
+            const block = msg.toBlock({ common: this.backend.getCommon(0), hardforkByBlockNumber: true });
             logger.debug('StateMachine::replay, block, height:', block.header.number.toString(), 'from:', (message as StateMachineMessage).peerId);
           } else if (msg instanceof ProposalMessage) {
             const proposal = msg.proposal;

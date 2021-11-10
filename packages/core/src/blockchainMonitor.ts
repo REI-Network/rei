@@ -14,8 +14,8 @@ export declare interface BlockchainMonitor {
   on(event: 'logs' | 'removedLogs', listener: (logs: Log[]) => void): this;
   on(event: 'newHeads', listener: (hashes: Buffer[]) => void): this;
 
-  once(event: 'logs' | 'removedLogs', listener: (logs: Log[]) => void): this;
-  once(event: 'newHeads', listener: (hashes: Buffer[]) => void): this;
+  off(event: 'logs' | 'removedLogs', listener: (logs: Log[]) => void): this;
+  off(event: 'newHeads', listener: (hashes: Buffer[]) => void): this;
 }
 
 /**

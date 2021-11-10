@@ -28,8 +28,11 @@ const defaultUdpPort = 9810;
 const defaultNat = '127.0.0.1';
 
 export declare interface NetworkManager {
-  on(event: 'installed' | 'removed', listener: (peer: Peer) => void): this;
-  once(event: 'installed' | 'removed', listener: (peer: Peer) => void): this;
+  on(event: 'installed', listener: (name: string, peer: Peer) => void): this;
+  on(event: 'removed', listener: (peer: Peer) => void): this;
+
+  once(event: 'installed', listener: (name: string, peer: Peer) => void): this;
+  once(event: 'removed', listener: (peer: Peer) => void): this;
 }
 
 enum Libp2pPeerValue {
@@ -442,7 +445,7 @@ export class NetworkManager extends EventEmitter {
       peer.status = PeerStatus.Installed;
       this.setPeerValue(peerId, Libp2pPeerValue.installed);
       this.clearInstallTimeout(peerId);
-      this.emit('installed', peer);
+      this.emit('installed', protocol.name, peer);
       logger.info('💬 Peer installed:', peerId, 'protocol:', protocol.name);
     } else {
       if (peer.status === PeerStatus.Installing) {

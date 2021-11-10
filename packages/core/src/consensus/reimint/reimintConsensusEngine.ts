@@ -9,11 +9,10 @@ import { logger } from '@gxchain2/utils';
 import { StakeManager, Router } from '../../contracts';
 import { ValidatorSet, ValidatorChanges } from '../../staking';
 import { Node, ProcessBlockOptions } from '../../node';
-import { ConsensusProtocol } from '../../protocols/consensus';
 import { isEmptyAddress, postByzantiumTxReceiptsToReceipts, getGasLimitByCommon } from '../../utils';
 import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from '../types';
 import { BaseConsensusEngine } from '../baseConsensusEngine';
-import { ExtraData, EvidencePool, EvidenceDatabase, Message, SendMessageOptions, WAL } from './types';
+import { ExtraData, EvidencePool, EvidenceDatabase, WAL } from './types';
 import { StateMachine } from './state';
 import { Reimint } from './reimint';
 import { makeRunTxCallback } from './makeRunTxCallback';
@@ -68,7 +67,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     if (!isEmptyAddress(this.coinbase) && this.node.accMngr.hasUnlockedAccount(this.coinbase)) {
       this.signer = new SimpleNodeSigner(this.node);
     }
-    this.state = new StateMachine(this, this.evpool, new WAL({ path: path.join(options.node.datadir, 'WAL') }), this.node.getChainId(), this.config, this.signer);
+    this.state = new StateMachine(this, this.node.consensus, this.evpool, new WAL({ path: path.join(options.node.datadir, 'WAL') }), this.node.getChainId(), this.config, this.signer);
   }
 
   protected _start() {
@@ -113,35 +112,12 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
 
   ///////////// Backend Logic ////////////////
 
+  /**
+   * Get common instance by number
+   * @param num - Number
+   */
   getCommon(num: BNLike) {
     return this.node.getCommon(num);
-  }
-
-  /**
-   * Broadcast p2p message to remote peer
-   * @param msg - Message
-   * @param options - Send options {@link SendMessageOptions}
-   */
-  broadcastMessage(msg: Message, options: SendMessageOptions) {
-    const consensus = this.node.consensus;
-    if (options.broadcast) {
-      for (const handler of consensus.handlers) {
-        handler.send(msg);
-      }
-    } else if (options.to) {
-      const peer = this.node.networkMngr.getPeer(options.to);
-      if (peer) {
-        consensus.getHandler(peer, false)?.send(msg);
-      }
-    } else if (options.exclude) {
-      for (const handler of consensus.handlers) {
-        if (!options.exclude.includes(handler.peer.peerId)) {
-          handler.send(msg);
-        }
-      }
-    } else {
-      throw new Error('invalid broadcast message options');
-    }
   }
 
   /**

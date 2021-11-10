@@ -1,6 +1,8 @@
 import { Address, BN, BNLike } from 'ethereumjs-util';
 import { Block } from '@gxchain2/structure';
 import { Common } from '@gxchain2/common';
+import { ProcessBlockOptions } from '../../../node';
+import { SendMessageOptions } from '../../../protocols/consensus';
 import { StateMachineMsg } from './stateMessages';
 import { Message } from './messages';
 import { Evidence } from './evidence';
@@ -35,17 +37,11 @@ export interface IWALReader {
   read(): Promise<StateMachineMsg | undefined>;
 }
 
-export interface SendMessageOptions {
-  // broadcast the message but exlcude the target peers
-  exclude?: string[];
-  // send message to target peer
-  to?: string;
-  // boardcast the message to all peers
-  broadcast?: boolean;
-}
-
 export interface IStateMachineBackend {
   getCommon(num: BNLike): Common;
+  executeBlock(block: Block, options: ProcessBlockOptions): Promise<boolean>;
+}
+
+export interface IStateMachineP2PBackend {
   broadcastMessage(msg: Message, options: SendMessageOptions): void;
-  executeBlock(block: Block, options: any /*TODO*/): Promise<boolean>;
 }

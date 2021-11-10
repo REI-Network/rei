@@ -166,44 +166,27 @@ export class ProposalPOLMessage implements Message {
 }
 
 export class ProposalBlockMessage implements Message {
-  readonly block: Block;
+  readonly rawBlock: BlockBuffer;
+  private block?: Block;
 
-  constructor(block: Block) {
-    this.block = block;
+  constructor(b: Block | BlockBuffer) {
+    if (b instanceof Block) {
+      this.rawBlock = b.raw();
+      this.block = b;
+    } else {
+      this.rawBlock = b;
+    }
     this.validateBasic();
   }
 
   static readonly code = 9;
 
-  static fromValuesArray(values: BlockBuffer, options?: BlockOptions) {
-    return new ProposalBlockMessage(Block.fromValuesArray(values, options));
-  }
-
-  raw() {
-    return this.block.raw();
-  }
-
-  serialize() {
-    return this.block.serialize();
-  }
-
-  validateBasic() {
-    // no thing
-  }
-}
-
-export class ProposalRawBlockMessage implements Message {
-  readonly rawBlock: BlockBuffer;
-
-  constructor(rawBlock: BlockBuffer) {
-    this.rawBlock = rawBlock;
-    this.validateBasic();
-  }
-
-  static readonly code = 10;
-
   static fromValuesArray(values: BlockBuffer) {
-    return new ProposalRawBlockMessage(values);
+    return new ProposalBlockMessage(values);
+  }
+
+  toBlock(options?: BlockOptions) {
+    return this.block ?? (this.block = Block.fromValuesArray(this.rawBlock, options));
   }
 
   raw() {

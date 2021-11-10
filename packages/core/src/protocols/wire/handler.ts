@@ -47,7 +47,6 @@ const wireHandlerFuncs: HandlerFunc[] = [
     },
     process(this: WireProtocolHandler, status: NodeStatus) {
       this.handshakeResponse(status);
-      this.updateStatus(status);
     }
   },
   {
@@ -249,7 +248,7 @@ export class WireProtocolHandler implements ProtocolHandler {
 
   /**
    * Update node status
-   * @param newStatus New status
+   * @param newStatus - New status
    */
   updateStatus(newStatus: Partial<NodeStatus>) {
     this._status = { ...this._status!, ...newStatus };
@@ -293,6 +292,9 @@ export class WireProtocolHandler implements ProtocolHandler {
     if (this.handshakeResolve) {
       const localStatus = this.node.status;
       const result = localStatus.genesisHash.equals(status.genesisHash) && localStatus.networkId === status.networkId;
+      if (result) {
+        this.updateStatus(status);
+      }
       this.handshakeResolve(result);
       this.handshakeResolve = undefined;
       if (this.handshakeTimeout) {

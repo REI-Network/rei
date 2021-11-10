@@ -320,8 +320,10 @@ export class Node {
     this.getCurrentEngine().newBlock(this.blockchain.latestBlock);
   }
 
-  private onPeerInstalled = (peer: Peer) => {
-    this.sync.announce(peer);
+  private onPeerInstalled = (name: string, peer: Peer) => {
+    if (name === this.wire.name) {
+      this.sync.announce(peer);
+    }
   };
 
   private onPeerRemoved = (peer: Peer) => {
@@ -547,7 +549,7 @@ export class Node {
         if (reorged) {
           const promises = [this.txPool.newBlock(block), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
           if (options.broadcast) {
-            promises.push(this.broadcastNewBlock(block));
+            promises.push(this.wire.broadcastNewBlock(block));
           }
           await Promise.all(promises);
         }
@@ -610,17 +612,6 @@ export class Node {
   }
 
   /**
-   * Broadcast new block to all connected peers
-   * @param block - Block
-   */
-  async broadcastNewBlock(block: Block) {
-    const td = await this.db.getTotalDifficulty(block.hash(), block.header.number);
-    for (const handler of this.wire.pool.handlers) {
-      handler.announceNewBlock(block, td);
-    }
-  }
-
-  /**
    * Ban peer
    * @param peerId - Target peer
    * @param reason - Ban reason
@@ -637,10 +628,10 @@ export class Node {
    * Abort node
    */
   async abort() {
-    this.sync.removeListener('synchronized', this.onSyncOver);
-    this.sync.removeListener('failed', this.onSyncOver);
-    this.networkMngr.removeListener('installed', this.onPeerInstalled);
-    this.networkMngr.removeListener('removed', this.onPeerRemoved);
+    this.sync.off('synchronized', this.onSyncOver);
+    this.sync.off('failed', this.onSyncOver);
+    this.networkMngr.off('installed', this.onPeerInstalled);
+    this.networkMngr.off('removed', this.onPeerRemoved);
     this.taskQueue.abort();
     this.processQueue.abort();
     await this.aborter.abort();

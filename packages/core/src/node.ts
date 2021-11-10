@@ -22,7 +22,7 @@ import { TxFetcher } from './txSync';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
 import { BlockchainMonitor } from './blockchainMonitor';
-import { createProtocolsByNames, NetworkProtocol, WireProtocol } from './protocols';
+import { createProtocolByName, NetworkProtocol, WireProtocol, ConsensusProtocol } from './protocols';
 import { ValidatorSets } from './staking';
 import { StakeManager, Router } from './contracts';
 import { createEnginesByConsensusTypes, ConsensusEngine, ConsensusType, ProcessBlockOpts } from './consensus';
@@ -144,6 +144,8 @@ export class Node {
   public bloomBitsIndexer!: ChainIndexer;
   public bcMonitor!: BlockchainMonitor;
   public accMngr!: AccountManager;
+  public wire!: WireProtocol;
+  public consensus!: ConsensusProtocol;
 
   public readonly validatorSets = new ValidatorSets();
 
@@ -289,10 +291,13 @@ export class Node {
 
     this.txSync = new TxFetcher(this);
 
+    this.wire = createProtocolByName(this, NetworkProtocol.GXC2_ETHWIRE) as WireProtocol;
+    this.consensus = createProtocolByName(this, NetworkProtocol.GXC2_CONSENSUS) as ConsensusProtocol;
+
     let bootnodes = options.p2p.bootnodes || [];
     bootnodes = bootnodes.concat(common.bootstrapNodes());
     this.networkMngr = new NetworkManager({
-      protocols: createProtocolsByNames(this, [NetworkProtocol.GXC2_ETHWIRE, NetworkProtocol.GXC2_CONSENSUS]),
+      protocols: [this.wire, this.consensus],
       datastore: this.networkdb,
       nodedb: this.nodedb,
       peerId,
@@ -500,6 +505,11 @@ export class Node {
   }
 
   /**
+   * Get wire protocol instance
+   */
+  getWireProtocol() {}
+
+  /**
    * A loop that executes blocks sequentially
    */
   private async processLoop() {
@@ -567,7 +577,7 @@ export class Node {
           const hashes = Array.from(readies.values())
             .reduce((a, b) => a.concat(b), [])
             .map((tx) => tx.hash());
-          for (const handler of WireProtocol.getPool().handlers) {
+          for (const handler of this.wire.pool.handlers) {
             handler.announceTx(hashes);
           }
           await this.getCurrentEngine().addTxs(readies);
@@ -611,7 +621,7 @@ export class Node {
    */
   async broadcastNewBlock(block: Block) {
     const td = await this.db.getTotalDifficulty(block.hash(), block.header.number);
-    for (const handler of WireProtocol.getPool().handlers) {
+    for (const handler of this.wire.pool.handlers) {
       handler.announceNewBlock(block, td);
     }
   }

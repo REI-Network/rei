@@ -4,7 +4,7 @@ import { BlockHeader } from '@gxchain2/structure';
 import { logger } from '@gxchain2/utils';
 import { Synchronizer, SynchronizerOptions } from './sync';
 import { Fetcher } from './fetcher';
-import { WireProtocol, WireProtocolHandler, PeerRequestTimeoutError, maxGetBlockHeaders } from '../protocols';
+import { WireProtocolHandler, PeerRequestTimeoutError, maxGetBlockHeaders } from '../protocols';
 
 const defaultMaxLimit = 16;
 const minSyncPeers = 3;
@@ -35,7 +35,7 @@ export class FullSynchronizer extends Synchronizer {
    * @param peer - remote peer
    */
   announce(peer: Peer) {
-    const handler = WireProtocol.getHandler(peer, false);
+    const handler = this.node.wire.getHandler(peer, false);
     if (handler && !this.isSyncing && this.node.blockchain.totalDifficulty.lt(new BN(handler.status!.totalDifficulty))) {
       this.sync(peer);
     }
@@ -57,10 +57,11 @@ export class FullSynchronizer extends Synchronizer {
    * @return Resolves with true if sync successful
    */
   protected async _sync(peer?: Peer): Promise<boolean> {
+    const wire = this.node.wire;
     if (this.syncingPromise) {
       return false;
     }
-    if (!this.forceSync && WireProtocol.getPool().handlers.length < minSyncPeers) {
+    if (!this.forceSync && wire.pool.handlers.length < minSyncPeers) {
       return false;
     }
     const result = await (this.syncingPromise = new Promise<boolean>(async (resolve) => {
@@ -69,7 +70,7 @@ export class FullSynchronizer extends Synchronizer {
       let bestTD!: BN;
 
       if (peer) {
-        bestPeerHandler = WireProtocol.getHandler(peer, false);
+        bestPeerHandler = wire.getHandler(peer, false);
         if (!bestPeerHandler) {
           return resolve(false);
         }
@@ -80,7 +81,7 @@ export class FullSynchronizer extends Synchronizer {
         }
       } else {
         bestTD = this.node.blockchain.totalDifficulty;
-        for (const handler of WireProtocol.getPool().handlers) {
+        for (const handler of wire.pool.handlers) {
           const remoteStatus = handler.status!;
           const td = new BN(remoteStatus.totalDifficulty);
           if (td.gt(bestTD)) {

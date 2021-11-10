@@ -123,17 +123,18 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    * @param options - Send options {@link SendMessageOptions}
    */
   broadcastMessage(msg: Message, options: SendMessageOptions) {
+    const consensus = this.node.consensus;
     if (options.broadcast) {
-      for (const handler of ConsensusProtocol.getPool().handlers) {
+      for (const handler of consensus.handlers) {
         handler.sendMessage(msg);
       }
     } else if (options.to) {
       const peer = this.node.networkMngr.getPeer(options.to);
       if (peer) {
-        ConsensusProtocol.getHandler(peer, false)?.sendMessage(msg);
+        consensus.getHandler(peer, false)?.sendMessage(msg);
       }
     } else if (options.exclude) {
-      for (const handler of ConsensusProtocol.getPool().handlers) {
+      for (const handler of consensus.handlers) {
         if (!options.exclude.includes(handler.peer.peerId)) {
           handler.sendMessage(msg);
         }

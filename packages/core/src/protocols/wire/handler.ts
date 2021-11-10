@@ -2,7 +2,8 @@ import { bufferToInt, rlp, BN } from 'ethereumjs-util';
 import { mustParseTransction, Transaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/structure';
 import { logger, Channel, createBufferFunctionalSet } from '@gxchain2/utils';
 import { NodeStatus } from '../../node';
-import { HandlerBase, HandlerFunc, HandlerBaseOptions } from '../handlerBase';
+import { BaseHandler } from '../baseHandler';
+import { HandlerFunc, BaseHandlerOptions } from '../types';
 import { WireProtocol } from './protocol';
 
 const maxTxPacketSize = 102400;
@@ -181,12 +182,13 @@ const wireHandlerFuncs: HandlerFunc[] = [
   }
 ];
 
-export interface WireProtocolHandlerOptions extends Omit<HandlerBaseOptions, 'handlerFuncs'> {}
+export interface WireProtocolHandlerOptions extends Omit<BaseHandlerOptions<WireProtocol>, 'handlerFuncs'> {}
 
 /**
  * WireProtocolHandler is used to manage protocol communication between nodes
  */
-export class WireProtocolHandler extends HandlerBase<NodeStatus> {
+export class WireProtocolHandler extends BaseHandler<WireProtocol> {
+  private _status?: NodeStatus;
   private _knowTxs = createBufferFunctionalSet();
   private _knowBlocks = createBufferFunctionalSet();
 
@@ -194,7 +196,7 @@ export class WireProtocolHandler extends HandlerBase<NodeStatus> {
   private txAnnouncesQueue: Channel<Buffer>;
 
   protected onHandshakeSucceed() {
-    WireProtocol.getPool().add(this);
+    this.protocol.pool.add(this);
     this.announceTx(this.node.txPool.getPooledTransactionHashes());
   }
   protected onHandshake() {
@@ -207,7 +209,7 @@ export class WireProtocolHandler extends HandlerBase<NodeStatus> {
   protected onAbort() {
     this.newBlockAnnouncesQueue.abort();
     this.txAnnouncesQueue.abort();
-    WireProtocol.getPool().remove(this);
+    this.protocol.pool.remove(this);
   }
 
   protected encode(method: string | number, data: any) {
@@ -224,6 +226,18 @@ export class WireProtocolHandler extends HandlerBase<NodeStatus> {
     this.txAnnouncesQueue = new Channel<Buffer>({ max: maxQueuedTxs });
     this.newBlockAnnouncesLoop();
     this.txAnnouncesLoop();
+  }
+
+  get status() {
+    return this._status;
+  }
+
+  /**
+   * Update node status
+   * @param newStatus New status
+   */
+  updateStatus(newStatus: Partial<NodeStatus>) {
+    this._status = { ...this._status!, ...newStatus };
   }
 
   /**

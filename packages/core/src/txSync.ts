@@ -1,7 +1,7 @@
 import { bufferToHex } from 'ethereumjs-util';
 import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Channel, Aborter, logger } from '@gxchain2/utils';
 import { Transaction } from '@gxchain2/structure';
-import { WireProtocol, PeerRequestTimeoutError, maxTxRetrievals } from './protocols';
+import { PeerRequestTimeoutError, maxTxRetrievals } from './protocols';
 import { Node } from './node';
 
 type NewPooledTransactionMessage = {
@@ -318,19 +318,24 @@ export class TxFetcher {
         if (!p) {
           this.dropPeer(peer);
         } else {
-          WireProtocol.getHandler(p)
-            .getPooledTransactions(hashes)
-            .then((txs) => {
-              this.enqueueTransaction(peer, txs);
-            })
-            .catch((err) => {
-              if (err instanceof PeerRequestTimeoutError) {
-                this.requestTimeout(peer);
-              } else {
-                this.dropPeer(peer);
-              }
-              logger.error('TxFetcher::getPooledTransactions, catch error:', err);
-            });
+          const handler = this.node.wire.getHandler(p, false);
+          if (!handler) {
+            this.dropPeer(peer);
+          } else {
+            handler
+              .getPooledTransactions(hashes)
+              .then((txs) => {
+                this.enqueueTransaction(peer, txs);
+              })
+              .catch((err) => {
+                if (err instanceof PeerRequestTimeoutError) {
+                  this.requestTimeout(peer);
+                } else {
+                  this.dropPeer(peer);
+                }
+                logger.error('TxFetcher::getPooledTransactions, catch error:', err);
+              });
+          }
         }
       }
     }

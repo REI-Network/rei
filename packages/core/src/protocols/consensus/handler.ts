@@ -3,7 +3,8 @@ import { logger } from '@gxchain2/utils';
 import { ReimintConsensusEngine } from '../../consensus/reimint/reimintConsensusEngine';
 import { RoundStepType, Proposal, BitArray, VoteType, VoteSet, MessageFactory } from '../../consensus/reimint/types';
 import * as m from '../../consensus/reimint/types/messages';
-import { HandlerBase, HandlerFunc, HandlerBaseOptions } from '../handlerBase';
+import { BaseHandler } from '../baseHandler';
+import { HandlerFunc, BaseHandlerOptions } from '../types';
 import { ConsensusProtocol } from './protocol';
 
 const peerGossipSleepDuration = 100;
@@ -185,9 +186,9 @@ const consensusHandlerFuncs: HandlerFunc[] = [
   }
 ];
 
-export interface ConsensusProtocolHanderOptions extends Omit<HandlerBaseOptions, 'handlerFuncs'> {}
+export interface ConsensusProtocolHanderOptions extends Omit<BaseHandlerOptions<ConsensusProtocol>, 'handlerFuncs'> {}
 
-export class ConsensusProtocolHander extends HandlerBase<m.NewRoundStepMessage> {
+export class ConsensusProtocolHander extends BaseHandler<ConsensusProtocol> {
   readonly reimint?: ReimintConsensusEngine;
   private aborted: boolean = false;
 
@@ -209,7 +210,7 @@ export class ConsensusProtocolHander extends HandlerBase<m.NewRoundStepMessage> 
   /////////////// PeerRoundState ///////////////
 
   protected onHandshakeSucceed() {
-    ConsensusProtocol.getPool().add(this);
+    this.protocol.addHandler(this);
   }
   protected onHandshake() {
     this.send(0, this.reimint?.state.genNewRoundStepMessage() ?? defaultNewRoundStepMessage);
@@ -223,7 +224,7 @@ export class ConsensusProtocolHander extends HandlerBase<m.NewRoundStepMessage> 
   protected onAbort() {
     this.aborted = true;
     this.reimint?.off('start', this.onEngineStart);
-    ConsensusProtocol.getPool().remove(this);
+    this.protocol.removeHandler(this);
   }
 
   protected encode(method: string | number, data: any) {

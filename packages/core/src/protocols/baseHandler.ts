@@ -1,35 +1,18 @@
 import { bufferToInt } from 'ethereumjs-util';
 import { logger } from '@gxchain2/utils';
-import { ProtocolHandler, Peer } from '@gxchain2/network';
+import { ProtocolHandler, Peer, Protocol } from '@gxchain2/network';
 import { Node } from '../node';
-
-export class PeerRequestTimeoutError extends Error {}
-
-export type HandlerFunc = {
-  name: string;
-  code: number;
-  response?: number;
-  encode(data: any): any;
-  decode(data: any): any;
-  process?: (data: any) => Promise<[string, any]> | Promise<[string, any] | void> | [string, any] | void;
-};
-
-export interface HandlerBaseOptions {
-  node: Node;
-  name: string;
-  peer: Peer;
-  handlerFuncs: HandlerFunc[];
-}
+import { HandlerFunc, BaseHandlerOptions, PeerRequestTimeoutError } from './types';
 
 /**
  * WireProtocolHandler is used to manage protocol communication between nodes
  */
-export abstract class HandlerBase<T> implements ProtocolHandler {
+export abstract class BaseHandler<T extends Protocol> implements ProtocolHandler {
+  readonly protocol: T;
   readonly node: Node;
   readonly peer: Peer;
   readonly name: string;
 
-  protected _status?: T;
   protected handlerFuncs: HandlerFunc[];
 
   protected readonly waitingRequests = new Map<
@@ -47,13 +30,14 @@ export abstract class HandlerBase<T> implements ProtocolHandler {
 
   protected abstract onHandshakeSucceed(): void;
   protected abstract onHandshake(): void;
-  protected abstract onHandshakeResponse(statue: T): boolean;
+  protected abstract onHandshakeResponse(resps: any): boolean;
   protected abstract onAbort(): void;
 
   protected abstract encode(method: string | number, data: any): any;
   protected abstract decode(data: Buffer): [number, any];
 
-  constructor(options: HandlerBaseOptions) {
+  constructor(options: BaseHandlerOptions<T>) {
+    this.protocol = options.protocol;
     this.node = options.node;
     this.peer = options.peer;
     this.name = options.name;
@@ -86,18 +70,6 @@ export abstract class HandlerBase<T> implements ProtocolHandler {
     this.peer.send(this.name, this.encode(method, data));
   }
 
-  get status() {
-    return this._status;
-  }
-
-  /**
-   * Update node status
-   * @param newStatus New status
-   */
-  updateStatus(newStatus: Partial<T>) {
-    this._status = { ...this._status!, ...newStatus };
-  }
-
   /**
    * Node handshake and establish connection
    */
@@ -119,12 +91,11 @@ export abstract class HandlerBase<T> implements ProtocolHandler {
    * Response to handshake and update status
    * @param status Node Status
    */
-  handshakeResponse(status: T) {
+  handshakeResponse(status: any) {
     if (this.handshakeResolve) {
       if (!this.onHandshakeResponse(status)) {
         this.handshakeResolve(false);
       } else {
-        this.updateStatus(status);
         this.handshakeResolve(true);
       }
       this.handshakeResolve = undefined;

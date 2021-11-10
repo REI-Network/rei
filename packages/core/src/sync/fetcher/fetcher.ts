@@ -2,7 +2,7 @@ import { BN, KECCAK256_RLP } from 'ethereumjs-util';
 import { HChannel, PChannel, logger } from '@gxchain2/utils';
 import { BlockHeader, Block } from '@gxchain2/structure';
 import { Node } from '../../node';
-import { PeerRequestTimeoutError, WireProtocol, WireProtocolHandler } from '../../protocols';
+import { PeerRequestTimeoutError, WireProtocolHandler } from '../../protocols';
 import { preValidateBlock, preValidateHeader } from '../../validation';
 
 export interface FetcherOptions {
@@ -67,7 +67,7 @@ export class Fetcher {
       throw err;
     } finally {
       for (const handler of this.uselessHandlers) {
-        WireProtocol.getPool().put(handler);
+        this.node.wire.pool.put(handler);
       }
       this.uselessHandlers.clear();
     }
@@ -187,7 +187,7 @@ export class Fetcher {
 
       let handler: WireProtocolHandler;
       try {
-        handler = await WireProtocol.getPool().get();
+        handler = await this.node.wire.pool.get();
       } catch (err) {
         logger.warn('Fetcher::downloadBodiesLoop, catch error:', err);
         this.abort();
@@ -257,7 +257,7 @@ export class Fetcher {
             this.pushToBlockQueue(block);
           }
         }
-        WireProtocol.getPool().put(handler);
+        this.node.wire.pool.put(handler);
       })
       .catch((err) => {
         over();

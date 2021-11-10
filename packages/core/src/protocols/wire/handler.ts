@@ -38,6 +38,7 @@ const wireHandlerFuncs: HandlerFunc[] = [
     },
     process(this: WireProtocolHandler, status: NodeStatus) {
       this.handshakeResponse(status);
+      this.updateStatus(status);
     }
   },
   {

@@ -283,6 +283,9 @@ export class Node {
     });
     await this.blockchain.init();
 
+    this.wire = createProtocolByName(this, NetworkProtocol.GXC2_ETHWIRE) as WireProtocol;
+    this.consensus = createProtocolByName(this, NetworkProtocol.GXC2_CONSENSUS) as ConsensusProtocol;
+
     this.sync = new FullSynchronizer({ node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
     this.txPool = new TxPool({ node: this, journal: this.datadir });
 
@@ -290,9 +293,6 @@ export class Node {
     await this.networkdb.open();
 
     this.txSync = new TxFetcher(this);
-
-    this.wire = createProtocolByName(this, NetworkProtocol.GXC2_ETHWIRE) as WireProtocol;
-    this.consensus = createProtocolByName(this, NetworkProtocol.GXC2_CONSENSUS) as ConsensusProtocol;
 
     let bootnodes = options.p2p.bootnodes || [];
     bootnodes = bootnodes.concat(common.bootstrapNodes());
@@ -503,11 +503,6 @@ export class Node {
       return this.getStateManager(latest.header.stateRoot, latest._common);
     }
   }
-
-  /**
-   * Get wire protocol instance
-   */
-  getWireProtocol() {}
 
   /**
    * A loop that executes blocks sequentially

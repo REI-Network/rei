@@ -31,8 +31,8 @@ export declare interface NetworkManager {
   on(event: 'installed', listener: (name: string, peer: Peer) => void): this;
   on(event: 'removed', listener: (peer: Peer) => void): this;
 
-  once(event: 'installed', listener: (name: string, peer: Peer) => void): this;
-  once(event: 'removed', listener: (peer: Peer) => void): this;
+  off(event: 'installed', listener: (name: string, peer: Peer) => void): this;
+  off(event: 'removed', listener: (peer: Peer) => void): this;
 }
 
 enum Libp2pPeerValue {

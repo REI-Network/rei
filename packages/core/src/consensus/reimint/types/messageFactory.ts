@@ -74,3 +74,4 @@ MessageFactory.registry.register(m.VoteSetMaj23Message);
 MessageFactory.registry.register(m.VoteSetBitsMessage);
 MessageFactory.registry.register(m.GetProposalBlockMessage);
 MessageFactory.registry.register(m.ProposalBlockMessage);
+MessageFactory.registry.register(m.DuplicateVoteEvidenceMessage);

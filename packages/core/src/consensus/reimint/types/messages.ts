@@ -4,6 +4,7 @@ import { RoundStepType } from './roundStepType';
 import { Proposal } from './proposal';
 import { BitArray, BitArrayRaw } from './bitArray';
 import { Vote, VoteType } from './vote';
+import { DuplicateVoteEvidence } from './evidence';
 import * as v from './validate';
 
 export interface Message {
@@ -388,5 +389,36 @@ export class GetProposalBlockMessage implements Message {
 
   validateBasic() {
     v.validateHash(this.hash);
+  }
+}
+
+export class DuplicateVoteEvidenceMessage implements Message {
+  readonly evidence: DuplicateVoteEvidence;
+
+  constructor(evidence: DuplicateVoteEvidence) {
+    this.evidence = evidence;
+    this.validateBasic();
+  }
+
+  static readonly code = 10;
+
+  static fromValuesArray(values: Buffer[][]) {
+    return new DuplicateVoteEvidenceMessage(DuplicateVoteEvidence.fromValuesArray(values));
+  }
+
+  hash() {
+    return this.evidence.hash();
+  }
+
+  raw() {
+    return this.evidence.raw();
+  }
+
+  serialize(): Buffer {
+    return this.evidence.serialize();
+  }
+
+  validateBasic(): void {
+    // do nothing
   }
 }

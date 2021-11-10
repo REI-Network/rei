@@ -19,7 +19,7 @@ export interface IConfig {
 }
 
 export interface IEvidencePool {
-  addEvidence(ev: Evidence): Promise<void>;
+  addEvidence(ev: Evidence): Promise<boolean>;
   pickEvidence(height: BN, count: number): Promise<Evidence[]>;
 }
 

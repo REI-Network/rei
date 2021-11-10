@@ -1,3 +1,4 @@
+import EventEmitter from 'events';
 import { BN } from 'ethereumjs-util';
 import { Evidence } from './evidence';
 
@@ -19,7 +20,13 @@ export interface EvidencePoolOptions {
   maxAgeNumBlocks?: BN;
 }
 
-export class EvidencePool {
+export declare interface EvidencePool {
+  on(event: 'evidence', listener: (ev: Evidence) => void): this;
+
+  off(event: 'evidence', listener: (ev: Evidence) => void): this;
+}
+
+export class EvidencePool extends EventEmitter {
   private readonly backend: EvidencePoolBackend;
   private readonly maxCacheSize: number;
   private readonly maxAgeNumBlocks: BN;
@@ -30,6 +37,7 @@ export class EvidencePool {
   private pruningHeight: BN = new BN(0);
 
   constructor({ backend, maxCacheSize, maxAgeNumBlocks }: EvidencePoolOptions) {
+    super();
     this.backend = backend;
     this.maxCacheSize = maxCacheSize ?? defaultMaxCacheSize;
     this.maxAgeNumBlocks = maxAgeNumBlocks ?? defaultMaxAgeNumBlocks;
@@ -51,6 +59,7 @@ export class EvidencePool {
     if (this.cachedPendingEvidence.length > this.maxCacheSize) {
       this.cachedPendingEvidence.shift();
     }
+    this.emit('evidence', ev);
   }
 
   private async _init(height: BN) {
@@ -91,16 +100,18 @@ export class EvidencePool {
    */
   async addEvidence(ev: Evidence) {
     await this._afterInit();
+    if (this.isExpired(ev)) {
+      return false;
+    }
     if (await this.backend.isPending(ev)) {
-      return;
+      return false;
     }
     if (await this.backend.isCommitted(ev)) {
-      return;
+      return false;
     }
-    if (!this.isExpired(ev)) {
-      await this.backend.addPendingEvidence(ev);
-      this.addToCache(ev);
-    }
+    await this.backend.addPendingEvidence(ev);
+    this.addToCache(ev);
+    return true;
   }
 
   /**

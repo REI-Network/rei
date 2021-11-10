@@ -126,17 +126,17 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     const consensus = this.node.consensus;
     if (options.broadcast) {
       for (const handler of consensus.handlers) {
-        handler.sendMessage(msg);
+        handler.send(msg);
       }
     } else if (options.to) {
       const peer = this.node.networkMngr.getPeer(options.to);
       if (peer) {
-        consensus.getHandler(peer, false)?.sendMessage(msg);
+        consensus.getHandler(peer, false)?.send(msg);
       }
     } else if (options.exclude) {
       for (const handler of consensus.handlers) {
         if (!options.exclude.includes(handler.peer.peerId)) {
-          handler.sendMessage(msg);
+          handler.send(msg);
         }
       }
     } else {

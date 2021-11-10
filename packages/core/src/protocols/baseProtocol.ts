@@ -7,6 +7,8 @@ export abstract class BaseProtocol<T extends ProtocolHandler> implements Protoco
   readonly name: NetworkProtocol;
   readonly version: string;
 
+  abstract makeHandler(peer: Peer): T;
+
   constructor(node: Node, name: NetworkProtocol, version: string) {
     this.node = node;
     this.name = name;
@@ -20,11 +22,9 @@ export abstract class BaseProtocol<T extends ProtocolHandler> implements Protoco
     return `/${this.name}/${this.version}`;
   }
 
-  abstract makeHandler(peer: Peer): T;
-
   /**
    * Get the protocol handler of the peer
-   * @param peer Peer object
+   * @param peer - Peer object
    */
   getHandler(peer: Peer): T;
   getHandler(peer: Peer, throwError: true): T;

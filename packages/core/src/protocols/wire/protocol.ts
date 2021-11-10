@@ -13,12 +13,6 @@ export class WireProtocol extends BaseProtocol<WireProtocolHandler> implements P
   }
 
   makeHandler(peer: Peer) {
-    const handler = new WireProtocolHandler({
-      protocol: this,
-      node: this.node,
-      name: this.name,
-      peer
-    });
-    return handler;
+    return new WireProtocolHandler(this, peer);
   }
 }

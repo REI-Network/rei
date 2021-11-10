@@ -1,9 +1,9 @@
-import { bufferToInt, rlp, BN } from 'ethereumjs-util';
+import { bufferToInt, rlp, BN, intToBuffer } from 'ethereumjs-util';
 import { mustParseTransction, Transaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/structure';
 import { logger, Channel, createBufferFunctionalSet } from '@gxchain2/utils';
+import { ProtocolHandler, Peer } from '@gxchain2/network';
 import { NodeStatus } from '../../node';
-import { BaseHandler } from '../baseHandler';
-import { HandlerFunc, BaseHandlerOptions } from '../types';
+import { PeerRequestTimeoutError } from '../types';
 import { WireProtocol } from './protocol';
 
 const maxTxPacketSize = 102400;
@@ -14,6 +14,15 @@ const maxQueuedBlocks = 4;
 
 export const maxGetBlockHeaders = 128;
 export const maxTxRetrievals = 256;
+
+type HandlerFunc = {
+  name: string;
+  code: number;
+  response?: number;
+  encode(data: any): any;
+  decode(data: any): any;
+  process?: (data: any) => Promise<[string, any]> | Promise<[string, any] | void> | [string, any] | void;
+};
 
 const wireHandlerFuncs: HandlerFunc[] = [
   {
@@ -183,54 +192,59 @@ const wireHandlerFuncs: HandlerFunc[] = [
   }
 ];
 
-export interface WireProtocolHandlerOptions extends Omit<BaseHandlerOptions<WireProtocol>, 'handlerFuncs'> {}
-
 /**
  * WireProtocolHandler is used to manage protocol communication between nodes
  */
-export class WireProtocolHandler extends BaseHandler<WireProtocol> {
+export class WireProtocolHandler implements ProtocolHandler {
+  readonly peer: Peer;
+  readonly protocol: WireProtocol;
+
   private _status?: NodeStatus;
   private _knowTxs = createBufferFunctionalSet();
   private _knowBlocks = createBufferFunctionalSet();
 
+  protected handshakeResolve?: (result: boolean) => void;
+  protected handshakeTimeout?: NodeJS.Timeout;
+  protected readonly handshakePromise: Promise<boolean>;
+
+  protected readonly waitingRequests = new Map<
+    number,
+    {
+      resolve: (data: any) => void;
+      reject: (reason?: any) => void;
+      timeout: NodeJS.Timeout;
+    }
+  >();
+
   private newBlockAnnouncesQueue: Channel<{ block: Block; td: BN }>;
   private txAnnouncesQueue: Channel<Buffer>;
 
-  protected onHandshakeSucceed() {
-    this.protocol.pool.add(this);
-    this.announceTx(this.node.txPool.getPooledTransactionHashes());
-  }
-  protected onHandshake() {
-    this.send(0, this.node.status);
-  }
-  protected onHandshakeResponse(status: NodeStatus) {
-    const localStatus = this.node.status;
-    return localStatus.genesisHash.equals(status.genesisHash) && localStatus.networkId === status.networkId;
-  }
-  protected onAbort() {
-    this.newBlockAnnouncesQueue.abort();
-    this.txAnnouncesQueue.abort();
-    this.protocol.pool.remove(this);
-  }
-
-  protected encode(method: string | number, data: any) {
-    const handler = this.findHandler(method);
-    return rlp.encode([handler.code, handler.encode.call(this, data)]);
-  }
-  protected decode(data: Buffer) {
-    return rlp.decode(data) as unknown as [number, any];
-  }
-
-  constructor(options: WireProtocolHandlerOptions) {
-    super({ ...options, handlerFuncs: wireHandlerFuncs });
+  constructor(protocol: WireProtocol, peer: Peer) {
+    this.peer = peer;
+    this.protocol = protocol;
     this.newBlockAnnouncesQueue = new Channel<{ block: Block; td: BN }>({ max: maxQueuedBlocks });
     this.txAnnouncesQueue = new Channel<Buffer>({ max: maxQueuedTxs });
+
+    this.handshakePromise = new Promise<boolean>((resolve) => {
+      this.handshakeResolve = resolve;
+    });
+    this.handshakePromise.then((result) => {
+      if (result) {
+        this.protocol.pool.add(this);
+        this.announceTx(this.node.txPool.getPooledTransactionHashes());
+      }
+    });
+
     this.newBlockAnnouncesLoop();
     this.txAnnouncesLoop();
   }
 
   get status() {
     return this._status;
+  }
+
+  get node() {
+    return this.protocol.node;
   }
 
   /**
@@ -242,12 +256,165 @@ export class WireProtocolHandler extends BaseHandler<WireProtocol> {
   }
 
   /**
-   * Rotate and broadcast newly generated blocks
+   * Get method hander according to method name
+   * @param method - Method name
+   * @returns Handler function
    */
+  protected findHandler(method: string | number) {
+    const handler = wireHandlerFuncs.find((h) => (typeof method === 'string' ? h.name === method : h.code === method));
+    if (!handler) {
+      throw new Error(`Missing handler, method: ${method}`);
+    }
+    return handler;
+  }
+
+  /**
+   * {@link ProtocolHandler.handshake}
+   */
+  handshake() {
+    if (!this.handshakeResolve) {
+      throw new Error('repeated handshake');
+    }
+    this.send(0, this.node.status);
+    this.handshakeTimeout = setTimeout(() => {
+      if (this.handshakeResolve) {
+        this.handshakeResolve(false);
+        this.handshakeResolve = undefined;
+      }
+    }, 8000);
+    return this.handshakePromise;
+  }
+
+  /**
+   * Handshake response callback
+   * @param status - New node status
+   */
+  handshakeResponse(status: NodeStatus) {
+    if (this.handshakeResolve) {
+      const localStatus = this.node.status;
+      const result = localStatus.genesisHash.equals(status.genesisHash) && localStatus.networkId === status.networkId;
+      this.handshakeResolve(result);
+      this.handshakeResolve = undefined;
+      if (this.handshakeTimeout) {
+        clearTimeout(this.handshakeTimeout);
+        this.handshakeTimeout = undefined;
+      }
+    }
+  }
+
+  /**
+   * Send message to the remote peer
+   * @param method - Method name or code
+   * @param data - Message data
+   */
+  send(method: string | number, data: any) {
+    const handler = this.findHandler(method);
+    this.peer.send(this.protocol.name, rlp.encode([intToBuffer(handler.code), handler.encode.call(this, data)]));
+  }
+
+  /**
+   * Send message to the peer and wait for the response
+   * @param method - Method name
+   * @param data - Message data
+   * @returns Response
+   */
+  request(method: string, data: any) {
+    const handler = this.findHandler(method);
+    if (!handler.response) {
+      throw new Error(`invalid request: ${method}`);
+    }
+    if (this.waitingRequests.has(handler.response!)) {
+      throw new Error(`repeated request: ${method}`);
+    }
+    return new Promise<any>((resolve, reject) => {
+      this.waitingRequests.set(handler.response!, {
+        reject,
+        resolve,
+        timeout: setTimeout(() => {
+          this.waitingRequests.delete(handler.response!);
+          reject(new PeerRequestTimeoutError(`timeout request: ${method}`));
+        }, 8000)
+      });
+      this.send(method, data);
+    });
+  }
+
+  /**
+   * {@link ProtocolHandler.abort}
+   */
+  abort() {
+    if (this.handshakeResolve) {
+      this.handshakeResolve(false);
+      this.handshakeResolve = undefined;
+      if (this.handshakeTimeout) {
+        clearTimeout(this.handshakeTimeout);
+        this.handshakeTimeout = undefined;
+      }
+    }
+
+    for (const [, request] of this.waitingRequests) {
+      clearTimeout(request.timeout);
+      request.reject(new Error('abort'));
+    }
+    this.waitingRequests.clear();
+
+    this.newBlockAnnouncesQueue.abort();
+    this.txAnnouncesQueue.abort();
+    this.protocol.pool.remove(this);
+  }
+
+  /**
+   * Handle the data received from the remote peer
+   * @param data - Received data
+   */
+  async handle(data: Buffer) {
+    const decoded = rlp.decode(data);
+    if (!Array.isArray(decoded) || decoded.length !== 2) {
+      throw new Error('invalid decoded values');
+    }
+
+    const [codeBuf, valuesArray]: any = decoded;
+    const code = bufferToInt(codeBuf);
+    const handler = this.findHandler(code);
+    data = handler.decode.call(this, valuesArray);
+
+    const request = this.waitingRequests.get(code);
+    if (request) {
+      clearTimeout(request.timeout);
+      this.waitingRequests.delete(code);
+      request.resolve(data);
+    } else if (handler.process) {
+      if (code !== 0 && !(await this.handshakePromise)) {
+        logger.warn('WireProtocolHander::handle, handshake failed');
+        return;
+      }
+
+      const result = handler.process.call(this, data);
+      if (result) {
+        if (Array.isArray(result)) {
+          const [method, resps] = result;
+          this.send(method, resps);
+        } else {
+          result
+            .then((response) => {
+              if (response) {
+                const [method, resps] = response;
+                this.send(method, resps);
+              }
+            })
+            .catch((err) => {
+              logger.error('HandlerBase::process, catch error:', err);
+            });
+        }
+      }
+    }
+  }
+
   private async newBlockAnnouncesLoop() {
     if (!(await this.handshakePromise)) {
       return;
     }
+
     for await (const { block, td } of this.newBlockAnnouncesQueue.generator()) {
       try {
         this.newBlock(block, td);
@@ -257,13 +424,11 @@ export class WireProtocolHandler extends BaseHandler<WireProtocol> {
     }
   }
 
-  /**
-   * Rotate and broadcast newly generated transcations
-   */
   private async txAnnouncesLoop() {
     if (!(await this.handshakePromise)) {
       return;
     }
+
     let hashesCache: Buffer[] = [];
     for await (const hash of this.txAnnouncesQueue.generator()) {
       hashesCache.push(hash);
@@ -280,10 +445,10 @@ export class WireProtocolHandler extends BaseHandler<WireProtocol> {
   }
 
   /**
-   * Filter out known data
-   * @param know Known data
-   * @param data All data
-   * @param toHash function convert data into buffer
+   * Filter known data
+   * @param know - Known data
+   * @param data - All data
+   * @param toHash - Convert data to hash
    * @returns Filtered data
    */
   private filterHash<T>(know: Set<Buffer>, data: T[], toHash?: (t: T) => Buffer) {
@@ -298,9 +463,9 @@ export class WireProtocolHandler extends BaseHandler<WireProtocol> {
   }
 
   /**
-   * Call filterHash, filter out known transactions
-   * @param data All transactions
-   * @param toHash function convert data into buffer
+   * filter out known transactions
+   * @param data - All transactions
+   * @param toHash - Convert data to hash
    * @returns Filtered transactions
    */
   private filterTxs<T>(data: T[], toHash?: (t: T) => Buffer) {
@@ -309,8 +474,8 @@ export class WireProtocolHandler extends BaseHandler<WireProtocol> {
 
   /**
    * Call filterHash, filter out known blocks
-   * @param data All blocks
-   * @param toHash function convert data into buffer
+   * @param data - All blocks
+   * @param toHash - Convert data to hash
    * @returns Filtered blocks
    */
   private filterBlocks<T>(data: T[], toHash?: (t: T) => Buffer) {
@@ -319,9 +484,9 @@ export class WireProtocolHandler extends BaseHandler<WireProtocol> {
 
   /**
    * Add known data information
-   * @param know Previous data set
-   * @param max Maximum number of messages allowed to be stored
-   * @param hashs Data to be added
+   * @param know - Previous data set
+   * @param max - Maximum number of messages allowed to be stored
+   * @param hashs - Data to be added
    */
   private knowHash(know: Set<Buffer>, max: number, hashs: Buffer[]) {
     if (hashs.length >= max) {
@@ -338,7 +503,7 @@ export class WireProtocolHandler extends BaseHandler<WireProtocol> {
 
   /**
    * Call knowHash, add known transactions
-   * @param hashs Transactions to be added
+   * @param hashs - Transactions to be added
    */
   knowTxs(hashs: Buffer[]) {
     this.knowHash(this._knowTxs, maxKnownTxs, hashs);
@@ -346,7 +511,7 @@ export class WireProtocolHandler extends BaseHandler<WireProtocol> {
 
   /**
    * Call knowHash, add known blocks
-   * @param hashs Blocks to be added
+   * @param hashs - Blocks to be added
    */
   knowBlocks(hashs: Buffer[]) {
     this.knowHash(this._knowBlocks, maxKnownBlocks, hashs);
@@ -355,8 +520,8 @@ export class WireProtocolHandler extends BaseHandler<WireProtocol> {
   /**
    * Send new block message and add new block message to
    * the set of known set
-   * @param block New block
-   * @param td Total difficulty
+   * @param block - New block
+   * @param td - Total difficulty
    */
   private newBlock(block: Block, td: BN) {
     const filtered = this.filterBlocks([block], (b) => b.hash());
@@ -366,19 +531,19 @@ export class WireProtocolHandler extends BaseHandler<WireProtocol> {
     }
   }
 
-  private newBlockHashes(hashes: Buffer[]) {
-    const filtered = this.filterBlocks(hashes, (h) => h);
-    if (filtered.length > 0) {
-      this.send('NewBlockHashes', filtered);
-      this.knowBlocks(filtered);
-    }
-  }
+  // private newBlockHashes(hashes: Buffer[]) {
+  //   const filtered = this.filterBlocks(hashes, (h) => h);
+  //   if (filtered.length > 0) {
+  //     this.send('NewBlockHashes', filtered);
+  //     this.knowBlocks(filtered);
+  //   }
+  // }
 
   /**
    * Send new transactions which added to the pool
    * and add them to the known transactions set
    * the set of known set
-   * @param hashes
+   * @param - hashes
    */
   private newPooledTransactionHashes(hashes: Buffer[]) {
     const filtered = this.filterTxs(hashes, (h) => h);
@@ -390,8 +555,8 @@ export class WireProtocolHandler extends BaseHandler<WireProtocol> {
 
   /**
    * Make a request to get block headers
-   * @param start Start block number
-   * @param count Wanted blocks number
+   * @param start - Start block number
+   * @param count - Wanted blocks number
    * @returns The block headers
    */
   getBlockHeaders(start: number, count: number): Promise<BlockHeader[]> {
@@ -400,7 +565,7 @@ export class WireProtocolHandler extends BaseHandler<WireProtocol> {
 
   /**
    * Make a request to get block bodies
-   * @param headers Headers of blocks which wanted
+   * @param headers - Headers of blocks which wanted
    * @returns The block bodies
    */
   getBlockBodies(headers: BlockHeader[]): Promise<Transaction[][]> {
@@ -409,7 +574,7 @@ export class WireProtocolHandler extends BaseHandler<WireProtocol> {
 
   /**
    * Make a request to get pooled transactions
-   * @param hashes Transactions hashes
+   * @param hashes - Transactions hashes
    * @returns Transactions
    */
   getPooledTransactions(hashes: Buffer[]): Promise<Transaction[]> {
@@ -418,7 +583,7 @@ export class WireProtocolHandler extends BaseHandler<WireProtocol> {
 
   /**
    * Push transactions into txAnnouncesQueue
-   * @param hashes Transactions' hashes
+   * @param hashes - Transactions' hashes
    */
   announceTx(hashes: Buffer[]) {
     for (const hash of hashes) {
@@ -428,8 +593,8 @@ export class WireProtocolHandler extends BaseHandler<WireProtocol> {
 
   /**
    * Push block into newBlockAnnouncesQueue
-   * @param block Block object
-   * @param td Totol difficulty
+   * @param block - Block object
+   * @param td - Total difficulty
    */
   announceNewBlock(block: Block, td: BN) {
     this.newBlockAnnouncesQueue.push({ block, td });

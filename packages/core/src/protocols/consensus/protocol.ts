@@ -24,12 +24,6 @@ export class ConsensusProtocol extends BaseProtocol<ConsensusProtocolHander> imp
   }
 
   makeHandler(peer: Peer) {
-    const handler = new ConsensusProtocolHander({
-      protocol: this,
-      node: this.node,
-      name: this.name,
-      peer
-    });
-    return handler;
+    return new ConsensusProtocolHander(this, peer);
   }
 }

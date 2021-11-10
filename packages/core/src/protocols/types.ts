@@ -1,4 +1,4 @@
-import { Peer, Protocol } from '@gxchain2/network';
+import { Protocol } from '@gxchain2/network';
 import { Node } from '../node';
 import { WireProtocol } from './wire';
 import { ConsensusProtocol } from './consensus';
@@ -10,27 +10,10 @@ export enum NetworkProtocol {
 
 export class PeerRequestTimeoutError extends Error {}
 
-export type HandlerFunc = {
-  name: string;
-  code: number;
-  response?: number;
-  encode(data: any): any;
-  decode(data: any): any;
-  process?: (data: any) => Promise<[string, any]> | Promise<[string, any] | void> | [string, any] | void;
-};
-
-export interface BaseHandlerOptions<T extends Protocol> {
-  node: Node;
-  protocol: T;
-  name: string;
-  peer: Peer;
-  handlerFuncs: HandlerFunc[];
-}
-
 /**
  * Create Protocol by protocol name
- * @param node Node object
- * @param name Protocol name
+ * @param node - Node instance
+ * @param name - Protocol name
  * @returns Protocol objects
  */
 export function createProtocolByName(node: Node, name: string): Protocol {

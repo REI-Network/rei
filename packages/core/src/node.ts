@@ -128,11 +128,13 @@ type ProcessBlock = {
 };
 
 export class Node {
+  public readonly datadir: string;
   public readonly chaindb: LevelUp;
   public readonly nodedb: LevelUp;
   public readonly evidencedb: LevelUp;
   public readonly networkdb: LevelStore;
-  public readonly datadir: string;
+  public readonly wire: WireProtocol;
+  public readonly consensus: ConsensusProtocol;
   public readonly aborter = new Aborter();
 
   public db!: Database;
@@ -144,8 +146,6 @@ export class Node {
   public bloomBitsIndexer!: ChainIndexer;
   public bcMonitor!: BlockchainMonitor;
   public accMngr!: AccountManager;
-  public wire!: WireProtocol;
-  public consensus!: ConsensusProtocol;
 
   public readonly validatorSets = new ValidatorSets();
 
@@ -167,6 +167,8 @@ export class Node {
     this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));
     this.evidencedb = createLevelDB(path.join(this.datadir, 'evidence'));
     this.networkdb = new LevelStore(path.join(this.datadir, 'networkdb'), { createIfMissing: true });
+    this.wire = createProtocolByName(this, NetworkProtocol.GXC2_ETHWIRE) as WireProtocol;
+    this.consensus = createProtocolByName(this, NetworkProtocol.GXC2_CONSENSUS) as ConsensusProtocol;
     this.initPromise = this.init(options);
     this.taskLoopPromise = this.taskLoop();
     this.processLoopPromise = this.processLoop();
@@ -282,9 +284,6 @@ export class Node {
       hardforkByHeadBlockNumber: true
     });
     await this.blockchain.init();
-
-    this.wire = createProtocolByName(this, NetworkProtocol.GXC2_ETHWIRE) as WireProtocol;
-    this.consensus = createProtocolByName(this, NetworkProtocol.GXC2_CONSENSUS) as ConsensusProtocol;
 
     this.sync = new FullSynchronizer({ node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
     this.txPool = new TxPool({ node: this, journal: this.datadir });

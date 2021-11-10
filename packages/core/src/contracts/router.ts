@@ -8,8 +8,13 @@ const methods = {
   estimateTotalFee: toBuffer('0xab124206'),
   assignTransactionReward: toBuffer('0xcec7a83e'),
   assignBlockReward: toBuffer('0x0cccae70'),
+  slash: toBuffer('0x30b409a4'),
   onAfterBlock: toBuffer('0x9313f105')
 };
+
+export enum SlashReason {
+  DuplicateVote = 1
+}
 
 export class Router extends Contract {
   constructor(evm: EVM, common: Common) {
@@ -38,6 +43,13 @@ export class Router extends Contract {
   assignBlockReward(validator: Address, amount: BN) {
     return this.runWithLogger(async () => {
       const { logs } = await this.executeMessage(this.makeSystemCallerMessage('assignBlockReward', ['address'], [validator.toString()], amount));
+      return logs;
+    });
+  }
+
+  slash(validator: Address, reason: SlashReason) {
+    return this.runWithLogger(async () => {
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('slash', ['address', 'uint8'], [validator.toString(), reason]));
       return logs;
     });
   }

@@ -1,11 +1,15 @@
-import { BN, rlp, intToBuffer, bufferToInt } from 'ethereumjs-util';
-import { BlockHeader, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
-import { ValidatorSet } from '../../../staking';
+import { BN, rlp, intToBuffer, bufferToInt, BNLike } from 'ethereumjs-util';
+import VM from '@gxchain2-ethereumjs/vm';
+import { Common } from '@gxchain2/common';
+import { Block, BlockHeader, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
+import { Database } from '@gxchain2/database';
+import { ValidatorSet, ValidatorSets } from '../../../staking';
 import { Reimint } from '../reimint';
 import { Vote, VoteType, VoteSet } from './vote';
 import { EvidenceFactory } from './evidencFactory';
-import { Evidence } from './evidence';
+import { Evidence, DuplicateVoteEvidence } from './evidence';
 import { Proposal } from './proposal';
+import { StakeManager } from '../../../contracts';
 
 export interface ExtraDataOptions {
   header: BlockHeader;
@@ -68,6 +72,13 @@ function isRLPEvidenceList(ele: RLPElement): ele is RLPEvidenceList {
     }
   }
   return true;
+}
+
+export interface ExtraDataValidateBackend {
+  readonly db: Database;
+  readonly validatorSets: ValidatorSets;
+  getStakeManager(vm: VM, block: Block, common?: Common): StakeManager;
+  getVM(root: Buffer, num: BNLike | Common): Promise<VM>;
 }
 
 export class ExtraData {
@@ -133,9 +144,17 @@ export class ExtraData {
           throw new Error('invliad values');
         }
 
+        const maxEvidenceCount = header._common.param('vm', 'maxEvidenceCount');
+        if (typeof maxEvidenceCount !== 'number') {
+          throw new Error('invalid maxEvidenceCount');
+        }
+
+        if (value.length > maxEvidenceCount) {
+          throw new Error('invalid evidence count');
+        }
+
         evidence = value.map((buf) => {
           const ev = EvidenceFactory.fromValuesArray(buf);
-          // TODO: ev.validate()
           return ev;
         });
 
@@ -206,7 +225,7 @@ export class ExtraData {
   raw(validaterSetSize?: number) {
     const raw: rlp.Input = [];
     raw.push([intToBuffer(this.round), intToBuffer(this.POLRound + 1)]);
-    raw.push(this.evidence.map((ev) => ev.raw()));
+    raw.push(this.evidence.map((ev) => EvidenceFactory.rawEvidence(ev)));
     raw.push([intToBuffer(this.proposal.timestamp), this.proposal.signature!]);
     if (this.voteSet) {
       for (const vote of this.voteSet.votes) {
@@ -235,7 +254,7 @@ export class ExtraData {
     return this.voteSet?.valSet;
   }
 
-  validate() {
+  async validate(backend: ExtraDataValidateBackend) {
     if (this.round < 0 || this.round >= Number.MAX_SAFE_INTEGER) {
       throw new Error('invalid round');
     }
@@ -248,6 +267,17 @@ export class ExtraData {
     }
     if (!this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash)) {
       throw new Error('invalid vote set');
+    }
+
+    for (const ev of this.evidence) {
+      if (ev instanceof DuplicateVoteEvidence) {
+        const block = await backend.db.getBlock(ev.height);
+        const stakeManager = backend.getStakeManager(await backend.getVM(block.header.stateRoot, block._common), block);
+        const validatorSet = await backend.validatorSets.get(block.header.stateRoot, stakeManager);
+        ev.verify(validatorSet);
+      } else {
+        throw new Error('unknown evidence');
+      }
     }
   }
 }

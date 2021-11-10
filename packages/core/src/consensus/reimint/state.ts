@@ -441,7 +441,7 @@ export class StateMachine {
     const signer = this.signer!;
 
     const evidence = await evpool.pickEvidence(height, maxEvidenceCount);
-    const blockData = await pendingBlock.finalize({ round });
+    const blockData = await pendingBlock.finalize({ round, evidence });
 
     return Reimint.generateBlockAndProposal(blockData.header, blockData.transactions, {
       signer,

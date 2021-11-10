@@ -8,6 +8,7 @@ import { HeaderData, Block, TypedTransaction, Transaction } from '@gxchain2/stru
 import { Node } from '../node';
 import { Worker } from '../worker';
 import { ValidatorSet } from '../staking';
+import { Evidence } from './reimint/types';
 
 export enum ConsensusType {
   Clique,
@@ -21,6 +22,7 @@ export interface FinalizeOpts {
   receipts: TxReceipt[];
 
   round?: number;
+  evidence?: Evidence[];
   parentStateRoot?: Buffer;
 }
 

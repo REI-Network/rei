@@ -3,13 +3,13 @@ import { BaseTrie } from 'merkle-patricia-tree';
 import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
 import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
 import { Common } from '@gxchain2/common';
+import { nowTimestamp } from '@gxchain2/utils';
 import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@gxchain2/structure';
 import { ExtraData, Proposal, VoteType, VoteSet, Evidence, ISigner } from './types';
 import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../../utils';
 
 const defaultRound = 0;
 const defaultPOLRound = -1;
-const defaultProposalTimestamp = 0;
 const defaultValidaterSetSize = 1;
 const defaultEvidence = [];
 
@@ -180,7 +180,7 @@ export class Reimint {
 
       const round = options.round ?? defaultRound;
       const POLRound = options.POLRound ?? defaultPOLRound;
-      const timestamp = options.proposalTimestamp ?? defaultProposalTimestamp;
+      const timestamp = options.proposalTimestamp ?? nowTimestamp();
       const validaterSetSize = options.validatorSetSize ?? defaultValidaterSetSize;
       const evidence = options.evidence ?? defaultEvidence;
 

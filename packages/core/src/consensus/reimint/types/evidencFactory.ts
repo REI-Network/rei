@@ -36,9 +36,13 @@ export class EvidenceFactory {
     return EvidenceFactory.registry.getCtorByCode(bufferToInt(codeBuffer)).fromValuesArray(valuesArray);
   }
 
-  static serializeEvidence(ev: Evidence) {
+  static rawEvidence(ev: Evidence) {
     const code = EvidenceFactory.registry.getCodeByInstance(ev);
-    return rlp.encode([intToBuffer(code), ev.raw()]);
+    return [intToBuffer(code), ev.raw()];
+  }
+
+  static serializeEvidence(ev: Evidence) {
+    return rlp.encode(EvidenceFactory.rawEvidence(ev));
   }
 }
 

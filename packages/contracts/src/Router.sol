@@ -131,6 +131,15 @@ contract Router is ReentrancyGuard, Only {
     }
 
     /**
+     * @dev Slash validator by reason
+     * @param validator         Validator address
+     * @param reason            Slash reason
+     */
+    function slash(address validator, uint8 reason) external nonReentrant onlySystemCaller {
+        IStakeManager(config.stakeManager()).slash(validator, reason);
+    }
+
+    /**
      * @dev After block callback, it only can be called by system caller
      * @param _proposer         Proposer address
      * @param acValidators      Parameter of StakeManager.onAfterBlock

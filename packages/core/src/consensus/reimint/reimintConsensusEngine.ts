@@ -6,13 +6,13 @@ import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/stat
 import { Block, HeaderData, Log, Receipt } from '@gxchain2/structure';
 import { Common } from '@gxchain2/common';
 import { logger } from '@gxchain2/utils';
-import { StakeManager, Router } from '../../contracts';
+import { StakeManager, Router, SlashReason } from '../../contracts';
 import { ValidatorSet, ValidatorChanges } from '../../staking';
 import { Node, ProcessBlockOptions } from '../../node';
 import { isEmptyAddress, postByzantiumTxReceiptsToReceipts, getGasLimitByCommon } from '../../utils';
 import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from '../types';
 import { BaseConsensusEngine } from '../baseConsensusEngine';
-import { ExtraData, EvidencePool, EvidenceDatabase, WAL } from './types';
+import { ExtraData, Evidence, DuplicateVoteEvidence, EvidencePool, EvidenceDatabase, WAL } from './types';
 import { StateMachine } from './state';
 import { Reimint } from './reimint';
 import { makeRunTxCallback } from './makeRunTxCallback';
@@ -155,9 +155,10 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   /**
    * After apply block logic,
    * 1. call `Router.assignBlockReward`
-   * 2. collect all transaction logs
-   * 3. merge validator changes to parent validator set
-   * 4. call `Router.onAfterBlock`
+   * 2. call `Router.slash` (if evidence exists)
+   * 3. collect all transaction logs
+   * 4. merge validator changes to parent validator set
+   * 5. call `Router.onAfterBlock`
    * @param vm - VM instance
    * @param pendingBlock - Pending block
    * @param receipts - Transaction receipts
@@ -170,13 +171,24 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    *                       (used to call `Router.assignBlockReward` and `Router.onAfterBlock`)
    * @returns New validator set
    */
-  async afterApply(vm: VM, pendingBlock: Block, receipts: Receipt[], miner: Address, blockReward: BN, parentValidatorSet: ValidatorSet, parentStakeManager: StakeManager, parentRouter: Router) {
+  async afterApply(vm: VM, pendingBlock: Block, receipts: Receipt[], evidence: Evidence[], miner: Address, blockReward: BN, parentValidatorSet: ValidatorSet, parentStakeManager: StakeManager, parentRouter: Router) {
     const pendingCommon = pendingBlock._common;
 
-    let logs: Log[] | undefined;
+    let logs: Log[] = [];
     const ethLogs = await parentRouter.assignBlockReward(miner, blockReward);
     if (ethLogs && ethLogs.length > 0) {
-      logs = ethLogs.map((raw) => Log.fromValuesArray(raw));
+      logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));
+    }
+
+    for (const ev of evidence) {
+      if (ev instanceof DuplicateVoteEvidence) {
+        const ethLogs = await parentRouter.slash(ev.voteA.validator(), SlashReason.DuplicateVote);
+        if (ethLogs && ethLogs.length > 0) {
+          logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));
+        }
+      } else {
+        throw new Error('unknown evidence');
+      }
     }
 
     const { totalLockedAmount, validatorCount } = await parentStakeManager.getTotalLockedAmountAndValidatorCount();
@@ -248,9 +260,9 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    * {@link ConsensusEngine.finalize}
    */
   async finalize(options: FinalizeOpts) {
-    const { block, transactions, receipts, stateRoot, parentStateRoot, round } = options;
-    if (round === undefined || !parentStateRoot) {
-      throw new Error('missing state root');
+    const { block, transactions, receipts, stateRoot, parentStateRoot, round, evidence } = options;
+    if (round === undefined || evidence === undefined || !parentStateRoot) {
+      throw new Error('missing state root or round or evidence');
     }
 
     const pendingCommon = block._common;
@@ -267,7 +279,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     await vm.stateManager.checkpoint();
     try {
       await this.assignBlockReward(vm.stateManager, systemCaller, minerReward);
-      await this.afterApply(vm, block, postByzantiumTxReceiptsToReceipts(receipts), miner, minerReward, parentValidatorSet, parentStakeManager, parentRouter);
+      await this.afterApply(vm, block, postByzantiumTxReceiptsToReceipts(receipts), evidence, miner, minerReward, parentValidatorSet, parentStakeManager, parentRouter);
       await vm.stateManager.commit();
       const finalizedStateRoot = await vm.stateManager.getStateRoot();
       return {
@@ -301,7 +313,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     parentValidatorSet = extraData.validatorSet()!;
 
     if (!options.skipConsensusValidation) {
-      extraData.validate();
+      await extraData.validate(this.node);
     }
 
     let validatorSet!: ValidatorSet;
@@ -318,7 +330,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
       },
       afterApply: async (state, { receipts: postByzantiumTxReceipts }) => {
         const receipts = postByzantiumTxReceiptsToReceipts(postByzantiumTxReceipts);
-        validatorSet = await this.afterApply(vm, block, receipts, miner, blockReward, parentValidatorSet, parentStakeManager, parentRouter);
+        validatorSet = await this.afterApply(vm, block, receipts, extraData.evidence, miner, blockReward, parentValidatorSet, parentStakeManager, parentRouter);
       },
       runTxOpts: { ...runTxOpts, ...makeRunTxCallback(parentRouter, systemCaller, miner, pendingHeader.timestamp.toNumber()) }
     };

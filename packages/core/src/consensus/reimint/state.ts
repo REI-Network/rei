@@ -1,5 +1,5 @@
 import { BN, bufferToHex } from 'ethereumjs-util';
-import { Channel, logger } from '@gxchain2/utils';
+import { Channel, logger, nowTimestamp } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/structure';
 import { ValidatorSet } from '../../staking';
 import { PendingBlock } from '../pendingBlock';
@@ -498,7 +498,7 @@ export class StateMachine {
       type,
       height: this.height,
       round: this.round,
-      timestamp: 1,
+      timestamp: nowTimestamp(),
       hash,
       index
     });

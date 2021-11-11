@@ -173,6 +173,9 @@ export class ConsensusProtocolHander implements ProtocolHandler {
       } else {
         reimint.on('start', this.onEngineStart);
       }
+
+      const newRoundMsg = reimint.state.genNewRoundStepMessage();
+      newRoundMsg && this.send(newRoundMsg);
     }
 
     return true;

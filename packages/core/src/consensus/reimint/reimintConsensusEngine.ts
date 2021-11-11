@@ -313,7 +313,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     parentValidatorSet = extraData.validatorSet()!;
 
     if (!options.skipConsensusValidation) {
-      await extraData.validate(this.node);
+      await extraData.validate(this.node, this.evpool, pendingHeader.number);
     }
 
     let validatorSet!: ValidatorSet;

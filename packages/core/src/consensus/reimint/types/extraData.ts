@@ -4,12 +4,13 @@ import { Common } from '@gxchain2/common';
 import { Block, BlockHeader, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
 import { Database } from '@gxchain2/database';
 import { ValidatorSet, ValidatorSets } from '../../../staking';
+import { StakeManager } from '../../../contracts';
 import { Reimint } from '../reimint';
 import { Vote, VoteType, VoteSet } from './vote';
 import { EvidenceFactory } from './evidencFactory';
 import { Evidence, DuplicateVoteEvidence } from './evidence';
 import { Proposal } from './proposal';
-import { StakeManager } from '../../../contracts';
+import * as v from './validate';
 
 export interface ExtraDataOptions {
   header: BlockHeader;
@@ -55,21 +56,8 @@ function isRLPRoundAndPOLRound(ele: RLPElement): ele is RLPRoundAndPOLRound {
 }
 
 function isRLPEvidenceList(ele: RLPElement): ele is RLPEvidenceList {
-  if (!Array.isArray(ele)) {
+  if (!Array.isArray(ele) || (ele.length !== 0 && ele.length !== 2)) {
     return false;
-  }
-  for (const ev of ele) {
-    if (!(ev instanceof Buffer)) {
-      if (!Array.isArray(ev)) {
-        return false;
-      }
-
-      for (const _ele of ev) {
-        if (!(_ele instanceof Buffer)) {
-          return false;
-        }
-      }
-    }
   }
   return true;
 }
@@ -79,6 +67,10 @@ export interface ExtraDataValidateBackend {
   readonly validatorSets: ValidatorSets;
   getStakeManager(vm: VM, block: Block, common?: Common): StakeManager;
   getVM(root: Buffer, num: BNLike | Common): Promise<VM>;
+}
+
+export interface ExtraDataEvPoolBackend {
+  isExpired(ev: Evidence, height?: BN): boolean;
 }
 
 export class ExtraData {
@@ -220,6 +212,7 @@ export class ExtraData {
     if (voteSet && voteSet.signedMsgType !== VoteType.Precommit) {
       throw new Error('invalid vote set type');
     }
+    this.validateBasic();
   }
 
   raw(validaterSetSize?: number) {
@@ -254,26 +247,45 @@ export class ExtraData {
     return this.voteSet?.valSet;
   }
 
-  async validate(backend: ExtraDataValidateBackend) {
-    if (this.round < 0 || this.round >= Number.MAX_SAFE_INTEGER) {
-      throw new Error('invalid round');
+  validateBasic() {
+    v.validateRound(this.round);
+    v.validatePOLRound(this.POLRound);
+    if (this.voteSet) {
+      if (this.voteSet.voteCount() === 0 || !this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash)) {
+        throw new Error('invalid vote set');
+      }
     }
-    if (this.POLRound < -1 || this.POLRound >= Number.MAX_SAFE_INTEGER - 1) {
-      throw new Error('invalid POLRound');
-    }
+  }
 
-    if (!this.voteSet || this.voteSet.voteCount() === 0) {
+  async validate(backend: ExtraDataValidateBackend, evpool: ExtraDataEvPoolBackend, height: BN) {
+    if (!this.voteSet) {
       throw new Error('empty vote set');
     }
-    if (!this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash)) {
-      throw new Error('invalid vote set');
+
+    if (height.eqn(0)) {
+      throw new Error('invalid height');
+    } else if (height.eqn(1) && this.evidence.length !== 0) {
+      throw new Error('invalid evidence when height === 1');
     }
 
+    const finalizedHeight = height.subn(1);
+
     for (const ev of this.evidence) {
+      if (evpool.isExpired(ev, height)) {
+        throw new Error('expired evidence');
+      }
+      if (ev.height.gt(finalizedHeight)) {
+        throw new Error('future evidence');
+      }
+
       if (ev instanceof DuplicateVoteEvidence) {
-        const block = await backend.db.getBlock(ev.height);
-        const stakeManager = backend.getStakeManager(await backend.getVM(block.header.stateRoot, block._common), block);
-        const validatorSet = await backend.validatorSets.get(block.header.stateRoot, stakeManager);
+        // ev.height must be greater than 0, has been checked in ev.validateBasic
+        const parentHeight = ev.height.subn(1);
+        const parentBlock = await backend.db.getBlock(parentHeight);
+        const parentHeader = parentBlock.header;
+        const stakeManager = backend.getStakeManager(await backend.getVM(parentHeader.stateRoot, parentHeader._common), parentBlock);
+        let validatorSet = (await backend.validatorSets.get(parentHeader.stateRoot, stakeManager)).copy();
+        validatorSet.incrementProposerPriority(ev.voteA.round);
         ev.verify(validatorSet);
       } else {
         throw new Error('unknown evidence');

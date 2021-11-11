@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { BN, bufferToHex } from 'ethereumjs-util';
 import { Channel, logger, nowTimestamp } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/structure';

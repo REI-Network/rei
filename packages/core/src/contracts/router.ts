@@ -13,7 +13,7 @@ const methods = {
 };
 
 export enum SlashReason {
-  DuplicateVote = 1
+  DuplicateVote = 0
 }
 
 export class Router extends Contract {

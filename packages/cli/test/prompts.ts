@@ -5,6 +5,7 @@ import { Multiaddr } from 'multiaddr';
 import { program } from 'commander';
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
 import { Node } from '@gxchain2/core';
+import { ExtraData } from '@gxchain2/core/dist/consensus/reimint/types';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
 import { startNode, installOptions } from '../src/commands';
 import { SIGINT } from '../src/process';
@@ -84,6 +85,50 @@ const handler: {
   },
   lstxpool: async (node: Node) => {
     await node.txPool.ls();
+  },
+  lv: async (node: Node) => {
+    const state = node.getReimintEngine()!.state as any;
+    console.log('state:', state.height.toString(), state.round, state.step);
+    const rvotes = state.votes.roundVoteSets;
+    for (let i = 0; i < 2; i++) {
+      if (!rvotes.has(i)) {
+        break;
+      }
+      const { prevotes, precommits } = rvotes.get(i);
+      const print = (name, set) => {
+        console.log(
+          'name:',
+          name,
+          'content:',
+          set.votes.map((v) => {
+            if (v === undefined) {
+              return undefined;
+            } else {
+              return v.validator();
+            }
+          })
+        );
+      };
+      console.log('=========', i, '=========');
+      print('prevotes:', prevotes);
+      print('precommits:', precommits);
+      console.log('---------', i, '---------');
+    }
+  },
+  lh: async (node: Node, h: string) => {
+    const parentBlock = await node.db.getBlock(new BN(h).subn(1));
+    const block = await node.db.getBlock(new BN(h));
+    const stakeManager = node.getStakeManager(await node.getVM(parentBlock.header.stateRoot, parentBlock._common), parentBlock);
+    const validatorSet = await node.validatorSets.get(parentBlock.header.stateRoot, stakeManager);
+    // console.log('val:', validatorSet);
+    // console.log(ExtraData.fromBlockHeader(block.header));
+    console.log('----------------');
+    console.log(
+      ExtraData.fromBlockHeader(block.header, {
+        valSet: validatorSet,
+        increaseValSet: true
+      })
+    );
   }
 };
 

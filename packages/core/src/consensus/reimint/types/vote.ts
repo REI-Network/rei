@@ -1,5 +1,5 @@
 import { Address, BN, ecsign, ecrecover, rlp, intToBuffer, bnToUnpaddedBuffer, rlphash, bufferToInt } from 'ethereumjs-util';
-import { createBufferFunctionalMap /*, logger*/ } from '@gxchain2/utils';
+import { createBufferFunctionalMap, logger } from '@gxchain2/utils';
 import { ValidatorSet } from '../../../staking';
 import { BitArray } from './bitArray';
 import * as v from './validate';
@@ -212,7 +212,8 @@ export class VoteSet {
 
   addVote(vote: Vote) {
     if (!vote.height.eq(this.height) || vote.round !== this.round || vote.type !== this.signedMsgType) {
-      throw new Error('unexpected vote');
+      logger.deteil('VoteSet::addVote, invalid vote');
+      return;
     }
 
     // validate signature and validator address

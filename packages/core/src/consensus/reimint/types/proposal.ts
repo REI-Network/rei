@@ -100,9 +100,7 @@ export class Proposal {
     }
     v.validateHeight(this.height);
     v.validateRound(this.round);
-    if (this.POLRound !== -1) {
-      v.validateRound(this.POLRound);
-    }
+    v.validatePOLRound(this.POLRound);
     v.validateHash(this.hash);
     v.validateTimestamp(this.timestamp);
     if (this.isSigned()) {

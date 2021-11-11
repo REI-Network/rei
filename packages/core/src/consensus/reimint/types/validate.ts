@@ -14,6 +14,12 @@ export function validateRound(round: number) {
   }
 }
 
+export function validatePOLRound(POLRound: number) {
+  if (POLRound < -1 || POLRound >= Number.MAX_SAFE_INTEGER - 1) {
+    throw new Error('invalid POLRound');
+  }
+}
+
 export function validateStep(step: RoundStepType) {
   if (step !== RoundStepType.Propose && step !== RoundStepType.PrevoteWait && step !== RoundStepType.Prevote && step !== RoundStepType.PrecommitWait && step !== RoundStepType.Precommit && step !== RoundStepType.NewRound && step !== RoundStepType.NewHeight && step !== RoundStepType.Commit) {
     throw new Error('invalid step');

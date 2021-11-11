@@ -121,6 +121,12 @@ export class EvidencePool extends EventEmitter {
    * @returns Evidence list
    */
   async pickEvidence(height: BN, count: number) {
+    if (height.eqn(0)) {
+      throw new Error('invalid height');
+    } else if (height.eqn(1)) {
+      return [];
+    }
+
     const evList: Evidence[] = [];
     const from = height.gt(this.maxAgeNumBlocks) ? height.sub(this.maxAgeNumBlocks) : new BN(0);
     const to = height.subn(1);
@@ -139,8 +145,14 @@ export class EvidencePool extends EventEmitter {
     return evList;
   }
 
-  private isExpired(ev: Evidence) {
-    return this.height.sub(ev.height).gte(this.maxAgeNumBlocks);
+  /**
+   * Determine if evidence is expired
+   * @param ev - Evidence
+   * @param height - Local height(default: this.height)
+   * @returns Is expired
+   */
+  isExpired(ev: Evidence, height?: BN) {
+    return (height ?? this.height).sub(ev.height).gte(this.maxAgeNumBlocks);
   }
 
   private async pruneExpiredPendingEvidence() {

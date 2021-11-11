@@ -70,6 +70,9 @@ export class DuplicateVoteEvidence implements Evidence {
   }
 
   validateBasic(): void {
+    if (this.voteA.height.eqn(0)) {
+      throw new Error('invalid votes(zero height)');
+    }
     if (!this.voteA.isSigned() || !this.voteB.isSigned()) {
       throw new Error('invalid votes(unsigned)');
     }

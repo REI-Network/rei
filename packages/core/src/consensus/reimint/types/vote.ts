@@ -212,7 +212,7 @@ export class VoteSet {
 
   addVote(vote: Vote) {
     if (!vote.height.eq(this.height) || vote.round !== this.round || vote.type !== this.signedMsgType) {
-      logger.deteil('VoteSet::addVote, invalid vote');
+      logger.detail('VoteSet::addVote, invalid vote');
       return;
     }
 

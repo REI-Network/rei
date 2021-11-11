@@ -367,12 +367,17 @@ export class StateMachine {
         //   return;
         // }
 
+        const { voteA, voteB } = err;
         if (this.signer && vote.validator().equals(this.signer.address())) {
           // found conflicting vote from ourselves
+          logger.warn('local conflicting(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
           return;
         }
 
-        const { voteA, voteB } = err;
+        if (voteA.hash.equals(Buffer.alloc(32)) || voteB.hash.equals(Buffer.alloc(32))) {
+          logger.warn('zero hash');
+        }
+
         logger.debug('StateMachine::tryAddVote, catch duplicate vote evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
         this.evpool.addEvidence(DuplicateVoteEvidence.fromVotes(voteA, voteB));
       } else if (err instanceof DuplicateVotesError) {
@@ -882,10 +887,6 @@ export class StateMachine {
   }
 
   newBlockHeader(header: BlockHeader, validators: ValidatorSet, pendingBlock: PendingBlock) {
-    if (!this.height.eqn(0) && this.height.lt(header.number)) {
-      throw new Error('newBlockHeader invalid args');
-    }
-
     const timestamp = Date.now();
     this.parentHash = header.hash();
     this.height = header.number.addn(1);

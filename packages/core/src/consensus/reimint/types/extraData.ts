@@ -65,6 +65,7 @@ function isRLPEvidenceList(ele: RLPElement): ele is RLPEvidenceList {
 export interface ExtraDataValidateBackend {
   readonly db: Database;
   readonly validatorSets: ValidatorSets;
+  getCommon(num: BNLike): Common;
   getStakeManager(vm: VM, block: Block, common?: Common): StakeManager;
   getVM(root: Buffer, num: BNLike | Common): Promise<VM>;
 }
@@ -283,7 +284,12 @@ export class ExtraData {
         const parentHeight = ev.height.subn(1);
         const parentBlock = await backend.db.getBlock(parentHeight);
         const parentHeader = parentBlock.header;
-        const stakeManager = backend.getStakeManager(await backend.getVM(parentHeader.stateRoot, parentHeader._common), parentBlock);
+        /**
+         * If we use _common directly, it may cause some problems
+         * when the consensus algorithm is switched
+         */
+        const common = backend.getCommon(ev.height);
+        const stakeManager = backend.getStakeManager(await backend.getVM(parentHeader.stateRoot, common), parentBlock, common);
         let validatorSet = (await backend.validatorSets.get(parentHeader.stateRoot, stakeManager)).copy();
         validatorSet.incrementProposerPriority(ev.voteA.round);
         ev.verify(validatorSet);

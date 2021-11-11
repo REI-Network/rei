@@ -366,11 +366,14 @@ export class StateMachine {
         // if (!this.signer) {
         //   return;
         // }
+
         if (this.signer && vote.validator().equals(this.signer.address())) {
           // found conflicting vote from ourselves
           return;
         }
+
         const { voteA, voteB } = err;
+        logger.debug('StateMachine::tryAddVote, catch duplicate vote evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
         this.evpool.addEvidence(DuplicateVoteEvidence.fromVotes(voteA, voteB));
       } else if (err instanceof DuplicateVotesError) {
         logger.detail('StateMachine::tryAddVote, duplicate votes from:', peerId);

@@ -1,5 +1,5 @@
 import path from 'path';
-import { Address, BN, BNLike, ecsign, intToBuffer } from 'ethereumjs-util';
+import { Address, BN, BNLike, ecsign, intToBuffer, bufferToHex } from 'ethereumjs-util';
 import VM from '@gxchain2-ethereumjs/vm';
 import { RunBlockOpts, rewardAccount } from '@gxchain2-ethereumjs/vm/dist/runBlock';
 import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
@@ -182,6 +182,9 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
 
     for (const ev of evidence) {
       if (ev instanceof DuplicateVoteEvidence) {
+        const { voteA, voteB } = ev;
+        logger.debug('Reimint::afterApply, find evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
+
         const ethLogs = await parentRouter.slash(ev.voteA.validator(), SlashReason.DuplicateVote);
         if (ethLogs && ethLogs.length > 0) {
           logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));

@@ -86,42 +86,43 @@ const handler: {
   lstxpool: async (node: Node) => {
     await node.txPool.ls();
   },
-  lv: async (node: Node) => {
+  lstate: async (node: Node) => {
     const state = node.getReimintEngine()!.state as any;
-    console.log('state:', state.height.toString(), state.round, state.step);
-    const rvotes = state.votes.roundVoteSets;
-    for (let i = 0; i < 2; i++) {
-      if (!rvotes.has(i)) {
+    console.log('state(h,r,s):', state.height.toString(), state.round, state.step);
+    const roundVotes = state.votes.roundVoteSets;
+
+    const print = (name, set) => {
+      console.log(
+        'name:',
+        name,
+        'content:',
+        set.votes.map((v) => {
+          if (v === undefined) {
+            return undefined;
+          } else {
+            return v.validator();
+          }
+        })
+      );
+    };
+
+    for (let i = 0; ; i++) {
+      if (!roundVotes.has(i)) {
         break;
       }
-      const { prevotes, precommits } = rvotes.get(i);
-      const print = (name, set) => {
-        console.log(
-          'name:',
-          name,
-          'content:',
-          set.votes.map((v) => {
-            if (v === undefined) {
-              return undefined;
-            } else {
-              return v.validator();
-            }
-          })
-        );
-      };
-      console.log('=========', i, '=========');
+      const { prevotes, precommits } = roundVotes.get(i);
+      console.log('========= round:', i, '=========');
       print('prevotes:', prevotes);
       print('precommits:', precommits);
-      console.log('---------', i, '---------');
+      console.log('--------- round:', i, '---------');
     }
   },
-  lh: async (node: Node, h: string) => {
+  lsex: async (node: Node, h: string) => {
     const parentBlock = await node.db.getBlock(new BN(h).subn(1));
     const block = await node.db.getBlock(new BN(h));
-    const stakeManager = node.getStakeManager(await node.getVM(parentBlock.header.stateRoot, parentBlock._common), parentBlock);
+    const common = block._common;
+    const stakeManager = node.getStakeManager(await node.getVM(parentBlock.header.stateRoot, common), parentBlock, common);
     const validatorSet = await node.validatorSets.get(parentBlock.header.stateRoot, stakeManager);
-    // console.log('val:', validatorSet);
-    // console.log(ExtraData.fromBlockHeader(block.header));
     console.log('----------------');
     console.log(
       ExtraData.fromBlockHeader(block.header, {

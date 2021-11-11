@@ -8,7 +8,7 @@ import { HeaderData, Block, TypedTransaction, Transaction } from '@gxchain2/stru
 import { Node } from '../node';
 import { Worker } from '../worker';
 import { ValidatorSet } from '../staking';
-import { Evidence } from './reimint/types';
+import { Evidence, ExtraData } from './reimint/types';
 
 export enum ConsensusType {
   Clique,
@@ -34,6 +34,7 @@ export interface ProcessBlockOpts extends Pick<RunBlockOpts, 'block' | 'runTxOpt
 
 export interface ProcessBlockResult extends RunBlockResult {
   validatorSet?: ValidatorSet;
+  extraData?: ExtraData;
 }
 
 export interface ProcessTxOptions extends Omit<RunTxOpts, 'block' | 'beforeTx' | 'afterTx' | 'assignTxReward' | 'generateTxReceipt' | 'skipBalance'> {

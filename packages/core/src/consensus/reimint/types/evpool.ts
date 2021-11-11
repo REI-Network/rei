@@ -213,7 +213,6 @@ export class EvidencePool extends EventEmitter {
   /**
    * CheckEvidence takes an array of evidence from a block and verifies all the evidence there
    * @param evList - List of evidence
-   * @returns Return true, if check successfully
    */
   async checkEvidence(evList: Evidence[]) {
     const hashes = new Array<Buffer>(evList.length);
@@ -221,11 +220,15 @@ export class EvidencePool extends EventEmitter {
       const ev = evList[i];
 
       if (this.isExpired(ev)) {
-        return false;
+        throw new Error('expired evidence');
+      }
+
+      if (ev.height.gt(this.height)) {
+        throw new Error('future evidence');
       }
 
       if (await this.backend.isCommitted(ev)) {
-        return false;
+        throw new Error('committed evidence');
       }
 
       if (!(await this.backend.isPending(ev))) {
@@ -237,11 +240,9 @@ export class EvidencePool extends EventEmitter {
       hashes[i] = ev.hash();
       for (let j = i - 1; j >= 0; j--) {
         if (hashes[i].equals(hashes[j])) {
-          return false;
+          throw new Error('repeated evidence');
         }
       }
     }
-
-    return true;
   }
 }

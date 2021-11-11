@@ -515,15 +515,11 @@ export class Node {
         const hash = block.hash();
         const number = block.header.number;
         const common = block._common;
-        // ensure that every transaction is in the right common
-        for (const tx of block.transactions) {
-          tx.common.getHardforkByBlockNumber(number);
-        }
 
         // get parent header from database
         const parent = await this.db.getHeader(block.header.parentHash, number.subn(1));
         // process block through consensus engine
-        const { receipts: _receipts, validatorSet } = await this.getEngineByCommon(common).processBlock({ ...options, block, root: parent.stateRoot });
+        const { receipts: _receipts, validatorSet, extraData } = await this.getEngineByCommon(common).processBlock({ ...options, block, root: parent.stateRoot });
         // convert receipts
         const receipts = postByzantiumTxReceiptsToReceipts(_receipts);
 
@@ -548,6 +544,15 @@ export class Node {
         // if canonical chain changes, notify to other modules
         if (reorged) {
           const promises = [this.txPool.newBlock(block), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
+
+          /////////////////////////////////////
+          // TODO: this shouldn't belong here
+          const evpool = this.getReimintEngine()?.evpool;
+          if (extraData && evpool) {
+            promises.push(evpool.update(extraData.evidence, number));
+          }
+          /////////////////////////////////////
+
           if (options.broadcast) {
             promises.push(this.wire.broadcastNewBlock(block));
           }

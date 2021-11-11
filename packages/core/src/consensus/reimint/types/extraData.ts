@@ -70,10 +70,6 @@ export interface ExtraDataValidateBackend {
   getVM(root: Buffer, num: BNLike | Common): Promise<VM>;
 }
 
-export interface ExtraDataEvPoolBackend {
-  isExpired(ev: Evidence, height?: BN): boolean;
-}
-
 export class ExtraData {
   readonly evidence: Evidence[];
   readonly round: number;
@@ -258,27 +254,12 @@ export class ExtraData {
     }
   }
 
-  async validate(backend: ExtraDataValidateBackend, evpool: ExtraDataEvPoolBackend, height: BN) {
+  async validate(backend: ExtraDataValidateBackend) {
     if (!this.voteSet) {
       throw new Error('empty vote set');
     }
 
-    if (height.eqn(0)) {
-      throw new Error('invalid height');
-    } else if (height.eqn(1) && this.evidence.length !== 0) {
-      throw new Error('invalid evidence when height === 1');
-    }
-
-    const finalizedHeight = height.subn(1);
-
     for (const ev of this.evidence) {
-      if (evpool.isExpired(ev, height)) {
-        throw new Error('expired evidence');
-      }
-      if (ev.height.gt(finalizedHeight)) {
-        throw new Error('future evidence');
-      }
-
       if (ev instanceof DuplicateVoteEvidence) {
         // ev.height must be greater than 0, has been checked in ev.validateBasic
         const parentHeight = ev.height.subn(1);

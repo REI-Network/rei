@@ -87,6 +87,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    */
   protected async _newBlock(block: Block) {
     const header = block.header;
+
     // create a new pending block through worker
     const pendingBlock = await this.worker.createPendingBlock(header);
     if (!this.enable || this.node.sync.isSyncing) {
@@ -98,10 +99,11 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     pendingBlock.complete(difficulty, gasLimit);
 
     let validators = this.node.validatorSets.directlyGet(header.stateRoot);
-    // if the validator set doesn't exist, return
+    // if the validator set doesn't exist, load from state trie
     if (!validators) {
       const vm = await this.node.getVM(header.stateRoot, header._common);
-      validators = await this.node.validatorSets.get(header.stateRoot, this.node.getStakeManager(vm, block, this.node.getCommon(block.header.number.addn(1))));
+      const nextCommon = this.node.getCommon(block.header.number.addn(1));
+      validators = await this.node.validatorSets.get(header.stateRoot, this.node.getStakeManager(vm, block, nextCommon));
     }
 
     this.state.newBlockHeader(header, validators, pendingBlock);
@@ -316,7 +318,8 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     parentValidatorSet = extraData.validatorSet()!;
 
     if (!options.skipConsensusValidation) {
-      await extraData.validate(this.node, this.evpool, pendingHeader.number);
+      await extraData.validate(this.node);
+      await this.evpool.checkEvidence(extraData.evidence);
     }
 
     let validatorSet!: ValidatorSet;
@@ -349,7 +352,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
       'next proposer:',
       validatorSet.proposer.toString()
     );
-    return { ...result, validatorSet };
+    return { ...result, validatorSet, extraData };
   }
 
   /**

@@ -10,15 +10,15 @@ import "./DevConfig.sol";
  */
 contract Config_testnet is DevConfig {
     constructor() public {
-        ud = 1 days;
-        wd = 1 days;
+        ud = 7 days;
+        wd = 3 days;
         df = 283e18; // 283 GXC
         dff = 5e18; // 5 GXC
         uffl = 25e15; // 0.025 GXC
         fri = 1 days;
         ffri = 1 days;
         fpli = 1 days;
-        mivp = 1000e18;
+        mivp = 100e18; // 100 GXC
         scri = 1 days;
 
         // one of testnet genesis validators

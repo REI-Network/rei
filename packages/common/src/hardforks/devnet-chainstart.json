@@ -122,7 +122,7 @@
         },
         "minValidatorsCount": {
             "v": 3,
-            "d": "max validator set size"
+            "d": "min validator set size"
         },
         "minTotalLockedAmount": {
             "v": "100000000000000000000",

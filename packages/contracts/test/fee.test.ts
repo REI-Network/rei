@@ -7,7 +7,7 @@ import { toBN, upTimestamp } from './utils';
 declare var artifacts: Artifacts;
 declare var web3: Web3;
 
-const Config = artifacts.require('Config_test');
+const Config = artifacts.require('Config_devnet');
 const FeeToken = artifacts.require('FeeToken');
 const Fee = artifacts.require('Fee');
 const FreeFee = artifacts.require('FreeFee');

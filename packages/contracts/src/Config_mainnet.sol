@@ -4,24 +4,24 @@ pragma solidity ^0.6.0;
 
 import "./interfaces/IConfig.sol";
 
-// TODO: DAO logic
+/**
+ * Config contract for mainnet.
+ * In gxchain2, system contracts can be updated through hard forks,
+ * and DAO logic will be added in the futhure.
+ */
 contract Config is IConfig {
-    // get stake manager address
     function stakeManager() external view override returns (address) {
         return 0x0000000000000000000000000000000000001001;
     }
 
-    // get system caller address
     function systemCaller() external view override returns (address) {
         return 0x0000000000000000000000000000000000001002;
     }
 
-    // get unstake pool address
     function unstakePool() external view override returns (address) {
         return 0x0000000000000000000000000000000000001003;
     }
 
-    // get validator reward pool address
     function validatorRewardPool() external view override returns (address) {
         return 0x0000000000000000000000000000000000001004;
     }
@@ -46,68 +46,59 @@ contract Config is IConfig {
         return 0x000000000000000000000000000000000000100b;
     }
 
-    // get unstake delay
     function unstakeDelay() external view override returns (uint256) {
-        return 30 seconds;
+        return 7 days;
     }
 
     function withdrawDelay() external view override returns (uint256) {
-        return 30 seconds;
+        return 3 days;
     }
 
     function dailyFee() external view override returns (uint256) {
-        return 50000;
+        // 283 GXC
+        return 283e18;
     }
 
     function dailyFreeFee() external view override returns (uint256) {
-        return 30000;
+        // 5 GXC
+        return 5e18;
     }
 
     function userFreeFeeLimit() external view override returns (uint256) {
-        return 10000;
+        // 0.025 GXC
+        return 25e15;
     }
 
     function feeRecoverInterval() external view override returns (uint256) {
-        return 30 seconds;
+        return 1 days;
     }
 
     function freeFeeRecoverInterval() external view override returns (uint256) {
-        return 30 seconds;
+        return 1 days;
     }
 
     function feePoolLiquidateInterval() external view override returns (uint256) {
-        return 30 seconds;
+        return 1 days;
     }
 
-    /**
-     * @dev Get min index voting power.
-     *      Only when the validator's voting power is greater than this value, will the index be created for him.
-     *      The blockchain only sorts the validators who have created the index.
-     */
     function minIndexVotingPower() external view override returns (uint256) {
-        // 2 GXC
-        return 2e18;
+        // 1,000,000 GXC
+        return 1e24;
     }
 
-    /**
-     * @dev Get slash factor by reason.
-     * @param reason    Reason id.
-     *                  0 - Repeated sign.
-     */
+    function setCommissionRateInterval() external view override returns (uint256) {
+        return 1 days;
+    }
+
+    function minerRewardFactor() external view override returns (uint8) {
+        return 90;
+    }
+
     function getFactorByReason(uint8 reason) external view override returns (uint8) {
         if (reason == 0) {
             return 40;
         } else {
             revert("Config: invalid reason");
         }
-    }
-
-    // set commission rate interval
-    function setCommissionRateInterval() external view override returns (uint256) {
-        return 1 minutes;
-    }
-
-    function minerRewardFactor() external view override returns (uint8) {
-        return 90;
     }
 }

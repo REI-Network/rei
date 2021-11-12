@@ -6,7 +6,7 @@ import { BN, generateAddress, generateAddress2, Address, keccak256, MAX_INTEGER,
 declare var artifacts: Artifacts;
 declare var web3: Web3;
 
-const Config = artifacts.require('Config_test');
+const Config = artifacts.require('Config_devnet');
 const Factory = artifacts.require('Factory');
 const Product = artifacts.require('Product');
 const ContractFee = artifacts.require('ContractFee');

@@ -3,13 +3,13 @@ import { DeployFunction } from 'hardhat-deploy/dist/types';
 const func: DeployFunction = async function ({ deployments, getNamedAccounts }) {
   const { deploy, execute } = deployments;
   const { deployer } = await getNamedAccounts();
-  const config = await deploy('Config_test', {
+  const config = await deploy('Config_devnet', {
     from: deployer,
     log: true,
     deterministicDeployment: false,
     args: []
   });
-  await execute('Config_test', { from: deployer }, 'setSystemCaller', deployer);
+  await execute('Config_devnet', { from: deployer }, 'setSystemCaller', deployer);
 
   const deployContract = async (name: string, set: boolean = true, args: any[] = [config.address]) => {
     const contract = await deploy(name, {
@@ -19,7 +19,7 @@ const func: DeployFunction = async function ({ deployments, getNamedAccounts }) 
       args: args
     });
     if (set) {
-      await execute('Config_test', { from: deployer }, `set${name}`, contract.address);
+      await execute('Config_devnet', { from: deployer }, `set${name}`, contract.address);
     }
   };
 

@@ -7,7 +7,7 @@ import { upTimestamp, toBN } from './utils';
 declare var artifacts: Artifacts;
 declare var web3: Web3;
 
-const Config = artifacts.require('Config_test');
+const Config = artifacts.require('Config_devnet');
 const CommissionShare = artifacts.require('CommissionShare');
 const StakeManager = artifacts.require('StakeManager');
 const ValidatorRewardPool = artifacts.require('ValidatorRewardPool');

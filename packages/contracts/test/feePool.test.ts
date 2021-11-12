@@ -6,7 +6,7 @@ import { toBN } from './utils';
 declare var artifacts: Artifacts;
 declare var web3: Web3;
 
-const Config = artifacts.require('Config_test');
+const Config = artifacts.require('Config_devnet');
 const FeePool = artifacts.require('FeePool');
 const StakeManager = artifacts.require('StakeManager');
 const ValidatorRewardPool = artifacts.require('ValidatorRewardPool');

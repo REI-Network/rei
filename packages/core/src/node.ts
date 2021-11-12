@@ -647,7 +647,7 @@ export class Node {
     await this.taskLoopPromise;
     await this.processLoopPromise;
     await this.chaindb.close();
-    await this.evidencedb.clear();
+    await this.evidencedb.close();
     await this.nodedb.close();
     await this.networkdb.close();
   }

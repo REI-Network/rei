@@ -374,8 +374,8 @@ export class StateMachine {
           return;
         }
 
-        if (voteA.hash.equals(Buffer.alloc(32)) || voteB.hash.equals(Buffer.alloc(32))) {
-          logger.warn('zero hash');
+        if (voteA.hash.equals(EMPTY_HASH) || voteB.hash.equals(EMPTY_HASH)) {
+          logger.warn('zero hash, is there something wrong?');
         }
 
         logger.debug('StateMachine::tryAddVote, catch duplicate vote evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));

@@ -238,9 +238,11 @@ export class ConsensusProtocolHander implements ProtocolHandler {
       this.reimint?.state.newMessage(this.peer.peerId, msg);
     } else if (msg instanceof m.DuplicateVoteEvidenceMessage) {
       this.knowEvidence(msg.evidence);
-      this.reimint?.evpool.addEvidence(msg.evidence);
+      this.reimint?.evpool.addEvidence(msg.evidence).catch((err) => {
+        logger.error('ConsensusProtocolHander::handle, addEvidence, catch error:', err);
+      });
     } else {
-      logger.warn('ConsensusProtocolHander::handler, unknown message');
+      logger.warn('ConsensusProtocolHander::handle, unknown message');
     }
   }
 

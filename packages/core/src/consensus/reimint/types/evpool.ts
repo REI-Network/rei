@@ -260,7 +260,6 @@ export class EvidencePool extends EventEmitter {
         }
 
         if (await this.backend.isCommitted(ev)) {
-          console.log('isCommitted:', ev.hash());
           throw new Error('committed evidence');
         }
 

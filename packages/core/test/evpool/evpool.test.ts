@@ -1,4 +1,4 @@
-import { expect } from 'chai';
+import { expect, assert } from 'chai';
 import { BN } from 'ethereumjs-util';
 import { Evidence, EvidencePool, EvidencePoolBackend } from '../../src/consensus/reimint/types';
 import { MockEvidence } from './mockEvidence';
@@ -69,6 +69,17 @@ const getPoolInfo = (): {
     cachedPendingEvidence: [..._evpool.cachedPendingEvidence]
   };
 };
+
+async function shouldFailed(fn: () => Promise<void>, message?: string) {
+  try {
+    await fn();
+    assert.fail();
+  } catch (err: any) {
+    if (message) {
+      expect(err.message, 'error message should be equal').be.equal(message);
+    }
+  }
+}
 
 describe('EvidencePool', () => {
   before(async () => {
@@ -168,27 +179,28 @@ describe('EvidencePool', () => {
   });
 
   it('should check failed(conflicts)', async () => {
-    const result = await evpool.checkEvidence([new MockEvidence(new BN(10)), new MockEvidence(new BN(10))]);
-    expect(result).be.false;
+    await shouldFailed(async () => {
+      await evpool.checkEvidence([new MockEvidence(new BN(10)), new MockEvidence(new BN(10))]);
+    }, 'repeated evidence');
   });
 
   it('should check faild(expired)', async () => {
-    const result = await evpool.checkEvidence([new MockEvidence(new BN(1))]);
-    expect(result).be.false;
+    await shouldFailed(async () => {
+      await evpool.checkEvidence([new MockEvidence(new BN(1))]);
+    }, 'expired evidence');
   });
 
   it('should check faild(committed)', async () => {
-    const result = await evpool.checkEvidence([new MockEvidence(new BN(9))]);
-    expect(result).be.false;
+    await shouldFailed(async () => {
+      await evpool.checkEvidence([new MockEvidence(new BN(9))]);
+    }, 'committed evidence');
   });
 
   it('should check successfully', async () => {
-    const result = await evpool.checkEvidence([new MockEvidence(new BN(10))]);
+    await evpool.checkEvidence([new MockEvidence(new BN(10))]);
 
     // current pending: 7, 8, 10
     // current committed: 9
-
-    expect(result).be.true;
 
     expect(backend.committedEvidence.length).be.equal(1);
     expect(backend.committedEvidence[0].height.toNumber()).be.equal(9);

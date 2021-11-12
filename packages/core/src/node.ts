@@ -24,7 +24,7 @@ import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombi
 import { BlockchainMonitor } from './blockchainMonitor';
 import { createProtocolByName, NetworkProtocol, WireProtocol, ConsensusProtocol } from './protocols';
 import { ValidatorSets } from './staking';
-import { StakeManager, Router } from './contracts';
+import { StakeManager, Router, Contract } from './contracts';
 import { createEnginesByConsensusTypes, ConsensusEngine, ConsensusType, ProcessBlockOpts } from './consensus';
 import { ReimintConsensusEngine } from './consensus/reimint/reimintConsensusEngine';
 import { CliqueConsensusEngine } from './consensus/clique/cliqueConsensusEngine';
@@ -241,6 +241,7 @@ export class Node {
     }
 
     const common = Common.createChainStartCommon(typeof this.chain === 'string' ? this.chain : this.chain.chain);
+    common.setHardforkByBlockNumber(0);
     this.db = new Database(this.chaindb, common);
     this.networkId = common.networkIdBN().toNumber();
     this.chainId = common.chainIdBN().toNumber();
@@ -260,30 +261,49 @@ export class Node {
     }
 
     if (!genesisBlock) {
-      genesisBlock = Block.genesis({ header: common.genesis() }, { common });
+      genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
       logger.info('Read genesis block from file', bufferToHex(genesisBlock.hash()));
+      this.blockchain = new Blockchain({
+        dbManager: this.db,
+        common,
+        genesisBlock,
+        validateBlocks: false,
+        validateConsensus: false,
+        hardforkByHeadBlockNumber: true
+      });
+      await this.blockchain.init();
+
       if (typeof this.chain === 'string' || this.chain.genesisState) {
         const stateManager = new StateManager({ common, trie: new Trie(this.chaindb) });
         await stateManager.generateGenesis(typeof this.chain === 'string' ? getGenesisState(this.chain) : this.chain.genesisState);
-        const root = await stateManager.getStateRoot();
+        let root = await stateManager.getStateRoot();
+
+        // if it is devnet, deploy system contract now
+        if (this.chain === 'gxc2-devnet') {
+          const vm = await this.getVM(root, common);
+          const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
+          await Contract.deploy(evm, common);
+          root = await vm.stateManager.getStateRoot();
+        }
+
         if (!root.equals(genesisBlock.header.stateRoot)) {
           logger.error('State root not equal', bufferToHex(root), bufferToHex(genesisBlock.header.stateRoot));
           throw new Error('state root not equal');
         }
       }
+    } else {
+      this.blockchain = new Blockchain({
+        dbManager: this.db,
+        common,
+        genesisBlock,
+        validateBlocks: false,
+        validateConsensus: false,
+        hardforkByHeadBlockNumber: true
+      });
+      await this.blockchain.init();
     }
-    this.genesisHash = genesisBlock.hash();
 
-    common.setHardforkByBlockNumber(0);
-    this.blockchain = new Blockchain({
-      dbManager: this.db,
-      common,
-      genesisBlock,
-      validateBlocks: false,
-      validateConsensus: false,
-      hardforkByHeadBlockNumber: true
-    });
-    await this.blockchain.init();
+    this.genesisHash = genesisBlock.hash();
 
     this.sync = new FullSynchronizer({ node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
     this.txPool = new TxPool({ node: this, journal: this.datadir });

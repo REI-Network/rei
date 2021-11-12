@@ -103,7 +103,8 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     if (!validators) {
       const vm = await this.node.getVM(header.stateRoot, header._common);
       const nextCommon = this.node.getCommon(block.header.number.addn(1));
-      validators = await this.node.validatorSets.get(header.stateRoot, this.node.getStakeManager(vm, block, nextCommon));
+      const sm = this.node.getStakeManager(vm, block, nextCommon);
+      validators = await this.node.validatorSets.get(header.stateRoot, sm);
     }
 
     this.state.newBlockHeader(header, validators, pendingBlock);

@@ -51,7 +51,7 @@ export default {
       saveDeployments: true,
       url: 'http://127.0.0.1:11451',
       accounts,
-      chainId: 12357
+      chainId: 23579
     },
     mainnet: {
       url: `https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`,

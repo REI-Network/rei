@@ -32,7 +32,7 @@ const func: DeployFunction = async function ({ deployments, getNamedAccounts }) 
   await deployContract('FeeToken', false);
   await deployContract('FreeFeeToken', false);
   await deployContract('Router');
-  await deployContract('StakeManager', true, [config.address, []]);
+  await deployContract('StakeManager', true, [config.address, deployer, [], []]);
 };
 
 export default func;

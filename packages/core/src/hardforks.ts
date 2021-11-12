@@ -23,7 +23,9 @@ export function getConsensusTypeByCommon(common: Common) {
   if (common.chainName() === 'gxc2-testnet') {
     return common.gteHardfork('testnet-hf1') ? ConsensusType.Reimint : ConsensusType.Clique;
   } else if (common.chainName() === 'gxc2-mainnet') {
-    return common.gteHardfork('mainnet-hf1') ? ConsensusType.Reimint : ConsensusType.Clique;
+    return ConsensusType.Reimint;
+  } else if (common.chainName() === 'gxc2-devnet') {
+    return ConsensusType.Reimint;
   } else {
     throw new Error('unknown chain');
   }
@@ -38,7 +40,9 @@ export function isEnableStaking(common: Common) {
   if (common.chainName() === 'gxc2-testnet') {
     return common.gteHardfork('testnet-hf1');
   } else if (common.chainName() === 'gxc2-mainnet') {
-    return common.gteHardfork('mainnet-hf1');
+    return true;
+  } else if (common.chainName() === 'gxc2-devnet') {
+    return true;
   } else {
     throw new Error('unknown chain');
   }

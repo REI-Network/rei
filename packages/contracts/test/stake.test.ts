@@ -53,7 +53,7 @@ describe('StakeManger', () => {
     await config.methods.setValidatorRewardPool(validatorRewardPool.options.address).send();
     let unstakePool = new web3.eth.Contract(UnstakePool.abi, (await UnstakePool.new(config.options.address)).address, { from: deployer });
     await config.methods.setUnstakePool(unstakePool.options.address).send();
-    stakeManager = new web3.eth.Contract(StakeManager.abi, (await StakeManager.new(config.options.address, [genesis1, genesis2])).address, { from: deployer });
+    stakeManager = new web3.eth.Contract(StakeManager.abi, (await StakeManager.new(config.options.address, genesis1, [genesis1, genesis2], [100, 100])).address, { from: deployer });
     await config.methods.setStakeManager(stakeManager.options.address).send();
     unstakeDelay = toBN(await config.methods.unstakeDelay().call()).toNumber();
     minIndexVotingPower = toBN(await config.methods.minIndexVotingPower().call());

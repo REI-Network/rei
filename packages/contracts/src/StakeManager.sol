@@ -105,10 +105,18 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      */
     event UnindexedValidator(address indexed validator);
 
-    constructor(IConfig _config, address[] memory genesisValidators) public Only(_config) {
+    constructor(
+        IConfig _config,
+        address _proposer,
+        address[] memory genesisValidators,
+        int256[] memory priorities
+    ) public Only(_config) {
+        require(genesisValidators.length == priorities.length, "StakeManager: invalid list length");
+        proposer = _proposer;
         for (uint256 i = 0; i < genesisValidators.length; i = i.add(1)) {
-            // the validator was created, but not added to `indexedValidators`
-            createValidator(genesisValidators[i]);
+            address gv = genesisValidators[i];
+            createValidator(gv);
+            activeValidators.push(ActiveValidator(gv, priorities[i]));
         }
     }
 

@@ -39,7 +39,7 @@ describe('FeePool', () => {
     config = new web3.eth.Contract(Config.abi, (await Config.new()).address, { from: deployer });
     await config.methods.setRouter(deployer).send();
 
-    stakeManager = new web3.eth.Contract(StakeManager.abi, (await StakeManager.new(config.options.address, [])).address, { from: deployer });
+    stakeManager = new web3.eth.Contract(StakeManager.abi, (await StakeManager.new(config.options.address, deployer, [], [])).address, { from: deployer });
     await config.methods.setStakeManager(stakeManager.options.address).send();
 
     feePool = new web3.eth.Contract(FeePool.abi, (await FeePool.new(config.options.address)).address, { from: deployer });

@@ -3,8 +3,9 @@ import { Address, BN, MAX_INTEGER } from 'ethereumjs-util';
 import Message from '@gxchain2-ethereumjs/vm/dist/evm/message';
 import { Common } from '@gxchain2/common';
 import { hexStringToBuffer, logger } from '@gxchain2/utils';
-import { encode } from './utils';
 import { EMPTY_ADDRESS } from '../utils';
+import { ValidatorSet } from '../staking';
+import { encode } from './utils';
 
 export abstract class Contract {
   evm: EVM;
@@ -20,7 +21,11 @@ export abstract class Contract {
   }
 
   static async deploy(evm: EVM, common: Common) {
-    const genesisValidator: string[] = common.param('vm', 'genesisValidators');
+    const genesisValidators = ValidatorSet.createGenesisValidatorSet(common);
+    const activeValidators = genesisValidators.activeValidators();
+    const activeSigners = activeValidators.map(({ validator }) => validator.toString());
+    const priorities = activeValidators.map(({ priority }) => priority.toString());
+
     let cfgaddr!: string;
     const deploy = (prefix: string, args?: { types: string[]; values: any[] }) => {
       const code = hexStringToBuffer(common.param('vm', `${prefix}code`));
@@ -42,7 +47,7 @@ export abstract class Contract {
     // deploy config contract
     await deploy('cfg');
     // deploy stake manager contract
-    await deploy('sm', { types: ['address', 'address[]'], values: [cfgaddr, genesisValidator] });
+    await deploy('sm', { types: ['address', 'address', 'address[]', 'int256[]'], values: [cfgaddr, genesisValidators.proposer.toString(), activeSigners, priorities] });
     const defaultArgs = { types: ['address'], values: [cfgaddr] };
     // deploy fee contract
     await deploy('f', defaultArgs);

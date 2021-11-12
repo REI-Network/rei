@@ -108,7 +108,7 @@ export class EvidenceDatabase {
    * @param ev - Evidence
    */
   removePendingEvidence(ev: Evidence) {
-    return this.db.del(keyPending(ev), EvidenceFactory.serializeEvidence(ev));
+    return this.db.del(keyPending(ev));
   }
 
   /**

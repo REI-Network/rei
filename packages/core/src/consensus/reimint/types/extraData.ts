@@ -56,7 +56,7 @@ function isRLPRoundAndPOLRound(ele: RLPElement): ele is RLPRoundAndPOLRound {
 }
 
 function isRLPEvidenceList(ele: RLPElement): ele is RLPEvidenceList {
-  if (!Array.isArray(ele) || (ele.length !== 0 && ele.length !== 2)) {
+  if (!Array.isArray(ele)) {
     return false;
   }
   return true;

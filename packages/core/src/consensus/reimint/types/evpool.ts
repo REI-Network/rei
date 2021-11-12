@@ -1,4 +1,5 @@
 import EventEmitter from 'events';
+import Semaphore from 'semaphore-async-await';
 import { BN } from 'ethereumjs-util';
 import { Evidence } from './evidence';
 
@@ -28,6 +29,7 @@ export declare interface EvidencePool {
 
 export class EvidencePool extends EventEmitter {
   private readonly backend: EvidencePoolBackend;
+  private readonly lock = new Semaphore(1);
   private readonly maxCacheSize: number;
   private readonly maxAgeNumBlocks: BN;
   private initPromise?: Promise<void>;
@@ -47,6 +49,17 @@ export class EvidencePool extends EventEmitter {
     return [...this.cachedPendingEvidence];
   }
 
+  private async runWithLock<T>(fn: () => Promise<T>) {
+    try {
+      await this.lock.acquire();
+      return await fn();
+    } catch (err) {
+      throw err;
+    } finally {
+      this.lock.release();
+    }
+  }
+
   private deleteFromCache(ev: Evidence) {
     const index = this.cachedPendingEvidence.findIndex((_ev) => _ev.hash().equals(ev.hash()));
     if (index !== -1) {
@@ -55,6 +68,14 @@ export class EvidencePool extends EventEmitter {
   }
 
   private addToCache(ev: Evidence) {
+    // check repeated evidence
+    for (const _ev of this.cachedPendingEvidence) {
+      if (ev.hash().equals(_ev.hash())) {
+        return;
+      }
+    }
+
+    // push to cache
     this.cachedPendingEvidence.push(ev);
     if (this.cachedPendingEvidence.length > this.maxCacheSize) {
       this.cachedPendingEvidence.shift();
@@ -64,16 +85,18 @@ export class EvidencePool extends EventEmitter {
 
   private async _init(height: BN) {
     try {
-      this.height = height.clone();
-      await this.pruneExpiredPendingEvidence();
-      await this.backend.loadPendingEvidence({
-        // add 1 because we may have collected evidence for the next block
-        to: height.addn(1),
-        reverse: true,
-        onData: async (ev) => {
-          this.addToCache(ev);
-          return this.cachedPendingEvidence.length >= this.maxCacheSize;
-        }
+      await this.runWithLock(async () => {
+        this.height = height.clone();
+        await this.pruneExpiredPendingEvidence();
+        await this.backend.loadPendingEvidence({
+          // add 1 because we may have collected evidence for the next block
+          to: height.addn(1),
+          reverse: true,
+          onData: async (ev) => {
+            this.addToCache(ev);
+            return this.cachedPendingEvidence.length >= this.maxCacheSize;
+          }
+        });
       });
     } catch (err) {
       this.cachedPendingEvidence = [];
@@ -89,6 +112,10 @@ export class EvidencePool extends EventEmitter {
     return this.initPromise;
   }
 
+  /**
+   * Initialize evidence pool from the target height
+   * @param height - Target height
+   */
   init(height: BN) {
     return this.initPromise ?? (this.initPromise = this._init(height));
   }
@@ -100,18 +127,20 @@ export class EvidencePool extends EventEmitter {
    */
   async addEvidence(ev: Evidence) {
     await this._afterInit();
-    if (this.isExpired(ev)) {
-      return false;
-    }
-    if (await this.backend.isPending(ev)) {
-      return false;
-    }
-    if (await this.backend.isCommitted(ev)) {
-      return false;
-    }
-    await this.backend.addPendingEvidence(ev);
-    this.addToCache(ev);
-    return true;
+    return await this.runWithLock(async () => {
+      if (this.isExpired(ev)) {
+        return false;
+      }
+      if (await this.backend.isPending(ev)) {
+        return false;
+      }
+      if (await this.backend.isCommitted(ev)) {
+        return false;
+      }
+      await this.backend.addPendingEvidence(ev);
+      this.addToCache(ev);
+      return true;
+    });
   }
 
   /**
@@ -127,22 +156,25 @@ export class EvidencePool extends EventEmitter {
       return [];
     }
 
-    const evList: Evidence[] = [];
-    const from = height.gt(this.maxAgeNumBlocks) ? height.sub(this.maxAgeNumBlocks) : new BN(0);
-    const to = height.subn(1);
-    try {
-      await this.backend.loadPendingEvidence({
-        from,
-        to,
-        onData: async (ev) => {
-          evList.push(ev);
-          return evList.length >= count;
-        }
-      });
-    } catch (err) {
-      // ignore all errors
-    }
-    return evList;
+    await this._afterInit();
+    return await this.runWithLock(async () => {
+      const evList: Evidence[] = [];
+      const from = height.gt(this.maxAgeNumBlocks) ? height.sub(this.maxAgeNumBlocks) : new BN(0);
+      const to = height.subn(1);
+      try {
+        await this.backend.loadPendingEvidence({
+          from,
+          to,
+          onData: async (ev) => {
+            evList.push(ev);
+            return evList.length >= count;
+          }
+        });
+      } catch (err) {
+        // ignore all errors
+      }
+      return evList;
+    });
   }
 
   /**
@@ -189,25 +221,23 @@ export class EvidencePool extends EventEmitter {
       throw new Error('failed EvidencePool.Update new height is less than or equal to previous height: ' + height.toNumber() + '<=' + this.height.toNumber());
     }
 
-    this.height = height.clone();
+    await this._afterInit();
+    await this.runWithLock(async () => {
+      this.height = height.clone();
 
-    for (let i = 0; i < committedEvList.length; i++) {
-      const ev = committedEvList[i];
-      // save committed evidence
-      if (!(await this.backend.isCommitted(ev))) {
-        await this.backend.addCommittedEvidence(ev);
+      for (const ev of committedEvList) {
+        // save committed evidence
+        if (!(await this.backend.isCommitted(ev))) {
+          await this.backend.addCommittedEvidence(ev);
+          await this.backend.removePendingEvidence(ev);
+          this.deleteFromCache(ev);
+        }
       }
 
-      // mark pending evidence as committed
-      if (await this.backend.isPending(ev)) {
-        await this.backend.removePendingEvidence(ev);
-        this.deleteFromCache(ev);
+      if (this.height.gte(this.pruningHeight)) {
+        await this.pruneExpiredPendingEvidence();
       }
-    }
-
-    if (this.height.gte(this.pruningHeight)) {
-      await this.pruneExpiredPendingEvidence();
-    }
+    });
   }
 
   /**
@@ -215,34 +245,38 @@ export class EvidencePool extends EventEmitter {
    * @param evList - List of evidence
    */
   async checkEvidence(evList: Evidence[]) {
-    const hashes = new Array<Buffer>(evList.length);
-    for (let i = 0; i < evList.length; i++) {
-      const ev = evList[i];
+    await this._afterInit();
+    return await this.runWithLock(async () => {
+      const hashes = new Array<Buffer>(evList.length);
+      for (let i = 0; i < evList.length; i++) {
+        const ev = evList[i];
 
-      if (this.isExpired(ev)) {
-        throw new Error('expired evidence');
-      }
+        if (this.isExpired(ev)) {
+          throw new Error('expired evidence');
+        }
 
-      if (ev.height.gt(this.height)) {
-        throw new Error('future evidence');
-      }
+        if (ev.height.gt(this.height)) {
+          throw new Error('future evidence');
+        }
 
-      if (await this.backend.isCommitted(ev)) {
-        throw new Error('committed evidence');
-      }
+        if (await this.backend.isCommitted(ev)) {
+          console.log('isCommitted:', ev.hash());
+          throw new Error('committed evidence');
+        }
 
-      if (!(await this.backend.isPending(ev))) {
-        await this.backend.addPendingEvidence(ev);
-        this.addToCache(ev);
-      }
+        if (!(await this.backend.isPending(ev))) {
+          await this.backend.addPendingEvidence(ev);
+          this.addToCache(ev);
+        }
 
-      // check for hash conflicts
-      hashes[i] = ev.hash();
-      for (let j = i - 1; j >= 0; j--) {
-        if (hashes[i].equals(hashes[j])) {
-          throw new Error('repeated evidence');
+        // check for hash conflicts
+        hashes[i] = ev.hash();
+        for (let j = i - 1; j >= 0; j--) {
+          if (hashes[i].equals(hashes[j])) {
+            throw new Error('repeated evidence');
+          }
         }
       }
-    }
+    });
   }
 }

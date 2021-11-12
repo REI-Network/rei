@@ -32,7 +32,8 @@ export class EvidencePool extends EventEmitter {
   private readonly lock = new Semaphore(1);
   private readonly maxCacheSize: number;
   private readonly maxAgeNumBlocks: BN;
-  private initPromise?: Promise<void>;
+  private readonly initPromise: Promise<void>;
+  private initPromiseResolve!: () => void;
   // cached evidence for broadcast
   private cachedPendingEvidence: Evidence[] = [];
   private height: BN = new BN(0);
@@ -43,6 +44,9 @@ export class EvidencePool extends EventEmitter {
     this.backend = backend;
     this.maxCacheSize = maxCacheSize ?? defaultMaxCacheSize;
     this.maxAgeNumBlocks = maxAgeNumBlocks ?? defaultMaxAgeNumBlocks;
+    this.initPromise = new Promise<void>((resolve) => {
+      this.initPromiseResolve = resolve;
+    });
   }
 
   get pendingEvidence() {
@@ -83,7 +87,11 @@ export class EvidencePool extends EventEmitter {
     this.emit('evidence', ev);
   }
 
-  private async _init(height: BN) {
+  /**
+   * Initialize evidence pool from the target height
+   * @param height - Target height
+   */
+  async start(height: BN) {
     try {
       await this.runWithLock(async () => {
         this.height = height.clone();
@@ -97,6 +105,7 @@ export class EvidencePool extends EventEmitter {
             return this.cachedPendingEvidence.length >= this.maxCacheSize;
           }
         });
+        this.initPromiseResolve();
       });
     } catch (err) {
       this.cachedPendingEvidence = [];
@@ -105,28 +114,13 @@ export class EvidencePool extends EventEmitter {
     }
   }
 
-  private _afterInit() {
-    if (!this.initPromise) {
-      throw new Error('missing init promise');
-    }
-    return this.initPromise;
-  }
-
-  /**
-   * Initialize evidence pool from the target height
-   * @param height - Target height
-   */
-  init(height: BN) {
-    return this.initPromise ?? (this.initPromise = this._init(height));
-  }
-
   /**
    * Add a pending evidence to cache and database,
    * it will be called from p2p network or local state machine
    * @param ev - Pending evidence
    */
   async addEvidence(ev: Evidence) {
-    await this._afterInit();
+    await this.initPromise;
     return await this.runWithLock(async () => {
       if (this.isExpired(ev)) {
         return false;
@@ -156,7 +150,7 @@ export class EvidencePool extends EventEmitter {
       return [];
     }
 
-    await this._afterInit();
+    await this.initPromise;
     return await this.runWithLock(async () => {
       const evList: Evidence[] = [];
       const from = height.gt(this.maxAgeNumBlocks) ? height.sub(this.maxAgeNumBlocks) : new BN(0);
@@ -221,7 +215,7 @@ export class EvidencePool extends EventEmitter {
       throw new Error('failed EvidencePool.Update new height is less than or equal to previous height: ' + height.toNumber() + '<=' + this.height.toNumber());
     }
 
-    await this._afterInit();
+    await this.initPromise;
     await this.runWithLock(async () => {
       this.height = height.clone();
 
@@ -245,7 +239,7 @@ export class EvidencePool extends EventEmitter {
    * @param evList - List of evidence
    */
   async checkEvidence(evList: Evidence[]) {
-    await this._afterInit();
+    await this.initPromise;
     return await this.runWithLock(async () => {
       const hashes = new Array<Buffer>(evList.length);
       for (let i = 0; i < evList.length; i++) {

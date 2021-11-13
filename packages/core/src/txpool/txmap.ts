@@ -2,7 +2,7 @@ import { BN } from 'ethereumjs-util';
 import Heap from 'qheap';
 import { Transaction, WrappedTransaction } from '@gxchain2/structure';
 import { logger, createBNFunctionalMap } from '@gxchain2/utils';
-import { txSlots, txCost } from './index';
+import { txSlots, txCost } from './utils';
 
 /**
  * TxSortedMap is a nonce->transaction hash map with a heap based index to allow

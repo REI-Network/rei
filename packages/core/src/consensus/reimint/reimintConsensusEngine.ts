@@ -8,7 +8,8 @@ import { Common } from '@gxchain2/common';
 import { logger } from '@gxchain2/utils';
 import { StakeManager, Router, SlashReason } from '../../contracts';
 import { ValidatorSet, ValidatorChanges } from '../../staking';
-import { Node, ProcessBlockOptions } from '../../node';
+import { Node } from '../../node';
+import { ProcessBlockOptions } from '../../types';
 import { isEmptyAddress, postByzantiumTxReceiptsToReceipts, getGasLimitByCommon } from '../../utils';
 import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from '../types';
 import { BaseConsensusEngine } from '../baseConsensusEngine';
@@ -57,16 +58,12 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   readonly state: StateMachine;
   readonly evpool: EvidencePool;
   readonly config: SimpleConfig = new SimpleConfig();
-  readonly signer?: SimpleNodeSigner;
+  readonly signer: SimpleNodeSigner;
 
   constructor(options: ConsensusEngineOptions) {
     super(options);
-
+    this.signer = new SimpleNodeSigner(this.node);
     this.evpool = new EvidencePool({ backend: new EvidenceDatabase(options.node.evidencedb) });
-
-    if (!isEmptyAddress(this.coinbase) && this.node.accMngr.hasUnlockedAccount(this.coinbase)) {
-      this.signer = new SimpleNodeSigner(this.node);
-    }
     this.state = new StateMachine(this, this.node.consensus, this.evpool, new WAL({ path: path.join(options.node.datadir, 'WAL') }), this.node.getChainId(), this.config, this.signer);
   }
 

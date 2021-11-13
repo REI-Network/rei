@@ -84,8 +84,16 @@ export class TxFetcher {
     this.aborter = node.aborter;
     this.newPooledTransactionQueue = new Channel<NewPooledTransactionMessage>();
     this.enqueueTransactionQueue = new Channel<EnqueuePooledTransactionMessage>();
+  }
+
+  start() {
     this.newPooledTransactionLoop();
     this.enqueueTransactionLoop();
+  }
+
+  abort() {
+    this.newPooledTransactionQueue.abort();
+    this.enqueueTransactionQueue.abort();
   }
 
   /**

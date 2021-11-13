@@ -1,23 +1,17 @@
 import { BN } from 'ethereumjs-util';
 import { BlockHeader } from '@gxchain2/structure';
-import { DBSaveBloomBits, DBOp } from '@gxchain2/database';
-import { ChainIndexer, ChainIndexerBackend } from './chainindexer';
+import { DBSaveBloomBits, DBOp, Database } from '@gxchain2/database';
 import { BloomBitsGenerator } from '../bloombits';
-import { Node } from '../node';
 import { BloomBitLength } from '../bloombits';
-
-export interface BloomBitsIndexerOptions {
-  node: Node;
-  sectionSize: number;
-  confirmsBlockNumber: number;
-}
+import { ChainIndexer } from './chainindexer';
+import { BloomBitsIndexerOptions, ChainIndexerBackend } from './types';
 
 /**
  * BloomBitsIndexer implements ChainIndexerBackend, used to retrieve bloom
  */
 export class BloomBitsIndexer implements ChainIndexerBackend {
   private readonly sectionSize: number;
-  private readonly node: Node;
+  private readonly db: Database;
   private gen: BloomBitsGenerator;
   private section!: BN;
   private headerHash!: Buffer;
@@ -32,7 +26,7 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
   }
 
   constructor(options: BloomBitsIndexerOptions) {
-    this.node = options.node;
+    this.db = options.db;
     this.sectionSize = options.sectionSize;
     this.gen = new BloomBitsGenerator(options.sectionSize);
   }
@@ -71,6 +65,6 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
       const bits = this.gen.bitset(i);
       batch.push(DBSaveBloomBits(i, this.section, this.headerHash, Buffer.from(bits)));
     }
-    await this.node.db.batch(batch);
+    await this.db.batch(batch);
   }
 }

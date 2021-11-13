@@ -1,6 +1,6 @@
 import fs from 'fs';
 import process from 'process';
-import { Node } from '@gxchain2/core';
+import { Node, NodeFactory } from '@gxchain2/core';
 import { RpcServer } from '@gxchain2/rpc';
 import { setLevel, logger } from '@gxchain2/utils';
 import { SIGINT } from '../process';
@@ -26,7 +26,7 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     keyStorePath: getKeyStorePath(opts),
     unlock: addresses.map((address, i): [string, string] => [address, passphrase[i]])
   };
-  const p2p = {
+  const network = {
     enable: !opts.disableP2p,
     tcpPort: opts.p2pTcpPort ? Number(opts.p2pTcpPort) : undefined,
     udpPort: opts.p2pUdpPort ? Number(opts.p2pUdpPort) : undefined,
@@ -39,14 +39,13 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     enable: !!opts.mine,
     coinbase: opts.coinbase
   };
-  const node = new Node({
+  const node = await NodeFactory.createNode({
     databasePath: opts.datadir,
     chain: opts.chain,
     mine,
-    p2p,
+    network,
     account
   });
-  await node.init();
   SIGINT(node);
   let server: undefined | RpcServer;
   if (opts.rpc) {

@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
 import Heap from 'qheap';
 import { Transaction } from '@gxchain2/structure';
-import { txSlots } from './index';
+import { txSlots } from './utils';
 
 export class TxPricedList {
   remotes: Heap;

@@ -10,6 +10,8 @@ export const EMPTY_EXTRA_DATA = Buffer.alloc(CLIQUE_EXTRA_VANITY);
 export const EMPTY_MIX_HASH = Buffer.alloc(32);
 export const EMPTY_NONCE = Buffer.alloc(8);
 
+export const MAX_UINT64 = new BN(Buffer.from('ffffffffffffffff', 'hex'));
+
 export function isEmptyAddress(address: Address) {
   return address.equals(EMPTY_ADDRESS);
 }

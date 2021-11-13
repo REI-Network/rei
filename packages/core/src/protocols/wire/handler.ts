@@ -2,7 +2,7 @@ import { bufferToInt, rlp, BN, intToBuffer } from 'ethereumjs-util';
 import { mustParseTransction, Transaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/structure';
 import { logger, Channel, createBufferFunctionalSet } from '@gxchain2/utils';
 import { ProtocolHandler, Peer } from '@gxchain2/network';
-import { NodeStatus } from '../../node';
+import { NodeStatus } from '../../types';
 import { PeerRequestTimeoutError } from '../types';
 import { WireProtocol } from './protocol';
 

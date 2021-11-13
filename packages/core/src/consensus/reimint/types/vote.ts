@@ -43,10 +43,6 @@ export class Vote {
   readonly index: number;
   private _signature?: Buffer;
 
-  static fromVoteData(data: VoteData) {
-    return new Vote(data);
-  }
-
   static fromSerializedVote(serialized: Buffer) {
     const values = rlp.decode(serialized);
     if (!Array.isArray(values)) {

@@ -1,46 +1,9 @@
 import { BN } from 'ethereumjs-util';
 import { BlockHeader } from '@gxchain2/structure';
 import { Channel, logger } from '@gxchain2/utils';
-import { Node } from '../node';
-
-/**
- * ChainIndexerBackend defines the methods needed to process chain segments in
- * the background and write the segment results into the database. These can be
- * used to create filter blooms.
- */
-export interface ChainIndexerBackend {
-  /**
-   * Reset initiates the processing of a new chain segment, potentially terminating
-   * any partially completed operations (in case of a reorg).
-   * @param section The label of the regenerated section
-   */
-  reset(section: BN): void;
-
-  /**
-   * Process crunches through the next header in the chain segment. The caller
-   * will ensure a sequential order of headers.
-   * @param header
-   */
-  process(header: BlockHeader): void;
-
-  /**
-   * Commit finalizes the section metadata and stores it into the database.
-   */
-  commit(): Promise<void>;
-
-  /**
-   * Prune deletes the chain index older than the given threshold.
-   * @param section Larger than the section will be deleted
-   */
-  prune(section: BN): Promise<void>;
-}
-
-export interface ChainIndexerOptions {
-  node: Node;
-  sectionSize: number;
-  confirmsBlockNumber: number;
-  backend: ChainIndexerBackend;
-}
+import { Database } from '@gxchain2/database';
+import { Initializer } from '../types';
+import { ChainIndexerBackend, ChainIndexerOptions } from './types';
 
 /**
  * ChainIndexer does a post-processing job for equally sized sections of the canonical chain
@@ -50,38 +13,39 @@ export interface ChainIndexerOptions {
  * These child indexers receive new head notifications only after an entire section has been finished
  * or in case of rollbacks that might affect already finished sections.
  */
-export class ChainIndexer {
+export class ChainIndexer extends Initializer {
+  private readonly db: Database;
+  private readonly backend: ChainIndexerBackend;
   private readonly sectionSize: number;
   private readonly confirmsBlockNumber: number;
-  private readonly backend: ChainIndexerBackend;
-  private readonly node: Node;
-  private readonly initPromise: Promise<void>;
-  private readonly processHeaderLoopPromise: Promise<void>;
   private readonly headerQueue: Channel<BlockHeader>;
 
-  private storedSections: BN | undefined;
+  private storedSections?: BN;
+  private processHeaderLoopPromise?: Promise<void>;
 
   constructor(options: ChainIndexerOptions) {
+    super();
+    this.db = options.db;
+    this.backend = options.backend;
     this.sectionSize = options.sectionSize;
     this.confirmsBlockNumber = options.confirmsBlockNumber;
-    this.backend = options.backend;
-    this.node = options.node;
-    this.initPromise = this.init();
     this.headerQueue = new Channel<BlockHeader>({ max: 1 });
-    this.processHeaderLoopPromise = this.processHeaderLoop();
   }
 
   async init() {
-    if (this.initPromise) {
-      await this.initPromise;
-      return;
-    }
-    this.storedSections = await this.node.db.getStoredSectionCount();
+    this.storedSections = await this.db.getStoredSectionCount();
+    this.initOver();
+  }
+
+  start() {
+    this.initPromise.then(() => {
+      this.processHeaderLoopPromise = this.processHeaderLoop();
+    });
   }
 
   async abort() {
     this.headerQueue.abort();
-    await this.processHeaderLoop;
+    await this.processHeaderLoopPromise;
   }
 
   async newBlockHeader(header: BlockHeader) {
@@ -98,7 +62,7 @@ export class ChainIndexer {
     for await (const header of this.headerQueue.generator()) {
       try {
         if (preHeader !== undefined && !header.parentHash.equals(preHeader.hash())) {
-          const ancestor = await this.node.db.findCommonAncestor(header, preHeader);
+          const ancestor = await this.db.findCommonAncestor(header, preHeader);
           await this.newHeader(ancestor.number, true);
         }
         await this.newHeader(header.number, false);
@@ -125,17 +89,17 @@ export class ChainIndexer {
         await this.backend.prune(confirmedSections);
         this.storedSections = confirmedSections.clone();
       }
-      await this.node.db.setStoredSectionCount(this.storedSections);
+      await this.db.setStoredSectionCount(this.storedSections);
       return;
     }
     if (confirmedSections !== undefined && (this.storedSections === undefined || confirmedSections.gt(this.storedSections))) {
       for (const currentSections = this.storedSections ? this.storedSections.clone() : new BN(0); confirmedSections.gte(currentSections); currentSections.iaddn(1)) {
         this.backend.reset(currentSections);
-        let lastHeader = currentSections.gtn(0) ? await this.node.db.getCanonicalHeader(currentSections.muln(this.sectionSize).subn(1)) : undefined;
+        let lastHeader = currentSections.gtn(0) ? await this.db.getCanonicalHeader(currentSections.muln(this.sectionSize).subn(1)) : undefined;
         // the first header number of the next section.
         const maxNum = currentSections.addn(1).muln(this.sectionSize);
         for (const num = currentSections.muln(this.sectionSize); num.lt(maxNum); num.iaddn(1)) {
-          const header = await this.node.db.getCanonicalHeader(num);
+          const header = await this.db.getCanonicalHeader(num);
           if (lastHeader !== undefined && !header.parentHash.equals(lastHeader.hash())) {
             throw new Error(`parentHash is'not match, last: ${lastHeader.number.toString()}, current: ${header.number.toString()}`);
           }
@@ -144,7 +108,7 @@ export class ChainIndexer {
         }
         await this.backend.commit();
         // save stored section count.
-        await this.node.db.setStoredSectionCount(currentSections);
+        await this.db.setStoredSectionCount(currentSections);
         this.storedSections = currentSections.clone();
       }
     }

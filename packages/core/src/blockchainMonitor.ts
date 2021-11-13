@@ -1,8 +1,8 @@
-import EventEmitter from 'events';
 import { BN } from 'ethereumjs-util';
 import { Transaction, Block, BlockHeader, Log } from '@gxchain2/structure';
 import { createBufferFunctionalMap, logger } from '@gxchain2/utils';
-import { Node } from './node';
+import { Database } from '@gxchain2/database';
+import { InitializerWithEventEmitter } from './types';
 
 // record block hash and block number for quering receipt.
 type TransactionInfo = { tx: Transaction; blockHash: Buffer; blockNumber: BN };
@@ -21,27 +21,21 @@ export declare interface BlockchainMonitor {
 /**
  * BlockchainMonitor is used to monitor changes on the chain
  */
-export class BlockchainMonitor extends EventEmitter {
-  private readonly node: Node;
-  private readonly initPromise: Promise<void>;
+export class BlockchainMonitor extends InitializerWithEventEmitter {
+  private db: Database;
   private currentHeader!: BlockHeader;
 
-  constructor(node: Node) {
+  constructor(db: Database) {
     super();
-    this.node = node;
-    this.initPromise = this.init();
+    this.db = db;
   }
 
   /**
    * initialization
    */
-  async init() {
-    if (this.initPromise) {
-      await this.initPromise;
-      return;
-    }
-    await this.node.blockchain.init();
-    this.currentHeader = this.node.blockchain.latestBlock.header;
+  init(header: BlockHeader) {
+    this.currentHeader = header;
+    this.initOver();
   }
 
   /**
@@ -56,7 +50,7 @@ export class BlockchainMonitor extends EventEmitter {
     try {
       const originalNewBlock = block;
       const newHeads: BlockHeader[] = [];
-      let oldBlock = await this.node.db.getBlockByHashAndNumber(this.currentHeader.hash(), this.currentHeader.number);
+      let oldBlock = await this.db.getBlockByHashAndNumber(this.currentHeader.hash(), this.currentHeader.number);
       const discarded = createBufferFunctionalMap<TransactionInfo>();
       const included = createBufferFunctionalMap<TransactionInfo>();
       while (oldBlock.header.number.gt(block.header.number)) {
@@ -64,7 +58,7 @@ export class BlockchainMonitor extends EventEmitter {
         for (const tx of oldBlock.transactions as Transaction[]) {
           discarded.set(tx.hash(), { tx, blockHash, blockNumber: oldBlock.header.number });
         }
-        oldBlock = await this.node.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
+        oldBlock = await this.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
       }
       while (block.header.number.gt(oldBlock.header.number)) {
         newHeads.push(block.header);
@@ -72,7 +66,7 @@ export class BlockchainMonitor extends EventEmitter {
         for (const tx of block.transactions as Transaction[]) {
           included.set(tx.hash(), { tx, blockHash, blockNumber: block.header.number });
         }
-        block = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
+        block = await this.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
       }
       while (!oldBlock.hash().equals(block.hash()) && oldBlock.header.number.gtn(0) && block.header.number.gtn(0)) {
         {
@@ -81,7 +75,7 @@ export class BlockchainMonitor extends EventEmitter {
             discarded.set(tx.hash(), { tx, blockHash, blockNumber: oldBlock.header.number });
           }
         }
-        oldBlock = await this.node.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
+        oldBlock = await this.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
 
         {
           newHeads.push(block.header);
@@ -90,7 +84,7 @@ export class BlockchainMonitor extends EventEmitter {
             included.set(tx.hash(), { tx, blockHash, blockNumber: block.header.number });
           }
         }
-        block = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
+        block = await this.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
       }
       if (!oldBlock.hash().equals(block.hash())) {
         throw new Error('reorg failed');
@@ -114,7 +108,7 @@ export class BlockchainMonitor extends EventEmitter {
         let removedLogs: Log[] = [];
         for (const txInfo of removed) {
           try {
-            const receipt = await this.node.db.getReceiptByHashAndNumber(txInfo.tx.hash(), txInfo.blockHash, txInfo.blockNumber);
+            const receipt = await this.db.getReceiptByHashAndNumber(txInfo.tx.hash(), txInfo.blockHash, txInfo.blockNumber);
             receipt.logs.forEach((log) => (log.removed = true));
             removedLogs = removedLogs.concat(receipt.logs);
           } catch (err: any) {
@@ -132,7 +126,7 @@ export class BlockchainMonitor extends EventEmitter {
         let logs: Log[] = [];
         for (const txInfo of rebirthed) {
           try {
-            const receipt = await this.node.db.getReceipt(txInfo.tx.hash());
+            const receipt = await this.db.getReceipt(txInfo.tx.hash());
             receipt.logs.forEach((log) => (log.removed = false));
             logs = logs.concat(receipt.logs);
           } catch (err: any) {

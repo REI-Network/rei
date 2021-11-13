@@ -349,27 +349,35 @@ export class NetworkManager extends EventEmitter {
       enr,
       maxConnections: this.maxPeers
     });
-    this.protocols.forEach((protocol) => {
-      this.libp2pNode.handle(protocol.protocolString, ({ connection, stream }) => {
-        const peerId: string = connection.remotePeer.toB58String();
-        this.install(peerId, protocol, stream).then((result) => {
-          if (!result) {
-            stream.close();
-          }
+  }
+
+  start() {
+    if (!this.libp2pNode) {
+      return;
+    }
+    this.initPromise.then(async () => {
+      this.protocols.forEach((protocol) => {
+        this.libp2pNode.handle(protocol.protocolString, ({ connection, stream }) => {
+          const peerId: string = connection.remotePeer.toB58String();
+          this.install(peerId, protocol, stream).then((result) => {
+            if (!result) {
+              stream.close();
+            }
+          });
         });
       });
-    });
-    this.libp2pNode.on('peer:discovery', this.onDiscovered);
-    this.libp2pNode.connectionManager.on('peer:connect', this.onConnect);
-    this.libp2pNode.connectionManager.on('peer:disconnect', this.onDisconnect);
-    await this.libp2pNode.start();
+      this.libp2pNode.on('peer:discovery', this.onDiscovered);
+      this.libp2pNode.connectionManager.on('peer:connect', this.onConnect);
+      this.libp2pNode.connectionManager.on('peer:disconnect', this.onDisconnect);
+      await this.libp2pNode.start();
 
-    // load enr from nodes db.
-    await this.nodedb.load((enr) => {
-      this.libp2pNode.discv5.addEnr(enr);
+      // load enr from nodes db.
+      await this.nodedb.load((enr) => {
+        this.libp2pNode.discv5.addEnr(enr);
+      });
+      this.libp2pNode.discv5.discv5.on('enrAdded', this.onENRAdded);
+      this.libp2pNode.discv5.discv5.on('multiaddrUpdated', this.onMultiaddrUpdated);
     });
-    this.libp2pNode.discv5.discv5.on('enrAdded', this.onENRAdded);
-    this.libp2pNode.discv5.discv5.on('multiaddrUpdated', this.onMultiaddrUpdated);
   }
 
   private checkInbound(peerId: string) {
@@ -585,11 +593,11 @@ export class NetworkManager extends EventEmitter {
   async abort() {
     this.aborted = true;
     this.libp2pNode?.unhandle(this.protocols.map(({ protocolString }) => protocolString));
-    this.libp2pNode?.removeListener('peer:discovery', this.onDiscovered);
-    this.libp2pNode?.connectionManager.removeListener('peer:connect', this.onConnect);
-    this.libp2pNode?.connectionManager.removeListener('peer:disconnect', this.onDisconnect);
-    this.libp2pNode?.discv5?.discv5.removeListener('enrAdded', this.onENRAdded);
-    this.libp2pNode?.discv5?.discv5.removeListener('multiaddrUpdated', this.onMultiaddrUpdated);
+    this.libp2pNode?.off('peer:discovery', this.onDiscovered);
+    this.libp2pNode?.connectionManager.off('peer:connect', this.onConnect);
+    this.libp2pNode?.connectionManager.off('peer:disconnect', this.onDisconnect);
+    this.libp2pNode?.discv5?.discv5.off('enrAdded', this.onENRAdded);
+    this.libp2pNode?.discv5?.discv5.off('multiaddrUpdated', this.onMultiaddrUpdated);
     await Promise.all(Array.from(this._peers.values()).map((peer) => this.removePeer(peer.peerId)));
     this.dialing.clear();
     this._peers.clear();

@@ -1,7 +1,7 @@
 import { Address, BN, BNLike } from 'ethereumjs-util';
 import { Block } from '@gxchain2/structure';
 import { Common } from '@gxchain2/common';
-import { ProcessBlockOptions } from '../../../node';
+import { ProcessBlockOptions } from '../../../types';
 import { SendMessageOptions } from '../../../protocols/consensus';
 import { StateMachineMsg } from './stateMessages';
 import { Message } from './messages';

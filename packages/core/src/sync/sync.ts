@@ -4,6 +4,8 @@ import { logger } from '@gxchain2/utils';
 import { Peer } from '@gxchain2/network';
 import type { Node } from '../node';
 
+const defaultSyncInterval = 1000;
+
 export interface SynchronizerOptions {
   node: Node;
   interval?: number;
@@ -27,8 +29,8 @@ export abstract class Synchronizer extends EventEmitter {
   protected readonly interval: number;
   private readonly lock = new Semaphore(1);
 
-  protected forceSync: boolean = false;
   protected _isSyncing: boolean = false;
+  protected forceSync: boolean = false;
   protected startingBlock: number = 0;
   protected highestBlock: number = 0;
 
@@ -39,11 +41,7 @@ export abstract class Synchronizer extends EventEmitter {
   constructor(options: SynchronizerOptions) {
     super();
     this.node = options.node;
-    this.interval = options.interval || 1000;
-    this.syncLoop();
-    setTimeout(() => {
-      this.forceSync = true;
-    }, this.interval * 30);
+    this.interval = options.interval ?? defaultSyncInterval;
   }
 
   /**
@@ -55,6 +53,13 @@ export abstract class Synchronizer extends EventEmitter {
 
   get isSyncing(): boolean {
     return this._isSyncing;
+  }
+
+  start() {
+    this.syncLoop();
+    setTimeout(() => {
+      this.forceSync = true;
+    }, this.interval * 30);
   }
 
   /**

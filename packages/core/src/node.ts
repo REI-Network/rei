@@ -1,10 +1,8 @@
 import path from 'path';
-import fs from 'fs';
 import type { LevelUp } from 'levelup';
 import LevelStore from 'datastore-level';
-import { bufferToHex, BN, BNLike, Address } from 'ethereumjs-util';
+import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
-import PeerId from 'peer-id';
 import { Database, createEncodingLevelDB, createLevelDB, DBSaveTxLookup, DBSaveReceipts } from '@gxchain2/database';
 import { NetworkManager, Peer } from '@gxchain2/network';
 import { Common, getGenesisState, getChain } from '@gxchain2/common';
@@ -22,98 +20,17 @@ import { TxFetcher } from './txSync';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
 import { BlockchainMonitor } from './blockchainMonitor';
-import { createProtocolByName, NetworkProtocol, WireProtocol, ConsensusProtocol } from './protocols';
+import { WireProtocol, ConsensusProtocol } from './protocols';
 import { ValidatorSets } from './staking';
 import { StakeManager, Router, Contract } from './contracts';
-import { createEnginesByConsensusTypes, ConsensusEngine, ConsensusType, ProcessBlockOpts } from './consensus';
-import { ReimintConsensusEngine } from './consensus/reimint/reimintConsensusEngine';
-import { CliqueConsensusEngine } from './consensus/clique/cliqueConsensusEngine';
+import { ConsensusEngine, ReimintConsensusEngine, CliqueConsensusEngine, ConsensusType } from './consensus';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from './utils';
 import { getConsensusTypeByCommon } from './hardforks';
+import { Initializer, ProcessBlockOptions, NodeOptions, NodeStatus } from './types';
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;
 const defaultChainName = 'gxc2-mainnet';
-
-export type NodeStatus = {
-  networkId: number;
-  totalDifficulty: Buffer;
-  height: number;
-  bestHash: Buffer;
-  genesisHash: Buffer;
-};
-
-export interface NodeOptions {
-  /**
-   * Full path of database
-   */
-  databasePath: string;
-  /**
-   * Chain name, default is `gxc2-mainnet`
-   */
-  chain?: string | { chain: any; genesisState?: any };
-  mine: {
-    /**
-     * Enable miner
-     */
-    enable: boolean;
-    /**
-     * Enable miner debug mode,
-     * in debug mode, miners will not mint empty block
-     */
-    debug?: boolean;
-    /**
-     * Miner coinbase,
-     * if miner is enable, this option must be passed in
-     */
-    coinbase?: string;
-  };
-  p2p: {
-    /**
-     * Enable p2p server
-     */
-    enable: boolean;
-    /**
-     * TCP listening port
-     */
-    tcpPort?: number;
-    /**
-     * Discv5 UDP listening port
-     */
-    udpPort?: number;
-    /**
-     * NAT ip address
-     */
-    nat?: string;
-    /**
-     * Bootnodes list
-     */
-    bootnodes?: string[];
-    /**
-     * Maximum number of peers
-     */
-    maxPeers?: number;
-    /**
-     * Maximum number of simultaneous dialing
-     */
-    maxDials?: number;
-  };
-  account: {
-    /**
-     * Keystore full path
-     */
-    keyStorePath: string;
-    /**
-     * Unlock account list,
-     * [[address, passphrase], [address, passphrase], ...]
-     */
-    unlock: [string, string][];
-  };
-}
-
-export interface ProcessBlockOptions extends Omit<ProcessBlockOpts, 'block' | 'root'> {
-  broadcast: boolean;
-}
 
 type PendingTxs = {
   txs: Transaction[];
@@ -127,51 +44,87 @@ type ProcessBlock = {
   reject: (reason?: any) => void;
 };
 
-export class Node {
-  public readonly datadir: string;
-  public readonly chaindb: LevelUp;
-  public readonly nodedb: LevelUp;
-  public readonly evidencedb: LevelUp;
-  public readonly networkdb: LevelStore;
-  public readonly wire: WireProtocol;
-  public readonly consensus: ConsensusProtocol;
-  public readonly aborter = new Aborter();
+export class Node extends Initializer {
+  readonly datadir: string;
+  readonly chain: string;
+  readonly networkId: number;
+  readonly chainId: number;
+  readonly genesisHash: Buffer;
+  readonly chaindb: LevelUp;
+  readonly nodedb: LevelUp;
+  readonly evidencedb: LevelUp;
+  readonly networkdb: LevelStore;
+  readonly wire: WireProtocol;
+  readonly consensus: ConsensusProtocol;
+  readonly db: Database;
+  readonly networkMngr: NetworkManager;
+  readonly blockchain: Blockchain;
+  readonly sync: Synchronizer;
+  readonly txPool: TxPool;
+  readonly txSync: TxFetcher;
+  readonly bloomBitsIndexer: ChainIndexer;
+  readonly bcMonitor: BlockchainMonitor;
+  readonly accMngr: AccountManager;
+  readonly reimint: ReimintConsensusEngine;
+  readonly clique: CliqueConsensusEngine;
+  readonly aborter = new Aborter();
+  readonly validatorSets = new ValidatorSets();
 
-  public db!: Database;
-  public networkMngr!: NetworkManager;
-  public blockchain!: Blockchain;
-  public sync!: Synchronizer;
-  public txPool!: TxPool;
-  public txSync!: TxFetcher;
-  public bloomBitsIndexer!: ChainIndexer;
-  public bcMonitor!: BlockchainMonitor;
-  public accMngr!: AccountManager;
-
-  public readonly validatorSets = new ValidatorSets();
-
-  private readonly initPromise: Promise<void>;
-  private readonly taskLoopPromise: Promise<void>;
-  private readonly processLoopPromise: Promise<void>;
+  private taskLoopPromise!: Promise<void>;
+  private processLoopPromise!: Promise<void>;
   private readonly taskQueue = new Channel<PendingTxs>();
   private readonly processQueue = new Channel<ProcessBlock>();
 
-  private engines!: Map<ConsensusType, ConsensusEngine>;
-  private chain!: string | { chain: any; genesisState?: any };
-  private networkId!: number;
-  private chainId!: number;
-  private genesisHash!: Buffer;
-
   constructor(options: NodeOptions) {
+    super();
     this.datadir = options.databasePath;
     this.chaindb = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
     this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));
     this.evidencedb = createLevelDB(path.join(this.datadir, 'evidence'));
     this.networkdb = new LevelStore(path.join(this.datadir, 'networkdb'), { createIfMissing: true });
-    this.wire = createProtocolByName(this, NetworkProtocol.GXC2_ETHWIRE) as WireProtocol;
-    this.consensus = createProtocolByName(this, NetworkProtocol.GXC2_CONSENSUS) as ConsensusProtocol;
-    this.initPromise = this.init(options);
-    this.taskLoopPromise = this.taskLoop();
-    this.processLoopPromise = this.processLoop();
+    this.wire = new WireProtocol(this);
+    this.consensus = new ConsensusProtocol(this);
+    this.accMngr = new AccountManager(options.account.keyStorePath);
+
+    this.chain = options.chain ?? defaultChainName;
+    if (getChain(this.chain) === undefined) {
+      throw new Error(`Unknown chain: ${this.chain}`);
+    }
+
+    const common = this.getCommon(0);
+    this.db = new Database(this.chaindb, common);
+    this.networkId = common.networkIdBN().toNumber();
+    this.chainId = common.chainIdBN().toNumber();
+    this.clique = new CliqueConsensusEngine({ ...options.mine, node: this });
+    this.reimint = new ReimintConsensusEngine({ ...options.mine, node: this });
+
+    const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
+    this.genesisHash = genesisBlock.hash();
+    logger.info('Read genesis block from file', bufferToHex(this.genesisHash));
+    this.blockchain = new Blockchain({
+      dbManager: this.db,
+      common,
+      genesisBlock,
+      validateBlocks: false,
+      validateConsensus: false,
+      hardforkByHeadBlockNumber: true
+    });
+
+    this.networkMngr = new NetworkManager({
+      ...options.network,
+      protocols: [this.wire, this.consensus],
+      datastore: this.networkdb,
+      nodedb: this.nodedb,
+      bootnodes: [...common.bootstrapNodes(), ...(options.network.bootnodes ?? [])]
+    })
+      .on('installed', this.onPeerInstalled)
+      .on('removed', this.onPeerRemoved);
+
+    this.sync = new FullSynchronizer({ node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
+    this.txPool = new TxPool({ node: this, journal: this.datadir });
+    this.txSync = new TxFetcher(this);
+    this.bcMonitor = new BlockchainMonitor(this.db);
+    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ db: this.db, sectionSize: BloomBitsBlocks, confirmsBlockNumber: ConfirmsBlockNumber });
   }
 
   /**
@@ -187,157 +140,83 @@ export class Node {
     };
   }
 
-  private async loadPeerId(databasePath: string) {
-    let peerId!: PeerId;
-    const nodeKeyPath = path.join(databasePath, 'nodekey');
-    try {
-      const key = fs.readFileSync(nodeKeyPath);
-      peerId = await PeerId.createFromPrivKey(key);
-    } catch (err) {
-      logger.warn('Read nodekey faild, generate a new key');
-      peerId = await PeerId.create({ keyType: 'secp256k1' });
-      fs.writeFileSync(nodeKeyPath, peerId.privKey.bytes);
+  private async generateGenesis(latest: Block) {
+    if (latest.header.number.eqn(0)) {
+      const common = this.getCommon(0);
+      const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
+      const stateManager = new StateManager({ common, trie: new Trie(this.chaindb) });
+      await stateManager.generateGenesis(getGenesisState(this.chain));
+      let root = await stateManager.getStateRoot();
+
+      // if it is mainnet or devnet, deploy system contract now
+      if (this.chain === 'gxc2-devnet' || this.chain === 'gxc2-mainnet') {
+        const vm = await this.getVM(root, common);
+        const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
+        await Contract.deploy(evm, common);
+        root = await vm.stateManager.getStateRoot();
+      }
+
+      if (!root.equals(genesisBlock.header.stateRoot)) {
+        logger.error('State root not equal', bufferToHex(root), bufferToHex(genesisBlock.header.stateRoot));
+        throw new Error('state root not equal');
+      }
     }
-    return peerId;
   }
 
   /**
    * Initialize the node
    */
-  async init(options?: NodeOptions) {
-    if (this.initPromise) {
-      await this.initPromise;
-      return;
-    }
-    if (!options) {
-      throw new Error('Missing options');
-    }
-
-    this.accMngr = new AccountManager(options.account.keyStorePath);
-    if (options.account.unlock.length > 0) {
-      const result = await Promise.all(options.account.unlock.map(([address, passphrase]) => this.accMngr.unlock(address, passphrase)));
-      for (let i = 0; i < result.length; i++) {
-        if (!result[i]) {
-          throw new Error(`Unlock account ${options.account.unlock[i][0]} failed!`);
-        }
-      }
-    }
-    if (options.mine.coinbase && !this.accMngr.hasUnlockedAccount(options.mine.coinbase)) {
-      throw new Error(`Unlock coin account ${options.mine.coinbase} failed!`);
-    }
-
-    if (options.chain) {
-      this.chain = options.chain;
-    }
-    if (this.chain === undefined) {
-      try {
-        this.chain = JSON.parse(fs.readFileSync(path.join(this.datadir, 'genesis.json')).toString());
-      } catch (err) {
-        logger.warn(`Read genesis.json faild, use default chain(${defaultChainName})`);
-        this.chain = defaultChainName;
-      }
-    } else if (getChain(this.chain as string) === undefined) {
-      throw new Error(`Unknow chain: ${this.chain}`);
-    }
-
-    const common = Common.createChainStartCommon(typeof this.chain === 'string' ? this.chain : this.chain.chain);
-    common.setHardforkByBlockNumber(0);
-    this.db = new Database(this.chaindb, common);
-    this.networkId = common.networkIdBN().toNumber();
-    this.chainId = common.chainIdBN().toNumber();
-
-    const engineOptions = { node: this, enable: options.mine.enable, coinbase: options.mine.coinbase ? Address.fromString(options.mine.coinbase) : undefined };
-    this.engines = createEnginesByConsensusTypes([ConsensusType.Clique, ConsensusType.Reimint], engineOptions);
-
-    let genesisBlock!: Block;
-    try {
-      const genesisHash = await this.db.numberToHash(new BN(0));
-      genesisBlock = await this.db.getBlock(genesisHash);
-      logger.info('Find genesis block in db', bufferToHex(genesisHash));
-    } catch (error: any) {
-      if (error.type !== 'NotFoundError') {
-        throw error;
-      }
-    }
-
-    if (!genesisBlock) {
-      genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
-      logger.info('Read genesis block from file', bufferToHex(genesisBlock.hash()));
-      this.blockchain = new Blockchain({
-        dbManager: this.db,
-        common,
-        genesisBlock,
-        validateBlocks: false,
-        validateConsensus: false,
-        hardforkByHeadBlockNumber: true
-      });
-      await this.blockchain.init();
-
-      if (typeof this.chain === 'string' || this.chain.genesisState) {
-        const stateManager = new StateManager({ common, trie: new Trie(this.chaindb) });
-        await stateManager.generateGenesis(typeof this.chain === 'string' ? getGenesisState(this.chain) : this.chain.genesisState);
-        let root = await stateManager.getStateRoot();
-
-        // if it is devnet, deploy system contract now
-        if (this.chain === 'gxc2-devnet') {
-          const vm = await this.getVM(root, common);
-          const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
-          await Contract.deploy(evm, common);
-          root = await vm.stateManager.getStateRoot();
-        }
-
-        if (!root.equals(genesisBlock.header.stateRoot)) {
-          logger.error('State root not equal', bufferToHex(root), bufferToHex(genesisBlock.header.stateRoot));
-          throw new Error('state root not equal');
-        }
-      }
-    } else {
-      this.blockchain = new Blockchain({
-        dbManager: this.db,
-        common,
-        genesisBlock,
-        validateBlocks: false,
-        validateConsensus: false,
-        hardforkByHeadBlockNumber: true
-      });
-      await this.blockchain.init();
-    }
-
-    this.genesisHash = genesisBlock.hash();
-
-    this.sync = new FullSynchronizer({ node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
-    this.txPool = new TxPool({ node: this, journal: this.datadir });
-
-    const peerId = await this.loadPeerId(this.datadir);
+  async init() {
+    await this.blockchain.init();
+    const latest = this.blockchain.latestBlock;
+    await this.generateGenesis(latest);
     await this.networkdb.open();
-
-    this.txSync = new TxFetcher(this);
-
-    let bootnodes = options.p2p.bootnodes || [];
-    bootnodes = bootnodes.concat(common.bootstrapNodes());
-    this.networkMngr = new NetworkManager({
-      protocols: [this.wire, this.consensus],
-      datastore: this.networkdb,
-      nodedb: this.nodedb,
-      peerId,
-      ...options.p2p,
-      bootnodes
-    })
-      .on('installed', this.onPeerInstalled)
-      .on('removed', this.onPeerRemoved);
     await this.networkMngr.init();
-
-    await this.txPool.init();
-
-    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ node: this, sectionSize: BloomBitsBlocks, confirmsBlockNumber: ConfirmsBlockNumber });
+    await this.txPool.init(latest);
     await this.bloomBitsIndexer.init();
+    await this.bcMonitor.init(latest.header);
+    this.initOver();
+  }
 
-    this.bcMonitor = new BlockchainMonitor(this);
-    await this.bcMonitor.init();
+  start() {
+    this.sync.start();
+    this.txPool.start();
+    this.txSync.start();
+    this.bloomBitsIndexer.start();
+    this.networkMngr.start();
+
+    this.taskLoopPromise = this.taskLoop();
+    this.processLoopPromise = this.processLoop();
 
     // start mint
     this.getCurrentEngine().start();
     this.getCurrentEngine().newBlock(this.blockchain.latestBlock);
+  }
+
+  /**
+   * Abort node
+   */
+  async abort() {
+    this.sync.off('synchronized', this.onSyncOver);
+    this.sync.off('failed', this.onSyncOver);
+    this.networkMngr.off('installed', this.onPeerInstalled);
+    this.networkMngr.off('removed', this.onPeerRemoved);
+    this.taskQueue.abort();
+    this.processQueue.abort();
+    await this.aborter.abort();
+    await this.clique.abort();
+    await this.reimint.abort();
+    await this.networkMngr.abort();
+    await this.sync.abort();
+    await this.txPool.abort();
+    this.txSync.abort();
+    await this.bloomBitsIndexer.abort();
+    await this.taskLoopPromise;
+    await this.processLoopPromise;
+    await this.chaindb.close();
+    await this.evidencedb.close();
+    await this.nodedb.close();
+    await this.networkdb.close();
   }
 
   private onPeerInstalled = (name: string, peer: Peer) => {
@@ -369,7 +248,7 @@ export class Node {
    * @returns Common object
    */
   getCommon(num: BNLike) {
-    return Common.createCommonByBlockNumber(num, typeof this.chain === 'string' ? this.chain : this.chain.chain);
+    return Common.createCommonByBlockNumber(num, this.chain);
   }
 
   /**
@@ -381,12 +260,27 @@ export class Node {
   }
 
   /**
+   * Get consensus engine by consensus typo
+   * @param type - Consensus type
+   * @returns Consensus engine
+   */
+  getEngineByType(type: ConsensusType): ConsensusEngine {
+    if (type === ConsensusType.Clique) {
+      return this.clique;
+    } else if (type === ConsensusType.Reimint) {
+      return this.reimint;
+    } else {
+      throw new Error('unknown consensus type:' + type);
+    }
+  }
+
+  /**
    * Get consensus engine by common instance
    * @param common - Common instance
    * @returns Consensus engine
    */
   getEngineByCommon(common: Common) {
-    return this.engines.get(getConsensusTypeByCommon(common))!;
+    return this.getEngineByType(getConsensusTypeByCommon(common))!;
   }
 
   /**
@@ -395,27 +289,23 @@ export class Node {
    */
   getCurrentEngine() {
     const nextCommon = this.getCommon(this.blockchain.latestBlock.header.number.addn(1));
-    return this.engines.get(getConsensusTypeByCommon(nextCommon))!;
+    return this.getEngineByType(getConsensusTypeByCommon(nextCommon))!;
   }
 
   /**
-   * Get clique consensus engine instance,
-   * return undefined if clique is disable
-   * @returns CliqueConsensusEngine or undefined
+   * Get clique consensus engine instance
+   * @returns CliqueConsensusEngine
    */
   getCliqueEngine() {
-    const engine = this.engines.get(ConsensusType.Clique);
-    return engine ? (engine as CliqueConsensusEngine) : undefined;
+    return this.getEngineByType(ConsensusType.Clique) as CliqueConsensusEngine;
   }
 
   /**
-   * Get reimint consensus engine instance,
-   * return undefined if reimint is disable
-   * @returns ReimintConsensusEngine or undefined
+   * Get reimint consensus engine instance
+   * @returns ReimintConsensusEngine
    */
   getReimintEngine() {
-    const engine = this.engines.get(ConsensusType.Reimint);
-    return engine ? (engine as ReimintConsensusEngine) : undefined;
+    return this.getEngineByType(ConsensusType.Reimint) as ReimintConsensusEngine;
   }
 
   /**
@@ -647,28 +537,5 @@ export class Node {
     } else {
       await this.networkMngr.ban(peerId, defaultTimeoutBanTime);
     }
-  }
-
-  /**
-   * Abort node
-   */
-  async abort() {
-    this.sync.off('synchronized', this.onSyncOver);
-    this.sync.off('failed', this.onSyncOver);
-    this.networkMngr.off('installed', this.onPeerInstalled);
-    this.networkMngr.off('removed', this.onPeerRemoved);
-    this.taskQueue.abort();
-    this.processQueue.abort();
-    await this.aborter.abort();
-    await Promise.all(Array.from(this.engines.values()).map((engine) => engine.abort()));
-    await this.networkMngr.abort();
-    await this.bloomBitsIndexer.abort();
-    await this.txPool.abort();
-    await this.taskLoopPromise;
-    await this.processLoopPromise;
-    await this.chaindb.close();
-    await this.evidencedb.close();
-    await this.nodedb.close();
-    await this.networkdb.close();
   }
 }

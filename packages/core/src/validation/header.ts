@@ -1,7 +1,9 @@
 import { BN } from 'ethereumjs-util';
-import { ConsensusAlgorithm, ConsensusType } from '@gxchain2/common';
+import { ConsensusAlgorithm, ConsensusType as EthereumConsensusType } from '@gxchain2/common';
 import { nowTimestamp } from '@gxchain2/utils';
 import { BlockHeader, CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL } from '@gxchain2/structure';
+import { ConsensusType } from '../consensus/types';
+import { getConsensusTypeByCommon } from '../hardforks';
 import { getGasLimitByCommon, EMPTY_NONCE, EMPTY_ADDRESS, EMPTY_MIX_HASH } from '../utils';
 
 const allowedFutureBlockTimeSeconds = 15;
@@ -61,10 +63,6 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
     if (!this.nonce.equals(EMPTY_NONCE) || !this.coinbase.equals(EMPTY_ADDRESS)) {
       throw this._error('invalid header(nonce or coinbase), currently does not support beneficiary');
     }
-    // additional check for gasLimit
-    if (!this.gasLimit.eq(getGasLimitByCommon(this._common))) {
-      throw this._error('invalid header(gas limit)');
-    }
     // additional check for timestamp
     if (!this.timestamp.gtn(nowTimestamp() + allowedFutureBlockTimeSeconds)) {
       throw this._error('invalid header(timestamp)');
@@ -94,23 +92,20 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
     }
   }
 
-  if (this._common.consensusType() === ConsensusType.ProofOfWork) {
+  if (this._common.consensusType() === EthereumConsensusType.ProofOfWork) {
     if (!this.validateDifficulty(parentHeader)) {
       throw new Error('invalid difficulty');
     }
   }
 
-  if (testnetHF1Number === null) {
-    try {
-      testnetHF1Number = this._common.hardforkBlockBN('testnet-hf1');
-    } catch (err) {
-      // ignore all errors
+  const currentConsensusType = getConsensusTypeByCommon(this._common);
+  const parentConsensusType = getConsensusTypeByCommon(parentHeader._common);
+
+  if ((currentConsensusType === ConsensusType.Reimint && parentConsensusType === ConsensusType.Clique) || currentConsensusType === ConsensusType.Clique) {
+    if (!this.gasLimit.eq(getGasLimitByCommon(this._common))) {
+      throw new Error('invalid gas limit');
     }
-  }
-  if (testnetHF1Number !== null && this.number.eq(testnetHF1Number)) {
-    // do noting, don't check gas limit,
-    // because hardfork will chang block gas limit
-  } else if (!parentHeader.isGenesis() && !this.validateGasLimit(parentHeader)) {
+  } else if (!this.validateGasLimit(parentHeader)) {
     throw new Error('invalid gas limit');
   }
 

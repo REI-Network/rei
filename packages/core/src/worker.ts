@@ -16,14 +16,14 @@ export interface WorkerOptions {
  */
 export class Worker {
   private readonly node: Node;
-  private readonly consensusEngine: ConsensusEngine;
+  private readonly engine: ConsensusEngine;
   private readonly lock = new Semaphore(1);
 
   private pendingBlock?: PendingBlock;
 
   constructor(options: WorkerOptions) {
     this.node = options.node;
-    this.consensusEngine = options.consensusEngine;
+    this.engine = options.consensusEngine;
   }
 
   /**
@@ -52,7 +52,7 @@ export class Worker {
     const nexTimestamp2 = header.timestamp.toNumber() + period;
     const nexTimestamp = nexTimestamp1 > nexTimestamp2 ? nexTimestamp1 : nexTimestamp2;
 
-    this.pendingBlock = new PendingBlock(this.node, this.consensusEngine, parentHash, header.stateRoot, nextNumber, new BN(nexTimestamp), nextCommon);
+    this.pendingBlock = new PendingBlock(this.node, this.engine, parentHash, header.stateRoot, nextNumber, new BN(nexTimestamp), nextCommon);
 
     // unlock
     this.lock.release();

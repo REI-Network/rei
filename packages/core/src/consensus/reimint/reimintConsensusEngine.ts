@@ -3,7 +3,7 @@ import { Address, BN, BNLike, ecsign, intToBuffer, bufferToHex } from 'ethereumj
 import VM from '@gxchain2-ethereumjs/vm';
 import { RunBlockOpts, rewardAccount } from '@gxchain2-ethereumjs/vm/dist/runBlock';
 import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
-import { Block, HeaderData, Log, Receipt } from '@gxchain2/structure';
+import { Block, HeaderData, Log, Receipt, BlockHeader } from '@gxchain2/structure';
 import { Common } from '@gxchain2/common';
 import { logger } from '@gxchain2/utils';
 import { StakeManager, Router, SlashReason } from '../../contracts';
@@ -11,7 +11,8 @@ import { ValidatorSet, ValidatorChanges } from '../../staking';
 import { Node } from '../../node';
 import { ProcessBlockOptions } from '../../types';
 import { isEmptyAddress, postByzantiumTxReceiptsToReceipts, getGasLimitByCommon } from '../../utils';
-import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from '../types';
+import { getConsensusTypeByCommon } from '../../hardforks';
+import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../baseConsensusEngine';
 import { ExtraData, Evidence, DuplicateVoteEvidence, EvidencePool, EvidenceDatabase, WAL } from './types';
 import { StateMachine } from './state';
@@ -92,7 +93,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     }
 
     const difficulty = new BN(1);
-    const gasLimit = getGasLimitByCommon(pendingBlock.common);
+    const gasLimit = this.calcGasLimit(block.header);
     pendingBlock.complete(difficulty, gasLimit);
 
     let validators = this.node.validatorSets.directlyGet(header.stateRoot);
@@ -136,6 +137,16 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   }
 
   ///////////// Backend Logic ////////////////
+
+  // calculate the gas limit of next block
+  private calcGasLimit(parent: BlockHeader) {
+    const nextCommon = this.node.getCommon(parent.number.addn(1));
+    if (getConsensusTypeByCommon(parent._common) === ConsensusType.Clique) {
+      return getGasLimitByCommon(nextCommon);
+    } else {
+      return Reimint.calcGasLimit(parent.gasLimit, parent.gasUsed);
+    }
+  }
 
   /**
    * Assign block reward to miner,

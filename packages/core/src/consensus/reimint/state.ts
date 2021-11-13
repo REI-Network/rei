@@ -778,8 +778,6 @@ export class StateMachine {
       return;
     }
 
-    // TODO: validate proposalBlock
-
     const finalizedBlock = Reimint.generateFinalizedBlock({ ...this.proposalBlock.header }, [...this.proposalBlock.transactions], [...this.proposalEvidence], this.proposal, precommits, { common: this.proposalBlock._common });
     if (!finalizedBlock.hash().equals(maj23Hash)) {
       logger.error('StateMachine::tryFinalizeCommit, finalizedBlock hash not equal, something is wrong');
@@ -1010,7 +1008,6 @@ export class StateMachine {
     }
 
     if (step === RoundStepType.NewHeight) {
-      // TODO: return this.lastCommit
       return;
     }
 

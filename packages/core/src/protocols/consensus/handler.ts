@@ -350,8 +350,6 @@ export class ConsensusProtocolHander implements ProtocolHandler {
     }
 
     this.proposal = true;
-
-    // TODO: if it is set by NewValidBlockMessage, ignore
     this.proposalBlockHash = proposal.hash;
     this.proposalPOLRound = proposal.POLRound;
     this.proposalPOL = undefined;

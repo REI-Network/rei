@@ -110,7 +110,7 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
   if (testnetHF1Number !== null && this.number.eq(testnetHF1Number)) {
     // do noting, don't check gas limit,
     // because hardfork will chang block gas limit
-  } else if (!this.validateGasLimit(parentHeader)) {
+  } else if (!parentHeader.isGenesis() && !this.validateGasLimit(parentHeader)) {
     throw new Error('invalid gas limit');
   }
 

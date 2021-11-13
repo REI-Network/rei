@@ -37,6 +37,7 @@ import {
   DuplicateVoteEvidence,
   ExtraData
 } from './types';
+import { preValidateHeader } from '../../validation';
 
 const SkipTimeoutCommit = true;
 const WaitForTxs = true;
@@ -64,6 +65,7 @@ export class StateMachine {
     }
   });
 
+  private parent!: BlockHeader;
   private parentHash!: Buffer;
   private triggeredTimeoutPrecommit: boolean = false;
 
@@ -238,7 +240,11 @@ export class StateMachine {
     const proposer = extraData.proposal.proposer();
     const evidence = extraData.evidence;
 
-    if (!this.proposal.proposer().equals(proposer)) {
+    /**
+     * TODO: Check proposal block's validator set size,
+     * but this isn't important
+     */
+    if (!this.proposal.proposer().equals(proposer) || extraData.round !== this.proposal.round || extraData.POLRound !== this.proposal.POLRound) {
       throw new Error('invalid proposal block');
     }
 
@@ -246,7 +252,8 @@ export class StateMachine {
       throw new Error('invalid proposal block');
     }
 
-    // TODO: validate block?
+    preValidateHeader.call(block.header, this.parent);
+
     this.proposalBlock = block;
     this.proposalEvidence = evidence;
 
@@ -887,6 +894,7 @@ export class StateMachine {
 
   newBlockHeader(header: BlockHeader, validators: ValidatorSet, pendingBlock: PendingBlock) {
     const timestamp = Date.now();
+    this.parent = header;
     this.parentHash = header.hash();
     this.height = header.number.addn(1);
     this.round = 0;

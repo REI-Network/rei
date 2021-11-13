@@ -14,7 +14,7 @@ import { NodeDB } from './nodedb';
 export * from './peer';
 export * from './types';
 
-const timeoutLoopInterval = 30e3;
+const timeoutLoopInterval = 300e3;
 const dialLoopInterval1 = 2e3;
 const dialLoopInterval2 = 10e3;
 const inboundThrottleTime = 30e3;
@@ -132,10 +132,6 @@ export class NetworkManager extends EventEmitter {
     this.protocols = options.protocols;
     this.nodedb = new NodeDB(options.nodedb);
     this.initPromise = this.init(options);
-    if (options.enable) {
-      this.dialLoop();
-      this.timeoutLoop();
-    }
   }
 
   /**
@@ -355,6 +351,9 @@ export class NetworkManager extends EventEmitter {
     if (!this.libp2pNode) {
       return;
     }
+    this.dialLoop();
+    this.timeoutLoop();
+
     this.initPromise.then(async () => {
       this.protocols.forEach((protocol) => {
         this.libp2pNode.handle(protocol.protocolString, ({ connection, stream }) => {

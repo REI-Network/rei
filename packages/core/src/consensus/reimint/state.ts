@@ -37,7 +37,7 @@ import {
   DuplicateVoteEvidence,
   ExtraData
 } from './types';
-import { preValidateHeader } from '../../validation';
+import { preValidateBlock, preValidateHeader } from '../../validation';
 
 const SkipTimeoutCommit = true;
 const WaitForTxs = true;
@@ -252,8 +252,6 @@ export class StateMachine {
       throw new Error('invalid proposal block');
     }
 
-    preValidateHeader.call(block.header, this.parent);
-
     this.proposalBlock = block;
     this.proposalEvidence = evidence;
 
@@ -287,7 +285,6 @@ export class StateMachine {
     }
 
     this.votes.addVote(vote, peerId);
-    // TODO: if add failed, return
 
     this.p2p.broadcastMessage(new HasVoteMessage(vote.height, vote.round, vote.type, vote.index), { exclude: [peerId] });
 
@@ -580,14 +577,23 @@ export class StateMachine {
       return update();
     }
 
-    // TODO: validate block
-    const validate = 1;
-    if (validate) {
-      this.signVote(VoteType.Prevote, this.proposalBlock.hash());
-    } else {
-      this.signVote(VoteType.Prevote, EMPTY_HASH);
-    }
-    return update();
+    (async () => {
+      let validateResult = false;
+      try {
+        preValidateHeader.call(this.proposalBlock!.header, this.parent);
+        await preValidateBlock.call(this.proposalBlock!);
+        validateResult = true;
+      } catch (err) {
+        logger.warn('StateMachine::enterPrevote, preValidateHeaderAndBlock failed:', err);
+      }
+
+      if (validateResult) {
+        this.signVote(VoteType.Prevote, this.proposalBlock!.hash());
+      } else {
+        this.signVote(VoteType.Prevote, EMPTY_HASH);
+      }
+      return update();
+    })();
   }
 
   private enterPrevoteWait(height: BN, round: number) {

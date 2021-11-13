@@ -225,10 +225,6 @@ export class PendingBlock {
   finalize(options?: PendingBlockFinalizeOpts) {
     this.requireCompleted();
     return this.runWithLock(async () => {
-      if (this.finalizedStateRoot) {
-        return this.makeBlockData();
-      }
-
       // calculate finalizedStateRoot and receiptTrie
       const { finalizedStateRoot, receiptTrie } = await this.engine.finalize({
         ...options,

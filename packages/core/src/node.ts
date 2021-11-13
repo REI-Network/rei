@@ -88,6 +88,11 @@ export class Node extends Initializer {
     this.accMngr = new AccountManager(options.account.keyStorePath);
 
     this.chain = options.chain ?? defaultChainName;
+    /////// unsupport gxc2-mainnet ///////
+    if (this.chain === defaultChainName) {
+      throw new Error('Unspport mainnet!');
+    }
+    /////// unsupport gxc2-mainnet ///////
     if (getChain(this.chain) === undefined) {
       throw new Error(`Unknown chain: ${this.chain}`);
     }

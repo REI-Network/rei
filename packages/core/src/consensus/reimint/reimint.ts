@@ -1,9 +1,8 @@
-import { toBuffer, setLengthLeft, Address, rlp, BN, rlphash, intToBuffer } from 'ethereumjs-util';
+import { toBuffer, setLengthLeft, Address, rlp, BN, rlphash } from 'ethereumjs-util';
 import { BaseTrie } from 'merkle-patricia-tree';
 import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
 import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
 import { Common } from '@gxchain2/common';
-import { nowTimestamp } from '@gxchain2/utils';
 import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@gxchain2/structure';
 import { ExtraData, Proposal, VoteType, VoteSet, Evidence, ISigner } from './types';
 import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../../utils';
@@ -60,9 +59,6 @@ export interface ReimintBlockOptions extends BlockOptions {
   // validatorSetSize must be passed in,
   // it will be used to determine the size of the validator set
   validatorSetSize?: number;
-
-  // proposal timestamp
-  proposalTimestamp?: number;
 }
 
 export interface ReimintBlockOptions_SignerExists extends Omit<ReimintBlockOptions, 'signer'> {
@@ -92,20 +88,18 @@ export class Reimint {
    *    parentHash
    *    uncleHash
    *    ...
-   *    extraData(32 bytes) + round + POLRound + evidence1.hash() + evidence2.hash() + ...
+   *    extraData(32 bytes) + evidence1.hash() + evidence2.hash() + ...
    *    ...
    *    mixHash
    *    nonce
    * ])
    * @param header - Block header
-   * @param round - Round
-   * @param POLRound - POLRound
    * @param evidence - Evidence list
    * @returns Hash
    */
-  static calcBlockHeaderRawHash(header: BlockHeader, round: number, POLRound: number, evidence: Evidence[]) {
+  static calcBlockHeaderRawHash(header: BlockHeader, evidence: Evidence[]) {
     const raw = header.raw();
-    raw[12] = Buffer.concat([raw[12].slice(0, CLIQUE_EXTRA_VANITY), intToBuffer(round), intToBuffer(POLRound + 1), ...evidence.map((ev) => ev.hash())]);
+    raw[12] = Buffer.concat([raw[12].slice(0, CLIQUE_EXTRA_VANITY), ...evidence.map((ev) => ev.hash())]);
     return rlphash(raw);
   }
 
@@ -180,19 +174,17 @@ export class Reimint {
 
       const round = options.round ?? defaultRound;
       const POLRound = options.POLRound ?? defaultPOLRound;
-      const timestamp = options.proposalTimestamp ?? nowTimestamp();
       const validaterSetSize = options.validatorSetSize ?? defaultValidaterSetSize;
       const evidence = options.evidence ?? defaultEvidence;
 
       // calculate block hash
-      const headerHash = Reimint.calcBlockHeaderRawHash(header, round, POLRound, evidence);
+      const headerHash = Reimint.calcBlockHeaderRawHash(header, evidence);
       const proposal = new Proposal({
         round,
         POLRound,
         height: header.number,
         type: VoteType.Proposal,
-        hash: headerHash,
-        timestamp
+        hash: headerHash
       });
       proposal.signature = options.signer.sign(proposal.getMessageToSign());
       const extraData = new ExtraData(round, POLRound, evidence, proposal, options?.voteSet);

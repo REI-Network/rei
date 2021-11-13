@@ -29,7 +29,6 @@ export interface VoteData {
   height: BN;
   round: number;
   hash: Buffer;
-  timestamp: number;
   index: number;
 }
 
@@ -39,7 +38,6 @@ export class Vote {
   readonly height: BN;
   readonly round: number;
   readonly hash: Buffer;
-  readonly timestamp: number;
   readonly index: number;
   private _signature?: Buffer;
 
@@ -52,10 +50,10 @@ export class Vote {
   }
 
   static fromValuesArray(values: Buffer[]) {
-    if (values.length !== 8) {
+    if (values.length !== 7) {
       throw new Error('invalid values length');
     }
-    const [chainId, type, height, round, hash, timestamp, index, signature] = values;
+    const [chainId, type, height, round, hash, index, signature] = values;
     return new Vote(
       {
         chainId: bufferToInt(chainId),
@@ -63,7 +61,6 @@ export class Vote {
         height: new BN(height),
         round: bufferToInt(round),
         hash,
-        timestamp: bufferToInt(timestamp),
         index: bufferToInt(index)
       },
       signature
@@ -76,7 +73,6 @@ export class Vote {
     this.height = data.height.clone();
     this.round = data.round;
     this.hash = data.hash;
-    this.timestamp = data.timestamp;
     this.index = data.index;
     this._signature = signature;
     this.validateBasic();
@@ -94,7 +90,7 @@ export class Vote {
   }
 
   getMessageToSign() {
-    return rlphash([intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.timestamp), intToBuffer(this.index)]);
+    return rlphash([intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.index)]);
   }
 
   isSigned() {
@@ -110,7 +106,7 @@ export class Vote {
     if (!this.isSigned()) {
       throw new Error('missing signature');
     }
-    return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.timestamp), intToBuffer(this.index), this._signature!];
+    return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.index), this._signature!];
   }
 
   serialize() {
@@ -123,7 +119,6 @@ export class Vote {
     v.validateHeight(this.height);
     v.validateRound(this.round);
     v.validateHash(this.hash);
-    v.validateTimestamp(this.timestamp);
     if (this.isSigned()) {
       v.validateSignature(this._signature!);
     }

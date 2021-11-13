@@ -77,6 +77,7 @@ export class Node extends Initializer {
 
   constructor(options: NodeOptions) {
     super();
+
     this.datadir = options.databasePath;
     this.chaindb = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
     this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));

@@ -1,6 +1,5 @@
-import crypto from 'crypto';
 import { BN, bufferToHex } from 'ethereumjs-util';
-import { Channel, logger, nowTimestamp } from '@gxchain2/utils';
+import { Channel, logger } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/structure';
 import { ValidatorSet } from '../../staking';
 import { PendingBlock } from '../pendingBlock';
@@ -89,6 +88,7 @@ export class StateMachine {
 
   private validRound: number = -1;
   private validBlock?: Block;
+  private validEvidence?: Evidence[];
 
   private votes!: HeightVoteSet;
   private commitRound: number = -1;
@@ -256,6 +256,7 @@ export class StateMachine {
       if (this.proposalBlockHash.equals(maj23Hash)) {
         this.validRound = this.round;
         this.validBlock = this.proposalBlock;
+        this.validEvidence = this.proposalEvidence;
         logger.debug('StateMachine::addProposalBlock, update valid block, round:', this.round, 'hash:', bufferToHex(maj23Hash));
       }
     }
@@ -303,6 +304,7 @@ export class StateMachine {
 
                 this.validRound = vote.round;
                 this.validBlock = this.proposalBlock;
+                this.validEvidence = this.proposalEvidence;
               } else {
                 this.proposalBlock = undefined;
                 this.proposalEvidence = undefined;
@@ -464,16 +466,14 @@ export class StateMachine {
 
   private decideProposal(height: BN, round: number) {
     if (this.validBlock) {
-      const block = this.validBlock;
-      const proposal = new Proposal({
-        type: VoteType.Proposal,
-        height,
+      const { block, proposal } = Reimint.generateBlockAndProposal({ ...this.validBlock.header }, [...this.validBlock.transactions], {
+        signer: this.signer!,
         round,
-        hash: block.hash(),
         POLRound: this.validRound,
-        timestamp: Date.now()
+        evidence: this.validEvidence,
+        validatorSetSize: this.validators.length,
+        common: this.validBlock._common
       });
-      proposal.signature = this.signer!.sign(proposal.getMessageToSign());
 
       this._newMessage(new StateMachineMessage('', new ProposalMessage(proposal)));
       this._newMessage(new StateMachineMessage('', new ProposalBlockMessage(block)));
@@ -507,7 +507,6 @@ export class StateMachine {
       type,
       height: this.height,
       round: this.round,
-      timestamp: nowTimestamp(),
       hash,
       index
     });
@@ -904,6 +903,7 @@ export class StateMachine {
     this.lockedEvidence = undefined;
     this.validRound = -1;
     this.validBlock = undefined;
+    this.validEvidence = undefined;
     this.votes = new HeightVoteSet(this.chainId, this.height, this.validators);
     this.commitRound = -1;
     this.triggeredTimeoutPrecommit = false;

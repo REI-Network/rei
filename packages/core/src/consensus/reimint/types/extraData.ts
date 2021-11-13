@@ -1,4 +1,4 @@
-import { BN, rlp, intToBuffer, bufferToInt, BNLike } from 'ethereumjs-util';
+import { rlp, intToBuffer, bufferToInt, BNLike } from 'ethereumjs-util';
 import VM from '@gxchain2-ethereumjs/vm';
 import { Common } from '@gxchain2/common';
 import { Block, BlockHeader, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
@@ -21,31 +21,25 @@ export interface ExtraDataOptions {
 
 export interface ExtraDataFromBlockHeaderOptions extends Omit<ExtraDataOptions, 'header' | 'chainId'> {}
 
-export type RLPVote = [Buffer, Buffer];
-export type RLPEmptyVote = [];
-export type RLPRoundAndPOLRound = [Buffer, Buffer];
-export type RLPEvidenceList = (Buffer | Buffer[])[];
-export type RLPElement = RLPEmptyVote | RLPVote | RLPRoundAndPOLRound | RLPEvidenceList;
-export type RLPElements = RLPElement[];
+export type EXVote = Buffer;
+export type EXEmptyVote = [];
+export type EXRoundAndPOLRound = [Buffer, Buffer];
+export type EXEvidenceList = (Buffer | Buffer[])[];
+export type EXElement = EXEmptyVote | EXVote | EXRoundAndPOLRound | EXEvidenceList;
+export type EXElements = EXElement[];
 
-function isRLPVote(ele: RLPElement): ele is RLPVote {
-  if (!Array.isArray(ele) || ele.length !== 2) {
-    return false;
-  }
-  if (!(ele[0] instanceof Buffer) || !(ele[1] instanceof Buffer)) {
-    return false;
-  }
-  return true;
+function isEXVote(ele: EXElement): ele is EXVote {
+  return ele instanceof Buffer;
 }
 
-function isRLPEmptyVote(ele: RLPElement): ele is RLPEmptyVote {
+function isEXEmptyVote(ele: EXElement): ele is EXEmptyVote {
   if (!Array.isArray(ele)) {
     return false;
   }
   return ele.length === 0;
 }
 
-function isRLPRoundAndPOLRound(ele: RLPElement): ele is RLPRoundAndPOLRound {
+function isEXRoundAndPOLRound(ele: EXElement): ele is EXRoundAndPOLRound {
   if (!Array.isArray(ele) || ele.length !== 2) {
     return false;
   }
@@ -55,7 +49,7 @@ function isRLPRoundAndPOLRound(ele: RLPElement): ele is RLPRoundAndPOLRound {
   return true;
 }
 
-function isRLPEvidenceList(ele: RLPElement): ele is RLPEvidenceList {
+function isEXEvidenceList(ele: EXElement): ele is EXEvidenceList {
   if (!Array.isArray(ele)) {
     return false;
   }
@@ -85,14 +79,14 @@ export class ExtraData {
   }
 
   static fromSerializedData(serialized: Buffer, options: ExtraDataOptions) {
-    const values = rlp.decode(serialized) as unknown as RLPElements;
+    const values = rlp.decode(serialized) as unknown as EXElements;
     if (!Array.isArray(values)) {
       throw new Error('invalid serialized value');
     }
     return ExtraData.fromValuesArray(values, options);
   }
 
-  static fromValuesArray(values: RLPElements, { header, valSet, chainId, increaseValSet }: ExtraDataOptions) {
+  static fromValuesArray(values: EXElements, { header, valSet, chainId, increaseValSet }: ExtraDataOptions) {
     // the additional extra data should include at lease 3 elements(RLPRoundAndPOLRound, RLPEvidenceList, RLPVote(proposal))
     if (values.length < 3) {
       throw new Error('invliad values');
@@ -114,22 +108,7 @@ export class ExtraData {
     for (let i = 0; i < values.length; i++) {
       const value = values[i];
       if (i === 0) {
-        if (!isRLPRoundAndPOLRound(value)) {
-          throw new Error('invliad values');
-        }
-        round = bufferToInt(value[0]);
-        POLRound = bufferToInt(value[1]) - 1;
-
-        // increase round
-        if (increaseValSet && valSet) {
-          valSet = valSet.copy();
-          valSet.incrementProposerPriority(round);
-        }
-        if (valSet) {
-          voteSet = new VoteSet(chainId, header.number, round, VoteType.Precommit, valSet);
-        }
-      } else if (i === 1) {
-        if (!isRLPEvidenceList(value)) {
+        if (!isEXEvidenceList(value)) {
           throw new Error('invliad values');
         }
 
@@ -148,21 +127,35 @@ export class ExtraData {
         });
 
         // calculate block hash
-        headerHash = Reimint.calcBlockHeaderRawHash(header, round, POLRound, evidence);
+        headerHash = Reimint.calcBlockHeaderRawHash(header, evidence);
+      } else if (i === 1) {
+        if (!isEXRoundAndPOLRound(value)) {
+          throw new Error('invliad values');
+        }
+        round = bufferToInt(value[0]);
+        POLRound = bufferToInt(value[1]) - 1;
+
+        // increase round
+        if (increaseValSet && valSet) {
+          valSet = valSet.copy();
+          valSet.incrementProposerPriority(round);
+        }
+        if (valSet) {
+          voteSet = new VoteSet(chainId, header.number, round, VoteType.Precommit, valSet);
+        }
       } else if (i === 2) {
-        if (!isRLPVote(value)) {
+        if (!isEXVote(value)) {
           throw new Error('invliad values');
         }
 
-        const [timestampBuf, signature] = value;
+        const signature = value;
         proposal = new Proposal(
           {
             round,
             POLRound,
             height: header.number,
             type: VoteType.Proposal,
-            hash: headerHash,
-            timestamp: new BN(timestampBuf).toNumber()
+            hash: headerHash
           },
           signature
         );
@@ -170,16 +163,15 @@ export class ExtraData {
           proposal.validateSignature(valSet.proposer);
         }
       } else {
-        if (isRLPVote(value)) {
+        if (isEXVote(value)) {
           if (!voteSet) {
             break;
           }
-          const [timestampBuf, signature] = value;
+          const signature = value;
           const vote = new Vote(
             {
               type: VoteType.Precommit,
               hash: headerHash,
-              timestamp: new BN(timestampBuf).toNumber(),
               height: header.number,
               round,
               index: i - 3,
@@ -191,7 +183,7 @@ export class ExtraData {
           if (conflicting) {
             throw new Error('conflicting vote');
           }
-        } else if (!isRLPEmptyVote(value)) {
+        } else if (!isEXEmptyVote(value)) {
           throw new Error('invliad values');
         }
       }
@@ -214,15 +206,15 @@ export class ExtraData {
 
   raw(validaterSetSize?: number) {
     const raw: rlp.Input = [];
-    raw.push([intToBuffer(this.round), intToBuffer(this.POLRound + 1)]);
     raw.push(this.evidence.map((ev) => EvidenceFactory.rawEvidence(ev)));
-    raw.push([intToBuffer(this.proposal.timestamp), this.proposal.signature!]);
+    raw.push([intToBuffer(this.round), intToBuffer(this.POLRound + 1)]);
+    raw.push(this.proposal.signature!);
     if (this.voteSet) {
       for (const vote of this.voteSet.votes) {
         if (vote === undefined) {
           raw.push([]);
         } else {
-          raw.push([intToBuffer(vote.timestamp), vote.signature!]);
+          raw.push(vote.signature!);
         }
       }
     } else {

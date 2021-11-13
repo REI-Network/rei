@@ -8,7 +8,6 @@ export interface ProposalData {
   round: number;
   POLRound: number;
   hash: Buffer;
-  timestamp: number;
 }
 
 export class Proposal {
@@ -17,7 +16,6 @@ export class Proposal {
   readonly round: number;
   readonly POLRound: number;
   readonly hash: Buffer;
-  readonly timestamp: number;
   private _signature?: Buffer;
 
   static fromSerializedProposal(serialized: Buffer) {
@@ -29,11 +27,11 @@ export class Proposal {
   }
 
   static fromValuesArray(values: Buffer[]) {
-    if (values.length !== 7) {
+    if (values.length !== 6) {
       throw new Error('invalid proposal');
     }
 
-    const [type, height, round, POLRound, hash, timestamp, signature] = values;
+    const [type, height, round, POLRound, hash, signature] = values;
 
     return new Proposal(
       {
@@ -41,8 +39,7 @@ export class Proposal {
         height: new BN(height),
         round: bufferToInt(round),
         POLRound: bufferToInt(POLRound) - 1,
-        hash,
-        timestamp: bufferToInt(timestamp)
+        hash
       },
       signature
     );
@@ -54,7 +51,6 @@ export class Proposal {
     this.round = data.round;
     this.POLRound = data.POLRound;
     this.hash = data.hash;
-    this.timestamp = data.timestamp;
     this._signature = signature;
     this.validateBasic();
   }
@@ -71,7 +67,7 @@ export class Proposal {
   }
 
   getMessageToSign() {
-    return rlphash([intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.POLRound + 1), this.hash, intToBuffer(this.timestamp)]);
+    return rlphash([intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.POLRound + 1), this.hash]);
   }
 
   isSigned() {
@@ -87,7 +83,7 @@ export class Proposal {
     if (!this.isSigned()) {
       throw new Error('missing signature');
     }
-    return [intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.POLRound + 1), this.hash, intToBuffer(this.timestamp), this._signature!];
+    return [intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.POLRound + 1), this.hash, this._signature!];
   }
 
   serialize() {
@@ -102,7 +98,6 @@ export class Proposal {
     v.validateRound(this.round);
     v.validatePOLRound(this.POLRound);
     v.validateHash(this.hash);
-    v.validateTimestamp(this.timestamp);
     if (this.isSigned()) {
       v.validateSignature(this._signature!);
     }

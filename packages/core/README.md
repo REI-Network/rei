@@ -12,7 +12,7 @@ The core logic of blockchain node, including:
   - `newHeads`: Emit when canonical chain changes
 
 - `Indexer` and `BloomBitsFilter`: Create bloom bits index for section
-- `Miner`: Generate blocks
+- `Consensus`: Consensus engine implement
 - `Protocols`: Used for communication and data transmission between nodes
 - `Txpool`: Manage pending and queued transactions
 - `Sync` : Synchronize blocks
@@ -30,22 +30,25 @@ npm install @gxchain2/core
 ## USAGE
 
 ```ts
-const node = new Node({
-  databasePath: '/root/.gxchain2',
-  chain: 'gxc2-testnet',
+const node = await NodeFactory.createNode({
+  databasePath: "path/to/dataDir",
+  chain: "chainName",
   mine: {
-    enable: false
+    enable: true,
+    coinbase: "address1",
   },
-  p2p: {
-    enable: false
+  network: {
+    enable: true,
   },
   account: {
-    keyStorePath: '/root/.gxchain2/keystore'),
-    unlock: []
-  }
+    keyStorePath: "path/to/keystore",
+    unlock: [
+      ["address1", "passphrase1"],
+      ["address2", "passphrase2"],
+    ],
+  },
 });
 
-await node.init();
 await node.abort();
 ```
 

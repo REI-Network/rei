@@ -334,6 +334,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     let validatorSet!: ValidatorSet;
     const blockReward = new BN(0);
     const runBlockOptions: RunBlockOpts = {
+      debug: options.debug,
       block,
       root,
       generate: false,

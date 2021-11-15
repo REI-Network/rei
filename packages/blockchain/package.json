@@ -1,6 +1,6 @@
 {
     "name": "@gxchain2/blockchain",
-    "version": "0.0.7-alpha.0",
+    "version": "0.0.1",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
@@ -15,7 +15,7 @@
     },
     "dependencies": {
         "@gxchain2-ethereumjs/blockchain": "^5.4.3",
-        "@gxchain2/database": "^0.0.7-alpha.0",
-        "@gxchain2/structure": "^0.0.7-alpha.0"
+        "@gxchain2/database": "^0.0.1",
+        "@gxchain2/structure": "^0.0.1"
     }
 }

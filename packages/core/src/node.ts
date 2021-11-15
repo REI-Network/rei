@@ -400,15 +400,17 @@ export class Node extends Initializer {
   getPendingBlock() {
     const engine = this.getCurrentEngine();
     const pendingBlock = engine.worker.getPendingBlock();
+    const lastest = this.blockchain.latestBlock;
     if (pendingBlock) {
       const { header, transactions } = pendingBlock.makeBlockData();
+      header.stateRoot = header.stateRoot ?? lastest.header.stateRoot;
       return engine.generatePendingBlock(header, pendingBlock.common, transactions);
     } else {
-      const lastest = this.blockchain.latestBlock;
       const nextNumber = lastest.header.number.addn(1);
       return engine.generatePendingBlock(
         {
           parentHash: lastest.hash(),
+          stateRoot: lastest.header.stateRoot,
           number: nextNumber
         },
         this.getCommon(nextNumber)

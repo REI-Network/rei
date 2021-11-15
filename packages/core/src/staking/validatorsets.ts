@@ -3,7 +3,7 @@ import { ValidatorSet } from './validatorset';
 import { StakeManager } from '../contracts';
 import { Reimint } from '../consensus/reimint/reimint';
 
-const maxSize = 120;
+const maxSize = 100;
 
 /**
  * `ValidatorSets` will record the most recent `maxSize` block of validators set

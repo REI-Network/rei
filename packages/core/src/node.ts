@@ -11,7 +11,7 @@ import VM from '@gxchain2-ethereumjs/vm';
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
-import { Transaction, Block } from '@gxchain2/structure';
+import { Transaction, Block, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
 import { Channel, Aborter, logger } from '@gxchain2/utils';
 import { AccountManager } from '@gxchain2/wallet';
 import { TxPool } from './txpool';
@@ -343,7 +343,11 @@ export class Node extends Initializer {
         if (type === ConsensusType.Clique) {
           return header.cliqueSigner();
         } else if (type === ConsensusType.Reimint) {
-          return ExtraData.fromBlockHeader(header).proposal.proposer();
+          if (header.extraData.length === CLIQUE_EXTRA_VANITY) {
+            return EMPTY_ADDRESS;
+          } else {
+            return ExtraData.fromBlockHeader(header).proposal.proposer();
+          }
         } else {
           throw new Error('unknow consensus type');
         }

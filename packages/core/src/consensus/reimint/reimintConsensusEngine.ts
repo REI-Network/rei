@@ -266,7 +266,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    * {@link ConsensusEngine.generatePendingBlock}
    */
   generatePendingBlock(headerData: HeaderData, common: Common) {
-    const { block } = Reimint.generateBlockAndProposal(headerData, [], { common, signer: this.signer });
+    const { block } = Reimint.generateBlockAndProposal(headerData, [], { common, signer: this.node.accMngr.hasUnlockedAccount(this.signer.address()) ? this.signer : undefined });
     return block;
   }
 

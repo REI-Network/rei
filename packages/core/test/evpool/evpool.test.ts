@@ -83,7 +83,7 @@ async function shouldFailed(fn: () => Promise<void>, message?: string) {
 
 describe('EvidencePool', () => {
   before(async () => {
-    await evpool.init(new BN(10));
+    await evpool.start(new BN(10));
   });
 
   it('should add successfully(1)', async () => {

@@ -41,7 +41,6 @@ describe('DuplicateVoteEvidence', () => {
       chainId: 100,
       type: VoteType.Precommit,
       hash: crypto.randomBytes(32),
-      timestamp: nowTimestamp(),
       index: 0
     });
 
@@ -51,7 +50,6 @@ describe('DuplicateVoteEvidence', () => {
       chainId: 100,
       type: VoteType.Precommit,
       hash: crypto.randomBytes(32),
-      timestamp: nowTimestamp(),
       index: 0
     });
 
@@ -67,7 +65,6 @@ describe('DuplicateVoteEvidence', () => {
       chainId: 100,
       type: VoteType.Precommit,
       hash: crypto.randomBytes(32),
-      timestamp: nowTimestamp(),
       index: 0
     });
     vote1.sign(accMngr.n2p('foo'));
@@ -78,7 +75,6 @@ describe('DuplicateVoteEvidence', () => {
       chainId: 100,
       type: VoteType.Precommit,
       hash: crypto.randomBytes(32),
-      timestamp: nowTimestamp(),
       index: 0
     });
     vote2.sign(accMngr.n2p('foo'));
@@ -96,7 +92,6 @@ describe('DuplicateVoteEvidence', () => {
       chainId: 100,
       type: VoteType.Precommit,
       hash: hash,
-      timestamp: nowTimestamp(),
       index: 0
     });
     vote1.sign(accMngr.n2p('foo'));
@@ -107,7 +102,6 @@ describe('DuplicateVoteEvidence', () => {
       chainId: 100,
       type: VoteType.Precommit,
       hash: hash,
-      timestamp: nowTimestamp(),
       index: 0
     });
     vote2.sign(accMngr.n2p('foo'));
@@ -124,7 +118,6 @@ describe('DuplicateVoteEvidence', () => {
       chainId: 100,
       type: VoteType.Precommit,
       hash: crypto.randomBytes(32),
-      timestamp: nowTimestamp(),
       index: 0
     });
     vote1.sign(accMngr.n2p('foo'));
@@ -135,7 +128,6 @@ describe('DuplicateVoteEvidence', () => {
       chainId: 100,
       type: VoteType.Precommit,
       hash: crypto.randomBytes(32),
-      timestamp: nowTimestamp(),
       index: 0
     });
     vote2.sign(accMngr.n2p('bar'));
@@ -152,7 +144,6 @@ describe('DuplicateVoteEvidence', () => {
       chainId: 100,
       type: VoteType.Precommit,
       hash: crypto.randomBytes(32),
-      timestamp: nowTimestamp(),
       index: 0
     });
     vote1.sign(accMngr.n2p('foo'));
@@ -163,7 +154,6 @@ describe('DuplicateVoteEvidence', () => {
       chainId: 100,
       type: VoteType.Precommit,
       hash: crypto.randomBytes(32),
-      timestamp: nowTimestamp(),
       index: 0
     });
     vote2.sign(accMngr.n2p('foo'));
@@ -181,7 +171,6 @@ describe('DuplicateVoteEvidence', () => {
       chainId: 100,
       type: VoteType.Precommit,
       hash: crypto.randomBytes(32),
-      timestamp: nowTimestamp(),
       index: 1
     });
     vote1.sign(accMngr.n2p('foo'));
@@ -192,7 +181,6 @@ describe('DuplicateVoteEvidence', () => {
       chainId: 100,
       type: VoteType.Precommit,
       hash: crypto.randomBytes(32),
-      timestamp: nowTimestamp(),
       index: 1
     });
     vote2.sign(accMngr.n2p('foo'));
@@ -210,7 +198,6 @@ describe('DuplicateVoteEvidence', () => {
       chainId: 100,
       type: VoteType.Precommit,
       hash: crypto.randomBytes(32),
-      timestamp: nowTimestamp(),
       index: 0
     });
     vote1.sign(accMngr.n2p('foo'));
@@ -221,7 +208,6 @@ describe('DuplicateVoteEvidence', () => {
       chainId: 100,
       type: VoteType.Precommit,
       hash: crypto.randomBytes(32),
-      timestamp: nowTimestamp(),
       index: 0
     });
     vote2.sign(accMngr.n2p('foo'));

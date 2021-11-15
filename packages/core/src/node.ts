@@ -23,7 +23,7 @@ import { BlockchainMonitor } from './blockchainMonitor';
 import { WireProtocol, ConsensusProtocol } from './protocols';
 import { ValidatorSets } from './staking';
 import { StakeManager, Router, Contract } from './contracts';
-import { ConsensusEngine, ReimintConsensusEngine, CliqueConsensusEngine, ConsensusType } from './consensus';
+import { ConsensusEngine, ReimintConsensusEngine, CliqueConsensusEngine, ConsensusType, ExtraData } from './consensus';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from './utils';
 import { getConsensusTypeByCommon } from './hardforks';
 import { Initializer, ProcessBlockOptions, NodeOptions, NodeStatus } from './types';
@@ -337,7 +337,17 @@ export class Node extends Initializer {
     return new VM({
       common: stateManager._common,
       stateManager,
-      blockchain: this.blockchain
+      blockchain: this.blockchain,
+      getMiner: (header) => {
+        const type = getConsensusTypeByCommon(header._common);
+        if (type === ConsensusType.Clique) {
+          return header.cliqueSigner();
+        } else if (type === ConsensusType.Reimint) {
+          return ExtraData.fromBlockHeader(header).proposal.proposer();
+        } else {
+          throw new Error('unknow consensus type');
+        }
+      }
     });
   }
 

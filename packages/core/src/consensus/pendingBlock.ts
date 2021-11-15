@@ -165,7 +165,8 @@ export class PendingBlock {
             txRes = await this.engine.processTx({
               vm,
               tx,
-              block: pendingBlock
+              block: pendingBlock,
+              blockGasUsed: this.gasUsed
             });
           } catch (err) {
             await vm.stateManager.revert();

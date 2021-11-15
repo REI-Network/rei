@@ -17,7 +17,7 @@
     },
     "dependencies": {
         "@ethersproject/abi": "^5.4.0",
-        "@gxchain2-ethereumjs/vm": "^5.5.10",
+        "@gxchain2-ethereumjs/vm": "^5.5.11",
         "@gxchain2/blockchain": "^0.0.7-alpha.0",
         "@gxchain2/common": "^0.0.7-alpha.0",
         "@gxchain2/database": "^0.0.7-alpha.0",

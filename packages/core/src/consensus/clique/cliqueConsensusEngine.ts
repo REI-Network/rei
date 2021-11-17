@@ -35,7 +35,7 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
     const header = block.header;
     // create a new pending block through worker
     const pendingBlock = await this.worker.createPendingBlock(header);
-    if (!this.enable || this.node.sync.isSyncing) {
+    if (!this.enable) {
       return;
     }
 
@@ -225,6 +225,7 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
 
     let validatorSet: ValidatorSet | undefined;
     const runBlockOptions: RunBlockOpts = {
+      debug: options.debug,
       block,
       root,
       generate: false,

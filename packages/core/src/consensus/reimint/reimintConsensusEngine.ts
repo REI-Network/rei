@@ -88,7 +88,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
 
     // create a new pending block through worker
     const pendingBlock = await this.worker.createPendingBlock(header);
-    if (!this.enable || this.node.sync.isSyncing) {
+    if (!this.enable) {
       return;
     }
 

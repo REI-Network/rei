@@ -15,7 +15,7 @@ import { Transaction, Block, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
 import { Channel, Aborter, logger } from '@gxchain2/utils';
 import { AccountManager } from '@gxchain2/wallet';
 import { TxPool } from './txpool';
-import { FullSynchronizer, Synchronizer } from './sync';
+import { Synchronizer } from './sync';
 import { TxFetcher } from './txSync';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
@@ -126,7 +126,7 @@ export class Node extends Initializer {
       .on('installed', this.onPeerInstalled)
       .on('removed', this.onPeerRemoved);
 
-    this.sync = new FullSynchronizer({ node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
+    this.sync = new Synchronizer({ node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
     this.txPool = new TxPool({ node: this, journal: this.datadir });
     this.txSync = new TxFetcher(this);
     this.bcMonitor = new BlockchainMonitor(this.db);
@@ -227,7 +227,8 @@ export class Node extends Initializer {
 
   private onPeerInstalled = (name: string, peer: Peer) => {
     if (name === this.wire.name) {
-      this.sync.announce(peer);
+      const handler = this.wire.getHandler(peer, false);
+      handler && this.sync.announce(handler);
     }
   };
 

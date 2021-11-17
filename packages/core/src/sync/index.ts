@@ -1,2 +1,3 @@
 export * from './sync';
-export * from './fullsync';
+export * from './fetcher';
+export * from './limited';

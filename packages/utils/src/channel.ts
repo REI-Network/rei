@@ -259,7 +259,7 @@ export class HChannel<T = any> {
 /**
  * An asynchronous queue, order by element index(grow from 0) and index must be continuous
  */
-export class PChannel<U = any, T extends { data: U; index: number } = { data: any; index: number }> {
+export class PChannel<U = any, T extends { data: U; index: number } = { data: U; index: number }> {
   private processed: number = 0;
   private aborted = false;
   private _array: T[] = [];

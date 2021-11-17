@@ -897,6 +897,11 @@ export class StateMachine {
   }
 
   newBlockHeader(header: BlockHeader, validators: ValidatorSet, pendingBlock: PendingBlock) {
+    if (this.parent && this.parent.hash().equals(header.hash())) {
+      // ignore same header
+      return;
+    }
+
     const timestamp = Date.now();
     this.parent = header;
     this.parentHash = header.hash();

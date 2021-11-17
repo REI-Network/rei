@@ -1,4 +1,4 @@
-import { bufferToInt, rlp, BN, intToBuffer } from 'ethereumjs-util';
+import { bufferToInt, rlp, BN, intToBuffer, bnToUnpaddedBuffer } from 'ethereumjs-util';
 import { mustParseTransction, Transaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/structure';
 import { logger, Channel, createBufferFunctionalSet } from '@gxchain2/utils';
 import { ProtocolHandler, Peer } from '@gxchain2/network';
@@ -53,18 +53,18 @@ const wireHandlerFuncs: HandlerFunc[] = [
     name: 'GetBlockHeaders',
     code: 1,
     response: 2,
-    encode(this: WireProtocolHandler, { start, count }: { start: number; count: number }) {
-      return [start, count];
+    encode(this: WireProtocolHandler, { start, count }: { start: BN; count: BN }) {
+      return [bnToUnpaddedBuffer(start), bnToUnpaddedBuffer(count)];
     },
     decode(this: WireProtocolHandler, [start, count]: Buffer[]) {
-      return { start: bufferToInt(start), count: bufferToInt(count) };
+      return { start: new BN(start), count: new BN(count) };
     },
-    async process(this: WireProtocolHandler, { start, count }: { start: number; count: number }): Promise<[string, BlockHeader[]] | void> {
-      if (count > maxGetBlockHeaders) {
+    async process(this: WireProtocolHandler, { start, count }: { start: BN; count: BN }): Promise<[string, BlockHeader[]] | void> {
+      if (count.gtn(maxGetBlockHeaders)) {
         this.node.banPeer(this.peer.peerId, 'invalid');
         return;
       }
-      const blocks = await this.node.blockchain.getBlocks(start, count, 0, false);
+      const blocks = await this.node.blockchain.getBlocks(start, count.toNumber(), 0, false);
       return ['BlockHeaders', blocks.map((b) => b.header)];
     }
   },
@@ -140,7 +140,7 @@ const wireHandlerFuncs: HandlerFunc[] = [
       this.knowBlocks([bestHash]);
       const totalDifficulty = td.toBuffer();
       this.updateStatus({ height, bestHash, totalDifficulty });
-      this.node.sync.announce(this.peer);
+      this.node.sync.announce(this);
     }
   },
   {
@@ -561,7 +561,7 @@ export class WireProtocolHandler implements ProtocolHandler {
    * @param count - Wanted blocks number
    * @returns The block headers
    */
-  getBlockHeaders(start: number, count: number): Promise<BlockHeader[]> {
+  getBlockHeaders(start: BN, count: BN): Promise<BlockHeader[]> {
     return this.request('GetBlockHeaders', { start, count });
   }
 

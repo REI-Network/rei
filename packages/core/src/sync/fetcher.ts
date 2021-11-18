@@ -177,7 +177,7 @@ export class Fetcher {
       }
 
       try {
-        logger.info('Download headers start:', start.toString(), 'count:', count.toString(), 'from:', handler.peer.peerId);
+        logger.info('Download headers start:', startNumber.toString(), 'count:', count.toString(), 'from:', handler.peer.peerId);
         const headers = await handler.getBlockHeaders(startNumber, count);
         parent = this.validateBackend.validateHeaders(parent, headers);
         await onData(headers);

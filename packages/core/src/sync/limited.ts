@@ -21,10 +21,22 @@ export class LimitedConcurrency {
     return this._concurrency > this.limit;
   }
 
+  /**
+   * Get `finishedPromise` to make sure all task are completed
+   * @returns `finishedPromise`
+   */
   finished() {
     return this.finishedPromise ?? Promise.resolve();
   }
 
+  /**
+   * Try to start a new concurrency,
+   * when this function returns,
+   * it means that the task has started,
+   * but may not have been completed
+   * @param fn - Callback function
+   * @returns The promise of fn
+   */
   async newConcurrency<T>(fn: () => Promise<T>) {
     while (true) {
       if (this._concurrency < this.limit) {

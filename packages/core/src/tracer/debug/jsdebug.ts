@@ -71,7 +71,7 @@ class Memory {
     if (offset < 0 || offset + 32 > this.memory.length - 1) {
       return bi(0);
     }
-    return this.memory.slice(offset, offset + 32).readUInt32BE();
+    return bi(this.memory.slice(offset, offset + 32).readUInt32BE());
   }
 }
 
@@ -156,7 +156,7 @@ function makeDB(stateManager: StateManager) {
  * @returns A object for get contract parameter
  */
 function makeLog(ctx: { [key: string]: any }, opcodes: OpcodeList, step: InterpreterStep, error?: string) {
-  const stack = step.stack.map((bn) => bi(bn.toString()));
+  const stack = step.stack.map((bn) => bi(bn.toString())).reverse();
   Object.defineProperty(stack, 'peek', {
     value: (idx: number) => {
       if (idx < 0 || idx > stack.length - 1) {
@@ -174,10 +174,10 @@ function makeLog(ctx: { [key: string]: any }, opcodes: OpcodeList, step: Interpr
       return step.pc;
     },
     getGas() {
-      return step.gasLeft.toNumber();
+      return bi(step.gasLeft.toString());
     },
     getCost() {
-      return step.opcode.fee;
+      return bi(step.opcode.fee);
     },
     getDepth() {
       return step.depth + 1;
@@ -281,7 +281,7 @@ export class JSDebug implements IDebugImpl {
     this.debugContext['from'] = from;
     this.debugContext['to'] = to;
     this.debugContext['input'] = input;
-    this.debugContext['gas'] = gas.toNumber();
+    this.debugContext['gas'] = bi(gas.toString());
     this.debugContext['gasPrice'] = gasPrice.toNumber();
     this.debugContext['intrinsicGas'] = calcIntrinsicGas(create, input).toNumber();
     this.debugContext['value'] = bi(value.toString());

@@ -15,8 +15,7 @@ contract Router is ReentrancyGuard, Only {
     using SafeMath for uint256;
 
     /**
-     * @dev `UsageInfo` event contains the usage information of tx,
-     *      It will be automatically appended to the end of the transaction log.
+     * `UsageInfo` event contains the usage information of tx, it will be automatically appended to the end of the transaction log.
      * @param feeUsage          `dailyFee` usage
      * @param freeFeeUsage      `dailyFreeFee` usage
      * @param contractFeeUsage  Contract fee usage
@@ -32,7 +31,7 @@ contract Router is ReentrancyGuard, Only {
     }
 
     /**
-     * @dev Estimate daily fee and free fee left.
+     * Estimate daily fee and free fee left.
      * @param from              Transaction sender
      * @param to                Transaction receiver(if contract creation, address(0))
      * @param timestamp         Timestamp
@@ -68,11 +67,11 @@ contract Router is ReentrancyGuard, Only {
     }
 
     /**
-     * @dev Assign transaction reward to miner, and emit the `UsageInfo` event,
-     *      if the consumed fee is `dailyFee` or `dailyFreeFee`,
-     *      it will only increase miner's share of the fee pool,
-     *      otherwise, if the consumed fee is user's balance,
-     *      it will add the fee to the fee pool and increase miner's share of the fee pool.
+     * Assign transaction reward to miner, and emit the `UsageInfo` event,
+     * if the consumed fee is `dailyFee` or `dailyFreeFee`,
+     * it will only increase miner's share of the fee pool,
+     * otherwise, if the consumed fee is user's balance,
+     * it will add the fee to the fee pool and increase miner's share of the fee pool.
      * @param validator         Block miner
      * @param from              Transaction sender
      * @param to                Transaction receiver(if contract creation, address(0))
@@ -107,10 +106,10 @@ contract Router is ReentrancyGuard, Only {
     }
 
     /**
-     * @dev Assign block reward, and call `onAssignBlockReward` callback,
-     *      it will split the block reward into two parts according to the `minerRewardFactor`,
-     *      one part will be directly distributed to miners as a reward,
-     *      and the other part will be added to the transaction fee pool.
+     * Assign block reward, and call `onAssignBlockReward` callback,
+     * it will split the block reward into two parts according to the `minerRewardFactor`,
+     * one part will be directly distributed to miners as a reward,
+     * and the other part will be added to the transaction fee pool.
      * @param validator         Block miner
      */
     function assignBlockReward(address validator) external payable nonReentrant onlySystemCaller {
@@ -131,7 +130,7 @@ contract Router is ReentrancyGuard, Only {
     }
 
     /**
-     * @dev Slash validator by reason
+     * Slash validator by reason
      * @param validator         Validator address
      * @param reason            Slash reason
      */
@@ -140,7 +139,7 @@ contract Router is ReentrancyGuard, Only {
     }
 
     /**
-     * @dev After block callback, it only can be called by system caller
+     * After block callback, it only can be called by system caller
      * @param _proposer         Proposer address
      * @param acValidators      Parameter of StakeManager.onAfterBlock
      * @param priorities        Parameter of StakeManager.onAfterBlock

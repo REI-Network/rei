@@ -18,8 +18,8 @@ contract UnstakePool is ReentrancyGuard, Only, IUnstakePool {
     constructor(IConfig config) public Only(config) {}
 
     /**
-     * @dev Deposit GXC to `UnstakePool`, only can be called by stake manager,
-     *      this will be called when user starts unstake.
+     * Deposit GXC to `UnstakePool`, only can be called by stake manager,
+     * this will be called when user starts unstake.
      * @param validator     Validator address.
      */
     function deposit(address validator) external payable override nonReentrant onlyStakeManager returns (uint256 shares) {
@@ -38,8 +38,8 @@ contract UnstakePool is ReentrancyGuard, Only, IUnstakePool {
     }
 
     /**
-     * @dev Withdraw GXC and burn shares, only can be called by stake manager,
-     *      this will be called when unstake timeout.
+     * Withdraw GXC and burn shares, only can be called by stake manager,
+     * this will be called when unstake timeout.
      * @param validator     Validator address.
      * @param shares        Number of shares.
      * @param to            GXC receiver address(this value is set when the user starts unstake).
@@ -64,7 +64,7 @@ contract UnstakePool is ReentrancyGuard, Only, IUnstakePool {
     }
 
     /**
-     * @dev Slash validator and transfer the slashed amount to `address(0)`.
+     * Slash validator and transfer the slashed amount to `address(0)`.
      * @param validator     Validator address.
      * @param factor        Slash factor.
      */

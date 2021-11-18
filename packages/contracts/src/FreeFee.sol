@@ -22,7 +22,7 @@ contract FreeFee is ReentrancyGuard, Only, IFreeFee {
     constructor(IConfig config) public Only(config) {}
 
     /**
-     * @dev Estimate total daily free fee left.
+     * Estimate total daily free fee left.
      * @param timestamp        Current timestamp
      */
     function estimateTotalLeft(uint256 timestamp) public view override returns (uint256 totalLeft) {
@@ -35,7 +35,7 @@ contract FreeFee is ReentrancyGuard, Only, IFreeFee {
     }
 
     /**
-     * @dev Estimate user daily free fee usage.
+     * Estimate user daily free fee usage.
      * @param ui                User usage information
      * @param timestamp         Current timestamp
      */
@@ -48,7 +48,7 @@ contract FreeFee is ReentrancyGuard, Only, IFreeFee {
     }
 
     /**
-     * @dev Estimate user daily free fee left.
+     * Estimate user daily free fee left.
      * @param user              User address
      * @param timestamp         Current timestamp
      */
@@ -65,7 +65,7 @@ contract FreeFee is ReentrancyGuard, Only, IFreeFee {
     }
 
     /**
-     * @dev Consume user usage, it only can be called by router.
+     * Consume user usage, it only can be called by router.
      * @param user              Transaction sender
      * @param usage             Usage amount
      */
@@ -82,8 +82,7 @@ contract FreeFee is ReentrancyGuard, Only, IFreeFee {
     }
 
     /**
-     * @dev After block callback, it only can be called by router,
-     *      it will update `globalTimestamp` if the time interval exceeds `freeFeeRecoverInterval`
+     * After block callback, it only can be called by router, it will update `globalTimestamp` if the time interval exceeds `freeFeeRecoverInterval`.
      */
     function onAfterBlock() external override nonReentrant onlyRouter {
         if (globalTimestamp.add(config.freeFeeRecoverInterval()) < block.timestamp) {

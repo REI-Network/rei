@@ -22,7 +22,7 @@ contract Fee is ReentrancyGuard, Only, IFee {
     uint256 public override totalAmount;
 
     /**
-     * @dev Emit when user deposits.
+     * Emit when user deposits.
      * @param by        Deposit user
      * @param to        Receiver user
      * @param amount    Deposit amount
@@ -30,7 +30,7 @@ contract Fee is ReentrancyGuard, Only, IFee {
     event Deposit(address indexed by, address indexed to, uint256 indexed amount);
 
     /**
-     * @dev Emit when user withdraws.
+     * Emit when user withdraws.
      * @param by        Withdraw user
      * @param from      From user
      * @param amount    Withdraw amount
@@ -40,7 +40,7 @@ contract Fee is ReentrancyGuard, Only, IFee {
     constructor(IConfig config) public Only(config) {}
 
     /**
-     * @dev Deposit amount to target user.
+     * Deposit amount to target user.
      * @param user      Target user address
      */
     function deposit(address user) external payable override nonReentrant {
@@ -55,7 +55,7 @@ contract Fee is ReentrancyGuard, Only, IFee {
     }
 
     /**
-     * @dev Withdraw amount from target user.
+     * Withdraw amount from target user.
      * @param user              Target user address
      * @param desiredAmount     Desired withdraw amount
      * @param minAmount         Min withdraw amount
@@ -84,8 +84,7 @@ contract Fee is ReentrancyGuard, Only, IFee {
     }
 
     /**
-     * @dev Estimate wtihdrawable timestamp,
-     *      if the estimation fails, return 0.
+     * Estimate wtihdrawable timestamp, if the estimation fails, return 0.
      * @param user      Target user address
      * @param from      From user address
      */
@@ -125,7 +124,7 @@ contract Fee is ReentrancyGuard, Only, IFee {
     }
 
     /**
-     * @dev Estimate wtihdrawable amount.
+     * Estimate wtihdrawable amount.
      * @param user      Target user address
      * @param timestamp Current timestamp
      */
@@ -139,8 +138,10 @@ contract Fee is ReentrancyGuard, Only, IFee {
     }
 
     /**
-     * @dev Estimate user fee.
+     * Estimate user fee.
+     *
      *      userFee = userTotalAmount * dailyFee / totalAmount - userUsage
+     *
      * @param user      User address
      * @param timestamp Current timestamp
      */
@@ -154,7 +155,7 @@ contract Fee is ReentrancyGuard, Only, IFee {
     }
 
     /**
-     * @dev Estimate user usage
+     * Estimate user usage
      *
      *      T: current timestamp
      *      T': last timestamp
@@ -180,7 +181,7 @@ contract Fee is ReentrancyGuard, Only, IFee {
     }
 
     /**
-     * @dev Consume user fee, can only be called by the system caller.
+     * Consume user fee, can only be called by the system caller.
      * @param user      User address
      * @param usage     Number of usage fee
      */

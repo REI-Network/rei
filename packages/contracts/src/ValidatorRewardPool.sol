@@ -16,7 +16,7 @@ contract ValidatorRewardPool is ReentrancyGuard, Only, IValidatorRewardPool {
     constructor(IConfig config) public Only(config) {}
 
     /**
-     * @dev Claim validator reward.
+     * Claim validator reward.
      * @param validator     Validator address.
      * @param amount        Claim amount.
      */
@@ -26,7 +26,7 @@ contract ValidatorRewardPool is ReentrancyGuard, Only, IValidatorRewardPool {
     }
 
     /**
-     * @dev Reward validator.
+     * Reward validator.
      * @param validator     Validator address.
      */
     function reward(address validator) external payable override nonReentrant onlyStakeManager {
@@ -35,7 +35,7 @@ contract ValidatorRewardPool is ReentrancyGuard, Only, IValidatorRewardPool {
     }
 
     /**
-     * @dev Slash validator and transfer the slashed amount to `address(0)`.
+     * Slash validator and transfer the slashed amount to `address(0)`.
      * @param validator     Validator address.
      * @param factor        Slash factor.
      */

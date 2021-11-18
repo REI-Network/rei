@@ -30,14 +30,14 @@ contract FeePool is ReentrancyGuard, Only, IFeePool {
     constructor(IConfig config) public Only(config) {}
 
     /**
-     * @dev Get validators length.
+     * Get validators length.
      */
     function validatorsLength() external view override returns (uint256) {
         return validators.length;
     }
 
     /**
-     * @dev Increase miner's share.
+     * Increase miner's share.
      * @param validator         Miner address
      * @param earned            Miner earned share.
      */
@@ -51,7 +51,7 @@ contract FeePool is ReentrancyGuard, Only, IFeePool {
     }
 
     /**
-     * @dev Add reward to fee pool.
+     * Add reward to fee pool.
      * @param isTxFee           Is transaction fee
      */
     function accumulate(bool isTxFee) external payable override nonReentrant onlyRouter {
@@ -61,7 +61,7 @@ contract FeePool is ReentrancyGuard, Only, IFeePool {
     }
 
     /**
-     * @dev Assign block reward callback, it only can be called by router.
+     * Assign block reward callback, it only can be called by router.
      */
     function onAssignBlockReward() external override nonReentrant onlyRouter {
         if (globalTimestamp.add(config.feePoolLiquidateInterval()) < block.timestamp) {

@@ -38,7 +38,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     address public override proposer;
 
     /**
-     * @dev Emitted when a validator gets a reward
+     * Emitted when a validator gets a reward
      * NOTE: this event is never shown in the block,
      *       because the `reward` function is only called by the system caller
      * @param validator     Validator address
@@ -47,7 +47,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     event Reward(address indexed validator, uint256 indexed value);
 
     /**
-     * @dev Emitted when a validator is slashed
+     * Emitted when a validator is slashed
      * NOTE: this event is never shown in the block,
      *       because the `slash` function is only called by the system caller
      * @param validator     Validator address
@@ -56,7 +56,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     event Slash(address indexed validator, uint256 indexed value);
 
     /**
-     * @dev Emitted when the user stakes
+     * Emitted when the user stakes
      * @param validator     Validator address
      * @param value         Stake value
      * @param to            Receiver address
@@ -65,7 +65,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     event Stake(address indexed validator, uint256 indexed value, address to, uint256 shares);
 
     /**
-     * @dev Emitted when the user starts unstake
+     * Emitted when the user starts unstake
      * @param id            Unique unstake id
      * @param validator     Validator address
      * @param value         Stake value
@@ -76,7 +76,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     event StartUnstake(uint256 indexed id, address indexed validator, uint256 indexed value, address to, uint256 unstakeShares, uint256 timestamp);
 
     /**
-     * @dev Emitted when stake manager `unstake`
+     * Emitted when stake manager `unstake`
      * @param id            Unique unstake id
      * @param validator     Validator address
      * @param to            Receiver address
@@ -85,7 +85,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     event DoUnstake(uint256 indexed id, address indexed validator, address to, uint256 amount);
 
     /**
-     * @dev Emitted when validator set commission rate
+     * Emitted when validator set commission rate
      * @param validator     Validator address
      * @param rate          New commission rate
      * @param timestamp     Update timestamp
@@ -93,14 +93,14 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     event SetCommissionRate(address indexed validator, uint256 indexed rate, uint256 indexed timestamp);
 
     /**
-     * @dev Emitted when a new validator is indexed
+     * Emitted when a new validator is indexed
      * @param validator     Validator address
      * @param votingPower   Validator voting power
      */
     event IndexedValidator(address indexed validator, uint256 indexed votingPower);
 
     /**
-     * @dev Emitted when a new validator is unindexed
+     * Emitted when a new validator is unindexed
      * @param validator     Validator address
      */
     event UnindexedValidator(address indexed validator);
@@ -126,14 +126,14 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Get the indexed validators length.
+     * Get the indexed validators length.
      */
     function indexedValidatorsLength() external view override returns (uint256) {
         return indexedValidators.length();
     }
 
     /**
-     * @dev Determine whether the index validator exists by id.
+     * Determine whether the index validator exists by id.
      * @param id            The validator id
      */
     function indexedValidatorsExists(uint256 id) external view override returns (bool) {
@@ -141,7 +141,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Get indexed validator address by index.
+     * Get indexed validator address by index.
      * @param index         The validator index
      */
     function indexedValidatorsByIndex(uint256 index) external view override returns (address validator) {
@@ -149,7 +149,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Get indexed validator address by id.
+     * Get indexed validator address by id.
      * @param id            The validator id
      */
     function indexedValidatorsById(uint256 id) external view override returns (address) {
@@ -157,8 +157,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Get the voting power by validator index.
-     *      If index is out of range or validator doesn't exist, return 0
+     * Get the voting power by validator index, if index is out of range or validator doesn't exist, return 0.
      * @param index         The validator index
      */
     function getVotingPowerByIndex(uint256 index) external view override returns (uint256) {
@@ -175,8 +174,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Get the voting power by validator id.
-     *      If doesn't exist, return 0
+     * Get the voting power by validator id, if doesn't exist, return 0.
      * @param id            The validator id
      */
     function getVotingPowerById(uint256 id) external view override returns (uint256) {
@@ -189,8 +187,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Get the voting power by validator address.
-     *      If the validator doesn't exist, return 0
+     * Get the voting power by validator address, if the validator doesn't exist, return 0.
      * @param validator     Validator address
      */
     function getVotingPowerByAddress(address validator) public view override returns (uint256) {
@@ -202,7 +199,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Get the voting power by validator address.
+     * Get the voting power by validator address.
      * @param commissionShare Validator commission share address
      * @param validator       Validator address
      */
@@ -211,8 +208,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Get the total locked amount and the validator count
-     *      but no including the `excludes`
+     * Get the total locked amount and the validator count, but no including the `excludes`.
      * @param excludes         Excluded addresses
      */
     function getTotalLockedAmountAndValidatorCount(address[] calldata excludes) external view override returns (uint256 _totalLockedAmount, uint256 validatorCount) {
@@ -232,15 +228,14 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Get the active validators list length.
+     * Get the active validators list length.
      */
     function activeValidatorsLength() external view override returns (uint256) {
         return activeValidators.length;
     }
 
     /**
-     * @dev Estimate how much GXC should be stake, if user wants to get the number of shares.
-     *      Or Estimate how much GXC can be obtained, if user unstake the amount of GXC.
+     * Estimate how much GXC should be stake, if user wants to get the number of shares, Or estimate how much GXC can be obtained, if user unstake the amount of GXC.
      * @param validator    Validator address
      * @param shares       Number of shares
      */
@@ -254,9 +249,9 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Estimate how much shares should be unstake, if user wants to get the amount of GXC.
-     *      Or estimate how much shares can be obtained, if user stake the amount of GXC.
-     *      If the validator doesn't exist, return 0.
+     * Estimate how much shares should be unstake, if user wants to get the amount of GXC.
+     * Or estimate how much shares can be obtained, if user stake the amount of GXC.
+     * If the validator doesn't exist, return 0.
      * @param validator    Validator address
      * @param amount       Number of GXC
      */
@@ -270,8 +265,8 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Estimate how much GXC can be claim, if unstake the number of shares(when unstake timeout).
-     *      If the validator doesn't exist, return 0.
+     * Estimate how much GXC can be claim, if unstake the number of shares(when unstake timeout).
+     * If the validator doesn't exist, return 0.
      * @param validator    Validator address
      * @param shares       Number of shares
      */
@@ -305,8 +300,8 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Stake for validator and mint share token to `to` address.
-     *      It will emit `Stake` event.
+     * Stake for validator and mint share token to `to` address.
+     * It will emit `Stake` event.
      * @param validator    Validator address
      * @param to           Receiver address
      */
@@ -335,8 +330,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Do start unstake.
-     *      It will mint unstake shares and add a record to `unstakeQueue`
+     * Do start unstake, it will mint unstake shares and add a record to `unstakeQueue`
      */
     function _startUnstake(
         address validator,
@@ -365,9 +359,9 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Start unstake shares for validator.
-     *      Stake manager will burn the shares immediately, but return GXC to `to` address after `config.unstakeDelay`.
-     *      It will emit `StartUnstake` event.
+     * Start unstake shares for validator.
+     * Stake manager will burn the shares immediately, but return GXC to `to` address after `config.unstakeDelay`.
+     * It will emit `StartUnstake` event.
      * @param validator    Validator address
      * @param to           Receiver address
      * @param shares       Number of shares to be burned
@@ -392,9 +386,9 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Start claim validator reward.
-     *      Stake manager will claim GXC from validator reward manager immediately, but return GXC to `to` address after `config.unstakeDelay`.
-     *      It will emit `StartUnstake` event.
+     * Start claim validator reward.
+     * Stake manager will claim GXC from validator reward manager immediately, but return GXC to `to` address after `config.unstakeDelay`.
+     * It will emit `StartUnstake` event.
      * @param to           Receiver address
      * @param amount       Number of GXC
      * @return             Unstake id
@@ -409,7 +403,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Set validator commission rate.
+     * Set validator commission rate.
      * @param rate         New commission rate
      */
     function setCommissionRate(uint256 rate) external override nonReentrant {
@@ -425,7 +419,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Unstake by id, return unstake amount.
+     * Unstake by id, return unstake amount.
      * @param id            Unstake id
      */
     function unstake(uint256 id) external override nonReentrant returns (uint256 amount) {
@@ -438,8 +432,8 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Remove the validator from `indexedValidators` if the voting power is less than `minIndexVotingPower`
-     *      This can be called by anyone.
+     * Remove the validator from `indexedValidators` if the voting power is less than `minIndexVotingPower`
+     * This can be called by anyone.
      * @param validator           Validator address
      */
     function removeIndexedValidator(address validator) external override nonReentrant {
@@ -450,8 +444,8 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Add the validator to `indexedValidators` if the voting power is greater than `minIndexVotingPower`
-     *      This can be called by anyone.
+     * Add the validator to `indexedValidators` if the voting power is greater than `minIndexVotingPower`
+     * This can be called by anyone.
      * @param validator          Validator address
      */
     function addIndexedValidator(address validator) external override nonReentrant {
@@ -464,7 +458,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Reward validator, only can be called by system caller
+     * Reward validator, only can be called by system caller
      * @param validator         Validator address
      */
     function reward(address validator) external payable override nonReentrant onlyRouterOrFeePool {
@@ -492,7 +486,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * @dev Slash validator, only can be called by system caller
+     * Slash validator, only can be called by system caller
      * @param validator         Validator address
      * @param reason            Slash reason
      */
@@ -515,7 +509,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
 
     // TODO: if the active validators list is exactly the same as the last list, don't modify the storage
     /**
-     * @dev After block callback, it will be called by system caller after each block is processed
+     * After block callback, it will be called by system caller after each block is processed
      * @param _proposer          Proposer address
      * @param acValidators       Active validators list
      * @param priorities         Priority list of active validators

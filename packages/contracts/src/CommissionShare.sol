@@ -17,8 +17,7 @@ contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
     }
 
     /**
-     * @dev Estimate how much GXC should be stake, if user wants to get the number of shares.
-     *      Or Estimate how much GXC can be obtained, if user unstake the amount of GXC.
+     * Estimate how much GXC should be stake, if user wants to get the number of shares, or estimate how much GXC can be obtained, if user unstake the amount of GXC.
      * @param shares    Number of shares
      */
     function estimateSharesToAmount(uint256 shares) external view override returns (uint256 amount) {
@@ -32,8 +31,7 @@ contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
     }
 
     /**
-     * @dev Estimate how much shares should be unstake, if user wants to get the amount of GXC.
-     *      Or estimate how much shares can be obtained, if user stake the amount of GXC.
+     * Estimate how much shares should be unstake, if user wants to get the amount of GXC, or estimate how much shares can be obtained, if user stake the amount of GXC.
      * @param amount    Number of GXC
      */
     function estimateAmountToShares(uint256 amount) external view override returns (uint256 shares) {
@@ -47,8 +45,7 @@ contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
     }
 
     /**
-     * @dev Mint share token to `to` address.
-     *      Can only be called by stake manager.
+     * Mint share token to `to` address. Can only be called by stake manager.
      * @param to        Receiver address
      */
     function mint(address to) external payable override nonReentrant onlyStakeManager returns (uint256 shares) {
@@ -67,8 +64,7 @@ contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
     }
 
     /**
-     * @dev Burn shares and return GXC to `to` address.
-     *      Can only be called by stake manager.
+     * Burn shares and return GXC to `to` address. Can only be called by stake manager.
      * @param shares    Number of shares to be burned
      */
     function burn(uint256 shares) external override nonReentrant onlyStakeManager returns (uint256 amount) {
@@ -86,12 +82,12 @@ contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
     }
 
     /**
-     * @dev Reward validator.
+     * Reward validator.
      */
     function reward() external payable override nonReentrant onlyStakeManager {}
 
     /**
-     * @dev Slash validator and transfer the slashed amount to `address(0)`.
+     * Slash validator and transfer the slashed amount to `address(0)`.
      * @param factor        Slash factor.
      */
     function slash(uint8 factor) external override nonReentrant onlyStakeManager returns (uint256 amount) {

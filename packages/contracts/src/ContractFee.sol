@@ -13,7 +13,7 @@ contract ContractFee is IContractFee {
     mapping(address => address) public override creatorOf;
 
     /**
-     * @dev Registration event, emit when someone registers their contract.
+     * Registration event, emit when someone registers their contract.
      * @param parent        Creator
      * @param child         Contract address
      */
@@ -80,7 +80,7 @@ contract ContractFee is IContractFee {
     }
 
     /**
-     * @dev Generate contract address.
+     * Generate contract address.
      * @param from          Creator address
      * @param nonce         Creator nonce
      */
@@ -89,7 +89,7 @@ contract ContractFee is IContractFee {
     }
 
     /**
-     * @dev Generate contract address(create2).
+     * Generate contract address(create2).
      * @param from          Creator address
      * @param salt          Salt
      * @param codeHash      Deploy code hash, notice: this is not the same as the account code hash
@@ -133,11 +133,9 @@ contract ContractFee is IContractFee {
     }
 
     /**
-     * @dev Register the contract creator.
+     * Register the contract creator.
      * @param parent        Root creator address
-     * @param flags         A list of flags,
-     *                      if the flag is true, it means `create` and load a nonce from nonces,
-     *                      otherwise it means `create2` and load a `Create2Info` from infos
+     * @param flags         A list of flags, if the flag is true, it means `create` and load a nonce from nonces, otherwise it means `create2` and load a `Create2Info` from infos
      * @param nonces        A list of nonces
      * @param infos         A list of `Create2Info`
      */
@@ -163,8 +161,7 @@ contract ContractFee is IContractFee {
     }
 
     /**
-     * @dev Set contract fee.
-     *      The contract fee can be set only when the sender is the creator of the contract.
+     * Set contract fee. The contract fee can be set only when the sender is the creator of the contract.
      * @param contractAddress       Target contract address
      * @param fee                   Contract fee
      */

@@ -100,7 +100,7 @@ const handler: {
           if (v === undefined) {
             return undefined;
           } else {
-            return v.validator();
+            return v.validator().toString();
           }
         })
       );

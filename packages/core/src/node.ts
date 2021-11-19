@@ -443,11 +443,23 @@ export class Node extends Initializer {
    */
   private async processLoop() {
     await this.initPromise;
-    for await (let { block, options, resolve, reject } of this.processQueue.generator()) {
+    for await (const { block, options, resolve, reject } of this.processQueue.generator()) {
       try {
         const hash = block.hash();
         const number = block.header.number;
         const common = block._common;
+
+        // ensure that the block has not been executed
+        try {
+          await this.db.getHeader(hash, number);
+          resolve(false);
+          continue;
+        } catch (err: any) {
+          if (err.type !== 'NotFoundError') {
+            reject(err);
+            continue;
+          }
+        }
 
         // get parent header from database
         const parent = await this.db.getHeader(block.header.parentHash, number.subn(1));

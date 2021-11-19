@@ -805,7 +805,7 @@ export class StateMachine {
       throw new Error('height is undefined');
     }
 
-    logger.debug('StateMachine::replay, start, local height:', this.height.toString());
+    logger.debug('StateMachine::replay, start, local height:', this.height.subn(1).toString());
 
     const height = this.height.clone();
     let reader = await this.wal.searchForEndHeight(height);

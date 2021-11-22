@@ -348,7 +348,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
         const receipts = postByzantiumTxReceiptsToReceipts(postByzantiumTxReceipts);
         validatorSet = await this.afterApply(vm, block, receipts, extraData.evidence, miner, blockReward, parentValidatorSet, parentStakeManager, parentRouter);
       },
-      runTxOpts: { ...runTxOpts, ...makeRunTxCallback(parentRouter, systemCaller, miner, pendingHeader.timestamp.toNumber()) }
+      runTxOpts: { ...runTxOpts, ...makeRunTxCallback(parentRouter, systemCaller, miner, pendingHeader.timestamp.toNumber()), skipBalance: true }
     };
 
     const result = await vm.runBlock(runBlockOptions);

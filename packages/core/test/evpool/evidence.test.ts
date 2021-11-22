@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import { assert, expect } from 'chai';
 import { Address, BN } from 'ethereumjs-util';
-import { nowTimestamp } from '@gxchain2/utils';
 import { DuplicateVoteEvidence, Vote, VoteType } from '../../src/consensus/reimint/types';
 import { MockAccountManager } from '../util';
 

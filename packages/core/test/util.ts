@@ -2,11 +2,15 @@ import { Address } from 'ethereumjs-util';
 import { FunctionalMap } from '@gxchain2/utils';
 
 export class MockAccountManager {
-  private nameToAddress = new Map<string, Address>();
-  private nameToPrivKey = new Map<string, Buffer>();
-  private addressToName = new FunctionalMap<Address, string>((a: Address, b: Address) => a.buf.compare(b.buf));
+  readonly nameToAddress = new Map<string, Address>();
+  readonly nameToPrivKey = new Map<string, Buffer>();
+  readonly addressToName = new FunctionalMap<Address, string>((a: Address, b: Address) => a.buf.compare(b.buf));
 
   constructor(addresses: [string, Address][] | [string, Address, Buffer][]) {
+    this.add(addresses);
+  }
+
+  add(addresses: [string, Address][] | [string, Address, Buffer][]) {
     for (const [name, address, privKey] of addresses) {
       this.nameToAddress.set(name, address);
       this.addressToName.set(address, name);

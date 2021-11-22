@@ -573,8 +573,12 @@ export class TxPool extends InitializerWithEventEmitter {
       const accountInDB = await this.currentStateManager.getAccount(new Address(sender));
       const forwards = queue.forward(accountInDB.nonce);
       this.removeTxFromGlobal(forwards);
-      const { removed: drops } = queue.filter(accountInDB.balance, this.currentHeader.gasLimit);
-      this.removeTxFromGlobal(drops);
+      let dropsLength = 0;
+      if (!isEnableStaking(this.currentBlock._common)) {
+        const { removed: drops } = queue.filter(accountInDB.balance, this.currentHeader.gasLimit);
+        this.removeTxFromGlobal(drops);
+        dropsLength = drops.length;
+      }
       const totalReadies = queue.ready(await account.getPendingNonce());
       for (const tx of totalReadies) {
         if (this.promoteTx(tx)) {
@@ -588,7 +592,7 @@ export class TxPool extends InitializerWithEventEmitter {
         this.removeTxFromGlobal(resizes);
       }
       // resize priced
-      this.priced.removed(forwards.length + drops.length + resizesNumber);
+      this.priced.removed(forwards.length + dropsLength + resizesNumber);
       if (!account.hasQueue() && !account.hasPending()) {
         this.accounts.delete(sender);
       }
@@ -624,13 +628,17 @@ export class TxPool extends InitializerWithEventEmitter {
       const accountInDB = await this.currentStateManager.getAccount(new Address(sender));
       const forwards = pending.forward(accountInDB.nonce);
       this.removeTxFromGlobal(forwards);
-      const { removed: drops, invalids } = pending.filter(accountInDB.balance, this.currentHeader.gasLimit);
-      this.removeTxFromGlobal(drops);
-      // resize priced
-      this.priced.removed(forwards.length + drops.length);
-      for (const tx of invalids) {
-        this.enqueueTx(tx);
+      let dropsLength = 0;
+      if (!isEnableStaking(this.currentBlock._common)) {
+        const { removed: drops, invalids } = pending.filter(accountInDB.balance, this.currentHeader.gasLimit);
+        this.removeTxFromGlobal(drops);
+        dropsLength = drops.length;
+        for (const tx of invalids) {
+          this.enqueueTx(tx);
+        }
       }
+      // resize priced
+      this.priced.removed(forwards.length + dropsLength);
       if (!pending.has(accountInDB.nonce) && pending.size > 0) {
         const resizes = pending.resize(0);
         for (const tx of resizes) {

@@ -232,8 +232,12 @@ export class TxSortedMap {
     if (lowestNonce) {
       this.strictCheck(lowestNonce, invalids);
     }
-    this.decreaseSlots(invalids.concat(removed));
-    this.sortedTxCache = undefined;
+    const deleted = invalids.concat(removed);
+    if (deleted.length > 0) {
+      this.decreaseSlots(deleted);
+      this.resetNonceHeap(this.nonceToTx.keys());
+      this.sortedTxCache = undefined;
+    }
     return { removed, invalids };
   }
 

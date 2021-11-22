@@ -6,7 +6,7 @@
     "license": "GPL-3.0-or-later",
     "scripts": {
         "build": "tsc --build tsconfig.json",
-        "test": "echo @gxchain2/common has not test cases"
+        "test": "echo @gxchain2/common has no test cases"
     },
     "devDependencies": {
         "typescript": "^4.1.2"

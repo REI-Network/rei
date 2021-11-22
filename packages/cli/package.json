@@ -9,7 +9,7 @@
     },
     "scripts": {
         "build": "tsc --build tsconfig.json",
-        "test": "echo @gxchain2/cli has not test cases"
+        "test": "echo @gxchain2/cli has no test cases"
     },
     "devDependencies": {
         "@types/node": "^14.14.9",

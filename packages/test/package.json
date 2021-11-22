@@ -1,0 +1,14 @@
+{
+  "name": "test",
+  "version": "0.0.1",
+  "description": "test cases for rei-network",
+  "scripts": {
+    "start": "mocha -r ts-node/register 'test/**/*.test.ts' --timeout 1000000 --exit",
+    "build": "echo test has no build command",
+    "test": "echo test has no test cases, if you want to start test, please run npm start"
+  },
+  "license": "GPL-3.0-or-later",
+  "devDependencies": {
+    "web3": "^1.6.1"
+  }
+}

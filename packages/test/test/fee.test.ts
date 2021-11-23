@@ -60,6 +60,7 @@ describe('Fee', () => {
   });
 
   it('should stack successfully', async () => {
+    // let test2 deposit for test1
     await client.fee.methods.deposit(accMngr.n2a('test1').toString()).send({
       from: accMngr.n2a('test2').toString(),
       value: 100,
@@ -90,6 +91,7 @@ describe('Fee', () => {
     const gasUsed = gasPrice.muln(21000);
     const feeUsed = left.clone();
 
+    // due to the time difference, there may be a certain error
     const feeUsedMax = feeUsed.muln(101).divn(100);
     const feeUsedMin = feeUsed.muln(99).divn(100);
 

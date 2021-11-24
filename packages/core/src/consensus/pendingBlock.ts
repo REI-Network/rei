@@ -147,7 +147,17 @@ export class PendingBlock {
    * @param txs - PendingTxMap instance(created by txpool)
    */
   appendTxs(txs: PendingTxMap) {
+    // TODO: remove this
+    if (this.finalizedStateRoot) {
+      return Promise.resolve();
+    }
+
     return this.runWithLock(async () => {
+      // TODO: remove this
+      if (this.finalizedStateRoot) {
+        return;
+      }
+
       // create a empty block for execute transaction
       const pendingBlock = this.engine.generatePendingBlock(this.toHeaderData(), this._common);
       const gasLimit = pendingBlock.header.gasLimit;

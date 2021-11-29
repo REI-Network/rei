@@ -145,10 +145,8 @@ export class StateMachine {
       this.setProposal(msg.proposal, peerId);
     } else if (msg instanceof ProposalBlockMessage) {
       this.addProposalBlock(msg.toBlock({ common: this.backend.getCommon(0), hardforkByBlockNumber: true }));
-      // statsMsgQueue <- mi
     } else if (msg instanceof VoteMessage) {
       this.tryAddVote(msg.vote, peerId);
-      // statsMsgQueue <- mi
     } else {
       throw new Error('unknown msg type');
     }
@@ -156,7 +154,7 @@ export class StateMachine {
 
   private handleTimeout(ti: StateMachineTimeout) {
     if (!ti.height.eq(this.height) || ti.round < this.round || (ti.round === this.round && ti.step < this.step)) {
-      logger.debug('StateMachine::handleTimeout, ignoring tock because we are ahead:', ti, 'local(h,r,s):', this.height.toString(), this.round, this.step);
+      logger.debug('StateMachine::handleTimeout, ignoring tock because we are ahead(h,r,s):', ti.height.toString(), ti.round, ti.step, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
     // logger.debug('StateMachine::handleTimeout, timeout info:', ti);
@@ -185,8 +183,20 @@ export class StateMachine {
 
   private setProposal(proposal: Proposal, peerId: string) {
     // logger.debug('StateMachine::setProposal');
+
+    const requestProposalBlock = () => {
+      if (this.proposalBlock === undefined && peerId !== '') {
+        this.p2p.broadcastMessage(new GetProposalBlockMessage(proposal.hash), { to: peerId });
+      }
+    };
+
     if (this.proposal) {
       logger.debug('StateMachine::setProposal, proposal already exists');
+
+      // if we still don’t have the proposal block, request the remote peer
+      if (this.proposal.hash.equals(proposal.hash)) {
+        requestProposalBlock();
+      }
       return;
     }
 
@@ -203,9 +213,7 @@ export class StateMachine {
 
     this.proposal = proposal;
     this.proposalBlockHash = proposal.hash;
-    if (this.proposalBlock === undefined && peerId !== '') {
-      this.p2p.broadcastMessage(new GetProposalBlockMessage(proposal.hash), { to: peerId });
-    }
+    requestProposalBlock();
   }
 
   private isProposalComplete() {
@@ -242,7 +250,7 @@ export class StateMachine {
 
     /**
      * TODO: Check proposal block's validator set size,
-     * but this isn't important
+     *       but this isn't important...
      */
     if (!this.proposal.proposer().equals(proposer) || extraData.round !== this.proposal.round || extraData.POLRound !== this.proposal.POLRound) {
       throw new Error('invalid proposal block');
@@ -272,14 +280,14 @@ export class StateMachine {
         this.enterPrecommit(this.height, this.round);
       }
     } else if (this.step === RoundStepType.Commit) {
-      this.tryFinalizeCommit(this.height);
+      this.finalizeCommit(this.height);
     }
   }
 
   private addVote(vote: Vote, peerId: string) {
     // logger.debug('StateMachine::addVote, vote(h,r,h,t):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, 'from:', peerId);
 
-    if (!vote.height.eq(vote.height)) {
+    if (!vote.height.eq(this.height)) {
       logger.debug('StateMachine::addVote, unequal height, ignore, height:', vote.height.toString(), 'local:', this.height.toString());
       return;
     }
@@ -665,8 +673,6 @@ export class StateMachine {
     }
 
     if (this.proposalBlock && this.proposalBlock.hash().equals(maj23Hash)) {
-      // validate block
-
       this.lockedRound = round;
       this.lockedBlock = this.proposalBlock;
       this.lockedEvidence = this.proposalEvidence;
@@ -724,7 +730,7 @@ export class StateMachine {
       this.commitTime = Date.now();
       this.newStep();
 
-      this.tryFinalizeCommit(height);
+      this.finalizeCommit(height);
     };
 
     const maj23Hash = this.votes.precommits(commitRound)?.maj23;
@@ -749,38 +755,38 @@ export class StateMachine {
     return update();
   }
 
-  private tryFinalizeCommit(height: BN) {
+  private finalizeCommit(height: BN) {
     // logger.debug('StateMachine::tryFinalizeCommit, height:', height.toString());
 
     if (!this.height.eq(height) || this.step !== RoundStepType.Commit) {
-      throw new Error('tryFinalizeCommit invalid args');
+      throw new Error('finalizeCommit invalid args');
     }
 
     const precommits = this.votes.precommits(this.commitRound);
     const maj23Hash = precommits?.maj23;
     if (!precommits || !maj23Hash || isEmptyHash(maj23Hash)) {
-      logger.debug('StateMachine::tryFinalizeCommit, empty maj23 hash');
+      logger.debug('StateMachine::finalizeCommit, empty maj23 hash');
       return;
     }
 
     if (!this.proposal || !this.proposal.hash.equals(maj23Hash)) {
-      logger.debug('StateMachine::tryFinalizeCommit, invalid proposal');
+      logger.debug('StateMachine::finalizeCommit, invalid proposal');
       return;
     }
 
     if (!this.proposalBlock || !this.proposalBlock.hash().equals(maj23Hash)) {
-      logger.debug('StateMachine::tryFinalizeCommit, invalid proposal block');
+      logger.debug('StateMachine::finalizeCommit, invalid proposal block');
       return;
     }
 
     if (this.proposalEvidence === undefined) {
-      logger.debug('StateMachine::tryFinalizeCommit, invalid proposal evidence');
+      logger.debug('StateMachine::finalizeCommit, invalid proposal evidence');
       return;
     }
 
     const finalizedBlock = Reimint.generateFinalizedBlock({ ...this.proposalBlock.header }, [...this.proposalBlock.transactions], [...this.proposalEvidence], this.proposal, precommits, { common: this.proposalBlock._common });
     if (!finalizedBlock.hash().equals(maj23Hash)) {
-      logger.error('StateMachine::tryFinalizeCommit, finalizedBlock hash not equal, something is wrong');
+      logger.error('StateMachine::finalizeCommit, finalizedBlock hash not equal, something is wrong');
       return;
     }
 
@@ -790,10 +796,10 @@ export class StateMachine {
           await this.backend.executeBlock(finalizedBlock, { broadcast: true });
           logger.info('⛏️  Mine block, height:', finalizedBlock.header.number.toString(), 'hash:', bufferToHex(finalizedBlock.hash()));
         } catch (err) {
-          logger.error('StateMachine::tryFinalizeCommit, catch error:', err);
+          logger.error('StateMachine::finalizeCommit, catch error:', err);
         }
       } else {
-        logger.error('StateMachine::tryFinalizeCommit, write ahead log failed');
+        logger.error('StateMachine::finalizeCommit, write ahead log failed');
       }
     });
   }

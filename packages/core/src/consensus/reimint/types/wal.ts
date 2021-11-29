@@ -62,6 +62,7 @@ export class WAL {
       await runAndIgnoreErrors(async () => {
         await this.group.clear();
         await this.group.open();
+        logger.warn('WAL::open, open failed, clear up');
       });
     } finally {
       this.setTimeout();

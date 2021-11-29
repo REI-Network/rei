@@ -211,12 +211,17 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
    * {@link ConsensusEngine.processBlock}
    */
   async processBlock(options: ProcessBlockOpts) {
-    const { block, root } = options;
+    const { block } = options;
 
     const miner = Clique.getMiner(block);
     const pendingHeader = block.header;
     const pendingCommon = block._common;
 
+    // get parent header from database
+    const parent = await this.node.db.getHeader(block.header.parentHash, pendingHeader.number.subn(1));
+
+    // get state root and vm instance
+    const root = parent.stateRoot;
     const vm = await this.node.getVM(root, pendingCommon);
 
     if (!options.skipConsensusValidation) {

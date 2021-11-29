@@ -26,10 +26,9 @@ export interface FinalizeOpts {
   parentStateRoot?: Buffer;
 }
 
-export interface ProcessBlockOpts extends Pick<RunBlockOpts, 'block' | 'runTxOpts' | 'root' | 'debug'> {
-  root: Buffer;
-
+export interface ProcessBlockOpts extends Pick<RunBlockOpts, 'block' | 'runTxOpts' | 'debug'> {
   skipConsensusValidation?: boolean;
+  skipConsensusVerify?: boolean;
 }
 
 export interface ProcessBlockResult extends RunBlockResult {

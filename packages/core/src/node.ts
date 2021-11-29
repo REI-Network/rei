@@ -461,10 +461,8 @@ export class Node extends Initializer {
           }
         }
 
-        // get parent header from database
-        const parent = await this.db.getHeader(block.header.parentHash, number.subn(1));
         // process block through consensus engine
-        const { receipts: _receipts, validatorSet, extraData } = await this.getEngineByCommon(common).processBlock({ ...options, block, root: parent.stateRoot });
+        const { receipts: _receipts, validatorSet, extraData } = await this.getEngineByCommon(common).processBlock({ ...options, block });
         // convert receipts
         const receipts = postByzantiumTxReceiptsToReceipts(_receipts);
 
@@ -492,8 +490,8 @@ export class Node extends Initializer {
 
           /////////////////////////////////////
           // TODO: this shouldn't belong here
-          const evpool = this.getReimintEngine()?.evpool;
-          if (extraData && evpool) {
+          if (extraData) {
+            const evpool = this.getReimintEngine().evpool;
             promises.push(evpool.update(extraData.evidence, number));
           }
           /////////////////////////////////////

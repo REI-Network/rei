@@ -57,7 +57,6 @@ function isEXEvidenceList(ele: EXElement): ele is EXEvidenceList {
 }
 
 export interface ExtraDataValidateBackend {
-  readonly db: Database;
   readonly validatorSets: ValidatorSets;
   getCommon(num: BNLike): Common;
   getStakeManager(vm: VM, block: Block, common?: Common): StakeManager;
@@ -246,16 +245,15 @@ export class ExtraData {
     }
   }
 
-  async validate(backend: ExtraDataValidateBackend) {
-    if (!this.voteSet) {
-      throw new Error('empty vote set');
+  validate() {
+    if (!this.voteSet || this.voteSet.voteCount() === 0 || !this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash)) {
+      throw new Error('invalid vote set');
     }
+  }
 
+  async verifyEvidence(backend: ExtraDataValidateBackend, parentBlock: Block) {
     for (const ev of this.evidence) {
       if (ev instanceof DuplicateVoteEvidence) {
-        // ev.height must be greater than 0, has been checked in ev.validateBasic
-        const parentHeight = ev.height.subn(1);
-        const parentBlock = await backend.db.getBlock(parentHeight);
         const parentHeader = parentBlock.header;
         /**
          * If we use _common directly, it may cause some problems
@@ -263,7 +261,7 @@ export class ExtraData {
          */
         const common = backend.getCommon(ev.height);
         const stakeManager = backend.getStakeManager(await backend.getVM(parentHeader.stateRoot, common), parentBlock, common);
-        let validatorSet = (await backend.validatorSets.get(parentHeader.stateRoot, stakeManager)).copy();
+        const validatorSet = (await backend.validatorSets.get(parentHeader.stateRoot, stakeManager)).copy();
         validatorSet.incrementProposerPriority(ev.voteA.round);
         ev.verify(validatorSet);
       } else {

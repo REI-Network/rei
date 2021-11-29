@@ -310,11 +310,16 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    * {@link ConsensusEngine.processBlock}
    */
   async processBlock(options: ProcessBlockOpts) {
-    const { block, root, runTxOpts } = options;
+    const { block, runTxOpts } = options;
 
     const pendingHeader = block.header;
     const pendingCommon = block._common;
 
+    // get parent block from database
+    const parent = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, pendingHeader.number.subn(1));
+
+    // get state root and vm instance
+    const root = parent.header.stateRoot;
     const vm = await this.node.getVM(root, pendingCommon);
 
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
@@ -327,7 +332,11 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     parentValidatorSet = extraData.validatorSet()!;
 
     if (!options.skipConsensusValidation) {
-      await extraData.validate(this.node);
+      extraData.validate();
+    }
+
+    if (!options.skipConsensusVerify) {
+      await extraData.verifyEvidence(this.node, parent);
       await this.evpool.checkEvidence(extraData.evidence);
     }
 

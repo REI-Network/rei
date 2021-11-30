@@ -8,6 +8,7 @@ import { ExtraData, Proposal, VoteType, VoteSet, Evidence, ISigner } from './typ
 import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../../utils';
 
 const defaultRound = 0;
+const defaultCommitRound = 0;
 const defaultPOLRound = -1;
 const defaultValidaterSetSize = 1;
 const defaultEvidence = [];
@@ -47,6 +48,9 @@ export interface ReimintBlockOptions extends BlockOptions {
 
   // reimint round
   round?: number;
+
+  // commit round
+  commitRound?: number;
 
   // POLRound, default: -1
   POLRound?: number;
@@ -177,6 +181,7 @@ export class Reimint {
       data = formatHeaderData(data);
 
       const round = options.round ?? defaultRound;
+      const commitRound = options.commitRound ?? defaultCommitRound;
       const POLRound = options.POLRound ?? defaultPOLRound;
       const validaterSetSize = options.validatorSetSize ?? defaultValidaterSetSize;
       const evidence = options.evidence ?? defaultEvidence;
@@ -191,7 +196,7 @@ export class Reimint {
         hash: headerHash
       });
       proposal.signature = options.signer.sign(proposal.getMessageToSign());
-      const extraData = new ExtraData(round, POLRound, evidence, proposal, options?.voteSet);
+      const extraData = new ExtraData(round, commitRound, POLRound, evidence, proposal, options?.voteSet);
       return {
         header: BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize(validaterSetSize)]) }, options),
         proposal
@@ -223,11 +228,12 @@ export class Reimint {
    * @param evidence - Evidence list
    * @param proposal - Proposal
    * @param votes - Precommit vote set
+   * @param commitRound - Commit round
    * @param options - Block options
    * @returns Complete block
    */
-  static generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], evidence: Evidence[], proposal: Proposal, votes: VoteSet, options?: BlockOptions) {
-    const extraData = new ExtraData(proposal.round, proposal.POLRound, evidence, proposal, votes);
+  static generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], evidence: Evidence[], proposal: Proposal, commitRound: number, votes: VoteSet, options?: BlockOptions) {
+    const extraData = new ExtraData(proposal.round, commitRound, proposal.POLRound, evidence, proposal, votes);
     data = formatHeaderData(data);
     const header = BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize()]) }, options);
     return new Block(header, transactions, undefined, options);

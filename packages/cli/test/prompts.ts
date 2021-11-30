@@ -126,8 +126,7 @@ const handler: {
     console.log('----------------');
     console.log(
       ExtraData.fromBlockHeader(block.header, {
-        valSet: validatorSet,
-        increaseValSet: true
+        valSet: validatorSet
       })
     );
   }

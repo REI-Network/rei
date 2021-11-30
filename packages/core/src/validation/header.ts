@@ -8,7 +8,6 @@ import { getGasLimitByCommon, EMPTY_NONCE, EMPTY_ADDRESS, EMPTY_MIX_HASH } from 
 
 const allowedFutureBlockTimeSeconds = 15;
 const maxGasLimit = new BN('8000000000000000', 16);
-let testnetHF1Number: BN | null = null;
 
 export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) {
   if (this.isGenesis()) {

@@ -252,10 +252,13 @@ export class StateMachine {
     const evidence = extraData.evidence;
 
     /**
-     * TODO: Check proposal block's validator set size,
-     *       but this isn't important...
+     * NOTE: the block proposer may be different from this.proposal.proposer,
+     *       we just make sure that the block proposer is one of the validators
      */
-    if (!this.proposal.proposer().equals(proposer) || extraData.round !== this.proposal.round || extraData.POLRound !== this.proposal.POLRound) {
+    // if (!this.proposal.proposer().equals(proposer) || extraData.round !== this.proposal.round || extraData.POLRound !== this.proposal.POLRound) {
+    //   throw new Error('invalid proposal block');
+    // }
+    if (!this.validators.contains(proposer)) {
       throw new Error('invalid proposal block');
     }
 
@@ -484,17 +487,16 @@ export class StateMachine {
 
   private decideProposal(height: BN, round: number) {
     if (this.validBlock) {
-      const { block, proposal } = Reimint.generateBlockAndProposal({ ...this.validBlock.header }, [...this.validBlock.transactions], {
-        signer: this.signer!,
+      const proposal = new Proposal({
+        type: VoteType.Proposal,
+        height: this.validBlock.header.number,
         round,
         POLRound: this.validRound,
-        evidence: this.validEvidence,
-        validatorSetSize: this.validators.length,
-        common: this.validBlock._common
+        hash: this.validBlock.hash()
       });
 
       this._newMessage(new StateMachineMessage('', new ProposalMessage(proposal)));
-      this._newMessage(new StateMachineMessage('', new ProposalBlockMessage(block)));
+      this._newMessage(new StateMachineMessage('', new ProposalBlockMessage(this.validBlock)));
     } else {
       this.createBlockAndProposal()
         .then(({ block, proposal }) => {
@@ -795,7 +797,15 @@ export class StateMachine {
       return;
     }
 
-    const finalizedBlock = Reimint.generateFinalizedBlock({ ...this.proposalBlock.header }, [...this.proposalBlock.transactions], [...this.proposalEvidence], this.proposal, precommits, { common: this.proposalBlock._common });
+    if (this.commitRound === -1) {
+      logger.debug('StateMachine::finalizeCommit, invalid commitRound');
+      return;
+    }
+
+    const extraData = ExtraData.fromBlockHeader(this.proposalBlock.header);
+    const proposalInBlock = extraData.proposal;
+
+    const finalizedBlock = Reimint.generateFinalizedBlock({ ...this.proposalBlock.header }, [...this.proposalBlock.transactions], [...this.proposalEvidence], proposalInBlock, this.commitRound, precommits, { common: this.proposalBlock._common });
     if (!finalizedBlock.hash().equals(maj23Hash)) {
       logger.error('StateMachine::finalizeCommit, finalizedBlock hash not equal, something is wrong');
       return;
@@ -809,8 +819,8 @@ export class StateMachine {
 
     try {
       /**
-       * here, we will directly submit the block that has not executed `validateConsensus`,
-       * but it's ok, because the `precommits` already contains +2/3 pre-commit votes
+       * NOTE: here, we will directly submit the block that has not executed `validateConsensus`,
+       *       but it's ok, because the `precommits` already contains +2/3 pre-commit votes
        */
       await this.backend.commitBlock(finalizedBlock, this.proposalBlockResult);
     } catch (err) {

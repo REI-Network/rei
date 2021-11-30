@@ -339,7 +339,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     const parentRouter = this.node.getRouter(vm, block);
     let parentValidatorSet = await this.node.validatorSets.get(root, parentStakeManager);
 
-    const extraData = ExtraData.fromBlockHeader(pendingHeader, { valSet: parentValidatorSet, increaseValSet: true });
+    const extraData = ExtraData.fromBlockHeader(pendingHeader, { valSet: parentValidatorSet });
     const miner = extraData.proposal.proposer();
     parentValidatorSet = extraData.validatorSet()!;
 

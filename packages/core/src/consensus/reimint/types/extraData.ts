@@ -1,4 +1,4 @@
-import { rlp, intToBuffer, bufferToInt, BNLike } from 'ethereumjs-util';
+import { rlp, intToBuffer, bufferToInt, BNLike, Address } from 'ethereumjs-util';
 import VM from '@gxchain2-ethereumjs/vm';
 import { Common } from '@gxchain2/common';
 import { Block, BlockHeader, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
@@ -12,17 +12,16 @@ import { Proposal } from './proposal';
 import * as v from './validate';
 
 export interface ExtraDataOptions {
+  chainId: number;
   header: BlockHeader;
   valSet?: ValidatorSet;
-  increaseValSet?: boolean;
-  chainId: number;
 }
 
 export interface ExtraDataFromBlockHeaderOptions extends Omit<ExtraDataOptions, 'header' | 'chainId'> {}
 
 export type EXVote = Buffer;
 export type EXEmptyVote = [];
-export type EXRoundAndPOLRound = [Buffer, Buffer];
+export type EXRoundAndPOLRound = [Buffer, Buffer] | [Buffer, Buffer, Buffer];
 export type EXEvidenceList = (Buffer | Buffer[])[];
 export type EXElement = EXEmptyVote | EXVote | EXRoundAndPOLRound | EXEvidenceList;
 export type EXElements = EXElement[];
@@ -39,10 +38,10 @@ function isEXEmptyVote(ele: EXElement): ele is EXEmptyVote {
 }
 
 function isEXRoundAndPOLRound(ele: EXElement): ele is EXRoundAndPOLRound {
-  if (!Array.isArray(ele) || ele.length !== 2) {
+  if (!Array.isArray(ele) || (ele.length !== 2 && ele.length !== 3)) {
     return false;
   }
-  if (!(ele[0] instanceof Buffer) || !(ele[1] instanceof Buffer)) {
+  if (!(ele[0] instanceof Buffer) || !(ele[1] instanceof Buffer) || (ele.length === 3 && !(ele[2] instanceof Buffer))) {
     return false;
   }
   return true;
@@ -65,6 +64,7 @@ export interface ExtraDataValidateBackend {
 export class ExtraData {
   readonly evidence: Evidence[];
   readonly round: number;
+  readonly commitRound: number;
   readonly POLRound: number;
   readonly proposal: Proposal;
   readonly voteSet?: VoteSet;
@@ -84,15 +84,17 @@ export class ExtraData {
     return ExtraData.fromValuesArray(values, options);
   }
 
-  static fromValuesArray(values: EXElements, { header, valSet, chainId, increaseValSet }: ExtraDataOptions) {
+  static fromValuesArray(values: EXElements, { header, valSet, chainId }: ExtraDataOptions) {
     // the additional extra data should include at lease 3 elements(EXEvidenceList + EXRoundAndPOLRound, EXVote(proposal))
     if (values.length < 3) {
       throw new Error('invliad values');
     }
 
     let round!: number;
+    let commitRound!: number;
     let POLRound!: number;
     let headerHash!: Buffer;
+    let proposer: Address | undefined;
     let proposal!: Proposal;
     let evidence!: Evidence[];
     let voteSet: VoteSet | undefined;
@@ -132,14 +134,27 @@ export class ExtraData {
         }
         round = bufferToInt(value[0]);
         POLRound = bufferToInt(value[1]) - 1;
-
-        // increase round
-        if (increaseValSet && valSet) {
-          valSet = valSet.copy();
-          valSet.incrementProposerPriority(round);
+        if (value.length === 3) {
+          commitRound = bufferToInt(value[2]);
+          if (commitRound === round) {
+            throw new Error('commitRound equals round, but round list length is 3');
+          }
+        } else {
+          commitRound = round;
         }
+
         if (valSet) {
-          voteSet = new VoteSet(chainId, header.number, round, VoteType.Precommit, valSet);
+          // get proposer address by round
+          const tempValSet = valSet.copy();
+          tempValSet.incrementProposerPriority(round);
+          proposer = tempValSet.proposer;
+
+          // increase validator set by commit round
+          valSet = valSet.copy();
+          valSet.incrementProposerPriority(commitRound);
+
+          // create vote set
+          voteSet = new VoteSet(chainId, header.number, commitRound, VoteType.Precommit, valSet);
         }
       } else if (i === 2) {
         if (!isEXVote(value)) {
@@ -157,21 +172,22 @@ export class ExtraData {
           },
           signature
         );
-        if (valSet) {
-          proposal.validateSignature(valSet.proposer);
+        if (proposer) {
+          proposal.validateSignature(proposer);
         }
       } else {
         if (isEXVote(value)) {
           if (!voteSet) {
             break;
           }
+
           const signature = value;
           const vote = new Vote(
             {
               type: VoteType.Precommit,
               hash: headerHash,
               height: header.number,
-              round,
+              round: commitRound,
               index: i - 3,
               chainId
             },
@@ -187,11 +203,12 @@ export class ExtraData {
       }
     }
 
-    return new ExtraData(round, POLRound, evidence, proposal, voteSet);
+    return new ExtraData(round, commitRound, POLRound, evidence, proposal, voteSet);
   }
 
-  constructor(round: number, POLRound: number, evidence: Evidence[], proposal: Proposal, voteSet?: VoteSet) {
+  constructor(round: number, commitRound: number, POLRound: number, evidence: Evidence[], proposal: Proposal, voteSet?: VoteSet) {
     this.round = round;
+    this.commitRound = commitRound;
     this.POLRound = POLRound;
     this.proposal = proposal;
     this.evidence = evidence;
@@ -205,7 +222,11 @@ export class ExtraData {
   raw(validaterSetSize?: number) {
     const raw: rlp.Input = [];
     raw.push(this.evidence.map((ev) => EvidenceFactory.rawEvidence(ev)));
-    raw.push([intToBuffer(this.round), intToBuffer(this.POLRound + 1)]);
+    if (this.round === this.commitRound) {
+      raw.push([intToBuffer(this.round), intToBuffer(this.POLRound + 1)]);
+    } else {
+      raw.push([intToBuffer(this.round), intToBuffer(this.POLRound + 1), intToBuffer(this.commitRound)]);
+    }
     raw.push(this.proposal.signature!);
     if (this.voteSet) {
       for (const vote of this.voteSet.votes) {

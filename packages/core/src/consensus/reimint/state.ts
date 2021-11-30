@@ -808,6 +808,10 @@ export class StateMachine {
     }
 
     try {
+      /**
+       * here, we will directly submit the block that has not executed `validateConsensus`,
+       * but it's ok, because the `precommits` already contains +2/3 pre-commit votes
+       */
       await this.backend.commitBlock(finalizedBlock, this.proposalBlockResult);
     } catch (err) {
       logger.error('StateMachine::finalizeCommit, catch error:', err);

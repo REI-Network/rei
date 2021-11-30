@@ -85,6 +85,11 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   protected async _newBlock(block: Block) {
     const header = block.header;
 
+    // make sure the new block has not been processed
+    if (!this.state.isNewBlockHeader(header)) {
+      return;
+    }
+
     // create a new pending block through worker
     const pendingBlock = await this.worker.createPendingBlock(header);
     if (!this.enable) {

@@ -926,12 +926,15 @@ export class StateMachine {
     this.msgQueue.push(message);
   }
 
-  newBlockHeader(header: BlockHeader, validators: ValidatorSet, pendingBlock: PendingBlock) {
+  isNewBlockHeader(header: BlockHeader) {
     if (this.parent && this.parent.hash().equals(header.hash())) {
       // ignore same header
-      return;
+      return false;
     }
+    return true;
+  }
 
+  newBlockHeader(header: BlockHeader, validators: ValidatorSet, pendingBlock: PendingBlock) {
     const timestamp = Date.now();
     this.parent = header;
     this.parentHash = header.hash();

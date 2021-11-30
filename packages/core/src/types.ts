@@ -1,6 +1,9 @@
 import EventEmitter from 'events';
 import { NetworkManagerOptions } from '@gxchain2/network';
-import { ProcessBlockOpts, ConsensusEngineOptions } from './consensus/types';
+import { Receipt, Block } from '@gxchain2/structure';
+import { ValidatorSet } from './staking';
+import { Evidence } from './consensus/reimint/types';
+import { ConsensusEngineOptions } from './consensus/types';
 
 export interface ConsensusEngineConstructorOptions extends Omit<ConsensusEngineOptions, 'node'> {}
 
@@ -35,8 +38,12 @@ export type NodeStatus = {
   genesisHash: Buffer;
 };
 
-export interface ProcessBlockOptions extends Omit<ProcessBlockOpts, 'block' | 'root'> {
+export interface CommitBlockOptions {
   broadcast: boolean;
+  block: Block;
+  receipts: Receipt[];
+  validatorSet?: ValidatorSet;
+  evidence?: Evidence[];
 }
 
 export abstract class Initializer {

@@ -9,7 +9,6 @@ import { logger } from '@gxchain2/utils';
 import { StakeManager, Router, SlashReason } from '../../contracts';
 import { ValidatorSet, ValidatorChanges } from '../../staking';
 import { Node } from '../../node';
-import { ProcessBlockOptions } from '../../types';
 import { isEmptyAddress, postByzantiumTxReceiptsToReceipts, getGasLimitByCommon } from '../../utils';
 import { getConsensusTypeByCommon } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions, ConsensusType } from '../types';
@@ -124,16 +123,16 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   /**
    * Execute single block
    * @param block - Block
-   * @param options - Process block options
-   * @returns Reorged
    */
-  executeBlock(block: Block, options: ProcessBlockOptions) {
-    return this.node.processBlock(block, options).then((reorged) => {
-      if (reorged) {
-        this.node.onMintBlock();
-      }
-      return reorged;
-    });
+  async executeBlock(block: Block) {
+    const result = await this.processBlock({ block });
+    // const reorged = await this.node.commitBlock(block, result, { broadcast: true });
+    const reorged = true;
+    if (reorged) {
+      logger.info('⛏️  Mine block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
+      // try to continue minting
+      this.node.onMintBlock();
+    }
   }
 
   ///////////// Backend Logic ////////////////
@@ -293,12 +292,13 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     await vm.stateManager.checkpoint();
     try {
       await this.assignBlockReward(vm.stateManager, systemCaller, minerReward);
-      await this.afterApply(vm, block, postByzantiumTxReceiptsToReceipts(receipts), evidence, miner, minerReward, parentValidatorSet, parentStakeManager, parentRouter);
+      const validatorSet = await this.afterApply(vm, block, postByzantiumTxReceiptsToReceipts(receipts), evidence, miner, minerReward, parentValidatorSet, parentStakeManager, parentRouter);
       await vm.stateManager.commit();
       const finalizedStateRoot = await vm.stateManager.getStateRoot();
       return {
         finalizedStateRoot,
-        receiptTrie: await Reimint.genReceiptTrie(transactions, receipts)
+        receiptTrie: await Reimint.genReceiptTrie(transactions, receipts),
+        validatorSet
       };
     } catch (err) {
       await vm.stateManager.revert();

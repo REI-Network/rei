@@ -1,8 +1,9 @@
 import { Address, BN, BNLike } from 'ethereumjs-util';
-import { Block } from '@gxchain2/structure';
+import { Block, Receipt } from '@gxchain2/structure';
 import { Common } from '@gxchain2/common';
-import { ProcessBlockOptions } from '../../../types';
 import { SendMessageOptions } from '../../../protocols/consensus';
+import { ValidatorSet } from '../../../staking';
+import { CommitBlockOptions } from '../../../types';
 import { StateMachineMsg } from './stateMessages';
 import { Message } from './messages';
 import { Evidence } from './evidence';
@@ -37,9 +38,16 @@ export interface IWALReader {
   read(): Promise<StateMachineMsg | undefined>;
 }
 
+export interface IProcessBlockResult {
+  receipts: Receipt[];
+  validatorSet?: ValidatorSet;
+  evidence?: Evidence[];
+}
+
 export interface IStateMachineBackend {
   getCommon(num: BNLike): Common;
-  executeBlock(block: Block, options: ProcessBlockOptions): Promise<boolean>;
+  processBlock(block: Block): Promise<IProcessBlockResult>;
+  commitBlock(options: CommitBlockOptions): Promise<void>;
 }
 
 export interface IStateMachineP2PBackend {

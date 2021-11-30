@@ -24,9 +24,9 @@ import { WireProtocol, ConsensusProtocol } from './protocols';
 import { ValidatorSets } from './staking';
 import { StakeManager, Router, Contract } from './contracts';
 import { ConsensusEngine, ReimintConsensusEngine, CliqueConsensusEngine, ConsensusType, ExtraData } from './consensus';
-import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from './utils';
+import { EMPTY_ADDRESS } from './utils';
 import { getConsensusTypeByCommon } from './hardforks';
-import { Initializer, ProcessBlockOptions, NodeOptions, NodeStatus } from './types';
+import { Initializer, CommitBlockOptions, NodeOptions, NodeStatus } from './types';
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;
@@ -37,9 +37,8 @@ type PendingTxs = {
   resolve: (results: boolean[]) => void;
 };
 
-type ProcessBlock = {
-  block: Block;
-  options: ProcessBlockOptions;
+type CommitBlock = {
+  options: CommitBlockOptions;
   resolve: (result: boolean) => void;
   reject: (reason?: any) => void;
 };
@@ -70,10 +69,10 @@ export class Node extends Initializer {
   readonly aborter = new Aborter();
   readonly validatorSets = new ValidatorSets();
 
-  private taskLoopPromise!: Promise<void>;
-  private processLoopPromise!: Promise<void>;
-  private readonly taskQueue = new Channel<PendingTxs>();
-  private readonly processQueue = new Channel<ProcessBlock>();
+  private pendingTxsLoopPromise!: Promise<void>;
+  private commitBlockLoopPromise!: Promise<void>;
+  private readonly pendingTxsQueue = new Channel<PendingTxs>();
+  private readonly commitBlockQueue = new Channel<CommitBlock>();
 
   constructor(options: NodeOptions) {
     super();
@@ -191,8 +190,8 @@ export class Node extends Initializer {
     this.bloomBitsIndexer.start();
     this.networkMngr.start();
 
-    this.taskLoopPromise = this.taskLoop();
-    this.processLoopPromise = this.processLoop();
+    this.pendingTxsLoopPromise = this.pendingTxsLoop();
+    this.commitBlockLoopPromise = this.commitBlockLoop();
 
     // start mint
     this.getCurrentEngine().start();
@@ -207,8 +206,8 @@ export class Node extends Initializer {
     this.sync.off('failed', this.onSyncOver);
     this.networkMngr.off('installed', this.onPeerInstalled);
     this.networkMngr.off('removed', this.onPeerRemoved);
-    this.taskQueue.abort();
-    this.processQueue.abort();
+    this.pendingTxsQueue.abort();
+    this.commitBlockQueue.abort();
     await this.aborter.abort();
     await this.clique.abort();
     await this.reimint.abort();
@@ -217,8 +216,8 @@ export class Node extends Initializer {
     await this.txPool.abort();
     this.txSync.abort();
     await this.bloomBitsIndexer.abort();
-    await this.taskLoopPromise;
-    await this.processLoopPromise;
+    await this.pendingTxsLoopPromise;
+    await this.commitBlockLoopPromise;
     await this.chaindb.close();
     await this.evidencedb.close();
     await this.nodedb.close();
@@ -441,13 +440,16 @@ export class Node extends Initializer {
   /**
    * A loop that executes blocks sequentially
    */
-  private async processLoop() {
+  private async commitBlockLoop() {
     await this.initPromise;
-    for await (const { block, options, resolve, reject } of this.processQueue.generator()) {
+    for await (const {
+      options: { block, receipts, validatorSet, evidence, broadcast },
+      resolve,
+      reject
+    } of this.commitBlockQueue.generator()) {
       try {
         const hash = block.hash();
         const number = block.header.number;
-        const common = block._common;
 
         // ensure that the block has not been executed
         try {
@@ -461,13 +463,6 @@ export class Node extends Initializer {
           }
         }
 
-        // process block through consensus engine
-        const { receipts: _receipts, validatorSet, extraData } = await this.getEngineByCommon(common).processBlock({ ...options, block });
-        // convert receipts
-        const receipts = postByzantiumTxReceiptsToReceipts(_receipts);
-
-        logger.info('✨ Process block, height:', number.toString(), 'hash:', bufferToHex(hash));
-
         const before = this.blockchain.latestBlock.hash();
 
         // commit
@@ -480,6 +475,8 @@ export class Node extends Initializer {
           await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, hash, number)));
         }
 
+        logger.info('✨ Commit block, height:', number.toString(), 'hash:', bufferToHex(hash));
+
         const after = this.blockchain.latestBlock.hash();
 
         const reorged = !before.equals(after);
@@ -490,13 +487,13 @@ export class Node extends Initializer {
 
           /////////////////////////////////////
           // TODO: this shouldn't belong here
-          if (extraData) {
+          if (evidence) {
             const evpool = this.getReimintEngine().evpool;
-            promises.push(evpool.update(extraData.evidence, number));
+            promises.push(evpool.update(evidence, number));
           }
           /////////////////////////////////////
 
-          if (options.broadcast) {
+          if (broadcast) {
             promises.push(this.wire.broadcastNewBlock(block));
           }
           await Promise.all(promises);
@@ -512,9 +509,9 @@ export class Node extends Initializer {
   /**
    * A loop that adds pending transaction
    */
-  private async taskLoop() {
+  private async pendingTxsLoop() {
     await this.initPromise;
-    for await (const task of this.taskQueue.generator()) {
+    for await (const task of this.pendingTxsQueue.generator()) {
       try {
         const { results, readies } = await this.txPool.addTxs(task.txs);
         if (readies && readies.size > 0) {
@@ -535,15 +532,14 @@ export class Node extends Initializer {
   }
 
   /**
-   * Push a block to the block queue
-   * @param block - Block
-   * @param options - Process block options
+   * Push a block to the commit block queue
+   * @param options - Commit block options
    * @returns Reorged
    */
-  async processBlock(block: Block, options: ProcessBlockOptions) {
+  async commitBlock(options: CommitBlockOptions) {
     await this.initPromise;
     return new Promise<boolean>((resolve, reject) => {
-      this.processQueue.push({ block, options, resolve, reject });
+      this.commitBlockQueue.push({ options, resolve, reject });
     });
   }
 
@@ -555,7 +551,7 @@ export class Node extends Initializer {
   async addPendingTxs(txs: Transaction[]) {
     await this.initPromise;
     return new Promise<boolean[]>((resolve) => {
-      this.taskQueue.push({ txs, resolve });
+      this.pendingTxsQueue.push({ txs, resolve });
     });
   }
 

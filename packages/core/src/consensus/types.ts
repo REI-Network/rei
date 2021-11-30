@@ -4,7 +4,7 @@ import { RunBlockOpts, RunBlockResult } from '@gxchain2-ethereumjs/vm/dist/runBl
 import { RunTxOpts, RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
 import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
 import { Common } from '@gxchain2/common';
-import { HeaderData, Block, TypedTransaction, Transaction, BlockHeader } from '@gxchain2/structure';
+import { HeaderData, Block, TypedTransaction, Transaction } from '@gxchain2/structure';
 import { Node } from '../node';
 import { Worker } from '../worker';
 import { ValidatorSet } from '../staking';
@@ -34,6 +34,11 @@ export interface ProcessBlockOpts extends Pick<RunBlockOpts, 'block' | 'runTxOpt
 export interface ProcessBlockResult extends RunBlockResult {
   validatorSet?: ValidatorSet;
   extraData?: ExtraData;
+}
+
+export interface FinalizeBlockResult {
+  finalizedStateRoot: Buffer;
+  receiptTrie: Buffer;
 }
 
 export interface ProcessTxOptions extends Omit<RunTxOpts, 'block' | 'beforeTx' | 'afterTx' | 'assignTxReward' | 'generateTxReceipt' | 'skipBalance'> {
@@ -119,7 +124,7 @@ export interface ConsensusEngine {
    * @param options - Finalize options
    * @return FinalizedStateRoot and receiptTrie
    */
-  finalize(options: FinalizeOpts): Promise<{ finalizedStateRoot: Buffer; receiptTrie: Buffer }>;
+  finalize(options: FinalizeOpts): Promise<FinalizeBlockResult>;
 
   /**
    * Process a block

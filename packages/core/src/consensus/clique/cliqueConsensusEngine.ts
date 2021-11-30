@@ -12,7 +12,7 @@ import { Contract, Router } from '../../contracts';
 import { ValidatorSet } from '../../staking';
 import { isEnableStaking } from '../../hardforks';
 import { BaseConsensusEngine } from '../baseConsensusEngine';
-import { getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
+import { postByzantiumTxReceiptsToReceipts, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
 import { Clique } from './clique';
 
 const NoTurnSignerDelay = 500;
@@ -69,9 +69,14 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
           // finalize pending block
           const { header: data, transactions } = await pendingBlock.finalize();
           const block = this.generatePendingBlock(data, pendingBlock.common, transactions);
-
-          const reorged = await this.node.processBlock(block, {
-            broadcast: true
+          // process pending block
+          const result = await this.processBlock({ block });
+          // commit pending block
+          const reorged = await this.node.commitBlock({
+            block,
+            broadcast: true,
+            receipts: postByzantiumTxReceiptsToReceipts(result.receipts),
+            validatorSet: result.validatorSet
           });
           if (reorged) {
             logger.info('⛏️  Mine block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
@@ -195,11 +200,13 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
     await vm.stateManager.checkpoint();
     try {
       await this.assignBlockReward(vm.stateManager, miner, minerReward);
-      await this.afterApply(vm, block);
+      const validatorSet = await this.afterApply(vm, block);
+      await vm.stateManager.commit();
       const finalizedStateRoot = await vm.stateManager.getStateRoot();
       return {
         finalizedStateRoot,
-        receiptTrie: await Clique.genReceiptTrie(transactions, receipts)
+        receiptTrie: await Clique.genReceiptTrie(transactions, receipts),
+        validatorSet
       };
     } catch (err) {
       await vm.stateManager.revert();

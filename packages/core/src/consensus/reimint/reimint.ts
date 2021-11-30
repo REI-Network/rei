@@ -8,7 +8,6 @@ import { ExtraData, Proposal, VoteType, VoteSet, Evidence, ISigner } from './typ
 import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../../utils';
 
 const defaultRound = 0;
-const defaultCommitRound = 0;
 const defaultPOLRound = -1;
 const defaultValidaterSetSize = 1;
 const defaultEvidence = [];
@@ -181,7 +180,7 @@ export class Reimint {
       data = formatHeaderData(data);
 
       const round = options.round ?? defaultRound;
-      const commitRound = options.commitRound ?? defaultCommitRound;
+      const commitRound = options.commitRound ?? round;
       const POLRound = options.POLRound ?? defaultPOLRound;
       const validaterSetSize = options.validatorSetSize ?? defaultValidaterSetSize;
       const evidence = options.evidence ?? defaultEvidence;

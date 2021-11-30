@@ -2,7 +2,6 @@ import { rlp, intToBuffer, bufferToInt, BNLike } from 'ethereumjs-util';
 import VM from '@gxchain2-ethereumjs/vm';
 import { Common } from '@gxchain2/common';
 import { Block, BlockHeader, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
-import { Database } from '@gxchain2/database';
 import { ValidatorSet, ValidatorSets } from '../../../staking';
 import { StakeManager } from '../../../contracts';
 import { Reimint } from '../reimint';
@@ -86,7 +85,7 @@ export class ExtraData {
   }
 
   static fromValuesArray(values: EXElements, { header, valSet, chainId, increaseValSet }: ExtraDataOptions) {
-    // the additional extra data should include at lease 3 elements(RLPRoundAndPOLRound, RLPEvidenceList, RLPVote(proposal))
+    // the additional extra data should include at lease 3 elements(EXEvidenceList + EXRoundAndPOLRound, EXVote(proposal))
     if (values.length < 3) {
       throw new Error('invliad values');
     }
@@ -98,7 +97,7 @@ export class ExtraData {
     let evidence!: Evidence[];
     let voteSet: VoteSet | undefined;
     if (valSet) {
-      // validator size + 1(round and POLRound list) + 1(evidence list) + 1(proposal)
+      // validator size + 1(evidence list) + 1(round and POLRound list) + 1(proposal)
       if (values.length !== valSet.length + 3) {
         throw new Error('invalid values length');
       }
@@ -238,11 +237,6 @@ export class ExtraData {
   validateBasic() {
     v.validateRound(this.round);
     v.validatePOLRound(this.POLRound);
-    if (this.voteSet) {
-      if (this.voteSet.voteCount() === 0 || !this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash)) {
-        throw new Error('invalid vote set');
-      }
-    }
   }
 
   validate() {

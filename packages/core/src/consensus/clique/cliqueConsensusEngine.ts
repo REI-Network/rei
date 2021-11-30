@@ -73,10 +73,9 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
           const result = await this.processBlock({ block });
           // commit pending block
           const reorged = await this.node.commitBlock({
+            ...result,
             block,
-            broadcast: true,
-            receipts: postByzantiumTxReceiptsToReceipts(result.receipts),
-            validatorSet: result.validatorSet
+            broadcast: true
           });
           if (reorged) {
             logger.info('⛏️  Mine block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
@@ -264,7 +263,7 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
         validatorSet.proposer.toString()
       );
     }
-    return { ...result, validatorSet };
+    return { ...result, receipts: postByzantiumTxReceiptsToReceipts(result.receipts), validatorSet };
   }
 
   /**

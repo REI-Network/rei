@@ -13,7 +13,7 @@ import { isEmptyAddress, postByzantiumTxReceiptsToReceipts, getGasLimitByCommon 
 import { getConsensusTypeByCommon } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../baseConsensusEngine';
-import { ExtraData, Evidence, DuplicateVoteEvidence, EvidencePool, EvidenceDatabase, WAL } from './types';
+import { ExtraData, Evidence, DuplicateVoteEvidence, EvidencePool, EvidenceDatabase, WAL, IProcessBlockResult } from './types';
 import { StateMachine } from './state';
 import { Reimint } from './reimint';
 import { makeRunTxCallback } from './makeRunTxCallback';
@@ -121,13 +121,25 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   }
 
   /**
-   * Execute single block
+   * Pre process block, skip consensus validation,
+   * ensure the state root is correct
+   * @param block - Target block
+   * @returns Pre process block result
+   */
+  preProcessBlock(block: Block) {
+    return this.processBlock({ block, skipConsensusValidation: true });
+  }
+
+  /**
+   * Commit single block
    * @param block - Block
    */
-  async executeBlock(block: Block) {
-    const result = await this.processBlock({ block });
-    // const reorged = await this.node.commitBlock(block, result, { broadcast: true });
-    const reorged = true;
+  async commitBlock(block: Block, result: IProcessBlockResult) {
+    const reorged = await this.node.commitBlock({
+      ...result,
+      block,
+      broadcast: true
+    });
     if (reorged) {
       logger.info('⛏️  Mine block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
       // try to continue minting
@@ -371,7 +383,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
       'next proposer:',
       validatorSet.proposer.toString()
     );
-    return { ...result, validatorSet, extraData };
+    return { ...result, receipts: postByzantiumTxReceiptsToReceipts(result.receipts), validatorSet, extraData };
   }
 
   /**

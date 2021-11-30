@@ -4,7 +4,7 @@ import { RunBlockOpts, RunBlockResult } from '@gxchain2-ethereumjs/vm/dist/runBl
 import { RunTxOpts, RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
 import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
 import { Common } from '@gxchain2/common';
-import { HeaderData, Block, TypedTransaction, Transaction } from '@gxchain2/structure';
+import { HeaderData, Block, TypedTransaction, Transaction, Receipt } from '@gxchain2/structure';
 import { Node } from '../node';
 import { Worker } from '../worker';
 import { ValidatorSet } from '../staking';
@@ -31,7 +31,8 @@ export interface ProcessBlockOpts extends Pick<RunBlockOpts, 'block' | 'runTxOpt
   skipConsensusVerify?: boolean;
 }
 
-export interface ProcessBlockResult extends RunBlockResult {
+export interface ProcessBlockResult extends Omit<RunBlockResult, 'receipts'> {
+  receipts: Receipt[];
   validatorSet?: ValidatorSet;
   extraData?: ExtraData;
 }

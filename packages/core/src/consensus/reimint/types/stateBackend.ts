@@ -3,7 +3,6 @@ import { Block, Receipt } from '@gxchain2/structure';
 import { Common } from '@gxchain2/common';
 import { SendMessageOptions } from '../../../protocols/consensus';
 import { ValidatorSet } from '../../../staking';
-import { CommitBlockOptions } from '../../../types';
 import { StateMachineMsg } from './stateMessages';
 import { Message } from './messages';
 import { Evidence } from './evidence';
@@ -46,8 +45,8 @@ export interface IProcessBlockResult {
 
 export interface IStateMachineBackend {
   getCommon(num: BNLike): Common;
-  processBlock(block: Block): Promise<IProcessBlockResult>;
-  commitBlock(options: CommitBlockOptions): Promise<void>;
+  preProcessBlock(block: Block): Promise<IProcessBlockResult>;
+  commitBlock(block: Block, result: IProcessBlockResult): Promise<void>;
 }
 
 export interface IStateMachineP2PBackend {

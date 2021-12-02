@@ -5,8 +5,8 @@ import { logger } from '@gxchain2/utils';
 
 const defaultGroupCheckDuration = 5 * 1000;
 const defaultHeadSizeLimit = 10 * 1024 * 1024; // 10MB
-const defaultTotalSizeLimit = 1 * 1024 * 1024 * 1024; // 1GB
-const defaultMaxFilesToRemove = 4;
+const defaultTotalSizeLimit = 200 * 1024 * 1024; // 200MB
+const defaultMaxFilesToRemove = 40;
 
 /**
  * Make group file path by index,

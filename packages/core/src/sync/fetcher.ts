@@ -46,7 +46,7 @@ export interface FetcherBackend {
 export interface FetcherValidateBackend {
   validateHeaders(parent: BlockHeader | undefined, headers: BlockHeader[]): BlockHeader;
   validateBodies(headers: BlockHeader[], bodies: Transaction[][]): void;
-  validateBlocks(blocks): void;
+  validateBlocks(blocks): Promise<void>;
 }
 
 type ProcessBlocks = {
@@ -211,7 +211,7 @@ export class Fetcher {
         const bodies = await handler.getBlockBodies(headers);
         this.validateBackend.validateBodies(headers, bodies);
         const blocks = headers.map((header, i) => Block.fromBlockData({ header, transactions: bodies[i] }, { common: this.common.copy(), hardforkByBlockNumber: true }));
-        this.validateBackend.validateBlocks(blocks);
+        await this.validateBackend.validateBlocks(blocks);
         wire.pool.put(handler);
         await onData(blocks);
         return;

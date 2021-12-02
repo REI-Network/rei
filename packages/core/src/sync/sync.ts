@@ -291,15 +291,13 @@ export class Synchronizer extends EventEmitter {
     }
     headers.forEach((header, i) => {
       if (bodies[i].length === 0 && !header.transactionsTrie.equals(KECCAK256_RLP)) {
-        throw new Error('useless peer');
+        throw new Error('useless');
       }
     });
   }
 
-  validateBlocks(blocks: Block[]) {
-    blocks.forEach((b) => {
-      preValidateBlock.call(b);
-    });
+  async validateBlocks(blocks: Block[]) {
+    Promise.all(blocks.map((b) => preValidateBlock.call(b)));
   }
 
   /////////////////// Fetcher validate backend ///////////////////

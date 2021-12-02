@@ -96,7 +96,6 @@ export class StateMachine {
 
   private validRound: number = -1;
   private validBlock?: Block;
-  private validEvidence?: Evidence[];
 
   private votes!: HeightVoteSet;
   private commitRound: number = -1;
@@ -279,7 +278,6 @@ export class StateMachine {
       if (this.proposalBlockHash.equals(maj23Hash)) {
         this.validRound = this.round;
         this.validBlock = this.proposalBlock;
-        this.validEvidence = this.proposalEvidence;
         logger.debug('StateMachine::addProposalBlock, update valid block, round:', this.round, 'hash:', bufferToHex(maj23Hash));
       }
     }
@@ -327,7 +325,6 @@ export class StateMachine {
 
                 this.validRound = vote.round;
                 this.validBlock = this.proposalBlock;
-                this.validEvidence = this.proposalEvidence;
               } else {
                 this.proposalBlock = undefined;
                 this.proposalEvidence = undefined;
@@ -975,7 +972,6 @@ export class StateMachine {
     this.lockedBlockResult = undefined;
     this.validRound = -1;
     this.validBlock = undefined;
-    this.validEvidence = undefined;
     this.votes = new HeightVoteSet(this.chainId, this.height, this.validators);
     this.commitRound = -1;
     this.triggeredTimeoutPrecommit = false;

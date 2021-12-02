@@ -2,7 +2,6 @@ import { BN } from 'ethereumjs-util';
 import { Common } from '@gxchain2/common';
 import { BlockHeader, Block, Transaction } from '@gxchain2/structure';
 import { PChannel, logger } from '@gxchain2/utils';
-import { ConsensusEngine } from '../consensus/types';
 import { WireProtocol, WireProtocolHandler } from '../protocols';
 import { LimitedConcurrency } from './limited';
 

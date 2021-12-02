@@ -1,6 +1,7 @@
 import { rlp, intToBuffer, bufferToInt, BNLike, Address } from 'ethereumjs-util';
 import VM from '@gxchain2-ethereumjs/vm';
 import { Common } from '@gxchain2/common';
+import { Database } from '@gxchain2/database';
 import { Block, BlockHeader, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
 import { ValidatorSet, ValidatorSets } from '../../../staking';
 import { StakeManager } from '../../../contracts';
@@ -56,6 +57,7 @@ function isEXEvidenceList(ele: EXElement): ele is EXEvidenceList {
 
 export interface ExtraDataValidateBackend {
   readonly validatorSets: ValidatorSets;
+  readonly db: Database;
   getCommon(num: BNLike): Common;
   getStakeManager(vm: VM, block: Block, common?: Common): StakeManager;
   getVM(root: Buffer, num: BNLike | Common): Promise<VM>;
@@ -232,8 +234,9 @@ export class ExtraData {
     }
     raw.push(this.proposal.signature!);
     if (this.voteSet) {
+      const maj23Hash = this.voteSet.maj23!;
       for (const vote of this.voteSet.votes) {
-        if (vote === undefined) {
+        if (vote === undefined || !vote.hash.equals(maj23Hash)) {
           raw.push([]);
         } else {
           raw.push(vote.signature!);
@@ -269,10 +272,12 @@ export class ExtraData {
     }
   }
 
-  async verifyEvidence(backend: ExtraDataValidateBackend, parentBlock: Block) {
+  async verifyEvidence(backend: ExtraDataValidateBackend) {
     for (const ev of this.evidence) {
       if (ev instanceof DuplicateVoteEvidence) {
+        const parentBlock = await backend.db.getBlock(ev.height.subn(1));
         const parentHeader = parentBlock.header;
+
         /**
          * If we use _common directly, it may cause some problems
          * when the consensus algorithm is switched

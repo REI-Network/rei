@@ -355,7 +355,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     }
 
     if (!options.skipConsensusVerify) {
-      await extraData.verifyEvidence(this.node, parent);
+      await extraData.verifyEvidence(this.node);
       await this.evpool.checkEvidence(extraData.evidence);
     }
 

@@ -52,3 +52,8 @@ export interface IStateMachineBackend {
 export interface IStateMachineP2PBackend {
   broadcastMessage(msg: Message, options: SendMessageOptions): void;
 }
+
+export interface IDebug {
+  precommitForEmptyWhenFirstRound?: boolean;
+  conflictVotes?: boolean;
+}

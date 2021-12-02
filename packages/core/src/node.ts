@@ -487,10 +487,7 @@ export class Node extends Initializer {
 
           /////////////////////////////////////
           // TODO: this shouldn't belong here
-          if (evidence) {
-            const evpool = this.getReimintEngine().evpool;
-            promises.push(evpool.update(evidence, number));
-          }
+          promises.push(this.getReimintEngine().evpool.update(evidence ?? [], number));
           /////////////////////////////////////
 
           if (broadcast) {

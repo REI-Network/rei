@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { BN, bufferToHex } from 'ethereumjs-util';
 import { Channel, logger } from '@gxchain2/utils';
 import { Block, BlockHeader } from '@gxchain2/structure';
@@ -18,6 +19,7 @@ import {
   IConfig,
   IEvidencePool,
   IWAL,
+  IDebug,
   RoundStepType,
   Message,
   NewRoundStepMessage,
@@ -57,6 +59,7 @@ export class StateMachine {
   private readonly config: IConfig;
   private readonly evpool: IEvidencePool;
   private readonly wal: IWAL;
+  private readonly debug?: IDebug;
 
   private msgLoopPromise?: Promise<void>;
   private readonly msgQueue = new Channel<StateMachineMsg>({
@@ -99,7 +102,7 @@ export class StateMachine {
   private commitRound: number = -1;
   /////////////// RoundState ///////////////
 
-  constructor(backend: IStateMachineBackend, p2p: IStateMachineP2PBackend, evpool: IEvidencePool, wal: IWAL, chainId: number, config: IConfig, signer?: ISigner) {
+  constructor(backend: IStateMachineBackend, p2p: IStateMachineP2PBackend, evpool: IEvidencePool, wal: IWAL, chainId: number, config: IConfig, signer?: ISigner, debug?: IDebug) {
     this.backend = backend;
     this.p2p = p2p;
     this.chainId = chainId;
@@ -107,6 +110,7 @@ export class StateMachine {
     this.wal = wal;
     this.config = config;
     this.signer = signer;
+    this.debug = debug;
   }
 
   private newStep() {
@@ -390,14 +394,10 @@ export class StateMachine {
         // }
 
         const { voteA, voteB } = err;
-        if (this.signer && vote.validator().equals(this.signer.address())) {
+        if (!this.debug?.conflictVotes && this.signer && vote.validator().equals(this.signer.address())) {
           // found conflicting vote from ourselves
           logger.warn('local conflicting(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
           return;
-        }
-
-        if (voteA.hash.equals(EMPTY_HASH) || voteB.hash.equals(EMPTY_HASH)) {
-          logger.warn('zero hash, is there something wrong?');
         }
 
         logger.debug('StateMachine::tryAddVote, catch duplicate vote evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
@@ -494,6 +494,7 @@ export class StateMachine {
         POLRound: this.validRound,
         hash: this.validBlock.hash()
       });
+      proposal.signature = this.signer!.sign(proposal.getMessageToSign());
 
       this._newMessage(new StateMachineMessage('', new ProposalMessage(proposal)));
       this._newMessage(new StateMachineMessage('', new ProposalBlockMessage(this.validBlock)));
@@ -532,7 +533,20 @@ export class StateMachine {
     });
     vote.signature = this.signer.sign(vote.getMessageToSign());
     this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
-    return vote;
+
+    if (this.debug?.conflictVotes) {
+      const vote = new Vote({
+        chainId: this.chainId,
+        type,
+        height: this.height,
+        round: this.round,
+        hash: crypto.randomBytes(32),
+        index
+      });
+      vote.signature = this.signer.sign(vote.getMessageToSign());
+
+      this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
+    }
   }
 
   private async enterPropose(height: BN, round: number) {
@@ -647,6 +661,11 @@ export class StateMachine {
       this.newStep();
     };
 
+    if (this.debug?.precommitForEmptyWhenFirstRound && round === 0) {
+      this.signVote(VoteType.Precommit, EMPTY_HASH);
+      return update();
+    }
+
     const maj23Hash = this.votes.prevotes(round)?.maj23;
 
     if (!maj23Hash) {
@@ -748,6 +767,7 @@ export class StateMachine {
     if (!maj23Hash) {
       throw new Error('enterCommit expected +2/3 precommits');
     }
+
     if (this.lockedBlock) {
       const lockedHash = this.lockedBlock.hash();
       if (lockedHash.equals(maj23Hash)) {

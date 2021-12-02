@@ -49,7 +49,7 @@ export class Synchronizer extends EventEmitter {
     this.interval = options.interval ?? defaultSyncInterval;
     this.minSyncPeers = options.minSyncPeers ?? defaultMinSyncPeers;
     this.elementsCountLimit = options.elementsCountLimit ?? defaultDownloadElementsCountLimit;
-    this.fetcher = new Fetcher({ backend: this.node, validateBackend: this, common: this.node.getCommon(0), downloadElementsCountLimit: this.elementsCountLimit });
+    this.fetcher = new Fetcher({ backend: this, validateBackend: this, common: this.node.getCommon(0), downloadElementsCountLimit: this.elementsCountLimit });
   }
 
   /**
@@ -276,7 +276,20 @@ export class Synchronizer extends EventEmitter {
     }
   }
 
-  /////////////////// Fetcher validate backend ///////////////////
+  /////////////////// Fetcher backend ///////////////////
+
+  banPeer(peerId: string, reason: string) {
+    return this.node.banPeer(peerId, reason as any);
+  }
+
+  async processAndCommitBlock(block: Block) {
+    const result = await this.node.getEngineByCommon(block._common).processBlock({ block });
+    return await this.node.commitBlock({
+      ...result,
+      block,
+      broadcast: false
+    });
+  }
 
   validateHeaders(parent: BlockHeader | undefined, headers: BlockHeader[]) {
     headers.forEach((header, i) => {
@@ -300,5 +313,5 @@ export class Synchronizer extends EventEmitter {
     await Promise.all(blocks.map((b) => preValidateBlock.call(b)));
   }
 
-  /////////////////// Fetcher validate backend ///////////////////
+  /////////////////// Fetcher backend ///////////////////
 }

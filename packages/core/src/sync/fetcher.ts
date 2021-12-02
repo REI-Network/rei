@@ -4,7 +4,6 @@ import { BlockHeader, Block, Transaction } from '@gxchain2/structure';
 import { PChannel, logger } from '@gxchain2/utils';
 import { ConsensusEngine } from '../consensus/types';
 import { WireProtocol, WireProtocolHandler } from '../protocols';
-import { CommitBlockOptions } from '../types';
 import { LimitedConcurrency } from './limited';
 
 const defaultDownloadBodiesLimit = 5;
@@ -38,9 +37,8 @@ export interface FetcherOptions {
 }
 
 export interface FetcherBackend {
-  getEngineByCommon(common: Common): ConsensusEngine;
   banPeer(peerId: string, reason: string): Promise<void>;
-  commitBlock(options: CommitBlockOptions): Promise<boolean>;
+  processAndCommitBlock(block: Block): Promise<boolean>;
 }
 
 export interface FetcherValidateBackend {
@@ -251,13 +249,7 @@ export class Fetcher {
     } of this.processBlocksChannel.generator()) {
       try {
         for (const block of blocks) {
-          const result = await this.backend.getEngineByCommon(block._common).processBlock({ block });
-          reorged =
-            (await this.backend.commitBlock({
-              ...result,
-              block,
-              broadcast: false
-            })) || reorged;
+          reorged = (await this.backend.processAndCommitBlock(block)) || reorged;
 
           if (this.aborted) {
             resolve();

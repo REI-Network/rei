@@ -4,17 +4,24 @@ import { Common } from '@gxchain2/common';
 import { Block, BlockHeader, Transaction } from '@gxchain2/structure';
 import { setLevel } from '@gxchain2/utils';
 import { Fetcher, FetcherBackend, FetcherValidateBackend } from '../../src/sync/fetcher';
-import { ProcessBlockOptions } from '../../src/types';
+import { CommitBlockOptions } from '../../src/types';
 import { HandlerPool, GetHandlerTimeoutError } from '../../src/protocols/handlerPool';
+import { ConsensusEngine } from '../../src/consensus';
 
 setLevel('silent');
 const common = Common.createCommonByBlockNumber(0, 'gxc2-testnet');
 const decl = 10;
 
 class MockFetcherBackend implements FetcherBackend, FetcherValidateBackend {
+  getEngineByCommon(common: Common): ConsensusEngine {
+    throw new Error('Method not implemented.');
+  }
+  commitBlock(options: CommitBlockOptions): Promise<boolean> {
+    throw new Error('Method not implemented.');
+  }
   lastestNumber?: BN;
 
-  async processBlock(block: Block, options: ProcessBlockOptions) {
+  async processAndCommitBlock(block: Block) {
     if (this.lastestNumber !== undefined && !this.lastestNumber.addn(1).eq(block.header.number)) {
       throw new Error('process invalid block');
     }
@@ -35,9 +42,9 @@ class MockFetcherBackend implements FetcherBackend, FetcherValidateBackend {
     return headers[headers.length - 1];
   }
 
-  validateBodies(): void {}
+  validateBodies() {}
 
-  validateBlocks(): void {}
+  async validateBlocks() {}
 }
 
 class MockProtocolHander {

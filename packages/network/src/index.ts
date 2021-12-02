@@ -333,15 +333,19 @@ export class NetworkManager extends EventEmitter {
     }
 
     const { enr, keypair } = await this.loadLocalENR(options);
+    const strEnr = enr.encodeTxt(keypair.privateKey);
     this.privateKey = keypair.privateKey;
     logger.info('NetworkManager::init, peerId:', options.peerId.toB58String());
-    logger.info('NetworkManager::init,', enr.encodeTxt(keypair.privateKey));
+    logger.info('NetworkManager::init,', strEnr);
+
+    // filter local enr
+    const bootnodes = (options.bootnodes ?? []).filter((b) => b !== strEnr);
 
     this.libp2pNode = new Libp2pNode({
       ...options,
       tcpPort: options.tcpPort ?? defaultTcpPort,
       udpPort: options.udpPort ?? defaultUdpPort,
-      bootnodes: options.bootnodes ?? [],
+      bootnodes: bootnodes,
       enr,
       maxConnections: this.maxPeers
     });

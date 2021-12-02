@@ -346,6 +346,8 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
 
     const extraData = ExtraData.fromBlockHeader(pendingHeader, { valSet: parentValidatorSet });
     const miner = extraData.proposal.proposer();
+
+    // now, parentValidatorSet has increased extraData.proposal.round times
     parentValidatorSet = extraData.validatorSet()!;
 
     if (!options.skipConsensusValidation) {

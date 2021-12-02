@@ -754,7 +754,7 @@ export class StateMachine {
         this.proposalBlockHash = this.lockedBlock.hash();
         this.proposalBlock = this.lockedBlock;
         this.proposalEvidence = this.lockedEvidence;
-        this.proposalBlockResult = this.lockedBlockResult; // TODO:
+        this.proposalBlockResult = this.lockedBlockResult;
       }
     }
 
@@ -773,6 +773,11 @@ export class StateMachine {
 
     if (!this.height.eq(height) || this.step !== RoundStepType.Commit) {
       throw new Error('finalizeCommit invalid args');
+    }
+
+    if (this.commitRound === -1) {
+      logger.debug('StateMachine::finalizeCommit, invalid commitRound');
+      return;
     }
 
     const precommits = this.votes.precommits(this.commitRound);
@@ -794,11 +799,6 @@ export class StateMachine {
 
     if (this.proposalEvidence === undefined || this.proposalBlockResult === undefined) {
       logger.debug('StateMachine::finalizeCommit, invalid proposal evidence or block result');
-      return;
-    }
-
-    if (this.commitRound === -1) {
-      logger.debug('StateMachine::finalizeCommit, invalid commitRound');
       return;
     }
 

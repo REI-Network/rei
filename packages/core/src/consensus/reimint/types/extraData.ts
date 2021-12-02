@@ -144,16 +144,19 @@ export class ExtraData {
         }
 
         if (valSet) {
-          // get proposer address by round
-          const tempValSet = valSet.copy();
-          tempValSet.incrementProposerPriority(round);
-          proposer = tempValSet.proposer;
-
-          // increase validator set by commit round
+          // increase validator set by round
           valSet = valSet.copy();
-          valSet.incrementProposerPriority(commitRound);
+          valSet.incrementProposerPriority(round);
 
-          // create vote set
+          // get proposer address by round
+          proposer = valSet.proposer;
+
+          /**
+           * create a vote set,
+           * commitRound and valSet.round may be different,
+           * but it doesn't matter,
+           * because the validator voting power is same
+           */
           voteSet = new VoteSet(chainId, header.number, commitRound, VoteType.Precommit, valSet);
         }
       } else if (i === 2) {

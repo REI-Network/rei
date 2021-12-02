@@ -297,7 +297,7 @@ export class Synchronizer extends EventEmitter {
   }
 
   async validateBlocks(blocks: Block[]) {
-    Promise.all(blocks.map((b) => preValidateBlock.call(b)));
+    await Promise.all(blocks.map((b) => preValidateBlock.call(b)));
   }
 
   /////////////////// Fetcher validate backend ///////////////////

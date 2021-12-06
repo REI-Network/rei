@@ -16,6 +16,7 @@ GXChain2.0 genesis contracts
 - `Router` A router smart contract, blockchain will only interact with router contract, deployed at `0x0000000000000000000000000000000000001008`
 - `FeeToken` An ERC20 smart contract, only provides `balanceOf` method for users to query the fee balance, deployed at `0x0000000000000000000000000000000000001009`
 - `FreeFeeToken` An ERC20 smart contract, only provides `balanceOf` method for users to query the free fee balance, deployed at `0x000000000000000000000000000000000000100a`
+- `ContractFee` A smart contract for registering contract creators and setting contract fee, deployed at `0x000000000000000000000000000000000000100b`
 
 ## Install
 

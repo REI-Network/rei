@@ -1,11 +1,11 @@
 {
     "name": "@gxchain2/contracts",
-    "version": "0.0.2",
-    "main": "hardhat.config.ts",
+    "version": "0.0.3",
+    "main": "dist/index.js",
     "license": "GPL-3.0-or-later",
     "scripts": {
         "hardhat": "node ../../node_modules/hardhat/internal/cli/cli.js",
-        "build": "npm run hardhat -- compile",
+        "build": "npm run hardhat -- compile && tsc",
         "node": "npm run hardhat -- node",
         "test": "npm run hardhat -- test",
         "docgen": "solidity-docgen -i ./src -t ./templates -H ./helper.js",

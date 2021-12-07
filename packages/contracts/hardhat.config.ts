@@ -1,3 +1,4 @@
+import '@typechain/hardhat';
 import '@nomiclabs/hardhat-etherscan';
 import '@nomiclabs/hardhat-truffle5';
 import 'hardhat-deploy';
@@ -14,6 +15,10 @@ const accounts = {
  * @type import('hardhat/config').HardhatUserConfig
  */
 export default {
+  typechain: {
+    outDir: 'types',
+    target: 'ethers-v5'
+  },
   etherscan: {
     apiKey: process.env.ETHERSCAN_KEY
   },

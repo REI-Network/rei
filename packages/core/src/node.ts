@@ -487,7 +487,9 @@ export class Node extends Initializer {
 
           /////////////////////////////////////
           // TODO: this shouldn't belong here
-          promises.push(this.getReimintEngine().evpool.update(evidence ?? [], number));
+          if (this.reimint.isStarted) {
+            promises.push(this.reimint.evpool.update(evidence ?? [], number));
+          }
           /////////////////////////////////////
 
           if (broadcast) {

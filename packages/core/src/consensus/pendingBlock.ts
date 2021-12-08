@@ -147,13 +147,19 @@ export class PendingBlock {
    * @param txs - PendingTxMap instance(created by txpool)
    */
   appendTxs(txs: PendingTxMap) {
-    // TODO: remove this
+    /**
+     * TODO: We should continue to try to append transactions instead of returning directly,
+     *       here the return is for performance considerations
+     */
     if (this.finalizedStateRoot) {
       return Promise.resolve();
     }
 
     return this.runWithLock(async () => {
-      // TODO: remove this
+      /**
+       * TODO: We should continue to try to append transactions instead of returning directly,
+       *       here the return is for performance considerations
+       */
       if (this.finalizedStateRoot) {
         return;
       }
@@ -188,6 +194,12 @@ export class PendingBlock {
           if (txRes.gasUsed.add(this.gasUsed).gt(gasLimit)) {
             await vm.stateManager.revert();
             txs.pop();
+
+            /**
+             * TODO: We should continue to try to execute the transaction until the block limit is reached,
+             *       the return here is for performance considerations
+             */
+            return;
           } else {
             await vm.stateManager.commit();
             const stateRoot = await vm.stateManager.getStateRoot();

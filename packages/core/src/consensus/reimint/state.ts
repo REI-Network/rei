@@ -854,7 +854,7 @@ export class StateMachine {
       throw new Error('height is undefined');
     }
 
-    logger.debug('StateMachine::replay, start, local height:', this.height.subn(1).toString());
+    logger.info('♻️  Start replay, local height:', this.height.subn(1).toString());
 
     const result = await this.wal.searchForLatestEndHeight();
     if (result === undefined) {
@@ -909,7 +909,7 @@ export class StateMachine {
       await this.wal.open();
       logger.error('StateMachine::replay, catch error:', err);
     } finally {
-      logger.debug('StateMachine::replay, over');
+      logger.info('♻️  Replay, over');
     }
   }
 

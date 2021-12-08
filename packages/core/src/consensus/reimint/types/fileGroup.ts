@@ -116,8 +116,7 @@ export class FileGroup {
       if (this.head) {
         throw new Error('head already exists');
       }
-      const { minIndex, maxIndex, totalSize, headSize } = await this.readGroupInfo();
-      console.log('m,m,t,h:', minIndex, maxIndex, totalSize, headSize);
+      const { minIndex, maxIndex } = await this.readGroupInfo();
       this._minIndex = minIndex;
       this._maxIndex = maxIndex;
       this.head = await fs.open(makeGroupFilePath(this.path, this.base, 0, 0), 'a');

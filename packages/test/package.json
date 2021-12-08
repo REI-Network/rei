@@ -4,7 +4,7 @@
   "description": "test cases for rei-network",
   "scripts": {
     "start": "mocha -r ts-node/register 'test/**/*.test.ts' --timeout 1000000 --exit",
-    "start:concurency": "mocha -r ts-node/register 'test/**/concurency.test.ts' --timeout 100000000 --exit",
+    "start:concurrency": "mocha -r ts-node/register 'test/**/concurrency.test.ts' --timeout 100000000 --exit",
     "build": "echo test has no build command",
     "test": "echo test has no test cases, if you want to start test, please run npm start"
   },

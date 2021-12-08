@@ -1,6 +1,6 @@
 {
     "name": "@gxchain2/rpc",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
@@ -15,7 +15,7 @@
     },
     "dependencies": {
         "@gxchain2-ethereumjs/vm": "^5.5.11",
-        "@gxchain2/core": "^0.0.3",
+        "@gxchain2/core": "^0.0.4",
         "@gxchain2/structure": "^0.0.1",
         "@gxchain2/utils": "^0.0.1",
         "body-parser": "^1.19.0",

@@ -1,6 +1,6 @@
 {
     "name": "@gxchain2/cli",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
@@ -18,8 +18,8 @@
     },
     "dependencies": {
         "@gxchain2/common": "^0.0.2",
-        "@gxchain2/core": "^0.0.3",
-        "@gxchain2/rpc": "^0.0.3",
+        "@gxchain2/core": "^0.0.4",
+        "@gxchain2/rpc": "^0.0.4",
         "@gxchain2/utils": "^0.0.1",
         "@gxchain2/wallet": "^0.0.1",
         "commander": "^6.2.1",

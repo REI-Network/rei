@@ -856,6 +856,9 @@ export class StateMachine {
 
     logger.info('♻️  Start replay, local height:', this.height.subn(1).toString());
 
+    /**
+     * TODO: There is room for optimization, we should start replay from height - 1
+     */
     const result = await this.wal.searchForLatestEndHeight();
     if (result === undefined) {
       logger.debug('StateMachine::replay, has nothing to replay');
@@ -875,6 +878,10 @@ export class StateMachine {
           const msg = message.msg;
 
           if (msg instanceof VoteMessage) {
+            if (!msg.vote.height.eq(this.height)) {
+              continue;
+            }
+
             const vote = msg.vote;
             logger.debug('StateMachine::replay, vote, height:', vote.height.toString(), 'round:', vote.round, 'type:', vote.type, 'hash:', bufferToHex(vote.hash), 'validator:', vote.validator().toString(), 'from:', message.peerId);
           } else if (msg instanceof ProposalBlockMessage) {
@@ -882,6 +889,10 @@ export class StateMachine {
             const block = msg.toBlock({ common: this.backend.getCommon(0), hardforkByBlockNumber: true });
             logger.debug('StateMachine::replay, block, height:', block.header.number.toString(), 'from:', (message as StateMachineMessage).peerId);
           } else if (msg instanceof ProposalMessage) {
+            if (!msg.proposal.height.eq(this.height)) {
+              continue;
+            }
+
             const proposal = msg.proposal;
             logger.debug('StateMachine::replay, proposal, height:', proposal.height.toString(), 'round:', proposal.round, 'hash:', bufferToHex(proposal.hash), 'proposer:', proposal.proposer().toString(), 'from:', message.peerId);
           } else {
@@ -891,6 +902,10 @@ export class StateMachine {
 
           await this.handleMsg(message as StateMachineMessage);
         } else if (message instanceof StateMachineTimeout) {
+          if (!message.height.eq(this.height)) {
+            continue;
+          }
+
           logger.debug('StateMachine::replay, timeout, height:', message.height.toString(), 'round:', message.round, 'step:', message.step);
           await this.handleTimeout(message);
         } else if (message instanceof StateMachineEndHeight) {

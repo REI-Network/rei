@@ -68,13 +68,15 @@ describe('WAL', () => {
   });
 
   it("shouldn't find end height message", async () => {
-    const reader = await wal.searchForEndHeight(new BN(102));
-    expect(reader === undefined).be.true;
+    const result = await wal.searchForLatestEndHeight();
+    expect(result === undefined || !result.height.eq(new BN(102))).be.true;
   });
 
   const readMessagesAfter101 = async () => {
-    const reader = await wal.searchForEndHeight(new BN(101));
-    expect(reader === undefined).be.false;
+    const result = await wal.searchForLatestEndHeight();
+    expect(result !== undefined).be.true;
+    const { reader, height } = result!;
+    expect(height.eq(new BN(101))).be.true;
 
     const messages = await readAndClose(reader!);
     expect(messages.length).be.equal(1);

@@ -116,7 +116,8 @@ export class FileGroup {
       if (this.head) {
         throw new Error('head already exists');
       }
-      const { minIndex, maxIndex } = await this.readGroupInfo();
+      const { minIndex, maxIndex, totalSize, headSize } = await this.readGroupInfo();
+      console.log('m,m,t,h:', minIndex, maxIndex, totalSize, headSize);
       this._minIndex = minIndex;
       this._maxIndex = maxIndex;
       this.head = await fs.open(makeGroupFilePath(this.path, this.base, 0, 0), 'a');
@@ -331,6 +332,7 @@ export class GroupFileReader {
   private index: number = 0;
   private group: FileGroup;
   private lock = new Semaphore(1);
+  private position = 0;
   private file?: fs.FileHandle;
 
   constructor(group: FileGroup, index: number) {
@@ -375,6 +377,7 @@ export class GroupFileReader {
       if (this.file) {
         await this.file.close();
         this.file = undefined;
+        this.position = 0;
       }
     });
   }
@@ -393,12 +396,14 @@ export class GroupFileReader {
           return false;
         }
 
-        const { bytesRead } = await this.file!.read(buf, buf.length - readLength, readLength);
+        const { bytesRead } = await this.file!.read(buf, buf.length - readLength, readLength, this.position);
+        this.position += bytesRead;
         readLength -= bytesRead;
 
         if (readLength > 0) {
           await this.file!.close();
           this.file = undefined;
+          this.position = 0;
           if (this.index + 1 > this.group.maxIndex) {
             return false;
           }
@@ -414,7 +419,7 @@ export class GroupFileReader {
    * @returns Group file index
    */
   getIndex() {
-    return this.runWithLock(() => Promise.resolve(this.index));
+    return this.index;
   }
 
   /**
@@ -427,7 +432,17 @@ export class GroupFileReader {
       if (this.file) {
         await this.file.close();
         this.file = undefined;
+        this.position = 0;
       }
     });
+  }
+
+  /**
+   * Copy reader instance
+   */
+  copy() {
+    const reader = new GroupFileReader(this.group, this.index);
+    reader.position = this.position;
+    return reader;
   }
 }

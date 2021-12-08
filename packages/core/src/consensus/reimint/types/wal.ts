@@ -114,23 +114,30 @@ export class WAL {
   }
 
   /**
-   * Search for target height EndHeightMessage from the beginning
-   * @param height - Target height
+   * Search for latest height EndHeightMessage from the beginning
    * @returns WALReader, if found
    */
-  async searchForEndHeight(height: BN) {
-    const reader = this.newReader();
+  async searchForLatestEndHeight() {
+    const pendingReader = this.newReader();
+    let latestReader: WALReader | undefined;
+    let latestHeight: BN | undefined;
     try {
       let message: StateMachineMsg | undefined;
-      while ((message = await reader.read())) {
-        if (message instanceof StateMachineEndHeight && message.height.eq(height)) {
-          return reader;
+      while ((message = await pendingReader.read())) {
+        if (message instanceof StateMachineEndHeight) {
+          latestHeight = message.height.clone();
+          latestReader = pendingReader.copy();
         }
       }
-      await reader.close();
+
+      await pendingReader.close();
+      if (latestReader && latestHeight) {
+        return { reader: latestReader, height: latestHeight };
+      }
     } catch (err) {
       // ignore all errors
-      await reader.close();
+      await pendingReader.close();
+      latestReader && (await latestReader.close());
     }
   }
 
@@ -191,5 +198,12 @@ export class WALReader {
     }
 
     return StateMachineMsgFactory.fromSerializedMessage(data);
+  }
+
+  /**
+   * Copy reader instance
+   */
+  copy() {
+    return new WALReader(this.reader.copy());
   }
 }

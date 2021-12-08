@@ -242,11 +242,13 @@ export class StateMachine {
     }
 
     if (this.proposal === undefined) {
-      throw new Error('add proposal block when proposal is undefined');
+      // logger.debug('StateMachine::setProposal, add proposal block when proposal is undefined');
+      return;
     }
 
     if (this.proposalBlockHash === undefined) {
-      throw new Error('add proposal block when hash is undefined');
+      // logger.debug('StateMachine::setProposal, add proposal block when hash is undefined');
+      return;
     }
 
     const extraData = ExtraData.fromBlockHeader(block.header);
@@ -854,17 +856,15 @@ export class StateMachine {
 
     logger.debug('StateMachine::replay, start, local height:', this.height.subn(1).toString());
 
-    const height = this.height.clone();
-    let reader = await this.wal.searchForEndHeight(height);
-    if (reader !== undefined) {
-      await reader.close();
-      logger.debug('StateMachine::replay, height:', height.toString(), 'should not contain StateMachineEndHeightMessage');
+    const result = await this.wal.searchForLatestEndHeight();
+    if (result === undefined) {
+      logger.debug('StateMachine::replay, has nothing to replay');
       return;
     }
 
-    reader = await this.wal.searchForEndHeight(height.subn(1));
-    if (reader === undefined) {
-      logger.debug('StateMachine::replay, height:', height.subn(1).toString(), 'has nothing to replay');
+    const { reader, height: readerHeight } = result;
+    if (readerHeight.gte(this.height)) {
+      logger.debug('StateMachine::replay, future message');
       return;
     }
 

@@ -1,9 +1,9 @@
 import { Address, BN, bufferToHex, toBuffer, bnToHex } from 'ethereumjs-util';
 import { v4 as uuidv4 } from 'uuid';
-import { Aborter, Channel, logger } from '@gxchain2/utils';
-import { Topics, BloomBitsFilter } from '@gxchain2/core/dist/bloombits';
-import { Node } from '@gxchain2/core';
-import { Transaction, Log, BlockHeader } from '@gxchain2/structure';
+import { Aborter, Channel, logger } from '@rei-network/utils';
+import { Topics, BloomBitsFilter } from '@rei-network/core/dist/bloombits';
+import { Node } from '@rei-network/core';
+import { Transaction, Log, BlockHeader } from '@rei-network/structure';
 import { WsClient } from './client';
 import { SyncingStatus } from './types';
 

@@ -1,7 +1,7 @@
-# @gxchain2/core
+# @rei-network/core
 
-[![NPM Version](https://img.shields.io/npm/v/@gxchain2/core)](https://www.npmjs.org/package/@gxchain2/core)
-![License](https://img.shields.io/npm/l/@gxchain2/core)
+[![NPM Version](https://img.shields.io/npm/v/@rei-network/core)](https://www.npmjs.org/package/@rei-network/core)
+![License](https://img.shields.io/npm/l/@rei-network/core)
 
 The core logic of blockchain node, including:
 
@@ -24,7 +24,7 @@ The core logic of blockchain node, including:
 ## INSTALL
 
 ```sh
-npm install @gxchain2/core
+npm install @rei-network/core
 ```
 
 ## USAGE

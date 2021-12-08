@@ -6,7 +6,7 @@ import "./interfaces/IConfig.sol";
 
 /**
  * Config contract for mainnet.
- * In gxchain2, system contracts can be updated through hard forks,
+ * In rei-network, system contracts can be updated through hard forks,
  * and DAO logic will be added in the futhure.
  */
 contract Config is IConfig {
@@ -55,17 +55,17 @@ contract Config is IConfig {
     }
 
     function dailyFee() external view override returns (uint256) {
-        // 283 GXC
+        // 283 REI
         return 283e18;
     }
 
     function dailyFreeFee() external view override returns (uint256) {
-        // 5 GXC
+        // 5 REI
         return 5e18;
     }
 
     function userFreeFeeLimit() external view override returns (uint256) {
-        // 0.025 GXC
+        // 0.025 REI
         return 25e15;
     }
 
@@ -82,7 +82,7 @@ contract Config is IConfig {
     }
 
     function minIndexVotingPower() external view override returns (uint256) {
-        // 1,000,000 GXC
+        // 1,000,000 REI
         return 1e24;
     }
 

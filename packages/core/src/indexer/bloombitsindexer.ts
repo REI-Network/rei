@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
-import { BlockHeader } from '@gxchain2/structure';
-import { DBSaveBloomBits, DBOp, Database } from '@gxchain2/database';
+import { BlockHeader } from '@rei-network/structure';
+import { DBSaveBloomBits, DBOp, Database } from '@rei-network/database';
 import { BloomBitsGenerator } from '../bloombits';
 import { BloomBitLength } from '../bloombits';
 import { ChainIndexer } from './chainindexer';

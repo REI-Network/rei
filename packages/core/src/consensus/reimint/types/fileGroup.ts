@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import path from 'path';
 import Semaphore from 'semaphore-async-await';
-import { logger } from '@gxchain2/utils';
+import { logger } from '@rei-network/utils';
 
 const defaultGroupCheckDuration = 5 * 1000;
 const defaultHeadSizeLimit = 10 * 1024 * 1024; // 10MB

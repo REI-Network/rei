@@ -2,8 +2,8 @@ import { BaseTrie } from 'merkle-patricia-tree';
 import { toBuffer, Address, BN } from 'ethereumjs-util';
 import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
 import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
-import { Blockchain } from '@gxchain2/blockchain';
-import { TypedTransaction, BlockHeader, Block, CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@gxchain2/structure';
+import { Blockchain } from '@rei-network/blockchain';
+import { TypedTransaction, BlockHeader, Block, CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@rei-network/structure';
 
 export class Clique {
   // disable constructor

@@ -1,7 +1,7 @@
 import { Address, BN } from 'ethereumjs-util';
-import { Node } from '@gxchain2/core';
-import { Block, WrappedBlock } from '@gxchain2/structure';
-import { hexStringToBuffer, hexStringToBN, logger } from '@gxchain2/utils';
+import { Node } from '@rei-network/core';
+import { Block, WrappedBlock } from '@rei-network/structure';
+import { hexStringToBuffer, hexStringToBN, logger } from '@rei-network/utils';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import * as helper from '../helper';
 import { FilterSystem } from '../filtersystem';

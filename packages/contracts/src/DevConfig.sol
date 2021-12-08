@@ -21,9 +21,9 @@ contract DevConfig is Ownable, IConfig {
 
     uint256 internal ud = 1 seconds;
     uint256 internal wd = 1 seconds;
-    uint256 internal df = 12e16; // 0.012 GXC
-    uint256 internal dff = 12e15; // 0.0012 GXC
-    uint256 internal uffl = 6e15; // 0.0006 GXC
+    uint256 internal df = 12e16; // 0.012 REI
+    uint256 internal dff = 12e15; // 0.0012 REI
+    uint256 internal uffl = 6e15; // 0.0006 REI
     uint256 internal fri = 10 seconds;
     uint256 internal ffri = 10 seconds;
     uint256 internal fpli = 10 seconds;

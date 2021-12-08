@@ -1,7 +1,7 @@
 import { RpcServer } from '../src/index';
 import { expect } from 'chai';
 import { EventEmitter } from 'events';
-import { setLevel } from '@gxchain2/utils';
+import { setLevel } from '@rei-network/utils';
 import WebSocket from 'ws';
 import axios from 'axios';
 

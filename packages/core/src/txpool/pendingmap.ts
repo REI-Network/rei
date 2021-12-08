@@ -1,6 +1,6 @@
 import Heap from 'qheap';
-import { Transaction } from '@gxchain2/structure';
-import { createBufferFunctionalMap } from '@gxchain2/utils';
+import { Transaction } from '@rei-network/structure';
+import { createBufferFunctionalMap } from '@rei-network/utils';
 
 /**
  * PendingTxMap record pending transactions

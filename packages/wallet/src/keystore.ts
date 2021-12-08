@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import Wallet from 'ethereumjs-wallet';
-import { hexStringToBuffer } from '@gxchain2/utils';
+import { hexStringToBuffer } from '@rei-network/utils';
 
 /**
  * KeyStore manages a key storage directory on disk.

@@ -1,6 +1,6 @@
 import { Address, BN, BNLike } from 'ethereumjs-util';
-import { Block, Receipt } from '@gxchain2/structure';
-import { Common } from '@gxchain2/common';
+import { Block, Receipt } from '@rei-network/structure';
+import { Common } from '@rei-network/common';
 import { SendMessageOptions } from '../../../protocols/consensus';
 import { ValidatorSet } from '../../../staking';
 import { StateMachineMsg } from './stateMessages';

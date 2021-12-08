@@ -1,6 +1,6 @@
 {
     "name": "testnet-hf1",
-    "comment": "gxc2-testnet hardfork 1",
+    "comment": "rei-testnet hardfork 1",
     "gasConfig": {
         "gasLimit": {
             "v": "0x989680",

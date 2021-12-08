@@ -1,7 +1,7 @@
 import path from 'path';
 import Wallet from 'ethereumjs-wallet';
 import { Address, bufferToHex } from 'ethereumjs-util';
-import { createBufferFunctionalMap, hexStringToBuffer } from '@gxchain2/utils';
+import { createBufferFunctionalMap, hexStringToBuffer } from '@rei-network/utils';
 import { AccountCache } from './accountcache';
 import { KeyStore, keyStoreFileName } from './keystore';
 

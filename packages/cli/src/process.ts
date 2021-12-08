@@ -1,6 +1,6 @@
 import process from 'process';
-import { Node } from '@gxchain2/core';
-import { logger } from '@gxchain2/utils';
+import { Node } from '@rei-network/core';
+import { logger } from '@rei-network/utils';
 
 process.on('uncaughtException', (err) => {
   logger.error('uncaughtException:', err);

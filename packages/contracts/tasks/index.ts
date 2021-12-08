@@ -212,7 +212,7 @@ task('abr', 'Assign block reward')
     console.log('Assign block reward succeed');
   });
 
-task('deposit', 'Deposit GXC for fee')
+task('deposit', 'Deposit REI for fee')
   .addParam('user', 'user address')
   .addParam('value', 'reward amount')
   .addFlag('ether', 'use ether as unit')
@@ -227,7 +227,7 @@ task('deposit', 'Deposit GXC for fee')
     console.log('Deposit succeed');
   });
 
-task('withdraw', 'Withdraw GXC from fee contract')
+task('withdraw', 'Withdraw REI from fee contract')
   .addParam('user', 'user address')
   .addParam('value', 'reward amount')
   .addFlag('ether', 'use ether as unit')
@@ -264,10 +264,10 @@ task('afb', 'Call onAfterBlock callback')
     console.log('onAfterBlock succeed');
   });
 
-task('gb', 'Get gxc balance')
+task('gb', 'Get REI balance')
   .addParam('user', 'target user')
   .setAction(async (taskArgs, { web3 }) => {
-    console.log('GXC:', await web3.eth.getBalance(taskArgs.user));
+    console.log('REI:', await web3.eth.getBalance(taskArgs.user));
   });
 
 task('register', 'Register contract creator')

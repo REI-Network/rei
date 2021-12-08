@@ -1,4 +1,4 @@
-import { Transaction, WrappedTransaction, calcIntrinsicGasByTx } from '@gxchain2/structure';
+import { Transaction, WrappedTransaction, calcIntrinsicGasByTx } from '@rei-network/structure';
 import { MAX_UINT64 } from '../utils';
 
 /**

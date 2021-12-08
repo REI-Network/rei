@@ -1,5 +1,5 @@
 import { bufferToInt, rlp, intToBuffer } from 'ethereumjs-util';
-import { getRandomIntInclusive } from '@gxchain2/utils';
+import { getRandomIntInclusive } from '@rei-network/utils';
 
 const ELEM_MAX_INTEGER = Math.pow(2, 32) - 1;
 

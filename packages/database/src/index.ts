@@ -3,9 +3,9 @@ import { DBManager, CacheMap } from '@gxchain2-ethereumjs/blockchain/dist/db/man
 import { DBOp, DBTarget, DatabaseKey, DBOpData } from '@gxchain2-ethereumjs/blockchain/dist/db/operation';
 import Cache from '@gxchain2-ethereumjs/blockchain/dist/db/cache';
 import { BN, rlp, toBuffer } from 'ethereumjs-util';
-import { Block, BlockBodyBuffer, BlockHeader, BlockHeaderBuffer, WrappedTransaction, Receipt, Transaction } from '@gxchain2/structure';
-import { Common } from '@gxchain2/common';
-import { compressBytes } from '@gxchain2/utils';
+import { Block, BlockBodyBuffer, BlockHeader, BlockHeaderBuffer, WrappedTransaction, Receipt, Transaction } from '@rei-network/structure';
+import { Common } from '@rei-network/common';
+import { compressBytes } from '@rei-network/utils';
 const level = require('level-mem');
 
 // constants prefix for receipts, txLookup and bloomBits.

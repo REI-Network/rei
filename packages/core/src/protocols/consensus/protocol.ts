@@ -1,4 +1,4 @@
-import { Protocol, Peer } from '@gxchain2/network';
+import { Protocol, Peer } from '@rei-network/network';
 import { Node } from '../../node';
 import { Message } from '../../consensus/reimint/types';
 import { NetworkProtocol } from '../types';
@@ -18,7 +18,7 @@ export class ConsensusProtocol extends BaseProtocol<ConsensusProtocolHander> imp
   private _handlers = new Set<ConsensusProtocolHander>();
 
   constructor(node: Node) {
-    super(node, NetworkProtocol.GXC2_CONSENSUS, '1');
+    super(node, NetworkProtocol.REI_CONSENSUS, '1');
   }
 
   get handlers() {

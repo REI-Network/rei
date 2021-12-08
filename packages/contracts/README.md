@@ -1,18 +1,18 @@
-# @gxchain2/contracts
+# @rei-network/contracts
 
-[![NPM Version](https://img.shields.io/npm/v/@gxchain2/contracts)](https://www.npmjs.org/package/@gxchain2/contracts)
-![License](https://img.shields.io/npm/l/@gxchain2/contracts)
+[![NPM Version](https://img.shields.io/npm/v/@rei-network/contracts)](https://www.npmjs.org/package/@rei-network/contracts)
+![License](https://img.shields.io/npm/l/@rei-network/contracts)
 
-GXChain2.0 genesis contracts
+REI-Network genesis contracts
 
 - `Config` Global config contract, deployed at `0x0000000000000000000000000000000000001000`
 - `StakeManager` Stake manager contract, deployed at `0x0000000000000000000000000000000000001001`
 - `UnstakePool` A smart contract that keeps unstake amount, deployed at `0x0000000000000000000000000000000000001003`
 - `ValidatorRewardPool` A smart contract that keeps validator reward for validator, deployed at `0x0000000000000000000000000000000000001004`
 - `CommmissionShare` A smart contract that keeps commission reward for all staking user, dynamically deployed for each validator
-- `Fee` A smart contract that accepts GXC deposit and calculates user fees, deployed at `0x0000000000000000000000000000000000001005`
+- `Fee` A smart contract that accepts REI deposit and calculates user fees, deployed at `0x0000000000000000000000000000000000001005`
 - `FreeFee` A smart contract that calculates user daily free fees, deployed at `0x0000000000000000000000000000000000001006`
-- `FeePool` A smart contract that assigns GXC rewards to miners according to miner shares every 24 hours, deployed at `0x0000000000000000000000000000000000001007`
+- `FeePool` A smart contract that assigns REI rewards to miners according to miner shares every 24 hours, deployed at `0x0000000000000000000000000000000000001007`
 - `Router` A router smart contract, blockchain will only interact with router contract, deployed at `0x0000000000000000000000000000000000001008`
 - `FeeToken` An ERC20 smart contract, only provides `balanceOf` method for users to query the fee balance, deployed at `0x0000000000000000000000000000000000001009`
 - `FreeFeeToken` An ERC20 smart contract, only provides `balanceOf` method for users to query the free fee balance, deployed at `0x000000000000000000000000000000000000100a`
@@ -21,7 +21,7 @@ GXChain2.0 genesis contracts
 ## Install
 
 ```sh
-npm install @gxchain2/contracts
+npm install @rei-network/contracts
 ```
 
 ## Usage
@@ -34,8 +34,8 @@ pragma solidity ^0.6.0;
 import "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@gxchain2/contracts/src/interfaces/IStakeManager.sol";
-import "@gxchain2/contracts/src/interfaces/ICommissionShare.sol";
+import "@rei-network/contracts/src/interfaces/IStakeManager.sol";
+import "@rei-network/contracts/src/interfaces/ICommissionShare.sol";
 
 // candy token for stake user
 // after deployment, the `transferOwnership` method should be called
@@ -110,7 +110,7 @@ contract LockedStake {
       address(sm),
       _shares
     );
-    // stake manager will burn the shares and return the GXC after `config.unstakeDelay`
+    // stake manager will burn the shares and return the REI after `config.unstakeDelay`
     unstakeId = sm.startUnstake(validator, to, _shares);
     delete stakeTimestampOf[id];
     delete stakeSharesOf[id];
@@ -132,9 +132,9 @@ AVAILABLE TASKS:
   approve               Approve commission share
   balance               Get balance
   deploy                Deploy contracts
-  deposit               Deposit GXC for fee
+  deposit               Deposit REI for fee
   fee                   Query user fee and free fee info
-  gb                    Get gxc balance
+  gb                    Get REI balance
   lscfgaddr             List config addresses
   scr                   Set commission rate
   stake                 Stake for validator
@@ -146,7 +146,7 @@ AVAILABLE TASKS:
   vu                    Visit unstake info by id
   vva                   Visit validator information by address
   vvi                   Visit validator information by index
-  withdraw              Withdraw GXC from fee contract
+  withdraw              Withdraw REI from fee contract
 ```
 
 Any detailed options of the task can be obtained like this:
@@ -160,23 +160,23 @@ npx hardhat stake --help
 ### Stake
 
 ```
-npx hardhat --networkd gxc2-testnet stake --address 0x0000000000000000000000000000000000001001 --validator 0x...123 --value 100 --ether
+npx hardhat --networkd rei-testnet stake --address 0x0000000000000000000000000000000000001001 --validator 0x...123 --value 100 --ether
 ```
 
-stake 100 GXC for 0x...123 on gxc2-testnet
+stake 100 REI for 0x...123 on rei-testnet
 
 ### Start unstake
 
 ```
-npx hardhat --networkd gxc2-testnet sunstake --address 0x0000000000000000000000000000000000001001 --validator 0x...123 --shares 100 --ether
+npx hardhat --networkd rei-testnet sunstake --address 0x0000000000000000000000000000000000001001 --validator 0x...123 --shares 100 --ether
 ```
 
-start unstake 100 CommissionShares for 0x...123 on gxc2-testnet
+start unstake 100 CommissionShares for 0x...123 on rei-testnet
 
 ### Unstake
 
 ```
-npx hardhat --networkd gxc2-testnet unstake --address 0x0000000000000000000000000000000000001001 --id 0
+npx hardhat --networkd rei-testnet unstake --address 0x0000000000000000000000000000000000001001 --id 0
 ```
 
 unstake for id `0`

@@ -51,7 +51,7 @@ export default {
       url: 'http://127.0.0.1:8545',
       loggingEnabled: true
     },
-    'gxc2-localhost': {
+    'rei-devnet': {
       live: false,
       saveDeployments: true,
       url: 'http://127.0.0.1:11451',
@@ -104,10 +104,17 @@ export default {
       gasPrice: 1e11,
       gasMultiplier: 2
     },
-    'gxc2-testnet': {
-      url: 'https://testnet2.gxchain.org/rpc',
+    'rei-testnet': {
+      url: 'https://rpc-testnet.rei.network',
       accounts,
       chainId: 12357,
+      live: true,
+      saveDeployments: true
+    },
+    'rei-mainnet': {
+      url: 'https://rpc-mainnet.rei.network',
+      accounts,
+      chainId: 47805,
       live: true,
       saveDeployments: true
     }

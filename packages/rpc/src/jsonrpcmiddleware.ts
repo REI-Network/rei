@@ -3,7 +3,7 @@ import * as helper from './helper';
 import errors from './errorcodes';
 import { RpcContext, emptyContext } from './index';
 import { JSONRPC_VERSION } from './types';
-import { logger } from '@gxchain2/utils';
+import { logger } from '@rei-network/utils';
 
 type HookFunction = (params: any, result: any) => Promise<any> | any;
 

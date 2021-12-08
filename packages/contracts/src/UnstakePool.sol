@@ -18,7 +18,7 @@ contract UnstakePool is ReentrancyGuard, Only, IUnstakePool {
     constructor(IConfig config) public Only(config) {}
 
     /**
-     * Deposit GXC to `UnstakePool`, only can be called by stake manager,
+     * Deposit REI to `UnstakePool`, only can be called by stake manager,
      * this will be called when user starts unstake.
      * @param validator     Validator address.
      */
@@ -38,11 +38,11 @@ contract UnstakePool is ReentrancyGuard, Only, IUnstakePool {
     }
 
     /**
-     * Withdraw GXC and burn shares, only can be called by stake manager,
+     * Withdraw REI and burn shares, only can be called by stake manager,
      * this will be called when unstake timeout.
      * @param validator     Validator address.
      * @param shares        Number of shares.
-     * @param to            GXC receiver address(this value is set when the user starts unstake).
+     * @param to            REI receiver address(this value is set when the user starts unstake).
      */
     function withdraw(
         address validator,

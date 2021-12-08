@@ -1,8 +1,8 @@
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import { Address, BN, MAX_INTEGER } from 'ethereumjs-util';
 import Message from '@gxchain2-ethereumjs/vm/dist/evm/message';
-import { Common } from '@gxchain2/common';
-import { hexStringToBuffer, logger } from '@gxchain2/utils';
+import { Common } from '@rei-network/common';
+import { hexStringToBuffer, logger } from '@rei-network/utils';
 import { EMPTY_ADDRESS } from '../utils';
 import { ValidatorSet } from '../staking';
 import { encode } from './utils';

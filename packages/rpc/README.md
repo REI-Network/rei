@@ -1,7 +1,7 @@
-# @gxchain2/rpc
+# @rei-network/rpc
 
-[![NPM Version](https://img.shields.io/npm/v/@gxchain2/rpc)](https://www.npmjs.org/package/@gxchain2/rpc)
-![License](https://img.shields.io/npm/l/@gxchain2/rpc)
+[![NPM Version](https://img.shields.io/npm/v/@rei-network/rpc)](https://www.npmjs.org/package/@rei-network/rpc)
+![License](https://img.shields.io/npm/l/@rei-network/rpc)
 
 Rpc call interface of websocket and http.
 
@@ -17,7 +17,7 @@ Rpc call interface of websocket and http.
 ## INSTALL
 
 ```sh
-npm install @gxchain2/rpc
+npm install @rei-network/rpc
 ```
 
 ## USAGE

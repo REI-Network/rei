@@ -2,7 +2,7 @@ import { BN, Address } from 'ethereumjs-util';
 import EthereumBlockchain from '@gxchain2-ethereumjs/blockchain';
 import { CliqueLatestBlockSigners } from '@gxchain2-ethereumjs/blockchain/dist/clique';
 import { CliqueLatestSignerStates } from '@gxchain2-ethereumjs/blockchain/dist/clique';
-import { Block, BlockHeader } from '@gxchain2/structure';
+import { Block, BlockHeader } from '@rei-network/structure';
 
 /**
  * Blockchain represents the canonical chain given a database with a genesis

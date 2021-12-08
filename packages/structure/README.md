@@ -1,14 +1,14 @@
-# @gxchain2/structure
+# @rei-network/structure
 
-[![NPM Version](https://img.shields.io/npm/v/@gxchain2/structure)](https://www.npmjs.org/package/@gxchain2/structure)
-![License](https://img.shields.io/npm/l/@gxchain2/structure)
+[![NPM Version](https://img.shields.io/npm/v/@rei-network/structure)](https://www.npmjs.org/package/@rei-network/structure)
+![License](https://img.shields.io/npm/l/@rei-network/structure)
 
 Contains the definition of structure, includes `Block`, `Log`, `Receipt` and `Transaction`
 
 ## INSTALL
 
 ```sh
-npm install @gxchain2/structure
+npm install @rei-network/structure
 ```
 
 ## License

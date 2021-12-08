@@ -6,8 +6,8 @@ import { OpcodeList } from '@gxchain2-ethereumjs/vm/dist/evm/opcodes';
 import { Address, BN, bufferToHex, setLengthLeft, generateAddress, generateAddress2, keccak256 } from 'ethereumjs-util';
 import { InterpreterStep } from '@gxchain2-ethereumjs/vm/dist/evm/interpreter';
 import { VmError } from '@gxchain2-ethereumjs/vm/dist/exceptions';
-import { hexStringToBuffer, logger } from '@gxchain2/utils';
-import { calcIntrinsicGas } from '@gxchain2/structure';
+import { hexStringToBuffer, logger } from '@rei-network/utils';
+import { calcIntrinsicGas } from '@rei-network/structure';
 import { IDebugImpl, TraceConfig } from '../tracer';
 import { Node } from '../../node';
 

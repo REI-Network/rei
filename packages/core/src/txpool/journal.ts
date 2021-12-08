@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import Semaphore from 'semaphore-async-await';
-import { TransactionFactory, Transaction } from '@gxchain2/structure';
-import { logger } from '@gxchain2/utils';
+import { TransactionFactory, Transaction } from '@rei-network/structure';
+import { logger } from '@rei-network/utils';
 import { Node } from '../node';
 
 const bufferSplit = Buffer.from('\r\n');

@@ -80,7 +80,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * @param id            Unique unstake id
      * @param validator     Validator address
      * @param to            Receiver address
-     * @param amount        GXC Released
+     * @param amount        REI Released
      */
     event DoUnstake(uint256 indexed id, address indexed validator, address to, uint256 amount);
 
@@ -235,7 +235,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * Estimate how much GXC should be stake, if user wants to get the number of shares, Or estimate how much GXC can be obtained, if user unstake the amount of GXC.
+     * Estimate how much REI should be stake, if user wants to get the number of shares, Or estimate how much REI can be obtained, if user unstake the amount of REI.
      * @param validator    Validator address
      * @param shares       Number of shares
      */
@@ -249,11 +249,11 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * Estimate how much shares should be unstake, if user wants to get the amount of GXC.
-     * Or estimate how much shares can be obtained, if user stake the amount of GXC.
+     * Estimate how much shares should be unstake, if user wants to get the amount of REI.
+     * Or estimate how much shares can be obtained, if user stake the amount of REI.
      * If the validator doesn't exist, return 0.
      * @param validator    Validator address
-     * @param amount       Number of GXC
+     * @param amount       Number of REI
      */
     function estimateAmountToShares(address validator, uint256 amount) public view override returns (uint256 shares) {
         address commissionShare = validators[validator].commissionShare;
@@ -265,7 +265,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * Estimate how much GXC can be claim, if unstake the number of shares(when unstake timeout).
+     * Estimate how much REI can be claim, if unstake the number of shares(when unstake timeout).
      * If the validator doesn't exist, return 0.
      * @param validator    Validator address
      * @param shares       Number of shares
@@ -281,7 +281,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         }
     }
 
-    // receive GXC transfer
+    // receive REI transfer
     receive() external payable {}
 
     // create a new validator
@@ -360,7 +360,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
 
     /**
      * Start unstake shares for validator.
-     * Stake manager will burn the shares immediately, but return GXC to `to` address after `config.unstakeDelay`.
+     * Stake manager will burn the shares immediately, but return REI to `to` address after `config.unstakeDelay`.
      * It will emit `StartUnstake` event.
      * @param validator    Validator address
      * @param to           Receiver address
@@ -387,10 +387,10 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
 
     /**
      * Start claim validator reward.
-     * Stake manager will claim GXC from validator reward manager immediately, but return GXC to `to` address after `config.unstakeDelay`.
+     * Stake manager will claim REI from validator reward manager immediately, but return REI to `to` address after `config.unstakeDelay`.
      * It will emit `StartUnstake` event.
      * @param to           Receiver address
-     * @param amount       Number of GXC
+     * @param amount       Number of REI
      * @return             Unstake id
      */
     function startClaim(address payable to, uint256 amount) external override nonReentrant returns (uint256) {

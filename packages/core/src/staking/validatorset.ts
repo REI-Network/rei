@@ -1,7 +1,7 @@
 import Heap from 'qheap';
 import { Address, BN } from 'ethereumjs-util';
-import { createBufferFunctionalMap } from '@gxchain2/utils';
-import { Common } from '@gxchain2/common';
+import { createBufferFunctionalMap } from '@rei-network/utils';
+import { Common } from '@rei-network/common';
 import { StakeManager, ActiveValidator } from '../contracts';
 import { ValidatorChanges } from './validatorchanges';
 

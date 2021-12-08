@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
-import { BlockHeader } from '@gxchain2/structure';
-import { Channel, logger } from '@gxchain2/utils';
-import { Database } from '@gxchain2/database';
+import { BlockHeader } from '@rei-network/structure';
+import { Channel, logger } from '@rei-network/utils';
+import { Database } from '@rei-network/database';
 import { Initializer } from '../types';
 import { ChainIndexerBackend, ChainIndexerOptions } from './types';
 

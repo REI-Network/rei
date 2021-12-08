@@ -1,8 +1,8 @@
 import { rlp, intToBuffer, bufferToInt, BNLike, Address } from 'ethereumjs-util';
 import VM from '@gxchain2-ethereumjs/vm';
-import { Common } from '@gxchain2/common';
-import { Database } from '@gxchain2/database';
-import { Block, BlockHeader, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
+import { Common } from '@rei-network/common';
+import { Database } from '@rei-network/database';
+import { Block, BlockHeader, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
 import { ValidatorSet, ValidatorSets } from '../../../staking';
 import { StakeManager } from '../../../contracts';
 import { Reimint } from '../reimint';

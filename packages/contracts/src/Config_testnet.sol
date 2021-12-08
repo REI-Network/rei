@@ -12,13 +12,13 @@ contract Config_testnet is DevConfig {
     constructor() public {
         ud = 7 days;
         wd = 3 days;
-        df = 283e18; // 283 GXC
-        dff = 5e18; // 5 GXC
-        uffl = 25e15; // 0.025 GXC
+        df = 283e18; // 283 REI
+        dff = 5e18; // 5 REI
+        uffl = 25e15; // 0.025 REI
         fri = 1 days;
         ffri = 1 days;
         fpli = 1 days;
-        mivp = 100e18; // 100 GXC
+        mivp = 100e18; // 100 REI
         scri = 1 days;
 
         // one of testnet genesis validators

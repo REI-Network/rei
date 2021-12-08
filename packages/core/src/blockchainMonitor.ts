@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
-import { Transaction, Block, BlockHeader, Log } from '@gxchain2/structure';
-import { createBufferFunctionalMap, logger } from '@gxchain2/utils';
-import { Database } from '@gxchain2/database';
+import { Transaction, Block, BlockHeader, Log } from '@rei-network/structure';
+import { createBufferFunctionalMap, logger } from '@rei-network/utils';
+import { Database } from '@rei-network/database';
 import { InitializerWithEventEmitter } from './types';
 
 // record block hash and block number for quering receipt.

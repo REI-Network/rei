@@ -1,15 +1,15 @@
 import { BN } from 'ethereumjs-util';
 import { expect, assert } from 'chai';
-import { Common } from '@gxchain2/common';
-import { Block, BlockHeader, Transaction } from '@gxchain2/structure';
-import { setLevel } from '@gxchain2/utils';
+import { Common } from '@rei-network/common';
+import { Block, BlockHeader, Transaction } from '@rei-network/structure';
+import { setLevel } from '@rei-network/utils';
 import { Fetcher, FetcherBackend, FetcherValidateBackend } from '../../src/sync/fetcher';
 import { CommitBlockOptions } from '../../src/types';
 import { HandlerPool, GetHandlerTimeoutError } from '../../src/protocols/handlerPool';
 import { ConsensusEngine } from '../../src/consensus';
 
 setLevel('silent');
-const common = Common.createCommonByBlockNumber(0, 'gxc2-testnet');
+const common = Common.createCommonByBlockNumber(0, 'rei-testnet');
 const decl = 10;
 
 class MockFetcherBackend implements FetcherBackend, FetcherValidateBackend {

@@ -17,7 +17,7 @@ contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
     }
 
     /**
-     * Estimate how much GXC should be stake, if user wants to get the number of shares, or estimate how much GXC can be obtained, if user unstake the amount of GXC.
+     * Estimate how much REI should be stake, if user wants to get the number of shares, or estimate how much REI can be obtained, if user unstake the amount of REI.
      * @param shares    Number of shares
      */
     function estimateSharesToAmount(uint256 shares) external view override returns (uint256 amount) {
@@ -31,8 +31,8 @@ contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
     }
 
     /**
-     * Estimate how much shares should be unstake, if user wants to get the amount of GXC, or estimate how much shares can be obtained, if user stake the amount of GXC.
-     * @param amount    Number of GXC
+     * Estimate how much shares should be unstake, if user wants to get the amount of REI, or estimate how much shares can be obtained, if user stake the amount of REI.
+     * @param amount    Number of REI
      */
     function estimateAmountToShares(uint256 amount) external view override returns (uint256 shares) {
         require(amount > 0, "CommissionShare: insufficient amount");
@@ -64,7 +64,7 @@ contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
     }
 
     /**
-     * Burn shares and return GXC to `to` address. Can only be called by stake manager.
+     * Burn shares and return REI to `to` address. Can only be called by stake manager.
      * @param shares    Number of shares to be burned
      */
     function burn(uint256 shares) external override nonReentrant onlyStakeManager returns (uint256 amount) {

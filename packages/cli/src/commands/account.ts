@@ -3,8 +3,8 @@ import path from 'path';
 import { Command } from 'commander';
 import inquirer from 'inquirer';
 import { bufferToHex, toChecksumAddress, Address } from 'ethereumjs-util';
-import { AccountManager } from '@gxchain2/wallet';
-import { hexStringToBuffer, logger } from '@gxchain2/utils';
+import { AccountManager } from '@rei-network/wallet';
+import { hexStringToBuffer, logger } from '@rei-network/utils';
 
 /**
  * Get account passphrase, if the user specifies the file, read from the file, if not, let the user input

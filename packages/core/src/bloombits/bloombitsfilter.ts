@@ -1,6 +1,6 @@
 import { Address, BN, keccak256 } from 'ethereumjs-util';
-import { Block, Log } from '@gxchain2/structure';
-import { createBNFunctionalMap, createBNFunctionalSet, decompressBytes } from '@gxchain2/utils';
+import { Block, Log } from '@rei-network/structure';
+import { createBNFunctionalMap, createBNFunctionalSet, decompressBytes } from '@rei-network/utils';
 import { Node } from '../node';
 import { BloomBitsBlocks } from './index';
 

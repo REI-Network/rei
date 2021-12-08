@@ -1,9 +1,9 @@
 import util from 'util';
 import { Address } from 'ethereumjs-util';
 import { OpcodeList } from '@gxchain2-ethereumjs/vm/dist/evm/opcodes';
-import { Block } from '@gxchain2/structure';
+import { Block } from '@rei-network/structure';
 import { IDebug } from '@gxchain2-ethereumjs/vm/dist/types';
-import { hexStringToBN, hexStringToBuffer } from '@gxchain2/utils';
+import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Node } from '../node';
 import { EMPTY_ADDRESS } from '../utils';
 import { StructLogDebug, JSDebug } from './debug';

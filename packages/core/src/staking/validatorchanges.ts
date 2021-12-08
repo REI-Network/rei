@@ -1,5 +1,5 @@
 import { BN, Address } from 'ethereumjs-util';
-import { createBufferFunctionalMap, FunctionalSet } from '@gxchain2/utils';
+import { createBufferFunctionalMap, FunctionalSet } from '@rei-network/utils';
 import { ValidatorSet, getGenesisValidators } from './validatorset';
 
 // validator change information

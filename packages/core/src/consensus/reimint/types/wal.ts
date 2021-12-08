@@ -1,5 +1,5 @@
 import { bufferToInt, intToBuffer, setLengthLeft, BN } from 'ethereumjs-util';
-import { logger } from '@gxchain2/utils';
+import { logger } from '@rei-network/utils';
 import { StateMachineMsg, StateMachineEndHeight } from './stateMessages';
 import { StateMachineMsgFactory } from './stateMessageFactory';
 import { FileGroup, GroupFileReader } from './fileGroup';

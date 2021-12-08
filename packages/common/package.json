@@ -1,12 +1,12 @@
 {
-    "name": "@gxchain2/common",
+    "name": "@rei-network/common",
     "version": "0.0.2",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
     "scripts": {
         "build": "tsc --build tsconfig.json",
-        "test": "echo @gxchain2/common has no test cases"
+        "test": "echo @rei-network/common has no test cases"
     },
     "devDependencies": {
         "typescript": "^4.1.2"

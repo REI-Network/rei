@@ -3,9 +3,9 @@ import path from 'path';
 import { expect } from 'chai';
 import { LevelUp } from 'levelup';
 import { generateAddress } from 'ethereumjs-util';
-import { hexStringToBN, hexStringToBuffer } from '@gxchain2/utils';
-import { Common } from '@gxchain2/common';
-import { Block, Receipt, Log } from '@gxchain2/structure';
+import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
+import { Common } from '@rei-network/common';
+import { Block, Receipt, Log } from '@rei-network/structure';
 import { Database, createEncodingLevelDB, DBSaveTxLookup, DBSetBlockOrHeader, DBSetHashToNumber, DBSaveLookups, DBSetTD, DBSaveReceipts } from '../src';
 
 describe('Database', () => {
@@ -21,7 +21,7 @@ describe('Database', () => {
       fs.mkdirSync(testdir, { recursive: true });
     }
     testdb = createEncodingLevelDB(testdir);
-    const common = Common.createChainStartCommon('gxc2-testnet');
+    const common = Common.createChainStartCommon('rei-testnet');
     database = new Database(testdb, common);
 
     const testdata = JSON.parse(fs.readFileSync(path.join(__dirname, '/test-data.json')).toString());

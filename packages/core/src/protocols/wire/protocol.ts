@@ -1,5 +1,5 @@
-import { Protocol, Peer } from '@gxchain2/network';
-import { Block } from '@gxchain2/structure';
+import { Protocol, Peer } from '@rei-network/network';
+import { Block } from '@rei-network/structure';
 import { Node } from '../../node';
 import { NetworkProtocol } from '../types';
 import { BaseProtocol } from '../baseProtocol';
@@ -10,7 +10,7 @@ export class WireProtocol extends BaseProtocol<WireProtocolHandler> implements P
   readonly pool = new HandlerPool<WireProtocolHandler>();
 
   constructor(node: Node) {
-    super(node, NetworkProtocol.GXC2_ETHWIRE, '1');
+    super(node, NetworkProtocol.REI_ETHWIRE, '1');
   }
 
   /**

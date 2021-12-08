@@ -1,4 +1,4 @@
-import { createBufferFunctionalMap } from '@gxchain2/utils';
+import { createBufferFunctionalMap } from '@rei-network/utils';
 import { ValidatorSet } from './validatorset';
 import { StakeManager } from '../contracts';
 import { Reimint } from '../consensus/reimint/reimint';

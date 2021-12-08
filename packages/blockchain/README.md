@@ -1,14 +1,14 @@
-# @gxchain2/blockchain
+# @rei-network/blockchain
 
-[![NPM Version](https://img.shields.io/npm/v/@gxchain2/blockchain)](https://www.npmjs.org/package/@gxchain2/blockchain)
-![License](https://img.shields.io/npm/l/@gxchain2/blockchain)
+[![NPM Version](https://img.shields.io/npm/v/@rei-network/blockchain)](https://www.npmjs.org/package/@rei-network/blockchain)
+![License](https://img.shields.io/npm/l/@rei-network/blockchain)
 
 Definition of blockchain structure and rules, based on `@gxchain2-ethereumjs/blockchain`
 
 ## INSTALL
 
 ```sh
-npm install @gxchain2/blockchain
+npm install @rei-network/blockchain
 ```
 
 ## USAGE

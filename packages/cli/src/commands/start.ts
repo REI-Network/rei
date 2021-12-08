@@ -1,13 +1,13 @@
 import fs from 'fs';
 import process from 'process';
-import { Node, NodeFactory } from '@gxchain2/core';
-import { RpcServer } from '@gxchain2/rpc';
-import { setLevel, logger } from '@gxchain2/utils';
+import { Node, NodeFactory } from '@rei-network/core';
+import { RpcServer } from '@rei-network/rpc';
+import { setLevel, logger } from '@rei-network/utils';
 import { SIGINT } from '../process';
 import { getPassphrase, getKeyStorePath } from './account';
 
 /**
- * Start gxchain2.0 node
+ * Start rei node
  * @param opts - Commander options
  * @returns node and rpc server instance
  */

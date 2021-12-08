@@ -7,10 +7,10 @@
       "epoch": 30000
     }
   },
-  "name": "gxc2-mainnet",
+  "name": "rei-mainnet",
   "chainId": 47805,
   "networkId": 47805,
-  "comment": "The gxchain2.0 main net",
+  "comment": "The rei-network main net",
   "url": "https://does.not.exist/",
   "genesis": {
     "bloom":

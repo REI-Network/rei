@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { Transaction } from '@gxchain2/structure';
+import { Transaction } from '@rei-network/structure';
 import { TxPricedList } from '../../src/txpool/txpricedlist';
-import { hexStringToBN, createBufferFunctionalMap } from '@gxchain2/utils';
+import { hexStringToBN, createBufferFunctionalMap } from '@rei-network/utils';
 import { expect } from 'chai';
 
 describe('TxPricedList', () => {

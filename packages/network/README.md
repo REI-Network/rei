@@ -1,14 +1,14 @@
-# @gxchain2/network
+# @rei-network/network
 
-[![NPM Version](https://img.shields.io/npm/v/@gxchain2/network)](https://www.npmjs.org/package/@gxchain2/network)
-![License](https://img.shields.io/npm/l/@gxchain2/network)
+[![NPM Version](https://img.shields.io/npm/v/@rei-network/network)](https://www.npmjs.org/package/@rei-network/network)
+![License](https://img.shields.io/npm/l/@rei-network/network)
 
 Implement a decentralized p2p network between nodes, based on `libp2p` and `discv5`. Protocol logic is abstracted out through `Protocol` and `ProtocolHandler`
 
 ## INSTALL
 
 ```sh
-npm install @gxchain2/network
+npm install @rei-network/network
 ```
 
 ## USAGE

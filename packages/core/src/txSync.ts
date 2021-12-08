@@ -1,6 +1,6 @@
 import { bufferToHex } from 'ethereumjs-util';
-import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Channel, Aborter, logger } from '@gxchain2/utils';
-import { Transaction } from '@gxchain2/structure';
+import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Channel, Aborter, logger } from '@rei-network/utils';
+import { Transaction } from '@rei-network/structure';
 import { PeerRequestTimeoutError, maxTxRetrievals } from './protocols';
 import { Node } from './node';
 

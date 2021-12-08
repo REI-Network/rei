@@ -1,5 +1,5 @@
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
-import { Common } from '@gxchain2/common';
+import { Common } from '@rei-network/common';
 import { Address, toBuffer, BN } from 'ethereumjs-util';
 import { Contract } from '../src/contracts';
 

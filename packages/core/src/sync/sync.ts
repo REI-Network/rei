@@ -1,8 +1,8 @@
 import { EventEmitter } from 'events';
 import Semaphore from 'semaphore-async-await';
 import { BN, KECCAK256_RLP } from 'ethereumjs-util';
-import { logger } from '@gxchain2/utils';
-import { BlockHeader, Transaction, Block } from '@gxchain2/structure';
+import { logger } from '@rei-network/utils';
+import { BlockHeader, Transaction, Block } from '@rei-network/structure';
 import { Node } from '../node';
 import { Fetcher } from './fetcher';
 import { preValidateBlock, preValidateHeader } from '../validation';

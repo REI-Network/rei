@@ -11,7 +11,7 @@ import "./IOnly.sol";
 struct Unstake {
     // validator address
     address validator;
-    // GXC receiver address
+    // REI receiver address
     address payable to;
     // number of shares
     uint256 unstakeShares;

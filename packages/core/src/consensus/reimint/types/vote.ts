@@ -1,5 +1,5 @@
 import { Address, BN, ecsign, ecrecover, rlp, intToBuffer, bnToUnpaddedBuffer, rlphash, bufferToInt } from 'ethereumjs-util';
-import { createBufferFunctionalMap, logger } from '@gxchain2/utils';
+import { createBufferFunctionalMap, logger } from '@rei-network/utils';
 import { ValidatorSet } from '../../../staking';
 import { BitArray } from './bitArray';
 import * as v from './validate';

@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
-import { BlockHeader } from '@gxchain2/structure';
-import { Database } from '@gxchain2/database';
+import { BlockHeader } from '@rei-network/structure';
+import { Database } from '@rei-network/database';
 
 /**
  * ChainIndexerBackend defines the methods needed to process chain segments in

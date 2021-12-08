@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
-import { BlockHeader, Transaction } from '@gxchain2/structure';
-import { logger, nowTimestamp } from '@gxchain2/utils';
+import { BlockHeader, Transaction } from '@rei-network/structure';
+import { logger, nowTimestamp } from '@rei-network/utils';
 import { PendingTxMap } from './txpool';
 import { Node } from './node';
 import { ConsensusEngine, PendingBlock } from './consensus';

@@ -1,7 +1,7 @@
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import { Address, BN, toBuffer } from 'ethereumjs-util';
-import { Common } from '@gxchain2/common';
-import { Log, Receipt } from '@gxchain2/structure';
+import { Common } from '@rei-network/common';
+import { Log, Receipt } from '@rei-network/structure';
 import { ValidatorChanges, getGenesisValidators } from '../staking';
 import { bufferToAddress, decodeInt256 } from './utils';
 import { Contract } from './contract';

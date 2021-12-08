@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
-import { ConsensusAlgorithm, ConsensusType as EthereumConsensusType } from '@gxchain2/common';
-import { nowTimestamp } from '@gxchain2/utils';
-import { BlockHeader, CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL } from '@gxchain2/structure';
+import { ConsensusAlgorithm, ConsensusType as EthereumConsensusType } from '@rei-network/common';
+import { nowTimestamp } from '@rei-network/utils';
+import { BlockHeader, CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL } from '@rei-network/structure';
 import { ConsensusType } from '../consensus/types';
 import { getConsensusTypeByCommon } from '../hardforks';
 import { getGasLimitByCommon, EMPTY_NONCE, EMPTY_ADDRESS, EMPTY_MIX_HASH } from '../utils';

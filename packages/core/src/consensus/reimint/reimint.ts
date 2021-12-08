@@ -2,8 +2,8 @@ import { toBuffer, setLengthLeft, Address, rlp, BN, rlphash } from 'ethereumjs-u
 import { BaseTrie } from 'merkle-patricia-tree';
 import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
 import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
-import { Common } from '@gxchain2/common';
-import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@gxchain2/structure';
+import { Common } from '@rei-network/common';
+import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@rei-network/structure';
 import { ExtraData, Proposal, VoteType, VoteSet, Evidence, ISigner } from './types';
 import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../../utils';
 

@@ -1,4 +1,4 @@
-import { ProtocolHandler, Protocol, Peer } from '@gxchain2/network';
+import { ProtocolHandler, Protocol, Peer } from '@rei-network/network';
 import { Node } from '../node';
 import { NetworkProtocol } from './types';
 

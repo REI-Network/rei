@@ -1,5 +1,5 @@
 import pipe from 'it-pipe';
-import { Channel, logger } from '@gxchain2/utils';
+import { Channel, logger } from '@rei-network/utils';
 import { NetworkManager, logNetworkError } from './index';
 import { Protocol, ProtocolHandler } from './types';
 

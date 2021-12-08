@@ -6,10 +6,10 @@
         "period": 3
     }
   },
-  "name": "gxc2-devnet",
+  "name": "rei-devnet",
   "chainId": 23579,
   "networkId": 23579,
-  "comment": "The gxchain2.0 dev net",
+  "comment": "The rei-network dev net",
   "url": "https://does.not.exist/",
   "genesis": {
     "hash": "0xe92126b3336035931e5904274d52cd154d4dc4034810dd3a9ff400fbd7965817",

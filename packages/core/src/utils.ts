@@ -1,8 +1,8 @@
 import { Address, BN } from 'ethereumjs-util';
 import { PostByzantiumTxReceipt, TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
-import { Common } from '@gxchain2/common';
-import { CLIQUE_EXTRA_VANITY, Receipt, Log } from '@gxchain2/structure';
-import { hexStringToBN } from '@gxchain2/utils';
+import { Common } from '@rei-network/common';
+import { CLIQUE_EXTRA_VANITY, Receipt, Log } from '@rei-network/structure';
+import { hexStringToBN } from '@rei-network/utils';
 
 export const EMPTY_HASH = Buffer.alloc(32);
 export const EMPTY_ADDRESS = Address.zero();

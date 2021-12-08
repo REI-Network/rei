@@ -3,9 +3,9 @@ import { Address, BN, BNLike, ecsign, intToBuffer, bufferToHex } from 'ethereumj
 import VM from '@gxchain2-ethereumjs/vm';
 import { RunBlockOpts, rewardAccount } from '@gxchain2-ethereumjs/vm/dist/runBlock';
 import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
-import { Block, HeaderData, Log, Receipt, BlockHeader } from '@gxchain2/structure';
-import { Common } from '@gxchain2/common';
-import { logger } from '@gxchain2/utils';
+import { Block, HeaderData, Log, Receipt, BlockHeader } from '@rei-network/structure';
+import { Common } from '@rei-network/common';
+import { logger } from '@rei-network/utils';
 import { StakeManager, Router, SlashReason } from '../../contracts';
 import { ValidatorSet, ValidatorChanges } from '../../staking';
 import { Node } from '../../node';

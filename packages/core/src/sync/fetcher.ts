@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
-import { Common } from '@gxchain2/common';
-import { BlockHeader, Block, Transaction } from '@gxchain2/structure';
-import { PChannel, logger } from '@gxchain2/utils';
+import { Common } from '@rei-network/common';
+import { BlockHeader, Block, Transaction } from '@rei-network/structure';
+import { PChannel, logger } from '@rei-network/utils';
 import { WireProtocol, WireProtocolHandler } from '../protocols';
 import { LimitedConcurrency } from './limited';
 

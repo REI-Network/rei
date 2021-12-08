@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { createBufferFunctionalMap, hexStringToBuffer } from '@gxchain2/utils';
+import { createBufferFunctionalMap, hexStringToBuffer } from '@rei-network/utils';
 import { FileCache } from './filecache';
 
 export type AccountInfo = {

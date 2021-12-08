@@ -12,7 +12,7 @@ describe('Free fee', () => {
     await client.init();
 
     // transfer amount to the test1 account
-    const amount = '1' + '0'.repeat(18); // 1 GXC
+    const amount = '1' + '0'.repeat(18); // 1 REI
     await client.sendTestTransaction(new BN(1), {
       from: 'genesis1',
       to: 'test1',

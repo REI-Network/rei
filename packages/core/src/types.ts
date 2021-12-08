@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
-import { NetworkManagerOptions } from '@gxchain2/network';
-import { Receipt, Block } from '@gxchain2/structure';
+import { NetworkManagerOptions } from '@rei-network/network';
+import { Receipt, Block } from '@rei-network/structure';
 import { ValidatorSet } from './staking';
 import { Evidence } from './consensus/reimint/types';
 import { ConsensusEngineOptions } from './consensus/types';
@@ -22,7 +22,7 @@ export interface NodeOptions {
    */
   databasePath: string;
   /**
-   * Chain name, default is `gxc2-mainnet`
+   * Chain name, default is `rei-mainnet`
    */
   chain?: string;
   mine: ConsensusEngineConstructorOptions;

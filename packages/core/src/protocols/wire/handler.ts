@@ -1,7 +1,7 @@
 import { bufferToInt, rlp, BN, intToBuffer, bnToUnpaddedBuffer } from 'ethereumjs-util';
-import { mustParseTransction, Transaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@gxchain2/structure';
-import { logger, Channel, createBufferFunctionalSet } from '@gxchain2/utils';
-import { ProtocolHandler, Peer } from '@gxchain2/network';
+import { mustParseTransction, Transaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@rei-network/structure';
+import { logger, Channel, createBufferFunctionalSet } from '@rei-network/utils';
+import { ProtocolHandler, Peer } from '@rei-network/network';
 import { NodeStatus } from '../../types';
 import { PeerRequestTimeoutError } from '../types';
 import { WireProtocol } from './protocol';

@@ -1,5 +1,5 @@
-import { hexStringToBuffer } from '@gxchain2/utils';
-import { Tracer, TraceConfig } from '@gxchain2/core';
+import { hexStringToBuffer } from '@rei-network/utils';
+import { Tracer, TraceConfig } from '@rei-network/core';
 import { Controller, CallData } from './base';
 
 export class DebugController extends Controller {

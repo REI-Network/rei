@@ -3,17 +3,17 @@ import type { LevelUp } from 'levelup';
 import LevelStore from 'datastore-level';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
-import { Database, createEncodingLevelDB, createLevelDB, DBSaveTxLookup, DBSaveReceipts } from '@gxchain2/database';
-import { NetworkManager, Peer } from '@gxchain2/network';
-import { Common, getGenesisState, getChain } from '@gxchain2/common';
-import { Blockchain } from '@gxchain2/blockchain';
+import { Database, createEncodingLevelDB, createLevelDB, DBSaveTxLookup, DBSaveReceipts } from '@rei-network/database';
+import { NetworkManager, Peer } from '@rei-network/network';
+import { Common, getGenesisState, getChain } from '@rei-network/common';
+import { Blockchain } from '@rei-network/blockchain';
 import VM from '@gxchain2-ethereumjs/vm';
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
-import { Transaction, Block, CLIQUE_EXTRA_VANITY } from '@gxchain2/structure';
-import { Channel, Aborter, logger } from '@gxchain2/utils';
-import { AccountManager } from '@gxchain2/wallet';
+import { Transaction, Block, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
+import { Channel, Aborter, logger } from '@rei-network/utils';
+import { AccountManager } from '@rei-network/wallet';
 import { TxPool } from './txpool';
 import { Synchronizer } from './sync';
 import { TxFetcher } from './txSync';
@@ -30,7 +30,7 @@ import { Initializer, CommitBlockOptions, NodeOptions, NodeStatus } from './type
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;
-const defaultChainName = 'gxc2-mainnet';
+const defaultChainName = 'rei-mainnet';
 
 type PendingTxs = {
   txs: Transaction[];
@@ -87,11 +87,11 @@ export class Node extends Initializer {
     this.accMngr = new AccountManager(options.account.keyStorePath);
 
     this.chain = options.chain ?? defaultChainName;
-    /////// unsupport gxc2-mainnet ///////
+    /////// unsupport rei-mainnet ///////
     if (this.chain === defaultChainName) {
       throw new Error('Unspport mainnet!');
     }
-    /////// unsupport gxc2-mainnet ///////
+    /////// unsupport rei-mainnet ///////
     if (getChain(this.chain) === undefined) {
       throw new Error(`Unknown chain: ${this.chain}`);
     }
@@ -154,7 +154,7 @@ export class Node extends Initializer {
       let root = await stateManager.getStateRoot();
 
       // if it is mainnet or devnet, deploy system contract now
-      if (this.chain === 'gxc2-devnet' || this.chain === 'gxc2-mainnet') {
+      if (this.chain === 'rei-devnet' || this.chain === 'rei-mainnet') {
         const vm = await this.getVM(root, common);
         const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
         await Contract.deploy(evm, common);

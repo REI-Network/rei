@@ -1,4 +1,4 @@
-import { getRandomIntInclusive } from '@gxchain2/utils';
+import { getRandomIntInclusive } from '@rei-network/utils';
 
 type Getter<T> = {
   resolve(handler: T): void;

@@ -4,7 +4,7 @@ import { Multiaddr } from 'multiaddr';
 import { LevelUp } from 'levelup';
 import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
-import { getRandomIntInclusive, logger, TimeoutQueue } from '@gxchain2/utils';
+import { getRandomIntInclusive, logger, TimeoutQueue } from '@rei-network/utils';
 import { Peer, PeerStatus } from './peer';
 import { Libp2pNode } from './libp2pnode';
 import { Protocol } from './types';

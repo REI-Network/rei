@@ -1,6 +1,6 @@
 {
     "name": "devnet-hf1",
-    "comment": "gxc2-devnet hardfork 1",
+    "comment": "rei-devnet hardfork 1",
     "gasConfig": {
         "gasLimit": {
             "v": "0x989680",

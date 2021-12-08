@@ -1,7 +1,7 @@
-# @gxchain2/utils
+# @rei-network/utils
 
-[![NPM Version](https://img.shields.io/npm/v/@gxchain2/utils)](https://www.npmjs.org/package/@gxchain2/utils)
-![License](https://img.shields.io/npm/l/@gxchain2/utils)
+[![NPM Version](https://img.shields.io/npm/v/@rei-network/utils)](https://www.npmjs.org/package/@rei-network/utils)
+![License](https://img.shields.io/npm/l/@rei-network/utils)
 
 Utils include the following classes:
 
@@ -15,20 +15,20 @@ Utils include the following classes:
 ## INSTALL
 
 ```sh
-npm install @gxchain2/utils
+npm install @rei-network/utils
 ```
 
 ## USAGE
 
 ```ts
 const channel = new Channel<string>();
-channel.push('123');
-channel.push('456');
+channel.push("123");
+channel.push("456");
 setTimeout(() => {
-  channel.push('789');
+  channel.push("789");
 }, 1000);
 setTimeout(() => {
-  channel.push('101112');
+  channel.push("101112");
 }, 2000);
 setTimeout(() => {
   channel.abort();
@@ -36,16 +36,18 @@ setTimeout(() => {
 
 (async () => {
   for await (const data of channel.generator()) {
-    console.log('data:', data);
+    console.log("data:", data);
   }
-  console.log('channel end');
+  console.log("channel end");
 })();
 ```
 
 ```ts
-const bufferMap = new FunctionalMap<Buffer, string>((a: Buffer, b: Buffer) => a.compare(b));
-bufferMap.set(Buffer.from('aaaaaa', 'hex'), 'aaaaaa');
-console.log(bufferMap.get(Buffer.from('aaaaaa', 'hex')) === 'aaaaaa'); // true
+const bufferMap = new FunctionalMap<Buffer, string>((a: Buffer, b: Buffer) =>
+  a.compare(b)
+);
+bufferMap.set(Buffer.from("aaaaaa", "hex"), "aaaaaa");
+console.log(bufferMap.get(Buffer.from("aaaaaa", "hex")) === "aaaaaa"); // true
 ```
 
 ## License

@@ -1,6 +1,6 @@
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import { Address, BN, toBuffer } from 'ethereumjs-util';
-import { Common } from '@gxchain2/common';
+import { Common } from '@rei-network/common';
 import { Contract } from './contract';
 
 // function selector of router

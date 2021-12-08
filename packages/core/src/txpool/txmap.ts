@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
 import Heap from 'qheap';
-import { Transaction, WrappedTransaction } from '@gxchain2/structure';
-import { logger, createBNFunctionalMap } from '@gxchain2/utils';
+import { Transaction, WrappedTransaction } from '@rei-network/structure';
+import { logger, createBNFunctionalMap } from '@rei-network/utils';
 import { txSlots, txCost } from './utils';
 
 /**

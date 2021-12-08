@@ -1,10 +1,10 @@
 import { BN } from 'ethereumjs-util';
-import { Channel, createBufferFunctionalSet, logger } from '@gxchain2/utils';
+import { Channel, createBufferFunctionalSet, logger } from '@rei-network/utils';
 import { ReimintConsensusEngine } from '../../consensus/reimint/reimintConsensusEngine';
 import { RoundStepType, Proposal, BitArray, VoteType, VoteSet, MessageFactory, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint/types';
 import * as m from '../../consensus/reimint/types/messages';
 import { ConsensusProtocol } from './protocol';
-import { Peer, ProtocolHandler } from '@gxchain2/network';
+import { Peer, ProtocolHandler } from '@rei-network/network';
 
 const peerGossipSleepDuration = 100;
 const maxQueuedEvidence = 100;

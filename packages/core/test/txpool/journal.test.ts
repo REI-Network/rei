@@ -1,15 +1,15 @@
 import fs from 'fs';
 import path from 'path';
-import { Common } from '@gxchain2/common';
+import { Common } from '@rei-network/common';
 import { Journal } from '../../src/txpool/journal';
-import { Transaction } from '@gxchain2/structure';
+import { Transaction } from '@rei-network/structure';
 import { expect } from 'chai';
-import { createBufferFunctionalMap, hexStringToBuffer, setLevel } from '@gxchain2/utils';
+import { createBufferFunctionalMap, hexStringToBuffer, setLevel } from '@rei-network/utils';
 
 setLevel('silent');
 class testnode {
   getCommon(num: number) {
-    return Common.createCommonByBlockNumber(0, 'gxc2-testnet');
+    return Common.createCommonByBlockNumber(0, 'rei-testnet');
   }
 }
 

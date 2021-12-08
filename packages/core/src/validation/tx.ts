@@ -1,5 +1,5 @@
 import { BN, Address } from 'ethereumjs-util';
-import { Transaction } from '@gxchain2/structure';
+import { Transaction } from '@rei-network/structure';
 import { Router } from '../contracts';
 import { EMPTY_ADDRESS } from '../utils';
 

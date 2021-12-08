@@ -1,11 +1,11 @@
 import { expect, assert } from 'chai';
 import { Address, BN, MAX_INTEGER } from 'ethereumjs-util';
-import { Common } from '@gxchain2/common';
-import { createBufferFunctionalMap } from '@gxchain2/utils';
+import { Common } from '@rei-network/common';
+import { createBufferFunctionalMap } from '@rei-network/utils';
 import { ValidatorSet, ValidatorChanges, ValidatorInfo } from '../../src/staking';
 import { MockAccountManager } from '../util';
 
-const common = Common.createCommonByBlockNumber(1, 'gxc2-testnet');
+const common = Common.createCommonByBlockNumber(1, 'rei-testnet');
 const num = common.hardforkBlockBN('testnet-hf1')!;
 common.setHardforkByBlockNumber(num);
 

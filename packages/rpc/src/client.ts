@@ -1,5 +1,5 @@
 import { bufferToHex } from 'ethereumjs-util';
-import { BlockHeader, Log } from '@gxchain2/structure';
+import { BlockHeader, Log } from '@rei-network/structure';
 import { SyncingStatus, JSONRPC_VERSION } from './types';
 
 /**

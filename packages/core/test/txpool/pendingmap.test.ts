@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { Transaction } from '@gxchain2/structure';
+import { Transaction } from '@rei-network/structure';
 import { PendingTxMap } from '../../../core/src/txpool';
-import { hexStringToBuffer } from '@gxchain2/utils';
+import { hexStringToBuffer } from '@rei-network/utils';
 import { expect } from 'chai';
 
 describe('PendingTxMap', () => {

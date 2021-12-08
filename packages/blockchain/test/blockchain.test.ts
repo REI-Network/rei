@@ -3,8 +3,8 @@ import path from 'path';
 import { expect } from 'chai';
 import { LevelUp } from 'levelup';
 import { Address } from 'ethereumjs-util';
-import { Database, createEncodingLevelDB } from '@gxchain2/database';
-import { Block, BlockData } from '@gxchain2/structure';
+import { Database, createEncodingLevelDB } from '@rei-network/database';
+import { Block, BlockData } from '@rei-network/structure';
 import { Common } from '../../common/src';
 import { Blockchain } from '../src';
 
@@ -22,7 +22,7 @@ describe('Blockchain', () => {
       fs.mkdirSync(testdir, { recursive: true });
     }
     testdb = createEncodingLevelDB(testdir);
-    const common = Common.createChainStartCommon('gxc2-testnet');
+    const common = Common.createChainStartCommon('rei-testnet');
     const genesisBlock = Block.genesis({ header: common.genesis() }, { common });
     testsigners = genesisBlock.header.cliqueEpochTransitionSigners();
     database = new Database(testdb, common);

@@ -13,7 +13,7 @@ describe('Transaction', () => {
   let testdata: any;
 
   before(() => {
-    const common = Common.createChainStartCommon('gxc2-testnet');
+    const common = Common.createChainStartCommon('rei-testnet');
     testdata = JSON.parse(fs.readFileSync(path.join(__dirname, './test-data.json')).toString());
     testblock = Block.fromBlockData(testdata, { common, hardforkByBlockNumber: true });
     testTransaction = Transaction.fromTxData(testdata.transactions[0]);

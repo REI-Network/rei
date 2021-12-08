@@ -1,6 +1,6 @@
 export enum NetworkProtocol {
-  GXC2_ETHWIRE = 'gxc2-ethwire',
-  GXC2_CONSENSUS = 'gxc2-consensus'
+  REI_ETHWIRE = 'rei-ethwire',
+  REI_CONSENSUS = 'rei-consensus'
 }
 
 export class PeerRequestTimeoutError extends Error {}

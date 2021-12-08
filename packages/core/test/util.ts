@@ -1,5 +1,5 @@
 import { Address } from 'ethereumjs-util';
-import { FunctionalMap } from '@gxchain2/utils';
+import { FunctionalMap } from '@rei-network/utils';
 
 export class MockAccountManager {
   readonly nameToAddress = new Map<string, Address>();

@@ -1,9 +1,9 @@
 import EventEmitter from 'events';
 import { Address } from 'ethereumjs-util';
 import { RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
-import { Block, HeaderData, Transaction } from '@gxchain2/structure';
-import { Common } from '@gxchain2/common';
-import { Channel, logger } from '@gxchain2/utils';
+import { Block, HeaderData, Transaction } from '@rei-network/structure';
+import { Common } from '@rei-network/common';
+import { Channel, logger } from '@rei-network/utils';
 import { Node } from '../node';
 import { Worker } from '../worker';
 import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions, ProcessBlockResult } from './types';

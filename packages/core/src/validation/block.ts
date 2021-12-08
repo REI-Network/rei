@@ -1,4 +1,4 @@
-import { Block } from '@gxchain2/structure';
+import { Block } from '@rei-network/structure';
 
 export async function preValidateBlock(this: Block) {
   await this.validateData();

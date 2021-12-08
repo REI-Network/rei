@@ -1,5 +1,5 @@
 import { rlp, BN, bnToUnpaddedBuffer, intToBuffer, bufferToInt } from 'ethereumjs-util';
-import { Block, BlockBuffer, BlockOptions } from '@gxchain2/structure';
+import { Block, BlockBuffer, BlockOptions } from '@rei-network/structure';
 import { RoundStepType } from './roundStepType';
 import { Proposal } from './proposal';
 import { BitArray, BitArrayRaw } from './bitArray';

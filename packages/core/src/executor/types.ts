@@ -11,7 +11,6 @@ import { Block, TypedTransaction, Receipt } from '@rei-network/structure';
 import { ValidatorSet } from '../staking';
 import { StakeManager, Router } from '../contracts';
 import { Evidence, ExtraData } from '../consensus/reimint/types';
-import { CommitBlockOptions } from '../types';
 import { ValidatorSets } from '../staking';
 
 export interface FinalizeOpts {
@@ -43,7 +42,7 @@ export interface ProcessBlockResult extends Omit<RunBlockResult, 'receipts'> {
 
 export interface ProcessTxOptions extends Omit<RunTxOpts, 'block' | 'beforeTx' | 'afterTx' | 'assignTxReward' | 'generateTxReceipt' | 'skipBalance'> {
   block: Block;
-  vm: VM;
+  root: Buffer;
 }
 
 export interface ExecutorBackend {
@@ -55,7 +54,6 @@ export interface ExecutorBackend {
   getVM(root: Buffer, num: BNLike | Common): Promise<VM>;
   getStakeManager(vm: VM, block: Block, common?: Common): StakeManager;
   getRouter(vm: VM, block: Block, common?: Common): Router;
-  commitBlock(options: CommitBlockOptions): Promise<boolean>;
 }
 
 export interface Executor {

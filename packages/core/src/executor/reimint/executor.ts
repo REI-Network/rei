@@ -243,11 +243,12 @@ export class ReimintExecutor {
   /**
    * {@link ConsensusEngine.processTx}
    */
-  processTx(options: ProcessTxOptions) {
-    const { vm, block } = options;
+  async processTx(options: ProcessTxOptions) {
+    const { root, block } = options;
+    const vm = await this.backend.getVM(root, block._common);
     const systemCaller = Address.fromString(block._common.param('vm', 'scaddr'));
     const router = this.backend.getRouter(vm, block);
-    return vm.runTx({
+    return await vm.runTx({
       ...options,
       skipBalance: true,
       ...makeRunTxCallback(router, systemCaller, Reimint.getMiner(block), block.header.timestamp.toNumber())

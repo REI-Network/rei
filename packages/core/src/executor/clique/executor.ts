@@ -153,8 +153,9 @@ export class CliqueExecutor {
   /**
    * {@link ConsensusEngine.processTx}
    */
-  processTx(options: ProcessTxOptions) {
-    const { vm } = options;
-    return vm.runTx(options);
+  async processTx(options: ProcessTxOptions) {
+    const { root } = options;
+    const vm = await this.backend.getVM(root, options.block._common);
+    return await vm.runTx(options);
   }
 }

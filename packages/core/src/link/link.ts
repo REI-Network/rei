@@ -65,7 +65,8 @@ export abstract class Link {
     if (this.runningPromise) {
       this._removeListener(this.onMessage);
       this.channel.abort();
-      this.runningPromise && (await this.runningPromise);
+      await this.runningPromise;
+      this.runningPromise = undefined;
     }
   }
 

@@ -4,7 +4,8 @@ import { BlockHeader, Transaction } from '@rei-network/structure';
 import { logger, nowTimestamp } from '@rei-network/utils';
 import { PendingTxMap } from './txpool';
 import { Node } from './node';
-import { ConsensusEngine, PendingBlock } from './consensus';
+import { ConsensusEngine } from './consensus';
+import { PendingBlock } from './pendingBlock';
 
 export interface WorkerOptions {
   node: Node;

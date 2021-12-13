@@ -3,7 +3,7 @@ import { BN, bufferToHex } from 'ethereumjs-util';
 import { Channel, logger } from '@rei-network/utils';
 import { Block, BlockHeader } from '@rei-network/structure';
 import { ValidatorSet } from '../../staking';
-import { PendingBlock } from '../pendingBlock';
+import { PendingBlock } from '../../pendingBlock';
 import { isEmptyHash, EMPTY_HASH } from '../../utils';
 import { Reimint } from './reimint';
 import {

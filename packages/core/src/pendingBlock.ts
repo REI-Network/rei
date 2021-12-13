@@ -4,10 +4,10 @@ import Bloom from '@gxchain2-ethereumjs/vm/dist/bloom';
 import { Transaction, calcTransactionTrie, HeaderData } from '@rei-network/structure';
 import { logger } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
-import { PendingTxMap } from '../txpool';
-import { EMPTY_ADDRESS, EMPTY_NONCE, EMPTY_MIX_HASH, EMPTY_EXTRA_DATA } from '../utils';
-import { FinalizeOpts, Executor, ProcessTxResult } from '../executor/types';
-import { ConsensusEngine } from './types';
+import { PendingTxMap } from './txpool';
+import { EMPTY_ADDRESS, EMPTY_NONCE, EMPTY_MIX_HASH, EMPTY_EXTRA_DATA } from './utils';
+import { FinalizeOpts, Executor, ProcessTxResult } from './executor/types';
+import { ConsensusEngine } from './consensus/types';
 
 export interface PendingBlockFinalizeOpts extends Pick<FinalizeOpts, 'round' | 'evidence'> {}
 

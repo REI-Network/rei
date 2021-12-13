@@ -1,4 +1,4 @@
-import type { Log } from '@gxchain2-ethereumjs/vm/dist/evm/types';
+import { Block, Receipt } from '@rei-network/structure';
 
 export type Message = {
   id: number;
@@ -44,4 +44,22 @@ export type RLPProcessTxResult = {
   receipt: Buffer;
   gasUsed: Buffer;
   bloom: Buffer;
+};
+
+export type CommitBlockOpts = {
+  block: Block;
+  receipts: Receipt[];
+};
+
+export type RLPCommitBlockOpts = {
+  block: Buffer;
+  receipts: Buffer[];
+};
+
+export type CommitBlockResult = {
+  reorged: boolean;
+};
+
+export type RLPCommitBlockResult = {
+  reorged: boolean;
 };

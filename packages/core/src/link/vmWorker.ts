@@ -1,23 +1,25 @@
 import { LevelUp } from 'levelup';
-import { BN, BNLike } from 'ethereumjs-util';
+import { BN, BNLike, bufferToHex } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import { Blockchain } from '@rei-network/blockchain';
 import { Common } from '@rei-network/common';
-import { Database } from '@rei-network/database';
+import { Database, DBSaveTxLookup, DBSaveReceipts } from '@rei-network/database';
 import VM from '@gxchain2-ethereumjs/vm';
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
 import { Block } from '@rei-network/structure';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import { logger } from '@rei-network/utils';
 import { StakeManager, Router } from '../contracts';
 import { ValidatorSets } from '../staking';
-import { EvidencePool, EvidenceDatabase } from '../consensus/reimint/types';
+import { Evidence } from '../consensus/reimint/types';
 import { EMPTY_ADDRESS } from '../utils';
 import { CliqueExecutor, ReimintExecutor } from '../executor';
 import { isEnableStaking } from '../hardforks';
 import { WorkerSide } from './link';
 import { Handler, RLPFinalizeOpts, RLPProcessBlockOpts, RLPProcessTxOpts } from './types';
-import { fromFinalizeResult, fromProcessBlockResult, fromProcessTxResult, toFinalizeOpts, toProcessBlockOpts, toProcessTxOpts } from './utils';
+import { fromFinalizeResult, fromProcessBlockResult, fromProcessTxResult, toCommitBlockOpts, toFinalizeOpts, toProcessBlockOpts, toProcessTxOpts } from './utils';
+import { RLPCommitBlockOpts, RLPCommitBlockResult } from '.';
 
 const vmHandlers = new Map<string, Handler>([
   [
@@ -48,6 +50,44 @@ const vmHandlers = new Map<string, Handler>([
       const opts = toProcessTxOpts(_opts, this.common);
       const result = await this.getExecutor(opts.block._common).processTx(opts);
       return fromProcessTxResult(result);
+    }
+  ],
+  [
+    'commitBlock',
+    async function (this: VMWorker, _opts: RLPCommitBlockOpts): Promise<RLPCommitBlockResult> {
+      const opts = toCommitBlockOpts(_opts, this.common);
+      const { block, receipts } = opts;
+
+      const hash = block.hash();
+      const number = block.header.number;
+
+      // ensure that the block has not been executed
+      try {
+        await this.db.getHeader(hash, number);
+        return { reorged: false };
+      } catch (err: any) {
+        if (err.type !== 'NotFoundError') {
+          throw err;
+        }
+      }
+
+      const before = this.blockchain.latestBlock.hash();
+
+      // commit
+      {
+        // save block
+        await this.blockchain.putBlock(block);
+        // save receipts
+        await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, hash, number)));
+      }
+
+      logger.info('✨ Commit block, height:', number.toString(), 'hash:', bufferToHex(hash));
+
+      const after = this.blockchain.latestBlock.hash();
+
+      const reorged = !before.equals(after);
+
+      return { reorged };
     }
   ],
   [
@@ -84,7 +124,6 @@ export class VMWorker extends WorkerSide {
   readonly db: Database;
   readonly blockchain: Blockchain;
   readonly validatorSets: ValidatorSets;
-  readonly evpool: EvidencePool;
 
   readonly clique: CliqueExecutor;
   readonly reimint: ReimintExecutor;
@@ -97,7 +136,6 @@ export class VMWorker extends WorkerSide {
 
     this.validatorSets = new ValidatorSets();
     this.db = new Database(chaindb, common);
-    this.evpool = new EvidencePool({ backend: new EvidenceDatabase(evidencedb) });
 
     this.clique = new CliqueExecutor(this);
     this.reimint = new ReimintExecutor(this);
@@ -115,7 +153,6 @@ export class VMWorker extends WorkerSide {
 
   async init() {
     await this.blockchain.init();
-    await this.evpool.start(this.blockchain.latestBlock.header.number);
   }
 
   callLevelDB(method: string, data: any) {
@@ -167,5 +204,9 @@ export class VMWorker extends WorkerSide {
   getRouter(vm: VM, block: Block, common?: Common) {
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
     return new Router(evm, common ?? block._common);
+  }
+
+  async checkEvidence(evList: Evidence[]) {
+    // TODO:...
   }
 }

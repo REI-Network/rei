@@ -202,7 +202,7 @@ export class ReimintExecutor implements Executor {
 
     if (!skipConsensusVerify) {
       await extraData.verifyEvidence(this.backend);
-      await this.backend.evpool.checkEvidence(extraData.evidence);
+      await this.backend.checkEvidence(extraData.evidence);
     }
 
     let validatorSet!: ValidatorSet;

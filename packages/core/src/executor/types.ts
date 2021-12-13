@@ -7,7 +7,7 @@ import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dis
 import Bloom from '@gxchain2-ethereumjs/vm/dist/bloom';
 import { Block, TypedTransaction, Receipt } from '@rei-network/structure';
 import { StakeManager, Router } from '../contracts';
-import { Evidence, EvidencePool } from '../consensus/reimint/types';
+import { Evidence } from '../consensus/reimint/types';
 import { ValidatorSets, ValidatorSet } from '../staking';
 
 export interface FinalizeOpts {
@@ -53,12 +53,13 @@ export interface ExecutorBackend {
   readonly db: Database;
   readonly blockchain: Blockchain;
   readonly validatorSets: ValidatorSets;
-  readonly evpool: EvidencePool;
   getCommon(num: BNLike): Common;
   getStateManager(root: Buffer, num: BNLike | Common): Promise<StateManager>;
   getVM(root: Buffer, num: BNLike | Common): Promise<VM>;
   getStakeManager(vm: VM, block: Block, common?: Common): StakeManager;
   getRouter(vm: VM, block: Block, common?: Common): Router;
+
+  checkEvidence(evidence: Evidence[]): Promise<void>;
 }
 
 export interface Executor {

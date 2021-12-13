@@ -1,6 +1,6 @@
 import { MasterSide } from './link';
-import { fromFinalizeOpts, fromProcessBlockOpts, fromProcessTxOpts, toFinalizeResult, toProcessBlockResult, toProcessTxResult } from './utils';
-import { Handler } from './types';
+import { fromCommitBlockOpts, fromFinalizeOpts, fromProcessBlockOpts, fromProcessTxOpts, toCommitBlockResult, toFinalizeResult, toProcessBlockResult, toProcessTxResult } from './utils';
+import { Handler, CommitBlockOpts } from './types';
 import { FinalizeOpts, ProcessBlockOpts, ProcessTxOpts } from '../executor';
 
 const handlers = new Map<string, Handler>();
@@ -43,5 +43,10 @@ export class VMMaster extends MasterSide {
   async processTx(opts: ProcessTxOpts) {
     const result = await this.request('processTx', fromProcessTxOpts(opts));
     return toProcessTxResult(result);
+  }
+
+  async commitBlock(opts: CommitBlockOpts) {
+    const result = await this.request('commitBlock', fromCommitBlockOpts(opts));
+    return toCommitBlockResult(result);
   }
 }

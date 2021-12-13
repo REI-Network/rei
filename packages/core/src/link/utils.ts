@@ -1,28 +1,10 @@
-import { BN, Address } from 'ethereumjs-util';
+import { BN } from 'ethereumjs-util';
 import Bloom from '@gxchain2-ethereumjs/vm/dist/bloom';
 import { Common } from '@rei-network/common';
 import { Transaction, Block, Receipt } from '@rei-network/structure';
 import { EvidenceFactory } from '../consensus/reimint/types';
 import { FinalizeOpts, FinalizeResult, ProcessBlockOpts, ProcessBlockResult, ProcessTxOpts, ProcessTxResult } from '../executor/types';
-import { RLPFinalizeOpts, RLPFinalizeResult, RLPProcessBlockOpts, RLPProcessBlockResult, RLPProcessTxOpts, RLPProcessTxResult } from './types';
-
-export function bufferToAddress(buffer: Buffer | undefined) {
-  return buffer && new Address(buffer);
-}
-
-export function bufferToBN(buffer: Buffer | undefined) {
-  return buffer && new BN(buffer);
-}
-
-export function bufferToBlock(buffer: Buffer | undefined, common: Common) {
-  return (
-    buffer &&
-    Block.fromRLPSerializedBlock(buffer, {
-      common: common.copy(),
-      hardforkByBlockNumber: true
-    })
-  );
-}
+import { RLPFinalizeOpts, RLPFinalizeResult, RLPProcessBlockOpts, RLPProcessBlockResult, RLPProcessTxOpts, RLPProcessTxResult, CommitBlockOpts, RLPCommitBlockOpts, CommitBlockResult, RLPCommitBlockResult } from './types';
 
 export function toFinalizeOpts(opts: RLPFinalizeOpts, common: Common): FinalizeOpts {
   const block = Block.fromRLPSerializedBlock(opts.block, { common: common.copy(), hardforkByBlockNumber: true });
@@ -138,4 +120,26 @@ export function fromProcessTxResult(opts: ProcessTxResult): RLPProcessTxResult {
     gasUsed,
     bloom
   };
+}
+
+export function toCommitBlockOpts(opts: RLPCommitBlockOpts, common: Common): CommitBlockOpts {
+  const block = Block.fromRLPSerializedBlock(opts.block, { common: common.copy(), hardforkByBlockNumber: true });
+  const receipts = opts.receipts.map((receipt) => Receipt.fromRlpSerializedReceipt(receipt));
+
+  return { block, receipts };
+}
+
+export function fromCommitBlockOpts(opts: CommitBlockOpts): RLPCommitBlockOpts {
+  const block = opts.block.serialize();
+  const receipts = opts.receipts.map((receipt) => receipt.serialize());
+
+  return { block, receipts };
+}
+
+export function toCommitBlockResult(result: RLPCommitBlockResult): CommitBlockResult {
+  return result;
+}
+
+export function fromCommitBlockResult(result: CommitBlockResult): RLPCommitBlockResult {
+  return result;
 }

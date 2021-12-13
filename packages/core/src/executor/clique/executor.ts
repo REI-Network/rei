@@ -6,14 +6,14 @@ import { RunBlockOpts, rewardAccount } from '@gxchain2-ethereumjs/vm/dist/runBlo
 import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Block } from '@rei-network/structure';
 import { logger } from '@rei-network/utils';
-import { FinalizeOpts, ProcessBlockOpts, ProcessTxOptions, ExecutorBackend } from '../types';
+import { FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, ExecutorBackend, Executor } from '../types';
 import { Contract, Router } from '../../contracts';
 import { ValidatorSet } from '../../staking';
 import { isEnableStaking } from '../../hardforks';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
 import { Clique } from '../../consensus/clique/clique';
 
-export class CliqueExecutor {
+export class CliqueExecutor implements Executor {
   private readonly backend: ExecutorBackend;
 
   constructor(backend: ExecutorBackend) {
@@ -72,7 +72,7 @@ export class CliqueExecutor {
    * {@link ConsensusEngine.finalize}
    */
   async finalize(options: FinalizeOpts) {
-    const { block, stateRoot, receipts, transactions } = options;
+    const { block, stateRoot } = options;
 
     const pendingCommon = block._common;
     const vm = await this.backend.getVM(stateRoot, pendingCommon);
@@ -88,7 +88,6 @@ export class CliqueExecutor {
       const finalizedStateRoot = await vm.stateManager.getStateRoot();
       return {
         finalizedStateRoot,
-        receiptTrie: await Clique.genReceiptTrie(transactions, receipts),
         validatorSet
       };
     } catch (err) {
@@ -120,7 +119,6 @@ export class CliqueExecutor {
 
     let validatorSet: ValidatorSet | undefined;
     const runBlockOptions: RunBlockOpts = {
-      debug: options.debug,
       block,
       root,
       generate: false,
@@ -153,9 +151,14 @@ export class CliqueExecutor {
   /**
    * {@link ConsensusEngine.processTx}
    */
-  async processTx(options: ProcessTxOptions) {
+  async processTx(options: ProcessTxOpts) {
     const { root } = options;
     const vm = await this.backend.getVM(root, options.block._common);
-    return await vm.runTx(options);
+    const result = await vm.runTx(options);
+    return {
+      receipt: postByzantiumTxReceiptsToReceipts([result.receipt])[0],
+      gasUsed: result.gasUsed,
+      bloom: result.bloom
+    };
   }
 }

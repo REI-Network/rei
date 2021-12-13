@@ -1,9 +1,7 @@
-import { BN } from 'ethereumjs-util';
-import { RunCallOpts } from '@gxchain2-ethereumjs/vm/dist/runCall';
-import { RunTxOpts } from '@gxchain2-ethereumjs/vm/dist/runTx';
 import { MasterSide } from './link';
-import { fromRunCallOpts, fromRunTxOpts } from './utils';
-import { Handler, RunTxResult, RunCallResult } from './types';
+import { fromFinalizeOpts, fromProcessBlockOpts, fromProcessTxOpts, toFinalizeResult, toProcessBlockResult, toProcessTxResult } from './utils';
+import { Handler } from './types';
+import { FinalizeOpts, ProcessBlockOpts, ProcessTxOpts } from '../executor';
 
 const handlers = new Map<string, Handler>();
 
@@ -32,11 +30,18 @@ export class VMMaster extends MasterSide {
 
   //// VM ////
 
-  runTx(opts: RunTxOpts, number: BN, root: Buffer): Promise<RunTxResult> {
-    return this.request('runTx', fromRunTxOpts(opts, number, root));
+  async finalize(opts: FinalizeOpts) {
+    const result = await this.request('finalize', fromFinalizeOpts(opts));
+    return toFinalizeResult(result);
   }
 
-  runCall(opts: RunCallOpts, number: BN, root: Buffer): Promise<RunCallResult> {
-    return this.request('runCall', fromRunCallOpts(opts, number, root));
+  async processBlock(opts: ProcessBlockOpts) {
+    const result = await this.request('processBlock', fromProcessBlockOpts(opts));
+    return toProcessBlockResult(result);
+  }
+
+  async processTx(opts: ProcessTxOpts) {
+    const result = await this.request('processTx', fromProcessTxOpts(opts));
+    return toProcessTxResult(result);
   }
 }

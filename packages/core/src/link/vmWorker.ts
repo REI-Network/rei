@@ -1,44 +1,53 @@
 import { LevelUp } from 'levelup';
-import { BN } from 'ethereumjs-util';
+import { BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
+import { Blockchain } from '@rei-network/blockchain';
 import { Common } from '@rei-network/common';
+import { Database } from '@rei-network/database';
 import VM from '@gxchain2-ethereumjs/vm';
+import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
+import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
+import { Block } from '@rei-network/structure';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import { StakeManager, Router } from '../contracts';
+import { ValidatorSets } from '../staking';
+import { EvidencePool, EvidenceDatabase } from '../consensus/reimint/types';
+import { EMPTY_ADDRESS } from '../utils';
+import { CliqueExecutor, ReimintExecutor } from '../executor';
+import { isEnableStaking } from '../hardforks';
 import { WorkerSide } from './link';
-import { Handler, RunCallArgs, RunTxArgs, RunTxResult, RunCallResult } from './types';
-import { toRunCallOpts, toRunTxOpts } from './utils';
+import { Handler, RLPFinalizeOpts, RLPProcessBlockOpts, RLPProcessTxOpts } from './types';
+import { fromFinalizeResult, fromProcessBlockResult, fromProcessTxResult, toFinalizeOpts, toProcessBlockOpts, toProcessTxOpts } from './utils';
 
 const vmHandlers = new Map<string, Handler>([
   [
-    'runTx',
-    async function (this: VMWorker, args: RunTxArgs): Promise<RunTxResult> {
-      const common = this.getCommon(args.number);
-      const opts = toRunTxOpts(args, common);
-      const vm = await this.getVM(args.root, common);
-      const result = await vm.runTx(opts);
-      return {
-        createAddress: result.createdAddress && result.createdAddress.buf,
-        succeed: !result.execResult.exceptionError,
-        gasUsed: result.gasUsed.toArrayLike(Buffer),
-        logs: result.execResult.logs,
-        newRoot: await vm.stateManager.getStateRoot()
-      };
+    'finalize',
+    async function (this: VMWorker, _opts: RLPFinalizeOpts) {
+      const opts = toFinalizeOpts(_opts, this.common);
+      const result = await this.getExecutor(opts.block._common).finalize(opts);
+      if (result.validatorSet) {
+        this.validatorSets.set(result.finalizedStateRoot, result.validatorSet);
+      }
+      return fromFinalizeResult(result);
     }
   ],
   [
-    'runCall',
-    async function (this: VMWorker, args: RunCallArgs): Promise<RunCallResult> {
-      const common = this.getCommon(args.number);
-      const opts = toRunCallOpts(args, common);
-      const vm = await this.getVM(args.root, common);
-      const result = await vm.runCall(opts);
-      return {
-        createAddress: result.createdAddress && result.createdAddress.buf,
-        succeed: !result.execResult.exceptionError,
-        gasUsed: result.gasUsed.toArrayLike(Buffer),
-        logs: result.execResult.logs,
-        returnValue: result.execResult.returnValue
-      };
+    'processBlock',
+    async function (this: VMWorker, _opts: RLPProcessBlockOpts) {
+      const opts = toProcessBlockOpts(_opts, this.common);
+      const result = await this.getExecutor(opts.block._common).processBlock(opts);
+      if (result.validatorSet) {
+        this.validatorSets.set(opts.block.header.stateRoot, result.validatorSet);
+      }
+      return fromProcessBlockResult(result);
+    }
+  ],
+  [
+    'processTx',
+    async function (this: VMWorker, _opts: RLPProcessTxOpts) {
+      const opts = toProcessTxOpts(_opts, this.common);
+      const result = await this.getExecutor(opts.block._common).processTx(opts);
+      return fromProcessTxResult(result);
     }
   ],
   [
@@ -68,50 +77,95 @@ const vmHandlers = new Map<string, Handler>([
 ]);
 
 export class VMWorker extends WorkerSide {
-  readonly db: LevelUp;
+  readonly chaindb: LevelUp;
+  readonly evidencedb: LevelUp;
   readonly common: Common;
 
-  constructor(db: LevelUp, common: Common) {
+  readonly db: Database;
+  readonly blockchain: Blockchain;
+  readonly validatorSets: ValidatorSets;
+  readonly evpool: EvidencePool;
+
+  readonly clique: CliqueExecutor;
+  readonly reimint: ReimintExecutor;
+
+  constructor(chaindb: LevelUp, evidencedb: LevelUp, common: Common) {
     super(vmHandlers);
-    this.db = db;
+    this.chaindb = chaindb;
+    this.evidencedb = evidencedb;
     this.common = common;
+
+    this.validatorSets = new ValidatorSets();
+    this.db = new Database(chaindb, common);
+    this.evpool = new EvidencePool({ backend: new EvidenceDatabase(evidencedb) });
+
+    this.clique = new CliqueExecutor(this);
+    this.reimint = new ReimintExecutor(this);
+
+    const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
+    this.blockchain = new Blockchain({
+      dbManager: this.db,
+      common,
+      genesisBlock,
+      validateBlocks: false,
+      validateConsensus: false,
+      hardforkByHeadBlockNumber: true
+    });
+  }
+
+  async init() {
+    await this.blockchain.init();
+    await this.evpool.start(this.blockchain.latestBlock.header.number);
   }
 
   callLevelDB(method: string, data: any) {
-    return (this.db as any)[method].apply(this.db, data);
+    return (this.chaindb as any)[method].apply(this.chaindb, data);
   }
 
-  getCommon(number: BN | Buffer) {
-    const bn = number instanceof Buffer ? new BN(number) : number;
+  getExecutor(common: Common) {
+    return isEnableStaking(common) ? this.reimint : this.clique;
+  }
+
+  getCommon(num: BNLike) {
     const common = this.common.copy();
-    common.setHardforkByBlockNumber(bn);
+    common.setHardforkByBlockNumber(num);
     return common;
   }
 
-  async getStateManager(root: Buffer, number: BN | Common) {
+  async getStateManager(root: Buffer, num: BNLike | Common) {
     let common: Common;
-    if (number instanceof BN) {
-      common = this.common.copy();
-      common.setHardforkByBlockNumber(number);
+    if (num instanceof Common) {
+      common = num.copy();
     } else {
-      common = number.copy();
+      common = this.common.copy();
+      common.setHardforkByBlockNumber(num);
     }
 
     const stateManager = new StateManager({
       common,
-      trie: new Trie(this.db)
+      trie: new Trie(this.chaindb)
     });
     await stateManager.setStateRoot(root);
     return stateManager;
   }
 
-  async getVM(root: Buffer | StateManager, number: BN | Common) {
-    const stateManager = root instanceof Buffer ? await this.getStateManager(root, number) : root;
+  async getVM(root: Buffer, num: BNLike | Common) {
+    const stateManager = root instanceof Buffer ? await this.getStateManager(root, num) : root;
     return new VM({
       listenHardforkChanged: false,
       hardforkByBlockNumber: true,
       common: stateManager._common,
       stateManager: stateManager
     });
+  }
+
+  getStakeManager(vm: VM, block: Block, common?: Common) {
+    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
+    return new StakeManager(evm, common ?? block._common);
+  }
+
+  getRouter(vm: VM, block: Block, common?: Common) {
+    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
+    return new Router(evm, common ?? block._common);
   }
 }

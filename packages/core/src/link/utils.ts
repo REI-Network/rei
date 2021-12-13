@@ -1,9 +1,10 @@
 import { BN, Address } from 'ethereumjs-util';
+import Bloom from '@gxchain2-ethereumjs/vm/dist/bloom';
 import { Common } from '@rei-network/common';
-import { Transaction, Block } from '@rei-network/structure';
-import { RunTxOpts } from '@gxchain2-ethereumjs/vm/dist/runTx';
-import { RunCallOpts } from '@gxchain2-ethereumjs/vm/dist/runCall';
-import { RunCallArgs, RunTxArgs } from './types';
+import { Transaction, Block, Receipt } from '@rei-network/structure';
+import { EvidenceFactory } from '../consensus/reimint/types';
+import { FinalizeOpts, FinalizeResult, ProcessBlockOpts, ProcessBlockResult, ProcessTxOpts, ProcessTxResult } from '../executor/types';
+import { RLPFinalizeOpts, RLPFinalizeResult, RLPProcessBlockOpts, RLPProcessBlockResult, RLPProcessTxOpts, RLPProcessTxResult } from './types';
 
 export function bufferToAddress(buffer: Buffer | undefined) {
   return buffer && new Address(buffer);
@@ -23,74 +24,118 @@ export function bufferToBlock(buffer: Buffer | undefined, common: Common) {
   );
 }
 
-export function toRunTxOpts(args: RunTxArgs, common: Common): RunTxOpts {
-  const tx = Transaction.fromSerializedTx(args.tx, { common: common.copy() });
-  const block = bufferToBlock(args.block, common);
-  const blockGasUsed = bufferToBN(args.blockGasUsed);
+export function toFinalizeOpts(opts: RLPFinalizeOpts, common: Common): FinalizeOpts {
+  const block = Block.fromRLPSerializedBlock(opts.block, { common: common.copy(), hardforkByBlockNumber: true });
+  const receipts = opts.receipts.map((receipt) => Receipt.fromRlpSerializedReceipt(receipt));
+  const evidence = opts.evidence && opts.evidence.map((ev) => EvidenceFactory.fromSerializedEvidence(ev));
+
   return {
-    ...args,
-    tx,
+    ...opts,
     block,
+    receipts,
+    evidence
+  };
+}
+
+export function fromFinalizeOpts(opts: FinalizeOpts): RLPFinalizeOpts {
+  const block = opts.block.serialize();
+  const receipts = opts.receipts.map((receipt) => receipt.serialize());
+  const evidence = opts.evidence && opts.evidence.map((ev) => EvidenceFactory.serializeEvidence(ev));
+
+  return {
+    ...opts,
+    block,
+    receipts,
+    evidence
+  };
+}
+
+export function toFinalizeResult(result: RLPFinalizeResult): FinalizeResult {
+  return result;
+}
+
+export function fromFinalizeResult(result: FinalizeResult): RLPFinalizeResult {
+  return {
+    finalizedStateRoot: result.finalizedStateRoot
+  };
+}
+
+export function toProcessBlockOpts(opts: RLPProcessBlockOpts, common: Common): ProcessBlockOpts {
+  const block = Block.fromRLPSerializedBlock(opts.block, { common: common.copy(), hardforkByBlockNumber: true });
+
+  return {
+    ...opts,
+    block
+  };
+}
+
+export function fromProcessBlockOpts(opts: ProcessBlockOpts): RLPProcessBlockOpts {
+  const block = opts.block.serialize();
+
+  return {
+    ...opts,
+    block
+  };
+}
+
+export function toProcessBlockResult(result: RLPProcessBlockResult): ProcessBlockResult {
+  const receipts = result.receipts.map((receipt) => Receipt.fromRlpSerializedReceipt(receipt));
+
+  return { receipts };
+}
+
+export function fromProcessBlockResult(result: ProcessBlockResult): RLPProcessBlockResult {
+  const receipts = result.receipts.map((receipt) => receipt.serialize());
+
+  return { receipts };
+}
+
+export function toProcessTxOpts(opts: RLPProcessTxOpts, common: Common): ProcessTxOpts {
+  const block = Block.fromRLPSerializedBlock(opts.block, { common: common.copy(), hardforkByBlockNumber: true });
+  const tx = Transaction.fromSerializedTx(opts.tx, { common: block._common });
+  const blockGasUsed = opts.blockGasUsed && new BN(opts.blockGasUsed);
+
+  return {
+    ...opts,
+    block,
+    tx,
     blockGasUsed
   };
 }
 
-export function toRunCallOpts(args: RunCallArgs, common: Common): RunCallOpts {
-  const block = bufferToBlock(args.block, common);
-  const gasPrice = bufferToBN(args.gasPrice);
-  const origin = bufferToAddress(args.origin);
-  const caller = bufferToAddress(args.caller);
-  const gasLimit = bufferToBN(args.gasLimit);
-  const to = bufferToAddress(args.to);
-  const value = bufferToBN(args.value);
-
-  return {
-    ...args,
-    block,
-    gasPrice,
-    origin,
-    caller,
-    gasLimit,
-    to,
-    value
-  };
-}
-
-export function fromRunTxOpts(opts: RunTxOpts, _number: BN, root: Buffer): RunTxArgs {
+export function fromProcessTxOpts(opts: ProcessTxOpts) {
+  const block = opts.block.serialize();
   const tx = opts.tx.serialize();
-  const block = opts.block?.serialize();
-  const blockGasUsed = opts.blockGasUsed?.toArrayLike(Buffer);
-  const number = _number.toArrayLike(Buffer);
+  const blockGasUsed = opts.blockGasUsed && opts.blockGasUsed.toArrayLike(Buffer);
+
   return {
     ...opts,
-    tx,
     block,
-    blockGasUsed,
-    number,
-    root
+    tx,
+    blockGasUsed
   };
 }
 
-export function fromRunCallOpts(opts: RunCallOpts, _number: BN, root: Buffer): RunCallArgs {
-  const block = opts.block?.serialize();
-  const gasPrice = opts.gasPrice?.toArrayLike(Buffer);
-  const origin = opts.origin?.buf;
-  const caller = opts.caller?.buf;
-  const gasLimit = opts.gasLimit?.toArrayLike(Buffer);
-  const to = opts.to?.buf;
-  const value = opts.value?.toArrayLike(Buffer);
-  const number = _number.toArrayLike(Buffer);
+export function toProcessTxResult(opts: RLPProcessTxResult): ProcessTxResult {
+  const receipt = Receipt.fromRlpSerializedReceipt(opts.receipt);
+  const gasUsed = new BN(opts.gasUsed);
+  const bloom = new Bloom(opts.bloom);
 
   return {
-    ...opts,
-    block,
-    gasPrice,
-    origin,
-    caller,
-    gasLimit,
-    to,
-    value,
-    number,
-    root
+    receipt,
+    gasUsed,
+    bloom
+  };
+}
+
+export function fromProcessTxResult(opts: ProcessTxResult): RLPProcessTxResult {
+  const receipt = opts.receipt.serialize();
+  const gasUsed = opts.gasUsed.toArrayLike(Buffer);
+  const bloom = opts.bloom.bitvector;
+
+  return {
+    receipt,
+    gasUsed,
+    bloom
   };
 }

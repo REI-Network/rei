@@ -4,7 +4,7 @@ import { Block, Log, Receipt } from '@rei-network/structure';
 import { RunBlockOpts, rewardAccount } from '@gxchain2-ethereumjs/vm/dist/runBlock';
 import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import VM from '@gxchain2-ethereumjs/vm';
-import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from '../types';
+import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executor } from '../types';
 import { postByzantiumTxReceiptsToReceipts } from '../../utils';
 import { ValidatorSet, ValidatorChanges } from '../../staking';
 import { StakeManager, Router, SlashReason } from '../../contracts';
@@ -12,7 +12,7 @@ import { Reimint } from '../../consensus/reimint/reimint';
 import { ExtraData, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint/types';
 import { makeRunTxCallback } from './makeRunTxCallback';
 
-export class ReimintExecutor {
+export class ReimintExecutor implements Executor {
   private readonly backend: ExecutorBackend;
 
   constructor(backend: ExecutorBackend) {
@@ -137,7 +137,7 @@ export class ReimintExecutor {
    * {@link ConsensusEngine.finalize}
    */
   async finalize(options: FinalizeOpts) {
-    const { block, transactions, receipts, stateRoot, parentStateRoot, round, evidence } = options;
+    const { block, receipts, stateRoot, parentStateRoot, round, evidence } = options;
     if (round === undefined || evidence === undefined || !parentStateRoot) {
       throw new Error('missing state root or round or evidence');
     }
@@ -156,12 +156,11 @@ export class ReimintExecutor {
     await vm.stateManager.checkpoint();
     try {
       await this.assignBlockReward(vm.stateManager, systemCaller, minerReward);
-      const validatorSet = await this.afterApply(vm, block, postByzantiumTxReceiptsToReceipts(receipts), evidence, miner, minerReward, parentValidatorSet, parentStakeManager, parentRouter);
+      const validatorSet = await this.afterApply(vm, block, receipts, evidence, miner, minerReward, parentValidatorSet, parentStakeManager, parentRouter);
       await vm.stateManager.commit();
       const finalizedStateRoot = await vm.stateManager.getStateRoot();
       return {
         finalizedStateRoot,
-        receiptTrie: await Reimint.genReceiptTrie(transactions, receipts),
         validatorSet
       };
     } catch (err) {
@@ -174,7 +173,7 @@ export class ReimintExecutor {
    * {@link ConsensusEngine.processBlock}
    */
   async processBlock(options: ProcessBlockOpts) {
-    const { block, runTxOpts } = options;
+    const { block, skipConsensusValidation, skipConsensusVerify } = options;
 
     const pendingHeader = block.header;
     const pendingCommon = block._common;
@@ -197,19 +196,18 @@ export class ReimintExecutor {
     // now, parentValidatorSet has increased extraData.proposal.round times
     parentValidatorSet = extraData.validatorSet()!;
 
-    if (!options.skipConsensusValidation) {
+    if (!skipConsensusValidation) {
       extraData.validate();
     }
 
-    if (!options.skipConsensusVerify) {
+    if (!skipConsensusVerify) {
       await extraData.verifyEvidence(this.backend);
-      await (this.backend as any).evpool.checkEvidence(extraData.evidence); // TODO: fix
+      await this.backend.evpool.checkEvidence(extraData.evidence);
     }
 
     let validatorSet!: ValidatorSet;
     const blockReward = new BN(0);
     const runBlockOptions: RunBlockOpts = {
-      debug: options.debug,
       block,
       root,
       generate: false,
@@ -223,7 +221,7 @@ export class ReimintExecutor {
         const receipts = postByzantiumTxReceiptsToReceipts(postByzantiumTxReceipts);
         validatorSet = await this.afterApply(vm, block, receipts, extraData.evidence, miner, blockReward, parentValidatorSet, parentStakeManager, parentRouter);
       },
-      runTxOpts: { ...runTxOpts, ...makeRunTxCallback(parentRouter, systemCaller, miner, pendingHeader.timestamp.toNumber()), skipBalance: true }
+      runTxOpts: { ...makeRunTxCallback(parentRouter, systemCaller, miner, pendingHeader.timestamp.toNumber()), skipBalance: true }
     };
 
     const result = await vm.runBlock(runBlockOptions);
@@ -237,21 +235,27 @@ export class ReimintExecutor {
       'next proposer:',
       validatorSet.proposer.toString()
     );
-    return { ...result, receipts: postByzantiumTxReceiptsToReceipts(result.receipts), validatorSet, extraData };
+    return { receipts: postByzantiumTxReceiptsToReceipts(result.receipts), validatorSet };
   }
 
   /**
    * {@link ConsensusEngine.processTx}
    */
-  async processTx(options: ProcessTxOptions) {
-    const { root, block } = options;
+  async processTx(options: ProcessTxOpts) {
+    const { root, block, tx } = options;
     const vm = await this.backend.getVM(root, block._common);
     const systemCaller = Address.fromString(block._common.param('vm', 'scaddr'));
     const router = this.backend.getRouter(vm, block);
-    return await vm.runTx({
-      ...options,
+    const result = await vm.runTx({
+      block,
+      tx,
       skipBalance: true,
       ...makeRunTxCallback(router, systemCaller, Reimint.getMiner(block), block.header.timestamp.toNumber())
     });
+    return {
+      receipt: postByzantiumTxReceiptsToReceipts([result.receipt])[0],
+      gasUsed: result.gasUsed,
+      bloom: result.bloom
+    };
   }
 }

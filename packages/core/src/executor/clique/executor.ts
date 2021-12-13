@@ -62,9 +62,6 @@ export class CliqueExecutor implements Executor {
       const priorities = activeValidators.map(({ priority }) => priority);
       // call after block callback to save active validators list
       await parentRouter!.onAfterBlock(validatorSet.proposer, activeSigners, priorities);
-
-      // start consensus engine
-      //   this.node.getReimintEngine()?.start(); TODO: fix this!
     }
 
     return validatorSet;
@@ -153,7 +150,7 @@ export class CliqueExecutor implements Executor {
         validatorSet.proposer.toString()
       );
     }
-    return { ...result, receipts: postByzantiumTxReceiptsToReceipts(result.receipts), validatorSet };
+    return { receipts: postByzantiumTxReceiptsToReceipts(result.receipts), validatorSet };
   }
 
   /**

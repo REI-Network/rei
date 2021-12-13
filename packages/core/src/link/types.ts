@@ -1,5 +1,4 @@
 import { Block, Receipt } from '@rei-network/structure';
-import { Evidence } from '../consensus/reimint/types';
 
 export type Message = {
   id: number;

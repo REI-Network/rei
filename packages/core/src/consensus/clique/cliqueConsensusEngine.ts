@@ -1,4 +1,5 @@
-import { Address, bufferToHex, BN } from 'ethereumjs-util';
+import { Address, bufferToHex, BN, toBuffer } from 'ethereumjs-util';
+import { BaseTrie } from 'merkle-patricia-tree';
 import { Block, HeaderData, Transaction, Receipt } from '@rei-network/structure';
 import { Common } from '@rei-network/common';
 import { logger, nowTimestamp, getRandomIntInclusive } from '@rei-network/utils';
@@ -126,7 +127,14 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
     return Block.fromBlockData({ header: headerData, transactions }, { common, cliqueSigner: this.cliqueSigner() });
   }
 
-  generateReceiptTrie(transactions: Transaction[], receipts: Receipt[]): Promise<Buffer> {
-    return Clique.genReceiptTrie(receipts);
+  /**
+   * {@link ConsensusEngine.generateReceiptTrie}
+   */
+  async generateReceiptTrie(transactions: Transaction[], receipts: Receipt[]): Promise<Buffer> {
+    const trie = new BaseTrie();
+    for (let i = 0; i < receipts.length; i++) {
+      await trie.put(toBuffer(i), receipts[i].serialize());
+    }
+    return trie.root;
   }
 }

@@ -78,5 +78,10 @@ export interface ConsensusEngine {
    */
   generatePendingBlock(headerData: HeaderData, common: Common, transactions?: Transaction[]): Block;
 
+  /**
+   * Generate receipt trie
+   * @param transactions - Transactions
+   * @param receipts - Receipts
+   */
   generateReceiptTrie(transactions: Transaction[], receipts: Receipt[]): Promise<Buffer>;
 }

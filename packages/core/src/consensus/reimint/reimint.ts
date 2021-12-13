@@ -1,7 +1,6 @@
-import { toBuffer, setLengthLeft, Address, rlp, BN, rlphash, intToBuffer } from 'ethereumjs-util';
-import { BaseTrie } from 'merkle-patricia-tree';
+import { toBuffer, setLengthLeft, Address, BN, rlphash } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
-import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions, Receipt } from '@rei-network/structure';
+import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@rei-network/structure';
 import { ExtraData, Proposal, VoteType, VoteSet, Evidence, ISigner } from './types';
 import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../../utils';
 
@@ -150,20 +149,6 @@ export class Reimint {
     }
 
     return false;
-  }
-
-  /**
-   * Generate receipt root after `hf1`
-   * @param transactions - List of transaction
-   * @param receipts - List of receipt
-   * @returns Receipt root
-   */
-  static async genReceiptTrie(transactions: TypedTransaction[], receipts: Receipt[]) {
-    const trie = new BaseTrie();
-    for (let i = 0; i < receipts.length; i++) {
-      await trie.put(rlp.encode(i), Buffer.concat([intToBuffer(transactions[i].type), receipts[i].serialize()]));
-    }
-    return trie.root;
   }
 
   /**

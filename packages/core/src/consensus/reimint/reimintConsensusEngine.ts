@@ -1,5 +1,6 @@
 import path from 'path';
-import { Address, BN, BNLike, ecsign, intToBuffer, bufferToHex } from 'ethereumjs-util';
+import { Address, BN, BNLike, ecsign, intToBuffer, bufferToHex, rlp } from 'ethereumjs-util';
+import { BaseTrie } from 'merkle-patricia-tree';
 import { Block, HeaderData, BlockHeader, Transaction, Receipt } from '@rei-network/structure';
 import { Common } from '@rei-network/common';
 import { logger } from '@rei-network/utils';
@@ -122,8 +123,15 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     return block;
   }
 
-  generateReceiptTrie(transactions: Transaction[], receipts: Receipt[]): Promise<Buffer> {
-    return Reimint.genReceiptTrie(transactions, receipts);
+  /**
+   * {@link ConsensusEngine.generateReceiptTrie}
+   */
+  async generateReceiptTrie(transactions: Transaction[], receipts: Receipt[]): Promise<Buffer> {
+    const trie = new BaseTrie();
+    for (let i = 0; i < receipts.length; i++) {
+      await trie.put(rlp.encode(i), Buffer.concat([intToBuffer(transactions[i].type), receipts[i].serialize()]));
+    }
+    return trie.root;
   }
 
   ///////////// Backend Logic ////////////////

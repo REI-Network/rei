@@ -110,7 +110,7 @@ export class FilterSystem {
       syncing: true,
       status: {
         startingBlock: bufferToHex(toBuffer(status.startingBlock)),
-        currentBlock: bnToHex(this.node.blockchain.latestBlock.header.number),
+        currentBlock: bnToHex(this.node.getLatestBlock().header.number),
         highestBlock: bufferToHex(toBuffer(status.highestBlock))
       }
     };

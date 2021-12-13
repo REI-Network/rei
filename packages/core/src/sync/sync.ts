@@ -84,7 +84,7 @@ export class Synchronizer extends EventEmitter {
 
   // TODO: binary search.
   private async findAncient(handler: WireProtocolHandler): Promise<[BlockHeader, BN]> {
-    const latest = this.node.blockchain.latestBlock.header.number.clone();
+    const latest = this.node.getLatestBlock().header.number.clone();
     if (latest.eqn(0)) {
       return await this.genesis();
     }
@@ -142,13 +142,13 @@ export class Synchronizer extends EventEmitter {
       bestPeerHandler = handler;
       bestHeight = new BN(bestPeerHandler.status!.height);
       bestTD = new BN(bestPeerHandler.status!.totalDifficulty);
-      if (bestTD.lte(this.node.blockchain.totalDifficulty)) {
+      if (bestTD.lte(this.node.getTotalDifficulty())) {
         return;
       }
     } else {
       // if handler doesn't exist,
       // randomly select one from the handler pool
-      bestTD = this.node.blockchain.totalDifficulty.clone();
+      bestTD = this.node.getTotalDifficulty();
       for (const handler of wire.pool.handlers) {
         const remoteStatus = handler.status!;
         const td = new BN(remoteStatus.totalDifficulty);
@@ -189,7 +189,7 @@ export class Synchronizer extends EventEmitter {
       }
 
       // add check for reimint consensus engine
-      const reimint = this.node.getReimintEngine();
+      const reimint = this.node.reimint;
       if (reimint.isStarted && reimint.state.hasMaj23Precommit(bestHeight)) {
         // our consensus engine has collected enough votes for this height,
         // so we ignore this best block
@@ -217,11 +217,12 @@ export class Synchronizer extends EventEmitter {
         logger.warn('Synchronizer::doSync, total difficulty does not match:', peerId);
       }
 
-      logger.info('💫 Sync over, local height:', this.node.blockchain.latestHeight, 'local td:', this.node.blockchain.totalDifficulty.toString(), 'best height:', bestHeight.toString(), 'best td:', bestTD.toString());
+      const latest = this.node.getLatestBlock();
+      logger.info('💫 Sync over, local height:', latest.header.number.toString(), 'local td:', this.node.getTotalDifficulty().toString(), 'best height:', bestHeight.toString(), 'best td:', bestTD.toString());
       if (reorged) {
         logger.info('💫 Synchronized');
         this.emit('synchronized');
-        this.node.wire.broadcastNewBlock(this.node.blockchain.latestBlock);
+        this.node.wire.broadcastNewBlock(latest);
       } else {
         this.emit('failed');
       }
@@ -232,7 +233,6 @@ export class Synchronizer extends EventEmitter {
    * Start the Synchronizer
    */
   private async syncLoop() {
-    await this.node.blockchain.init();
     while (!this.node.aborter.isAborted) {
       if (!this.isSyncing) {
         await this.syncOnce();
@@ -283,7 +283,7 @@ export class Synchronizer extends EventEmitter {
   }
 
   async processAndCommitBlock(block: Block) {
-    const result = await this.node.getEngineByCommon(block._common).processBlock({ block });
+    const result = await this.node.master.processBlock({ block });
     return await this.node.commitBlock({
       ...result,
       block,

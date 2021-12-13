@@ -1,5 +1,5 @@
 import { LevelUp } from 'levelup';
-import { BN, BNLike, bufferToHex } from 'ethereumjs-util';
+import { Address, BN, BNLike, bufferToHex } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import { Blockchain } from '@rei-network/blockchain';
 import { Common } from '@rei-network/common';
@@ -7,19 +7,19 @@ import { Database, DBSaveTxLookup, DBSaveReceipts } from '@rei-network/database'
 import VM from '@gxchain2-ethereumjs/vm';
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
-import { Block } from '@rei-network/structure';
+import { Block, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { logger } from '@rei-network/utils';
 import { StakeManager, Router } from '../contracts';
 import { ValidatorSets } from '../staking';
-import { Evidence } from '../consensus/reimint/types';
+import { ConsensusType } from '../consensus/types';
+import { Evidence, ExtraData, EvidenceFactory } from '../consensus/reimint/types';
 import { EMPTY_ADDRESS } from '../utils';
 import { CliqueExecutor, ReimintExecutor } from '../executor';
-import { isEnableStaking } from '../hardforks';
+import { isEnableStaking, getConsensusTypeByCommon } from '../hardforks';
 import { WorkerSide } from './link';
-import { Handler, RLPFinalizeOpts, RLPProcessBlockOpts, RLPProcessTxOpts } from './types';
+import { Handler, RLPFinalizeOpts, RLPProcessBlockOpts, RLPProcessTxOpts, RLPCommitBlockOpts, RLPCommitBlockResult } from './types';
 import { fromFinalizeResult, fromProcessBlockResult, fromProcessTxResult, toCommitBlockOpts, toFinalizeOpts, toProcessBlockOpts, toProcessTxOpts } from './utils';
-import { RLPCommitBlockOpts, RLPCommitBlockResult } from '.';
 
 const vmHandlers = new Map<string, Handler>([
   [
@@ -113,6 +113,46 @@ const vmHandlers = new Map<string, Handler>([
     function (this: VMWorker, data: any) {
       return this.callLevelDB('batch', data);
     }
+  ],
+  [
+    'latestBlock',
+    async function (this: VMWorker, data: any) {
+      const block = await this.blockchain.getLatestBlock();
+      return block.serialize();
+    }
+  ],
+  [
+    'totalDifficulty',
+    async function (this: VMWorker, { hash, number }: { hash: Buffer; number: Buffer }) {
+      const td = await this.blockchain.getTotalDifficulty(hash, new BN(number));
+      return td.toArrayLike(Buffer);
+    }
+  ],
+  [
+    'cliqueActiveSignersByBlockNumber',
+    async function (this: VMWorker, { number }: { number: Buffer }) {
+      const signers = this.blockchain.cliqueActiveSignersByBlockNumber(new BN(number));
+      return signers.map((signer) => signer.buf);
+    }
+  ],
+  [
+    'cliqueCheckNextRecentlySigned',
+    async function name(this: VMWorker, { number: _number, signer: _signer }: { number: Buffer; signer: Buffer }) {
+      // TODO: fix this
+      const number = new BN(_number);
+      const signer = new Address(_signer);
+
+      if (number.isZero()) {
+        return false;
+      }
+
+      const limit: number = (this.blockchain as any).cliqueSignerLimit();
+      let signers = (this as any)._cliqueLatestBlockSigners;
+      signers = signers.slice(signers.length < limit ? 0 : 1);
+      signers.push([number.addn(1), signer]);
+      const seen = signers.filter((s) => s[1].equals(signer)).length;
+      return seen > 1;
+    }
   ]
 ]);
 
@@ -192,7 +232,21 @@ export class VMWorker extends WorkerSide {
       listenHardforkChanged: false,
       hardforkByBlockNumber: true,
       common: stateManager._common,
-      stateManager: stateManager
+      stateManager: stateManager,
+      getMiner: (header) => {
+        const type = getConsensusTypeByCommon(header._common);
+        if (type === ConsensusType.Clique) {
+          return header.cliqueSigner();
+        } else if (type === ConsensusType.Reimint) {
+          if (header.extraData.length === CLIQUE_EXTRA_VANITY) {
+            return EMPTY_ADDRESS;
+          } else {
+            return ExtraData.fromBlockHeader(header).proposal.proposer();
+          }
+        } else {
+          throw new Error('unknown consensus type');
+        }
+      }
     });
   }
 
@@ -207,6 +261,9 @@ export class VMWorker extends WorkerSide {
   }
 
   async checkEvidence(evList: Evidence[]) {
-    // TODO:...
+    await this.request(
+      'checkEvidence',
+      evList.map((ev) => EvidenceFactory.serializeEvidence(ev))
+    );
   }
 }

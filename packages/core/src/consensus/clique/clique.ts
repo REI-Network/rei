@@ -3,7 +3,7 @@ import { toBuffer, Address, BN } from 'ethereumjs-util';
 import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
 import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
 import { Blockchain } from '@rei-network/blockchain';
-import { TypedTransaction, BlockHeader, Block, CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@rei-network/structure';
+import { TypedTransaction, Receipt, BlockHeader, Block, CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@rei-network/structure';
 
 export class Clique {
   // disable constructor
@@ -25,10 +25,10 @@ export class Clique {
    * @param receipts - List of receipt
    * @returns Receipt root
    */
-  static async genReceiptTrie(transactions: TypedTransaction[], receipts: TxReceipt[]) {
+  static async genReceiptTrie(receipts: Receipt[]) {
     const trie = new BaseTrie();
     for (let i = 0; i < receipts.length; i++) {
-      await trie.put(toBuffer(i), encodeReceipt(transactions[i], receipts[i]));
+      await trie.put(toBuffer(i), receipts[i].serialize());
     }
     return trie.root;
   }

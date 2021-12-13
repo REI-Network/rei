@@ -46,7 +46,7 @@ export class ETHController extends Controller {
     const status = this.node.sync.status;
     return {
       startingBlock: bufferToHex(toBuffer(status.startingBlock)),
-      currentBlock: bnToHex(this.node.blockchain.latestBlock.header.number),
+      currentBlock: bnToHex(this.node.getLatestBlock().header.number),
       highestBlock: bufferToHex(toBuffer(status.highestBlock))
     };
   }
@@ -70,7 +70,7 @@ export class ETHController extends Controller {
     return this.node.accMngr.totalUnlockedAccounts().map((addr) => bufferToHex(addr));
   }
   eth_blockNumber() {
-    return bnToHex(this.node.blockchain.latestBlock.header.number);
+    return bnToHex(this.node.getLatestBlock().header.number);
   }
   async eth_getBalance([address, tag]: [string, string]) {
     const stateManager = await this.getStateManagerByTag(tag);

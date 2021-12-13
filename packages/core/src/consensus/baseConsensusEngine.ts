@@ -1,19 +1,16 @@
 import EventEmitter from 'events';
 import { Address } from 'ethereumjs-util';
-import { RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
-import { Block, HeaderData, Transaction } from '@rei-network/structure';
+import { Block, HeaderData, Transaction, Receipt } from '@rei-network/structure';
 import { Common } from '@rei-network/common';
 import { Channel, logger } from '@rei-network/utils';
 import { Node } from '../node';
 import { Worker } from '../worker';
-import { ConsensusEngine, ConsensusEngineOptions, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions, ProcessBlockResult } from './types';
+import { ConsensusEngine, ConsensusEngineOptions } from './types';
 import { EMPTY_ADDRESS } from '../utils';
 
 export abstract class BaseConsensusEngine extends EventEmitter implements ConsensusEngine {
   abstract generatePendingBlock(headerData: HeaderData, common: Common, transactions?: Transaction[]): Block;
-  abstract finalize(options: FinalizeOpts): Promise<{ finalizedStateRoot: Buffer; receiptTrie: Buffer }>;
-  abstract processBlock(options: ProcessBlockOpts): Promise<ProcessBlockResult>;
-  abstract processTx(options: ProcessTxOptions): Promise<RunTxResult>;
+  abstract generateReceiptTrie(transactions: Transaction[], receipts: Receipt[]): Promise<Buffer>;
 
   protected abstract _newBlock(header: Block): Promise<void>;
   protected abstract _start(): void;

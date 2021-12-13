@@ -40,13 +40,17 @@ export class ConsensusProtocolHander implements ProtocolHandler {
     this.protocol = protocol;
   }
 
+  get node() {
+    return this.protocol.node;
+  }
+
   get reimint() {
-    return this.protocol.node.getReimintEngine();
+    return this.protocol.node.reimint;
   }
 
   private onEngineStart = () => {
-    this.gossipDataLoop(this.reimint!);
-    this.gossipVotesLoop(this.reimint!);
+    this.gossipDataLoop(this.reimint);
+    this.gossipVotesLoop(this.reimint);
     this.gossipEvidenceLoop();
   };
 
@@ -161,22 +165,19 @@ export class ConsensusProtocolHander implements ProtocolHandler {
   handshake() {
     this.protocol.addHandler(this);
 
-    const reimint = this.reimint;
-    if (reimint) {
-      reimint.evpool.on('evidence', this.onEvidence);
-      for (const ev of reimint.evpool.pendingEvidence) {
-        this.evidenceQueue.push(ev);
-      }
-
-      if (reimint.isStarted) {
-        this.onEngineStart();
-      } else {
-        reimint.on('start', this.onEngineStart);
-      }
-
-      const newRoundMsg = reimint.state.genNewRoundStepMessage();
-      newRoundMsg && this.send(newRoundMsg);
+    this.node.evpool.on('evidence', this.onEvidence);
+    for (const ev of this.node.evpool.pendingEvidence) {
+      this.evidenceQueue.push(ev);
     }
+
+    if (this.reimint.isStarted) {
+      this.onEngineStart();
+    } else {
+      this.reimint.on('start', this.onEngineStart);
+    }
+
+    const newRoundMsg = this.reimint.state.genNewRoundStepMessage();
+    newRoundMsg && this.send(newRoundMsg);
 
     return true;
   }
@@ -186,8 +187,8 @@ export class ConsensusProtocolHander implements ProtocolHandler {
    */
   abort() {
     this.aborted = true;
-    this.reimint?.off('start', this.onEngineStart);
-    this.reimint?.evpool.off('evidence', this.onEvidence);
+    this.reimint.off('start', this.onEngineStart);
+    this.node.evpool.off('evidence', this.onEvidence);
     this.protocol.removeHandler(this);
     this.evidenceQueue.abort();
   }
@@ -213,7 +214,7 @@ export class ConsensusProtocolHander implements ProtocolHandler {
       this.applyHasVoteMessage(msg);
     } else if (msg instanceof m.ProposalMessage) {
       this.setHasProposal(msg.proposal);
-      this.reimint?.state.newMessage(this.peer.peerId, msg);
+      this.reimint.state.newMessage(this.peer.peerId, msg);
     } else if (msg instanceof m.ProposalPOLMessage) {
       this.applyProposalPOLMessage(msg);
     } else if (msg instanceof m.VoteMessage) {
@@ -232,13 +233,13 @@ export class ConsensusProtocolHander implements ProtocolHandler {
     } else if (msg instanceof m.VoteSetBitsMessage) {
       this.applyVoteSetBitsMessage(msg);
     } else if (msg instanceof m.GetProposalBlockMessage) {
-      const proposalBlock = this.protocol.node.getReimintEngine()?.state.getProposalBlock(msg.hash);
+      const proposalBlock = this.reimint.state.getProposalBlock(msg.hash);
       proposalBlock && this.send(new m.ProposalBlockMessage(proposalBlock));
     } else if (msg instanceof m.ProposalBlockMessage) {
-      this.reimint?.state.newMessage(this.peer.peerId, msg);
+      this.reimint.state.newMessage(this.peer.peerId, msg);
     } else if (msg instanceof m.DuplicateVoteEvidenceMessage) {
       this.knowEvidence(msg.evidence);
-      this.reimint?.evpool.addEvidence(msg.evidence).catch((err) => {
+      this.node.evpool.addEvidence(msg.evidence).catch((err) => {
         logger.error('ConsensusProtocolHander::handle, addEvidence, catch error:', err);
       });
     } else {

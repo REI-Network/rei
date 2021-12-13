@@ -74,7 +74,7 @@ export class Tracer {
         const parent = await this.node.db.getHeader(block.header.parentHash, block.header.number.subn(1));
         const vm = await this.node.getVM(parent.stateRoot, block.header.number);
         const debug = this.createDebugImpl((vm as any)._opcodes, reject, config, hash);
-        await this.node.getEngineByCommon(block._common).processBlock({ block, debug, skipConsensusValidation: true, skipConsensusVerify: true });
+        await this.node.master.processBlock({ block, skipConsensusValidation: true, skipConsensusVerify: true }); // TODO: support debug
         const result = debug.result();
         resolve(util.types.isPromise(result) ? await result : result);
       } catch (err) {

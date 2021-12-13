@@ -47,6 +47,7 @@ export interface ProcessTxResult {
   receipt: Receipt;
   gasUsed: BN;
   bloom: Bloom;
+  root: Buffer;
 }
 
 export interface ExecutorBackend {

@@ -172,7 +172,7 @@ export class BloomBitsFilter {
       blooms.push(calcBloomIndexes(buf));
     }
 
-    const latestHeader = await this.node.blockchain.getLatestHeader();
+    const latestHeader = this.node.getLatestBlock().header;
     // if addresses and topics is empty, return all logs between from and to.
     if (blooms.length === 0) {
       for (const num = from.gt(latestHeader.number) ? latestHeader.number.clone() : from.clone(); num.lte(to) && num.lte(latestHeader.number); num.iaddn(1)) {

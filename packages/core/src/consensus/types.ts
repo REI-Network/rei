@@ -1,50 +1,12 @@
 import { Address } from 'ethereumjs-util';
-import VM from '@gxchain2-ethereumjs/vm';
-import { RunBlockOpts, RunBlockResult } from '@gxchain2-ethereumjs/vm/dist/runBlock';
-import { RunTxOpts, RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
-import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
 import { Common } from '@rei-network/common';
-import { HeaderData, Block, TypedTransaction, Transaction, Receipt } from '@rei-network/structure';
+import { HeaderData, Block, Transaction, Receipt } from '@rei-network/structure';
 import { Node } from '../node';
 import { Worker } from '../worker';
-import { ValidatorSet } from '../staking';
-import { Evidence, ExtraData } from './reimint/types';
 
 export enum ConsensusType {
   Clique,
   Reimint
-}
-
-export interface FinalizeOpts {
-  block: Block;
-  stateRoot: Buffer;
-  transactions: TypedTransaction[];
-  receipts: TxReceipt[];
-
-  round?: number;
-  evidence?: Evidence[];
-  parentStateRoot?: Buffer;
-}
-
-export interface ProcessBlockOpts extends Pick<RunBlockOpts, 'block' | 'runTxOpts' | 'debug'> {
-  skipConsensusValidation?: boolean;
-  skipConsensusVerify?: boolean;
-}
-
-export interface ProcessBlockResult extends Omit<RunBlockResult, 'receipts'> {
-  receipts: Receipt[];
-  validatorSet?: ValidatorSet;
-  extraData?: ExtraData;
-}
-
-export interface FinalizeBlockResult {
-  finalizedStateRoot: Buffer;
-  receiptTrie: Buffer;
-}
-
-export interface ProcessTxOptions extends Omit<RunTxOpts, 'block' | 'beforeTx' | 'afterTx' | 'assignTxReward' | 'generateTxReceipt' | 'skipBalance'> {
-  block: Block;
-  vm: VM;
 }
 
 export interface ConsensusEngineOptions {
@@ -116,28 +78,5 @@ export interface ConsensusEngine {
    */
   generatePendingBlock(headerData: HeaderData, common: Common, transactions?: Transaction[]): Block;
 
-  /**
-   * Finalize a pending block,
-   * assign block reward to miner and
-   * do other things(afterApply) and
-   * calculate finalized state root and
-   * receipt trie
-   * @param options - Finalize options
-   * @return FinalizedStateRoot and receiptTrie
-   */
-  finalize(options: FinalizeOpts): Promise<FinalizeBlockResult>;
-
-  /**
-   * Process a block
-   * @param options - Process block options
-   * @returns ProcessBlockResult
-   */
-  processBlock(options: ProcessBlockOpts): Promise<ProcessBlockResult>;
-
-  /**
-   * Process transaction
-   * @param options - Process transaction options
-   * @returns RunTxResult
-   */
-  processTx(options: ProcessTxOptions): Promise<RunTxResult>;
+  generateReceiptTrie(transactions: Transaction[], receipts: Receipt[]): Promise<Buffer>;
 }

@@ -64,8 +64,21 @@ const wireHandlerFuncs: HandlerFunc[] = [
         this.node.banPeer(this.peer.peerId, 'invalid');
         return;
       }
-      const blocks = await this.node.blockchain.getBlocks(start, count.toNumber(), 0, false);
-      return ['BlockHeaders', blocks.map((b) => b.header)];
+
+      const headers: BlockHeader[] = [];
+      for (const n = start.clone(); ; n.iaddn(1)) {
+        try {
+          headers.push(await this.node.db.getCanonicalHeader(n));
+        } catch (err) {
+          // ignore all errors ...
+          break;
+        }
+
+        if (headers.length >= count.toNumber()) {
+          break;
+        }
+      }
+      return ['BlockHeaders', headers];
     }
   },
   {

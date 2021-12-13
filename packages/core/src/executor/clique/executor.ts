@@ -1,10 +1,12 @@
-import { Address, BN } from 'ethereumjs-util';
+import { Address, BN, toBuffer } from 'ethereumjs-util';
+import { BaseTrie } from 'merkle-patricia-tree';
 import VM from '@gxchain2-ethereumjs/vm';
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
-import { RunBlockOpts, rewardAccount } from '@gxchain2-ethereumjs/vm/dist/runBlock';
+import { RunBlockOpts, rewardAccount, encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
+import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
 import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
-import { Block } from '@rei-network/structure';
+import { Block, TypedTransaction } from '@rei-network/structure';
 import { logger } from '@rei-network/utils';
 import { FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, ExecutorBackend, Executor } from '../types';
 import { Contract, Router } from '../../contracts';
@@ -123,7 +125,13 @@ export class CliqueExecutor implements Executor {
       root,
       generate: false,
       skipBlockValidation: true,
-      genReceiptTrie: Clique.genReceiptTrie,
+      genReceiptTrie: async function (transactions: TypedTransaction[], receipts: TxReceipt[]) {
+        const trie = new BaseTrie();
+        for (let i = 0; i < receipts.length; i++) {
+          await trie.put(toBuffer(i), encodeReceipt(transactions[i], receipts[i]));
+        }
+        return trie.root;
+      },
       assignBlockReward: (state: IStateManager, reward: BN) => {
         return this.assignBlockReward(state, miner, reward);
       },
@@ -158,7 +166,8 @@ export class CliqueExecutor implements Executor {
     return {
       receipt: postByzantiumTxReceiptsToReceipts([result.receipt])[0],
       gasUsed: result.gasUsed,
-      bloom: result.bloom
+      bloom: result.bloom,
+      root: await vm.stateManager.getStateRoot()
     };
   }
 }

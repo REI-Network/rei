@@ -1,18 +1,10 @@
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
-import VM from '@gxchain2-ethereumjs/vm';
-import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
-import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
-import { RunBlockOpts, rewardAccount } from '@gxchain2-ethereumjs/vm/dist/runBlock';
-import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
-import { Block, HeaderData, Transaction } from '@rei-network/structure';
+import { Block, HeaderData, Transaction, Receipt } from '@rei-network/structure';
 import { Common } from '@rei-network/common';
 import { logger, nowTimestamp, getRandomIntInclusive } from '@rei-network/utils';
-import { ConsensusEngine, FinalizeOpts, ProcessBlockOpts, ProcessTxOptions } from '../types';
-import { Contract, Router } from '../../contracts';
-import { ValidatorSet } from '../../staking';
-import { isEnableStaking } from '../../hardforks';
+import { ConsensusEngine } from '../types';
 import { BaseConsensusEngine } from '../baseConsensusEngine';
-import { postByzantiumTxReceiptsToReceipts, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
+import { getGasLimitByCommon } from '../../utils';
 import { Clique } from './clique';
 
 const NoTurnSignerDelay = 500;
@@ -47,8 +39,8 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
     }
 
     // check valid signer and recently sign
-    const activeSigners = this.node.blockchain.cliqueActiveSignersByBlockNumber(header.number);
-    const recentlyCheck = this.node.blockchain.cliqueCheckNextRecentlySigned(header, this.coinbase);
+    const activeSigners = await this.node.master.cliqueActiveSignersByBlockNumber(header.number);
+    const recentlyCheck = await this.node.master.cliqueCheckNextRecentlySigned(header.number, this.coinbase);
     if (!this.isValidSigner(activeSigners) || recentlyCheck) {
       return;
     }
@@ -70,7 +62,7 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
           const { header: data, transactions } = await pendingBlock.finalize();
           const block = this.generatePendingBlock(data, pendingBlock.common, transactions);
           // process pending block
-          const result = await this.processBlock({ block });
+          const result = await this.node.master.processBlock({ block });
           // commit pending block
           const reorged = await this.node.commitBlock({
             ...result,
@@ -127,56 +119,6 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
     return this.enable && this.node.accMngr.hasUnlockedAccount(this.coinbase) ? this.node.accMngr.getPrivateKey(this.coinbase) : undefined;
   }
 
-  ////////////////////////
-
-  /**
-   * Assign block reward to miner
-   * @param state - State manager instance
-   * @param miner - Miner address
-   * @param reward - Block rward
-   */
-  async assignBlockReward(state: IStateManager, miner: Address, reward: BN) {
-    await rewardAccount(state, miner, reward);
-  }
-
-  /**
-   * After block apply logic,
-   * if the next block is in Reimint consensus,
-   * we should deploy all system contract and
-   * call `Router.onAfterBlock`
-   * @param vm - VM instance
-   * @param pendingBlock - Pending block
-   * @returns Genesis validator set
-   *          (if the next block is in Reimint consensus)
-   */
-  async afterApply(vm: VM, pendingBlock: Block) {
-    let validatorSet: ValidatorSet | undefined;
-    const nextCommon = this.node.getCommon(pendingBlock.header.number.addn(1));
-    if (isEnableStaking(nextCommon)) {
-      // deploy system contracts
-      const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
-      await Contract.deploy(evm, nextCommon);
-
-      const parentRouter = new Router(evm, nextCommon);
-      validatorSet = ValidatorSet.createGenesisValidatorSet(nextCommon);
-
-      const activeValidators = validatorSet.activeValidators();
-      if (activeValidators.length === 0) {
-        throw new Error('activeValidators length is zero');
-      }
-
-      const activeSigners = activeValidators.map(({ validator }) => validator);
-      const priorities = activeValidators.map(({ priority }) => priority);
-      // call after block callback to save active validators list
-      await parentRouter!.onAfterBlock(validatorSet.proposer, activeSigners, priorities);
-
-      // start consensus engine
-      this.node.getReimintEngine()?.start();
-    }
-
-    return validatorSet;
-  }
-
   /**
    * {@link ConsensusEngine.generatePendingBlock}
    */
@@ -184,93 +126,7 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
     return Block.fromBlockData({ header: headerData, transactions }, { common, cliqueSigner: this.cliqueSigner() });
   }
 
-  /**
-   * {@link ConsensusEngine.finalize}
-   */
-  async finalize(options: FinalizeOpts) {
-    const { block, stateRoot, receipts, transactions } = options;
-
-    const pendingCommon = block._common;
-    const vm = await this.node.getVM(stateRoot, pendingCommon);
-
-    const miner = Clique.getMiner(block);
-    const minerReward = new BN(pendingCommon.param('pow', 'minerReward'));
-
-    await vm.stateManager.checkpoint();
-    try {
-      await this.assignBlockReward(vm.stateManager, miner, minerReward);
-      const validatorSet = await this.afterApply(vm, block);
-      await vm.stateManager.commit();
-      const finalizedStateRoot = await vm.stateManager.getStateRoot();
-      return {
-        finalizedStateRoot,
-        receiptTrie: await Clique.genReceiptTrie(transactions, receipts),
-        validatorSet
-      };
-    } catch (err) {
-      await vm.stateManager.revert();
-      throw err;
-    }
-  }
-
-  /**
-   * {@link ConsensusEngine.processBlock}
-   */
-  async processBlock(options: ProcessBlockOpts) {
-    const { block } = options;
-
-    const miner = Clique.getMiner(block);
-    const pendingHeader = block.header;
-    const pendingCommon = block._common;
-
-    // get parent header from database
-    const parent = await this.node.db.getHeader(block.header.parentHash, pendingHeader.number.subn(1));
-
-    // get state root and vm instance
-    const root = parent.stateRoot;
-    const vm = await this.node.getVM(root, pendingCommon);
-
-    if (!options.skipConsensusValidation) {
-      Clique.consensusValidateHeader(pendingHeader, this.node.blockchain);
-    }
-
-    let validatorSet: ValidatorSet | undefined;
-    const runBlockOptions: RunBlockOpts = {
-      debug: options.debug,
-      block,
-      root,
-      generate: false,
-      skipBlockValidation: true,
-      genReceiptTrie: Clique.genReceiptTrie,
-      assignBlockReward: (state: IStateManager, reward: BN) => {
-        return this.assignBlockReward(state, miner, reward);
-      },
-      afterApply: async () => {
-        validatorSet = await this.afterApply(vm, block);
-      }
-    };
-
-    const result = await vm.runBlock(runBlockOptions);
-
-    if (validatorSet) {
-      const activeValidators = validatorSet.activeValidators();
-      logger.debug(
-        'Clique::processBlock, activeValidators:',
-        activeValidators.map(({ validator, priority }) => {
-          return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${validatorSet!.getVotingPower(validator).toString()}`;
-        }),
-        'next proposer:',
-        validatorSet.proposer.toString()
-      );
-    }
-    return { ...result, receipts: postByzantiumTxReceiptsToReceipts(result.receipts), validatorSet };
-  }
-
-  /**
-   * {@link ConsensusEngine.processTx}
-   */
-  processTx(options: ProcessTxOptions) {
-    const { vm } = options;
-    return vm.runTx(options);
+  generateReceiptTrie(transactions: Transaction[], receipts: Receipt[]): Promise<Buffer> {
+    return Clique.genReceiptTrie(receipts);
   }
 }

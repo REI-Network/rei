@@ -212,7 +212,6 @@ export class ReimintExecutor implements Executor {
       root,
       generate: false,
       skipBlockValidation: true,
-      genReceiptTrie: Reimint.genReceiptTrie,
       assignBlockReward: async (state: IStateManager, reward: BN) => {
         await this.assignBlockReward(state, systemCaller, reward);
         blockReward.iadd(reward);
@@ -255,7 +254,8 @@ export class ReimintExecutor implements Executor {
     return {
       receipt: postByzantiumTxReceiptsToReceipts([result.receipt])[0],
       gasUsed: result.gasUsed,
-      bloom: result.bloom
+      bloom: result.bloom,
+      root: await vm.stateManager.getStateRoot()
     };
   }
 }

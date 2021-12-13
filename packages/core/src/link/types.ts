@@ -1,4 +1,5 @@
 import { Block, Receipt } from '@rei-network/structure';
+import { Evidence } from '../consensus/reimint/types';
 
 export type Message = {
   id: number;
@@ -44,6 +45,7 @@ export type RLPProcessTxResult = {
   receipt: Buffer;
   gasUsed: Buffer;
   bloom: Buffer;
+  root: Buffer;
 };
 
 export type CommitBlockOpts = {

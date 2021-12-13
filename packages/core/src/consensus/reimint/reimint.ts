@@ -1,9 +1,7 @@
-import { toBuffer, setLengthLeft, Address, rlp, BN, rlphash } from 'ethereumjs-util';
+import { toBuffer, setLengthLeft, Address, rlp, BN, rlphash, intToBuffer } from 'ethereumjs-util';
 import { BaseTrie } from 'merkle-patricia-tree';
-import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
-import { encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
 import { Common } from '@rei-network/common';
-import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@rei-network/structure';
+import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions, Receipt } from '@rei-network/structure';
 import { ExtraData, Proposal, VoteType, VoteSet, Evidence, ISigner } from './types';
 import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../../utils';
 
@@ -160,10 +158,10 @@ export class Reimint {
    * @param receipts - List of receipt
    * @returns Receipt root
    */
-  static async genReceiptTrie(transactions: TypedTransaction[], receipts: TxReceipt[]) {
+  static async genReceiptTrie(transactions: TypedTransaction[], receipts: Receipt[]) {
     const trie = new BaseTrie();
     for (let i = 0; i < receipts.length; i++) {
-      await trie.put(rlp.encode(i), encodeReceipt(transactions[i], receipts[i]));
+      await trie.put(rlp.encode(i), Buffer.concat([intToBuffer(transactions[i].type), receipts[i].serialize()]));
     }
     return trie.root;
   }

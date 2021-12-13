@@ -1,23 +1,18 @@
-import { BN, KECCAK256_RLP_ARRAY, BNLike } from 'ethereumjs-util';
+import { BN, KECCAK256_RLP_ARRAY } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
-import VM from '@gxchain2-ethereumjs/vm';
 import Bloom from '@gxchain2-ethereumjs/vm/dist/bloom';
-import { RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
 import { Transaction, calcTransactionTrie, HeaderData } from '@rei-network/structure';
 import { logger } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { PendingTxMap } from '../txpool';
-import { ConsensusEngine, FinalizeOpts } from './types';
 import { EMPTY_ADDRESS, EMPTY_NONCE, EMPTY_MIX_HASH, EMPTY_EXTRA_DATA } from '../utils';
+import { FinalizeOpts, Executor, ProcessTxResult } from '../executor/types';
+import { ConsensusEngine } from './types';
 
 export interface PendingBlockFinalizeOpts extends Pick<FinalizeOpts, 'round' | 'evidence'> {}
 
-export interface PendingBlockBackend {
-  getVM(root: Buffer, num: BNLike | Common): Promise<VM>;
-}
-
 export class PendingBlock {
-  private backend: PendingBlockBackend;
+  private executor: Executor;
   private engine: ConsensusEngine;
   private lock = new Semaphore(1);
 
@@ -38,7 +33,7 @@ export class PendingBlock {
 
   private gasUsed: BN = new BN(0);
   private transactions: Transaction[] = [];
-  private transactionResults: RunTxResult[] = [];
+  private transactionResults: ProcessTxResult[] = [];
   private latestStateRoot?: Buffer;
 
   private bloom?: Buffer;
@@ -46,11 +41,11 @@ export class PendingBlock {
   private transactionsTrie?: Buffer;
   private finalizedStateRoot?: Buffer;
 
-  constructor(backend: PendingBlockBackend, engine: ConsensusEngine, parentHash: Buffer, parentStateRoot: Buffer, number: BN, timestamp: BN, common: Common, extraData?: Buffer) {
+  constructor(engine: ConsensusEngine, executor: Executor, parentHash: Buffer, parentStateRoot: Buffer, number: BN, timestamp: BN, common: Common, extraData?: Buffer) {
     if (extraData && extraData.length !== 32) {
       throw new Error('invalid extra data length');
     }
-    this.backend = backend;
+    this.executor = executor;
     this.engine = engine;
     this._common = common;
     this._parentHash = parentHash;
@@ -167,32 +162,26 @@ export class PendingBlock {
       // create a empty block for execute transaction
       const pendingBlock = this.engine.generatePendingBlock(this.toHeaderData(), this._common);
       const gasLimit = pendingBlock.header.gasLimit;
-      // create vm instance
-      const vm = await this.backend.getVM(this.latestStateRoot ?? this._parentStateRoot, this._common);
 
       let tx = txs.peek();
       while (tx) {
         try {
-          await vm.stateManager.checkpoint();
-
-          let txRes: RunTxResult;
+          let txRes: ProcessTxResult;
           tx = Transaction.fromTxData({ ...tx }, { common: this._common });
           try {
-            txRes = await this.engine.processTx({
-              vm,
+            txRes = await this.executor.processTx({
               tx,
+              root: this.latestStateRoot ?? this._parentStateRoot,
               block: pendingBlock,
               blockGasUsed: this.gasUsed
             });
           } catch (err) {
-            await vm.stateManager.revert();
             txs.pop();
             tx = txs.peek();
             continue;
           }
 
           if (txRes.gasUsed.add(this.gasUsed).gt(gasLimit)) {
-            await vm.stateManager.revert();
             txs.pop();
 
             /**
@@ -201,14 +190,11 @@ export class PendingBlock {
              */
             return;
           } else {
-            await vm.stateManager.commit();
-            const stateRoot = await vm.stateManager.getStateRoot();
-
             // save transaction info
             this.transactions.push(tx);
             this.transactionResults.push(txRes);
             this.gasUsed.iadd(txRes.gasUsed);
-            this.latestStateRoot = stateRoot;
+            this.latestStateRoot = txRes.root;
 
             // clear finalized info
             this.bloom = undefined;
@@ -248,17 +234,20 @@ export class PendingBlock {
   finalize(options?: PendingBlockFinalizeOpts) {
     this.requireCompleted();
     return this.runWithLock(async () => {
-      // calculate finalizedStateRoot and receiptTrie
-      const { finalizedStateRoot, receiptTrie } = await this.engine.finalize({
+      const receipts = this.transactionResults.map(({ receipt }) => receipt);
+
+      // calculate finalizedStateRoot
+      const { finalizedStateRoot } = await this.executor.finalize({
         ...options,
-        receipts: this.transactionResults.map(({ receipt }) => receipt),
+        receipts,
         block: this.engine.generatePendingBlock(this.toHeaderData(), this._common),
         stateRoot: this.latestStateRoot ?? this._parentStateRoot,
-        parentStateRoot: this._parentStateRoot,
-        transactions: this.transactions
+        parentStateRoot: this._parentStateRoot
       });
       this.finalizedStateRoot = finalizedStateRoot;
-      this.receiptTrie = receiptTrie;
+
+      // calculate receipts trie
+      this.receiptTrie = await this.engine.generateReceiptTrie(this.transactions, receipts);
 
       // calculate transactions trie
       this.transactionsTrie = await calcTransactionTrie(this.transactions);

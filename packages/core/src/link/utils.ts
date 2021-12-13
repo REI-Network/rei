@@ -104,6 +104,7 @@ export function toProcessTxResult(opts: RLPProcessTxResult): ProcessTxResult {
   const bloom = new Bloom(opts.bloom);
 
   return {
+    ...opts,
     receipt,
     gasUsed,
     bloom
@@ -116,6 +117,7 @@ export function fromProcessTxResult(opts: ProcessTxResult): RLPProcessTxResult {
   const bloom = opts.bloom.bitvector;
 
   return {
+    ...opts,
     receipt,
     gasUsed,
     bloom

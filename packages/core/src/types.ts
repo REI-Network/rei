@@ -1,8 +1,6 @@
 import EventEmitter from 'events';
 import { NetworkManagerOptions } from '@rei-network/network';
 import { Receipt, Block } from '@rei-network/structure';
-import { ValidatorSet } from './staking';
-import { Evidence } from './consensus/reimint/types';
 import { ConsensusEngineOptions } from './consensus/types';
 
 export interface ConsensusEngineConstructorOptions extends Omit<ConsensusEngineOptions, 'node'> {}
@@ -42,8 +40,6 @@ export interface CommitBlockOptions {
   broadcast: boolean;
   block: Block;
   receipts: Receipt[];
-  validatorSet?: ValidatorSet;
-  evidence?: Evidence[];
 }
 
 export abstract class Initializer {

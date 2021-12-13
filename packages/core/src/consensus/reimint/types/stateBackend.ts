@@ -39,8 +39,6 @@ export interface IWALReader {
 
 export interface IProcessBlockResult {
   receipts: Receipt[];
-  validatorSet?: ValidatorSet;
-  evidence?: Evidence[];
 }
 
 export interface IStateMachineBackend {

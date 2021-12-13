@@ -24,6 +24,14 @@ export class VMMaster extends MasterSide {
     this.node = node;
   }
 
+  async init() {
+    await this.request('init', undefined);
+  }
+
+  async abort() {
+    await this.request('abort', undefined);
+  }
+
   //// levelDB ////
 
   put(...args: any[]) {

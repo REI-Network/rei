@@ -153,6 +153,18 @@ const vmHandlers = new Map<string, Handler>([
       const seen = signers.filter((s) => s[1].equals(signer)).length;
       return seen > 1;
     }
+  ],
+  [
+    'init',
+    async function (this: VMWorker, data: any) {
+      await this.init();
+    }
+  ],
+  [
+    'abort',
+    async function (this: VMWorker, data: any) {
+      await this.abort();
+    }
   ]
 ]);
 
@@ -193,6 +205,11 @@ export class VMWorker extends WorkerSide {
 
   async init() {
     await this.blockchain.init();
+  }
+
+  override async abort() {
+    await super.abort();
+    await this.chaindb.close();
   }
 
   callLevelDB(method: string, data: any) {

@@ -75,19 +75,19 @@ const handler: {
     logger.info('block', bufferToHex(block.hash()), 'on height', block.header.number.toString(), ':', new WrappedBlock(block).toRPCJSON(true));
   },
   lsheight: (node: Node) => {
-    const height = node.blockchain.latestHeight;
-    const hash = node.blockchain.latestHash;
-    logger.info('local height:', height, 'hash:', hash);
+    const block = node.getLatestBlock();
+    logger.info('local height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
   },
   lsaccount: async (node: Node, address: string) => {
-    const acc = await (await node.getStateManager(node.blockchain.latestBlock.header.stateRoot, node.blockchain.latestHeight)).getAccount(Address.fromString(address));
+    const block = node.getLatestBlock();
+    const acc = await (await node.getStateManager(block.header.stateRoot, block._common)).getAccount(Address.fromString(address));
     logger.info('balance', acc.balance.toString(), 'nonce', acc.nonce.toString(), 'codeHash', acc.codeHash.toString('hex'));
   },
   lstxpool: async (node: Node) => {
     await node.txPool.ls();
   },
   lstate: async (node: Node) => {
-    const state = node.getReimintEngine()!.state as any;
+    const state = node.reimint.state as any;
     console.log('state(h,r,s):', state.height.toString(), state.round, state.step);
     const roundVotes = state.votes.roundVoteSets;
 

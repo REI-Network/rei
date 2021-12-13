@@ -171,6 +171,7 @@ export class Node extends Initializer {
    * Initialize the node
    */
   async init() {
+    await this.master.init();
     this.latestBlock = await this.master.latestBlock();
     this.totalDifficulty = await this.master.totalDifficulty(this.latestBlock.hash(), this.latestBlock.header.number);
     await this.generateGenesis(this.latestBlock);
@@ -211,6 +212,7 @@ export class Node extends Initializer {
     this.pendingTxsQueue.abort();
     this.commitBlockQueue.abort();
     await this.aborter.abort();
+    await this.master.abort();
     await this.clique.abort();
     await this.reimint.abort();
     await this.networkMngr.abort();

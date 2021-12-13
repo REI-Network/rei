@@ -1,2 +1,2 @@
 export * from './clique';
-export * from './cliqueConsensusEngine';
+export * from './engine';

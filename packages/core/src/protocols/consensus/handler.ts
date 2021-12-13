@@ -1,6 +1,5 @@
 import { BN } from 'ethereumjs-util';
 import { Channel, createBufferFunctionalSet, logger } from '@rei-network/utils';
-import { ReimintConsensusEngine } from '../../consensus/reimint/reimintConsensusEngine';
 import { RoundStepType, Proposal, BitArray, VoteType, VoteSet, MessageFactory, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint/types';
 import * as m from '../../consensus/reimint/types/messages';
 import { ConsensusProtocol } from './protocol';
@@ -49,8 +48,8 @@ export class ConsensusProtocolHander implements ProtocolHandler {
   }
 
   private onEngineStart = () => {
-    this.gossipDataLoop(this.reimint);
-    this.gossipVotesLoop(this.reimint);
+    this.gossipDataLoop();
+    this.gossipVotesLoop();
     this.gossipEvidenceLoop();
   };
 
@@ -58,11 +57,11 @@ export class ConsensusProtocolHander implements ProtocolHandler {
     this.evidenceQueue.push(ev);
   };
 
-  private async gossipDataLoop(reimint: ReimintConsensusEngine) {
+  private async gossipDataLoop() {
     while (!this.aborted) {
       try {
         if (!this.proposal) {
-          const proposalMessage = reimint.state.genProposalMessage(this.height, this.round);
+          const proposalMessage = this.reimint.state.genProposalMessage(this.height, this.round);
           if (proposalMessage) {
             // logger.debug('ConsensusProtocolHander::gossipDataLoop, send proposal to:', this.peer.peerId);
             this.send(proposalMessage);
@@ -77,11 +76,11 @@ export class ConsensusProtocolHander implements ProtocolHandler {
     }
   }
 
-  private async gossipVotesLoop(reimint: ReimintConsensusEngine) {
+  private async gossipVotesLoop() {
     while (!this.aborted) {
       try {
         // pick vote from memory and send
-        const votes = reimint.state.pickVoteSetToSend(this.height, this.round, this.proposalPOLRound, this.step);
+        const votes = this.reimint.state.pickVoteSetToSend(this.height, this.round, this.proposalPOLRound, this.step);
         if (votes && this.pickAndSend(votes)) {
           continue;
         }

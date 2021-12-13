@@ -4,7 +4,7 @@ import { Block, HeaderData, Transaction, Receipt } from '@rei-network/structure'
 import { Common } from '@rei-network/common';
 import { logger, nowTimestamp, getRandomIntInclusive } from '@rei-network/utils';
 import { ConsensusEngine } from '../types';
-import { BaseConsensusEngine } from '../baseConsensusEngine';
+import { BaseConsensusEngine } from '../engine';
 import { getGasLimitByCommon } from '../../utils';
 import { Clique } from './clique';
 

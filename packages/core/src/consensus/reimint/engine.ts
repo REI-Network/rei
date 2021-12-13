@@ -8,7 +8,7 @@ import { Node } from '../../node';
 import { isEmptyAddress, getGasLimitByCommon } from '../../utils';
 import { getConsensusTypeByCommon } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
-import { BaseConsensusEngine } from '../baseConsensusEngine';
+import { BaseConsensusEngine } from '../engine';
 import { WAL, IProcessBlockResult } from './types';
 import { StateMachine } from './state';
 import { Reimint } from './reimint';

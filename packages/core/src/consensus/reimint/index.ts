@@ -1,4 +1,4 @@
 export * from './reimint';
-export * from './reimintConsensusEngine';
+export * from './engine';
 export * from './types';
 export * from './state';

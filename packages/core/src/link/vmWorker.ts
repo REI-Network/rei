@@ -1,16 +1,17 @@
+import path from 'path';
 import { LevelUp } from 'levelup';
 import { Address, BN, BNLike, bufferToHex } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import { Blockchain } from '@rei-network/blockchain';
-import { Common } from '@rei-network/common';
-import { Database, DBSaveTxLookup, DBSaveReceipts } from '@rei-network/database';
+import { Common, getGenesisState } from '@rei-network/common';
+import { Database, DBSaveTxLookup, DBSaveReceipts, createEncodingLevelDB } from '@rei-network/database';
 import VM from '@gxchain2-ethereumjs/vm';
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
 import { Block, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { logger } from '@rei-network/utils';
-import { StakeManager, Router } from '../contracts';
+import { StakeManager, Router, Contract } from '../contracts';
 import { ValidatorSets } from '../staking';
 import { ConsensusType } from '../consensus/types';
 import { Evidence, ExtraData, EvidenceFactory } from '../consensus/reimint/types';
@@ -155,9 +156,32 @@ const vmHandlers = new Map<string, Handler>([
     }
   ],
   [
-    'init',
+    'generateGenesis',
     async function (this: VMWorker, data: any) {
-      await this.init();
+      const common = this.getCommon(0);
+      const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
+      const stateManager = new StateManager({ common, trie: new Trie(this.chaindb) });
+      await stateManager.generateGenesis(getGenesisState(this.chain));
+      let root = await stateManager.getStateRoot();
+
+      // if it is mainnet or devnet, deploy system contract now
+      if (this.chain === 'rei-devnet' || this.chain === 'rei-mainnet') {
+        const vm = await this.getVM(root, common);
+        const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
+        await Contract.deploy(evm, common);
+        root = await vm.stateManager.getStateRoot();
+      }
+
+      if (!root.equals(genesisBlock.header.stateRoot)) {
+        logger.error('State root not equal', bufferToHex(root), bufferToHex(genesisBlock.header.stateRoot));
+        throw new Error('state root not equal');
+      }
+    }
+  ],
+  [
+    'init',
+    async function (this: VMWorker, { path, chain }: { path: string; chain: string }) {
+      await this.init(path, chain);
     }
   ],
   [
@@ -169,45 +193,43 @@ const vmHandlers = new Map<string, Handler>([
 ]);
 
 export class VMWorker extends WorkerSide {
-  readonly chaindb: LevelUp;
-  readonly evidencedb: LevelUp;
-  readonly common: Common;
-
-  readonly db: Database;
-  readonly blockchain: Blockchain;
   readonly validatorSets: ValidatorSets;
-
   readonly clique: CliqueExecutor;
   readonly reimint: ReimintExecutor;
 
-  constructor(chaindb: LevelUp, evidencedb: LevelUp, common: Common) {
+  db!: Database;
+  chain!: string;
+  chaindb!: LevelUp;
+  common!: Common;
+  blockchain!: Blockchain;
+
+  constructor() {
     super(vmHandlers);
-    this.chaindb = chaindb;
-    this.evidencedb = evidencedb;
-    this.common = common;
 
     this.validatorSets = new ValidatorSets();
-    this.db = new Database(chaindb, common);
-
     this.clique = new CliqueExecutor(this);
     this.reimint = new ReimintExecutor(this);
+  }
 
-    const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
+  async init(_path: string, chain: string) {
+    this.common = Common.createCommonByBlockNumber(0, chain);
+    this.chain = chain;
+    this.chaindb = createEncodingLevelDB(path.join(_path, 'chaindb'));
+    this.db = new Database(this.chaindb, this.common);
+
+    const genesisBlock = Block.fromBlockData({ header: this.common.genesis() }, { common: this.common });
     this.blockchain = new Blockchain({
       dbManager: this.db,
-      common,
+      common: this.common,
       genesisBlock,
       validateBlocks: false,
       validateConsensus: false,
       hardforkByHeadBlockNumber: true
     });
-  }
-
-  async init() {
     await this.blockchain.init();
   }
 
-  override async abort() {
+  async abort() {
     await super.abort();
     await this.chaindb.close();
   }
@@ -250,6 +272,7 @@ export class VMWorker extends WorkerSide {
       hardforkByBlockNumber: true,
       common: stateManager._common,
       stateManager: stateManager,
+      blockchain: this.blockchain,
       getMiner: (header) => {
         const type = getConsensusTypeByCommon(header._common);
         if (type === ConsensusType.Clique) {

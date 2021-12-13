@@ -3,11 +3,6 @@ import cluster, { Worker } from 'cluster';
 import { Channel, logger } from '@rei-network/utils';
 import { Message, Handler } from './types';
 
-/**
- * TODO: fix this
- */
-(cluster.settings as any).serialization = 'advanced';
-
 type WaitingRequest = {
   resolve: (resps: any) => void;
   reject: (reason?: any) => void;
@@ -67,6 +62,10 @@ export abstract class Link {
       this.channel.abort();
       await this.runningPromise;
       this.runningPromise = undefined;
+      for (const { reject } of this.waitingRequests.values()) {
+        reject(new Error('aborted'));
+      }
+      this.waitingRequests.clear();
     }
   }
 
@@ -94,22 +93,30 @@ export abstract class Link {
     const req = this.waitingRequests.get(id);
     if (req) {
       const { resolve, reject } = req;
-      err ? reject(new Error(err)) : resolve(data);
+      err ? reject(err) : resolve(data);
       this.waitingRequests.delete(id);
     } else if (method !== undefined) {
       const handler = this.handlers.get(method);
       if (!handler) {
         this.send({ err: 'unknown method name: ' + method, id });
       } else {
+        let result: any;
         try {
-          let result = handler.call(this, data);
-          if (util.types.isPromise(result)) {
-            result = await result;
-          }
-          this.send({ data: result, id });
+          result = handler.call(this, data);
         } catch (err: any) {
-          console.log('err:', err);
-          this.send({ err: err.message, id });
+          this.send({ err: { message: err.message, type: err.type }, id });
+        }
+
+        if (util.types.isPromise(result)) {
+          result
+            .then((result) => {
+              this.send({ data: result, id });
+            })
+            .catch((err) => {
+              this.send({ err: { message: err.message, type: err.type }, id });
+            });
+        } else {
+          this.send({ data: result, id });
         }
       }
     } else {
@@ -141,7 +148,7 @@ export abstract class MasterSide extends Link {
 
   constructor(pathToWorker: string, handlers: Map<string, Handler>) {
     super(handlers);
-    cluster.setupMaster({ exec: pathToWorker });
+    (cluster as any).setupMaster({ exec: pathToWorker, serialization: 'advanced' });
     this.worker = cluster.fork();
   }
 

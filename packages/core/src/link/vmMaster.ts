@@ -24,12 +24,17 @@ export class VMMaster extends MasterSide {
     this.node = node;
   }
 
-  async init() {
-    await this.request('init', undefined);
+  async init(path: string, chain: string) {
+    await this.request('init', { path, chain });
   }
 
   async abort() {
     await this.request('abort', undefined);
+    await super.abort();
+  }
+
+  async generateGenesis() {
+    await this.request('generateGenesis', undefined);
   }
 
   //// levelDB ////

@@ -5,7 +5,7 @@ import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import { Database, createLevelDB } from '@rei-network/database';
 import { NetworkManager, Peer } from '@rei-network/network';
-import { Common, getGenesisState, getChain } from '@rei-network/common';
+import { Common, getChain } from '@rei-network/common';
 import { Blockchain } from '@rei-network/blockchain';
 import VM from '@gxchain2-ethereumjs/vm';
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
@@ -89,7 +89,7 @@ export class Node extends Initializer {
     this.wire = new WireProtocol(this);
     this.consensus = new ConsensusProtocol(this);
     this.accMngr = new AccountManager(options.account.keyStorePath);
-    this.master = new VMMaster(path.join(__dirname, '/worker.js'), this);
+    this.master = new VMMaster(path.join(__dirname, '/workers/vmWorker.js'), this);
 
     this.chain = options.chain ?? defaultChainName;
     /////// unsupport rei-mainnet ///////
@@ -106,9 +106,9 @@ export class Node extends Initializer {
     this.db = new Database(this.master as any, common);
     this.networkId = common.networkIdBN().toNumber();
     this.chainId = common.chainIdBN().toNumber();
+    this.evpool = new EvidencePool({ backend: new EvidenceDatabase(this.evidencedb) });
     this.clique = new CliqueConsensusEngine({ ...options.mine, node: this });
     this.reimint = new ReimintConsensusEngine({ ...options.mine, node: this });
-    this.evpool = new EvidencePool({ backend: new EvidenceDatabase(this.evidencedb) });
 
     const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
     this.genesisHash = genesisBlock.hash();
@@ -144,37 +144,19 @@ export class Node extends Initializer {
     };
   }
 
-  private async generateGenesis(latest: Block) {
-    if (latest.header.number.eqn(0)) {
-      const common = this.getCommon(0);
-      const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
-      const stateManager = new StateManager({ common, trie: new Trie(this.master) });
-      await stateManager.generateGenesis(getGenesisState(this.chain));
-      let root = await stateManager.getStateRoot();
-
-      // if it is mainnet or devnet, deploy system contract now
-      if (this.chain === 'rei-devnet' || this.chain === 'rei-mainnet') {
-        const vm = await this.getVM(root, common);
-        const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
-        await Contract.deploy(evm, common);
-        root = await vm.stateManager.getStateRoot();
-      }
-
-      if (!root.equals(genesisBlock.header.stateRoot)) {
-        logger.error('State root not equal', bufferToHex(root), bufferToHex(genesisBlock.header.stateRoot));
-        throw new Error('state root not equal');
-      }
-    }
-  }
-
   /**
    * Initialize the node
    */
   async init() {
-    await this.master.init();
+    this.master.start();
+    await this.master.init(this.datadir, this.chain);
+
     this.latestBlock = await this.master.latestBlock();
     this.totalDifficulty = await this.master.totalDifficulty(this.latestBlock.hash(), this.latestBlock.header.number);
-    await this.generateGenesis(this.latestBlock);
+    if (this.latestBlock.header.number.eqn(0)) {
+      await this.master.generateGenesis();
+    }
+
     await this.networkdb.open();
     await this.networkMngr.init();
     await this.txPool.init(this.latestBlock);

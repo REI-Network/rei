@@ -4,7 +4,7 @@ export type Message = {
   id: number;
   method?: string;
   data?: any;
-  err?: string;
+  err?: any;
 };
 
 export type Handler = (data: any) => any;

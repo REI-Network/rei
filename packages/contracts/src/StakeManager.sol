@@ -120,11 +120,6 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         }
     }
 
-    modifier onlyRouterOrFeePool() {
-        require(msg.sender == config.router() || msg.sender == config.feePool(), "StakeManager: only router or fee pool");
-        _;
-    }
-
     /**
      * Get the indexed validators length.
      */
@@ -461,7 +456,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * Reward validator, only can be called by system caller
      * @param validator         Validator address
      */
-    function reward(address validator) external payable override nonReentrant onlyRouterOrFeePool {
+    function reward(address validator) external payable override nonReentrant onlySystemCaller {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint256 commissionReward = msg.value.mul(v.commissionRate).div(100);
@@ -490,7 +485,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * @param validator         Validator address
      * @param reason            Slash reason
      */
-    function slash(address validator, uint8 reason) external override nonReentrant onlyRouter returns (uint256 amount) {
+    function slash(address validator, uint8 reason) external override nonReentrant onlySystemCaller returns (uint256 amount) {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint8 factor = config.getFactorByReason(reason);
@@ -518,7 +513,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         address _proposer,
         address[] calldata acValidators,
         int256[] calldata priorities
-    ) external override nonReentrant onlyRouter {
+    ) external override nonReentrant onlySystemCaller {
         require(acValidators.length == priorities.length, "StakeManager: invalid list length");
         proposer = _proposer;
         uint256 originLength = activeValidators.length;

@@ -1,10 +1,9 @@
-import type { Artifacts } from 'hardhat/types';
 import type Web3 from 'web3';
 import { assert, expect } from 'chai';
 import { BN, MAX_INTEGER } from 'ethereumjs-util';
 import { upTimestamp, toBN } from './utils';
 
-declare var artifacts: Artifacts;
+declare var artifacts: any;
 declare var web3: Web3;
 
 const Config = artifacts.require('Config_devnet');
@@ -48,7 +47,7 @@ describe('StakeManger', () => {
 
   it('should deploy succeed', async () => {
     config = new web3.eth.Contract(Config.abi, (await Config.new()).address, { from: deployer });
-    await config.methods.setRouter(deployer).send();
+    await config.methods.setSystemCaller(deployer).send();
     validatorRewardPool = new web3.eth.Contract(ValidatorRewardPool.abi, (await ValidatorRewardPool.new(config.options.address)).address, { from: deployer });
     await config.methods.setValidatorRewardPool(validatorRewardPool.options.address).send();
     let unstakePool = new web3.eth.Contract(UnstakePool.abi, (await UnstakePool.new(config.options.address)).address, { from: deployer });

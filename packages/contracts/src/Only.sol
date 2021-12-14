@@ -13,8 +13,8 @@ abstract contract Only is IOnly {
         _;
     }
 
-    modifier onlyRouter() {
-        require(msg.sender == config.router(), "Only: only router");
+    modifier onlySystemCaller() {
+        require(msg.sender == config.systemCaller(), "Only: only system caller");
         _;
     }
 

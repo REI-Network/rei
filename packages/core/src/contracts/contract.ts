@@ -49,18 +49,6 @@ export abstract class Contract {
     // deploy stake manager contract
     await deploy('sm', { types: ['address', 'address', 'address[]', 'int256[]'], values: [cfgaddr, genesisValidators.proposer.toString(), activeSigners, priorities] });
     const defaultArgs = { types: ['address'], values: [cfgaddr] };
-    // deploy fee contract
-    await deploy('f', defaultArgs);
-    // deploy fee pool contract
-    await deploy('fp', defaultArgs);
-    // deploy fee token contract
-    await deploy('ft', defaultArgs);
-    // deploy free fee token contract
-    await deploy('fft', defaultArgs);
-    // deploy free fee contract
-    await deploy('ff', defaultArgs);
-    // deploy contract fee contract
-    await deploy('cf');
     // deploy router contract
     await deploy('r', defaultArgs);
     // deploy unstake pool contract

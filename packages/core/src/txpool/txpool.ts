@@ -6,7 +6,6 @@ import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFu
 import { Transaction, WrappedTransaction, BlockHeader, Block } from '@rei-network/structure';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Node } from '../node';
-import { validateTx } from '../validation';
 import { isEnableStaking } from '../hardforks';
 import { InitializerWithEventEmitter } from '../types';
 import { getGasLimitByCommon } from '../utils';
@@ -516,13 +515,7 @@ export class TxPool extends InitializerWithEventEmitter {
       if (account.nonce.gt(tx.nonce)) {
         throw new Error(`nonce too low: ${tx.nonce.toString()} account: ${account.nonce.toString()}`);
       }
-      // estimate next block's timestamp
-      const period: number = this.currentHeader._common.consensusConfig().period;
-      const currentTimestamp = this.currentHeader.timestamp.toNumber();
-      // check whether the user's fee can cover tx costs
-      if (isEnableStaking(this.currentBlock._common)) {
-        await validateTx(tx, this.node.getRouter(this.currentVM, this.currentBlock), senderAddr, currentTimestamp + period, account.balance);
-      } else if (account.balance.lt(tx.getUpfrontCost())) {
+      if (account.balance.lt(tx.getUpfrontCost())) {
         throw new Error(`balance is not enough: ${tx.getUpfrontCost().toString()} account: ${account.balance.toString()}`);
       }
 

@@ -10,7 +10,6 @@ import { ValidatorSet, ValidatorChanges } from '../../staking';
 import { StakeManager, Router, SlashReason } from '../../contracts';
 import { Reimint } from '../../consensus/reimint/reimint';
 import { ExtraData, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint/types';
-import { makeRunTxCallback } from './makeRunTxCallback';
 
 export class ReimintExecutor implements Executor {
   private readonly backend: ExecutorBackend;
@@ -219,8 +218,7 @@ export class ReimintExecutor implements Executor {
       afterApply: async (state, { receipts: postByzantiumTxReceipts }) => {
         const receipts = postByzantiumTxReceiptsToReceipts(postByzantiumTxReceipts);
         validatorSet = await this.afterApply(vm, block, receipts, extraData.evidence, miner, blockReward, parentValidatorSet, parentStakeManager, parentRouter);
-      },
-      runTxOpts: { ...makeRunTxCallback(parentRouter, systemCaller, miner, pendingHeader.timestamp.toNumber()), skipBalance: true }
+      }
     };
 
     const result = await vm.runBlock(runBlockOptions);
@@ -243,14 +241,10 @@ export class ReimintExecutor implements Executor {
   async processTx(options: ProcessTxOpts) {
     const { root, block, tx, blockGasUsed } = options;
     const vm = await this.backend.getVM(root, block._common);
-    const systemCaller = Address.fromString(block._common.param('vm', 'scaddr'));
-    const router = this.backend.getRouter(vm, block);
     const result = await vm.runTx({
       tx,
       block,
-      blockGasUsed,
-      skipBalance: true,
-      ...makeRunTxCallback(router, systemCaller, Reimint.getMiner(block), block.header.timestamp.toNumber())
+      blockGasUsed
     });
     return {
       receipt: postByzantiumTxReceiptsToReceipts([result.receipt])[0],

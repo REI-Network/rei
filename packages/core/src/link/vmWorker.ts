@@ -11,7 +11,7 @@ import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
 import { Block, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { logger } from '@rei-network/utils';
-import { StakeManager, Router, Contract } from '../contracts';
+import { StakeManager, Contract } from '../contracts';
 import { ValidatorSets } from '../staking';
 import { ConsensusType } from '../consensus/types';
 import { Evidence, ExtraData, EvidenceFactory } from '../consensus/reimint/types';
@@ -293,11 +293,6 @@ export class VMWorker extends WorkerSide {
   getStakeManager(vm: VM, block: Block, common?: Common) {
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
     return new StakeManager(evm, common ?? block._common);
-  }
-
-  getRouter(vm: VM, block: Block, common?: Common) {
-    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
-    return new Router(evm, common ?? block._common);
   }
 
   async checkEvidence(evList: Evidence[]) {

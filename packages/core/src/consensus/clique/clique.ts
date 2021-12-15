@@ -1,6 +1,6 @@
-import { toBuffer, Address, BN } from 'ethereumjs-util';
+import { Address, BN } from 'ethereumjs-util';
 import { Blockchain } from '@rei-network/blockchain';
-import { Receipt, BlockHeader, Block, CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@rei-network/structure';
+import { BlockHeader, Block, CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from '@rei-network/structure';
 
 export class Clique {
   // disable constructor

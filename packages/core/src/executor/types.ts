@@ -6,7 +6,7 @@ import { Database } from '@rei-network/database';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import Bloom from '@gxchain2-ethereumjs/vm/dist/bloom';
 import { Block, TypedTransaction, Receipt } from '@rei-network/structure';
-import { StakeManager, Router } from '../contracts';
+import { StakeManager } from '../contracts';
 import { Evidence } from '../consensus/reimint/types';
 import { ValidatorSets, ValidatorSet } from '../staking';
 
@@ -58,7 +58,6 @@ export interface ExecutorBackend {
   getStateManager(root: Buffer, num: BNLike | Common): Promise<StateManager>;
   getVM(root: Buffer, num: BNLike | Common): Promise<VM>;
   getStakeManager(vm: VM, block: Block, common?: Common): StakeManager;
-  getRouter(vm: VM, block: Block, common?: Common): Router;
 
   checkEvidence(evidence: Evidence[]): Promise<void>;
 }

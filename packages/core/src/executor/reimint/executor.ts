@@ -7,7 +7,7 @@ import VM from '@gxchain2-ethereumjs/vm';
 import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executor } from '../types';
 import { postByzantiumTxReceiptsToReceipts } from '../../utils';
 import { ValidatorSet, ValidatorChanges } from '../../staking';
-import { StakeManager, Router, SlashReason } from '../../contracts';
+import { StakeManager, SlashReason } from '../../contracts';
 import { Reimint } from '../../consensus/reimint/reimint';
 import { ExtraData, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint/types';
 
@@ -52,11 +52,11 @@ export class ReimintExecutor implements Executor {
    *                       (used to call `Router.assignBlockReward` and `Router.onAfterBlock`)
    * @returns New validator set
    */
-  async afterApply(vm: VM, pendingBlock: Block, receipts: Receipt[], evidence: Evidence[], miner: Address, blockReward: BN, parentValidatorSet: ValidatorSet, parentStakeManager: StakeManager, parentRouter: Router) {
+  async afterApply(vm: VM, pendingBlock: Block, receipts: Receipt[], evidence: Evidence[], miner: Address, blockReward: BN, parentValidatorSet: ValidatorSet, parentStakeManager: StakeManager) {
     const pendingCommon = pendingBlock._common;
 
     let logs: Log[] = [];
-    const ethLogs = await parentRouter.assignBlockReward(miner, blockReward);
+    const ethLogs = await parentStakeManager.reward(miner, blockReward);
     if (ethLogs && ethLogs.length > 0) {
       logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));
     }
@@ -66,7 +66,7 @@ export class ReimintExecutor implements Executor {
         const { voteA, voteB } = ev;
         logger.debug('Reimint::afterApply, find evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
 
-        const ethLogs = await parentRouter.slash(ev.voteA.validator(), SlashReason.DuplicateVote);
+        const ethLogs = await parentStakeManager.slash(ev.voteA.validator(), SlashReason.DuplicateVote);
         if (ethLogs && ethLogs.length > 0) {
           logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));
         }
@@ -128,7 +128,7 @@ export class ReimintExecutor implements Executor {
     const activeSigners = activeValidators.map(({ validator }) => validator);
     const priorities = activeValidators.map(({ priority }) => priority);
     // call after block callback to save active validators list
-    await parentRouter.onAfterBlock(validatorSet.proposer, activeSigners, priorities);
+    await parentStakeManager.onAfterBlock(validatorSet.proposer, activeSigners, priorities);
     return validatorSet;
   }
 
@@ -148,14 +148,13 @@ export class ReimintExecutor implements Executor {
     const minerReward = new BN(pendingCommon.param('pow', 'minerReward'));
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.backend.getStakeManager(vm, block);
-    const parentRouter = this.backend.getRouter(vm, block);
     const parentValidatorSet = (await this.backend.validatorSets.get(parentStateRoot, parentStakeManager)).copy();
     parentValidatorSet.incrementProposerPriority(round);
 
     await vm.stateManager.checkpoint();
     try {
       await this.assignBlockReward(vm.stateManager, systemCaller, minerReward);
-      const validatorSet = await this.afterApply(vm, block, receipts, evidence, miner, minerReward, parentValidatorSet, parentStakeManager, parentRouter);
+      const validatorSet = await this.afterApply(vm, block, receipts, evidence, miner, minerReward, parentValidatorSet, parentStakeManager);
       await vm.stateManager.commit();
       const finalizedStateRoot = await vm.stateManager.getStateRoot();
       return {
@@ -186,7 +185,6 @@ export class ReimintExecutor implements Executor {
 
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.backend.getStakeManager(vm, block);
-    const parentRouter = this.backend.getRouter(vm, block);
     let parentValidatorSet = await this.backend.validatorSets.get(root, parentStakeManager);
 
     const extraData = ExtraData.fromBlockHeader(pendingHeader, { valSet: parentValidatorSet });
@@ -217,7 +215,7 @@ export class ReimintExecutor implements Executor {
       },
       afterApply: async (state, { receipts: postByzantiumTxReceipts }) => {
         const receipts = postByzantiumTxReceiptsToReceipts(postByzantiumTxReceipts);
-        validatorSet = await this.afterApply(vm, block, receipts, extraData.evidence, miner, blockReward, parentValidatorSet, parentStakeManager, parentRouter);
+        validatorSet = await this.afterApply(vm, block, receipts, extraData.evidence, miner, blockReward, parentValidatorSet, parentStakeManager);
       }
     };
 

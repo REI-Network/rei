@@ -22,7 +22,7 @@ import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombi
 import { BlockchainMonitor } from './blockchainMonitor';
 import { WireProtocol, ConsensusProtocol } from './protocols';
 import { ValidatorSets } from './staking';
-import { StakeManager, Router } from './contracts';
+import { StakeManager } from './contracts';
 import { ConsensusEngine, ReimintConsensusEngine, CliqueConsensusEngine, ConsensusType, ExtraData, EvidencePool, EvidenceDatabase } from './consensus';
 import { EMPTY_ADDRESS } from './utils';
 import { isEnableRemint, getConsensusTypeByCommon } from './hardforks';
@@ -350,18 +350,6 @@ export class Node extends Initializer {
   getStakeManager(vm: VM, block: Block, common?: Common) {
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
     return new StakeManager(evm, common ?? block._common);
-  }
-
-  /**
-   * Get router contract object
-   * @param vm - Target vm instance
-   * @param block - Target block
-   * @param common - Common instance
-   * @returns Router contract object
-   */
-  getRouter(vm: VM, block: Block, common?: Common) {
-    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
-    return new Router(evm, common ?? block._common);
   }
 
   /**

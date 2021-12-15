@@ -113,7 +113,7 @@ export abstract class Link {
               this.send({ data: result, id });
             })
             .catch((err) => {
-              this.send({ err: { message: err.message, type: err.type }, id });
+              this.send({ err: { message: err.message, type: err.type, stack: err.stack }, id });
             });
         } else {
           this.send({ data: result, id });

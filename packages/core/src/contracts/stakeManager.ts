@@ -15,7 +15,10 @@ const methods = {
   getVotingPowerByAddress: toBuffer('0x7fdde75c'),
   activeValidatorsLength: toBuffer('0x75bac430'),
   activeValidators: toBuffer('0x14f64c78'),
-  proposer: toBuffer('0xa8e4fb90')
+  proposer: toBuffer('0xa8e4fb90'),
+  reward: toBuffer('0x6353586b'),
+  slash: toBuffer('0x30b409a4'),
+  onAfterBlock: toBuffer('0x9313f105')
 };
 
 // event topic
@@ -27,6 +30,10 @@ const events = {
   IndexedValidator: toBuffer('0x07c18d1e961213770ba59e4b4001fc312f17def9ba35867316edefe029c5dd18'),
   UnindexedValidator: toBuffer('0xa37745de139b774fe502f6f6da1c791e290244eb016b146816e3bcd8b13bc999')
 };
+
+export enum SlashReason {
+  DuplicateVote = 0
+}
 
 // active validator information
 export type ActiveValidator = {
@@ -190,6 +197,26 @@ export class StakeManager extends Contract {
         validator: bufferToAddress(returnValue.slice(i++ * 32, i * 32)),
         priority: decodeInt256(returnValue.slice(i++ * 32, i * 32))
       };
+    });
+  }
+
+  reward(validator: Address, amount: BN) {
+    return this.runWithLogger(async () => {
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('reward', ['address'], [validator.toString()], amount));
+      return logs;
+    });
+  }
+
+  slash(validator: Address, reason: SlashReason) {
+    return this.runWithLogger(async () => {
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('slash', ['address', 'uint8'], [validator.toString(), reason]));
+      return logs;
+    });
+  }
+
+  onAfterBlock(proposer: Address, activeValidators: Address[], priorities: BN[]) {
+    return this.runWithLogger(async () => {
+      await this.executeMessage(this.makeSystemCallerMessage('onAfterBlock', ['address', 'address[]', 'int256[]'], [proposer.toString(), activeValidators.map((addr) => addr.toString()), priorities.map((p) => p.toString())]));
     });
   }
 }

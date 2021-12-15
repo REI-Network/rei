@@ -9,7 +9,7 @@ import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/stat
 import { Block, TypedTransaction } from '@rei-network/structure';
 import { logger } from '@rei-network/utils';
 import { FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, ExecutorBackend, Executor } from '../types';
-import { Contract, Router } from '../../contracts';
+import { Contract } from '../../contracts';
 import { ValidatorSet } from '../../staking';
 import { isEnableRemint } from '../../hardforks';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
@@ -50,18 +50,18 @@ export class CliqueExecutor implements Executor {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deploy(evm, nextCommon);
 
-      const parentRouter = new Router(evm, nextCommon);
+      // const parentStakeManager = new StakeManager(evm, nextCommon);
       validatorSet = ValidatorSet.createGenesisValidatorSet(nextCommon);
 
-      const activeValidators = validatorSet.activeValidators();
-      if (activeValidators.length === 0) {
-        throw new Error('activeValidators length is zero');
-      }
+      // const activeValidators = validatorSet.activeValidators();
+      // if (activeValidators.length === 0) {
+      //   throw new Error('activeValidators length is zero');
+      // }
 
-      const activeSigners = activeValidators.map(({ validator }) => validator);
-      const priorities = activeValidators.map(({ priority }) => priority);
-      // call after block callback to save active validators list
-      await parentRouter!.onAfterBlock(validatorSet.proposer, activeSigners, priorities);
+      // const activeSigners = activeValidators.map(({ validator }) => validator);
+      // const priorities = activeValidators.map(({ priority }) => priority);
+      // // call after block callback to save active validators list
+      // await parentStakeManager!.onAfterBlock(validatorSet.proposer, activeSigners, priorities);
     }
 
     return validatorSet;

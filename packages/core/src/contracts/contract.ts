@@ -49,8 +49,6 @@ export abstract class Contract {
     // deploy stake manager contract
     await deploy('sm', { types: ['address', 'address', 'address[]', 'int256[]'], values: [cfgaddr, genesisValidators.proposer.toString(), activeSigners, priorities] });
     const defaultArgs = { types: ['address'], values: [cfgaddr] };
-    // deploy router contract
-    await deploy('r', defaultArgs);
     // deploy unstake pool contract
     await deploy('up', defaultArgs);
     // deploy validator reward pool contract

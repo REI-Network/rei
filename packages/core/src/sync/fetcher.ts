@@ -5,8 +5,7 @@ import { PChannel, logger } from '@rei-network/utils';
 import { WireProtocol, WireProtocolHandler } from '../protocols';
 import { LimitedConcurrency } from './limited';
 
-const defaultDownloadBodiesLimit = 5;
-const defaultProcessBodiesLimit = 3;
+const defaultDownloadBodiesLimit = 3;
 
 export interface FetcherOptions {
   /**
@@ -14,13 +13,9 @@ export interface FetcherOptions {
    */
   downloadElementsCountLimit: BN;
   /**
-   * How many remote handlers to download the block body at the same time(default: 5)
+   * How many remote handlers to download the block body at the same time(default: 3)
    */
   downloadBodiesLimit?: number;
-  /**
-   * How many tasks of processing blocks can be cached in memory(default: 3)
-   */
-  processBodiesLimit?: number;
   /**
    * Common instance used to construct the block
    */
@@ -57,7 +52,6 @@ export class Fetcher {
   private readonly common: Common;
   private readonly downloadElementsCountLimit: BN;
   private readonly downloadBodiesLimit: number;
-  private readonly processBodiesLimit: number;
 
   private readonly useless = new Set<WireProtocolHandler>();
   private readonly processBlocksChannel = new PChannel<ProcessBlocks>({
@@ -77,7 +71,6 @@ export class Fetcher {
     this.common = options.common;
     this.downloadElementsCountLimit = options.downloadElementsCountLimit.clone();
     this.downloadBodiesLimit = options.downloadBodiesLimit ?? defaultDownloadBodiesLimit;
-    this.processBodiesLimit = options.processBodiesLimit ?? defaultProcessBodiesLimit;
   }
 
   /**
@@ -116,7 +109,6 @@ export class Fetcher {
     const cumulativeTotalDifficulty = new BN(0);
 
     const downloadBodiesLimit = new LimitedConcurrency(this.downloadBodiesLimit);
-    const processBlocksLimit = new LimitedConcurrency(this.processBodiesLimit);
 
     // start process blocks loop
     const loopPromise = this.processBlocksLoop();
@@ -131,7 +123,8 @@ export class Fetcher {
       await downloadBodiesLimit.newConcurrency(
         this.downloadBodies.bind(this, handler.protocol, headers, async (blocks) => {
           // try to add process blocks task by blocks
-          await processBlocksLimit.newConcurrency(this.processBlocks.bind(this, blocks));
+          // await processBlocksLimit.newConcurrency(this.processBlocks.bind(this, blocks));
+          await this.processBlocks(blocks);
         })
       );
     });
@@ -140,11 +133,7 @@ export class Fetcher {
 
     await downloadBodiesLimit.finished();
 
-    // now, all bodies have been downloaded and added to `processBlocksLimit`
-
-    await processBlocksLimit.finished();
-
-    // now, all blocks have been processed
+    // now, all bodies have been downloaded and processed
 
     // wait for the loop to exit and reset
     this.processBlocksChannel.abort();

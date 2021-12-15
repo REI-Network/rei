@@ -21,7 +21,7 @@ setCustomHashFunction(customHashFunction);
  */
 export function getConsensusTypeByCommon(common: Common) {
   if (common.chainName() === 'rei-testnet') {
-    return common.gteHardfork('testnet-hf1') ? ConsensusType.Reimint : ConsensusType.Clique;
+    return ConsensusType.Reimint;
   } else if (common.chainName() === 'rei-mainnet') {
     return ConsensusType.Reimint;
   } else if (common.chainName() === 'rei-devnet') {
@@ -36,9 +36,9 @@ export function getConsensusTypeByCommon(common: Common) {
  * @param common - Common instance
  * @returns Enable if `true`
  */
-export function isEnableStaking(common: Common) {
+export function isEnableRemint(common: Common) {
   if (common.chainName() === 'rei-testnet') {
-    return common.gteHardfork('testnet-hf1');
+    return true;
   } else if (common.chainName() === 'rei-mainnet') {
     return true;
   } else if (common.chainName() === 'rei-devnet') {

@@ -11,7 +11,7 @@ import { logger } from '@rei-network/utils';
 import { FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, ExecutorBackend, Executor } from '../types';
 import { Contract, Router } from '../../contracts';
 import { ValidatorSet } from '../../staking';
-import { isEnableStaking } from '../../hardforks';
+import { isEnableRemint } from '../../hardforks';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
 import { Clique } from '../../consensus/clique/clique';
 
@@ -45,7 +45,7 @@ export class CliqueExecutor implements Executor {
   async afterApply(vm: VM, pendingBlock: Block) {
     let validatorSet: ValidatorSet | undefined;
     const nextCommon = this.backend.getCommon(pendingBlock.header.number.addn(1));
-    if (isEnableStaking(nextCommon)) {
+    if (isEnableRemint(nextCommon)) {
       // deploy system contracts
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deploy(evm, nextCommon);

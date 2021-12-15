@@ -22,12 +22,11 @@ import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombi
 import { BlockchainMonitor } from './blockchainMonitor';
 import { WireProtocol, ConsensusProtocol } from './protocols';
 import { ValidatorSets } from './staking';
-import { StakeManager, Router, Contract } from './contracts';
-import { ConsensusEngine, ReimintConsensusEngine, CliqueConsensusEngine, ConsensusType, ExtraData } from './consensus';
+import { StakeManager, Router } from './contracts';
+import { ConsensusEngine, ReimintConsensusEngine, CliqueConsensusEngine, ConsensusType, ExtraData, EvidencePool, EvidenceDatabase } from './consensus';
 import { EMPTY_ADDRESS } from './utils';
-import { isEnableStaking, getConsensusTypeByCommon } from './hardforks';
+import { isEnableRemint, getConsensusTypeByCommon } from './hardforks';
 import { Initializer, CommitBlockOptions, NodeOptions, NodeStatus } from './types';
-import { EvidencePool, EvidenceDatabase } from './consensus/reimint/types';
 import { VMMaster } from './link';
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
@@ -443,7 +442,7 @@ export class Node extends Initializer {
           this.totalDifficulty = await this.master.totalDifficulty(this.latestBlock.hash(), this.latestBlock.header.number);
 
           const promises = [this.txPool.newBlock(block), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
-          if (isEnableStaking(block._common)) {
+          if (isEnableRemint(block._common)) {
             const extraData = ExtraData.fromBlockHeader(block.header);
             this.evpool.update(extraData.evidence, block.header.number);
           }

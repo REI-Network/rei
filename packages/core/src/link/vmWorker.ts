@@ -17,7 +17,7 @@ import { ConsensusType } from '../consensus/types';
 import { Evidence, ExtraData, EvidenceFactory } from '../consensus/reimint/types';
 import { EMPTY_ADDRESS } from '../utils';
 import { CliqueExecutor, ReimintExecutor } from '../executor';
-import { isEnableStaking, getConsensusTypeByCommon } from '../hardforks';
+import { isEnableRemint, getConsensusTypeByCommon } from '../hardforks';
 import { WorkerSide } from './link';
 import { Handler, RLPFinalizeOpts, RLPProcessBlockOpts, RLPProcessTxOpts, RLPCommitBlockOpts, RLPCommitBlockResult } from './types';
 import { fromFinalizeResult, fromProcessBlockResult, fromProcessTxResult, toCommitBlockOpts, toFinalizeOpts, toProcessBlockOpts, toProcessTxOpts } from './utils';
@@ -239,7 +239,7 @@ export class VMWorker extends WorkerSide {
   }
 
   getExecutor(common: Common) {
-    return isEnableStaking(common) ? this.reimint : this.clique;
+    return isEnableRemint(common) ? this.reimint : this.clique;
   }
 
   getCommon(num: BNLike) {

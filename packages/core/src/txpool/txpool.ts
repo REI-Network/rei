@@ -6,7 +6,6 @@ import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFu
 import { Transaction, WrappedTransaction, BlockHeader, Block } from '@rei-network/structure';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Node } from '../node';
-import { isEnableStaking } from '../hardforks';
 import { InitializerWithEventEmitter } from '../types';
 import { getGasLimitByCommon } from '../utils';
 import { TxSortedMap } from './txmap';
@@ -567,11 +566,9 @@ export class TxPool extends InitializerWithEventEmitter {
       const forwards = queue.forward(accountInDB.nonce);
       this.removeTxFromGlobal(forwards);
       let dropsLength = 0;
-      if (!isEnableStaking(this.currentBlock._common)) {
-        const { removed: drops } = queue.filter(accountInDB.balance, this.currentHeader.gasLimit);
-        this.removeTxFromGlobal(drops);
-        dropsLength = drops.length;
-      }
+      const { removed: drops } = queue.filter(accountInDB.balance, this.currentHeader.gasLimit);
+      this.removeTxFromGlobal(drops);
+      dropsLength = drops.length;
       const totalReadies = queue.ready(await account.getPendingNonce());
       for (const tx of totalReadies) {
         if (this.promoteTx(tx)) {
@@ -622,13 +619,11 @@ export class TxPool extends InitializerWithEventEmitter {
       const forwards = pending.forward(accountInDB.nonce);
       this.removeTxFromGlobal(forwards);
       let dropsLength = 0;
-      if (!isEnableStaking(this.currentBlock._common)) {
-        const { removed: drops, invalids } = pending.filter(accountInDB.balance, this.currentHeader.gasLimit);
-        this.removeTxFromGlobal(drops);
-        dropsLength = drops.length;
-        for (const tx of invalids) {
-          this.enqueueTx(tx);
-        }
+      const { removed: drops, invalids } = pending.filter(accountInDB.balance, this.currentHeader.gasLimit);
+      this.removeTxFromGlobal(drops);
+      dropsLength = drops.length;
+      for (const tx of invalids) {
+        this.enqueueTx(tx);
       }
       // resize priced
       this.priced.removed(forwards.length + dropsLength);

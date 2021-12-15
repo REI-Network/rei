@@ -4,6 +4,7 @@ pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "./interfaces/IUnstakePool.sol";
 import "./Only.sol";
 
@@ -59,7 +60,7 @@ contract UnstakePool is ReentrancyGuard, Only, IUnstakePool {
         totalSupplyOf[validator] = totalSupply.sub(shares, "UnstakePool: insufficient total supply");
         if (amount > 0) {
             balanceOf[validator] = balance.sub(amount);
-            to.transfer(amount);
+            Address.sendValue(to, amount);
         }
     }
 
@@ -74,7 +75,7 @@ contract UnstakePool is ReentrancyGuard, Only, IUnstakePool {
         amount = balance.mul(factor).div(100);
         if (amount > 0) {
             balanceOf[validator] = balance.sub(amount);
-            address(0).transfer(amount);
+            Address.sendValue(address(0), amount);
         }
     }
 }

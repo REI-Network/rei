@@ -19,6 +19,7 @@ abstract contract Only is IOnly {
     }
 
     constructor(IConfig _config) public {
+        require(address(_config) != address(0), "Only: invalid config");
         config = _config;
     }
 }

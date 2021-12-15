@@ -9,10 +9,13 @@ const sendTestTransaction = (nonce: number) => {
   return web3.eth.sendTransaction({
     from: accMngr.n2a('test1').toString(),
     to: accMngr.n2a('genesis1').toString(),
+    // to: '0x094319890280E2c6430091FEc44822540229ca62',
     value: 0,
     gas: 21000,
+    // gas: 50000,
     gasPrice: 1,
     nonce
+    // data: '0xa0712d680000000000000000000000000000000000000000000000000000000000000064'
   });
 };
 
@@ -58,7 +61,7 @@ describe('Concurency', () => {
     let ps: Promise<any>[] = [];
     const sendOnce = async () => {
       ps.push(sendTestTransaction(nonce++));
-      if (ps.length >= 100) {
+      if (ps.length >= 250) {
         console.log('tx too many, await');
         await Promise.all(ps);
         console.log('tx clear up');
@@ -66,7 +69,7 @@ describe('Concurency', () => {
       }
     };
 
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < 10000; i++) {
       await sendOnce();
     }
 

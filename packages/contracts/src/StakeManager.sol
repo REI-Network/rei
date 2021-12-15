@@ -5,10 +5,10 @@ pragma solidity ^0.6.0;
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/EnumerableMap.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "./interfaces/IUnstakePool.sol";
 import "./interfaces/IValidatorRewardPool.sol";
 import "./interfaces/IStakeManager.sol";
-import "./libraries/Util.sol";
 import "./CommissionShare.sol";
 import "./Only.sol";
 
@@ -281,7 +281,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
 
     // create a new validator
     function createValidator(address validator) private returns (Validator memory) {
-        require(!Util.isContract(validator), "StakeManager: validator can not be a contract");
+        require(!Address.isContract(validator), "StakeManager: validator can not be a contract");
         uint256 id = validatorId;
         Validator storage v = validators[validator];
         v.id = id;
@@ -447,7 +447,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0) && !indexedValidators.contains(v.id), "StakeManager: invalid validator");
         uint256 votingPower = getVotingPower(v.commissionShare, validator);
-        require(votingPower >= config.minIndexVotingPower());
+        require(votingPower >= config.minIndexVotingPower(), "StakeManager: invalid votingPower");
         indexedValidators.set(v.id, validator);
         emit IndexedValidator(validator, votingPower);
     }
@@ -514,6 +514,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         address[] calldata acValidators,
         int256[] calldata priorities
     ) external override nonReentrant onlySystemCaller {
+        require(_proposer != address(0), "StakeManager: invalid proposer");
         require(acValidators.length == priorities.length, "StakeManager: invalid list length");
         proposer = _proposer;
         uint256 originLength = activeValidators.length;

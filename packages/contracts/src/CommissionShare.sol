@@ -4,6 +4,7 @@ pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "./interfaces/ICommissionShare.sol";
 import "./libraries/Util.sol";
 import "./Only.sol";
@@ -13,6 +14,7 @@ contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
     address public validator;
 
     constructor(IConfig config, address _validator) public ERC20("CommissionShare", "CS") Only(config) {
+        require(_validator != address(0), "CommissionShare: invalid validtor");
         validator = _validator;
     }
 
@@ -77,7 +79,7 @@ contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
         }
         _burn(msg.sender, shares);
         if (amount > 0) {
-            msg.sender.transfer(amount);
+            Address.sendValue(msg.sender, amount);
         }
     }
 
@@ -94,7 +96,7 @@ contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
         require(factor <= 100, "CommissionShare: invalid factor");
         amount = address(this).balance.mul(factor).div(100);
         if (amount > 0) {
-            address(0).transfer(amount);
+            Address.sendValue(address(0), amount);
         }
     }
 }

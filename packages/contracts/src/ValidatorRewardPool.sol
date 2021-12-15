@@ -4,6 +4,7 @@ pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "./interfaces/IValidatorRewardPool.sol";
 import "./Only.sol";
 
@@ -22,7 +23,7 @@ contract ValidatorRewardPool is ReentrancyGuard, Only, IValidatorRewardPool {
      */
     function claim(address validator, uint256 amount) external override nonReentrant onlyStakeManager {
         balanceOf[validator] = balanceOf[validator].sub(amount, "ValidatorRewardPool: insufficient balance");
-        msg.sender.transfer(amount);
+        Address.sendValue(msg.sender, amount);
     }
 
     /**
@@ -45,7 +46,7 @@ contract ValidatorRewardPool is ReentrancyGuard, Only, IValidatorRewardPool {
         amount = balance.mul(factor).div(100);
         if (amount > 0) {
             balanceOf[validator] = balance.sub(amount);
-            address(0).transfer(amount);
+            Address.sendValue(address(0), amount);
         }
     }
 }

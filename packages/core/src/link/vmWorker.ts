@@ -164,8 +164,8 @@ const vmHandlers = new Map<string, Handler>([
       await stateManager.generateGenesis(getGenesisState(this.chain));
       let root = await stateManager.getStateRoot();
 
-      // if it is mainnet or devnet, deploy system contract now
-      if (this.chain === 'rei-devnet' || this.chain === 'rei-mainnet') {
+      // deploy system contract
+      if (isEnableRemint(common)) {
         const vm = await this.getVM(root, common);
         const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
         await Contract.deploy(evm, common);

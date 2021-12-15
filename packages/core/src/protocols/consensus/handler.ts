@@ -1,9 +1,9 @@
 import { BN } from 'ethereumjs-util';
 import { Channel, createBufferFunctionalSet, logger } from '@rei-network/utils';
+import { Peer, ProtocolHandler } from '@rei-network/network';
 import { RoundStepType, Proposal, BitArray, VoteType, VoteSet, MessageFactory, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint/types';
 import * as m from '../../consensus/reimint/types/messages';
 import { ConsensusProtocol } from './protocol';
-import { Peer, ProtocolHandler } from '@rei-network/network';
 
 const peerGossipSleepDuration = 100;
 const maxQueuedEvidence = 100;
@@ -15,7 +15,12 @@ export class ConsensusProtocolHander implements ProtocolHandler {
 
   private aborted: boolean = false;
   private evidenceQueue = new Channel<Evidence>({ max: maxQueuedEvidence });
+
   private _knowEvidence = createBufferFunctionalSet();
+
+  protected handshakeResolve?: (result: boolean) => void;
+  protected handshakeTimeout?: NodeJS.Timeout;
+  protected readonly handshakePromise: Promise<boolean>;
 
   /////////////// PeerRoundState ///////////////
   private height: BN = new BN(0);
@@ -37,6 +42,26 @@ export class ConsensusProtocolHander implements ProtocolHandler {
   constructor(protocol: ConsensusProtocol, peer: Peer) {
     this.peer = peer;
     this.protocol = protocol;
+
+    this.handshakePromise = new Promise<boolean>((resolve) => {
+      this.handshakeResolve = resolve;
+    });
+    this.handshakePromise.then((result) => {
+      if (result) {
+        this.protocol.addHandler(this);
+
+        // start gossip loop
+        if (this.reimint.isStarted) {
+          this.onEngineStart();
+        } else {
+          this.reimint.on('start', this.onEngineStart);
+        }
+
+        // send round step message
+        const newRoundMsg = this.reimint.state.genNewRoundStepMessage();
+        newRoundMsg && this.send(newRoundMsg);
+      }
+    });
   }
 
   get node() {
@@ -48,6 +73,12 @@ export class ConsensusProtocolHander implements ProtocolHandler {
   }
 
   private onEngineStart = () => {
+    // gossip evidence
+    this.node.evpool.on('evidence', this.onEvidence);
+    for (const ev of this.node.evpool.pendingEvidence) {
+      this.evidenceQueue.push(ev);
+    }
+
     this.gossipDataLoop();
     this.gossipVotesLoop();
     this.gossipEvidenceLoop();
@@ -162,23 +193,19 @@ export class ConsensusProtocolHander implements ProtocolHandler {
    * {@link ProtocolHandler.handshake}
    */
   handshake() {
-    this.protocol.addHandler(this);
-
-    this.node.evpool.on('evidence', this.onEvidence);
-    for (const ev of this.node.evpool.pendingEvidence) {
-      this.evidenceQueue.push(ev);
+    if (!this.handshakeResolve) {
+      throw new Error('repeated handshake');
     }
-
-    if (this.reimint.isStarted) {
-      this.onEngineStart();
-    } else {
-      this.reimint.on('start', this.onEngineStart);
-    }
-
-    const newRoundMsg = this.reimint.state.genNewRoundStepMessage();
-    newRoundMsg && this.send(newRoundMsg);
-
-    return true;
+    const status = this.protocol.node.status;
+    this.send(new m.HandshakeMessage(status.networkId, status.genesisHash));
+    this.handshakeTimeout = setTimeout(() => {
+      this.handshakeTimeout = undefined;
+      if (this.handshakeResolve) {
+        this.handshakeResolve(false);
+        this.handshakeResolve = undefined;
+      }
+    }, 2000);
+    return this.handshakePromise;
   }
 
   /**
@@ -205,7 +232,9 @@ export class ConsensusProtocolHander implements ProtocolHandler {
    */
   async handle(data: Buffer) {
     const msg = MessageFactory.fromSerializedMessage(data);
-    if (msg instanceof m.NewRoundStepMessage) {
+    if (msg instanceof m.HandshakeMessage) {
+      this.applyHandshakeMessage(msg);
+    } else if (msg instanceof m.NewRoundStepMessage) {
       this.applyNewRoundStepMessage(msg);
     } else if (msg instanceof m.NewValidBlockMessage) {
       this.applyNewValidBlockMessage(msg);
@@ -243,6 +272,19 @@ export class ConsensusProtocolHander implements ProtocolHandler {
       });
     } else {
       logger.warn('ConsensusProtocolHander::handle, unknown message');
+    }
+  }
+
+  private applyHandshakeMessage(msg: m.HandshakeMessage) {
+    if (this.handshakeResolve) {
+      const localStatus = this.protocol.node.status;
+      const result = localStatus.genesisHash.equals(msg.genesisHash) && localStatus.networkId === msg.networkId;
+      this.handshakeResolve(result);
+      this.handshakeResolve = undefined;
+      if (this.handshakeTimeout) {
+        clearTimeout(this.handshakeTimeout);
+        this.handshakeTimeout = undefined;
+      }
     }
   }
 

@@ -75,3 +75,4 @@ MessageFactory.registry.register(m.VoteSetBitsMessage);
 MessageFactory.registry.register(m.GetProposalBlockMessage);
 MessageFactory.registry.register(m.ProposalBlockMessage);
 MessageFactory.registry.register(m.DuplicateVoteEvidenceMessage);
+MessageFactory.registry.register(m.HandshakeMessage);

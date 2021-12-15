@@ -289,11 +289,12 @@ export class WireProtocolHandler implements ProtocolHandler {
     }
     this.send(0, this.node.status);
     this.handshakeTimeout = setTimeout(() => {
+      this.handshakeTimeout = undefined;
       if (this.handshakeResolve) {
         this.handshakeResolve(false);
         this.handshakeResolve = undefined;
       }
-    }, 8000);
+    }, 2000);
     return this.handshakePromise;
   }
 

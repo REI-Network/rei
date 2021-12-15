@@ -422,3 +422,35 @@ export class DuplicateVoteEvidenceMessage implements Message {
     // do nothing
   }
 }
+
+export class HandshakeMessage implements Message {
+  readonly networkId: number;
+  readonly genesisHash: Buffer;
+
+  constructor(networkId: number, genesisHash: Buffer) {
+    this.networkId = networkId;
+    this.genesisHash = genesisHash;
+  }
+
+  static readonly code = 11;
+
+  static fromValuesArray(values: Buffer[]) {
+    if (values.length !== 2) {
+      throw new Error('invalid values');
+    }
+
+    return new HandshakeMessage(bufferToInt(values[0]), values[1]);
+  }
+
+  raw() {
+    return [intToBuffer(this.networkId), this.genesisHash];
+  }
+
+  serialize(): Buffer {
+    return rlp.encode(this.raw());
+  }
+
+  validateBasic(): void {
+    // do nothing
+  }
+}

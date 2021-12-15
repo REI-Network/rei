@@ -13,7 +13,7 @@ contract CommissionShare is ReentrancyGuard, ERC20, Only, ICommissionShare {
     // validator address
     address public validator;
 
-    constructor(IConfig config, address _validator) public ERC20("CommissionShare", "CS") Only(config) {
+    constructor(IConfig config, address _validator) public ERC20("CommissionShare", Util.concat("ShareOf ", Util.toString(_validator))) Only(config) {
         require(_validator != address(0), "CommissionShare: invalid validtor");
         validator = _validator;
     }

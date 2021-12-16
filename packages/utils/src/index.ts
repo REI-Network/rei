@@ -127,7 +127,7 @@ export const logger = tracer.colorConsole({
   }
 });
 
-export { setLevel } from 'tracer';
+export { setLevel, getLevel } from 'tracer';
 
 export * from './abort';
 export * from './channel';

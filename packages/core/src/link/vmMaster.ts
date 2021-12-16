@@ -1,5 +1,6 @@
 import { Address, BN } from 'ethereumjs-util';
 import { Block } from '@rei-network/structure';
+import { getLevel } from '@rei-network/utils';
 import { MasterSide } from './link';
 import { fromCommitBlockOpts, fromFinalizeOpts, fromProcessBlockOpts, fromProcessTxOpts, toCommitBlockResult, toFinalizeResult, toProcessBlockResult, toProcessTxResult } from './utils';
 import { FinalizeOpts, ProcessBlockOpts, ProcessTxOpts } from '../executor/types';
@@ -25,7 +26,7 @@ export class VMMaster extends MasterSide {
   }
 
   async init(path: string, chain: string) {
-    await this.request('init', { path, chain });
+    await this.request('init', { path, chain, logLevel: getLevel() });
   }
 
   async abort() {

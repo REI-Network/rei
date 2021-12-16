@@ -9,6 +9,7 @@ import VM from '@gxchain2-ethereumjs/vm';
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
 import { Block, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
+import { setLevel } from '@rei-network/utils';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { logger } from '@rei-network/utils';
 import { StakeManager, Contract } from '../contracts';
@@ -180,8 +181,8 @@ const vmHandlers = new Map<string, Handler>([
   ],
   [
     'init',
-    async function (this: VMWorker, { path, chain }: { path: string; chain: string }) {
-      await this.init(path, chain);
+    async function (this: VMWorker, { path, chain, logLevel }: { path: string; chain: string; logLevel: string }) {
+      await this.init(path, chain, logLevel);
     }
   ],
   [
@@ -211,7 +212,8 @@ export class VMWorker extends WorkerSide {
     this.reimint = new ReimintExecutor(this);
   }
 
-  async init(_path: string, chain: string) {
+  async init(_path: string, chain: string, logLevel: string) {
+    setLevel(logLevel);
     this.common = Common.createCommonByBlockNumber(0, chain);
     this.chain = chain;
     this.chaindb = createEncodingLevelDB(path.join(_path, 'chaindb'));

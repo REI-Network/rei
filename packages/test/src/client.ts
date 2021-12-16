@@ -16,11 +16,6 @@ export class Client {
   readonly configAddress: string;
   readonly accMngr: MockAccountManager;
   config!: Contract;
-  fee!: Contract;
-  freeFee!: Contract;
-  feePool!: Contract;
-  router!: Contract;
-  contractFee!: Contract;
   stakeManager!: Contract;
   unstakePool!: Contract;
   validatorRewardPool!: Contract;
@@ -42,11 +37,6 @@ export class Client {
       const contractName = contract.substr(0, 1).toUpperCase() + contract.substr(1);
       this[contract] = new this.web3.eth.Contract(this.loadABI(contractName), await this.config.methods[contract]().call());
     };
-    await initContract('fee');
-    await initContract('freeFee');
-    await initContract('feePool');
-    await initContract('router');
-    await initContract('contractFee');
     await initContract('stakeManager');
     await initContract('unstakePool');
     await initContract('validatorRewardPool');
@@ -71,22 +61,6 @@ export class Client {
         privateKey: bufferToHex(this.accMngr.n2p(name))
       });
     }
-  }
-
-  parseUsageInfoLog(log: any) {
-    if (log.address !== this.router.options.address) {
-      throw new Error('invalid logger address');
-    }
-    if (log.data.length !== 2 + 64 * 4) {
-      throw new Error('invalid log data');
-    }
-    const data: string = log.data.substr(2);
-    let index = 0;
-    const feeUsage = new BN(data.substr(index++ * 64, 64), 'hex');
-    const freeFeeUsage = new BN(data.substr(index++ * 64, 64), 'hex');
-    const contractFeeUsage = new BN(data.substr(index++ * 64, 64), 'hex');
-    const balanceUsage = new BN(data.substr(index++ * 64, 64), 'hex');
-    return { feeUsage, freeFeeUsage, contractFeeUsage, balanceUsage };
   }
 
   sendTestTransaction(gasPrice: BN, options?: TxOptions) {

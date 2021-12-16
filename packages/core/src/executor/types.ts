@@ -6,6 +6,7 @@ import { Database } from '@rei-network/database';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import Bloom from '@gxchain2-ethereumjs/vm/dist/bloom';
 import { Block, TypedTransaction, Receipt } from '@rei-network/structure';
+import { IDebug } from '@gxchain2-ethereumjs/vm/dist/types';
 import { StakeManager } from '../contracts';
 import { Evidence } from '../consensus/reimint/types';
 import { ValidatorSets, ValidatorSet } from '../staking';
@@ -27,6 +28,7 @@ export interface FinalizeResult {
 
 export interface ProcessBlockOpts {
   block: Block;
+  debug?: IDebug;
   skipConsensusValidation?: boolean;
   skipConsensusVerify?: boolean;
 }
@@ -67,10 +69,9 @@ export interface Executor {
    * Finalize a pending block,
    * assign block reward to miner and
    * do other things(afterApply) and
-   * calculate finalized state root and
-   * receipt trie
+   * calculate finalized state root
    * @param options - Finalize options
-   * @return FinalizedStateRoot and receiptTrie
+   * @return FinalizeResult
    */
   finalize(options: FinalizeOpts): Promise<FinalizeResult>;
 
@@ -84,7 +85,7 @@ export interface Executor {
   /**
    * Process transaction
    * @param options - Process transaction options
-   * @returns RunTxResult
+   * @returns ProcessTxResult
    */
   processTx(options: ProcessTxOpts): Promise<ProcessTxResult>;
 }

@@ -8,6 +8,15 @@ type WaitingRequest = {
   reject: (reason?: any) => void;
 };
 
+function convertError(err: any) {
+  return {
+    message: err.type,
+    type: err.type,
+    stack: err.stack,
+    notFound: err.notFound
+  };
+}
+
 export abstract class Link {
   private readonly handlers: Map<string, Handler>;
   private readonly waitingRequests = new Map<number, WaitingRequest>();
@@ -98,13 +107,13 @@ export abstract class Link {
     } else if (method !== undefined) {
       const handler = this.handlers.get(method);
       if (!handler) {
-        this.send({ err: 'unknown method name: ' + method, id });
+        this.send({ err: convertError(new Error('unknown method name: ' + method)), id });
       } else {
         let result: any;
         try {
           result = handler.call(this, data);
         } catch (err: any) {
-          this.send({ err: { message: err.message, type: err.type }, id });
+          this.send({ err: convertError(err), id });
         }
 
         if (util.types.isPromise(result)) {
@@ -113,14 +122,15 @@ export abstract class Link {
               this.send({ data: result, id });
             })
             .catch((err) => {
-              this.send({ err: { message: err.message, type: err.type, stack: err.stack }, id });
+              console.log('err:', err);
+              this.send({ err: convertError(err), id });
             });
         } else {
           this.send({ data: result, id });
         }
       }
     } else {
-      this.send({ err: 'missing method name', id });
+      this.send({ err: convertError(new Error('missing method name')), id });
     }
   }
 }

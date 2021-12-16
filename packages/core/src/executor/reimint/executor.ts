@@ -171,7 +171,7 @@ export class ReimintExecutor implements Executor {
    * {@link ConsensusEngine.processBlock}
    */
   async processBlock(options: ProcessBlockOpts) {
-    const { block, skipConsensusValidation, skipConsensusVerify } = options;
+    const { debug, block, skipConsensusValidation, skipConsensusVerify } = options;
 
     const pendingHeader = block.header;
     const pendingCommon = block._common;
@@ -207,6 +207,7 @@ export class ReimintExecutor implements Executor {
     const runBlockOptions: RunBlockOpts = {
       block,
       root,
+      debug,
       generate: false,
       skipBlockValidation: true,
       assignBlockReward: async (state: IStateManager, reward: BN) => {

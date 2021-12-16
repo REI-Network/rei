@@ -1,10 +1,12 @@
 import util from 'util';
 import { Address } from 'ethereumjs-util';
-import { OpcodeList } from '@gxchain2-ethereumjs/vm/dist/evm/opcodes';
+import { OpcodeList, getOpcodesForHF } from '@gxchain2-ethereumjs/vm/dist/evm/opcodes';
 import { Block } from '@rei-network/structure';
 import { IDebug } from '@gxchain2-ethereumjs/vm/dist/types';
 import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Node } from '../node';
+import { ReimintExecutor, CliqueExecutor } from '../executor';
+import { isEnableRemint } from '../hardforks';
 import { EMPTY_ADDRESS } from '../utils';
 import { StructLogDebug, JSDebug } from './debug';
 import { toAsync } from './toasync';
@@ -68,13 +70,13 @@ export class Tracer {
     if (block.header.number.eqn(0)) {
       throw new Error('invalid block number, 0');
     }
+    const executor = isEnableRemint(block._common) ? new ReimintExecutor(this.node as any) : new CliqueExecutor(this.node as any); // TODO: support debug through cluster
     return new Promise<any>(async (resolve, reject) => {
       try {
         block = block as Block;
-        const parent = await this.node.db.getHeader(block.header.parentHash, block.header.number.subn(1));
-        const vm = await this.node.getVM(parent.stateRoot, block.header.number);
-        const debug = this.createDebugImpl((vm as any)._opcodes, reject, config, hash);
-        await this.node.master.processBlock({ block, skipConsensusValidation: true, skipConsensusVerify: true }); // TODO: support debug
+        const opcodeList = getOpcodesForHF(block._common);
+        const debug = this.createDebugImpl(opcodeList, reject, config, hash);
+        await executor.processBlock({ debug, block, skipConsensusValidation: true, skipConsensusVerify: true });
         const result = debug.result();
         resolve(util.types.isPromise(result) ? await result : result);
       } catch (err) {

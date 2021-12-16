@@ -22,8 +22,8 @@ import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombi
 import { BlockchainMonitor } from './blockchainMonitor';
 import { WireProtocol, ConsensusProtocol } from './protocols';
 import { ValidatorSets } from './staking';
-import { StakeManager } from './contracts';
-import { ConsensusEngine, ReimintConsensusEngine, CliqueConsensusEngine, ConsensusType, ExtraData, EvidencePool, EvidenceDatabase } from './consensus';
+import { StakeManager, Contract } from './contracts';
+import { ConsensusEngine, ReimintConsensusEngine, CliqueConsensusEngine, ConsensusType, ExtraData, EvidencePool, EvidenceDatabase, Evidence } from './consensus';
 import { EMPTY_ADDRESS } from './utils';
 import { isEnableRemint, getConsensusTypeByCommon } from './hardforks';
 import { Initializer, CommitBlockOptions, NodeOptions, NodeStatus } from './types';
@@ -509,5 +509,13 @@ export class Node extends Initializer {
     } else {
       await this.networkMngr.ban(peerId, defaultTimeoutBanTime);
     }
+  }
+
+  /**
+   * CheckEvidence takes an array of evidence from a block and verifies all the evidence there
+   * @param evList - List of evidence
+   */
+  async checkEvidence(evList: Evidence[]) {
+    await this.evpool.checkEvidence(evList);
   }
 }

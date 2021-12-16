@@ -99,7 +99,7 @@ export class CliqueExecutor implements Executor {
    * {@link ConsensusEngine.processBlock}
    */
   async processBlock(options: ProcessBlockOpts) {
-    const { block } = options;
+    const { block, debug } = options;
 
     const miner = Clique.getMiner(block);
     const pendingHeader = block.header;
@@ -120,6 +120,7 @@ export class CliqueExecutor implements Executor {
     const runBlockOptions: RunBlockOpts = {
       block,
       root,
+      debug,
       generate: false,
       skipBlockValidation: true,
       genReceiptTrie: async function (transactions: TypedTransaction[], receipts: TxReceipt[]) {

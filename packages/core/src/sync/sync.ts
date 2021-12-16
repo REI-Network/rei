@@ -283,7 +283,7 @@ export class Synchronizer extends EventEmitter {
   }
 
   async processAndCommitBlock(block: Block) {
-    const result = await this.node.master.processBlock({ block });
+    const result = await this.node.getExecutor(block._common).processBlock({ block });
     return await this.node.commitBlock({
       ...result,
       block,

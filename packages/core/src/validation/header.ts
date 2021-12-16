@@ -98,9 +98,9 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
   }
 
   const currentConsensusType = getConsensusTypeByCommon(this._common);
-  const parentConsensusType = getConsensusTypeByCommon(parentHeader._common);
+  // const parentConsensusType = getConsensusTypeByCommon(parentHeader._common);
 
-  if ((currentConsensusType === ConsensusType.Reimint && parentConsensusType === ConsensusType.Clique) || currentConsensusType === ConsensusType.Clique) {
+  if (currentConsensusType === ConsensusType.Reimint || currentConsensusType === ConsensusType.Clique) {
     if (!this.gasLimit.eq(getGasLimitByCommon(this._common))) {
       throw new Error('invalid gas limit');
     }

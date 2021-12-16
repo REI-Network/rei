@@ -40,8 +40,8 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
     }
 
     // check valid signer and recently sign
-    const activeSigners = await this.node.master.cliqueActiveSignersByBlockNumber(header.number);
-    const recentlyCheck = await this.node.master.cliqueCheckNextRecentlySigned(header.number, this.coinbase);
+    const activeSigners = await this.node.blockchain.cliqueActiveSignersByBlockNumber(header.number);
+    const recentlyCheck = await this.node.blockchain.cliqueCheckNextRecentlySigned(header, this.coinbase);
     if (!this.isValidSigner(activeSigners) || recentlyCheck) {
       return;
     }
@@ -63,7 +63,7 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
           const { header: data, transactions } = await pendingBlock.finalize();
           const block = this.generatePendingBlock(data, pendingBlock.common, transactions);
           // process pending block
-          const result = await this.node.master.processBlock({ block });
+          const result = await this.node.getExecutor(block._common).processBlock({ block });
           // commit pending block
           const reorged = await this.node.commitBlock({
             ...result,

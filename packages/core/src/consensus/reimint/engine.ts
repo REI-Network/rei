@@ -109,7 +109,8 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     if (getConsensusTypeByCommon(parent._common) === ConsensusType.Clique) {
       return getGasLimitByCommon(nextCommon);
     } else {
-      return Reimint.calcGasLimit(parent.gasLimit, parent.gasUsed);
+      // return Reimint.calcGasLimit(parent.gasLimit, parent.gasUsed);
+      return getGasLimitByCommon(nextCommon);
     }
   }
 
@@ -149,7 +150,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    * @returns Pre process block result
    */
   preProcessBlock(block: Block) {
-    return this.node.master.processBlock({ block, skipConsensusValidation: true });
+    return this.node.getExecutor(block._common).processBlock({ block, skipConsensusValidation: true });
   }
 
   /**

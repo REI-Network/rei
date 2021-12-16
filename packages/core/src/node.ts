@@ -3,9 +3,9 @@ import type { LevelUp } from 'levelup';
 import LevelStore from 'datastore-level';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
-import { Database, createLevelDB } from '@rei-network/database';
+import { Database, createLevelDB, createEncodingLevelDB, DBSaveTxLookup, DBSaveReceipts } from '@rei-network/database';
 import { NetworkManager, Peer } from '@rei-network/network';
-import { Common, getChain } from '@rei-network/common';
+import { Common, getChain, getGenesisState } from '@rei-network/common';
 import { Blockchain } from '@rei-network/blockchain';
 import VM from '@gxchain2-ethereumjs/vm';
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
@@ -27,7 +27,8 @@ import { ConsensusEngine, ReimintConsensusEngine, CliqueConsensusEngine, Consens
 import { EMPTY_ADDRESS } from './utils';
 import { isEnableRemint, getConsensusTypeByCommon } from './hardforks';
 import { Initializer, CommitBlockOptions, NodeOptions, NodeStatus } from './types';
-import { VMMaster } from './link';
+import { CliqueExecutor, ReimintExecutor } from './executor';
+// import { VMMaster } from './link';
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;
@@ -51,12 +52,14 @@ export class Node extends Initializer {
   readonly chainId: number;
   readonly genesisHash: Buffer;
   readonly nodedb: LevelUp;
+  readonly chaindb: LevelUp;
   readonly evidencedb: LevelUp;
-  readonly master: VMMaster;
+  // readonly master: VMMaster;
   readonly networkdb: LevelStore;
   readonly wire: WireProtocol;
   readonly consensus: ConsensusProtocol;
   readonly db: Database;
+  readonly blockchain: Blockchain;
   readonly networkMngr: NetworkManager;
   readonly sync: Synchronizer;
   readonly txPool: TxPool;
@@ -66,6 +69,8 @@ export class Node extends Initializer {
   readonly accMngr: AccountManager;
   readonly reimint: ReimintConsensusEngine;
   readonly clique: CliqueConsensusEngine;
+  readonly reimintExecutor: ReimintExecutor;
+  readonly cliqueExecutor: CliqueExecutor;
   readonly evpool: EvidencePool;
   readonly aborter = new Aborter();
   readonly validatorSets = new ValidatorSets();
@@ -82,13 +87,14 @@ export class Node extends Initializer {
     super();
 
     this.datadir = options.databasePath;
+    this.chaindb = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
     this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));
     this.evidencedb = createLevelDB(path.join(this.datadir, 'evidence'));
     this.networkdb = new LevelStore(path.join(this.datadir, 'networkdb'), { createIfMissing: true });
     this.wire = new WireProtocol(this);
     this.consensus = new ConsensusProtocol(this);
     this.accMngr = new AccountManager(options.account.keyStorePath);
-    this.master = new VMMaster(path.join(__dirname, '/workers/vmWorker.js'), this);
+    // this.master = new VMMaster(path.join(__dirname, '/workers/vmWorker.js'), this);
 
     this.chain = options.chain ?? defaultChainName;
     /////// unsupport rei-mainnet ///////
@@ -102,16 +108,27 @@ export class Node extends Initializer {
 
     const common = this.getCommon(0);
     // TODO: fix type
-    this.db = new Database(this.master as any, common);
+    this.db = new Database(this.chaindb, common);
     this.networkId = common.networkIdBN().toNumber();
     this.chainId = common.chainIdBN().toNumber();
     this.evpool = new EvidencePool({ backend: new EvidenceDatabase(this.evidencedb) });
     this.clique = new CliqueConsensusEngine({ ...options.mine, node: this });
     this.reimint = new ReimintConsensusEngine({ ...options.mine, node: this });
+    this.reimintExecutor = new ReimintExecutor(this);
+    this.cliqueExecutor = new CliqueExecutor(this);
 
     const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
     this.genesisHash = genesisBlock.hash();
     logger.info('Read genesis block from file', bufferToHex(this.genesisHash));
+
+    this.blockchain = new Blockchain({
+      dbManager: this.db,
+      common,
+      genesisBlock,
+      validateBlocks: false,
+      validateConsensus: false,
+      hardforkByHeadBlockNumber: true
+    });
 
     this.networkMngr = new NetworkManager({
       ...options.network,
@@ -143,17 +160,45 @@ export class Node extends Initializer {
     };
   }
 
+  private async generateGenesis() {
+    const common = this.getCommon(0);
+    const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
+    const stateManager = new StateManager({ common, trie: new Trie(this.chaindb) });
+    await stateManager.generateGenesis(getGenesisState(this.chain));
+    let root = await stateManager.getStateRoot();
+
+    // deploy system contract
+    if (isEnableRemint(common)) {
+      const vm = await this.getVM(root, common);
+      const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
+      await Contract.deploy(evm, common);
+      root = await vm.stateManager.getStateRoot();
+    }
+
+    if (!root.equals(genesisBlock.header.stateRoot)) {
+      logger.error('State root not equal', bufferToHex(root), bufferToHex(genesisBlock.header.stateRoot));
+      throw new Error('state root not equal');
+    }
+  }
+
   /**
    * Initialize the node
    */
   async init() {
-    this.master.start();
-    await this.master.init(this.datadir, this.chain);
+    // this.master.start();
+    // await this.master.init(this.datadir, this.chain);
 
-    this.latestBlock = await this.master.latestBlock();
-    this.totalDifficulty = await this.master.totalDifficulty(this.latestBlock.hash(), this.latestBlock.header.number);
+    // this.latestBlock = await this.master.latestBlock();
+    // this.totalDifficulty = await this.master.totalDifficulty(this.latestBlock.hash(), this.latestBlock.header.number);
+    // if (this.latestBlock.header.number.eqn(0)) {
+    //   await this.master.generateGenesis();
+    // }
+
+    await this.blockchain.init();
+    this.latestBlock = await this.blockchain.getLatestBlock();
+    this.totalDifficulty = await this.blockchain.getTotalDifficulty(this.latestBlock.hash(), this.latestBlock.header.number);
     if (this.latestBlock.header.number.eqn(0)) {
-      await this.master.generateGenesis();
+      await this.generateGenesis();
     }
 
     await this.networkdb.open();
@@ -193,7 +238,7 @@ export class Node extends Initializer {
     this.pendingTxsQueue.abort();
     this.commitBlockQueue.abort();
     await this.aborter.abort();
-    await this.master.abort();
+    // await this.master.abort();
     await this.clique.abort();
     await this.reimint.abort();
     await this.networkMngr.abort();
@@ -257,6 +302,10 @@ export class Node extends Initializer {
     return this.totalDifficulty.clone();
   }
 
+  getExecutor(common: Common) {
+    return isEnableRemint(common) ? this.reimintExecutor : this.cliqueExecutor;
+  }
+
   /**
    * Get consensus engine by consensus typo
    * @param type - Consensus type
@@ -297,7 +346,7 @@ export class Node extends Initializer {
    * @returns State manager object
    */
   async getStateManager(root: Buffer, num: BNLike | Common) {
-    const stateManager = new StateManager({ common: num instanceof Common ? num : this.getCommon(num), trie: new Trie(this.master) });
+    const stateManager = new StateManager({ common: num instanceof Common ? num : this.getCommon(num), trie: new Trie(this.chaindb) });
     await stateManager.setStateRoot(root);
     return stateManager;
   }
@@ -315,14 +364,7 @@ export class Node extends Initializer {
     return new VM({
       common,
       stateManager,
-      blockchain: new Blockchain({
-        dbManager: this.db,
-        common,
-        genesisBlock,
-        validateBlocks: false,
-        validateConsensus: false,
-        hardforkByHeadBlockNumber: true
-      }),
+      blockchain: this.blockchain,
       getMiner: (header) => {
         const type = getConsensusTypeByCommon(header._common);
         if (type === ConsensusType.Clique) {
@@ -410,24 +452,55 @@ export class Node extends Initializer {
     }
   }
 
+  private async doCommitBlock(opts: CommitBlockOptions) {
+    const { block, receipts } = opts;
+
+    const hash = block.hash();
+    const number = block.header.number;
+
+    // ensure that the block has not been executed
+    try {
+      await this.db.getHeader(hash, number);
+      return { reorged: false };
+    } catch (err: any) {
+      if (err.type !== 'NotFoundError') {
+        throw err;
+      }
+    }
+
+    const before = this.blockchain.latestBlock.hash();
+
+    // commit
+    {
+      // save block
+      await this.blockchain.putBlock(block);
+      // save receipts
+      await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, hash, number)));
+    }
+
+    logger.info('✨ Commit block, height:', number.toString(), 'hash:', bufferToHex(hash));
+
+    const after = this.blockchain.latestBlock.hash();
+
+    const reorged = !before.equals(after);
+    return { reorged };
+  }
+
   /**
    * A loop that executes blocks sequentially
    */
   private async commitBlockLoop() {
     await this.initPromise;
-    for await (const {
-      options: { block, receipts, broadcast },
-      resolve,
-      reject
-    } of this.commitBlockQueue.generator()) {
+    for await (const { options, resolve, reject } of this.commitBlockQueue.generator()) {
       try {
-        const { reorged } = await this.master.commitBlock({ block, receipts });
+        const { block, broadcast } = options;
+        const { reorged } = await this.doCommitBlock(options);
 
         // if canonical chain changes, notify to other modules
         if (reorged) {
           // update the latest block and total difficulty
-          this.latestBlock = await this.master.latestBlock();
-          this.totalDifficulty = await this.master.totalDifficulty(this.latestBlock.hash(), this.latestBlock.header.number);
+          this.latestBlock = await this.blockchain.getLatestBlock();
+          this.totalDifficulty = await this.blockchain.getTotalDifficulty(this.latestBlock.hash(), this.latestBlock.header.number);
 
           const promises = [this.txPool.newBlock(block), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
           if (isEnableRemint(block._common)) {

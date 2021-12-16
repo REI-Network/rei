@@ -3,7 +3,7 @@
     "comment": "rei-testnet chainstart hardfork",
     "gasConfig": {
         "gasLimit": {
-            "v": "0x989680",
+            "v": "0x1e8480",
             "d": "chainstart gas limit"
         }
     },

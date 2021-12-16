@@ -53,7 +53,7 @@ export class Worker {
     const nexTimestamp2 = header.timestamp.toNumber() + period;
     const nexTimestamp = nexTimestamp1 > nexTimestamp2 ? nexTimestamp1 : nexTimestamp2;
 
-    this.pendingBlock = new PendingBlock(this.engine, this.node.master, parentHash, header.stateRoot, nextNumber, new BN(nexTimestamp), nextCommon);
+    this.pendingBlock = new PendingBlock(this.engine, this.node.getExecutor(nextCommon), parentHash, header.stateRoot, nextNumber, new BN(nexTimestamp), nextCommon);
 
     // unlock
     this.lock.release();

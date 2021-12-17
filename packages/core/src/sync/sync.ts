@@ -213,16 +213,17 @@ export class Synchronizer extends EventEmitter {
 
       // check total difficulty
       if (!cumulativeTotalDifficulty.add(localTD).eq(bestTD)) {
-        await this.node.banPeer(peerId, 'invalid');
+        // await this.node.banPeer(peerId, 'invalid');
         logger.warn('Synchronizer::doSync, total difficulty does not match:', peerId);
       }
 
       const latest = this.node.getLatestBlock();
+      const td = this.node.getTotalDifficulty();
       logger.info('💫 Sync over, local height:', latest.header.number.toString(), 'local td:', this.node.getTotalDifficulty().toString(), 'best height:', bestHeight.toString(), 'best td:', bestTD.toString());
       if (reorged) {
         logger.info('💫 Synchronized');
         this.emit('synchronized');
-        this.node.wire.broadcastNewBlock(latest);
+        this.node.wire.broadcastNewBlock(latest, td);
       } else {
         this.emit('failed');
       }

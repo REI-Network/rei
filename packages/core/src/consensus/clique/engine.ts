@@ -1,30 +1,49 @@
 import { Address, bufferToHex, BN, toBuffer } from 'ethereumjs-util';
 import { BaseTrie } from 'merkle-patricia-tree';
-import { Block, HeaderData, Transaction, Receipt } from '@rei-network/structure';
+import { Block, BlockHeader, HeaderData, Transaction, Receipt } from '@rei-network/structure';
 import { Common } from '@rei-network/common';
 import { logger, nowTimestamp, getRandomIntInclusive } from '@rei-network/utils';
-import { ConsensusEngine } from '../types';
+import { ConsensusEngine, ConsensusEngineOptions } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { getGasLimitByCommon } from '../../utils';
 import { Clique } from './clique';
+import { CliqueExecutor } from './executor';
 
 const NoTurnSignerDelay = 500;
 
 export class CliqueConsensusEngine extends BaseConsensusEngine implements ConsensusEngine {
+  readonly executor: CliqueExecutor;
+
   private nextTd?: BN;
   private timeout?: NodeJS.Timeout;
 
-  protected _start() {}
+  constructor(options: ConsensusEngineOptions) {
+    super(options);
+    this.executor = new CliqueExecutor(this.node);
+  }
+
+  /**
+   * {@link ConsensusEngine.init}
+   */
+  async init() {}
+
+  protected _start() {
+    logger.debug('CliqueConsensusEngine::start');
+  }
 
   protected _abort() {
+    if (this.timeout) {
+      clearTimeout(this.timeout);
+      this.timeout = undefined;
+    }
     return Promise.resolve();
   }
 
   /**
-   * Process a new block, try to mint a block after this block
+   * Try to mint a block after this block
    * @param block - New block
    */
-  protected async _newBlock(block: Block) {
+  protected async _tryToMintNextBlock(block: Block) {
     const header = block.header;
     // create a new pending block through worker
     const pendingBlock = await this.worker.createPendingBlock(header);
@@ -63,17 +82,17 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
           const { header: data, transactions } = await pendingBlock.finalize();
           const block = this.generatePendingBlock(data, pendingBlock.common, transactions);
           // process pending block
-          const result = await this.node.getExecutor(block._common).processBlock({ block });
+          const result = await this.executor.processBlock({ block });
           // commit pending block
           const reorged = await this.node.commitBlock({
-            ...result,
+            receipts: result.receipts,
             block,
             broadcast: true
           });
           if (reorged) {
-            logger.info('⛏️  Mine block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
+            logger.info('⛏️  Mint block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
             // try to continue minting
-            this.node.onMintBlock();
+            this.node.tryToMintNextBlock();
           }
         } catch (err) {
           logger.error('CliqueConsensusEngine::newBlockHeader, processBlock, catch error:', err);
@@ -81,6 +100,11 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
       }, duration);
     }
   }
+
+  /**
+   * {@link ConsensusEngine.newBlock}
+   */
+  async newBlock(block: Block) {}
 
   // cancel the timer if the total difficulty is greater than `this.nextTD`
   private cancel(nextTd: BN) {
@@ -118,6 +142,13 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
   // return undefined if it is disable
   private cliqueSigner() {
     return this.enable && this.node.accMngr.hasUnlockedAccount(this.coinbase) ? this.node.accMngr.getPrivateKey(this.coinbase) : undefined;
+  }
+
+  /**
+   * {@link ConsensusEngine.getMiner}
+   */
+  getMiner(data: Block | BlockHeader) {
+    return Clique.getMiner(data);
   }
 
   /**

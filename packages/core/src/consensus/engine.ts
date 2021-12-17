@@ -1,18 +1,22 @@
 import EventEmitter from 'events';
 import { Address } from 'ethereumjs-util';
-import { Block, HeaderData, Transaction, Receipt } from '@rei-network/structure';
+import { Block, BlockHeader, HeaderData, Transaction, Receipt } from '@rei-network/structure';
 import { Common } from '@rei-network/common';
 import { Channel, logger } from '@rei-network/utils';
 import { Node } from '../node';
-import { Worker } from '../worker';
-import { ConsensusEngine, ConsensusEngineOptions } from './types';
 import { EMPTY_ADDRESS } from '../utils';
+import { Worker } from './worker';
+import { ConsensusEngine, ConsensusEngineOptions, Executor } from './types';
 
 export abstract class BaseConsensusEngine extends EventEmitter implements ConsensusEngine {
+  abstract readonly executor: Executor;
+  abstract newBlock(block: Block): Promise<void>;
+  abstract init(): Promise<void>;
+  abstract getMiner(block: Block | BlockHeader): Address;
   abstract generatePendingBlock(headerData: HeaderData, common: Common, transactions?: Transaction[]): Block;
   abstract generateReceiptTrie(transactions: Transaction[], receipts: Receipt[]): Promise<Buffer>;
 
-  protected abstract _newBlock(header: Block): Promise<void>;
+  protected abstract _tryToMintNextBlock(header: Block): Promise<void>;
   protected abstract _start(): void;
   protected abstract _abort(): Promise<void>;
 
@@ -30,7 +34,7 @@ export abstract class BaseConsensusEngine extends EventEmitter implements Consen
     this.node = options.node;
     this._enable = options.enable;
     this._coinbase = options.coinbase ?? EMPTY_ADDRESS;
-    this.worker = new Worker({ node: this.node, consensusEngine: this });
+    this.worker = new Worker({ node: this.node, engine: this });
   }
 
   /**
@@ -55,9 +59,9 @@ export abstract class BaseConsensusEngine extends EventEmitter implements Consen
   }
 
   /**
-   * {@link ConsensusEngine.newBlock}
+   * {@link ConsensusEngine.tryToMintNextBlock}
    */
-  newBlock(block: Block) {
+  tryToMintNextBlock(block: Block) {
     this.msgQueue.push(block);
   }
 
@@ -71,7 +75,7 @@ export abstract class BaseConsensusEngine extends EventEmitter implements Consen
   private async msgLoop() {
     for await (const block of this.msgQueue.generator()) {
       try {
-        await this._newBlock(block);
+        await this._tryToMintNextBlock(block);
       } catch (err) {
         logger.error('BaseConsensusEngine::msgLoop, catch error:', err);
       }

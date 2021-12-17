@@ -1,6 +1,6 @@
 import { Protocol, Peer } from '@rei-network/network';
 import { Node } from '../../node';
-import { Message } from '../../consensus/reimint/types';
+import { Message } from '../../consensus/reimint/messages';
 import { NetworkProtocol } from '../types';
 import { BaseProtocol } from '../baseProtocol';
 import { ConsensusProtocolHander } from './handler';

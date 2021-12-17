@@ -2,14 +2,14 @@ import { BN } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
 import { BlockHeader, Transaction } from '@rei-network/structure';
 import { logger, nowTimestamp } from '@rei-network/utils';
-import { PendingTxMap } from './txpool';
-import { Node } from './node';
-import { ConsensusEngine } from './consensus';
+import { PendingTxMap } from '../txpool';
+import { Node } from '../node';
+import { ConsensusEngine } from './types';
 import { PendingBlock } from './pendingBlock';
 
 export interface WorkerOptions {
   node: Node;
-  consensusEngine: ConsensusEngine;
+  engine: ConsensusEngine;
 }
 
 /**
@@ -24,7 +24,7 @@ export class Worker {
 
   constructor(options: WorkerOptions) {
     this.node = options.node;
-    this.engine = options.consensusEngine;
+    this.engine = options.engine;
   }
 
   /**
@@ -53,7 +53,7 @@ export class Worker {
     const nexTimestamp2 = header.timestamp.toNumber() + period;
     const nexTimestamp = nexTimestamp1 > nexTimestamp2 ? nexTimestamp1 : nexTimestamp2;
 
-    this.pendingBlock = new PendingBlock(this.engine, this.node.getExecutor(nextCommon), parentHash, header.stateRoot, nextNumber, new BN(nexTimestamp), nextCommon);
+    this.pendingBlock = new PendingBlock(this.engine, parentHash, header.stateRoot, nextNumber, new BN(nexTimestamp), nextCommon);
 
     // unlock
     this.lock.release();

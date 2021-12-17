@@ -1,8 +1,12 @@
 import { toBuffer, setLengthLeft, Address, BN, rlphash } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@rei-network/structure';
-import { ExtraData, Proposal, VoteType, VoteSet, Evidence, ISigner } from './types';
 import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../../utils';
+import { ISigner } from './types';
+import { ExtraData } from './extraData';
+import { Proposal } from './proposal';
+import { VoteType, VoteSet } from './vote';
+import { Evidence } from './evpool';
 
 const defaultRound = 0;
 const defaultPOLRound = -1;

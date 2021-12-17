@@ -2,10 +2,9 @@ import { Address, BN, BNLike } from 'ethereumjs-util';
 import { Block, Receipt } from '@rei-network/structure';
 import { Common } from '@rei-network/common';
 import { SendMessageOptions } from '../../../protocols/consensus';
-import { ValidatorSet } from '../../../staking';
-import { StateMachineMsg } from './stateMessages';
-import { Message } from './messages';
-import { Evidence } from './evidence';
+import { StateMachineMsg } from '../stateMessages';
+import { Message } from '../messages';
+import { Evidence } from '../evpool';
 
 export interface ISigner {
   address(): Address;

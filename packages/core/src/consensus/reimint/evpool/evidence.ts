@@ -1,6 +1,6 @@
 import { keccak256, rlp, BN } from 'ethereumjs-util';
 import { ValidatorSet } from '../../../staking';
-import { Vote } from './vote';
+import { Vote } from '../vote';
 
 export interface Evidence {
   height: BN;

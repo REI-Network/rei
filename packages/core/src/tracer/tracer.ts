@@ -5,7 +5,6 @@ import { Block } from '@rei-network/structure';
 import { IDebug } from '@gxchain2-ethereumjs/vm/dist/types';
 import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Node } from '../node';
-import { ReimintExecutor, CliqueExecutor } from '../executor';
 import { isEnableRemint } from '../hardforks';
 import { EMPTY_ADDRESS } from '../utils';
 import { StructLogDebug, JSDebug } from './debug';
@@ -70,7 +69,7 @@ export class Tracer {
     if (block.header.number.eqn(0)) {
       throw new Error('invalid block number, 0');
     }
-    const executor = isEnableRemint(block._common) ? new ReimintExecutor(this.node as any) : new CliqueExecutor(this.node as any); // TODO: support debug through cluster
+    const executor = this.node.getExecutor(block._common);
     return new Promise<any>(async (resolve, reject) => {
       try {
         block = block as Block;

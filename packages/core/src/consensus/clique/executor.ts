@@ -13,7 +13,7 @@ import { Contract } from '../../contracts';
 import { ValidatorSet } from '../../staking';
 import { isEnableRemint } from '../../hardforks';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
-import { Clique } from '../../consensus/clique/clique';
+import { Clique } from './clique';
 
 export class CliqueExecutor implements Executor {
   private readonly backend: ExecutorBackend;

@@ -8,14 +8,17 @@ import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executo
 import { postByzantiumTxReceiptsToReceipts } from '../../utils';
 import { ValidatorSet, ValidatorChanges } from '../../staking';
 import { StakeManager, SlashReason } from '../../contracts';
-import { Reimint } from '../../consensus/reimint/reimint';
-import { ExtraData, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint/types';
+import { Reimint } from './reimint';
+import { EvidencePool, Evidence, DuplicateVoteEvidence } from './evpool';
+import { ExtraData } from './extraData';
 
 export class ReimintExecutor implements Executor {
   private readonly backend: ExecutorBackend;
+  private readonly evpool: EvidencePool;
 
-  constructor(backend: ExecutorBackend) {
+  constructor(backend: ExecutorBackend, evpool: EvidencePool) {
     this.backend = backend;
+    this.evpool = evpool;
   }
 
   /**
@@ -199,7 +202,7 @@ export class ReimintExecutor implements Executor {
 
     if (!skipConsensusVerify) {
       await extraData.verifyEvidence(this.backend);
-      await this.backend.checkEvidence(extraData.evidence);
+      await this.evpool.checkEvidence(extraData.evidence);
     }
 
     let validatorSet!: ValidatorSet;

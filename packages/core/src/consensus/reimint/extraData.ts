@@ -3,12 +3,11 @@ import VM from '@gxchain2-ethereumjs/vm';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
 import { Block, BlockHeader, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
-import { ValidatorSet, ValidatorSets } from '../../../staking';
-import { StakeManager } from '../../../contracts';
+import { ValidatorSet, ValidatorSets } from '../../staking';
+import { StakeManager } from '../../contracts';
+import { Evidence, DuplicateVoteEvidence, EvidenceFactory } from './evpool';
 import { Reimint } from '../reimint';
 import { Vote, VoteType, VoteSet } from './vote';
-import { EvidenceFactory } from './evidencFactory';
-import { Evidence, DuplicateVoteEvidence } from './evidence';
 import { Proposal } from './proposal';
 import * as v from './validate';
 

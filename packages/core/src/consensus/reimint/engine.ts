@@ -10,9 +10,13 @@ import { isEmptyAddress, getGasLimitByCommon } from '../../utils';
 import { getConsensusTypeByCommon } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../engine';
-import { WAL, IProcessBlockResult } from './types';
+import { IProcessBlockResult } from './types';
 import { StateMachine } from './state';
+import { EvidencePool, EvidenceDatabase } from './evpool';
 import { Reimint } from './reimint';
+import { WAL } from './wal';
+import { ReimintExecutor } from './executor';
+import { ExtraData } from './extraData';
 
 export class SimpleNodeSigner {
   readonly node: Node;
@@ -54,15 +58,29 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   readonly state: StateMachine;
   readonly config: SimpleConfig = new SimpleConfig();
   readonly signer: SimpleNodeSigner;
+  readonly evpool: EvidencePool;
+  readonly executor: ReimintExecutor;
 
   constructor(options: ConsensusEngineOptions) {
     super(options);
+
     this.signer = new SimpleNodeSigner(this.node);
-    this.state = new StateMachine(this, this.node.consensus, this.node.evpool, new WAL({ path: path.join(options.node.datadir, 'WAL') }), this.node.getChainId(), this.config, this.signer);
+
+    const db = new EvidenceDatabase(this.node.evidencedb);
+    this.evpool = new EvidencePool({ backend: db });
+
+    const wal = new WAL({ path: path.join(this.node.datadir, 'WAL') });
+    this.state = new StateMachine(this, this.node.consensus, this.evpool, wal, this.node.chainId, this.config, this.signer);
+
+    this.executor = new ReimintExecutor(this.node, this.evpool);
+  }
+
+  init() {
+    return this.evpool.start(this.node.getLatestBlock().header.number);
   }
 
   protected _start() {
-    logger.debug('ReimintConsensusEngine::_start');
+    logger.debug('ReimintConsensusEngine::start');
   }
 
   protected async _abort() {
@@ -70,10 +88,10 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   }
 
   /**
-   * Process a new block, try to mint a block after this block
+   * Try to mint a block after this block
    * @param block - New block
    */
-  protected async _newBlock(block: Block) {
+  protected async _tryToMintNextBlock(block: Block) {
     const header = block.header;
 
     // make sure the new block has not been processed
@@ -103,6 +121,14 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     }
   }
 
+  /**
+   * {@link ConsensusEngine.newBlock}
+   */
+  async newBlock(block: Block) {
+    const extraData = ExtraData.fromBlockHeader(block.header);
+    await this.evpool.update(extraData.evidence, block.header.number);
+  }
+
   // calculate the gas limit of next block
   private calcGasLimit(parent: BlockHeader) {
     const nextCommon = this.node.getCommon(parent.number.addn(1));
@@ -112,6 +138,13 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
       // return Reimint.calcGasLimit(parent.gasLimit, parent.gasUsed);
       return getGasLimitByCommon(nextCommon);
     }
+  }
+
+  /**
+   * {@link ConsensusEngine.getMiner}
+   */
+  getMiner(block: Block | BlockHeader) {
+    return Reimint.getMiner(block);
   }
 
   /**
@@ -150,7 +183,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    * @returns Pre process block result
    */
   preProcessBlock(block: Block) {
-    return this.node.getExecutor(block._common).processBlock({ block, skipConsensusValidation: true });
+    return this.executor.processBlock({ block, skipConsensusValidation: true });
   }
 
   /**
@@ -159,14 +192,14 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    */
   async commitBlock(block: Block, result: IProcessBlockResult) {
     const reorged = await this.node.commitBlock({
-      ...result,
+      receipts: result.receipts,
       block,
       broadcast: true
     });
     if (reorged) {
-      logger.info('⛏️  Mine block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
+      logger.info('⛏️  Mint block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
       // try to continue minting
-      this.node.onMintBlock();
+      this.node.tryToMintNextBlock();
     }
   }
 

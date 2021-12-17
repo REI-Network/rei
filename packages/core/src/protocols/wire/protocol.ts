@@ -1,3 +1,4 @@
+import { BN } from 'ethereumjs-util';
 import { Protocol, Peer } from '@rei-network/network';
 import { Block } from '@rei-network/structure';
 import { Node } from '../../node';
@@ -24,8 +25,7 @@ export class WireProtocol extends BaseProtocol<WireProtocolHandler> implements P
    * Broadcast new block to all connected peers
    * @param block - Block
    */
-  async broadcastNewBlock(block: Block) {
-    const td = await this.node.db.getTotalDifficulty(block.hash(), block.header.number);
+  async broadcastNewBlock(block: Block, td: BN) {
     for (const handler of this.pool.handlers) {
       handler.announceNewBlock(block, td);
     }

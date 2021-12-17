@@ -1,8 +1,8 @@
 import { BN } from 'ethereumjs-util';
 import { Channel, createBufferFunctionalSet, logger } from '@rei-network/utils';
 import { Peer, ProtocolHandler } from '@rei-network/network';
-import { RoundStepType, Proposal, BitArray, VoteType, VoteSet, MessageFactory, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint/types';
-import * as m from '../../consensus/reimint/types/messages';
+import { RoundStepType, Proposal, BitArray, VoteType, VoteSet, MessageFactory, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint';
+import * as m from '../../consensus/reimint/messages';
 import { ConsensusProtocol } from './protocol';
 
 const peerGossipSleepDuration = 100;
@@ -74,8 +74,8 @@ export class ConsensusProtocolHander implements ProtocolHandler {
 
   private onEngineStart = () => {
     // gossip evidence
-    this.node.evpool.on('evidence', this.onEvidence);
-    for (const ev of this.node.evpool.pendingEvidence) {
+    this.node.reimint.evpool.on('evidence', this.onEvidence);
+    for (const ev of this.node.reimint.evpool.pendingEvidence) {
       this.evidenceQueue.push(ev);
     }
 
@@ -214,7 +214,7 @@ export class ConsensusProtocolHander implements ProtocolHandler {
   abort() {
     this.aborted = true;
     this.reimint.off('start', this.onEngineStart);
-    this.node.evpool.off('evidence', this.onEvidence);
+    this.node.reimint.evpool.off('evidence', this.onEvidence);
     this.protocol.removeHandler(this);
     this.evidenceQueue.abort();
   }
@@ -267,7 +267,7 @@ export class ConsensusProtocolHander implements ProtocolHandler {
       this.reimint.state.newMessage(this.peer.peerId, msg);
     } else if (msg instanceof m.DuplicateVoteEvidenceMessage) {
       this.knowEvidence(msg.evidence);
-      this.node.evpool.addEvidence(msg.evidence).catch((err) => {
+      this.node.reimint.evpool.addEvidence(msg.evidence).catch((err) => {
         logger.error('ConsensusProtocolHander::handle, addEvidence, catch error:', err);
       });
     } else {

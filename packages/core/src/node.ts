@@ -11,7 +11,7 @@ import VM from '@gxchain2-ethereumjs/vm';
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
-import { Transaction, Block, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
+import { Transaction, Block } from '@rei-network/structure';
 import { Channel, Aborter, logger } from '@rei-network/utils';
 import { AccountManager } from '@rei-network/wallet';
 import { TxPool } from './txpool';
@@ -23,12 +23,10 @@ import { BlockchainMonitor } from './blockchainMonitor';
 import { WireProtocol, ConsensusProtocol } from './protocols';
 import { ValidatorSets } from './staking';
 import { StakeManager, Contract } from './contracts';
-import { ConsensusEngine, ReimintConsensusEngine, CliqueConsensusEngine, ConsensusType, ExtraData, EvidencePool, EvidenceDatabase, Evidence } from './consensus';
+import { ReimintConsensusEngine, CliqueConsensusEngine } from './consensus';
 import { EMPTY_ADDRESS } from './utils';
-import { isEnableRemint, getConsensusTypeByCommon } from './hardforks';
+import { isEnableRemint } from './hardforks';
 import { Initializer, CommitBlockOptions, NodeOptions, NodeStatus } from './types';
-import { CliqueExecutor, ReimintExecutor } from './executor';
-// import { VMMaster } from './link';
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;
@@ -54,7 +52,6 @@ export class Node extends Initializer {
   readonly nodedb: LevelUp;
   readonly chaindb: LevelUp;
   readonly evidencedb: LevelUp;
-  // readonly master: VMMaster;
   readonly networkdb: LevelStore;
   readonly wire: WireProtocol;
   readonly consensus: ConsensusProtocol;
@@ -69,9 +66,6 @@ export class Node extends Initializer {
   readonly accMngr: AccountManager;
   readonly reimint: ReimintConsensusEngine;
   readonly clique: CliqueConsensusEngine;
-  readonly reimintExecutor: ReimintExecutor;
-  readonly cliqueExecutor: CliqueExecutor;
-  readonly evpool: EvidencePool;
   readonly aborter = new Aborter();
   readonly validatorSets = new ValidatorSets();
 
@@ -94,7 +88,6 @@ export class Node extends Initializer {
     this.wire = new WireProtocol(this);
     this.consensus = new ConsensusProtocol(this);
     this.accMngr = new AccountManager(options.account.keyStorePath);
-    // this.master = new VMMaster(path.join(__dirname, '/workers/vmWorker.js'), this);
 
     this.chain = options.chain ?? defaultChainName;
     /////// unsupport rei-mainnet ///////
@@ -111,11 +104,8 @@ export class Node extends Initializer {
     this.db = new Database(this.chaindb, common);
     this.networkId = common.networkIdBN().toNumber();
     this.chainId = common.chainIdBN().toNumber();
-    this.evpool = new EvidencePool({ backend: new EvidenceDatabase(this.evidencedb) });
     this.clique = new CliqueConsensusEngine({ ...options.mine, node: this });
     this.reimint = new ReimintConsensusEngine({ ...options.mine, node: this });
-    this.reimintExecutor = new ReimintExecutor(this);
-    this.cliqueExecutor = new CliqueExecutor(this);
 
     const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
     this.genesisHash = genesisBlock.hash();
@@ -185,15 +175,6 @@ export class Node extends Initializer {
    * Initialize the node
    */
   async init() {
-    // this.master.start();
-    // await this.master.init(this.datadir, this.chain);
-
-    // this.latestBlock = await this.master.latestBlock();
-    // this.totalDifficulty = await this.master.totalDifficulty(this.latestBlock.hash(), this.latestBlock.header.number);
-    // if (this.latestBlock.header.number.eqn(0)) {
-    //   await this.master.generateGenesis();
-    // }
-
     await this.blockchain.init();
     this.latestBlock = await this.blockchain.getLatestBlock();
     this.totalDifficulty = await this.blockchain.getTotalDifficulty(this.latestBlock.hash(), this.latestBlock.header.number);
@@ -215,16 +196,12 @@ export class Node extends Initializer {
     this.txSync.start();
     this.bloomBitsIndexer.start();
     this.networkMngr.start();
-    const latest = this.latestBlock;
-    const number = latest.header.number;
-    this.evpool.start(number);
 
     this.pendingTxsLoopPromise = this.pendingTxsLoop();
     this.commitBlockLoopPromise = this.commitBlockLoop();
 
     // start mint
-    this.getCurrentEngine().start();
-    this.getCurrentEngine().newBlock(latest);
+    this.tryToMintNextBlock();
   }
 
   /**
@@ -238,7 +215,6 @@ export class Node extends Initializer {
     this.pendingTxsQueue.abort();
     this.commitBlockQueue.abort();
     await this.aborter.abort();
-    // await this.master.abort();
     await this.clique.abort();
     await this.reimint.abort();
     await this.networkMngr.abort();
@@ -251,6 +227,7 @@ export class Node extends Initializer {
     await this.evidencedb.close();
     await this.nodedb.close();
     await this.networkdb.close();
+    await this.chaindb.close();
   }
 
   private onPeerInstalled = (name: string, peer: Peer) => {
@@ -265,16 +242,18 @@ export class Node extends Initializer {
   };
 
   private onSyncOver = () => {
-    this.getCurrentEngine().newBlock(this.latestBlock);
+    this.tryToMintNextBlock();
   };
 
   /**
-   * Mint over callback,
-   * it will be called when local node mint a block,
-   * it will try to continue mint a new block after the latest block
+   * It will try to continue mint a new block after the latest block
    */
-  onMintBlock() {
-    this.getCurrentEngine().newBlock(this.latestBlock);
+  tryToMintNextBlock() {
+    const engine = this.getCurrentEngine();
+    if (!engine.isStarted) {
+      engine.start();
+    }
+    engine.tryToMintNextBlock(this.latestBlock);
   }
 
   /**
@@ -288,46 +267,44 @@ export class Node extends Initializer {
 
   /**
    * Get latest block common instance
-   * @returns Common object
+   * @returns Common instance
    */
   getLatestCommon() {
     return this.latestBlock._common;
   }
 
+  /**
+   * Get latest block
+   * @returns Latest block
+   */
   getLatestBlock() {
     return this.latestBlock;
   }
 
+  /**
+   * Get latest block total difficulty
+   * @returns Total difficulty
+   */
   getTotalDifficulty() {
     return this.totalDifficulty.clone();
   }
 
-  getExecutor(common: Common) {
-    return isEnableRemint(common) ? this.reimintExecutor : this.cliqueExecutor;
-  }
-
   /**
-   * Get consensus engine by consensus typo
-   * @param type - Consensus type
-   * @returns Consensus engine
-   */
-  getEngineByType(type: ConsensusType): ConsensusEngine {
-    if (type === ConsensusType.Clique) {
-      return this.clique;
-    } else if (type === ConsensusType.Reimint) {
-      return this.reimint;
-    } else {
-      throw new Error('unknown consensus type:' + type);
-    }
-  }
-
-  /**
-   * Get consensus engine by common instance
+   * Get executor by common instance
    * @param common - Common instance
-   * @returns Consensus engine
+   * @returns Executor
    */
-  getEngineByCommon(common: Common) {
-    return this.getEngineByType(getConsensusTypeByCommon(common))!;
+  getExecutor(common: Common) {
+    return this.getEngine(common).executor;
+  }
+
+  /**
+   * Get engine by common instance
+   * @param common - Common instance
+   * @returns Engine
+   */
+  getEngine(common: Common) {
+    return isEnableRemint(common) ? this.reimint : this.clique;
   }
 
   /**
@@ -336,7 +313,7 @@ export class Node extends Initializer {
    */
   getCurrentEngine() {
     const nextCommon = this.getCommon(this.latestBlock.header.number.addn(1));
-    return this.getEngineByType(getConsensusTypeByCommon(nextCommon))!;
+    return this.getEngine(nextCommon);
   }
 
   /**
@@ -360,25 +337,11 @@ export class Node extends Initializer {
   async getVM(root: Buffer, num: BNLike | Common) {
     const stateManager = await this.getStateManager(root, num);
     const common = stateManager._common;
-    const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
     return new VM({
       common,
       stateManager,
       blockchain: this.blockchain,
-      getMiner: (header) => {
-        const type = getConsensusTypeByCommon(header._common);
-        if (type === ConsensusType.Clique) {
-          return header.cliqueSigner();
-        } else if (type === ConsensusType.Reimint) {
-          if (header.extraData.length === CLIQUE_EXTRA_VANITY) {
-            return EMPTY_ADDRESS;
-          } else {
-            return ExtraData.fromBlockHeader(header).proposal.proposer();
-          }
-        } else {
-          throw new Error('unknow consensus type');
-        }
-      }
+      getMiner: (header) => this.getEngine(header._common).getMiner(header)
     });
   }
 
@@ -400,14 +363,6 @@ export class Node extends Initializer {
    */
   getFilter() {
     return new BloomBitsFilter({ node: this, sectionSize: BloomBitsBlocks });
-  }
-
-  /**
-   * Get chain id
-   * @returns Chain id
-   */
-  getChainId() {
-    return this.chainId;
   }
 
   /**
@@ -501,17 +456,11 @@ export class Node extends Initializer {
           // update the latest block and total difficulty
           this.latestBlock = await this.blockchain.getLatestBlock();
           this.totalDifficulty = await this.blockchain.getTotalDifficulty(this.latestBlock.hash(), this.latestBlock.header.number);
-
-          const promises = [this.txPool.newBlock(block), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header)];
-          if (isEnableRemint(block._common)) {
-            const extraData = ExtraData.fromBlockHeader(block.header);
-            this.evpool.update(extraData.evidence, block.header.number);
-          }
-
           if (broadcast) {
-            promises.push(this.wire.broadcastNewBlock(block));
+            this.wire.broadcastNewBlock(block, this.totalDifficulty);
           }
 
+          const promises = [this.txPool.newBlock(block), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header), this.getEngine(block._common).newBlock(block)];
           await Promise.all(promises);
         }
 
@@ -582,13 +531,5 @@ export class Node extends Initializer {
     } else {
       await this.networkMngr.ban(peerId, defaultTimeoutBanTime);
     }
-  }
-
-  /**
-   * CheckEvidence takes an array of evidence from a block and verifies all the evidence there
-   * @param evList - List of evidence
-   */
-  async checkEvidence(evList: Evidence[]) {
-    await this.evpool.checkEvidence(evList);
   }
 }

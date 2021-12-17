@@ -3,43 +3,17 @@ import { BN, bufferToHex } from 'ethereumjs-util';
 import { Channel, logger } from '@rei-network/utils';
 import { Block, BlockHeader } from '@rei-network/structure';
 import { ValidatorSet } from '../../staking';
-import { PendingBlock } from '../../pendingBlock';
 import { isEmptyHash, EMPTY_HASH } from '../../utils';
+import { PendingBlock } from '../pendingBlock';
 import { Reimint } from './reimint';
-import {
-  TimeoutTicker,
-  StateMachineMessage,
-  StateMachineTimeout,
-  StateMachineEndHeight,
-  StateMachineMsg,
-  IProcessBlockResult,
-  IStateMachineBackend,
-  IStateMachineP2PBackend,
-  ISigner,
-  IConfig,
-  IEvidencePool,
-  IWAL,
-  IDebug,
-  RoundStepType,
-  Message,
-  NewRoundStepMessage,
-  NewValidBlockMessage,
-  VoteMessage,
-  ProposalBlockMessage,
-  GetProposalBlockMessage,
-  ProposalMessage,
-  HasVoteMessage,
-  VoteSetBitsMessage,
-  HeightVoteSet,
-  Vote,
-  VoteType,
-  ConflictingVotesError,
-  DuplicateVotesError,
-  Proposal,
-  Evidence,
-  DuplicateVoteEvidence,
-  ExtraData
-} from './types';
+import { IProcessBlockResult, IStateMachineBackend, IStateMachineP2PBackend, ISigner, IConfig, IEvidencePool, IWAL, IDebug, RoundStepType } from './types';
+import { StateMachineMessage, StateMachineTimeout, StateMachineEndHeight, StateMachineMsg } from './stateMessages';
+import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from './messages';
+import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, DuplicateVotesError } from './vote';
+import { Proposal } from './proposal';
+import { Evidence, DuplicateVoteEvidence } from './evpool';
+import { TimeoutTicker } from './timeoutTicker';
+import { ExtraData } from './extraData';
 import { preValidateBlock, preValidateHeader } from '../../validation';
 
 const SkipTimeoutCommit = true;

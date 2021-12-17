@@ -4,15 +4,13 @@ import Bloom from '@gxchain2-ethereumjs/vm/dist/bloom';
 import { Transaction, calcTransactionTrie, HeaderData } from '@rei-network/structure';
 import { logger } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
-import { PendingTxMap } from './txpool';
-import { EMPTY_ADDRESS, EMPTY_NONCE, EMPTY_MIX_HASH, EMPTY_EXTRA_DATA } from './utils';
-import { FinalizeOpts, Executor, ProcessTxResult } from './executor/types';
-import { ConsensusEngine } from './consensus/types';
+import { PendingTxMap } from '../txpool';
+import { EMPTY_ADDRESS, EMPTY_NONCE, EMPTY_MIX_HASH, EMPTY_EXTRA_DATA } from '../utils';
+import { ConsensusEngine, FinalizeOpts, ProcessTxResult } from './types';
 
 export interface PendingBlockFinalizeOpts extends Pick<FinalizeOpts, 'round' | 'evidence'> {}
 
 export class PendingBlock {
-  private executor: Executor;
   private engine: ConsensusEngine;
   private lock = new Semaphore(1);
 
@@ -41,11 +39,10 @@ export class PendingBlock {
   private transactionsTrie?: Buffer;
   private finalizedStateRoot?: Buffer;
 
-  constructor(engine: ConsensusEngine, executor: Executor, parentHash: Buffer, parentStateRoot: Buffer, number: BN, timestamp: BN, common: Common, extraData?: Buffer) {
+  constructor(engine: ConsensusEngine, parentHash: Buffer, parentStateRoot: Buffer, number: BN, timestamp: BN, common: Common, extraData?: Buffer) {
     if (extraData && extraData.length !== 32) {
       throw new Error('invalid extra data length');
     }
-    this.executor = executor;
     this.engine = engine;
     this._common = common;
     this._parentHash = parentHash;
@@ -169,7 +166,7 @@ export class PendingBlock {
           let txRes: ProcessTxResult;
           tx = Transaction.fromTxData({ ...tx }, { common: this._common });
           try {
-            txRes = await this.executor.processTx({
+            txRes = await this.engine.executor.processTx({
               tx,
               root: this.latestStateRoot ?? this._parentStateRoot,
               block: pendingBlock,
@@ -237,7 +234,7 @@ export class PendingBlock {
       const receipts = this.transactionResults.map(({ receipt }) => receipt);
 
       // calculate finalizedStateRoot
-      const { finalizedStateRoot } = await this.executor.finalize({
+      const { finalizedStateRoot } = await this.engine.executor.finalize({
         ...options,
         receipts,
         block: this.engine.generatePendingBlock(this.toHeaderData(), this._common),

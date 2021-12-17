@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
 import { VoteType } from './vote';
-import { RoundStepType } from './roundStepType';
+import { RoundStepType } from './types';
 
 export function validateHeight(height: BN) {
   if (height.isNeg()) {

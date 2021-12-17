@@ -1,7 +1,7 @@
 import { LevelUp } from 'levelup';
 import { AbstractIterator } from 'abstract-leveldown';
 import { intToBuffer, BN } from 'ethereumjs-util';
-import { EvidenceFactory } from './evidencFactory';
+import { EvidenceFactory } from './evidenceFactory';
 import { Evidence } from './evidence';
 import { EMPTY_HASH } from '../../../utils';
 

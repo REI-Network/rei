@@ -5,7 +5,7 @@ import { Multiaddr } from 'multiaddr';
 import { program } from 'commander';
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
 import { Node } from '@rei-network/core';
-import { ExtraData } from '@rei-network/core/dist/consensus/reimint/types';
+import { ExtraData } from '@rei-network/core/dist/consensus/reimint/extraData';
 import { hexStringToBuffer, logger } from '@rei-network/utils';
 import { startNode, installOptions } from '../src/commands';
 import { SIGINT } from '../src/process';
@@ -121,8 +121,8 @@ const handler: {
     const parentBlock = await node.db.getBlock(new BN(h).subn(1));
     const block = await node.db.getBlock(new BN(h));
     const common = block._common;
-    const stakeManager = node.getStakeManager(await node.getVM(parentBlock.header.stateRoot, common), parentBlock, common);
-    const validatorSet = await node.validatorSets.get(parentBlock.header.stateRoot, stakeManager);
+    const stakeManager = node.reimint.getStakeManager(await node.getVM(parentBlock.header.stateRoot, common), parentBlock, common);
+    const validatorSet = await node.reimint.validatorSets.get(parentBlock.header.stateRoot, stakeManager);
     console.log('----------------');
     console.log(
       ExtraData.fromBlockHeader(block.header, {

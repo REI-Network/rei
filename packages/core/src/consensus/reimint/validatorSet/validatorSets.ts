@@ -26,7 +26,6 @@ export class ValidatorSets {
    * create if it doesn't exist
    * @param stateRoot - Target state root
    * @param sm - `StakeManager` instance
-   * @returns
    */
   async get(stateRoot: Buffer, sm: StakeManager) {
     let set = this.sets.get(stateRoot);
@@ -39,6 +38,11 @@ export class ValidatorSets {
     return set;
   }
 
+  /**
+   * Directly get validator set by state root,
+   * return undefined, if it doesn't exsit
+   * @param stateRoot - Target state root
+   */
   directlyGet(stateRoot: Buffer) {
     return this.sets.get(stateRoot);
   }

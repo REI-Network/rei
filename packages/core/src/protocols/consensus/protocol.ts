@@ -56,7 +56,11 @@ export class ConsensusProtocol extends BaseProtocol<ConsensusProtocolHander> imp
   broadcastMessage(msg: Message, options: SendMessageOptions) {
     if (options.broadcast) {
       for (const handler of this.handlers) {
-        handler.send(msg);
+        try {
+          handler.send(msg);
+        } catch (err) {
+          // ignore all errors ...
+        }
       }
     } else if (options.to) {
       const peer = this.node.networkMngr.getPeer(options.to);
@@ -66,7 +70,11 @@ export class ConsensusProtocol extends BaseProtocol<ConsensusProtocolHander> imp
     } else if (options.exclude) {
       for (const handler of this.handlers) {
         if (!options.exclude.includes(handler.peer.peerId)) {
-          handler.send(msg);
+          try {
+            handler.send(msg);
+          } catch (err) {
+            // ignore all errors ...
+          }
         }
       }
     } else {

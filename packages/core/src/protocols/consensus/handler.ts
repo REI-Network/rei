@@ -73,8 +73,7 @@ export class ConsensusProtocolHander implements ProtocolHandler {
   }
 
   private onEngineStart = () => {
-    // gossip evidence
-    this.node.reimint.evpool.on('evidence', this.onEvidence);
+    // broadcast all cached evidence
     for (const ev of this.node.reimint.evpool.pendingEvidence) {
       this.evidenceQueue.push(ev);
     }
@@ -82,10 +81,6 @@ export class ConsensusProtocolHander implements ProtocolHandler {
     this.gossipDataLoop();
     this.gossipVotesLoop();
     this.gossipEvidenceLoop();
-  };
-
-  private onEvidence = (ev: Evidence) => {
-    this.evidenceQueue.push(ev);
   };
 
   private async gossipDataLoop() {
@@ -214,7 +209,6 @@ export class ConsensusProtocolHander implements ProtocolHandler {
   abort() {
     this.aborted = true;
     this.reimint.off('start', this.onEngineStart);
-    this.node.reimint.evpool.off('evidence', this.onEvidence);
     this.protocol.removeHandler(this);
     this.evidenceQueue.abort();
   }
@@ -225,6 +219,16 @@ export class ConsensusProtocolHander implements ProtocolHandler {
    */
   send(msg: m.Message) {
     this.peer.send(this.protocol.name, MessageFactory.serializeMessage(msg));
+  }
+
+  /**
+   * Add evidence to evidence queue
+   * @param evidence - Target evidence
+   */
+  sendEvidence(evidence: Evidence) {
+    if (!this.isKnowEvidence(evidence)) {
+      this.evidenceQueue.push(evidence);
+    }
   }
 
   /**
@@ -267,7 +271,7 @@ export class ConsensusProtocolHander implements ProtocolHandler {
       this.reimint.state.newMessage(this.peer.peerId, msg);
     } else if (msg instanceof m.DuplicateVoteEvidenceMessage) {
       this.knowEvidence(msg.evidence);
-      this.node.reimint.evpool.addEvidence(msg.evidence).catch((err) => {
+      this.node.reimint.addEvidence(msg.evidence).catch((err) => {
         logger.error('ConsensusProtocolHander::handle, addEvidence, catch error:', err);
       });
     } else {

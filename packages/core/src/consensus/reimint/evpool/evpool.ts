@@ -1,6 +1,6 @@
 import Semaphore from 'semaphore-async-await';
 import { BN } from 'ethereumjs-util';
-import { InitializerWithEventEmitter } from '../../../initializer';
+import { Initializer } from '../../../initializer';
 import { Evidence } from './evidence';
 
 const defaultMaxCacheSize = 100;
@@ -21,13 +21,7 @@ export interface EvidencePoolOptions {
   maxAgeNumBlocks?: BN;
 }
 
-export declare interface EvidencePool {
-  on(event: 'evidence', listener: (ev: Evidence) => void): this;
-
-  off(event: 'evidence', listener: (ev: Evidence) => void): this;
-}
-
-export class EvidencePool extends InitializerWithEventEmitter {
+export class EvidencePool extends Initializer {
   private readonly backend: EvidencePoolBackend;
   private readonly lock = new Semaphore(1);
   private readonly maxCacheSize: number;
@@ -79,7 +73,6 @@ export class EvidencePool extends InitializerWithEventEmitter {
     if (this.cachedPendingEvidence.length > this.maxCacheSize) {
       this.cachedPendingEvidence.shift();
     }
-    this.emit('evidence', ev);
   }
 
   /**

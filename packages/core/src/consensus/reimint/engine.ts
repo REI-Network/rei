@@ -18,7 +18,7 @@ import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
 import { StakeManager, Contract } from './contracts';
 import { StateMachine } from './state';
-import { EvidencePool, EvidenceDatabase } from './evpool';
+import { Evidence, EvidencePool, EvidenceDatabase } from './evpool';
 import { Reimint } from './reimint';
 import { WAL } from './wal';
 import { ReimintExecutor } from './executor';
@@ -147,6 +147,19 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     } else {
       // return Reimint.calcGasLimit(parent.gasLimit, parent.gasUsed);
       return getGasLimitByCommon(nextCommon);
+    }
+  }
+
+  /**
+   * Try to add pending evidence,
+   * if the addition is successful, broadcast to all peers
+   * @param evidence - Pending evidence
+   */
+  async addEvidence(evidence: Evidence) {
+    if (await this.evpool.addEvidence(evidence)) {
+      for (const handler of this.node.consensus.handlers) {
+        handler.sendEvidence(evidence);
+      }
     }
   }
 

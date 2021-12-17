@@ -1,6 +1,6 @@
-import EventEmitter from 'events';
 import Semaphore from 'semaphore-async-await';
 import { BN } from 'ethereumjs-util';
+import { InitializerWithEventEmitter } from '../../../initializer';
 import { Evidence } from './evidence';
 
 const defaultMaxCacheSize = 100;
@@ -27,13 +27,11 @@ export declare interface EvidencePool {
   off(event: 'evidence', listener: (ev: Evidence) => void): this;
 }
 
-export class EvidencePool extends EventEmitter {
+export class EvidencePool extends InitializerWithEventEmitter {
   private readonly backend: EvidencePoolBackend;
   private readonly lock = new Semaphore(1);
   private readonly maxCacheSize: number;
   private readonly maxAgeNumBlocks: BN;
-  private readonly initPromise: Promise<void>;
-  private initPromiseResolve!: () => void;
   // cached evidence for broadcast
   private cachedPendingEvidence: Evidence[] = [];
   private height: BN = new BN(0);
@@ -44,9 +42,6 @@ export class EvidencePool extends EventEmitter {
     this.backend = backend;
     this.maxCacheSize = maxCacheSize ?? defaultMaxCacheSize;
     this.maxAgeNumBlocks = maxAgeNumBlocks ?? defaultMaxAgeNumBlocks;
-    this.initPromise = new Promise<void>((resolve) => {
-      this.initPromiseResolve = resolve;
-    });
   }
 
   get pendingEvidence() {
@@ -91,7 +86,7 @@ export class EvidencePool extends EventEmitter {
    * Initialize evidence pool from the target height
    * @param height - Target height
    */
-  async start(height: BN) {
+  async init(height: BN) {
     try {
       await this.runWithLock(async () => {
         this.height = height.clone();
@@ -105,7 +100,7 @@ export class EvidencePool extends EventEmitter {
             return this.cachedPendingEvidence.length >= this.maxCacheSize;
           }
         });
-        this.initPromiseResolve();
+        this.initOver();
       });
     } catch (err) {
       this.cachedPendingEvidence = [];

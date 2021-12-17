@@ -6,7 +6,7 @@ import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFu
 import { Transaction, WrappedTransaction, BlockHeader, Block } from '@rei-network/structure';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Node } from '../node';
-import { InitializerWithEventEmitter } from '../types';
+import { InitializerWithEventEmitter } from '../initializer';
 import { getGasLimitByCommon } from '../utils';
 import { TxSortedMap } from './txmap';
 import { PendingTxMap } from './pendingmap';

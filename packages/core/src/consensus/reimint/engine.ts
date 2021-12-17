@@ -75,8 +75,11 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     this.executor = new ReimintExecutor(this.node, this.evpool);
   }
 
+  /**
+   * {@link ConsensusEngine.init}
+   */
   init() {
-    return this.evpool.start(this.node.getLatestBlock().header.number);
+    return this.evpool.init(this.node.getLatestBlock().header.number);
   }
 
   protected _start() {

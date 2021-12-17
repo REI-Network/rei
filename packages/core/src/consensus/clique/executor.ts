@@ -35,8 +35,7 @@ export class CliqueExecutor implements Executor {
   /**
    * After block apply logic,
    * if the next block is in Reimint consensus,
-   * we should deploy all system contract and
-   * call `Router.onAfterBlock`
+   * we should deploy all system contracts
    * @param vm - VM instance
    * @param pendingBlock - Pending block
    * @returns Genesis validator set
@@ -50,25 +49,15 @@ export class CliqueExecutor implements Executor {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deploy(evm, nextCommon);
 
-      // const parentStakeManager = new StakeManager(evm, nextCommon);
+      // create genesis validator set
       validatorSet = ValidatorSet.createGenesisValidatorSet(nextCommon);
-
-      // const activeValidators = validatorSet.activeValidators();
-      // if (activeValidators.length === 0) {
-      //   throw new Error('activeValidators length is zero');
-      // }
-
-      // const activeSigners = activeValidators.map(({ validator }) => validator);
-      // const priorities = activeValidators.map(({ priority }) => priority);
-      // // call after block callback to save active validators list
-      // await parentStakeManager!.onAfterBlock(validatorSet.proposer, activeSigners, priorities);
     }
 
     return validatorSet;
   }
 
   /**
-   * {@link ConsensusEngine.finalize}
+   * {@link Executor.finalize}
    */
   async finalize(options: FinalizeOpts) {
     const { block, stateRoot } = options;
@@ -96,7 +85,7 @@ export class CliqueExecutor implements Executor {
   }
 
   /**
-   * {@link ConsensusEngine.processBlock}
+   * {@link Executor.processBlock}
    */
   async processBlock(options: ProcessBlockOpts) {
     const { block, debug } = options;
@@ -155,7 +144,7 @@ export class CliqueExecutor implements Executor {
   }
 
   /**
-   * {@link ConsensusEngine.processTx}
+   * {@link Executor.processTx}
    */
   async processTx(options: ProcessTxOpts) {
     const { root } = options;

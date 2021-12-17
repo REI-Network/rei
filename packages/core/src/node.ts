@@ -26,7 +26,8 @@ import { StakeManager, Contract } from './contracts';
 import { ReimintConsensusEngine, CliqueConsensusEngine } from './consensus';
 import { EMPTY_ADDRESS } from './utils';
 import { isEnableRemint } from './hardforks';
-import { Initializer, CommitBlockOptions, NodeOptions, NodeStatus } from './types';
+import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
+import { Initializer } from './initializer';
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;
@@ -157,7 +158,7 @@ export class Node extends Initializer {
     await stateManager.generateGenesis(getGenesisState(this.chain));
     let root = await stateManager.getStateRoot();
 
-    // deploy system contract
+    // deploy system contracts
     if (isEnableRemint(common)) {
       const vm = await this.getVM(root, common);
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
@@ -172,7 +173,7 @@ export class Node extends Initializer {
   }
 
   /**
-   * Initialize the node
+   * Initialize node
    */
   async init() {
     await this.blockchain.init();
@@ -190,6 +191,9 @@ export class Node extends Initializer {
     this.initOver();
   }
 
+  /**
+   * Start node
+   */
   start() {
     this.sync.start();
     this.txPool.start();

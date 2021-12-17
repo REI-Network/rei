@@ -5,7 +5,6 @@ import { Block } from '@rei-network/structure';
 import { IDebug } from '@gxchain2-ethereumjs/vm/dist/types';
 import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Node } from '../node';
-import { isEnableRemint } from '../hardforks';
 import { EMPTY_ADDRESS } from '../utils';
 import { StructLogDebug, JSDebug } from './debug';
 import { toAsync } from './toasync';

@@ -2,7 +2,7 @@ import { BN } from 'ethereumjs-util';
 import { Transaction, Block, BlockHeader, Log } from '@rei-network/structure';
 import { createBufferFunctionalMap, logger } from '@rei-network/utils';
 import { Database } from '@rei-network/database';
-import { InitializerWithEventEmitter } from './types';
+import { InitializerWithEventEmitter } from './initializer';
 
 // record block hash and block number for quering receipt.
 type TransactionInfo = { tx: Transaction; blockHash: Buffer; blockNumber: BN };

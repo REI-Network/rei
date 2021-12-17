@@ -136,7 +136,7 @@ export class ReimintExecutor implements Executor {
   }
 
   /**
-   * {@link ConsensusEngine.finalize}
+   * {@link Executor.finalize}
    */
   async finalize(options: FinalizeOpts) {
     const { block, receipts, stateRoot, parentStateRoot, round, evidence } = options;
@@ -171,7 +171,7 @@ export class ReimintExecutor implements Executor {
   }
 
   /**
-   * {@link ConsensusEngine.processBlock}
+   * {@link Executor.processBlock}
    */
   async processBlock(options: ProcessBlockOpts) {
     const { debug, block, skipConsensusValidation, skipConsensusVerify } = options;
@@ -238,7 +238,7 @@ export class ReimintExecutor implements Executor {
   }
 
   /**
-   * {@link ConsensusEngine.processTx}
+   * {@link Executor.processTx}
    */
   async processTx(options: ProcessTxOpts) {
     const { root, block, tx, blockGasUsed } = options;

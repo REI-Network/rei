@@ -1,6 +1,6 @@
 import { BN, Address } from 'ethereumjs-util';
 import { createBufferFunctionalMap, FunctionalSet } from '@rei-network/utils';
-import { ValidatorSet, getGenesisValidators } from './validatorset';
+import { ValidatorSet, getGenesisValidators } from './validatorSet';
 
 // validator change information
 export type ValidatorChange = {

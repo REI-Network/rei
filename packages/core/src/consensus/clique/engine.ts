@@ -1,7 +1,8 @@
 import { Address, bufferToHex, BN, toBuffer } from 'ethereumjs-util';
-import { BaseTrie } from 'merkle-patricia-tree';
+import { BaseTrie, SecureTrie as Trie } from 'merkle-patricia-tree';
+import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Block, BlockHeader, HeaderData, Transaction, Receipt } from '@rei-network/structure';
-import { Common } from '@rei-network/common';
+import { Common, getGenesisState } from '@rei-network/common';
 import { logger, nowTimestamp, getRandomIntInclusive } from '@rei-network/utils';
 import { ConsensusEngine, ConsensusEngineOptions } from '../types';
 import { BaseConsensusEngine } from '../engine';
@@ -142,6 +143,22 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
   // return undefined if it is disable
   private cliqueSigner() {
     return this.enable && this.node.accMngr.hasUnlockedAccount(this.coinbase) ? this.node.accMngr.getPrivateKey(this.coinbase) : undefined;
+  }
+
+  /**
+   * {@link ConsensusEngine.generateGenesis}
+   */
+  async generateGenesis() {
+    const common = this.node.getCommon(0);
+    const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
+    const stateManager = new StateManager({ common, trie: new Trie(this.node.chaindb) });
+    await stateManager.generateGenesis(getGenesisState(this.node.chain));
+    const root = await stateManager.getStateRoot();
+
+    if (!root.equals(genesisBlock.header.stateRoot)) {
+      logger.error('State root not equal', bufferToHex(root), bufferToHex(genesisBlock.header.stateRoot));
+      throw new Error('state root not equal');
+    }
   }
 
   /**

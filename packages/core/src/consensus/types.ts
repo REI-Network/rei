@@ -8,8 +8,7 @@ import { HeaderData, Block, Transaction, Receipt, TypedTransaction, BlockHeader 
 import { Blockchain } from '@rei-network/blockchain';
 import { Database } from '@rei-network/database';
 import { Node } from '../node';
-import { StakeManager } from '../contracts';
-import { ValidatorSets, ValidatorSet } from '../staking';
+import { ValidatorSet } from './reimint/validatorSet';
 import { Worker } from './worker';
 import { Evidence } from './reimint/evpool';
 
@@ -85,6 +84,11 @@ export interface ConsensusEngine {
   abort(): Promise<void>;
 
   /**
+   * Generate genesis state
+   */
+  generateGenesis(): Promise<void>;
+
+  /**
    * Get miner address
    * @param block - Block or block header
    */
@@ -154,11 +158,9 @@ export interface ProcessTxResult {
 export interface ExecutorBackend {
   readonly db: Database;
   readonly blockchain: Blockchain;
-  readonly validatorSets: ValidatorSets;
   getCommon(num: BNLike): Common;
   getStateManager(root: Buffer, num: BNLike | Common): Promise<StateManager>;
   getVM(root: Buffer, num: BNLike | Common): Promise<VM>;
-  getStakeManager(vm: VM, block: Block, common?: Common): StakeManager;
 }
 
 export interface Executor {

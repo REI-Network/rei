@@ -3,8 +3,8 @@ import { Address, BN, MAX_INTEGER } from 'ethereumjs-util';
 import Message from '@gxchain2-ethereumjs/vm/dist/evm/message';
 import { Common } from '@rei-network/common';
 import { hexStringToBuffer, logger } from '@rei-network/utils';
-import { EMPTY_ADDRESS } from '../utils';
-import { ValidatorSet } from '../staking';
+import { EMPTY_ADDRESS } from '../../../utils';
+import { ValidatorSet } from '../validatorSet';
 import { encode } from './utils';
 
 export abstract class Contract {

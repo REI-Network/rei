@@ -5,11 +5,9 @@ import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import { Database, createLevelDB, createEncodingLevelDB, DBSaveTxLookup, DBSaveReceipts } from '@rei-network/database';
 import { NetworkManager, Peer } from '@rei-network/network';
-import { Common, getChain, getGenesisState } from '@rei-network/common';
+import { Common, getChain } from '@rei-network/common';
 import { Blockchain } from '@rei-network/blockchain';
 import VM from '@gxchain2-ethereumjs/vm';
-import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
-import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Transaction, Block } from '@rei-network/structure';
 import { Channel, Aborter, logger } from '@rei-network/utils';
@@ -21,10 +19,7 @@ import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
 import { BlockchainMonitor } from './blockchainMonitor';
 import { WireProtocol, ConsensusProtocol } from './protocols';
-import { ValidatorSets } from './staking';
-import { StakeManager, Contract } from './contracts';
 import { ReimintConsensusEngine, CliqueConsensusEngine } from './consensus';
-import { EMPTY_ADDRESS } from './utils';
 import { isEnableRemint } from './hardforks';
 import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
 import { Initializer } from './initializer';
@@ -68,7 +63,6 @@ export class Node extends Initializer {
   readonly reimint: ReimintConsensusEngine;
   readonly clique: CliqueConsensusEngine;
   readonly aborter = new Aborter();
-  readonly validatorSets = new ValidatorSets();
 
   private pendingTxsLoopPromise!: Promise<void>;
   private commitBlockLoopPromise!: Promise<void>;
@@ -151,27 +145,6 @@ export class Node extends Initializer {
     };
   }
 
-  private async generateGenesis() {
-    const common = this.getCommon(0);
-    const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
-    const stateManager = new StateManager({ common, trie: new Trie(this.chaindb) });
-    await stateManager.generateGenesis(getGenesisState(this.chain));
-    let root = await stateManager.getStateRoot();
-
-    // deploy system contracts
-    if (isEnableRemint(common)) {
-      const vm = await this.getVM(root, common);
-      const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
-      await Contract.deploy(evm, common);
-      root = await vm.stateManager.getStateRoot();
-    }
-
-    if (!root.equals(genesisBlock.header.stateRoot)) {
-      logger.error('State root not equal', bufferToHex(root), bufferToHex(genesisBlock.header.stateRoot));
-      throw new Error('state root not equal');
-    }
-  }
-
   /**
    * Initialize node
    */
@@ -180,7 +153,7 @@ export class Node extends Initializer {
     this.latestBlock = await this.blockchain.getLatestBlock();
     this.totalDifficulty = await this.blockchain.getTotalDifficulty(this.latestBlock.hash(), this.latestBlock.header.number);
     if (this.latestBlock.header.number.eqn(0)) {
-      await this.generateGenesis();
+      await this.getEngine(this.latestBlock._common).generateGenesis();
     }
 
     await this.networkdb.open();
@@ -347,18 +320,6 @@ export class Node extends Initializer {
       blockchain: this.blockchain,
       getMiner: (header) => this.getEngine(header._common).getMiner(header)
     });
-  }
-
-  /**
-   * Get stake manager contract object
-   * @param vm - Target vm instance
-   * @param block - Target block
-   * @param common - Common instance
-   * @returns Stake manager contract object
-   */
-  getStakeManager(vm: VM, block: Block, common?: Common) {
-    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
-    return new StakeManager(evm, common ?? block._common);
   }
 
   /**

@@ -3,7 +3,7 @@ import { Address, BN } from 'ethereumjs-util';
 import { createBufferFunctionalMap } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { StakeManager, ActiveValidator } from '../contracts';
-import { ValidatorChanges } from './validatorchanges';
+import { ValidatorChanges } from './validatorChanges';
 
 const maxInt256 = new BN('7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 'hex');
 const minInt256 = new BN('8000000000000000000000000000000000000000000000000000000000000000', 'hex').neg();

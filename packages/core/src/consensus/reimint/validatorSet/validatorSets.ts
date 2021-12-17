@@ -1,7 +1,7 @@
 import { createBufferFunctionalMap } from '@rei-network/utils';
-import { ValidatorSet } from './validatorset';
+import { ValidatorSet } from './validatorSet';
 import { StakeManager } from '../contracts';
-import { Reimint } from '../consensus/reimint/reimint';
+import { Reimint } from '../reimint';
 
 const maxSize = 100;
 

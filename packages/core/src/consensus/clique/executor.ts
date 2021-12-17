@@ -9,8 +9,8 @@ import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/stat
 import { Block, TypedTransaction } from '@rei-network/structure';
 import { logger } from '@rei-network/utils';
 import { FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, ExecutorBackend, Executor } from '../types';
-import { Contract } from '../../contracts';
-import { ValidatorSet } from '../../staking';
+import { Contract } from '../reimint/contracts';
+import { ValidatorSet } from '../reimint/validatorSet';
 import { isEnableRemint } from '../../hardforks';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
 import { Clique } from './clique';

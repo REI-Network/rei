@@ -12,6 +12,7 @@ export abstract class BaseConsensusEngine extends EventEmitter implements Consen
   abstract readonly executor: Executor;
   abstract newBlock(block: Block): Promise<void>;
   abstract init(): Promise<void>;
+  abstract generateGenesis(): Promise<void>;
   abstract getMiner(block: Block | BlockHeader): Address;
   abstract generatePendingBlock(headerData: HeaderData, common: Common, transactions?: Transaction[]): Block;
   abstract generateReceiptTrie(transactions: Transaction[], receipts: Receipt[]): Promise<Buffer>;

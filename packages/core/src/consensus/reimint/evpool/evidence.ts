@@ -1,5 +1,5 @@
 import { keccak256, rlp, BN } from 'ethereumjs-util';
-import { ValidatorSet } from '../../../staking';
+import { ValidatorSet } from '../validatorSet';
 import { Vote } from '../vote';
 
 export interface Evidence {

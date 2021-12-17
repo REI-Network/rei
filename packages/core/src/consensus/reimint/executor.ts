@@ -6,19 +6,20 @@ import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/stat
 import VM from '@gxchain2-ethereumjs/vm';
 import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executor } from '../types';
 import { postByzantiumTxReceiptsToReceipts } from '../../utils';
-import { ValidatorSet, ValidatorChanges } from '../../staking';
-import { StakeManager, SlashReason } from '../../contracts';
+import { ValidatorSet, ValidatorChanges } from './validatorSet';
+import { StakeManager, SlashReason } from './contracts';
 import { Reimint } from './reimint';
-import { EvidencePool, Evidence, DuplicateVoteEvidence } from './evpool';
+import { Evidence, DuplicateVoteEvidence } from './evpool';
 import { ExtraData } from './extraData';
+import { ReimintConsensusEngine } from './engine';
 
 export class ReimintExecutor implements Executor {
   private readonly backend: ExecutorBackend;
-  private readonly evpool: EvidencePool;
+  private readonly engine: ReimintConsensusEngine;
 
-  constructor(backend: ExecutorBackend, evpool: EvidencePool) {
+  constructor(backend: ExecutorBackend, engine: ReimintConsensusEngine) {
     this.backend = backend;
-    this.evpool = evpool;
+    this.engine = engine;
   }
 
   /**
@@ -150,8 +151,8 @@ export class ReimintExecutor implements Executor {
     const miner = Reimint.getMiner(block);
     const minerReward = new BN(pendingCommon.param('pow', 'minerReward'));
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
-    const parentStakeManager = this.backend.getStakeManager(vm, block);
-    const parentValidatorSet = (await this.backend.validatorSets.get(parentStateRoot, parentStakeManager)).copy();
+    const parentStakeManager = this.engine.getStakeManager(vm, block);
+    const parentValidatorSet = (await this.engine.validatorSets.get(parentStateRoot, parentStakeManager)).copy();
     parentValidatorSet.incrementProposerPriority(round);
 
     await vm.stateManager.checkpoint();
@@ -187,8 +188,8 @@ export class ReimintExecutor implements Executor {
     const vm = await this.backend.getVM(root, pendingCommon);
 
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
-    const parentStakeManager = this.backend.getStakeManager(vm, block);
-    let parentValidatorSet = await this.backend.validatorSets.get(root, parentStakeManager);
+    const parentStakeManager = this.engine.getStakeManager(vm, block);
+    let parentValidatorSet = await this.engine.validatorSets.get(root, parentStakeManager);
 
     const extraData = ExtraData.fromBlockHeader(pendingHeader, { valSet: parentValidatorSet });
     const miner = extraData.proposal.proposer();
@@ -201,8 +202,8 @@ export class ReimintExecutor implements Executor {
     }
 
     if (!skipConsensusVerify) {
-      await extraData.verifyEvidence(this.backend);
-      await this.evpool.checkEvidence(extraData.evidence);
+      await extraData.verifyEvidence(this.backend, this.engine);
+      await this.engine.evpool.checkEvidence(extraData.evidence);
     }
 
     let validatorSet!: ValidatorSet;

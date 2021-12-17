@@ -2,8 +2,8 @@ import crypto from 'crypto';
 import { BN, bufferToHex } from 'ethereumjs-util';
 import { Channel, logger } from '@rei-network/utils';
 import { Block, BlockHeader } from '@rei-network/structure';
-import { ValidatorSet } from '../../staking';
 import { isEmptyHash, EMPTY_HASH } from '../../utils';
+import { preValidateBlock, preValidateHeader } from '../../validation';
 import { PendingBlock } from '../pendingBlock';
 import { Reimint } from './reimint';
 import { IProcessBlockResult, IStateMachineBackend, IStateMachineP2PBackend, ISigner, IConfig, IEvidencePool, IWAL, IDebug, RoundStepType } from './types';
@@ -14,7 +14,7 @@ import { Proposal } from './proposal';
 import { Evidence, DuplicateVoteEvidence } from './evpool';
 import { TimeoutTicker } from './timeoutTicker';
 import { ExtraData } from './extraData';
-import { preValidateBlock, preValidateHeader } from '../../validation';
+import { ValidatorSet } from './validatorSet';
 
 const SkipTimeoutCommit = true;
 const WaitForTxs = true;

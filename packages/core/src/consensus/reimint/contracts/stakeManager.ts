@@ -2,7 +2,7 @@ import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import { Address, BN, toBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Log, Receipt } from '@rei-network/structure';
-import { ValidatorChanges, getGenesisValidators } from '../staking';
+import { ValidatorChanges, getGenesisValidators } from '../validatorSet';
 import { bufferToAddress, decodeInt256 } from './utils';
 import { Contract } from './contract';
 
@@ -200,6 +200,11 @@ export class StakeManager extends Contract {
     });
   }
 
+  /**
+   * Reward block validator
+   * @param validator - Validator address
+   * @param amount - Amount
+   */
   reward(validator: Address, amount: BN) {
     return this.runWithLogger(async () => {
       const { logs } = await this.executeMessage(this.makeSystemCallerMessage('reward', ['address'], [validator.toString()], amount));
@@ -207,6 +212,11 @@ export class StakeManager extends Contract {
     });
   }
 
+  /**
+   * Slash block validator
+   * @param validator - Validator address
+   * @param reason - Slash reason
+   */
   slash(validator: Address, reason: SlashReason) {
     return this.runWithLogger(async () => {
       const { logs } = await this.executeMessage(this.makeSystemCallerMessage('slash', ['address', 'uint8'], [validator.toString(), reason]));
@@ -214,6 +224,12 @@ export class StakeManager extends Contract {
     });
   }
 
+  /**
+   * After block call back
+   * @param proposer - Proposer address
+   * @param activeValidators - Address list of active validator
+   * @param priorities - Priority list of active validator
+   */
   onAfterBlock(proposer: Address, activeValidators: Address[], priorities: BN[]) {
     return this.runWithLogger(async () => {
       await this.executeMessage(this.makeSystemCallerMessage('onAfterBlock', ['address', 'address[]', 'int256[]'], [proposer.toString(), activeValidators.map((addr) => addr.toString()), priorities.map((p) => p.toString())]));

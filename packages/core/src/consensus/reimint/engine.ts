@@ -1,16 +1,22 @@
 import path from 'path';
 import { encode } from 'rlp';
 import { Address, BN, BNLike, ecsign, intToBuffer, bufferToHex } from 'ethereumjs-util';
-import { BaseTrie } from 'merkle-patricia-tree';
+import { BaseTrie, SecureTrie as Trie } from 'merkle-patricia-tree';
+import VM from '@gxchain2-ethereumjs/vm';
+import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
+import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
+import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Block, HeaderData, BlockHeader, Transaction, Receipt } from '@rei-network/structure';
-import { Common } from '@rei-network/common';
+import { Common, getGenesisState } from '@rei-network/common';
 import { logger } from '@rei-network/utils';
 import { Node } from '../../node';
-import { isEmptyAddress, getGasLimitByCommon } from '../../utils';
+import { ValidatorSets } from './validatorSet';
+import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
 import { getConsensusTypeByCommon } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
+import { StakeManager, Contract } from './contracts';
 import { StateMachine } from './state';
 import { EvidencePool, EvidenceDatabase } from './evpool';
 import { Reimint } from './reimint';
@@ -60,6 +66,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   readonly signer: SimpleNodeSigner;
   readonly evpool: EvidencePool;
   readonly executor: ReimintExecutor;
+  readonly validatorSets = new ValidatorSets();
 
   constructor(options: ConsensusEngineOptions) {
     super(options);
@@ -72,7 +79,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     const wal = new WAL({ path: path.join(this.node.datadir, 'WAL') });
     this.state = new StateMachine(this, this.node.consensus, this.evpool, wal, this.node.chainId, this.config, this.signer);
 
-    this.executor = new ReimintExecutor(this.node, this.evpool);
+    this.executor = new ReimintExecutor(this.node, this);
   }
 
   /**
@@ -109,13 +116,13 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     const gasLimit = this.calcGasLimit(block.header);
     pendingBlock.complete(difficulty, gasLimit);
 
-    let validators = this.node.validatorSets.directlyGet(header.stateRoot);
+    let validators = this.validatorSets.directlyGet(header.stateRoot);
     // if the validator set doesn't exist, load from state trie
     if (!validators) {
       const vm = await this.node.getVM(header.stateRoot, header._common);
       const nextCommon = this.node.getCommon(block.header.number.addn(1));
-      const sm = this.node.getStakeManager(vm, block, nextCommon);
-      validators = await this.node.validatorSets.get(header.stateRoot, sm);
+      const sm = this.getStakeManager(vm, block, nextCommon);
+      validators = await this.validatorSets.get(header.stateRoot, sm);
     }
 
     this.state.newBlockHeader(header, validators, pendingBlock);
@@ -141,6 +148,40 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
       // return Reimint.calcGasLimit(parent.gasLimit, parent.gasUsed);
       return getGasLimitByCommon(nextCommon);
     }
+  }
+
+  /**
+   * {@link ConsensusEngine.generateGenesis}
+   */
+  async generateGenesis() {
+    const common = this.getCommon(0);
+    const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
+    const stateManager = new StateManager({ common, trie: new Trie(this.node.chaindb) });
+    await stateManager.generateGenesis(getGenesisState(this.node.chain));
+    let root = await stateManager.getStateRoot();
+
+    // deploy system contracts
+    const vm = await this.node.getVM(root, common);
+    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
+    await Contract.deploy(evm, common);
+    root = await vm.stateManager.getStateRoot();
+
+    if (!root.equals(genesisBlock.header.stateRoot)) {
+      logger.error('State root not equal', bufferToHex(root), bufferToHex(genesisBlock.header.stateRoot));
+      throw new Error('state root not equal');
+    }
+  }
+
+  /**
+   * Get stake manager contract object
+   * @param vm - Target vm instance
+   * @param block - Target block
+   * @param common - Common instance
+   * @returns Stake manager contract object
+   */
+  getStakeManager(vm: VM, block: Block, common?: Common) {
+    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
+    return new StakeManager(evm, common ?? block._common);
   }
 
   /**

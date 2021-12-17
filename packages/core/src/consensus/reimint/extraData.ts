@@ -2,14 +2,14 @@ import { rlp, intToBuffer, bufferToInt, BNLike, Address } from 'ethereumjs-util'
 import VM from '@gxchain2-ethereumjs/vm';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
-import { Block, BlockHeader, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
-import { ValidatorSet, ValidatorSets } from '../../staking';
-import { StakeManager } from '../../contracts';
+import { BlockHeader, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
+import { ValidatorSet } from './validatorSet';
 import { Evidence, DuplicateVoteEvidence, EvidenceFactory } from './evpool';
 import { Reimint } from '../reimint';
 import { Vote, VoteType, VoteSet } from './vote';
 import { Proposal } from './proposal';
 import * as v from './validate';
+import { ReimintConsensusEngine } from './engine';
 
 export interface ExtraDataOptions {
   chainId: number;
@@ -55,10 +55,8 @@ function isEXEvidenceList(ele: EXElement): ele is EXEvidenceList {
 }
 
 export interface ExtraDataValidateBackend {
-  readonly validatorSets: ValidatorSets;
   readonly db: Database;
   getCommon(num: BNLike): Common;
-  getStakeManager(vm: VM, block: Block, common?: Common): StakeManager;
   getVM(root: Buffer, num: BNLike | Common): Promise<VM>;
 }
 
@@ -271,7 +269,7 @@ export class ExtraData {
     }
   }
 
-  async verifyEvidence(backend: ExtraDataValidateBackend) {
+  async verifyEvidence(backend: ExtraDataValidateBackend, engine: ReimintConsensusEngine) {
     for (const ev of this.evidence) {
       if (ev instanceof DuplicateVoteEvidence) {
         const parentBlock = await backend.db.getBlock(ev.height.subn(1));
@@ -282,8 +280,8 @@ export class ExtraData {
          * when the consensus algorithm is switched
          */
         const common = backend.getCommon(ev.height);
-        const stakeManager = backend.getStakeManager(await backend.getVM(parentHeader.stateRoot, common), parentBlock, common);
-        const validatorSet = (await backend.validatorSets.get(parentHeader.stateRoot, stakeManager)).copy();
+        const stakeManager = engine.getStakeManager(await backend.getVM(parentHeader.stateRoot, common), parentBlock, common);
+        const validatorSet = (await engine.validatorSets.get(parentHeader.stateRoot, stakeManager)).copy();
         validatorSet.incrementProposerPriority(ev.voteA.round);
         ev.verify(validatorSet);
       } else {

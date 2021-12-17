@@ -161,10 +161,11 @@ export class ReimintExecutor implements Executor {
       const validatorSet = await this.afterApply(vm, block, receipts, evidence, miner, minerReward, parentValidatorSet, parentStakeManager);
       await vm.stateManager.commit();
       const finalizedStateRoot = await vm.stateManager.getStateRoot();
-      return {
-        finalizedStateRoot,
-        validatorSet
-      };
+
+      // put the validator set in the memory cache
+      this.engine.validatorSets.set(finalizedStateRoot, validatorSet);
+
+      return { finalizedStateRoot };
     } catch (err) {
       await vm.stateManager.revert();
       throw err;
@@ -235,7 +236,11 @@ export class ReimintExecutor implements Executor {
       'next proposer:',
       validatorSet.proposer.toString()
     );
-    return { receipts: postByzantiumTxReceiptsToReceipts(result.receipts), validatorSet };
+
+    // put the validator set in the memory cache
+    this.engine.validatorSets.set(result.stateRoot, validatorSet);
+
+    return { receipts: postByzantiumTxReceiptsToReceipts(result.receipts) };
   }
 
   /**

@@ -8,7 +8,6 @@ import { HeaderData, Block, Transaction, Receipt, TypedTransaction, BlockHeader 
 import { Blockchain } from '@rei-network/blockchain';
 import { Database } from '@rei-network/database';
 import { Node } from '../node';
-import { ValidatorSet } from './reimint/validatorSet';
 import { Worker } from './worker';
 import { Evidence } from './reimint/evpool';
 
@@ -126,7 +125,6 @@ export interface FinalizeOpts {
 
 export interface FinalizeResult {
   finalizedStateRoot: Buffer;
-  validatorSet?: ValidatorSet;
 }
 
 export interface ProcessBlockOpts {
@@ -138,7 +136,6 @@ export interface ProcessBlockOpts {
 
 export interface ProcessBlockResult {
   receipts: Receipt[];
-  validatorSet?: ValidatorSet;
 }
 
 export interface ProcessTxOpts {

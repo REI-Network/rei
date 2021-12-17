@@ -134,7 +134,7 @@ export class StructLogDebug implements IDebugImpl {
     } else if (typeof err === 'string') {
       errString = err;
     } else {
-      errString = 'unkonw error';
+      errString = 'unknown error';
     }
     this.failed = true;
     await this.captureLog(step, errString);

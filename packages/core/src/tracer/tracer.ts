@@ -74,7 +74,7 @@ export class Tracer {
         block = block as Block;
         const opcodeList = getOpcodesForHF(block._common);
         const debug = this.createDebugImpl(opcodeList, reject, config, hash);
-        await executor.processBlock({ debug, block, skipConsensusValidation: true, skipConsensusVerify: true });
+        await executor.processBlock({ debug, block, force: true, skipConsensusValidation: true, skipConsensusVerify: true });
         const result = debug.result();
         resolve(util.types.isPromise(result) ? await result : result);
       } catch (err) {

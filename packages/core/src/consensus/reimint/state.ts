@@ -378,7 +378,7 @@ export class StateMachine {
       } else if (err instanceof DuplicateVotesError) {
         logger.detail('StateMachine::tryAddVote, duplicate votes from:', peerId);
       } else {
-        logger.warn('StateMachine::tryAddVote, catch error:', err);
+        logger.error('StateMachine::tryAddVote, catch error:', err);
       }
     }
   }
@@ -586,8 +586,12 @@ export class StateMachine {
       await preValidateBlock.call(this.proposalBlock);
       this.proposalBlockResult = await this.backend.preProcessBlock(this.proposalBlock);
       validateResult = true;
-    } catch (err) {
-      logger.warn('StateMachine::enterPrevote, preValidateHeaderAndBlock or process block failed:', err);
+    } catch (err: any) {
+      if (err.message === 'committed') {
+        return;
+      } else {
+        logger.warn('StateMachine::enterPrevote, preValidateHeaderAndBlock or process block failed:', err);
+      }
     }
 
     if (validateResult) {

@@ -129,6 +129,7 @@ export interface FinalizeResult {
 
 export interface ProcessBlockOpts {
   block: Block;
+  force?: boolean;
   debug?: IDebug;
   skipConsensusValidation?: boolean;
   skipConsensusVerify?: boolean;
@@ -174,7 +175,7 @@ export interface Executor {
   /**
    * Process a block
    * @param options - Process block options
-   * @returns ProcessBlockResult
+   * @returns ProcessBlockResult or undefined
    */
   processBlock(options: ProcessBlockOpts): Promise<ProcessBlockResult>;
 

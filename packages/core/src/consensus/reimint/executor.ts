@@ -176,10 +176,24 @@ export class ReimintExecutor implements Executor {
    * {@link Executor.processBlock}
    */
   async processBlock(options: ProcessBlockOpts) {
-    const { debug, block, skipConsensusValidation, skipConsensusVerify } = options;
+    const { debug, block, force, skipConsensusValidation, skipConsensusVerify } = options;
 
     const pendingHeader = block.header;
     const pendingCommon = block._common;
+
+    if (!force) {
+      // ensure that the block has not been committed
+      try {
+        const hashInDB = await this.backend.db.numberToHash(pendingHeader.number);
+        if (hashInDB.equals(block.hash())) {
+          throw new Error('committed');
+        }
+      } catch (err: any) {
+        if (err.type !== 'NotFoundError') {
+          throw err;
+        }
+      }
+    }
 
     // get parent block from database
     const parent = await this.backend.db.getBlockByHashAndNumber(block.header.parentHash, pendingHeader.number.subn(1));

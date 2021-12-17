@@ -95,8 +95,12 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
             // try to continue minting
             this.node.tryToMintNextBlock();
           }
-        } catch (err) {
-          logger.error('CliqueConsensusEngine::newBlockHeader, processBlock, catch error:', err);
+        } catch (err: any) {
+          if (err.message === 'committed') {
+            // ignore committed
+          } else {
+            logger.error('CliqueConsensusEngine::newBlockHeader, processBlock, catch error:', err);
+          }
         }
       }, duration);
     }

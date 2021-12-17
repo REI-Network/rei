@@ -284,12 +284,20 @@ export class Synchronizer extends EventEmitter {
   }
 
   async processAndCommitBlock(block: Block) {
-    const result = await this.node.getExecutor(block._common).processBlock({ block });
-    return await this.node.commitBlock({
-      ...result,
-      block,
-      broadcast: false
-    });
+    try {
+      const result = await this.node.getExecutor(block._common).processBlock({ block });
+      return await this.node.commitBlock({
+        ...result,
+        block,
+        broadcast: false
+      });
+    } catch (err: any) {
+      if (err.message === 'committed') {
+        return false;
+      } else {
+        throw err;
+      }
+    }
   }
 
   validateHeaders(parent: BlockHeader | undefined, headers: BlockHeader[]) {

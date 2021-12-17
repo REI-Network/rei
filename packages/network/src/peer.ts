@@ -151,7 +151,7 @@ export class Peer {
   getMsgQueue(name: string) {
     const queue = this.queueMap.get(name);
     if (!queue) {
-      throw new Error(`Peer unkonw name: ${name}`);
+      throw new Error(`Peer unknown name: ${name}`);
     }
     return queue;
   }

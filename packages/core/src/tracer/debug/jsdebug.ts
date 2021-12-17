@@ -335,7 +335,7 @@ export class JSDebug implements IDebugImpl {
     } else if (typeof err === 'string') {
       errString = err;
     } else {
-      errString = 'unkonw error';
+      errString = 'unknown error';
     }
     await this.captureLog(step, errString);
   }

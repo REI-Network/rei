@@ -380,10 +380,12 @@ export class Node extends Initializer {
     const hash = block.hash();
     const number = block.header.number;
 
-    // ensure that the block has not been executed
+    // ensure that the block has not been committed
     try {
-      await this.db.getHeader(hash, number);
-      return { reorged: false };
+      const hashInDB = await this.db.numberToHash(number);
+      if (hashInDB.equals(hash)) {
+        return { reorged: false };
+      }
     } catch (err: any) {
       if (err.type !== 'NotFoundError') {
         throw err;

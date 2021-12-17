@@ -88,11 +88,25 @@ export class CliqueExecutor implements Executor {
    * {@link Executor.processBlock}
    */
   async processBlock(options: ProcessBlockOpts) {
-    const { block, debug } = options;
+    const { block, debug, force, skipConsensusValidation } = options;
 
     const miner = Clique.getMiner(block);
     const pendingHeader = block.header;
     const pendingCommon = block._common;
+
+    if (!force) {
+      // ensure that the block has not been committed
+      try {
+        const hashInDB = await this.backend.db.numberToHash(pendingHeader.number);
+        if (hashInDB.equals(block.hash())) {
+          throw new Error('committed');
+        }
+      } catch (err: any) {
+        if (err.type !== 'NotFoundError') {
+          throw err;
+        }
+      }
+    }
 
     // get parent header from database
     const parent = await this.backend.db.getHeader(block.header.parentHash, pendingHeader.number.subn(1));
@@ -101,7 +115,7 @@ export class CliqueExecutor implements Executor {
     const root = parent.stateRoot;
     const vm = await this.backend.getVM(root, pendingCommon);
 
-    if (!options.skipConsensusValidation) {
+    if (!skipConsensusValidation) {
       Clique.consensusValidateHeader(pendingHeader, this.backend.blockchain);
     }
 

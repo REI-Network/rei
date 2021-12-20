@@ -81,7 +81,7 @@ export class Controller {
       }
     }
     const fee = new BN(cost).addn(common.param('gasPrices', 'tx'));
-    if (common.gteHardfork('homestead') && (data.to === undefined || hexStringToBuffer(data.to).length === 0)) {
+    if (common.gteHardfork('homestead') && (!data.to || hexStringToBuffer(data.to).length === 0)) {
       fee.iaddn(common.param('gasPrices', 'txCreation'));
     }
     return fee;

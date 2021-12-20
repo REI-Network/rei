@@ -3,7 +3,7 @@ import VM from '@gxchain2-ethereumjs/vm';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
 import { BlockHeader, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
-import { ValidatorSet } from './validatorSet';
+import { ActiveValidatorSet } from './validatorSet';
 import { Evidence, DuplicateVoteEvidence, EvidenceFactory } from './evpool';
 import { Reimint } from '../reimint';
 import { Vote, VoteType, VoteSet } from './vote';
@@ -14,7 +14,7 @@ import { ReimintConsensusEngine } from './engine';
 export interface ExtraDataOptions {
   chainId: number;
   header: BlockHeader;
-  valSet?: ValidatorSet;
+  valSet?: ActiveValidatorSet;
 }
 
 export interface ExtraDataFromBlockHeaderOptions extends Omit<ExtraDataOptions, 'header' | 'chainId'> {}
@@ -254,7 +254,7 @@ export class ExtraData {
     return rlp.encode(this.raw(validaterSetSize));
   }
 
-  validatorSet() {
+  activeValidatorSet() {
     return this.voteSet?.valSet;
   }
 
@@ -281,7 +281,7 @@ export class ExtraData {
          */
         const common = backend.getCommon(ev.height);
         const stakeManager = engine.getStakeManager(await backend.getVM(parentHeader.stateRoot, common), parentBlock, common);
-        const validatorSet = (await engine.validatorSets.get(parentHeader.stateRoot, stakeManager)).copy();
+        const validatorSet = (await engine.validatorSets.getActiveValSet(parentHeader.stateRoot, stakeManager)).copy();
         validatorSet.incrementProposerPriority(ev.voteA.round);
         ev.verify(validatorSet);
       } else {

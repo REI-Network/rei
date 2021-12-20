@@ -1,6 +1,6 @@
 import { Address, BN, ecsign, ecrecover, rlp, intToBuffer, bnToUnpaddedBuffer, rlphash, bufferToInt } from 'ethereumjs-util';
 import { createBufferFunctionalMap, logger } from '@rei-network/utils';
-import { ValidatorSet } from './validatorSet';
+import { ActiveValidatorSet } from './validatorSet';
 import { BitArray } from './bitArray';
 import * as v from './validate';
 
@@ -124,7 +124,7 @@ export class Vote {
     }
   }
 
-  validateSignature(valSet: ValidatorSet) {
+  validateSignature(valSet: ActiveValidatorSet) {
     if (this.index >= valSet.length) {
       throw new Error('invalid index');
     }
@@ -181,7 +181,7 @@ export class VoteSet {
   height: BN;
   round: number;
   signedMsgType: VoteType;
-  valSet: ValidatorSet;
+  valSet: ActiveValidatorSet;
 
   votesBitArray: BitArray;
   votes: (Vote | undefined)[];
@@ -190,7 +190,7 @@ export class VoteSet {
   votesByBlock = createBufferFunctionalMap<BlockVotes>();
   peerMaj23s = new Map<string, Buffer>();
 
-  constructor(chainId: number, height: BN, round: number, signedMsgType: VoteType, valSet: ValidatorSet) {
+  constructor(chainId: number, height: BN, round: number, signedMsgType: VoteType, valSet: ActiveValidatorSet) {
     this.chainId = chainId;
     this.height = height.clone();
     this.round = round;
@@ -327,20 +327,20 @@ export type RoundVoteSet = {
 export class HeightVoteSet {
   chainId: number;
   height: BN;
-  valSet: ValidatorSet;
+  valSet: ActiveValidatorSet;
 
   round: number;
   roundVoteSets = new Map<number, RoundVoteSet>();
   peerCatchupRounds = new Map<string, number[]>();
 
-  constructor(chainId: number, height: BN, valSet: ValidatorSet) {
+  constructor(chainId: number, height: BN, valSet: ActiveValidatorSet) {
     this.chainId = chainId;
     this.height = height.clone();
     this.valSet = valSet;
     this.round = 0;
   }
 
-  reset(height: BN, valSet: ValidatorSet) {
+  reset(height: BN, valSet: ActiveValidatorSet) {
     this.height = height.clone();
     this.valSet = valSet;
     this.roundVoteSets.clear();

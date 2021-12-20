@@ -85,24 +85,24 @@ export class ReimintExecutor implements Executor {
 
     let validatorSet: ValidatorSet;
     if (enableGenesisValidators) {
-      if (!parentValidatorSet.isGenesisValidatorSet()) {
+      if (!parentValidatorSet.isGenesis(pendingCommon)) {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, create a new genesis validator set');
         // if the parent validator set isn't a genesis validator set, we create a new one
-        validatorSet = ValidatorSet.createGenesisValidatorSet(pendingCommon);
+        validatorSet = ValidatorSet.genesis(pendingCommon);
       } else {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, copy from parent');
         // if the parent validator set is a genesis validator set, we copy the set from the parent
         validatorSet = parentValidatorSet.copy();
       }
     } else {
-      if (parentValidatorSet.isGenesisValidatorSet()) {
+      if (parentValidatorSet.isGenesis(pendingCommon)) {
         logger.debug('Reimint::afterApply, DisableGenesisValidators, create a new normal validator set');
         // if the parent validator set is a genesis validator set, we create a new set from state trie
-        validatorSet = await ValidatorSet.createFromStakeManager(parentStakeManager, true);
+        validatorSet = await ValidatorSet.fromStakeManager(parentStakeManager, { sort: true });
       } else {
         logger.debug('Reimint::afterApply, DisableGenesisValidators, copy from parent and merge changes');
         // filter changes
-        const changes = new ValidatorChanges(parentValidatorSet);
+        const changes = new ValidatorChanges(pendingCommon);
         StakeManager.filterReceiptsChanges(changes, receipts, pendingCommon);
         if (logs) {
           StakeManager.filterLogsChanges(changes, logs, pendingCommon);
@@ -114,17 +114,15 @@ export class ReimintExecutor implements Executor {
           logger.debug('Reimint::processBlock, change, address:', vc.validator.toString(), 'votingPower:', vc.votingPower?.toString(), 'update:', vc.update.toString());
         }
 
-        // copy from parent
-        validatorSet = parentValidatorSet!.copy();
         // merge changes
-        validatorSet.mergeChanges(changes);
+        validatorSet = parentValidatorSet!.copyAndMerge(changes, pendingCommon);
       }
     }
 
     // increase once
-    validatorSet.incrementProposerPriority(1);
+    validatorSet.active.incrementProposerPriority(1);
 
-    const activeValidators = validatorSet.activeValidators();
+    const activeValidators = validatorSet.active.activeValidators();
     if (activeValidators.length === 0) {
       throw new Error('activeValidators length is zero');
     }
@@ -132,7 +130,7 @@ export class ReimintExecutor implements Executor {
     const activeSigners = activeValidators.map(({ validator }) => validator);
     const priorities = activeValidators.map(({ priority }) => priority);
     // call after block callback to save active validators list
-    await parentStakeManager.onAfterBlock(validatorSet.proposer, activeSigners, priorities);
+    await parentStakeManager.onAfterBlock(validatorSet.active.proposer, activeSigners, priorities);
     return validatorSet;
   }
 
@@ -152,8 +150,8 @@ export class ReimintExecutor implements Executor {
     const minerReward = new BN(pendingCommon.param('pow', 'minerReward'));
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.engine.getStakeManager(vm, block);
-    const parentValidatorSet = (await this.engine.validatorSets.get(parentStateRoot, parentStakeManager)).copy();
-    parentValidatorSet.incrementProposerPriority(round);
+    const parentValidatorSet = (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager)).copy();
+    parentValidatorSet.active.incrementProposerPriority(round);
 
     await vm.stateManager.checkpoint();
     try {
@@ -204,13 +202,13 @@ export class ReimintExecutor implements Executor {
 
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.engine.getStakeManager(vm, block);
-    let parentValidatorSet = await this.engine.validatorSets.get(root, parentStakeManager);
+    let parentValidatorSet = await this.engine.validatorSets.getValSet(root, parentStakeManager);
 
-    const extraData = ExtraData.fromBlockHeader(pendingHeader, { valSet: parentValidatorSet });
+    const extraData = ExtraData.fromBlockHeader(pendingHeader, { valSet: parentValidatorSet.active });
     const miner = extraData.proposal.proposer();
 
     // now, parentValidatorSet has increased extraData.proposal.round times
-    parentValidatorSet = extraData.validatorSet()!;
+    parentValidatorSet = new ValidatorSet(parentValidatorSet.indexed, extraData.activeValidatorSet()!);
 
     if (!skipConsensusValidation) {
       extraData.validate();
@@ -241,14 +239,14 @@ export class ReimintExecutor implements Executor {
 
     const result = await vm.runBlock(runBlockOptions);
 
-    const activeValidators = validatorSet.activeValidators();
+    const activeValidators = validatorSet.active.activeValidators();
     logger.debug(
       'Reimint::processBlock, activeValidators:',
       activeValidators.map(({ validator, priority }) => {
-        return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${validatorSet!.getVotingPower(validator).toString()}`;
+        return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${validatorSet!.indexed.getVotingPower(validator).toString()}`;
       }),
       'next proposer:',
-      validatorSet.proposer.toString()
+      validatorSet.active.proposer.toString()
     );
 
     // put the validator set in the memory cache

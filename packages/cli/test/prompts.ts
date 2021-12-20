@@ -122,7 +122,7 @@ const handler: {
     const block = await node.db.getBlock(new BN(h));
     const common = block._common;
     const stakeManager = node.reimint.getStakeManager(await node.getVM(parentBlock.header.stateRoot, common), parentBlock, common);
-    const validatorSet = await node.reimint.validatorSets.get(parentBlock.header.stateRoot, stakeManager);
+    const validatorSet = await node.reimint.validatorSets.getActiveValSet(parentBlock.header.stateRoot, stakeManager);
     console.log('----------------');
     console.log(
       ExtraData.fromBlockHeader(block.header, {

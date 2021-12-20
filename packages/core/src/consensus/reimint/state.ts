@@ -14,7 +14,7 @@ import { Proposal } from './proposal';
 import { Evidence, DuplicateVoteEvidence } from './evpool';
 import { TimeoutTicker } from './timeoutTicker';
 import { ExtraData } from './extraData';
-import { ValidatorSet } from './validatorSet';
+import { ActiveValidatorSet } from './validatorSet';
 
 const SkipTimeoutCommit = true;
 const WaitForTxs = true;
@@ -54,7 +54,7 @@ export class StateMachine {
   private startTime!: number;
 
   private commitTime?: number;
-  private validators!: ValidatorSet;
+  private validators!: ActiveValidatorSet;
   private pendingBlock?: PendingBlock;
 
   private proposal?: Proposal;
@@ -237,7 +237,7 @@ export class StateMachine {
     // if (!this.proposal.proposer().equals(proposer) || extraData.round !== this.proposal.round || extraData.POLRound !== this.proposal.POLRound) {
     //   throw new Error('invalid proposal block');
     // }
-    if (!this.validators.contains(proposer)) {
+    if (!this.validators.isActive(proposer)) {
       throw new Error('invalid proposal block');
     }
 
@@ -944,7 +944,7 @@ export class StateMachine {
     return true;
   }
 
-  newBlockHeader(header: BlockHeader, validators: ValidatorSet, pendingBlock: PendingBlock) {
+  newBlockHeader(header: BlockHeader, validators: ActiveValidatorSet, pendingBlock: PendingBlock) {
     const timestamp = Date.now();
     this.parent = header;
     this.parentHash = header.hash();

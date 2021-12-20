@@ -1,5 +1,5 @@
 import { keccak256, rlp, BN } from 'ethereumjs-util';
-import { ValidatorSet } from '../validatorSet';
+import { ActiveValidatorSet } from '../validatorSet';
 import { Vote } from '../vote';
 
 export interface Evidence {
@@ -50,7 +50,7 @@ export class DuplicateVoteEvidence implements Evidence {
     return new DuplicateVoteEvidence(Vote.fromValuesArray(voteABuf), Vote.fromValuesArray(voteBBuf));
   }
 
-  verify(valSet: ValidatorSet) {
+  verify(valSet: ActiveValidatorSet) {
     const validator = valSet.getValidatorByIndex(this.voteA.index);
     if (!validator.equals(this.voteA.validator())) {
       throw new Error('invalid votes(validator index)');

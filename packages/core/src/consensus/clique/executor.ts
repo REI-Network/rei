@@ -50,7 +50,7 @@ export class CliqueExecutor implements Executor {
       await Contract.deploy(evm, nextCommon);
 
       // create genesis validator set
-      validatorSet = ValidatorSet.createGenesisValidatorSet(nextCommon);
+      validatorSet = ValidatorSet.genesis(nextCommon);
     }
 
     return validatorSet;
@@ -144,14 +144,14 @@ export class CliqueExecutor implements Executor {
     const result = await vm.runBlock(runBlockOptions);
 
     if (validatorSet) {
-      const activeValidators = validatorSet.activeValidators();
+      const activeValidators = validatorSet.active.activeValidators();
       logger.debug(
         'Clique::processBlock, activeValidators:',
         activeValidators.map(({ validator, priority }) => {
-          return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${validatorSet!.getVotingPower(validator).toString()}`;
+          return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${validatorSet!.indexed.getVotingPower(validator).toString()}`;
         }),
         'next proposer:',
-        validatorSet.proposer.toString()
+        validatorSet.active.proposer.toString()
       );
     }
     return { receipts: postByzantiumTxReceiptsToReceipts(result.receipts), validatorSet };

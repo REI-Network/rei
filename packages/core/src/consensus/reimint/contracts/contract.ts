@@ -4,7 +4,7 @@ import Message from '@gxchain2-ethereumjs/vm/dist/evm/message';
 import { Common } from '@rei-network/common';
 import { hexStringToBuffer, logger } from '@rei-network/utils';
 import { EMPTY_ADDRESS } from '../../../utils';
-import { ValidatorSet } from '../validatorSet';
+import { ActiveValidatorSet } from '../validatorSet';
 import { encode } from './utils';
 
 export abstract class Contract {
@@ -21,7 +21,7 @@ export abstract class Contract {
   }
 
   static async deploy(evm: EVM, common: Common) {
-    const genesisValidators = ValidatorSet.createGenesisValidatorSet(common);
+    const genesisValidators = ActiveValidatorSet.genesis(common);
     const activeValidators = genesisValidators.activeValidators();
     const activeSigners = activeValidators.map(({ validator }) => validator.toString());
     const priorities = activeValidators.map(({ priority }) => priority.toString());

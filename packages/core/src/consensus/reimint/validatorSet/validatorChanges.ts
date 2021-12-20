@@ -1,6 +1,7 @@
 import { BN, Address } from 'ethereumjs-util';
-import { createBufferFunctionalMap, FunctionalSet } from '@rei-network/utils';
-import { ValidatorSet, getGenesisValidators } from './validatorSet';
+import { FunctionalSet, FunctionalMap } from '@rei-network/utils';
+import { Common } from '@rei-network/common';
+import { isGenesis } from './genesis';
 
 // validator change information
 export type ValidatorChange = {
@@ -14,28 +15,28 @@ export type ValidatorChange = {
 
 // a class used to record validator changes
 export class ValidatorChanges {
-  // validator set of parent block
-  parent: ValidatorSet;
+  // common instance
+  common: Common;
   // a map to record changes
-  changes = createBufferFunctionalMap<ValidatorChange>();
+  changes = new FunctionalMap<Address, ValidatorChange>((a: Address, b: Address) => a.buf.compare(b.buf));
   // new indexed validator address set
   indexedValidators = new FunctionalSet<Address>((a: Address, b: Address) => a.buf.compare(b.buf));
   // new unindexed validator address set
   unindexedValidators = new FunctionalSet<Address>((a: Address, b: Address) => a.buf.compare(b.buf));
 
-  constructor(parent: ValidatorSet) {
-    this.parent = parent;
+  constructor(common: Common) {
+    this.common = common;
   }
 
   // get validator change object(create if it does not exist)
   private getChange(validator: Address) {
-    let c = this.changes.get(validator.buf);
+    let c = this.changes.get(validator);
     if (!c) {
       c = {
         validator: validator,
         update: new BN(0)
       };
-      this.changes.set(validator.buf, c);
+      this.changes.set(validator, c);
     }
     return c;
   }
@@ -48,7 +49,7 @@ export class ValidatorChanges {
    * @param votingPower - Voting power
    */
   index(validator: Address, votingPower: BN) {
-    if (!this.isGenesisValidator(validator)) {
+    if (!isGenesis(validator, this.common)) {
       this.unindexedValidators.delete(validator);
       this.indexedValidators.add(validator);
       const vc = this.getChange(validator);
@@ -64,21 +65,11 @@ export class ValidatorChanges {
    * @param validator - Validator address
    */
   unindex(validator: Address) {
-    if (!this.isGenesisValidator(validator)) {
+    if (!isGenesis(validator, this.common)) {
       this.unindexedValidators.add(validator);
       this.indexedValidators.delete(validator);
-      this.changes.delete(validator.buf);
+      this.changes.delete(validator);
     }
-  }
-
-  // check if the validator is a genesis validator
-  private isGenesisValidator(validator: Address) {
-    return getGenesisValidators(this.parent.common).filter((gv) => gv.equals(validator)).length > 0;
-  }
-
-  // check if the validator changes can be ignored
-  private cannonIgnore(validator: Address) {
-    return !this.isGenesisValidator(validator) && (this.parent.contains(validator) || this.indexedValidators.has(validator)) && !this.unindexedValidators.has(validator);
   }
 
   /**
@@ -87,7 +78,7 @@ export class ValidatorChanges {
    * @param value - Stake amount
    */
   stake(validator: Address, value: BN) {
-    if (this.cannonIgnore(validator)) {
+    if (!isGenesis(validator, this.common)) {
       this.getChange(validator).update.iadd(value);
     }
   }
@@ -98,7 +89,7 @@ export class ValidatorChanges {
    * @param value - Ustake amount
    */
   unstake(validator: Address, value: BN) {
-    if (this.cannonIgnore(validator)) {
+    if (!isGenesis(validator, this.common)) {
       this.getChange(validator).update.isub(value);
     }
   }

@@ -116,16 +116,12 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     const gasLimit = this.calcGasLimit(block.header);
     pendingBlock.complete(difficulty, gasLimit);
 
-    let validators = this.validatorSets.directlyGet(header.stateRoot);
-    // if the validator set doesn't exist, load from state trie
-    if (!validators) {
-      const vm = await this.node.getVM(header.stateRoot, header._common);
-      const nextCommon = this.node.getCommon(block.header.number.addn(1));
-      const sm = this.getStakeManager(vm, block, nextCommon);
-      validators = await this.validatorSets.get(header.stateRoot, sm);
-    }
+    const vm = await this.node.getVM(header.stateRoot, header._common);
+    const nextCommon = this.node.getCommon(block.header.number.addn(1));
+    const sm = this.getStakeManager(vm, block, nextCommon);
+    const valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm);
 
-    this.state.newBlockHeader(header, validators, pendingBlock);
+    this.state.newBlockHeader(header, valSet, pendingBlock);
     if (!this.state.isStarted) {
       this.state.start();
     }

@@ -1,7 +1,10 @@
 import { createBufferFunctionalMap } from '@rei-network/utils';
-import { ValidatorSet } from './validatorSet';
 import { StakeManager } from '../contracts';
 import { Reimint } from '../reimint';
+import { ValidatorSet, LoadOptions } from './validatorSet';
+import { IndexedValidatorSet } from './indexedValidatorSet';
+import { ActiveValidatorSet } from './activeValidatorSet';
+import { isGenesis, genesisValidatorVotingPower } from './genesis';
 
 const maxSize = 100;
 
@@ -9,54 +12,93 @@ const maxSize = 100;
  * `ValidatorSets` will record the most recent `maxSize` block of validators set
  */
 export class ValidatorSets {
-  private sets = createBufferFunctionalMap<ValidatorSet>();
-  private roots: Buffer[] = [];
-
-  /**
-   * Check whether state root exists in set
-   * @param stateRoot - Target state root
-   * @returns `true` if it is exist
-   */
-  has(stateRoot: Buffer) {
-    return this.sets.has(stateRoot);
-  }
+  private indexedSets = createBufferFunctionalMap<IndexedValidatorSet>();
+  private activeSets = createBufferFunctionalMap<ActiveValidatorSet>();
+  private indexedRoots: Buffer[] = [];
+  private activeRoots: Buffer[] = [];
 
   /**
    * Get validator set by state root,
-   * create if it doesn't exist
+   * load from stake manager if it doesn't exist
    * @param stateRoot - Target state root
    * @param sm - `StakeManager` instance
    */
-  async get(stateRoot: Buffer, sm: StakeManager) {
-    let set = this.sets.get(stateRoot);
-    if (!set) {
+  async getValSet(stateRoot: Buffer, sm?: StakeManager) {
+    const indexed = this.indexedSets.get(stateRoot);
+    const active = this.activeSets.get(stateRoot);
+    if (!indexed || !active) {
+      if (!sm) {
+        throw new Error('missing state root: ' + stateRoot.toString('hex'));
+      }
+
       const { totalLockedAmount, validatorCount } = await sm.getTotalLockedAmountAndValidatorCount();
       const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
-      set = enableGenesisValidators ? await ValidatorSet.createGenesisValidatorSetFromStakeManager(sm) : await ValidatorSet.createFromStakeManager(sm);
-      this.set(stateRoot, set);
+      const options: LoadOptions = enableGenesisValidators ? { genesis: true } : { active };
+      const valSet = await ValidatorSet.fromStakeManager(sm, options);
+      this.set(stateRoot, valSet);
+      return valSet;
+    } else {
+      return new ValidatorSet(indexed, active);
     }
-    return set;
   }
 
   /**
-   * Directly get validator set by state root,
-   * return undefined, if it doesn't exsit
+   * Get active validator set by state root,
+   * load from stake manager if it doesn't exist
    * @param stateRoot - Target state root
+   * @param sm - `StakeManager` instance
    */
-  directlyGet(stateRoot: Buffer) {
-    return this.sets.get(stateRoot);
+  async getActiveValSet(stateRoot: Buffer, sm?: StakeManager) {
+    let active = this.activeSets.get(stateRoot);
+    if (!active) {
+      if (!sm) {
+        throw new Error('missing state root: ' + stateRoot.toString('hex'));
+      }
+
+      const { totalLockedAmount, validatorCount } = await sm.getTotalLockedAmountAndValidatorCount();
+      const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
+      active = await ActiveValidatorSet.fromStakeManager(
+        sm,
+        enableGenesisValidators
+          ? (val) => {
+              if (!isGenesis(val, sm.common)) {
+                throw new Error('unknown validator: ' + val.toString());
+              }
+
+              return genesisValidatorVotingPower.clone();
+            }
+          : undefined
+      );
+      this.set(stateRoot, active);
+    }
+    return active;
   }
 
   /**
-   * Set validator set with state root
+   * Add validator set to memort cache with state root
    * @param stateRoot - Target state root
    * @param set - Validator set
    */
-  set(stateRoot: Buffer, set: ValidatorSet) {
-    this.sets.set(stateRoot, set);
-    this.roots.push(stateRoot);
-    while (this.roots.length > maxSize) {
-      this.sets.delete(this.roots.shift()!);
+  set(stateRoot: Buffer, value: ValidatorSet | IndexedValidatorSet | ActiveValidatorSet) {
+    if (value instanceof IndexedValidatorSet) {
+      if (!this.indexedSets.has(stateRoot)) {
+        this.indexedSets.set(stateRoot, value);
+        this.indexedRoots.push(stateRoot);
+        while (this.indexedRoots.length > maxSize) {
+          this.indexedSets.delete(this.indexedRoots.shift()!);
+        }
+      }
+    } else if (value instanceof ActiveValidatorSet) {
+      if (!this.activeSets.has(stateRoot)) {
+        this.activeSets.set(stateRoot, value);
+        this.activeRoots.push(stateRoot);
+        while (this.activeRoots.length > maxSize) {
+          this.activeSets.delete(this.activeRoots.shift()!);
+        }
+      }
+    } else {
+      this.set(stateRoot, value.indexed);
+      this.set(stateRoot, value.active);
     }
   }
 }

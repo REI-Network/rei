@@ -1,6 +1,7 @@
-import { Address, bnToHex, bufferToHex, toBuffer, hashPersonalMessage, toRpcSig, ecsign } from 'ethereumjs-util';
-import { TransactionFactory, WrappedTransaction, WrappedBlock, Log, Transaction } from '@rei-network/structure';
-import { hexStringToBuffer } from '@rei-network/utils';
+import { Address, bnToHex, bufferToHex, toBuffer, hashPersonalMessage, toRpcSig, ecsign, BN } from 'ethereumjs-util';
+import { TransactionFactory, WrappedTransaction, WrappedBlock, Log, Transaction, Block } from '@rei-network/structure';
+import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
+import { Common } from '@rei-network/common';
 import * as helper from '../helper';
 import { RpcContext } from '../index';
 import { Controller, CallData } from './base';
@@ -165,9 +166,64 @@ export class ETHController extends Controller {
     const result = await this.runCall(data, tag);
     return bufferToHex(result.execResult.returnValue);
   }
+
+  private calculateBaseFee(data: CallData, common: Common) {
+    const txDataZero = common.param('gasPrices', 'txDataZero');
+    const txDataNonZero = common.param('gasPrices', 'txDataNonZero');
+    let cost = 0;
+    if (data.data) {
+      const buf = hexStringToBuffer(data.data);
+      for (let i = 0; i < buf.length; i++) {
+        buf[i] === 0 ? (cost += txDataZero) : (cost += txDataNonZero);
+      }
+    }
+
+    const fee = new BN(cost).addn(common.param('gasPrices', 'tx'));
+    if (common.gteHardfork('homestead') && (!data.to || hexStringToBuffer(data.to).length === 0)) {
+      fee.iaddn(common.param('gasPrices', 'txCreation'));
+    }
+    return fee;
+  }
+
+  private async estimateGas(data: CallData, block: Block) {
+    let lo = new BN(20999);
+    let hi = data.gas ? hexStringToBN(data.gas) : block.header.gasLimit;
+    if (hi.lte(lo)) {
+      throw new Error('invalid gas limit');
+    }
+    const cap = hi;
+
+    const executable = async (gas: BN) => {
+      try {
+        await this.runCall({ ...data, gas: bnToHex(gas) }, block);
+        return true;
+      } catch (err) {
+        return false;
+      }
+    };
+
+    while (lo.addn(1).lt(hi)) {
+      const mid = lo.add(hi).divn(2);
+      if (!(await executable(mid))) {
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+
+    if (hi.eq(cap)) {
+      if (!(await executable(hi))) {
+        throw new Error('vm revert');
+      }
+    }
+
+    return hi;
+  }
+
   async eth_estimateGas([data, tag]: [CallData, string]) {
-    const result = await this.runCall(data, tag);
-    return bnToHex(result.gasUsed);
+    const block = await this.getBlockByTag(tag);
+    const result = await this.estimateGas(data, block);
+    return bnToHex(result.add(this.calculateBaseFee(data, block._common)));
   }
   async eth_getBlockByHash([hash, fullTransactions]: [string, boolean]) {
     try {

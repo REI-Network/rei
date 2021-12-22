@@ -1,7 +1,7 @@
 import { Address, BN } from 'ethereumjs-util';
 import { Node } from '@rei-network/core';
 import { Block, WrappedBlock } from '@rei-network/structure';
-import { hexStringToBuffer, hexStringToBN, logger } from '@rei-network/utils';
+import { hexStringToBuffer, hexStringToBN } from '@rei-network/utils';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import * as helper from '../helper';
 import { FilterSystem } from '../filtersystem';
@@ -69,26 +69,8 @@ export class Controller {
     }
   }
 
-  protected calculateBaseFee(data: CallData, num: BN) {
-    const common = this.node.getCommon(num);
-    const txDataZero = common.param('gasPrices', 'txDataZero');
-    const txDataNonZero = common.param('gasPrices', 'txDataNonZero');
-    let cost = 0;
-    if (data.data) {
-      const buf = hexStringToBuffer(data.data);
-      for (let i = 0; i < data.data.length; i++) {
-        buf[i] === 0 ? (cost += txDataZero) : (cost += txDataNonZero);
-      }
-    }
-    const fee = new BN(cost).addn(common.param('gasPrices', 'tx'));
-    if (common.gteHardfork('homestead') && (!data.to || hexStringToBuffer(data.to).length === 0)) {
-      fee.iaddn(common.param('gasPrices', 'txCreation'));
-    }
-    return fee;
-  }
-
-  protected async runCall(data: CallData, tag: string) {
-    const block = await this.getBlockByTag(tag);
+  protected async runCall(data: CallData, tag: string | Block) {
+    const block = typeof tag === 'string' ? await this.getBlockByTag(tag) : tag;
     const vm = await this.node.getVM(block.header.stateRoot, block.header.number);
     await vm.stateManager.checkpoint();
     try {
@@ -106,11 +88,9 @@ export class Controller {
         throw result.execResult.exceptionError;
       }
       await vm.stateManager.revert();
-      result.gasUsed.iadd(this.calculateBaseFee(data, block.header.number));
       return result;
     } catch (err) {
       await vm.stateManager.revert();
-      logger.warn('Controller::runCall, catch error:', err);
       throw err;
     }
   }

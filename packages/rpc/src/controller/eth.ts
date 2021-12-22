@@ -186,7 +186,7 @@ export class ETHController extends Controller {
   }
 
   private async estimateGas(data: CallData, block: Block) {
-    let lo = new BN(20999);
+    let lo = new BN(21000 - 1);
     let hi = data.gas ? hexStringToBN(data.gas) : block.header.gasLimit;
     if (hi.lte(lo)) {
       throw new Error('invalid gas limit');

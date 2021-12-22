@@ -156,7 +156,8 @@ export class ReimintExecutor implements Executor {
     await vm.stateManager.checkpoint();
     try {
       await this.assignBlockReward(vm.stateManager, systemCaller, minerReward);
-      const validatorSet = await this.afterApply(vm, block, receipts, evidence, miner, minerReward, parentValidatorSet, parentStakeManager);
+      const blockReward = (await vm.stateManager.getAccount(systemCaller)).balance;
+      const validatorSet = await this.afterApply(vm, block, receipts, evidence, miner, blockReward, parentValidatorSet, parentStakeManager);
       await vm.stateManager.commit();
       const finalizedStateRoot = await vm.stateManager.getStateRoot();
 
@@ -220,20 +221,25 @@ export class ReimintExecutor implements Executor {
     }
 
     let validatorSet!: ValidatorSet;
-    const blockReward = new BN(0);
     const runBlockOptions: RunBlockOpts = {
       block,
       root,
       debug,
       generate: false,
       skipBlockValidation: true,
-      assignBlockReward: async (state: IStateManager, reward: BN) => {
+      assignBlockReward: async (state, reward) => {
         await this.assignBlockReward(state, systemCaller, reward);
-        blockReward.iadd(reward);
       },
       afterApply: async (state, { receipts: postByzantiumTxReceipts }) => {
+        // assign all balances of systemCaller to miner
+        const blockReward = (await state.getAccount(systemCaller)).balance;
         const receipts = postByzantiumTxReceiptsToReceipts(postByzantiumTxReceipts);
         validatorSet = await this.afterApply(vm, block, receipts, extraData.evidence, miner, blockReward, parentValidatorSet, parentStakeManager);
+      },
+      runTxOpts: {
+        assignTxReward: async (state, value) => {
+          await rewardAccount(state, systemCaller, value);
+        }
       }
     };
 
@@ -260,11 +266,15 @@ export class ReimintExecutor implements Executor {
    */
   async processTx(options: ProcessTxOpts) {
     const { root, block, tx, blockGasUsed } = options;
+    const systemCaller = Address.fromString(block._common.param('vm', 'scaddr'));
     const vm = await this.backend.getVM(root, block._common);
     const result = await vm.runTx({
       tx,
       block,
-      blockGasUsed
+      blockGasUsed,
+      assignTxReward: async (state, value) => {
+        await rewardAccount(state, systemCaller, value);
+      }
     });
     return {
       receipt: postByzantiumTxReceiptsToReceipts([result.receipt])[0],

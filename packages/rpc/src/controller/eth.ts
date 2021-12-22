@@ -1,4 +1,4 @@
-import { Address, bnToHex, bufferToHex, toBuffer, hashPersonalMessage, toRpcSig, ecsign, BN } from 'ethereumjs-util';
+import { Address, intToHex, bnToHex, bufferToHex, toBuffer, hashPersonalMessage, toRpcSig, ecsign, BN } from 'ethereumjs-util';
 import { TransactionFactory, WrappedTransaction, WrappedBlock, Log, Transaction, Block } from '@rei-network/structure';
 import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
@@ -46,13 +46,13 @@ export class ETHController extends Controller {
     }
     const status = this.node.sync.status;
     return {
-      startingBlock: bufferToHex(toBuffer(status.startingBlock)),
+      startingBlock: intToHex(status.startingBlock),
       currentBlock: bnToHex(this.node.getLatestBlock().header.number),
-      highestBlock: bufferToHex(toBuffer(status.highestBlock))
+      highestBlock: intToHex(status.highestBlock)
     };
   }
   eth_chainId() {
-    return bufferToHex(this.node.getCommon(0).chainIdBN().toBuffer());
+    return bnToHex(this.node.getCommon(0).chainIdBN());
   }
   eth_coinbase() {
     return this.node.getCurrentEngine().coinbase.toString();
@@ -61,7 +61,7 @@ export class ETHController extends Controller {
     return this.node.getCurrentEngine().enable;
   }
   eth_hashrate() {
-    return bufferToHex(toBuffer(0));
+    return intToHex(0);
   }
   // TODO: eth_gasPrice
   eth_gasPrice() {
@@ -90,7 +90,7 @@ export class ETHController extends Controller {
   async eth_getBlockTransactionCountByHash([hash]: [string]) {
     try {
       const number = (await this.node.db.getBlock(hexStringToBuffer(hash))).transactions.length;
-      return bufferToHex(toBuffer(number));
+      return intToHex(number);
     } catch (err) {
       return null;
     }
@@ -98,16 +98,16 @@ export class ETHController extends Controller {
   async eth_getBlockTransactionCountByNumber([tag]: [string]) {
     try {
       const number = (await this.getBlockByTag(tag)).transactions.length;
-      return bufferToHex(toBuffer(number));
+      return intToHex(number);
     } catch (err) {
       return null;
     }
   }
   eth_getUncleCountByBlockHash([hash]: [string]) {
-    return bufferToHex(toBuffer(0));
+    return intToHex(0);
   }
   eth_getUncleCountByBlockNumber([tag]: [string]) {
-    return bufferToHex(toBuffer(0));
+    return intToHex(0);
   }
   async eth_getCode([address, tag]: [string, string]) {
     const stateManager = await this.getStateManagerByTag(tag);

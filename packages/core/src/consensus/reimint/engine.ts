@@ -1,4 +1,4 @@
-import path from 'path';
+import path, { resolve } from 'path';
 import { encode } from 'rlp';
 import { Address, BN, BNLike, ecsign, intToBuffer, bufferToHex } from 'ethereumjs-util';
 import { BaseTrie, SecureTrie as Trie } from 'merkle-patricia-tree';
@@ -17,6 +17,7 @@ import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types
 import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
 import { StakeManager, Contract } from './contracts';
+import { StateMachineNewHeight } from './stateMessages';
 import { StateMachine } from './state';
 import { Evidence, EvidencePool, EvidenceDatabase } from './evpool';
 import { Reimint } from './reimint';
@@ -121,10 +122,10 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     const sm = this.getStakeManager(vm, block, nextCommon);
     const valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm);
 
-    this.state.newBlockHeader(header, valSet, pendingBlock);
     if (!this.state.isStarted) {
       this.state.start();
     }
+    await this.state.newBlockHeader(header, valSet, pendingBlock);
   }
 
   /**

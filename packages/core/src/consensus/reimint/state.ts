@@ -7,7 +7,7 @@ import { preValidateBlock, preValidateHeader } from '../../validation';
 import { PendingBlock } from '../pendingBlock';
 import { Reimint } from './reimint';
 import { IProcessBlockResult, IStateMachineBackend, IStateMachineP2PBackend, ISigner, IConfig, IEvidencePool, IWAL, IDebug, RoundStepType } from './types';
-import { StateMachineMessage, StateMachineTimeout, StateMachineEndHeight, StateMachineMsg } from './stateMessages';
+import { StateMachineMessage, StateMachineTimeout, StateMachineEndHeight, StateMachineNewHeight, StateMachineMsg } from './stateMessages';
 import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from './messages';
 import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, DuplicateVotesError } from './vote';
 import { Proposal } from './proposal';
@@ -39,7 +39,12 @@ export class StateMachine {
   private readonly msgQueue = new Channel<StateMachineMsg>({
     max: StateMachineMsgQueueMaxSize,
     drop: (message) => {
-      logger.warn('StateMachine::drop, too many messages, drop:', message);
+      if (message instanceof StateMachineNewHeight) {
+        logger.warn('StateMachine::drop, too many messages, drop NewHeight message');
+        message.reject(new Error('dropped'));
+      } else {
+        logger.warn('StateMachine::drop, too many messages, drop:', message);
+      }
     }
   });
 
@@ -109,6 +114,14 @@ export class StateMachine {
         } else if (msg instanceof StateMachineTimeout) {
           await this.wal.write(msg);
           await this.handleTimeout(msg);
+        } else if (msg instanceof StateMachineNewHeight) {
+          const { header, validators, pendingBlock, resolve, reject } = msg;
+          try {
+            this._newBlockHeader(header, validators, pendingBlock);
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
         }
       } catch (err) {
         logger.error('State::msgLoop, catch error:', err);
@@ -944,7 +957,7 @@ export class StateMachine {
     return true;
   }
 
-  newBlockHeader(header: BlockHeader, validators: ActiveValidatorSet, pendingBlock: PendingBlock) {
+  private _newBlockHeader(header: BlockHeader, validators: ActiveValidatorSet, pendingBlock: PendingBlock) {
     const timestamp = Date.now();
     this.parent = header;
     this.parentHash = header.hash();
@@ -977,22 +990,56 @@ export class StateMachine {
     logger.debug('StateMachine::newBlockHeader, lastest height:', header.number.toString(), 'next round should start at:', this.startTime);
   }
 
+  /**
+   * Notify new block header to state machine
+   * @param header - New block header
+   * @param validators - Active validator set of next block
+   * @param pendingBlock - Pending block instance
+   */
+  newBlockHeader(header: BlockHeader, validators: ActiveValidatorSet, pendingBlock: PendingBlock) {
+    return new Promise<void>((resolve, reject) => {
+      this._newMessage(new StateMachineNewHeight(header, validators, pendingBlock, resolve, reject));
+    });
+  }
+
+  /**
+   * Notify new message to state machine
+   * @param peerId - Remote peer id, if the message comes from local, the peer id is ''
+   * @param msg - Message
+   */
   newMessage(peerId: string, msg: Message) {
     if (this.isStarted) {
       this._newMessage(new StateMachineMessage(peerId, msg));
     }
   }
 
+  /**
+   * Get proposal block by hash
+   * @param hash - Proposal block hash
+   * @returns Return undefined if the target block doesn't exist
+   */
   getProposalBlock(hash: Buffer) {
     if (this.proposalBlockHash && this.proposalBlockHash.equals(hash) && this.proposalBlock) {
       return this.proposalBlock;
     }
   }
 
+  /**
+   * Get active validator set length
+   * @returns Active validator set length
+   */
   getValSetSize() {
     return this.validators.length;
   }
 
+  /**
+   * Mark target hash as maj23
+   * @param height - Height
+   * @param round - Round
+   * @param type - Vote type
+   * @param peerId - Remote peer id
+   * @param hash - Proposal block hash
+   */
   setVoteMaj23(height: BN, round: number, type: VoteType, peerId: string, hash: Buffer) {
     if (height.eq(this.height)) {
       return;
@@ -1001,6 +1048,10 @@ export class StateMachine {
     this.votes.setPeerMaj23(round, type, peerId, hash);
   }
 
+  /**
+   * Check whether the state machine reaches a consensus at the specified height
+   * @param height - Height
+   */
   hasMaj23Precommit(height: BN) {
     if (height.eq(this.height)) {
       const maj23 = this.votes.precommits(this.round)?.maj23;
@@ -1011,10 +1062,22 @@ export class StateMachine {
     return false;
   }
 
+  /**
+   * Generate new round step message for remote peer
+   * @returns Return undefined if the local state machine is not ready
+   */
   genNewRoundStepMessage() {
     return this.startTime !== undefined ? new NewRoundStepMessage(this.height, this.round, this.step) : undefined;
   }
 
+  /**
+   * Generate vote set bits message for remote peer
+   * @param height - Heigth
+   * @param round - Round
+   * @param type - Vote type
+   * @param hash - Proposal block hash
+   * @returns Return undefined if the local state machine is not ready
+   */
   genVoteSetBitsMessage(height: BN, round: number, type: VoteType, hash: Buffer) {
     if (height.eq(this.height)) {
       return;
@@ -1032,6 +1095,12 @@ export class StateMachine {
     return new VoteSetBitsMessage(height, round, type, hash, bitArray);
   }
 
+  /**
+   * Generate proposal message for remote peer
+   * @param height - Heigth
+   * @param round - Round
+   * @returns Return undefined if the local state machine is not ready
+   */
   genProposalMessage(height: BN, round: number) {
     if (!height.eq(this.height) || round !== this.round) {
       return;
@@ -1051,6 +1120,14 @@ export class StateMachine {
     return new ProposalMessage(this.proposal);
   }
 
+  /**
+   * Pick a vote for remote peer
+   * @param height - Height
+   * @param round - Round
+   * @param proposalPOLRound - Proposal POL Round
+   * @param step - Round step
+   * @returns Return undefined if the local state machine is not ready
+   */
   pickVoteSetToSend(height: BN, round: number, proposalPOLRound: number, step: RoundStepType) {
     if (!height.eq(this.height) || this.votes === undefined) {
       return;

@@ -130,7 +130,7 @@ export class Receipt {
       blockHash: this.blockHash ? bufferToHex(this.blockHash) : undefined,
       blockNumber: this.blockNumber ? bnToHex(this.blockNumber) : undefined,
       contractAddress: this.contractAddress ? bufferToHex(this.contractAddress) : null,
-      cumulativeGasUsed: bufferToHex(this.cumulativeGasUsed),
+      cumulativeGasUsed: bnToHex(this.bnCumulativeGasUsed),
       from: this.from ? bufferToHex(this.from) : undefined,
       gasUsed: this.gasUsed ? bnToHex(this.gasUsed) : undefined,
       logs: this.logs.map((log) => log.toRPCJSON()),

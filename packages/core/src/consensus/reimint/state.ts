@@ -459,6 +459,7 @@ export class StateMachine {
     const signer = this.signer!;
 
     const evidence = await evpool.pickEvidence(height, maxEvidenceCount);
+    pendingBlock.stop();
     const blockData = await pendingBlock.finalize({ round, evidence });
 
     return Reimint.generateBlockAndProposal(blockData.header, blockData.transactions, {
@@ -986,6 +987,14 @@ export class StateMachine {
 
     const duration = this.startTime - timestamp;
     this._schedule(duration, this.height, 0, RoundStepType.NewHeight);
+
+    // let pending block stop appending transactions before enter new height
+    const stopAppendDuration = Math.max(Math.floor((duration * 9) / 10), 1);
+    setTimeout(() => {
+      if (pendingBlock === this.pendingBlock) {
+        pendingBlock.stop();
+      }
+    }, stopAppendDuration);
 
     logger.debug('StateMachine::newBlockHeader, lastest height:', header.number.toString(), 'next round should start at:', this.startTime);
   }

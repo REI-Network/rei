@@ -39,6 +39,8 @@ export class PendingBlock {
   private transactionsTrie?: Buffer;
   private finalizedStateRoot?: Buffer;
 
+  private stopped: boolean = false;
+
   constructor(engine: ConsensusEngine, parentHash: Buffer, parentStateRoot: Buffer, number: BN, timestamp: BN, common: Common, extraData?: Buffer) {
     if (extraData && extraData.length !== 32) {
       throw new Error('invalid extra data length');
@@ -147,12 +149,22 @@ export class PendingBlock {
       return Promise.resolve();
     }
 
+    // if we have stopped, then just return
+    if (this.stopped) {
+      return Promise.resolve();
+    }
+
     return this.runWithLock(async () => {
       /**
        * TODO: We should continue to try to append transactions instead of returning directly,
        *       here the return is for performance considerations
        */
       if (this.finalizedStateRoot) {
+        return;
+      }
+
+      // if we have stopped, then just return
+      if (this.stopped) {
         return;
       }
 
@@ -200,6 +212,11 @@ export class PendingBlock {
             this.finalizedStateRoot = undefined;
 
             txs.shift();
+          }
+
+          // if we have stopped, then just return
+          if (this.stopped) {
+            return;
           }
         } catch (err) {
           logger.debug('PendingBlock::appendTx, catch error:', err);
@@ -258,5 +275,12 @@ export class PendingBlock {
 
       return this.makeBlockData();
     });
+  }
+
+  /**
+   * Stop appending pending transactions
+   */
+  stop() {
+    this.stopped = true;
   }
 }

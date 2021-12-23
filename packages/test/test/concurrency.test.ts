@@ -19,7 +19,7 @@ const sendTestTransaction = (nonce: number) => {
   });
 };
 
-describe('Concurency', () => {
+describe('Concurrency', () => {
   before(async () => {
     await client.init();
 
@@ -48,7 +48,7 @@ describe('Concurency', () => {
       totalUsed += blockHeader.gasUsed;
       totalUsage += usage;
       totalBlocks++;
-      console.log('block:', blockHeader.number, 'txs:', txs, 'used:', blockHeader.gasUsed, 'limited:', blockHeader.gasLimit, 'avgTxs:', Math.floor(totalTxs / totalBlocks), 'avgGasUsed:', Math.floor(totalUsed / totalBlocks), 'avgUsage:', Math.floor(totalUsage / totalBlocks));
+      console.log('block:', blockHeader.number, 'txs:', txs, 'used:', blockHeader.gasUsed, 'limited:', blockHeader.gasLimit, 'usage:', usage, 'avgTxs:', Math.floor(totalTxs / totalBlocks), 'avgGasUsed:', Math.floor(totalUsed / totalBlocks), 'avgUsage:', Math.floor(totalUsage / totalBlocks));
     }
 
     if (txs > 0) {

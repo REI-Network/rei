@@ -17,7 +17,7 @@
     "@typescript-eslint/parser": "^4.27.0",
     "eslint-config-prettier": "^6.11.0",
     "eslint-plugin-prettier": "^3.1.3",
-    "husky": "^4.2.5",
+    "husky": "^7.0.4",
     "eslint": "^6.8.0",
     "prettier": "^2.0.5",
     "prettier-plugin-solidity": "1.0.0-beta.6",
@@ -26,6 +26,7 @@
   "scripts": {
     "preinstall": "npm run checkNpmVersion",
     "postinstall": "npm run build -ws",
+    "prepare": "node node_modules/husky/lib/bin.js install",
     "checkNpmVersion": "./scripts/check-npm-version.sh",
     "build:structure": "npm run build -w @rei-network/structure",
     "build:blockchain": "npm run build -w @rei-network/blockchain",
@@ -44,10 +45,5 @@
     "lint:fix": "eslint packages/*/src/**.ts packages/*/test/**.ts --fix",
     "cli": "node -r ts-node/register ./packages/cli/src/index.ts",
     "test:prompts": "node -r ts-node/register ./packages/cli/test/prompts.ts"
-  },
-  "husky": {
-    "hooks": {
-      "pre-push": "npm run lint"
-    }
   }
 }

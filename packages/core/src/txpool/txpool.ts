@@ -1,7 +1,6 @@
 import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
 import Heap from 'qheap';
-import VM from '@gxchain2-ethereumjs/vm';
 import { FunctionalBufferMap, FunctionalBufferSet, Aborter, logger, InitializerWithEventEmitter } from '@rei-network/utils';
 import { Transaction, WrappedTransaction, BlockHeader, Block } from '@rei-network/structure';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
@@ -35,18 +34,16 @@ export declare interface TxPool {
  * TxPool contains all currently known transactions.
  */
 export class TxPool extends InitializerWithEventEmitter {
+  private readonly node: Node;
   private readonly aborter: Aborter;
   private readonly accounts = new FunctionalBufferMap<TxPoolAccount>();
   private readonly locals = new FunctionalBufferSet();
   private readonly txs = new FunctionalBufferMap<Transaction>();
-  private readonly node: Node;
   private readonly lock = new Semaphore(1);
 
   private rejournalLoopPromise?: Promise<void>;
 
-  private currentBlock!: Block;
   private currentHeader!: BlockHeader;
-  private currentVM!: VM;
   private currentStateManager!: StateManager;
 
   private txMaxSize: number;
@@ -179,10 +176,8 @@ export class TxPool extends InitializerWithEventEmitter {
    * Initialize tx pool
    */
   async init(block: Block) {
-    this.currentBlock = block;
-    this.currentHeader = this.currentBlock.header;
-    this.currentVM = await this.node.getVM(this.currentHeader.stateRoot, this.currentHeader._common);
-    this.currentStateManager = this.currentVM.stateManager as StateManager;
+    this.currentHeader = block.header;
+    this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, this.currentHeader._common);
     if (this.journal) {
       await this.journal.load(async (txs: Transaction[]) => {
         let news: Transaction[] = [];
@@ -274,10 +269,8 @@ export class TxPool extends InitializerWithEventEmitter {
             reinject.push(tx);
           }
         }
-        this.currentBlock = originalNewBlock;
         this.currentHeader = originalNewBlock.header;
-        this.currentVM = await this.node.getVM(this.currentHeader.stateRoot, this.currentHeader.number);
-        this.currentStateManager = this.currentVM.stateManager as StateManager;
+        this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, this.currentHeader._common);
         const reinjectAccounts = new FunctionalBufferMap<TxPoolAccount>();
         const getAccount = (addr: Address) => {
           let account = reinjectAccounts.get(addr.buf);

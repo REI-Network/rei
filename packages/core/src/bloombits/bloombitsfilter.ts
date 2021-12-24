@@ -1,6 +1,6 @@
 import { Address, BN, keccak256 } from 'ethereumjs-util';
 import { Block, Log } from '@rei-network/structure';
-import { createBNFunctionalMap, createBNFunctionalSet, decompressBytes } from '@rei-network/utils';
+import { FunctionalBNMap, FunctionalBNSet, decompressBytes } from '@rei-network/utils';
 import { Node } from '../node';
 import { BloomBitsBlocks } from './index';
 
@@ -190,11 +190,11 @@ export class BloomBitsFilter {
       toSection = toSection.gt(maxSection) ? maxSection : toSection;
       for (const section = fromSection.clone(); section.lte(toSection); section.iaddn(1)) {
         // create a map to record checked block numbers.
-        const checkedNums = createBNFunctionalSet();
+        const checkedNums = new FunctionalBNSet();
         // create a map to cache the bit set of each bit.
         const bitsCache = new Map<number, Buffer>();
         // create a map to cache the header hash of each section.
-        const headCache = createBNFunctionalMap<Buffer>();
+        const headCache = new FunctionalBNMap<Buffer>();
         const getSenctionHash = async (section: BN) => {
           let hash = headCache.get(section);
           if (!hash) {

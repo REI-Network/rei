@@ -1,5 +1,5 @@
 import { Address, BN, ecsign, ecrecover, rlp, intToBuffer, bnToUnpaddedBuffer, rlphash, bufferToInt } from 'ethereumjs-util';
-import { createBufferFunctionalMap, logger } from '@rei-network/utils';
+import { FunctionalBufferMap, logger } from '@rei-network/utils';
 import { ActiveValidatorSet } from './validatorSet';
 import { BitArray } from './bitArray';
 import * as v from './validate';
@@ -187,7 +187,7 @@ export class VoteSet {
   votes: (Vote | undefined)[];
   sum: BN;
   maj23?: Buffer;
-  votesByBlock = createBufferFunctionalMap<BlockVotes>();
+  votesByBlock = new FunctionalBufferMap<BlockVotes>();
   peerMaj23s = new Map<string, Buffer>();
 
   constructor(chainId: number, height: BN, round: number, signedMsgType: VoteType, valSet: ActiveValidatorSet) {

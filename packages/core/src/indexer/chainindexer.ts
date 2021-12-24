@@ -1,8 +1,7 @@
 import { BN } from 'ethereumjs-util';
 import { BlockHeader } from '@rei-network/structure';
-import { Channel, logger } from '@rei-network/utils';
+import { Channel, logger, Initializer } from '@rei-network/utils';
 import { Database } from '@rei-network/database';
-import { Initializer } from '../initializer';
 import { ChainIndexerBackend, ChainIndexerOptions } from './types';
 
 /**

@@ -2,11 +2,10 @@ import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
 import Heap from 'qheap';
 import VM from '@gxchain2-ethereumjs/vm';
-import { FunctionalMap, createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Aborter, logger } from '@rei-network/utils';
+import { FunctionalBufferMap, FunctionalBufferSet, Aborter, logger, InitializerWithEventEmitter } from '@rei-network/utils';
 import { Transaction, WrappedTransaction, BlockHeader, Block } from '@rei-network/structure';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Node } from '../node';
-import { InitializerWithEventEmitter } from '../initializer';
 import { getGasLimitByCommon } from '../utils';
 import { TxSortedMap } from './txmap';
 import { PendingTxMap } from './pendingmap';
@@ -37,9 +36,9 @@ export declare interface TxPool {
  */
 export class TxPool extends InitializerWithEventEmitter {
   private readonly aborter: Aborter;
-  private readonly accounts: FunctionalMap<Buffer, TxPoolAccount>;
-  private readonly locals: FunctionalSet<Buffer>;
-  private readonly txs: FunctionalMap<Buffer, Transaction>;
+  private readonly accounts = new FunctionalBufferMap<TxPoolAccount>();
+  private readonly locals = new FunctionalBufferSet();
+  private readonly txs = new FunctionalBufferMap<Transaction>();
   private readonly node: Node;
   private readonly lock = new Semaphore(1);
 
@@ -83,9 +82,6 @@ export class TxPool extends InitializerWithEventEmitter {
 
     this.node = options.node;
     this.aborter = options.node.aborter;
-    this.accounts = createBufferFunctionalMap<TxPoolAccount>();
-    this.txs = createBufferFunctionalMap<Transaction>();
-    this.locals = createBufferFunctionalSet();
     this.priced = new TxPricedList(this.txs);
     for (const buf of this.node.accMngr.totalUnlockedAccounts()) {
       this.locals.add(buf);
@@ -107,7 +103,7 @@ export class TxPool extends InitializerWithEventEmitter {
   }
 
   private local(): Map<Buffer, Transaction[]> {
-    const txs = createBufferFunctionalMap<Transaction[]>();
+    const txs = new FunctionalBufferMap<Transaction[]>();
     for (const addrBuf of this.locals) {
       const account = this.accounts.get(addrBuf);
       if (account?.hasPending()) {
@@ -250,7 +246,7 @@ export class TxPool extends InitializerWithEventEmitter {
         const originalNewBlock = newBlock;
         let oldBlock = await this.node.db.getBlockByHashAndNumber(this.currentHeader.hash(), this.currentHeader.number);
         let discarded: Transaction[] = [];
-        const included = createBufferFunctionalSet();
+        const included = new FunctionalBufferSet();
         while (oldBlock.header.number.gt(newBlock.header.number)) {
           discarded = discarded.concat(oldBlock.transactions as Transaction[]);
           oldBlock = await this.node.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
@@ -282,7 +278,7 @@ export class TxPool extends InitializerWithEventEmitter {
         this.currentHeader = originalNewBlock.header;
         this.currentVM = await this.node.getVM(this.currentHeader.stateRoot, this.currentHeader.number);
         this.currentStateManager = this.currentVM.stateManager as StateManager;
-        const reinjectAccounts = createBufferFunctionalMap<TxPoolAccount>();
+        const reinjectAccounts = new FunctionalBufferMap<TxPoolAccount>();
         const getAccount = (addr: Address) => {
           let account = reinjectAccounts.get(addr.buf);
           if (!account) {
@@ -589,7 +585,7 @@ export class TxPool extends InitializerWithEventEmitter {
       return readies;
     };
 
-    const txs = createBufferFunctionalMap<Transaction[]>();
+    const txs = new FunctionalBufferMap<Transaction[]>();
     if (dirtyAddrs) {
       for (const addr of dirtyAddrs) {
         const account = this.getAccount(addr);

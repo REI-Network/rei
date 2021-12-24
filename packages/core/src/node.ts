@@ -10,7 +10,7 @@ import { Blockchain } from '@rei-network/blockchain';
 import VM from '@gxchain2-ethereumjs/vm';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Transaction, Block } from '@rei-network/structure';
-import { Channel, Aborter, logger } from '@rei-network/utils';
+import { Channel, Aborter, logger, Initializer } from '@rei-network/utils';
 import { AccountManager } from '@rei-network/wallet';
 import { TxPool } from './txpool';
 import { Synchronizer } from './sync';
@@ -22,7 +22,6 @@ import { WireProtocol, ConsensusProtocol } from './protocols';
 import { ReimintConsensusEngine, CliqueConsensusEngine } from './consensus';
 import { isEnableRemint } from './hardforks';
 import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
-import { Initializer } from './initializer';
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;

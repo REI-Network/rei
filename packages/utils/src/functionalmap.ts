@@ -1,4 +1,5 @@
 import createRBTree from 'functional-red-black-tree';
+import { BN, Address } from 'ethereumjs-util';
 
 export class FunctionalMapIterator<T> implements IterableIterator<T> {
   protected readonly rbtreeIt;
@@ -130,5 +131,23 @@ export class FunctionalMap<K, V> implements Map<K, V> {
       this.tree = newTree;
     }
     return result;
+  }
+}
+
+export class FunctionalBufferMap<V> extends FunctionalMap<Buffer, V> {
+  constructor() {
+    super((a, b) => a.compare(b));
+  }
+}
+
+export class FunctionalBNMap<V> extends FunctionalMap<BN, V> {
+  constructor() {
+    super((a, b) => a.cmp(b));
+  }
+}
+
+export class FunctionalAddressMap<V> extends FunctionalMap<Address, V> {
+  constructor() {
+    super((a, b) => a.buf.compare(b.buf));
   }
 }

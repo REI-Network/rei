@@ -65,7 +65,7 @@ export class NodeDB {
   /**
    * Persist local node enr information
    */
-  persistLocal(enr: ENR, privateKey?: Buffer) {
+  persistLocal(enr: ENR, privateKey: Buffer) {
     return this.db.put(Buffer.from('local'), enr.encode(privateKey));
   }
 

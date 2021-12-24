@@ -1,8 +1,7 @@
 import { BN } from 'ethereumjs-util';
 import { Transaction, Block, BlockHeader, Log } from '@rei-network/structure';
-import { createBufferFunctionalMap, logger } from '@rei-network/utils';
+import { FunctionalBufferMap, logger, InitializerWithEventEmitter } from '@rei-network/utils';
 import { Database } from '@rei-network/database';
-import { InitializerWithEventEmitter } from './initializer';
 
 // record block hash and block number for quering receipt.
 type TransactionInfo = { tx: Transaction; blockHash: Buffer; blockNumber: BN };
@@ -51,8 +50,8 @@ export class BlockchainMonitor extends InitializerWithEventEmitter {
       const originalNewBlock = block;
       const newHeads: BlockHeader[] = [];
       let oldBlock = await this.db.getBlockByHashAndNumber(this.currentHeader.hash(), this.currentHeader.number);
-      const discarded = createBufferFunctionalMap<TransactionInfo>();
-      const included = createBufferFunctionalMap<TransactionInfo>();
+      const discarded = new FunctionalBufferMap<TransactionInfo>();
+      const included = new FunctionalBufferMap<TransactionInfo>();
       while (oldBlock.header.number.gt(block.header.number)) {
         const blockHash = oldBlock.hash();
         for (const tx of oldBlock.transactions as Transaction[]) {

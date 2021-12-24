@@ -2,7 +2,7 @@ import { BN, setLengthLeft } from 'ethereumjs-util';
 import { StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { InterpreterStep } from '@gxchain2-ethereumjs/vm/dist/evm/interpreter';
 import { VmError } from '@gxchain2-ethereumjs/vm/dist/exceptions';
-import { createBufferFunctionalMap } from '@rei-network/utils';
+import { FunctionalBufferMap } from '@rei-network/utils';
 import { TraceConfig, IDebugImpl } from '../tracer';
 
 export type StructLog = {
@@ -26,7 +26,7 @@ export class StructLogDebug implements IDebugImpl {
   output!: Buffer;
   gasUsed!: BN;
   failed: boolean = false;
-  storage = createBufferFunctionalMap<{ [address: string]: string }>();
+  storage = new FunctionalBufferMap<{ [address: string]: string }>();
 
   constructor(config?: TraceConfig, hash?: Buffer) {
     this.config = config || {};

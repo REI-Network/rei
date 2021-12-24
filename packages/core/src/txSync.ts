@@ -1,5 +1,5 @@
 import { bufferToHex } from 'ethereumjs-util';
-import { createBufferFunctionalMap, FunctionalSet, createBufferFunctionalSet, Channel, Aborter, logger } from '@rei-network/utils';
+import { FunctionalBufferMap, FunctionalBufferSet, Channel, Aborter, logger } from '@rei-network/utils';
 import { Transaction } from '@rei-network/structure';
 import { PeerRequestTimeoutError, maxTxRetrievals } from './protocols';
 import { Node } from './node';
@@ -23,7 +23,7 @@ type EnqueuePooledTransactionMessage = {
 function forceAdd<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer | string) {
   let set = map.get(key);
   if (!set) {
-    set = typeof value === 'string' ? new Set<string>() : createBufferFunctionalSet();
+    set = typeof value === 'string' ? new Set<string>() : new FunctionalBufferSet();
     map.set(key, set);
   }
   set.add(value);
@@ -54,22 +54,22 @@ const gatherSlack = 100;
 const txGatherSlack = 100;
 const maxTxAnnounces = 4096;
 
-type Request = { hashes: Buffer[]; stolen?: FunctionalSet<Buffer> };
+type Request = { hashes: Buffer[]; stolen?: FunctionalBufferSet };
 
 /**
  * TxFetcher retrieves all new pooled transaction
  */
 export class TxFetcher {
-  private waitingList = createBufferFunctionalMap<Set<string>>();
-  private waitingTime = createBufferFunctionalMap<number>();
-  private watingSlots = new Map<string, FunctionalSet<Buffer>>();
+  private waitingList = new FunctionalBufferMap<Set<string>>();
+  private waitingTime = new FunctionalBufferMap<number>();
+  private watingSlots = new Map<string, FunctionalBufferSet>();
 
-  private announces = new Map<string, FunctionalSet<Buffer>>();
-  private announced = createBufferFunctionalMap<Set<string>>();
+  private announces = new Map<string, FunctionalBufferSet>();
+  private announced = new FunctionalBufferMap<Set<string>>();
 
-  private fetching = createBufferFunctionalMap<string>();
+  private fetching = new FunctionalBufferMap<string>();
   private requests = new Map<string, Request>();
-  private alternates = createBufferFunctionalMap<Set<string>>();
+  private alternates = new FunctionalBufferMap<Set<string>>();
 
   private aborter: Aborter;
   private newPooledTransactionQueue: Channel<NewPooledTransactionMessage>;
@@ -193,7 +193,7 @@ export class TxFetcher {
             if (origin !== undefined && origin !== message.origin) {
               const req = this.requests.get(origin);
               if (req) {
-                req.stolen = req.stolen ? req.stolen.add(hash) : createBufferFunctionalSet().add(hash);
+                req.stolen = req.stolen ? req.stolen.add(hash) : new FunctionalBufferSet().add(hash);
               }
             }
             this.fetching.delete(hash);

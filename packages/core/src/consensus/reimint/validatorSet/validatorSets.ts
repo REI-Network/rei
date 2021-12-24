@@ -1,4 +1,4 @@
-import { createBufferFunctionalMap } from '@rei-network/utils';
+import { FunctionalBufferMap } from '@rei-network/utils';
 import { StakeManager } from '../contracts';
 import { Reimint } from '../reimint';
 import { ValidatorSet, LoadOptions } from './validatorSet';
@@ -12,8 +12,8 @@ const maxSize = 100;
  * `ValidatorSets` will record the most recent `maxSize` block of validators set
  */
 export class ValidatorSets {
-  private indexedSets = createBufferFunctionalMap<IndexedValidatorSet>();
-  private activeSets = createBufferFunctionalMap<ActiveValidatorSet>();
+  private indexedSets = new FunctionalBufferMap<IndexedValidatorSet>();
+  private activeSets = new FunctionalBufferMap<ActiveValidatorSet>();
   private indexedRoots: Buffer[] = [];
   private activeRoots: Buffer[] = [];
 

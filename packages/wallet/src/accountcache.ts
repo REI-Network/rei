@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { createBufferFunctionalMap, hexStringToBuffer } from '@rei-network/utils';
+import { FunctionalBufferMap, hexStringToBuffer } from '@rei-network/utils';
 import { FileCache } from './filecache';
 
 export type AccountInfo = {
@@ -13,7 +13,7 @@ export type AccountInfo = {
 export class AccountCache {
   private keydir: string;
   private fileCache = new FileCache();
-  private addrToPath = createBufferFunctionalMap<string>();
+  private addrToPath = new FunctionalBufferMap<string>();
 
   constructor(keydir: string) {
     this.keydir = keydir;

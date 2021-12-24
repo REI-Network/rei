@@ -1,5 +1,5 @@
 import { BN } from 'ethereumjs-util';
-import { Channel, createBufferFunctionalSet, logger } from '@rei-network/utils';
+import { Channel, FunctionalBufferSet, logger } from '@rei-network/utils';
 import { Peer, ProtocolHandler } from '@rei-network/network';
 import { RoundStepType, Proposal, BitArray, VoteType, VoteSet, MessageFactory, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint';
 import * as m from '../../consensus/reimint/messages';
@@ -16,7 +16,7 @@ export class ConsensusProtocolHander implements ProtocolHandler {
   private aborted: boolean = false;
   private evidenceQueue = new Channel<Evidence>({ max: maxQueuedEvidence });
 
-  private _knowEvidence = createBufferFunctionalSet();
+  private _knowEvidence = new FunctionalBufferSet();
 
   protected handshakeResolve?: (result: boolean) => void;
   protected handshakeTimeout?: NodeJS.Timeout;

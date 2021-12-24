@@ -1,6 +1,6 @@
 import Semaphore from 'semaphore-async-await';
 import { BN } from 'ethereumjs-util';
-import { Initializer } from '../../../initializer';
+import { Initializer } from '@rei-network/utils';
 import { Evidence } from './evidence';
 
 const defaultMaxCacheSize = 100;

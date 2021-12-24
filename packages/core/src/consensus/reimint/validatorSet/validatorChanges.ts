@@ -1,5 +1,5 @@
 import { BN, Address } from 'ethereumjs-util';
-import { FunctionalSet, FunctionalMap } from '@rei-network/utils';
+import { FunctionalAddressSet, FunctionalAddressMap } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { isGenesis } from './genesis';
 
@@ -18,11 +18,11 @@ export class ValidatorChanges {
   // common instance
   common: Common;
   // a map to record changes
-  changes = new FunctionalMap<Address, ValidatorChange>((a: Address, b: Address) => a.buf.compare(b.buf));
+  changes = new FunctionalAddressMap<ValidatorChange>();
   // new indexed validator address set
-  indexedValidators = new FunctionalSet<Address>((a: Address, b: Address) => a.buf.compare(b.buf));
+  indexedValidators = new FunctionalAddressSet();
   // new unindexed validator address set
-  unindexedValidators = new FunctionalSet<Address>((a: Address, b: Address) => a.buf.compare(b.buf));
+  unindexedValidators = new FunctionalAddressSet();
 
   constructor(common: Common) {
     this.common = common;

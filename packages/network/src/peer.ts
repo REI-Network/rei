@@ -1,6 +1,6 @@
 import pipe from 'it-pipe';
-import { Channel, logger } from '@rei-network/utils';
-import { NetworkManager, logNetworkError } from './index';
+import { Channel, logger, ignoreError } from '@rei-network/utils';
+import { NetworkManager } from './index';
 import { Protocol, ProtocolHandler } from './types';
 
 /**
@@ -87,7 +87,7 @@ export class MsgQueue {
         });
         await Promise.all([sinkPromise, sourcePromise]);
       } catch (err) {
-        logNetworkError('MsgQueue::pipeStream', err);
+        // ignore all errors ...
       }
     })();
   }
@@ -176,7 +176,7 @@ export class Peer {
    * Abort peer
    */
   async abort() {
-    await Promise.all(Array.from(this.queueMap.values()).map((queue) => queue.abort()));
+    await ignoreError(Promise.all(Array.from(this.queueMap.values()).map((queue) => queue.abort())));
     this.queueMap.clear();
   }
 

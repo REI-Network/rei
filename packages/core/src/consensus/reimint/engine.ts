@@ -8,7 +8,7 @@ import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
 import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Block, HeaderData, BlockHeader, Transaction, Receipt } from '@rei-network/structure';
 import { Common, getGenesisState } from '@rei-network/common';
-import { logger } from '@rei-network/utils';
+import { logger, ignoreError } from '@rei-network/utils';
 import { Node } from '../../node';
 import { ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
@@ -94,7 +94,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   }
 
   protected async _abort() {
-    await this.state.abort();
+    await ignoreError(this.state.abort());
   }
 
   /**

@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
 import Heap from 'qheap';
 import { Transaction, WrappedTransaction } from '@rei-network/structure';
-import { logger, createBNFunctionalMap } from '@rei-network/utils';
+import { logger, FunctionalBNMap } from '@rei-network/utils';
 import { txSlots, txCost } from './utils';
 
 /**
@@ -9,7 +9,7 @@ import { txSlots, txCost } from './utils';
  * iterating over the contents in a nonce-incrementing way.
  */
 export class TxSortedMap {
-  readonly nonceToTx = createBNFunctionalMap<Transaction>();
+  readonly nonceToTx = new FunctionalBNMap<Transaction>();
   private readonly strict: boolean;
   private nonceHeap: Heap;
   private sortedTxCache?: Transaction[];

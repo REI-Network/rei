@@ -1,7 +1,5 @@
 import { BN } from 'ethereumjs-util';
 import tracer from 'tracer';
-import { FunctionalMap } from './functionalmap';
-import { FunctionalSet } from './functionalset';
 
 interface Constructor<T = {}> {
   new (...args: any[]): T;
@@ -53,12 +51,21 @@ export function getRandomIntInclusive(min: number, max: number): number {
 }
 
 /**
+ * Run function and ignore all errors
+ * @param fn - Function
+ * @returns Funtion result or undefined(if something goes wrong)
+ */
+export function ignoreError<T>(p?: Promise<T>): Promise<void | T> | undefined {
+  return p && p.catch((err) => {});
+}
+
+/**
  * Convert hex string to buffer
  * @param hex - Hex string to be converted
  * @returns Buffer
  */
 export function hexStringToBuffer(hex: string): Buffer {
-  return hex.indexOf('0x') === 0 ? Buffer.from(hex.substr(2), 'hex') : Buffer.from(hex, 'hex');
+  return hex.startsWith('0x') ? Buffer.from(hex.substr(2), 'hex') : Buffer.from(hex, 'hex');
 }
 
 /**
@@ -67,43 +74,7 @@ export function hexStringToBuffer(hex: string): Buffer {
  * @returns BN
  */
 export function hexStringToBN(hex: string): BN {
-  return hex.indexOf('0x') === 0 ? new BN(hex.substr(2), 'hex') : new BN(hex, 'hex');
-}
-
-const bufferCompare = (a: Buffer, b: Buffer) => a.compare(b);
-
-const bnCompare = (a: BN, b: BN) => a.cmp(b);
-
-/**
- * Create a functional map which has `Buffer` key
- * @returns Functional map object
- */
-export function createBufferFunctionalMap<T>() {
-  return new FunctionalMap<Buffer, T>(bufferCompare);
-}
-
-/**
- * Create a functional map which has `BN` key
- * @returns Functional map object
- */
-export function createBNFunctionalMap<T>() {
-  return new FunctionalMap<BN, T>(bnCompare);
-}
-
-/**
- * Create a functional set which has `Buffer` key
- * @returns Functional set object
- */
-export function createBufferFunctionalSet() {
-  return new FunctionalSet<Buffer>(bufferCompare);
-}
-
-/**
- * Create a functional set which has `BN` key
- * @returns Functional set object
- */
-export function createBNFunctionalSet() {
-  return new FunctionalSet<BN>(bnCompare);
+  return hex.startsWith('0x') ? new BN(hex.substr(2), 'hex') : new BN(hex, 'hex');
 }
 
 /**
@@ -132,6 +103,7 @@ export { setLevel, getLevel } from 'tracer';
 export * from './abort';
 export * from './channel';
 export * from './compress';
+export * from './initializer';
 export * from './functionalmap';
 export * from './functionalset';
 export * from './timeoutQueue';

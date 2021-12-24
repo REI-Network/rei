@@ -1,6 +1,6 @@
 import { bufferToInt, rlp, BN, intToBuffer, bnToUnpaddedBuffer } from 'ethereumjs-util';
 import { mustParseTransction, Transaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@rei-network/structure';
-import { logger, Channel, createBufferFunctionalSet } from '@rei-network/utils';
+import { logger, Channel, FunctionalBufferSet } from '@rei-network/utils';
 import { ProtocolHandler, Peer } from '@rei-network/network';
 import { NodeStatus } from '../../types';
 import { PeerRequestTimeoutError } from '../types';
@@ -212,8 +212,8 @@ export class WireProtocolHandler implements ProtocolHandler {
   readonly protocol: WireProtocol;
 
   private _status?: NodeStatus;
-  private _knowTxs = createBufferFunctionalSet();
-  private _knowBlocks = createBufferFunctionalSet();
+  private _knowTxs = new FunctionalBufferSet();
+  private _knowBlocks = new FunctionalBufferSet();
 
   protected handshakeResolve?: (result: boolean) => void;
   protected handshakeTimeout?: NodeJS.Timeout;

@@ -4,12 +4,13 @@ import { Multiaddr } from 'multiaddr';
 import { LevelUp } from 'levelup';
 import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
-import { getRandomIntInclusive, logger, TimeoutQueue } from '@rei-network/utils';
+import { logger, TimeoutQueue, ignoreError, InitializerWithEventEmitter } from '@rei-network/utils';
 import { Peer, PeerStatus } from './peer';
 import { Libp2pNode } from './libp2pnode';
 import { Protocol } from './types';
 import { ExpHeap } from './expheap';
 import { NodeDB } from './nodedb';
+import { randomOne } from './utils';
 
 export * from './peer';
 export * from './types';
@@ -27,52 +28,10 @@ const defaultTcpPort = 4191;
 const defaultUdpPort = 9810;
 const defaultNat = '127.0.0.1';
 
-export declare interface NetworkManager {
-  on(event: 'installed', listener: (name: string, peer: Peer) => void): this;
-  on(event: 'removed', listener: (peer: Peer) => void): this;
-
-  off(event: 'installed', listener: (name: string, peer: Peer) => void): this;
-  off(event: 'removed', listener: (peer: Peer) => void): this;
-}
-
 enum Libp2pPeerValue {
   installed = 1,
   connected = 0.5,
   incoming = 0
-}
-
-function randomOne<T>(array: T[]) {
-  if (array.length === 1) {
-    return array[0];
-  } else if (array.length === 0) {
-    throw new Error('empty array');
-  }
-  return array[getRandomIntInclusive(0, array.length - 1)];
-}
-
-const ignoredErrors = new RegExp(['selection', 'closed', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT', 'ECONNREFUSED', 'EHOSTDOWN', '1 bytes', 'abort'].join('|'));
-
-/**
- * Handle errors, ignore not important errors
- */
-export function logNetworkError(prefix: string, err: any) {
-  if (err.message && ignoredErrors.test(err.message)) {
-    return;
-  }
-  if (err.errors) {
-    if (Array.isArray(err.errors)) {
-      for (const e of err.errors) {
-        if (ignoredErrors.test(e.message)) {
-          return;
-        }
-      }
-    } else if (typeof err.errors === 'string') {
-      if (ignoredErrors.test(err.errors)) {
-        return;
-      }
-    }
-  }
-  logger.error(prefix, ', error:', err);
 }
 
 export interface NetworkManagerOptions {
@@ -89,12 +48,19 @@ export interface NetworkManagerOptions {
   bootnodes?: string[];
 }
 
+export declare interface NetworkManager {
+  on(event: 'installed', listener: (name: string, peer: Peer) => void): this;
+  on(event: 'removed', listener: (peer: Peer) => void): this;
+
+  off(event: 'installed', listener: (name: string, peer: Peer) => void): this;
+  off(event: 'removed', listener: (peer: Peer) => void): this;
+}
+
 /**
  * Implement a decentralized p2p network between nodes, based on `libp2p`
  */
-export class NetworkManager extends EventEmitter {
+export class NetworkManager extends InitializerWithEventEmitter {
   private readonly protocols: Protocol[];
-  private readonly initPromise: Promise<void>;
   private readonly nodedb: NodeDB;
   private privateKey!: Buffer;
   private libp2pNode!: Libp2pNode;
@@ -102,6 +68,7 @@ export class NetworkManager extends EventEmitter {
 
   private readonly maxPeers: number;
   private readonly maxDials: number;
+  private readonly options: NetworkManagerOptions;
 
   // a cache list that records all discovered peer,
   // the max size of this list is `this.maxPeers`
@@ -131,7 +98,7 @@ export class NetworkManager extends EventEmitter {
     this.maxDials = options.maxDials ?? defaultMaxDials;
     this.protocols = options.protocols;
     this.nodedb = new NodeDB(options.nodedb);
-    this.initPromise = this.init(options);
+    this.options = options;
   }
 
   /**
@@ -170,8 +137,8 @@ export class NetworkManager extends EventEmitter {
     const peer = this._peers.get(peerId);
     if (peer) {
       this._peers.delete(peerId);
-      await peer.abort();
-      await this.disconnect(peerId);
+      await ignoreError(peer.abort());
+      await ignoreError(this.disconnect(peerId));
       this.emit('removed', peer);
     }
   }
@@ -200,7 +167,7 @@ export class NetworkManager extends EventEmitter {
     return false;
   }
 
-  private isDialAble(peerId: string) {
+  private isDialable(peerId: string) {
     return !this.dialing.has(peerId) && !this._peers.has(peerId);
   }
 
@@ -212,7 +179,7 @@ export class NetworkManager extends EventEmitter {
   // this will be called when a peer
   // disconnected or installed
   private clearInstallTimeout(peerId: string) {
-    let id = this.installTimeoutId.get(peerId);
+    const id = this.installTimeoutId.get(peerId);
     if (id) {
       this.installTimeoutId.delete(peerId);
       this.installTimeoutQueue.clearTimeout(id);
@@ -320,41 +287,48 @@ export class NetworkManager extends EventEmitter {
     return { enr, keypair };
   }
 
-  async init(options?: NetworkManagerOptions) {
+  /**
+   * Initialize node
+   */
+  async init() {
     if (this.initPromise) {
       await this.initPromise;
       return;
     }
-    if (!options) {
-      throw new Error('NetworkManager missing init options');
-    }
-    if (!options.enable) {
+
+    if (!this.options.enable) {
       return;
     }
 
-    const { enr, keypair } = await this.loadLocalENR(options);
+    const { enr, keypair } = await this.loadLocalENR(this.options);
     const strEnr = enr.encodeTxt(keypair.privateKey);
     this.privateKey = keypair.privateKey;
-    logger.info('NetworkManager::init, peerId:', options.peerId.toB58String());
+    logger.info('NetworkManager::init, peerId:', this.options.peerId.toB58String());
     logger.info('NetworkManager::init,', strEnr);
 
     // filter local enr
-    const bootnodes = (options.bootnodes ?? []).filter((b) => b !== strEnr);
+    const bootnodes = (this.options.bootnodes ?? []).filter((b) => b !== strEnr);
 
     this.libp2pNode = new Libp2pNode({
-      ...options,
-      tcpPort: options.tcpPort ?? defaultTcpPort,
-      udpPort: options.udpPort ?? defaultUdpPort,
+      ...this.options,
+      tcpPort: this.options.tcpPort ?? defaultTcpPort,
+      udpPort: this.options.udpPort ?? defaultUdpPort,
       bootnodes: bootnodes,
       enr,
       maxConnections: this.maxPeers
     });
+
+    this.initOver();
   }
 
+  /**
+   * Start node
+   */
   start() {
-    if (!this.libp2pNode) {
+    if (!this.options.enable) {
       return;
     }
+
     this.dialLoop();
     this.timeoutLoop();
 
@@ -484,7 +458,7 @@ export class NetworkManager extends EventEmitter {
         const { stream } = await this.libp2pNode.dialProtocol(PeerId.createFromB58String(peerId), protocol.protocolString);
         streams.push(stream);
       } catch (err) {
-        logNetworkError('NetworkManager::dial', err);
+        // ignore all errors ...
         streams.push(null);
       }
     }
@@ -507,7 +481,7 @@ export class NetworkManager extends EventEmitter {
           // search discovered peer in memory
           while (this.discovered.length > 0) {
             const id = this.discovered.shift()!;
-            if (this.checkOutbound(id) && this.isDialAble(id) && !this.isBanned(id)) {
+            if (this.checkOutbound(id) && this.isDialable(id) && !this.isBanned(id)) {
               const addresses: { multiaddr: Multiaddr }[] | undefined = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(id));
               if (addresses && addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp').length > 0) {
                 peerId = id;
@@ -526,7 +500,7 @@ export class NetworkManager extends EventEmitter {
             peers = peers.filter((peer) => {
               const id = peer.id.toB58String();
               let b = peer.addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp').length > 0;
-              b &&= this.isDialAble(id);
+              b &&= this.isDialable(id);
               b &&= !this.isBanned(id);
               b &&= this.checkOutbound(id);
               return b;
@@ -604,6 +578,6 @@ export class NetworkManager extends EventEmitter {
     await Promise.all(Array.from(this._peers.values()).map((peer) => this.removePeer(peer.peerId)));
     this.dialing.clear();
     this._peers.clear();
-    await this.libp2pNode?.stop();
+    await ignoreError(this.libp2pNode?.stop());
   }
 }

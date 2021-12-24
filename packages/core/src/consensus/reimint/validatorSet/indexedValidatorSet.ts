@@ -1,6 +1,6 @@
 import Heap from 'qheap';
 import { Address, BN } from 'ethereumjs-util';
-import { FunctionalMap } from '@rei-network/utils';
+import { FunctionalAddressMap } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { StakeManager } from '../contracts';
 import { ValidatorChanges } from './validatorChanges';
@@ -32,7 +32,7 @@ export class IndexedValidatorSet {
    * @returns IndexedValidatorSet instance
    */
   static async fromStakeManager(sm: StakeManager) {
-    const indexed = new FunctionalMap<Address, IndexedValidator>((a: Address, b: Address) => a.buf.compare(b.buf));
+    const indexed = new FunctionalAddressMap<IndexedValidator>();
     const length = await sm.indexedValidatorsLength();
     for (const i = new BN(0); i.lt(length); i.iaddn(1)) {
       const validator = await sm.indexedValidatorsByIndex(i);
@@ -59,7 +59,7 @@ export class IndexedValidatorSet {
    * @returns IndexedValidatorSet instance
    */
   static genesis(common: Common) {
-    const indexed = new FunctionalMap<Address, IndexedValidator>((a: Address, b: Address) => a.buf.compare(b.buf));
+    const indexed = new FunctionalAddressMap<IndexedValidator>();
     for (const gv of getGenesisValidators(common)) {
       indexed.set(gv, {
         validator: gv,
@@ -175,7 +175,7 @@ export class IndexedValidatorSet {
    * @returns New indexed validator set
    */
   copy() {
-    const indexed = new FunctionalMap<Address, IndexedValidator>((a: Address, b: Address) => a.buf.compare(b.buf));
+    const indexed = new FunctionalAddressMap<IndexedValidator>();
     for (const [addr, validator] of this.indexed) {
       indexed.set(addr, copyIndexedValidator(validator));
     }

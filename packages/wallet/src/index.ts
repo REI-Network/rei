@@ -1,7 +1,7 @@
 import path from 'path';
 import Wallet from 'ethereumjs-wallet';
 import { Address, bufferToHex } from 'ethereumjs-util';
-import { createBufferFunctionalMap, hexStringToBuffer } from '@rei-network/utils';
+import { FunctionalBufferMap, hexStringToBuffer } from '@rei-network/utils';
 import { AccountCache } from './accountcache';
 import { KeyStore, keyStoreFileName } from './keystore';
 
@@ -36,7 +36,7 @@ function addrToString(addr: AddrType) {
 export class AccountManager {
   private storage: KeyStore;
   private cache: AccountCache;
-  private unlocked = createBufferFunctionalMap<Buffer>();
+  private unlocked = new FunctionalBufferMap<Buffer>();
 
   /**
    * @param keydir - Keystore dir full path

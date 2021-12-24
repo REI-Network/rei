@@ -1,4 +1,5 @@
 import createRBTree from 'functional-red-black-tree';
+import { BN, Address } from 'ethereumjs-util';
 import { FunctionalMapIterator } from './functionalmap';
 
 class FunctionalSetValueIterator<T> extends FunctionalMapIterator<T> {
@@ -76,5 +77,23 @@ export class FunctionalSet<T> implements Set<T> {
 
   get [Symbol.toStringTag](): string {
     return 'FunctionalSet';
+  }
+}
+
+export class FunctionalBufferSet extends FunctionalSet<Buffer> {
+  constructor() {
+    super((a, b) => a.compare(b));
+  }
+}
+
+export class FunctionalBNSet extends FunctionalSet<BN> {
+  constructor() {
+    super((a, b) => a.cmp(b));
+  }
+}
+
+export class FunctionalAddressSet extends FunctionalSet<Address> {
+  constructor() {
+    super((a, b) => a.buf.compare(b.buf));
   }
 }

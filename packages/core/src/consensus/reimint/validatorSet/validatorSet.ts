@@ -1,5 +1,4 @@
-import { Address } from 'ethereumjs-util';
-import { FunctionalMap } from '@rei-network/utils';
+import { FunctionalAddressMap } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { StakeManager } from '../contracts';
 import { IndexedValidatorSet, IndexedValidator } from './indexedValidatorSet';
@@ -31,7 +30,7 @@ export class ValidatorSet {
     let active: ActiveValidatorSet;
 
     if (options?.genesis) {
-      const _indexed = new FunctionalMap<Address, IndexedValidator>((a: Address, b: Address) => a.buf.compare(b.buf));
+      const _indexed = new FunctionalAddressMap<IndexedValidator>();
       active = await ActiveValidatorSet.fromStakeManager(sm, (val) => {
         if (!isGenesis(val, sm.common)) {
           throw new Error('unknown validator: ' + val.toString());

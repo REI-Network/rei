@@ -1,13 +1,13 @@
 import Heap from 'qheap';
 import { Transaction } from '@rei-network/structure';
-import { createBufferFunctionalMap } from '@rei-network/utils';
+import { FunctionalBufferMap } from '@rei-network/utils';
 
 /**
  * PendingTxMap record pending transactions
  */
 export class PendingTxMap {
   private heap = new Heap({ comparBefore: (a: Transaction, b: Transaction) => a.gasPrice.gt(b.gasPrice) });
-  private txs = createBufferFunctionalMap<Transaction[]>();
+  private txs = new FunctionalBufferMap<Transaction[]>();
 
   /**
    * Push record to the map

@@ -31,8 +31,8 @@ contract Config is IConfig {
     }
 
     function minIndexVotingPower() external view override returns (uint256) {
-        // 1,000,000 REI
-        return 1e24;
+        // 100000 REI
+        return 1e23;
     }
 
     function setCommissionRateInterval() external view override returns (uint256) {
@@ -41,7 +41,7 @@ contract Config is IConfig {
 
     function getFactorByReason(uint8 reason) external view override returns (uint8) {
         if (reason == 0) {
-            return 40;
+            return 20;
         } else {
             revert("Config: invalid reason");
         }

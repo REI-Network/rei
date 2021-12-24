@@ -1,4 +1,3 @@
-import { EventEmitter } from 'events';
 import PeerId from 'peer-id';
 import { Multiaddr } from 'multiaddr';
 import { LevelUp } from 'levelup';
@@ -291,12 +290,8 @@ export class NetworkManager extends InitializerWithEventEmitter {
    * Initialize node
    */
   async init() {
-    if (this.initPromise) {
-      await this.initPromise;
-      return;
-    }
-
     if (!this.options.enable) {
+      this.initOver();
       return;
     }
 

@@ -13,13 +13,14 @@ The core logic of blockchain node, including:
 
 - `Indexer` and `BloomBitsFilter`: Create bloom bits index for section
 - `Consensus`: Consensus engine implement
-- `Protocols`: Used for communication and data transmission between nodes
+- `Protocols`: P2P protocols, include `rei-ethwire` and `rei-consensus`
 - `Txpool`: Manage pending and queued transactions
 - `Sync` : Synchronize blocks
-- `Txsync`: Synchronize transactions
+- `TxSync`: Synchronize transactions
 - `Tracer`: Tracer provides an implementation of tracing blocks or transactions
-- `Staking`: An implementation of staking logic
 - `Contracts`: Some classes are used to interact with the smart contract
+- `Validation`: Contains the logic to verify the block
+- `Hardforks`: Contains logic related to the hard fork
 
 ## INSTALL
 

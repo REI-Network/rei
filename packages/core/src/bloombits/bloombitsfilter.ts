@@ -1,8 +1,11 @@
-import { Address, BN, keccak256 } from 'ethereumjs-util';
-import { Block, Log } from '@rei-network/structure';
+import { Address, BN, keccak256, rlp } from 'ethereumjs-util';
+import { Block, Log, Transaction, Receipt } from '@rei-network/structure';
 import { FunctionalBNMap, FunctionalBNSet, decompressBytes } from '@rei-network/utils';
 import { Node } from '../node';
 import { BloomBitsBlocks } from './index';
+
+// TODO: fix this
+const DBTarget_Receipts = 100;
 
 /**
  * calcBloomIndexes returns the bloom filter bit indexes belonging to the given key
@@ -128,12 +131,20 @@ export class BloomBitsFilter {
    */
   private async checkBlockMatches(block: Block, addresses: Address[], topics: Topics) {
     const logs: Log[] = [];
-    for (const tx of block.transactions) {
-      const receipt = await this.node.db.getReceipt(tx.hash());
-      for (const log of receipt.logs) {
-        if (BloomBitsFilter.checkLogMatches(log, { addresses, topics })) {
-          logs.push(log);
+    if (block.transactions.length > 0) {
+      let lastCumulativeGasUsed = new BN(0);
+      const rawArr: Buffer[][] = rlp.decode(await this.node.db.get(DBTarget_Receipts, { blockHash: block.hash(), blockNumber: block.header.number })) as any;
+      for (let i = 0; i < block.transactions.length; i++) {
+        const raw = rawArr[i];
+        const receipt = Receipt.fromValuesArray(raw);
+        for (const log of receipt.logs) {
+          if (BloomBitsFilter.checkLogMatches(log, { addresses, topics })) {
+            const gasUsed = receipt.bnCumulativeGasUsed.sub(lastCumulativeGasUsed);
+            receipt.installProperties(block, block.transactions[i] as Transaction, gasUsed, i);
+            logs.push(log);
+          }
         }
+        lastCumulativeGasUsed = receipt.bnCumulativeGasUsed;
       }
     }
     return logs;
@@ -198,7 +209,7 @@ export class BloomBitsFilter {
         const getSenctionHash = async (section: BN) => {
           let hash = headCache.get(section);
           if (!hash) {
-            hash = (await this.node.db.getCanonicalHeader(section.addn(1).muln(this.sectionSize).subn(1))).hash();
+            hash = await this.node.db.numberToHash(section.addn(1).muln(this.sectionSize).subn(1));
             headCache.set(section, hash);
           }
           return hash;

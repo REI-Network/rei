@@ -46,7 +46,7 @@
             "d": "validator reward pool contract address"
         },
         "genesisValidators": {
-            "v": ["0xFF96A3BfF24DA3d686FeA7BD4bEB5ccFD7868DdE", "0x809FaE291f79c9953577Ee9007342cff84014b1c", "0x57B80007d142297Bc383A741E4c1dd18e4C75754"],
+            "v": ["0x2957879b3831b5ac1ef0ea1fb08dd21920f439b4", "0xaa714ecc110735b4e114c8b35f035fc8706ff930", "0x1b0885d33b43a696cd5517244a4fcb20b929f79d", "0xb7a19f9b6269c26c5ef901bd128c364dd9ddc53a", "0x0efe0da2b918412f1009337fe86321d88de091fb"],
             "d": "genesis validator addressess"
         },
         "maxEvidenceCount": {
@@ -62,7 +62,7 @@
             "d": "min validator set size"
         },
         "minTotalLockedAmount": {
-            "v": "1000000000000000000000000000",
+            "v": "100000000000000000000000000",
             "d": "min total locked amount"
         }
     },

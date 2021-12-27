@@ -10,7 +10,7 @@
   "chainId": 12357,
   "networkId": 12357,
   "comment": "The rei-network test net",
-  "url": "https://does.not.exist/",
+  "url": "https://scan-test.rei.network/",
   "genesis": {
     "hash": "0x02ccc56b7ec9ee495b09b73f531b8d9adf73888cde6a8a06005ede62a2e93e80",
     "bloom":

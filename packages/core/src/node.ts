@@ -84,11 +84,6 @@ export class Node extends Initializer {
     this.accMngr = new AccountManager(options.account.keyStorePath);
 
     this.chain = options.chain ?? defaultChainName;
-    /////// unsupport rei-mainnet ///////
-    if (this.chain === defaultChainName) {
-      throw new Error('Unspport mainnet!');
-    }
-    /////// unsupport rei-mainnet ///////
     if (getChain(this.chain) === undefined) {
       throw new Error(`Unknown chain: ${this.chain}`);
     }

@@ -1,6 +1,6 @@
 import type { BNLike } from 'ethereumjs-util';
 import type { Block, Transaction } from '@rei-network/structure';
-import type { Common } from '@rei-network/Common';
+import type { Common } from '@rei-network/common';
 import type VM from '@gxchain2-ethereumjs/vm';
 import type { StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 

@@ -19,7 +19,10 @@ const accMngr = new MockAccountManager([
   ['baz2', Address.fromString('0x9000000000000000000000000000000000000000')],
   ['foo3', Address.fromString('0xa000000000000000000000000000000000000000')],
   ['bar3', Address.fromString('0xb000000000000000000000000000000000000000')],
-  ['baz3', Address.fromString('0xc000000000000000000000000000000000000000')]
+  ['baz3', Address.fromString('0xc000000000000000000000000000000000000000')],
+  ['foo4', Address.fromString('0xd000000000000000000000000000000000000000')],
+  ['bar4', Address.fromString('0xe000000000000000000000000000000000000000')],
+  ['baz4', Address.fromString('0xf000000000000000000000000000000000000000')]
 ]);
 
 function createValidatorSet(validators: { [name: string]: number | BN }) {
@@ -51,7 +54,7 @@ describe('ValidatorSet', () => {
   });
 
   it('should choose correct validator', async () => {
-    const vs = createValidatorSet({ foo: 50, bar: 50, baz: 50, foo1: 100, bar1: 100, baz1: 100, foo2: 100, bar2: 100, baz2: 100, foo3: 100, bar3: 100, baz3: 100 });
+    const vs = createValidatorSet({ foo: 50, bar: 50, baz: 50, foo1: 100, bar1: 100, baz1: 100, foo2: 100, bar2: 100, baz2: 100, foo3: 100, bar3: 100, baz3: 100, foo4: 100, bar4: 100, baz4: 100 });
     const active = vs.active.activeValidators();
     expect(active[0].validator.toString()).equal(accMngr.n2a('foo1').toString());
     expect(active[1].validator.toString()).equal(accMngr.n2a('bar1').toString());

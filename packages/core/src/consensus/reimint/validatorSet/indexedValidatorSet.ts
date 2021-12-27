@@ -194,6 +194,7 @@ export class IndexedValidatorSet {
         let num = a.votingPower.cmp(b.votingPower);
         if (num === 0) {
           num = a.validator.buf.compare(b.validator.buf) as 1 | -1 | 0;
+          num *= -1;
         }
         return num;
       }
@@ -213,6 +214,16 @@ export class IndexedValidatorSet {
       const v = heap.remove() as IndexedValidator;
       activeValidators.push(v);
     }
+
+    // sort active validators
+    activeValidators.sort((a, b) => {
+      let num = a.votingPower.cmp(b.votingPower);
+      num *= -1;
+      if (num === 0) {
+        num = a.validator.buf.compare(b.validator.buf) as 1 | -1 | 0;
+      }
+      return num;
+    });
 
     return activeValidators;
   }

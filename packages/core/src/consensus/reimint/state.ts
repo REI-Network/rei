@@ -879,6 +879,10 @@ export class StateMachine {
           } else if (msg instanceof ProposalBlockMessage) {
             // create block instance from block buffer
             const block = msg.toBlock({ common: this.backend.getCommon(0), hardforkByBlockNumber: true });
+            if (!block.header.number.eq(this.height)) {
+              continue;
+            }
+
             logger.debug('StateMachine::replay, block, height:', block.header.number.toString(), 'from:', (message as StateMachineMessage).peerId);
           } else if (msg instanceof ProposalMessage) {
             if (!msg.proposal.height.eq(this.height)) {

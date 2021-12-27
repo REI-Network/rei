@@ -17,6 +17,7 @@ import { Synchronizer } from './sync';
 import { TxFetcher } from './txSync';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
+import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
 import { WireProtocol, ConsensusProtocol } from './protocols';
 import { ReimintConsensusEngine, CliqueConsensusEngine } from './consensus';
@@ -324,6 +325,14 @@ export class Node extends Initializer {
    */
   getFilter() {
     return new BloomBitsFilter({ node: this, sectionSize: BloomBitsBlocks });
+  }
+
+  /**
+   * Create a new tracer
+   * @returns Tracer object
+   */
+  getTracer() {
+    return new Tracer(this);
   }
 
   /**

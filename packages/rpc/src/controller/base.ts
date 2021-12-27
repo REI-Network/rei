@@ -1,10 +1,10 @@
 import { Address, BN } from 'ethereumjs-util';
-import { Node } from '@rei-network/core';
 import { Block, WrappedBlock } from '@rei-network/structure';
 import { hexStringToBuffer, hexStringToBN } from '@rei-network/utils';
-import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import { StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import * as helper from '../helper';
 import { FilterSystem } from '../filtersystem';
+import { Backend } from '../types';
 
 export type CallData = {
   from?: string;
@@ -17,10 +17,10 @@ export type CallData = {
 };
 
 export class Controller {
-  protected readonly node: Node;
+  protected readonly backend: Backend;
   protected readonly filterSystem: FilterSystem;
-  constructor(node: Node, filterSystem: FilterSystem) {
-    this.node = node;
+  constructor(backend: Backend, filterSystem: FilterSystem) {
+    this.backend = backend;
     this.filterSystem = filterSystem;
   }
 
@@ -28,9 +28,9 @@ export class Controller {
     if (tag === 'earliest') {
       return new BN(0);
     } else if (tag === 'latest' || tag === undefined) {
-      return this.node.getLatestBlock().header.number.clone();
+      return this.backend.getLatestBlock().header.number.clone();
     } else if (tag === 'pending') {
-      return this.node.getLatestBlock().header.number.addn(1);
+      return this.backend.getLatestBlock().header.number.addn(1);
     } else if (tag.startsWith('0x')) {
       return hexStringToBN(tag);
     } else {
@@ -43,13 +43,13 @@ export class Controller {
   protected async getBlockByTag(tag: string): Promise<Block> {
     let block!: Block;
     if (tag === 'earliest') {
-      block = await this.node.db.getBlock(0);
+      block = await this.backend.db.getBlock(0);
     } else if (tag === 'latest' || tag === undefined) {
-      block = this.node.getLatestBlock();
+      block = this.backend.getLatestBlock();
     } else if (tag === 'pending') {
-      block = this.node.getPendingBlock();
+      block = this.backend.getPendingBlock();
     } else if (tag.startsWith('0x')) {
-      block = await this.node.db.getBlock(hexStringToBN(tag));
+      block = await this.backend.db.getBlock(hexStringToBN(tag));
     } else {
       helper.throwRpcErr('Invalid tag value');
     }
@@ -62,16 +62,16 @@ export class Controller {
 
   protected async getStateManagerByTag(tag: string): Promise<StateManager> {
     if (tag === 'pending') {
-      return this.node.getPendingStateManager();
+      return this.backend.getPendingStateManager();
     } else {
       const block = await this.getBlockByTag(tag);
-      return this.node.getStateManager(block.header.stateRoot, block.header.number);
+      return this.backend.getStateManager(block.header.stateRoot, block.header.number);
     }
   }
 
   protected async runCall(data: CallData, tag: string | Block) {
     const block = typeof tag === 'string' ? await this.getBlockByTag(tag) : tag;
-    const vm = await this.node.getVM(block.header.stateRoot, block.header.number);
+    const vm = await this.backend.getVM(block.header.stateRoot, block.header.number);
     await vm.stateManager.checkpoint();
     try {
       const result = await vm.runCall({

@@ -2,12 +2,12 @@ import express from 'express';
 import expressws from 'express-ws';
 import * as http from 'http';
 import bodyParse from 'body-parser';
-import { Node } from '@rei-network/core';
 import { logger } from '@rei-network/utils';
 import { JsonRPCMiddleware } from './jsonrpcmiddleware';
 import { api } from './controller';
 import { WsClient } from './client';
 import { FilterSystem } from './filtersystem';
+import { Backend } from './types';
 
 const defaultPort = 11451;
 const defaultHost = '127.0.0.1';
@@ -34,8 +34,8 @@ export class RpcContext {
 export const emptyContext = new RpcContext();
 
 export interface RpcServerOptions {
-  // Node instance
-  node: Node;
+  // Backend instance
+  backend: Backend;
   // rpc server listening port
   port?: number;
   // rpc server listening host
@@ -64,12 +64,12 @@ export class RpcServer {
     this.port = options.port || defaultPort;
     this.host = options.host || defaultHost;
     const apis = options.apis || defaultApis;
-    const filterSystem = new FilterSystem(options.node);
+    const filterSystem = new FilterSystem(options.backend);
     this.controllers = apis.split(',').map((name) => {
       if (!(name in api)) {
         throw new Error('RpcServer, Unknow api:' + name);
       }
-      return new api[name](options.node, filterSystem);
+      return new api[name](options.backend, filterSystem);
     });
   }
 

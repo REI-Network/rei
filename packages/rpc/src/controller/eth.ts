@@ -1,4 +1,4 @@
-import { Address, intToHex, bnToHex, bufferToHex, toBuffer, hashPersonalMessage, toRpcSig, ecsign, BN } from 'ethereumjs-util';
+import { Address, intToHex, bnToHex, bufferToHex, hashPersonalMessage, toRpcSig, ecsign, BN } from 'ethereumjs-util';
 import { TransactionFactory, WrappedTransaction, WrappedBlock, Log, Transaction, Block } from '@rei-network/structure';
 import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
@@ -41,24 +41,24 @@ export class ETHController extends Controller {
     return '1';
   }
   eth_syncing() {
-    if (!this.node.sync.isSyncing) {
+    if (!this.backend.sync.isSyncing) {
       return false;
     }
-    const status = this.node.sync.status;
+    const status = this.backend.sync.status;
     return {
       startingBlock: intToHex(status.startingBlock),
-      currentBlock: bnToHex(this.node.getLatestBlock().header.number),
+      currentBlock: bnToHex(this.backend.getLatestBlock().header.number),
       highestBlock: intToHex(status.highestBlock)
     };
   }
   eth_chainId() {
-    return bnToHex(this.node.getCommon(0).chainIdBN());
+    return bnToHex(this.backend.getCommon(0).chainIdBN());
   }
   eth_coinbase() {
-    return this.node.getCurrentEngine().coinbase.toString();
+    return this.backend.getCurrentEngine().coinbase.toString();
   }
   eth_mining() {
-    return this.node.getCurrentEngine().enable;
+    return this.backend.getCurrentEngine().enable;
   }
   eth_hashrate() {
     return intToHex(0);
@@ -68,10 +68,10 @@ export class ETHController extends Controller {
     return '0x3b9aca00';
   }
   eth_accounts() {
-    return this.node.accMngr.totalUnlockedAccounts().map((addr) => bufferToHex(addr));
+    return this.backend.accMngr.totalUnlockedAccounts().map((addr) => bufferToHex(addr));
   }
   eth_blockNumber() {
-    return bnToHex(this.node.getLatestBlock().header.number);
+    return bnToHex(this.backend.getLatestBlock().header.number);
   }
   async eth_getBalance([address, tag]: [string, string]) {
     const stateManager = await this.getStateManagerByTag(tag);
@@ -89,7 +89,7 @@ export class ETHController extends Controller {
   }
   async eth_getBlockTransactionCountByHash([hash]: [string]) {
     try {
-      const number = (await this.node.db.getBlock(hexStringToBuffer(hash))).transactions.length;
+      const number = (await this.backend.db.getBlock(hexStringToBuffer(hash))).transactions.length;
       return intToHex(number);
     } catch (err) {
       return null;
@@ -115,7 +115,7 @@ export class ETHController extends Controller {
     return bufferToHex(code);
   }
   eth_sign([address, data]: [string, string]) {
-    const signature = ecsign(hashPersonalMessage(Buffer.from(data)), this.node.accMngr.getPrivateKey(address));
+    const signature = ecsign(hashPersonalMessage(Buffer.from(data)), this.backend.accMngr.getPrivateKey(address));
     return toRpcSig(signature.v, signature.r, signature.s);
   }
   private async makeTxForUnlockedAccount(data: CallData) {
@@ -134,9 +134,9 @@ export class ETHController extends Controller {
         ...data,
         gasLimit: data.gas
       },
-      { common: this.node.getLatestCommon() }
+      { common: this.backend.getLatestCommon() }
     );
-    const privateKey = this.node.accMngr.getPrivateKey(data.from);
+    const privateKey = this.backend.accMngr.getPrivateKey(data.from);
     return unsignedTx.sign(privateKey);
   }
   async eth_signTransaction([data]: [CallData]) {
@@ -151,15 +151,15 @@ export class ETHController extends Controller {
     if (!(tx instanceof Transaction)) {
       return null;
     }
-    const results = await this.node.addPendingTxs([tx]);
+    const results = await this.backend.addPendingTxs([tx]);
     return results.length > 0 && results[0] ? bufferToHex(tx.hash()) : null;
   }
   async eth_sendRawTransaction([rawtx]: [string]) {
-    const tx = TransactionFactory.fromSerializedData(hexStringToBuffer(rawtx), { common: this.node.getLatestCommon() });
+    const tx = TransactionFactory.fromSerializedData(hexStringToBuffer(rawtx), { common: this.backend.getLatestCommon() });
     if (!(tx instanceof Transaction)) {
       return null;
     }
-    const results = await this.node.addPendingTxs([tx]);
+    const results = await this.backend.addPendingTxs([tx]);
     return results.length > 0 && results[0] ? bufferToHex(tx.hash()) : null;
   }
   async eth_call([data, tag]: [CallData, string]) {
@@ -227,7 +227,7 @@ export class ETHController extends Controller {
   }
   async eth_getBlockByHash([hash, fullTransactions]: [string, boolean]) {
     try {
-      return new WrappedBlock(await this.node.db.getBlock(hexStringToBuffer(hash))).toRPCJSON(fullTransactions);
+      return new WrappedBlock(await this.backend.db.getBlock(hexStringToBuffer(hash))).toRPCJSON(fullTransactions);
     } catch (err) {
       return null;
     }
@@ -242,13 +242,13 @@ export class ETHController extends Controller {
   async eth_getTransactionByHash([hash]: [string]) {
     const hashBuffer = hexStringToBuffer(hash);
     try {
-      return (await this.node.db.getWrappedTransaction(hashBuffer)).toRPCJSON();
+      return (await this.backend.db.getWrappedTransaction(hashBuffer)).toRPCJSON();
     } catch (err: any) {
       if (err.type !== 'NotFoundError') {
         throw err;
       }
     }
-    const tx = this.node.txPool.getTransaction(hashBuffer);
+    const tx = this.backend.txPool.getTransaction(hashBuffer);
     if (!tx) {
       return null;
     }
@@ -256,7 +256,7 @@ export class ETHController extends Controller {
   }
   async eth_getTransactionByBlockHashAndIndex([hash, index]: [string, string]) {
     try {
-      const block = await this.node.db.getBlock(hexStringToBuffer(hash));
+      const block = await this.backend.db.getBlock(hexStringToBuffer(hash));
       const wtx = new WrappedTransaction(block.transactions[Number(index)] as Transaction);
       wtx.installProperties(block, Number(index));
       return wtx.toRPCJSON();
@@ -276,7 +276,7 @@ export class ETHController extends Controller {
   }
   async eth_getTransactionReceipt([hash]: [string]) {
     try {
-      return (await this.node.db.getReceipt(hexStringToBuffer(hash))).toRPCJSON();
+      return (await this.backend.db.getReceipt(hexStringToBuffer(hash))).toRPCJSON();
     } catch (err) {
       return null;
     }
@@ -333,7 +333,7 @@ export class ETHController extends Controller {
     let { fromBlock: from, toBlock: to, addresses, topics } = query;
     from = from ? from : await this.getBlockNumberByTag('latest');
     to = to ? to : await this.getBlockNumberByTag('latest');
-    const filter = this.node.getFilter();
+    const filter = this.backend.getFilter();
     const logs = await filter.filterRange(from, to, addresses, topics);
     return logs.map((log) => log.toRPCJSON());
   }
@@ -341,7 +341,7 @@ export class ETHController extends Controller {
     const from = await this.getBlockNumberByTag(fromBlock ? fromBlock : 'latest');
     const to = await this.getBlockNumberByTag(toBlock ? toBlock : 'latest');
     const { addresses, topics } = parseAddressesAndTopics(_addresses, _topics);
-    const filter = this.node.getFilter();
+    const filter = this.backend.getFilter();
     const logs = blockhash ? await filter.filterBlock(hexStringToBuffer(blockhash), addresses, topics) : await filter.filterRange(from, to, addresses, topics);
     return logs.map((log) => log.toRPCJSON());
   }

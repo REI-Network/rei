@@ -2,10 +2,9 @@ import { Address, BN, bufferToHex, toBuffer, bnToHex } from 'ethereumjs-util';
 import { v4 as uuidv4 } from 'uuid';
 import { Aborter, Channel, logger } from '@rei-network/utils';
 import { Topics, BloomBitsFilter } from '@rei-network/core/dist/bloombits';
-import { Node } from '@rei-network/core';
 import { Transaction, Log, BlockHeader } from '@rei-network/structure';
 import { WsClient } from './client';
-import { SyncingStatus } from './types';
+import { SyncingStatus, Backend } from './types';
 
 export type Query = {
   fromBlock?: BN;
@@ -66,7 +65,7 @@ type Task = LogsTask | HeadsTask | PendingTxTask | SyncingTask;
  * Filter subscribe information for client
  */
 export class FilterSystem {
-  private readonly node: Node;
+  private readonly backend: Backend;
   private aborter = new Aborter();
   private taskQueue = new Channel<Task>();
 
@@ -79,17 +78,17 @@ export class FilterSystem {
   private readonly filterPendingTransactions = new Map<string, Filter>();
   private readonly filterType = new Map<string, string>();
 
-  constructor(node: Node) {
-    this.node = node;
+  constructor(backend: Backend) {
+    this.backend = backend;
     this.timeoutLoop();
     this.taskLoop();
-    this.node.bcMonitor.on('logs', this.onLogs);
-    this.node.bcMonitor.on('removedLogs', this.onRemovedLogs);
-    this.node.bcMonitor.on('newHeads', this.onNewHeads);
-    this.node.sync.on('start', this.onStart);
-    this.node.sync.on('failed', this.onFailed);
-    this.node.sync.on('synchronized', this.onSynchronized);
-    this.node.txPool.on('readies', this.onReadies);
+    this.backend.bcMonitor.on('logs', this.onLogs);
+    this.backend.bcMonitor.on('removedLogs', this.onRemovedLogs);
+    this.backend.bcMonitor.on('newHeads', this.onNewHeads);
+    this.backend.sync.on('start', this.onStart);
+    this.backend.sync.on('failed', this.onFailed);
+    this.backend.sync.on('synchronized', this.onSynchronized);
+    this.backend.txPool.on('readies', this.onReadies);
   }
 
   private onLogs = (logs) => {
@@ -105,12 +104,12 @@ export class FilterSystem {
   };
 
   private onStart = () => {
-    const status = this.node.sync.status;
+    const status = this.backend.sync.status;
     const syncingStatus: SyncingStatus = {
       syncing: true,
       status: {
         startingBlock: bufferToHex(toBuffer(status.startingBlock)),
-        currentBlock: bnToHex(this.node.getLatestBlock().header.number),
+        currentBlock: bnToHex(this.backend.getLatestBlock().header.number),
         highestBlock: bufferToHex(toBuffer(status.highestBlock))
       }
     };
@@ -140,13 +139,13 @@ export class FilterSystem {
 
   async abort() {
     this.taskQueue.abort();
-    this.node.bcMonitor.removeListener('logs', this.onLogs);
-    this.node.bcMonitor.removeListener('removedLogs', this.onRemovedLogs);
-    this.node.bcMonitor.removeListener('newHeads', this.onNewHeads);
-    this.node.sync.removeListener('start', this.onStart);
-    this.node.sync.removeListener('failed', this.onFailed);
-    this.node.sync.removeListener('synchronized', this.onSynchronized);
-    this.node.txPool.removeListener('readies', this.onReadies);
+    this.backend.bcMonitor.removeListener('logs', this.onLogs);
+    this.backend.bcMonitor.removeListener('removedLogs', this.onRemovedLogs);
+    this.backend.bcMonitor.removeListener('newHeads', this.onNewHeads);
+    this.backend.sync.removeListener('start', this.onStart);
+    this.backend.sync.removeListener('failed', this.onFailed);
+    this.backend.sync.removeListener('synchronized', this.onSynchronized);
+    this.backend.txPool.removeListener('readies', this.onReadies);
     await this.aborter.abort();
   }
 
@@ -175,7 +174,7 @@ export class FilterSystem {
         if (task instanceof LogsTask) {
           this.newLogs(task.logs);
         } else if (task instanceof HeadsTask) {
-          const headers = (await Promise.all(task.hashes.map((hash) => this.node.db.tryToGetCanonicalHeader(hash)))).filter((header) => header !== undefined) as BlockHeader[];
+          const headers = (await Promise.all(task.hashes.map((hash) => this.backend.db.tryToGetCanonicalHeader(hash)))).filter((header) => header !== undefined) as BlockHeader[];
           this.newHeads(headers);
         } else if (task instanceof PendingTxTask) {
           this.newPendingTransactions(task.hashes);

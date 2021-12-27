@@ -3,12 +3,12 @@ import { Controller } from './base';
 
 export class NetController extends Controller {
   net_version() {
-    return this.node.chainId.toString();
+    return this.backend.chainId.toString();
   }
   net_listenging() {
     return true;
   }
   net_peerCount() {
-    return intToHex(this.node.networkMngr.peers.length);
+    return intToHex(this.backend.networkMngr.peers.length);
   }
 }

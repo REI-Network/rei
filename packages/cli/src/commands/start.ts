@@ -50,7 +50,7 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
   let server: undefined | RpcServer;
   if (opts.rpc) {
     const rpc = {
-      node,
+      backend: node,
       port: opts.rpcPort ? Number(opts.rpcPort) : undefined,
       host: opts.rpcHost ? opts.rpcHost : undefined,
       apis: opts.rpcApi ? opts.rpcApi : undefined

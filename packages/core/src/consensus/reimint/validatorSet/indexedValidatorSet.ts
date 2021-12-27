@@ -194,7 +194,6 @@ export class IndexedValidatorSet {
         let num = a.votingPower.cmp(b.votingPower);
         if (num === 0) {
           num = a.validator.buf.compare(b.validator.buf) as 1 | -1 | 0;
-          num *= -1;
         }
         return num;
       }

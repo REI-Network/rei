@@ -1,6 +1,6 @@
 import { expect, assert } from 'chai';
 import { BN } from 'ethereumjs-util';
-import { Evidence, EvidencePool, EvidencePoolBackend } from '../../src/consensus/reimint/types';
+import { Evidence, EvidencePool, EvidencePoolBackend } from '../../src/consensus/reimint/evpool';
 import { MockEvidence } from './mockEvidence';
 
 const MAX_UINT64 = new BN('ffffffffffffffff', 'hex');
@@ -83,7 +83,7 @@ async function shouldFailed(fn: () => Promise<void>, message?: string) {
 
 describe('EvidencePool', () => {
   before(async () => {
-    await evpool.start(new BN(10));
+    await evpool.init(new BN(10));
   });
 
   it('should add successfully(1)', async () => {

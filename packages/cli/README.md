@@ -5,8 +5,6 @@
 
 Command Line of REI-Network
 
-**This project is currently under development, only testnet provides bootnode.**
-
 ## Install
 
 ```

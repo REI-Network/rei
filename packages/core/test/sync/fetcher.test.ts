@@ -155,7 +155,7 @@ describe('Fetcher', () => {
   });
 
   it('should fetch successfully', async () => {
-    const fetcher = new Fetcher({ common, backend, validateBackend: backend, downloadElementsCountLimit: new BN(decl), downloadBodiesLimit: 5, processBodiesLimit: 5 });
+    const fetcher = new Fetcher({ common, backend, validateBackend: backend, downloadElementsCountLimit: new BN(decl), downloadBodiesLimit: 5 });
     const start = new BN(0);
     const totalCount = new BN(decl * 10);
     await fetcher.fetch(start, totalCount, targetHandler as any);
@@ -181,7 +181,7 @@ describe('Fetcher', () => {
   });
 
   it('should fetch failed(get peer timeout)', async () => {
-    const fetcher = new Fetcher({ common, backend, validateBackend: backend, downloadElementsCountLimit: new BN(decl), downloadBodiesLimit: 5, processBodiesLimit: 5 });
+    const fetcher = new Fetcher({ common, backend, validateBackend: backend, downloadElementsCountLimit: new BN(decl), downloadBodiesLimit: 5 });
     const start = new BN(0);
     const totalCount = new BN(decl * 10);
 
@@ -196,7 +196,7 @@ describe('Fetcher', () => {
   });
 
   it('should fetch successfully(retry get bodies)', async () => {
-    const fetcher = new Fetcher({ common, backend, validateBackend: backend, downloadElementsCountLimit: new BN(decl), downloadBodiesLimit: 5, processBodiesLimit: 5 });
+    const fetcher = new Fetcher({ common, backend, validateBackend: backend, downloadElementsCountLimit: new BN(decl), downloadBodiesLimit: 5 });
     const start = new BN(0);
     const totalCount = new BN(decl * 10);
 

@@ -4,7 +4,7 @@ import { Common } from '@rei-network/common';
 import { Journal } from '../../src/txpool/journal';
 import { Transaction } from '@rei-network/structure';
 import { expect } from 'chai';
-import { createBufferFunctionalMap, hexStringToBuffer, setLevel } from '@rei-network/utils';
+import { FunctionalBufferMap, hexStringToBuffer, setLevel } from '@rei-network/utils';
 
 setLevel('silent');
 class testnode {
@@ -52,7 +52,7 @@ describe('Journal', () => {
 
   it('should rotate correctly', async () => {
     const addr = hexStringToBuffer('0x2dd3cf3116858021c7a234ff470b21a8d3e547d4');
-    const remap = createBufferFunctionalMap<Transaction[]>();
+    const remap = new FunctionalBufferMap<Transaction[]>();
     remap.set(addr, testTransactions);
     await journal.rotate(remap);
     await journal.load(async (trxs: Transaction[]) => {

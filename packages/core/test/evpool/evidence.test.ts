@@ -1,7 +1,8 @@
 import crypto from 'crypto';
 import { assert, expect } from 'chai';
 import { Address, BN } from 'ethereumjs-util';
-import { DuplicateVoteEvidence, Vote, VoteType } from '../../src/consensus/reimint/types';
+import { DuplicateVoteEvidence } from '../../src/consensus/reimint/evpool';
+import { Vote, VoteType } from '../../src/consensus/reimint/vote';
 import { MockAccountManager } from '../util';
 
 const accMngr = new MockAccountManager([

@@ -105,14 +105,14 @@ export default {
       gasMultiplier: 2
     },
     'rei-testnet': {
-      url: 'https://rpc-testnet.rei.network',
+      url: 'https://rpc-testnet.rei.network/',
       accounts,
       chainId: 12357,
       live: true,
       saveDeployments: true
     },
     'rei-mainnet': {
-      url: 'https://rpc-mainnet.rei.network',
+      url: 'https://rpc-mainnet.rei.network/',
       accounts,
       chainId: 47805,
       live: true,

@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { Transaction } from '@rei-network/structure';
 import { TxPricedList } from '../../src/txpool/txpricedlist';
-import { hexStringToBN, createBufferFunctionalMap } from '@rei-network/utils';
+import { hexStringToBN, FunctionalBufferMap } from '@rei-network/utils';
 import { expect } from 'chai';
 
 describe('TxPricedList', () => {
@@ -10,7 +10,7 @@ describe('TxPricedList', () => {
   let testdata: any;
   let testTransactions: Transaction[] = [];
   let another: Transaction;
-  const trxmap = createBufferFunctionalMap<Transaction>();
+  const trxmap = new FunctionalBufferMap<Transaction>();
 
   before(() => {
     testdata = JSON.parse(fs.readFileSync(path.join(__dirname, '/test-data.json')).toString());

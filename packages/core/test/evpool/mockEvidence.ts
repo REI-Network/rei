@@ -1,5 +1,5 @@
 import { BN, keccak256, rlp, bnToUnpaddedBuffer } from 'ethereumjs-util';
-import { Evidence, EvidenceFactory } from '../../src/consensus/reimint/types';
+import { Evidence, EvidenceFactory } from '../../src/consensus/reimint/evpool';
 
 export class MockEvidence implements Evidence {
   readonly height: BN;

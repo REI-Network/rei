@@ -10,13 +10,6 @@ REI-Network genesis contracts
 - `UnstakePool` A smart contract that keeps unstake amount, deployed at `0x0000000000000000000000000000000000001003`
 - `ValidatorRewardPool` A smart contract that keeps validator reward for validator, deployed at `0x0000000000000000000000000000000000001004`
 - `CommmissionShare` A smart contract that keeps commission reward for all staking user, dynamically deployed for each validator
-- `Fee` A smart contract that accepts REI deposit and calculates user fees, deployed at `0x0000000000000000000000000000000000001005`
-- `FreeFee` A smart contract that calculates user daily free fees, deployed at `0x0000000000000000000000000000000000001006`
-- `FeePool` A smart contract that assigns REI rewards to miners according to miner shares every 24 hours, deployed at `0x0000000000000000000000000000000000001007`
-- `Router` A router smart contract, blockchain will only interact with router contract, deployed at `0x0000000000000000000000000000000000001008`
-- `FeeToken` An ERC20 smart contract, only provides `balanceOf` method for users to query the fee balance, deployed at `0x0000000000000000000000000000000000001009`
-- `FreeFeeToken` An ERC20 smart contract, only provides `balanceOf` method for users to query the free fee balance, deployed at `0x000000000000000000000000000000000000100a`
-- `ContractFee` A smart contract for registering contract creators and setting contract fee, deployed at `0x000000000000000000000000000000000000100b`
 
 ## Install
 
@@ -131,22 +124,33 @@ AVAILABLE TASKS:
   afb                   Call onAfterBlock callback
   approve               Approve commission share
   balance               Get balance
+  check                 Check whatever you need
+  clean                 Clears the cache and deletes all artifacts
+  compile               Compiles the entire project, building all artifacts
+  console               Opens a hardhat console
   deploy                Deploy contracts
-  deposit               Deposit REI for fee
-  fee                   Query user fee and free fee info
+  du                    Do unstake
+  etherscan-verify      submit contract source code to etherscan
+  export                export contract deployment of the specified network into one file
+  export-artifacts
+  flatten               Flattens and prints contracts and their dependencies
   gb                    Get REI balance
+  help                  Prints this message
   lscfgaddr             List config addresses
+  node                  Starts a JSON-RPC server on top of Hardhat EVM
+  run                   Runs a user-defined script after compiling the project
   scr                   Set commission rate
+  sourcify              submit contract source code to sourcify (https://sourcify.dev)
   stake                 Stake for validator
-  sunstake              Start unstake
+  su                    Start unstake
+  test                  Runs mocha tests
   transfer              Transfer value to target address
-  unstake               Do unstake
+  typechain             Generate Typechain typings for compiled contracts
   verify                Verifies contract on Etherscan
   vp                    Visit validator voting power by address
   vu                    Visit unstake info by id
   vva                   Visit validator information by address
   vvi                   Visit validator information by index
-  withdraw              Withdraw REI from fee contract
 ```
 
 Any detailed options of the task can be obtained like this:

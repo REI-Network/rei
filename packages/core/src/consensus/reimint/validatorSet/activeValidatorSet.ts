@@ -208,15 +208,19 @@ export class ActiveValidatorSet {
    * Calculate priority through parent set
    * @param parent - Parent active validator set
    */
-  computeNewPriorities(parent: ActiveValidatorSet) {
-    const tvpAfterUpdatesBeforeRemovals = this._totalVotingPower.add(this.compareRemovals(parent));
+  computeNewPriorities(parent?: ActiveValidatorSet) {
+    const tvpAfterUpdatesBeforeRemovals = this._totalVotingPower.add(parent ? this.compareRemovals(parent) : new BN(0));
     // - 1.25 * tvpAfterUpdatesBeforeRemovals
     const newPriority = tvpAfterUpdatesBeforeRemovals.muln(10).divn(8).neg();
 
     for (const av of this.active) {
-      const index = parent.active.findIndex(({ validator }) => validator.equals(av.validator));
-      if (index !== -1) {
-        av.priority = parent.active[index].priority.clone();
+      if (parent) {
+        const index = parent.active.findIndex(({ validator }) => validator.equals(av.validator));
+        if (index !== -1) {
+          av.priority = parent.active[index].priority.clone();
+        } else {
+          av.priority = newPriority.clone();
+        }
       } else {
         av.priority = newPriority.clone();
       }
@@ -298,7 +302,7 @@ export class ActiveValidatorSet {
     }
     let proposer: ActiveValidator | undefined;
     for (const av of this.active) {
-      if (proposer === undefined || proposer.priority.lt(av.priority) || (proposer.priority.eq(av.priority) && proposer!.validator.buf.compare(av.validator.buf) === 1)) {
+      if (proposer === undefined || proposer.priority.lt(av.priority) || (proposer.priority.eq(av.priority) && proposer.validator.buf.compare(av.validator.buf) === 1)) {
         proposer = av;
       }
     }

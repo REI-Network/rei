@@ -15,6 +15,7 @@ const defaultPort = 11451;
 const defaultHost = '127.0.0.1';
 const defaultApis = 'eth,net,web3';
 
+// long time-consuming requests that need to be queued for processing
 const queuedMethods = new Set<string>(['eth_call', 'eth_estimateGas', 'eth_getLogs']);
 
 export interface RpcServerOptions {

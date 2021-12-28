@@ -19,6 +19,7 @@ export type CallData = {
 export class Controller {
   protected readonly backend: Backend;
   protected readonly filterSystem: FilterSystem;
+
   constructor(backend: Backend, filterSystem: FilterSystem) {
     this.backend = backend;
     this.filterSystem = filterSystem;

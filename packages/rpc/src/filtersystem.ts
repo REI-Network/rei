@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Aborter, Channel, logger } from '@rei-network/utils';
 import { Topics, BloomBitsFilter } from '@rei-network/core/dist/bloombits';
 import { Transaction, Log, BlockHeader } from '@rei-network/structure';
-import { WsClient } from './client';
+import { WebsocketClient } from './client';
 import { SyncingStatus, Backend } from './types';
 
 export type Query = {
@@ -20,7 +20,7 @@ type Filter = {
   logs: Log[];
   creationTime?: number;
   query?: Query;
-  client?: WsClient;
+  client?: WebsocketClient;
 };
 
 /**
@@ -196,7 +196,7 @@ export class FilterSystem {
    * @param query - Query option
    * @returns Subscription id
    */
-  subscribe(client: WsClient, type: string, query?: Query): string {
+  subscribe(client: WebsocketClient, type: string, query?: Query): string {
     const uid = genSubscriptionId();
     const filter = { hashes: [], logs: [], query, client };
     switch (type) {

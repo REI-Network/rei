@@ -1,88 +1,65 @@
-import util from 'util';
 import * as helper from './helper';
 import errors from './errorcodes';
-import { RpcContext, emptyContext } from './index';
-import { JSONRPC_VERSION } from './types';
-import { logger } from '@rei-network/utils';
-
-type HookFunction = (params: any, result: any) => Promise<any> | any;
+import { JSONRPC_VERSION, Request } from './types';
+import { WebsocketClient } from './client';
 
 type JsonRPCBody = { id: any; method: string; jsonrpc: string; params: any };
 
-export interface JsonMiddlewareOption {
-  methods: {
-    [name: string]: (params: any, context: RpcContext) => Promise<any> | any;
-  }[];
-  beforeMethods?: {
-    [name: string]: HookFunction | HookFunction[];
-  };
-  afterMethods?: {
-    [name: string]: HookFunction | HookFunction[];
-  };
-  onError?: (err: any, body: JsonRPCBody) => void;
-}
-
 export class JsonRPCMiddleware {
-  private readonly config: JsonMiddlewareOption;
+  private readonly newReq: (req: Request) => void;
 
-  constructor(config: JsonMiddlewareOption) {
-    helper.validateConfig(config);
-    this.config = config;
+  constructor(newReq: (req: Request) => void) {
+    this.newReq = newReq;
   }
 
   /**
    * Deal with a single RPC request
-   * @param {object} body Request body
-   * @param context Running context https or websocket
+   * @param body Request body
+   * @param client Websoket client
    * @returns Handled result
    */
-  private async handleSingleReq(body: JsonRPCBody, context: RpcContext): Promise<any> {
+  private async handleSingleReq(body: JsonRPCBody, client?: WebsocketClient): Promise<any> {
     const { id, method, jsonrpc, params } = body;
     try {
-      helper.validateJsonRpcVersion(jsonrpc, JSONRPC_VERSION);
+      helper.validateJsonRpcVersion(jsonrpc);
+      helper.validateJsonRpcMethod(method);
 
-      helper.validateJsonRpcMethod(method, this.config.methods);
-      logger.info('📦 Rpc served', method);
-      const beforeMethod = this.config.beforeMethods && this.config.beforeMethods[method];
-      if (beforeMethod) {
-        await helper.executeHook(beforeMethod, params, null);
-      }
+      const result = await new Promise<any>((resolve, reject) => {
+        this.newReq({
+          method,
+          params,
+          client,
+          resolve,
+          reject
+        });
+      });
 
-      const p = this.config.methods.find((c) => method in c)![method](params, context);
-      const result = util.types.isPromise(p) ? await p : p;
-      const afterMethod = this.config.afterMethods && this.config.afterMethods[method];
-      if (afterMethod) {
-        await helper.executeHook(afterMethod, params, result);
-      }
-
-      if (!helper.isNil(id)) {
-        return { jsonrpc, result, id };
-      }
+      return { jsonrpc, result, id };
     } catch (err: any) {
-      logger.debug('JsonRPCMiddleware::handleSingleReq, catch error:', err);
-      if (helper.isFunction(this.config.onError)) this.config.onError && this.config.onError(err, body);
       const error = {
         code: Number(err.code || err.status || errors.INTERNAL_ERROR.code),
-        // message: err.message || errors.INTERNAL_ERROR.message,
-        message: errors.INTERNAL_ERROR.message, // don't print the message
+        message: err.rpcMessage || errors.INTERNAL_ERROR.message,
         data: undefined
       };
-      if (err && err.data) error.data = err.data;
+
+      if (err && err.data) {
+        error.data = err.data;
+      }
+
       return { jsonrpc, error, id };
     }
   }
 
   /**
    * Process a series of requests
-   * @param bachBody Request body
-   * @param context Running context https or websocket
+   * @param batchBody Request body
+   * @param client Websocket client
    * @returns Array of Handled results
    */
-  private handleBatchReq(bachBody: any[], context: RpcContext): Promise<any[]> {
+  private handleBatchReq(batchBody: any[], client?: WebsocketClient): Promise<any[]> {
     return Promise.all(
-      bachBody.reduce((memo, body) => {
-        const result = this.handleSingleReq(body, context);
-        if (!helper.isNil(body.id)) memo.push(result);
+      batchBody.reduce((memo, body) => {
+        memo.push(this.handleSingleReq(body, client));
         return memo;
       }, [])
     );
@@ -95,15 +72,16 @@ export class JsonRPCMiddleware {
   private makeParseError() {
     return {
       jsonrpc: JSONRPC_VERSION,
-      error: errors.PARSE_ERROR
+      error: errors.PARSE_ERROR,
+      message: errors.PARSE_ERROR.message
     };
   }
 
-  private async rpcMiddleware(rpcData: any, send: (res: any) => void, context: RpcContext) {
-    if (Array.isArray(rpcData)) {
-      send(await this.handleBatchReq(rpcData, context));
-    } else if (typeof rpcData === 'object') {
-      send(await this.handleSingleReq(rpcData, context));
+  private async handleReq(req: any, send: (res: any) => void, client?: WebsocketClient) {
+    if (Array.isArray(req)) {
+      send(await this.handleBatchReq(req, client));
+    } else if (typeof req === 'object') {
+      send(await this.handleSingleReq(req, client));
     } else {
       send(this.makeParseError());
     }
@@ -111,18 +89,18 @@ export class JsonRPCMiddleware {
 
   /**
    * Format the rpc request passed in by websocket and then process it
-   * @param context Websocket context
+   * @param client Websocket client
    */
-  wrapWs(context: RpcContext) {
-    context.client!.ws.addEventListener('message', (msg) => {
-      let rpcData: any;
+  wrapWs(client: WebsocketClient) {
+    client.ws.addEventListener('message', (msg) => {
+      let req: any;
       try {
-        rpcData = JSON.parse(msg.data);
+        req = JSON.parse(msg.data);
       } catch (err) {
-        context.client!.send(this.makeParseError());
+        client.send(this.makeParseError());
         return;
       }
-      this.rpcMiddleware(rpcData, context.client!.send.bind(context.client!), context);
+      this.handleReq(req, client.send.bind(client), client);
     });
   }
 
@@ -134,7 +112,7 @@ export class JsonRPCMiddleware {
       if (req.ws) {
         next();
       } else {
-        this.rpcMiddleware(req.body, res.send.bind(res), emptyContext);
+        this.handleReq(req.body, res.send.bind(res));
       }
     };
   }

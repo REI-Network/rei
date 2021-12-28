@@ -3,6 +3,7 @@ import type { Block, Transaction } from '@rei-network/structure';
 import type { Common } from '@rei-network/common';
 import type VM from '@gxchain2-ethereumjs/vm';
 import type { StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import type { WebsocketClient } from './client';
 
 export type SyncingStatus = { syncing: true; status: { startingBlock: string; currentBlock: string; highestBlock: string } } | false;
 
@@ -30,4 +31,13 @@ export interface Backend {
   getTracer(): any; // TODO: fix types
 
   addPendingTxs(txs: Transaction[]): Promise<boolean[]>;
+}
+
+export interface Request {
+  method: string;
+  params: any;
+  client?: WebsocketClient;
+
+  resolve: (resps: any) => void;
+  reject: (reason?: any) => void;
 }

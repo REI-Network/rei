@@ -5,8 +5,8 @@ import { SyncingStatus, JSONRPC_VERSION } from './types';
 /**
  * Websocket client, used to manage websocket connections
  */
-export class WsClient {
-  public readonly ws: WebSocket;
+export class WebsocketClient {
+  readonly ws: WebSocket;
   private closed = false;
 
   /**
@@ -28,7 +28,9 @@ export class WsClient {
     if (!this.closed) {
       try {
         this.ws.send(JSON.stringify(data));
-      } catch (err) {}
+      } catch (err) {
+        // ignore all errors ...
+      }
     }
   }
 

@@ -46,7 +46,6 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     network,
     account
   });
-  SIGINT(node);
   let server: undefined | RpcServer;
   if (opts.rpc) {
     const rpc = {
@@ -58,6 +57,7 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     server = new RpcServer(rpc);
     await server.start();
   }
+  SIGINT(node, server);
   return [node, server];
 }
 

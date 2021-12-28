@@ -3,7 +3,7 @@ import { TransactionFactory, WrappedTransaction, WrappedBlock, Log, Transaction,
 import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import * as helper from '../helper';
-import { RpcContext } from '../index';
+import { WebsocketClient } from '../client';
 import { Controller, CallData } from './base';
 
 type TopicsData = (string | null | (string | null)[])[];
@@ -357,21 +357,19 @@ export class ETHController extends Controller {
   eth_unsubscribe([id]: [string]) {
     return this.filterSystem.unsubscribe(id);
   }
-  async eth_subscribe([type, options]: [string, undefined | { address?: string | string[]; topics?: TopicsData }], context: RpcContext) {
-    if (!context.client) {
-      helper.throwRpcErr('eth_subscribe is only supported on websocket!');
-      // for types.
-      throw new Error();
+  async eth_subscribe([type, options]: [string, undefined | { address?: string | string[]; topics?: TopicsData }], client?: WebsocketClient) {
+    if (!client) {
+      throw helper.throwRpcErr('eth_subscribe is only supported on websocket!');
     }
+
     if (type !== 'newHeads' && type !== 'logs' && type !== 'newPendingTransactions' && type !== 'syncing') {
-      helper.throwRpcErr('eth_subscribe, invalid subscription type!');
-      // for types.
-      throw new Error();
+      throw helper.throwRpcErr('eth_subscribe, invalid subscription type!');
     }
+
     if (type === 'logs') {
-      return this.filterSystem.subscribe(context.client, type, parseAddressesAndTopics(options?.address, options?.topics));
+      return this.filterSystem.subscribe(client, type, parseAddressesAndTopics(options?.address, options?.topics));
     } else {
-      return this.filterSystem.subscribe(context.client, type);
+      return this.filterSystem.subscribe(client, type);
     }
   }
 }

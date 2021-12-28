@@ -340,6 +340,10 @@ export class ETHController extends Controller {
   async eth_getLogs([{ fromBlock, toBlock, address: _addresses, topics: _topics, blockhash }]: [{ fromBlock?: string; toBlock?: string; address?: string | string[]; topics?: TopicsData; blockhash?: string }]) {
     const from = await this.getBlockNumberByTag(fromBlock ? fromBlock : 'latest');
     const to = await this.getBlockNumberByTag(toBlock ? toBlock : 'latest');
+    if (from.sub(to).gtn(5000)) {
+      helper.throwRpcErr('eth_getLogs, too many block, max limit is 5000');
+    }
+
     const { addresses, topics } = parseAddressesAndTopics(_addresses, _topics);
     const filter = this.backend.getFilter();
     const logs = blockhash ? await filter.filterBlock(hexStringToBuffer(blockhash), addresses, topics) : await filter.filterRange(from, to, addresses, topics);

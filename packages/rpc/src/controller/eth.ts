@@ -63,9 +63,8 @@ export class ETHController extends Controller {
   eth_hashrate() {
     return intToHex(0);
   }
-  // TODO: eth_gasPrice
   eth_gasPrice() {
-    return '0x3b9aca00';
+    return bnToHex(this.oracle.gasPrice);
   }
   eth_accounts() {
     return this.backend.accMngr.totalUnlockedAccounts().map((addr) => bufferToHex(addr));

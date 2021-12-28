@@ -80,15 +80,6 @@ export class FilterSystem {
 
   constructor(backend: Backend) {
     this.backend = backend;
-    this.timeoutLoop();
-    this.taskLoop();
-    this.backend.bcMonitor.on('logs', this.onLogs);
-    this.backend.bcMonitor.on('removedLogs', this.onRemovedLogs);
-    this.backend.bcMonitor.on('newHeads', this.onNewHeads);
-    this.backend.sync.on('start', this.onStart);
-    this.backend.sync.on('failed', this.onFailed);
-    this.backend.sync.on('synchronized', this.onSynchronized);
-    this.backend.txPool.on('readies', this.onReadies);
   }
 
   private onLogs = (logs) => {
@@ -137,6 +128,24 @@ export class FilterSystem {
     }
   }
 
+  /**
+   * Start filter system
+   */
+  start() {
+    this.timeoutLoop();
+    this.taskLoop();
+    this.backend.bcMonitor.on('logs', this.onLogs);
+    this.backend.bcMonitor.on('removedLogs', this.onRemovedLogs);
+    this.backend.bcMonitor.on('newHeads', this.onNewHeads);
+    this.backend.sync.on('start', this.onStart);
+    this.backend.sync.on('failed', this.onFailed);
+    this.backend.sync.on('synchronized', this.onSynchronized);
+    this.backend.txPool.on('readies', this.onReadies);
+  }
+
+  /**
+   * Abort filter system
+   */
   async abort() {
     this.taskQueue.abort();
     this.backend.bcMonitor.removeListener('logs', this.onLogs);

@@ -2,6 +2,7 @@ import { Address, BN } from 'ethereumjs-util';
 import { Block, WrappedBlock } from '@rei-network/structure';
 import { hexStringToBuffer, hexStringToBN } from '@rei-network/utils';
 import { StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import { RpcServer } from '../index';
 import * as helper from '../helper';
 import { FilterSystem } from '../filtersystem';
 import { Backend } from '../types';
@@ -17,12 +18,22 @@ export type CallData = {
 };
 
 export class Controller {
-  protected readonly backend: Backend;
-  protected readonly filterSystem: FilterSystem;
+  protected readonly server: RpcServer;
 
-  constructor(backend: Backend, filterSystem: FilterSystem) {
-    this.backend = backend;
-    this.filterSystem = filterSystem;
+  constructor(server: RpcServer) {
+    this.server = server;
+  }
+
+  get backend() {
+    return this.server.backend;
+  }
+
+  get filterSystem() {
+    return this.server.filterSystem;
+  }
+
+  get oracle() {
+    return this.server.oracle;
   }
 
   protected async getBlockNumberByTag(tag: string): Promise<BN> {

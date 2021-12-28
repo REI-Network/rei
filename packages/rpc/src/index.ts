@@ -8,6 +8,7 @@ import { JsonRPCMiddleware } from './jsonrpcmiddleware';
 import { api } from './controller';
 import { WebsocketClient } from './client';
 import { FilterSystem } from './filtersystem';
+import { SimpleOracle } from './gasPriceOracle';
 import { Backend, Request } from './types';
 import * as helper from './helper';
 
@@ -33,10 +34,13 @@ export interface RpcServerOptions {
  * Rpc server
  */
 export class RpcServer {
+  readonly backend: Backend;
+  readonly filterSystem: FilterSystem;
+  readonly oracle: SimpleOracle;
+
   private readonly port: number;
   private readonly host: string;
   private readonly controllers: { [name: string]: any }[];
-  private readonly filterSystem: FilterSystem;
   private readonly reqQueue = new Channel<Request>({
     max: 1000,
     drop: (msg) => {
@@ -48,7 +52,10 @@ export class RpcServer {
   private reqPromise?: Promise<void>;
 
   constructor(options: RpcServerOptions) {
+    this.backend = options.backend;
     this.filterSystem = new FilterSystem(options.backend);
+    this.oracle = new SimpleOracle(options.backend);
+
     this.port = options.port ?? defaultPort;
     this.host = options.host ?? defaultHost;
 
@@ -56,7 +63,7 @@ export class RpcServer {
       if (!(name in api)) {
         throw new Error('unknown api:' + name);
       }
-      return new api[name](options.backend, this.filterSystem);
+      return new api[name](this);
     });
   }
 
@@ -160,7 +167,11 @@ export class RpcServer {
             logger.error('RpcServer, error:', err);
           });
 
+          // start loop
           this.reqPromise = this.reqLoop();
+          this.filterSystem.start();
+          this.oracle.start();
+
           resolve();
         });
       } catch (err) {
@@ -194,5 +205,6 @@ export class RpcServer {
     this.reqPromise = undefined;
 
     await ignoreError(this.filterSystem.abort());
+    this.oracle.abort();
   }
 }

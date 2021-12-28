@@ -1,10 +1,7 @@
 import { BN, bnToUnpaddedBuffer, bufferToInt, intToBuffer, rlp } from 'ethereumjs-util';
-import { BlockHeader } from '@rei-network/structure';
-import { PendingBlock } from '../../pendingBlock';
 import { Message, MessageFactory } from '../messages';
 import { RoundStepType } from '../types';
 import * as v from '../validate';
-import { ActiveValidatorSet } from '../validatorSet';
 
 export interface StateMachineMsg {
   raw(): any;
@@ -118,33 +115,5 @@ export class StateMachineEndHeight implements StateMachineMsg {
 
   validateBasic() {
     v.validateHeight(this.height);
-  }
-}
-
-export class StateMachineNewHeight implements StateMachineMsg {
-  readonly header: BlockHeader;
-  readonly validators: ActiveValidatorSet;
-  readonly pendingBlock: PendingBlock;
-  readonly resolve: () => void;
-  readonly reject: (reason?: any) => void;
-
-  constructor(header: BlockHeader, validators: ActiveValidatorSet, pendingBlock: PendingBlock, resolve: () => void, reject: (reason?: any) => void) {
-    this.header = header;
-    this.validators = validators;
-    this.pendingBlock = pendingBlock;
-    this.resolve = resolve;
-    this.reject = reject;
-  }
-
-  raw() {
-    throw new Error('Method not implemented.');
-  }
-
-  serialize(): Buffer {
-    throw new Error('Method not implemented.');
-  }
-
-  validateBasic(): void {
-    throw new Error('Method not implemented.');
   }
 }

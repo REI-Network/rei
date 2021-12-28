@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { BN, bufferToHex } from 'ethereumjs-util';
+import Semaphore from 'semaphore-async-await';
 import { Channel, logger } from '@rei-network/utils';
 import { Block, BlockHeader } from '@rei-network/structure';
 import { isEmptyHash, EMPTY_HASH } from '../../utils';
@@ -7,7 +8,7 @@ import { preValidateBlock, preValidateHeader } from '../../validation';
 import { PendingBlock } from '../pendingBlock';
 import { Reimint } from './reimint';
 import { IProcessBlockResult, IStateMachineBackend, IStateMachineP2PBackend, ISigner, IConfig, IEvidencePool, IWAL, IDebug, RoundStepType } from './types';
-import { StateMachineMessage, StateMachineTimeout, StateMachineEndHeight, StateMachineNewHeight, StateMachineMsg } from './stateMessages';
+import { StateMachineMessage, StateMachineTimeout, StateMachineEndHeight, StateMachineMsg } from './stateMessages';
 import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from './messages';
 import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, DuplicateVotesError } from './vote';
 import { Proposal } from './proposal';
@@ -19,7 +20,7 @@ import { ActiveValidatorSet } from './validatorSet';
 const SkipTimeoutCommit = true;
 const WaitForTxs = true;
 const CreateEmptyBlocksInterval = 0;
-const StateMachineMsgQueueMaxSize = 100;
+const StateMachineMsgQueueMaxSize = 1000;
 
 export class StateMachine {
   private readonly chainId: number;
@@ -35,16 +36,12 @@ export class StateMachine {
   private readonly wal: IWAL;
   private readonly debug?: IDebug;
 
+  private readonly lock = new Semaphore(1);
   private msgLoopPromise?: Promise<void>;
   private readonly msgQueue = new Channel<StateMachineMsg>({
     max: StateMachineMsgQueueMaxSize,
     drop: (message) => {
-      if (message instanceof StateMachineNewHeight) {
-        logger.warn('StateMachine::drop, too many messages, drop NewHeight message');
-        message.reject(new Error('dropped'));
-      } else {
-        logger.warn('StateMachine::drop, too many messages, drop:', message);
-      }
+      logger.detail('StateMachine::drop, too many messages, drop:', message);
     }
   });
 
@@ -102,6 +99,7 @@ export class StateMachine {
     await this.replay();
     // message loop
     for await (const msg of this.msgQueue.generator()) {
+      await this.lock.acquire();
       try {
         if (msg instanceof StateMachineMessage) {
           const internal = msg.peerId === '';
@@ -114,17 +112,11 @@ export class StateMachine {
         } else if (msg instanceof StateMachineTimeout) {
           await this.wal.write(msg);
           await this.handleTimeout(msg);
-        } else if (msg instanceof StateMachineNewHeight) {
-          const { header, validators, pendingBlock, resolve, reject } = msg;
-          try {
-            this._newBlockHeader(header, validators, pendingBlock);
-            resolve();
-          } catch (err) {
-            reject(err);
-          }
         }
       } catch (err) {
         logger.error('State::msgLoop, catch error:', err);
+      } finally {
+        this.lock.release();
       }
     }
     // close WAL
@@ -962,57 +954,57 @@ export class StateMachine {
     return true;
   }
 
-  private _newBlockHeader(header: BlockHeader, validators: ActiveValidatorSet, pendingBlock: PendingBlock) {
-    const timestamp = Date.now();
-    this.parent = header;
-    this.parentHash = header.hash();
-    this.height = header.number.addn(1);
-    this.round = 0;
-    this.step = RoundStepType.NewHeight;
-    const pendingBlockTimestamp = pendingBlock.timestamp * 1e3;
-    this.startTime = timestamp > pendingBlockTimestamp ? timestamp : pendingBlockTimestamp;
-    this.validators = validators;
-    this.proposal = undefined;
-    this.proposalBlock = undefined;
-    this.proposalEvidence = undefined;
-    this.proposalBlockResult = undefined;
-    this.pendingBlock = pendingBlock;
-    this.lockedRound = -1;
-    this.lockedBlock = undefined;
-    this.lockedEvidence = undefined;
-    this.lockedBlockResult = undefined;
-    this.validRound = -1;
-    this.validBlock = undefined;
-    this.votes = new HeightVoteSet(this.chainId, this.height, this.validators);
-    this.commitRound = -1;
-    this.triggeredTimeoutPrecommit = false;
-
-    this.newStep();
-
-    const duration = this.startTime - timestamp;
-    this._schedule(duration, this.height, 0, RoundStepType.NewHeight);
-
-    // let pending block stop appending transactions before enter new height
-    const stopAppendDuration = Math.max(Math.floor((duration * 9) / 10), 1);
-    setTimeout(() => {
-      if (pendingBlock === this.pendingBlock) {
-        pendingBlock.stop();
-      }
-    }, stopAppendDuration);
-
-    logger.debug('StateMachine::newBlockHeader, lastest height:', header.number.toString(), 'next round should start at:', this.startTime);
-  }
-
   /**
    * Notify new block header to state machine
    * @param header - New block header
    * @param validators - Active validator set of next block
    * @param pendingBlock - Pending block instance
    */
-  newBlockHeader(header: BlockHeader, validators: ActiveValidatorSet, pendingBlock: PendingBlock) {
-    return new Promise<void>((resolve, reject) => {
-      this._newMessage(new StateMachineNewHeight(header, validators, pendingBlock, resolve, reject));
-    });
+  async newBlockHeader(header: BlockHeader, validators: ActiveValidatorSet, pendingBlock: PendingBlock) {
+    await this.lock.acquire();
+    try {
+      const timestamp = Date.now();
+      this.parent = header;
+      this.parentHash = header.hash();
+      this.height = header.number.addn(1);
+      this.round = 0;
+      this.step = RoundStepType.NewHeight;
+      const pendingBlockTimestamp = pendingBlock.timestamp * 1e3;
+      this.startTime = timestamp > pendingBlockTimestamp ? timestamp : pendingBlockTimestamp;
+      this.validators = validators;
+      this.proposal = undefined;
+      this.proposalBlock = undefined;
+      this.proposalEvidence = undefined;
+      this.proposalBlockResult = undefined;
+      this.pendingBlock = pendingBlock;
+      this.lockedRound = -1;
+      this.lockedBlock = undefined;
+      this.lockedEvidence = undefined;
+      this.lockedBlockResult = undefined;
+      this.validRound = -1;
+      this.validBlock = undefined;
+      this.votes = new HeightVoteSet(this.chainId, this.height, this.validators);
+      this.commitRound = -1;
+      this.triggeredTimeoutPrecommit = false;
+
+      this.newStep();
+
+      const duration = this.startTime - timestamp;
+      this._schedule(duration, this.height, 0, RoundStepType.NewHeight);
+
+      // let pending block stop appending transactions before enter new height
+      const stopAppendDuration = Math.max(Math.floor((duration * 9) / 10), 1);
+      setTimeout(() => {
+        if (pendingBlock === this.pendingBlock) {
+          pendingBlock.stop();
+        }
+      }, stopAppendDuration);
+
+      logger.debug('StateMachine::newBlockHeader, lastest height:', header.number.toString(), 'next round should start at:', this.startTime);
+    } catch (err) {
+      this.lock.release();
+      throw err;
+    }
   }
 
   /**

@@ -1001,9 +1001,8 @@ export class StateMachine {
       }, stopAppendDuration);
 
       logger.debug('StateMachine::newBlockHeader, lastest height:', header.number.toString(), 'next round should start at:', this.startTime);
-    } catch (err) {
+    } finally {
       this.lock.release();
-      throw err;
     }
   }
 

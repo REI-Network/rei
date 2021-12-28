@@ -4,8 +4,6 @@ import { hexStringToBuffer, hexStringToBN } from '@rei-network/utils';
 import { StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { RpcServer } from '../index';
 import * as helper from '../helper';
-import { FilterSystem } from '../filtersystem';
-import { Backend } from '../types';
 
 export type CallData = {
   from?: string;

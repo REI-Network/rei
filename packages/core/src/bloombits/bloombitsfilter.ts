@@ -172,9 +172,13 @@ export class BloomBitsFilter {
     }
 
     const latestHeader = this.node.getLatestBlock().header;
+    if (from.gt(latestHeader.number)) {
+      return logs;
+    }
+
     // if addresses and topics is empty, return all logs between from and to.
     if (blooms.length === 0) {
-      for (const num = from.gt(latestHeader.number) ? latestHeader.number.clone() : from.clone(); num.lte(to) && num.lte(latestHeader.number); num.iaddn(1)) {
+      for (const num = from.clone(); num.lte(to) && num.lte(latestHeader.number); num.iaddn(1)) {
         append(await this.filterBlock(num, addresses, topics));
       }
       return logs;

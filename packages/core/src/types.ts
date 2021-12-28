@@ -22,6 +22,11 @@ export interface NodeOptions {
    * Chain name, default is `rei-mainnet`
    */
   chain?: string;
+  /**
+   * Max receipts cache size
+   */
+  receiptsCacheSize?: number;
+
   mine: ConsensusEngineConstructorOptions;
   network: NetworkManagerConstructorOptions;
   account: AccountManagerConstructorOptions;

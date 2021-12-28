@@ -1,11 +1,8 @@
-import { Address, BN, keccak256, rlp } from 'ethereumjs-util';
-import { Block, Log, Transaction, Receipt } from '@rei-network/structure';
+import { Address, BN, keccak256 } from 'ethereumjs-util';
+import { Log, Receipt } from '@rei-network/structure';
 import { FunctionalBNMap, FunctionalBNSet, decompressBytes } from '@rei-network/utils';
 import { Node } from '../node';
 import { BloomBitsBlocks } from './index';
-
-// TODO: fix this
-const DBTarget_Receipts = 100;
 
 /**
  * calcBloomIndexes returns the bloom filter bit indexes belonging to the given key
@@ -124,27 +121,18 @@ export class BloomBitsFilter {
 
   /**
    * Find logs which are matched by given range in this block
-   * @param block Blcok to be checked
+   * @param receipts Receipts
    * @param addresses Given address range
    * @param topics Given topics range
    * @returns The logs meet the conditions
    */
-  private async checkBlockMatches(block: Block, addresses: Address[], topics: Topics) {
+  private async checkBlockMatches(receipts: Receipt[], addresses: Address[], topics: Topics) {
     const logs: Log[] = [];
-    if (block.transactions.length > 0) {
-      let lastCumulativeGasUsed = new BN(0);
-      const rawArr: Buffer[][] = rlp.decode(await this.node.db.get(DBTarget_Receipts, { blockHash: block.hash(), blockNumber: block.header.number })) as any;
-      for (let i = 0; i < block.transactions.length; i++) {
-        const raw = rawArr[i];
-        const receipt = Receipt.fromValuesArray(raw);
-        for (const log of receipt.logs) {
-          if (BloomBitsFilter.checkLogMatches(log, { addresses, topics })) {
-            const gasUsed = receipt.bnCumulativeGasUsed.sub(lastCumulativeGasUsed);
-            receipt.installProperties(block, block.transactions[i] as Transaction, gasUsed, i);
-            logs.push(log);
-          }
+    for (const receipt of receipts) {
+      for (const log of receipt.logs) {
+        if (BloomBitsFilter.checkLogMatches(log, { addresses, topics })) {
+          logs.push(log);
         }
-        lastCumulativeGasUsed = receipt.bnCumulativeGasUsed;
       }
     }
     return logs;
@@ -270,8 +258,8 @@ export class BloomBitsFilter {
    * @returns All logs that meet the conditions
    */
   async filterBlock(blockHashOrNumber: Buffer | BN | number, addresses: Address[], topics: Topics) {
-    const block = await this.node.db.getBlock(blockHashOrNumber);
-    const logs = await this.checkBlockMatches(block, addresses, topics);
+    const receipts = await this.node.receiptsCache.get(blockHashOrNumber, this.node.db);
+    const logs = await this.checkBlockMatches(receipts, addresses, topics);
     logs.forEach((log) => (log.removed = false));
     return logs;
   }

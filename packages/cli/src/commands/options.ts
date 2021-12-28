@@ -28,4 +28,5 @@ export function installOptions(program: any) {
   program.option('--mine', 'mine block');
   program.option('--coinbase <address>', 'miner address');
   program.option('--verbosity <verbosity>', 'logging verbosity: silent, error, warn, info, debug, detail', 'info');
+  program.option('--receipts-cache-size <receiptsCacheSize>', 'receipts cache size');
 }

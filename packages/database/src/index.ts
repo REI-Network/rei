@@ -295,6 +295,27 @@ export class Database extends DBManager {
   }
 
   /**
+   * Get receipts by block hash and number
+   * @param number - Block number
+   * @param hash - Block hash
+   * @returns Receipts
+   */
+  async getReceipts(number: BN, hash: Buffer, block?: Block): Promise<Receipt[]> {
+    const rawArr: Buffer[][] = rlp.decode(await this.get(DBTarget_Receipts, { blockHash: hash, blockNumber: number })) as any;
+    const receipts: Receipt[] = [];
+    let lastCumulativeGasUsed = new BN(0);
+    for (let i = 0; i < rawArr.length; i++) {
+      const raw = rawArr[i];
+      const receipt = Receipt.fromValuesArray(raw);
+      const gasUsed = receipt.bnCumulativeGasUsed.sub(lastCumulativeGasUsed);
+      block && receipt.installProperties(block, block.transactions[i] as Transaction, gasUsed, i);
+      lastCumulativeGasUsed = receipt.bnCumulativeGasUsed;
+      receipts.push(receipt);
+    }
+    return receipts;
+  }
+
+  /**
    * Get transaction receipt by block hash and block number
    * @param txHash - Transaction hash
    * @param blockHash - Block hash

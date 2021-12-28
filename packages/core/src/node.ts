@@ -16,7 +16,7 @@ import { TxPool } from './txpool';
 import { Synchronizer } from './sync';
 import { TxFetcher } from './txSync';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
-import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber } from './bloombits';
+import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber, ReceiptsCache } from './bloombits';
 import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
 import { WireProtocol, ConsensusProtocol } from './protocols';
@@ -62,6 +62,7 @@ export class Node extends Initializer {
   readonly accMngr: AccountManager;
   readonly reimint: ReimintConsensusEngine;
   readonly clique: CliqueConsensusEngine;
+  readonly receiptsCache: ReceiptsCache;
   readonly aborter = new Aborter();
 
   private pendingTxsLoopPromise!: Promise<void>;
@@ -83,6 +84,7 @@ export class Node extends Initializer {
     this.wire = new WireProtocol(this);
     this.consensus = new ConsensusProtocol(this);
     this.accMngr = new AccountManager(options.account.keyStorePath);
+    this.receiptsCache = new ReceiptsCache(options.receiptsCacheSize);
 
     this.chain = options.chain ?? defaultChainName;
     if (getChain(this.chain) === undefined) {
@@ -404,6 +406,9 @@ export class Node extends Initializer {
       // save receipts
       await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, hash, number)));
     }
+
+    // add receipts to cache
+    this.receiptsCache.add(hash, receipts);
 
     logger.info('✨ Commit block, height:', number.toString(), 'hash:', bufferToHex(hash));
 

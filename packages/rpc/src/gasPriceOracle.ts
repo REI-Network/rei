@@ -29,21 +29,25 @@ export class SimpleOracle {
 
   private async taskLoop() {
     for await (const hashes of this.taskQueue.generator()) {
-      if (hashes.length > 0) {
-        const hash = hashes[hashes.length - 1];
-        const block: Block = await this.backend.db.getBlock(hash);
-        if (block.transactions.length > 0) {
-          const totalGasPrice = new BN(0);
-          for (const tx of block.transactions as Transaction[]) {
-            totalGasPrice.iadd(tx.gasPrice);
+      try {
+        if (hashes.length > 0) {
+          const hash = hashes[hashes.length - 1];
+          const block: Block = await this.backend.db.getBlock(hash);
+          if (block.transactions.length > 0) {
+            const totalGasPrice = new BN(0);
+            for (const tx of block.transactions as Transaction[]) {
+              totalGasPrice.iadd(tx.gasPrice);
+            }
+            this.avgGasPrice = totalGasPrice.divn(block.transactions.length);
+            if (this.avgGasPrice.isZero()) {
+              this.avgGasPrice = new BN(1);
+            }
+          } else {
+            this.avgGasPrice = undefined;
           }
-          this.avgGasPrice = totalGasPrice.divn(block.transactions.length);
-          if (this.avgGasPrice.isZero()) {
-            this.avgGasPrice = new BN(1);
-          }
-        } else {
-          this.avgGasPrice = undefined;
         }
+      } catch (err) {
+        // ignore errors ...
       }
     }
   }

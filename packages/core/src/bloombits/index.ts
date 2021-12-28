@@ -1,5 +1,6 @@
 export * from './bloombitsfilter';
 export * from './bloombitsgenerator';
+export * from './receiptsCache';
 
 export const ConfirmsBlockNumber = 256;
 // block number of each section.

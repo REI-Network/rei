@@ -397,7 +397,7 @@ export class Node extends Initializer {
       }
     }
 
-    // if we are now under the remint consensus,
+    // if we are now under the reimint consensus,
     // we will refuse to roll back the block
     if (isEnableRemint(block._common)) {
       if (block.header.number.lte(this.latestBlock.header.number)) {

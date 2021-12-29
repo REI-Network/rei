@@ -35,7 +35,7 @@ function opNameToNumber(opcodes: OpcodeList, name: string) {
       return code;
     }
   }
-  throw new Error(`unknow opcode: ${name}`);
+  throw new Error(`unknown opcode: ${name}`);
 }
 
 /**

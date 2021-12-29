@@ -106,7 +106,7 @@ export class AccountManager {
   getPrivateKey(addr: AddrType) {
     const privateKey = this.unlocked.get(addrToBuffer(addr));
     if (!privateKey) {
-      throw new Error(`Unknow address: ${addrToString(addr)}`);
+      throw new Error(`Unknown address: ${addrToString(addr)}`);
     }
     return privateKey;
   }

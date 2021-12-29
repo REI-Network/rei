@@ -84,5 +84,5 @@
       "block": 0
     }
   ],
-  "bootstrapNodes": []
+  "bootstrapNodes": ["enr:-Iu4QD0Vbq-Hnhlz4YaEFKIHgSJbty6-CyavMGPOy-h2pjmsT7-WzjRxLPCVn9rNvCwrbAbBb1uZebhPoNlN0WANKXkEgmlkgnY0gmlwhH8AAAGJc2VjcDI1NmsxoQLqv0DBwIAlD3OyAWqz8_b1L6kIX9Otkh5HdC0n2upn-oN0Y3CCEF-DdWRwgiZS", "enr:-Iu4QKmw2yGgfF8-HaJcDCj8oawDlbOA5ytEbivOoXQsxJajM4xr42YlKQ1UvGybuE2hNazQLGlvNF1Ys6xW1450RIoEgmlkgnY0gmlwhH8AAAGJc2VjcDI1NmsxoQOLTB41t2bg-j_kaXW_G0J3_g6KvIgG6YzUNfaN-BIbj4N0Y3CCXviDdWRwgl75"]
 }

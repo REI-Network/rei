@@ -407,6 +407,15 @@ export class Node extends Initializer {
       await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, hash, number)));
     }
 
+    // install properties for receipts
+    let lastCumulativeGasUsed = new BN(0);
+    for (let i = 0; i < receipts.length; i++) {
+      const receipt = receipts[i];
+      const gasUsed = receipt.bnCumulativeGasUsed.sub(lastCumulativeGasUsed);
+      receipt.installProperties(block, block.transactions[i] as Transaction, gasUsed, i);
+      lastCumulativeGasUsed = receipt.bnCumulativeGasUsed;
+    }
+
     // add receipts to cache
     this.receiptsCache.add(hash, receipts);
 

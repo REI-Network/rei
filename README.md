@@ -1,4 +1,4 @@
-# REI-Network-Alpha
+# REI-Network
 
 ![Node Version](https://img.shields.io/badge/node-%e2%89%a5v14.0.0-blue)
 ![NPM Version](https://img.shields.io/badge/npm-%E2%89%A5v7.0.0-blue)

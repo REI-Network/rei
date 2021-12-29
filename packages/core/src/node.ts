@@ -401,7 +401,7 @@ export class Node extends Initializer {
     // we will refuse to roll back the block
     if (isEnableRemint(block._common)) {
       if (block.header.number.lte(this.latestBlock.header.number)) {
-        throw new Error('remint revert');
+        throw new Error('reimint revert');
       }
     }
 

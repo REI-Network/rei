@@ -1,6 +1,6 @@
 {
     "name": "@rei-network/rpc",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
@@ -15,8 +15,8 @@
     },
     "dependencies": {
         "@gxchain2-ethereumjs/vm": "^5.5.12",
-        "@rei-network/structure": "^0.0.1",
-        "@rei-network/utils": "^0.0.1",
+        "@rei-network/structure": "^0.0.2",
+        "@rei-network/utils": "^0.0.2",
         "body-parser": "^1.19.0",
         "express": "^4.17.1",
         "express-ws": "^4.0.0",

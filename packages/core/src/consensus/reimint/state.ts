@@ -1161,4 +1161,41 @@ export class StateMachine {
       return this.votes.prevotes(proposalPOLRound);
     }
   }
+
+  /**
+   * Pre validate vote
+   * @param vote - Vote
+   * @returns Is the vote valid
+   */
+  preValidateVote(vote: Vote) {
+    return !!this.votes.getVoteSet(vote.round, vote.type)?.preValidate(vote);
+  }
+
+  /**
+   * Pre validator proposal
+   * @param proposal - Proposal
+   * @returns Is the proposal valid
+   */
+  preValidateProposal(proposal: Proposal) {
+    if (this.proposal) {
+      return false;
+    }
+
+    if (!this.height.eq(proposal.height) || this.round !== proposal.round) {
+      return false;
+    }
+
+    if (proposal.POLRound < -1 || (proposal.POLRound >= 0 && proposal.POLRound >= proposal.round)) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Pre validate do we need the proposal block message
+   * @returns Do we need the proposal block message
+   */
+  preValidateProposalBlock() {
+    return !this.proposalBlock && !!this.proposal && !!this.proposalBlockHash;
+  }
 }

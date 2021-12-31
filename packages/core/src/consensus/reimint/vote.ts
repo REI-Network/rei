@@ -201,6 +201,16 @@ export class VoteSet {
     this.sum = new BN(0);
   }
 
+  preValidate(vote: Vote) {
+    if (!vote.height.eq(this.height) || vote.round !== this.round || vote.type !== this.signedMsgType) {
+      return false;
+    }
+
+    const existing = this.votes?.[vote.index];
+    const result = existing && existing.hash.equals(vote.hash);
+    return !result;
+  }
+
   addVote(vote: Vote) {
     if (!vote.height.eq(this.height) || vote.round !== this.round || vote.type !== this.signedMsgType) {
       logger.detail('VoteSet::addVote, invalid vote');

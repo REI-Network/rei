@@ -450,7 +450,7 @@ export class HandshakeMessage implements Message {
       throw new Error('invalid values');
     }
 
-    return new HandshakeMessage(bufferToInt(values[0]), values[1], new BN(values[2]), bufferToInt(values[3]), bufferToInt(values[4]), values.length > 0 ? BitArray.fromValuesArray(values[5]) : undefined, values.length > 0 ? BitArray.fromValuesArray(values[6]) : undefined);
+    return new HandshakeMessage(bufferToInt(values[0]), values[1], new BN(values[2]), bufferToInt(values[3]), bufferToInt(values[4]), values[5].length > 0 ? BitArray.fromValuesArray(values[5]) : undefined, values[6].length > 0 ? BitArray.fromValuesArray(values[6]) : undefined);
   }
 
   raw() {

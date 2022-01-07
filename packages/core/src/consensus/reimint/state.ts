@@ -1045,8 +1045,8 @@ export class StateMachine {
       height: this.height,
       round: this.round,
       step: this.step,
-      prevotes: this.votes?.prevotes(this.round)!.votesBitArray,
-      precommits: this.votes?.precommits(this.round)!.votesBitArray
+      prevotes: this.votes?.prevotes(this.round)?.votesBitArray,
+      precommits: this.votes?.precommits(this.round)?.votesBitArray
     };
   }
 

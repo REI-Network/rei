@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
 import { Channel, FunctionalBufferSet, logger } from '@rei-network/utils';
 import { Peer, ProtocolHandler } from '@rei-network/network';
-import { RoundStepType, Proposal, BitArray, VoteType, VoteSet, MessageFactory, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint';
+import { RoundStepType, Proposal, Vote, BitArray, VoteType, VoteSet, MessageFactory, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint';
 import * as m from '../../consensus/reimint/messages';
 import { ConsensusProtocol } from './protocol';
 
@@ -177,8 +177,7 @@ export class ConsensusProtocolHander implements ProtocolHandler {
     const vote = this.pickRandom(votes);
     if (vote) {
       // logger.debug('ConsensusProtocolHander::gossipDataLoop, send vote(h,r,h,t):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, 'to:', this.peer.peerId);
-      this.send(new m.VoteMessage(vote));
-      this.setHasVote(vote.height, vote.round, vote.type, vote.index);
+      this.sendVote(vote);
       return true;
     }
     return false;
@@ -230,6 +229,15 @@ export class ConsensusProtocolHander implements ProtocolHandler {
     if (!this.isKnowEvidence(evidence)) {
       this.evidenceQueue.push(evidence);
     }
+  }
+
+  /**
+   * Send vote to remote peer immediately
+   * @param vote - Vote
+   */
+  sendVote(vote: Vote) {
+    this.send(new m.VoteMessage(vote));
+    this.setHasVote(vote.height, vote.round, vote.type, vote.index);
   }
 
   /**

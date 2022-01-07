@@ -283,7 +283,11 @@ export class StateMachine {
 
     this.votes.addVote(vote, peerId);
 
-    this.p2p.broadcastMessage(new HasVoteMessage(vote.height, vote.round, vote.type, vote.index), { exclude: [peerId] });
+    if (peerId === '' && this.signer && vote.validator().equals(this.signer.address())) {
+      this.p2p.broadcastVote(vote);
+    } else {
+      this.p2p.broadcastMessage(new HasVoteMessage(vote.height, vote.round, vote.type, vote.index), { exclude: [peerId] });
+    }
 
     switch (vote.type) {
       case VoteType.Prevote:

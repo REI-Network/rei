@@ -1,6 +1,6 @@
 import { Protocol, Peer } from '@rei-network/network';
 import { Node } from '../../node';
-import { Message } from '../../consensus/reimint/messages';
+import { Message, Vote } from '../../consensus/reimint';
 import { NetworkProtocol } from '../types';
 import { BaseProtocol } from '../baseProtocol';
 import { ConsensusProtocolHander } from './handler';
@@ -46,6 +46,16 @@ export class ConsensusProtocol extends BaseProtocol<ConsensusProtocolHander> imp
    */
   makeHandler(peer: Peer) {
     return new ConsensusProtocolHander(this, peer);
+  }
+
+  /**
+   * Broadcast vote to all remote peer
+   * @param vote - Vote
+   */
+  broadcastVote(vote: Vote) {
+    for (const handler of this.handlers) {
+      handler.sendVote(vote);
+    }
   }
 
   /**

@@ -5,6 +5,7 @@ import { SendMessageOptions } from '../../../protocols/consensus';
 import { StateMachineMsg } from '../stateMessages';
 import { Message } from '../messages';
 import { Evidence } from '../evpool';
+import { Vote } from '../vote';
 
 export interface ISigner {
   address(): Address;
@@ -47,6 +48,7 @@ export interface IStateMachineBackend {
 }
 
 export interface IStateMachineP2PBackend {
+  broadcastVote(vote: Vote): void;
   broadcastMessage(msg: Message, options: SendMessageOptions): void;
 }
 

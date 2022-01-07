@@ -93,11 +93,6 @@ export class StateMachine {
   }
 
   async msgLoop() {
-    // open WAL
-    await this.wal.open();
-    // replay from WAL files
-    await this.replay();
-    // message loop
     for await (const msg of this.msgQueue.generator()) {
       await this.lock.acquire();
       try {
@@ -119,8 +114,6 @@ export class StateMachine {
         this.lock.release();
       }
     }
-    // close WAL
-    await this.wal.close();
   }
 
   private async handleMsg(mi: StateMachineMessage) {
@@ -925,11 +918,17 @@ export class StateMachine {
     return !!this.msgLoopPromise;
   }
 
+  async init() {
+    // open WAL
+    await this.wal.open();
+    // replay from WAL files
+    await this.replay();
+  }
+
   start() {
-    if (this.msgLoopPromise) {
-      throw new Error('msg loop has started');
+    if (!this.msgLoopPromise) {
+      this.msgLoopPromise = this.msgLoop();
     }
-    this.msgLoopPromise = this.msgLoop();
   }
 
   async abort() {

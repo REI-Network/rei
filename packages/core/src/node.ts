@@ -153,13 +153,13 @@ export class Node extends Initializer {
       await this.getEngine(this.latestBlock._common).generateGenesis();
     }
 
-    await this.networkdb.open();
-    await this.networkMngr.init();
     await this.txPool.init(this.latestBlock);
     await this.reimint.init();
     await this.clique.init();
     await this.bloomBitsIndexer.init();
     await this.bcMonitor.init(this.latestBlock.header);
+    await this.networkdb.open();
+    await this.networkMngr.init();
     this.initOver();
   }
 

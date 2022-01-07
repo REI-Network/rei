@@ -85,12 +85,16 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   /**
    * {@link ConsensusEngine.init}
    */
-  init() {
-    return this.evpool.init(this.node.getLatestBlock().header.number);
+  async init() {
+    const block = this.node.getLatestBlock();
+    await this.evpool.init(block.header.number);
+    await this._tryToMintNextBlock(block);
+    await this.state.init();
   }
 
   protected _start() {
     logger.debug('ReimintConsensusEngine::start');
+    this.state.start();
   }
 
   protected async _abort() {
@@ -121,9 +125,6 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     const sm = this.getStakeManager(vm, block, nextCommon);
     const valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm);
 
-    if (!this.state.isStarted) {
-      this.state.start();
-    }
     await this.state.newBlockHeader(header, valSet, pendingBlock);
   }
 

@@ -1172,7 +1172,7 @@ export class StateMachine {
   }
 
   /**
-   * Pre validator proposal
+   * Pre validate proposal
    * @param proposal - Proposal
    * @returns Is the proposal valid
    */

@@ -192,7 +192,8 @@ export class ConsensusProtocolHander implements ProtocolHandler {
       throw new Error('repeated handshake');
     }
     const status = this.protocol.node.status;
-    this.send(new m.HandshakeMessage(status.networkId, status.genesisHash));
+    const { height, round, step, prevotes, precommits } = this.reimint.state.getHandshakeInfo();
+    this.send(new m.HandshakeMessage(status.networkId, status.genesisHash, height, round, step, prevotes, precommits));
     this.handshakeTimeout = setTimeout(() => {
       this.handshakeTimeout = undefined;
       if (this.handshakeResolve) {
@@ -293,6 +294,15 @@ export class ConsensusProtocolHander implements ProtocolHandler {
       if (this.handshakeTimeout) {
         clearTimeout(this.handshakeTimeout);
         this.handshakeTimeout = undefined;
+      }
+
+      if (result) {
+        // save remote round state and votes info
+        this.height = msg.height.clone();
+        this.round = msg.round;
+        this.step = msg.step;
+        this.prevotes = msg.prevotes;
+        this.precommits = msg.precommits;
       }
     }
   }

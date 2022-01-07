@@ -426,24 +426,35 @@ export class DuplicateVoteEvidenceMessage implements Message {
 export class HandshakeMessage implements Message {
   readonly networkId: number;
   readonly genesisHash: Buffer;
+  readonly height: BN;
+  readonly round: number;
+  readonly step: RoundStepType;
+  readonly prevotes: BitArray;
+  readonly precommits: BitArray;
 
-  constructor(networkId: number, genesisHash: Buffer) {
+  constructor(networkId: number, genesisHash: Buffer, height: BN, round: number, step: RoundStepType, prevotes: BitArray, precommits: BitArray) {
     this.networkId = networkId;
     this.genesisHash = genesisHash;
+    this.height = height.clone();
+    this.round = round;
+    this.step = step;
+    this.prevotes = prevotes;
+    this.precommits = precommits;
+    this.validateBasic();
   }
 
   static readonly code = 11;
 
-  static fromValuesArray(values: Buffer[]) {
-    if (values.length !== 2) {
+  static fromValuesArray(values: any[]) {
+    if (values.length !== 7) {
       throw new Error('invalid values');
     }
 
-    return new HandshakeMessage(bufferToInt(values[0]), values[1]);
+    return new HandshakeMessage(bufferToInt(values[0]), values[1], new BN(values[2]), bufferToInt(values[3]), bufferToInt(values[4]), BitArray.fromValuesArray(values[5]), BitArray.fromValuesArray(values[6]));
   }
 
   raw() {
-    return [intToBuffer(this.networkId), this.genesisHash];
+    return [intToBuffer(this.networkId), this.genesisHash, bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.step), this.prevotes.raw(), this.precommits.raw()];
   }
 
   serialize(): Buffer {
@@ -451,6 +462,8 @@ export class HandshakeMessage implements Message {
   }
 
   validateBasic(): void {
-    // do nothing
+    v.validateHeight(this.height);
+    v.validateRound(this.round);
+    v.validateStep(this.step);
   }
 }

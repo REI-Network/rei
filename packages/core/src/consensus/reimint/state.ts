@@ -1037,6 +1037,20 @@ export class StateMachine {
   }
 
   /**
+   * Get handshake info
+   * @returns Handshake info
+   */
+  getHandshakeInfo() {
+    return {
+      height: this.height,
+      round: this.round,
+      step: this.step,
+      prevotes: this.votes.prevotes(this.round)!.votesBitArray,
+      precommits: this.votes.precommits(this.round)!.votesBitArray
+    };
+  }
+
+  /**
    * Mark target hash as maj23
    * @param height - Height
    * @param round - Round

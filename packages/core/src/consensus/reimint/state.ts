@@ -989,6 +989,7 @@ export class StateMachine {
       this.votes = new HeightVoteSet(this.chainId, this.height, this.validators);
       this.commitRound = -1;
       this.triggeredTimeoutPrecommit = false;
+      this.msgQueue.clear();
 
       this.newStep();
 

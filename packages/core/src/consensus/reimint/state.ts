@@ -135,7 +135,7 @@ export class StateMachine {
       logger.debug('StateMachine::handleTimeout, ignoring tock because we are ahead(h,r,s):', ti.height.toString(), ti.round, ti.step, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
-    // logger.debug('StateMachine::handleTimeout, timeout info:', ti);
+    logger.debug('StateMachine::handleTimeout, timeout info:', ti.height.toString(), ti.round, ti.step);
 
     switch (ti.step) {
       case RoundStepType.NewHeight:
@@ -165,6 +165,7 @@ export class StateMachine {
     const requestProposalBlock = () => {
       if (this.proposalBlock === undefined && peerId !== '') {
         this.p2p.broadcastMessage(new GetProposalBlockMessage(proposal.hash), { to: peerId });
+        logger.debug('StateMachine::setProposal, request proposal block to', peerId);
       }
     };
 
@@ -243,6 +244,7 @@ export class StateMachine {
       throw new Error('invalid proposal block');
     }
 
+    logger.debug('StateMachine::addProposalBlock');
     this.proposalBlock = block;
     this.proposalEvidence = evidence;
 
@@ -267,17 +269,17 @@ export class StateMachine {
   }
 
   private async addVote(vote: Vote, peerId: string) {
-    // logger.debug('StateMachine::addVote, vote(h,r,h,t):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, 'from:', peerId);
-
     if (!vote.height.eq(this.height)) {
       logger.debug('StateMachine::addVote, unequal height, ignore, height:', vote.height.toString(), 'local:', this.height.toString());
       return;
     }
 
     this.votes.addVote(vote, peerId);
+    logger.debug('StateMachine::addVote, vote(h,r,h,t,v):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, vote.validator().toString(), 'from:', peerId);
 
     if (peerId === '' && this.signer && vote.validator().equals(this.signer.address())) {
       this.p2p.broadcastVote(vote);
+      logger.debug('StateMachine::addVote, broadcastVote');
     } else {
       this.p2p.broadcastMessage(new HasVoteMessage(vote.height, vote.round, vote.type, vote.index), { exclude: [peerId] });
     }
@@ -386,12 +388,12 @@ export class StateMachine {
   }
 
   private async enterNewRound(height: BN, round: number) {
-    // logger.debug('StateMachine::enterNewRound, height:', height.toString(), 'round:', round);
-
     if (!this.height.eq(height) || round < this.round || (this.round === round && this.step !== RoundStepType.NewHeight)) {
       // logger.debug('StateMachine::enterNewRound, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
+
+    logger.debug('StateMachine::enterNewRound, height:', height.toString(), 'round:', round);
 
     let validators = this.validators;
     if (this.round < round) {
@@ -437,6 +439,8 @@ export class StateMachine {
     if (typeof maxEvidenceCount !== 'number') {
       throw new Error('invalid maxEvidenceCount');
     }
+
+    logger.debug('StateMachine::createBlockAndProposal');
 
     // save all parameters, because the parameters may change
     const round = this.round;
@@ -526,12 +530,12 @@ export class StateMachine {
   }
 
   private async enterPropose(height: BN, round: number) {
-    // logger.debug('StateMachine::enterPropose, height:', height.toString(), 'round:', round);
-
     if (!this.height.eq(height) || round < this.round || (this.round === round && RoundStepType.Propose <= this.step)) {
       // logger.debug('StateMachine::enterPropose, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
+
+    logger.debug('StateMachine::enterPropose, height:', height.toString(), 'round:', round);
 
     const update = async () => {
       this.round = round;
@@ -560,12 +564,12 @@ export class StateMachine {
   }
 
   private async enterPrevote(height: BN, round: number) {
-    // logger.debug('StateMachine::enterPrevote, height:', height.toString(), 'round:', round);
-
     if (!this.height.eq(height) || round < this.round || (this.round === round && RoundStepType.Prevote <= this.step)) {
       // logger.debug('StateMachine::enterPrevote, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
+
+    logger.debug('StateMachine::enterPrevote, height:', height.toString(), 'round:', round);
 
     const update = () => {
       this.round = round;
@@ -583,6 +587,9 @@ export class StateMachine {
       return update();
     }
 
+    logger.debug('StateMachine::enterPrevote, pre process block start, height:', height.toString(), 'round:', round);
+    const startAt = Date.now();
+
     let validateResult = false;
     try {
       preValidateHeader.call(this.proposalBlock.header, this.parent);
@@ -597,6 +604,8 @@ export class StateMachine {
       }
     }
 
+    logger.debug('StateMachine::enterPrevote, pre process block over, height:', height.toString(), 'round:', round, 'usage:', Date.now() - startAt);
+
     if (validateResult) {
       this.signVote(VoteType.Prevote, this.proposalBlock.hash());
     } else {
@@ -606,8 +615,6 @@ export class StateMachine {
   }
 
   private enterPrevoteWait(height: BN, round: number) {
-    // logger.debug('StateMachine::enterPrevoteWait, height:', height.toString(), 'round:', round);
-
     if (!this.height.eq(height) || round < this.round || (this.round === round && RoundStepType.PrevoteWait <= this.step)) {
       // logger.debug('StateMachine::enterPrevoteWait, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
@@ -616,6 +623,8 @@ export class StateMachine {
     if (!this.votes.prevotes(round)?.hasTwoThirdsAny()) {
       throw new Error("enterPrevoteWait doesn't have any +2/3 votes");
     }
+
+    logger.debug('StateMachine::enterPrevoteWait, height:', height.toString(), 'round:', round);
 
     const update = () => {
       this.round = round;
@@ -628,12 +637,12 @@ export class StateMachine {
   }
 
   private enterPrecommit(height: BN, round: number) {
-    // logger.debug('StateMachine::enterPrecommit, height:', height.toString(), 'round:', round);
-
     if (!this.height.eq(height) || round < this.round || (this.round === round && RoundStepType.Precommit <= this.step)) {
       // logger.debug('StateMachine::enterPrecommit, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
+
+    logger.debug('StateMachine::enterPrecommit, height:', height.toString(), 'round:', round);
 
     const update = () => {
       this.round = round;
@@ -706,12 +715,12 @@ export class StateMachine {
   }
 
   private enterPrecommitWait(height: BN, round: number) {
-    // logger.debug('StateMachine::enterPrecommitWait, height:', height.toString(), 'round:', round);
-
     if (!this.height.eq(height) || round < this.round || (this.round === round && this.triggeredTimeoutPrecommit)) {
       // logger.debug('StateMachine::enterPrecommitWait, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
+
+    logger.debug('StateMachine::enterPrecommitWait, height:', height.toString(), 'round:', round);
 
     if (!this.votes.precommits(round)?.hasTwoThirdsAny()) {
       throw new Error("enterPrecommitWait doesn't have any +2/3 votes");
@@ -727,12 +736,12 @@ export class StateMachine {
   }
 
   private async enterCommit(height: BN, commitRound: number) {
-    // logger.debug('StateMachine::enterCommit, height:', height.toString(), 'commitRound:', commitRound);
-
     if (!this.height.eq(height) || RoundStepType.Commit <= this.step) {
       // logger.debug('StateMachine::enterCommit, invalid args(h,r):', height.toString(), commitRound, 'local(h,r,s):', this.height.toString(), this.round, this.step);
       return;
     }
+
+    logger.debug('StateMachine::enterCommit, height:', height.toString(), 'commitRound:', commitRound);
 
     const update = async () => {
       this.step = RoundStepType.Commit;
@@ -769,7 +778,7 @@ export class StateMachine {
   }
 
   private async finalizeCommit(height: BN) {
-    // logger.debug('StateMachine::tryFinalizeCommit, height:', height.toString());
+    logger.debug('StateMachine::tryFinalizeCommit, height:', height.toString());
 
     if (!this.height.eq(height) || this.step !== RoundStepType.Commit) {
       throw new Error('finalizeCommit invalid args');

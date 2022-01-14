@@ -236,8 +236,9 @@ export class ConsensusProtocolHander implements ProtocolHandler {
    * @param vote - Vote
    */
   sendVote(vote: Vote) {
-    this.send(new m.VoteMessage(vote));
-    this.setHasVote(vote.height, vote.round, vote.type, vote.index);
+    if (this.setHasVote(vote.height, vote.round, vote.type, vote.index)) {
+      this.send(new m.VoteMessage(vote));
+    }
   }
 
   /**
@@ -406,7 +407,7 @@ export class ConsensusProtocolHander implements ProtocolHandler {
   }
 
   private setHasVote(height: BN, round: number, type: VoteType, index: number) {
-    this.getVoteBitArray(height, round, type)?.setIndex(index, true);
+    return !!this.getVoteBitArray(height, round, type)?.setIndex(index, true);
   }
 
   private setHasProposal(proposal: Proposal) {

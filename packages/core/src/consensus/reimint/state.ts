@@ -1195,7 +1195,12 @@ export class StateMachine {
    * @returns Is the vote valid
    */
   preValidateVote(vote: Vote) {
-    return !!this.votes.getVoteSet(vote.round, vote.type)?.preValidate(vote);
+    const votes = this.votes.getVoteSet(vote.round, vote.type);
+    if (votes) {
+      return votes.preValidate(vote);
+    } else {
+      return vote.height.eq(this.height);
+    }
   }
 
   /**

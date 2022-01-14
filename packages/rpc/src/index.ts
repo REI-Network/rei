@@ -1,5 +1,6 @@
 import util from 'util';
 import http from 'http';
+import net from 'net';
 import express from 'express';
 import expressws from 'express-ws';
 import bodyParse from 'body-parser';
@@ -38,6 +39,7 @@ export class RpcServer {
   readonly filterSystem: FilterSystem;
   readonly oracle: SimpleOracle;
 
+  private readonly sockets = new Set<net.Socket>();
   private readonly port: number;
   private readonly host: string;
   private readonly controllers: { [name: string]: any }[];
@@ -166,6 +168,12 @@ export class RpcServer {
           this.server!.on('error', (err) => {
             logger.error('RpcServer, error:', err);
           });
+          this.server!.on('connection', (socket) => {
+            this.sockets.add(socket);
+            socket.on('close', () => {
+              this.sockets.delete(socket);
+            });
+          });
 
           // start loop
           this.reqPromise = this.reqLoop();
@@ -190,6 +198,7 @@ export class RpcServer {
       return;
     }
 
+    this.sockets.forEach((socket) => socket.destroy());
     await new Promise<void>((resovle) => {
       this.server!.close((err) => {
         if (err) {

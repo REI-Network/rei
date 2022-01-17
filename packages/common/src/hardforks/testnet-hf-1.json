@@ -24,7 +24,7 @@
         },
         "dailyFee": {
             "v": "0xde0b6b3a7640000",
-            "d": "daily fee amount"
+            "d": "daily fee amount(1 REI)"
         },
         "minerRewardFactor": {
             "v": 90,

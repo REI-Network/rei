@@ -63,7 +63,7 @@ export function isEnableFreeStaking(common: Common) {
   } else if (common.chainName() === 'rei-mainnet') {
     return false;
   } else if (common.chainName() === 'rei-devnet') {
-    return false;
+    return true;
   } else {
     throw new Error('unknown chain');
   }

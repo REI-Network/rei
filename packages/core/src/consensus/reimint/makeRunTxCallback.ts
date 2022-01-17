@@ -27,8 +27,8 @@ export function makeRunTxCallback(systemCaller: Address, feeAddr: Address, times
 
     // update caller's nonce
     fromAccount.nonce.iaddn(1);
-    // reduce caller balance
-    fromAccount.balance.isub(tx.value);
+    // don't reduce caller balance
+    // fromAccount.balance.isub(tx.value);
     await state.putAccount(caller, fromAccount);
   };
 

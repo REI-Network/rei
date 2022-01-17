@@ -19,6 +19,12 @@ import { ExtraData } from './extraData';
 import { ReimintConsensusEngine } from './engine';
 import { makeRunTxCallback } from './makeRunTxCallback';
 
+/**
+ * Calculate accumulative fee usage
+ * and accumulative balance usage from receipte
+ * @param receipts - Receipts
+ * @returns Fee and balance usage
+ */
 function calcAccUsage(receipts: Receipt[]) {
   const accFeeUsage = new BN(0);
   const accBalUsage = new BN(0);
@@ -55,7 +61,7 @@ export class ReimintExecutor implements Executor {
    * Assign block reward to miner,
    * in Reimint consensus,
    * it will first assign all block rewards to the system caller,
-   * then the system caller will call `Router.assignBlockReward`
+   * then the system caller will call `StakeManager.reward`
    * to assign block reward to real miner
    * @param state - State manger instance
    * @param systemCaller - System caller address
@@ -73,13 +79,13 @@ export class ReimintExecutor implements Executor {
    * @param receipts - Transaction receipts
    * @param miner - Miner address
    * @param totalReward - Total block reward
-   *                      totalReward = common.param('pow', 'minerReward') + accBalUsage + etc(if some one transfer REI to system caller address)
+   *                      totalReward = common.param('pow', 'minerRewardFactor') + accBalUsage + etc(if some one transfer REI to system caller address)
    * @param parentValidatorSet - Validator set loaded from parent state trie
    * @param parentStakeManager - Stake manager contract instance
    *                             (used to load totalLockedAmount and validatorCount and validatorSet if need)
    * @param parentFeePool - Fee pool contract instance
-   * @param accFeeUsage - The amount of usage of the accumulated fee
-   * @param accBalUsage - The amount used of the accumulated balance
+   * @param accFeeUsage - Accumulative fee usage
+   * @param accBalUsage - Accumulative balance usage
    * @returns New validator set
    */
   async afterApply(vm: VM, pendingBlock: Block, receipts: Receipt[], evidence: Evidence[], miner: Address, totalReward: BN, parentValidatorSet: ValidatorSet, parentStakeManager: StakeManager, parentFeePool?: FeePool) {
@@ -106,7 +112,7 @@ export class ReimintExecutor implements Executor {
 
       /**
        * If free staking is enable,
-       * minerReward = (totalReward - accBalUsage) * common.param('vm', 'minerFactor') / 100
+       * minerReward = (totalReward - accBalUsage) * common.param('vm', 'minerRewardFactor') / 100
        * feePoolReward = totalReward - minerReward
        */
       minerReward = totalBlockReward.muln(minerFactor).divn(100);

@@ -10,7 +10,7 @@ import { StateManager } from '../../stateManager';
 import { validateTx } from '../../validation';
 import { encode } from './contracts';
 
-const usageTopic = toBuffer('0x873c82cd');
+const usageTopic = toBuffer('0x873c82cd37aaacdcf736cbb6beefc8da36d474b65ad23aaa1b1c6fbd875f7076');
 
 export function makeRunTxCallback(systemCaller: Address, feeAddr: Address, timestamp: number, totalAmount: BN) {
   let feeLeft!: BN;

@@ -198,16 +198,37 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     return new StakeManager(evm, common ?? block._common);
   }
 
+  /**
+   * Get fee contract object
+   * @param vm - Target vm instance
+   * @param block - Target block
+   * @param common - Common instance
+   * @returns Fee contract object
+   */
   getFee(vm: VM, block: Block, common?: Common) {
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
     return new Fee(evm, common ?? block._common);
   }
 
+  /**
+   * Get fee pool contract object
+   * @param vm - Target vm instance
+   * @param block - Target block
+   * @param common - Common instance
+   * @returns Fee pool contract object
+   */
   getFeePool(vm: VM, block: Block, common?: Common) {
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
     return new FeePool(evm, common ?? block._common);
   }
 
+  /**
+   * Read total amount in fee contract
+   * @param root - Target state root
+   * @param block - Target block
+   * @param common - Common instance
+   * @returns Total amount
+   */
   async getTotalAmount(root: Buffer, block: Block, common?: Common) {
     common = common ?? block._common;
     const vm = await this.node.getVM(root, common);

@@ -14,6 +14,13 @@ export class FeePool extends Contract {
     super(evm, common, methods, Address.fromString(common.param('vm', 'fpaddr')));
   }
 
+  /**
+   * Distribute block reward
+   * @param validator - Miner address
+   * @param amount - Shares earned by miner
+   * @param value - Fee pool reward(Block reward * (1 - minerRewardFactor)) + Tx fee
+   * @returns
+   */
   distribute(validator: Address, amount: BN, value: BN) {
     return this.runWithLogger(async () => {
       const { logs } = await this.executeMessage(this.makeSystemCallerMessage('distribute', ['address', 'uint256'], [validator.toString(), amount.toString()], value));

@@ -1,4 +1,4 @@
-import { Account, AccountData, BN, rlp, KECCAK256_RLP, KECCAK256_NULL, toBuffer, BNLike, BufferLike, bnToUnpaddedBuffer } from 'ethereumjs-util';
+import { Account, AccountData, BN, rlp, KECCAK256_RLP, KECCAK256_NULL, toBuffer, bnToUnpaddedBuffer } from 'ethereumjs-util';
 import { StakeInfo, StakeInfoData } from './stakeInfo';
 
 export interface StakingAccountData extends AccountData {

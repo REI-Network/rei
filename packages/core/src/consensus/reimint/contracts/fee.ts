@@ -18,6 +18,12 @@ const events = {
 };
 
 export class Fee extends Contract {
+  /**
+   * Filter receipts and collect fee contract logs
+   * @param receipts - Receipts
+   * @param common - Common instance
+   * @returns Account changes
+   */
   static filterReceipts(receipts: Receipt[], common: Common) {
     const map = new FunctionalAddressMap<BN>();
     const faddr = Address.fromString(common.param('vm', 'faddr'));
@@ -58,6 +64,10 @@ export class Fee extends Contract {
     super(evm, common, methods, Address.fromString(common.param('vm', 'faddr')));
   }
 
+  /**
+   * Read total amount from state trie
+   * @returns Total amount
+   */
   totalAmount() {
     return this.runWithLogger(async () => {
       const { returnValue } = await this.executeMessage(this.makeCallMessage('totalAmount', [], []));

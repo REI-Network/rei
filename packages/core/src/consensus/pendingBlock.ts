@@ -6,7 +6,9 @@ import { logger } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { PendingTxMap } from '../txpool';
 import { EMPTY_ADDRESS, EMPTY_NONCE, EMPTY_MIX_HASH, EMPTY_EXTRA_DATA } from '../utils';
+import { isEnableFreeStaking } from '../hardforks';
 import { ConsensusEngine, FinalizeOpts, ProcessTxResult } from './types';
+import { ReimintConsensusEngine } from './reimint/engine';
 
 export interface PendingBlockFinalizeOpts extends Pick<FinalizeOpts, 'round' | 'evidence'> {}
 
@@ -40,6 +42,8 @@ export class PendingBlock {
   private finalizedStateRoot?: Buffer;
 
   private stopped: boolean = false;
+
+  private totalAmount?: BN;
 
   constructor(engine: ConsensusEngine, parentHash: Buffer, parentStateRoot: Buffer, number: BN, timestamp: BN, common: Common, extraData?: Buffer) {
     if (extraData && extraData.length !== 32) {
@@ -172,6 +176,13 @@ export class PendingBlock {
       const pendingBlock = this.engine.generatePendingBlock(this.toHeaderData(), this._common);
       const gasLimit = pendingBlock.header.gasLimit;
 
+      // if free staking is enable, initialize variables
+      if (isEnableFreeStaking(this._common)) {
+        if (this.totalAmount === undefined) {
+          this.totalAmount = await (this.engine as ReimintConsensusEngine).getTotalAmount(this._parentStateRoot, pendingBlock, this._common);
+        }
+      }
+
       let tx = txs.peek();
       while (tx) {
         try {
@@ -182,7 +193,8 @@ export class PendingBlock {
               tx,
               root: this.latestStateRoot ?? this._parentStateRoot,
               block: pendingBlock,
-              blockGasUsed: this.gasUsed
+              blockGasUsed: this.gasUsed,
+              totalAmount: this.totalAmount
             });
           } catch (err) {
             txs.pop();

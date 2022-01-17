@@ -5,18 +5,18 @@ import { BaseTrie, SecureTrie as Trie } from 'merkle-patricia-tree';
 import VM from '@gxchain2-ethereumjs/vm';
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
-import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Block, HeaderData, BlockHeader, Transaction, Receipt } from '@rei-network/structure';
 import { Common, getGenesisState } from '@rei-network/common';
 import { logger, ignoreError } from '@rei-network/utils';
 import { Node } from '../../node';
+import { StateManager } from '../../stateManager';
 import { ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
 import { getConsensusTypeByCommon } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
-import { StakeManager, Contract } from './contracts';
+import { StakeManager, Contract, Fee, FeePool } from './contracts';
 import { StateMachine } from './state';
 import { Evidence, EvidencePool, EvidenceDatabase } from './evpool';
 import { Reimint } from './reimint';
@@ -173,7 +173,11 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     // deploy system contracts
     const vm = await this.node.getVM(root, common);
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
-    await Contract.deploy(evm, common);
+    if (common.chainName() === 'rei-devnet') {
+      await Contract.deployGenesisContracts_devnet(evm, common);
+    } else {
+      await Contract.deployGenesisContracts(evm, common);
+    }
     root = await vm.stateManager.getStateRoot();
 
     if (!root.equals(genesisBlock.header.stateRoot)) {
@@ -192,6 +196,23 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   getStakeManager(vm: VM, block: Block, common?: Common) {
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
     return new StakeManager(evm, common ?? block._common);
+  }
+
+  getFee(vm: VM, block: Block, common?: Common) {
+    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
+    return new Fee(evm, common ?? block._common);
+  }
+
+  getFeePool(vm: VM, block: Block, common?: Common) {
+    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
+    return new FeePool(evm, common ?? block._common);
+  }
+
+  async getTotalAmount(root: Buffer, block: Block, common?: Common) {
+    common = common ?? block._common;
+    const vm = await this.node.getVM(root, common);
+    const fee = this.getFee(vm, block, common);
+    return await fee.totalAmount();
   }
 
   /**

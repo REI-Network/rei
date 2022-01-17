@@ -121,6 +121,14 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
+     * Only system caller or fee pool can call those functions
+     */
+    modifier onlySystemCallerOrFeePool() {
+        require(msg.sender == config.systemCaller() || msg.sender == config.feePool(), "Only: only system caller or fee pool");
+        _;
+    }
+
+    /**
      * Get the indexed validators length.
      */
     function indexedValidatorsLength() external view override returns (uint256) {
@@ -453,10 +461,10 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     }
 
     /**
-     * Reward validator, only can be called by system caller
+     * Reward validator, only can be called by system caller or fee pool
      * @param validator         Validator address
      */
-    function reward(address validator) external payable override nonReentrant onlySystemCaller {
+    function reward(address validator) external payable override nonReentrant onlySystemCallerOrFeePool {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint256 commissionReward = msg.value.mul(v.commissionRate).div(100);

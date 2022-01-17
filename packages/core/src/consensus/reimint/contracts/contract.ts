@@ -20,39 +20,104 @@ export abstract class Contract {
     this.address = address;
   }
 
-  static async deploy(evm: EVM, common: Common) {
+  /**
+   * Deploy genesis contracts for mainnet and testnet
+   * @param evm - EVM instance
+   * @param common - Common instance
+   */
+  static async deployGenesisContracts(evm: EVM, common: Common) {
     const genesisValidators = ActiveValidatorSet.genesis(common);
     const activeValidators = genesisValidators.activeValidators();
     const activeSigners = activeValidators.map(({ validator }) => validator.toString());
     const priorities = activeValidators.map(({ priority }) => priority.toString());
-
-    let cfgaddr!: string;
-    const deploy = (prefix: string, args?: { types: string[]; values: any[] }) => {
-      const code = hexStringToBuffer(common.param('vm', `${prefix}code`));
-      const address = Address.fromString(common.param('vm', `${prefix}addr`));
-      if (prefix === 'cfg') {
-        cfgaddr = address.toString();
-      }
-      return Contract.executeMessage(
-        evm,
-        new Message({
-          contractAddress: address,
-          to: address,
-          gasLimit: MAX_INTEGER,
-          data: args ? Buffer.concat([code, encode(args.types, args.values)]) : code
-        })
-      );
-    };
+    const cfgaddr = common.param('vm', 'cfgaddr');
 
     // deploy config contract
-    await deploy('cfg');
+    await Contract.deployContract(evm, common, 'cfg');
     // deploy stake manager contract
-    await deploy('sm', { types: ['address', 'address', 'address[]', 'int256[]'], values: [cfgaddr, genesisValidators.proposer.toString(), activeSigners, priorities] });
+    await Contract.deployContract(evm, common, 'sm', { types: ['address', 'address', 'address[]', 'int256[]'], values: [cfgaddr, genesisValidators.proposer.toString(), activeSigners, priorities] });
+
     const defaultArgs = { types: ['address'], values: [cfgaddr] };
     // deploy unstake pool contract
-    await deploy('up', defaultArgs);
+    await Contract.deployContract(evm, common, 'up', defaultArgs);
     // deploy validator reward pool contract
-    await deploy('vrp', defaultArgs);
+    await Contract.deployContract(evm, common, 'vrp', defaultArgs);
+  }
+
+  /**
+   * Deploy genesis contracts for devnet
+   * NOTE: devnet contains all contracts in genesis,
+   *       but mainnet and testnet will collect all contracts through hard forks
+   * @param evm - EVM instance
+   * @param common - Common instance
+   */
+  static async deployGenesisContracts_devnet(evm: EVM, common: Common) {
+    const genesisValidators = ActiveValidatorSet.genesis(common);
+    const activeValidators = genesisValidators.activeValidators();
+    const activeSigners = activeValidators.map(({ validator }) => validator.toString());
+    const priorities = activeValidators.map(({ priority }) => priority.toString());
+    const cfgaddr = common.param('vm', 'cfgaddr');
+
+    // deploy config contract
+    await Contract.deployContract(evm, common, 'cfg');
+    // deploy stake manager contract
+    await Contract.deployContract(evm, common, 'sm', { types: ['address', 'address', 'address[]', 'int256[]'], values: [cfgaddr, genesisValidators.proposer.toString(), activeSigners, priorities] });
+
+    const defaultArgs = { types: ['address'], values: [cfgaddr] };
+    // deploy unstake pool contract
+    await Contract.deployContract(evm, common, 'up', defaultArgs);
+    // deploy validator reward pool contract
+    await Contract.deployContract(evm, common, 'vrp', defaultArgs);
+    // deploy fee contract
+    await Contract.deployContract(evm, common, 'f', defaultArgs);
+    // deploy fee pool contract
+    await Contract.deployContract(evm, common, 'fp', defaultArgs);
+  }
+
+  /**
+   * Deploy free staking contracts for mainnet and testnet
+   * @param evm - EVM instance
+   * @param common - Common instance
+   */
+  static async deployFreeStakingContracts(evm: EVM, common: Common) {
+    // deploy config contract
+    await Contract.deployContract(evm, common, 'cfg', undefined, true);
+    // deploy stake manager contract
+    await Contract.deployContract(evm, common, 'sm');
+
+    const cfgaddr = common.param('vm', 'cfgaddr');
+    const defaultArgs = { types: ['address'], values: [cfgaddr] };
+    // deploy fee contract
+    await Contract.deployContract(evm, common, 'f', defaultArgs);
+    // deploy fee pool contract
+    await Contract.deployContract(evm, common, 'fp', defaultArgs);
+  }
+
+  /**
+   * Deploy contract to target address
+   * @param evm - EVM instance
+   * @param common - Common instance
+   * @param prefix - Contract prefix name
+   * @param args - Contract constructor args
+   * @param clearup - Clear up contract storage before deploy
+   */
+  private static async deployContract(evm: EVM, common: Common, prefix: string, args?: { types: string[]; values: any[] }, clearup?: boolean) {
+    const code = hexStringToBuffer(common.param('vm', `${prefix}code`));
+    const address = Address.fromString(common.param('vm', `${prefix}addr`));
+
+    if (clearup) {
+      await evm._state.clearContractStorage(address);
+    }
+
+    return await Contract.executeMessage(
+      evm,
+      new Message({
+        contractAddress: address,
+        to: address,
+        gasLimit: MAX_INTEGER,
+        data: args ? Buffer.concat([code, encode(args.types, args.values)]) : code
+      })
+    );
   }
 
   private static async executeMessage(evm: EVM, message: Message) {

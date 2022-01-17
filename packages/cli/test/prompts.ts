@@ -81,7 +81,9 @@ const handler: {
   lsaccount: async (node: Node, address: string) => {
     const block = node.getLatestBlock();
     const acc = await (await node.getStateManager(block.header.stateRoot, block._common)).getAccount(Address.fromString(address));
-    logger.info('balance', acc.balance.toString(), 'nonce', acc.nonce.toString(), 'codeHash', acc.codeHash.toString('hex'));
+    console.log('balance:', acc.balance.toString(), 'nonce:', acc.nonce.toString(), 'codeHash:', acc.codeHash.toString('hex'), 'stateRoot:', acc.stateRoot.toString('hex'));
+    const stakeInfo = acc.getStakeInfo();
+    console.log('total:', stakeInfo.total.toString(), 'usage:', stakeInfo.usage.toString(), 'timestamp:', stakeInfo.timestamp, 'estimateUsage:', stakeInfo.estimateUsage(block.header.timestamp.toNumber()).toString());
   },
   lstxpool: async (node: Node) => {
     await node.txPool.ls();

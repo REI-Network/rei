@@ -32,7 +32,7 @@ export function getConsensusTypeByCommon(common: Common) {
 }
 
 /**
- * Check whether staking logic is enabled
+ * Check whether reimint logic is enabled
  * @param common - Common instance
  * @returns Enable if `true`
  */
@@ -43,6 +43,27 @@ export function isEnableRemint(common: Common) {
     return true;
   } else if (common.chainName() === 'rei-devnet') {
     return true;
+  } else {
+    throw new Error('unknown chain');
+  }
+}
+
+/**
+ * Check whether free staking logic is enabled
+ * @param common - Common instance
+ * @returns Enable if `true`
+ */
+export function isEnableFreeStaking(common: Common) {
+  if (common.chainName() === 'rei-testnet') {
+    if (common.gteHardfork('testnet-hf-1')) {
+      return true;
+    } else {
+      return false;
+    }
+  } else if (common.chainName() === 'rei-mainnet') {
+    return false;
+  } else if (common.chainName() === 'rei-devnet') {
+    return false;
   } else {
     throw new Error('unknown chain');
   }

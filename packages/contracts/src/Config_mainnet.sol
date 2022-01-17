@@ -26,8 +26,20 @@ contract Config is IConfig {
         return 0x0000000000000000000000000000000000001004;
     }
 
+    function fee() external view override returns (address) {
+        return 0x0000000000000000000000000000000000001005;
+    }
+
+    function feePool() external view override returns (address) {
+        return 0x0000000000000000000000000000000000001006;
+    }
+
     function unstakeDelay() external view override returns (uint256) {
         return 7 days;
+    }
+
+    function withdrawDelay() external view override returns (uint256) {
+        return 3 days;
     }
 
     function minIndexVotingPower() external view override returns (uint256) {

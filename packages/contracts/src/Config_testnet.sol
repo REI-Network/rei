@@ -11,6 +11,7 @@ import "./DevConfig.sol";
 contract Config_testnet is DevConfig {
     constructor() public {
         ud = 7 days;
+        wd = 3 days;
         mivp = 100e18; // 100 REI
         scri = 1 days;
 

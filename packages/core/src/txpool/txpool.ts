@@ -3,15 +3,17 @@ import Semaphore from 'semaphore-async-await';
 import Heap from 'qheap';
 import { FunctionalBufferMap, FunctionalBufferSet, Aborter, logger, InitializerWithEventEmitter } from '@rei-network/utils';
 import { Transaction, WrappedTransaction, BlockHeader, Block } from '@rei-network/structure';
-import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Node } from '../node';
 import { getGasLimitByCommon } from '../utils';
+import { StateManager } from '../stateManager';
 import { TxSortedMap } from './txmap';
 import { PendingTxMap } from './pendingmap';
 import { TxPricedList } from './txpricedlist';
 import { Journal } from './journal';
 import { TxPoolAccount, TxPoolOptions } from './types';
 import { txSlots, checkTxIntrinsicGas } from './utils';
+import { isEnableFreeStaking } from '../hardforks';
+import { validateTx } from '../validation';
 
 const defaultTxMaxSize = 32768 * 4;
 const defaultPriceLimit = new BN(1);
@@ -62,6 +64,8 @@ export class TxPool extends InitializerWithEventEmitter {
   private lifetime: number;
   private timeoutInterval: number;
   private rejournalInterval: number;
+
+  private totalAmount?: BN;
 
   constructor(options: TxPoolOptions) {
     super();
@@ -270,7 +274,16 @@ export class TxPool extends InitializerWithEventEmitter {
           }
         }
         this.currentHeader = originalNewBlock.header;
-        this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, this.currentHeader._common);
+
+        if (isEnableFreeStaking(this.currentHeader._common)) {
+          const vm = await this.node.getVM(this.currentHeader.stateRoot, this.currentHeader._common);
+          this.totalAmount = await this.node.reimint.getFee(vm, originalNewBlock, this.currentHeader._common).totalAmount();
+          this.currentStateManager = vm.stateManager as StateManager;
+        } else {
+          this.totalAmount = undefined;
+          this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, this.currentHeader._common);
+        }
+
         const reinjectAccounts = new FunctionalBufferMap<TxPoolAccount>();
         const getAccount = (addr: Address) => {
           let account = reinjectAccounts.get(addr.buf);
@@ -499,13 +512,13 @@ export class TxPool extends InitializerWithEventEmitter {
       if (!this.locals.has(sender) && tx.gasPrice.lt(this.priceLimit)) {
         throw new Error(`gasPrice too low: ${tx.gasPrice.toString()} limit: ${this.priceLimit.toString()}`);
       }
-      const account = await this.currentStateManager.getAccount(senderAddr);
-      if (account.nonce.gt(tx.nonce)) {
-        throw new Error(`nonce too low: ${tx.nonce.toString()} account: ${account.nonce.toString()}`);
-      }
-      if (account.balance.lt(tx.getUpfrontCost())) {
-        throw new Error(`balance is not enough: ${tx.getUpfrontCost().toString()} account: ${account.balance.toString()}`);
-      }
+
+      // estimate next block's timestamp
+      const period: number = this.currentHeader._common.consensusConfig().period;
+      const currentTimestamp = this.currentHeader.timestamp.toNumber();
+
+      // validate transaction
+      await validateTx(tx as Transaction, currentTimestamp + period, this.currentStateManager, this.totalAmount);
 
       if (!checkTxIntrinsicGas(tx)) {
         throw new Error('checkTxIntrinsicGas failed');
@@ -555,9 +568,11 @@ export class TxPool extends InitializerWithEventEmitter {
       const forwards = queue.forward(accountInDB.nonce);
       this.removeTxFromGlobal(forwards);
       let dropsLength = 0;
-      const { removed: drops } = queue.filter(accountInDB.balance, this.currentHeader.gasLimit);
-      this.removeTxFromGlobal(drops);
-      dropsLength = drops.length;
+      if (!isEnableFreeStaking(this.currentHeader._common)) {
+        const { removed: drops } = queue.filter(accountInDB.balance, this.currentHeader.gasLimit);
+        this.removeTxFromGlobal(drops);
+        dropsLength = drops.length;
+      }
       const totalReadies = queue.ready(await account.getPendingNonce());
       for (const tx of totalReadies) {
         if (this.promoteTx(tx)) {
@@ -608,11 +623,13 @@ export class TxPool extends InitializerWithEventEmitter {
       const forwards = pending.forward(accountInDB.nonce);
       this.removeTxFromGlobal(forwards);
       let dropsLength = 0;
-      const { removed: drops, invalids } = pending.filter(accountInDB.balance, this.currentHeader.gasLimit);
-      this.removeTxFromGlobal(drops);
-      dropsLength = drops.length;
-      for (const tx of invalids) {
-        this.enqueueTx(tx);
+      if (!isEnableFreeStaking(this.currentHeader._common)) {
+        const { removed: drops, invalids } = pending.filter(accountInDB.balance, this.currentHeader.gasLimit);
+        this.removeTxFromGlobal(drops);
+        dropsLength = drops.length;
+        for (const tx of invalids) {
+          this.enqueueTx(tx);
+        }
       }
       // resize priced
       this.priced.removed(forwards.length + dropsLength);

@@ -82,6 +82,10 @@
     {
       "name": "testnet-chainstart",
       "block": 0
+    },
+    {
+      "name": "testnet-hf-1",
+      "block": 10
     }
   ],
   "bootstrapNodes": []

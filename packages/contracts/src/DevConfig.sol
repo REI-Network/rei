@@ -13,8 +13,11 @@ contract DevConfig is Ownable, IConfig {
     address internal c = 0x0000000000000000000000000000000000001002;
     address internal u = 0x0000000000000000000000000000000000001003;
     address internal v = 0x0000000000000000000000000000000000001004;
+    address internal f = 0x0000000000000000000000000000000000001005;
+    address internal fp = 0x0000000000000000000000000000000000001006;
 
     uint256 internal ud = 1 seconds;
+    uint256 internal wd = 1 seconds;
     uint256 internal mivp = 10000;
     uint256 internal scri = 5 seconds;
 
@@ -36,8 +39,20 @@ contract DevConfig is Ownable, IConfig {
         v = _v;
     }
 
+    function setFee(address _f) external onlyOwner {
+        f = _f;
+    }
+
+    function setFeePool(address _fp) external onlyOwner {
+        fp = _fp;
+    }
+
     function setUnstakeDelay(uint256 _ud) external onlyOwner {
         ud = _ud;
+    }
+
+    function setWithdrawDelay(uint256 _wd) external onlyOwner {
+        wd = _wd;
     }
 
     function setMinIndexVotingPower(uint256 _mivp) external onlyOwner {
@@ -66,8 +81,20 @@ contract DevConfig is Ownable, IConfig {
         return v;
     }
 
+    function fee() external view override returns (address) {
+        return f;
+    }
+
+    function feePool() external view override returns (address) {
+        return fp;
+    }
+
     function unstakeDelay() external view override returns (uint256) {
         return ud;
+    }
+
+    function withdrawDelay() external view override returns (uint256) {
+        return wd;
     }
 
     function minIndexVotingPower() external view override returns (uint256) {

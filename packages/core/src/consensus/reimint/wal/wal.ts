@@ -118,25 +118,23 @@ export class WAL {
    */
   async searchForLatestEndHeight() {
     const pendingReader = this.newReader();
-    let latestReader: WALReader | undefined;
-    let latestHeight: BN | undefined;
+    let reader = pendingReader.copy();
+    let height = new BN(0);
     try {
       let message: StateMachineMsg | undefined;
       while ((message = await pendingReader.read())) {
         if (message instanceof StateMachineEndHeight) {
-          latestHeight = message.height.clone();
-          latestReader = pendingReader.copy();
+          height = message.height.clone();
+          reader = pendingReader.copy();
         }
       }
 
       await pendingReader.close();
-      if (latestReader && latestHeight) {
-        return { reader: latestReader, height: latestHeight };
-      }
+      return { reader, height };
     } catch (err) {
       // ignore all errors
       await pendingReader.close();
-      latestReader && (await latestReader.close());
+      reader && (await reader.close());
     }
   }
 

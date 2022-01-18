@@ -15,7 +15,7 @@ import * as helper from './helper';
 
 const defaultPort = 11451;
 const defaultHost = '127.0.0.1';
-const defaultApis = 'eth,net,web3';
+const defaultApis = 'eth,net,web3,rei';
 
 // long time-consuming requests that need to be queued for processing
 const queuedMethods = new Set<string>(['eth_getLogs', 'eth_getFilterLogs', 'debug_traceBlock', 'debug_traceBlockByNumber', 'debug_traceBlockByHash', 'debug_traceTransaction', 'debug_traceCall']);

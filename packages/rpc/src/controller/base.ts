@@ -1,7 +1,7 @@
 import { Address, BN } from 'ethereumjs-util';
 import { Block, WrappedBlock } from '@rei-network/structure';
 import { hexStringToBuffer, hexStringToBN } from '@rei-network/utils';
-import { StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import { StateManager } from '../types';
 import { RpcServer } from '../index';
 import * as helper from '../helper';
 

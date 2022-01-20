@@ -8,10 +8,10 @@ for (const hf of hardforks) {
   EthereumHF.push(hf);
 }
 
-// custom gips.
-for (const gip of Object.keys(RIPs)) {
-  Object.defineProperty(EIPs, gip, {
-    value: RIPs[gip],
+// custom rips.
+for (const rip of Object.keys(RIPs)) {
+  Object.defineProperty(EIPs, rip, {
+    value: RIPs[rip],
     writable: false,
     enumerable: true
   });

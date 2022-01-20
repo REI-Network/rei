@@ -28,6 +28,7 @@
     "postinstall": "npm run build -ws",
     "prepare": "node node_modules/husky/lib/bin.js install",
     "checkNpmVersion": "./scripts/check-npm-version.sh",
+    "build:contracts": "npm run build -w @rei-network/contracts",
     "build:structure": "npm run build -w @rei-network/structure",
     "build:blockchain": "npm run build -w @rei-network/blockchain",
     "build:cli": "npm run build -w @rei-network/cli",

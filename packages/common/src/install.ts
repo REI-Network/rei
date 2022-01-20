@@ -1,7 +1,7 @@
 import { hardforks as EthereumHF } from '@gxchain2-ethereumjs/common/dist/hardforks';
 import { EIPs } from '@gxchain2-ethereumjs/common/dist/eips';
 import { hardforks } from './hardforks';
-import { GIPs } from './gips';
+import { RIPs } from './rips';
 
 // custom hardforks.
 for (const hf of hardforks) {
@@ -9,9 +9,9 @@ for (const hf of hardforks) {
 }
 
 // custom gips.
-for (const gip of Object.keys(GIPs)) {
+for (const gip of Object.keys(RIPs)) {
   Object.defineProperty(EIPs, gip, {
-    value: GIPs[gip],
+    value: RIPs[gip],
     writable: false,
     enumerable: true
   });

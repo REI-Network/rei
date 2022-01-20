@@ -179,7 +179,7 @@ export class PendingBlock {
       // if free staking is enable, initialize variables
       if (isEnableFreeStaking(this._common)) {
         if (this.totalAmount === undefined) {
-          this.totalAmount = await (this.engine as ReimintConsensusEngine).getTotalAmount(this._parentStateRoot, pendingBlock, this._common);
+          this.totalAmount = await (this.engine as ReimintConsensusEngine).getTotalAmount(this._parentStateRoot, this._common);
         }
       }
 

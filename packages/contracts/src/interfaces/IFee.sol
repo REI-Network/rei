@@ -19,8 +19,6 @@ interface IFee is IOnly {
 
     function userDeposit(address user1, address user2) external view returns (uint256, uint256);
 
-    function totalAmount() external view returns (uint256);
-
     function deposit(address user) external payable;
 
     function withdraw(address user, uint256 amount) external;

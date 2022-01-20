@@ -14,6 +14,7 @@ import { TxPoolAccount, TxPoolOptions } from './types';
 import { txSlots, checkTxIntrinsicGas } from './utils';
 import { isEnableFreeStaking } from '../hardforks';
 import { validateTx } from '../validation';
+import { Fee } from '../consensus/reimint/contracts';
 
 const defaultTxMaxSize = 32768 * 4;
 const defaultPriceLimit = new BN(1);
@@ -274,14 +275,12 @@ export class TxPool extends InitializerWithEventEmitter {
           }
         }
         this.currentHeader = originalNewBlock.header;
+        this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, this.currentHeader._common);
 
         if (isEnableFreeStaking(this.currentHeader._common)) {
-          const vm = await this.node.getVM(this.currentHeader.stateRoot, this.currentHeader._common);
-          this.totalAmount = await this.node.reimint.getFee(vm, originalNewBlock, this.currentHeader._common).totalAmount();
-          this.currentStateManager = vm.stateManager as StateManager;
+          this.totalAmount = await Fee.getTotalAmount(this.currentStateManager);
         } else {
           this.totalAmount = undefined;
-          this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, this.currentHeader._common);
         }
 
         const reinjectAccounts = new FunctionalBufferMap<TxPoolAccount>();

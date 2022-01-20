@@ -1,15 +1,9 @@
 import { toBuffer, Address, BN } from 'ethereumjs-util';
-import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
+import { StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Common } from '@rei-network/common';
 import { Log, Receipt } from '@rei-network/structure';
 import { FunctionalAddressMap } from '@rei-network/utils';
-import { Contract } from './contract';
 import { bufferToAddress } from './utils';
-
-// function selector of fee
-const methods = {
-  totalAmount: toBuffer('0x1a39d8ef')
-};
 
 // event topic
 const events = {
@@ -17,7 +11,7 @@ const events = {
   Withdraw: toBuffer('0x9b1bfa7fa9ee420a16e124f794c35ac9f90472acc99140eb2f6447c714cad8eb')
 };
 
-export class Fee extends Contract {
+export abstract class Fee {
   /**
    * Filter receipts and collect fee contract logs
    * @param receipts - Receipts
@@ -60,18 +54,13 @@ export class Fee extends Contract {
     }
   }
 
-  constructor(evm: EVM, common: Common) {
-    super(evm, common, methods, Address.fromString(common.param('vm', 'faddr')));
-  }
-
   /**
-   * Read total amount from state trie
+   * Get total amount of fee contract
+   * @param state - State manager instance
    * @returns Total amount
    */
-  totalAmount() {
-    return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('totalAmount', [], []));
-      return new BN(returnValue);
-    });
+  static async getTotalAmount(state: StateManager) {
+    const faddr = Address.fromString((state as any)._common.param('vm', 'faddr'));
+    return (await state.getAccount(faddr)).balance;
   }
 }

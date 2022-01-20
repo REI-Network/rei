@@ -199,18 +199,6 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   }
 
   /**
-   * Get fee contract object
-   * @param vm - Target vm instance
-   * @param block - Target block
-   * @param common - Common instance
-   * @returns Fee contract object
-   */
-  getFee(vm: VM, block: Block, common?: Common) {
-    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
-    return new Fee(evm, common ?? block._common);
-  }
-
-  /**
    * Get fee pool contract object
    * @param vm - Target vm instance
    * @param block - Target block
@@ -225,15 +213,12 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   /**
    * Read total amount in fee contract
    * @param root - Target state root
-   * @param block - Target block
-   * @param common - Common instance
+   * @param num - Block number or common instance
    * @returns Total amount
    */
-  async getTotalAmount(root: Buffer, block: Block, common?: Common) {
-    common = common ?? block._common;
-    const vm = await this.node.getVM(root, common);
-    const fee = this.getFee(vm, block, common);
-    return await fee.totalAmount();
+  async getTotalAmount(root: Buffer, num: BNLike | Common) {
+    const state = await this.node.getStateManager(root, num);
+    return await Fee.getTotalAmount(state);
   }
 
   /**

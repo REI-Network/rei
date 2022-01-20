@@ -14,9 +14,6 @@ contract Fee is ReentrancyGuard, Only, IFee {
     // user deposit information
     mapping(address => mapping(address => DepositInfo)) public override userDeposit;
 
-    // total deposit amount
-    uint256 public override totalAmount;
-
     /**
      * Emit when user deposits.
      * @param by        Deposit user
@@ -51,7 +48,6 @@ contract Fee is ReentrancyGuard, Only, IFee {
         DepositInfo storage di = userDeposit[user][msg.sender];
         di.amount = di.amount.add(msg.value);
         di.timestamp = block.timestamp;
-        totalAmount = totalAmount.add(msg.value);
         emit Deposit(msg.sender, user, msg.value);
     }
 
@@ -65,7 +61,6 @@ contract Fee is ReentrancyGuard, Only, IFee {
         // adding two timestamps will never overflow
         require(di.timestamp + config.withdrawDelay() < block.timestamp, "Fee: invalid withdraw delay");
         di.amount = di.amount.sub(amount);
-        totalAmount = totalAmount.sub(amount);
         msg.sender.transfer(amount);
         emit Withdraw(msg.sender, user, amount);
     }

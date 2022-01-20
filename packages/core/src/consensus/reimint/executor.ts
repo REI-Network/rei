@@ -83,12 +83,9 @@ export class ReimintExecutor implements Executor {
    * @param parentValidatorSet - Validator set loaded from parent state trie
    * @param parentStakeManager - Stake manager contract instance
    *                             (used to load totalLockedAmount and validatorCount and validatorSet if need)
-   * @param parentFeePool - Fee pool contract instance
-   * @param accFeeUsage - Accumulative fee usage
-   * @param accBalUsage - Accumulative balance usage
    * @returns New validator set
    */
-  async afterApply(vm: VM, pendingBlock: Block, receipts: Receipt[], evidence: Evidence[], miner: Address, totalReward: BN, parentValidatorSet: ValidatorSet, parentStakeManager: StakeManager, parentFeePool?: FeePool) {
+  async afterApply(vm: VM, pendingBlock: Block, receipts: Receipt[], evidence: Evidence[], miner: Address, totalReward: BN, parentValidatorSet: ValidatorSet, parentStakeManager: StakeManager) {
     console.log('(0) pendingBlock(h,n,m):', pendingBlock.hash().toString('hex'), pendingBlock.header.number.toString(), miner.toString());
 
     const pendingCommon = pendingBlock._common;
@@ -182,7 +179,8 @@ export class ReimintExecutor implements Executor {
       //    and call feePool.distribute
       const minerAmount = accBalUsage!.add(accFeeUsage!);
       const distributeValue = feePoolReward.add(accBalUsage!);
-      const ethLogs = await parentFeePool!.distribute(miner, minerAmount, distributeValue);
+      const feePool = this.engine.getFeePool(vm, pendingBlock, pendingCommon);
+      const ethLogs = await feePool!.distribute(miner, minerAmount, distributeValue);
       if (ethLogs && ethLogs.length > 0) {
         logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));
       }
@@ -279,16 +277,11 @@ export class ReimintExecutor implements Executor {
     const parentValidatorSet = (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager)).copy();
     parentValidatorSet.active.incrementProposerPriority(round);
 
-    let parentFeePool: FeePool | undefined;
-    if (isEnableFreeStaking(pendingCommon)) {
-      parentFeePool = this.engine.getFeePool(vm, block);
-    }
-
     await vm.stateManager.checkpoint();
     try {
       await this.assignBlockReward(vm.stateManager, systemCaller, minerReward);
       const blockReward = (await vm.stateManager.getAccount(systemCaller)).balance;
-      const validatorSet = await this.afterApply(vm, block, receipts, evidence, miner, blockReward, parentValidatorSet, parentStakeManager, parentFeePool);
+      const validatorSet = await this.afterApply(vm, block, receipts, evidence, miner, blockReward, parentValidatorSet, parentStakeManager);
       await vm.stateManager.commit();
       const finalizedStateRoot = await vm.stateManager.getStateRoot();
 
@@ -342,14 +335,6 @@ export class ReimintExecutor implements Executor {
     // now, parentValidatorSet has increased extraData.proposal.round times
     parentValidatorSet = new ValidatorSet(parentValidatorSet.indexed, extraData.activeValidatorSet()!);
 
-    let totalAmount: BN | undefined;
-    let parentFeePool: FeePool | undefined;
-    if (isEnableFreeStaking(pendingCommon)) {
-      const parentFee = this.engine.getFee(vm, block);
-      totalAmount = await parentFee.totalAmount();
-      parentFeePool = this.engine.getFeePool(vm, block);
-    }
-
     if (!skipConsensusValidation) {
       extraData.validate();
     }
@@ -362,7 +347,7 @@ export class ReimintExecutor implements Executor {
     let runTxOpts: any;
     if (isEnableFreeStaking(pendingCommon)) {
       runTxOpts = {
-        ...makeRunTxCallback(systemCaller, Address.fromString(pendingCommon.param('vm', 'faddr')), block.header.timestamp.toNumber(), totalAmount!)
+        ...makeRunTxCallback(systemCaller, Address.fromString(pendingCommon.param('vm', 'faddr')), block.header.timestamp.toNumber(), await Fee.getTotalAmount(vm.stateManager))
       };
     } else {
       runTxOpts = {
@@ -386,7 +371,7 @@ export class ReimintExecutor implements Executor {
         // assign all balances of systemCaller to miner
         const blockReward = (await state.getAccount(systemCaller)).balance;
         const receipts = postByzantiumTxReceiptsToReceipts(postByzantiumTxReceipts);
-        validatorSet = await this.afterApply(vm, block, receipts, extraData.evidence, miner, blockReward, parentValidatorSet, parentStakeManager, parentFeePool);
+        validatorSet = await this.afterApply(vm, block, receipts, extraData.evidence, miner, blockReward, parentValidatorSet, parentStakeManager);
       },
       runTxOpts
     };

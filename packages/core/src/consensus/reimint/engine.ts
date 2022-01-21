@@ -12,7 +12,7 @@ import { Node } from '../../node';
 import { StateManager } from '../../stateManager';
 import { ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
-import { getConsensusTypeByCommon } from '../../hardforks';
+import { getConsensusTypeByCommon, isEnableFreeStaking } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
@@ -174,6 +174,9 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     const vm = await this.node.getVM(root, common);
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
     await Contract.deployReimintContracts(evm, common);
+    if (isEnableFreeStaking(common)) {
+      await Contract.deployFreeStakingContracts(evm, common);
+    }
     root = await vm.stateManager.getStateRoot();
 
     if (!root.equals(genesisBlock.header.stateRoot)) {

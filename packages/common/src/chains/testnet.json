@@ -86,6 +86,10 @@
     {
       "name": "testnet-hf-1",
       "block": 10
+    },
+    {
+      "name": "free-staking",
+      "block": 10
     }
   ],
   "bootstrapNodes": []

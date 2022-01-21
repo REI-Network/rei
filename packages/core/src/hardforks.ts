@@ -1,18 +1,66 @@
-import { rlphash } from 'ethereumjs-util';
+import { rlphash, Address, BN, setLengthRight, setLengthLeft } from 'ethereumjs-util';
+import { addPrecompile } from '@gxchain2-ethereumjs/vm/dist/evm/precompiles';
+import { OOGResult } from '@gxchain2-ethereumjs/vm/dist/evm/evm';
+import { hexStringToBN } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
-import { BlockHeader, HashFunction, setCustomHashFunction, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
+import { BlockHeader, setCustomHashFunction, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
+import { StateManager } from './stateManager';
 import { ConsensusType } from './consensus/types';
 import { Reimint } from './consensus/reimint/reimint';
+import { Fee } from './consensus/reimint/contracts';
+import { bufferToAddress } from './consensus/reimint/contracts/utils';
+const assert = require('assert');
 
-const customHashFunction: HashFunction = (header: BlockHeader) => {
+/**
+ * Set custom block hash function
+ */
+setCustomHashFunction((header: BlockHeader) => {
   if (header.extraData.length <= CLIQUE_EXTRA_VANITY || getConsensusTypeByCommon(header._common) === ConsensusType.Clique) {
     return rlphash(header.raw());
   } else {
     return Reimint.calcBlockHash(header);
   }
-};
+});
 
-setCustomHashFunction(customHashFunction);
+/**
+ * Add estimate fee precompile function
+ */
+addPrecompile(
+  Address.fromString('0x00000000000000000000000000000000000000ff'),
+  async (opts) => {
+    console.log('enter estimate');
+    assert(opts.data);
+
+    if (!isEnableFreeStaking(opts._common)) {
+      throw new Error('invalid call');
+    }
+
+    const gasUsed = new BN(opts._common.param('gasPrices', 'estimateFee'));
+
+    if (opts.gasLimit.lt(gasUsed)) {
+      return OOGResult(opts.gasLimit);
+    }
+
+    const data = setLengthRight(opts.data, 64);
+    const address = bufferToAddress(data.slice(0, 32));
+    const timestamp = new BN(data.slice(32, 64));
+
+    const state = opts._VM.stateManager as StateManager;
+    const totalAmount = await Fee.getTotalAmount(state);
+    const dailyFee = hexStringToBN(state._common.param('vm', 'dailyFee'));
+    const stakeInfo = (await state.getAccount(address)).getStakeInfo();
+    const fee = stakeInfo.estimateFee(timestamp.toNumber(), totalAmount, dailyFee);
+
+    return {
+      gasUsed,
+      returnValue: setLengthLeft(fee.toBuffer(), 32)
+    };
+  },
+  {
+    type: 0, // TODO: PrecompileAvailabilityCheck.EIP
+    param: 100000
+  }
+);
 
 /**
  * Get consensus engine type by common instance
@@ -53,17 +101,30 @@ export function isEnableRemint(common: Common) {
  * @param common - Common instance
  * @returns Enable if `true`
  */
-export function isEnableFreeStaking(common: Common) {
+export function isEnableHardfork1(common: Common) {
   if (common.chainName() === 'rei-testnet') {
-    if (common.gteHardfork('testnet-hf-1')) {
-      return true;
-    } else {
-      return false;
-    }
+    return common.gteHardfork('testnet-hf1');
   } else if (common.chainName() === 'rei-mainnet') {
     return false;
   } else if (common.chainName() === 'rei-devnet') {
-    return true;
+    return false;
+  } else {
+    throw new Error('unknown chain');
+  }
+}
+
+/**
+ * Check whether free staking logic is enabled
+ * @param common - Common instance
+ * @returns Enable if `true`
+ */
+export function isEnableFreeStaking(common: Common) {
+  if (common.chainName() === 'rei-testnet') {
+    return common.gteHardfork('free-staking');
+  } else if (common.chainName() === 'rei-mainnet') {
+    return false;
+  } else if (common.chainName() === 'rei-devnet') {
+    return common.gteHardfork('free-staking');
   } else {
     throw new Error('unknown chain');
   }

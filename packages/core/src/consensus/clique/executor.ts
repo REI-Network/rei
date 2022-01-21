@@ -47,11 +47,7 @@ export class CliqueExecutor implements Executor {
     if (isEnableRemint(nextCommon)) {
       // deploy system contracts
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
-      if (nextCommon.chainName() === 'rei-devnet') {
-        await Contract.deployGenesisContracts_devnet(evm, nextCommon);
-      } else {
-        await Contract.deployGenesisContracts(evm, nextCommon);
-      }
+      await Contract.deployReimintContracts(evm, nextCommon);
 
       // create genesis validator set
       validatorSet = ValidatorSet.genesis(nextCommon);

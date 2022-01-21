@@ -173,11 +173,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     // deploy system contracts
     const vm = await this.node.getVM(root, common);
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
-    if (common.chainName() === 'rei-devnet') {
-      await Contract.deployGenesisContracts_devnet(evm, common);
-    } else {
-      await Contract.deployGenesisContracts(evm, common);
-    }
+    await Contract.deployReimintContracts(evm, common);
     root = await vm.stateManager.getStateRoot();
 
     if (!root.equals(genesisBlock.header.stateRoot)) {

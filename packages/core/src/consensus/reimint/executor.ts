@@ -9,10 +9,10 @@ import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
 import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executor } from '../types';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
-import { isEnableFreeStaking } from '../../hardforks';
+import { isEnableFreeStaking, isEnableHardfork1 } from '../../hardforks';
 import { StateManager } from '../../stateManager';
 import { ValidatorSet, ValidatorChanges } from './validatorSet';
-import { StakeManager, SlashReason, FeePool, Fee, Contract } from './contracts';
+import { StakeManager, SlashReason, Fee, Contract } from './contracts';
 import { Reimint } from './reimint';
 import { Evidence, DuplicateVoteEvidence } from './evpool';
 import { ExtraData } from './extraData';
@@ -246,13 +246,19 @@ export class ReimintExecutor implements Executor {
     const priorities = activeValidators.map(({ priority }) => priority);
     await parentStakeManager.onAfterBlock(validatorSet.active.proposer, activeSigners, priorities);
 
-    // 10. deploy contracts if enable free staking is enabled in the next block
     const nextCommon = this.backend.getCommon(pendingBlock.header.number.addn(1));
+    // 10. deploy contracts if enable hardfork 1 is enabled in the next block
+    if (!isEnableHardfork1(pendingCommon) && isEnableHardfork1(nextCommon)) {
+      const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
+      await Contract.deployHardfork1Contracts(evm, nextCommon);
+      console.log('(11) deployHardfork1Contracts');
+    }
+
+    // 11. deploy contracts if enable free staking is enabled in the next block
     if (!isEnableFreeStaking(pendingCommon) && isEnableFreeStaking(nextCommon)) {
-      console.log('(10) deployFreeStakingContracts');
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployFreeStakingContracts(evm, nextCommon);
-      console.log('(10) deployFreeStakingContracts over');
+      console.log('(11) deployFreeStakingContracts');
     }
 
     return validatorSet;
@@ -401,8 +407,8 @@ export class ReimintExecutor implements Executor {
     const { root, block, tx, blockGasUsed, totalAmount } = options;
     const systemCaller = Address.fromString(block._common.param('vm', 'scaddr'));
     const vm = await this.backend.getVM(root, block._common);
-    let result: RunTxResult;
 
+    let result: RunTxResult;
     if (isEnableFreeStaking(block._common)) {
       const feeAddr = Address.fromString(block._common.param('vm', 'faddr'));
 

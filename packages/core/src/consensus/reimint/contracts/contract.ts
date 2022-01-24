@@ -21,7 +21,7 @@ export abstract class Contract {
   }
 
   /**
-   * Deploy genesis contracts for mainnet and testnet
+   * Deploy reimint contracts
    * @param evm - EVM instance
    * @param common - Common instance
    */
@@ -45,7 +45,7 @@ export abstract class Contract {
   }
 
   /**
-   * Deploy free staking hardfork
+   * Deploy free staking contracts
    * @param evm - EVM instance
    * @param common - Common instance
    */
@@ -55,6 +55,8 @@ export abstract class Contract {
     await Contract.deployContract(evm, common, 'f', { types: ['address'], values: [cfgaddr] });
     // deploy fee pool contract
     await Contract.deployContract(evm, common, 'fp', { types: ['address'], values: [cfgaddr] });
+    // deploy fee token contract
+    await Contract.deployContract(evm, common, 'ft', { types: ['address'], values: [cfgaddr] });
   }
 
   /**
@@ -68,55 +70,6 @@ export abstract class Contract {
     // deploy stake manager contract
     await Contract.deployContract(evm, common, 'sm');
   }
-
-  /**
-   * Deploy genesis contracts for devnet
-   * NOTE: devnet contains all contracts in genesis,
-   *       but mainnet and testnet will collect all contracts through hard forks
-   * @param evm - EVM instance
-   * @param common - Common instance
-   */
-  // static async deployGenesisContracts_devnet(evm: EVM, common: Common) {
-  //   const genesisValidators = ActiveValidatorSet.genesis(common);
-  //   const activeValidators = genesisValidators.activeValidators();
-  //   const activeSigners = activeValidators.map(({ validator }) => validator.toString());
-  //   const priorities = activeValidators.map(({ priority }) => priority.toString());
-  //   const cfgaddr = common.param('vm', 'cfgaddr');
-
-  //   // deploy config contract
-  //   await Contract.deployContract(evm, common, 'cfg');
-  //   // deploy stake manager contract
-  //   await Contract.deployContract(evm, common, 'sm', { types: ['address', 'address', 'address[]', 'int256[]'], values: [cfgaddr, genesisValidators.proposer.toString(), activeSigners, priorities] });
-
-  //   const defaultArgs = { types: ['address'], values: [cfgaddr] };
-  //   // deploy unstake pool contract
-  //   await Contract.deployContract(evm, common, 'up', defaultArgs);
-  //   // deploy validator reward pool contract
-  //   await Contract.deployContract(evm, common, 'vrp', defaultArgs);
-  //   // deploy fee contract
-  //   await Contract.deployContract(evm, common, 'f', defaultArgs);
-  //   // deploy fee pool contract
-  //   await Contract.deployContract(evm, common, 'fp', defaultArgs);
-  // }
-
-  /**
-   * Deploy free staking contracts for mainnet and testnet
-   * @param evm - EVM instance
-   * @param common - Common instance
-   */
-  // static async deployFreeStakingContracts(evm: EVM, common: Common) {
-  //   // deploy config contract
-  //   await Contract.deployContract(evm, common, 'cfg', undefined, true);
-  //   // deploy stake manager contract
-  //   await Contract.deployContract(evm, common, 'sm');
-
-  //   const cfgaddr = common.param('vm', 'cfgaddr');
-  //   const defaultArgs = { types: ['address'], values: [cfgaddr] };
-  //   // deploy fee contract
-  //   await Contract.deployContract(evm, common, 'f', defaultArgs);
-  //   // deploy fee pool contract
-  //   await Contract.deployContract(evm, common, 'fp', defaultArgs);
-  // }
 
   /**
    * Deploy contract to target address

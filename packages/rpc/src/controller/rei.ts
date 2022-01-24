@@ -1,4 +1,4 @@
-import { bnToHex, Address, BN, intToHex } from 'ethereumjs-util';
+import { bnToHex, Address, intToHex } from 'ethereumjs-util';
 import { hexStringToBN } from '@rei-network/utils';
 import { Controller } from './base';
 

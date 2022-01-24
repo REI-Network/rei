@@ -1,16 +1,15 @@
 import { bnToHex, Address, BN, intToHex } from 'ethereumjs-util';
 import { hexStringToBN } from '@rei-network/utils';
-import { StateManager } from '../types';
 import { Controller } from './base';
 
 export class ReiController extends Controller {
   /**
-   * Estimate user available fee
+   * Estimate user available crude
    * @param address - Target address
    * @param tag - Block tag
-   * @returns Estimate result
+   * @returns Available crude
    */
-  async rei_estimateFee([address, tag]: [string, string]) {
+  async rei_getCrude([address, tag]: [string, string]) {
     const block = await this.getBlockByTag(tag);
     const common = block._common;
     const strDailyFee = common.param('vm', 'dailyFee');
@@ -18,14 +17,13 @@ export class ReiController extends Controller {
       return null;
     }
 
-    const vm = await this.backend.getVM(block.header.stateRoot, common);
-    const fee = this.backend.reimint.getFee(vm, block, common);
-
-    const totalAmount: BN = await fee.totalAmount();
+    const state = await this.backend.getStateManager(block.header.stateRoot, common);
+    const faddr = Address.fromString(common.param('vm', 'faddr'));
+    const totalAmount = (await state.getAccount(faddr)).balance;
     const timestamp = block.header.timestamp.toNumber();
     const dailyFee = hexStringToBN(strDailyFee);
 
-    const account = await (vm.stateManager as StateManager).getAccount(Address.fromString(address));
+    const account = await state.getAccount(Address.fromString(address));
     const stakeInfo = account.getStakeInfo();
     return bnToHex(stakeInfo.estimateFee(timestamp, totalAmount, dailyFee));
   }
@@ -55,7 +53,7 @@ export class ReiController extends Controller {
     if (typeof strDailyFee !== 'string') {
       return null;
     }
-    return hexStringToBN(strDailyFee);
+    return bnToHex(hexStringToBN(strDailyFee));
   }
 
   /**

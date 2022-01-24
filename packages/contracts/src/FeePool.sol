@@ -42,12 +42,14 @@ contract FeePool is ReentrancyGuard, Only, IFeePool {
      */
     function distribute(address _validator, uint256 amount) external payable override nonReentrant onlySystemCaller {
         // 1. Increase miner's share and total shares
-        uint256 shares = sharesOf[_validator];
-        if (shares == 0) {
-            validators.push(_validator);
+        if (amount > 0) {
+            uint256 shares = sharesOf[_validator];
+            if (shares == 0) {
+                validators.push(_validator);
+            }
+            sharesOf[_validator] = shares.add(amount);
+            totalShares = totalShares.add(amount);
         }
-        sharesOf[_validator] = shares.add(amount);
-        totalShares = totalShares.add(amount);
 
         // 2. If 1 day is reached, distribute rewards to all validators
         if (globalTimestamp + 86400 < block.timestamp) {
@@ -70,8 +72,8 @@ contract FeePool is ReentrancyGuard, Only, IFeePool {
                         break;
                     }
                 }
+                totalShares = 0;
             }
-            totalShares = 0;
             globalTimestamp = block.timestamp;
         }
     }

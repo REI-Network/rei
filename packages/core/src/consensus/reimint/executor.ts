@@ -353,6 +353,7 @@ export class ReimintExecutor implements Executor {
     let runTxOpts: any;
     if (isEnableFreeStaking(pendingCommon)) {
       runTxOpts = {
+        skipBalance: true,
         ...makeRunTxCallback(systemCaller, Address.fromString(pendingCommon.param('vm', 'faddr')), block.header.timestamp.toNumber(), await Fee.getTotalAmount(vm.stateManager))
       };
     } else {
@@ -417,6 +418,7 @@ export class ReimintExecutor implements Executor {
       }
 
       result = await vm.runTx({
+        skipBalance: true,
         tx,
         block,
         blockGasUsed,

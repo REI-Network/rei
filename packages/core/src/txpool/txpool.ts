@@ -183,6 +183,13 @@ export class TxPool extends InitializerWithEventEmitter {
   async init(block: Block) {
     this.currentHeader = block.header;
     this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, this.currentHeader._common);
+
+    if (isEnableFreeStaking(this.currentHeader._common)) {
+      this.totalAmount = await Fee.getTotalAmount(this.currentStateManager);
+    } else {
+      this.totalAmount = undefined;
+    }
+
     if (this.journal) {
       await this.journal.load(async (txs: Transaction[]) => {
         let news: Transaction[] = [];

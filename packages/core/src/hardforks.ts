@@ -57,8 +57,8 @@ addPrecompile(
     };
   },
   {
-    type: 0, // TODO: PrecompileAvailabilityCheck.EIP
-    param: 100000
+    type: 1, // TODO: PrecompileAvailabilityCheck.Hardfork
+    param: 'free-staking'
   }
 );
 

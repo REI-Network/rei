@@ -10,6 +10,9 @@ REI-Network genesis contracts
 - `UnstakePool` A smart contract that keeps unstake amount, deployed at `0x0000000000000000000000000000000000001003`
 - `ValidatorRewardPool` A smart contract that keeps validator reward for validator, deployed at `0x0000000000000000000000000000000000001004`
 - `CommmissionShare` A smart contract that keeps commission reward for all staking user, dynamically deployed for each validator
+- `Fee` A smart contract for staking REI to get Crude, deployed at `0x0000000000000000000000000000000000001005`
+- `FeePool` A smart contract for distributing miner fee rewards, deployed at `0x0000000000000000000000000000000000001006`
+- `FeeToken` A smart contract for querying the user's remaining Crude quantity, deployed at `0x0000000000000000000000000000000000001007`
 
 ## Install
 

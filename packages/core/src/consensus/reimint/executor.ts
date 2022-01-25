@@ -251,7 +251,7 @@ export class ReimintExecutor implements Executor {
     if (!isEnableHardfork1(pendingCommon) && isEnableHardfork1(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployHardfork1Contracts(evm, nextCommon);
-      console.log('(11) deployHardfork1Contracts');
+      console.log('(10) deployHardfork1Contracts');
     }
 
     // 11. deploy contracts if enable free staking is enabled in the next block

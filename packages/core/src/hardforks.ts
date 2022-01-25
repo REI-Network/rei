@@ -103,9 +103,9 @@ export function isEnableRemint(common: Common) {
  */
 export function isEnableHardfork1(common: Common) {
   if (common.chainName() === 'rei-testnet') {
-    return common.gteHardfork('testnet-hf1');
+    return common.gteHardfork('testnet-hf-1');
   } else if (common.chainName() === 'rei-mainnet') {
-    return false;
+    return common.gteHardfork('mainnet-hf-1');
   } else if (common.chainName() === 'rei-devnet') {
     return false;
   } else {
@@ -122,7 +122,7 @@ export function isEnableFreeStaking(common: Common) {
   if (common.chainName() === 'rei-testnet') {
     return common.gteHardfork('free-staking');
   } else if (common.chainName() === 'rei-mainnet') {
-    return false;
+    return common.gteHardfork('free-staking');
   } else if (common.chainName() === 'rei-devnet') {
     return common.gteHardfork('free-staking');
   } else {

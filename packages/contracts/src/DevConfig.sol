@@ -65,6 +65,10 @@ contract DevConfig is Ownable, IConfig {
         scri = _scri;
     }
 
+    function setFeePoolInterval(uint256 _fpi) external onlyOwner {
+        fpi = _fpi;
+    }
+
     /////////////////////////////////
 
     function stakeManager() external view override returns (address) {

@@ -1,6 +1,6 @@
 import type Web3 from 'web3';
 import { expect } from 'chai';
-import { toBN, upTimestamp } from './utils';
+import { toBN } from './utils';
 
 declare var artifacts: any;
 declare var web3: Web3;
@@ -120,7 +120,7 @@ describe('FeePool', () => {
     await stakeManager.methods.setCommissionRate(validator2Rate).send({ from: validator2 });
     await stakeManager.methods.setCommissionRate(validator3Rate).send({ from: validator3 });
 
-    await config.methods.setFeePoolInterval(2).send();
+    await config.methods.setFeePoolInterval(0).send();
     await feePool.methods.distribute(validator1, 0).send();
 
     const validator1Reward = toBN(await validatorRewardPool.methods.balanceOf(validator1).call());

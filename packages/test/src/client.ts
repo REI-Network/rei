@@ -40,7 +40,7 @@ export class Client {
 
     const initContract = async (contract: string) => {
       const contractName = contract.substr(0, 1).toUpperCase() + contract.substr(1);
-      const address = contract === 'feeToken' ? '0x0000000000000000000000000000000000001007' : await this.config.methods[contract]().call();
+      const address = await this.config.methods[contract]().call();
       this[contract] = new this.web3.eth.Contract(this.loadABI(contractName), address);
     };
     await initContract('stakeManager');

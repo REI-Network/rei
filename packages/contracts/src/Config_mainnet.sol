@@ -34,6 +34,10 @@ contract Config is IConfig {
         return 0x0000000000000000000000000000000000001006;
     }
 
+    function feeToken() external view override returns (address) {
+        return 0x0000000000000000000000000000000000001007;
+    }
+
     function unstakeDelay() external view override returns (uint256) {
         return 7 days;
     }
@@ -48,6 +52,10 @@ contract Config is IConfig {
     }
 
     function setCommissionRateInterval() external view override returns (uint256) {
+        return 1 days;
+    }
+
+    function feePoolInterval() external view override returns (uint256) {
         return 1 days;
     }
 

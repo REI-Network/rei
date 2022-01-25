@@ -52,7 +52,7 @@ contract FeePool is ReentrancyGuard, Only, IFeePool {
         }
 
         // 2. If 1 day is reached, distribute rewards to all validators
-        if (globalTimestamp + 86400 < block.timestamp) {
+        if (globalTimestamp + config.feePoolInterval() < block.timestamp) {
             uint256 balance = address(this).balance;
             uint256 _totalShares = totalShares;
             if (validators.length != 0 && _totalShares != 0 && balance != 0) {

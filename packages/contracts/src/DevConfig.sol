@@ -15,11 +15,13 @@ contract DevConfig is Ownable, IConfig {
     address internal v = 0x0000000000000000000000000000000000001004;
     address internal f = 0x0000000000000000000000000000000000001005;
     address internal fp = 0x0000000000000000000000000000000000001006;
+    address internal ft = 0x0000000000000000000000000000000000001007;
 
     uint256 internal ud = 1 seconds;
     uint256 internal wd = 1 seconds;
     uint256 internal mivp = 10000;
     uint256 internal scri = 5 seconds;
+    uint256 internal fpi = 10 seconds;
 
     /////////////////////////////////
 
@@ -89,6 +91,10 @@ contract DevConfig is Ownable, IConfig {
         return fp;
     }
 
+    function feeToken() external view override returns (address) {
+        return ft;
+    }
+
     function unstakeDelay() external view override returns (uint256) {
         return ud;
     }
@@ -103,6 +109,10 @@ contract DevConfig is Ownable, IConfig {
 
     function setCommissionRateInterval() external view override returns (uint256) {
         return scri;
+    }
+
+    function feePoolInterval() external view override returns (uint256) {
+        return fpi;
     }
 
     function getFactorByReason(uint8 reason) external view override returns (uint8) {

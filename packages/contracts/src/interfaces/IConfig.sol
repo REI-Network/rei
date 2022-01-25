@@ -18,6 +18,8 @@ interface IConfig {
 
     function feePool() external view returns (address);
 
+    function feeToken() external view returns (address);
+
     function unstakeDelay() external view returns (uint256);
 
     function withdrawDelay() external view returns (uint256);
@@ -27,4 +29,6 @@ interface IConfig {
     function getFactorByReason(uint8 reason) external view returns (uint8);
 
     function setCommissionRateInterval() external view returns (uint256);
+
+    function feePoolInterval() external view returns (uint256);
 }

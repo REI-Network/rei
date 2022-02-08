@@ -1,6 +1,6 @@
 {
     "name": "@rei-network/network",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
@@ -17,7 +17,7 @@
         "it-pipe": "^1.1.0",
         "levelup": "^4.4.0",
         "libp2p": "^0.29.3",
-        "libp2p-mplex": "^0.10.1",
+        "libp2p-mplex": "0.10.5",
         "libp2p-secio": "^0.13.1",
         "libp2p-tcp": "^0.15.1",
         "peer-id": "^0.14.2"

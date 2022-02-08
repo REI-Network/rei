@@ -1,6 +1,6 @@
 {
     "name": "@rei-network/cli",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
@@ -18,7 +18,7 @@
     },
     "dependencies": {
         "@rei-network/common": "^0.0.4",
-        "@rei-network/core": "^0.0.7",
+        "@rei-network/core": "^0.0.8",
         "@rei-network/rpc": "^0.0.6",
         "@rei-network/utils": "^0.0.2",
         "@rei-network/wallet": "^0.0.2",

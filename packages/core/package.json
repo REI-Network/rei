@@ -21,7 +21,7 @@
         "@rei-network/blockchain": "^0.0.4",
         "@rei-network/common": "^0.0.4",
         "@rei-network/database": "^0.0.4",
-        "@rei-network/network": "^0.0.3",
+        "@rei-network/network": "^0.0.4",
         "@rei-network/structure": "^0.0.2",
         "@rei-network/utils": "^0.0.2",
         "@rei-network/wallet": "^0.0.2",

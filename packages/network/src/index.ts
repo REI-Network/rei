@@ -221,18 +221,18 @@ export class NetworkManager extends InitializerWithEventEmitter {
       logger.debug('Network::onConnect, peerId:', peerId, 'is banned');
       return;
     }
-    if (!this.checkInbound(peerId)) {
-      connect.close();
-      logger.debug('Network::onConnect, too many connection attempts');
-      return;
-    }
+    // if (!this.checkInbound(peerId)) {
+    //   connect.close();
+    //   logger.debug('Network::onConnect, too many connection attempts');
+    //   return;
+    // }
     if (this.libp2pNode.connectionManager.size > this.maxPeers) {
       this.setPeerValue(peerId, Libp2pPeerValue.incoming);
       logger.debug('Network::onConnect, too many incoming connections');
     } else {
       logger.info('💬 Peer connect:', peerId);
       this.setPeerValue(peerId, Libp2pPeerValue.connected);
-      this.createInstallTimeout(peerId);
+      // this.createInstallTimeout(peerId);
     }
   };
 

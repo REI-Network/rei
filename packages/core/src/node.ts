@@ -92,7 +92,6 @@ export class Node extends Initializer {
     }
 
     const common = this.getCommon(0);
-    // TODO: fix type
     this.db = new Database(this.chaindb, common);
     this.networkId = common.networkIdBN().toNumber();
     this.chainId = common.chainIdBN().toNumber();
@@ -104,7 +103,7 @@ export class Node extends Initializer {
     logger.info('Read genesis block from file', bufferToHex(this.genesisHash));
 
     this.blockchain = new Blockchain({
-      dbManager: this.db as any,
+      database: this.db,
       common,
       genesisBlock,
       validateBlocks: false,
@@ -316,7 +315,7 @@ export class Node extends Initializer {
     return new VM({
       common,
       stateManager,
-      blockchain: this.blockchain,
+      blockchain: this.blockchain as any,
       getMiner: (header) => this.getEngine(header._common).getMiner(header)
     });
   }

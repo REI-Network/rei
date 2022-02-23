@@ -104,7 +104,7 @@ export class Node extends Initializer {
     logger.info('Read genesis block from file', bufferToHex(this.genesisHash));
 
     this.blockchain = new Blockchain({
-      dbManager: this.db,
+      dbManager: this.db as any,
       common,
       genesisBlock,
       validateBlocks: false,

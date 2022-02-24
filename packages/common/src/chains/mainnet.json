@@ -10,7 +10,7 @@
   "chainId": 47805,
   "networkId": 47805,
   "comment": "The rei-network main net",
-  "url": "https://scan-main.rei.network/",
+  "url": "https://scan.rei.network/",
   "genesis": {
     "hash": "0x4d4b63bf127f5c019fcb64480d264be83931953c18752b262a2061b924e49d70",
     "bloom":

@@ -1,12 +1,12 @@
 import { Address, bufferToHex, BN, toBuffer } from 'ethereumjs-util';
 import { BaseTrie, SecureTrie as Trie } from 'merkle-patricia-tree';
-import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Block, BlockHeader, HeaderData, Transaction, Receipt } from '@rei-network/structure';
 import { Common, getGenesisState } from '@rei-network/common';
 import { logger, nowTimestamp, getRandomIntInclusive } from '@rei-network/utils';
 import { ConsensusEngine, ConsensusEngineOptions } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { getGasLimitByCommon } from '../../utils';
+import { StateManager } from '../../stateManager';
 import { Clique } from './clique';
 import { CliqueExecutor } from './executor';
 

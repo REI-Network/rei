@@ -3,6 +3,8 @@ import path from 'path';
 import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Web3 from 'web3';
 import { Contract } from 'web3-eth-contract';
+import { TransactionReceipt } from 'web3-core';
+import { hexStringToBN } from '../../utils';
 import { MockAccountManager } from '../../core/test/util';
 
 export type TxOptions = {
@@ -19,6 +21,9 @@ export class Client {
   stakeManager!: Contract;
   unstakePool!: Contract;
   validatorRewardPool!: Contract;
+  fee!: Contract;
+  feePool!: Contract;
+  feeToken!: Contract;
 
   constructor(provider = 'ws://127.0.0.1:11451', configAddress = '0x0000000000000000000000000000000000001000') {
     this.web3 = new Web3(provider);
@@ -35,11 +40,15 @@ export class Client {
 
     const initContract = async (contract: string) => {
       const contractName = contract.substr(0, 1).toUpperCase() + contract.substr(1);
-      this[contract] = new this.web3.eth.Contract(this.loadABI(contractName), await this.config.methods[contract]().call());
+      const address = await this.config.methods[contract]().call();
+      this[contract] = new this.web3.eth.Contract(this.loadABI(contractName), address);
     };
     await initContract('stakeManager');
     await initContract('unstakePool');
     await initContract('validatorRewardPool');
+    await initContract('fee');
+    await initContract('feePool');
+    await initContract('feeToken');
 
     // add accounts
     this.accMngr.add([
@@ -48,7 +57,7 @@ export class Client {
     ]);
 
     // create random accounts
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 5; i++) {
       const priv = crypto.randomBytes(32);
       const addr = Address.fromPrivateKey(priv);
       this.accMngr.add([[`test${i}`, addr, priv]]);
@@ -71,5 +80,42 @@ export class Client {
       gas: 21000,
       gasPrice: gasPrice.toString()
     });
+  }
+
+  parseUsageInfo(receipt: TransactionReceipt) {
+    if (receipt.logs) {
+      if (receipt.logs.length === 0) {
+        throw new Error('invalid receipt');
+      }
+
+      const log = receipt.logs[receipt.logs.length - 1];
+      if (log.address !== this.fee.options.address) {
+        throw new Error('invalid log');
+      }
+
+      if (log.topics.length !== 3) {
+        throw new Error('invalid log');
+      }
+
+      if (log.topics[0] !== '0x873c82cd37aaacdcf736cbb6beefc8da36d474b65ad23aaa1b1c6fbd875f7076') {
+        throw new Error('invalid log');
+      }
+
+      return {
+        feeUsage: hexStringToBN(log.topics[1]),
+        balanceUsage: hexStringToBN(log.topics[2])
+      };
+    } else if (receipt.events) {
+      if (!receipt.events.Usage) {
+        throw new Error('invalid log');
+      }
+
+      return {
+        feeUsage: new BN(receipt.events.Usage.returnValues.feeUsage),
+        balanceUsage: new BN(receipt.events.Usage.returnValues.balanceUsage)
+      };
+    } else {
+      throw new Error('invalid log');
+    }
   }
 }

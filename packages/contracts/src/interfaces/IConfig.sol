@@ -14,11 +14,21 @@ interface IConfig {
 
     function validatorRewardPool() external view returns (address);
 
+    function fee() external view returns (address);
+
+    function feePool() external view returns (address);
+
+    function feeToken() external view returns (address);
+
     function unstakeDelay() external view returns (uint256);
+
+    function withdrawDelay() external view returns (uint256);
 
     function minIndexVotingPower() external view returns (uint256);
 
     function getFactorByReason(uint8 reason) external view returns (uint8);
 
     function setCommissionRateInterval() external view returns (uint256);
+
+    function feePoolInterval() external view returns (uint256);
 }

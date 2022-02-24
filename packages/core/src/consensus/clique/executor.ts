@@ -47,7 +47,7 @@ export class CliqueExecutor implements Executor {
     if (isEnableRemint(nextCommon)) {
       // deploy system contracts
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
-      await Contract.deploy(evm, nextCommon);
+      await Contract.deployReimintContracts(evm, nextCommon);
 
       // create genesis validator set
       validatorSet = ValidatorSet.genesis(nextCommon);

@@ -1,12 +1,12 @@
 {
     "name": "@rei-network/blockchain",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
     "scripts": {
         "build": "tsc --build tsconfig.json",
-        "test": "mocha -r ts-node/register 'test/**/*.test.ts'"
+        "test": "echo @rei-network/blockchain has not test cases"
     },
     "devDependencies": {
         "typescript": "^4.1.2",
@@ -15,7 +15,7 @@
     },
     "dependencies": {
         "@gxchain2-ethereumjs/blockchain": "^5.4.3",
-        "@rei-network/database": "^0.0.4",
+        "@rei-network/database": "^0.0.5",
         "@rei-network/structure": "^0.0.2"
     }
 }

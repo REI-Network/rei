@@ -1,6 +1,5 @@
 import { Address, BNLike, BN } from 'ethereumjs-util';
 import VM from '@gxchain2-ethereumjs/vm';
-import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import Bloom from '@gxchain2-ethereumjs/vm/dist/bloom';
 import { IDebug } from '@gxchain2-ethereumjs/vm/dist/types';
 import { Common } from '@rei-network/common';
@@ -8,6 +7,7 @@ import { HeaderData, Block, Transaction, Receipt, TypedTransaction, BlockHeader 
 import { Blockchain } from '@rei-network/blockchain';
 import { Database } from '@rei-network/database';
 import { Node } from '../node';
+import { StateManager } from '../stateManager';
 import { Worker } from './worker';
 import { Evidence } from './reimint/evpool';
 
@@ -144,6 +144,8 @@ export interface ProcessTxOpts {
   root: Buffer;
   tx: TypedTransaction;
   blockGasUsed?: BN;
+
+  totalAmount?: BN;
 }
 
 export interface ProcessTxResult {

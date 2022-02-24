@@ -72,16 +72,16 @@ export class ETHController extends Controller {
   eth_blockNumber() {
     return bnToHex(this.backend.getLatestBlock().header.number);
   }
-  async eth_getBalance([address, tag]: [string, string]) {
+  async eth_getBalance([address, tag]: [string, any]) {
     const stateManager = await this.getStateManagerByTag(tag);
     const account = await stateManager.getAccount(Address.fromString(address));
     return bnToHex(account.balance);
   }
-  async eth_getStorageAt([address, key, tag]: [string, string, string]) {
+  async eth_getStorageAt([address, key, tag]: [string, string, any]) {
     const stateManager = await this.getStateManagerByTag(tag);
     return bufferToHex(await stateManager.getContractStorage(Address.fromString(address), hexStringToBuffer(key)));
   }
-  async eth_getTransactionCount([address, tag]: [string, string]) {
+  async eth_getTransactionCount([address, tag]: [string, any]) {
     const stateManager = await this.getStateManagerByTag(tag);
     const account = await stateManager.getAccount(Address.fromString(address));
     return bnToHex(account.nonce);
@@ -94,7 +94,7 @@ export class ETHController extends Controller {
       return null;
     }
   }
-  async eth_getBlockTransactionCountByNumber([tag]: [string]) {
+  async eth_getBlockTransactionCountByNumber([tag]: [any]) {
     try {
       const number = (await this.getBlockByTag(tag)).transactions.length;
       return intToHex(number);
@@ -105,10 +105,10 @@ export class ETHController extends Controller {
   eth_getUncleCountByBlockHash([hash]: [string]) {
     return intToHex(0);
   }
-  eth_getUncleCountByBlockNumber([tag]: [string]) {
+  eth_getUncleCountByBlockNumber([tag]: [any]) {
     return intToHex(0);
   }
-  async eth_getCode([address, tag]: [string, string]) {
+  async eth_getCode([address, tag]: [string, any]) {
     const stateManager = await this.getStateManagerByTag(tag);
     const code = await stateManager.getContractCode(Address.fromString(address));
     return bufferToHex(code);
@@ -161,7 +161,7 @@ export class ETHController extends Controller {
     const results = await this.backend.addPendingTxs([tx]);
     return results.length > 0 && results[0] ? bufferToHex(tx.hash()) : null;
   }
-  async eth_call([data, tag]: [CallData, string]) {
+  async eth_call([data, tag]: [CallData, any]) {
     const result = await this.runCall(data, tag);
     return bufferToHex(result.execResult.returnValue);
   }
@@ -219,7 +219,7 @@ export class ETHController extends Controller {
     return hi;
   }
 
-  async eth_estimateGas([data, tag]: [CallData, string]) {
+  async eth_estimateGas([data, tag]: [CallData, any]) {
     const block = await this.getBlockByTag(tag);
     const result = await this.estimateGas(data, block);
     return bnToHex(result.add(this.calculateBaseFee(data, block._common)));
@@ -231,7 +231,7 @@ export class ETHController extends Controller {
       return null;
     }
   }
-  async eth_getBlockByNumber([tag, fullTransactions]: [string, boolean]) {
+  async eth_getBlockByNumber([tag, fullTransactions]: [any, boolean]) {
     try {
       return (await this.getWrappedBlockByTag(tag)).toRPCJSON(fullTransactions);
     } catch (err) {
@@ -263,7 +263,7 @@ export class ETHController extends Controller {
       return null;
     }
   }
-  async eth_getTransactionByBlockNumberAndIndex([tag, index]: [string, string]) {
+  async eth_getTransactionByBlockNumberAndIndex([tag, index]: [any, string]) {
     try {
       const block = await this.getBlockByTag(tag);
       const wtx = new WrappedTransaction(block.transactions[Number(index)] as Transaction);

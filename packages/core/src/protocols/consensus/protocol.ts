@@ -54,7 +54,11 @@ export class ConsensusProtocol extends BaseProtocol<ConsensusProtocolHander> imp
    */
   broadcastVote(vote: Vote) {
     for (const handler of this.handlers) {
-      handler.sendVote(vote);
+      try {
+        handler.sendVote(vote);
+      } catch (err) {
+        // ignore all errors ...
+      }
     }
   }
 

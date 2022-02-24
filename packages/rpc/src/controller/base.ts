@@ -1,7 +1,7 @@
 import { Address, BN } from 'ethereumjs-util';
 import { Block, WrappedBlock } from '@rei-network/structure';
 import { hexStringToBuffer, hexStringToBN } from '@rei-network/utils';
-import { StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import { StateManager } from '../types';
 import { RpcServer } from '../index';
 import * as helper from '../helper';
 
@@ -34,7 +34,7 @@ export class Controller {
     return this.server.oracle;
   }
 
-  protected async getBlockNumberByTag(tag: string): Promise<BN> {
+  protected async getBlockNumberByTag(tag: any): Promise<BN> {
     if (tag === 'earliest') {
       return new BN(0);
     } else if (tag === 'latest' || tag === undefined) {
@@ -50,27 +50,41 @@ export class Controller {
     }
   }
 
-  protected async getBlockByTag(tag: string): Promise<Block> {
+  protected async getBlockByTag(tag: any): Promise<Block> {
     let block!: Block;
-    if (tag === 'earliest') {
-      block = await this.backend.db.getBlock(0);
-    } else if (tag === 'latest' || tag === undefined) {
+    if (typeof tag === 'string') {
+      if (tag === 'earliest') {
+        block = await this.backend.db.getBlock(0);
+      } else if (tag === 'latest') {
+        block = this.backend.getLatestBlock();
+      } else if (tag === 'pending') {
+        block = this.backend.getPendingBlock();
+      } else if (tag.startsWith('0x')) {
+        block = await this.backend.db.getBlock(hexStringToBN(tag));
+      } else {
+        helper.throwRpcErr('Invalid tag value');
+      }
+    } else if (typeof tag === 'object') {
+      if ('blockNumber' in tag) {
+        block = await this.backend.db.getBlock(hexStringToBN(tag.blockNumber));
+      } else if ('blockHash' in tag) {
+        block = await this.backend.db.getBlock(hexStringToBuffer(tag.blockHash));
+      } else {
+        helper.throwRpcErr('Invalid tag value');
+      }
+    } else if (tag === undefined) {
       block = this.backend.getLatestBlock();
-    } else if (tag === 'pending') {
-      block = this.backend.getPendingBlock();
-    } else if (tag.startsWith('0x')) {
-      block = await this.backend.db.getBlock(hexStringToBN(tag));
     } else {
       helper.throwRpcErr('Invalid tag value');
     }
     return block;
   }
 
-  protected async getWrappedBlockByTag(tag: string) {
+  protected async getWrappedBlockByTag(tag: any) {
     return new WrappedBlock(await this.getBlockByTag(tag), tag === 'pending');
   }
 
-  protected async getStateManagerByTag(tag: string): Promise<StateManager> {
+  protected async getStateManagerByTag(tag: any): Promise<StateManager> {
     if (tag === 'pending') {
       return this.backend.getPendingStateManager();
     } else {
@@ -79,8 +93,8 @@ export class Controller {
     }
   }
 
-  protected async runCall(data: CallData, tag: string | Block) {
-    const block = typeof tag === 'string' ? await this.getBlockByTag(tag) : tag;
+  protected async runCall(data: CallData, tag: any) {
+    const block = tag instanceof Block ? tag : await this.getBlockByTag(tag);
     const vm = await this.backend.getVM(block.header.stateRoot, block.header.number);
     await vm.stateManager.checkpoint();
     try {

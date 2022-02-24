@@ -5,18 +5,18 @@ import { BaseTrie, SecureTrie as Trie } from 'merkle-patricia-tree';
 import VM from '@gxchain2-ethereumjs/vm';
 import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
 import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
-import { DefaultStateManager as StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
 import { Block, HeaderData, BlockHeader, Transaction, Receipt } from '@rei-network/structure';
 import { Common, getGenesisState } from '@rei-network/common';
 import { logger, ignoreError } from '@rei-network/utils';
 import { Node } from '../../node';
+import { StateManager } from '../../stateManager';
 import { ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
-import { getConsensusTypeByCommon } from '../../hardforks';
+import { getConsensusTypeByCommon, isEnableFreeStaking, isEnableHardfork1, isEnableRemint } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
-import { StakeManager, Contract } from './contracts';
+import { StakeManager, Contract, Fee, FeePool } from './contracts';
 import { StateMachine } from './state';
 import { Evidence, EvidencePool, EvidenceDatabase } from './evpool';
 import { Reimint } from './reimint';
@@ -173,7 +173,15 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     // deploy system contracts
     const vm = await this.node.getVM(root, common);
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
-    await Contract.deploy(evm, common);
+    if (isEnableRemint(common)) {
+      await Contract.deployReimintContracts(evm, common);
+    }
+    if (isEnableHardfork1(common)) {
+      await Contract.deployHardfork1Contracts(evm, common);
+    }
+    if (isEnableFreeStaking(common)) {
+      await Contract.deployFreeStakingContracts(evm, common);
+    }
     root = await vm.stateManager.getStateRoot();
 
     if (!root.equals(genesisBlock.header.stateRoot)) {
@@ -192,6 +200,29 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   getStakeManager(vm: VM, block: Block, common?: Common) {
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
     return new StakeManager(evm, common ?? block._common);
+  }
+
+  /**
+   * Get fee pool contract object
+   * @param vm - Target vm instance
+   * @param block - Target block
+   * @param common - Common instance
+   * @returns Fee pool contract object
+   */
+  getFeePool(vm: VM, block: Block, common?: Common) {
+    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
+    return new FeePool(evm, common ?? block._common);
+  }
+
+  /**
+   * Read total amount in fee contract
+   * @param root - Target state root
+   * @param num - Block number or common instance
+   * @returns Total amount
+   */
+  async getTotalAmount(root: Buffer, num: BNLike | Common) {
+    const state = await this.node.getStateManager(root, num);
+    return await Fee.getTotalAmount(state);
   }
 
   /**

@@ -48,6 +48,7 @@ export class StateMachine {
   private parent!: BlockHeader;
   private parentHash!: Buffer;
   private triggeredTimeoutPrecommit: boolean = false;
+  private replaying: boolean = false;
 
   /////////////// RoundState ///////////////
   private height: BN = new BN(0);
@@ -826,14 +827,24 @@ export class StateMachine {
       return;
     }
 
-    try {
-      /**
-       * NOTE: here, we will directly submit the block that has not executed `validateConsensus`,
-       *       but it's ok, because the `precommits` already contains +2/3 pre-commit votes
-       */
-      await this.backend.commitBlock(finalizedBlock, this.proposalBlockResult);
-    } catch (err) {
-      logger.error('StateMachine::finalizeCommit, catch error:', err);
+    /**
+     * If we are replaying messages,
+     * commit block asynchronously to prevent message queues from getting stuck
+     */
+    if (this.replaying) {
+      this.backend.commitBlock(finalizedBlock, this.proposalBlockResult).catch((err) => {
+        logger.error('StateMachine::finalizeCommit(replaying), catch error:', err);
+      });
+    } else {
+      try {
+        /**
+         * NOTE: here, we will directly submit the block that has not executed `validateConsensus`,
+         *       but it's ok, because the `precommits` already contains +2/3 pre-commit votes
+         */
+        await this.backend.commitBlock(finalizedBlock, this.proposalBlockResult);
+      } catch (err) {
+        logger.error('StateMachine::finalizeCommit, catch error:', err);
+      }
     }
   }
 
@@ -860,6 +871,9 @@ export class StateMachine {
       logger.debug('StateMachine::replay, future message');
       return;
     }
+
+    // set replaying to true
+    this.replaying = true;
 
     try {
       let message: StateMachineMsg | undefined;
@@ -919,6 +933,7 @@ export class StateMachine {
       logger.error('StateMachine::replay, catch error:', err);
     } finally {
       logger.info('♻️  Replay, over');
+      this.replaying = false;
     }
   }
 

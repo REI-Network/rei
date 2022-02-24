@@ -1,5 +1,5 @@
 import { Address, intToHex, bnToHex, bufferToHex, hashPersonalMessage, toRpcSig, ecsign, BN } from 'ethereumjs-util';
-import { TransactionFactory, WrappedTransaction, WrappedBlock, Log, Transaction, Block } from '@rei-network/structure';
+import { TransactionFactory, Log, Transaction, Block } from '@rei-network/structure';
 import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import * as helper from '../helper';
@@ -226,14 +226,14 @@ export class ETHController extends Controller {
   }
   async eth_getBlockByHash([hash, fullTransactions]: [string, boolean]) {
     try {
-      return new WrappedBlock(await this.backend.db.getBlock(hexStringToBuffer(hash))).toRPCJSON(fullTransactions);
+      return ((await this.backend.db.getBlock(hexStringToBuffer(hash))) as Block).toRPCJSON(false, fullTransactions);
     } catch (err) {
       return null;
     }
   }
   async eth_getBlockByNumber([tag, fullTransactions]: [any, boolean]) {
     try {
-      return (await this.getWrappedBlockByTag(tag)).toRPCJSON(fullTransactions);
+      return (await this.getBlockByTag(tag)).toRPCJSON(tag === 'pending', fullTransactions);
     } catch (err) {
       return null;
     }
@@ -241,7 +241,7 @@ export class ETHController extends Controller {
   async eth_getTransactionByHash([hash]: [string]) {
     const hashBuffer = hexStringToBuffer(hash);
     try {
-      return (await this.backend.db.getWrappedTransaction(hashBuffer)).toRPCJSON();
+      return ((await this.backend.db.getTransaction(hashBuffer)) as Transaction).toRPCJSON();
     } catch (err: any) {
       if (err.type !== 'NotFoundError') {
         throw err;
@@ -251,14 +251,14 @@ export class ETHController extends Controller {
     if (!tx) {
       return null;
     }
-    return new WrappedTransaction(tx).toRPCJSON();
+    return tx.toRPCJSON();
   }
   async eth_getTransactionByBlockHashAndIndex([hash, index]: [string, string]) {
     try {
       const block = await this.backend.db.getBlock(hexStringToBuffer(hash));
-      const wtx = new WrappedTransaction(block.transactions[Number(index)] as Transaction);
-      wtx.installProperties(block, Number(index));
-      return wtx.toRPCJSON();
+      const tx = block.transactions[Number(index)] as Transaction;
+      tx.initExtension(block);
+      return tx.toRPCJSON();
     } catch (err) {
       return null;
     }
@@ -266,9 +266,9 @@ export class ETHController extends Controller {
   async eth_getTransactionByBlockNumberAndIndex([tag, index]: [any, string]) {
     try {
       const block = await this.getBlockByTag(tag);
-      const wtx = new WrappedTransaction(block.transactions[Number(index)] as Transaction);
-      wtx.installProperties(block, Number(index));
-      return wtx.toRPCJSON();
+      const tx = block.transactions[Number(index)] as Transaction;
+      tx.initExtension(block);
+      return tx.toRPCJSON();
     } catch (err) {
       return null;
     }

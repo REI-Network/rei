@@ -5,7 +5,7 @@ import { getChain } from './chains';
 
 export * from './genesisStates';
 export * from './chains';
-export { ConsensusAlgorithm, ConsensusType } from '@gxchain2-ethereumjs/common';
+export { Hardfork, Chain, ConsensusAlgorithm, ConsensusType } from '@gxchain2-ethereumjs/common';
 
 /**
  * Common class to access chain and hardfork parameters, based on `@ethereumjs/common`

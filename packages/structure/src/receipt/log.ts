@@ -1,5 +1,6 @@
 import { rlp, BN, bufferToHex, bnToHex, intToHex } from 'ethereumjs-util';
 import { Receipt } from './receipt';
+import { LogExtension, ReceiptExtension } from './extension';
 
 export type LogRawValue = Buffer | Buffer[];
 export type LogRawValues = LogRawValue[];
@@ -12,12 +13,8 @@ export class Log {
   topics: Buffer[];
   data: Buffer;
 
-  blockHash?: Buffer;
-  blockNumber?: BN;
-  logIndex?: number;
-  removed?: boolean;
-  transactionHash?: Buffer;
-  transactionIndex?: number;
+  removed: boolean = false;
+  extension?: LogExtension;
 
   constructor(address: Buffer, topics: Buffer[], data: Buffer) {
     this.address = address;
@@ -68,16 +65,10 @@ export class Log {
   }
 
   /**
-   * Add additional information from receipt
-   * @param receipt - Transaction receipt
-   * @param logIndex - Log index
+   * Init extension
    */
-  installProperties(receipt: Receipt, logIndex: number) {
-    this.blockHash = receipt.blockHash;
-    this.blockNumber = receipt.blockNumber;
-    this.transactionHash = receipt.transactionHash;
-    this.transactionIndex = receipt.transactionIndex;
-    this.logIndex = logIndex;
+  initExtension(receipt: ReceiptExtension, logIndex: number) {
+    this.extension = new LogExtension(receipt, logIndex);
   }
 
   /**
@@ -87,14 +78,14 @@ export class Log {
   toRPCJSON() {
     return {
       address: bufferToHex(this.address),
-      blockHash: this.blockHash ? bufferToHex(this.blockHash) : undefined,
-      blockNumber: this.blockNumber ? bnToHex(this.blockNumber) : undefined,
+      blockHash: this.extension?.blockHash ? bufferToHex(this.extension.blockHash) : undefined,
+      blockNumber: this.extension?.blockNumber ? bnToHex(this.extension.blockNumber) : undefined,
       data: bufferToHex(this.data),
-      logIndex: this.logIndex !== undefined ? intToHex(this.logIndex) : undefined,
+      logIndex: this.extension?.logIndex !== undefined ? intToHex(this.extension.logIndex) : undefined,
       removed: this.removed,
       topics: this.topics.map((topic) => bufferToHex(topic)),
-      transactionHash: this.transactionHash ? bufferToHex(this.transactionHash) : undefined,
-      transactionIndex: this.transactionIndex !== undefined ? intToHex(this.transactionIndex) : undefined
+      transactionHash: this.extension?.transactionHash ? bufferToHex(this.extension.transactionHash) : undefined,
+      transactionIndex: this.extension?.transactionIndex !== undefined ? intToHex(this.extension.transactionIndex) : undefined
     };
   }
 }

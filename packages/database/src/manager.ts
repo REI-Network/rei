@@ -1,7 +1,7 @@
 import * as rlp from 'rlp';
 import { Address, BN } from 'ethereumjs-util';
-import { Block, BlockHeader, BlockBuffer, BlockHeaderBuffer, BlockBodyBuffer, Transaction, WrappedTransaction, Receipt } from '@rei-network/structure';
-import Common from '@gxchain2-ethereumjs/common';
+import { Block, BlockHeader, BlockBuffer, BlockHeaderBuffer, BlockBodyBuffer, Transaction, Receipt } from '@rei-network/structure';
+import { Common } from '@rei-network/common';
 import { CliqueLatestSignerStates, CliqueLatestVotes, CliqueLatestBlockSigners } from './clique';
 import Cache from './cache';
 import { DatabaseKey, DBOp, DBTarget, DBOpData } from './operation';
@@ -260,31 +260,14 @@ export class DBManager {
    */
   async getTransaction(txHash: Buffer): Promise<Transaction> {
     const blockHeightBuffer = await this.get(DBTarget.TxLookup, { txHash });
-    const blockHeihgt = new BN(blockHeightBuffer);
-    const block = await this.getBlock(blockHeihgt);
+    const blockHeight = new BN(blockHeightBuffer);
+    const block = await this.getBlock(blockHeight);
     for (let i = 0; i < block.transactions.length; i++) {
       const tx = block.transactions[i];
       if (tx.hash().equals(txHash)) {
-        return tx as Transaction;
-      }
-    }
-    throw new level.errors.NotFoundError();
-  }
-
-  /**
-   * Get WrappedTransaction by transaction hash
-   * WrappedTransaction includes addtional information from block
-   * @param txHash - Transaction hash
-   * @returns WrappedTransaction
-   */
-  async getWrappedTransaction(txHash: Buffer): Promise<WrappedTransaction> {
-    const blockHeightBuffer = await this.get(DBTarget.TxLookup, { txHash });
-    const blockHeihgt = new BN(blockHeightBuffer);
-    const block = await this.getBlock(blockHeihgt);
-    for (let i = 0; i < block.transactions.length; i++) {
-      const tx = block.transactions[i];
-      if (tx.hash().equals(txHash)) {
-        return new WrappedTransaction(tx as Transaction).installProperties(block, i);
+        const _tx = tx as Transaction;
+        _tx.initExtension(block);
+        return _tx;
       }
     }
     throw new level.errors.NotFoundError();
@@ -302,12 +285,11 @@ export class DBManager {
     const rawArr = rlp.decode(await this.get(DBTarget.Receipts, { blockHash: block.hash(), blockNumber: blockHeihgt })) as unknown as Buffer[][];
     let lastCumulativeGasUsed = new BN(0);
     for (let i = 0; i < block.transactions.length; i++) {
-      const tx = block.transactions[i];
-      const raw = rawArr[i];
-      const receipt = Receipt.fromValuesArray(raw);
+      const tx = block.transactions[i] as Transaction;
+      const receipt = Receipt.fromValuesArray(rawArr[i]);
       if (tx.hash().equals(txHash)) {
         const gasUsed = receipt.bnCumulativeGasUsed.sub(lastCumulativeGasUsed);
-        receipt.installProperties(block, tx as Transaction, gasUsed, i);
+        receipt.initExtension(block, tx, gasUsed, i);
         return receipt;
       }
       lastCumulativeGasUsed = receipt.bnCumulativeGasUsed;
@@ -329,7 +311,7 @@ export class DBManager {
       const raw = rawArr[i];
       const receipt = Receipt.fromValuesArray(raw);
       const gasUsed = receipt.bnCumulativeGasUsed.sub(lastCumulativeGasUsed);
-      block && receipt.installProperties(block, block.transactions[i] as Transaction, gasUsed, i);
+      block && receipt.initExtension(block, block.transactions[i] as Transaction, gasUsed, i);
       lastCumulativeGasUsed = receipt.bnCumulativeGasUsed;
       receipts.push(receipt);
     }
@@ -350,12 +332,11 @@ export class DBManager {
     const rawArr = rlp.decode(await this.get(DBTarget.Receipts, { blockHash, blockNumber })) as unknown as Buffer[][];
     let lastCumulativeGasUsed = new BN(0);
     for (let i = 0; i < block.transactions.length; i++) {
-      const tx = block.transactions[i];
-      const raw = rawArr[i];
-      const receipt = Receipt.fromValuesArray(raw);
+      const tx = block.transactions[i] as Transaction;
+      const receipt = Receipt.fromValuesArray(rawArr[i]);
       if (tx.hash().equals(txHash)) {
         const gasUsed = receipt.bnCumulativeGasUsed.sub(lastCumulativeGasUsed);
-        receipt.installProperties(block, tx as Transaction, gasUsed, i);
+        receipt.initExtension(block, tx, gasUsed, i);
         return receipt;
       }
       lastCumulativeGasUsed = receipt.bnCumulativeGasUsed;

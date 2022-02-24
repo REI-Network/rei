@@ -1,6 +1,6 @@
-import { DBOp, DBTarget } from './operation';
 import { BN, rlp, toBuffer } from 'ethereumjs-util';
 import { Block, BlockHeader, Receipt } from '@rei-network/structure';
+import { DBOp, DBTarget } from './operation';
 import { bufBE8 } from './constants';
 
 /*

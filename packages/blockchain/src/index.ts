@@ -1,8 +1,8 @@
 import { debug as createDebugLogger } from 'debug';
 import Semaphore from 'semaphore-async-await';
 import { Address, BN, rlp } from 'ethereumjs-util';
-import { Block, BlockData, BlockHeader } from '@gxchain2-ethereumjs/block';
-import Common, { Chain, ConsensusAlgorithm, ConsensusType, Hardfork } from '@gxchain2-ethereumjs/common';
+import { Block, BlockData, BlockHeader } from '@rei-network/structure';
+import { Common, Chain, ConsensusAlgorithm, ConsensusType, Hardfork } from '@rei-network/common';
 import { Database, DBTarget, DBOp, DBSetBlockOrHeader, DBSetTD, DBSetHashToNumber, DBSaveLookups } from '@rei-network/database';
 import { CliqueSignerState, CliqueLatestSignerStates, CliqueVote, CliqueLatestVotes, CliqueBlockSigner, CliqueLatestBlockSigners, CLIQUE_NONCE_AUTH, CLIQUE_NONCE_DROP } from './clique';
 

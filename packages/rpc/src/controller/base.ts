@@ -1,5 +1,5 @@
 import { Address, BN } from 'ethereumjs-util';
-import { Block, WrappedBlock } from '@rei-network/structure';
+import { Block } from '@rei-network/structure';
 import { hexStringToBuffer, hexStringToBN } from '@rei-network/utils';
 import { StateManager } from '../types';
 import { RpcServer } from '../index';
@@ -80,10 +80,6 @@ export class Controller {
     return block;
   }
 
-  protected async getWrappedBlockByTag(tag: any) {
-    return new WrappedBlock(await this.getBlockByTag(tag), tag === 'pending');
-  }
-
   protected async getStateManagerByTag(tag: any): Promise<StateManager> {
     if (tag === 'pending') {
       return this.backend.getPendingStateManager();
@@ -99,7 +95,7 @@ export class Controller {
     await vm.stateManager.checkpoint();
     try {
       const result = await vm.runCall({
-        block,
+        block: block as any,
         gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
         origin: data.from ? Address.fromString(data.from) : Address.zero(),
         caller: data.from ? Address.fromString(data.from) : Address.zero(),

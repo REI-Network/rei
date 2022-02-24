@@ -1,7 +1,8 @@
 import { rlp, toBuffer, unpadBuffer, bufferToInt, BN, bufferToHex, bnToHex, intToHex, generateAddress } from 'ethereumjs-util';
-import { Block } from './block';
-import { Transaction } from './transaction';
+import { Block } from '../block';
+import { Transaction } from '../tx';
 import { LogRawValues, Log } from './log';
+import { ReceiptExtension } from './extension';
 
 export type ReceiptRawValue = (Buffer | LogRawValues[])[];
 
@@ -14,14 +15,7 @@ export class Receipt {
   logs: Log[];
   status: 0 | 1;
 
-  gasUsed?: BN;
-  blockHash?: Buffer;
-  blockNumber?: BN;
-  contractAddress?: Buffer;
-  from?: Buffer;
-  to?: Buffer;
-  transactionHash?: Buffer;
-  transactionIndex?: number;
+  extension?: ReceiptExtension;
 
   /**
    * Return the cumulative gas in `BN` type
@@ -85,23 +79,13 @@ export class Receipt {
   }
 
   /**
-   * Add addtional information for receipt
-   * @param block - Block
-   * @param tx - Transaction
-   * @param gasUsed - Transaction gas used
-   * @param txIndex - Transaction index
+   * Init extension
    */
-  installProperties(block: Block, tx: Transaction, gasUsed: BN, txIndex: number) {
-    this.blockHash = block.hash();
-    this.blockNumber = block.header.number;
-    this.from = tx.getSenderAddress().toBuffer();
-    this.contractAddress = tx.to ? undefined : generateAddress(this.from!, tx.nonce.toArrayLike(Buffer));
-    this.gasUsed = gasUsed;
-    this.to = tx?.to?.toBuffer();
-    this.transactionHash = tx.hash();
-    this.transactionIndex = txIndex;
-
-    this.logs.forEach((log, i) => log.installProperties(this, i));
+  initExtension(block: Block, tx: Transaction, gasUsed: BN, txIndex: number) {
+    this.extension = new ReceiptExtension(block, tx, gasUsed, txIndex);
+    this.logs.forEach((log, i) => {
+      log.initExtension(this.extension!, i);
+    });
   }
 
   /**
@@ -110,18 +94,18 @@ export class Receipt {
    */
   toRPCJSON() {
     return {
-      blockHash: this.blockHash ? bufferToHex(this.blockHash) : undefined,
-      blockNumber: this.blockNumber ? bnToHex(this.blockNumber) : undefined,
-      contractAddress: this.contractAddress ? bufferToHex(this.contractAddress) : null,
+      blockHash: this.extension?.blockHash ? bufferToHex(this.extension.blockHash) : undefined,
+      blockNumber: this.extension?.blockNumber ? bnToHex(this.extension.blockNumber) : undefined,
+      contractAddress: this.extension?.contractAddress ? bufferToHex(this.extension.contractAddress) : null,
       cumulativeGasUsed: bnToHex(this.bnCumulativeGasUsed),
-      from: this.from ? bufferToHex(this.from) : undefined,
-      gasUsed: this.gasUsed ? bnToHex(this.gasUsed) : undefined,
+      from: this.extension?.from ? bufferToHex(this.extension.from) : undefined,
+      gasUsed: this.extension?.gasUsed ? bnToHex(this.extension.gasUsed) : undefined,
       logs: this.logs.map((log) => log.toRPCJSON()),
       logsBloom: bufferToHex(this.bitvector),
       status: intToHex(this.status),
-      to: this.to ? bufferToHex(this.to) : undefined,
-      transactionHash: this.transactionHash ? bufferToHex(this.transactionHash) : undefined,
-      transactionIndex: this.transactionIndex !== undefined ? intToHex(this.transactionIndex) : undefined
+      to: this.extension?.to ? bufferToHex(this.extension.to) : undefined,
+      transactionHash: this.extension?.transactionHash ? bufferToHex(this.extension.transactionHash) : undefined,
+      transactionIndex: this.extension?.transactionIndex !== undefined ? intToHex(this.extension.transactionIndex) : undefined
     };
   }
 }

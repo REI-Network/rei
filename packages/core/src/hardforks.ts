@@ -28,7 +28,6 @@ setCustomHashFunction((header: BlockHeader) => {
 addPrecompile(
   Address.fromString('0x00000000000000000000000000000000000000ff'),
   async (opts) => {
-    console.log('enter estimate');
     assert(opts.data);
 
     if (!isEnableFreeStaking(opts._common)) {

@@ -1,5 +1,5 @@
-import Common, { Chain, ConsensusAlgorithm, ConsensusType, Hardfork } from '@gxchain2-ethereumjs/common';
 import { Address, BN, bnToHex, bnToUnpaddedBuffer, ecrecover, ecsign, intToBuffer, KECCAK256_RLP_ARRAY, KECCAK256_RLP, rlp, rlphash, toBuffer, zeros } from 'ethereumjs-util';
+import { Common, Chain, ConsensusAlgorithm, ConsensusType, Hardfork } from '@rei-network/common';
 import { HeaderData, JsonHeader, BlockHeaderBuffer, Blockchain, BlockOptions } from './types';
 import { CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL, CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from './clique';
 

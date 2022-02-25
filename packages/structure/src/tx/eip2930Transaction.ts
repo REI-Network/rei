@@ -1,8 +1,7 @@
 import { BN, bnToHex, bnToUnpaddedBuffer, ecrecover, keccak256, rlp, toBuffer } from 'ethereumjs-util';
-import Common from '@gxchain2-ethereumjs/common';
+import { Common } from '@rei-network/common';
 import { BaseTransaction } from './baseTransaction';
 import { AccessList, AccessListBuffer, AccessListEIP2930TxData, AccessListEIP2930ValuesArray, JsonTx, TxOptions, N_DIV_2 } from './types';
-
 import { AccessLists } from './util';
 
 const TRANSACTION_TYPE = 1;

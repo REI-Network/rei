@@ -14,7 +14,7 @@
         "mocha": "^9.0.2"
     },
     "dependencies": {
-        "@gxchain2-ethereumjs/blockchain": "^5.4.3",
+        "@rei-network/common": "^0.0.4",
         "@rei-network/database": "^0.0.4",
         "@rei-network/structure": "^0.0.2"
     }

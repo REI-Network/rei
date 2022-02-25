@@ -1,5 +1,5 @@
 import { BN, AddressLike, BNLike, BufferLike, PrefixedHexString } from 'ethereumjs-util';
-import Common from '@gxchain2-ethereumjs/common';
+import { Common } from '@rei-network/common';
 import { default as Transaction } from './legacyTransaction';
 import { default as AccessListEIP2930Transaction } from './eip2930Transaction';
 import { default as FeeMarketEIP1559Transaction } from './eip1559Transaction';

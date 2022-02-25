@@ -1,11 +1,11 @@
 import vm from 'vm';
 import bi, { BigInteger } from 'big-integer';
-import { StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
-import { getPrecompile } from '@gxchain2-ethereumjs/vm/dist/evm/precompiles';
-import { OpcodeList } from '@gxchain2-ethereumjs/vm/dist/evm/opcodes';
+import { StateManager } from '@rei-network/vm/dist/state';
+import { getPrecompile } from '@rei-network/vm/dist/evm/precompiles';
+import { OpcodeList } from '@rei-network/vm/dist/evm/opcodes';
 import { Address, BN, bufferToHex, setLengthLeft, generateAddress, generateAddress2, keccak256 } from 'ethereumjs-util';
-import { InterpreterStep } from '@gxchain2-ethereumjs/vm/dist/evm/interpreter';
-import { VmError } from '@gxchain2-ethereumjs/vm/dist/exceptions';
+import { InterpreterStep } from '@rei-network/vm/dist/evm/interpreter';
+import { VmError } from '@rei-network/vm/dist/exceptions';
 import { hexStringToBuffer, logger } from '@rei-network/utils';
 import { calcIntrinsicGas } from '@rei-network/structure';
 import { IDebugImpl, TraceConfig } from '../tracer';

@@ -1,27 +1,25 @@
 import fs from 'fs';
 import path from 'path';
-import { Common } from '../../../common/src';
 import { expect } from 'chai';
-import { WrappedBlock, Block } from '../../src';
+import { Common } from '../../../common/src';
+import { Block } from '../../src';
 
 describe('Blcok', () => {
   let testblock: Block;
-  let wrappedTestBlcok: WrappedBlock;
   let testdata: any;
 
   before(() => {
     const common = Common.createChainStartCommon('rei-testnet');
     testdata = JSON.parse(fs.readFileSync(path.join(__dirname, '/test-data.json')).toString());
     testblock = Block.fromBlockData(testdata, { common, hardforkByBlockNumber: true });
-    wrappedTestBlcok = new WrappedBlock(testblock);
   });
 
   it('should get block size', () => {
-    expect(wrappedTestBlcok.size, 'block size should euqal').be.equal(parseInt(testdata.header.size));
+    expect(testblock.size, 'block size should euqal').be.equal(parseInt(testdata.header.size));
   });
 
   it('should convert to rpcjson', () => {
-    const rpcjson = wrappedTestBlcok.toRPCJSON();
+    const rpcjson = testblock.toRPCJSON(false, false);
     expect(rpcjson.number, 'number should be equal').be.equal(testdata.header.number);
     expect(rpcjson.hash, 'hash should be equal').be.equal(testdata.header.hash);
     expect(rpcjson.parentHash, 'parentHash should be equal').be.equal(testdata.header.parentHash);

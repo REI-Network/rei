@@ -1,4 +1,4 @@
-import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
+import EVM from '@rei-network/vm/dist/evm/evm';
 import { Address, BN, toBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Log, Receipt } from '@rei-network/structure';

@@ -1,6 +1,6 @@
 import { rlphash, Address, BN, setLengthRight, setLengthLeft } from 'ethereumjs-util';
-import { addPrecompile } from '@gxchain2-ethereumjs/vm/dist/evm/precompiles';
-import { OOGResult } from '@gxchain2-ethereumjs/vm/dist/evm/evm';
+import { addPrecompile } from '@rei-network/vm/dist/evm/precompiles';
+import { OOGResult } from '@rei-network/vm/dist/evm/evm';
 import { hexStringToBN } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { BlockHeader, setCustomHashFunction, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';

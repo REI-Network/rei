@@ -1,11 +1,11 @@
 import { Address, BN, bufferToHex, toBuffer } from 'ethereumjs-util';
-import { RunTxResult, generateTxReceipt as EthereumGenerateTxReceipt } from '@gxchain2-ethereumjs/vm/dist/runTx';
-import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
-import { Log as EthereumLog } from '@gxchain2-ethereumjs/vm/dist/evm/types';
+import { RunTxResult, generateTxReceipt as EthereumGenerateTxReceipt } from '@rei-network/vm/dist/runTx';
+import { TxReceipt } from '@rei-network/vm/dist/types';
+import { Log as EthereumLog } from '@rei-network/vm/dist/evm/types';
 import { TypedTransaction, Transaction } from '@rei-network/structure';
 import { logger } from '@rei-network/utils';
-import VM from '@gxchain2-ethereumjs/vm';
-import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import { VM } from '@rei-network/vm';
+import { StateManager as IStateManager } from '@rei-network/vm/dist/state';
 import { StateManager } from '../../stateManager';
 import { validateTx } from '../../validation';
 import { encode } from './contracts';

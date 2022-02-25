@@ -1,11 +1,11 @@
 import { Address, BN, toBuffer } from 'ethereumjs-util';
 import { BaseTrie } from 'merkle-patricia-tree';
-import VM from '@gxchain2-ethereumjs/vm';
-import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
-import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
-import { RunBlockOpts, rewardAccount, encodeReceipt } from '@gxchain2-ethereumjs/vm/dist/runBlock';
-import { TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
-import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import { VM } from '@rei-network/vm';
+import EVM from '@rei-network/vm/dist/evm/evm';
+import TxContext from '@rei-network/vm/dist/evm/txContext';
+import { RunBlockOpts, rewardAccount, encodeReceipt } from '@rei-network/vm/dist/runBlock';
+import { TxReceipt } from '@rei-network/vm/dist/types';
+import { StateManager as IStateManager } from '@rei-network/vm/dist/state';
 import { Block, TypedTransaction } from '@rei-network/structure';
 import { logger } from '@rei-network/utils';
 import { FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, ExecutorBackend, Executor } from '../types';

@@ -1,4 +1,4 @@
-import { rlp, toBuffer, unpadBuffer, bufferToInt, BN, bufferToHex, bnToHex, intToHex, generateAddress } from 'ethereumjs-util';
+import { rlp, toBuffer, unpadBuffer, bufferToInt, BN, bufferToHex, bnToHex, intToHex } from 'ethereumjs-util';
 import { Block } from '../block';
 import { Transaction } from '../tx';
 import { LogRawValues, Log } from './log';

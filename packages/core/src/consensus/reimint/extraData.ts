@@ -1,5 +1,5 @@
 import { rlp, intToBuffer, bufferToInt, BNLike, Address } from 'ethereumjs-util';
-import VM from '@gxchain2-ethereumjs/vm';
+import { VM } from '@rei-network/vm';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
 import { BlockHeader, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';

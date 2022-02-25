@@ -1,5 +1,4 @@
-import { rlp, BN, bufferToHex, bnToHex, intToHex } from 'ethereumjs-util';
-import { Receipt } from './receipt';
+import { rlp, bufferToHex, bnToHex, intToHex } from 'ethereumjs-util';
 import { LogExtension, ReceiptExtension } from './extension';
 
 export type LogRawValue = Buffer | Buffer[];

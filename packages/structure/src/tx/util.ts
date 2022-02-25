@@ -1,4 +1,4 @@
-import Common from '@gxchain2-ethereumjs/common';
+import { Common } from '@rei-network/common';
 import { bufferToHex, setLengthLeft, toBuffer } from 'ethereumjs-util';
 import { AccessList, AccessListBuffer, AccessListItem, isAccessList } from './types';
 

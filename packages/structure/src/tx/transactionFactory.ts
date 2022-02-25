@@ -1,9 +1,9 @@
 import { BN, toBuffer } from 'ethereumjs-util';
+import { Common } from '@rei-network/common';
 import { TxOptions, TypedTransaction, TxData, AccessListEIP2930TxData, FeeMarketEIP1559TxData } from './types';
 import Transaction from './legacyTransaction';
 import AccessListEIP2930Transaction from './eip2930Transaction';
 import FeeMarketEIP1559Transaction from './eip1559Transaction';
-import Common from '@gxchain2-ethereumjs/common';
 
 export default class TransactionFactory {
   // It is not possible to instantiate a TransactionFactory object.

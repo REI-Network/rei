@@ -1,9 +1,9 @@
 import path from 'path';
 import fs from 'fs';
-import { Common } from '../../../common/src';
-import { BN } from 'ethereumjs-util';
-import { hexStringToBuffer, hexStringToBN } from '../../../utils/src';
 import { expect } from 'chai';
+import { BN } from 'ethereumjs-util';
+import { Common } from '../../../common/src';
+import { hexStringToBuffer, hexStringToBN } from '../../../utils/src';
 import { Block, Transaction, Log, Receipt } from '../../src';
 
 describe('Log', () => {

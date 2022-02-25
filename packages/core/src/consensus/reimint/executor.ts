@@ -1,12 +1,12 @@
 import { Address, BN, bufferToHex } from 'ethereumjs-util';
 import { logger } from '@rei-network/utils';
 import { Block, Log, Receipt } from '@rei-network/structure';
-import { RunBlockOpts, rewardAccount } from '@gxchain2-ethereumjs/vm/dist/runBlock';
-import { StateManager as IStateManager } from '@gxchain2-ethereumjs/vm/dist/state';
-import { RunTxResult } from '@gxchain2-ethereumjs/vm/dist/runTx';
-import VM from '@gxchain2-ethereumjs/vm';
-import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
-import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
+import { RunBlockOpts, rewardAccount } from '@rei-network/vm/dist/runBlock';
+import { StateManager as IStateManager } from '@rei-network/vm/dist/state';
+import { RunTxResult } from '@rei-network/vm/dist/runTx';
+import { VM } from '@rei-network/vm';
+import EVM from '@rei-network/vm/dist/evm/evm';
+import TxContext from '@rei-network/vm/dist/evm/txContext';
 import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executor } from '../types';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
 import { isEnableFreeStaking, isEnableHardfork1 } from '../../hardforks';

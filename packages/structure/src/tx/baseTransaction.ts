@@ -1,5 +1,5 @@
-import Common, { Chain, Hardfork } from '@gxchain2-ethereumjs/common';
 import { Address, BN, toBuffer, MAX_INTEGER, TWO_POW256, unpadBuffer, ecsign, publicToAddress, BNLike } from 'ethereumjs-util';
+import { Common, Chain, Hardfork } from '@rei-network/common';
 import { Block } from '../block';
 import { TxData, JsonTx, AccessListEIP2930ValuesArray, AccessListEIP2930TxData, FeeMarketEIP1559ValuesArray, FeeMarketEIP1559TxData, TxValuesArray, Capability } from './types';
 import { TransactionExtension } from './extension';

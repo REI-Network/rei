@@ -104,10 +104,10 @@ export class BloomBitsFilter {
    * @returns `true` if matched
    */
   static checkLogMatches(log: Log, { addresses, topics, from, to }: { addresses: Address[]; topics: Topics; from?: BN; to?: BN }): boolean {
-    if (from && (!log.blockNumber || from.gt(log.blockNumber))) {
+    if (from && (!log.extension!.blockNumber || from.gt(log.extension!.blockNumber))) {
       return false;
     }
-    if (to && (!log.blockNumber || to.lt(log.blockNumber))) {
+    if (to && (!log.extension!.blockNumber || to.lt(log.extension!.blockNumber))) {
       return false;
     }
     if (addresses.length > 0 && addresses.findIndex((addr) => addr.buf.equals(log.address)) === -1) {

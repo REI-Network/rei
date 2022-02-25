@@ -7,7 +7,7 @@ import { Database, createLevelDB, createEncodingLevelDB, DBSaveTxLookup, DBSaveR
 import { NetworkManager, Peer } from '@rei-network/network';
 import { Common, getChain } from '@rei-network/common';
 import { Blockchain } from '@rei-network/blockchain';
-import VM from '@gxchain2-ethereumjs/vm';
+import { VM } from '@rei-network/vm';
 import { Transaction, Block } from '@rei-network/structure';
 import { Channel, Aborter, logger, Initializer } from '@rei-network/utils';
 import { AccountManager } from '@rei-network/wallet';
@@ -315,7 +315,7 @@ export class Node extends Initializer {
     return new VM({
       common,
       stateManager,
-      blockchain: this.blockchain as any,
+      blockchain: this.blockchain,
       getMiner: (header) => this.getEngine(header._common).getMiner(header)
     });
   }
@@ -419,7 +419,7 @@ export class Node extends Initializer {
     for (let i = 0; i < receipts.length; i++) {
       const receipt = receipts[i];
       const gasUsed = receipt.bnCumulativeGasUsed.sub(lastCumulativeGasUsed);
-      receipt.installProperties(block, block.transactions[i] as Transaction, gasUsed, i);
+      receipt.initExtension(block, block.transactions[i] as Transaction, gasUsed, i);
       lastCumulativeGasUsed = receipt.bnCumulativeGasUsed;
     }
 

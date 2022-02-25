@@ -1,5 +1,5 @@
 import { AddressLike, BNLike, BufferLike } from 'ethereumjs-util';
-import Common from '@gxchain2-ethereumjs/common';
+import { Common } from '@rei-network/common';
 import { TxData, JsonTx, AccessListEIP2930TxData, FeeMarketEIP1559TxData } from '../tx';
 import { Block } from './block';
 import { BlockHeader } from './header';

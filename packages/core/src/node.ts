@@ -3,7 +3,7 @@ import type { LevelUp } from 'levelup';
 import LevelStore from 'datastore-level';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
-import { Database, createLevelDB, createEncodingLevelDB, DBSaveTxLookup, DBSaveReceipts } from '@rei-network/database';
+import { Database, createLevelDB, createEncodingLevelDB } from '@rei-network/database';
 import { NetworkManager, Peer } from '@rei-network/network';
 import { Common } from '@rei-network/common';
 import { Blockchain } from '@rei-network/blockchain';
@@ -415,10 +415,8 @@ export class Node extends Initializer {
       }
     }
 
-    // save block
-    const reorged = await this.blockchain.putBlock(block);
-    // save receipts
-    await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, hash, number)));
+    // save block to the database
+    const reorged = await this.blockchain.putBlock(block, { receipts, saveTxLookup: true });
 
     // install properties for receipts
     let lastCumulativeGasUsed = new BN(0);

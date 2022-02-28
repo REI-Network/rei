@@ -1,14 +1,21 @@
 import { debug as createDebugLogger } from 'debug';
 import Semaphore from 'semaphore-async-await';
 import { Address, BN, rlp } from 'ethereumjs-util';
-import { Block, BlockData, BlockHeader } from '@rei-network/structure';
+import { Block, BlockData, BlockHeader, Receipt } from '@rei-network/structure';
 import { Common, Chain, ConsensusAlgorithm, ConsensusType, Hardfork } from '@rei-network/common';
-import { Database, DBTarget, DBOp, DBSetBlockOrHeader, DBSetTD, DBSetHashToNumber, DBSaveLookups } from '@rei-network/database';
+import { Database, DBTarget, DBOp, DBSetBlockOrHeader, DBSetTD, DBSetHashToNumber, DBSaveLookups, DBSaveReceipts, DBSaveTxLookup } from '@rei-network/database';
 import { CliqueSignerState, CliqueLatestSignerStates, CliqueVote, CliqueLatestVotes, CliqueBlockSigner, CliqueLatestBlockSigners, CLIQUE_NONCE_AUTH, CLIQUE_NONCE_DROP } from './clique';
 
 const debug = createDebugLogger('blockchain:clique');
 
 type OnBlock = (block: Block, reorg: boolean) => Promise<void> | void;
+
+export interface PutBlockOptions {
+  // The list of block receipt
+  receipts?: Receipt[];
+  // Whether to save the tx lookup index
+  saveTxLookup?: boolean;
+}
 
 export interface BlockchainInterface {
   /**
@@ -16,7 +23,7 @@ export interface BlockchainInterface {
    *
    * @param block - The block to be added to the blockchain.
    */
-  putBlock(block: Block): Promise<boolean>;
+  putBlock(block: Block, options?: PutBlockOptions): Promise<boolean>;
 
   /**
    * Deletes a block from the blockchain. All child blocks in the chain are
@@ -747,10 +754,11 @@ export class Blockchain implements BlockchainInterface {
    * max total difficulty, the canonical chain is rebuilt and any stale
    * heads/hashes are overwritten.
    * @param block - The block to be added to the blockchain
+   * @param options - Options
    */
-  async putBlock(block: Block) {
+  async putBlock(block: Block, options?: PutBlockOptions) {
     await this.initPromise;
-    return await this._putBlockOrHeader(block);
+    return await this._putBlockOrHeader(block, options);
   }
 
   /**
@@ -794,7 +802,7 @@ export class Blockchain implements BlockchainInterface {
    * header using the iterator method.
    * @hidden
    */
-  private async _putBlockOrHeader(item: Block | BlockHeader) {
+  private async _putBlockOrHeader(item: Block | BlockHeader, options?: PutBlockOptions) {
     return await this.runWithLock<boolean>(async () => {
       const block =
         item instanceof BlockHeader
@@ -880,6 +888,10 @@ export class Blockchain implements BlockchainInterface {
 
       // save header/block to the database
       dbOps = dbOps.concat(DBSetBlockOrHeader(block));
+      // save receipts to the database
+      options?.receipts && (dbOps = dbOps.concat(DBSaveReceipts(options.receipts, blockHash, blockNumber)));
+      // save tx lookup to the database
+      options?.saveTxLookup && (dbOps = dbOps.concat(DBSaveTxLookup(block)));
 
       let ancientHeaderNumber: undefined | BN;
       const reorg = block.isGenesis() || (block._common.consensusType() !== ConsensusType.ProofOfStake && td.gt(currentTd.header)) || block._common.consensusType() === ConsensusType.ProofOfStake;

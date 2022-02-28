@@ -40,8 +40,6 @@ function calcAccUsage(receipts: Receipt[]) {
     accBalUsage.iadd(new BN(log.topics[2]));
   }
 
-  console.log('accFeeUsage:', accFeeUsage.toString(), 'accBalUsage:', accBalUsage.toString());
-
   return {
     accFeeUsage,
     accBalUsage
@@ -86,8 +84,6 @@ export class ReimintExecutor implements Executor {
    * @returns New validator set
    */
   async afterApply(vm: VM, pendingBlock: Block, receipts: Receipt[], evidence: Evidence[], miner: Address, totalReward: BN, parentValidatorSet: ValidatorSet, parentStakeManager: StakeManager) {
-    console.log('(0) pendingBlock(h,n,m):', pendingBlock.hash().toString('hex'), pendingBlock.header.number.toString(), miner.toString());
-
     const pendingCommon = pendingBlock._common;
 
     let accFeeUsage: BN | undefined;
@@ -124,16 +120,12 @@ export class ReimintExecutor implements Executor {
       feePoolReward = new BN(0);
     }
 
-    console.log('(1) minerReward:', minerReward.toString(), 'feePoolReward:', feePoolReward.toString());
-
     // 2. call stakeManager.reward to assign miner reward
     let logs: Log[] = [];
     const ethLogs = await parentStakeManager.reward(miner, minerReward);
     if (ethLogs && ethLogs.length > 0) {
       logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));
     }
-
-    console.log('(2) logs:', logs.length);
 
     // 3. call stakeManager.slash to slash validators
     for (const ev of evidence) {
@@ -149,8 +141,6 @@ export class ReimintExecutor implements Executor {
         throw new Error('unknown evidence');
       }
     }
-
-    console.log('(3) evidence:', evidence.length);
 
     if (isEnableFreeStaking(pendingCommon)) {
       // 4. filter all receipts to collect free staking changes,
@@ -168,13 +158,6 @@ export class ReimintExecutor implements Executor {
         }
       }
 
-      console.log(
-        '(4) changes:',
-        Array.from(changes).map(([addr, value]) => {
-          return `addr: ${addr.toString()} | value: ${value.toString()}`;
-        })
-      );
-
       // 5. calculate miner amount and distributed value,
       //    and call feePool.distribute
       const minerAmount = accBalUsage!.add(accFeeUsage!);
@@ -184,10 +167,6 @@ export class ReimintExecutor implements Executor {
       if (ethLogs && ethLogs.length > 0) {
         logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));
       }
-
-      console.log('(5) minerAmount:', minerAmount.toString(), 'distributeValue:', distributeValue.toString());
-    } else {
-      console.log('(4)(5) skip');
     }
 
     // 6. call stakeManager.getTotalLockedAmountAndValidatorCount to get totalLockedAmount and validatorCount,
@@ -251,14 +230,12 @@ export class ReimintExecutor implements Executor {
     if (!isEnableHardfork1(pendingCommon) && isEnableHardfork1(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployHardfork1Contracts(evm, nextCommon);
-      console.log('(10) deployHardfork1Contracts');
     }
 
     // 11. deploy contracts if enable free staking is enabled in the next block
     if (!isEnableFreeStaking(pendingCommon) && isEnableFreeStaking(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployFreeStakingContracts(evm, nextCommon);
-      console.log('(11) deployFreeStakingContracts');
     }
 
     return validatorSet;

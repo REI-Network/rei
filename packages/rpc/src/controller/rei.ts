@@ -29,6 +29,21 @@ export class ReiController extends Controller {
   }
 
   /**
+   * Estimate user used crude
+   * @param address - Target address
+   * @param tag - Block tag
+   * @returns Used crude
+   */
+  async rei_getUsedCrude([address, tag]: [string, string]) {
+    const block = await this.getBlockByTag(tag);
+    const timestamp = block.header.timestamp.toNumber();
+    const state = await this.backend.getStateManager(block.header.stateRoot, block._common);
+    const account = await state.getAccount(Address.fromString(address));
+    const stakeInfo = account.getStakeInfo();
+    return bnToHex(stakeInfo.estimateUsage(timestamp));
+  }
+
+  /**
    * Get the total deposit amount of the user
    * @param address - Target address
    * @param tag - Block tag

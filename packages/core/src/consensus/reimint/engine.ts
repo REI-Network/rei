@@ -13,7 +13,7 @@ import { Node } from '../../node';
 import { StateManager } from '../../stateManager';
 import { ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
-import { getConsensusTypeByCommon, isEnableFreeStaking } from '../../hardforks';
+import { getConsensusTypeByCommon, isEnableFreeStaking, isEnableHardfork1, isEnableRemint } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
@@ -174,7 +174,12 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     // deploy system contracts
     const vm = await this.node.getVM(root, common);
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
-    await Contract.deployReimintContracts(evm, common);
+    if (isEnableRemint(common)) {
+      await Contract.deployReimintContracts(evm, common);
+    }
+    if (isEnableHardfork1(common)) {
+      await Contract.deployHardfork1Contracts(evm, common);
+    }
     if (isEnableFreeStaking(common)) {
       await Contract.deployFreeStakingContracts(evm, common);
     }

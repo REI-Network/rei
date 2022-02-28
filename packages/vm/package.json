@@ -10,6 +10,9 @@
     "test": "echo @rei-network/vm has not test cases"
   },
   "dependencies": {
+    "@rei-network/blockchain": "^0.0.4",
+    "@rei-network/common": "^0.0.4",
+    "@rei-network/structure": "^0.0.2",
     "merkle-patricia-tree": "^4.2.1",
     "async-eventemitter": "^0.2.4",
     "core-js-pure": "^3.0.1",

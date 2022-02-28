@@ -317,17 +317,7 @@ export abstract class BaseTransaction<TransactionObject> {
           // -> Instantiate Common with chain ID
           return new Common({ chain: chainIdBN, hardfork: this.DEFAULT_HARDFORK });
         } else {
-          // No Common, chain ID not supported by Common
-          // -> Instantiate custom Common derived from DEFAULT_CHAIN
-          return Common.forCustomChain(
-            this.DEFAULT_CHAIN,
-            {
-              name: 'custom-chain',
-              networkId: chainIdBN,
-              chainId: chainIdBN
-            },
-            this.DEFAULT_HARDFORK
-          );
+          throw new Common({ chain: this.DEFAULT_CHAIN, hardfork: this.DEFAULT_HARDFORK });
         }
       }
     } else {

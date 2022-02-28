@@ -6,7 +6,8 @@ import { VM } from '@rei-network/vm';
 import EVM from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';
 import { Block, HeaderData, BlockHeader, Transaction, Receipt } from '@rei-network/structure';
-import { Common, getGenesisState } from '@rei-network/common';
+import { Common } from '@rei-network/common';
+import { genesisStateByName } from '@rei-network/common/dist/genesisStates';
 import { logger, ignoreError } from '@rei-network/utils';
 import { Node } from '../../node';
 import { StateManager } from '../../stateManager';
@@ -167,7 +168,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     const common = this.getCommon(0);
     const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
     const stateManager = new StateManager({ common, trie: new Trie(this.node.chaindb) });
-    await stateManager.generateGenesis(getGenesisState(this.node.chain));
+    await stateManager.generateGenesis(genesisStateByName(this.node.chain));
     let root = await stateManager.getStateRoot();
 
     // deploy system contracts

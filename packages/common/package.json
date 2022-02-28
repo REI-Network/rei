@@ -10,8 +10,5 @@
     },
     "devDependencies": {
         "typescript": "^4.1.2"
-    },
-    "dependencies": {
-        "@gxchain2-ethereumjs/common": "^2.4.2"
     }
 }

@@ -5,7 +5,7 @@ import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import { Database, createLevelDB, createEncodingLevelDB, DBSaveTxLookup, DBSaveReceipts } from '@rei-network/database';
 import { NetworkManager, Peer } from '@rei-network/network';
-import { Common, getChain } from '@rei-network/common';
+import { Common } from '@rei-network/common';
 import { Blockchain } from '@rei-network/blockchain';
 import { VM } from '@rei-network/vm';
 import { Transaction, Block } from '@rei-network/structure';
@@ -87,7 +87,7 @@ export class Node extends Initializer {
     this.receiptsCache = new ReceiptsCache(options.receiptsCacheSize);
 
     this.chain = options.chain ?? defaultChainName;
-    if (getChain(this.chain) === undefined) {
+    if (!Common.isSupportedChainName(this.chain)) {
       throw new Error(`Unknown chain: ${this.chain}`);
     }
 
@@ -237,7 +237,9 @@ export class Node extends Initializer {
    * @returns Common object
    */
   getCommon(num: BNLike) {
-    return Common.createCommonByBlockNumber(num, this.chain);
+    const common = new Common({ chain: this.chain });
+    common.setHardforkByBlockNumber(num);
+    return common;
   }
 
   /**

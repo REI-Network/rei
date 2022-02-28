@@ -3,7 +3,7 @@
 [![NPM Version](https://img.shields.io/npm/v/@rei-network/common)](https://www.npmjs.org/package/@rei-network/common)
 ![License](https://img.shields.io/npm/l/@rei-network/common)
 
-The basic settings of rei, based on `@gxchain2-ethereumjs/common`, including parameters of the mainnet and testnet:
+The basic settings of rei, based on `@ethereumjs/common`, including parameters of the mainnet and testnet:
 
 - `chains` Chain information of each chain
 - `genesisStates` Initial state of each chain

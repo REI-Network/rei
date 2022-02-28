@@ -250,7 +250,7 @@ export class Block {
    *
    * Throws if invalid.
    *
-   * @param blockchain - validate against an @gxchain2-ethereumjs/blockchain
+   * @param blockchain - validate against an @ethereumjs/blockchain
    * @param onlyHeader - if should only validate the header (skips validating txTrie and unclesHash) (default: false)
    */
   async validate(blockchain: Blockchain, onlyHeader: boolean = false): Promise<void> {
@@ -308,7 +308,7 @@ export class Block {
    * Header has at most 2 uncles.
    * Header does not count an uncle twice.
    *
-   * @param blockchain - additionally validate against an @gxchain2-ethereumjs/blockchain instance
+   * @param blockchain - additionally validate against an @ethereumjs/blockchain instance
    */
   async validateUncles(blockchain: Blockchain): Promise<void> {
     if (this.isGenesis()) {

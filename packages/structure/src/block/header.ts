@@ -422,7 +422,7 @@ export class BlockHeader {
    *   - Checks on coinbase and mixHash
    *   - Current block has a timestamp diff greater or equal to PERIOD
    *   - Current block has difficulty correctly marked as INTURN or NOTURN
-   * @param blockchain - validate against an @gxchain2-ethereumjs/blockchain
+   * @param blockchain - validate against an @ethereumjs/blockchain
    * @param height - If this is an uncle header, this is the height of the block that is including it
    */
   async validate(blockchain: Blockchain, height?: BN): Promise<void> {

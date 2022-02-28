@@ -21,7 +21,7 @@ describe('Database', () => {
       fs.mkdirSync(testdir, { recursive: true });
     }
     testdb = createEncodingLevelDB(testdir);
-    const common = Common.createChainStartCommon('rei-testnet');
+    const common = new Common({ chain: 'rei-testnet', hardfork: 'chainstart' });
     database = new Database(testdb, common);
 
     const testdata = JSON.parse(fs.readFileSync(path.join(__dirname, '/test-data.json')).toString());
@@ -62,10 +62,10 @@ describe('Database', () => {
     rs.forEach((r, i) => {
       const receipt = testreceipts[i];
       const transaction = testblock.transactions[i];
-      expect(r.transactionHash!.equals(transaction.hash()), 'receipt tx hash should be equal').be.true;
+      expect(r.extension!.transactionHash!.equals(transaction.hash()), 'receipt tx hash should be equal').be.true;
       expect(r.serialize().equals(receipt.serialize()), 'receipt serialize should be equal').be.true;
       if (!transaction.to) {
-        expect(r.contractAddress!.equals(generateAddress(transaction.getSenderAddress().buf, transaction.nonce.toArrayLike(Buffer))), 'receipt contractAddress should be equal').be.true;
+        expect(r.extension!.contractAddress!.equals(generateAddress(transaction.getSenderAddress().buf, transaction.nonce.toArrayLike(Buffer))), 'receipt contractAddress should be equal').be.true;
       }
     });
     expect(rs.length, 'receipt length should be equal').be.equal(testreceipts.length);

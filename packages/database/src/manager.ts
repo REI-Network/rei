@@ -37,7 +37,9 @@ export class DBManager {
       header: new Cache({ max: 512 }),
       body: new Cache({ max: 256 }),
       numberToHash: new Cache({ max: 2048 }),
-      hashToNumber: new Cache({ max: 2048 })
+      hashToNumber: new Cache({ max: 2048 }),
+      txLookup: new Cache({ max: 2048 }),
+      receipts: new Cache({ max: 1024 })
     };
   }
 

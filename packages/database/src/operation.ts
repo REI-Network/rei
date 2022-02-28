@@ -123,7 +123,6 @@ export class DBOp {
       }
       case DBTarget.BloomBits: {
         this.baseDBOp.key = bloomBitsKey(key!.bit!, key!.section!, key!.hash!);
-        this.cacheString = 'bloomBits';
         break;
       }
     }

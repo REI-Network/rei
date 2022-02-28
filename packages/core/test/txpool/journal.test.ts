@@ -7,9 +7,11 @@ import { expect } from 'chai';
 import { FunctionalBufferMap, hexStringToBuffer, setLevel } from '@rei-network/utils';
 
 setLevel('silent');
-class testnode {
+class MockNode {
   getCommon(num: number) {
-    return Common.createCommonByBlockNumber(0, 'rei-testnet');
+    const common = new Common({ chain: 'rei-testnet' });
+    common.setHardforkByBlockNumber(0);
+    return common;
   }
 }
 
@@ -17,7 +19,7 @@ describe('Journal', () => {
   let testdir: string;
   let journal: Journal;
   let testdata: any;
-  const node = new testnode();
+  const node = new MockNode();
   const testTransactions: Transaction[] = [];
   before(async () => {
     testdata = JSON.parse(fs.readFileSync(path.join(__dirname, '/test-data.json')).toString());

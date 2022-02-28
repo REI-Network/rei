@@ -6,7 +6,7 @@
     "license": "GPL-3.0-or-later",
     "scripts": {
         "build": "tsc --build tsconfig.json",
-        "test": "echo @rei-network/rpc has not test cases"
+        "test": "echo @rei-network/rpc has no test cases"
     },
     "devDependencies": {
         "typescript": "^4.1.2",

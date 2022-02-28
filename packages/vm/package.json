@@ -7,7 +7,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc --build tsconfig.json",
-    "test": "echo @rei-network/vm has not test cases"
+    "test": "echo @rei-network/vm has no test cases"
   },
   "dependencies": {
     "@rei-network/blockchain": "^0.0.6",

@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import { Transaction } from '@rei-network/structure';
-import { TxPricedList } from '../../src/txpool/txpricedlist';
-import { hexStringToBN, FunctionalBufferMap } from '@rei-network/utils';
 import { expect } from 'chai';
+import { Transaction } from '@rei-network/structure';
+import { hexStringToBN, FunctionalBufferMap } from '@rei-network/utils';
+import { TxPricedList } from '../../src/txpool/txpricedlist';
 
 describe('TxPricedList', () => {
   let txList: TxPricedList;

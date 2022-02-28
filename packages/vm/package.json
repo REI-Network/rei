@@ -25,7 +25,7 @@
   },
   "devDependencies": {
     "@types/lru-cache": "^5.1.0",
-    "@types/node": "^11.13.4",
+    "@types/node": "^14.14.9",
     "level": "^6.0.0",
     "level-mem": "^5.0.1"
   },

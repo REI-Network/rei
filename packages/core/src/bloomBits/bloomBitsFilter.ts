@@ -1,8 +1,11 @@
 import { Address, BN, keccak256 } from 'ethereumjs-util';
-import { Log, Receipt } from '@rei-network/structure';
+import { Log, Receipt, Block } from '@rei-network/structure';
 import { FunctionalBNMap, FunctionalBNSet, decompressBytes } from '@rei-network/utils';
-import { Node } from '../node';
-import { BloomBitsBlocks } from './index';
+import { Database } from '@rei-network/database';
+import { ReceiptsCache } from './receiptsCache';
+
+// block section size
+export const bloomBitsSectionSize = 4096;
 
 /**
  * calcBloomIndexes returns the bloom filter bit indexes belonging to the given key
@@ -80,21 +83,20 @@ function checkSingleNumber(bits: Buffer, sectionStart: BN, num: BN) {
   return false;
 }
 
-export interface BloomBitsFilterOptions {
-  node: Node;
-  sectionSize: number;
+export interface BloomBitsFilterBackend {
+  db: Database;
+  receiptsCache: ReceiptsCache;
+  latestBlock: Block;
 }
 
 /**
  * Represents a Bloom filter.
  */
 export class BloomBitsFilter {
-  private readonly node: Node;
-  private readonly sectionSize: number;
+  private readonly backend: BloomBitsFilterBackend;
 
-  constructor(options: BloomBitsFilterOptions) {
-    this.node = options.node;
-    this.sectionSize = options.sectionSize;
+  constructor(backend: BloomBitsFilterBackend) {
+    this.backend = backend;
   }
 
   /**
@@ -171,7 +173,7 @@ export class BloomBitsFilter {
       blooms.push(calcBloomIndexes(buf));
     }
 
-    const latestHeader = this.node.getLatestBlock().header;
+    const latestHeader = this.backend.latestBlock.header;
     if (from.gt(latestHeader.number)) {
       return logs;
     }
@@ -184,11 +186,11 @@ export class BloomBitsFilter {
       return logs;
     }
 
-    let maxSection = await this.node.db.getStoredSectionCount();
+    let maxSection = await this.backend.db.getStoredSectionCount();
     if (maxSection !== undefined) {
       // query indexed logs.
-      let fromSection = from.divn(BloomBitsBlocks);
-      let toSection = to.divn(BloomBitsBlocks);
+      let fromSection = from.divn(bloomBitsSectionSize);
+      let toSection = to.divn(bloomBitsSectionSize);
       fromSection = fromSection.gt(maxSection) ? maxSection : fromSection;
       toSection = toSection.gt(maxSection) ? maxSection : toSection;
       for (const section = fromSection.clone(); section.lte(toSection); section.iaddn(1)) {
@@ -201,7 +203,7 @@ export class BloomBitsFilter {
         const getSenctionHash = async (section: BN) => {
           let hash = headCache.get(section);
           if (!hash) {
-            hash = await this.node.db.numberToHash(section.addn(1).muln(this.sectionSize).subn(1));
+            hash = await this.backend.db.numberToHash(section.addn(1).muln(bloomBitsSectionSize).subn(1));
             headCache.set(section, hash);
           }
           return hash;
@@ -211,8 +213,8 @@ export class BloomBitsFilter {
           for (const bit of bloom) {
             let bits = bitsCache.get(bit);
             if (!bits) {
-              bits = (await this.node.db.getBloomBits(bit, section, await getSenctionHash(section))) as Buffer;
-              bits = decompressBytes(bits, Math.floor(BloomBitsBlocks / 8));
+              bits = (await this.backend.db.getBloomBits(bit, section, await getSenctionHash(section))) as Buffer;
+              bits = decompressBytes(bits, Math.floor(bloomBitsSectionSize / 8));
               bitsCache.set(bit, bits);
             }
             bitsArray.push(bits);
@@ -226,9 +228,9 @@ export class BloomBitsFilter {
         };
 
         // the start block number of this section.
-        const sectionStart = section.muln(this.sectionSize);
+        const sectionStart = section.muln(bloomBitsSectionSize);
         // the end block number of this section.
-        const sectionEnd = section.addn(1).muln(this.sectionSize);
+        const sectionEnd = section.addn(1).muln(bloomBitsSectionSize);
         // calculate the start block number for check.
         const fromBlock = from.lt(sectionStart) ? sectionStart : from;
         // calculate the end block number for check.
@@ -247,7 +249,7 @@ export class BloomBitsFilter {
     }
 
     // query unindexed logs.
-    const maxIndexedBlockNumber = maxSection ? maxSection.addn(1).muln(BloomBitsBlocks).subn(1) : new BN(0);
+    const maxIndexedBlockNumber = maxSection ? maxSection.addn(1).muln(bloomBitsSectionSize).subn(1) : new BN(0);
     for (const num = maxIndexedBlockNumber.addn(1); num.lte(to) && num.lte(latestHeader.number); num.iaddn(1)) {
       append(await this.filterBlock(num, addresses, topics));
     }
@@ -262,7 +264,7 @@ export class BloomBitsFilter {
    * @returns All logs that meet the conditions
    */
   async filterBlock(blockHashOrNumber: Buffer | BN | number, addresses: Address[], topics: Topics) {
-    const receipts = await this.node.receiptsCache.get(blockHashOrNumber, this.node.db);
+    const receipts = await this.backend.receiptsCache.get(blockHashOrNumber, this.backend.db);
     const logs = await this.checkBlockMatches(receipts, addresses, topics);
     logs.forEach((log) => (log.removed = false));
     return logs;

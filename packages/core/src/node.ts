@@ -15,7 +15,7 @@ import { TxPool } from './txpool';
 import { Synchronizer } from './sync';
 import { TxFetcher } from './txSync';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
-import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber, ReceiptsCache } from './bloomBits';
+import { BloomBitsFilter, ReceiptsCache } from './bloomBits';
 import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
 import { WireProtocol, ConsensusProtocol } from './protocols';
@@ -122,7 +122,7 @@ export class Node extends Initializer {
     this.txPool = new TxPool({ node: this, journal: this.datadir });
     this.txSync = new TxFetcher(this);
     this.bcMonitor = new BlockchainMonitor(this.db);
-    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ db: this.db, sectionSize: BloomBitsBlocks, confirmsBlockNumber: ConfirmsBlockNumber });
+    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ db: this.db });
   }
 
   /**
@@ -336,7 +336,7 @@ export class Node extends Initializer {
    * @returns Bloom filter object
    */
   getFilter() {
-    return new BloomBitsFilter({ node: this, sectionSize: BloomBitsBlocks });
+    return new BloomBitsFilter(this);
   }
 
   /**

@@ -1,4 +1,7 @@
-import { BloomBitLength, BloomByteLength } from './index';
+// bit length of a single bloom.
+export const bloomBitLength = 2048;
+// byte length of a single bloom.
+export const bloomByteLength = bloomBitLength / 8;
 
 /**
  * Generator takes a number of bloom filters and generates the rotated bloom bits
@@ -16,7 +19,7 @@ export class BloomBitsGenerator {
     this.sections = sections;
     this.nextSec = 0;
     this.blooms = [];
-    for (let i = 0; i < BloomBitLength; i++) {
+    for (let i = 0; i < bloomBitLength; i++) {
       this.blooms.push(new Array<number>(Math.floor(sections / 8)).fill(0));
     }
   }
@@ -36,7 +39,7 @@ export class BloomBitsGenerator {
     }
     const byteIndex = Math.floor(this.nextSec / 8);
     const bitIndex = 7 - (this.nextSec % 8);
-    for (let byt = 0; byt < BloomByteLength; byt++) {
+    for (let byt = 0; byt < bloomByteLength; byt++) {
       const bloomByte = bloom[byt];
       if (bloomByte === 0) {
         continue;
@@ -64,7 +67,7 @@ export class BloomBitsGenerator {
     if (this.nextSec !== this.sections) {
       throw new Error('bloom not fully generated yet');
     }
-    if (index >= BloomBitLength) {
+    if (index >= bloomBitLength) {
       throw new Error('bloom bit out of bounds');
     }
     return this.blooms[index];

@@ -41,4 +41,4 @@ export interface ChainIndexerOptions {
   backend: ChainIndexerBackend;
 }
 
-export interface BloomBitsIndexerOptions extends Omit<ChainIndexerOptions, 'backend'> {}
+export interface BloomBitsIndexerOptions extends Omit<ChainIndexerOptions, 'backend' | 'confirmsBlockNumber' | 'sectionSize'> {}

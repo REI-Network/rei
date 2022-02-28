@@ -1,16 +1,17 @@
 import { BN } from 'ethereumjs-util';
 import { BlockHeader } from '@rei-network/structure';
 import { DBSaveBloomBits, DBOp, Database } from '@rei-network/database';
-import { BloomBitsGenerator } from '../bloomBits';
-import { BloomBitLength } from '../bloomBits';
+import { BloomBitsGenerator, bloomBitLength, bloomBitsSectionSize } from '../bloomBits';
 import { ChainIndexer } from './chainIndexer';
 import { BloomBitsIndexerOptions, ChainIndexerBackend } from './types';
+
+// confirm number
+const confirmsBlockNumber = 256;
 
 /**
  * BloomBitsIndexer implements ChainIndexerBackend, used to retrieve bloom
  */
 export class BloomBitsIndexer implements ChainIndexerBackend {
-  private readonly sectionSize: number;
   private readonly db: Database;
   private gen: BloomBitsGenerator;
   private section!: BN;
@@ -22,13 +23,12 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
    * @returns A ChainIndexer object
    */
   static createBloomBitsIndexer(options: BloomBitsIndexerOptions) {
-    return new ChainIndexer(Object.assign(options, { backend: new BloomBitsIndexer(options) }));
+    return new ChainIndexer({ ...options, confirmsBlockNumber, sectionSize: bloomBitsSectionSize, backend: new BloomBitsIndexer(options) });
   }
 
   constructor(options: BloomBitsIndexerOptions) {
     this.db = options.db;
-    this.sectionSize = options.sectionSize;
-    this.gen = new BloomBitsGenerator(options.sectionSize);
+    this.gen = new BloomBitsGenerator(bloomBitsSectionSize);
   }
 
   /**
@@ -39,7 +39,7 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
    */
   reset(section: BN): void {
     this.section = section.clone();
-    this.gen = new BloomBitsGenerator(this.sectionSize);
+    this.gen = new BloomBitsGenerator(bloomBitsSectionSize);
   }
 
   async prune(section: BN) {
@@ -52,7 +52,7 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
    * @param header BlockHeader
    */
   process(header: BlockHeader): void {
-    this.gen.addBloom(header.number.sub(this.section.muln(this.sectionSize)).toNumber(), header.bloom);
+    this.gen.addBloom(header.number.sub(this.section.muln(bloomBitsSectionSize)).toNumber(), header.bloom);
     this.headerHash = header.hash();
   }
 
@@ -61,7 +61,7 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
    */
   async commit() {
     const batch: DBOp[] = [];
-    for (let i = 0; i < BloomBitLength; i++) {
+    for (let i = 0; i < bloomBitLength; i++) {
       const bits = this.gen.bitset(i);
       batch.push(DBSaveBloomBits(i, this.section, this.headerHash, Buffer.from(bits)));
     }

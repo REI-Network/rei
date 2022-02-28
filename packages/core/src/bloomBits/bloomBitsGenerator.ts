@@ -1,26 +1,18 @@
-// bit length of a single bloom.
-export const bloomBitLength = 2048;
-// byte length of a single bloom.
-export const bloomByteLength = bloomBitLength / 8;
+import { bloomBitsConfig as config } from './config';
 
 /**
  * Generator takes a number of bloom filters and generates the rotated bloom bits
  * to be used for batched filtering.
  */
 export class BloomBitsGenerator {
-  private sections: number;
   private nextSec: number;
   private blooms: number[][];
 
-  constructor(sections: number) {
-    if (sections % 8 !== 0) {
-      throw new Error('section count not multiple of 8');
-    }
-    this.sections = sections;
+  constructor() {
     this.nextSec = 0;
     this.blooms = [];
-    for (let i = 0; i < bloomBitLength; i++) {
-      this.blooms.push(new Array<number>(Math.floor(sections / 8)).fill(0));
+    for (let i = 0; i < config.bloomBitLength; i++) {
+      this.blooms.push(new Array<number>(Math.floor(config.bloomBitsSectionSize / 8)).fill(0));
     }
   }
 
@@ -31,7 +23,7 @@ export class BloomBitsGenerator {
    * @param bloom Bloom filter to be added
    */
   addBloom(index: number, bloom: Buffer) {
-    if (this.nextSec >= this.sections) {
+    if (this.nextSec >= config.bloomBitsSectionSize) {
       throw new Error('section out of bounds');
     }
     if (this.nextSec !== index) {
@@ -39,7 +31,7 @@ export class BloomBitsGenerator {
     }
     const byteIndex = Math.floor(this.nextSec / 8);
     const bitIndex = 7 - (this.nextSec % 8);
-    for (let byt = 0; byt < bloomByteLength; byt++) {
+    for (let byt = 0; byt < config.bloomByteLength; byt++) {
       const bloomByte = bloom[byt];
       if (bloomByte === 0) {
         continue;
@@ -64,10 +56,10 @@ export class BloomBitsGenerator {
    * @returns A bit vector
    */
   bitset(index: number) {
-    if (this.nextSec !== this.sections) {
+    if (this.nextSec !== config.bloomBitsSectionSize) {
       throw new Error('bloom not fully generated yet');
     }
-    if (index >= bloomBitLength) {
+    if (index >= config.bloomBitLength) {
       throw new Error('bloom bit out of bounds');
     }
     return this.blooms[index];

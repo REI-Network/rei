@@ -16,7 +16,7 @@ export interface BlockchainInterface {
    *
    * @param block - The block to be added to the blockchain.
    */
-  putBlock(block: Block): Promise<void>;
+  putBlock(block: Block): Promise<boolean>;
 
   /**
    * Deletes a block from the blockchain. All child blocks in the chain are
@@ -750,7 +750,7 @@ export class Blockchain implements BlockchainInterface {
    */
   async putBlock(block: Block) {
     await this.initPromise;
-    await this._putBlockOrHeader(block);
+    return await this._putBlockOrHeader(block);
   }
 
   /**
@@ -762,12 +762,11 @@ export class Blockchain implements BlockchainInterface {
    * chain is rebuilt and any stale heads/hashes are overwritten.
    * @param headers - The headers to be added to the blockchain
    */
-  async putHeaders(headers: Array<any>) {
+  async putHeaders(headers: BlockHeader[]) {
     await this.initPromise;
     for (let i = 0; i < headers.length; i++) {
       await this._putBlockOrHeader(headers[i]);
     }
-    await this.updateLatest();
   }
 
   /**
@@ -780,8 +779,7 @@ export class Blockchain implements BlockchainInterface {
    */
   async putHeader(header: BlockHeader) {
     await this.initPromise;
-    await this._putBlockOrHeader(header);
-    await this.updateLatest();
+    return await this._putBlockOrHeader(header);
   }
 
   /**
@@ -797,7 +795,7 @@ export class Blockchain implements BlockchainInterface {
    * @hidden
    */
   private async _putBlockOrHeader(item: Block | BlockHeader) {
-    await this.runWithLock<void>(async () => {
+    return await this.runWithLock<boolean>(async () => {
       const block =
         item instanceof BlockHeader
           ? new Block(item, undefined, undefined, {
@@ -884,8 +882,9 @@ export class Blockchain implements BlockchainInterface {
       dbOps = dbOps.concat(DBSetBlockOrHeader(block));
 
       let ancientHeaderNumber: undefined | BN;
+      const reorg = block.isGenesis() || (block._common.consensusType() !== ConsensusType.ProofOfStake && td.gt(currentTd.header)) || block._common.consensusType() === ConsensusType.ProofOfStake;
       // if total difficulty is higher than current, add it to canonical chain
-      if (block.isGenesis() || (block._common.consensusType() !== ConsensusType.ProofOfStake && td.gt(currentTd.header)) || block._common.consensusType() === ConsensusType.ProofOfStake) {
+      if (reorg) {
         if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique) {
           ancientHeaderNumber = (await this._findAncient(header)).number;
         }
@@ -931,6 +930,12 @@ export class Blockchain implements BlockchainInterface {
           await this._cliqueBuildSnapshots(canonicalHeader);
         }
       }
+
+      if (reorg) {
+        await this.updateLatest();
+      }
+
+      return reorg;
     });
   }
 
@@ -1466,12 +1471,21 @@ export class Blockchain implements BlockchainInterface {
 
   // the latest block of blockchain
   private _latestBlock!: Block;
+  // the latest block total difficulty
+  private _totalDifficulty!: BN;
 
   /**
-   * Return blockchain's latest block
+   * Get blockchain's latest block
    */
   get latestBlock() {
     return this._latestBlock;
+  }
+
+  /**
+   * Get blockchain's total difficulty
+   */
+  get totalDifficulty() {
+    return this._totalDifficulty;
   }
 
   /**
@@ -1485,9 +1499,14 @@ export class Blockchain implements BlockchainInterface {
    * This method check and update the latestBlock and totalDifficulty of blockchain
    */
   private async updateLatest() {
-    const latestBlock = await this.getLatestBlock();
-    if (!this._latestBlock || !latestBlock.hash().equals(this._latestBlock.hash())) {
+    if (!this._headBlockHash) {
+      throw new Error('No head block set');
+    }
+
+    const latestBlock = await this._getBlock(this._headBlockHash);
+    if (!this._latestBlock || !this._headBlockHash.equals(this._latestBlock.hash())) {
       this._latestBlock = latestBlock;
+      this._totalDifficulty = await this.getTotalDifficulty(this._headBlockHash, latestBlock.header.number);
     }
   }
 

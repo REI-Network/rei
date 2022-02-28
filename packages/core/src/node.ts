@@ -70,9 +70,6 @@ export class Node extends Initializer {
   private readonly pendingTxsQueue = new Channel<PendingTxs>();
   private readonly commitBlockQueue = new Channel<CommitBlock>();
 
-  private latestBlock!: Block;
-  private totalDifficulty!: BN;
-
   constructor(options: NodeOptions) {
     super();
 
@@ -129,6 +126,20 @@ export class Node extends Initializer {
   }
 
   /**
+   * Get blockchain's latest block
+   */
+  get latestBlock() {
+    return this.blockchain.latestBlock;
+  }
+
+  /**
+   * Get blockchain's total difficulty
+   */
+  get totalDifficulty() {
+    return this.blockchain.totalDifficulty;
+  }
+
+  /**
    * Get the status of the node syncing
    */
   get status(): NodeStatus {
@@ -146,8 +157,6 @@ export class Node extends Initializer {
    */
   async init() {
     await this.blockchain.init();
-    this.latestBlock = await this.blockchain.getLatestBlock();
-    this.totalDifficulty = await this.blockchain.getTotalDifficulty(this.latestBlock.hash(), this.latestBlock.header.number);
     if (this.latestBlock.header.number.eqn(0)) {
       await this.getEngine(this.latestBlock._common).generateGenesis();
     }
@@ -406,15 +415,10 @@ export class Node extends Initializer {
       }
     }
 
-    const before = this.blockchain.latestBlock.hash();
-
-    // commit
-    {
-      // save block
-      await this.blockchain.putBlock(block);
-      // save receipts
-      await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, hash, number)));
-    }
+    // save block
+    const reorged = await this.blockchain.putBlock(block);
+    // save receipts
+    await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, hash, number)));
 
     // install properties for receipts
     let lastCumulativeGasUsed = new BN(0);
@@ -430,9 +434,6 @@ export class Node extends Initializer {
 
     logger.info('✨ Commit block, height:', number.toString(), 'hash:', bufferToHex(hash));
 
-    const after = this.blockchain.latestBlock.hash();
-
-    const reorged = !before.equals(after);
     return { reorged };
   }
 
@@ -448,9 +449,6 @@ export class Node extends Initializer {
 
         // if canonical chain changes, notify to other modules
         if (reorged) {
-          // update the latest block and total difficulty
-          this.latestBlock = await this.blockchain.getLatestBlock();
-          this.totalDifficulty = await this.blockchain.getTotalDifficulty(this.latestBlock.hash(), this.latestBlock.header.number);
           if (broadcast) {
             this.wire.broadcastNewBlock(block, this.totalDifficulty);
           }

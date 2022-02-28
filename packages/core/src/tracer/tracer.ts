@@ -7,7 +7,7 @@ import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Node } from '../node';
 import { EMPTY_ADDRESS } from '../utils';
 import { StructLogDebug, JSDebug } from './debug';
-import { toAsync } from './toasync';
+import { toAsync } from './toAsync';
 import { tracers } from './tracers';
 
 export interface IDebugImpl extends IDebug {

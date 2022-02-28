@@ -1,4 +1,4 @@
-import error from './errorcodes';
+import error from './errorCodes';
 import { JSONRPC_VERSION } from './types';
 
 class Errexpand extends Error {

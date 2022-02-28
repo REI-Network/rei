@@ -15,7 +15,7 @@ import { TxPool } from './txpool';
 import { Synchronizer } from './sync';
 import { TxFetcher } from './txSync';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
-import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber, ReceiptsCache } from './bloombits';
+import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber, ReceiptsCache } from './bloomBits';
 import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
 import { WireProtocol, ConsensusProtocol } from './protocols';

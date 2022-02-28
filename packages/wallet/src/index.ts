@@ -2,7 +2,7 @@ import path from 'path';
 import Wallet from 'ethereumjs-wallet';
 import { Address, bufferToHex } from 'ethereumjs-util';
 import { FunctionalBufferMap, hexStringToBuffer } from '@rei-network/utils';
-import { AccountCache } from './accountcache';
+import { AccountCache } from './accountCache';
 import { KeyStore, keyStoreFileName } from './keystore';
 
 type AddrType = Address | string | Buffer;

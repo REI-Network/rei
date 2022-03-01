@@ -377,25 +377,6 @@ export class DBManager {
   }
 
   /**
-   * Try to get canonical chain block header by block hash
-   * If it doesn't exist, return `undefined`
-   * @param hash - Block header hash
-   * @returns Block header
-   */
-  async tryToGetCanonicalHeader(hash: Buffer) {
-    try {
-      const num = await this.hashToNumber(hash);
-      const hashInDB = await this.numberToHash(num);
-      return hashInDB.equals(hash) ? await this.getHeader(hash, num) : undefined;
-    } catch (err: any) {
-      if (err.type === 'NotFoundError') {
-        return;
-      }
-      throw err;
-    }
-  }
-
-  /**
    * Get canonical chain block header by block number
    * @param num - Target block number
    * @returns Block header

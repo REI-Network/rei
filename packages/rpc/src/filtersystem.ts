@@ -183,7 +183,19 @@ export class FilterSystem {
         if (task instanceof LogsTask) {
           this.newLogs(task.logs);
         } else if (task instanceof HeadsTask) {
-          const headers = (await Promise.all(task.hashes.map((hash) => this.backend.db.tryToGetCanonicalHeader(hash)))).filter((header) => header !== undefined) as BlockHeader[];
+          const headers: BlockHeader[] = [];
+          for (const hash of task.hashes) {
+            // make sure the block we get is on the canonical chain
+            try {
+              const num: BN = await this.backend.db.hashToNumber(hash);
+              const hashInDB: Buffer = await this.backend.db.numberToHash(num);
+              if (hashInDB.equals(hash)) {
+                headers.push(await this.backend.db.getHeader(hash, num));
+              }
+            } catch (err) {
+              // ignore errors
+            }
+          }
           this.newHeads(headers);
         } else if (task instanceof PendingTxTask) {
           this.newPendingTransactions(task.hashes);

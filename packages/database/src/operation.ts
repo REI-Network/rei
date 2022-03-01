@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
 import { compressBytes } from '@rei-network/utils';
-import { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, CLIQUE_SIGNERS_KEY as CLIQUE_SIGNER_STATES_KEY, CLIQUE_VOTES_KEY, CLIQUE_BLOCK_SIGNERS_KEY, receiptsKey, txLookupKey, bloomBitsKey } from './constants';
+import { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, BLOOM_BITS_SECTION_COUNT, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, CLIQUE_SIGNERS_KEY as CLIQUE_SIGNER_STATES_KEY, CLIQUE_VOTES_KEY, CLIQUE_BLOCK_SIGNERS_KEY, receiptsKey, txLookupKey, bloomBitsKey } from './constants';
 import { CacheMap } from './manager';
 
 export enum DBTarget {
@@ -18,7 +18,8 @@ export enum DBTarget {
 
   Receipts = 100,
   TxLookup = 101,
-  BloomBits = 102
+  BloomBits = 102,
+  BloomBitsSectionCount = 103
 }
 
 /**
@@ -30,7 +31,7 @@ export interface DBOpData {
   key: Buffer | string;
   keyEncoding: String;
   valueEncoding?: String;
-  value?: Buffer | object;
+  value?: string | Buffer | object;
 }
 
 // a Database Key is identified by a block hash, a block number, or both
@@ -125,6 +126,12 @@ export class DBOp {
         this.baseDBOp.key = bloomBitsKey(key!.bit!, key!.section!, key!.hash!);
         break;
       }
+      case DBTarget.BloomBitsSectionCount: {
+        this.baseDBOp.key = BLOOM_BITS_SECTION_COUNT;
+        this.baseDBOp.keyEncoding = 'none';
+        this.baseDBOp.valueEncoding = 'none';
+        break;
+      }
     }
   }
 
@@ -133,7 +140,7 @@ export class DBOp {
   }
 
   // set operation: note: value/key is not in default order
-  public static set(operationTarget: DBTarget, value: Buffer | object, key?: DatabaseKey): DBOp {
+  public static set(operationTarget: DBTarget, value: string | Buffer | object, key?: DatabaseKey): DBOp {
     const dbOperation = new DBOp(operationTarget, key);
     dbOperation.baseDBOp.type = 'put';
 
@@ -141,12 +148,6 @@ export class DBOp {
       dbOperation.baseDBOp.value = compressBytes(value as Buffer);
     } else {
       dbOperation.baseDBOp.value = value;
-    }
-
-    if (operationTarget == DBTarget.Heads) {
-      dbOperation.baseDBOp.valueEncoding = 'json';
-    } else {
-      dbOperation.baseDBOp.valueEncoding = 'binary';
     }
 
     return dbOperation;

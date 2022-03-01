@@ -30,6 +30,11 @@ const CLIQUE_VOTES_KEY = 'CliqueVotes';
 const CLIQUE_BLOCK_SIGNERS_KEY = 'CliqueBlockSignersSnapshot';
 
 /**
+ * Bloom bits section count
+ */
+const BLOOM_BITS_SECTION_COUNT = 'scount';
+
+/**
  * headerPrefix + number + hash -> header
  */
 const HEADER_PREFIX = Buffer.from('h');
@@ -100,4 +105,4 @@ const bloomBitsKey = (bit: number, section: BN, hash: Buffer) => {
 /**
  * @hidden
  */
-export { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, CLIQUE_SIGNERS_KEY, CLIQUE_VOTES_KEY, CLIQUE_BLOCK_SIGNERS_KEY, RECEIPTS_PREFIX, TX_LOOKUP_PREFIX, BLOOM_BITS_PREFIX, bufBE8, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, receiptsKey, txLookupKey, bloomBitsKey };
+export { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, CLIQUE_SIGNERS_KEY, CLIQUE_VOTES_KEY, CLIQUE_BLOCK_SIGNERS_KEY, BLOOM_BITS_SECTION_COUNT, RECEIPTS_PREFIX, TX_LOOKUP_PREFIX, BLOOM_BITS_PREFIX, bufBE8, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, receiptsKey, txLookupKey, bloomBitsKey };

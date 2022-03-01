@@ -39,8 +39,8 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
     this.gen = new BloomBitsGenerator();
   }
 
-  async prune(section: BN) {
-    // await this.node.db.clearBloomBits(section);
+  prune(section: BN) {
+    return [];
   }
 
   /**
@@ -56,12 +56,12 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
   /**
    * Commit finalizes the section metadata and stores it into the database.
    */
-  async commit() {
+  commit() {
     const batch: DBOp[] = [];
     for (let i = 0; i < config.bloomBitLength; i++) {
       const bits = this.gen.bitset(i);
       batch.push(DBSaveBloomBits(i, this.section, this.headerHash, Buffer.from(bits)));
     }
-    await this.db.batch(batch);
+    return batch;
   }
 }

@@ -118,4 +118,21 @@ function DBSaveBloomBits(bit: number, section: BN, hash: Buffer, bits: Buffer) {
   return DBOp.set(DBTarget.BloomBits, bits, { bit, section, hash });
 }
 
-export { DBOp, DBSetTD, DBSetBlockOrHeader, DBSetHashToNumber, DBSaveLookups, DBSaveReceipts, DBSaveTxLookup, DBSaveBloomBits };
+/**
+ * Create BloomBitsSectionCount operation
+ * @param section - Section number
+ * @returns  New operation
+ */
+function DBSaveBloomBitsSectionCount(section: BN) {
+  return DBOp.set(DBTarget.BloomBitsSectionCount, section.toString());
+}
+
+/**
+ * Create a operation to delete BloomBitsSectionCount
+ * @returns New operation
+ */
+function DBDeleteBloomBitsSectionCount() {
+  return DBOp.del(DBTarget.BloomBitsSectionCount);
+}
+
+export { DBOp, DBSetTD, DBSetBlockOrHeader, DBSetHashToNumber, DBSaveLookups, DBSaveReceipts, DBSaveTxLookup, DBSaveBloomBits, DBSaveBloomBitsSectionCount, DBDeleteBloomBitsSectionCount };

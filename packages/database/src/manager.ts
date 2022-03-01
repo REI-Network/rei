@@ -387,48 +387,17 @@ export class DBManager {
   }
 
   /**
-   * Find the common ancestor block of two forks
-   * @param header1 - Header of fork1
-   * @param header2 - Header of fork2
-   * @returns Ancestor block header
-   */
-  async findCommonAncestor(header1: BlockHeader, header2: BlockHeader) {
-    while (header1.number.gt(header2.number)) {
-      header1 = await this.getHeader(header1.parentHash, header1.number.subn(1));
-    }
-    while (header2.number.gt(header1.number)) {
-      header2 = await this.getHeader(header2.parentHash, header2.number.subn(1));
-    }
-    while (!header1.hash().equals(header2.hash()) && header1.number.gtn(0) && header2.number.gtn(0)) {
-      header1 = await this.getHeader(header1.parentHash, header1.number.subn(1));
-      header2 = await this.getHeader(header2.parentHash, header2.number.subn(1));
-    }
-    if (!header1.hash().equals(header2.hash())) {
-      throw new Error('find common ancestor failed');
-    }
-    return header1;
-  }
-
-  /**
    * Get section count of database
-   * @returns section count
+   * @returns section count or undefined(if doesn't exsit)
    */
   async getStoredSectionCount() {
     try {
-      return new BN(await this.rawdb.get('scount'));
+      return new BN(await this.get(DBTarget.BloomBitsSectionCount));
     } catch (err: any) {
       if (err.type === 'NotFoundError') {
         return undefined;
       }
       throw err;
     }
-  }
-
-  /**
-   * Set section count of database
-   * @param section - Section count
-   */
-  async setStoredSectionCount(section: BN | undefined) {
-    section === undefined ? await this.rawdb.del('scount') : await this.rawdb.put('scount', section.toString());
   }
 }

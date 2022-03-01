@@ -12,6 +12,8 @@ const level = require('level-mem');
 const common = new Common({ chain: 'rei-devnet' });
 common.setHardforkByBlockNumber(0);
 
+const privateKey = toBuffer('0xd8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0');
+
 type BloomInfo = { address: Buffer; topic: Buffer; data: Buffer; bloom: Buffer };
 
 async function genRandomBlock(db: Database, parentNumber?: BN): Promise<{ block: Block; info?: BloomInfo }> {
@@ -45,11 +47,7 @@ async function genRandomBlock(db: Database, parentNumber?: BN): Promise<{ block:
   const data = crypto.randomBytes(32);
   const log = new Log(address, [topic], data);
   const receipt = new Receipt(toBuffer(0), bloom, [log], 1);
-  const tx = Transaction.fromTxData({}, { common });
-  // inject getSenderAddress method
-  (tx as any).__proto__.getSenderAddress = () => {
-    return new Address(address);
-  };
+  const tx = Transaction.fromTxData({}, { common }).sign(privateKey);
   const parent = await db.getBlock(parentNumber);
   const parentHash = parent.hash();
   const block = Block.fromBlockData(

@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { expect } from 'chai';
 import { Address, toBuffer, BN } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Block, Log, Receipt, Transaction } from '@rei-network/structure';
@@ -6,7 +7,6 @@ import { Database, DBSaveReceipts, DBSetHashToNumber, DBSetBlockOrHeader, DBSave
 import Bloom from '@rei-network/vm/dist/bloom';
 import { BloomBitsIndexer } from '../../src/indexer';
 import { BloomBitsFilter, BloomBitsFilterBackend, ReceiptsCache, bloomBitsConfig } from '../../src/bloomBits';
-import { expect } from 'chai';
 const level = require('level-mem');
 
 const common = new Common({ chain: 'rei-devnet' });
@@ -127,6 +127,12 @@ describe('bloomBits', () => {
         expect(logs[0].topics[0].equals(topic)).be.true;
         expect(logs[0].data.equals(data)).be.true;
       }
+
+      // wait until all blocks are processed
+      await new Promise((r) => setTimeout(r, 100));
+
+      const section = await db.getStoredSectionCount();
+      expect(section?.toNumber()).be.equal(undefined);
     });
 
     it('should abort succeed', async () => {

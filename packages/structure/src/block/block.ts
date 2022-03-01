@@ -141,11 +141,6 @@ export class Block {
         throw new Error('Block initialization with uncleHeaders on a PoS network is not allowed');
       }
     }
-
-    const freeze = opts?.freeze ?? false;
-    if (freeze) {
-      Object.freeze(this);
-    }
   }
 
   /**

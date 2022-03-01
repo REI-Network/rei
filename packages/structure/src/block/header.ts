@@ -206,11 +206,6 @@ export class BlockHeader {
     }
 
     this._errorPostfix = `block number=${this.number.toNumber()} hash=${this.hash().toString('hex')}`;
-
-    const freeze = options?.freeze ?? false;
-    if (freeze) {
-      Object.freeze(this);
-    }
   }
 
   /**

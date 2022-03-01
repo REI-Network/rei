@@ -115,11 +115,6 @@ export default class Transaction extends BaseTransaction<Transaction> {
         }
       }
     }
-
-    const freeze = opts?.freeze ?? false;
-    if (freeze) {
-      Object.freeze(this);
-    }
   }
 
   /**

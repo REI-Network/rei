@@ -184,11 +184,6 @@ export default class FeeMarketEIP1559Transaction extends BaseTransaction<FeeMark
     if (this.common.gteHardfork('homestead') && this.s?.gt(N_DIV_2)) {
       throw new Error('Invalid Signature: s-values greater than secp256k1n/2 are considered invalid');
     }
-
-    const freeze = opts?.freeze ?? false;
-    if (freeze) {
-      Object.freeze(this);
-    }
   }
 
   /**

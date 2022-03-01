@@ -43,7 +43,7 @@ export class PendingTxMap {
       const nextTx = this.txs.get(sender);
       if (nextTx && nextTx.length > 0) {
         this.heap.push(nextTx.shift());
-        if (nextTx?.length === 0) {
+        if (nextTx.length === 0) {
           this.txs.delete(sender);
         }
       }

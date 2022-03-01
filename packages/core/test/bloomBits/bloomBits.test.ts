@@ -92,7 +92,7 @@ function genMockBackend(db: Database, latestNumber: number): BloomBitsFilterBack
   };
 }
 
-describe('bloomBits', () => {
+describe('BloomBits', () => {
   describe('unindexed bloomBits', () => {
     const from = 0;
     const to = 25;

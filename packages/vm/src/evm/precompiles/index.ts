@@ -174,4 +174,4 @@ function getActivePrecompiles(common: Common): Address[] {
   return activePrecompiles;
 }
 
-export { precompiles, getPrecompile, addPrecompile, PrecompileFunc, PrecompileInput, PrecompileAvailabilityCheckType, ripemdPrecompileAddress, getActivePrecompiles };
+export { precompiles, getPrecompile, addPrecompile, PrecompileFunc, PrecompileInput, PrecompileAvailabilityCheck, PrecompileAvailabilityCheckType, ripemdPrecompileAddress, getActivePrecompiles };

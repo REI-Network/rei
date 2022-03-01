@@ -1,5 +1,5 @@
 import { rlphash, Address, BN, setLengthRight, setLengthLeft } from 'ethereumjs-util';
-import { addPrecompile } from '@rei-network/vm/dist/evm/precompiles';
+import { addPrecompile, PrecompileAvailabilityCheck } from '@rei-network/vm/dist/evm/precompiles';
 import { OOGResult } from '@rei-network/vm/dist/evm/evm';
 import { hexStringToBN } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
@@ -30,10 +30,6 @@ addPrecompile(
   async (opts) => {
     assert(opts.data);
 
-    if (!isEnableFreeStaking(opts._common)) {
-      throw new Error('invalid call');
-    }
-
     const gasUsed = new BN(opts._common.param('gasPrices', 'estimateFee'));
 
     if (opts.gasLimit.lt(gasUsed)) {
@@ -56,7 +52,7 @@ addPrecompile(
     };
   },
   {
-    type: 1, // TODO: PrecompileAvailabilityCheck.Hardfork
+    type: PrecompileAvailabilityCheck.Hardfork,
     param: 'free-staking'
   }
 );

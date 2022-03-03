@@ -1,10 +1,11 @@
 import * as rlp from 'rlp';
-import { Address, BN } from 'ethereumjs-util';
+import { Address, BN, keccak256 } from 'ethereumjs-util';
 import { Block, BlockHeader, BlockBuffer, BlockHeaderBuffer, BlockBodyBuffer, Transaction, Receipt } from '@rei-network/structure';
 import { Common } from '@rei-network/common';
 import { CliqueLatestSignerStates, CliqueLatestVotes, CliqueLatestBlockSigners } from './clique';
 import Cache from './cache';
 import { DatabaseKey, DBOp, DBTarget, DBOpData } from './operation';
+import { SlimAccountCtor } from './types';
 import type { LevelUp } from 'levelup';
 const level = require('level-mem');
 
@@ -401,5 +402,28 @@ export class DBManager {
       }
       throw err;
     }
+  }
+
+  /**
+   * Get snapshot account
+   * @param ctor - Slim account constructor
+   * @param address - Account address
+   * @returns Slim account object
+   */
+  async getSnapAccount<S>(ctor: SlimAccountCtor<S>, address: Address) {
+    return ctor.fromRlpSerializedSlimAccount(await this.get(DBTarget.SnapAccount, { accountHash: keccak256(address.buf) }));
+  }
+
+  /**
+   * Get snapshot account storage
+   * @param addressOrAccountHash - Account address or address hash
+   * @param storageHash - Account storage hash
+   * @returns Account Storage value
+   */
+  getSnapStorage(addressOrAccountHash: Address | Buffer, storageHash: Buffer) {
+    return this.get(DBTarget.SnapStorage, {
+      accountHash: addressOrAccountHash instanceof Address ? keccak256(addressOrAccountHash.buf) : addressOrAccountHash,
+      storageHash
+    });
   }
 }

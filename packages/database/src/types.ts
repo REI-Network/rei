@@ -1,8 +1,9 @@
-export interface SlimAccount {
+import { Account } from 'ethereumjs-util';
+
+export interface SlimAccount extends Account {
   slimSerialize(): Buffer;
 }
 
-export interface SlimAccountCtor {
-  new (...args: any[]): SlimAccount;
-  fromRlpSerializedSlimAccount(serialized: Buffer): SlimAccount;
+export interface SlimAccountCtor<S> {
+  fromRlpSerializedSlimAccount(serialized: Buffer): S;
 }

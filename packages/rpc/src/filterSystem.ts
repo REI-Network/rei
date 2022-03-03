@@ -1,7 +1,7 @@
 import { Address, BN, bufferToHex, toBuffer, bnToHex } from 'ethereumjs-util';
 import { v4 as uuidv4 } from 'uuid';
 import { Aborter, Channel, logger } from '@rei-network/utils';
-import { Topics, BloomBitsFilter } from '@rei-network/core/src/bloomBits';
+import { Topics, BloomBitsFilter } from '@rei-network/core';
 import { Transaction, Log, BlockHeader } from '@rei-network/structure';
 import { WebsocketClient } from './client';
 import { SyncingStatus, Backend } from './types';

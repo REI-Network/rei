@@ -420,7 +420,7 @@ export class DBManager {
    * @param storageHash - Account storage hash
    * @returns Account Storage value
    */
-  getSnapStorage(addressOrAccountHash: Address | Buffer, storageHash: Buffer) {
+  getSnapStorage(addressOrAccountHash: Address | Buffer, storageHash: Buffer): Promise<Buffer> {
     return this.get(DBTarget.SnapStorage, {
       accountHash: addressOrAccountHash instanceof Address ? keccak256(addressOrAccountHash.buf) : addressOrAccountHash,
       storageHash

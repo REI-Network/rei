@@ -10,7 +10,7 @@ import Message from './evm/message';
 import TxContext from './evm/txContext';
 import { getActivePrecompiles } from './evm/precompiles';
 import { EIP2929StateManager } from './state/interface';
-import type { TxReceipt, BaseTxReceipt, PreByzantiumTxReceipt, PostByzantiumTxReceipt } from './types';
+import type { TxReceipt, BaseTxReceipt, PreByzantiumTxReceipt, PostByzantiumTxReceipt, IDebug } from './types';
 import { StateManager } from './state';
 
 const debug = createDebugLogger('vm:tx');
@@ -60,6 +60,11 @@ export interface RunTxOpts {
    * To obtain an accurate tx receipt input the block gas used up until this tx.
    */
   blockGasUsed?: BN;
+
+  /**
+   * Debug callback
+   */
+  debug?: IDebug;
 
   /**
    * Before tx callback
@@ -328,7 +333,7 @@ async function _runTx(this: VM, opts: RunTxOpts): Promise<RunTxResult> {
     value,
     data
   });
-  const evm = new EVM(this, txContext, block);
+  const evm = new EVM(this, txContext, block, opts.debug);
   if (this.DEBUG) {
     debug(`Running tx=0x${tx.isSigned() ? tx.hash().toString('hex') : 'unsigned'} with caller=${caller.toString()} gasLimit=${gasLimit} to=${to ? to.toString() : ''} value=${value} data=0x${short(data)}`);
   }

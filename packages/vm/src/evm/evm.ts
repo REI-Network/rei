@@ -3,6 +3,7 @@ import { Account, Address, BN, generateAddress, generateAddress2, KECCAK256_NULL
 import { Block } from '@rei-network/structure';
 import { ERROR, VmError } from '../exceptions';
 import { StateManager } from '../state/index';
+import { IDebug } from '../types';
 import { getPrecompile, PrecompileFunc } from './precompiles';
 import TxContext from './txContext';
 import Message from './message';
@@ -117,17 +118,19 @@ export default class EVM {
   _state: StateManager;
   _tx: TxContext;
   _block: Block;
+  _debug?: IDebug;
   /**
    * Amount of gas to refund from deleting storage values
    */
   _refund: BN;
 
-  constructor(vm: any, txContext: TxContext, block: Block) {
+  constructor(vm: any, txContext: TxContext, block: Block, debug?: IDebug) {
     this._vm = vm;
     this._state = this._vm.stateManager;
     this._tx = txContext;
     this._block = block;
     this._refund = new BN(0);
+    this._debug = debug;
   }
 
   /**
@@ -600,7 +603,7 @@ export default class EVM {
    * Starts the actual bytecode processing for a CALL or CREATE, providing
    * it with the {@link EEI}.
    */
-  async runInterpreter(message: Message, opts: InterpreterOpts = {}): Promise<ExecResult> {
+  async runInterpreter(message: Message): Promise<ExecResult> {
     const env = {
       blockchain: this._vm.blockchain, // Only used in BLOCKHASH
       address: message.to || Address.zero(),
@@ -623,7 +626,7 @@ export default class EVM {
 
     const oldRefund = this._refund.clone();
     const interpreter = new Interpreter(this._vm, eei);
-    const interpreterRes = await interpreter.run(message.code as Buffer, opts);
+    const interpreterRes = await interpreter.run(message.code as Buffer, { debug: this._debug });
 
     let result = eei._result;
     let gasUsed = message.gasLimit.sub(eei._gasLeft);

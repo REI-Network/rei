@@ -3,7 +3,6 @@ import { Block } from '@rei-network/structure';
 import { VM } from './index';
 import TxContext from './evm/txContext';
 import Message from './evm/message';
-import { InterpreterStep } from './evm/interpreter';
 import type { IDebug } from './types';
 import { default as EVM, EVMResult } from './evm/evm';
 
@@ -62,29 +61,26 @@ export default async function runCall(this: VM, opts: RunCallOpts): Promise<EVMR
   await state.putAccount(message.caller, fromAccount);
 
   let time: undefined | number;
-  let handler: undefined | ((step: InterpreterStep, next: () => void) => void);
   if (opts.debug) {
-    handler = async (step: InterpreterStep, next: () => void) => {
-      await opts.debug!.captureState(step);
-      next();
-    };
-    this.on('step', handler);
     time = Date.now();
-    await opts.debug.captureStart(message?.caller?.buf, message?.to?.buf || generateAddress(message.caller.buf, fromAccount.nonce.subn(1).toArrayLike(Buffer)), message.to === undefined, message.data, message.gasLimit, new BN(0), message.value, block.header.number, this.stateManager);
+    const from = message?.caller?.buf;
+    const to = message?.to?.buf ?? generateAddress(message.caller.buf, fromAccount.nonce.subn(1).toArrayLike(Buffer));
+    const create = message.to === undefined;
+    const input = message.data;
+    const gas = message.gasLimit;
+    const gasPrice = new BN(0);
+    const value = message.value;
+    const number = block.header.number;
+    await opts.debug!.captureStart(from, to, create, input, gas, gasPrice, value, number, this.stateManager);
   }
 
   let result: undefined | EVMResult;
   let catchedErr: any;
   try {
-    const evm = new EVM(this, txContext, block);
+    const evm = new EVM(this, txContext, block, opts.debug);
     result = await evm.executeMessage(message);
   } catch (err) {
     catchedErr = err;
-  }
-
-  // Remove Listener
-  if (handler) {
-    this.removeListener('step', handler);
   }
 
   // Call tx exec over

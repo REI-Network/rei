@@ -10,7 +10,6 @@ import { StateManager } from './state';
 import { short } from './evm/opcodes';
 import type { RunTxResult, RunTxOpts } from './runTx';
 import type { TxReceipt, IDebug } from './types';
-import { InterpreterStep } from './evm/interpreter';
 import * as DAOConfig from './config/dao_fork_accounts_config.json';
 
 type PromisResultType<T> = T extends PromiseLike<infer U> ? U : T;
@@ -305,14 +304,6 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
   const receipts: TxReceipt[] = [];
   const txResults: RunTxResult[] = [];
 
-  let handler: undefined | ((step: InterpreterStep, next: () => void) => void);
-  if (opts.debug) {
-    handler = async (step: InterpreterStep, next: () => void) => {
-      await opts.debug!.captureState(step);
-      next();
-    };
-  }
-
   /*
    * Process transactions
    */
@@ -329,18 +320,23 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
 
     const gasLimitIsHigherThanBlock = maxGasLimit.lt(tx.gasLimit.add(gasUsed));
     if (gasLimitIsHigherThanBlock) {
-      if (handler) {
-        this.removeListener('step', handler);
-      }
       throw new Error('tx has a higher gas limit than the block');
     }
 
     // Call tx exec start
     let time: undefined | number;
-    if (opts.debug && (!opts.debug.hash || opts.debug.hash.equals(tx.hash()))) {
+    const _debug = opts.debug && (!opts.debug.hash || opts.debug.hash.equals(tx.hash()));
+    if (_debug) {
       time = Date.now();
-      await opts.debug.captureStart(tx.getSenderAddress().buf, tx?.to?.buf ?? generateAddress(tx.getSenderAddress().buf, tx.nonce.toArrayLike(Buffer)), tx.toCreationAddress(), tx.data, tx.gasLimit, tx instanceof FeeMarketEIP1559Transaction ? new BN(0) : tx.gasPrice, tx.value, block.header.number, this.stateManager);
-      this.on('step', handler);
+      const from = tx.getSenderAddress().buf;
+      const to = tx?.to?.buf ?? generateAddress(tx.getSenderAddress().buf, tx.nonce.toArrayLike(Buffer));
+      const create = tx.toCreationAddress();
+      const input = tx.data;
+      const gas = tx.gasLimit;
+      const gasPrice = tx instanceof FeeMarketEIP1559Transaction ? new BN(0) : tx.gasPrice;
+      const value = tx.value;
+      const number = block.header.number;
+      await opts.debug!.captureStart(from, to, create, input, gas, gasPrice, value, number, this.stateManager);
     }
 
     let txRes: undefined | RunTxResult;
@@ -349,7 +345,8 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
         ...opts.runTxOpts,
         tx,
         block,
-        blockGasUsed: gasUsed
+        blockGasUsed: gasUsed,
+        debug: _debug ? opts.debug : undefined
       });
       txResults.push(txRes);
     } catch (err) {
@@ -375,14 +372,11 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
     }
 
     // Call tx exec over
-    if (opts.debug && (!opts.debug.hash || opts.debug.hash.equals(tx.hash()))) {
+    if (_debug) {
       if (txRes) {
-        await opts.debug.captureEnd(txRes.execResult.returnValue, txRes.gasUsed, Date.now() - time!);
+        await opts.debug!.captureEnd(txRes.execResult.returnValue, txRes.gasUsed, Date.now() - time!);
       } else {
-        await opts.debug.captureEnd(Buffer.alloc(0), new BN(0), Date.now() - time!);
-      }
-      if (handler) {
-        this.removeListener('step', handler);
+        await opts.debug!.captureEnd(Buffer.alloc(0), new BN(0), Date.now() - time!);
       }
     }
 

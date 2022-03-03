@@ -2,6 +2,7 @@ import { debug as createDebugLogger } from 'debug';
 import { Account, Address, BN } from 'ethereumjs-util';
 import { StateManager } from '../state/index';
 import { ERROR, VmError } from '../exceptions';
+import { IDebug } from '../types';
 import Memory from './memory';
 import Stack from './stack';
 import EEI from './eei';
@@ -9,6 +10,7 @@ import { Opcode, handlers as opHandlers, OpHandler, AsyncOpHandler } from './opc
 
 export interface InterpreterOpts {
   pc?: number;
+  debug?: IDebug;
 }
 
 export interface RunState {
@@ -107,10 +109,11 @@ export default class Interpreter {
     while (this._runState.programCounter < this._runState.code.length) {
       const opCode = this._runState.code[this._runState.programCounter];
       this._runState.opCode = opCode;
-      await this._runStepHook();
+      const eventObj = await this._runStepHook();
 
       try {
         await this.runStep();
+        opts.debug && (await opts.debug.captureState(eventObj));
       } catch (e: any) {
         // re-throw on non-VM errors
         if (!('errorType' in e && e.errorType === 'VmError')) {
@@ -119,6 +122,7 @@ export default class Interpreter {
         // STOP is not an exception
         if (e.error !== ERROR.STOP) {
           err = e;
+          opts.debug && (await opts.debug.captureFault(eventObj, e));
         }
         break;
       }
@@ -170,7 +174,7 @@ export default class Interpreter {
     return this._vm._opcodes.get(op) ?? this._vm._opcodes.get(0xfe);
   }
 
-  async _runStepHook(): Promise<void> {
+  async _runStepHook(): Promise<InterpreterStep> {
     const opcode = this.lookupOpInfo(this._runState.opCode);
     const eventObj: InterpreterStep = {
       pc: this._runState.programCounter,
@@ -233,7 +237,9 @@ export default class Interpreter {
      * @property {StateManager} stateManager a {@link StateManager} instance
      * @property {Address} codeAddress the address of the code which is currently being ran (this differs from `address` in a `DELEGATECALL` and `CALLCODE` call)
      */
-    return this._vm._emit('step', eventObj);
+    await this._vm._emit('step', eventObj);
+
+    return eventObj;
   }
 
   // Returns all valid jump and jumpsub destinations.

@@ -39,7 +39,9 @@ export class DBManager {
       numberToHash: new Cache({ max: 2048 }),
       hashToNumber: new Cache({ max: 2048 }),
       txLookup: new Cache({ max: 2048 }),
-      receipts: new Cache({ max: 1024 })
+      receipts: new Cache({ max: 1024 }),
+      snapAccount: new Cache({ max: 1024 }),
+      snapStorage: new Cache({ max: 1024 })
     };
   }
 

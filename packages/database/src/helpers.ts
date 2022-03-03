@@ -2,13 +2,14 @@ import { BN, rlp, toBuffer } from 'ethereumjs-util';
 import { Block, BlockHeader, Receipt } from '@rei-network/structure';
 import { DBOp, DBTarget } from './operation';
 import { bufBE8 } from './constants';
+import { SlimAccount } from './types';
 
 /*
  * This extra helper file serves as an interface between the blockchain API functionality
  * and the DB operations from `db/operation.ts` and also handles the right encoding of the keys
  */
 
-function DBSetTD(TD: BN, blockNumber: BN, blockHash: Buffer): DBOp {
+export function DBSetTD(TD: BN, blockNumber: BN, blockHash: Buffer): DBOp {
   return DBOp.set(DBTarget.TotalDifficulty, rlp.encode(TD), {
     blockNumber,
     blockHash
@@ -22,7 +23,7 @@ function DBSetTD(TD: BN, blockNumber: BN, blockHash: Buffer): DBOp {
  * - A "Set Body Operation" is only added if the body is not empty (it has transactions/uncles) or if the block is the genesis block
  * (if there is a header but no block saved the DB will implicitly assume the block to be empty)
  */
-function DBSetBlockOrHeader(blockBody: Block | BlockHeader): DBOp[] {
+export function DBSetBlockOrHeader(blockBody: Block | BlockHeader): DBOp[] {
   const header: BlockHeader = blockBody instanceof Block ? blockBody.header : blockBody;
   const dbOps: DBOp[] = [];
 
@@ -52,14 +53,14 @@ function DBSetBlockOrHeader(blockBody: Block | BlockHeader): DBOp[] {
   return dbOps;
 }
 
-function DBSetHashToNumber(blockHash: Buffer, blockNumber: BN): DBOp {
+export function DBSetHashToNumber(blockHash: Buffer, blockNumber: BN): DBOp {
   const blockNumber8Byte = bufBE8(blockNumber);
   return DBOp.set(DBTarget.HashToNumber, blockNumber8Byte, {
     blockHash
   });
 }
 
-function DBSaveLookups(blockHash: Buffer, blockNumber: BN): DBOp[] {
+export function DBSaveLookups(blockHash: Buffer, blockNumber: BN): DBOp[] {
   const ops: DBOp[] = [];
   ops.push(DBOp.set(DBTarget.NumberToHash, blockHash, { blockNumber }));
 
@@ -79,7 +80,7 @@ function DBSaveLookups(blockHash: Buffer, blockNumber: BN): DBOp[] {
  * @param blockNumber - Block number
  * @returns New operation
  */
-function DBSaveReceipts(receipts: Receipt[], blockHash: Buffer, blockNumber: BN) {
+export function DBSaveReceipts(receipts: Receipt[], blockHash: Buffer, blockNumber: BN) {
   return DBOp.set(DBTarget.Receipts, rlp.encode(receipts.map((r) => r.raw())), {
     blockHash,
     blockNumber
@@ -91,7 +92,7 @@ function DBSaveReceipts(receipts: Receipt[], blockHash: Buffer, blockNumber: BN)
  * @param block - Target block
  * @returns Array of operations
  */
-function DBSaveTxLookup(block: Block): DBOp[] {
+export function DBSaveTxLookup(block: Block): DBOp[] {
   const dbOps: DBOp[] = [];
   const blockNumber = block.header.number;
 
@@ -114,7 +115,7 @@ function DBSaveTxLookup(block: Block): DBOp[] {
  * @param bits - Bloom bits data
  * @returns New operation
  */
-function DBSaveBloomBits(bit: number, section: BN, hash: Buffer, bits: Buffer) {
+export function DBSaveBloomBits(bit: number, section: BN, hash: Buffer, bits: Buffer) {
   return DBOp.set(DBTarget.BloomBits, bits, { bit, section, hash });
 }
 
@@ -123,7 +124,7 @@ function DBSaveBloomBits(bit: number, section: BN, hash: Buffer, bits: Buffer) {
  * @param section - Section number
  * @returns  New operation
  */
-function DBSaveBloomBitsSectionCount(section: BN) {
+export function DBSaveBloomBitsSectionCount(section: BN) {
   return DBOp.set(DBTarget.BloomBitsSectionCount, section.toString());
 }
 
@@ -131,8 +132,27 @@ function DBSaveBloomBitsSectionCount(section: BN) {
  * Create a operation to delete BloomBitsSectionCount
  * @returns New operation
  */
-function DBDeleteBloomBitsSectionCount() {
+export function DBDeleteBloomBitsSectionCount() {
   return DBOp.del(DBTarget.BloomBitsSectionCount);
 }
 
-export { DBOp, DBSetTD, DBSetBlockOrHeader, DBSetHashToNumber, DBSaveLookups, DBSaveReceipts, DBSaveTxLookup, DBSaveBloomBits, DBSaveBloomBitsSectionCount, DBDeleteBloomBitsSectionCount };
+/**
+ * Create a operation to save snapshot account
+ * @param accountHash - Account hash
+ * @param account - Account object
+ * @returns New operation
+ */
+export function DBSaveSnapAccount(accountHash: Buffer, account: SlimAccount) {
+  return DBOp.set(DBTarget.SnapAccount, account.slimSerialize(), { accountHash });
+}
+
+/**
+ * Create a operation to save snapshot account storage
+ * @param accountHash - Account hash
+ * @param storageHash - Storage hash
+ * @param storageValue - Storage value
+ * @returns New operation
+ */
+export function DBSaveSnapStorage(accountHash: Buffer, storageHash: Buffer, storageValue: Buffer) {
+  return DBOp.set(DBTarget.SnapStorage, storageValue, { accountHash, storageHash });
+}

@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
 import { compressBytes } from '@rei-network/utils';
-import { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, BLOOM_BITS_SECTION_COUNT, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, CLIQUE_SIGNERS_KEY as CLIQUE_SIGNER_STATES_KEY, CLIQUE_VOTES_KEY, CLIQUE_BLOCK_SIGNERS_KEY, receiptsKey, txLookupKey, bloomBitsKey } from './constants';
+import { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, BLOOM_BITS_SECTION_COUNT, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, CLIQUE_SIGNERS_KEY as CLIQUE_SIGNER_STATES_KEY, CLIQUE_VOTES_KEY, CLIQUE_BLOCK_SIGNERS_KEY, receiptsKey, txLookupKey, bloomBitsKey, snapAccountKey, snapStorageKey } from './constants';
 import { CacheMap } from './manager';
 
 export enum DBTarget {
@@ -19,7 +19,9 @@ export enum DBTarget {
   Receipts = 100,
   TxLookup = 101,
   BloomBits = 102,
-  BloomBitsSectionCount = 103
+  BloomBitsSectionCount = 103,
+  SnapAccount = 104,
+  SnapStorage = 105
 }
 
 /**
@@ -42,6 +44,8 @@ export type DatabaseKey = {
   bit?: number;
   section?: BN;
   hash?: Buffer;
+  accountHash?: Buffer;
+  storageHash?: Buffer;
 };
 
 /**
@@ -130,6 +134,16 @@ export class DBOp {
         this.baseDBOp.key = BLOOM_BITS_SECTION_COUNT;
         this.baseDBOp.keyEncoding = 'none';
         this.baseDBOp.valueEncoding = 'none';
+        break;
+      }
+      case DBTarget.SnapAccount: {
+        this.baseDBOp.key = snapAccountKey(key!.accountHash!);
+        this.cacheString = 'snapAccount';
+        break;
+      }
+      case DBTarget.SnapStorage: {
+        this.baseDBOp.key = snapStorageKey(key!.accountHash!, key!.storageHash!);
+        this.cacheString = 'snapStorage';
         break;
       }
     }

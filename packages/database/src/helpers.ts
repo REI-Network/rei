@@ -2,7 +2,6 @@ import { BN, rlp, toBuffer } from 'ethereumjs-util';
 import { Block, BlockHeader, Receipt } from '@rei-network/structure';
 import { DBOp, DBTarget } from './operation';
 import { bufBE8 } from './constants';
-import { SlimAccount } from './types';
 
 /*
  * This extra helper file serves as an interface between the blockchain API functionality
@@ -139,11 +138,11 @@ export function DBDeleteBloomBitsSectionCount() {
 /**
  * Create a operation to save snapshot account
  * @param accountHash - Account hash
- * @param account - Account object
+ * @param serializedAccount - Serialized account
  * @returns New operation
  */
-export function DBSaveSnapAccount(accountHash: Buffer, account: SlimAccount) {
-  return DBOp.set(DBTarget.SnapAccount, account.slimSerialize(), { accountHash });
+export function DBSaveSerializedSnapAccount(accountHash: Buffer, serializedAccount: Buffer) {
+  return DBOp.set(DBTarget.SnapAccount, serializedAccount, { accountHash });
 }
 
 /**

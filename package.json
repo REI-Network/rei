@@ -38,6 +38,7 @@
     "build:network": "npm run build -w @rei-network/network",
     "build:rpc": "npm run build -w @rei-network/rpc",
     "build:utils": "npm run build -w @rei-network/utils",
+    "build:vm": "npm run build -w @rei-network/vm",
     "build:wallet": "npm run build -w @rei-network/wallet",
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/package-lock.json && npm run clean:build",
     "clean:build": "rm -rf packages/*/dist && rm -rf rm -rf packages/*/*.tsbuildinfo && cd packages/contracts && npm run clean:build",

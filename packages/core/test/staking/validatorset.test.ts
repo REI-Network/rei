@@ -5,7 +5,8 @@ import { FunctionalAddressMap } from '@rei-network/utils';
 import { ValidatorSet, IndexedValidatorSet, IndexedValidator, ActiveValidatorSet } from '../../src/consensus/reimint/validatorSet';
 import { MockAccountManager } from '../util';
 
-const common = Common.createCommonByBlockNumber(1, 'rei-testnet');
+const common = new Common({ chain: 'rei-testnet' });
+common.setHardforkByBlockNumber(0);
 
 const accMngr = new MockAccountManager([
   ['foo', Address.fromString('0x1000000000000000000000000000000000000000')],

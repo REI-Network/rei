@@ -3,10 +3,10 @@ import { debug as createDebugLogger } from 'debug';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import { Address, BN, toBuffer, keccak256, KECCAK256_NULL, unpadBuffer } from 'ethereumjs-util';
 import { encode, decode } from 'rlp';
-import Common, { Chain, Hardfork } from '@gxchain2-ethereumjs/common';
-import { getActivePrecompiles, ripemdPrecompileAddress } from '@gxchain2-ethereumjs/vm/dist/evm/precompiles';
-import { short } from '@gxchain2-ethereumjs/vm/dist/evm/opcodes';
-import { AccessList, AccessListItem } from '@gxchain2-ethereumjs/tx';
+import { Common, Chain, Hardfork } from '@rei-network/common';
+import { getActivePrecompiles, ripemdPrecompileAddress } from '@rei-network/vm/dist/evm/precompiles';
+import { short } from '@rei-network/vm/dist/evm/opcodes';
+import { AccessList, AccessListItem } from '@rei-network/structure';
 import Cache from './cache';
 import { FunctionalBufferMap } from '@rei-network/utils';
 import { StakingAccount as Account } from './account';
@@ -771,7 +771,7 @@ export class StateManager {
    * @param addressesRemoved - List of addresses to be removed from the final list
    * @param addressesOnlyStorage - List of addresses only to be added in case of present storage slots
    *
-   * @returns - an [@gxchain2-ethereumjs/tx](https://github.com/ethereumjs/ethereumjs-monorepo/packages/tx) `AccessList`
+   * @returns - an [@ethereumjs/tx](https://github.com/ethereumjs/ethereumjs-monorepo/packages/tx) `AccessList`
    */
   generateAccessList(addressesRemoved: Address[] = [], addressesOnlyStorage: Address[] = []): AccessList {
     // Merge with the reverted storage list

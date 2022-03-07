@@ -1,7 +1,7 @@
 import { Address, BNLike, BN } from 'ethereumjs-util';
-import VM from '@gxchain2-ethereumjs/vm';
-import Bloom from '@gxchain2-ethereumjs/vm/dist/bloom';
-import { IDebug } from '@gxchain2-ethereumjs/vm/dist/types';
+import { VM } from '@rei-network/vm';
+import Bloom from '@rei-network/vm/dist/bloom';
+import { IDebug } from '@rei-network/vm/dist/types';
 import { Common } from '@rei-network/common';
 import { HeaderData, Block, Transaction, Receipt, TypedTransaction, BlockHeader } from '@rei-network/structure';
 import { Blockchain } from '@rei-network/blockchain';

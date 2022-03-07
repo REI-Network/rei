@@ -2,17 +2,18 @@ import path from 'path';
 import { encode } from 'rlp';
 import { Address, BN, BNLike, ecsign, intToBuffer, bufferToHex } from 'ethereumjs-util';
 import { BaseTrie, SecureTrie as Trie } from 'merkle-patricia-tree';
-import VM from '@gxchain2-ethereumjs/vm';
-import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
-import TxContext from '@gxchain2-ethereumjs/vm/dist/evm/txContext';
+import { VM } from '@rei-network/vm';
+import EVM from '@rei-network/vm/dist/evm/evm';
+import TxContext from '@rei-network/vm/dist/evm/txContext';
 import { Block, HeaderData, BlockHeader, Transaction, Receipt } from '@rei-network/structure';
-import { Common, getGenesisState } from '@rei-network/common';
+import { Common } from '@rei-network/common';
+import { genesisStateByName } from '@rei-network/common/dist/genesisStates';
 import { logger, ignoreError } from '@rei-network/utils';
 import { Node } from '../../node';
 import { StateManager } from '../../stateManager';
 import { ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
-import { getConsensusTypeByCommon, isEnableFreeStaking } from '../../hardforks';
+import { getConsensusTypeByCommon, isEnableFreeStaking, isEnableHardfork1, isEnableRemint } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
@@ -167,13 +168,18 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     const common = this.getCommon(0);
     const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
     const stateManager = new StateManager({ common, trie: new Trie(this.node.chaindb) });
-    await stateManager.generateGenesis(getGenesisState(this.node.chain));
+    await stateManager.generateGenesis(genesisStateByName(this.node.chain));
     let root = await stateManager.getStateRoot();
 
     // deploy system contracts
     const vm = await this.node.getVM(root, common);
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
-    await Contract.deployReimintContracts(evm, common);
+    if (isEnableRemint(common)) {
+      await Contract.deployReimintContracts(evm, common);
+    }
+    if (isEnableHardfork1(common)) {
+      await Contract.deployHardfork1Contracts(evm, common);
+    }
     if (isEnableFreeStaking(common)) {
       await Contract.deployFreeStakingContracts(evm, common);
     }

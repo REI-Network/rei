@@ -1,9 +1,9 @@
-import { TxSortedMap } from '../../src/txpool/txmap';
 import fs from 'fs';
 import path from 'path';
-import { Transaction } from '@rei-network/structure';
 import { expect } from 'chai';
+import { Transaction } from '@rei-network/structure';
 import { hexStringToBN } from '@rei-network/utils';
+import { TxSortedMap } from '../../src/txpool/txmap';
 
 describe('TxSortedMap', () => {
   let txSortedMap: TxSortedMap;

@@ -1,13 +1,13 @@
 import util from 'util';
 import { Address } from 'ethereumjs-util';
-import { OpcodeList, getOpcodesForHF } from '@gxchain2-ethereumjs/vm/dist/evm/opcodes';
+import { OpcodeList, getOpcodesForHF } from '@rei-network/vm/dist/evm/opcodes';
 import { Block } from '@rei-network/structure';
-import { IDebug } from '@gxchain2-ethereumjs/vm/dist/types';
+import { IDebug } from '@rei-network/vm/dist/types';
 import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Node } from '../node';
 import { EMPTY_ADDRESS } from '../utils';
 import { StructLogDebug, JSDebug } from './debug';
-import { toAsync } from './toasync';
+import { toAsync } from './toAsync';
 import { tracers } from './tracers';
 
 export interface IDebugImpl extends IDebug {
@@ -101,8 +101,8 @@ export class Tracer {
    * @returns Result of execution
    */
   async traceTx(hash: Buffer, config?: TraceConfig) {
-    const wtx = await this.node.db.getWrappedTransaction(hash);
-    return await this.traceBlock(await this.node.db.getBlockByHashAndNumber(wtx.blockHash!, wtx.blockNumber!), config, hash);
+    const tx = await this.node.db.getTransaction(hash);
+    return await this.traceBlock(await this.node.db.getBlockByHashAndNumber(tx.extension!.blockHash, tx.extension!.blockNumber), config, hash);
   }
 
   /**

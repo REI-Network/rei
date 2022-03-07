@@ -1,7 +1,8 @@
 import { Address, bufferToHex, BN, toBuffer } from 'ethereumjs-util';
 import { BaseTrie, SecureTrie as Trie } from 'merkle-patricia-tree';
 import { Block, BlockHeader, HeaderData, Transaction, Receipt } from '@rei-network/structure';
-import { Common, getGenesisState } from '@rei-network/common';
+import { Common } from '@rei-network/common';
+import { genesisStateByName } from '@rei-network/common/dist/genesisStates';
 import { logger, nowTimestamp, getRandomIntInclusive } from '@rei-network/utils';
 import { ConsensusEngine, ConsensusEngineOptions } from '../types';
 import { BaseConsensusEngine } from '../engine';
@@ -156,7 +157,7 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
     const common = this.node.getCommon(0);
     const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
     const stateManager = new StateManager({ common, trie: new Trie(this.node.chaindb) });
-    await stateManager.generateGenesis(getGenesisState(this.node.chain));
+    await stateManager.generateGenesis(genesisStateByName(this.node.chain));
     const root = await stateManager.getStateRoot();
 
     if (!root.equals(genesisBlock.header.stateRoot)) {

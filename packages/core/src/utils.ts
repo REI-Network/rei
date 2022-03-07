@@ -1,5 +1,5 @@
 import { Address, BN } from 'ethereumjs-util';
-import { PostByzantiumTxReceipt, TxReceipt } from '@gxchain2-ethereumjs/vm/dist/types';
+import { PostByzantiumTxReceipt, TxReceipt } from '@rei-network/vm/dist/types';
 import { Common } from '@rei-network/common';
 import { CLIQUE_EXTRA_VANITY, Receipt, Log } from '@rei-network/structure';
 import { hexStringToBN } from '@rei-network/utils';

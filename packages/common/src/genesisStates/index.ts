@@ -1,4 +1,4 @@
-import { genesisStatesType } from '@gxchain2-ethereumjs/common/dist/types';
+import { genesisStatesType } from './../types';
 
 const genesisStates: genesisStatesType = {
   names: {
@@ -11,6 +11,20 @@ const genesisStates: genesisStatesType = {
   'rei-devnet': require('./devnet.json')
 };
 
-export function getGenesisState(name: number | string) {
-  return typeof name === 'string' ? genesisStates[name] : genesisStates[genesisStates['names'][name]];
+/**
+ * Returns the genesis state by network ID
+ * @param id ID of the network (e.g. 1)
+ * @returns Dictionary with genesis accounts
+ */
+export function genesisStateById(id: number): any {
+  return genesisStates[genesisStates['names'][id]];
+}
+
+/**
+ * Returns the genesis state by network name
+ * @param name Name of the network (e.g. 'mainnet')
+ * @returns Dictionary with genesis accounts
+ */
+export function genesisStateByName(name: string): any {
+  return genesisStates[name];
 }

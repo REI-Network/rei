@@ -1,4 +1,4 @@
-import { Transaction, WrappedTransaction, calcIntrinsicGasByTx } from '@rei-network/structure';
+import { Transaction } from '@rei-network/structure';
 import { MAX_UINT64 } from '../utils';
 
 /**
@@ -7,7 +7,7 @@ import { MAX_UINT64 } from '../utils';
  * @returns Transaction slots
  */
 export function txSlots(tx: Transaction) {
-  return Math.ceil(new WrappedTransaction(tx).size / 32768);
+  return Math.ceil(tx.size / 32768);
 }
 
 /**
@@ -25,6 +25,6 @@ export function txCost(tx: Transaction) {
  * @returns `true` if valid, `false` if not
  */
 export function checkTxIntrinsicGas(tx: Transaction) {
-  const gas = calcIntrinsicGasByTx(tx);
+  const gas = tx.getBaseFee();
   return gas.lte(MAX_UINT64) && gas.lte(tx.gasLimit);
 }

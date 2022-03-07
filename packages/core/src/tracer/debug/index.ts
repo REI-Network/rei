@@ -1,2 +1,2 @@
-export * from './structlogdebug';
-export * from './jsdebug';
+export * from './structLogDebug';
+export * from './jsDebug';

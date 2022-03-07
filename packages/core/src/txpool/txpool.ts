@@ -2,13 +2,13 @@ import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
 import Heap from 'qheap';
 import { FunctionalBufferMap, FunctionalBufferSet, Aborter, logger, InitializerWithEventEmitter } from '@rei-network/utils';
-import { Transaction, WrappedTransaction, BlockHeader, Block } from '@rei-network/structure';
+import { Transaction, BlockHeader, Block } from '@rei-network/structure';
 import { Node } from '../node';
 import { getGasLimitByCommon } from '../utils';
 import { StateManager } from '../stateManager';
 import { TxSortedMap } from './txmap';
-import { PendingTxMap } from './pendingmap';
-import { TxPricedList } from './txpricedlist';
+import { PendingTxMap } from './pendingMap';
+import { TxPricedList } from './txPricedList';
 import { Journal } from './journal';
 import { TxPoolAccount, TxPoolOptions } from './types';
 import { txSlots, checkTxIntrinsicGas } from './utils';
@@ -408,7 +408,7 @@ export class TxPool extends InitializerWithEventEmitter {
         const pendingObj = forceGet(result.pending, address);
         for (const [nonce, tx] of account.pending.nonceToTx) {
           const txObj = forceGet(pendingObj, nonce.toString());
-          const txInfo = new WrappedTransaction(tx).toRPCJSON();
+          const txInfo = tx.toRPCJSON();
           for (const property in txInfo) {
             Object.defineProperty(txObj, property, { value: txInfo[property], enumerable: true });
           }
@@ -418,7 +418,7 @@ export class TxPool extends InitializerWithEventEmitter {
         const queuedObj = forceGet(result.queued, address);
         for (const [nonce, tx] of account.queue.nonceToTx) {
           const txObj = forceGet(queuedObj, nonce.toString());
-          const txInfo = new WrappedTransaction(tx).toRPCJSON();
+          const txInfo = tx.toRPCJSON();
           for (const property in txInfo) {
             Object.defineProperty(txObj, property, { value: txInfo[property], enumerable: true });
           }
@@ -502,7 +502,7 @@ export class TxPool extends InitializerWithEventEmitter {
 
   private async validateTx(tx: Transaction): Promise<boolean> {
     try {
-      const txSize = new WrappedTransaction(tx).size;
+      const txSize = tx.size;
       if (txSize > this.txMaxSize) {
         throw new Error(`size too large: ${txSize} max: ${this.txMaxSize}`);
       }

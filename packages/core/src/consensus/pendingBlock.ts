@@ -1,6 +1,6 @@
 import { BN, KECCAK256_RLP_ARRAY } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
-import Bloom from '@gxchain2-ethereumjs/vm/dist/bloom';
+import Bloom from '@rei-network/vm/dist/bloom';
 import { Transaction, calcTransactionTrie, HeaderData } from '@rei-network/structure';
 import { logger } from '@rei-network/utils';
 import { Common } from '@rei-network/common';

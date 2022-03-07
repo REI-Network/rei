@@ -9,7 +9,8 @@ import { HandlerPool, GetHandlerTimeoutError } from '../../src/protocols/handler
 import { ConsensusEngine } from '../../src/consensus';
 
 setLevel('silent');
-const common = Common.createCommonByBlockNumber(0, 'rei-testnet');
+const common = new Common({ chain: 'rei-testnet' });
+common.setHardforkByBlockNumber(0);
 const decl = 10;
 
 class MockFetcherBackend implements FetcherBackend, FetcherValidateBackend {

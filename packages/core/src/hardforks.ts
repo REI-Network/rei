@@ -1,6 +1,6 @@
 import { rlphash, Address, BN, setLengthRight, setLengthLeft } from 'ethereumjs-util';
-import { addPrecompile } from '@gxchain2-ethereumjs/vm/dist/evm/precompiles';
-import { OOGResult } from '@gxchain2-ethereumjs/vm/dist/evm/evm';
+import { addPrecompile, PrecompileAvailabilityCheck } from '@rei-network/vm/dist/evm/precompiles';
+import { OOGResult } from '@rei-network/vm/dist/evm/evm';
 import { hexStringToBN } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { BlockHeader, setCustomHashFunction, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
@@ -28,12 +28,7 @@ setCustomHashFunction((header: BlockHeader) => {
 addPrecompile(
   Address.fromString('0x00000000000000000000000000000000000000ff'),
   async (opts) => {
-    console.log('enter estimate');
     assert(opts.data);
-
-    if (!isEnableFreeStaking(opts._common)) {
-      throw new Error('invalid call');
-    }
 
     const gasUsed = new BN(opts._common.param('gasPrices', 'estimateFee'));
 
@@ -57,7 +52,7 @@ addPrecompile(
     };
   },
   {
-    type: 1, // TODO: PrecompileAvailabilityCheck.Hardfork
+    type: PrecompileAvailabilityCheck.Hardfork,
     param: 'free-staking'
   }
 );

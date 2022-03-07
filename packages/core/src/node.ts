@@ -3,11 +3,11 @@ import type { LevelUp } from 'levelup';
 import LevelStore from 'datastore-level';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
-import { Database, createLevelDB, createEncodingLevelDB, DBSaveTxLookup, DBSaveReceipts } from '@rei-network/database';
+import { Database, createLevelDB, createEncodingLevelDB } from '@rei-network/database';
 import { NetworkManager, Peer } from '@rei-network/network';
-import { Common, getChain } from '@rei-network/common';
+import { Common } from '@rei-network/common';
 import { Blockchain } from '@rei-network/blockchain';
-import VM from '@gxchain2-ethereumjs/vm';
+import { VM } from '@rei-network/vm';
 import { Transaction, Block } from '@rei-network/structure';
 import { Channel, Aborter, logger, Initializer } from '@rei-network/utils';
 import { AccountManager } from '@rei-network/wallet';
@@ -15,7 +15,7 @@ import { TxPool } from './txpool';
 import { Synchronizer } from './sync';
 import { TxFetcher } from './txSync';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
-import { BloomBitsFilter, BloomBitsBlocks, ConfirmsBlockNumber, ReceiptsCache } from './bloombits';
+import { BloomBitsFilter, ReceiptsCache } from './bloomBits';
 import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
 import { WireProtocol, ConsensusProtocol } from './protocols';
@@ -70,9 +70,6 @@ export class Node extends Initializer {
   private readonly pendingTxsQueue = new Channel<PendingTxs>();
   private readonly commitBlockQueue = new Channel<CommitBlock>();
 
-  private latestBlock!: Block;
-  private totalDifficulty!: BN;
-
   constructor(options: NodeOptions) {
     super();
 
@@ -87,12 +84,11 @@ export class Node extends Initializer {
     this.receiptsCache = new ReceiptsCache(options.receiptsCacheSize);
 
     this.chain = options.chain ?? defaultChainName;
-    if (getChain(this.chain) === undefined) {
+    if (!Common.isSupportedChainName(this.chain)) {
       throw new Error(`Unknown chain: ${this.chain}`);
     }
 
     const common = this.getCommon(0);
-    // TODO: fix type
     this.db = new Database(this.chaindb, common);
     this.networkId = common.networkIdBN().toNumber();
     this.chainId = common.chainIdBN().toNumber();
@@ -104,7 +100,7 @@ export class Node extends Initializer {
     logger.info('Read genesis block from file', bufferToHex(this.genesisHash));
 
     this.blockchain = new Blockchain({
-      dbManager: this.db,
+      database: this.db,
       common,
       genesisBlock,
       validateBlocks: false,
@@ -126,7 +122,21 @@ export class Node extends Initializer {
     this.txPool = new TxPool({ node: this, journal: this.datadir });
     this.txSync = new TxFetcher(this);
     this.bcMonitor = new BlockchainMonitor(this.db);
-    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ db: this.db, sectionSize: BloomBitsBlocks, confirmsBlockNumber: ConfirmsBlockNumber });
+    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ db: this.db });
+  }
+
+  /**
+   * Get blockchain's latest block
+   */
+  get latestBlock() {
+    return this.blockchain.latestBlock;
+  }
+
+  /**
+   * Get blockchain's total difficulty
+   */
+  get totalDifficulty() {
+    return this.blockchain.totalDifficulty;
   }
 
   /**
@@ -147,8 +157,6 @@ export class Node extends Initializer {
    */
   async init() {
     await this.blockchain.init();
-    this.latestBlock = await this.blockchain.getLatestBlock();
-    this.totalDifficulty = await this.blockchain.getTotalDifficulty(this.latestBlock.hash(), this.latestBlock.header.number);
     if (this.latestBlock.header.number.eqn(0)) {
       await this.getEngine(this.latestBlock._common).generateGenesis();
     }
@@ -238,7 +246,9 @@ export class Node extends Initializer {
    * @returns Common object
    */
   getCommon(num: BNLike) {
-    return Common.createCommonByBlockNumber(num, this.chain);
+    const common = new Common({ chain: this.chain });
+    common.setHardforkByBlockNumber(num);
+    return common;
   }
 
   /**
@@ -326,7 +336,7 @@ export class Node extends Initializer {
    * @returns Bloom filter object
    */
   getFilter() {
-    return new BloomBitsFilter({ node: this, sectionSize: BloomBitsBlocks });
+    return new BloomBitsFilter(this);
   }
 
   /**
@@ -405,22 +415,15 @@ export class Node extends Initializer {
       }
     }
 
-    const before = this.blockchain.latestBlock.hash();
-
-    // commit
-    {
-      // save block
-      await this.blockchain.putBlock(block);
-      // save receipts
-      await this.db.batch(DBSaveTxLookup(block).concat(DBSaveReceipts(receipts, hash, number)));
-    }
+    // save block to the database
+    const reorged = await this.blockchain.putBlock(block, { receipts, saveTxLookup: true });
 
     // install properties for receipts
     let lastCumulativeGasUsed = new BN(0);
     for (let i = 0; i < receipts.length; i++) {
       const receipt = receipts[i];
       const gasUsed = receipt.bnCumulativeGasUsed.sub(lastCumulativeGasUsed);
-      receipt.installProperties(block, block.transactions[i] as Transaction, gasUsed, i);
+      receipt.initExtension(block, block.transactions[i] as Transaction, gasUsed, i);
       lastCumulativeGasUsed = receipt.bnCumulativeGasUsed;
     }
 
@@ -429,9 +432,6 @@ export class Node extends Initializer {
 
     logger.info('✨ Commit block, height:', number.toString(), 'hash:', bufferToHex(hash));
 
-    const after = this.blockchain.latestBlock.hash();
-
-    const reorged = !before.equals(after);
     return { reorged };
   }
 
@@ -447,9 +447,6 @@ export class Node extends Initializer {
 
         // if canonical chain changes, notify to other modules
         if (reorged) {
-          // update the latest block and total difficulty
-          this.latestBlock = await this.blockchain.getLatestBlock();
-          this.totalDifficulty = await this.blockchain.getTotalDifficulty(this.latestBlock.hash(), this.latestBlock.header.number);
           if (broadcast) {
             this.wire.broadcastNewBlock(block, this.totalDifficulty);
           }

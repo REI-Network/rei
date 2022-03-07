@@ -20,23 +20,9 @@ export interface Snapshot extends ISnapshot {
 }
 
 export interface SnapshotTree {
-  diskdb: DB;
-
-  triedb: DB;
-
-  cache: number;
-
-  layers: Map<Buffer, Snapshot>;
-
-  lock: Semaphore;
-
   snapshot(blockRoot: Buffer): ISnapshot;
 
   update(root: Buffer, parent: Buffer, accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferMap<Buffer>, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>): void;
 
   cap(root: Buffer, layers: number): void;
-}
-
-interface ToSnapAccount {
-  (account: Account): Buffer;
 }

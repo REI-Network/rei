@@ -1,8 +1,10 @@
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { Database } from '@rei-network/database';
+import { snapStorageKey, snapAccountKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
 import { FunctionalBufferSet } from '@rei-network/utils';
 import { StakingAccount } from '../stateManager';
 import { DiffLayer } from './diffLayer';
+import { asyncTraverseRawDB } from './iterator';
 import { ISnapshot, AccountData, StorageData } from './types';
 
 export class DiskLayer implements ISnapshot {
@@ -75,5 +77,37 @@ export class DiskLayer implements ISnapshot {
    */
   update(root: Buffer, destructSet: FunctionalBufferSet, accountData: AccountData, storageData: StorageData) {
     return DiffLayer.createDiffLayerFromParent(this, root, destructSet, accountData, storageData);
+  }
+
+  /**
+   * Generates an iterator that traverses all accounts on disk
+   * @param seek - Point to start traversing
+   * @returns Iterator
+   */
+  genAccountIterator(seek: Buffer) {
+    return asyncTraverseRawDB(
+      this.db.rawdb,
+      { gte: snapAccountKey(seek), keys: true, values: true },
+      (key) => key.length !== SNAP_ACCOUNT_PREFIX.length + 32,
+      (value) => StakingAccount.fromRlpSerializedSlimAccount(value)
+    );
+  }
+
+  /**
+   * Generates an iterator that traverses all storage data on disk for the target account
+   * @param accountHash - Target account hash
+   * @param seek - Point to start traversing
+   * @returns Iterator
+   */
+  genStorageIterator(accountHash: Buffer, seek: Buffer) {
+    return {
+      iter: asyncTraverseRawDB(
+        this.db.rawdb,
+        { gte: snapStorageKey(accountHash, seek), keys: true, values: true },
+        (key) => key.length !== SNAP_STORAGE_PREFIX.length + 32 + 32,
+        (value) => value
+      ),
+      destructed: false
+    };
   }
 }

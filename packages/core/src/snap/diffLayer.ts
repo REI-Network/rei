@@ -2,6 +2,7 @@ import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
 import Bloom from '@rei-network/vm/dist/bloom';
 import { StakingAccount } from '../stateManager';
 import { DiskLayer } from './diskLayer';
+import { asyncTraverseHashList } from './iterator';
 import { ISnapshot, Snapshot, AccountData, StorageData } from './types';
 
 /**
@@ -286,5 +287,54 @@ export class DiffLayer implements ISnapshot {
    */
   update(root: Buffer, destructSet: FunctionalBufferSet, accountData: AccountData, storageData: StorageData) {
     return DiffLayer.createDiffLayerFromParent(this, root, destructSet, accountData, storageData);
+  }
+
+  /**
+   * Generates an iterator that traverses all accounts in this object
+   * @param seek - Point to start traversing
+   * @returns Iterator
+   */
+  genAccountIterator(seek: Buffer) {
+    const accountList = this.getAccountList();
+    const index = accountList.findIndex((value) => seek.compare(value) <= 0);
+    return asyncTraverseHashList(
+      index === -1 ? [] : accountList.slice(index),
+      () => this.stale,
+      (hash: Buffer) => {
+        const serializedAccount = this.accountData.get(hash);
+        if (!serializedAccount) {
+          if (this.destructSet.has(hash)) {
+            return null;
+          }
+          throw new Error('missing hash in account data');
+        }
+        return StakingAccount.fromRlpSerializedAccount(serializedAccount);
+      }
+    );
+  }
+
+  /**
+   * Generates an iterator that traverses all storage data in this object for the target account
+   * @param accountHash - Target account hash
+   * @param seek - Point to start traversing
+   * @returns Iterator
+   */
+  genStorageIterator(accountHash: Buffer, seek: Buffer) {
+    const { list, destructed } = this.getStorageList(accountHash);
+    const index = list.findIndex((value) => seek.compare(value) <= 0);
+    return {
+      iter: asyncTraverseHashList(
+        index === -1 ? [] : list.slice(index),
+        () => this.stale,
+        (hash: Buffer) => {
+          const storageValue = this.storageData.get(accountHash)?.get(hash);
+          if (!storageValue) {
+            throw new Error('missing hash in storage data');
+          }
+          return storageValue;
+        }
+      ),
+      destructed
+    };
   }
 }

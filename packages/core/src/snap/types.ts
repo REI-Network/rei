@@ -1,4 +1,4 @@
-import type { FunctionalBufferMap } from '@rei-network/utils';
+import type { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
 import type { StakingAccount } from '../stateManager';
 import type { DiffLayer } from './diffLayer';
 import type { DiskLayer } from './diskLayer';
@@ -22,6 +22,8 @@ export interface ISnapshot {
 }
 
 export type Snapshot = DiffLayer | DiskLayer;
+
+export type DestructSet = FunctionalBufferSet;
 
 export type AccountData = FunctionalBufferMap<Buffer>;
 

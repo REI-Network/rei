@@ -3,7 +3,7 @@ import Bloom from '@rei-network/vm/dist/bloom';
 import { StakingAccount } from '../stateManager';
 import { DiskLayer } from './diskLayer';
 import { asyncTraverseHashList } from './iterator';
-import { ISnapshot, Snapshot, AccountData, StorageData } from './types';
+import { ISnapshot, Snapshot, DestructSet, AccountData, StorageData } from './types';
 
 /**
  * TODO: improve
@@ -21,7 +21,7 @@ export class DiffLayer implements ISnapshot {
   readonly memory: number;
   readonly parent: Snapshot;
 
-  readonly destructSet: FunctionalBufferSet;
+  readonly destructSet: DestructSet;
   readonly accountData: AccountData;
   readonly storageData: StorageData;
 
@@ -39,7 +39,7 @@ export class DiffLayer implements ISnapshot {
    * @param storageData - Modified storage data
    * @returns New diff layer
    */
-  static createDiffLayerFromParent(parent: Snapshot, root: Buffer, destructSet: FunctionalBufferSet, accountData: AccountData, storageData: StorageData) {
+  static createDiffLayerFromParent(parent: Snapshot, root: Buffer, destructSet: DestructSet, accountData: AccountData, storageData: StorageData) {
     let diffed: DiffBloom;
     if (parent instanceof DiffLayer) {
       // if the parent layer is a diff layer, copy the bloom from it

@@ -425,21 +425,42 @@ export class DBManager {
   /**
    * Get snapshot root
    */
-  getSnapRoot(): Promise<Buffer> {
-    return this.get(DBTarget.SnapRoot);
+  async getSnapRoot(): Promise<Buffer | null> {
+    try {
+      return await this.get(DBTarget.SnapRoot);
+    } catch (err: any) {
+      if (err.type === 'NotFoundError') {
+        return null;
+      }
+      throw err;
+    }
   }
 
   /**
    * Get snapshot journal
    */
-  getSnapJournal(): Promise<Buffer> {
-    return this.get(DBTarget.SnapJournal);
+  async getSnapJournal(): Promise<Buffer | null> {
+    try {
+      return await this.get(DBTarget.SnapJournal);
+    } catch (err: any) {
+      if (err.type === 'NotFoundError') {
+        return null;
+      }
+      throw err;
+    }
   }
 
   /**
    * Get snapshot generator
    */
-  getSnapGenerator(): Promise<Buffer> {
-    return this.get(DBTarget.SnapGenerator);
+  async getSnapGenerator(): Promise<Buffer | null> {
+    try {
+      return await this.get(DBTarget.SnapGenerator);
+    } catch (err: any) {
+      if (err.type === 'NotFoundError') {
+        return null;
+      }
+      throw err;
+    }
   }
 }

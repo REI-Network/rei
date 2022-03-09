@@ -43,6 +43,7 @@ export async function* asyncTraverseRawDB<T>(db: DB<Buffer, Buffer>, options: It
     valueAsBuffer: true,
     valueEncoding: 'binary'
   });
+
   try {
     while (true) {
       const result = await new Promise<[Buffer, Buffer] | void>((resolve, reject) => {

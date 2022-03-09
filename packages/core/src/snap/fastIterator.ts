@@ -27,18 +27,23 @@ class WeightedIterator<T> {
   }
 }
 
+export type FastSnapReturnType<T> = { hash: Buffer; value: T };
+
+export type FastSnapAsyncGenerator<T> = AsyncGenerator<FastSnapReturnType<T>, FastSnapReturnType<T> | void>;
+
 export class FastSnapIterator<T> {
   readonly root: Buffer;
 
-  private iterators: WeightedIterator<T>[] = [];
+  private iterators: WeightedIterator<T | null>[] = [];
   private initiated: boolean = false;
+  private asyncGenerator?: FastSnapAsyncGenerator<T>;
 
-  constructor(snap: ISnapshot, genSnapIterator: (snap: ISnapshot) => { iter: SnapIterator<T>; stop: boolean }) {
+  constructor(snap: ISnapshot, genSnapIterator: (snap: ISnapshot) => { iter: SnapIterator<T | null>; stop: boolean }) {
     this.root = snap.root;
     let _snap: undefined | ISnapshot = snap;
     for (let depth = 0; _snap !== undefined; depth++) {
       const { iter, stop } = genSnapIterator(_snap);
-      this.iterators.push(new WeightedIterator<T>(iter, depth));
+      this.iterators.push(new WeightedIterator<T | null>(iter, depth));
       if (stop) {
         break;
       }
@@ -156,20 +161,45 @@ export class FastSnapIterator<T> {
   /**
    * Generate an async generator to iterate all elements
    */
-  async *[Symbol.asyncIterator](): AsyncGenerator<T, T | void> {
-    if (!this.initiated) {
-      this.initiated = true;
-      const value = this.iterators[0].getCurrValue!();
-      if (value !== null) {
-        yield value;
-      }
+  [Symbol.asyncIterator](): FastSnapAsyncGenerator<T> {
+    if (this.asyncGenerator) {
+      throw new Error('repeat iterate');
     }
 
-    while (await this.next(0)) {
-      const value = this.iterators[0].getCurrValue!();
-      if (value !== null) {
-        yield value;
+    return (this.asyncGenerator = async function* (this: FastSnapIterator<T>) {
+      try {
+        if (!this.initiated) {
+          this.initiated = true;
+          const hash = this.iterators[0].curr!;
+          const value = this.iterators[0].getCurrValue!();
+          if (value !== null) {
+            yield { hash, value };
+          }
+        }
+
+        while (await this.next(0)) {
+          const hash = this.iterators[0].curr!;
+          const value = this.iterators[0].getCurrValue!();
+          if (value !== null) {
+            yield { hash, value };
+          }
+        }
+      } finally {
+        this.asyncGenerator = undefined;
       }
+    }.call(this));
+  }
+
+  /**
+   * Abort iterator
+   */
+  async abort() {
+    if (this.asyncGenerator) {
+      await this.asyncGenerator.return();
+      this.asyncGenerator = undefined;
     }
+
+    await Promise.all(this.iterators.map(({ iter }) => iter.return()));
+    this.iterators = [];
   }
 }

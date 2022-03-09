@@ -1,12 +1,12 @@
 import crypto from 'crypto';
-import { expect } from 'chai';
+import { assert, expect } from 'chai';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import { Account, BN, keccak256 } from 'ethereumjs-util';
 import { FunctionalBufferMap, FunctionalBufferSet, getRandomIntInclusive } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { Database, DBSaveSnapStorage, DBSaveSerializedSnapAccount } from '@rei-network/database';
 import { EMPTY_HASH } from '../../src/utils';
-import { DiskLayer, DiffLayer, Snapshot } from '../../src/snap';
+import { DiskLayer, DiffLayer, Snapshot, FastSnapIterator } from '../../src/snap';
 const level = require('level-mem');
 
 const common = new Common({ chain: 'rei-devnet' });
@@ -218,10 +218,9 @@ describe('Layer', () => {
     });
   });
 
+  const db = new Database(level(), common);
+  const layers: LayerInfo[] = [];
   describe('DiffLayer', () => {
-    const db = new Database(level(), common);
-    const layers: LayerInfo[] = [];
-
     before(async () => {
       let count = 10;
       for (let i = 0; i < 3; i++) {
@@ -368,6 +367,70 @@ describe('Layer', () => {
           }
           expect(storageData.size, 'storage data should be empty').be.equal(0);
         }
+      }
+    });
+  });
+
+  describe('FastIterator', () => {
+    it('should fast iterate account succeed', async () => {
+      const { layer } = layers[2];
+      const fastIter = new FastSnapIterator(layer, (snap) => {
+        return {
+          iter: snap.genAccountIterator(EMPTY_HASH),
+          stop: false
+        };
+      });
+      await fastIter.init();
+
+      let totalCount = 0;
+      for await (const { hash, value } of fastIter) {
+        const expectAccount = await layer.getAccount(hash);
+        expect(expectAccount?.serialize().equals(value.serialize()), 'account should be equal').be.true;
+        totalCount++;
+      }
+      expect(totalCount, 'total count should be equal').be.equal(layers[0].accounts.length);
+    });
+
+    it('should abort succeed', async () => {
+      const { layer } = layers[2];
+      const fastIter = new FastSnapIterator(layer, (snap) => {
+        return {
+          iter: snap.genAccountIterator(EMPTY_HASH),
+          stop: false
+        };
+      });
+      await fastIter.init();
+
+      let index = 0;
+      for await (const element of fastIter) {
+        if (++index === 3) {
+          await fastIter.abort();
+        }
+      }
+      expect(index === 3, 'iterator should abort').be.true;
+    });
+
+    it('should prohibite repeated iterations', async () => {
+      const { layer } = layers[2];
+      const fastIter = new FastSnapIterator(layer, (snap) => {
+        return {
+          iter: snap.genAccountIterator(EMPTY_HASH),
+          stop: false
+        };
+      });
+      await fastIter.init();
+
+      const doIter = async () => {
+        for await (const element of fastIter) {
+        }
+      };
+
+      try {
+        await Promise.all([doIter(), doIter()]);
+        assert.fail('should prohibite repeated iterations');
+      } catch (err) {
+      } finally {
+        await fastIter.abort();
       }
     });
   });

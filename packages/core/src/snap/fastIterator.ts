@@ -156,7 +156,7 @@ export class FastSnapIterator<T> {
   /**
    * Generate an async generator to iterate all elements
    */
-  async *generator(): AsyncGenerator<T, T | void> {
+  async *[Symbol.asyncIterator](): AsyncGenerator<T, T | void> {
     if (!this.initiated) {
       this.initiated = true;
       const value = this.iterators[0].getCurrValue!();

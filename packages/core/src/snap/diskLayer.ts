@@ -2,6 +2,7 @@ import { Database } from '@rei-network/database';
 import { snapStorageKey, snapAccountKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
 import { FunctionalBufferSet } from '@rei-network/utils';
 import { StakingAccount } from '../stateManager';
+import { MAX_HASH } from '../utils';
 import { DiffLayer } from './diffLayer';
 import { asyncTraverseRawDB } from './iterator';
 import { ISnapshot, AccountData, StorageData } from './types';
@@ -84,8 +85,9 @@ export class DiskLayer implements ISnapshot {
   genAccountIterator(seek: Buffer) {
     return asyncTraverseRawDB(
       this.db.rawdb,
-      { gte: snapAccountKey(seek), keys: true, values: true },
+      { gte: snapAccountKey(seek), lte: snapAccountKey(MAX_HASH) },
       (key) => key.length !== SNAP_ACCOUNT_PREFIX.length + 32,
+      (key) => key.slice(SNAP_STORAGE_PREFIX.length),
       (value) => StakingAccount.fromRlpSerializedSlimAccount(value)
     );
   }
@@ -100,8 +102,9 @@ export class DiskLayer implements ISnapshot {
     return {
       iter: asyncTraverseRawDB(
         this.db.rawdb,
-        { gte: snapStorageKey(accountHash, seek), keys: true, values: true },
+        { gte: snapStorageKey(accountHash, seek), lte: snapStorageKey(MAX_HASH, MAX_HASH) },
         (key) => key.length !== SNAP_STORAGE_PREFIX.length + 32 + 32,
+        (key) => key.slice(SNAP_STORAGE_PREFIX.length + 32),
         (value) => value
       ),
       destructed: false

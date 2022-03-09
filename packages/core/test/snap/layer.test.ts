@@ -5,6 +5,7 @@ import { Account, BN, keccak256 } from 'ethereumjs-util';
 import { FunctionalBufferMap, FunctionalBufferSet, getRandomIntInclusive } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { Database, DBSaveSnapStorage, DBSaveSerializedSnapAccount } from '@rei-network/database';
+import { EMPTY_HASH } from '../../src/utils';
 import { DiskLayer, DiffLayer, Snapshot } from '../../src/snap';
 const level = require('level-mem');
 
@@ -153,13 +154,20 @@ type LayerInfo = {
   layer: Snapshot;
   accounts: AccountInfo[];
 };
+
 describe('Layer', () => {
   describe('DiskLayer', () => {
     const db = new Database(level(), common);
+    let accounts!: AccountInfo[];
+    let diskLayer!: DiskLayer;
+
+    before(async () => {
+      const { root, accounts: _accounts } = await genRandomAccounts(db, 10);
+      accounts = _accounts;
+      diskLayer = new DiskLayer(db, root);
+    });
 
     it('should get account and storage data succeed', async () => {
-      const { root, accounts } = await genRandomAccounts(db, 10);
-      const diskLayer = new DiskLayer(db, root);
       for (const { address, account, storageData } of accounts) {
         const accountHash = keccak256(address);
         const _account = await diskLayer.getAccount(accountHash);
@@ -169,6 +177,17 @@ describe('Layer', () => {
           expect(_v.equals(v), 'storage data should be equal').be.true;
         }
       }
+    });
+
+    it('should iterate account and storage data succeed', async () => {
+      const _accounts = [...accounts];
+      for await (const { hash, getValue } of diskLayer.genAccountIterator(EMPTY_HASH)) {
+        const index = _accounts.findIndex(({ address }) => keccak256(address).equals(hash));
+        expect(index !== -1, 'account should exist in accout list').be.true;
+        expect(_accounts[index].account.serialize().equals(getValue().serialize()), 'accout should be equal').be.true;
+        _accounts.splice(index, 1);
+      }
+      expect(_accounts.length, 'account list should be empty').be.equal(0);
     });
   });
 

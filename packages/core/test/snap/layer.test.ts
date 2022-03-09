@@ -153,119 +153,138 @@ type LayerInfo = {
   layer: Snapshot;
   accounts: AccountInfo[];
 };
+describe('Layer', () => {
+  describe('DiskLayer', () => {
+    const db = new Database(level(), common);
 
-describe('DiffLayer', () => {
-  const db = new Database(level(), common);
-  const layers: LayerInfo[] = [];
-
-  before(async () => {
-    let count = 10;
-    for (let i = 0; i < 3; i++) {
-      if (i === 0) {
-        // the first layer is diskLayer
-        const { root, accounts } = await genRandomAccounts(db, count);
-        layers.push({
-          layer: new DiskLayer(db, new Trie(db.rawdb, root), root),
-          accounts
-        });
-      } else {
-        // the remaining layers are diffLayer
-        const latest = layers[layers.length - 1];
-        const { root, accounts } = await modifyRandomAccounts(db, latest.layer.root, latest.accounts, count);
-        layers.push({
-          layer: accountsToDiffLayer(latest.layer, root, accounts),
-          accounts
-        });
+    it('should get account and storage data succeed', async () => {
+      const { root, accounts } = await genRandomAccounts(db, 10);
+      const diskLayer = new DiskLayer(db, new Trie(db.rawdb, root), root);
+      for (const { address, account, storageData } of accounts) {
+        const accountHash = keccak256(address);
+        const _account = await diskLayer.getAccount(accountHash);
+        expect(_account.serialize().equals(account.serialize()), 'account should be equal').be.true;
+        for (const [k, v] of storageData) {
+          const _v = await diskLayer.getStorage(accountHash, k);
+          expect(_v.equals(v), 'storage data should be equal').be.true;
+        }
       }
-      count = Math.ceil(count / 2);
-    }
+    });
   });
 
-  it('should get account succeed(when account exsits in this diff layer)', async () => {
-    const { layer, accounts } = layers[2];
-    const expectAccount = accounts[getRandomIntInclusive(0, accounts.length - 1)];
-    const accountHash = keccak256(expectAccount.address);
-    expect((layer as DiffLayer).diffed.check(accountHash), 'should hit diff layer bloom').be.true;
-    const account = await layer.getAccount(accountHash);
-    expect(account?.serialize()?.equals(expectAccount.account.serialize()), 'should be equal').be.true;
-  });
+  describe('DiffLayer', () => {
+    const db = new Database(level(), common);
+    const layers: LayerInfo[] = [];
 
-  it('should get storage data succeed(when storage data exsits in this diff layer)', async () => {
-    const { layer, accounts } = layers[2];
-    const expectAccount = accounts[getRandomIntInclusive(0, accounts.length - 1)];
-    const accountHash = keccak256(expectAccount.address);
-    expect((layer as DiffLayer).diffed.check(accountHash), 'should hit diff layer bloom').be.true;
-    const storageHashes = Array.from(expectAccount.storageData.keys());
-    const storageHash = storageHashes[getRandomIntInclusive(0, storageHashes.length - 1)];
-    const storageData = await layer.getStorage(accountHash, storageHash);
-    expect(storageData?.equals(expectAccount.storageData.get(storageHash)!), 'should be equal').be.true;
-  });
-
-  it('should get account succeed(when account does not exsit in this diff layer but exsit in parent diff layer)', async () => {
-    const { layer, accounts } = layers[2];
-    const { accounts: _accounts } = layers[1];
-    const index = _accounts.findIndex(({ address }) => accounts.findIndex(({ address: _address }) => address.equals(_address)) === -1);
-    const expectAccount = _accounts[index];
-    const accountHash = keccak256(expectAccount.address);
-    expect((layer as DiffLayer).diffed.check(accountHash), 'should hit diff layer bloom').be.true;
-    const account = await layer.getAccount(accountHash);
-    expect(account?.serialize()?.equals(expectAccount.account.serialize()), 'should be equal').be.true;
-  });
-
-  it('should get storage data succeed(when storage data does not exsit in this diff layer but exsit in parent diff layer)', async () => {
-    const { layer, accounts } = layers[2];
-    const { accounts: _accounts } = layers[1];
-    const index = _accounts.findIndex(({ address }) => accounts.findIndex(({ address: _address }) => address.equals(_address)) === -1);
-    const expectAccount = _accounts[index];
-    const accountHash = keccak256(expectAccount.address);
-    expect((layer as DiffLayer).diffed.check(accountHash), 'should hit diff layer bloom').be.true;
-    const storageHashes = Array.from(expectAccount.storageData.keys());
-    const storageHash = storageHashes[getRandomIntInclusive(0, storageHashes.length - 1)];
-    const storageData = await layer.getStorage(accountHash, storageHash);
-    expect(storageData?.equals(expectAccount.storageData.get(storageHash)!), 'should be equal').be.true;
-  });
-
-  it('should get account succeed(when account does not exsit in this layer and only exist in disk layer)', async () => {
-    const { layer, accounts } = layers[1];
-    let { accounts: _accounts } = layers[0];
-    _accounts = [..._accounts];
-    let hit = true;
-    while (hit && _accounts.length > 0) {
-      const index = _accounts.findIndex(({ address }) => accounts.findIndex(({ address: _address }) => address.equals(_address)) === -1);
-      if (index === -1) {
-        break;
+    before(async () => {
+      let count = 10;
+      for (let i = 0; i < 3; i++) {
+        if (i === 0) {
+          // the first layer is diskLayer
+          const { root, accounts } = await genRandomAccounts(db, count);
+          layers.push({
+            layer: new DiskLayer(db, new Trie(db.rawdb, root), root),
+            accounts
+          });
+        } else {
+          // the remaining layers are diffLayer
+          const latest = layers[layers.length - 1];
+          const { root, accounts } = await modifyRandomAccounts(db, latest.layer.root, latest.accounts, count);
+          layers.push({
+            layer: accountsToDiffLayer(latest.layer, root, accounts),
+            accounts
+          });
+        }
+        count = Math.ceil(count / 2);
       }
+    });
 
-      const expectAccount = _accounts[index];
-      _accounts.splice(index, 1);
+    it('should get account succeed(when account exsits in this diff layer)', async () => {
+      const { layer, accounts } = layers[2];
+      const expectAccount = accounts[getRandomIntInclusive(0, accounts.length - 1)];
       const accountHash = keccak256(expectAccount.address);
-      hit = (layer as DiffLayer).diffed.check(accountHash);
+      expect((layer as DiffLayer).diffed.check(accountHash), 'should hit diff layer bloom').be.true;
       const account = await layer.getAccount(accountHash);
       expect(account?.serialize()?.equals(expectAccount.account.serialize()), 'should be equal').be.true;
-    }
-    expect(hit, 'should not hit diff layer bloom').be.false;
-  });
+    });
 
-  it('should get storage data succeed(when storage data does not exsit in this layer and only exist in disk layer)', async () => {
-    const { layer, accounts } = layers[1];
-    let { accounts: _accounts } = layers[0];
-    _accounts = [..._accounts];
-    let hit = true;
-    while (hit && _accounts.length > 0) {
-      const index = _accounts.findIndex(({ address }) => accounts.findIndex(({ address: _address }) => address.equals(_address)) === -1);
-      if (index === -1) {
-        break;
-      }
-
-      const expectAccount = _accounts[index];
-      _accounts.splice(index, 1);
+    it('should get storage data succeed(when storage data exsits in this diff layer)', async () => {
+      const { layer, accounts } = layers[2];
+      const expectAccount = accounts[getRandomIntInclusive(0, accounts.length - 1)];
       const accountHash = keccak256(expectAccount.address);
-      hit = (layer as DiffLayer).diffed.check(accountHash);
+      expect((layer as DiffLayer).diffed.check(accountHash), 'should hit diff layer bloom').be.true;
       const storageHashes = Array.from(expectAccount.storageData.keys());
       const storageHash = storageHashes[getRandomIntInclusive(0, storageHashes.length - 1)];
       const storageData = await layer.getStorage(accountHash, storageHash);
       expect(storageData?.equals(expectAccount.storageData.get(storageHash)!), 'should be equal').be.true;
-    }
-    expect(hit, 'should not hit diff layer bloom').be.false;
+    });
+
+    it('should get account succeed(when account does not exsit in this diff layer but exsit in parent diff layer)', async () => {
+      const { layer, accounts } = layers[2];
+      const { accounts: _accounts } = layers[1];
+      const index = _accounts.findIndex(({ address }) => accounts.findIndex(({ address: _address }) => address.equals(_address)) === -1);
+      const expectAccount = _accounts[index];
+      const accountHash = keccak256(expectAccount.address);
+      expect((layer as DiffLayer).diffed.check(accountHash), 'should hit diff layer bloom').be.true;
+      const account = await layer.getAccount(accountHash);
+      expect(account?.serialize()?.equals(expectAccount.account.serialize()), 'should be equal').be.true;
+    });
+
+    it('should get storage data succeed(when storage data does not exsit in this diff layer but exsit in parent diff layer)', async () => {
+      const { layer, accounts } = layers[2];
+      const { accounts: _accounts } = layers[1];
+      const index = _accounts.findIndex(({ address }) => accounts.findIndex(({ address: _address }) => address.equals(_address)) === -1);
+      const expectAccount = _accounts[index];
+      const accountHash = keccak256(expectAccount.address);
+      expect((layer as DiffLayer).diffed.check(accountHash), 'should hit diff layer bloom').be.true;
+      const storageHashes = Array.from(expectAccount.storageData.keys());
+      const storageHash = storageHashes[getRandomIntInclusive(0, storageHashes.length - 1)];
+      const storageData = await layer.getStorage(accountHash, storageHash);
+      expect(storageData?.equals(expectAccount.storageData.get(storageHash)!), 'should be equal').be.true;
+    });
+
+    it('should get account succeed(when account does not exsit in this layer and only exist in disk layer)', async () => {
+      const { layer, accounts } = layers[1];
+      let { accounts: _accounts } = layers[0];
+      _accounts = [..._accounts];
+      let hit = true;
+      while (hit && _accounts.length > 0) {
+        const index = _accounts.findIndex(({ address }) => accounts.findIndex(({ address: _address }) => address.equals(_address)) === -1);
+        if (index === -1) {
+          break;
+        }
+
+        const expectAccount = _accounts[index];
+        _accounts.splice(index, 1);
+        const accountHash = keccak256(expectAccount.address);
+        hit = (layer as DiffLayer).diffed.check(accountHash);
+        const account = await layer.getAccount(accountHash);
+        expect(account?.serialize()?.equals(expectAccount.account.serialize()), 'should be equal').be.true;
+      }
+      expect(hit, 'should not hit diff layer bloom').be.false;
+    });
+
+    it('should get storage data succeed(when storage data does not exsit in this layer and only exist in disk layer)', async () => {
+      const { layer, accounts } = layers[1];
+      let { accounts: _accounts } = layers[0];
+      _accounts = [..._accounts];
+      let hit = true;
+      while (hit && _accounts.length > 0) {
+        const index = _accounts.findIndex(({ address }) => accounts.findIndex(({ address: _address }) => address.equals(_address)) === -1);
+        if (index === -1) {
+          break;
+        }
+
+        const expectAccount = _accounts[index];
+        _accounts.splice(index, 1);
+        const accountHash = keccak256(expectAccount.address);
+        hit = (layer as DiffLayer).diffed.check(accountHash);
+        const storageHashes = Array.from(expectAccount.storageData.keys());
+        const storageHash = storageHashes[getRandomIntInclusive(0, storageHashes.length - 1)];
+        const storageData = await layer.getStorage(accountHash, storageHash);
+        expect(storageData?.equals(expectAccount.storageData.get(storageHash)!), 'should be equal').be.true;
+      }
+      expect(hit, 'should not hit diff layer bloom').be.false;
+    });
   });
 });

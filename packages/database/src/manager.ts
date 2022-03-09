@@ -421,4 +421,25 @@ export class DBManager {
   getSnapStorage(accountHash: Buffer, storageHash: Buffer): Promise<Buffer> {
     return this.get(DBTarget.SnapStorage, { accountHash, storageHash });
   }
+
+  /**
+   * Get snapshot root
+   */
+  getSnapRoot(): Promise<Buffer> {
+    return this.get(DBTarget.SnapRoot);
+  }
+
+  /**
+   * Get snapshot journal
+   */
+  getSnapJournal(): Promise<Buffer> {
+    return this.get(DBTarget.SnapJournal);
+  }
+
+  /**
+   * Get snapshot generator
+   */
+  getSnapGenerator(): Promise<Buffer> {
+    return this.get(DBTarget.SnapGenerator);
+  }
 }

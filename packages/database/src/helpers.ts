@@ -155,3 +155,30 @@ export function DBSaveSerializedSnapAccount(accountHash: Buffer, serializedAccou
 export function DBSaveSnapStorage(accountHash: Buffer, storageHash: Buffer, storageValue: Buffer) {
   return DBOp.set(DBTarget.SnapStorage, storageValue, { accountHash, storageHash });
 }
+
+/**
+ * Create a operation to save snapshot root
+ * @param root
+ * @returns New operation
+ */
+export function DBSaveSnapRoot(root: Buffer) {
+  return DBOp.set(DBTarget.SnapRoot, root);
+}
+
+/**
+ * Create a operation to save snapshot journal
+ * @param journal
+ * @returns New operation
+ */
+export function DBSaveSnapJournal(journal: Buffer) {
+  return DBOp.set(DBTarget.SnapJournal, journal);
+}
+
+/**
+ * Create a operation to save snapshot generator
+ * @param generator
+ * @returns New operation
+ */
+export function DBSaveSnapGenerator(generator: Buffer) {
+  return DBOp.set(DBTarget.SnapGenerator, generator);
+}

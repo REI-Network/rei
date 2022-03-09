@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
 import { compressBytes } from '@rei-network/utils';
-import { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, BLOOM_BITS_SECTION_COUNT, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, CLIQUE_SIGNERS_KEY as CLIQUE_SIGNER_STATES_KEY, CLIQUE_VOTES_KEY, CLIQUE_BLOCK_SIGNERS_KEY, receiptsKey, txLookupKey, bloomBitsKey, snapAccountKey, snapStorageKey } from './constants';
+import { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, BLOOM_BITS_SECTION_COUNT, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, CLIQUE_SIGNERS_KEY as CLIQUE_SIGNER_STATES_KEY, CLIQUE_VOTES_KEY, CLIQUE_BLOCK_SIGNERS_KEY, receiptsKey, txLookupKey, bloomBitsKey, snapAccountKey, snapStorageKey, SNAP_ROOT_KEY, SNAP_JOURNAL_KEY, SNAP_GENERATOR_KEY } from './constants';
 import { CacheMap } from './manager';
 
 export enum DBTarget {
@@ -17,11 +17,14 @@ export enum DBTarget {
   CliqueBlockSigners,
 
   Receipts = 100,
-  TxLookup = 101,
-  BloomBits = 102,
-  BloomBitsSectionCount = 103,
-  SnapAccount = 104,
-  SnapStorage = 105
+  TxLookup,
+  BloomBits,
+  BloomBitsSectionCount,
+  SnapAccount,
+  SnapStorage,
+  SnapRoot,
+  SnapJournal,
+  SnapGenerator
 }
 
 /**
@@ -144,6 +147,18 @@ export class DBOp {
       case DBTarget.SnapStorage: {
         this.baseDBOp.key = snapStorageKey(key!.accountHash!, key!.storageHash!);
         this.cacheString = 'snapStorage';
+        break;
+      }
+      case DBTarget.SnapRoot: {
+        this.baseDBOp.key = SNAP_ROOT_KEY;
+        break;
+      }
+      case DBTarget.SnapJournal: {
+        this.baseDBOp.key = SNAP_JOURNAL_KEY;
+        break;
+      }
+      case DBTarget.SnapGenerator: {
+        this.baseDBOp.key = SNAP_GENERATOR_KEY;
         break;
       }
     }

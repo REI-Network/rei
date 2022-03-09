@@ -84,6 +84,21 @@ export const SNAP_ACCOUNT_PREFIX = Buffer.from('a');
  */
 export const SNAP_STORAGE_PREFIX = Buffer.from('o');
 
+/**
+ * snapshotRootKey
+ */
+export const SNAP_ROOT_KEY = Buffer.from('SnapshotRoot');
+
+/**
+ * snapshotJournalKey
+ */
+export const SNAP_JOURNAL_KEY = Buffer.from('SnapshotJournal');
+
+/**
+ * snapshotGeneratorKey
+ */
+export const SNAP_GENERATOR_KEY = Buffer.from('SnapshotGenerator');
+
 // Utility functions
 
 /**

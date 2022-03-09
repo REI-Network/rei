@@ -391,6 +391,30 @@ describe('Layer', () => {
       expect(totalCount, 'total count should be equal').be.equal(layers[0].accounts.length);
     });
 
+    it('should fast iterate storage data succeed', async () => {
+      const { layer } = layers[2];
+
+      for (const { address } of layers[0].accounts) {
+        const accountHash = keccak256(address);
+        const fastIter = new FastSnapIterator(layer, (snap) => {
+          const { iter, destructed } = snap.genStorageIterator(accountHash, EMPTY_HASH);
+          return {
+            iter,
+            stop: destructed
+          };
+        });
+        await fastIter.init();
+
+        let totalCount = 0;
+        for await (const { hash, value } of fastIter) {
+          const expectStorageData = await layer.getStorage(accountHash, hash);
+          expect(expectStorageData.equals(value), 'storage data should be equal').be.true;
+          totalCount++;
+        }
+        expect(totalCount, 'total count should be equal').be.equal(layers[0].accounts[0].storageData.size);
+      }
+    });
+
     it('should abort succeed', async () => {
       const { layer } = layers[2];
       const fastIter = new FastSnapIterator(layer, (snap) => {

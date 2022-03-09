@@ -159,7 +159,7 @@ describe('Layer', () => {
 
     it('should get account and storage data succeed', async () => {
       const { root, accounts } = await genRandomAccounts(db, 10);
-      const diskLayer = new DiskLayer(db, new Trie(db.rawdb, root), root);
+      const diskLayer = new DiskLayer(db, root);
       for (const { address, account, storageData } of accounts) {
         const accountHash = keccak256(address);
         const _account = await diskLayer.getAccount(accountHash);
@@ -183,7 +183,7 @@ describe('Layer', () => {
           // the first layer is diskLayer
           const { root, accounts } = await genRandomAccounts(db, count);
           layers.push({
-            layer: new DiskLayer(db, new Trie(db.rawdb, root), root),
+            layer: new DiskLayer(db, root),
             accounts
           });
         } else {

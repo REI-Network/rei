@@ -1,4 +1,3 @@
-import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { Database } from '@rei-network/database';
 import { snapStorageKey, snapAccountKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
 import { FunctionalBufferSet } from '@rei-network/utils';
@@ -9,16 +8,14 @@ import { ISnapshot, AccountData, StorageData } from './types';
 
 export class DiskLayer implements ISnapshot {
   readonly db: Database;
-  readonly trie: Trie;
   readonly root: Buffer;
   readonly parent = undefined;
 
   stale: boolean = false;
   genMarker?: Buffer;
 
-  constructor(db: Database, trie: Trie, root: Buffer) {
+  constructor(db: Database, root: Buffer) {
     this.db = db;
-    this.trie = trie;
     this.root = root;
   }
 

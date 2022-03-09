@@ -102,7 +102,7 @@ export class DiskLayer implements ISnapshot {
     return {
       iter: asyncTraverseRawDB(
         this.db.rawdb,
-        { gte: snapStorageKey(accountHash, seek), lte: snapStorageKey(MAX_HASH, MAX_HASH) },
+        { gte: snapStorageKey(accountHash, seek), lte: snapStorageKey(accountHash, MAX_HASH) },
         (key) => key.length !== SNAP_STORAGE_PREFIX.length + 32 + 32,
         (key) => key.slice(SNAP_STORAGE_PREFIX.length + 32),
         (value) => value

@@ -15,18 +15,18 @@ common.setHardforkByBlockNumber(0);
 class AccountInfo {
   address: Buffer;
   account: Account;
-  storageData: FunctionalBufferMap<Buffer>;
+  storageData: FunctionalBufferMap<{ key: Buffer; val: Buffer }>;
 
-  constructor(address: Buffer, account: Account, storageData: FunctionalBufferMap<Buffer>) {
+  constructor(address: Buffer, account: Account, storageData: FunctionalBufferMap<{ key: Buffer; val: Buffer }>) {
     this.address = address;
     this.account = account;
     this.storageData = storageData;
   }
 
   copy() {
-    const storageData = new FunctionalBufferMap<Buffer>();
+    const storageData = new FunctionalBufferMap<{ key: Buffer; val: Buffer }>();
     for (const [k, v] of this.storageData) {
-      storageData.set(k, v);
+      storageData.set(k, { ...v });
     }
     return new AccountInfo(Buffer.from(this.address), new Account(this.account.nonce.clone(), this.account.balance.clone(), Buffer.from(this.account.stateRoot)), storageData);
   }
@@ -46,13 +46,17 @@ async function genRandomAccounts(db: Database, genCount: number) {
     const address = crypto.randomBytes(20);
     const accountHash = keccak256(address);
     const storageTrie = new Trie(db.rawdb);
-    const storageData = new FunctionalBufferMap<Buffer>();
+    const storageData = new FunctionalBufferMap<{ key: Buffer; val: Buffer }>();
     for (let i = 0; i < 10; i++) {
-      const key = crypto.randomBytes(32);
-      const value = crypto.randomBytes(32);
-      await db.batch([DBSaveSnapStorage(accountHash, key, value)]);
-      await storageTrie.put(key, value);
-      storageData.set(key, value);
+      const storageKey = crypto.randomBytes(32);
+      const storageValue = crypto.randomBytes(32);
+      const storageHash = keccak256(storageKey);
+      await db.batch([DBSaveSnapStorage(accountHash, storageHash, storageValue)]);
+      await storageTrie.put(storageKey, storageValue);
+      storageData.set(storageHash, {
+        key: storageKey,
+        val: storageValue
+      });
     }
     const account = new Account(new BN(1), new BN(1), storageTrie.root);
     await db.batch([DBSaveSerializedSnapAccount(accountHash, account.serialize())]);
@@ -92,17 +96,21 @@ async function modifyRandomAccounts(db: Database, root: Buffer, lastLayerAccount
     for (let i = 0; i < modifiedKeyCount; i++) {
       const index = getRandomIntInclusive(0, keys.length - 1);
       const modifiedKey = keys[index];
+      const { key, val } = storageData.get(modifiedKey)!;
       modifiedKeys.push(modifiedKey);
       keys.splice(index, 1);
 
       let newValue = crypto.randomBytes(32);
-      while (newValue.equals(storageData.get(modifiedKey)!)) {
+      while (newValue.equals(val)) {
         newValue = crypto.randomBytes(32);
       }
 
-      storageData.set(modifiedKey, newValue);
+      storageData.set(modifiedKey, {
+        key,
+        val: newValue
+      });
       const storageTrie = new Trie(db.rawdb, account.stateRoot);
-      await storageTrie.put(modifiedKey, newValue);
+      await storageTrie.put(key, newValue);
       account.stateRoot = storageTrie.root;
     }
 
@@ -143,7 +151,7 @@ function accountsToDiffLayer(parent: Snapshot, root: Buffer, accounts: AccountIn
       storageData.set(accountHash, storage);
     }
     for (const [storageHash, storageValue] of _storageData) {
-      storage.set(storageHash, storageValue);
+      storage.set(storageHash, storageValue.val);
     }
   }
 
@@ -172,14 +180,14 @@ describe('Layer', () => {
         const accountHash = keccak256(address);
         const _account = await diskLayer.getAccount(accountHash);
         expect(_account.serialize().equals(account.serialize()), 'account should be equal').be.true;
-        for (const [k, v] of storageData) {
-          const _v = await diskLayer.getStorage(accountHash, k);
-          expect(_v.equals(v), 'storage data should be equal').be.true;
+        for (const [hash, { val }] of storageData) {
+          const _v = await diskLayer.getStorage(accountHash, hash);
+          expect(_v.equals(val), 'storage data should be equal').be.true;
         }
       }
     });
 
-    it('should iterate account and storage data succeed', async () => {
+    it('should iterate account succeed', async () => {
       const _accounts = [...accounts];
       for await (const { hash, getValue } of diskLayer.genAccountIterator(EMPTY_HASH)) {
         const index = _accounts.findIndex(({ address }) => keccak256(address).equals(hash));
@@ -188,6 +196,25 @@ describe('Layer', () => {
         _accounts.splice(index, 1);
       }
       expect(_accounts.length, 'account list should be empty').be.equal(0);
+    });
+
+    it('should iterate storage data succeed', async () => {
+      for (const { address, storageData: _storageData } of accounts) {
+        // copy storage data
+        const storageData = new FunctionalBufferMap<{ key: Buffer; val: Buffer }>();
+        for (const [k, v] of _storageData) {
+          storageData.set(k, { ...v });
+        }
+
+        const accountHash = keccak256(address);
+        const { iter, destructed } = diskLayer.genStorageIterator(accountHash, EMPTY_HASH);
+        expect(destructed, 'should not be destructed').be.false;
+        for await (const { hash, getValue } of iter) {
+          expect(storageData.get(hash)?.val.equals(getValue()), 'storage data should be equal').be.true;
+          storageData.delete(hash);
+        }
+        expect(storageData.size, 'storage data should be empty').be.equal(0);
+      }
     });
   });
 
@@ -235,7 +262,7 @@ describe('Layer', () => {
       const storageHashes = Array.from(expectAccount.storageData.keys());
       const storageHash = storageHashes[getRandomIntInclusive(0, storageHashes.length - 1)];
       const storageData = await layer.getStorage(accountHash, storageHash);
-      expect(storageData?.equals(expectAccount.storageData.get(storageHash)!), 'should be equal').be.true;
+      expect(storageData?.equals(expectAccount.storageData.get(storageHash)!.val), 'should be equal').be.true;
     });
 
     it('should get account succeed(when account does not exsit in this diff layer but exsit in parent diff layer)', async () => {
@@ -259,7 +286,7 @@ describe('Layer', () => {
       const storageHashes = Array.from(expectAccount.storageData.keys());
       const storageHash = storageHashes[getRandomIntInclusive(0, storageHashes.length - 1)];
       const storageData = await layer.getStorage(accountHash, storageHash);
-      expect(storageData?.equals(expectAccount.storageData.get(storageHash)!), 'should be equal').be.true;
+      expect(storageData?.equals(expectAccount.storageData.get(storageHash)!.val), 'should be equal').be.true;
     });
 
     it('should get account succeed(when account does not exsit in this layer and only exist in disk layer)', async () => {
@@ -301,9 +328,47 @@ describe('Layer', () => {
         const storageHashes = Array.from(expectAccount.storageData.keys());
         const storageHash = storageHashes[getRandomIntInclusive(0, storageHashes.length - 1)];
         const storageData = await layer.getStorage(accountHash, storageHash);
-        expect(storageData?.equals(expectAccount.storageData.get(storageHash)!), 'should be equal').be.true;
+        expect(storageData?.equals(expectAccount.storageData.get(storageHash)!.val), 'should be equal').be.true;
       }
       expect(hit, 'should not hit diff layer bloom').be.false;
+    });
+
+    it('should iterate account succeed', async () => {
+      const diffLayers = layers.slice(1) as { layer: DiffLayer; accounts: AccountInfo[] }[];
+      for (const { layer, accounts } of diffLayers) {
+        const _accounts = [...accounts];
+        for await (const { hash, getValue } of layer.genAccountIterator(EMPTY_HASH)) {
+          const index = _accounts.findIndex(({ address }) => keccak256(address).equals(hash));
+          expect(index !== -1, 'account should exist in accout list').be.true;
+          const _account = getValue();
+          expect(_account !== null, 'account should not be null').be.true;
+          expect(_accounts[index].account.serialize().equals(_account!.serialize()), 'accout should be equal').be.true;
+          _accounts.splice(index, 1);
+        }
+        expect(_accounts.length, 'account list should be empty').be.equal(0);
+      }
+    });
+
+    it('should iterate storage data succeed', async () => {
+      const diffLayers = layers.slice(1) as { layer: DiffLayer; accounts: AccountInfo[] }[];
+      for (const { layer, accounts } of diffLayers) {
+        for (const { address, storageData: _storageData } of accounts) {
+          // copy storage data
+          const storageData = new FunctionalBufferMap<{ key: Buffer; val: Buffer }>();
+          for (const [k, v] of _storageData) {
+            storageData.set(k, { ...v });
+          }
+
+          const accountHash = keccak256(address);
+          const { iter, destructed } = layer.genStorageIterator(accountHash, EMPTY_HASH);
+          expect(destructed, 'should not be destructed').be.false;
+          for await (const { hash, getValue } of iter) {
+            expect(storageData.get(hash)?.val.equals(getValue()), 'storage data should be equal').be.true;
+            storageData.delete(hash);
+          }
+          expect(storageData.size, 'storage data should be empty').be.equal(0);
+        }
+      }
     });
   });
 });

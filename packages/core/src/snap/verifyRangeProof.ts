@@ -1,4 +1,4 @@
-import { nibblesToBuffer } from 'merkle-patricia-tree/dist/util/nibbles';
+import { bufferToNibbles, nibblesToBuffer } from 'merkle-patricia-tree/dist/util/nibbles';
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { TrieNode, BranchNode, ExtensionNode, LeafNode, Nibbles } from 'merkle-patricia-tree/dist/trieNode';
 
@@ -420,7 +420,7 @@ async function hasRightElement(trie: Trie, key: Nibbles): Promise<boolean> {
  * @param proof - proof node list, if proof is null, both `firstKey` and `lastKey` must be null
  * @returns a flag to indicate whether there exists more trie node in the trie
  */
-export async function verifyRangeProof(rootHash: Buffer, firstKey: Nibbles | null, lastKey: Nibbles | null, keys: Nibbles[], values: Buffer[], proof: Buffer[] | null): Promise<boolean> {
+async function _verifyRangeProof(rootHash: Buffer, firstKey: Nibbles | null, lastKey: Nibbles | null, keys: Nibbles[], values: Buffer[], proof: Buffer[] | null): Promise<boolean> {
   if (keys.length !== values.length) {
     throw new Error('invalid keys length or values length');
   }
@@ -507,4 +507,11 @@ export async function verifyRangeProof(rootHash: Buffer, firstKey: Nibbles | nul
   }
 
   return hasRightElement(trie, keys[keys.length - 1]);
+}
+
+/**
+ * {@link _verifyRangeProof}
+ */
+export function verifyRangeProof(rootHash: Buffer, firstKey: Buffer | null, lastKey: Buffer | null, keys: Buffer[], values: Buffer[], proof: Buffer[] | null): Promise<boolean> {
+  return _verifyRangeProof(rootHash, firstKey && bufferToNibbles(firstKey), lastKey && bufferToNibbles(lastKey), keys.map(bufferToNibbles), values, proof);
 }

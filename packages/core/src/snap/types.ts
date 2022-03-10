@@ -19,6 +19,8 @@ export interface ISnapshot {
   genAccountIterator(seek: Buffer): SnapIterator<StakingAccount | null>;
 
   genStorageIterator(accountHash: Buffer, seek: Buffer): { iter: SnapIterator<Buffer>; destructed: boolean };
+
+  journal(output: any[]): Buffer;
 }
 
 export type Snapshot = DiffLayer | DiskLayer;

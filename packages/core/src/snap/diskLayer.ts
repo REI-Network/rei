@@ -110,4 +110,21 @@ export class DiskLayer implements ISnapshot {
       destructed: false
     };
   }
+
+  /**
+   * Persist to self disk
+   * @param output - Output array
+   * @returns Disk layer root hash
+   */
+  journal(output: any[]): Buffer {
+    // TODO: journalProgress
+
+    if (this.stale) {
+      throw new Error('stale disk layer');
+    }
+
+    output.push(this.root);
+
+    return this.root;
+  }
 }

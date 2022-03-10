@@ -337,4 +337,42 @@ export class DiffLayer implements ISnapshot {
       destructed
     };
   }
+
+  /**
+   * Persist to self disk
+   * @param output - Output array
+   * @returns Disk layer root hash
+   */
+  journal(output: any[]): Buffer {
+    const root = this.parent.journal(output);
+
+    if (this.stale) {
+      throw new Error('stale diff layer');
+    }
+
+    const destructSet: Buffer[] = [];
+    for (const accountHash of this.destructSet) {
+      destructSet.push(accountHash);
+    }
+
+    const accountData: [Buffer, Buffer][] = [];
+    for (const [accountHash, _accountData] of this.accountData) {
+      accountData.push([accountHash, _accountData]);
+    }
+
+    const storageData: [Buffer, Buffer[], Buffer[]][] = [];
+    for (const [accountData, storage] of this.storageData) {
+      const storageHashes: Buffer[] = [];
+      const storageValues: Buffer[] = [];
+      for (const [storageHash, storageValue] of storage) {
+        storageHashes.push(storageHash);
+        storageValues.push(storageValue);
+      }
+      storageData.push([accountData, storageHashes, storageValues]);
+    }
+
+    output.push([this.root, destructSet, accountData, storageData]);
+
+    return root;
+  }
 }

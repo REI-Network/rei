@@ -339,7 +339,7 @@ export class DiffLayer implements ISnapshot {
   }
 
   /**
-   * Persist to self disk
+   * Persist self to disk
    * @param output - Output array
    * @returns Disk layer root hash
    */

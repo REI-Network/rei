@@ -146,6 +146,15 @@ export function DBSaveSerializedSnapAccount(accountHash: Buffer, serializedAccou
 }
 
 /**
+ * Create a operation to delete snapshot account
+ * @param accountHash - Account hash
+ * @returns New operation
+ */
+export function DBDeleteSnapAccount(accountHash: Buffer) {
+  return DBOp.del(DBTarget.SnapAccount, { accountHash });
+}
+
+/**
  * Create a operation to save snapshot account storage
  * @param accountHash - Account hash
  * @param storageHash - Storage hash
@@ -154,6 +163,16 @@ export function DBSaveSerializedSnapAccount(accountHash: Buffer, serializedAccou
  */
 export function DBSaveSnapStorage(accountHash: Buffer, storageHash: Buffer, storageValue: Buffer) {
   return DBOp.set(DBTarget.SnapStorage, storageValue, { accountHash, storageHash });
+}
+
+/**
+ * Create a operation to delete snapshot account storage
+ * @param accountHash - Account hash
+ * @param storageHash - Storage hash
+ * @returns New operation
+ */
+export function DBDeleteSnapStorage(accountHash: Buffer, storageHash: Buffer) {
+  return DBOp.del(DBTarget.SnapStorage, { accountHash, storageHash });
 }
 
 /**

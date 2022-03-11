@@ -46,7 +46,7 @@ export class DiskLayer implements ISnapshot {
   genMarker?: Buffer;
 
   // An aborter to abort snapshot generation
-  private aborter = new SimpleAborter();
+  private aborter?: SimpleAborter;
 
   constructor(db: Database, root: Buffer) {
     this.db = db;
@@ -346,7 +346,7 @@ export class DiskLayer implements ISnapshot {
   /**
    * Generate snapshot
    */
-  async generate() {
+  private async _generate(aborter: SimpleAborter) {
     let accMarker: Buffer | null = null;
     let accountRange = accountCheckRange;
 
@@ -363,7 +363,7 @@ export class DiskLayer implements ISnapshot {
 
     // persistent journal
     const checkAndFlush = async (currentLocation: Buffer) => {
-      if (batch.length > idealBatchSize || this.aborter.isAborted) {
+      if (batch.length > idealBatchSize || aborter.isAborted) {
         if (this.genMarker && currentLocation.compare(this.genMarker) < 0) {
           // TODO: log error
         }
@@ -376,7 +376,7 @@ export class DiskLayer implements ISnapshot {
         this.genMarker = currentLocation;
       }
 
-      return this.aborter.isAborted;
+      return aborter.isAborted;
     };
 
     // delete all slots for account
@@ -405,7 +405,7 @@ export class DiskLayer implements ISnapshot {
       if (isDelete) {
         batch.push(DBDeleteSnapAccount(accountHash));
         await deleteAllSlotsForAccount(accountHash);
-        return this.aborter.isAborted;
+        return aborter.isAborted;
       }
 
       const account = StakingAccount.fromRlpSerializedAccount(val!);
@@ -458,7 +458,7 @@ export class DiskLayer implements ISnapshot {
           if (isDelete) {
             // delete this slot
             batch.push(DBDeleteSnapStorage(accountHash, key));
-            return this.aborter.isAborted;
+            return aborter.isAborted;
           }
           if (isWrite) {
             // write this slot
@@ -473,7 +473,7 @@ export class DiskLayer implements ISnapshot {
         let storeOrigin = storeMarker ?? EMPTY_HASH;
         while (true) {
           const { exhausted, last } = await this.generateRange(account.stateRoot, SNAP_STORAGE_PREFIX, storeOrigin, storageCheckRange, onStorage, (value) => value);
-          if (this.aborter.isAborted) {
+          if (aborter.isAborted) {
             return true;
           }
 
@@ -494,17 +494,17 @@ export class DiskLayer implements ISnapshot {
       // some account processed, unmark the marker
       accMarker = null;
 
-      return this.aborter.isAborted;
+      return aborter.isAborted;
     };
 
     let accOrigin = accMarker ?? EMPTY_HASH;
     while (true) {
       const { exhausted, last } = await this.generateRange(this.root, SNAP_ACCOUNT_PREFIX, accOrigin, accountRange, onAccount, (value) => value);
-      if (this.aborter.isAborted) {
+      if (aborter.isAborted) {
         await batch.write();
         batch.reset();
 
-        this.aborter.abortFinished();
+        aborter.abortFinished();
 
         break;
       }
@@ -530,8 +530,31 @@ export class DiskLayer implements ISnapshot {
 
     this.genMarker = undefined;
 
-    if (this.aborter.isAborted) {
-      this.aborter.abortFinished();
+    if (aborter.isAborted) {
+      aborter.abortFinished();
     }
+  }
+
+  /**
+   * Generate snapshot
+   */
+  async generate() {
+    if (this.aborter) {
+      throw new Error('generating');
+    }
+
+    try {
+      this.aborter = new SimpleAborter();
+      await this._generate(this.aborter);
+    } finally {
+      this.aborter = undefined;
+    }
+  }
+
+  /**
+   * Abort generating
+   */
+  abort() {
+    return this.aborter?.abort() ?? Promise.resolve();
   }
 }

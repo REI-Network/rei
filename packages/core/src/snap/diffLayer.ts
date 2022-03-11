@@ -2,7 +2,7 @@ import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
 import Bloom from '@rei-network/vm/dist/bloom';
 import { StakingAccount } from '../stateManager';
 import { DiskLayer } from './diskLayer';
-import { asyncTraverseHashList } from './iterator';
+import { asyncTraverseHashList } from './layerIterator';
 import { ISnapshot, Snapshot, DestructSet, AccountData, StorageData } from './types';
 
 /**

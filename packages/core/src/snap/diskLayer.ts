@@ -1,6 +1,7 @@
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
-import { keccak256 } from 'ethereumjs-util';
+import { KECCAK256_NULL, KECCAK256_RLP } from 'ethereumjs-util';
 import { Database } from '@rei-network/database';
+import { DBDeleteSnapAccount, DBDeleteSnapStorage, DBSaveSerializedSnapAccount, DBSaveSnapStorage } from '@rei-network/database/dist/helpers';
 import { snapStorageKey, snapAccountKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
 import { FunctionalBufferSet } from '@rei-network/utils';
 import { StakingAccount } from '../stateManager';
@@ -8,34 +9,33 @@ import { EMPTY_HASH, MAX_HASH } from '../utils';
 import { verifyRangeProof } from './verifyRangeProof';
 import { TrieIterator } from './trieIterator';
 import { DiffLayer } from './diffLayer';
-import { asyncTraverseRawDB } from './iterator';
+import { asyncTraverseRawDB } from './layerIterator';
 import { ISnapshot, AccountData, StorageData } from './types';
+import { DBatch } from './batch';
+import { increaseKey, mergeProof, wipeKeyRange, SimpleAborter } from './utils';
 
-function mergeProof(proof1: Buffer[], proof2: Buffer[]) {
-  const proof: Buffer[] = [];
-  const set = new FunctionalBufferSet();
-  for (const p of proof1) {
-    proof.push(p);
-    set.add(keccak256(p));
-  }
-  for (const p of proof2) {
-    if (!set.has(keccak256(p))) {
-      proof.push(p);
-    }
-  }
-  return proof;
-}
+const accountCheckRange = 128;
+const storageCheckRange = 1024;
+const idealBatchSize = 102400;
 
+/**
+ * ProofResult keeps the proof result
+ */
 type ProofResult = {
+  // all keys
   keys: Buffer[];
+  // all values
   vals: Buffer[];
+  // whether there are more snapshots on the disk
   diskMore: boolean;
+  // whether there are more values in the trie
   trieMore: boolean;
+  // is it verified
   proofed: boolean;
   trie?: Trie;
 };
 
-type OnState = (key: Buffer, val: Buffer | null, isWrite: boolean, isDelete: boolean) => Promise<void>;
+type OnState = (key: Buffer, val: Buffer | null, isWrite: boolean, isDelete: boolean) => Promise<boolean>;
 
 export class DiskLayer implements ISnapshot {
   readonly db: Database;
@@ -44,6 +44,9 @@ export class DiskLayer implements ISnapshot {
 
   stale: boolean = false;
   genMarker?: Buffer;
+
+  // An aborter to abort snapshot generation
+  private aborter = new SimpleAborter();
 
   constructor(db: Database, root: Buffer) {
     this.db = db;
@@ -158,6 +161,18 @@ export class DiskLayer implements ISnapshot {
     return this.root;
   }
 
+  /**
+   * proveRange will try to load existing snapshots based on prefix, origin, and verify their validity
+   * @param root - Trie root
+   * @param prefix - Key prefix
+   * @param origin - Key origin
+   * @param max - Maximum number of keys processed
+   * @param convertValue - A function to convert the value
+   *                       Sometimes, the value stored in the snapshot is not consistent with the trie,
+   *                       in which case a conversion is required to pass the verification
+   *
+   * return: {@link ProofResult}
+   */
   async proveRange(root: Buffer, prefix: Buffer, origin: Buffer, max: number, convertValue: (value: Buffer) => Buffer): Promise<ProofResult> {
     const keys: Buffer[] = [];
     const vals: Buffer[] = [];
@@ -172,10 +187,12 @@ export class DiskLayer implements ISnapshot {
       convertValue
     );
 
+    // traverse snapshots on disk
     for await (const { hash, getValue } of iter) {
       const value = getValue();
 
       if (keys.length === max) {
+        // the maximum value is reached, stop traversing
         diskMore = true;
         break;
       }
@@ -184,11 +201,16 @@ export class DiskLayer implements ISnapshot {
       vals.push(value);
     }
 
+    /**
+     * We have obtained all the snapshots in the disk,
+     * at this time we only need to compare whether it is consistent with the node
+     */
     if (origin.equals(EMPTY_HASH) && !diskMore) {
       const trie = new Trie();
       for (let i = 0; i < keys.length; i++) {
         await trie.put(keys[i], vals[i]);
       }
+
       if (!trie.root.equals(root)) {
         return {
           keys,
@@ -208,6 +230,7 @@ export class DiskLayer implements ISnapshot {
       };
     }
 
+    // try to verify range proof
     const trie = new Trie(this.db.rawdb, root);
     const originProof = await Trie.createProof(trie, origin);
     const last = keys.length > 0 ? keys[keys.length - 1] : null;
@@ -232,13 +255,27 @@ export class DiskLayer implements ISnapshot {
     };
   }
 
+  /**
+   * generateRange will first try to load the snapshot in the disk and verify it.
+   * If the verification fails, it will traverse the trie and regenerate the snapshot
+   * @param root - Trie root
+   * @param prefix - Key prefix
+   * @param origin - Key origin
+   * @param max -  Maximum number of keys processed
+   * @param onState - Callback that will be called when data is loaded
+   * @param convertValue - A function to convert the value
+   * @returns Whether there are still values that have not been generated, and the last key processed
+   */
   async generateRange(root: Buffer, prefix: Buffer, origin: Buffer, max: number, onState: OnState, convertValue: (value: Buffer) => Buffer) {
     const { keys, vals, diskMore, trieMore: _trieMore, proofed, trie: _trie } = await this.proveRange(root, prefix, origin, max, convertValue);
     const last = keys.length > 0 ? keys[keys.length - 1] : null;
 
+    // if the snapshot in the current disk is valid, no need to traverse the trie
     if (proofed) {
       for (let i = 0; i < keys.length; i++) {
-        await onState(keys[0], vals[0], false, false);
+        if (await onState(keys[0], vals[0], false, false)) {
+          return { exhausted: false, last: null };
+        }
       }
 
       return { exhausted: !diskMore && !_trieMore, last };
@@ -251,6 +288,7 @@ export class DiskLayer implements ISnapshot {
     let deleted = 0;
     let untouched = 0;
 
+    // start traversing the Trie
     const trie = _trie ?? new Trie(this.db.rawdb, root);
     for await (const { key, val } of new TrieIterator(trie)) {
       if (last && key.compare(last) > 0) {
@@ -262,9 +300,11 @@ export class DiskLayer implements ISnapshot {
       let write = true;
       created++;
 
+      // try to compare with the value in the snapshot that already exists
       while (keys.length > 0) {
         const cmp = keys[0].compare(key);
         if (cmp < 0) {
+          // delete useless snapshots
           await onState(keys[0], null, false, true);
           keys.splice(0, 1);
           vals.splice(0, 1);
@@ -274,8 +314,10 @@ export class DiskLayer implements ISnapshot {
           created--;
           write = !vals[0].equals(val);
           if (write) {
+            // inconsistent snapshots need to be rewritten
             updated++;
           } else {
+            // consistent and valid snapshots do not need to be rewritten
             untouched++;
           }
           keys.splice(0, 1);
@@ -284,17 +326,212 @@ export class DiskLayer implements ISnapshot {
         break;
       }
 
-      await onState(key, val, write, false);
+      // write the snapshot
+      if (await onState(key, val, write, false)) {
+        return { exhausted: false, last: null };
+      }
     }
 
+    // delete all remaining invalid old snapshots
     for (let i = 0; i < keys.length; i++) {
-      await onState(keys[i], vals[i], false, true);
+      if (await onState(keys[i], vals[i], false, true)) {
+        return { exhausted: false, last: null };
+      }
       deleted++;
     }
 
-    return {
-      exhausted: !trieMore && !diskMore,
-      last
+    return { exhausted: !trieMore && !diskMore, last };
+  }
+
+  /**
+   * Generate snapshot
+   */
+  async generate() {
+    let accMarker: Buffer | null = null;
+    let accountRange = accountCheckRange;
+
+    if (this.genMarker) {
+      accMarker = this.genMarker.slice(0, 32);
+      accountRange = 1;
+    }
+
+    const batch = new DBatch(this.db);
+
+    let storage = 0;
+    let accounts = 0;
+    let slots = 0;
+
+    // persistent journal
+    const checkAndFlush = async (currentLocation: Buffer) => {
+      if (batch.length > idealBatchSize || this.aborter.isAborted) {
+        if (this.genMarker && currentLocation.compare(this.genMarker) < 0) {
+          // TODO: log error
+        }
+
+        // TODO: journalProgress
+
+        await batch.write();
+        batch.reset();
+
+        this.genMarker = currentLocation;
+      }
+
+      return this.aborter.isAborted;
     };
+
+    // delete all slots for account
+    const deleteAllSlotsForAccount = (accountHash: Buffer) => {
+      return wipeKeyRange(
+        this.db,
+        EMPTY_HASH,
+        MAX_HASH,
+        (origin, limit) =>
+          asyncTraverseRawDB(
+            this.db.rawdb,
+            { gte: snapStorageKey(accountHash, origin), lte: snapStorageKey(accountHash, limit) },
+            (key) => key.length !== SNAP_STORAGE_PREFIX.length + 32 + 32,
+            (key) => key.slice(SNAP_STORAGE_PREFIX.length + 32),
+            (value) => value
+          ),
+        (hash: Buffer) => DBDeleteSnapStorage(accountHash, hash)
+      );
+    };
+
+    // procces an account
+    const onAccount: OnState = async (key, val, isWrite, isDelete) => {
+      const accountHash = key;
+
+      // delete the account
+      if (isDelete) {
+        batch.push(DBDeleteSnapAccount(accountHash));
+        await deleteAllSlotsForAccount(accountHash);
+        return this.aborter.isAborted;
+      }
+
+      const account = StakingAccount.fromRlpSerializedAccount(val!);
+
+      if (accMarker === null || !accountHash.equals(accMarker)) {
+        let dataLen = val!.length;
+        if (!isWrite) {
+          // account already exists, no need to rewrite
+          if (account.codeHash.equals(KECCAK256_NULL)) {
+            dataLen -= 32;
+          }
+          if (account.stateRoot.equals(KECCAK256_RLP)) {
+            dataLen -= 32;
+          }
+        } else {
+          // write the account
+          const data = account.serialize(); // TODO
+          dataLen = data.length;
+          batch.push(DBSaveSerializedSnapAccount(accountHash, data));
+        }
+        storage += 1 + 32 + dataLen;
+        accounts++;
+      }
+
+      /**
+       * This is a special case, `this.genMarker` is accoutHash + storageHash,
+       * if the last generation is a slot of this account,
+       * then we need to ensure that the newly written marker is not smaller than the original marker
+       */
+      let marker = accountHash;
+      if (accMarker !== null && marker.equals(accMarker) && this.genMarker && this.genMarker.length > 32) {
+        marker = this.genMarker;
+      }
+
+      if (await checkAndFlush(marker)) {
+        return true;
+      }
+
+      if (account.stateRoot.equals(KECCAK256_RLP)) {
+        // account's trie is empty, delete all slots
+        await deleteAllSlotsForAccount(accountHash);
+      } else {
+        // account's trie is not empty, try to write all slots
+        let storeMarker: Buffer | null = null;
+        if (accMarker !== null && accountHash.equals(accMarker) && this.genMarker && this.genMarker.length > 32) {
+          storeMarker = this.genMarker.slice(32);
+        }
+
+        const onStorage: OnState = async (key, val, isWrite, isDelete) => {
+          if (isDelete) {
+            // delete this slot
+            batch.push(DBDeleteSnapStorage(accountHash, key));
+            return this.aborter.isAborted;
+          }
+          if (isWrite) {
+            // write this slot
+            batch.push(DBSaveSnapStorage(accountHash, key, val!));
+          }
+          storage += 1 + 32 + 32 + val!.length;
+          slots++;
+
+          return await checkAndFlush(Buffer.concat([accountHash, key]));
+        };
+
+        let storeOrigin = storeMarker ?? EMPTY_HASH;
+        while (true) {
+          const { exhausted, last } = await this.generateRange(account.stateRoot, SNAP_STORAGE_PREFIX, storeOrigin, storageCheckRange, onStorage, (value) => value);
+          if (this.aborter.isAborted) {
+            return true;
+          }
+
+          if (exhausted || last === null) {
+            break;
+          }
+
+          // process next slots
+          const nextStoreOrigin = increaseKey(last);
+          if (nextStoreOrigin === null) {
+            break;
+          }
+
+          storeOrigin = nextStoreOrigin;
+        }
+      }
+
+      // some account processed, unmark the marker
+      accMarker = null;
+
+      return this.aborter.isAborted;
+    };
+
+    let accOrigin = accMarker ?? EMPTY_HASH;
+    while (true) {
+      const { exhausted, last } = await this.generateRange(this.root, SNAP_ACCOUNT_PREFIX, accOrigin, accountRange, onAccount, (value) => value);
+      if (this.aborter.isAborted) {
+        await batch.write();
+        batch.reset();
+
+        this.aborter.abortFinished();
+
+        break;
+      }
+
+      if (exhausted || last === null) {
+        break;
+      }
+
+      // process next accounts
+      const nextAccOrigin = increaseKey(last);
+      if (nextAccOrigin === null) {
+        break;
+      }
+
+      accOrigin = nextAccOrigin;
+      accountRange = accountCheckRange;
+    }
+
+    // TODO: journalProgress
+
+    await batch.write();
+    batch.reset();
+
+    this.genMarker = undefined;
+
+    if (this.aborter.isAborted) {
+      this.aborter.abortFinished();
+    }
   }
 }

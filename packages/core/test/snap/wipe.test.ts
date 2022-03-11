@@ -1,10 +1,10 @@
 import crypto from 'crypto';
+import { expect } from 'chai';
 import { Database } from '@rei-network/database';
 import { Common } from '@rei-network/common';
 import { wipeKeyRange } from '../../src/snap/utils';
 import { EMPTY_HASH, MAX_HASH } from '../../src/utils';
 import { asyncTraverseRawDB } from '../../src/snap';
-import { expect } from 'chai';
 const level = require('level-mem');
 
 const common = new Common({ chain: 'rei-devnet' });

@@ -10,7 +10,7 @@ export interface ISnapshot {
 
   accountRLP(hash: Buffer): Buffer;
 
-  storage(accountHash: Buffer, storageHash: Buffer): Buffer;
+  // storage(accountHash: Buffer, storageHash: Buffer): Buffer;
 }
 
 export interface Snapshot extends ISnapshot {

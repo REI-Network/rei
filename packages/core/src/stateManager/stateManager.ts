@@ -85,7 +85,7 @@ export class StateManager {
 
   _snapStorage?: FunctionalBufferMap<FunctionalBufferMap<Buffer>>;
 
-  _acessedMapList: SnapMapList[];
+  _accessedMapList: SnapMapList[];
   /**
    * StateManager is run in DEBUG mode (default: false)
    * Taken from DEBUG environment variable
@@ -116,7 +116,7 @@ export class StateManager {
     this._accessedStorage = [new Map()];
     this._accessedStorageReverted = [new Map()];
     this._snapsTree = opts.snapsTree;
-    this._acessedMapList = [{ snapAccounts: new FunctionalBufferMap<Buffer>(), snapDestructs: new FunctionalBufferMap<Buffer>(), snapStroge: new FunctionalBufferMap<FunctionalBufferMap<Buffer>>() }];
+    this._accessedMapList = [];
     if (this._snapsTree && opts.root) {
       this._snap = this._snapsTree.snapshot(opts.root);
       this._snapAccounts = new FunctionalBufferMap<Buffer>();
@@ -420,7 +420,7 @@ export class StateManager {
     this._cache.checkpoint();
     this._touchedStack.push(new Set(Array.from(this._touched)));
     this._accessedStorage.push(new Map());
-    this._acessedMapList.push(this._copySnapMaps());
+    this._accessedMapList.push(this._copySnapMaps());
     this._checkpointCount++;
   }
 
@@ -482,7 +482,7 @@ export class StateManager {
     // setup cache checkpointing
     this._cache.commit();
     this._touchedStack.pop();
-    this._acessedMapList.pop();
+    this._accessedMapList.pop();
     this._checkpointCount--;
 
     // Copy the contents of the map of the current level to a map higher.
@@ -529,7 +529,7 @@ export class StateManager {
       touched.add(ripemdPrecompileAddress);
     }
     this._touched = touched;
-    const revertMapList = this._acessedMapList.pop();
+    const revertMapList = this._accessedMapList.pop();
     this._snapAccounts = revertMapList?.snapAccounts;
     this._snapDestructs = revertMapList?.snapDestructs;
     this._snapStorage = revertMapList?.snapStroge;

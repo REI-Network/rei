@@ -75,17 +75,25 @@ export class StateManager {
   // to also include on access list generation
   _accessedStorageReverted: Map<string, Set<string>>[];
 
+  // State snapshot tree. It consists of one persistent base
+  // layer backed by a key-value store, on top of which arbitrarily many in-memory
+  // diff layers are topped
   _snapsTree?: SnapshotTree;
 
+  // Snapshot represents the functionality supported by a snapshot storage layer.
   _snap?: ISnapshot;
 
+  // Record accounts modified while processing state transitions
   _snapAccounts?: FunctionalBufferMap<Buffer>;
 
+  // Record accounts deleted while processing state transitions
   _snapDestructs?: FunctionalBufferSet;
 
+  // Record account storage modified while processing state transactions
   _snapStorage?: FunctionalBufferMap<FunctionalBufferMap<Buffer>>;
 
-  _accessedSnapObjectsList: SnapObject[];
+  // Save _snapAccounts, _snapDestructs, _snapStorage state when checkpoint for revert
+  _snapCacheList: SnapObject[];
   /**
    * StateManager is run in DEBUG mode (default: false)
    * Taken from DEBUG environment variable
@@ -116,7 +124,7 @@ export class StateManager {
     this._accessedStorage = [new Map()];
     this._accessedStorageReverted = [new Map()];
     this._snapsTree = opts.snapsTree;
-    this._accessedSnapObjectsList = [];
+    this._snapCacheList = [];
     if (this._snapsTree && opts.root) {
       this._snap = this._snapsTree.snapshot(opts.root);
       this._snapAccounts = new FunctionalBufferMap<Buffer>();
@@ -175,9 +183,10 @@ export class StateManager {
     }
     this._cache.del(address);
     this.touchAccount(address);
-    this._snapDestructs?.add(keccak256(address.buf));
-    this._snapAccounts?.delete(keccak256(address.buf));
-    this._snapStorage?.delete(keccak256(address.buf));
+    const key = this._snap ? keccak256(address.buf) : Buffer.from([]);
+    this._snapDestructs?.add(key);
+    this._snapAccounts?.delete(key);
+    this._snapStorage?.delete(key);
   }
 
   /**
@@ -380,8 +389,8 @@ export class StateManager {
         storage = this._snapStorage.get(addressHash);
         if (storage == undefined) {
           storage = new FunctionalBufferMap<Buffer>();
+          this._snapStorage.set(addressHash, storage);
         }
-        this._snapStorage.set(addressHash, storage);
       }
 
       if (value && value.length) {
@@ -425,7 +434,7 @@ export class StateManager {
     this._cache.checkpoint();
     this._touchedStack.push(new Set(Array.from(this._touched)));
     this._accessedStorage.push(new Map());
-    this._accessedSnapObjectsList.push(this._copySnapObject());
+    this._snapCacheList.push(this._copySnapCache());
     this._checkpointCount++;
   }
 
@@ -433,7 +442,7 @@ export class StateManager {
    * Copy _snapAccounts, _snapDestructs, _snapStorage, return a obejct
    * included all of them
    */
-  private _copySnapObject(): SnapObject {
+  private _copySnapCache(): SnapObject {
     if (!this._snap) {
       return {};
     }
@@ -448,7 +457,7 @@ export class StateManager {
       copySnapDestructs.add(key);
     });
     this._snapStorage?.forEach((value, key) => {
-      let temp = new FunctionalBufferMap<Buffer>();
+      const temp = new FunctionalBufferMap<Buffer>();
       value.forEach((value, key) => {
         temp.set(key, value);
       });
@@ -460,11 +469,12 @@ export class StateManager {
   /**
    * Clean the _snapAccounts, _snapDestructs, _snapStorage in cache
    */
-  private _cleanSnapObjects(): void {
+  private _cleanSnapCache(): void {
     if (this._snap) {
-      this._snapAccounts = new FunctionalBufferMap<Buffer>();
-      this._snapDestructs = new FunctionalBufferSet();
-      this._snapStorage = new FunctionalBufferMap<FunctionalBufferMap<Buffer>>();
+      this._snap = undefined;
+      this._snapAccounts = undefined;
+      this._snapDestructs = undefined;
+      this._snapStorage = undefined;
     }
   }
 
@@ -499,7 +509,7 @@ export class StateManager {
     // setup cache checkpointing
     this._cache.commit();
     this._touchedStack.pop();
-    this._accessedSnapObjectsList.pop();
+    this._snapCacheList.pop();
     this._checkpointCount--;
 
     // Copy the contents of the map of the current level to a map higher.
@@ -512,11 +522,11 @@ export class StateManager {
       await this._cache.flush();
       this._clearOriginalStorageCache();
       const parent = this._snap?.root();
-      if (parent && parent !== this._trie.root) {
+      if (parent && !parent.equals(this._trie.root)) {
         await this._snapsTree?.update(this._trie.root, parent, this._snapAccounts!, this._snapDestructs!, this._snapStorage!);
         await this._snapsTree?.cap(this._trie.root, 128);
       }
-      this._cleanSnapObjects();
+      this._cleanSnapCache();
     }
   }
 
@@ -546,16 +556,16 @@ export class StateManager {
       touched.add(ripemdPrecompileAddress);
     }
     this._touched = touched;
-    const revertMapList = this._accessedSnapObjectsList.pop();
-    this._snapAccounts = revertMapList?.snapAccounts;
-    this._snapDestructs = revertMapList?.snapDestructs;
-    this._snapStorage = revertMapList?.snapStroge;
+    const revertCache = this._snapCacheList.pop();
+    this._snapAccounts = revertCache?.snapAccounts;
+    this._snapDestructs = revertCache?.snapDestructs;
+    this._snapStorage = revertCache?.snapStroge;
     this._checkpointCount--;
 
     if (this._checkpointCount === 0) {
       await this._cache.flush();
       this._clearOriginalStorageCache();
-      this._cleanSnapObjects();
+      this._cleanSnapCache();
     }
   }
 

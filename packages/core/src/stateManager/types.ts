@@ -14,7 +14,7 @@ export interface ISnapshot {
 export interface Snapshot extends ISnapshot {
   parent(): Snapshot;
 
-  update(blockRoot: Buffer, destructs: Map<Buffer, Buffer>, accounts: Map<Buffer, Buffer>, storage: Map<Buffer, Buffer>): Snapshot;
+  update(blockRoot: Buffer, destructs: Map<Buffer, Buffer>, accounts: Map<Buffer, Buffer>, storage: Map<Buffer, Buffer>): Promise<Snapshot>;
 }
 
 export interface SnapshotTree {

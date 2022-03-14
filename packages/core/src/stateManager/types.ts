@@ -1,7 +1,5 @@
-import { FunctionalBufferMap } from '@rei-network/utils';
+import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
 import { Account } from 'ethereumjs-util';
-import { DB } from 'merkle-patricia-tree/dist/db';
-import Semaphore from 'semaphore-async-await';
 
 export interface ISnapshot {
   root(): Buffer;
@@ -22,7 +20,7 @@ export interface Snapshot extends ISnapshot {
 export interface SnapshotTree {
   snapshot(blockRoot: Buffer): ISnapshot;
 
-  update(root: Buffer, parent: Buffer, accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferMap<Buffer>, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>): void;
+  update(root: Buffer, parent: Buffer, accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferSet, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>): Promise<void>;
 
-  cap(root: Buffer, layers: number): void;
+  cap(root: Buffer, layers: number): Promise<void>;
 }

@@ -46,7 +46,7 @@ export class SimpleAborter {
    */
   abortFinished(reason?: any) {
     if (this.promise && this.resolve && this.reject) {
-      reason ? this.resolve() : this.reject(reason);
+      reason ? this.reject(reason) : this.resolve();
       this.resolve = undefined;
       this.reject = undefined;
       this.promise = undefined;

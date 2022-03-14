@@ -506,7 +506,7 @@ export class DiskLayer implements ISnapshot {
 
         aborter.abortFinished();
 
-        break;
+        return;
       }
 
       if (exhausted || last === null) {

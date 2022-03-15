@@ -1,4 +1,4 @@
-import { BN } from 'ethereumjs-util';
+import { BN, toBuffer } from 'ethereumjs-util';
 import tracer from 'tracer';
 
 interface Constructor<T = {}> {
@@ -65,7 +65,7 @@ export function ignoreError<T>(p?: Promise<T>): Promise<void | T> | undefined {
  * @returns Buffer
  */
 export function hexStringToBuffer(hex: string): Buffer {
-  return hex.startsWith('0x') ? Buffer.from(hex.substr(2), 'hex') : Buffer.from(hex, 'hex');
+  return hex.startsWith('0x') ? toBuffer(hex) : toBuffer('0x' + hex);
 }
 
 /**

@@ -218,10 +218,11 @@ export class BloomBitsFilter {
             bitsArray.push(bits);
           }
           return bitsArray.reduce((a, b) => {
+            const _b = Buffer.from(b);
             for (let i = 0; i < b.length; i++) {
-              b[i] &= a[i];
+              _b[i] &= a[i];
             }
-            return b;
+            return _b;
           });
         };
 

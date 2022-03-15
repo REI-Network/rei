@@ -43,8 +43,6 @@ export interface StateManagerOpts {
   trie?: Trie;
 
   snapsTree?: SnapshotTree;
-
-  root?: Buffer;
 }
 
 /**
@@ -125,8 +123,8 @@ export class StateManager {
     this._accessedStorageReverted = [new Map()];
     this._snapsTree = opts.snapsTree;
     this._snapCacheList = [];
-    if (this._snapsTree && opts.root) {
-      this._snap = this._snapsTree.snapshot(opts.root);
+    if (this._snapsTree) {
+      this._snap = this._snapsTree.snapshot(this._trie.root);
       this._snapAccounts = new FunctionalBufferMap<Buffer>();
       this._snapDestructs = new FunctionalBufferSet();
       this._snapStorage = new FunctionalBufferMap<FunctionalBufferMap<Buffer>>();

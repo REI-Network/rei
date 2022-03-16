@@ -143,6 +143,7 @@ export class Synchronizer extends EventEmitter {
       bestHeight = new BN(bestPeerHandler.status!.height);
       bestTD = new BN(bestPeerHandler.status!.totalDifficulty);
       if (bestTD.lte(this.node.getTotalDifficulty())) {
+        logger.debug('Synchronizer::findTarget, best TD less or equal than local TD');
         return;
       }
     } else {
@@ -159,6 +160,7 @@ export class Synchronizer extends EventEmitter {
         }
       }
       if (!bestPeerHandler) {
+        logger.debug('Synchronizer::findTarget, can not find best peer handler, pool size:', wire.pool.handlers.length);
         return;
       }
     }
@@ -176,6 +178,9 @@ export class Synchronizer extends EventEmitter {
       if (!target) {
         // the target peer has been disconneted or
         // we don't have the best peer
+        if (this.forceSync) {
+          logger.debug('Synchronizer::syncOnce, find target failed');
+        }
         return;
       }
 
@@ -185,6 +190,7 @@ export class Synchronizer extends EventEmitter {
       const [localHeader, localTD] = await this.findAncient(bestPeerHandler);
       if (localHeader.number.eq(bestHeight)) {
         // we already have this best block
+        logger.debug('Synchronizer::syncOnce, we already have this best block');
         return;
       }
 
@@ -193,6 +199,7 @@ export class Synchronizer extends EventEmitter {
       if (reimint.isStarted && reimint.state.hasMaj23Precommit(bestHeight)) {
         // our consensus engine has collected enough votes for this height,
         // so we ignore this best block
+        logger.debug('Synchronizer::syncOnce, we collected enough votes for this height');
         return;
       }
 
@@ -214,7 +221,7 @@ export class Synchronizer extends EventEmitter {
       // check total difficulty
       if (!cumulativeTotalDifficulty.add(localTD).eq(bestTD)) {
         // await this.node.banPeer(peerId, 'invalid');
-        logger.warn('Synchronizer::doSync, total difficulty does not match:', peerId);
+        logger.warn('Synchronizer::syncOnce, total difficulty does not match:', peerId);
       }
 
       const latest = this.node.getLatestBlock();

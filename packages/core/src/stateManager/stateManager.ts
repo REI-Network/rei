@@ -16,7 +16,7 @@ const debug = createDebugLogger('vm:state');
 
 type AddressHex = string;
 
-interface SnapObject {
+interface SnapCache {
   snapAccounts?: FunctionalBufferMap<Buffer>;
   snapDestructs?: FunctionalBufferSet;
   snapStroge?: FunctionalBufferMap<FunctionalBufferMap<Buffer>>;
@@ -91,7 +91,7 @@ export class StateManager {
   _snapStorage?: FunctionalBufferMap<FunctionalBufferMap<Buffer>>;
 
   // Save _snapAccounts, _snapDestructs, _snapStorage state when checkpoint for revert
-  _snapCacheList: SnapObject[];
+  _snapCacheList: SnapCache[];
   /**
    * StateManager is run in DEBUG mode (default: false)
    * Taken from DEBUG environment variable
@@ -144,7 +144,8 @@ export class StateManager {
   copy(): StateManager {
     return new StateManager({
       trie: this._trie.copy(false),
-      common: this._common
+      common: this._common,
+      snapsTree: this._snapsTree
     });
   }
 
@@ -181,10 +182,12 @@ export class StateManager {
     }
     this._cache.del(address);
     this.touchAccount(address);
-    const key = this._snap ? keccak256(address.buf) : Buffer.from([]);
-    this._snapDestructs?.add(key);
-    this._snapAccounts?.delete(key);
-    this._snapStorage?.delete(key);
+    if (this._snap) {
+      const key = keccak256(address.buf);
+      this._snapDestructs?.add(key);
+      this._snapAccounts?.delete(key);
+      this._snapStorage?.delete(key);
+    }
   }
 
   /**
@@ -385,7 +388,7 @@ export class StateManager {
       if (this._snapStorage) {
         const addressHash = keccak256(address.buf);
         storage = this._snapStorage.get(addressHash);
-        if (storage == undefined) {
+        if (storage === undefined) {
           storage = new FunctionalBufferMap<Buffer>();
           this._snapStorage.set(addressHash, storage);
         }
@@ -418,6 +421,7 @@ export class StateManager {
   async clearContractStorage(address: Address): Promise<void> {
     await this._modifyContractStorage(address, (storageTrie, done) => {
       storageTrie.root = storageTrie.EMPTY_TRIE_ROOT;
+      this._snapStorage?.delete(keccak256(address.buf));
       done();
     });
   }
@@ -440,7 +444,7 @@ export class StateManager {
    * Copy _snapAccounts, _snapDestructs, _snapStorage, return a obejct
    * included all of them
    */
-  private _copySnapCache(): SnapObject {
+  private _copySnapCache(): SnapCache {
     if (!this._snap) {
       return {};
     }

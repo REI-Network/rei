@@ -4,7 +4,7 @@ import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import * as helper from '../helper';
 import { WebsocketClient } from '../client';
-import { Controller, CallData } from './base';
+import { Controller, CallData, OutOfGasError } from './base';
 
 type TopicsData = (string | null | (string | null)[])[];
 
@@ -184,9 +184,16 @@ export class ETHController extends Controller {
     return fee;
   }
 
-  private async estimateGas(data: CallData, block: Block) {
+  async eth_estimateGas([data, tag]: [CallData, any]) {
+    const block = await this.getBlockByTag(tag);
+    const baseFee = this.calculateBaseFee(data, block._common);
+    const gas = data.gas ? hexStringToBN(data.gas) : block.header.gasLimit;
+    if (gas.lt(baseFee)) {
+      throw new OutOfGasError(gas);
+    }
+
     let lo = new BN(-1);
-    let hi = data.gas ? hexStringToBN(data.gas) : block.header.gasLimit;
+    let hi = gas.sub(baseFee);
     if (hi.lte(lo)) {
       throw new Error('invalid gas limit');
     }
@@ -195,15 +202,14 @@ export class ETHController extends Controller {
     const executable = async (gas: BN) => {
       try {
         await this.runCall({ ...data, gas: bnToHex(gas) }, block);
-        return true;
-      } catch (err) {
-        return false;
+      } catch (err: any) {
+        return err;
       }
     };
 
     while (lo.addn(1).lt(hi)) {
       const mid = lo.add(hi).divn(2);
-      if (!(await executable(mid))) {
+      if (await executable(mid)) {
         lo = mid;
       } else {
         hi = mid;
@@ -211,18 +217,16 @@ export class ETHController extends Controller {
     }
 
     if (hi.eq(cap)) {
-      if (!(await executable(hi))) {
-        throw new Error('vm revert');
+      const err = await executable(hi);
+      if (err) {
+        if (err instanceof OutOfGasError) {
+          err.gas.iadd(baseFee);
+        }
+        throw err;
       }
     }
 
-    return hi;
-  }
-
-  async eth_estimateGas([data, tag]: [CallData, any]) {
-    const block = await this.getBlockByTag(tag);
-    const result = await this.estimateGas(data, block);
-    return bnToHex(result.add(this.calculateBaseFee(data, block._common)));
+    return bnToHex(hi.add(baseFee));
   }
   async eth_getBlockByHash([hash, fullTransactions]: [string, boolean]) {
     try {

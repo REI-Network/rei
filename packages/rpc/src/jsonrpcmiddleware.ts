@@ -39,7 +39,7 @@ export class JsonRPCMiddleware {
       const error = {
         code: Number(err.code || err.status || errors.INTERNAL_ERROR.code),
         message: err.rpcMessage || errors.INTERNAL_ERROR.message,
-        data: undefined
+        data: err.data
       };
 
       if (err && err.data) {

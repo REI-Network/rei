@@ -25,5 +25,8 @@ export default {
   SERVER_ERROR: {
     code: -32000,
     message: 'Server error'
+  },
+  REVERT_ERROR: {
+    code: 3
   }
 };

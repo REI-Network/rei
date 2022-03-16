@@ -39,7 +39,9 @@ export class DBManager {
       numberToHash: new Cache({ max: 2048 }),
       hashToNumber: new Cache({ max: 2048 }),
       txLookup: new Cache({ max: 2048 }),
-      receipts: new Cache({ max: 1024 })
+      receipts: new Cache({ max: 1024 }),
+      snapAccount: new Cache({ max: 1024 }),
+      snapStorage: new Cache({ max: 1024 })
     };
   }
 
@@ -396,6 +398,67 @@ export class DBManager {
     } catch (err: any) {
       if (err.type === 'NotFoundError') {
         return undefined;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Get snapshot account
+   * @param accountHash - Account address hash
+   * @returns Serialized account
+   */
+  getSerializedSnapAccount(accountHash: Buffer): Promise<Buffer> {
+    return this.get(DBTarget.SnapAccount, { accountHash });
+  }
+
+  /**
+   * Get snapshot account storage
+   * @param accountHash - Account address hash
+   * @param storageHash - Account storage hash
+   * @returns Account Storage value
+   */
+  getSnapStorage(accountHash: Buffer, storageHash: Buffer): Promise<Buffer> {
+    return this.get(DBTarget.SnapStorage, { accountHash, storageHash });
+  }
+
+  /**
+   * Get snapshot root
+   */
+  async getSnapRoot(): Promise<Buffer | null> {
+    try {
+      return await this.get(DBTarget.SnapRoot);
+    } catch (err: any) {
+      if (err.type === 'NotFoundError') {
+        return null;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Get snapshot journal
+   */
+  async getSnapJournal(): Promise<Buffer | null> {
+    try {
+      return await this.get(DBTarget.SnapJournal);
+    } catch (err: any) {
+      if (err.type === 'NotFoundError') {
+        return null;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Get snapshot generator
+   */
+  async getSnapGenerator(): Promise<Buffer | null> {
+    try {
+      return await this.get(DBTarget.SnapGenerator);
+    } catch (err: any) {
+      if (err.type === 'NotFoundError') {
+        return null;
       }
       throw err;
     }

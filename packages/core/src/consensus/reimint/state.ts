@@ -807,9 +807,26 @@ export class StateMachine {
       return;
     }
 
-    if (this.proposalEvidence === undefined || this.proposalBlockResult === undefined) {
-      logger.debug('StateMachine::finalizeCommit, invalid proposal evidence or block result');
+    if (this.proposalEvidence === undefined) {
+      logger.debug('StateMachine::finalizeCommit, invalid proposal evidence');
       return;
+    }
+
+    /**
+     * Maybe we skip the prevote and go directly to precommit,
+     * so we need to execute the block again here
+     */
+    if (this.proposalBlockResult === undefined) {
+      try {
+        preValidateHeader.call(this.proposalBlock.header, this.parent);
+        await preValidateBlock.call(this.proposalBlock);
+        this.proposalBlockResult = await this.backend.preProcessBlock(this.proposalBlock);
+      } catch (err: any) {
+        if (err.message !== 'committed') {
+          logger.warn('StateMachine::finalizeCommit, preValidateHeaderAndBlock or process block failed:', err);
+        }
+        return;
+      }
     }
 
     const extraData = ExtraData.fromBlockHeader(this.proposalBlock.header);
@@ -821,27 +838,27 @@ export class StateMachine {
       return;
     }
 
-    const succeed = await this.wal.write(new StateMachineEndHeight(height), true);
-    if (!succeed) {
-      logger.error('StateMachine::finalizeCommit, write ahead log failed');
-      return;
-    }
-
     /**
      * If we are replaying messages,
      * commit block asynchronously to prevent message queues from getting stuck
      */
     if (this.replaying) {
-      this.backend.commitBlock(finalizedBlock, this.proposalBlockResult).catch((err) => {
+      this.backend.commitBlock(finalizedBlock, this.proposalBlockResult!).catch((err) => {
         logger.error('StateMachine::finalizeCommit(replaying), catch error:', err);
       });
     } else {
       try {
+        const succeed = await this.wal.write(new StateMachineEndHeight(height), true);
+        if (!succeed) {
+          logger.error('StateMachine::finalizeCommit, write ahead log failed');
+          return;
+        }
+
         /**
          * NOTE: here, we will directly submit the block that has not executed `validateConsensus`,
          *       but it's ok, because the `precommits` already contains +2/3 pre-commit votes
          */
-        await this.backend.commitBlock(finalizedBlock, this.proposalBlockResult);
+        await this.backend.commitBlock(finalizedBlock, this.proposalBlockResult!);
       } catch (err) {
         logger.error('StateMachine::finalizeCommit, catch error:', err);
       }

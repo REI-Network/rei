@@ -31,7 +31,7 @@ export interface FetcherOptions {
 }
 
 export interface FetcherBackend {
-  banPeer(peerId: string, reason: string): Promise<void>;
+  handleNetworkError(prefix: string, peerId: string, reason: string): Promise<void>;
   processAndCommitBlock(block: Block): Promise<boolean>;
 }
 
@@ -54,6 +54,8 @@ export class Fetcher {
   private readonly downloadBodiesLimit: number;
 
   private readonly useless = new Set<WireProtocolHandler>();
+
+  protected processBlocksPromise?: Promise<boolean>;
   private readonly processBlocksChannel = new PChannel<ProcessBlocks>({
     drop: ({ data: { resolve } }) => {
       // if the task has been dropped,
@@ -84,9 +86,17 @@ export class Fetcher {
   /**
    * Abort fetcher
    */
-  abort() {
+  private _abort() {
     this.aborted = true;
     this.processBlocksChannel.abort();
+  }
+
+  /**
+   * Abort fetcher and wait until exit
+   */
+  async abort() {
+    this._abort();
+    this.processBlocksPromise && (await this.processBlocksPromise);
   }
 
   /**
@@ -111,7 +121,7 @@ export class Fetcher {
     const downloadBodiesLimit = new LimitedConcurrency(this.downloadBodiesLimit);
 
     // start process blocks loop
-    const loopPromise = this.processBlocksLoop();
+    this.processBlocksPromise = this.processBlocksLoop();
 
     // start download headers
     await this.downloadHeaders(start, totalCount, handler, async (headers) => {
@@ -137,7 +147,8 @@ export class Fetcher {
 
     // wait for the loop to exit and reset
     this.processBlocksChannel.abort();
-    const reorged = await loopPromise;
+    const reorged = await this.processBlocksPromise;
+    this.processBlocksPromise = undefined;
     this.processBlocksChannel.reset();
 
     // put back useless handlers
@@ -169,10 +180,9 @@ export class Fetcher {
         const headers = await handler.getBlockHeaders(startNumber, count);
         parent = this.validateBackend.validateHeaders(parent, headers);
         await onData(headers);
-      } catch (err) {
-        this.abort();
-        logger.warn('Fetcher::downloadHeaders, download failed:', err);
-        await this.backend.banPeer(handler.peer.peerId, 'invalid');
+      } catch (err: any) {
+        this._abort();
+        await this.backend.handleNetworkError('Fetcher::downloadHeaders', handler.peer.peerId, err);
         return;
       }
 
@@ -187,7 +197,7 @@ export class Fetcher {
       try {
         handler = await wire.pool.get();
       } catch (err) {
-        this.abort();
+        this._abort();
         logger.warn('Fetcher::downloadBodies, get handler failed:', err);
         return;
       }
@@ -202,10 +212,9 @@ export class Fetcher {
         await onData(blocks);
         return;
       } catch (err: any) {
-        logger.warn('Fetcher::downloadBodies, download failed:', err);
         this.useless.add(handler);
         if (err.message !== 'useless') {
-          await this.backend.banPeer(handler.peer.peerId, 'invalid');
+          await this.backend.handleNetworkError('Fetcher::downloadBodies', handler.peer.peerId, err);
         }
       }
     }
@@ -241,15 +250,15 @@ export class Fetcher {
 
           if (this.aborted) {
             resolve();
-            return;
+            return reorged;
           }
         }
         resolve();
       } catch (err) {
-        this.abort();
+        this._abort();
         logger.warn('Fetcher::processBlocksLoop, process block failed:', err);
         resolve();
-        return;
+        return reorged;
       }
     }
     return reorged;

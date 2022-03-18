@@ -1,6 +1,6 @@
 {
     "name": "@rei-network/network",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
@@ -13,7 +13,7 @@
     },
     "dependencies": {
         "@gxchain2/discv5": "^0.6.4",
-        "@rei-network/utils": "^0.0.2",
+        "@rei-network/utils": "^0.0.3",
         "it-pipe": "^1.1.0",
         "levelup": "^4.4.0",
         "libp2p": "^0.29.3",

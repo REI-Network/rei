@@ -6,7 +6,7 @@ import { BlockHeader, Transaction, Block } from '@rei-network/structure';
 import { Node } from '../node';
 import { Fetcher } from './fetcher';
 import { preValidateBlock, preValidateHeader } from '../validation';
-import { WireProtocolHandler, PeerRequestTimeoutError, maxGetBlockHeaders } from '../protocols';
+import { WireProtocolHandler, maxGetBlockHeaders } from '../protocols';
 
 const defaultDownloadElementsCountLimit = new BN(maxGetBlockHeaders);
 const defaultSyncInterval = 1000;
@@ -70,20 +70,18 @@ export class Synchronizer extends EventEmitter {
     try {
       await this.lock.acquire();
       return await fn();
-    } catch (err) {
-      throw err;
     } finally {
       this.lock.release();
     }
   }
 
-  private async genesis(): Promise<[BlockHeader, BN]> {
+  private async genesis(): Promise<{ header: BlockHeader; td: BN }> {
     const { header } = await this.node.db.getBlock(0);
-    return [header, header.difficulty];
+    return { header, td: header.difficulty };
   }
 
   // TODO: binary search.
-  private async findAncient(handler: WireProtocolHandler): Promise<[BlockHeader, BN]> {
+  private async findAncient(handler: WireProtocolHandler): Promise<{ header: BlockHeader; td: BN } | undefined> {
     const latest = this.node.getLatestBlock().header.number.clone();
     if (latest.eqn(0)) {
       return await this.genesis();
@@ -100,29 +98,26 @@ export class Synchronizer extends EventEmitter {
       let headers!: BlockHeader[];
       try {
         headers = await handler.getBlockHeaders(latest, count);
-      } catch (err) {
-        if (err instanceof PeerRequestTimeoutError) {
-          await this.node.banPeer(handler.peer.peerId, 'timeout');
-        }
-        throw err;
+      } catch (err: any) {
+        await this.handleNetworkError('Synchronizer::findAncient', handler.peer.peerId, err);
+        return;
       }
 
       for (let i = headers.length - 1; i >= 0; i--) {
         try {
           const remoteHeader = headers[i];
           const hash = remoteHeader.hash();
-          const localHeader = await this.node.db.getHeader(hash, remoteHeader.number);
-          const localTD = await this.node.db.getTotalDifficulty(hash, remoteHeader.number);
-          return [localHeader, localTD];
+          const header = await this.node.db.getHeader(hash, remoteHeader.number);
+          const td = await this.node.db.getTotalDifficulty(hash, remoteHeader.number);
+          return { header, td };
         } catch (err: any) {
           if (err.type === 'NotFoundError') {
             continue;
           }
-          throw err;
+          logger.error('Synchronizer::findAncient, load header failed:', err);
         }
       }
     }
-    throw new Error('find acient failed');
   }
 
   private findTarget(handler?: WireProtocolHandler) {
@@ -143,6 +138,7 @@ export class Synchronizer extends EventEmitter {
       bestHeight = new BN(bestPeerHandler.status!.height);
       bestTD = new BN(bestPeerHandler.status!.totalDifficulty);
       if (bestTD.lte(this.node.getTotalDifficulty())) {
+        logger.debug('Synchronizer::findTarget, best TD less or equal than local TD');
         return;
       }
     } else {
@@ -159,6 +155,7 @@ export class Synchronizer extends EventEmitter {
         }
       }
       if (!bestPeerHandler) {
+        logger.debug('Synchronizer::findTarget, can not find best peer handler, pool size:', wire.pool.handlers.length);
         return;
       }
     }
@@ -182,9 +179,16 @@ export class Synchronizer extends EventEmitter {
       const { bestPeerHandler, bestHeight, bestTD } = target;
 
       // find common ancient
-      const [localHeader, localTD] = await this.findAncient(bestPeerHandler);
+      const result = await this.findAncient(bestPeerHandler);
+      if (!result) {
+        return;
+      }
+
+      const localHeader = result.header;
+      const localTD = result.td;
       if (localHeader.number.eq(bestHeight)) {
         // we already have this best block
+        logger.debug('Synchronizer::syncOnce, we already have this best block');
         return;
       }
 
@@ -193,6 +197,7 @@ export class Synchronizer extends EventEmitter {
       if (reimint.isStarted && reimint.state.hasMaj23Precommit(bestHeight)) {
         // our consensus engine has collected enough votes for this height,
         // so we ignore this best block
+        logger.debug('Synchronizer::syncOnce, we collected enough votes for this height');
         return;
       }
 
@@ -214,7 +219,7 @@ export class Synchronizer extends EventEmitter {
       // check total difficulty
       if (!cumulativeTotalDifficulty.add(localTD).eq(bestTD)) {
         // await this.node.banPeer(peerId, 'invalid');
-        logger.warn('Synchronizer::doSync, total difficulty does not match:', peerId);
+        logger.warn('Synchronizer::syncOnce, total difficulty does not match:', peerId);
       }
 
       const latest = this.node.getLatestBlock();
@@ -271,7 +276,7 @@ export class Synchronizer extends EventEmitter {
    */
   async abort() {
     if (this.syncLoopPromise) {
-      this.fetcher.abort();
+      await this.fetcher.abort();
       await this.syncLoopPromise;
       this.syncLoopPromise = undefined;
     }
@@ -279,10 +284,31 @@ export class Synchronizer extends EventEmitter {
 
   /////////////////// Fetcher backend ///////////////////
 
-  banPeer(peerId: string, reason: string) {
-    return this.node.banPeer(peerId, reason as any);
+  /**
+   * Handle network error,
+   * ban peer when request timeout or invalid,
+   * ignore abort error
+   * @param prefix - Log prefix
+   * @param peerId - Peer id
+   * @param err - Error
+   */
+  async handleNetworkError(prefix: string, peerId: string, err: any) {
+    if (typeof err.message === 'string' && err.message.startsWith('timeout')) {
+      logger.warn(prefix, 'peerId:', peerId, 'error:', err);
+      await this.node.banPeer(peerId, 'timeout');
+    } else if (err.message === 'abort') {
+      // ignore abort error...
+    } else {
+      logger.error(prefix, 'peerId:', peerId, 'error:', err);
+      await this.node.banPeer(peerId, 'invalid');
+    }
   }
 
+  /**
+   * Process block and commit it to db
+   * @param block - Block
+   * @returns Reorg
+   */
   async processAndCommitBlock(block: Block) {
     try {
       const result = await this.node.getExecutor(block._common).processBlock({ block });
@@ -292,7 +318,7 @@ export class Synchronizer extends EventEmitter {
         broadcast: false
       });
     } catch (err: any) {
-      if (err.message === 'committed') {
+      if (err.message === 'committed' || err.message === 'aborted') {
         return false;
       } else {
         throw err;
@@ -300,6 +326,12 @@ export class Synchronizer extends EventEmitter {
     }
   }
 
+  /**
+   * Validate headers
+   * @param parent - Parent block header(if it exsits)
+   * @param headers - A list of headers that need to be validated
+   * @returns
+   */
   validateHeaders(parent: BlockHeader | undefined, headers: BlockHeader[]) {
     headers.forEach((header, i) => {
       preValidateHeader.call(header, i === 0 ? parent ?? this.localHeader! : headers[i - 1]);
@@ -307,6 +339,11 @@ export class Synchronizer extends EventEmitter {
     return headers[headers.length - 1];
   }
 
+  /**
+   * Validate block bodies
+   * @param headers - A list of headers
+   * @param bodies - A list of bodies, one-to-one correspondence with headers
+   */
   validateBodies(headers: BlockHeader[], bodies: Transaction[][]) {
     if (headers.length !== bodies.length) {
       throw new Error('invalid bodies length');
@@ -318,6 +355,10 @@ export class Synchronizer extends EventEmitter {
     });
   }
 
+  /**
+   * Validate blocks
+   * @param blocks - A list of blocks that need to be validated
+   */
   async validateBlocks(blocks: Block[]) {
     await Promise.all(blocks.map((b) => preValidateBlock.call(b)));
   }

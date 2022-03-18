@@ -1,7 +1,7 @@
 import { bufferToHex } from 'ethereumjs-util';
 import { FunctionalBufferMap, FunctionalBufferSet, Channel, Aborter, logger } from '@rei-network/utils';
 import { Transaction } from '@rei-network/structure';
-import { PeerRequestTimeoutError, maxTxRetrievals } from './protocols';
+import { maxTxRetrievals } from './protocols';
 import { Node } from './node';
 
 type NewPooledTransactionMessage = {
@@ -335,8 +335,8 @@ export class TxFetcher {
               .then((txs) => {
                 this.enqueueTransaction(peer, txs);
               })
-              .catch((err) => {
-                if (err instanceof PeerRequestTimeoutError) {
+              .catch((err: any) => {
+                if (typeof err.message === 'string' && err.message.startsWith('timeout')) {
                   this.requestTimeout(peer);
                 } else {
                   this.dropPeer(peer);

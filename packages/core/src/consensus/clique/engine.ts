@@ -97,8 +97,8 @@ export class CliqueConsensusEngine extends BaseConsensusEngine implements Consen
             this.node.tryToMintNextBlock();
           }
         } catch (err: any) {
-          if (err.message === 'committed') {
-            // ignore committed
+          if (err.message === 'committed' || err.message === 'aborted') {
+            // ignore errors...
           } else {
             logger.error('CliqueConsensusEngine::newBlockHeader, processBlock, catch error:', err);
           }

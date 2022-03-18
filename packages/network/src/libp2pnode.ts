@@ -23,7 +23,8 @@ export class Libp2pNode extends Libp2p {
     super({
       peerId: options.peerId,
       addresses: {
-        listen: [`/ip4/0.0.0.0/tcp/${options.tcpPort}`]
+        listen: [`/ip4/0.0.0.0/tcp/${options.tcpPort}`],
+        noAnnounce: [`/ip4/127.0.0.1/tcp/${options.tcpPort}`]
       },
       modules: {
         transport: [TCP],

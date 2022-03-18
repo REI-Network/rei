@@ -48,6 +48,7 @@ export class Channel<T = any> {
    */
   push(data: T) {
     if (this.aborted) {
+      this.drop && this.drop(data);
       return false;
     }
     if (this.resolve) {
@@ -172,6 +173,7 @@ export class HChannel<T = any> {
    */
   push(data: T) {
     if (this.aborted) {
+      this.drop && this.drop(data);
       return false;
     }
     if (this.resolve) {
@@ -300,6 +302,7 @@ export class PChannel<U = any, T extends { data: U; index: number } = { data: U;
    */
   push(data: T) {
     if (this.aborted) {
+      this.drop && this.drop(data);
       return false;
     }
     this._heap.insert(data);

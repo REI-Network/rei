@@ -3,7 +3,6 @@ import { mustParseTransction, Transaction, Block, BlockHeader, BlockHeaderBuffer
 import { logger, Channel, FunctionalBufferSet } from '@rei-network/utils';
 import { ProtocolHandler, Peer } from '@rei-network/network';
 import { NodeStatus } from '../../types';
-import { PeerRequestTimeoutError } from '../types';
 import { WireProtocol } from './protocol';
 
 const maxTxPacketSize = 102400;
@@ -325,7 +324,11 @@ export class WireProtocolHandler implements ProtocolHandler {
    */
   send(method: string | number, data: any) {
     const handler = this.findHandler(method);
-    this.peer.send(this.protocol.name, rlp.encode([intToBuffer(handler.code), handler.encode.call(this, data)]));
+    try {
+      this.peer.send(this.protocol.name, rlp.encode([intToBuffer(handler.code), handler.encode.call(this, data)]));
+    } catch (err) {
+      // ignore errors
+    }
   }
 
   /**
@@ -348,7 +351,7 @@ export class WireProtocolHandler implements ProtocolHandler {
         resolve,
         timeout: setTimeout(() => {
           this.waitingRequests.delete(handler.response!);
-          reject(new PeerRequestTimeoutError(`timeout request: ${method}`));
+          reject(new Error(`timeout request: ${method}`));
         }, 8000)
       });
       this.send(method, data);

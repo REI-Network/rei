@@ -67,8 +67,16 @@ export class Node extends Initializer {
 
   private pendingTxsLoopPromise!: Promise<void>;
   private commitBlockLoopPromise!: Promise<void>;
-  private readonly pendingTxsQueue = new Channel<PendingTxs>();
-  private readonly commitBlockQueue = new Channel<CommitBlock>();
+  private readonly pendingTxsQueue = new Channel<PendingTxs>({
+    drop: ({ txs, resolve }) => {
+      resolve(new Array<boolean>(txs.length).fill(false));
+    }
+  });
+  private readonly commitBlockQueue = new Channel<CommitBlock>({
+    drop: ({ reject }) => {
+      reject(new Error('aborted'));
+    }
+  });
 
   constructor(options: NodeOptions) {
     super();
@@ -517,6 +525,7 @@ export class Node extends Initializer {
    * @param reason - Ban reason
    */
   async banPeer(peerId: string, reason: 'invalid' | 'timeout') {
+    logger.debug('Node::banPeer, peerId:', peerId, 'reason:', reason);
     if (reason === 'invalid') {
       await this.networkMngr.ban(peerId, defaultInvalidBanTime);
     } else {

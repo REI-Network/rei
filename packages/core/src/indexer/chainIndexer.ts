@@ -129,7 +129,7 @@ export class ChainIndexer extends Initializer {
           if (lastHeader !== undefined && !header.parentHash.equals(lastHeader.hash())) {
             throw new Error(`parentHash is'not match, last: ${lastHeader.number.toString()}, current: ${header.number.toString()}`);
           }
-          await this.backend.process(header);
+          this.backend.process(header);
           lastHeader = header;
         }
         const batch = this.backend.commit();

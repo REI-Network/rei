@@ -325,7 +325,11 @@ export class WireProtocolHandler implements ProtocolHandler {
    */
   send(method: string | number, data: any) {
     const handler = this.findHandler(method);
-    this.peer.send(this.protocol.name, rlp.encode([intToBuffer(handler.code), handler.encode.call(this, data)]));
+    try {
+      this.peer.send(this.protocol.name, rlp.encode([intToBuffer(handler.code), handler.encode.call(this, data)]));
+    } catch (err) {
+      // ignore errors
+    }
   }
 
   /**

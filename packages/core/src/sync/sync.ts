@@ -278,7 +278,7 @@ export class Synchronizer extends EventEmitter {
    */
   async abort() {
     if (this.syncLoopPromise) {
-      this.fetcher.abort();
+      await this.fetcher.abort();
       await this.syncLoopPromise;
       this.syncLoopPromise = undefined;
     }
@@ -299,7 +299,7 @@ export class Synchronizer extends EventEmitter {
         broadcast: false
       });
     } catch (err: any) {
-      if (err.message === 'committed') {
+      if (err.message === 'committed' || err.message === 'aborted') {
         return false;
       } else {
         throw err;

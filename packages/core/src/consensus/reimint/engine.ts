@@ -276,15 +276,23 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    * @param block - Block
    */
   async commitBlock(block: Block, result: IProcessBlockResult) {
-    const reorged = await this.node.commitBlock({
-      receipts: result.receipts,
-      block,
-      broadcast: true
-    });
-    if (reorged) {
-      logger.info('⛏️  Mint block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
-      // try to continue minting
-      this.node.tryToMintNextBlock();
+    try {
+      const reorged = await this.node.commitBlock({
+        receipts: result.receipts,
+        block,
+        broadcast: true
+      });
+      if (reorged) {
+        logger.info('⛏️  Mint block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
+        // try to continue minting
+        this.node.tryToMintNextBlock();
+      }
+    } catch (err: any) {
+      if (err.message === 'committed' || err.message === 'aborted') {
+        // ignore errors...
+      } else {
+        logger.error('ReimintConsensusEngine::commitBlock, catch error:', err);
+      }
     }
   }
 

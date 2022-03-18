@@ -843,25 +843,19 @@ export class StateMachine {
      * commit block asynchronously to prevent message queues from getting stuck
      */
     if (this.replaying) {
-      this.backend.commitBlock(finalizedBlock, this.proposalBlockResult!).catch((err) => {
-        logger.error('StateMachine::finalizeCommit(replaying), catch error:', err);
-      });
+      this.backend.commitBlock(finalizedBlock, this.proposalBlockResult!);
     } else {
-      try {
-        const succeed = await this.wal.write(new StateMachineEndHeight(height), true);
-        if (!succeed) {
-          logger.error('StateMachine::finalizeCommit, write ahead log failed');
-          return;
-        }
-
-        /**
-         * NOTE: here, we will directly submit the block that has not executed `validateConsensus`,
-         *       but it's ok, because the `precommits` already contains +2/3 pre-commit votes
-         */
-        await this.backend.commitBlock(finalizedBlock, this.proposalBlockResult!);
-      } catch (err) {
-        logger.error('StateMachine::finalizeCommit, catch error:', err);
+      const succeed = await this.wal.write(new StateMachineEndHeight(height), true);
+      if (!succeed) {
+        logger.error('StateMachine::finalizeCommit, write ahead log failed');
+        return;
       }
+
+      /**
+       * NOTE: here, we will directly submit the block that has not executed `validateConsensus`,
+       *       but it's ok, because the `precommits` already contains +2/3 pre-commit votes
+       */
+      await this.backend.commitBlock(finalizedBlock, this.proposalBlockResult!);
     }
   }
 

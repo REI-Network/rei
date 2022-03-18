@@ -31,7 +31,7 @@ export interface FetcherOptions {
 }
 
 export interface FetcherBackend {
-  handleNetworkError(prefix: string, peerId: string, reason: string): Promise<void>;
+  handlePeerError(prefix: string, peerId: string, err: any): Promise<void>;
   processAndCommitBlock(block: Block): Promise<boolean>;
 }
 
@@ -55,7 +55,7 @@ export class Fetcher {
 
   private readonly useless = new Set<WireProtocolHandler>();
 
-  protected processBlocksPromise?: Promise<boolean>;
+  protected processBlocksPromise?: Promise<{ reorged: boolean; error: any }>;
   private readonly processBlocksChannel = new PChannel<ProcessBlocks>({
     drop: ({ data: { resolve } }) => {
       // if the task has been dropped,
@@ -147,7 +147,7 @@ export class Fetcher {
 
     // wait for the loop to exit and reset
     this.processBlocksChannel.abort();
-    const reorged = await this.processBlocksPromise;
+    const { reorged, error } = await this.processBlocksPromise;
     this.processBlocksPromise = undefined;
     this.processBlocksChannel.reset();
 
@@ -156,6 +156,11 @@ export class Fetcher {
       handler.protocol.pool.put(h);
     });
     this.useless.clear();
+
+    // handle errors, if an error occurs
+    if (error) {
+      await this.backend.handlePeerError('Fetcher::fetch', handler.peer.peerId, error);
+    }
 
     return {
       reorged,
@@ -182,7 +187,7 @@ export class Fetcher {
         await onData(headers);
       } catch (err: any) {
         this._abort();
-        await this.backend.handleNetworkError('Fetcher::downloadHeaders', handler.peer.peerId, err);
+        await this.backend.handlePeerError('Fetcher::downloadHeaders', handler.peer.peerId, err);
         return;
       }
 
@@ -214,7 +219,7 @@ export class Fetcher {
       } catch (err: any) {
         this.useless.add(handler);
         if (err.message !== 'useless') {
-          await this.backend.handleNetworkError('Fetcher::downloadBodies', handler.peer.peerId, err);
+          await this.backend.handlePeerError('Fetcher::downloadBodies', handler.peer.peerId, err);
         }
       }
     }
@@ -239,8 +244,9 @@ export class Fetcher {
     });
   }
 
-  private async processBlocksLoop() {
+  private async processBlocksLoop(): Promise<{ reorged: boolean; error: any }> {
     let reorged = false;
+    let error = undefined;
     for await (const {
       data: { blocks, resolve }
     } of this.processBlocksChannel.generator()) {
@@ -250,7 +256,7 @@ export class Fetcher {
 
           if (this.aborted) {
             resolve();
-            return reorged;
+            return { reorged, error };
           }
         }
         resolve();
@@ -263,11 +269,12 @@ export class Fetcher {
          * this error may be thrown when synchronously terminated
          */
         if (err.type !== 'NotFoundError') {
-          logger.warn('Fetcher::processBlocksLoop, process block failed:', err);
+          error = err;
         }
-        return reorged;
+
+        return { reorged, error };
       }
     }
-    return reorged;
+    return { reorged, error };
   }
 }

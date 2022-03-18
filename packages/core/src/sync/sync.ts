@@ -99,7 +99,7 @@ export class Synchronizer extends EventEmitter {
       try {
         headers = await handler.getBlockHeaders(latest, count);
       } catch (err: any) {
-        await this.handleNetworkError('Synchronizer::findAncient', handler.peer.peerId, err);
+        await this.handlePeerError('Synchronizer::findAncient', handler.peer.peerId, err);
         return;
       }
 
@@ -285,14 +285,14 @@ export class Synchronizer extends EventEmitter {
   /////////////////// Fetcher backend ///////////////////
 
   /**
-   * Handle network error,
+   * Handle peer error,
    * ban peer when request timeout or invalid,
    * ignore abort error
    * @param prefix - Log prefix
    * @param peerId - Peer id
    * @param err - Error
    */
-  async handleNetworkError(prefix: string, peerId: string, err: any) {
+  async handlePeerError(prefix: string, peerId: string, err: any) {
     if (typeof err.message === 'string' && err.message.startsWith('timeout')) {
       logger.warn(prefix, 'peerId:', peerId, 'error:', err);
       await this.node.banPeer(peerId, 'timeout');

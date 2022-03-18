@@ -31,7 +31,7 @@ export interface FetcherOptions {
 }
 
 export interface FetcherBackend {
-  banPeer(peerId: string, reason: string): Promise<void>;
+  handleNetworkError(prefix: string, peerId: string, reason: string): Promise<void>;
   processAndCommitBlock(block: Block): Promise<boolean>;
 }
 
@@ -180,10 +180,9 @@ export class Fetcher {
         const headers = await handler.getBlockHeaders(startNumber, count);
         parent = this.validateBackend.validateHeaders(parent, headers);
         await onData(headers);
-      } catch (err) {
+      } catch (err: any) {
         this._abort();
-        logger.warn('Fetcher::downloadHeaders, download failed:', err);
-        await this.backend.banPeer(handler.peer.peerId, 'invalid');
+        await this.backend.handleNetworkError('Fetcher::downloadHeaders', handler.peer.peerId, err);
         return;
       }
 
@@ -213,10 +212,9 @@ export class Fetcher {
         await onData(blocks);
         return;
       } catch (err: any) {
-        logger.warn('Fetcher::downloadBodies, download failed:', err);
         this.useless.add(handler);
         if (err.message !== 'useless') {
-          await this.backend.banPeer(handler.peer.peerId, 'invalid');
+          await this.backend.handleNetworkError('Fetcher::downloadBodies', handler.peer.peerId, err);
         }
       }
     }

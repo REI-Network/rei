@@ -9,7 +9,7 @@ import { Common } from '@rei-network/common';
 import { Blockchain } from '@rei-network/blockchain';
 import { VM } from '@rei-network/vm';
 import { Transaction, Block } from '@rei-network/structure';
-import { Channel, logger, Initializer } from '@rei-network/utils';
+import { Channel, logger } from '@rei-network/utils';
 import { AccountManager } from '@rei-network/wallet';
 import { TxPool } from './txpool';
 import { Synchronizer } from './sync';
@@ -39,7 +39,7 @@ type CommitBlock = {
   reject: (reason?: any) => void;
 };
 
-export class Node extends Initializer {
+export class Node {
   readonly datadir: string;
   readonly chain: string;
   readonly networkId: number;
@@ -64,8 +64,10 @@ export class Node extends Initializer {
   readonly clique: CliqueConsensusEngine;
   readonly receiptsCache: ReceiptsCache;
 
-  private pendingTxsLoopPromise!: Promise<void>;
-  private commitBlockLoopPromise!: Promise<void>;
+  private initPromise?: Promise<void>;
+  private pendingTxsLoopPromise?: Promise<void>;
+  private commitBlockLoopPromise?: Promise<void>;
+
   private readonly pendingTxsQueue = new Channel<PendingTxs>({
     drop: ({ txs, resolve }) => {
       resolve(new Array<boolean>(txs.length).fill(false));
@@ -78,8 +80,6 @@ export class Node extends Initializer {
   });
 
   constructor(options: NodeOptions) {
-    super();
-
     this.datadir = options.databasePath;
     this.chaindb = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
     this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));
@@ -162,20 +162,25 @@ export class Node extends Initializer {
   /**
    * Initialize node
    */
-  async init() {
-    await this.blockchain.init();
-    if (this.latestBlock.header.number.eqn(0)) {
-      await this.getEngine(this.latestBlock._common).generateGenesis();
+  init() {
+    if (this.initPromise) {
+      return this.initPromise;
     }
 
-    await this.txPool.init(this.latestBlock);
-    await this.reimint.init();
-    await this.clique.init();
-    await this.bloomBitsIndexer.init();
-    await this.bcMonitor.init(this.latestBlock.header);
-    await this.networkdb.open();
-    await this.networkMngr.init();
-    this.initOver();
+    return (this.initPromise = (async () => {
+      await this.blockchain.init();
+      if (this.latestBlock.header.number.eqn(0)) {
+        await this.getEngine(this.latestBlock._common).generateGenesis();
+      }
+
+      await this.txPool.init(this.latestBlock);
+      await this.reimint.init();
+      await this.clique.init();
+      await this.bloomBitsIndexer.init();
+      await this.bcMonitor.init(this.latestBlock.header);
+      await this.networkdb.open();
+      await this.networkMngr.init();
+    })());
   }
 
   /**

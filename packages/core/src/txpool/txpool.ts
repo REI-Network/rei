@@ -42,7 +42,8 @@ export class TxPool extends InitializerWithEventEmitter {
   private readonly locals = new FunctionalBufferSet();
   private readonly txs = new FunctionalBufferMap<Transaction>();
   private readonly lock = new Semaphore(1);
-  private readonly timer = new AbortableTimer();
+  private readonly timeoutTimer = new AbortableTimer();
+  private readonly rejournalTimer = new AbortableTimer();
 
   private aborted: boolean = false;
 
@@ -148,7 +149,7 @@ export class TxPool extends InitializerWithEventEmitter {
         }
       }
 
-      await this.timer.wait(this.timeoutInterval);
+      await this.timeoutTimer.wait(this.timeoutInterval);
     }
   }
 
@@ -159,7 +160,7 @@ export class TxPool extends InitializerWithEventEmitter {
     await this.initPromise;
     while (!this.aborted) {
       await this.journal!.rotate(this.local());
-      await this.timer.wait(this.rejournalInterval);
+      await this.rejournalTimer.wait(this.rejournalInterval);
     }
   }
 
@@ -221,7 +222,8 @@ export class TxPool extends InitializerWithEventEmitter {
 
   async abort() {
     this.aborted = true;
-    this.timer.abort();
+    this.timeoutTimer.abort();
+    this.rejournalTimer.abort();
     if (this.rejournalLoopPromise) {
       await this.rejournalLoopPromise;
       this.rejournalLoopPromise = undefined;
@@ -762,5 +764,3 @@ export class TxPool extends InitializerWithEventEmitter {
     }
   }
 }
-
-export { PendingTxMap, TxSortedMap };

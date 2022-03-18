@@ -12,6 +12,7 @@ export class AbortableTimer {
       this.timeout = setTimeout(() => {
         r();
         this.r = undefined;
+        this.timeout = undefined;
       }, timeout);
     });
   }

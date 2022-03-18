@@ -106,7 +106,7 @@ export class RpcServer {
    * A loop for time-consuming request
    */
   private async reqLoop() {
-    for await (const req of this.reqQueue.generator()) {
+    for await (const req of this.reqQueue) {
       await this.handleReq(req);
     }
   }

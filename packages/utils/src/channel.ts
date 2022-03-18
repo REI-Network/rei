@@ -119,7 +119,7 @@ export class Channel<T = any> {
   /**
    * Return an async generator to fetch the data in channel
    */
-  async *generator() {
+  async *[Symbol.asyncIterator]() {
     try {
       while (!this.aborted) {
         yield await this.next();
@@ -245,7 +245,7 @@ export class HChannel<T = any> {
   /**
    * Return an async generator to fetch the data in channel
    */
-  async *generator() {
+  async *[Symbol.asyncIterator]() {
     try {
       while (!this.aborted) {
         yield await this.next();
@@ -386,7 +386,7 @@ export class PChannel<U = any, T extends { data: U; index: number } = { data: U;
   /**
    * Return an async generator to fetch the data in channel
    */
-  async *generator() {
+  async *[Symbol.asyncIterator]() {
     try {
       while (!this.aborted) {
         yield await this.next();

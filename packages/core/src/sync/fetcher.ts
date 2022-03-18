@@ -243,7 +243,7 @@ export class Fetcher {
     let reorged = false;
     for await (const {
       data: { blocks, resolve }
-    } of this.processBlocksChannel.generator()) {
+    } of this.processBlocksChannel) {
       try {
         for (const block of blocks) {
           reorged = (await this.backend.processAndCommitBlock(block)) || reorged;

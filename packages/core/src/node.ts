@@ -448,7 +448,7 @@ export class Node extends Initializer {
    */
   private async commitBlockLoop() {
     await this.initPromise;
-    for await (const { options, resolve, reject } of this.commitBlockQueue.generator()) {
+    for await (const { options, resolve, reject } of this.commitBlockQueue) {
       try {
         const { block, broadcast } = options;
         const { reorged } = await this.doCommitBlock(options);
@@ -475,7 +475,7 @@ export class Node extends Initializer {
    */
   private async pendingTxsLoop() {
     await this.initPromise;
-    for await (const task of this.pendingTxsQueue.generator()) {
+    for await (const task of this.pendingTxsQueue) {
       try {
         const { results, readies } = await this.txPool.addTxs(task.txs);
         if (readies && readies.size > 0) {

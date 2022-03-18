@@ -82,7 +82,7 @@ export class ChainIndexer extends Initializer {
   private async processHeaderLoop() {
     await this.initPromise;
     let preHeader: BlockHeader | undefined;
-    for await (const header of this.headerQueue.generator()) {
+    for await (const header of this.headerQueue) {
       try {
         if (preHeader !== undefined && !header.parentHash.equals(preHeader.hash())) {
           const ancestor = await this.findCommonAncestor(header, preHeader);

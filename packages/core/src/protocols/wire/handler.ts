@@ -434,7 +434,7 @@ export class WireProtocolHandler implements ProtocolHandler {
       return;
     }
 
-    for await (const { block, td } of this.newBlockAnnouncesQueue.generator()) {
+    for await (const { block, td } of this.newBlockAnnouncesQueue) {
       try {
         this.newBlock(block, td);
       } catch (err) {
@@ -449,7 +449,7 @@ export class WireProtocolHandler implements ProtocolHandler {
     }
 
     let hashesCache: Buffer[] = [];
-    for await (const hash of this.txAnnouncesQueue.generator()) {
+    for await (const hash of this.txAnnouncesQueue) {
       hashesCache.push(hash);
       if (hashesCache.length < maxTxPacketSize && this.txAnnouncesQueue.array.length > 0) {
         continue;

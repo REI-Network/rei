@@ -178,7 +178,7 @@ export class FilterSystem {
    * A loop to handle blockchain event
    */
   private async taskLoop() {
-    for await (const task of this.taskQueue.generator()) {
+    for await (const task of this.taskQueue) {
       try {
         if (task instanceof LogsTask) {
           this.newLogs(task.logs);

@@ -101,7 +101,7 @@ export class TxFetcher {
    */
   private async newPooledTransactionLoop() {
     try {
-      for await (const message of this.newPooledTransactionQueue.generator()) {
+      for await (const message of this.newPooledTransactionQueue) {
         const used = (this.watingSlots.get(message.origin)?.size || 0) + (this.announces.get(message.origin)?.size || 0);
         if (used > maxTxAnnounces) {
           continue;
@@ -164,7 +164,7 @@ export class TxFetcher {
    */
   private async enqueueTransactionLoop() {
     try {
-      for await (const message of this.enqueueTransactionQueue.generator()) {
+      for await (const message of this.enqueueTransactionQueue) {
         // TODO: check underpriced and duplicate and etc.
         const added = (await this.node.addPendingTxs(message.txs)).map((result, i) => (result ? message.txs[i] : null)).filter((ele) => ele !== null) as Transaction[];
         for (const tx of added) {

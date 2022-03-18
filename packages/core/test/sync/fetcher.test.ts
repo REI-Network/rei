@@ -36,7 +36,7 @@ class MockFetcherBackend implements FetcherBackend, FetcherValidateBackend {
     this.lastestNumber = undefined;
   }
 
-  async banPeer() {}
+  async handleNetworkError(prefix: string, peerId: string, reason: string) {}
 
   validateHeaders(parent: BlockHeader | undefined, headers: BlockHeader[]): BlockHeader {
     return headers[headers.length - 1];

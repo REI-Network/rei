@@ -260,7 +260,13 @@ export class NetworkManager extends InitializerWithEventEmitter {
    * Persist local node enr to db
    */
   private onMultiaddrUpdated = () => {
-    this.nodedb.persistLocal(this.libp2pNode.discv5.discv5.enr, this.privateKey);
+    const enr = this.libp2pNode.discv5.discv5.enr;
+    const multiaddr = enr.getLocationMultiaddr('tcp4');
+    if (multiaddr) {
+      // update peer announce address
+      this.libp2pNode.addressManager.announce = new Set([multiaddr.toString()]);
+    }
+    this.nodedb.persistLocal(enr, this.privateKey);
   };
 
   /**

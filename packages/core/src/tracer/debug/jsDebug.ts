@@ -191,6 +191,10 @@ function makeLog(ctx: { [key: string]: any }, opcodes: OpcodeList, step: Interpr
   };
 }
 
+function toAddress(data: Buffer | string) {
+  return setLengthLeft(data instanceof Buffer ? data : hexStringToBuffer(data), 20);
+}
+
 export class JSDebug implements IDebugImpl {
   hash: Buffer | undefined;
   private node: Node;
@@ -220,13 +224,13 @@ export class JSDebug implements IDebugImpl {
       return setLengthLeft(data instanceof Buffer ? data : hexStringToBuffer(data), 32);
     },
     toAddress(data: Buffer | string) {
-      return setLengthLeft(data instanceof Buffer ? data : hexStringToBuffer(data), 20);
+      return toAddress(data);
     },
     toContract(data: Buffer | string, nonce: number) {
-      return generateAddress(data instanceof Buffer ? data : hexStringToBuffer(data), new BN(nonce).toBuffer());
+      return generateAddress(toAddress(data), new BN(nonce).toBuffer());
     },
     toContract2(data: Buffer | string, salt: string, code: Buffer) {
-      return generateAddress2(data instanceof Buffer ? data : hexStringToBuffer(data), hexStringToBuffer(salt), keccak256(code));
+      return generateAddress2(toAddress(data), hexStringToBuffer(salt), keccak256(code));
     },
     isPrecompiled: (address: Buffer) => {
       return getPrecompile(new Address(address), this.node.getCommon(this.debugContext['block'])) !== undefined;

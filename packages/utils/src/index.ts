@@ -103,6 +103,6 @@ export { setLevel, getLevel } from 'tracer';
 export * from './abort';
 export * from './channel';
 export * from './initializer';
-export * from './functionalmap';
-export * from './functionalset';
+export * from './functionalMap';
+export * from './functionalSet';
 export * from './timeoutQueue';

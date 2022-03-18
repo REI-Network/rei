@@ -1,6 +1,6 @@
 import createRBTree from 'functional-red-black-tree';
 import { BN, Address } from 'ethereumjs-util';
-import { FunctionalMapIterator } from './functionalmap';
+import { FunctionalMapIterator } from './functionalMap';
 
 class FunctionalSetValueIterator<T> extends FunctionalMapIterator<T> {
   protected value(): T | undefined {

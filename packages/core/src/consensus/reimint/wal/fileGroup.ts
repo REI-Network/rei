@@ -139,7 +139,7 @@ export class FileGroup {
       this.timeout = undefined;
     }
     if (this.head) {
-      await this.head?.close();
+      await this.head.close();
       this.head = undefined;
     }
   };

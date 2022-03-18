@@ -1,7 +1,7 @@
 import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
 import Heap from 'qheap';
-import { FunctionalBufferMap, FunctionalBufferSet, Aborter, logger, InitializerWithEventEmitter } from '@rei-network/utils';
+import { FunctionalBufferMap, FunctionalBufferSet, AbortableTimer, logger, InitializerWithEventEmitter } from '@rei-network/utils';
 import { Transaction, BlockHeader, Block } from '@rei-network/structure';
 import { Node } from '../node';
 import { getGasLimitByCommon } from '../utils';
@@ -38,11 +38,13 @@ export declare interface TxPool {
  */
 export class TxPool extends InitializerWithEventEmitter {
   private readonly node: Node;
-  private readonly aborter: Aborter;
   private readonly accounts = new FunctionalBufferMap<TxPoolAccount>();
   private readonly locals = new FunctionalBufferSet();
   private readonly txs = new FunctionalBufferMap<Transaction>();
   private readonly lock = new Semaphore(1);
+  private readonly timer = new AbortableTimer();
+
+  private aborted: boolean = false;
 
   private rejournalLoopPromise?: Promise<void>;
 
@@ -83,7 +85,6 @@ export class TxPool extends InitializerWithEventEmitter {
     this.rejournalInterval = options.rejournalInterval ?? defaultRejournalInterval;
 
     this.node = options.node;
-    this.aborter = options.node.aborter;
     this.priced = new TxPricedList(this.txs);
     for (const buf of this.node.accMngr.totalUnlockedAccounts()) {
       this.locals.add(buf);
@@ -139,17 +140,15 @@ export class TxPool extends InitializerWithEventEmitter {
    */
   private async timeoutLoop() {
     await this.initPromise;
-    while (!this.aborter.isAborted) {
-      await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.timeoutInterval)));
-      if (this.aborter.isAborted) {
-        break;
-      }
+    while (!this.aborted) {
       for (const [addr, account] of this.accounts) {
         if (account.hasQueue() && Date.now() - account.timestamp > this.lifetime) {
           const queue = account.queue.clear();
           this.removeTxFromGlobal(queue);
         }
       }
+
+      await this.timer.wait(this.timeoutInterval);
     }
   }
 
@@ -158,12 +157,9 @@ export class TxPool extends InitializerWithEventEmitter {
    */
   private async rejournalLoop() {
     await this.initPromise;
-    while (!this.aborter.isAborted) {
-      await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.rejournalInterval)));
-      if (this.aborter.isAborted) {
-        break;
-      }
+    while (!this.aborted) {
       await this.journal!.rotate(this.local());
+      await this.timer.wait(this.rejournalInterval);
     }
   }
 
@@ -224,8 +220,11 @@ export class TxPool extends InitializerWithEventEmitter {
   }
 
   async abort() {
+    this.aborted = true;
+    this.timer.abort();
     if (this.rejournalLoopPromise) {
       await this.rejournalLoopPromise;
+      this.rejournalLoopPromise = undefined;
     }
   }
 

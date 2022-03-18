@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import Semaphore from 'semaphore-async-await';
 import { BN, KECCAK256_RLP } from 'ethereumjs-util';
-import { logger } from '@rei-network/utils';
+import { logger, AbortableTimer } from '@rei-network/utils';
 import { BlockHeader, Transaction, Block } from '@rei-network/structure';
 import { Node } from '../node';
 import { Fetcher } from './fetcher';
@@ -36,12 +36,15 @@ export class Synchronizer extends EventEmitter {
   private readonly elementsCountLimit: BN;
   private readonly lock = new Semaphore(1);
   private readonly fetcher: Fetcher;
+  private readonly timer = new AbortableTimer();
+
+  private forceSync: boolean = false;
+  private aborted: boolean = false;
 
   private syncLoopPromise?: Promise<void>;
   private localHeader?: BlockHeader;
   private startingBlock: number = 0;
   private highestBlock: number = 0;
-  private forceSync: boolean = false;
 
   constructor(options: SynchronizerOptions) {
     super();
@@ -239,11 +242,11 @@ export class Synchronizer extends EventEmitter {
    * Start the Synchronizer
    */
   private async syncLoop() {
-    while (!this.node.aborter.isAborted) {
+    while (!this.aborted) {
       if (!this.isSyncing) {
         await this.syncOnce();
       }
-      await this.node.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.interval)));
+      await this.timer.wait(this.interval);
     }
   }
 
@@ -276,7 +279,9 @@ export class Synchronizer extends EventEmitter {
    */
   async abort() {
     if (this.syncLoopPromise) {
+      this.aborted = true;
       await this.fetcher.abort();
+      this.timer.abort();
       await this.syncLoopPromise;
       this.syncLoopPromise = undefined;
     }

@@ -9,7 +9,7 @@ import { Common } from '@rei-network/common';
 import { Blockchain } from '@rei-network/blockchain';
 import { VM } from '@rei-network/vm';
 import { Transaction, Block } from '@rei-network/structure';
-import { Channel, Aborter, logger, Initializer } from '@rei-network/utils';
+import { Channel, logger, Initializer } from '@rei-network/utils';
 import { AccountManager } from '@rei-network/wallet';
 import { TxPool } from './txpool';
 import { Synchronizer } from './sync';
@@ -63,7 +63,6 @@ export class Node extends Initializer {
   readonly reimint: ReimintConsensusEngine;
   readonly clique: CliqueConsensusEngine;
   readonly receiptsCache: ReceiptsCache;
-  readonly aborter = new Aborter();
 
   private pendingTxsLoopPromise!: Promise<void>;
   private commitBlockLoopPromise!: Promise<void>;
@@ -206,7 +205,6 @@ export class Node extends Initializer {
     this.networkMngr.off('removed', this.onPeerRemoved);
     this.pendingTxsQueue.abort();
     this.commitBlockQueue.abort();
-    await this.aborter.abort();
     await this.clique.abort();
     await this.reimint.abort();
     await this.networkMngr.abort();

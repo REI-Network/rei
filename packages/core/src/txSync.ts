@@ -1,5 +1,5 @@
 import { bufferToHex } from 'ethereumjs-util';
-import { FunctionalBufferMap, FunctionalBufferSet, Channel, Aborter, logger } from '@rei-network/utils';
+import { FunctionalBufferMap, FunctionalBufferSet, Channel, logger } from '@rei-network/utils';
 import { Transaction } from '@rei-network/structure';
 import { maxTxRetrievals } from './protocols';
 import { Node } from './node';
@@ -71,7 +71,6 @@ export class TxFetcher {
   private requests = new Map<string, Request>();
   private alternates = new FunctionalBufferMap<Set<string>>();
 
-  private aborter: Aborter;
   private newPooledTransactionQueue: Channel<NewPooledTransactionMessage>;
   private enqueueTransactionQueue: Channel<EnqueuePooledTransactionMessage>;
 
@@ -81,7 +80,6 @@ export class TxFetcher {
 
   constructor(node: Node) {
     this.node = node;
-    this.aborter = node.aborter;
     this.newPooledTransactionQueue = new Channel<NewPooledTransactionMessage>();
     this.enqueueTransactionQueue = new Channel<EnqueuePooledTransactionMessage>();
   }
@@ -444,9 +442,7 @@ export class TxFetcher {
    * @param hashes - Transaction hashes
    */
   newPooledTransactionHashes(origin: string, hashes: Buffer[]) {
-    if (!this.aborter.isAborted) {
-      this.newPooledTransactionQueue.push({ hashes, origin });
-    }
+    this.newPooledTransactionQueue.push({ hashes, origin });
   }
 
   /**
@@ -455,8 +451,6 @@ export class TxFetcher {
    * @param txs - Transactions
    */
   enqueueTransaction(origin: string, txs: Transaction[]) {
-    if (!this.aborter.isAborted) {
-      this.enqueueTransactionQueue.push({ txs, origin });
-    }
+    this.enqueueTransactionQueue.push({ txs, origin });
   }
 }

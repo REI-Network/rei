@@ -1,6 +1,6 @@
 import { Address, BN, bufferToHex, toBuffer, bnToHex } from 'ethereumjs-util';
 import { v4 as uuidv4 } from 'uuid';
-import { Aborter, Channel, logger } from '@rei-network/utils';
+import { AbortableTimer, Channel, logger } from '@rei-network/utils';
 import { Topics, BloomBitsFilter } from '@rei-network/core';
 import { Transaction, Log, BlockHeader } from '@rei-network/structure';
 import { WebsocketClient } from './client';
@@ -66,8 +66,10 @@ type Task = LogsTask | HeadsTask | PendingTxTask | SyncingTask;
  */
 export class FilterSystem {
   private readonly backend: Backend;
-  private aborter = new Aborter();
-  private taskQueue = new Channel<Task>();
+  private readonly taskQueue = new Channel<Task>();
+  private readonly timer = new AbortableTimer();
+
+  private aborted: boolean = false;
 
   private readonly subscribeHeads = new Map<string, Filter>();
   private readonly subscribeLogs = new Map<string, Filter>();
@@ -148,29 +150,28 @@ export class FilterSystem {
    */
   async abort() {
     this.taskQueue.abort();
-    this.backend.bcMonitor.removeListener('logs', this.onLogs);
-    this.backend.bcMonitor.removeListener('removedLogs', this.onRemovedLogs);
-    this.backend.bcMonitor.removeListener('newHeads', this.onNewHeads);
-    this.backend.sync.removeListener('start', this.onStart);
-    this.backend.sync.removeListener('failed', this.onFailed);
-    this.backend.sync.removeListener('synchronized', this.onSynchronized);
-    this.backend.txPool.removeListener('readies', this.onReadies);
-    await this.aborter.abort();
+    this.backend.bcMonitor.off('logs', this.onLogs);
+    this.backend.bcMonitor.off('removedLogs', this.onRemovedLogs);
+    this.backend.bcMonitor.off('newHeads', this.onNewHeads);
+    this.backend.sync.off('start', this.onStart);
+    this.backend.sync.off('failed', this.onFailed);
+    this.backend.sync.off('synchronized', this.onSynchronized);
+    this.backend.txPool.off('readies', this.onReadies);
+    this.aborted = true;
+    this.timer.abort();
   }
 
   /**
    * A loop to delete timeout filter
    */
   private async timeoutLoop() {
-    while (!this.aborter.isAborted) {
-      await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, deadline)));
-      if (this.aborter.isAborted) {
-        break;
-      }
+    while (!this.aborted) {
       const now = Date.now();
       this.deleteTimeout(this.filterHeads, now);
       this.deleteTimeout(this.filterLogs, now);
       this.deleteTimeout(this.filterPendingTransactions, now);
+
+      await this.timer.wait(deadline);
     }
   }
 

@@ -102,7 +102,6 @@ export { setLevel, getLevel } from 'tracer';
 
 export * from './abort';
 export * from './channel';
-export * from './compress';
 export * from './initializer';
 export * from './functionalmap';
 export * from './functionalset';

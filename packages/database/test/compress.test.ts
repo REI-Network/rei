@@ -1,9 +1,10 @@
 import { expect } from 'chai';
-import { hexStringToBuffer, compressBytes, decompressBytes } from '../src';
+import { toBuffer } from 'ethereumjs-util';
+import { compressBytes, decompressBytes } from '../src/compress';
 
 describe('Compress', () => {
-  const data1 = hexStringToBuffer('0x0000000000000000000000000000000000000000000000000de0b6b3a7640000');
-  const data2 = hexStringToBuffer('0x6dccc565ee3296e533e4be98733e284a45da7ca72883935f418c11f284354a3c');
+  const data1 = toBuffer('0x0000000000000000000000000000000000000000000000000de0b6b3a7640000');
+  const data2 = toBuffer('0x6dccc565ee3296e533e4be98733e284a45da7ca72883935f418c11f284354a3c');
 
   it('length should be shorter than the original data', () => {
     const compressed = compressBytes(data1);

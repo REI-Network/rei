@@ -1,11 +1,12 @@
 import * as rlp from 'rlp';
 import { Address, BN } from 'ethereumjs-util';
+import type { LevelUp } from 'levelup';
 import { Block, BlockHeader, BlockBuffer, BlockHeaderBuffer, BlockBodyBuffer, Transaction, Receipt } from '@rei-network/structure';
 import { Common } from '@rei-network/common';
 import { CliqueLatestSignerStates, CliqueLatestVotes, CliqueLatestBlockSigners } from './clique';
 import Cache from './cache';
 import { DatabaseKey, DBOp, DBTarget, DBOpData } from './operation';
-import type { LevelUp } from 'levelup';
+import { decompressBytes } from './compress';
 const level = require('level-mem');
 
 /**
@@ -370,10 +371,11 @@ export class DBManager {
    * @param bit - Bit index of target section
    * @param section - Section number
    * @param hash - Hash of the last block header of the target section
-   * @returns Bloom bits data
+   * @param length - Used for decompressing
+   * @returns Decompressed bloom bits data
    */
-  getBloomBits(bit: number, section: BN, hash: Buffer) {
-    return this.get(DBTarget.BloomBits, { bit, section, hash });
+  async getBloomBits(bit: number, section: BN, hash: Buffer, length: number): Promise<Buffer> {
+    return decompressBytes(await this.get(DBTarget.BloomBits, { bit, section, hash }), length);
   }
 
   /**

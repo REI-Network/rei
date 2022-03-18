@@ -528,6 +528,7 @@ export class Node extends Initializer {
    * @param reason - Ban reason
    */
   async banPeer(peerId: string, reason: 'invalid' | 'timeout') {
+    logger.debug('Node::banPeer, peerId:', peerId, 'reason:', reason);
     if (reason === 'invalid') {
       await this.networkMngr.ban(peerId, defaultInvalidBanTime);
     } else {

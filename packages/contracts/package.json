@@ -4,10 +4,9 @@
     "main": "dist/index.js",
     "license": "GPL-3.0-or-later",
     "scripts": {
-        "hardhat": "node ../../node_modules/hardhat/internal/cli/cli.js",
-        "build": "npm run hardhat -- compile && tsc",
-        "node": "npm run hardhat -- node",
-        "test": "npm run hardhat -- test",
+        "build": "npx hardhat compile && tsc",
+        "node": "npx hardhat node",
+        "test": "npx hardhat test",
         "docgen": "solidity-docgen -i ./src -t ./templates -H ./helper.js",
         "clean:build": "rm -rf ./artifacts ./cache ./deployments ./docs ./types"
     },

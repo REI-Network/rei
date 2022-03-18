@@ -254,10 +254,17 @@ export class Fetcher {
           }
         }
         resolve();
-      } catch (err) {
+      } catch (err: any) {
         this._abort();
-        logger.warn('Fetcher::processBlocksLoop, process block failed:', err);
         resolve();
+
+        /**
+         * Do special handling for NotFoundError,
+         * this error may be thrown when synchronously terminated
+         */
+        if (err.type !== 'NotFoundError') {
+          logger.warn('Fetcher::processBlocksLoop, process block failed:', err);
+        }
         return reorged;
       }
     }

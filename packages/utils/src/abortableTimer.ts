@@ -1,7 +1,14 @@
+/**
+ * An interruptible timer
+ */
 export class AbortableTimer {
   private r?: () => void;
   private timeout?: NodeJS.Timeout;
 
+  /**
+   * Start a timer
+   * @param timeout - Time interval
+   */
   wait(timeout: number) {
     if (this.r || this.timeout) {
       throw new Error('timer has started');
@@ -17,6 +24,9 @@ export class AbortableTimer {
     });
   }
 
+  /**
+   * Interrupt the current timer
+   */
   abort() {
     if (this.r) {
       this.r();

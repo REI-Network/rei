@@ -508,8 +508,11 @@ export class NetworkManager extends EventEmitter {
           return false;
         }
 
+        // there are some problems with the dependencies of multiaddrs
+        const family: any = options.family;
+
         // filter invalid address information
-        if (options.family === 'ipv4') {
+        if (family === 'ipv4' || family === 4) {
           // ipv4
           if (options.host === '127.0.0.1') {
             return false;

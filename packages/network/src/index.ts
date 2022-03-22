@@ -1,7 +1,8 @@
 import EventEmitter from 'events';
 import PeerId from 'peer-id';
-import { Multiaddr } from 'multiaddr';
+import Multiaddr from 'multiaddr';
 import { LevelUp } from 'levelup';
+import { v4, v6 } from 'is-ip';
 import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
 import { logger, TimeoutQueue, ignoreError } from '@rei-network/utils';
@@ -33,6 +34,11 @@ enum Libp2pPeerValue {
   connected = 0.5,
   incoming = 0
 }
+
+type PeerInfo = {
+  id: string;
+  addresses: { multiaddr: Multiaddr }[];
+};
 
 export interface NetworkManagerOptions {
   peerId: PeerId;
@@ -280,9 +286,20 @@ export class NetworkManager extends EventEmitter {
   private async loadLocalENR(options: NetworkManagerOptions) {
     const keypair = createKeypairFromPeerId(options.peerId);
     let enr = ENR.createV4(keypair.publicKey);
-    enr.tcp = options.tcpPort ?? defaultTcpPort;
-    enr.udp = options.udpPort ?? defaultUdpPort;
-    enr.ip = options.nat ?? defaultNat;
+
+    if (options.nat === undefined || v4(options.nat)) {
+      enr.ip = options.nat ?? defaultNat;
+      enr.tcp = options.tcpPort ?? defaultTcpPort;
+      enr.udp = options.udpPort ?? defaultUdpPort;
+    } else if (options.nat !== undefined && v6(options.nat)) {
+      // enr.ip6 = options.nat;
+      // enr.tcp6 = options.tcpPort ?? defaultTcpPort;
+      // enr.udp6 = options.udpPort ?? defaultUdpPort;
+      throw new Error('IPv6 is currently not supported');
+    } else {
+      throw new Error('invalid ip address: ' + options.nat);
+    }
+
     const setNAT = !!options.nat;
 
     const localENR = await this.nodedb.loadLocal();
@@ -291,6 +308,7 @@ export class NetworkManager extends EventEmitter {
     } else {
       await this.nodedb.persistLocal(enr, keypair.privateKey);
     }
+
     return { enr, keypair };
   }
 
@@ -475,6 +493,57 @@ export class NetworkManager extends EventEmitter {
   }
 
   /**
+   * Determine if remote node can be dialed
+   * @param param0 - Peer information
+   * @returns Whether the remote node can be dialed
+   */
+  private filterPeer({ id, addresses }: PeerInfo) {
+    // filter all address
+    if (
+      addresses.filter(({ multiaddr }) => {
+        const options = multiaddr.toOptions();
+
+        // filter all address information containing tcp
+        if (options.transport !== 'tcp') {
+          return false;
+        }
+
+        // filter invalid address information
+        if (options.family === 'ipv4') {
+          // ipv4
+          if (options.host === '127.0.0.1') {
+            return false;
+          }
+        } else {
+          // ipv6
+          return false;
+        }
+
+        return true;
+      }).length === 0
+    ) {
+      return false;
+    }
+
+    // make sure there are no repeat dials
+    if (!this.isDialable(id)) {
+      return false;
+    }
+
+    // make sure the remote node is not banned
+    if (this.isBanned(id)) {
+      return false;
+    }
+
+    // make sure we don't dial too often
+    if (!this.checkOutbound(id)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * A loop to keep the number of node connections
    * Automatically load peer information from db or memory and try to dial
    */
@@ -487,38 +556,38 @@ export class NetworkManager extends EventEmitter {
           // search discovered peer in memory
           while (this.discovered.length > 0) {
             const id = this.discovered.shift()!;
-            if (this.checkOutbound(id) && this.isDialable(id) && !this.isBanned(id)) {
-              const addresses: { multiaddr: Multiaddr }[] | undefined = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(id));
-              if (addresses && addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp').length > 0) {
-                peerId = id;
-                logger.debug('NetworkManager::dialLoop, use a discovered peer:', peerId);
-                break;
-              }
+            const addresses: { multiaddr: Multiaddr }[] | undefined = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(id));
+            if (addresses && this.filterPeer({ id, addresses })) {
+              peerId = id;
+              logger.debug('NetworkManager::dialLoop, use a discovered peer:', peerId);
+              break;
             }
           }
 
           // search discovered peer in database
           if (!peerId) {
-            let peers: {
+            const peers: {
               id: PeerId;
               addresses: { multiaddr: Multiaddr }[];
             }[] = Array.from(this.libp2pNode.peerStore.peers.values());
-            peers = peers.filter((peer) => {
-              const id = peer.id.toB58String();
-              let b = peer.addresses.filter(({ multiaddr }) => multiaddr.toOptions().transport === 'tcp').length > 0;
-              b &&= this.isDialable(id);
-              b &&= !this.isBanned(id);
-              b &&= this.checkOutbound(id);
-              return b;
-            });
-            if (peers.length > 0) {
-              const { id } = randomOne(peers);
-              peerId = id.toB58String();
+
+            const filteredPeers = peers
+              .map((peer) => {
+                return {
+                  id: peer.id.toB58String(),
+                  addresses: peer.addresses
+                };
+              })
+              .filter(this.filterPeer.bind(this));
+
+            if (filteredPeers.length > 0) {
+              const { id } = randomOne(filteredPeers);
+              peerId = id;
               logger.debug('NetworkManager::dialLoop, use a stored peer:', peerId);
             }
           }
 
-          // try to dial discovered peer
+          // try to dial a discovered peer
           if (peerId) {
             this.updateOutbound(peerId);
             this.dial(peerId, this.protocols).then(async ({ success, streams }) => {

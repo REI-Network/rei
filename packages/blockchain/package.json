@@ -1,6 +1,6 @@
 {
     "name": "@rei-network/blockchain",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
@@ -15,7 +15,7 @@
     },
     "dependencies": {
         "@gxchain2-ethereumjs/blockchain": "^5.4.3",
-        "@rei-network/database": "^0.0.7",
+        "@rei-network/database": "^0.0.8",
         "@rei-network/structure": "^0.0.2"
     }
 }

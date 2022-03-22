@@ -1,7 +1,7 @@
 import util from 'util';
 import prompts from 'prompts';
 import PeerId from 'peer-id';
-import { Multiaddr } from 'multiaddr';
+import Multiaddr from 'multiaddr';
 import { program } from 'commander';
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
 import { Node } from '@rei-network/core';

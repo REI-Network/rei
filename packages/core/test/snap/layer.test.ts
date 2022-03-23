@@ -113,7 +113,7 @@ describe('Layer', () => {
     let diskLayer!: DiskLayer;
 
     before(async () => {
-      const { root, accounts: _accounts } = await genRandomAccounts(db, 10);
+      const { root, accounts: _accounts } = await genRandomAccounts(db, 10, 10);
       accounts = _accounts;
       diskLayer = new DiskLayer(db, root);
     });
@@ -169,7 +169,7 @@ describe('Layer', () => {
       for (let i = 0; i < 3; i++) {
         if (i === 0) {
           // the first layer is diskLayer
-          const { root, accounts } = await genRandomAccounts(db, count);
+          const { root, accounts } = await genRandomAccounts(db, count, 10);
           layers.push({
             layer: new DiskLayer(db, root),
             accounts
@@ -375,30 +375,6 @@ describe('Layer', () => {
         }
       }
       expect(index === 3, 'iterator should abort').be.true;
-    });
-
-    it('should prohibite repeated iterations', async () => {
-      const { layer } = layers[2];
-      const fastIter = new FastSnapIterator(layer, (snap) => {
-        return {
-          iter: snap.genAccountIterator(EMPTY_HASH),
-          stop: false
-        };
-      });
-      await fastIter.init();
-
-      const doIter = async () => {
-        for await (const element of fastIter) {
-        }
-      };
-
-      try {
-        await Promise.all([doIter(), doIter()]);
-        assert.fail('should prohibite repeated iterations');
-      } catch (err) {
-      } finally {
-        await fastIter.abort();
-      }
     });
   });
 });

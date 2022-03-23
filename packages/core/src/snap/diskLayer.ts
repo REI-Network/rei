@@ -10,8 +10,9 @@ import { verifyRangeProof } from './verifyRangeProof';
 import { TrieIterator } from './trieIterator';
 import { DiffLayer } from './diffLayer';
 import { asyncTraverseRawDB } from './layerIterator';
-import { ISnapshot, AccountData, StorageData } from './types';
 import { DBatch } from './batch';
+import { journalProgress } from './journal';
+import { ISnapshot, AccountData, StorageData, GeneratorStats } from './types';
 import { increaseKey, mergeProof, wipeKeyRange, SimpleAborter } from './utils';
 
 const accountCheckRange = 128;
@@ -37,6 +38,8 @@ type ProofResult = {
 
 type OnState = (key: Buffer, val: Buffer | null, isWrite: boolean, isDelete: boolean) => Promise<boolean>;
 
+type GenerateAborter = SimpleAborter<GeneratorStats | void>;
+
 export class DiskLayer implements ISnapshot {
   readonly db: Database;
   readonly root: Buffer;
@@ -46,7 +49,7 @@ export class DiskLayer implements ISnapshot {
   genMarker?: Buffer;
 
   // An aborter to abort snapshot generation
-  private aborter?: SimpleAborter;
+  private aborter?: GenerateAborter;
 
   constructor(db: Database, root: Buffer) {
     this.db = db;
@@ -149,14 +152,18 @@ export class DiskLayer implements ISnapshot {
    * @param output - Output array
    * @returns Disk layer root hash
    */
-  journal(output: any[]): Buffer {
-    // TODO: journalProgress
+  async journal(output: any[]) {
+    const stats = await this.abort();
 
     if (this.stale) {
       throw new Error('stale disk layer');
     }
 
-    output.push(this.root);
+    const batch = new DBatch(this.db);
+    journalProgress(batch, this.genMarker, stats as undefined | GeneratorStats);
+
+    await batch.write();
+    batch.reset;
 
     return this.root;
   }
@@ -346,7 +353,7 @@ export class DiskLayer implements ISnapshot {
   /**
    * Generate snapshot
    */
-  private async _generate(aborter: SimpleAborter) {
+  private async _generate(aborter: GenerateAborter, stats: GeneratorStats) {
     let accMarker: Buffer | null = null;
     let accountRange = accountCheckRange;
 
@@ -357,10 +364,6 @@ export class DiskLayer implements ISnapshot {
 
     const batch = new DBatch(this.db);
 
-    let storage = 0;
-    let accounts = 0;
-    let slots = 0;
-
     // persistent journal
     const checkAndFlush = async (currentLocation: Buffer) => {
       if (batch.length > idealBatchSize || aborter.isAborted) {
@@ -368,7 +371,7 @@ export class DiskLayer implements ISnapshot {
           // TODO: log error
         }
 
-        // TODO: journalProgress
+        journalProgress(batch, currentLocation, stats);
 
         await batch.write();
         batch.reset();
@@ -426,8 +429,9 @@ export class DiskLayer implements ISnapshot {
           dataLen = data.length;
           batch.push(DBSaveSerializedSnapAccount(accountHash, data));
         }
-        storage += 1 + 32 + dataLen;
-        accounts++;
+        // SNAP_ACCOUNT_PREFIX(1) + accountHash(32) + dataLen
+        stats.storage.iaddn(1 + 32 + dataLen);
+        stats.accounts.iaddn(1);
       }
 
       /**
@@ -464,8 +468,9 @@ export class DiskLayer implements ISnapshot {
             // write this slot
             batch.push(DBSaveSnapStorage(accountHash, key, val!));
           }
-          storage += 1 + 32 + 32 + val!.length;
-          slots++;
+          // SNAP_STORAGE_PREFIX(1) + accountHash(32) + storageHash(32) + val.length
+          stats.storage.iaddn(1 + 32 + 32 + val!.length);
+          stats.slots.iaddn(1);
 
           return await checkAndFlush(Buffer.concat([accountHash, key]));
         };
@@ -504,7 +509,7 @@ export class DiskLayer implements ISnapshot {
         await batch.write();
         batch.reset();
 
-        aborter.abortFinished();
+        aborter.abortFinished(stats);
 
         return;
       }
@@ -523,7 +528,7 @@ export class DiskLayer implements ISnapshot {
       accountRange = accountCheckRange;
     }
 
-    // TODO: journalProgress
+    journalProgress(batch, undefined, stats);
 
     await batch.write();
     batch.reset();
@@ -538,15 +543,18 @@ export class DiskLayer implements ISnapshot {
   /**
    * Generate snapshot
    */
-  async generate() {
+  async generate(stats: GeneratorStats) {
     if (this.aborter) {
       throw new Error('generating');
     }
 
     try {
-      this.aborter = new SimpleAborter();
-      await this._generate(this.aborter);
+      this.aborter = new SimpleAborter<GeneratorStats | void>();
+      await this._generate(this.aborter, stats);
     } finally {
+      if (this.aborter?.isAborted) {
+        this.aborter.abortFinished();
+      }
       this.aborter = undefined;
     }
   }

@@ -27,19 +27,20 @@ export class AccountInfo {
 /**
  * Randomly generate several accounts and 10 random storage data for each account
  * @param db
- * @param genCount
+ * @param _accounts
+ * @param slots
  * @returns Account list and state root
  */
-export async function genRandomAccounts(db: Database, genCount: number, saveSnap = true) {
+export async function genRandomAccounts(db: Database, _accounts: number, slots: number, saveSnap = true) {
   const stateTrie = new Trie(db.rawdb);
   const accounts: AccountInfo[] = [];
 
-  for (let i = 0; i < genCount; i++) {
+  for (let i = 0; i < _accounts; i++) {
     const address = crypto.randomBytes(20);
     const accountHash = keccak256(address);
     const storageTrie = new Trie(db.rawdb);
     const storageData = new FunctionalBufferMap<{ key: Buffer; val: Buffer }>();
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < slots; i++) {
       const storageKey = crypto.randomBytes(32);
       const storageValue = crypto.randomBytes(32);
       const storageHash = keccak256(storageKey);

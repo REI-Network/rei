@@ -1,19 +1,29 @@
-import { rlp, bufferToInt, toBuffer } from 'ethereumjs-util';
-import { Database } from '@rei-network/database';
-import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
+import { rlp, bufferToInt, toBuffer, BN } from 'ethereumjs-util';
+import { Database, DBSaveSnapGenerator } from '@rei-network/database';
+import { FunctionalBufferMap, FunctionalBufferSet, logger } from '@rei-network/utils';
+import { EMPTY_HASH } from '../utils';
 import { DiskLayer } from './diskLayer';
-import { Snapshot } from './types';
+import { Snapshot, GeneratorStats } from './types';
 import { DiffLayer } from './diffLayer';
+import { DBatch } from './batch';
 
-const globalJournalVersion = 0;
+const journalVersion = 0;
 
+/**
+ * SnapJournalGenerator records the generation journal of the snapshot
+ */
 export class SnapJournalGenerator {
-  done: boolean;
-  marker: Buffer;
-  accounts: number;
-  slots: number;
-  storage: number;
+  readonly done: boolean;
+  readonly marker: Buffer;
+  readonly accounts: BN;
+  readonly slots: BN;
+  readonly storage: BN;
 
+  /**
+   * Construct journal from serialized journal
+   * @param serializedJournal
+   * @returns Journal
+   */
   static fromSerializedJournal(serializedJournal: Buffer) {
     const values = rlp.decode(serializedJournal) as unknown as Buffer[];
 
@@ -24,6 +34,11 @@ export class SnapJournalGenerator {
     return SnapJournalGenerator.fromValuesArray(values);
   }
 
+  /**
+   * Construct journal from values array
+   * @param values
+   * @returns Journal
+   */
   static fromValuesArray(values: Buffer[]) {
     if (values.length !== 5) {
       throw new Error('invalid values');
@@ -31,14 +46,14 @@ export class SnapJournalGenerator {
 
     const done = bufferToInt(values[0]);
     const marker = values[1];
-    const accounts = bufferToInt(values[2]);
-    const slots = bufferToInt(values[3]);
-    const storage = bufferToInt(values[4]);
+    const accounts = new BN(values[2]);
+    const slots = new BN(values[3]);
+    const storage = new BN(values[4]);
 
     return new SnapJournalGenerator(done === 1, marker, accounts, slots, storage);
   }
 
-  constructor(done: boolean, marker: Buffer, accounts: number, slots: number, storage: number) {
+  constructor(done: boolean, marker: Buffer, accounts: BN, slots: BN, storage: BN) {
     this.done = done;
     this.marker = marker;
     this.accounts = accounts;
@@ -46,10 +61,18 @@ export class SnapJournalGenerator {
     this.storage = storage;
   }
 
+  /**
+   * Convert journal to values array
+   * @returns Values array
+   */
   raw() {
     return [toBuffer(this.done ? 1 : 0), this.marker, toBuffer(this.accounts), toBuffer(this.slots), toBuffer(this.storage)];
   }
 
+  /**
+   * Convert journal to serialized journal
+   * @returns Serialized journal
+   */
   serialize() {
     return rlp.encode(this.raw());
   }
@@ -155,14 +178,21 @@ function isDiffLayerJournal(journal: any): journal is DiffLayerJournal {
   return true;
 }
 
-function loadDiffLayer(parent: Snapshot, journalArray: any[], offset: number): Snapshot | null {
+/**
+ * Load diff layer from journal
+ * @param parent - Parent layer
+ * @param journalArray
+ * @param offset - Offset of current layer
+ * @returns Bottom layer
+ */
+function loadDiffLayer(parent: Snapshot, journalArray: any[], offset: number): Snapshot {
   if (offset > journalArray.length - 1) {
     return parent;
   }
 
   const journal = journalArray[offset];
   if (!isDiffLayerJournal(journal)) {
-    return null;
+    throw new Error('invalid diff layer journal');
   }
 
   const root = journal[0];
@@ -187,49 +217,109 @@ function loadDiffLayer(parent: Snapshot, journalArray: any[], offset: number): S
   return loadDiffLayer(DiffLayer.createDiffLayerFromParent(parent, root, destructSet, accountData, storageData), journalArray, offset + 1);
 }
 
-export async function loadSnapshot(db: Database) {
-  const dbRoot = await db.getSnapRoot();
-  if (dbRoot === null) {
-    return null;
+/**
+ * Load and parse journal
+ * @param db
+ * @param base
+ * @returns Journal generator and bottom layer
+ */
+async function loadAndParseJournal(
+  db: Database,
+  base: DiskLayer
+): Promise<{
+  generator: SnapJournalGenerator;
+  snapshot: Snapshot;
+}> {
+  const serializedGenerator = await db.getSnapGenerator();
+  if (serializedGenerator === null) {
+    throw new Error('load generator failed');
   }
 
-  const journalGenerator = await db.getSnapGenerator();
-  if (journalGenerator === null) {
-    return null;
-  }
-
-  const generator = SnapJournalGenerator.fromSerializedJournal(journalGenerator);
+  const generator = SnapJournalGenerator.fromSerializedJournal(serializedGenerator);
 
   const serializedJournal = await db.getSnapJournal();
   if (serializedJournal === null) {
-    return null;
+    // the journal doesn't exsit, ignore
+    return { generator, snapshot: base };
   }
 
   const journal = rlp.decode(serializedJournal) as unknown as Journal;
   if (journal.length < 2) {
-    return null;
+    // invalid journal version, throw error
+    throw new Error('invalid journal');
   }
 
-  const bufJournalVersion = journal[0];
+  const _journalVersion = journal[0];
   const diskRoot = journal[1];
-  if (!(bufJournalVersion instanceof Buffer) || !(diskRoot instanceof Buffer)) {
-    return null;
+  if (!(_journalVersion instanceof Buffer) || !(diskRoot instanceof Buffer)) {
+    // invalid journal version, throw error
+    throw new Error('invalid journal');
   }
 
-  const journalVersion = bufferToInt(bufJournalVersion);
-  if (journalVersion !== globalJournalVersion) {
-    return null;
+  if (bufferToInt(_journalVersion) !== journalVersion) {
+    // unsupported journal version, ignore
+    return { generator, snapshot: base };
   }
 
-  if (!diskRoot.equals(dbRoot)) {
-    return null;
+  if (!diskRoot.equals(base.root)) {
+    // unmatched root, ignore
+    return { generator, snapshot: base };
   }
 
-  const diskLayer = new DiskLayer(db, dbRoot);
-  const snapshot = loadDiffLayer(diskLayer, journal, 3);
-  if (snapshot === null) {
-    return null;
+  return { generator, snapshot: loadDiffLayer(base, journal, 3) };
+}
+
+/**
+ * Load snapshot from database
+ * @param db - Database
+ * @param root - Root hash
+ * @param recovery - Recovery snapshot
+ * @returns Snapshot
+ */
+export async function loadSnapshot(db: Database, root: Buffer, recovery: boolean) {
+  // TODO: check disable
+
+  const baseRoot = await db.getSnapRoot();
+  if (baseRoot === null) {
+    throw new Error('missing snapshot root');
   }
 
-  return { diskLayer, snapshot, generator };
+  const base = new DiskLayer(db, baseRoot);
+  const { snapshot, generator } = await loadAndParseJournal(db, base);
+
+  if (!snapshot.root.equals(root)) {
+    if (!recovery) {
+      throw new Error('unmatched root');
+    }
+    logger.warn('Snapshot is not continuous with chain');
+  }
+
+  if (!generator.done) {
+    base.genMarker = generator.marker;
+    base.generate({
+      origin: generator.marker,
+      start: Date.now(),
+      accounts: generator.accounts,
+      slots: generator.slots,
+      storage: generator.storage
+    });
+  }
+
+  return snapshot;
+}
+
+/**
+ * Persistent snapshot generation progress to disk
+ * @param batch
+ * @param marker
+ * @param stats
+ */
+export function journalProgress(batch: DBatch, marker?: Buffer, stats?: GeneratorStats) {
+  const done = marker === undefined;
+  marker = marker ?? EMPTY_HASH;
+  const accounts = stats?.accounts.clone() ?? new BN(0);
+  const slots = stats?.slots.clone() ?? new BN(0);
+  const storage = stats?.storage.clone() ?? new BN(0);
+  const generator = new SnapJournalGenerator(done, marker, accounts, slots, storage);
+  batch.push(DBSaveSnapGenerator(generator.serialize()));
 }

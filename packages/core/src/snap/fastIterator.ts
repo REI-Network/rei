@@ -36,7 +36,6 @@ export class FastSnapIterator<T> {
 
   private iterators: WeightedIterator<T | null>[] = [];
   private initiated: boolean = false;
-  private asyncGenerator?: FastSnapAsyncGenerator<T>;
 
   constructor(snap: ISnapshot, genSnapIterator: (snap: ISnapshot) => { iter: SnapIterator<T | null>; stop: boolean }) {
     this.root = snap.root;
@@ -112,6 +111,10 @@ export class FastSnapIterator<T> {
    * @returns Whether there are any remaining elements
    */
   async next(index: number) {
+    if (index > this.iterators.length - 1) {
+      return false;
+    }
+
     const iter = this.iterators[index];
     if (!(await iter.next())) {
       // if this iterator has no next element, move it out of the array
@@ -198,45 +201,33 @@ export class FastSnapIterator<T> {
   /**
    * Generate an async generator to iterate all elements
    */
-  private async *generate() {
-    if (!this.initiated) {
-      this.initiated = true;
-      const hash = this.iterators[0].curr!;
-      const value = this.iterators[0].getCurrValue!();
-      if (value !== null) {
-        yield { hash, value };
+  async *[Symbol.asyncIterator](): FastSnapAsyncGenerator<T> {
+    try {
+      if (!this.initiated) {
+        this.initiated = true;
+        const hash = this.iterators[0].curr!;
+        const value = this.iterators[0].getCurrValue!();
+        if (value !== null) {
+          yield { hash, value };
+        }
       }
-    }
 
-    while (await this.next(0)) {
-      const hash = this.iterators[0].curr!;
-      const value = this.iterators[0].getCurrValue!();
-      if (value !== null) {
-        yield { hash, value };
+      while (await this.next(0)) {
+        const hash = this.iterators[0].curr!;
+        const value = this.iterators[0].getCurrValue!();
+        if (value !== null) {
+          yield { hash, value };
+        }
       }
+    } finally {
+      await this.abort();
     }
-  }
-
-  /**
-   * Generate an async generator to iterate all elements
-   */
-  [Symbol.asyncIterator](): FastSnapAsyncGenerator<T> {
-    if (this.asyncGenerator) {
-      // make sure the iterator will only be iterated once
-      throw new Error('repeat iterate');
-    }
-
-    return (this.asyncGenerator = this.generate());
   }
 
   /**
    * Abort iterator
    */
   async abort() {
-    if (this.asyncGenerator) {
-      await this.asyncGenerator.return();
-    }
-
     await Promise.all(this.iterators.map(({ iter }) => iter.return()));
     this.iterators = [];
   }

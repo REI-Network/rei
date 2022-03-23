@@ -1,8 +1,10 @@
 import { assert, expect } from 'chai';
-import { keccak256 } from 'ethereumjs-util';
+import { keccak256, BN } from 'ethereumjs-util';
 import { Database, DBDeleteSnapAccount, DBDeleteSnapStorage } from '@rei-network/database';
 import { Common } from '@rei-network/common';
+import { EMPTY_HASH } from '../../src/utils';
 import { DiskLayer } from '../../src/snap';
+import { SnapJournalGenerator } from '../../src/snap/journal';
 import { DBatch } from '../../src/snap/batch';
 import { AccountInfo, genRandomAccounts } from './util';
 const level = require('level-mem');
@@ -29,13 +31,19 @@ describe('GenerateSnapshot', () => {
   }
 
   before(async () => {
-    const { root, accounts: _accounts } = await genRandomAccounts(db, 200, false);
+    const { root, accounts: _accounts } = await genRandomAccounts(db, 200, 10, false);
     accounts = _accounts;
     diskLayer = new DiskLayer(db, root);
   });
 
   it('should generate succeed', async () => {
-    await diskLayer.generate();
+    await diskLayer.generate({
+      origin: EMPTY_HASH,
+      start: Date.now(),
+      accounts: new BN(0),
+      slots: new BN(0),
+      storage: new BN(0)
+    });
     expect(diskLayer.genMarker === undefined, 'should generate finished').be.true;
 
     const batch = new DBatch(db);
@@ -51,12 +59,31 @@ describe('GenerateSnapshot', () => {
       }
     }
 
+    const serializedGenerator = await db.getSnapGenerator();
+    expect(serializedGenerator !== null).be.true;
+    const { done, marker, accounts: _accounts, slots, storage } = SnapJournalGenerator.fromSerializedJournal(serializedGenerator!);
+    expect(done).be.true;
+    expect(marker.equals(EMPTY_HASH)).be.true;
+    expect(_accounts.toNumber()).be.equal(200);
+    expect(slots.toNumber()).be.equal(200 * 10);
+    /**
+     * one account = SNAP_ACCOUNT_PREFIX(1) + accountHash(32) + account.serialize().length(70)
+     * one slot = SNAP_STORAGE_PREFIX(1) + accountHash(32) + storageHash(32) + storageValue(32)
+     */
+    expect(storage.toNumber()).be.equal(200 * (1 + 32 + 70) + 200 * 10 * (1 + 32 + 32 + 32));
+
     await batch.write();
     batch.reset();
   });
 
   it('should abort succeed', async () => {
-    diskLayer.generate();
+    diskLayer.generate({
+      origin: EMPTY_HASH,
+      start: Date.now(),
+      accounts: new BN(0),
+      slots: new BN(0),
+      storage: new BN(0)
+    });
     await new Promise((r) => setTimeout(r, 100));
     await diskLayer.abort();
     expect(diskLayer.genMarker !== undefined, 'should not generate finished').be.true;
@@ -99,5 +126,19 @@ describe('GenerateSnapshot', () => {
         throw new Error('unknown error');
       }
     }
+
+    const serializedGenerator = await db.getSnapGenerator();
+    expect(serializedGenerator !== null).be.true;
+    const { done, marker, accounts: _accounts, slots, storage } = SnapJournalGenerator.fromSerializedJournal(serializedGenerator!);
+    expect(done).be.false;
+    expect(marker.equals(diskLayer.genMarker!)).be.true;
+    expect(_accounts.toNumber() < 200).be.true;
+    expect(slots.toNumber() < 200 * 10).be.true;
+    /**
+     * one account = SNAP_ACCOUNT_PREFIX(1) + accountHash(32) + account.serialize().length(70)
+     * one slot = SNAP_STORAGE_PREFIX(1) + accountHash(32) + storageHash(32) + storageValue(32)
+     */
+    const total = _accounts.toNumber() * (1 + 32 + 70) + slots.toNumber() * (1 + 32 + 32 + 32);
+    expect(storage.toNumber()).be.equal(total);
   });
 });

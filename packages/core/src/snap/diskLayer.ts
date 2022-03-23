@@ -156,8 +156,6 @@ export class DiskLayer implements ISnapshot {
       throw new Error('stale disk layer');
     }
 
-    output.push(this.root);
-
     return this.root;
   }
 

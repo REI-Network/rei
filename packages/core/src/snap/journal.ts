@@ -1,11 +1,11 @@
 import { rlp, bufferToInt, toBuffer } from 'ethereumjs-util';
 import { Database } from '@rei-network/database';
-import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
+import { FunctionalBufferMap, FunctionalBufferSet, logger } from '@rei-network/utils';
 import { DiskLayer } from './diskLayer';
 import { Snapshot } from './types';
 import { DiffLayer } from './diffLayer';
 
-const globalJournalVersion = 0;
+const journalVersion = 0;
 
 export class SnapJournalGenerator {
   done: boolean;
@@ -155,14 +155,14 @@ function isDiffLayerJournal(journal: any): journal is DiffLayerJournal {
   return true;
 }
 
-function loadDiffLayer(parent: Snapshot, journalArray: any[], offset: number): Snapshot | null {
+function loadDiffLayer(parent: Snapshot, journalArray: any[], offset: number): Snapshot {
   if (offset > journalArray.length - 1) {
     return parent;
   }
 
   const journal = journalArray[offset];
   if (!isDiffLayerJournal(journal)) {
-    return null;
+    throw new Error('invalid diff layer journal');
   }
 
   const root = journal[0];
@@ -187,49 +187,81 @@ function loadDiffLayer(parent: Snapshot, journalArray: any[], offset: number): S
   return loadDiffLayer(DiffLayer.createDiffLayerFromParent(parent, root, destructSet, accountData, storageData), journalArray, offset + 1);
 }
 
-export async function loadSnapshot(db: Database) {
-  const dbRoot = await db.getSnapRoot();
-  if (dbRoot === null) {
-    return null;
-  }
-
+async function loadAndParseJournal(
+  db: Database,
+  base: DiskLayer
+): Promise<{
+  generator: SnapJournalGenerator;
+  snapshot: Snapshot;
+}> {
   const journalGenerator = await db.getSnapGenerator();
   if (journalGenerator === null) {
-    return null;
+    throw new Error('load generator failed');
   }
 
   const generator = SnapJournalGenerator.fromSerializedJournal(journalGenerator);
 
   const serializedJournal = await db.getSnapJournal();
   if (serializedJournal === null) {
-    return null;
+    // the journal doesn't exsit, ignore
+    return { generator, snapshot: base };
   }
 
   const journal = rlp.decode(serializedJournal) as unknown as Journal;
   if (journal.length < 2) {
-    return null;
+    // invalid journal version, throw error
+    throw new Error('invalid journal');
   }
 
-  const bufJournalVersion = journal[0];
+  const _journalVersion = journal[0];
   const diskRoot = journal[1];
-  if (!(bufJournalVersion instanceof Buffer) || !(diskRoot instanceof Buffer)) {
-    return null;
+  if (!(_journalVersion instanceof Buffer) || !(diskRoot instanceof Buffer)) {
+    // invalid journal version, throw error
+    throw new Error('invalid journal');
   }
 
-  const journalVersion = bufferToInt(bufJournalVersion);
-  if (journalVersion !== globalJournalVersion) {
-    return null;
+  if (bufferToInt(_journalVersion) !== journalVersion) {
+    // unsupported journal version, ignore
+    return { generator, snapshot: base };
   }
 
-  if (!diskRoot.equals(dbRoot)) {
-    return null;
+  if (!diskRoot.equals(base.root)) {
+    // unmatched root, ignore
+    return { generator, snapshot: base };
   }
 
-  const diskLayer = new DiskLayer(db, dbRoot);
-  const snapshot = loadDiffLayer(diskLayer, journal, 3);
-  if (snapshot === null) {
-    return null;
+  return { generator, snapshot: loadDiffLayer(base, journal, 3) };
+}
+
+/**
+ * Load snapshot from database
+ * @param db - Database
+ * @param root - Root hash
+ * @param recovery - Recovery snapshot
+ * @returns Snapshot
+ */
+export async function loadSnapshot(db: Database, root: Buffer, recovery: boolean) {
+  // TODO: check disable
+
+  const baseRoot = await db.getSnapRoot();
+  if (baseRoot === null) {
+    throw new Error('missing snapshot root');
   }
 
-  return { diskLayer, snapshot, generator };
+  const base = new DiskLayer(db, baseRoot);
+  const { snapshot, generator } = await loadAndParseJournal(db, base);
+
+  if (!snapshot.root.equals(root)) {
+    if (!recovery) {
+      throw new Error('unmatched root');
+    }
+    logger.warn('Snapshot is not continuous with chain');
+  }
+
+  if (!generator.done) {
+    base.genMarker = generator.marker;
+    base.generate();
+  }
+
+  return snapshot;
 }

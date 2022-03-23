@@ -376,29 +376,5 @@ describe('Layer', () => {
       }
       expect(index === 3, 'iterator should abort').be.true;
     });
-
-    it('should prohibite repeated iterations', async () => {
-      const { layer } = layers[2];
-      const fastIter = new FastSnapIterator(layer, (snap) => {
-        return {
-          iter: snap.genAccountIterator(EMPTY_HASH),
-          stop: false
-        };
-      });
-      await fastIter.init();
-
-      const doIter = async () => {
-        for await (const element of fastIter) {
-        }
-      };
-
-      try {
-        await Promise.all([doIter(), doIter()]);
-        assert.fail('should prohibite repeated iterations');
-      } catch (err) {
-      } finally {
-        await fastIter.abort();
-      }
-    });
   });
 });

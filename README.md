@@ -93,8 +93,7 @@ This monorepo uses [npm workspaces](https://docs.npmjs.com/cli/v7/using-npm/work
 Install:
 
 ```
-npm i -g node-gyp-build
-npm i --no-bin-links
+npm install
 ```
 
 Build:

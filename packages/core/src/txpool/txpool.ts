@@ -1,7 +1,8 @@
+import EventEmitter from 'events';
 import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
 import Heap from 'qheap';
-import { FunctionalBufferMap, FunctionalBufferSet, Aborter, logger, InitializerWithEventEmitter } from '@rei-network/utils';
+import { FunctionalBufferMap, FunctionalBufferSet, AbortableTimer, logger } from '@rei-network/utils';
 import { Transaction, BlockHeader, Block } from '@rei-network/structure';
 import { Node } from '../node';
 import { getGasLimitByCommon } from '../utils';
@@ -36,14 +37,18 @@ export declare interface TxPool {
 /**
  * TxPool contains all currently known transactions.
  */
-export class TxPool extends InitializerWithEventEmitter {
+export class TxPool extends EventEmitter {
   private readonly node: Node;
-  private readonly aborter: Aborter;
   private readonly accounts = new FunctionalBufferMap<TxPoolAccount>();
   private readonly locals = new FunctionalBufferSet();
   private readonly txs = new FunctionalBufferMap<Transaction>();
   private readonly lock = new Semaphore(1);
+  private readonly timeoutTimer = new AbortableTimer();
+  private readonly rejournalTimer = new AbortableTimer();
 
+  private aborted: boolean = false;
+
+  private initPromise?: Promise<void>;
   private rejournalLoopPromise?: Promise<void>;
 
   private currentHeader!: BlockHeader;
@@ -83,7 +88,6 @@ export class TxPool extends InitializerWithEventEmitter {
     this.rejournalInterval = options.rejournalInterval ?? defaultRejournalInterval;
 
     this.node = options.node;
-    this.aborter = options.node.aborter;
     this.priced = new TxPricedList(this.txs);
     for (const buf of this.node.accMngr.totalUnlockedAccounts()) {
       this.locals.add(buf);
@@ -138,18 +142,15 @@ export class TxPool extends InitializerWithEventEmitter {
    * A loop to remove timeout queued transaction
    */
   private async timeoutLoop() {
-    await this.initPromise;
-    while (!this.aborter.isAborted) {
-      await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.timeoutInterval)));
-      if (this.aborter.isAborted) {
-        break;
-      }
+    while (!this.aborted) {
       for (const [addr, account] of this.accounts) {
         if (account.hasQueue() && Date.now() - account.timestamp > this.lifetime) {
           const queue = account.queue.clear();
           this.removeTxFromGlobal(queue);
         }
       }
+
+      await this.timeoutTimer.wait(this.timeoutInterval);
     }
   }
 
@@ -157,13 +158,9 @@ export class TxPool extends InitializerWithEventEmitter {
    * A loop to rejournal transaction to disk
    */
   private async rejournalLoop() {
-    await this.initPromise;
-    while (!this.aborter.isAborted) {
-      await this.aborter.abortablePromise(new Promise((r) => setTimeout(r, this.rejournalInterval)));
-      if (this.aborter.isAborted) {
-        break;
-      }
+    while (!this.aborted) {
       await this.journal!.rotate(this.local());
+      await this.rejournalTimer.wait(this.rejournalInterval);
     }
   }
 
@@ -180,52 +177,59 @@ export class TxPool extends InitializerWithEventEmitter {
   /**
    * Initialize tx pool
    */
-  async init(block: Block) {
-    this.currentHeader = block.header;
-    this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, this.currentHeader._common);
-
-    if (isEnableFreeStaking(this.currentHeader._common)) {
-      this.totalAmount = await Fee.getTotalAmount(this.currentStateManager);
-    } else {
-      this.totalAmount = undefined;
+  init(block: Block) {
+    if (this.initPromise) {
+      return this.initPromise;
     }
 
-    if (this.journal) {
-      await this.journal.load(async (txs: Transaction[]) => {
-        let news: Transaction[] = [];
-        for (const tx of txs) {
-          if (this.txs.has(tx.hash())) {
-            continue;
+    return (this.initPromise = (async () => {
+      this.currentHeader = block.header;
+      this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, this.currentHeader._common);
+
+      if (isEnableFreeStaking(this.currentHeader._common)) {
+        this.totalAmount = await Fee.getTotalAmount(this.currentStateManager);
+      } else {
+        this.totalAmount = undefined;
+      }
+
+      if (this.journal) {
+        await this.journal.load(async (txs: Transaction[]) => {
+          let news: Transaction[] = [];
+          for (const tx of txs) {
+            if (this.txs.has(tx.hash())) {
+              continue;
+            }
+            if (!tx.isSigned()) {
+              continue;
+            }
+            news.push(tx);
           }
-          if (!tx.isSigned()) {
-            continue;
+          if (news.length == 0) {
+            return;
           }
-          news.push(tx);
-        }
-        if (news.length == 0) {
-          return;
-        }
-        await this.node.addPendingTxs(news);
-      });
-    }
-    this.initOver();
+          await this.node.addPendingTxs(news);
+        });
+      }
+    })());
   }
 
   /**
    * Start tx pool
    */
   start() {
-    this.initPromise.then(() => {
-      this.timeoutLoop();
-      if (this.journal) {
-        this.rejournalLoopPromise = this.rejournalLoop();
-      }
-    });
+    this.timeoutLoop();
+    if (this.journal) {
+      this.rejournalLoopPromise = this.rejournalLoop();
+    }
   }
 
   async abort() {
+    this.aborted = true;
+    this.timeoutTimer.abort();
+    this.rejournalTimer.abort();
     if (this.rejournalLoopPromise) {
       await this.rejournalLoopPromise;
+      this.rejournalLoopPromise = undefined;
     }
   }
 
@@ -763,5 +767,3 @@ export class TxPool extends InitializerWithEventEmitter {
     }
   }
 }
-
-export { PendingTxMap, TxSortedMap };

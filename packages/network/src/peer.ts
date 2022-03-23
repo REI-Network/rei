@@ -44,7 +44,7 @@ export class MsgQueue {
    * Return an async generator for writing data from message queue to to the `libp2p` stream
    */
   private async *generator() {
-    const gen = this.queue.generator();
+    const gen = this.queue[Symbol.asyncIterator]();
     while (true) {
       const { value } = await gen.next();
       if (value !== undefined) {

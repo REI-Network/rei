@@ -8,6 +8,8 @@
         "rei": "dist/index.js"
     },
     "scripts": {
+        "preinstall": "npm run binWorkaround",
+        "binWorkaround": "test -f dist/index.js || echo 'install fails if bin script does not exist (https://github.com/npm/cli/issues/2632), creating placeholder file at \"dist/index.js\"' && mkdir -p 'dist' && touch dist/index.js",
         "build": "tsc --build tsconfig.json",
         "test": "echo @rei-network/cli has no test cases"
     },

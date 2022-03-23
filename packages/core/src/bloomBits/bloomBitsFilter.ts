@@ -1,6 +1,6 @@
 import { Address, BN, keccak256 } from 'ethereumjs-util';
 import { Log, Receipt, Block } from '@rei-network/structure';
-import { FunctionalBNMap, FunctionalBNSet, decompressBytes } from '@rei-network/utils';
+import { FunctionalBNMap, FunctionalBNSet } from '@rei-network/utils';
 import { Database } from '@rei-network/database';
 import { ReceiptsCache } from './receiptsCache';
 import { bloomBitsConfig as config } from './config';
@@ -211,8 +211,7 @@ export class BloomBitsFilter {
           for (const bit of bloom) {
             let bits = bitsCache.get(bit);
             if (!bits) {
-              bits = (await this.backend.db.getBloomBits(bit, section, await getSenctionHash(section))) as Buffer;
-              bits = decompressBytes(bits, Math.floor(config.bloomBitsSectionSize / 8));
+              bits = await this.backend.db.getBloomBits(bit, section, await getSenctionHash(section), Math.floor(config.bloomBitsSectionSize / 8));
               bitsCache.set(bit, bits);
             }
             bitsArray.push(bits);

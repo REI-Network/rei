@@ -1,19 +1,29 @@
-import { rlp, bufferToInt, toBuffer } from 'ethereumjs-util';
-import { Database } from '@rei-network/database';
+import { rlp, bufferToInt, toBuffer, BN } from 'ethereumjs-util';
+import { Database, DBSaveSnapGenerator } from '@rei-network/database';
 import { FunctionalBufferMap, FunctionalBufferSet, logger } from '@rei-network/utils';
+import { EMPTY_HASH } from '../utils';
 import { DiskLayer } from './diskLayer';
-import { Snapshot } from './types';
+import { Snapshot, GeneratorStats } from './types';
 import { DiffLayer } from './diffLayer';
+import { DBatch } from './batch';
 
 const journalVersion = 0;
 
+/**
+ * SnapJournalGenerator records the generation journal of the snapshot
+ */
 export class SnapJournalGenerator {
-  done: boolean;
-  marker: Buffer;
-  accounts: number;
-  slots: number;
-  storage: number;
+  readonly done: boolean;
+  readonly marker: Buffer;
+  readonly accounts: BN;
+  readonly slots: BN;
+  readonly storage: BN;
 
+  /**
+   * Construct journal from serialized journal
+   * @param serializedJournal
+   * @returns Journal
+   */
   static fromSerializedJournal(serializedJournal: Buffer) {
     const values = rlp.decode(serializedJournal) as unknown as Buffer[];
 
@@ -24,6 +34,11 @@ export class SnapJournalGenerator {
     return SnapJournalGenerator.fromValuesArray(values);
   }
 
+  /**
+   * Construct journal from values array
+   * @param values
+   * @returns Journal
+   */
   static fromValuesArray(values: Buffer[]) {
     if (values.length !== 5) {
       throw new Error('invalid values');
@@ -31,14 +46,14 @@ export class SnapJournalGenerator {
 
     const done = bufferToInt(values[0]);
     const marker = values[1];
-    const accounts = bufferToInt(values[2]);
-    const slots = bufferToInt(values[3]);
-    const storage = bufferToInt(values[4]);
+    const accounts = new BN(values[2]);
+    const slots = new BN(values[3]);
+    const storage = new BN(values[4]);
 
     return new SnapJournalGenerator(done === 1, marker, accounts, slots, storage);
   }
 
-  constructor(done: boolean, marker: Buffer, accounts: number, slots: number, storage: number) {
+  constructor(done: boolean, marker: Buffer, accounts: BN, slots: BN, storage: BN) {
     this.done = done;
     this.marker = marker;
     this.accounts = accounts;
@@ -46,10 +61,18 @@ export class SnapJournalGenerator {
     this.storage = storage;
   }
 
+  /**
+   * Convert journal to values array
+   * @returns Values array
+   */
   raw() {
     return [toBuffer(this.done ? 1 : 0), this.marker, toBuffer(this.accounts), toBuffer(this.slots), toBuffer(this.storage)];
   }
 
+  /**
+   * Convert journal to serialized journal
+   * @returns Serialized journal
+   */
   serialize() {
     return rlp.encode(this.raw());
   }
@@ -155,6 +178,13 @@ function isDiffLayerJournal(journal: any): journal is DiffLayerJournal {
   return true;
 }
 
+/**
+ * Load diff layer from journal
+ * @param parent - Parent layer
+ * @param journalArray
+ * @param offset - Offset of current layer
+ * @returns Bottom layer
+ */
 function loadDiffLayer(parent: Snapshot, journalArray: any[], offset: number): Snapshot {
   if (offset > journalArray.length - 1) {
     return parent;
@@ -187,6 +217,12 @@ function loadDiffLayer(parent: Snapshot, journalArray: any[], offset: number): S
   return loadDiffLayer(DiffLayer.createDiffLayerFromParent(parent, root, destructSet, accountData, storageData), journalArray, offset + 1);
 }
 
+/**
+ * Load and parse journal
+ * @param db
+ * @param base
+ * @returns Journal generator and bottom layer
+ */
 async function loadAndParseJournal(
   db: Database,
   base: DiskLayer
@@ -260,8 +296,24 @@ export async function loadSnapshot(db: Database, root: Buffer, recovery: boolean
 
   if (!generator.done) {
     base.genMarker = generator.marker;
-    base.generate();
+    base.generate({
+      origin: generator.marker,
+      start: Date.now(),
+      accounts: generator.accounts,
+      slots: generator.slots,
+      storage: generator.storage
+    });
   }
 
   return snapshot;
+}
+
+export function journalProgress(batch: DBatch, marker?: Buffer, stats?: GeneratorStats) {
+  const done = marker === undefined;
+  marker = marker ?? EMPTY_HASH;
+  const accounts = stats?.accounts.clone() ?? new BN(0);
+  const slots = stats?.slots.clone() ?? new BN(0);
+  const storage = stats?.storage.clone() ?? new BN(0);
+  const generator = new SnapJournalGenerator(done, marker, accounts, slots, storage);
+  batch.push(DBSaveSnapGenerator(generator.serialize()));
 }

@@ -4,11 +4,10 @@ import { Database, DBOp } from '@rei-network/database';
 import { SnapIterator } from './types';
 import { DBatch } from './batch';
 
-export class SimpleAborter {
+export class SimpleAborter<T> {
   private aborted = false;
-  private promise?: Promise<void>;
-  private resolve?: () => void;
-  private reject?: (reason?: any) => void;
+  private promise?: Promise<T>;
+  private resolve?: (result: T) => void;
 
   get isAborted() {
     return this.aborted;
@@ -22,34 +21,22 @@ export class SimpleAborter {
     this.aborted = true;
     return (
       this.promise ??
-      (this.promise = new Promise<void>((resolve, reject) => {
+      (this.promise = new Promise<T>((resolve) => {
         this.resolve = resolve;
-        this.reject = reject;
       }))
     );
   }
 
   /**
-   * Reset aborter
-   */
-  reset() {
-    if (this.promise || this.resolve || this.reject) {
-      throw new Error('invalid reset');
-    }
-
-    this.aborted = false;
-  }
-
-  /**
    * Tell the aborter that the task was aborted
-   * @param reason - Abort reason
+   * @param result
    */
-  abortFinished(reason?: any) {
-    if (this.promise && this.resolve && this.reject) {
-      reason ? this.reject(reason) : this.resolve();
+  abortFinished(result: T) {
+    if (this.aborted && this.promise && this.resolve) {
+      this.resolve(result);
       this.resolve = undefined;
-      this.reject = undefined;
       this.promise = undefined;
+      this.aborted = false;
     }
   }
 }

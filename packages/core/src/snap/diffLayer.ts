@@ -343,7 +343,7 @@ export class DiffLayer implements ISnapshot {
    * @param output - Output array
    * @returns Disk layer root hash
    */
-  journal(output: any[]): Buffer {
+  async journal(output: any[]) {
     const root = this.parent.journal(output);
 
     if (this.stale) {

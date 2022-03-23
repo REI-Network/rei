@@ -2,9 +2,11 @@ import { assert, expect } from 'chai';
 import { keccak256 } from 'ethereumjs-util';
 import { Database, DBDeleteSnapAccount, DBDeleteSnapStorage } from '@rei-network/database';
 import { Common } from '@rei-network/common';
+import { EMPTY_HASH } from '../../src/utils';
 import { DiskLayer } from '../../src/snap';
 import { DBatch } from '../../src/snap/batch';
 import { AccountInfo, genRandomAccounts } from './util';
+import { BN } from 'bn.js';
 const level = require('level-mem');
 
 const common = new Common({ chain: 'rei-devnet' });
@@ -35,7 +37,13 @@ describe('GenerateSnapshot', () => {
   });
 
   it('should generate succeed', async () => {
-    await diskLayer.generate();
+    await diskLayer.generate({
+      origin: EMPTY_HASH,
+      start: Date.now(),
+      accounts: new BN(0),
+      slots: new BN(0),
+      storage: new BN(0)
+    });
     expect(diskLayer.genMarker === undefined, 'should generate finished').be.true;
 
     const batch = new DBatch(db);
@@ -56,7 +64,13 @@ describe('GenerateSnapshot', () => {
   });
 
   it('should abort succeed', async () => {
-    diskLayer.generate();
+    diskLayer.generate({
+      origin: EMPTY_HASH,
+      start: Date.now(),
+      accounts: new BN(0),
+      slots: new BN(0),
+      storage: new BN(0)
+    });
     await new Promise((r) => setTimeout(r, 100));
     await diskLayer.abort();
     expect(diskLayer.genMarker !== undefined, 'should not generate finished').be.true;

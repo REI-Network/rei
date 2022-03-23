@@ -230,12 +230,12 @@ async function loadAndParseJournal(
   generator: SnapJournalGenerator;
   snapshot: Snapshot;
 }> {
-  const journalGenerator = await db.getSnapGenerator();
-  if (journalGenerator === null) {
+  const serializedGenerator = await db.getSnapGenerator();
+  if (serializedGenerator === null) {
     throw new Error('load generator failed');
   }
 
-  const generator = SnapJournalGenerator.fromSerializedJournal(journalGenerator);
+  const generator = SnapJournalGenerator.fromSerializedJournal(serializedGenerator);
 
   const serializedJournal = await db.getSnapJournal();
   if (serializedJournal === null) {

@@ -429,6 +429,7 @@ export class DiskLayer implements ISnapshot {
           dataLen = data.length;
           batch.push(DBSaveSerializedSnapAccount(accountHash, data));
         }
+        // SNAP_ACCOUNT_PREFIX(1) + accountHash(32) + dataLen
         stats.storage.iaddn(1 + 32 + dataLen);
         stats.accounts.iaddn(1);
       }
@@ -467,6 +468,7 @@ export class DiskLayer implements ISnapshot {
             // write this slot
             batch.push(DBSaveSnapStorage(accountHash, key, val!));
           }
+          // SNAP_STORAGE_PREFIX(1) + accountHash(32) + storageHash(32) + val.length
           stats.storage.iaddn(1 + 32 + 32 + val!.length);
           stats.slots.iaddn(1);
 

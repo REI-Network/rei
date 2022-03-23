@@ -113,7 +113,7 @@ describe('Layer', () => {
     let diskLayer!: DiskLayer;
 
     before(async () => {
-      const { root, accounts: _accounts } = await genRandomAccounts(db, 10);
+      const { root, accounts: _accounts } = await genRandomAccounts(db, 10, 10);
       accounts = _accounts;
       diskLayer = new DiskLayer(db, root);
     });
@@ -169,7 +169,7 @@ describe('Layer', () => {
       for (let i = 0; i < 3; i++) {
         if (i === 0) {
           // the first layer is diskLayer
-          const { root, accounts } = await genRandomAccounts(db, count);
+          const { root, accounts } = await genRandomAccounts(db, count, 10);
           layers.push({
             layer: new DiskLayer(db, root),
             accounts

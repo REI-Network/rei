@@ -1,5 +1,5 @@
 import { BN } from 'ethereumjs-util';
-import { compressBytes } from '@rei-network/utils';
+import { compressBytes } from './compress';
 import { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, BLOOM_BITS_SECTION_COUNT, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, CLIQUE_SIGNERS_KEY as CLIQUE_SIGNER_STATES_KEY, CLIQUE_VOTES_KEY, CLIQUE_BLOCK_SIGNERS_KEY, receiptsKey, txLookupKey, bloomBitsKey, snapAccountKey, snapStorageKey, SNAP_ROOT_KEY, SNAP_JOURNAL_KEY, SNAP_GENERATOR_KEY } from './constants';
 import { CacheMap } from './manager';
 

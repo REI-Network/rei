@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
 import { BlockHeader } from '@rei-network/structure';
-import { Channel, logger, Initializer } from '@rei-network/utils';
+import { Channel, logger } from '@rei-network/utils';
 import { Database } from '@rei-network/database';
 import { DBSaveBloomBitsSectionCount, DBDeleteBloomBitsSectionCount } from '@rei-network/database/dist/helpers';
 import { ChainIndexerBackend, ChainIndexerOptions } from './types';
@@ -13,7 +13,7 @@ import { ChainIndexerBackend, ChainIndexerOptions } from './types';
  * These child indexers receive new head notifications only after an entire section has been finished
  * or in case of rollbacks that might affect already finished sections.
  */
-export class ChainIndexer extends Initializer {
+export class ChainIndexer {
   private readonly db: Database;
   private readonly backend: ChainIndexerBackend;
   private readonly sectionSize: number;
@@ -22,9 +22,9 @@ export class ChainIndexer extends Initializer {
 
   private storedSections?: BN;
   private processHeaderLoopPromise?: Promise<void>;
+  private initPromise?: Promise<void>;
 
   constructor(options: ChainIndexerOptions) {
-    super();
     this.db = options.db;
     this.backend = options.backend;
     this.sectionSize = options.sectionSize;
@@ -32,15 +32,18 @@ export class ChainIndexer extends Initializer {
     this.headerQueue = new Channel<BlockHeader>({ max: 1 });
   }
 
-  async init() {
-    this.storedSections = await this.db.getStoredSectionCount();
-    this.initOver();
+  init() {
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+
+    return (this.initPromise = (async () => {
+      this.storedSections = await this.db.getStoredSectionCount();
+    })());
   }
 
   start() {
-    this.initPromise.then(() => {
-      this.processHeaderLoopPromise = this.processHeaderLoop();
-    });
+    this.processHeaderLoopPromise = this.processHeaderLoop();
   }
 
   async abort() {
@@ -82,7 +85,7 @@ export class ChainIndexer extends Initializer {
   private async processHeaderLoop() {
     await this.initPromise;
     let preHeader: BlockHeader | undefined;
-    for await (const header of this.headerQueue.generator()) {
+    for await (const header of this.headerQueue) {
       try {
         if (preHeader !== undefined && !header.parentHash.equals(preHeader.hash())) {
           const ancestor = await this.findCommonAncestor(header, preHeader);

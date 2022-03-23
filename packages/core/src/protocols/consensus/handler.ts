@@ -120,7 +120,7 @@ export class ConsensusProtocolHander implements ProtocolHandler {
   }
 
   private async gossipEvidenceLoop() {
-    for await (const evidence of this.evidenceQueue.generator()) {
+    for await (const evidence of this.evidenceQueue) {
       try {
         if (!this.isKnowEvidence(evidence)) {
           if (evidence instanceof DuplicateVoteEvidence) {

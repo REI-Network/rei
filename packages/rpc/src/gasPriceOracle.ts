@@ -28,7 +28,7 @@ export class SimpleOracle {
   };
 
   private async taskLoop() {
-    for await (const hashes of this.taskQueue.generator()) {
+    for await (const hashes of this.taskQueue) {
       try {
         if (hashes.length > 0) {
           const hash = hashes[hashes.length - 1];

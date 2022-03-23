@@ -1,6 +1,7 @@
+import EventEmitter from 'events';
 import { BN } from 'ethereumjs-util';
 import { Transaction, Block, BlockHeader, Log } from '@rei-network/structure';
-import { FunctionalBufferMap, logger, InitializerWithEventEmitter } from '@rei-network/utils';
+import { FunctionalBufferMap, logger } from '@rei-network/utils';
 import { Database } from '@rei-network/database';
 
 // record block hash and block number for quering receipt.
@@ -20,7 +21,7 @@ export declare interface BlockchainMonitor {
 /**
  * BlockchainMonitor is used to monitor changes on the chain
  */
-export class BlockchainMonitor extends InitializerWithEventEmitter {
+export class BlockchainMonitor extends EventEmitter {
   private db: Database;
   private currentHeader!: BlockHeader;
 
@@ -34,7 +35,6 @@ export class BlockchainMonitor extends InitializerWithEventEmitter {
    */
   init(header: BlockHeader) {
     this.currentHeader = header;
-    this.initOver();
   }
 
   /**
@@ -45,7 +45,6 @@ export class BlockchainMonitor extends InitializerWithEventEmitter {
    * @param block New Block data
    */
   async newBlock(block: Block) {
-    await this.initPromise;
     try {
       const originalNewBlock = block;
       const newHeads: BlockHeader[] = [];

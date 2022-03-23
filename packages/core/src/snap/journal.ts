@@ -308,6 +308,12 @@ export async function loadSnapshot(db: Database, root: Buffer, recovery: boolean
   return snapshot;
 }
 
+/**
+ * Persistent snapshot generation progress to disk
+ * @param batch
+ * @param marker
+ * @param stats
+ */
 export function journalProgress(batch: DBatch, marker?: Buffer, stats?: GeneratorStats) {
   const done = marker === undefined;
   marker = marker ?? EMPTY_HASH;

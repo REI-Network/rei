@@ -50,6 +50,9 @@ export interface InterpreterStep {
     fee: number;
     isAsync: boolean;
   };
+  caller: Address;
+  callValue: BN;
+  callData: Buffer;
   account: Account;
   codeAddress: Address;
 }
@@ -195,7 +198,10 @@ export default class Interpreter {
       stateManager: this._runState.stateManager,
       memory: this._runState.memory._store, // Return underlying array for backwards-compatibility
       memoryWordCount: this._runState.memoryWordCount,
-      codeAddress: this._eei._env.codeAddress
+      codeAddress: this._eei._env.codeAddress,
+      caller: this._eei._env.caller,
+      callValue: this._eei._env.callValue,
+      callData: this._eei._env.callData
     };
 
     if (this._vm.DEBUG) {

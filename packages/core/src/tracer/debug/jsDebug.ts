@@ -107,7 +107,7 @@ function makeDB(stateManager: StateManager) {
  * @param error
  * @returns
  */
-function makeLog(ctx: { [key: string]: any }, step: InterpreterStep, error?: string) {
+function makeLog(step: InterpreterStep, error?: string) {
   const stack = step.stack.map((bn) => bi(bn.toString())).reverse();
   Object.defineProperty(stack, 'peek', {
     value: (idx: number) => {
@@ -117,11 +117,12 @@ function makeLog(ctx: { [key: string]: any }, step: InterpreterStep, error?: str
       return stack[idx];
     }
   });
+
   return {
     op: makeOP(step.opcode.name, step.opcode.code),
     stack,
     memory: makeMemory(step.memory),
-    contract: makeContract(ctx['from'], ctx['to'], ctx['value'], ctx['input']),
+    contract: makeContract(step.caller.buf, step.address.buf, bi(step.callValue.toString()), step.callData),
     getPC() {
       return step.pc;
     },
@@ -254,7 +255,7 @@ export class JSDebug implements IDebugImpl {
     }
 
     try {
-      this.vmContextObj.globalLog = makeLog(this.debugContext, step, error);
+      this.vmContextObj.globalLog = makeLog(step, error);
       const script = error ? new vm.Script('globalPromise = obj.fault.call(obj, globalLog, globalDB)') : new vm.Script('globalPromise = obj.step.call(obj, globalLog, globalDB)');
       script.runInContext(this.vmContext, { timeout: this.config.timeout ? Number(this.config.timeout) : undefined, breakOnSigint: true });
       if (this.vmContextObj.globalPromise) {

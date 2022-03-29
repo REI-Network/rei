@@ -45,6 +45,7 @@ export interface InterpreterStep {
   memory: Buffer;
   memoryWordCount: BN;
   opcode: {
+    code: number;
     name: string;
     fee: number;
     isAsync: boolean;
@@ -181,6 +182,7 @@ export default class Interpreter {
       gasLeft: this._eei.getGasLeft(),
       gasRefund: this._eei._evm._refund,
       opcode: {
+        code: opcode.code,
         name: opcode.fullName,
         fee: opcode.fee,
         isAsync: opcode.isAsync

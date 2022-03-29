@@ -113,11 +113,12 @@ export default class Interpreter {
     while (this._runState.programCounter < this._runState.code.length) {
       const opCode = this._runState.code[this._runState.programCounter];
       this._runState.opCode = opCode;
+
       const eventObj = await this._runStepHook();
+      opts.debug && (await opts.debug.captureState(eventObj));
 
       try {
         await this.runStep();
-        opts.debug && (await opts.debug.captureState(eventObj));
       } catch (e: any) {
         // re-throw on non-VM errors
         if (!('errorType' in e && e.errorType === 'VmError')) {
@@ -126,7 +127,6 @@ export default class Interpreter {
         // STOP is not an exception
         if (e.error !== ERROR.STOP) {
           err = e;
-          opts.debug && (await opts.debug.captureFault(eventObj, e));
         }
         break;
       }

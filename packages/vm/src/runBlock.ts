@@ -426,10 +426,14 @@ async function assignBlockRewards(this: VM, block: Block, opts: RunBlockOpts): P
       await rewardAccount(state, block.header.coinbase, reward);
     } else {
       let miner: Address;
-      if ('cliqueSigner' in block.header) {
-        miner = block.header.cliqueSigner();
+      if (this._getMiner) {
+        miner = this._getMiner(block.header);
       } else {
-        miner = Address.zero();
+        if ('cliqueSigner' in block.header) {
+          miner = block.header.cliqueSigner();
+        } else {
+          miner = Address.zero();
+        }
       }
       await rewardAccount(state, miner, reward);
     }

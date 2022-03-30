@@ -1,6 +1,6 @@
 {
   "name": "@rei-network/vm",
-  "version": "5.5.14",
+  "version": "0.0.1",
   "description": "An Ethereum VM implementation",
   "license": "MPL-2.0",
   "author": "mjbecze <mjbecze@gmail.com>",
@@ -10,9 +10,9 @@
     "test": "mocha -r ts-node/register 'test/**/*.test.ts' --timeout 100000 --exit"
   },
   "dependencies": {
-    "@rei-network/blockchain": "^0.0.7",
-    "@rei-network/common": "^0.0.6",
-    "@rei-network/structure": "^0.0.2",
+    "@rei-network/blockchain": "^0.1.0",
+    "@rei-network/common": "^0.1.0",
+    "@rei-network/structure": "^0.1.0",
     "merkle-patricia-tree": "^4.2.1",
     "async-eventemitter": "^0.2.4",
     "core-js-pure": "^3.0.1",

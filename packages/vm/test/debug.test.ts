@@ -163,43 +163,43 @@ describe('JSDebug', () => {
      */
     expect(Array.isArray(result) && result.length === 6, 'debug result should be an array').be.true;
 
-    const call0 = result[0];
-    expect(call0.type).be.equal('call');
+    const call0 = result[0].action;
+    expect(call0.callType).be.equal('call');
     expect(call0.from).be.equal(sender.toString());
     expect(call0.to).be.equal(c2Addr.toString());
     expect(call0.input).be.equal(bufferToHex(encodeCallData('transferTo', ['uint256'], [1])));
     expect(call0.value).be.equal(intToHex(0));
 
-    const call1 = result[1];
-    expect(call1.type).be.equal('call');
+    const call1 = result[1].action;
+    expect(call1.callType).be.equal('call');
     expect(call1.from).be.equal(c2Addr.toString());
     expect(call1.to).be.equal(obj1Addr.toString());
     expect(call1.input).be.equal('0x');
     expect(call1.value).be.equal(intToHex(1));
 
-    const call2 = result[2];
-    expect(call2.type).be.equal('call');
+    const call2 = result[2].action;
+    expect(call2.callType).be.equal('call');
     expect(call2.from).be.equal(c2Addr.toString());
     expect(call2.to).be.equal(obj1Addr.toString());
     expect(call2.input).be.equal(bufferToHex(encodeCallData('transferTo', ['address', 'uint256'], [obj2Addr.toString(), 1])));
     expect(call2.value).be.equal(intToHex(0));
 
-    const call3 = result[3];
-    expect(call3.type).be.equal('call');
+    const call3 = result[3].action;
+    expect(call3.callType).be.equal('call');
     expect(call3.from).be.equal(obj1Addr.toString());
     expect(call3.to).be.equal(obj2Addr.toString());
     expect(call3.input).be.equal('0x');
     expect(call3.value).be.equal(intToHex(1));
 
-    const call4 = result[4];
-    expect(call4.type).be.equal('call');
+    const call4 = result[4].action;
+    expect(call4.callType).be.equal('call');
     expect(call4.from).be.equal(c2Addr.toString());
     expect(call4.to).be.equal(obj2Addr.toString());
     expect(call4.input).be.equal(bufferToHex(encodeCallData('transferTo', ['address', 'uint256'], [c2Addr.toString(), 1])));
     expect(call4.value).be.equal(intToHex(0));
 
-    const call5 = result[5];
-    expect(call5.type).be.equal('call');
+    const call5 = result[5].action;
+    expect(call5.callType).be.equal('call');
     expect(call5.from).be.equal(obj2Addr.toString());
     expect(call5.to).be.equal(c2Addr.toString());
     expect(call5.input).be.equal('0x');

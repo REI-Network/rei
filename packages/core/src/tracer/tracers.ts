@@ -984,7 +984,61 @@ export const replayTracer = `
         var result = this.ctxToResult(ctx, db);
         var filtered = this.filterNotUndefined(result);
         var callSequence = this.sequence(filtered, [], filtered.valueBigInt, []).callSequence;
-        return this.encodeCallSequence(callSequence);
+        return this.formatResult(this.encodeCallSequence(callSequence));
+    },
+
+    // convert the result to something like parity 'trace_replayTransaction'
+    formatResult(list) {
+      // find error
+      var error;
+      for (const ele of list) {
+        error = ele.error || error;
+      }
+
+      var result = [];
+      for (const ele of list) {
+        // calculate subtraces
+        var subtraces = 0;
+        for (const ele2 of list) {
+          if (ele2.traceAddress.length > ele.traceAddress.length) {
+            var matched = true;
+            for (let i = 0; i < ele.traceAddress.length; i++) {
+              if (ele.traceAddress[i] !== ele2.traceAddress[i]) {
+                matched = false;
+                break;
+              }
+            }
+
+            if (matched) {
+              subtraces++;
+            }
+          }
+        }
+
+        result.push({
+          action: {
+            callType: ele.callType,
+            from: ele.from,
+            gas: ele.gas,
+            input: ele.input,
+            to: ele.to,
+            value: ele.value,
+            init: ele.init
+          },
+          error,
+          result: error ? undefined : {
+            gasUsed: ele.gasUsed,
+            output: (ele.type === 'create' || ele.type === 'create2') ? undefined : (ele.output || '0x'),
+            code: ele.createdContractCode,
+            address: ele.createdContractAddressHash
+          },
+          subtraces,
+          traceAddress: ele.traceAddress,
+          type: ele.type
+        })
+      }
+
+      return result;
     },
 
     ctxToResult(ctx, db) {

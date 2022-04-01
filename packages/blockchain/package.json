@@ -16,6 +16,9 @@
     "dependencies": {
         "@rei-network/common": "^0.1.0",
         "@rei-network/database": "^0.1.1",
-        "@rei-network/structure": "^0.1.0"
+        "@rei-network/structure": "^0.1.0",
+        "debug": "^4.3.3",
+        "ethereumjs-util": "^7.1.4",
+        "semaphore-async-await": "^1.5.1"
     }
 }

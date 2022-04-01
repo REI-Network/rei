@@ -1,6 +1,6 @@
 {
     "name": "@rei-network/rpc",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
@@ -15,9 +15,9 @@
     },
     "dependencies": {
         "@ethersproject/abi": "^5.4.0",
-        "@rei-network/vm": "^0.0.2",
-        "@rei-network/structure": "^0.1.0",
-        "@rei-network/utils": "^0.1.0",
+        "@rei-network/vm": "^0.0.3",
+        "@rei-network/structure": "^0.1.1",
+        "@rei-network/utils": "^0.1.1",
         "body-parser": "^1.19.0",
         "express": "^4.17.1",
         "express-ws": "^4.0.0",

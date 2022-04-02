@@ -3,7 +3,7 @@
 [![NPM Version](https://img.shields.io/npm/v/@rei-network/blockchain)](https://www.npmjs.org/package/@rei-network/blockchain)
 ![License](https://img.shields.io/npm/l/@rei-network/blockchain)
 
-Definition of blockchain structure and rules, based on `@gxchain2-ethereumjs/blockchain`
+Definition of blockchain structure and rules, based on `@ethereumjs/blockchain`
 
 ## INSTALL
 

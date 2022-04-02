@@ -1,6 +1,9 @@
-import { chainsType } from '@gxchain2-ethereumjs/common/dist/types';
+import { chainsType } from './../types';
 
-const chains: chainsType = {
+/**
+ * @hidden
+ */
+export const chains: chainsType = {
   names: {
     '47805': 'rei-mainnet',
     '12357': 'rei-testnet',
@@ -10,7 +13,3 @@ const chains: chainsType = {
   'rei-testnet': require('./testnet.json'),
   'rei-devnet': require('./devnet.json')
 };
-
-export function getChain(name: number | string) {
-  return typeof name === 'string' ? chains[name] : chains[chains['names'][name]];
-}

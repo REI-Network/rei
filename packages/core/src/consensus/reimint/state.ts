@@ -94,7 +94,7 @@ export class StateMachine {
   }
 
   async msgLoop() {
-    for await (const msg of this.msgQueue.generator()) {
+    for await (const msg of this.msgQueue) {
       await this.lock.acquire();
       try {
         if (msg instanceof StateMachineMessage) {

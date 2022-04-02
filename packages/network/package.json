@@ -1,19 +1,19 @@
 {
     "name": "@rei-network/network",
-    "version": "0.0.6",
+    "version": "0.1.1",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
     "scripts": {
         "build": "tsc --build tsconfig.json",
-        "test": "echo @rei-network/network has not test cases"
+        "test": "echo @rei-network/network has no test cases"
     },
     "devDependencies": {
         "typescript": "^4.1.2"
     },
     "dependencies": {
         "@gxchain2/discv5": "^0.6.4",
-        "@rei-network/utils": "^0.0.4",
+        "@rei-network/utils": "^0.1.1",
         "is-ip": "^3.1.0",
         "it-pipe": "^1.1.0",
         "levelup": "^4.4.0",

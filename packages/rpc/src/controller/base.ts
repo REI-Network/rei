@@ -1,11 +1,11 @@
 import { Address, BN, bufferToHex } from 'ethereumjs-util';
 import { AbiCoder } from '@ethersproject/abi';
-import { ERROR } from '@gxchain2-ethereumjs/vm/dist/exceptions';
-import { Block, WrappedBlock } from '@rei-network/structure';
+import { Block } from '@rei-network/structure';
 import { hexStringToBuffer, hexStringToBN } from '@rei-network/utils';
+import { ERROR } from '@rei-network/vm/dist/exceptions';
 import { StateManager } from '../types';
 import { RpcServer } from '../index';
-import errors from '../errorcodes';
+import errors from '../errorCodes';
 import * as helper from '../helper';
 
 const coder = new AbiCoder();
@@ -116,10 +116,6 @@ export class Controller {
     return block;
   }
 
-  protected async getWrappedBlockByTag(tag: any) {
-    return new WrappedBlock(await this.getBlockByTag(tag), tag === 'pending');
-  }
-
   protected async getStateManagerByTag(tag: any): Promise<StateManager> {
     if (tag === 'pending') {
       return this.backend.getPendingStateManager();
@@ -136,7 +132,7 @@ export class Controller {
     await vm.stateManager.checkpoint();
     try {
       const result = await vm.runCall({
-        block,
+        block: block as any,
         gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
         origin: data.from ? Address.fromString(data.from) : Address.zero(),
         caller: data.from ? Address.fromString(data.from) : Address.zero(),

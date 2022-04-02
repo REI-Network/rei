@@ -1,7 +1,7 @@
 import type { BNLike, Account, AccountData, BN, Address } from 'ethereumjs-util';
 import type { Block, Transaction } from '@rei-network/structure';
 import type { Common } from '@rei-network/common';
-import type VM from '@gxchain2-ethereumjs/vm';
+import type { VM } from '@rei-network/vm';
 import type { WebsocketClient } from './client';
 
 export type SyncingStatus = { syncing: true; status: { startingBlock: string; currentBlock: string; highestBlock: string } } | false;

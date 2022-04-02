@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
 import { BlockHeader } from '@rei-network/structure';
-import { Database } from '@rei-network/database';
+import { Database, DBOp } from '@rei-network/database';
 
 /**
  * ChainIndexerBackend defines the methods needed to process chain segments in
@@ -25,13 +25,13 @@ export interface ChainIndexerBackend {
   /**
    * Commit finalizes the section metadata and stores it into the database.
    */
-  commit(): Promise<void>;
+  commit(): DBOp[];
 
   /**
    * Prune deletes the chain index older than the given threshold.
    * @param section Larger than the section will be deleted
    */
-  prune(section: BN): Promise<void>;
+  prune(section: BN): DBOp[];
 }
 
 export interface ChainIndexerOptions {
@@ -41,4 +41,4 @@ export interface ChainIndexerOptions {
   backend: ChainIndexerBackend;
 }
 
-export interface BloomBitsIndexerOptions extends Omit<ChainIndexerOptions, 'backend'> {}
+export interface BloomBitsIndexerOptions extends Omit<ChainIndexerOptions, 'backend' | 'confirmsBlockNumber' | 'sectionSize'> {}

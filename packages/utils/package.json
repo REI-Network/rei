@@ -1,6 +1,6 @@
 {
     "name": "@rei-network/utils",
-    "version": "0.0.4",
+    "version": "0.1.1",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
@@ -9,12 +9,14 @@
         "test": "mocha -r ts-node/register 'test/**/*.test.ts'"
     },
     "devDependencies": {
+        "@types/node": "^14.14.9",
         "typescript": "^4.1.2",
         "chai": "^4.3.4",
         "mocha": "^9.0.2"
     },
     "dependencies": {
         "qheap": "^1.4.0",
-        "tracer": "^1.1.4"
+        "tracer": "^1.1.4",
+        "ethereumjs-util": "^7.1.4"
     }
 }

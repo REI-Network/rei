@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
 import Heap from 'qheap';
-import { Transaction, WrappedTransaction } from '@rei-network/structure';
+import { Transaction } from '@rei-network/structure';
 import { logger, FunctionalBNMap } from '@rei-network/utils';
 import { txSlots, txCost } from './utils';
 
@@ -298,7 +298,7 @@ export class TxSortedMap {
   ls() {
     for (const [key, value] of this.nonceToTx) {
       logger.info('---');
-      logger.info(new WrappedTransaction(value).toRPCJSON());
+      logger.info(value.toRPCJSON());
     }
   }
 }

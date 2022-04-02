@@ -74,7 +74,7 @@ export abstract class BaseConsensusEngine extends EventEmitter implements Consen
   }
 
   private async msgLoop() {
-    for await (const block of this.msgQueue.generator()) {
+    for await (const block of this.msgQueue) {
       try {
         await this._tryToMintNextBlock(block);
       } catch (err) {

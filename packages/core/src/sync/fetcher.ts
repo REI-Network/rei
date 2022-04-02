@@ -249,7 +249,7 @@ export class Fetcher {
     let error = undefined;
     for await (const {
       data: { blocks, resolve }
-    } of this.processBlocksChannel.generator()) {
+    } of this.processBlocksChannel) {
       try {
         for (const block of blocks) {
           reorged = (await this.backend.processAndCommitBlock(block)) || reorged;

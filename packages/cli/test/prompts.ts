@@ -9,7 +9,6 @@ import { ExtraData } from '@rei-network/core/dist/consensus/reimint/extraData';
 import { hexStringToBuffer, logger } from '@rei-network/utils';
 import { startNode, installOptions } from '../src/commands';
 import { SIGINT } from '../src/process';
-import { WrappedBlock } from '../../structure/dist';
 
 installOptions(program);
 
@@ -56,7 +55,7 @@ const handler: {
   },
   lstx: async (node: Node, hash: string) => {
     try {
-      const tx = await node.db.getWrappedTransaction(hexStringToBuffer(hash));
+      const tx = await node.db.getTransaction(hexStringToBuffer(hash));
       logger.info(tx.toRPCJSON());
     } catch (err: any) {
       if (err.type === 'NotFoundError') {
@@ -68,11 +67,11 @@ const handler: {
   lsblock: async (node: Node, hashOrHeight: string) => {
     const key = hashOrHeight.indexOf('0x') !== 0 ? Number(hashOrHeight) : hexStringToBuffer(hashOrHeight);
     const block = await node.db.getBlock(key);
-    logger.info('block', bufferToHex(block.hash()), 'on height', block.header.number.toString(), ':', new WrappedBlock(block).toRPCJSON(true));
+    logger.info('block', bufferToHex(block.hash()), 'on height', block.header.number.toString(), ':', block.toRPCJSON(true, false));
   },
   lsblock2: async (node: Node, hash: string, height: string) => {
     const block = await node.db.getBlockByHashAndNumber(hexStringToBuffer(hash), new BN(height));
-    logger.info('block', bufferToHex(block.hash()), 'on height', block.header.number.toString(), ':', new WrappedBlock(block).toRPCJSON(true));
+    logger.info('block', bufferToHex(block.hash()), 'on height', block.header.number.toString(), ':', block.toRPCJSON(false, false));
   },
   lsheight: (node: Node) => {
     const block = node.getLatestBlock();

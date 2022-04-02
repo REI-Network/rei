@@ -1,6 +1,6 @@
 {
     "name": "@rei-network/cli",
-    "version": "0.0.12",
+    "version": "0.1.2",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
@@ -19,10 +19,10 @@
         "typescript": "^4.1.2"
     },
     "dependencies": {
-        "@rei-network/core": "^0.0.12",
-        "@rei-network/rpc": "^0.0.8",
-        "@rei-network/utils": "^0.0.4",
-        "@rei-network/wallet": "^0.0.4",
+        "@rei-network/core": "^0.1.2",
+        "@rei-network/rpc": "^0.1.2",
+        "@rei-network/utils": "^0.1.1",
+        "@rei-network/wallet": "^0.1.1",
         "commander": "^6.2.1",
         "inquirer": "^8.0.0"
     }

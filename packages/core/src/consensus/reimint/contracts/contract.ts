@@ -1,6 +1,6 @@
-import EVM from '@gxchain2-ethereumjs/vm/dist/evm/evm';
+import EVM from '@rei-network/vm/dist/evm/evm';
 import { Address, BN, MAX_INTEGER } from 'ethereumjs-util';
-import Message from '@gxchain2-ethereumjs/vm/dist/evm/message';
+import Message from '@rei-network/vm/dist/evm/message';
 import { Common } from '@rei-network/common';
 import { hexStringToBuffer, logger } from '@rei-network/utils';
 import { EMPTY_ADDRESS } from '../../../utils';

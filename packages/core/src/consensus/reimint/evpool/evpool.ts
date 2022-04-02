@@ -1,6 +1,5 @@
 import Semaphore from 'semaphore-async-await';
 import { BN } from 'ethereumjs-util';
-import { Initializer } from '@rei-network/utils';
 import { Evidence } from './evidence';
 
 const defaultMaxCacheSize = 100;
@@ -21,7 +20,7 @@ export interface EvidencePoolOptions {
   maxAgeNumBlocks?: BN;
 }
 
-export class EvidencePool extends Initializer {
+export class EvidencePool {
   private readonly backend: EvidencePoolBackend;
   private readonly lock = new Semaphore(1);
   private readonly maxCacheSize: number;
@@ -31,8 +30,9 @@ export class EvidencePool extends Initializer {
   private height: BN = new BN(0);
   private pruningHeight: BN = new BN(0);
 
+  private initPromise?: Promise<void>;
+
   constructor({ backend, maxCacheSize, maxAgeNumBlocks }: EvidencePoolOptions) {
-    super();
     this.backend = backend;
     this.maxCacheSize = maxCacheSize ?? defaultMaxCacheSize;
     this.maxAgeNumBlocks = maxAgeNumBlocks ?? defaultMaxAgeNumBlocks;
@@ -79,27 +79,32 @@ export class EvidencePool extends Initializer {
    * Initialize evidence pool from the target height
    * @param height - Target height
    */
-  async init(height: BN) {
-    try {
-      await this.runWithLock(async () => {
-        this.height = height.clone();
-        await this.pruneExpiredPendingEvidence();
-        await this.backend.loadPendingEvidence({
-          // add 1 because we may have collected evidence for the next block
-          to: height.addn(1),
-          reverse: true,
-          onData: async (ev) => {
-            this.addToCache(ev);
-            return this.cachedPendingEvidence.length >= this.maxCacheSize;
-          }
-        });
-        this.initOver();
-      });
-    } catch (err) {
-      this.cachedPendingEvidence = [];
-      this.height = new BN(0);
-      throw err;
+  init(height: BN) {
+    if (this.initPromise) {
+      return this.initPromise;
     }
+
+    return (this.initPromise = (async () => {
+      try {
+        await this.runWithLock(async () => {
+          this.height = height.clone();
+          await this.pruneExpiredPendingEvidence();
+          await this.backend.loadPendingEvidence({
+            // add 1 because we may have collected evidence for the next block
+            to: height.addn(1),
+            reverse: true,
+            onData: async (ev) => {
+              this.addToCache(ev);
+              return this.cachedPendingEvidence.length >= this.maxCacheSize;
+            }
+          });
+        });
+      } catch (err) {
+        this.cachedPendingEvidence = [];
+        this.height = new BN(0);
+        throw err;
+      }
+    })());
   }
 
   /**

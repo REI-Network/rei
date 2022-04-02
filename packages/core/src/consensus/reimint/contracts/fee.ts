@@ -1,5 +1,5 @@
 import { toBuffer, Address, BN } from 'ethereumjs-util';
-import { StateManager } from '@gxchain2-ethereumjs/vm/dist/state';
+import { StateManager } from '@rei-network/vm/dist/state';
 import { Common } from '@rei-network/common';
 import { Log, Receipt } from '@rei-network/structure';
 import { FunctionalAddressMap } from '@rei-network/utils';

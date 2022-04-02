@@ -1,10 +1,11 @@
+import EventEmitter from 'events';
 import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import { LevelUp } from 'levelup';
 import { v4, v6 } from 'is-ip';
 import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
-import { logger, TimeoutQueue, ignoreError, InitializerWithEventEmitter } from '@rei-network/utils';
+import { logger, TimeoutQueue, ignoreError } from '@rei-network/utils';
 import { Peer, PeerStatus } from './peer';
 import { Libp2pNode } from './libp2pnode';
 import { Protocol } from './types';
@@ -64,12 +65,13 @@ export declare interface NetworkManager {
 /**
  * Implement a decentralized p2p network between nodes, based on `libp2p`
  */
-export class NetworkManager extends InitializerWithEventEmitter {
+export class NetworkManager extends EventEmitter {
   private readonly protocols: Protocol[];
   private readonly nodedb: NodeDB;
   private privateKey!: Buffer;
   private libp2pNode!: Libp2pNode;
   private aborted: boolean = false;
+  private initPromise?: Promise<void>;
 
   private readonly maxPeers: number;
   private readonly maxDials: number;
@@ -313,31 +315,34 @@ export class NetworkManager extends InitializerWithEventEmitter {
   /**
    * Initialize node
    */
-  async init() {
+  init() {
     if (!this.options.enable) {
-      this.initOver();
-      return;
+      return Promise.resolve();
     }
 
-    const { enr, keypair } = await this.loadLocalENR(this.options);
-    const strEnr = enr.encodeTxt(keypair.privateKey);
-    this.privateKey = keypair.privateKey;
-    logger.info('NetworkManager::init, peerId:', this.options.peerId.toB58String());
-    logger.info('NetworkManager::init,', strEnr);
+    if (this.initPromise) {
+      return this.initPromise;
+    }
 
-    // filter local enr
-    const bootnodes = (this.options.bootnodes ?? []).filter((b) => b !== strEnr);
+    return (this.initPromise = (async () => {
+      const { enr, keypair } = await this.loadLocalENR(this.options);
+      const strEnr = enr.encodeTxt(keypair.privateKey);
+      this.privateKey = keypair.privateKey;
+      logger.info('NetworkManager::init, peerId:', this.options.peerId.toB58String());
+      logger.info('NetworkManager::init,', strEnr);
 
-    this.libp2pNode = new Libp2pNode({
-      ...this.options,
-      tcpPort: this.options.tcpPort ?? defaultTcpPort,
-      udpPort: this.options.udpPort ?? defaultUdpPort,
-      bootnodes: bootnodes,
-      enr,
-      maxConnections: this.maxPeers
-    });
+      // filter local enr
+      const bootnodes = (this.options.bootnodes ?? []).filter((b) => b !== strEnr);
 
-    this.initOver();
+      this.libp2pNode = new Libp2pNode({
+        ...this.options,
+        tcpPort: this.options.tcpPort ?? defaultTcpPort,
+        udpPort: this.options.udpPort ?? defaultUdpPort,
+        bootnodes: bootnodes,
+        enr,
+        maxConnections: this.maxPeers
+      });
+    })());
   }
 
   /**
@@ -351,7 +356,7 @@ export class NetworkManager extends InitializerWithEventEmitter {
     this.dialLoop();
     this.timeoutLoop();
 
-    this.initPromise.then(async () => {
+    (async () => {
       this.protocols.forEach((protocol) => {
         this.libp2pNode.handle(protocol.protocolString, ({ connection, stream }) => {
           const peerId: string = connection.remotePeer.toB58String();
@@ -373,7 +378,7 @@ export class NetworkManager extends InitializerWithEventEmitter {
       });
       this.libp2pNode.discv5.discv5.on('enrAdded', this.onENRAdded);
       this.libp2pNode.discv5.discv5.on('multiaddrUpdated', this.onMultiaddrUpdated);
-    });
+    })();
   }
 
   private checkInbound(peerId: string) {

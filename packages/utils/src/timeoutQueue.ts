@@ -4,6 +4,10 @@ type TimeoutInfo = {
   cb(): void;
 };
 
+/**
+ * TimeoutQueue is used to process multiple timers with the same time interval in batches,
+ * which can save resource consumption
+ */
 export class TimeoutQueue {
   private id: number = Number.MIN_SAFE_INTEGER;
   private duration: number;
@@ -46,6 +50,11 @@ export class TimeoutQueue {
     this.schedule();
   };
 
+  /**
+   * Add a timer callback to the queue
+   * @param cb
+   * @returns Callback id
+   */
   setTimeout(cb: () => void) {
     const id = this.incrementId();
     this.queue.push({
@@ -57,6 +66,11 @@ export class TimeoutQueue {
     return id;
   }
 
+  /**
+   * Clear callback by id
+   * @param id
+   * @returns Is the clearing successful
+   */
   clearTimeout(id: number) {
     const index = this.queue.findIndex(({ id: _id }) => id === _id);
     if (index === -1) {

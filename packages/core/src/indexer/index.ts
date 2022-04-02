@@ -1,3 +1,3 @@
-export * from './chainindexer';
-export * from './bloombitsindexer';
+export * from './chainIndexer';
+export * from './bloomBitsIndexer';
 export * from './types';

@@ -40,7 +40,7 @@ describe('Channel', () => {
       numberChannel.abort();
       symbol = true;
     }, 100);
-    for await (const element of numberChannel.generator()) {
+    for await (const element of numberChannel) {
       expect(element, 'array member should be euqal').be.equal(testdata2[i++]);
     }
     expect(symbol, 'channel be aborted').be.true;
@@ -79,7 +79,7 @@ describe('HChannel', () => {
       numberHChannel.abort();
       symbol = true;
     }, 100);
-    for await (const element of numberHChannel.generator()) {
+    for await (const element of numberHChannel) {
       expect(element.data, 'heap member should be equal').equal(testdata2Sorted[i++]);
     }
     expect(symbol, 'channel be aborted').be.true;
@@ -125,7 +125,7 @@ describe('PChannel', () => {
       numberPChannel.abort();
       symbol = true;
     }, 100);
-    for await (const element of numberPChannel.generator()) {
+    for await (const element of numberPChannel) {
       expect(element.data, 'array member should be euqal').be.equal(dataColletion[i++]);
     }
     expect(symbol, 'the Channel be aborted').be.true;

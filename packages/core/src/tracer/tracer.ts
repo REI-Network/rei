@@ -1,7 +1,7 @@
 import util from 'util';
 import { Address } from 'ethereumjs-util';
-import { OpcodeList, getOpcodesForHF } from '@rei-network/vm/dist/evm/opcodes';
 import { Block } from '@rei-network/structure';
+import { Common } from '@rei-network/common';
 import { IDebug } from '@rei-network/vm/dist/types';
 import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Node } from '../node';
@@ -36,20 +36,20 @@ export class Tracer {
   }
 
   /**
-   * Select the debug mode and generate the return object
-   * @param opcodes Opcodes collection
+   * Select the debug mode and generate the debug instance
    * @param reject Reject function
    * @param config Trace Config
-   * @param hash
-   * @returns Debug object
+   * @param hash Transaction hash
+   * @returns Debug instance
    */
-  private createDebugImpl(opcodes: OpcodeList, reject: (reason?: any) => void, config?: TraceConfig, hash?: Buffer): IDebugImpl {
+  private createDebugImpl(common: Common, reject: (reason?: any) => void, config?: TraceConfig, hash?: Buffer): IDebugImpl {
     if (config?.tracer) {
       if (tracers.has(config.tracer)) {
         config.tracer = tracers.get(config.tracer)!;
         config.toAsync = true;
       }
-      return new JSDebug(this.node, opcodes, reject, Object.assign({ ...config }, { tracer: config.toAsync === false ? `const obj = ${config.tracer}` : toAsync(`const obj = ${config.tracer}`) }));
+      config.tracer = config.toAsync === false ? `const obj = ${config.tracer}` : toAsync(`const obj = ${config.tracer}`);
+      return new JSDebug(common, config, reject, hash);
     } else {
       return new StructLogDebug(config, hash);
     }
@@ -68,12 +68,12 @@ export class Tracer {
     if (block.header.number.eqn(0)) {
       throw new Error('invalid block number, 0');
     }
+
     const executor = this.node.getExecutor(block._common);
     return new Promise<any>(async (resolve, reject) => {
       try {
         block = block as Block;
-        const opcodeList = getOpcodesForHF(block._common);
-        const debug = this.createDebugImpl(opcodeList, reject, config, hash);
+        const debug = this.createDebugImpl(block._common, reject, config, hash);
         await executor.processBlock({ debug, block, force: true, skipConsensusValidation: true, skipConsensusVerify: true });
         const result = debug.result();
         resolve(util.types.isPromise(result) ? await result : result);
@@ -127,11 +127,12 @@ export class Tracer {
     if (block.header.number.eqn(0)) {
       throw new Error('invalid block number, 0');
     }
+
     return new Promise<any>(async (resolve, reject) => {
       try {
         const parent = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
         const vm = await this.node.getVM(parent.header.stateRoot, block.header.number.subn(1));
-        const debug = this.createDebugImpl((vm as any)._opcodes, reject, config);
+        const debug = this.createDebugImpl(block._common, reject, config);
         await vm.runCall({
           block,
           debug,

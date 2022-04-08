@@ -229,6 +229,7 @@ describe('JSDebug', () => {
     const { result, root } = await debugTx(tx, lastRoot);
     expect(root === undefined, 'should call contract failed').be.true;
 
-    console.log('result:', result);
+    expect(Array.isArray(result) && result.length === 1, 'debug result should be an array').be.true;
+    expect(result[0].error, 'should be out of gas').be.equal('out of gas');
   });
 });

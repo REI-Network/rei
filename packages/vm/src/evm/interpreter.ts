@@ -127,6 +127,7 @@ export default class Interpreter {
         // STOP is not an exception
         if (e.error !== ERROR.STOP) {
           err = e;
+          opts.debug && (await opts.debug.captureFault(eventObj, e.error));
         }
         break;
       }

@@ -36,11 +36,27 @@ const vm = new VM({
 async function runTx(tx: Transaction, root: Buffer, debug?: IDebug) {
   const block = Block.fromBlockData({ transactions: [tx] }, { common });
   const result = await vm.runBlock({ block, root, debug, generate: true, skipBlockValidation: true, runTxOpts: { skipNonce: true, skipBlockGasLimitValidation: true } });
-  const error = result.results[0].execResult.exceptionError;
-  if (error) {
-    throw error;
-  }
   return result;
+}
+
+async function debugTx(tx: Transaction, root: Buffer) {
+  let newRoot: Buffer | undefined;
+  const result = await new Promise<any>(async (resolve, reject) => {
+    try {
+      const jsDebug = new JSDebug(common, { toAsync: true, tracer: toAsync(`const obj = ${tracers.get('replayTracer')}`) }, reject, tx.hash());
+      const runResult = await runTx(tx, root, jsDebug);
+      const error = runResult.results[0].execResult.exceptionError;
+      if (!error) {
+        newRoot = runResult.stateRoot;
+      }
+      const result = await jsDebug.result();
+      resolve(result);
+    } catch (err) {
+      reject(err);
+    }
+  });
+
+  return { result, root: newRoot };
 }
 
 function encodeCallData(name: string, types?: string[], values?: any[]) {
@@ -138,19 +154,11 @@ describe('JSDebug', () => {
       },
       { common }
     ).sign(privateKey);
-    const hash = tx.hash();
 
-    const result = await new Promise<any>(async (resolve, reject) => {
-      try {
-        const jsDebug = new JSDebug(common, { toAsync: true, tracer: toAsync(`const obj = ${tracers.get('replayTracer')}`) }, reject, hash);
-        const runResult = await runTx(tx, lastRoot, jsDebug);
-        lastRoot = runResult.stateRoot;
-        const result = await jsDebug.result();
-        resolve(result);
-      } catch (err) {
-        reject(err);
-      }
-    });
+    const { result, root } = await debugTx(tx, lastRoot);
+
+    expect(root !== undefined, 'should call contract succeed').be.true;
+    lastRoot = root!;
 
     /**
      * There are 6 calls here:
@@ -204,5 +212,23 @@ describe('JSDebug', () => {
     expect(call5.to).be.equal(c2Addr.toString());
     expect(call5.input).be.equal('0x');
     expect(call5.value).be.equal(intToHex(1));
+  });
+
+  it('should call contract failed(outOfGasLimit)', async () => {
+    const tx = Transaction.fromTxData(
+      {
+        to: c2Addr,
+        data: encodeCallData('transferTo', ['uint256'], [0]),
+        gasLimit: new BN(22000),
+        gasPrice: new BN(0),
+        value: new BN(0)
+      },
+      { common }
+    ).sign(privateKey);
+
+    const { result, root } = await debugTx(tx, lastRoot);
+    expect(root === undefined, 'should call contract failed').be.true;
+
+    console.log('result:', result);
   });
 });

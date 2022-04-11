@@ -6,7 +6,6 @@ import { snapStorageKey, snapAccountKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFI
 import { FunctionalBufferSet } from '@rei-network/utils';
 import { StakingAccount } from '../stateManager';
 import { EMPTY_HASH, MAX_HASH } from '../utils';
-import { verifyRangeProof } from './verifyRangeProof';
 import { TrieIterator } from './trieIterator';
 import { DiffLayer } from './diffLayer';
 import { asyncTraverseRawDB } from './layerIterator';
@@ -246,7 +245,7 @@ export class DiskLayer implements ISnapshot {
 
     let proofed = false;
     try {
-      trieMore = await verifyRangeProof(root, origin, last, keys, vals, proof);
+      trieMore = await Trie.verifyRangeProof(root, origin, last, keys, vals, proof);
       proofed = true;
     } catch (err) {
       // ignore error...

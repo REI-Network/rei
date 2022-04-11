@@ -56,6 +56,9 @@ export interface TrieSyncBackend {
   hasCode(hash: Buffer): Promise<boolean>;
 }
 
+/**
+ * TrieSync is a scheduler that synchronizes all missing trie nodes or code
+ */
 export class TrieSync {
   private readonly backend: TrieSyncBackend;
   private readonly memBatch = new SyncMemBatch();
@@ -79,6 +82,13 @@ export class TrieSync {
     return this.nodeReqs.size + this.codeReqs.size;
   }
 
+  /**
+   * Add a trie to the sync queue
+   * @param hash - Root node hash
+   * @param path - Node path
+   * @param parent - Parent node
+   * @param callback - Leaf callback
+   */
   async addSubTrie(hash: Buffer, path?: Nibbles, parent?: Buffer, callback?: LeafCallback) {
     if (hash.equals(KECCAK256_RLP)) {
       return;
@@ -102,17 +112,22 @@ export class TrieSync {
       parentReqs.push(ancestor);
     }
 
-    const req: SyncRequest = {
+    this.schedule({
       path,
       hash,
       code: false,
       parent: parentReqs,
       deps: 0,
       callback
-    };
-    this.schedule(req);
+    });
   }
 
+  /**
+   * Add a code entry to the sync queue
+   * @param hash - Code has
+   * @param path - Path
+   * @param parent - Parent node(it is a node)
+   */
   async addCodeEntry(hash: Buffer, path: Nibbles, parent?: Buffer) {
     if (hash.equals(KECCAK256_NULL)) {
       return;
@@ -136,16 +151,20 @@ export class TrieSync {
       parentReqs.push(ancestor);
     }
 
-    const req: SyncRequest = {
+    this.schedule({
       path,
       hash,
       code: true,
       parent: parentReqs,
       deps: 0
-    };
-    this.schedule(req);
+    });
   }
 
+  /**
+   * Retrieve known missing nodes or code
+   * @param max - Maximum number of nodes or code
+   * @returns Missing node or code
+   */
   missing(max: number) {
     const nodeHashes: Buffer[] = [];
     const nodePaths: TransportNibbles[][] = [];
@@ -171,6 +190,11 @@ export class TrieSync {
     };
   }
 
+  /**
+   * Process trie node response
+   * @param hash
+   * @param data
+   */
   async process(hash: Buffer, data: Buffer) {
     const req = this.nodeReqs.get(hash) ?? this.codeReqs.get(hash);
     if (!req) {
@@ -196,6 +220,10 @@ export class TrieSync {
     }
   }
 
+  /**
+   * Flush node and code to db
+   * @param batch
+   */
   commit(batch: RawDBatch) {
     for (const [hash, data] of this.memBatch.nodes) {
       batch.push({ type: 'put', key: hash, keyEncoding: 'none', value: data, valueEncoding: 'none' });
@@ -206,6 +234,10 @@ export class TrieSync {
     this.memBatch.clear();
   }
 
+  /**
+   * Put the request object to queue
+   * @param req
+   */
   private schedule(req: SyncRequest) {
     const map = req.code ? this.codeReqs : this.nodeReqs;
     const old = map.get(req.hash);
@@ -218,12 +250,20 @@ export class TrieSync {
     this.queue.push(req);
   }
 
+  /**
+   * Retrieve all non-existing child nodes
+   * @param req - Parent request
+   * @param node - Parent node
+   * @returns Requests
+   */
   private async children(req: SyncRequest, node: TrieNode): Promise<SyncRequest[]> {
     const onChild = async (nibbles: Nibbles, value: Buffer | Buffer[]): Promise<SyncRequest[]> => {
       if (isRawNode(value)) {
+        // the value is a raw node, decode it directly
         const child = decodeRawNode(value as Buffer[]);
         return await this.children(req, child);
       } else {
+        // the value is the hash of child node, try to queue it
         const hash = value as Buffer;
         if (this.memBatch.hasNode(hash)) {
           return [];
@@ -248,6 +288,8 @@ export class TrieSync {
 
     let reqs: SyncRequest[] = [];
     if (node instanceof LeafNode) {
+      // leaf nodes have no children,
+      // call the callback, then do nothing
       if (req.callback) {
         let paths!: Buffer[];
         const childPath = [...req.path!, ...node._nibbles];
@@ -259,8 +301,10 @@ export class TrieSync {
         await req.callback(paths, childPath, node._value, req.hash);
       }
     } else if (node instanceof ExtensionNode) {
+      // process the child node of extension node
       reqs = reqs.concat(await onChild(node._nibbles, node._value));
     } else if (node instanceof BranchNode) {
+      // process all child nodes of branch node
       for (let i = 0; i < 17; i++) {
         const child = node.getBranch(i);
         if (child) {
@@ -272,6 +316,10 @@ export class TrieSync {
     return reqs;
   }
 
+  /**
+   * Flush node to memory bath
+   * @param req
+   */
   private _commit(req: SyncRequest) {
     if (req.code) {
       this.memBatch.putCode(req.hash, req.data!);

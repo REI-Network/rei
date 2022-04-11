@@ -1,6 +1,6 @@
 {
     "name": "@rei-network/utils",
-    "version": "0.0.3",
+    "version": "0.1.1",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
@@ -16,6 +16,7 @@
     },
     "dependencies": {
         "qheap": "^1.4.0",
-        "tracer": "^1.1.4"
+        "tracer": "^1.1.4",
+        "ethereumjs-util": "^7.1.4"
     }
 }

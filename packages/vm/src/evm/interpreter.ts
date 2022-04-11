@@ -45,10 +45,14 @@ export interface InterpreterStep {
   memory: Buffer;
   memoryWordCount: BN;
   opcode: {
+    code: number;
     name: string;
     fee: number;
     isAsync: boolean;
   };
+  caller: Address;
+  callValue: BN;
+  callData: Buffer;
   account: Account;
   codeAddress: Address;
 }
@@ -109,11 +113,12 @@ export default class Interpreter {
     while (this._runState.programCounter < this._runState.code.length) {
       const opCode = this._runState.code[this._runState.programCounter];
       this._runState.opCode = opCode;
+
       const eventObj = await this._runStepHook();
+      opts.debug && (await opts.debug.captureState(eventObj));
 
       try {
         await this.runStep();
-        opts.debug && (await opts.debug.captureState(eventObj));
       } catch (e: any) {
         // re-throw on non-VM errors
         if (!('errorType' in e && e.errorType === 'VmError')) {
@@ -122,7 +127,7 @@ export default class Interpreter {
         // STOP is not an exception
         if (e.error !== ERROR.STOP) {
           err = e;
-          opts.debug && (await opts.debug.captureFault(eventObj, e));
+          opts.debug && (await opts.debug.captureFault(eventObj, e.error));
         }
         break;
       }
@@ -181,6 +186,7 @@ export default class Interpreter {
       gasLeft: this._eei.getGasLeft(),
       gasRefund: this._eei._evm._refund,
       opcode: {
+        code: opcode.code,
         name: opcode.fullName,
         fee: opcode.fee,
         isAsync: opcode.isAsync
@@ -193,7 +199,10 @@ export default class Interpreter {
       stateManager: this._runState.stateManager,
       memory: this._runState.memory._store, // Return underlying array for backwards-compatibility
       memoryWordCount: this._runState.memoryWordCount,
-      codeAddress: this._eei._env.codeAddress
+      codeAddress: this._eei._env.codeAddress,
+      caller: this._eei._env.caller,
+      callValue: this._eei._env.callValue,
+      callData: this._eei._env.callData
     };
 
     if (this._vm.DEBUG) {

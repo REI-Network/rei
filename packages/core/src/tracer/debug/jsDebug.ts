@@ -2,124 +2,76 @@ import vm from 'vm';
 import bi, { BigInteger } from 'big-integer';
 import { StateManager } from '@rei-network/vm/dist/state';
 import { getPrecompile } from '@rei-network/vm/dist/evm/precompiles';
-import { OpcodeList } from '@rei-network/vm/dist/evm/opcodes';
 import { Address, BN, bufferToHex, setLengthLeft, generateAddress, generateAddress2, keccak256 } from 'ethereumjs-util';
 import { InterpreterStep } from '@rei-network/vm/dist/evm/interpreter';
 import { VmError } from '@rei-network/vm/dist/exceptions';
 import { hexStringToBuffer, logger } from '@rei-network/utils';
 import { calcIntrinsicGas } from '@rei-network/structure';
+import { Common } from '@rei-network/common';
 import { IDebugImpl, TraceConfig } from '../tracer';
-import { Node } from '../../node';
 
 /**
- * Convert operation name to number
- * @param opcodes Opcodes collection
- * @param name Opcode name
- * @returns Opcode number
+ * Generate and return the operation method of OP
+ * @param name
+ * @param code
+ * @returns
  */
-function opNameToNumber(opcodes: OpcodeList, name: string) {
-  if (name.indexOf('LOG') === 0) {
-    return Number(name.substr(3)) + 0xa0;
-  } else if (name.indexOf('PUSH') === 0) {
-    return Number(name.substr(4)) + 0x5f;
-  } else if (name.indexOf('DUP') === 0) {
-    return Number(name.substr(3)) + 0x7f;
-  } else if (name.indexOf('SWAP') === 0) {
-    return Number(name.substr(4)) + 0x8f;
-  }
-  for (const [code, opcode] of opcodes) {
-    if (code >= 0x60 && code <= 0xa4) {
-      continue;
-    }
-    if (opcode.name === name) {
+function makeOP(name: string, code: number) {
+  return {
+    isPush() {
+      return name.startsWith('PUSH');
+    },
+    toString() {
+      return name;
+    },
+    toNumber() {
       return code;
     }
-  }
-  throw new Error(`unknown opcode: ${name}`);
+  };
 }
 
 /**
- * Used to manage an operation object
+ * Generate and return the operation method of memory
+ * @param memory
+ * @returns
  */
-class Op {
-  name: string;
-  constructor(opcodes: OpcodeList, name: string) {
-    this.name = name;
-    this.toNumber = () => {
-      const res = opNameToNumber(opcodes, this.name);
-      return res;
-    };
-  }
-  isPush() {
-    return this.name.indexOf('PUSH') === 0;
-  }
-  toString() {
-    return this.name;
-  }
-  toNumber: () => number;
-}
-
-class Memory {
-  memory: Buffer;
-  constructor(memory: Buffer) {
-    this.memory = memory;
-  }
-  slice(start: number, stop: number) {
-    return this.memory.slice(start, stop);
-  }
-  getUint(offset: number) {
-    if (offset < 0 || offset + 32 > this.memory.length - 1) {
-      return bi(0);
+function makeMemory(memory: Buffer) {
+  return {
+    slice(start: number, stop: number) {
+      return memory.slice(start, stop);
+    },
+    getUint(offset: number) {
+      if (offset < 0 || offset + 32 > memory.length - 1) {
+        return bi(0);
+      }
+      return bi(memory.slice(offset, offset + 32).readUInt32BE());
     }
-    return bi(this.memory.slice(offset, offset + 32).readUInt32BE());
-  }
+  };
 }
 
 /**
- * Contract represents an ethereum contract in the state database. It contains
- * the contract code, calling arguments.
+ * Generate and return the operation method of contract
+ * @param caller
+ * @param address
+ * @param value
+ * @param input
+ * @returns
  */
-class Contract {
-  caller: Buffer;
-  address: Buffer;
-  value: BigInteger;
-  input: Buffer;
-  constructor(caller: Buffer, address: Buffer, value: BigInteger, input: Buffer) {
-    this.caller = caller;
-    this.address = address;
-    this.value = value;
-    this.input = input;
-  }
-  /**
-   * getCaller returns the caller of the contract.
-   * @returns Contract caller
-   */
-  getCaller() {
-    return this.caller;
-  }
-
-  /**
-   * getAddress returns the contracts address
-   * @returns contracts address
-   */
-  getAddress() {
-    return this.address;
-  }
-
-  /**
-   * getValue returns the contract's value (sent to it from it's caller)
-   * @returns contract's value
-   */
-  getValue() {
-    return this.value;
-  }
-  /**
-   * getInput return the input data
-   * @returns Input data
-   */
-  getInput() {
-    return this.input;
-  }
+function makeContract(caller: Buffer, address: Buffer, value: BigInteger, input: Buffer) {
+  return {
+    getCaller() {
+      return caller;
+    },
+    getAddress() {
+      return address;
+    },
+    getValue() {
+      return value;
+    },
+    getInput() {
+      return input;
+    }
+  };
 }
 
 /**
@@ -149,13 +101,13 @@ function makeDB(stateManager: StateManager) {
 
 /**
  * Generate and return the operation method of the log
- * @param ctx Contract transaction information
- * @param opcodes Opcodes collection
- * @param step Step state
- * @param error Error message
- * @returns A object for get contract parameter
+ * @param ctx
+ * @param opcodes
+ * @param step
+ * @param error
+ * @returns
  */
-function makeLog(ctx: { [key: string]: any }, opcodes: OpcodeList, step: InterpreterStep, error?: string) {
+function makeLog(step: InterpreterStep, error?: string) {
   const stack = step.stack.map((bn) => bi(bn.toString())).reverse();
   Object.defineProperty(stack, 'peek', {
     value: (idx: number) => {
@@ -165,11 +117,12 @@ function makeLog(ctx: { [key: string]: any }, opcodes: OpcodeList, step: Interpr
       return stack[idx];
     }
   });
+
   return {
-    op: new Op(opcodes, step.opcode.name),
+    op: makeOP(step.opcode.name, step.opcode.code),
     stack,
-    memory: new Memory(step.memory),
-    contract: new Contract(ctx['from'], ctx['to'], ctx['value'], ctx['input']),
+    memory: makeMemory(step.memory),
+    contract: makeContract(step.caller.buf, step.address.buf, bi(step.callValue.toString()), step.callData),
     getPC() {
       return step.pc;
     },
@@ -196,12 +149,14 @@ function toAddress(data: Buffer | string) {
 }
 
 export class JSDebug implements IDebugImpl {
-  hash: Buffer | undefined;
-  private node: Node;
+  hash?: Buffer;
+
+  private common: Common;
   private config: TraceConfig;
-  private debugContext: {
-    [key: string]: any;
-  } = {};
+  private vmContext: vm.Context;
+  private reject?: (reason?: any) => void;
+  private debugContext: { [key: string]: any } = {};
+
   private vmContextObj: {
     toHex(buf: Buffer): string;
     toWord(data: Buffer | string): Buffer;
@@ -214,8 +169,8 @@ export class JSDebug implements IDebugImpl {
     globalDB?: ReturnType<typeof makeDB>;
     globalCtx: { [key: string]: any };
     globalPromise?: Promise<any>;
-    glog(...args: any[]): void;
     bigInt: typeof bi;
+    glog(...args: any[]): void;
   } = {
     toHex(buf: Buffer) {
       return bufferToHex(buf);
@@ -233,7 +188,7 @@ export class JSDebug implements IDebugImpl {
       return generateAddress2(toAddress(data), hexStringToBuffer(salt), keccak256(code));
     },
     isPrecompiled: (address: Buffer) => {
-      return getPrecompile(new Address(address), this.node.getCommon(this.debugContext['block'])) !== undefined;
+      return getPrecompile(new Address(address), this.common) !== undefined;
     },
     slice(buf: Buffer, start: number, end: number) {
       if (start < 0 || start > end || end > buf.length - 1) {
@@ -242,43 +197,39 @@ export class JSDebug implements IDebugImpl {
       return buf.slice(start, end);
     },
     globalCtx: this.debugContext,
+    bigInt: bi,
     glog(...args: any[]) {
-      logger.detail('JSDebug::glog,', ...args);
-    },
-    bigInt: bi
+      logger.debug('JSDebug::glog,', ...args);
+    }
   };
-  private vmContext: vm.Context;
-  private opcodes: OpcodeList;
-  private rejected: boolean = false;
-  private reject: (reason?: any) => void;
 
-  constructor(node: Node, opcodes: OpcodeList, reject: (reason?: any) => void, config: TraceConfig) {
-    this.node = node;
+  constructor(common: Common, config: TraceConfig, reject: (reason?: any) => void, hash?: Buffer) {
+    this.common = common;
     this.config = config;
-    this.opcodes = opcodes;
-    this.vmContext = vm.createContext(this.vmContextObj, { codeGeneration: { strings: false, wasm: false } });
     this.reject = reject;
+    this.hash = hash;
+    this.vmContext = vm.createContext(this.vmContextObj, { codeGeneration: { strings: false, wasm: false } });
     new vm.Script(config.tracer!).runInContext(this.vmContext);
   }
 
   private error(reason?: any) {
-    if (!this.rejected) {
-      this.rejected = true;
+    if (this.reject) {
       this.reject(reason);
+      this.reject = undefined;
     }
   }
 
   /**
    * CaptureStart implements the Tracer interface to initialize the tracing operation.
-   * @param from From address
-   * @param to To address
-   * @param create Create or call
-   * @param input Input data
-   * @param gas GasLimit
-   * @param gasPrice  gasPrice
-   * @param value Sent to it from it's caller
-   * @param number Blocknumber
-   * @param stateManager state trie manager
+   * @param from
+   * @param to
+   * @param create
+   * @param input
+   * @param gas
+   * @param gasPrice
+   * @param value
+   * @param number
+   * @param stateManager
    */
   async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, gasPrice: BN, value: BN, number: BN, stateManager: StateManager) {
     this.debugContext['type'] = create ? 'CREATE' : 'CALL';
@@ -294,17 +245,17 @@ export class JSDebug implements IDebugImpl {
   }
 
   /**
-   * captureLog implements the Tracer interface to trace a single step of VM execution.
-   * @param step Step state
-   * @param error Error message
-   * @returns
+   * CaptureLog implements the Tracer interface to trace a single step of VM execution.
+   * @param step
+   * @param error
    */
   private async captureLog(step: InterpreterStep, error?: string) {
-    if (this.rejected) {
+    if (!this.reject) {
       return;
     }
+
     try {
-      this.vmContextObj.globalLog = makeLog(this.debugContext, this.opcodes, step, error);
+      this.vmContextObj.globalLog = makeLog(step, error);
       const script = error ? new vm.Script('globalPromise = obj.fault.call(obj, globalLog, globalDB)') : new vm.Script('globalPromise = obj.step.call(obj, globalLog, globalDB)');
       script.runInContext(this.vmContext, { timeout: this.config.timeout ? Number(this.config.timeout) : undefined, breakOnSigint: true });
       if (this.vmContextObj.globalPromise) {
@@ -317,18 +268,18 @@ export class JSDebug implements IDebugImpl {
   }
 
   /**
-   * captureState call the captureLog function
-   * @param step Step state
-   * @param cost Cost value
+   * CaptureState call the captureLog function
+   * @param step
+   * @param cost
    */
   async captureState(step: InterpreterStep) {
     await this.captureLog(step);
   }
 
   /**
-   * captureFault implements the Tracer interface to trace an execution fault
-   * @param step Step state
-   * @param err Error message
+   * CaptureFault implements the Tracer interface to trace an execution fault.
+   * @param step
+   * @param err
    */
   async captureFault(step: InterpreterStep, err: any) {
     let errString: string;
@@ -345,10 +296,10 @@ export class JSDebug implements IDebugImpl {
   }
 
   /**
-   * CaptureEnd is called after the call finishes to finalize the tracing.
-   * @param output Output result
-   * @param gasUsed Gas used
-   * @param time Running time
+   * CaptureEnd implements the Tracer interface, called after the VM has finished executing.
+   * @param output
+   * @param gasUsed
+   * @param time
    */
   async captureEnd(output: Buffer, gasUsed: BN, time: number) {
     this.debugContext['output'] = output;
@@ -357,13 +308,14 @@ export class JSDebug implements IDebugImpl {
   }
 
   /**
-   * GetResult calls the Javascript 'result' function and returns its value, or any accumulated error
-   * @returns
+   * Result calls the Javascript 'result' function and returns its value, or any accumulated error
+   * @returns Debug result
    */
   async result() {
-    if (this.rejected) {
+    if (!this.reject) {
       return;
     }
+
     try {
       new vm.Script('globalPromise = obj.result.call(obj, globalCtx, globalDB)').runInContext(this.vmContext, { timeout: this.config.timeout ? Number(this.config.timeout) : undefined, breakOnSigint: true });
       if (this.vmContextObj.globalPromise) {

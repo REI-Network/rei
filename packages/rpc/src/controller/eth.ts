@@ -1,4 +1,4 @@
-import { Address, intToHex, bnToHex, bufferToHex, hashPersonalMessage, toRpcSig, ecsign, BN } from 'ethereumjs-util';
+import { Address, intToHex, bnToHex, bufferToHex, hashPersonalMessage, toRpcSig, ecsign, BN, setLengthLeft } from 'ethereumjs-util';
 import { TransactionFactory, Log, Transaction, Block } from '@rei-network/structure';
 import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
@@ -79,7 +79,7 @@ export class ETHController extends Controller {
   }
   async eth_getStorageAt([address, key, tag]: [string, string, any]) {
     const stateManager = await this.getStateManagerByTag(tag);
-    return bufferToHex(await stateManager.getContractStorage(Address.fromString(address), hexStringToBuffer(key)));
+    return bufferToHex(await stateManager.getContractStorage(Address.fromString(address), setLengthLeft(hexStringToBuffer(key), 32)));
   }
   async eth_getTransactionCount([address, tag]: [string, any]) {
     const stateManager = await this.getStateManagerByTag(tag);

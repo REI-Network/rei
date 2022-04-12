@@ -6,7 +6,7 @@ import { snapStorageKey, snapAccountKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFI
 import { FunctionalBufferSet } from '@rei-network/utils';
 import { StakingAccount } from '../stateManager';
 import { EMPTY_HASH, MAX_HASH } from '../utils';
-import { TrieIterator } from './trieIterator';
+import { KVIterator } from './trieIterator';
 import { DiffLayer } from './diffLayer';
 import { asyncTraverseRawDB } from './layerIterator';
 import { DBatch } from './batch';
@@ -296,7 +296,7 @@ export class DiskLayer implements ISnapshot {
 
     // start traversing the Trie
     const trie = _trie ?? new Trie(this.db.rawdb, root);
-    for await (const { key, val } of new TrieIterator(trie)) {
+    for await (const { key, val } of new KVIterator(trie)) {
       if (last && key.compare(last) > 0) {
         trieMore = true;
         break;

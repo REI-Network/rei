@@ -1,14 +1,15 @@
 import { expect } from 'chai';
 import { LevelUp } from 'levelup';
 import { SecureTrie, BaseTrie } from 'merkle-patricia-tree';
-import { BranchNode, TrieNode, ExtensionNode } from 'merkle-patricia-tree/dist/trieNode';
+import { BranchNode, LeafNode } from 'merkle-patricia-tree/dist/trieNode';
 import { Common } from '@rei-network/common';
 import { Database, DBOpData } from '@rei-network/database';
 import { getRandomIntInclusive } from '@rei-network/utils';
 import { BinaryRawDBatch } from '../../src/snap/batch';
 import { TrieSync, TrieSyncBackend } from '../../src/snap/trieSync';
-import { TrieIterator } from '../../src/snap/trieIterator';
+import { TrieNodeIterator } from '../../src/snap/trieIterator';
 import { AccountInfo, genRandomAccounts } from './util';
+import { StakingAccount } from '../../dist/stateManager';
 const level = require('level-mem');
 
 const common = new Common({ chain: 'rei-devnet' });
@@ -58,11 +59,13 @@ describe('TrieSync', () => {
   let accounts!: AccountInfo[];
   let root!: Buffer;
 
-  async function syncAndCheck(rawdb2?: LevelUp) {
+  async function syncAndCheck(rawdb2?: LevelUp, beforeSync?: () => Promise<void>) {
     const backend = new MockTrieSyncBackend(rawdb2);
 
     const sync = new TrieSync(backend);
     await sync.init(root);
+
+    beforeSync && (await beforeSync());
 
     while (sync.pending > 0) {
       const { nodeHashes, codeHashes } = sync.missing(3);
@@ -108,46 +111,58 @@ describe('TrieSync', () => {
   it("should sync trie succeed(when some nodes don't exist)", async () => {
     const rawdb2: LevelUp = level();
 
-    // copy whole tree
-    for await (const { key, val } of new TrieIterator(new BaseTrie(rawdb, root))) {
-      await rawdb2.put(key, val, rawDBOpts);
-    }
+    await syncAndCheck(rawdb2, async () => {
+      // copy whole tree
+      for await (const node of new TrieNodeIterator(new BaseTrie(rawdb, root))) {
+        await rawdb2.put(node.hash(), node.serialize(), rawDBOpts);
 
-    // ensure the root node is a branch node
-    const trie = new BaseTrie(rawdb, root);
-    const node = await trie._lookupNode(root);
-    if (!(node instanceof BranchNode)) {
-      throw new Error('the root node is not a branch node, please run test cases again');
-    }
+        if (node instanceof LeafNode) {
+          const account = StakingAccount.fromRlpSerializedAccount(node._value);
+          await rawdb2.put(account.codeHash, await rawdb.get(account.codeHash, rawDBOpts), rawDBOpts);
 
-    // randomly pick a child branch
-    const childNodes: (Buffer | Buffer[])[] = [];
-    for (let i = 0; i < 16; i++) {
-      const childNode = node.getBranch(i);
-      if (childNode && childNode.length > 0) {
-        childNodes.push(childNode);
-      }
-    }
-
-    // delete the whole child branch
-    const deleteNode = async (node: TrieNode) => {
-      if (node instanceof BranchNode) {
-        for (let i = 0; i < 16; i++) {
-          const childNode = node.getBranch(i);
-          if (childNode && childNode.length > 0) {
-            const child = await trie._lookupNode(childNode);
-            await deleteNode(child!);
+          for await (const node of new TrieNodeIterator(new BaseTrie(rawdb, account.stateRoot))) {
+            await rawdb2.put(node.hash(), node.serialize(), rawDBOpts);
           }
         }
-      } else if (node instanceof ExtensionNode) {
-        const child = await trie._lookupNode(node._value);
-        await deleteNode(child!);
       }
 
-      await rawdb2.del(node.hash(), rawDBOpts);
-    };
-    await deleteNode((await trie._lookupNode(childNodes[getRandomIntInclusive(0, childNodes.length - 1)]))!);
+      // ensure the root node is a branch node
+      const trie = new BaseTrie(rawdb, root);
+      const node = await trie._lookupNode(root);
+      if (!(node instanceof BranchNode)) {
+        throw new Error('the root node is not a branch node, please run test cases again');
+      }
 
-    await syncAndCheck(rawdb2);
+      const childNodes: (Buffer | Buffer[])[] = [];
+      for (let i = 0; i < 16; i++) {
+        const childNode = node.getBranch(i);
+        if (childNode && childNode.length > 0) {
+          childNodes.push(childNode);
+        }
+      }
+
+      // randomly pick a child branch
+      const childNode = childNodes[getRandomIntInclusive(0, childNodes.length - 1)] as Buffer;
+
+      // delete the whole child branch
+      const deleteKey: Buffer[] = [];
+      for await (const node of new TrieNodeIterator(new BaseTrie(rawdb, childNode))) {
+        deleteKey.push(node.hash());
+        if (node instanceof LeafNode) {
+          const account = StakingAccount.fromRlpSerializedAccount(node._value);
+          // delete code
+          deleteKey.push(account.codeHash);
+
+          // delete storage
+          for await (const node of new TrieNodeIterator(new BaseTrie(rawdb, account.stateRoot))) {
+            deleteKey.push(node.hash());
+          }
+        }
+      }
+
+      for (const key of deleteKey) {
+        await rawdb2.del(key, rawDBOpts);
+      }
+    });
   });
 });

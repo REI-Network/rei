@@ -5,7 +5,7 @@ import { nibblesToBuffer } from 'merkle-patricia-tree/dist/util/nibbles';
 import { FunctionalBufferMap } from '@rei-network/utils';
 import { StakingAccount } from '../stateManager';
 import { nibblesToTransportNibbles, TransportNibbles } from './nibbles';
-import { RawDBatch } from './batch';
+import { BinaryRawDBatch } from './batch';
 
 type LeafCallback = (paths: Buffer[], path: Nibbles, leaf: Buffer, parent: Buffer) => Promise<void>;
 
@@ -239,12 +239,12 @@ export class TrieSync {
    * Flush node and code to db
    * @param batch
    */
-  commit(batch: RawDBatch) {
+  commit(batch: BinaryRawDBatch) {
     for (const [hash, data] of this.memBatch.nodes) {
-      batch.push({ type: 'put', key: hash, keyEncoding: 'binary', value: data, valueEncoding: 'binary' });
+      batch.push({ type: 'put', key: hash, value: data });
     }
     for (const [hash, data] of this.memBatch.codes) {
-      batch.push({ type: 'put', key: hash, keyEncoding: 'binary', value: data, valueEncoding: 'binary' });
+      batch.push({ type: 'put', key: hash, value: data });
     }
     this.memBatch.clear();
   }

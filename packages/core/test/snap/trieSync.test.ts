@@ -5,7 +5,7 @@ import { BranchNode, TrieNode, ExtensionNode } from 'merkle-patricia-tree/dist/t
 import { Common } from '@rei-network/common';
 import { Database, DBOpData } from '@rei-network/database';
 import { getRandomIntInclusive } from '@rei-network/utils';
-import { RawDBatch } from '../../src/snap/batch';
+import { BinaryRawDBatch } from '../../src/snap/batch';
 import { TrieSync, TrieSyncBackend } from '../../src/snap/trieSync';
 import { TrieIterator } from '../../src/snap/trieIterator';
 import { AccountInfo, genRandomAccounts } from './util';
@@ -73,7 +73,7 @@ describe('TrieSync', () => {
         await sync.process(hash, await rawdb.get(hash, rawDBOpts));
       }
 
-      const batch = new RawDBatch(backend as any);
+      const batch = new BinaryRawDBatch(backend as any);
       sync.commit(batch);
       await batch.write();
       batch.reset();
@@ -129,7 +129,7 @@ describe('TrieSync', () => {
       }
     }
 
-    // delete whole child branch
+    // delete the whole child branch
     const deleteNode = async (node: TrieNode) => {
       if (node instanceof BranchNode) {
         for (let i = 0; i < 16; i++) {

@@ -26,7 +26,7 @@ export class DBatch {
   }
 }
 
-export class RawDBatch {
+export class BinaryRawDBatch {
   private readonly db: LevelUp;
   private batch: DBOpData[] = [];
 
@@ -38,8 +38,12 @@ export class RawDBatch {
     return this.batch.length;
   }
 
-  push(op: DBOpData) {
-    this.batch.push(op);
+  push(op: Omit<DBOpData, 'keyEncoding' | 'valueEncoding'>) {
+    this.batch.push({
+      ...op,
+      keyEncoding: 'binary',
+      valueEncoding: 'binary'
+    });
   }
 
   write() {

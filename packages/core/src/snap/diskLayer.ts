@@ -49,7 +49,7 @@ export class DiskLayer implements ISnapshot {
   genMarker?: Buffer;
 
   // An aborter to abort snapshot generation
-  private aborter?: GenerateAborter;
+  aborter?: GenerateAborter;
 
   constructor(db: Database, root: Buffer) {
     this.db = db;

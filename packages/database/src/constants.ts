@@ -99,6 +99,15 @@ export const SNAP_JOURNAL_KEY = Buffer.from('SnapshotJournal');
  */
 export const SNAP_GENERATOR_KEY = Buffer.from('SnapshotGenerator');
 
+/**
+ * snapshotRecoveryKey
+ */
+export const SNAP_RECOVERY_KEY = Buffer.from('SnapshotRecovery');
+
+/**
+ * snapshotDisableKey
+ */
+export const SNAP_DISABLED_KEY = Buffer.from('SnapshotDisabled');
 // Utility functions
 
 /**

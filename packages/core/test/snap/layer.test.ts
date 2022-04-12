@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { assert, expect } from 'chai';
+import { expect } from 'chai';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import { keccak256 } from 'ethereumjs-util';
 import { FunctionalBufferMap, FunctionalBufferSet, getRandomIntInclusive } from '@rei-network/utils';

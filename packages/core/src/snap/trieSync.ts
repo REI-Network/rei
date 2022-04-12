@@ -3,6 +3,7 @@ import { KECCAK256_NULL, KECCAK256_RLP } from 'ethereumjs-util';
 import { BranchNode, ExtensionNode, LeafNode, Nibbles, TrieNode, isRawNode, decodeRawNode, decodeNode } from 'merkle-patricia-tree/dist/trieNode';
 import { nibblesToBuffer } from 'merkle-patricia-tree/dist/util/nibbles';
 import { FunctionalBufferMap } from '@rei-network/utils';
+import { StakingAccount } from '../stateManager';
 import { nibblesToTransportNibbles, TransportNibbles } from './nibbles';
 import { RawDBatch } from './batch';
 
@@ -80,6 +81,20 @@ export class TrieSync {
 
   get pending() {
     return this.nodeReqs.size + this.codeReqs.size;
+  }
+
+  /**
+   * Initialize sync
+   * @param root - Root node hash
+   * @param onLeaf - Leaf callback
+   */
+  init(root: Buffer, onLeaf?: LeafCallback) {
+    return this.addSubTrie(root, undefined, undefined, async (paths, path, leaf, parent) => {
+      onLeaf && (await onLeaf(paths, path, leaf, parent));
+      const account = StakingAccount.fromRlpSerializedAccount(leaf);
+      await this.addSubTrie(account.stateRoot, path, parent, onLeaf);
+      await this.addCodeEntry(account.codeHash, path, parent);
+    });
   }
 
   /**
@@ -177,7 +192,7 @@ export class TrieSync {
         codeHashes.push(req.hash);
       } else {
         nodeHashes.push(req.hash);
-        nodePaths.push(toTransportNibbles(req.path!));
+        nodePaths.push(req.path ? toTransportNibbles(req.path) : [[]]);
       }
 
       this.queue.remove();
@@ -226,10 +241,10 @@ export class TrieSync {
    */
   commit(batch: RawDBatch) {
     for (const [hash, data] of this.memBatch.nodes) {
-      batch.push({ type: 'put', key: hash, keyEncoding: 'none', value: data, valueEncoding: 'none' });
+      batch.push({ type: 'put', key: hash, keyEncoding: 'binary', value: data, valueEncoding: 'binary' });
     }
     for (const [hash, data] of this.memBatch.codes) {
-      batch.push({ type: 'put', key: hash, keyEncoding: 'none', value: data, valueEncoding: 'none' });
+      batch.push({ type: 'put', key: hash, keyEncoding: 'binary', value: data, valueEncoding: 'binary' });
     }
     this.memBatch.clear();
   }
@@ -275,7 +290,7 @@ export class TrieSync {
 
         return [
           {
-            path: [...req.path!, ...nibbles],
+            path: [...(req.path ?? []), ...nibbles],
             hash,
             parent: [req],
             callback: req.callback,
@@ -286,30 +301,39 @@ export class TrieSync {
       }
     };
 
-    let reqs: SyncRequest[] = [];
-    if (node instanceof LeafNode) {
-      // leaf nodes have no children,
-      // call the callback, then do nothing
+    const onLeaf = async (nibbles: Nibbles, value: Buffer) => {
       if (req.callback) {
         let paths!: Buffer[];
-        const childPath = [...req.path!, ...node._nibbles];
+        const childPath = [...(req.path ?? []), ...nibbles];
         if (childPath.length === 2 * 32) {
           paths = [nibblesToBuffer(childPath)];
         } else if (childPath.length === 4 * 32) {
           paths = [nibblesToBuffer(childPath.slice(0, 64)), nibblesToBuffer(childPath.slice(64))];
         }
-        await req.callback(paths, childPath, node._value, req.hash);
+        await req.callback(paths, childPath, value, req.hash);
       }
+    };
+
+    let reqs: SyncRequest[] = [];
+    if (node instanceof LeafNode) {
+      // leaf nodes have no children,
+      // call the callback, then do nothing
+      await onLeaf(node._nibbles, node._value);
     } else if (node instanceof ExtensionNode) {
       // process the child node of extension node
       reqs = reqs.concat(await onChild(node._nibbles, node._value));
     } else if (node instanceof BranchNode) {
       // process all child nodes of branch node
-      for (let i = 0; i < 17; i++) {
+      for (let i = 0; i < 16; i++) {
         const child = node.getBranch(i);
         if (child) {
           reqs = reqs.concat(await onChild([i], child));
         }
+      }
+
+      // branch node may also contain a value
+      if (node._value && node._value.length > 0) {
+        await onLeaf([], node._value);
       }
     }
 

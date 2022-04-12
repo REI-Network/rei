@@ -9,7 +9,7 @@ import { BinaryRawDBatch } from '../../src/snap/batch';
 import { TrieSync, TrieSyncBackend } from '../../src/snap/trieSync';
 import { TrieNodeIterator } from '../../src/snap/trieIterator';
 import { AccountInfo, genRandomAccounts } from './util';
-import { StakingAccount } from '../../dist/stateManager';
+import { StakingAccount } from '../../src/stateManager';
 const level = require('level-mem');
 
 const common = new Common({ chain: 'rei-devnet' });

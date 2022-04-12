@@ -1,12 +1,12 @@
 import crypto from 'crypto';
 import { expect } from 'chai';
-import { Common } from '@rei-network/common';
-import { StateManager, StakingAccount } from '../../src/stateManager';
-import { Snapshot, SnapshotTree } from '../../src/stateManager/types';
-import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
-import { Address, BN, keccak256, unpadBuffer, Account } from 'ethereumjs-util';
 import { encode } from 'rlp';
+import { Address, BN, keccak256, unpadBuffer, Account } from 'ethereumjs-util';
+import { Common } from '@rei-network/common';
+import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
 import { Trie } from 'merkle-patricia-tree/dist/baseTrie';
+import { StateManager, StakingAccount } from '../../dist/stateManager';
+import { Snapshot, SnapshotTree } from '../../dist/stateManager/types';
 
 class MockSnap implements Snapshot {
   _root: Buffer;

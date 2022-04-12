@@ -1,24 +1,22 @@
+import { rlp, BN } from 'ethereumjs-util';
 import { Database } from '@rei-network/database';
 import { FunctionalBufferMap, FunctionalBufferSet, logger } from '@rei-network/utils';
+import { snapStorageKey, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
+import { DBDeleteSnapRoot, DBDeleteSnapAccount, DBDeleteSnapStorage, DBSaveSerializedSnapAccount, DBSaveSnapStorage, DBSaveSnapRoot, DBDeleteSnapJournal, DBDeleteSnapGenerator, DBSaveSnapDisabled, DBDeleteSnapRecoveryNumber, DBDeleteSnapDisabled, DBSaveSnapJournal } from '@rei-network/database/dist/helpers';
 import { DBatch } from './batch';
 import { DiffLayer } from './diffLayer';
 import { DiskLayer } from './diskLayer';
 import { GeneratorStats, Snapshot } from './types';
-import { DBDeleteSnapRoot, DBDeleteSnapAccount, DBDeleteSnapStorage, DBSaveSerializedSnapAccount, DBSaveSnapStorage, DBSaveSnapRoot, DBDeleteSnapJournal, DBDeleteSnapGenerator, DBSaveSnapDisabled, DBDeleteSnapRecoveryNumber, DBDeleteSnapDisabled, DBSaveSnapJournal } from '@rei-network/database/dist/helpers';
 import { SimpleAborter, wipeKeyRange } from './utils';
 import { asyncTraverseRawDB } from './layerIterator';
-import { EMPTY_HASH, MAX_HASH } from '../utils';
-import { snapStorageKey, SNAP_STORAGE_PREFIX } from '@rei-network/database/src/constants';
 import { journalProgress, loadSnapshot } from './journal';
-import { BN } from 'bn.js';
-import { rlp } from 'ethereumjs-util';
+import { EMPTY_HASH, MAX_HASH } from '../utils';
 
 const aggregatorMemoryLimit = 4 * 1024 * 1024;
 const idealBatchSize = 102400;
-
 const journalVersion = 0;
 
-class SnapTree {
+export class SnapTree {
   diskdb: Database;
   cache: number;
   layers: FunctionalBufferMap<Snapshot>;

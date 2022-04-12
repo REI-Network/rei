@@ -52,7 +52,7 @@ describe('TrieSync', () => {
   let root!: Buffer;
 
   before(async () => {
-    const result = await genRandomAccounts(db, 10, 10);
+    const result = await genRandomAccounts(db, 20, 20, false);
     accounts = result.accounts;
     root = result.root;
   });
@@ -78,10 +78,13 @@ describe('TrieSync', () => {
       batch.reset();
     }
 
-    for (const { address, account, storageData } of accounts) {
+    for (const { address, code, account, storageData } of accounts) {
       const trie = new SecureTrie(backend.rawdb, root);
       const account2 = await trie.get(address);
       expect(account2 && account2.equals(account.serialize()), 'account should be equal').be.true;
+
+      const code2 = await backend.rawdb.get(account.codeHash, rawDBOpts);
+      expect(code2 && code2.equals(code), 'code should be equal').be.true;
 
       for (const [, { key, val }] of storageData) {
         const trie = new SecureTrie(backend.rawdb, account.stateRoot);

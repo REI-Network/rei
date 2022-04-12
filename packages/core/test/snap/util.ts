@@ -6,11 +6,13 @@ import { Database, DBSaveSnapStorage, DBSaveSerializedSnapAccount } from '@rei-n
 
 export class AccountInfo {
   address: Buffer;
+  code: Buffer;
   account: Account;
   storageData: FunctionalBufferMap<{ key: Buffer; val: Buffer }>;
 
-  constructor(address: Buffer, account: Account, storageData: FunctionalBufferMap<{ key: Buffer; val: Buffer }>) {
+  constructor(address: Buffer, code: Buffer, account: Account, storageData: FunctionalBufferMap<{ key: Buffer; val: Buffer }>) {
     this.address = address;
+    this.code = code;
     this.account = account;
     this.storageData = storageData;
   }
@@ -20,7 +22,7 @@ export class AccountInfo {
     for (const [k, v] of this.storageData) {
       storageData.set(k, { ...v });
     }
-    return new AccountInfo(Buffer.from(this.address), new Account(this.account.nonce.clone(), this.account.balance.clone(), Buffer.from(this.account.stateRoot)), storageData);
+    return new AccountInfo(Buffer.from(this.address), Buffer.from(this.code), new Account(this.account.nonce.clone(), this.account.balance.clone(), Buffer.from(this.account.stateRoot)), storageData);
   }
 }
 
@@ -37,6 +39,9 @@ export async function genRandomAccounts(db: Database, _accounts: number, slots: 
 
   for (let i = 0; i < _accounts; i++) {
     const address = crypto.randomBytes(20);
+    const code = crypto.randomBytes(100);
+    const codeHash = keccak256(code);
+    await db.rawdb.put(codeHash, code, { keyEncoding: 'binary', valueEncoding: 'binary' });
     const accountHash = keccak256(address);
     const storageTrie = new Trie(db.rawdb);
     const storageData = new FunctionalBufferMap<{ key: Buffer; val: Buffer }>();
@@ -53,12 +58,12 @@ export async function genRandomAccounts(db: Database, _accounts: number, slots: 
         val: storageValue
       });
     }
-    const account = new Account(new BN(1), new BN(1), storageTrie.root);
+    const account = new Account(new BN(1), new BN(1), storageTrie.root, codeHash);
     if (saveSnap) {
       await db.batch([DBSaveSerializedSnapAccount(accountHash, account.serialize())]);
     }
     await stateTrie.put(address, account.serialize());
-    accounts.push(new AccountInfo(address, account, storageData));
+    accounts.push(new AccountInfo(address, code, account, storageData));
   }
 
   return {

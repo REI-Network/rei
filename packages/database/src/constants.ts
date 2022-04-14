@@ -99,6 +99,11 @@ export const SNAP_JOURNAL_KEY = Buffer.from('SnapshotJournal');
  */
 export const SNAP_GENERATOR_KEY = Buffer.from('SnapshotGenerator');
 
+/**
+ * snapshotSyncProgress
+ */
+export const SNAP_SYNC_PROGRESS_KEY = Buffer.from('SnapshotSyncProgress');
+
 // Utility functions
 
 /**

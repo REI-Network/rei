@@ -201,3 +201,12 @@ export function DBSaveSnapJournal(journal: Buffer) {
 export function DBSaveSnapGenerator(generator: Buffer) {
   return DBOp.set(DBTarget.SnapGenerator, generator);
 }
+
+/**
+ * Create a operation to save snapshot sync progress
+ * @param progress
+ * @returns New operation
+ */
+export function DBSaveSnapSyncProgress(progress: Buffer) {
+  return DBOp.set(DBTarget.SnapSyncProgress, progress);
+}

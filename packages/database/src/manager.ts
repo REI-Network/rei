@@ -465,4 +465,18 @@ export class DBManager {
       throw err;
     }
   }
+
+  /**
+   * Get snapshot sync progress
+   */
+  async getSnapSyncProgress(): Promise<Buffer | null> {
+    try {
+      return await this.get(DBTarget.SnapSyncProgress);
+    } catch (err: any) {
+      if (err.type === 'NotFoundError') {
+        return null;
+      }
+      throw err;
+    }
+  }
 }

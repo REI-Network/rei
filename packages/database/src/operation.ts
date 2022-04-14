@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
 import { compressBytes } from './compress';
-import { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, BLOOM_BITS_SECTION_COUNT, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, CLIQUE_SIGNERS_KEY as CLIQUE_SIGNER_STATES_KEY, CLIQUE_VOTES_KEY, CLIQUE_BLOCK_SIGNERS_KEY, receiptsKey, txLookupKey, bloomBitsKey, snapAccountKey, snapStorageKey, SNAP_ROOT_KEY, SNAP_JOURNAL_KEY, SNAP_GENERATOR_KEY } from './constants';
+import { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, BLOOM_BITS_SECTION_COUNT, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, CLIQUE_SIGNERS_KEY as CLIQUE_SIGNER_STATES_KEY, CLIQUE_VOTES_KEY, CLIQUE_BLOCK_SIGNERS_KEY, receiptsKey, txLookupKey, bloomBitsKey, snapAccountKey, snapStorageKey, SNAP_ROOT_KEY, SNAP_JOURNAL_KEY, SNAP_GENERATOR_KEY, SNAP_SYNC_PROGRESS_KEY } from './constants';
 import { CacheMap } from './manager';
 
 export enum DBTarget {
@@ -24,7 +24,8 @@ export enum DBTarget {
   SnapStorage,
   SnapRoot,
   SnapJournal,
-  SnapGenerator
+  SnapGenerator,
+  SnapSyncProgress
 }
 
 /**
@@ -159,6 +160,10 @@ export class DBOp {
       }
       case DBTarget.SnapGenerator: {
         this.baseDBOp.key = SNAP_GENERATOR_KEY;
+        break;
+      }
+      case DBTarget.SnapSyncProgress: {
+        this.baseDBOp.key = SNAP_SYNC_PROGRESS_KEY;
         break;
       }
     }

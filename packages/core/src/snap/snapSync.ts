@@ -6,12 +6,15 @@ import { Database, DBOp, DBSaveSnapStorage, DBSaveSnapSyncProgress } from '@rei-
 import { StakingAccount } from '../stateManager';
 import { EMPTY_HASH, MAX_HASH } from '../utils';
 import { increaseKey } from './utils';
+import { BinaryRawDBatch } from './batch';
 
 const maxHashBN = new BN(MAX_HASH);
 
 const accountConcurrency = 16;
 const storageConcurrency = 16;
+
 const storageRequestSize = 200000;
+const codeRequestSize = 50;
 
 function bnToBuffer32(bn: BN) {
   return setLengthLeft(bn.toBuffer(), 32);
@@ -456,7 +459,9 @@ export class SnapSync {
         limit: largeStateTask?.last ?? MAX_HASH
       };
 
-      peer.getStorageRanges(this.root, req).then(); // TODO
+      peer.getStorageRanges(this.root, req).then((res) => {
+        this.channel.push(this.processStorageResponse.bind(this, task, largeStateTask, req, res));
+      });
 
       if (largeStateTask) {
         largeStateTask.req = req;
@@ -487,6 +492,7 @@ export class SnapSync {
     for (let i = 0; i < req.accounts.length; i++) {
       const account = req.accounts[i];
       const root = req.roots[i];
+
       // reschedule the undelivered account
       if (i >= res.hashes.length) {
         accountTask.pendingState.set(account, req.roots[i]);
@@ -586,6 +592,72 @@ export class SnapSync {
 
     if (accountTask.pending === 0) {
       // TODO: forward account
+    }
+  }
+
+  private assignBytecodeTasks() {
+    for (const task of this.tasks) {
+      if (task.done || task.res === undefined) {
+        continue;
+      }
+
+      if (task.pendingCode.size === 0) {
+        continue;
+      }
+
+      const peer = this.network.getIdlePeer('code');
+      if (peer === null) {
+        return;
+      }
+
+      const hashes: Buffer[] = [];
+      for (const hash of task.pendingCode) {
+        hashes.push(hash);
+        task.pendingCode.delete(hash);
+        if (hashes.length >= codeRequestSize) {
+          break;
+        }
+      }
+
+      peer.getByteCodes(this.root, hashes).then((res) => {
+        this.channel.push(this.processByteCodesResponse.bind(this, task, hashes, res));
+      });
+    }
+  }
+
+  private async processByteCodesResponse(task: AccountTask, hashes: Buffer[], res: Buffer[] | null) {
+    // revert
+    if (res === null) {
+      hashes.forEach((hash) => task.pendingCode.add(hash));
+      return;
+    }
+
+    const batch = new BinaryRawDBatch(this.db.rawdb);
+
+    for (let i = 0; i < hashes.length; i++) {
+      const hash = hashes[i];
+
+      // reschedule the undelivered code
+      if (i >= res.length) {
+        task.pendingCode.add(hash);
+        continue;
+      }
+
+      for (let j = 0; j < task.res!.accounts.length; j++) {
+        if (task.needCode[j] && hash.equals(task.res!.accounts[j].codeHash)) {
+          task.needCode[j] = false;
+          task.pending--;
+        }
+      }
+
+      batch.push({ type: 'put', key: hash, value: res[i] });
+    }
+
+    await batch.write();
+    batch.reset();
+
+    if (task.pending === 0) {
+      // TODO: forwardAccount
     }
   }
 

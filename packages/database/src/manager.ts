@@ -479,4 +479,36 @@ export class DBManager {
       throw err;
     }
   }
+
+  /**
+   * Check whether the contract code exists
+   * @param codeHash
+   */
+  async hasCode(codeHash: Buffer): Promise<boolean> {
+    try {
+      await this._db.get(codeHash, { keyEncoding: 'binary', valueEncoding: 'binary' });
+      return true;
+    } catch (err: any) {
+      if (err.type === 'NotFoundError') {
+        return false;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Check whether the trie node exists
+   * @param hash
+   */
+  async hasTrieNode(hash: Buffer) {
+    try {
+      await this._db.get(hash, { keyEncoding: 'binary', valueEncoding: 'binary' });
+      return true;
+    } catch (err: any) {
+      if (err.type === 'NotFoundError') {
+        return false;
+      }
+      throw err;
+    }
+  }
 }

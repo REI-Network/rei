@@ -20,6 +20,12 @@ function bnToBuffer32(bn: BN) {
   return setLengthLeft(bn.toBuffer(), 32);
 }
 
+/**
+ * Divide the target account or status interval into segments
+ * @param concurrency - Maximum allowed concurrency
+ * @param from - Where to start dividing
+ * @returns Segments
+ */
 function splitRange(concurrency: number, from: Buffer = EMPTY_HASH) {
   const fromBN = new BN(from);
   const remaining = maxHashBN.sub(fromBN);
@@ -27,9 +33,10 @@ function splitRange(concurrency: number, from: Buffer = EMPTY_HASH) {
     throw new Error('from is greater than max hash');
   }
 
-  // calucate step
-  let step = maxHashBN.divn(concurrency);
+  // calucate a standard step
+  let step = maxHashBN.divRound(new BN(concurrency));
   if (!fromBN.eqn(0)) {
+    // if from is not 0, the step size and the number of concurrency need to be changed
     concurrency -= fromBN.div(step).toNumber();
     step = remaining.divn(concurrency);
   }
@@ -66,8 +73,6 @@ type AccountTaskJSON = {
   last: string;
 
   largeStateTasks: LargeStateTasksJSON;
-
-  done: boolean;
 };
 
 class AccountTask {
@@ -90,13 +95,12 @@ class AccountTask {
 
   genTrie!: CheckpointTrie;
 
-  done: boolean;
+  done: boolean = false;
 
-  constructor(next: Buffer, last: Buffer, largeStateTasks: LargeStateTasks = new FunctionalBufferMap<StorageTask[]>(), done: boolean = false) {
+  constructor(next: Buffer, last: Buffer, largeStateTasks: LargeStateTasks = new FunctionalBufferMap<StorageTask[]>()) {
     this.next = next;
     this.last = last;
     this.largeStateTasks = largeStateTasks;
-    this.done = done;
   }
 
   static fromJSON(json: AccountTaskJSON) {
@@ -105,9 +109,13 @@ class AccountTask {
       largeStateTasks.set(toBuffer(accountHash), tasks.map(StorageTask.fromJSON));
     }
 
-    return new AccountTask(toBuffer(json.next), toBuffer(json.last), largeStateTasks, json.done);
+    return new AccountTask(toBuffer(json.next), toBuffer(json.last), largeStateTasks);
   }
 
+  /**
+   * Initialize
+   * @param db - Raw db
+   */
   init(db: LevelUp) {
     this.genTrie = new CheckpointTrie(db);
     this.genTrie.checkpoint();
@@ -120,6 +128,10 @@ class AccountTask {
     }
   }
 
+  /**
+   * Reset task information,
+   * it will be called when a new response is received
+   */
   reset() {
     const len = this.res?.accounts.length ?? 0;
     this.needCode = new Array<boolean>(len).fill(false);
@@ -131,11 +143,9 @@ class AccountTask {
     this.pendingState.clear();
   }
 
-  async commit() {
-    await this.genTrie.commit();
-    this.genTrie.checkpoint();
-  }
-
+  /**
+   * Convert task to JSON format
+   */
   toJSON(): AccountTaskJSON {
     const largeStateTasks: { [accoutHash: string]: StorageTaskJSON[] } = {};
     for (const [accountHash, tasks] of this.largeStateTasks) {
@@ -145,8 +155,7 @@ class AccountTask {
     return {
       next: bufferToHex(this.next),
       last: bufferToHex(this.last),
-      largeStateTasks,
-      done: this.done
+      largeStateTasks
     };
   }
 }
@@ -171,8 +180,6 @@ type StorageTaskJSON = {
   last: string;
 
   root: string;
-
-  done: boolean;
 };
 
 class StorageTask {
@@ -186,35 +193,35 @@ class StorageTask {
 
   genTrie!: CheckpointTrie;
 
-  done: boolean;
+  done: boolean = false;
 
-  constructor(root: Buffer, next: Buffer, last: Buffer, done: boolean = false) {
+  constructor(root: Buffer, next: Buffer, last: Buffer) {
     this.next = next;
     this.last = last;
     this.root = root;
-    this.done = done;
   }
 
   static fromJSON(json: StorageTaskJSON) {
-    return new StorageTask(toBuffer(json.root), toBuffer(json.next), toBuffer(json.last), json.done);
+    return new StorageTask(toBuffer(json.root), toBuffer(json.next), toBuffer(json.last));
   }
 
+  /**
+   * Initialize
+   * @param db - Raw db
+   */
   init(db: LevelUp) {
     this.genTrie = new CheckpointTrie(db);
     this.genTrie.checkpoint();
   }
 
-  async commit() {
-    await this.genTrie.commit();
-    this.genTrie.checkpoint();
-  }
-
+  /**
+   * Convert task to JSON format
+   */
   toJSON(): StorageTaskJSON {
     return {
       next: bufferToHex(this.next),
       last: bufferToHex(this.last),
-      root: bufferToHex(this.root),
-      done: this.done
+      root: bufferToHex(this.root)
     };
   }
 }
@@ -259,6 +266,9 @@ export class SnapSync {
     return !!this.schedulePromise;
   }
 
+  /**
+   * Load tasks from database in JSON format
+   */
   private async loadSyncProgress() {
     let tasks: AccountTask[] | undefined;
 
@@ -284,13 +294,16 @@ export class SnapSync {
     this.snapped = tasks.length === 0;
   }
 
+  /**
+   * Save tasks in the database in JSON format
+   */
   private async saveSyncProgress() {
     try {
       for (const task of this.tasks) {
-        await task.commit();
+        await task.genTrie.commit();
         for (const stateTasks of task.largeStateTasks.values()) {
           for (const stateTask of stateTasks) {
-            await stateTask.commit();
+            await stateTask.genTrie.commit();
           }
         }
       }
@@ -302,6 +315,9 @@ export class SnapSync {
     await this.db.batch([DBSaveSnapSyncProgress(Buffer.from(JSON.stringify(json)))]);
   }
 
+  /**
+   * Assign account tasks to remote peers
+   */
   private assignAccountTasks() {
     for (const task of this.tasks) {
       if (task.done || task.req !== undefined || task.res !== undefined) {
@@ -326,6 +342,11 @@ export class SnapSync {
     }
   }
 
+  /**
+   * Process accoount response
+   * @param task - Account task
+   * @param res - Account response or null(if the request fails or times out)
+   */
   private async processAccountResponse(task: AccountTask, res: AccountResponse | null) {
     // revert
     if (res === null) {
@@ -397,6 +418,9 @@ export class SnapSync {
     }
   }
 
+  /**
+   * Assign storage tasks to remote peers
+   */
   private assignStorageTasks() {
     for (const task of this.tasks) {
       if (task.done || task.res === undefined) {
@@ -449,6 +473,7 @@ export class SnapSync {
       }
 
       if (accounts.length === 0) {
+        // no tasks to process, put the peer back
         this.network.putBackIdlePeer('storage', peer);
         continue;
       }
@@ -470,6 +495,13 @@ export class SnapSync {
     }
   }
 
+  /**
+   * Process storage response
+   * @param accountTask - Account Task
+   * @param stateTask - State task(if it is a large state task) or undefined
+   * @param req - Storage request
+   * @param res - Storage response or null(if the request fails or times out)
+   */
   private async processStorageResponse(accountTask: AccountTask, stateTask: StorageTask | undefined, req: StorageRequst, res: StorageResponse | null) {
     // revert
     if (res === null) {
@@ -585,7 +617,7 @@ export class SnapSync {
 
     // if the larget state task is done, commit it
     if (stateTask && stateTask.done) {
-      await stateTask.commit();
+      await stateTask.genTrie.commit();
       if (stateTask.genTrie.root.equals(stateTask.root)) {
         // if the chunk's root is an overflown but full delivery, clear the heal request
         const account = req.accounts[req.accounts.length - 1];
@@ -604,6 +636,9 @@ export class SnapSync {
     }
   }
 
+  /**
+   * Assign bytecode tasks to remote peers
+   */
   private assignBytecodeTasks() {
     for (const task of this.tasks) {
       if (task.done || task.res === undefined) {
@@ -629,12 +664,18 @@ export class SnapSync {
       }
 
       peer.getByteCodes(this.root, hashes).then((res) => {
-        this.channel.push(this.processByteCodesResponse.bind(this, task, hashes, res));
+        this.channel.push(this.processBytecodeResponse.bind(this, task, hashes, res));
       });
     }
   }
 
-  private async processByteCodesResponse(task: AccountTask, hashes: Buffer[], res: Buffer[] | null) {
+  /**
+   * Process bytecode response
+   * @param task - Account task
+   * @param hashes - Code hash list
+   * @param res - Codes or null(if the request fails or times out)
+   */
+  private async processBytecodeResponse(task: AccountTask, hashes: Buffer[], res: Buffer[] | null) {
     // revert
     if (res === null) {
       hashes.forEach((hash) => task.pendingCode.add(hash));
@@ -670,6 +711,10 @@ export class SnapSync {
     }
   }
 
+  /**
+   * Save snapshot to database and try to increase next hash of task
+   * @param task - Account task
+   */
   private async forwardAccoutTask(task: AccountTask) {
     const res = task.res;
     if (res === undefined) {
@@ -710,10 +755,13 @@ export class SnapSync {
     task.done = !res.cont;
 
     if (task.done) {
-      await task.commit();
+      await task.genTrie.commit();
     }
   }
 
+  /**
+   * Clean finished account tasks
+   */
   private cleanAccountTasks() {
     if (this.tasks.length === 0) {
       return;
@@ -725,6 +773,9 @@ export class SnapSync {
     }
   }
 
+  /**
+   * Clean finished storage tasks
+   */
   private async cleanStorageTasks() {
     for (const task of this.tasks) {
       for (const [account, stateTasks] of task.largeStateTasks) {
@@ -795,6 +846,9 @@ export class SnapSync {
     }
   }
 
+  /**
+   * Initialize
+   */
   async init() {
     await this.loadSyncProgress();
     if (this.snapped) {
@@ -803,6 +857,9 @@ export class SnapSync {
     }
   }
 
+  /**
+   * Start scheduling
+   */
   start() {
     if (this.isWorking) {
       throw new Error('snap sync is working');
@@ -814,6 +871,9 @@ export class SnapSync {
     this.channel.push();
   }
 
+  /**
+   * Stop scheduling
+   */
   async abort() {
     if (!this.isWorking) {
       throw new Error("snap sync isn't working");

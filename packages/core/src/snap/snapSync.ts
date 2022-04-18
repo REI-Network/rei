@@ -245,21 +245,12 @@ export class SnapSync {
   private readonly channel = new Channel<void | (() => Promise<void>)>({ max: 1 });
 
   tasks: AccountTask[] = [];
+  snapped: boolean = false;
 
   constructor(db: Database, root: Buffer, network: SnapSyncNetworkManager) {
     this.db = db;
     this.root = root;
     this.network = network;
-  }
-
-  get snapped() {
-    for (const task of this.tasks) {
-      if (!task.done) {
-        return false;
-      }
-    }
-
-    return true;
   }
 
   private async loadSyncProgress() {
@@ -284,6 +275,7 @@ export class SnapSync {
     tasks.forEach((task) => task.init(this.db.rawdb));
 
     this.tasks = tasks;
+    this.snapped = tasks.length === 0;
   }
 
   private async saveSyncProgress() {
@@ -395,7 +387,7 @@ export class SnapSync {
     }
 
     if (task.pending === 0) {
-      // TODO: forwardAccount
+      await this.forwardAccoutTask(task);
     }
   }
 
@@ -602,7 +594,7 @@ export class SnapSync {
     }
 
     if (accountTask.pending === 0) {
-      // TODO: forward account
+      await this.forwardAccoutTask(accountTask);
     }
   }
 
@@ -668,7 +660,7 @@ export class SnapSync {
     batch.reset();
 
     if (task.pending === 0) {
-      // TODO: forwardAccount
+      await this.forwardAccoutTask(task);
     }
   }
 
@@ -713,6 +705,43 @@ export class SnapSync {
 
     if (task.done) {
       await task.commit();
+    }
+  }
+
+  private cleanAccountTasks() {
+    if (this.tasks.length === 0) {
+      return;
+    }
+
+    this.tasks = this.tasks.filter((t) => !t.done);
+    if (this.tasks.length === 0) {
+      this.snapped = true;
+    }
+  }
+
+  private async cleanStorageTasks() {
+    for (const task of this.tasks) {
+      for (const [account, stateTasks] of task.largeStateTasks) {
+        const stateTasks2 = stateTasks.filter((t) => !t.done);
+        if (stateTasks2.length > 0) {
+          task.largeStateTasks.set(account, stateTasks2);
+          continue;
+        }
+
+        for (let i = 0; i < (task.res?.hashes.length ?? 0); i++) {
+          const hash = task.res!.hashes[i];
+          if (hash.equals(account)) {
+            task.needState[i] = false;
+          }
+        }
+
+        task.largeStateTasks.delete(account);
+        task.pending--;
+
+        if (task.pending === 0) {
+          await this.forwardAccoutTask(task);
+        }
+      }
     }
   }
 

@@ -809,5 +809,22 @@ export class SnapSync {
     }
 
     this.schedulePromise = this.scheduleLoop();
+
+    // put an empty value to start scheduling
+    this.channel.push();
+  }
+
+  async abort() {
+    if (!this.isWorking) {
+      throw new Error("snap sync isn't working");
+    }
+
+    // clear queue
+    this.channel.clear();
+    // put a null value to stop scheduling
+    this.channel.push(null);
+
+    await this.schedulePromise;
+    this.schedulePromise = undefined;
   }
 }

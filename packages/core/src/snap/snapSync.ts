@@ -242,15 +242,21 @@ export class SnapSync {
   readonly root: Buffer;
   readonly network: SnapSyncNetworkManager;
 
-  private readonly channel = new Channel<void | (() => Promise<void>)>({ max: 1 });
+  private readonly channel = new Channel<void | null | (() => Promise<void>)>({ max: 1 });
 
   tasks: AccountTask[] = [];
   snapped: boolean = false;
+
+  schedulePromise?: Promise<void>;
 
   constructor(db: Database, root: Buffer, network: SnapSyncNetworkManager) {
     this.db = db;
     this.root = root;
     this.network = network;
+  }
+
+  get isWorking() {
+    return !!this.schedulePromise;
   }
 
   private async loadSyncProgress() {
@@ -746,7 +752,46 @@ export class SnapSync {
   }
 
   private async scheduleLoop() {
-    for await (const fn of this.channel) {
+    for await (const cb of this.channel) {
+      try {
+        if (cb) {
+          // if callback exists, execute the callback
+          await cb();
+        } else if (cb === null) {
+          // null means break
+          break;
+        } else {
+          // otherwise, it might just be a peer join event, do nothing
+        }
+
+        await this.cleanStorageTasks();
+        this.cleanAccountTasks();
+        if (this.snapped) {
+          // TODO: heal.pending
+          break;
+        }
+
+        this.assignAccountTasks();
+        this.assignBytecodeTasks();
+        this.assignStorageTasks();
+
+        if (this.snapped) {
+          // TODO: heal logic
+        }
+      } catch (err) {
+        logger.error('SnapSync::scheduleLoop, catch:', err);
+      }
+    }
+
+    try {
+      for (const task of this.tasks) {
+        await this.forwardAccoutTask(task);
+      }
+
+      this.cleanAccountTasks();
+      await this.saveSyncProgress();
+    } catch (err) {
+      logger.error('SnapSync::scheduleLoop, catch(when exit):', err);
     }
   }
 
@@ -755,7 +800,14 @@ export class SnapSync {
     if (this.snapped) {
       // TODO: heal.pending
       logger.debug('SnapSync::init, already completed');
-      return;
     }
+  }
+
+  start() {
+    if (this.isWorking) {
+      throw new Error('snap sync is working');
+    }
+
+    this.schedulePromise = this.scheduleLoop();
   }
 }

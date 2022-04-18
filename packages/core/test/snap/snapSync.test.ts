@@ -1,11 +1,11 @@
 import { Database } from '@rei-network/database';
 import { snapAccountKey, snapStorageKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
 import { Common } from '@rei-network/common';
+import { getRandomIntInclusive } from '@rei-network/utils';
 import { StakingAccount } from '../../src/stateManager';
 import { asyncTraverseRawDB } from '../../src/snap/layerIterator';
 import { SnapSync, SnapSyncNetworkManager, SnapSyncPeer, AccountRequest, AccountResponse, StorageRequst, StorageResponse, PeerType } from '../../src/snap/snapSync';
 import { genRandomAccounts, GenRandomAccountsResult } from './util';
-import { getRandomIntInclusive } from '@rei-network/utils';
 const level = require('level-mem');
 
 const common = new Common({ chain: 'rei-devnet' });

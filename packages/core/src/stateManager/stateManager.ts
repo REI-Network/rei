@@ -10,7 +10,8 @@ import { AccessList, AccessListItem } from '@rei-network/structure';
 import Cache from './cache';
 import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
 import { StakingAccount as Account } from './account';
-import { ISnapshot, SnapshotTree } from './types';
+import { ISnapshot } from '../snap/types';
+import { SnapTree } from '../snap/snapTree';
 
 const debug = createDebugLogger('vm:state');
 
@@ -42,7 +43,7 @@ export interface StateManagerOpts {
    */
   trie?: Trie;
 
-  snapsTree?: SnapshotTree;
+  snapsTree?: SnapTree;
 }
 
 /**
@@ -76,7 +77,7 @@ export class StateManager {
   // State snapshot tree. It consists of one persistent base
   // layer backed by a key-value store, on top of which arbitrarily many in-memory
   // diff layers are topped
-  _snapsTree?: SnapshotTree;
+  _snapsTree?: SnapTree;
 
   // Snapshot represents the functionality supported by a snapshot storage layer.
   _snap?: ISnapshot;
@@ -124,7 +125,7 @@ export class StateManager {
     this._snapsTree = opts.snapsTree;
     this._snapCacheList = [];
     if (this._snapsTree) {
-      this._snap = this._snapsTree.snapshot(this._trie.root);
+      this._snap = this._snapsTree.snapShot(this._trie.root);
       this._snapAccounts = new FunctionalBufferMap<Buffer>();
       this._snapDestructs = new FunctionalBufferSet();
       this._snapStorage = new FunctionalBufferMap<FunctionalBufferMap<Buffer>>();
@@ -523,7 +524,7 @@ export class StateManager {
     if (this._checkpointCount === 0) {
       await this._cache.flush();
       this._clearOriginalStorageCache();
-      const parent = this._snap?.root();
+      const parent = this._snap?.root;
       if (parent && !parent.equals(this._trie.root)) {
         await this._snapsTree?.update(this._trie.root, parent, this._snapAccounts!, this._snapDestructs!, this._snapStorage!);
         await this._snapsTree?.cap(this._trie.root, 128);
@@ -608,7 +609,7 @@ export class StateManager {
     this._cache.clear();
     this._storageTries = {};
     if (this._snapsTree) {
-      this._snap = this._snapsTree.snapshot(stateRoot);
+      this._snap = this._snapsTree.snapShot(stateRoot);
       this._snapAccounts = new FunctionalBufferMap<Buffer>();
       this._snapDestructs = new FunctionalBufferSet();
       this._snapStorage = new FunctionalBufferMap<FunctionalBufferMap<Buffer>>();

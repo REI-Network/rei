@@ -111,7 +111,7 @@ export class SnapTree {
     return ret;
   }
 
-  update(root: Buffer, parentRoot: Buffer, destructs: FunctionalBufferSet, accounts: FunctionalBufferMap<Buffer>, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>) {
+  update(root: Buffer, parentRoot: Buffer, accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferSet, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>) {
     if (root.equals(parentRoot)) {
       throw new Error('snapshot cycle');
     }

@@ -2,11 +2,11 @@ import { LevelUp } from 'levelup';
 import { bufferToHex, toBuffer, BN, setLengthLeft, KECCAK256_NULL, KECCAK256_RLP } from 'ethereumjs-util';
 import { BaseTrie, CheckpointTrie } from 'merkle-patricia-tree';
 import { logger, Channel, FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
-import { Database, DBOp, DBSaveSnapStorage, DBSaveSnapSyncProgress } from '@rei-network/database';
+import { Database, DBOp, DBSaveSerializedSnapAccount, DBSaveSnapStorage, DBSaveSnapSyncProgress } from '@rei-network/database';
 import { StakingAccount } from '../stateManager';
 import { EMPTY_HASH, MAX_HASH } from '../utils';
 import { increaseKey } from './utils';
-import { BinaryRawDBatch } from './batch';
+import { BinaryRawDBatch, DBatch } from './batch';
 
 const maxHashBN = new BN(MAX_HASH);
 
@@ -79,6 +79,7 @@ class AccountTask {
 
   needCode: boolean[] = [];
   needState: boolean[] = [];
+  needHeal: boolean[] = [];
 
   pending: number = 0;
 
@@ -123,6 +124,7 @@ class AccountTask {
     const len = this.res?.accounts.length ?? 0;
     this.needCode = new Array<boolean>(len).fill(false);
     this.needState = new Array<boolean>(len).fill(false);
+    this.needHeal = new Array<boolean>(len).fill(false);
 
     this.pending = 0;
     this.pendingCode.clear();
@@ -375,6 +377,8 @@ export class SnapSync {
         if (largeStateTasks !== undefined) {
           // the state root of the account may have changed when the large state task was awakened again
           largeStateTasks.forEach((task) => (task.root = account.stateRoot));
+          // mark the task as needHeal
+          task.needHeal[i] = true;
           resumed.add(hash);
         } else {
           // if the large state task doesn't exist, add it to the pending state task
@@ -510,9 +514,10 @@ export class SnapSync {
         accountTask.pending--;
       }
 
-      // if (largeStateTask === undefined && ) {
-      // needHeal ??
-      // }
+      // mark the task as needHeal
+      if (stateTask === undefined && !accountTask.needHeal[j] && i === res.hashes.length - 1 && res.cont) {
+        accountTask.needHeal[j] = true;
+      }
 
       // if the last task is not completed, treat it as a large state task
       if (stateTask === undefined && i === res.hashes.length - 1 && res.cont) {
@@ -583,7 +588,15 @@ export class SnapSync {
     // if the larget state task is done, commit it
     if (stateTask && stateTask.done) {
       await stateTask.commit();
-      if (!stateTask.genTrie.root.equals(stateTask.root)) {
+      if (stateTask.genTrie.root.equals(stateTask.root)) {
+        // if the chunk's root is an overflown but full delivery, clear the heal request
+        const account = req.accounts[req.accounts.length - 1];
+        for (let i = 0; i < accountTask.res!.hashes.length; i++) {
+          if (account.equals(accountTask.res!.hashes[i])) {
+            accountTask.needHeal[i] = false;
+          }
+        }
+      } else {
         logger.debug('SnapSync::processStorageResponse, state task committed but root does not match');
       }
     }
@@ -656,6 +669,50 @@ export class SnapSync {
 
     if (task.pending === 0) {
       // TODO: forwardAccount
+    }
+  }
+
+  private async forwardAccoutTask(task: AccountTask) {
+    const res = task.res;
+    if (res === undefined) {
+      return;
+    }
+
+    task.res = undefined;
+
+    const batch = new DBatch(this.db);
+
+    for (let i = 0; i < res.hashes.length; i++) {
+      if (task.needCode[i] || task.needState[i]) {
+        break;
+      }
+
+      const hash = res.hashes[i];
+      const account = res.accounts[i];
+
+      batch.push(DBSaveSerializedSnapAccount(hash, account.slimSerialize()));
+
+      // if the task is complete, drop it into the stack trie to generate account trie nodes for it.
+      // otherwise, it will be generated later in the heal phase
+      if (!task.needHeal[i]) {
+        await task.genTrie.put(hash, account.serialize());
+      }
+    }
+
+    await batch.write();
+    batch.reset();
+
+    for (let i = 0; i < res.hashes.length; i++) {
+      if (task.needCode[i] || task.needState[i]) {
+        return;
+      }
+
+      task.next = increaseKey(res.hashes[i])!;
+    }
+    task.done = !res.cont;
+
+    if (task.done) {
+      await task.commit();
     }
   }
 

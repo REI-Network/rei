@@ -44,7 +44,7 @@ function splitRange(concurrency: number, from: Buffer = EMPTY_HASH) {
   const ranges: [Buffer, Buffer][] = [];
   let next = fromBN.eqn(0) ? fromBN : fromBN.addn(1);
   for (let i = 0; i < concurrency; i++) {
-    const last = i === concurrency - 1 ? maxHashBN : next.add(step);
+    const last = i === concurrency - 1 ? maxHashBN : next.add(step).subn(1);
     ranges.push([bnToBuffer32(next), bnToBuffer32(last)]);
     next = last.addn(1);
   }
@@ -52,12 +52,12 @@ function splitRange(concurrency: number, from: Buffer = EMPTY_HASH) {
   return ranges;
 }
 
-type AccountRequest = {
+export type AccountRequest = {
   origin: Buffer;
   limit: Buffer;
 };
 
-type AccountResponse = {
+export type AccountResponse = {
   hashes: Buffer[];
   accounts: StakingAccount[];
 
@@ -160,7 +160,7 @@ class AccountTask {
   }
 }
 
-type StorageRequst = {
+export type StorageRequst = {
   accounts: Buffer[];
   roots: Buffer[];
 
@@ -168,7 +168,7 @@ type StorageRequst = {
   limit: Buffer;
 };
 
-type StorageResponse = {
+export type StorageResponse = {
   hashes: Buffer[][];
   slots: Buffer[][];
 
@@ -237,7 +237,7 @@ export interface SnapSyncPeer {
   getTrieNodes(hashes: Buffer[]): Promise<Buffer[] | null>;
 }
 
-type PeerType = 'account' | 'storage' | 'code' | 'trieNode';
+export type PeerType = 'account' | 'storage' | 'code' | 'trieNode';
 
 export interface SnapSyncNetworkManager {
   getIdlePeer(type: PeerType): SnapSyncPeer | null;
@@ -249,7 +249,7 @@ export class SnapSync {
   readonly root: Buffer;
   readonly network: SnapSyncNetworkManager;
 
-  private readonly channel = new Channel<void | null | (() => Promise<void>)>({ max: 1 });
+  private readonly channel = new Channel<void | null | (() => Promise<void>)>();
 
   tasks: AccountTask[] = [];
   snapped: boolean = false;
@@ -403,6 +403,8 @@ export class SnapSync {
           // if the large state task doesn't exist, add it to the pending state task
           task.pendingState.set(res.hashes[i], account.stateRoot);
         }
+        task.needState[i] = true;
+        task.pending++;
       }
     }
 
@@ -427,7 +429,7 @@ export class SnapSync {
         continue;
       }
 
-      if (task.largeStateTasks.size === 0 || task.pendingState.size === 0) {
+      if (task.largeStateTasks.size === 0 && task.pendingState.size === 0) {
         continue;
       }
 
@@ -886,5 +888,16 @@ export class SnapSync {
 
     await this.schedulePromise;
     this.schedulePromise = undefined;
+  }
+
+  /**
+   * Wait until snap sync finished(only for test)
+   */
+  waitUntilFinished() {
+    if (!this.isWorking) {
+      throw new Error("snap sync isn't working");
+    }
+
+    return this.schedulePromise;
   }
 }

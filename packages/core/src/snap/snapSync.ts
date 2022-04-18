@@ -57,7 +57,7 @@ type AccountResponse = {
   cont: boolean;
 };
 
-type LargeStateTasks = { [accoutHash: string]: StorageTask[] };
+type LargeStateTasks = FunctionalBufferMap<StorageTask[]>;
 
 type LargeStateTasksJSON = { [accoutHash: string]: StorageTaskJSON[] };
 
@@ -91,7 +91,7 @@ class AccountTask {
 
   done: boolean;
 
-  constructor(next: Buffer, last: Buffer, largeStateTasks: LargeStateTasks = {}, done: boolean = false) {
+  constructor(next: Buffer, last: Buffer, largeStateTasks: LargeStateTasks = new FunctionalBufferMap<StorageTask[]>(), done: boolean = false) {
     this.next = next;
     this.last = last;
     this.largeStateTasks = largeStateTasks;
@@ -99,9 +99,9 @@ class AccountTask {
   }
 
   static fromJSON(json: AccountTaskJSON) {
-    const largeStateTasks: LargeStateTasks = {};
+    const largeStateTasks = new FunctionalBufferMap<StorageTask[]>();
     for (const [accountHash, tasks] of Object.entries(json.largeStateTasks)) {
-      largeStateTasks[accountHash] = tasks.map(StorageTask.fromJSON);
+      largeStateTasks.set(toBuffer(accountHash), tasks.map(StorageTask.fromJSON));
     }
 
     return new AccountTask(toBuffer(json.next), toBuffer(json.last), largeStateTasks, json.done);
@@ -112,7 +112,7 @@ class AccountTask {
     this.genTrie.checkpoint();
 
     // init state tasks
-    for (const tasks of Object.values(this.largeStateTasks)) {
+    for (const tasks of this.largeStateTasks.values()) {
       for (const task of tasks) {
         task.init(db);
       }
@@ -136,8 +136,8 @@ class AccountTask {
 
   toJSON(): AccountTaskJSON {
     const largeStateTasks: { [accoutHash: string]: StorageTaskJSON[] } = {};
-    for (const [accountHash, tasks] of Object.entries(this.largeStateTasks)) {
-      largeStateTasks[accountHash] = tasks.map((task) => task.toJSON());
+    for (const [accountHash, tasks] of this.largeStateTasks) {
+      largeStateTasks[bufferToHex(accountHash)] = tasks.map((task) => task.toJSON());
     }
 
     return {
@@ -288,7 +288,7 @@ export class SnapSync {
     try {
       for (const task of this.tasks) {
         await task.commit();
-        for (const stateTasks of Object.values(task.largeStateTasks)) {
+        for (const stateTasks of task.largeStateTasks.values()) {
           for (const stateTask of stateTasks) {
             await stateTask.commit();
           }
@@ -355,7 +355,7 @@ export class SnapSync {
     task.reset();
 
     // resumed is used to record the large state task that was woken up
-    const resumed = new Set<string>();
+    const resumed = new FunctionalBufferSet();
 
     for (let i = 0; i < res.accounts.length; i++) {
       const account = res.accounts[i];
@@ -369,9 +369,9 @@ export class SnapSync {
 
       // check if the account is a contract with an unknown storage trie
       if (!account.stateRoot.equals(KECCAK256_RLP) && !(await this.db.hasTrieNode(account.stateRoot))) {
-        const hash = bufferToHex(res.hashes[i]);
+        const hash = res.hashes[i];
         // if the large state task exists, wake it up
-        const largeStateTasks = task.largeStateTasks[hash];
+        const largeStateTasks = task.largeStateTasks.get(hash);
         if (largeStateTasks !== undefined) {
           // the state root of the account may have changed when the large state task was awakened again
           largeStateTasks.forEach((task) => (task.root = account.stateRoot));
@@ -384,9 +384,9 @@ export class SnapSync {
     }
 
     // delete all unawakened large state tasks
-    for (const hash of Object.keys(task.largeStateTasks)) {
+    for (const hash of task.largeStateTasks.keys()) {
       if (!resumed.has(hash)) {
-        delete task.largeStateTasks[hash];
+        task.largeStateTasks.delete(hash);
       }
     }
 
@@ -401,8 +401,7 @@ export class SnapSync {
         continue;
       }
 
-      const largeStateTasks = Object.entries(task.largeStateTasks);
-      if (largeStateTasks.length === 0 || task.pendingState.size === 0) {
+      if (task.largeStateTasks.size === 0 || task.pendingState.size === 0) {
         continue;
       }
 
@@ -416,13 +415,13 @@ export class SnapSync {
       let largeStateTask: StorageTask | undefined;
 
       // try to find a large state task
-      for (const [accountHash, tasks] of largeStateTasks) {
+      for (const [accountHash, tasks] of task.largeStateTasks) {
         for (const stateTask of tasks) {
           if (stateTask.req !== undefined) {
             continue;
           }
 
-          accounts.push(toBuffer(accountHash));
+          accounts.push(accountHash);
           roots.push(stateTask.root);
           largeStateTask = stateTask;
           break;
@@ -505,8 +504,7 @@ export class SnapSync {
         continue;
       }
 
-      const accountObject = accountTask.res!.accounts[j];
-
+      // mark completed tasks
       if (stateTask === undefined && accountTask.needState[j] && (i < res.hashes.length - 1 || !res.cont)) {
         accountTask.needState[j] = false;
         accountTask.pending--;
@@ -516,9 +514,9 @@ export class SnapSync {
       // needHeal ??
       // }
 
+      // if the last task is not completed, treat it as a large state task
       if (stateTask === undefined && i === res.hashes.length - 1 && res.cont) {
-        const accountHash = bufferToHex(account);
-        if (accountTask.largeStateTasks[accountHash] === undefined) {
+        if (accountTask.largeStateTasks.get(account) === undefined) {
           const keys = res.hashes[i];
           const lastKey = keys.length > 0 ? keys[keys.length - 1] : undefined;
 
@@ -529,7 +527,7 @@ export class SnapSync {
             largeStateTasks.push(largeStateTask);
           }
 
-          accountTask.largeStateTasks[accountHash] = largeStateTasks;
+          accountTask.largeStateTasks.set(account, largeStateTasks);
           stateTask = largeStateTasks[0];
         }
       }

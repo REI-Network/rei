@@ -79,4 +79,18 @@ export class StakingAccount extends Account {
   getStakeInfo() {
     return this.stakeInfo ?? (this.stakeInfo = StakeInfo.fromStakeInfoData());
   }
+
+  /**
+   * Returns a Buffer Array of the raw Buffers for the slim account, in order.
+   */
+  slimRaw(): Buffer[] {
+    return this.raw(); // TODO: ...
+  }
+
+  /**
+   * Returns the RLP serialization of the slim account as a `Buffer`.
+   */
+  slimSerialize(): Buffer {
+    return this.serialize(); // TODO: ...
+  }
 }

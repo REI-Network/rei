@@ -235,6 +235,7 @@ describe('SnapSync', () => {
 
   it('should sync succeed(resume)', async () => {
     const dstDB = new Database(level(), common);
+
     const sync1 = new SnapSync(dstDB, result.root, manager);
     await sync1.init();
     sync1.start();

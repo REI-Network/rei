@@ -810,9 +810,6 @@ export class SnapSync {
         if (cb) {
           // if callback exists, execute the callback
           await cb();
-        } else if (cb === null) {
-          // null means break
-          break;
         } else {
           // otherwise, it might just be a peer join event, do nothing
         }

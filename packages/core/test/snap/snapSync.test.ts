@@ -1,3 +1,4 @@
+import { expect } from 'chai';
 import { Database } from '@rei-network/database';
 import { snapAccountKey, snapStorageKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
 import { Common } from '@rei-network/common';
@@ -32,11 +33,6 @@ class MockPeer implements SnapSyncPeer {
       ['code', false],
       ['trieNode', false]
     ]);
-  }
-
-  private getLastestStorageHash(accountHash: Buffer) {
-    const account = this.result.accounts.find(({ accountHash: _accountHash }) => _accountHash.equals(accountHash))!;
-    return account.lastestStorageHash;
   }
 
   private async runWithLock<T>(type: PeerType, cb: () => Promise<T>) {
@@ -113,6 +109,7 @@ class MockPeer implements SnapSyncPeer {
           (val) => val
         )) {
           if (len >= maxStorageSize) {
+            cont = true;
             break;
           }
 
@@ -127,11 +124,6 @@ class MockPeer implements SnapSyncPeer {
         if (len >= maxStorageSize) {
           break;
         }
-      }
-
-      if (hashes.length > 0) {
-        const lastestStorage = this.getLastestStorageHash(req.accounts[req.accounts.length - 1]);
-        cont = req.limit.compare(lastestStorage) < 0;
       }
 
       return { hashes, slots, cont };
@@ -197,26 +189,42 @@ class MockNetworkManager implements SnapSyncNetworkManager {
 }
 
 describe('SnapSync', () => {
-  const db = new Database(level(), common);
-  const syncDB = new Database(level(), common);
-  let root!: Buffer;
+  const srcDB = new Database(level(), common);
+  const dstDB = new Database(level(), common);
+  let result!: GenRandomAccountsResult;
   let manager!: MockNetworkManager;
 
   before(async () => {
-    const result = await genRandomAccounts(db, 100, 100, true);
-    root = result.root;
+    result = await genRandomAccounts(srcDB, 100, 100, true);
 
     const peers: MockPeer[] = [];
     for (let i = 0; i < 20; i++) {
-      peers.push(new MockPeer(db, result));
+      peers.push(new MockPeer(srcDB, result));
     }
     manager = new MockNetworkManager(peers);
   });
 
   it('should sync succeed', async () => {
-    const sync = new SnapSync(syncDB, root, manager);
+    const sync = new SnapSync(dstDB, result.root, manager);
     await sync.init();
     sync.start();
     await sync.waitUntilFinished();
+
+    for (const info of result.accounts) {
+      const srcSnapAccount = await srcDB.getSerializedSnapAccount(info.accountHash);
+      const dstSnapAccount = await dstDB.getSerializedSnapAccount(info.accountHash);
+      expect(srcSnapAccount.equals(dstSnapAccount), 'account should be equal').be.true;
+
+      const srcCode = await srcDB.rawdb.get(info.account.codeHash, { keyEncoding: 'binary', valueEncoding: 'binary' });
+      const dstCode = await dstDB.rawdb.get(info.account.codeHash, { keyEncoding: 'binary', valueEncoding: 'binary' });
+      expect(srcCode.equals(dstCode), 'code should be equal').be.true;
+
+      for (const [storageHash, { val }] of info.storageData.entries()) {
+        const srcSnapStorage = await srcDB.getSnapStorage(info.accountHash, storageHash);
+        const dstSnapStorage = await dstDB.getSnapStorage(info.accountHash, storageHash);
+        expect(srcSnapStorage.equals(val), 'storage should be equal').be.true;
+        expect(srcSnapStorage.equals(dstSnapStorage), 'storage should be equal').be.true;
+      }
+    }
   });
 });

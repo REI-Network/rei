@@ -1,8 +1,7 @@
-import { LevelUp } from 'levelup';
 import { bufferToHex, toBuffer, BN, setLengthLeft, KECCAK256_NULL, KECCAK256_RLP } from 'ethereumjs-util';
 import { BaseTrie, CheckpointTrie } from 'merkle-patricia-tree';
 import { logger, Channel, FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
-import { Database, DBOp, DBSaveSerializedSnapAccount, DBSaveSnapStorage, DBSaveSnapSyncProgress } from '@rei-network/database';
+import { Database, DBSaveSerializedSnapAccount, DBSaveSnapStorage, DBSaveSnapSyncProgress } from '@rei-network/database';
 import { StakingAccount } from '../stateManager';
 import { EMPTY_HASH, MAX_HASH } from '../utils';
 import { increaseKey } from './utils';
@@ -113,19 +112,11 @@ class AccountTask {
   }
 
   /**
-   * Initialize
-   * @param db - Raw db
+   * Flush data to disk
    */
-  init(db: LevelUp) {
-    this.genTrie = new CheckpointTrie(db);
+  async commit() {
+    await this.genTrie.commit();
     this.genTrie.checkpoint();
-
-    // init state tasks
-    for (const tasks of this.largeStateTasks.values()) {
-      for (const task of tasks) {
-        task.init(db);
-      }
-    }
   }
 
   /**
@@ -206,11 +197,10 @@ class StorageTask {
   }
 
   /**
-   * Initialize
-   * @param db - Raw db
+   * Flush data to disk
    */
-  init(db: LevelUp) {
-    this.genTrie = new CheckpointTrie(db);
+  async commit() {
+    await this.genTrie.commit();
     this.genTrie.checkpoint();
   }
 
@@ -288,7 +278,23 @@ export class SnapSync {
       }
     }
 
-    tasks.forEach((task) => task.init(this.db.rawdb));
+    // initialize account genTrie
+    const accountGenTrie = new CheckpointTrie(this.db.rawdb);
+    accountGenTrie.checkpoint();
+    for (const task of tasks) {
+      task.genTrie = accountGenTrie;
+
+      // initialize storage genTrie
+      if (task.largeStateTasks.size > 0) {
+        const storageGenTrie = new CheckpointTrie(this.db.rawdb);
+        storageGenTrie.checkpoint();
+        for (const stateTasks of task.largeStateTasks.values()) {
+          for (const stateTask of stateTasks) {
+            stateTask.genTrie = storageGenTrie;
+          }
+        }
+      }
+    }
 
     this.tasks = tasks;
     this.snapped = tasks.length === 0;
@@ -300,10 +306,10 @@ export class SnapSync {
   private async saveSyncProgress() {
     try {
       for (const task of this.tasks) {
-        await task.genTrie.commit();
+        await task.commit();
         for (const stateTasks of task.largeStateTasks.values()) {
           for (const stateTask of stateTasks) {
-            await stateTask.genTrie.commit();
+            await stateTask.commit();
           }
         }
       }
@@ -557,10 +563,13 @@ export class SnapSync {
           const keys = res.hashes[i];
           const lastKey = keys.length > 0 ? keys[keys.length - 1] : undefined;
 
+          const storageGenTrie = new CheckpointTrie(this.db.rawdb);
+          storageGenTrie.checkpoint();
+
           const largeStateTasks: StorageTask[] = [];
           for (const [next, last] of splitRange(storageConcurrency, lastKey)) {
             const largeStateTask = new StorageTask(root, next, last);
-            largeStateTask.init(this.db.rawdb);
+            largeStateTask.genTrie = storageGenTrie;
             largeStateTasks.push(largeStateTask);
           }
 
@@ -610,16 +619,17 @@ export class SnapSync {
       }
 
       // save snapshot
-      const batch: DBOp[] = [];
+      const batch = new DBatch(this.db);
       for (let j = 0; j < res.hashes[i].length; j++) {
         batch.push(DBSaveSnapStorage(account, res.hashes[i][j], res.slots[i][j]));
       }
-      await this.db.batch(batch);
+      await batch.write();
+      batch.reset();
     }
 
     // if the larget state task is done, commit it
     if (stateTask && stateTask.done) {
-      await stateTask.genTrie.commit();
+      await stateTask.commit();
       if (stateTask.genTrie.root.equals(stateTask.root)) {
         // if the chunk's root is an overflown but full delivery, clear the heal request
         const account = req.accounts[req.accounts.length - 1];
@@ -628,8 +638,6 @@ export class SnapSync {
             accountTask.needHeal[i] = false;
           }
         }
-      } else {
-        logger.debug('SnapSync::processStorageResponse, state task committed but root does not match');
       }
     }
 
@@ -757,7 +765,7 @@ export class SnapSync {
     task.done = !res.cont;
 
     if (task.done) {
-      await task.genTrie.commit();
+      await task.commit();
     }
   }
 
@@ -853,10 +861,6 @@ export class SnapSync {
    */
   async init() {
     await this.loadSyncProgress();
-    if (this.snapped) {
-      // TODO: heal.pending
-      logger.debug('SnapSync::init, already completed');
-    }
   }
 
   /**

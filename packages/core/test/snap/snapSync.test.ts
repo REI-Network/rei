@@ -12,8 +12,8 @@ const level = require('level-mem');
 const common = new Common({ chain: 'rei-devnet' });
 common.setHardforkByBlockNumber(0);
 
-const maxAccountSize = 10;
-const maxStorageSize = 3;
+const maxAccountSize = 13;
+const maxStorageSize = 13;
 
 class MockPeer implements SnapSyncPeer {
   private readonly db: Database;
@@ -190,26 +190,10 @@ class MockNetworkManager implements SnapSyncNetworkManager {
 
 describe('SnapSync', () => {
   const srcDB = new Database(level(), common);
-  const dstDB = new Database(level(), common);
   let result!: GenRandomAccountsResult;
   let manager!: MockNetworkManager;
 
-  before(async () => {
-    result = await genRandomAccounts(srcDB, 100, 100, true);
-
-    const peers: MockPeer[] = [];
-    for (let i = 0; i < 20; i++) {
-      peers.push(new MockPeer(srcDB, result));
-    }
-    manager = new MockNetworkManager(peers);
-  });
-
-  it('should sync succeed', async () => {
-    const sync = new SnapSync(dstDB, result.root, manager);
-    await sync.init();
-    sync.start();
-    await sync.waitUntilFinished();
-
+  async function checkSnap(dstDB: Database) {
     for (const info of result.accounts) {
       const srcSnapAccount = await srcDB.getSerializedSnapAccount(info.accountHash);
       const dstSnapAccount = await dstDB.getSerializedSnapAccount(info.accountHash);
@@ -226,5 +210,42 @@ describe('SnapSync', () => {
         expect(srcSnapStorage.equals(dstSnapStorage), 'storage should be equal').be.true;
       }
     }
+  }
+
+  before(async () => {
+    result = await genRandomAccounts(srcDB, 100, 100, true);
+
+    const peers: MockPeer[] = [];
+    for (let i = 0; i < 20; i++) {
+      peers.push(new MockPeer(srcDB, result));
+    }
+    manager = new MockNetworkManager(peers);
+  });
+
+  it('should sync succeed', async () => {
+    const dstDB = new Database(level(), common);
+
+    const sync = new SnapSync(dstDB, result.root, manager);
+    await sync.init();
+    sync.start();
+    await sync.waitUntilFinished();
+
+    await checkSnap(dstDB);
+  });
+
+  it('should sync succeed(resume)', async () => {
+    const dstDB = new Database(level(), common);
+    const sync1 = new SnapSync(dstDB, result.root, manager);
+    await sync1.init();
+    sync1.start();
+    await new Promise((r) => setTimeout(r, 500));
+    await sync1.abort();
+
+    const sync2 = new SnapSync(dstDB, result.root, manager);
+    await sync2.init();
+    sync2.start();
+    await sync2.waitUntilFinished();
+
+    await checkSnap(dstDB);
   });
 });

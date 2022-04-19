@@ -19,7 +19,7 @@ type SyncRequest = {
   callback?: LeafCallback;
 };
 
-function toTransportNibbles(path: Nibbles): TransportNibbles[] {
+function toPaths(path: Nibbles): TransportNibbles[] {
   if (path.length < 64) {
     return [nibblesToTransportNibbles(path)];
   }
@@ -182,7 +182,7 @@ export class TrieSync {
    */
   missing(max: number) {
     const nodeHashes: Buffer[] = [];
-    const nodePaths: TransportNibbles[][] = [];
+    const nodePaths: Buffer[][] = [];
     const codeHashes: Buffer[] = [];
 
     while (this.queue.length > 0 && (max === 0 || nodeHashes.length + codeHashes.length < max)) {
@@ -192,7 +192,7 @@ export class TrieSync {
         codeHashes.push(req.hash);
       } else {
         nodeHashes.push(req.hash);
-        nodePaths.push(req.path ? toTransportNibbles(req.path) : [[]]);
+        nodePaths.push(req.path ? toPaths(req.path).map(nibblesToBuffer) : [Buffer.alloc(0)]);
       }
 
       this.queue.remove();

@@ -6,6 +6,7 @@ import { StakingAccount } from '../stateManager';
 import { EMPTY_HASH, MAX_HASH } from '../utils';
 import { increaseKey } from './utils';
 import { BinaryRawDBatch, DBatch } from './batch';
+import { TrieSync } from './trieSync';
 
 const maxHashBN = new BN(MAX_HASH);
 
@@ -14,6 +15,8 @@ const storageConcurrency = 16;
 
 const storageRequestSize = 200000;
 const codeRequestSize = 50;
+const healTrieNodeRequestSize = 1024;
+const healCodeRequestSize = 50;
 
 function bnToBuffer32(bn: BN) {
   return setLengthLeft(bn.toBuffer(), 32);
@@ -216,6 +219,17 @@ class StorageTask {
   }
 }
 
+class HealTask {
+  scheduler: TrieSync;
+
+  pendingTrieNode = new FunctionalBufferMap<Buffer[]>();
+  pendingCode = new FunctionalBufferSet();
+
+  constructor(db: Database) {
+    this.scheduler = new TrieSync(db);
+  }
+}
+
 type SnapSyncProgressJSON = {
   tasks: AccountTaskJSON[];
 };
@@ -224,7 +238,7 @@ export interface SnapSyncPeer {
   getAccountRange(root: Buffer, req: AccountRequest): Promise<AccountResponse | null>;
   getStorageRanges(root: Buffer, req: StorageRequst): Promise<StorageResponse | null>;
   getByteCodes(root: Buffer, hashes: Buffer[]): Promise<Buffer[] | null>;
-  getTrieNodes(hashes: Buffer[]): Promise<Buffer[] | null>;
+  getTrieNodes(paths: Buffer[][]): Promise<Buffer[] | null>;
 }
 
 export type PeerType = 'account' | 'storage' | 'code' | 'trieNode';
@@ -241,6 +255,7 @@ export class SnapSync {
 
   private readonly channel = new Channel<void | (() => Promise<void>)>();
 
+  healer: HealTask;
   tasks: AccountTask[] = [];
   snapped: boolean = false;
 
@@ -250,6 +265,7 @@ export class SnapSync {
     this.db = db;
     this.root = root;
     this.network = network;
+    this.healer = new HealTask(db);
   }
 
   get isWorking() {
@@ -722,6 +738,164 @@ export class SnapSync {
   }
 
   /**
+   * Load requests from trieSync to fill pending requests
+   */
+  private fillHealTask() {
+    const have = this.healer.pendingTrieNode.size + this.healer.pendingCode.size;
+    const want = healTrieNodeRequestSize + healCodeRequestSize;
+    if (have < want) {
+      const { nodeHashes, nodePaths, codeHashes } = this.healer.scheduler.missing(want - have);
+      for (let i = 0; i < nodeHashes.length; i++) {
+        this.healer.pendingTrieNode.set(nodeHashes[i], nodePaths[i]);
+      }
+      for (const codeHash of codeHashes) {
+        this.healer.pendingCode.add(codeHash);
+      }
+    }
+  }
+
+  /**
+   * Assign trie node tasks to remote peers
+   */
+  private assignHealTrieNodeTasks() {
+    while (this.healer.pendingTrieNode.size > 0 || this.healer.scheduler.pending > 0) {
+      this.fillHealTask();
+
+      if (this.healer.pendingTrieNode.size === 0) {
+        return;
+      }
+
+      const peer = this.network.getIdlePeer('trieNode');
+      if (peer === null) {
+        return;
+      }
+
+      const hashes: Buffer[] = [];
+      const paths: Buffer[][] = [];
+      for (const [hash, _paths] of this.healer.pendingTrieNode) {
+        this.healer.pendingTrieNode.delete(hash);
+
+        hashes.push(hash);
+        paths.push(_paths);
+
+        if (hashes.length >= healTrieNodeRequestSize) {
+          break;
+        }
+      }
+
+      peer.getTrieNodes(paths).then((res) => {
+        this.channel.push(this.processHealTrieNodeResponse.bind(this, hashes, paths, res));
+      });
+    }
+  }
+
+  /**
+   * Process heal trie node response
+   * @param hashes - Node hash list
+   * @param paths - Node path list
+   * @param res - Nodes or null(if the request fails or times out)
+   */
+  private async processHealTrieNodeResponse(hashes: Buffer[], paths: Buffer[][], res: Buffer[] | null) {
+    // revert
+    if (res === null) {
+      for (let i = 0; i < hashes.length; i++) {
+        this.healer.pendingTrieNode.set(hashes[i], paths[i]);
+      }
+      return;
+    }
+
+    for (let i = 0; i < hashes.length; i++) {
+      if (i >= res.length) {
+        this.healer.pendingTrieNode.set(hashes[i], paths[i]);
+        continue;
+      }
+
+      try {
+        await this.healer.scheduler.process(hashes[i], res[i]);
+      } catch (err: any) {
+        if (err.message === 'not found req') {
+          // ignore missing request
+        } else {
+          logger.error('SnapSync::processHealTrieNodeResponse, catch:', err);
+        }
+      }
+    }
+
+    // flush data to disk
+    const batch = new BinaryRawDBatch(this.db.rawdb);
+    this.healer.scheduler.commit(batch);
+    await batch.write();
+    batch.reset();
+  }
+
+  /**
+   * Assign bytecode tasks to remote peers
+   */
+  private assignHealBytecodeTasks() {
+    while (this.healer.pendingCode.size > 0 || this.healer.scheduler.pending > 0) {
+      this.fillHealTask();
+
+      if (this.healer.pendingCode.size === 0) {
+        return;
+      }
+
+      const peer = this.network.getIdlePeer('code');
+      if (peer === null) {
+        return;
+      }
+
+      const hashes: Buffer[] = [];
+      for (const hash of this.healer.pendingCode) {
+        hashes.push(hash);
+
+        if (hashes.length >= healCodeRequestSize) {
+          break;
+        }
+      }
+
+      peer.getByteCodes(this.root, hashes).then((res) => {
+        this.channel.push(this.processHealBytecodeResponse.bind(this, hashes, res));
+      });
+    }
+  }
+
+  /**
+   * Process heal bytecode response
+   * @param hashes - Code hash list
+   * @param res - Codes list or null(if the request fails or times out)
+   */
+  private async processHealBytecodeResponse(hashes: Buffer[], res: Buffer[] | null) {
+    // revert
+    if (res === null) {
+      hashes.forEach((hash) => this.healer.pendingCode.add(hash));
+      return;
+    }
+
+    for (let i = 0; i < hashes.length; i++) {
+      if (i >= res.length) {
+        this.healer.pendingCode.add(hashes[i]);
+        continue;
+      }
+
+      try {
+        await this.healer.scheduler.process(hashes[i], res[i]);
+      } catch (err: any) {
+        if (err.message === 'not found req') {
+          // ignore missing request
+        } else {
+          logger.error('SnapSync::processHealBytecodeResponse, catch:', err);
+        }
+      }
+    }
+
+    // flush data to disk
+    const batch = new BinaryRawDBatch(this.db.rawdb);
+    this.healer.scheduler.commit(batch);
+    await batch.write();
+    batch.reset();
+  }
+
+  /**
    * Save snapshot to database and try to increase next hash of task
    * @param task - Account task
    */
@@ -824,17 +998,20 @@ export class SnapSync {
 
         await this.cleanStorageTasks();
         this.cleanAccountTasks();
-        if (this.snapped) {
-          // TODO: heal.pending
+        if (this.snapped && this.healer.scheduler.pending === 0) {
+          // finished, break
           break;
         }
 
+        // assign all the data retrieval tasks to any free peers
         this.assignAccountTasks();
         this.assignBytecodeTasks();
         this.assignStorageTasks();
 
         if (this.snapped) {
-          // TODO: heal logic
+          // sync phase done, run heal phase
+          this.assignHealTrieNodeTasks();
+          this.assignBytecodeTasks();
         }
       } catch (err) {
         logger.error('SnapSync::scheduleLoop, catch:', err);
@@ -861,6 +1038,19 @@ export class SnapSync {
    */
   async init() {
     await this.loadSyncProgress();
+    await this.healer.scheduler.init(this.root, async (paths, path, leaf, parent) => {
+      // the leaf node is an account
+      if (paths.length === 1) {
+        const account = StakingAccount.fromRlpSerializedAccount(leaf);
+        await this.db.batch([DBSaveSerializedSnapAccount(paths[0], account.slimSerialize())]);
+      }
+      // the leaf node is a slot
+      else if (paths.length === 2) {
+        await this.db.batch([DBSaveSnapStorage(paths[0], paths[1], leaf)]);
+      } else {
+        logger.warn('SnapSync::init, unknown leaf node');
+      }
+    });
   }
 
   /**

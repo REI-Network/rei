@@ -1,12 +1,15 @@
 import { expect } from 'chai';
+import { nibblesToBuffer, bufferToNibbles } from 'merkle-patricia-tree/dist/util/nibbles';
 import { Database } from '@rei-network/database';
 import { snapAccountKey, snapStorageKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
 import { Common } from '@rei-network/common';
 import { getRandomIntInclusive } from '@rei-network/utils';
 import { StakingAccount } from '../../src/stateManager';
 import { asyncTraverseRawDB } from '../../src/snap/layerIterator';
+import { transportNibblesToNibbles } from '../../src/snap/nibbles';
 import { SnapSync, SnapSyncNetworkManager, SnapSyncPeer, AccountRequest, AccountResponse, StorageRequst, StorageResponse, PeerType } from '../../src/snap/snapSync';
 import { genRandomAccounts, GenRandomAccountsResult } from './util';
+import { BaseTrie } from 'merkle-patricia-tree';
 const level = require('level-mem');
 
 const common = new Common({ chain: 'rei-devnet' });
@@ -140,9 +143,42 @@ class MockPeer implements SnapSyncPeer {
     });
   }
 
-  getTrieNodes(hashes: Buffer[]): Promise<Buffer[] | null> {
-    return this.runWithLock('trieNode', () => {
-      return Promise.all(hashes.map((hash) => this.db.rawdb.get(hash, { keyEncoding: 'binary', valueEncoding: 'binary' })));
+  getTrieNodes(paths: Buffer[][]): any {
+    return this.runWithLock('trieNode', async () => {
+      // const findNode = async (trie: BaseTrie, path: Buffer) => {
+      //   const { remaining, node } = await trie.findPath(path);
+      //   if (remaining.length > 0 || node === null) {
+      //     nodes.push(Buffer.alloc(0));
+      //     console.log('missing account!!!');
+      //   } else {
+      //     nodes.push(node.serialize());
+      //   }
+      // };
+      // const nodes: Buffer[] = [];
+      // for (const _path of paths) {
+      //   const path = _path.map((p) => nibblesToBuffer(transportNibblesToNibbles(bufferToNibbles(p))));
+      //   if (path.length === 1) {
+      //     // account
+      //     const trie = new BaseTrie(this.db.rawdb, this.result.root);
+      //     const { remaining, node } = await trie.findPath(path[0]);
+      //     if (remaining.length > 0 || node === null) {
+      //       nodes.push(Buffer.alloc(0));
+      //       console.log('missing account!!!');
+      //     } else {
+      //       nodes.push(node.serialize());
+      //     }
+      //   } else {
+      //     // storage
+      //     const accountHash = path[0];
+      //     const info = this.result.accounts.find((info) => info.accountHash.equals(accountHash));
+      //     if (!info) {
+      //       nodes.push(Buffer.alloc(0));
+      //       console.log('missing storage!!!');
+      //     } else {
+      //       const trie = new BaseTrie(this.db.rawdb, info.account.stateRoot);
+      //     }
+      //   }
+      // }
     });
   }
 }

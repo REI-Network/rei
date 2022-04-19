@@ -249,7 +249,7 @@ export class SnapSync {
   readonly root: Buffer;
   readonly network: SnapSyncNetworkManager;
 
-  private readonly channel = new Channel<void | null | (() => Promise<void>)>();
+  private readonly channel = new Channel<void | (() => Promise<void>)>();
 
   tasks: AccountTask[] = [];
   snapped: boolean = false;
@@ -846,6 +846,9 @@ export class SnapSync {
     } catch (err) {
       logger.error('SnapSync::scheduleLoop, catch(when exit):', err);
     }
+
+    // clear the promise, mark self as not working
+    this.schedulePromise = undefined;
   }
 
   /**
@@ -867,8 +870,8 @@ export class SnapSync {
       throw new Error('snap sync is working');
     }
 
+    // start loop
     this.schedulePromise = this.scheduleLoop();
-
     // put an empty value to start scheduling
     this.channel.push();
   }
@@ -877,27 +880,20 @@ export class SnapSync {
    * Stop scheduling
    */
   async abort() {
-    if (!this.isWorking) {
-      throw new Error("snap sync isn't working");
+    if (this.schedulePromise) {
+      // abort queue
+      this.channel.abort();
+      // wait for loop to exit
+      await this.schedulePromise;
     }
-
-    // clear queue
-    this.channel.clear();
-    // put a null value to stop scheduling
-    this.channel.push(null);
-
-    await this.schedulePromise;
-    this.schedulePromise = undefined;
   }
 
   /**
    * Wait until snap sync finished(only for test)
    */
-  waitUntilFinished() {
-    if (!this.isWorking) {
-      throw new Error("snap sync isn't working");
+  async waitUntilFinished() {
+    if (this.schedulePromise) {
+      await this.schedulePromise;
     }
-
-    return this.schedulePromise;
   }
 }

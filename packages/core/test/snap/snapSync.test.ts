@@ -5,46 +5,26 @@ import { getRandomIntInclusive } from '@rei-network/utils';
 import { StakingAccount } from '../../src/stateManager';
 import { asyncTraverseRawDB } from '../../src/snap/layerIterator';
 import { SnapSync, SnapSyncNetworkManager, SnapSyncPeer, AccountRequest, AccountResponse, StorageRequst, StorageResponse, PeerType } from '../../src/snap/snapSync';
-import { genRandomAccounts, GenRandomAccountsResult } from './util';
+import { genRandomAccounts } from './util';
 const level = require('level-mem');
 
 const common = new Common({ chain: 'rei-devnet' });
 common.setHardforkByBlockNumber(0);
 
-class Accounts {
-  root: Buffer;
-  private readonly result: GenRandomAccountsResult;
-
-  constructor(result: GenRandomAccountsResult) {
-    this.root = result.root;
-    this.result = result;
-  }
-
-  //   isLastestAccountHash(hash: Buffer) {
-  //     return hash.equals(this.result.lastestAccountHash);
-  //   }
-
-  //   isLastestStorageHash(accountHash: Buffer, storageHash: Buffer) {
-  //     for (const info of this.result.accounts) {
-  //       if (info.accountHash.equals(accountHash)) {
-  //         return info.lastestStorageHash.equals(storageHash);
-  //       }
-  //     }
-  //     return false;
-  //   }
-}
+const maxAccountSize = 10;
+const maxStorageSize = 3;
 
 class MockPeer implements SnapSyncPeer {
   private readonly db: Database;
-  private readonly accounts: Accounts;
+  private readonly root: Buffer;
 
   private manager!: MockNetworkManager;
 
   private workStatus: Map<string, boolean>;
 
-  constructor(accounts: Accounts, db: Database) {
+  constructor(root: Buffer, db: Database) {
     this.db = db;
-    this.accounts = accounts;
+    this.root = root;
 
     this.workStatus = new Map<PeerType, boolean>([
       ['account', false],
@@ -76,7 +56,7 @@ class MockPeer implements SnapSyncPeer {
 
   getAccountRange(root: Buffer, req: AccountRequest): Promise<AccountResponse | null> {
     return this.runWithLock('account', async () => {
-      if (!root.equals(this.accounts.root)) {
+      if (!root.equals(this.root)) {
         return null;
       }
 
@@ -91,9 +71,13 @@ class MockPeer implements SnapSyncPeer {
         (key) => key.slice(SNAP_ACCOUNT_PREFIX.length),
         (val) => StakingAccount.fromRlpSerializedAccount(val)
       )) {
+        if (hashes.length >= maxAccountSize) {
+          cont = true;
+          break;
+        }
+
         hashes.push(hash);
         accounts.push(getValue());
-        // cont = this.accounts.isLastestAccountHash(hash);
       }
 
       return { hashes, accounts, cont };
@@ -102,12 +86,13 @@ class MockPeer implements SnapSyncPeer {
 
   getStorageRanges(root: Buffer, req: StorageRequst): Promise<StorageResponse | null> {
     return this.runWithLock('storage', async () => {
-      if (!root.equals(this.accounts.root)) {
+      if (!root.equals(this.root)) {
         return null;
       }
 
       const hashes: Buffer[][] = [];
       const slots: Buffer[][] = [];
+      let len = 0;
       let cont = false;
 
       // large state task
@@ -122,13 +107,22 @@ class MockPeer implements SnapSyncPeer {
           (key) => key.slice(SNAP_STORAGE_PREFIX.length + 32),
           (val) => val
         )) {
+          if (len >= maxStorageSize) {
+            cont = true;
+            break;
+          }
+
           _hashes.push(hash);
           _slots.push(getValue());
-          //   cont = this.accounts.isLastestStorageHash(account, hash);
+          len++;
         }
 
         hashes.push(_hashes);
         slots.push(_slots);
+
+        if (len >= maxStorageSize) {
+          break;
+        }
       }
 
       return { hashes, slots, cont };
@@ -137,7 +131,7 @@ class MockPeer implements SnapSyncPeer {
 
   getByteCodes(root: Buffer, hashes: Buffer[]): Promise<Buffer[] | null> {
     return this.runWithLock('code', () => {
-      if (!root.equals(this.accounts.root)) {
+      if (!root.equals(this.root)) {
         return Promise.resolve(null);
       }
 
@@ -196,22 +190,22 @@ class MockNetworkManager implements SnapSyncNetworkManager {
 describe('SnapSync', () => {
   const db = new Database(level(), common);
   const syncDB = new Database(level(), common);
-  let accounts!: Accounts;
+  let root!: Buffer;
   let manager!: MockNetworkManager;
 
   before(async () => {
     const result = await genRandomAccounts(db, 100, 10, true);
-    accounts = new Accounts(result);
+    root = result.root;
 
     const peers: MockPeer[] = [];
     for (let i = 0; i < 20; i++) {
-      peers.push(new MockPeer(accounts, db));
+      peers.push(new MockPeer(root, db));
     }
     manager = new MockNetworkManager(peers);
   });
 
   it('should sync succeed', async () => {
-    const sync = new SnapSync(syncDB, accounts.root, manager);
+    const sync = new SnapSync(syncDB, root, manager);
     await sync.init();
     sync.start();
     await sync.waitUntilFinished();

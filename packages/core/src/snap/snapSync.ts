@@ -605,7 +605,7 @@ export class SnapSync {
       // put slots to stateTask.genTrie(in memory) for large state task
       if (i === res.hashes.length - 1 && stateTask) {
         for (let j = 0; j < res.hashes[i].length; j++) {
-          stateTask.genTrie.put(res.hashes[i][j], res.slots[i][j]);
+          await stateTask.genTrie.put(res.hashes[i][j], res.slots[i][j]);
         }
       }
 

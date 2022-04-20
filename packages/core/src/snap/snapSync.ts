@@ -1070,14 +1070,18 @@ export class SnapSync {
     await this.healer.scheduler.setRoot(this.root, async (paths, path, leaf, parent) => {
       // the leaf node is an account
       if (paths.length === 1) {
-        const account = StakingAccount.fromRlpSerializedAccount(leaf);
-        await this.db.batch([DBSaveSerializedSnapAccount(paths[0], account.slimSerialize())]);
+        try {
+          const account = StakingAccount.fromRlpSerializedAccount(leaf);
+          await this.db.batch([DBSaveSerializedSnapAccount(paths[0], account.slimSerialize())]);
+        } catch (err) {
+          // ignore invalid leaf node
+        }
       }
       // the leaf node is a slot
       else if (paths.length === 2) {
         await this.db.batch([DBSaveSnapStorage(paths[0], paths[1], leaf)]);
       } else {
-        logger.warn('SnapSync::init, unknown leaf node');
+        logger.warn('SnapSync::setRoot, unknown leaf node');
       }
     });
   }

@@ -1,12 +1,14 @@
+import crypto from 'crypto';
 import { expect } from 'chai';
 import { Database } from '@rei-network/database';
 import { snapAccountKey, snapStorageKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
 import { Common } from '@rei-network/common';
-import { getRandomIntInclusive } from '@rei-network/utils';
+import { FunctionalBufferMap, getRandomIntInclusive } from '@rei-network/utils';
 import { StakingAccount } from '../../src/stateManager';
 import { asyncTraverseRawDB } from '../../src/snap/layerIterator';
 import { SnapSync, SnapSyncNetworkManager, SnapSyncPeer, AccountRequest, AccountResponse, StorageRequst, StorageResponse, PeerType } from '../../src/snap/snapSync';
 import { genRandomAccounts, GenRandomAccountsResult } from './util';
+import { BaseTrie } from 'merkle-patricia-tree';
 const level = require('level-mem');
 
 const common = new Common({ chain: 'rei-devnet' });
@@ -213,7 +215,7 @@ describe('SnapSync', () => {
   }
 
   before(async () => {
-    result = await genRandomAccounts(srcDB, 50, 50, true);
+    result = await genRandomAccounts(srcDB, 30, 30, true);
 
     const peers: MockPeer[] = [];
     for (let i = 0; i < 20; i++) {
@@ -240,7 +242,7 @@ describe('SnapSync', () => {
     await sync.setRoot(result.root);
     sync.start();
 
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 100));
     await sync.abort();
 
     await sync.setRoot(result.root);
@@ -248,5 +250,34 @@ describe('SnapSync', () => {
     await sync.waitUntilFinished();
 
     await checkSnap(dstDB);
+  });
+
+  it('should sync succeed(gap)', async () => {
+    // put some value in srcTrie
+    const srcTrie = new BaseTrie(srcDB.rawdb, result.root);
+    const gap = new FunctionalBufferMap<Buffer>();
+    for (let i = 0; i < 10; i++) {
+      const key = crypto.randomBytes(32);
+      const value = crypto.randomBytes(32);
+      gap.set(key, value);
+      await srcTrie.put(key, value);
+    }
+    result.root = srcTrie.root;
+
+    const dstDB = new Database(level(), common);
+
+    const sync = new SnapSync(dstDB, manager);
+    await sync.setRoot(result.root);
+    sync.start();
+    await sync.waitUntilFinished();
+
+    await checkSnap(dstDB);
+
+    // make sure all gaps exist
+    const dstTrie = new BaseTrie(dstDB.rawdb, result.root);
+    for (const [key, value] of gap) {
+      const _value = await dstTrie.get(key);
+      expect(_value && _value.equals(value), 'value should be equal').be.true;
+    }
   });
 });

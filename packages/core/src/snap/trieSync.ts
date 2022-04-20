@@ -84,9 +84,14 @@ export class TrieSync {
   setRoot(root: Buffer, onLeaf?: LeafCallback) {
     return this.addSubTrie(root, undefined, undefined, async (paths, path, leaf, parent) => {
       onLeaf && (await onLeaf(paths, path, leaf, parent));
-      const account = StakingAccount.fromRlpSerializedAccount(leaf);
-      await this.addSubTrie(account.stateRoot, path, parent, onLeaf);
-      await this.addCodeEntry(account.codeHash, path, parent);
+
+      try {
+        const account = StakingAccount.fromRlpSerializedAccount(leaf);
+        await this.addSubTrie(account.stateRoot, path, parent, onLeaf);
+        await this.addCodeEntry(account.codeHash, path, parent);
+      } catch (err) {
+        // ignore invalid leaf node
+      }
     });
   }
 

@@ -63,7 +63,7 @@ describe('TrieSync', () => {
     const backend = new MockTrieSyncBackend(rawdb2);
 
     const sync = new TrieSync(backend);
-    await sync.init(root);
+    await sync.setRoot(root);
 
     beforeSync && (await beforeSync());
 

@@ -213,7 +213,7 @@ describe('SnapSync', () => {
   }
 
   before(async () => {
-    result = await genRandomAccounts(srcDB, 100, 100, true);
+    result = await genRandomAccounts(srcDB, 50, 50, true);
 
     const peers: MockPeer[] = [];
     for (let i = 0; i < 20; i++) {
@@ -225,8 +225,8 @@ describe('SnapSync', () => {
   it('should sync succeed', async () => {
     const dstDB = new Database(level(), common);
 
-    const sync = new SnapSync(dstDB, result.root, manager);
-    await sync.init();
+    const sync = new SnapSync(dstDB, manager);
+    await sync.setRoot(result.root);
     sync.start();
     await sync.waitUntilFinished();
 
@@ -236,16 +236,16 @@ describe('SnapSync', () => {
   it('should sync succeed(abort and resume)', async () => {
     const dstDB = new Database(level(), common);
 
-    const sync1 = new SnapSync(dstDB, result.root, manager);
-    await sync1.init();
-    sync1.start();
-    await new Promise((r) => setTimeout(r, 500));
-    await sync1.abort();
+    const sync = new SnapSync(dstDB, manager);
+    await sync.setRoot(result.root);
+    sync.start();
 
-    const sync2 = new SnapSync(dstDB, result.root, manager);
-    await sync2.init();
-    sync2.start();
-    await sync2.waitUntilFinished();
+    await new Promise((r) => setTimeout(r, 500));
+    await sync.abort();
+
+    await sync.setRoot(result.root);
+    sync.start();
+    await sync.waitUntilFinished();
 
     await checkSnap(dstDB);
   });

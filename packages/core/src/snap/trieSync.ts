@@ -18,6 +18,14 @@ type SyncRequest = {
   callback?: LeafCallback;
 };
 
+function compareSyncRequest(a: SyncRequest, b: SyncRequest) {
+  let res = (a.path?.length ?? 0) - (b.parent?.length ?? 0);
+  if (res === 0) {
+    res = a.hash.compare(b.hash);
+  }
+  return res;
+}
+
 class SyncMemBatch {
   readonly nodes = new FunctionalBufferMap<Buffer>();
   readonly codes = new FunctionalBufferMap<Buffer>();
@@ -57,15 +65,8 @@ export class TrieSync {
   private readonly memBatch = new SyncMemBatch();
   private readonly nodeReqs = new FunctionalBufferMap<SyncRequest>();
   private readonly codeReqs = new FunctionalBufferMap<SyncRequest>();
-  private readonly queue = new Heap({
-    compar: (a: SyncRequest, b: SyncRequest) => {
-      let res = (a.path?.length ?? 0) - (b.parent?.length ?? 0);
-      if (res === 0) {
-        res = a.hash.compare(b.hash);
-      }
-      return res;
-    }
-  });
+
+  private queue = new Heap({ compar: compareSyncRequest });
 
   constructor(backend: TrieSyncBackend) {
     this.backend = backend;
@@ -76,17 +77,27 @@ export class TrieSync {
   }
 
   /**
-   * Initialize sync
+   * Set sync root
    * @param root - Root node hash
    * @param onLeaf - Leaf callback
    */
-  init(root: Buffer, onLeaf?: LeafCallback) {
+  setRoot(root: Buffer, onLeaf?: LeafCallback) {
     return this.addSubTrie(root, undefined, undefined, async (paths, path, leaf, parent) => {
       onLeaf && (await onLeaf(paths, path, leaf, parent));
       const account = StakingAccount.fromRlpSerializedAccount(leaf);
       await this.addSubTrie(account.stateRoot, path, parent, onLeaf);
       await this.addCodeEntry(account.codeHash, path, parent);
     });
+  }
+
+  /**
+   * Clear sync scheduler
+   */
+  clear() {
+    this.memBatch.clear();
+    this.nodeReqs.clear();
+    this.codeReqs.clear();
+    this.queue = new Heap({ compar: compareSyncRequest });
   }
 
   /**

@@ -7,6 +7,7 @@ import { EMPTY_HASH, MAX_HASH } from '../utils';
 import { increaseKey } from './utils';
 import { BinaryRawDBatch, DBatch } from './batch';
 import { TrieSync } from './trieSync';
+import { CountLock } from './countLock';
 
 const maxHashBN = new BN(MAX_HASH);
 
@@ -228,6 +229,15 @@ class HealTask {
   constructor(db: Database) {
     this.scheduler = new TrieSync(db);
   }
+
+  /**
+   * Clear heal task
+   */
+  clear() {
+    this.scheduler.clear();
+    this.pendingCode.clear();
+    this.pendingTrieNode.clear();
+  }
 }
 
 type SnapSyncProgressJSON = {
@@ -250,26 +260,39 @@ export interface SnapSyncNetworkManager {
 
 export class SnapSync {
   readonly db: Database;
-  readonly root: Buffer;
   readonly network: SnapSyncNetworkManager;
+  readonly healer: HealTask;
+  readonly lock = new CountLock();
 
   private readonly channel = new Channel<void | (() => Promise<void>)>();
 
-  healer: HealTask;
+  root!: Buffer;
   tasks: AccountTask[] = [];
   snapped: boolean = false;
 
   schedulePromise?: Promise<void>;
 
-  constructor(db: Database, root: Buffer, network: SnapSyncNetworkManager) {
+  constructor(db: Database, network: SnapSyncNetworkManager) {
     this.db = db;
-    this.root = root;
     this.network = network;
     this.healer = new HealTask(db);
   }
 
   get isWorking() {
     return !!this.schedulePromise;
+  }
+
+  /**
+   * Run promise with lock
+   * @param p - Promise
+   * @returns Wrapped promise
+   */
+  private runWithLock<T>(p: Promise<T>): Promise<T> {
+    this.lock.increase();
+    return p.then((res) => {
+      this.lock.decrease();
+      return res;
+    });
   }
 
   /**
@@ -356,9 +379,11 @@ export class SnapSync {
         limit: task.last
       };
 
-      peer.getAccountRange(this.root, req).then((res) => {
-        this.channel.push(this.processAccountResponse.bind(this, task, res));
-      });
+      this.runWithLock(
+        peer.getAccountRange(this.root, req).then((res) => {
+          this.channel.push(this.processAccountResponse.bind(this, task, res));
+        })
+      );
 
       task.req = req;
     }
@@ -509,9 +534,11 @@ export class SnapSync {
         limit: largeStateTask?.last ?? MAX_HASH
       };
 
-      peer.getStorageRanges(this.root, req).then((res) => {
-        this.channel.push(this.processStorageResponse.bind(this, task, largeStateTask, req, res));
-      });
+      this.runWithLock(
+        peer.getStorageRanges(this.root, req).then((res) => {
+          this.channel.push(this.processStorageResponse.bind(this, task, largeStateTask, req, res));
+        })
+      );
 
       if (largeStateTask) {
         largeStateTask.req = req;
@@ -689,9 +716,11 @@ export class SnapSync {
         }
       }
 
-      peer.getByteCodes(this.root, hashes).then((res) => {
-        this.channel.push(this.processBytecodeResponse.bind(this, task, hashes, res));
-      });
+      this.runWithLock(
+        peer.getByteCodes(this.root, hashes).then((res) => {
+          this.channel.push(this.processBytecodeResponse.bind(this, task, hashes, res));
+        })
+      );
     }
   }
 
@@ -779,9 +808,11 @@ export class SnapSync {
         }
       }
 
-      peer.getTrieNodes(hashes).then((res) => {
-        this.channel.push(this.processHealTrieNodeResponse.bind(this, hashes, res));
-      });
+      this.runWithLock(
+        peer.getTrieNodes(hashes).then((res) => {
+          this.channel.push(this.processHealTrieNodeResponse.bind(this, hashes, res));
+        })
+      );
     }
   }
 
@@ -846,9 +877,11 @@ export class SnapSync {
         }
       }
 
-      peer.getByteCodes(this.root, hashes).then((res) => {
-        this.channel.push(this.processHealBytecodeResponse.bind(this, hashes, res));
-      });
+      this.runWithLock(
+        peer.getByteCodes(this.root, hashes).then((res) => {
+          this.channel.push(this.processHealBytecodeResponse.bind(this, hashes, res));
+        })
+      );
     }
   }
 
@@ -1024,14 +1057,17 @@ export class SnapSync {
 
     // clear the promise, mark self as not working
     this.schedulePromise = undefined;
+    // clear scheduler
+    this.clear();
   }
 
   /**
-   * Initialize
+   * Set sync root
    */
-  async init() {
+  async setRoot(root: Buffer) {
+    this.root = root;
     await this.loadSyncProgress();
-    await this.healer.scheduler.init(this.root, async (paths, path, leaf, parent) => {
+    await this.healer.scheduler.setRoot(this.root, async (paths, path, leaf, parent) => {
       // the leaf node is an account
       if (paths.length === 1) {
         const account = StakingAccount.fromRlpSerializedAccount(leaf);
@@ -1054,6 +1090,7 @@ export class SnapSync {
       throw new Error('snap sync is working');
     }
 
+    this.channel.reset();
     // start loop
     this.schedulePromise = this.scheduleLoop();
     // put an empty value to start scheduling
@@ -1069,7 +1106,19 @@ export class SnapSync {
       this.channel.abort();
       // wait for loop to exit
       await this.schedulePromise;
+      // wait for all requests to complete
+      await this.lock.wait();
     }
+  }
+
+  /**
+   * Clear scheduler
+   */
+  clear() {
+    this.healer.clear();
+    this.root = undefined as any;
+    this.tasks = [];
+    this.snapped = false;
   }
 
   /**

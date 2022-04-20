@@ -4,7 +4,6 @@ import { BranchNode, ExtensionNode, LeafNode, Nibbles, TrieNode, isRawNode, deco
 import { nibblesToBuffer } from 'merkle-patricia-tree/dist/util/nibbles';
 import { FunctionalBufferMap } from '@rei-network/utils';
 import { StakingAccount } from '../stateManager';
-import { nibblesToTransportNibbles, TransportNibbles } from './nibbles';
 import { BinaryRawDBatch } from './batch';
 
 type LeafCallback = (paths: Buffer[], path: Nibbles, leaf: Buffer, parent: Buffer) => Promise<void>;
@@ -18,13 +17,6 @@ type SyncRequest = {
   deps: number;
   callback?: LeafCallback;
 };
-
-function toPaths(path: Nibbles): TransportNibbles[] {
-  if (path.length < 64) {
-    return [nibblesToTransportNibbles(path)];
-  }
-  return [nibblesToTransportNibbles(path.slice(0, 64)), nibblesToTransportNibbles(path.slice(64))];
-}
 
 class SyncMemBatch {
   readonly nodes = new FunctionalBufferMap<Buffer>();
@@ -182,7 +174,6 @@ export class TrieSync {
    */
   missing(max: number) {
     const nodeHashes: Buffer[] = [];
-    const nodePaths: Buffer[][] = [];
     const codeHashes: Buffer[] = [];
 
     while (this.queue.length > 0 && (max === 0 || nodeHashes.length + codeHashes.length < max)) {
@@ -192,17 +183,12 @@ export class TrieSync {
         codeHashes.push(req.hash);
       } else {
         nodeHashes.push(req.hash);
-        nodePaths.push(req.path ? toPaths(req.path).map(nibblesToBuffer) : [Buffer.alloc(0)]);
       }
 
       this.queue.remove();
     }
 
-    return {
-      nodeHashes,
-      nodePaths,
-      codeHashes
-    };
+    return { nodeHashes, codeHashes };
   }
 
   /**

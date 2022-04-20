@@ -1,14 +1,15 @@
 import crypto from 'crypto';
 import { expect } from 'chai';
-import { Database } from '@rei-network/database';
+import { Database, DBSaveSerializedSnapAccount, DBSaveSnapStorage } from '@rei-network/database';
 import { snapAccountKey, snapStorageKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
 import { Common } from '@rei-network/common';
 import { FunctionalBufferMap, getRandomIntInclusive } from '@rei-network/utils';
 import { StakingAccount } from '../../src/stateManager';
 import { asyncTraverseRawDB } from '../../src/snap/layerIterator';
 import { SnapSync, SnapSyncNetworkManager, SnapSyncPeer, AccountRequest, AccountResponse, StorageRequst, StorageResponse, PeerType } from '../../src/snap/snapSync';
-import { genRandomAccounts, GenRandomAccountsResult } from './util';
+import { AccountInfo, genRandomAccounts, GenRandomAccountsResult } from './util';
 import { BaseTrie } from 'merkle-patricia-tree';
+import { keccak256 } from 'ethereumjs-util';
 const level = require('level-mem');
 
 const common = new Common({ chain: 'rei-devnet' });
@@ -132,12 +133,8 @@ class MockPeer implements SnapSyncPeer {
     });
   }
 
-  getByteCodes(root: Buffer, hashes: Buffer[]): Promise<Buffer[] | null> {
+  getByteCodes(hashes: Buffer[]): Promise<Buffer[] | null> {
     return this.runWithLock('code', () => {
-      if (!root.equals(this.result.root)) {
-        return Promise.resolve(null);
-      }
-
       return Promise.all(hashes.map((hash) => this.db.rawdb.get(hash, { keyEncoding: 'binary', valueEncoding: 'binary' })));
     });
   }
@@ -244,6 +241,71 @@ describe('SnapSync', () => {
 
     await new Promise((r) => setTimeout(r, 100));
     await sync.abort();
+
+    await sync.setRoot(result.root);
+    sync.start();
+    await sync.waitUntilFinished();
+
+    await checkSnap(dstDB);
+  });
+
+  it('should sync succeed(root changed)', async () => {
+    const dstDB = new Database(level(), common);
+
+    const sync = new SnapSync(dstDB, manager);
+    await sync.setRoot(result.root);
+    sync.start();
+
+    await new Promise((r) => setTimeout(r, 100));
+    await sync.abort();
+
+    const accounts = [...result.accounts];
+    const changedAccounts: AccountInfo[] = [];
+    for (let i = 0; i < Math.ceil(result.accounts.length / 2); i++) {
+      const index = getRandomIntInclusive(0, accounts.length - 1);
+      changedAccounts.push(accounts[index]);
+      accounts.splice(index, 1);
+    }
+
+    for (const account of changedAccounts) {
+      const storageData = [...account.storageData.entries()];
+      const changedStorageData: [
+        Buffer,
+        {
+          key: Buffer;
+          val: Buffer;
+        }
+      ][] = [];
+      for (let i = 0; i < Math.ceil(storageData.length / 2); i++) {
+        const index = getRandomIntInclusive(0, storageData.length - 1);
+        changedStorageData.push(storageData[index]);
+        storageData.splice(index, 1);
+      }
+
+      // change storage
+      let stateRoot = account.account.stateRoot;
+      for (const [hash, storage] of changedStorageData) {
+        storage.val = crypto.randomBytes(32);
+        const trie = new BaseTrie(srcDB.rawdb, stateRoot);
+        await trie.put(hash, storage.val);
+        await srcDB.batch([DBSaveSnapStorage(account.accountHash, hash, storage.val)]);
+        stateRoot = trie.root;
+      }
+
+      // change code
+      const code = crypto.randomBytes(100);
+      const codeHash = keccak256(code);
+      await srcDB.rawdb.put(codeHash, code, { keyEncoding: 'binary', valueEncoding: 'binary' });
+
+      // change account
+      account.account.stateRoot = stateRoot;
+      account.account.codeHash = codeHash;
+      account.account.balance.iaddn(1);
+      const trie = new BaseTrie(srcDB.rawdb, result.root);
+      await trie.put(account.accountHash, account.account.serialize());
+      await srcDB.batch([DBSaveSerializedSnapAccount(account.accountHash, account.account.serialize())]);
+      result.root = trie.root;
+    }
 
     await sync.setRoot(result.root);
     sync.start();

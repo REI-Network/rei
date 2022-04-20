@@ -247,7 +247,7 @@ type SnapSyncProgressJSON = {
 export interface SnapSyncPeer {
   getAccountRange(root: Buffer, req: AccountRequest): Promise<AccountResponse | null>;
   getStorageRanges(root: Buffer, req: StorageRequst): Promise<StorageResponse | null>;
-  getByteCodes(root: Buffer, hashes: Buffer[]): Promise<Buffer[] | null>;
+  getByteCodes(hashes: Buffer[]): Promise<Buffer[] | null>;
   getTrieNodes(hashes: Buffer[]): Promise<Buffer[] | null>;
 }
 
@@ -717,7 +717,7 @@ export class SnapSync {
       }
 
       this.runWithLock(
-        peer.getByteCodes(this.root, hashes).then((res) => {
+        peer.getByteCodes(hashes).then((res) => {
           this.channel.push(this.processBytecodeResponse.bind(this, task, hashes, res));
         })
       );
@@ -878,7 +878,7 @@ export class SnapSync {
       }
 
       this.runWithLock(
-        peer.getByteCodes(this.root, hashes).then((res) => {
+        peer.getByteCodes(hashes).then((res) => {
           this.channel.push(this.processHealBytecodeResponse.bind(this, hashes, res));
         })
       );

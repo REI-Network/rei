@@ -222,7 +222,7 @@ class StorageTask {
 class HealTask {
   scheduler: TrieSync;
 
-  pendingTrieNode = new FunctionalBufferMap<Buffer[]>();
+  pendingTrieNode = new FunctionalBufferSet();
   pendingCode = new FunctionalBufferSet();
 
   constructor(db: Database) {
@@ -238,7 +238,7 @@ export interface SnapSyncPeer {
   getAccountRange(root: Buffer, req: AccountRequest): Promise<AccountResponse | null>;
   getStorageRanges(root: Buffer, req: StorageRequst): Promise<StorageResponse | null>;
   getByteCodes(root: Buffer, hashes: Buffer[]): Promise<Buffer[] | null>;
-  getTrieNodes(paths: Buffer[][]): Promise<Buffer[] | null>;
+  getTrieNodes(hashes: Buffer[]): Promise<Buffer[] | null>;
 }
 
 export type PeerType = 'account' | 'storage' | 'code' | 'trieNode';
@@ -744,9 +744,9 @@ export class SnapSync {
     const have = this.healer.pendingTrieNode.size + this.healer.pendingCode.size;
     const want = healTrieNodeRequestSize + healCodeRequestSize;
     if (have < want) {
-      const { nodeHashes, nodePaths, codeHashes } = this.healer.scheduler.missing(want - have);
+      const { nodeHashes, codeHashes } = this.healer.scheduler.missing(want - have);
       for (let i = 0; i < nodeHashes.length; i++) {
-        this.healer.pendingTrieNode.set(nodeHashes[i], nodePaths[i]);
+        this.healer.pendingTrieNode.add(nodeHashes[i]);
       }
       for (const codeHash of codeHashes) {
         this.healer.pendingCode.add(codeHash);
@@ -771,20 +771,16 @@ export class SnapSync {
       }
 
       const hashes: Buffer[] = [];
-      const paths: Buffer[][] = [];
-      for (const [hash, _paths] of this.healer.pendingTrieNode) {
+      for (const hash of this.healer.pendingTrieNode) {
         this.healer.pendingTrieNode.delete(hash);
-
         hashes.push(hash);
-        paths.push(_paths);
-
         if (hashes.length >= healTrieNodeRequestSize) {
           break;
         }
       }
 
-      peer.getTrieNodes(paths).then((res) => {
-        this.channel.push(this.processHealTrieNodeResponse.bind(this, hashes, paths, res));
+      peer.getTrieNodes(hashes).then((res) => {
+        this.channel.push(this.processHealTrieNodeResponse.bind(this, hashes, res));
       });
     }
   }
@@ -792,21 +788,18 @@ export class SnapSync {
   /**
    * Process heal trie node response
    * @param hashes - Node hash list
-   * @param paths - Node path list
    * @param res - Nodes or null(if the request fails or times out)
    */
-  private async processHealTrieNodeResponse(hashes: Buffer[], paths: Buffer[][], res: Buffer[] | null) {
+  private async processHealTrieNodeResponse(hashes: Buffer[], res: Buffer[] | null) {
     // revert
     if (res === null) {
-      for (let i = 0; i < hashes.length; i++) {
-        this.healer.pendingTrieNode.set(hashes[i], paths[i]);
-      }
+      hashes.forEach((hash) => this.healer.pendingTrieNode.add(hash));
       return;
     }
 
     for (let i = 0; i < hashes.length; i++) {
       if (i >= res.length) {
-        this.healer.pendingTrieNode.set(hashes[i], paths[i]);
+        this.healer.pendingTrieNode.add(hashes[i]);
         continue;
       }
 
@@ -1011,7 +1004,7 @@ export class SnapSync {
         if (this.snapped) {
           // sync phase done, run heal phase
           this.assignHealTrieNodeTasks();
-          this.assignBytecodeTasks();
+          this.assignHealBytecodeTasks();
         }
       } catch (err) {
         logger.error('SnapSync::scheduleLoop, catch:', err);

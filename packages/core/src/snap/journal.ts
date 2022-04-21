@@ -1,11 +1,10 @@
 import { rlp, bufferToInt, toBuffer, BN } from 'ethereumjs-util';
 import { Database, DBSaveSnapGenerator } from '@rei-network/database';
 import { FunctionalBufferMap, FunctionalBufferSet, logger } from '@rei-network/utils';
-import { EMPTY_HASH } from '../utils';
+import { EMPTY_HASH, DBatch } from '../utils';
 import { DiskLayer } from './diskLayer';
 import { Snapshot, GeneratorStats } from './types';
 import { DiffLayer } from './diffLayer';
-import { DBatch } from './batch';
 
 const journalVersion = 0;
 

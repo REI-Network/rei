@@ -2,12 +2,11 @@ import { bufferToHex, toBuffer, BN, setLengthLeft, KECCAK256_NULL, KECCAK256_RLP
 import { BaseTrie, CheckpointTrie } from 'merkle-patricia-tree';
 import { logger, Channel, FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
 import { Database, DBSaveSerializedSnapAccount, DBSaveSnapStorage, DBSaveSnapSyncProgress } from '@rei-network/database';
-import { StakingAccount } from '../stateManager';
-import { EMPTY_HASH, MAX_HASH } from '../utils';
-import { increaseKey } from './utils';
-import { BinaryRawDBatch, DBatch } from './batch';
+import { StakingAccount } from '../../stateManager';
+import { EMPTY_HASH, MAX_HASH, BinaryRawDBatch, DBatch, CountLock } from '../../utils';
+import { increaseKey } from '../../snap/utils';
 import { TrieSync } from './trieSync';
-import { CountLock } from './countLock';
+import { AccountRequest, AccountResponse, StorageRequst, StorageResponse, SnapSyncNetworkManager } from './types';
 
 const maxHashBN = new BN(MAX_HASH);
 
@@ -54,18 +53,6 @@ function splitRange(concurrency: number, from: Buffer = EMPTY_HASH) {
 
   return ranges;
 }
-
-export type AccountRequest = {
-  origin: Buffer;
-  limit: Buffer;
-};
-
-export type AccountResponse = {
-  hashes: Buffer[];
-  accounts: StakingAccount[];
-
-  cont: boolean;
-};
 
 type LargeStateTasks = FunctionalBufferMap<StorageTask[]>;
 
@@ -155,21 +142,6 @@ class AccountTask {
   }
 }
 
-export type StorageRequst = {
-  accounts: Buffer[];
-  roots: Buffer[];
-
-  origin: Buffer;
-  limit: Buffer;
-};
-
-export type StorageResponse = {
-  hashes: Buffer[][];
-  slots: Buffer[][];
-
-  cont: boolean;
-};
-
 type StorageTaskJSON = {
   next: string;
   last: string;
@@ -243,20 +215,6 @@ class HealTask {
 type SnapSyncProgressJSON = {
   tasks: AccountTaskJSON[];
 };
-
-export interface SnapSyncPeer {
-  getAccountRange(root: Buffer, req: AccountRequest): Promise<AccountResponse | null>;
-  getStorageRanges(root: Buffer, req: StorageRequst): Promise<StorageResponse | null>;
-  getByteCodes(hashes: Buffer[]): Promise<Buffer[] | null>;
-  getTrieNodes(hashes: Buffer[]): Promise<Buffer[] | null>;
-}
-
-export type PeerType = 'account' | 'storage' | 'code' | 'trieNode';
-
-export interface SnapSyncNetworkManager {
-  getIdlePeer(type: PeerType): SnapSyncPeer | null;
-  putBackIdlePeer(type: PeerType, peer: SnapSyncPeer);
-}
 
 export class SnapSync {
   readonly db: Database;

@@ -6,7 +6,7 @@ import { Common } from '@rei-network/common';
 import { FunctionalBufferMap, getRandomIntInclusive } from '@rei-network/utils';
 import { StakingAccount } from '../../src/stateManager';
 import { asyncTraverseRawDB } from '../../src/snap/layerIterator';
-import { SnapSync, SnapSyncNetworkManager, SnapSyncPeer, AccountRequest, AccountResponse, StorageRequst, StorageResponse, PeerType } from '../../src/snap/snapSync';
+import { SnapSync, SnapSyncNetworkManager, SnapSyncPeer, AccountRequest, AccountResponse, StorageRequst, StorageResponse, PeerType } from '../../src/sync/snap';
 import { AccountInfo, genRandomAccounts, GenRandomAccountsResult } from './util';
 import { BaseTrie } from 'merkle-patricia-tree';
 import { keccak256 } from 'ethereumjs-util';

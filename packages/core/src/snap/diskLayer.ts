@@ -5,11 +5,10 @@ import { DBDeleteSnapAccount, DBDeleteSnapStorage, DBSaveSerializedSnapAccount, 
 import { snapStorageKey, snapAccountKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
 import { FunctionalBufferSet } from '@rei-network/utils';
 import { StakingAccount } from '../stateManager';
-import { EMPTY_HASH, MAX_HASH } from '../utils';
+import { EMPTY_HASH, MAX_HASH, DBatch } from '../utils';
 import { KVIterator } from './trieIterator';
 import { DiffLayer } from './diffLayer';
 import { asyncTraverseRawDB } from './layerIterator';
-import { DBatch } from './batch';
 import { journalProgress } from './journal';
 import { ISnapshot, AccountData, StorageData, GeneratorStats } from './types';
 import { increaseKey, mergeProof, wipeKeyRange, SimpleAborter } from './utils';

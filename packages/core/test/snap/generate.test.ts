@@ -2,10 +2,9 @@ import { assert, expect } from 'chai';
 import { keccak256, BN } from 'ethereumjs-util';
 import { Database, DBDeleteSnapAccount, DBDeleteSnapStorage } from '@rei-network/database';
 import { Common } from '@rei-network/common';
-import { EMPTY_HASH } from '../../src/utils';
+import { EMPTY_HASH, DBatch } from '../../src/utils';
 import { DiskLayer } from '../../src/snap';
 import { SnapJournalGenerator } from '../../src/snap/journal';
-import { DBatch } from '../../src/snap/batch';
 import { AccountInfo, genRandomAccounts } from './util';
 const level = require('level-mem');
 

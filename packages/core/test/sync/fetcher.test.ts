@@ -3,7 +3,7 @@ import { expect, assert } from 'chai';
 import { Common } from '@rei-network/common';
 import { Block, BlockHeader, Transaction } from '@rei-network/structure';
 import { setLevel } from '@rei-network/utils';
-import { Fetcher, FetcherBackend, FetcherValidateBackend } from '../../src/sync/fetcher';
+import { Fetcher, FetcherBackend, FetcherValidateBackend } from '../../src/sync/full/fetcher';
 import { CommitBlockOptions } from '../../src/types';
 import { HandlerPool, GetHandlerTimeoutError } from '../../src/protocols/handlerPool';
 import { ConsensusEngine } from '../../src/consensus';

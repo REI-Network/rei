@@ -1,8 +1,8 @@
 import { keccak256 } from 'ethereumjs-util';
 import { FunctionalBufferSet } from '@rei-network/utils';
 import { Database, DBOp } from '@rei-network/database';
+import { DBatch } from '../utils';
 import { SnapIterator } from './types';
-import { DBatch } from './batch';
 
 export class SimpleAborter<T> {
   private aborted = false;

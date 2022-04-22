@@ -1,13 +1,13 @@
 import { EventEmitter } from 'events';
+import { expect } from 'chai';
 import { BN, BNLike, toBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
-import { Block, BlockHeader, Transaction } from '@rei-network/structure';
+import { Block, BlockHeader, Receipt, Transaction } from '@rei-network/structure';
 import { NodeStatus } from '../../src/types';
 import { EMPTY_HASH } from '../../src/utils';
-import { SyncBackend, ISnapSync, IFullSync, Sync } from '../../src/sync/sync';
+import { SyncBackend, IFetcher, Sync, FetchResult, FetchingResult } from '../../src/sync/sync';
 import { HandlerPool } from '../../src/protocols/handlerPool';
 import { WireProtocolHandler } from '../../src/protocols';
-import { expect } from 'chai';
 
 const common = new Common({ chain: 'rei-devnet' });
 common.setHardforkByBlockNumber(0);
@@ -77,24 +77,44 @@ class MockSyncBackend implements SyncBackend {
   }
 }
 
-class MockSnapSync implements ISnapSync {
-  finished: boolean = false;
+class MockFetcher implements IFetcher {
+  isSnapSync: boolean = false;
 
-  async setRoot(root: Buffer): Promise<void> {}
+  private resolve?: (result: FetchingResult) => void;
 
-  start(): void {}
-
-  async abort(): Promise<void> {}
-}
-
-class MockFullSync implements IFullSync {
-  finished: boolean = false;
-
-  async setTarget(handler: WireProtocolHandler): Promise<boolean> {
-    return true;
+  get isFetching() {
+    return !!this.resolve;
   }
 
-  async abort(): Promise<void> {}
+  finish(result: FetchingResult) {
+    if (!this.resolve) {
+      throw new Error('invalid finish');
+    }
+
+    this.resolve(result);
+    this.resolve = undefined;
+  }
+
+  async fetch(handler: WireProtocolHandler, block: Block, receipts: Receipt[]): Promise<FetchResult> {
+    if (this.resolve) {
+      throw new Error('invalid fetch');
+    }
+
+    return {
+      isSnapSync: this.isSnapSync,
+      start: new BN(0),
+      fetching: new Promise<FetchingResult>((resolve) => {
+        this.resolve = resolve;
+      })
+    };
+  }
+
+  async abort(): Promise<void> {
+    if (this.resolve) {
+      this.resolve({ reorg: false, saveBlock: false });
+      this.resolve = undefined;
+    }
+  }
 }
 
 function generateBlock(height: BN) {
@@ -121,8 +141,8 @@ function generateBlock(height: BN) {
 describe('Sync', () => {
   const srcBlocks: Block[] = [];
   const dstBackend = new MockSyncBackend();
-  const dstSnapSync = new MockSnapSync();
-  const dstFullSync = new MockFullSync();
+
+  const fetcher = new MockFetcher();
   const pool = new HandlerPool<MockWireHandler>();
 
   let sync!: Sync;
@@ -145,8 +165,7 @@ describe('Sync', () => {
     sync = new Sync({
       backend: dstBackend,
       pool: pool as any,
-      snapSync: dstSnapSync,
-      fullSync: dstFullSync,
+      fetcher,
       enableRandomPick: false,
       validate: false
     });
@@ -182,14 +201,20 @@ describe('Sync', () => {
         expect(sync.isSyncing, 'should not start sync').be.false;
       } else if (i === 2) {
         await new Promise<void>((r) => setTimeout(r, 10));
+        expect(fetcher.isFetching, 'should start fetching').be.true;
         expect(sync.isSyncing, 'should start sync').be.true;
         const syncContext = sync.syncContext!;
         expect(syncContext.td.eq(latestBlock.header.number)).be.true;
         expect(syncContext.block.hash().equals(latestBlock.hash())).be.true;
         expect(syncContext.height.eq(latestBlock.header.number)).be.true;
-        expect(syncContext.isSnapSync).be.false;
+        expect(syncContext.isSnapSync).be.equal(fetcher.isSnapSync);
         expect(syncContext.start.eqn(start - 1)).be.true;
       }
     }
+
+    fetcher.finish({ reorg: true, saveBlock: false });
+    expect(fetcher.isFetching, 'should not fetching').be.false;
+    await new Promise<void>((r) => setTimeout(r, 10));
+    expect(sync.isSyncing, 'should start sync').be.false;
   });
 });

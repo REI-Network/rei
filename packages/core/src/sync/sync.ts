@@ -1,4 +1,5 @@
 import { BN, BNLike } from 'ethereumjs-util';
+import Semaphore from 'semaphore-async-await';
 import { Channel, getRandomIntInclusive, logger, AbortableTimer } from '@rei-network/utils';
 import { Block, Receipt } from '@rei-network/structure';
 import { Common } from '@rei-network/common';
@@ -6,7 +7,6 @@ import { preValidateBlock } from '../validation';
 import { WireProtocolHandler, HandlerPool } from '../protocols';
 
 const maxSnapSyncLimit = 200;
-const minSnapSyncInterval = 100000;
 const confirmLimit = 3;
 const confirmTimeout = 3000;
 const unconfirmLimit = 3;
@@ -37,6 +37,7 @@ type ConfirmContext = {
 };
 
 enum ConfirmStatus {
+  Failed,
   WaitingForConfirm,
   Confirmed,
   Unconfirmed
@@ -47,17 +48,18 @@ export type Announcement = {
   block?: Block;
 };
 
-export interface ISnapSync {
-  setRoot(root: Buffer): Promise<void>;
-  start(): void;
-  abort(): Promise<void>;
-  finished: boolean;
-}
+export type FetchResult = {
+  isSnapSync: boolean;
+  start?: BN;
+  fetching: Promise<FetchingResult>;
+} | null;
 
-export interface IFullSync {
-  setTarget(handler: WireProtocolHandler): Promise<boolean>;
+export type FetchingResult = { reorg: boolean; saveBlock: boolean };
+
+export interface IFetcher {
+  fetch(handler: WireProtocolHandler, block: Block, receipts: Receipt[]): Promise<FetchResult>;
+
   abort(): Promise<void>;
-  finished: boolean;
 }
 
 export interface SyncBackend {
@@ -69,8 +71,8 @@ export interface SyncBackend {
 export interface SyncOptions {
   backend: SyncBackend;
   pool: HandlerPool<WireProtocolHandler>;
-  snapSync: ISnapSync;
-  fullSync: IFullSync;
+  fetcher: IFetcher;
+
   enableRandomPick: boolean;
   validate: boolean;
 }
@@ -78,8 +80,7 @@ export interface SyncOptions {
 export class Sync {
   readonly backend: SyncBackend;
   readonly pool: HandlerPool<WireProtocolHandler>;
-  readonly snapSync: ISnapSync;
-  readonly fullSync: IFullSync;
+  readonly fetcher: IFetcher;
   readonly enableRandomPick: boolean;
   readonly validate: boolean;
 
@@ -89,8 +90,9 @@ export class Sync {
   private readonly channel = new Channel<Announcement>();
 
   private aborted: boolean = false;
-  private isWorking: boolean = false;
+  private isWorking: boolean = false; // TODO: fix this
   private timer = new AbortableTimer();
+  private lock = new Semaphore(1);
 
   private syncPromise?: Promise<void>;
   private randomPickPromise?: Promise<void>;
@@ -98,14 +100,12 @@ export class Sync {
   constructor(options: SyncOptions) {
     this.backend = options.backend;
     this.pool = options.pool;
-    this.snapSync = options.snapSync;
-    this.fullSync = options.fullSync;
+    this.fetcher = options.fetcher;
     this.enableRandomPick = options.enableRandomPick;
     this.validate = options.validate;
   }
 
   get isSyncing() {
-    this.clearFinishedSync();
     return !!this.syncContext;
   }
 
@@ -116,30 +116,15 @@ export class Sync {
 
   private async resetSyncContext() {
     if (this.syncContext) {
-      if (this.syncContext.isSnapSync) {
-        await this.snapSync.abort();
-      } else {
-        await this.fullSync.abort();
-      }
+      await this.fetcher.abort();
       this.syncContext = undefined;
-    }
-  }
-
-  private clearFinishedSync() {
-    if (this.syncContext) {
-      const { isSnapSync } = this.syncContext;
-      if (isSnapSync && this.snapSync.finished) {
-        this.syncContext = undefined;
-      } else if (!isSnapSync && this.fullSync.finished) {
-        this.syncContext = undefined;
-      }
     }
   }
 
   private async syncLoop() {
     for await (const ann of this.channel) {
       try {
-        this.isWorking = true;
+        await this.lock.acquire();
 
         const handler = ann.handler;
         const status = handler.status!;
@@ -187,8 +172,6 @@ export class Sync {
           await this.collectConfirm(ctx);
         };
 
-        this.clearFinishedSync();
-
         if (this.confirmContext) {
           const { td: confirmTD, confirmed, unconfirmed } = this.confirmContext;
           if (confirmTD.lte(this.backend.getTotalDifficulty())) {
@@ -226,7 +209,7 @@ export class Sync {
       } catch (err) {
         logger.warn('Sync::syncLoop, catch:', err);
       } finally {
-        this.isWorking = false;
+        this.lock.release();
       }
     }
   }
@@ -308,29 +291,30 @@ export class Sync {
     if (confirmed.size >= confirmLimit) {
       // TODO: ban unconfirmed peers
 
+      this.resetConfirmContext();
       await this.resetSyncContext();
 
-      let isSnapSync = false;
-      const localHeight = this.backend.getHeight();
-      if (height.sub(localHeight).gten(minSnapSyncInterval)) {
-        // use snap sync
-        await this.snapSync.setRoot(block.header.stateRoot);
-        this.snapSync.start();
-        isSnapSync = true;
-      } else {
-        // use full sync
-        await this.fullSync.setTarget(handler);
+      const result = await this.fetcher.fetch(handler, block, receipts);
+      if (result === null) {
+        // TODO: ban handler (if needed)
+        return ConfirmStatus.Failed;
       }
 
-      this.resetConfirmContext();
-      this.syncContext = {
+      const { start, isSnapSync, fetching } = result;
+      const ctx: SyncContext = {
         td,
         height,
         block,
         receipts,
-        start: localHeight,
+        start: start ?? this.backend.getHeight(),
         isSnapSync
       };
+      this.syncContext = ctx;
+
+      // we are sure that fetching will not throw an exception
+      fetching.then(({ reorg, saveBlock }) => {
+        this.onFetched(ctx, reorg, saveBlock);
+      });
 
       return ConfirmStatus.Confirmed;
     } else if (unconfirmed.size >= unconfirmLimit) {
@@ -374,6 +358,35 @@ export class Sync {
     const receipts: Receipt[] = [];
 
     return { block, receipts };
+  }
+
+  private async onFetched(ctx: SyncContext, reorg: boolean, saveBlock: boolean) {
+    if (ctx !== this.syncContext) {
+      // ignore
+      return;
+    }
+
+    try {
+      await this.lock.acquire();
+      if (ctx !== this.syncContext) {
+        // ignore
+        return;
+      }
+
+      if (reorg) {
+        // TODO: broadcast new block...
+      }
+
+      if (saveBlock) {
+        // TODO: blockchain.putBlock
+      }
+
+      this.syncContext = undefined;
+    } catch (err) {
+      logger.warn('Sync::onFetched, catch:', err);
+    } finally {
+      this.lock.release;
+    }
   }
 
   announce(ann: Announcement) {

@@ -146,6 +146,9 @@ describe('Sync', () => {
     dstBackend.setHeader(block.header);
     for (let i = 0; i < 10; i++) {
       const handler = new MockWireHandler(i, srcBlocks);
+      handler.on('changed', (handler: MockWireHandler, block: Block) => {
+        sync && sync.announce({ handler: handler as any, block });
+      });
       handler.setBlock(block);
       pool.add(handler);
     }
@@ -159,9 +162,6 @@ describe('Sync', () => {
       enableRandomPick: false,
       validate: false
     }).on('synchronized', synchronizedListener);
-    pool.handlers.forEach((handler) => {
-      handler.on('changed', changedListener);
-    });
     sync.start();
   });
 
@@ -171,9 +171,6 @@ describe('Sync', () => {
       await sync.abort();
       sync = undefined as any;
     }
-    pool.handlers.forEach((handler) => {
-      handler.off('changed', changedListener);
-    });
   });
 
   it('should sync succeed', async () => {

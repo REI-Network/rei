@@ -4,18 +4,12 @@ import { Block, Receipt } from '@rei-network/structure';
 import { Common } from '@rei-network/common';
 import { preValidateBlock } from '../validation';
 import { WireProtocolHandler, HandlerPool } from '../protocols';
-import { SnapSync } from './snap';
 
 const maxSnapSyncLimit = 200;
 const minSnapSyncInterval = 100000;
 const confirmLimit = 3;
 const confirmTimeout = 3000;
 const unconfirmLimit = 3;
-
-export type Announcement = {
-  handler: WireProtocolHandler;
-  block?: Block;
-};
 
 type SyncContext = {
   td: BN;
@@ -24,8 +18,7 @@ type SyncContext = {
   block: Block;
   receipts: Receipt[];
 
-  snapSync?: SnapSync;
-  fullSync?: any;
+  isSnapSync: boolean;
 };
 
 type ConfirmContext = {
@@ -49,30 +42,60 @@ enum ConfirmStatus {
   Unconfirmed
 }
 
+export type Announcement = {
+  handler: WireProtocolHandler;
+  block?: Block;
+};
+
+export interface ISnapSync {
+  setRoot(root: Buffer): Promise<void>;
+  start(): void;
+  abort(): Promise<void>;
+  finished: boolean;
+}
+
+export interface IFullSync {
+  setTarget(handler: WireProtocolHandler): Promise<boolean>;
+  abort(): Promise<void>;
+  finished: boolean;
+}
+
 export interface SyncBackend {
   getCommon(num: BNLike): Common;
   getHeight(): BN;
   getTotalDifficulty(): BN;
 }
 
+export interface SyncOptions {
+  backend: SyncBackend;
+  pool: HandlerPool<WireProtocolHandler>;
+  snapSync: ISnapSync;
+  fullSync: IFullSync;
+}
+
 export class Sync {
-  private readonly backend: SyncBackend;
-  private readonly pool: HandlerPool<WireProtocolHandler>;
+  readonly backend: SyncBackend;
+  readonly pool: HandlerPool<WireProtocolHandler>;
+  readonly snapSync: ISnapSync;
+  readonly fullSync: IFullSync;
+
+  syncContext?: SyncContext;
+  confirmContext?: ConfirmContext;
+
   private readonly channel = new Channel<Announcement>();
 
   private aborted: boolean = false;
   private isWorking: boolean = false;
   private timer = new AbortableTimer();
 
-  syncContext?: SyncContext;
-  confirmContext?: ConfirmContext;
-
   private syncPromise?: Promise<void>;
   private randomPickPromise?: Promise<void>;
 
-  constructor(backend: SyncBackend, pool: HandlerPool<WireProtocolHandler>) {
-    this.backend = backend;
-    this.pool = pool;
+  constructor(options: SyncOptions) {
+    this.backend = options.backend;
+    this.pool = options.pool;
+    this.snapSync = options.snapSync;
+    this.fullSync = options.fullSync;
   }
 
   private resetConfirmContext(ctx?: ConfirmContext) {
@@ -80,11 +103,14 @@ export class Sync {
     this.confirmContext = ctx;
   }
 
-  private async abortSyncContext() {
+  private async resetSyncContext() {
     if (this.syncContext) {
-      const { snapSync, fullSync } = this.syncContext;
-      // TODO: abort full sync
-      snapSync && (await snapSync.abort());
+      if (this.syncContext.isSnapSync) {
+        await this.snapSync.abort();
+      } else {
+        await this.fullSync.abort();
+      }
+      this.syncContext = undefined;
     }
   }
 
@@ -139,13 +165,22 @@ export class Sync {
           await this.collectConfirm(ctx);
         };
 
+        if (this.syncContext) {
+          const { isSnapSync } = this.syncContext;
+          if (isSnapSync && this.snapSync.finished) {
+            this.syncContext = undefined;
+          } else if (!isSnapSync && this.fullSync.finished) {
+            this.syncContext = undefined;
+          }
+        }
+
         if (this.confirmContext) {
           const { td: confirmTD, confirmed, unconfirmed } = this.confirmContext;
           if (confirmTD.lte(this.backend.getTotalDifficulty())) {
             this.resetConfirmContext();
           } else if (td.gte(confirmTD) && !confirmed.has(peerId) && !unconfirmed.has(peerId)) {
             const { block, receipts } = await downloadDataFromPeer();
-            const status = await this.updateConfirmContext(this.confirmContext, block, receipts, peerId);
+            const status = await this.updateConfirmContext(handler, this.confirmContext, block, receipts, peerId);
             if (status === ConfirmStatus.Confirmed || status === ConfirmStatus.WaitingForConfirm) {
               continue;
             }
@@ -153,8 +188,8 @@ export class Sync {
         }
 
         if (this.syncContext) {
-          const { snapSync, height: syncHeight } = this.syncContext;
-          if (snapSync) {
+          const { isSnapSync, height: syncHeight } = this.syncContext;
+          if (isSnapSync) {
             if (!this.confirmContext) {
               if (height.sub(syncHeight).gten(maxSnapSyncLimit)) {
                 await resetConfirmContextToCurrent();
@@ -223,7 +258,7 @@ export class Sync {
         continue;
       }
 
-      const status = await this.updateConfirmContext(context, result.block, result.receipts, handler.peer.peerId);
+      const status = await this.updateConfirmContext(handler, context, result.block, result.receipts, handler.peer.peerId);
       if (status === ConfirmStatus.WaitingForConfirm) {
         // do nothing
       } else if (status === ConfirmStatus.Confirmed || status === ConfirmStatus.Unconfirmed) {
@@ -232,7 +267,7 @@ export class Sync {
     }
   }
 
-  private async updateConfirmContext(context: ConfirmContext, block: Block, receipts: Receipt[], peerId: string): Promise<ConfirmStatus> {
+  private async updateConfirmContext(handler: WireProtocolHandler, context: ConfirmContext, block: Block, receipts: Receipt[], peerId: string): Promise<ConfirmStatus> {
     const { serializedHeader, serializedReceipts, confirmed, unconfirmed, height, td } = context;
 
     let confirm = true;
@@ -258,19 +293,18 @@ export class Sync {
     if (confirmed.size >= confirmLimit) {
       // TODO: ban unconfirmed peers
 
-      await this.abortSyncContext();
+      await this.resetSyncContext();
 
-      let snapSync: SnapSync | undefined;
-      let fullSync: any;
+      let isSnapSync = false;
       const localHeight = this.backend.getHeight();
       if (height.sub(localHeight).gten(minSnapSyncInterval)) {
         // use snap sync
-        snapSync = this.syncContext?.snapSync ?? new SnapSync('db' as any, 'network' as any); // TODO
-        await snapSync.setRoot(block.header.stateRoot);
-        snapSync.start();
+        await this.snapSync.setRoot(block.header.stateRoot);
+        this.snapSync.start();
+        isSnapSync = true;
       } else {
         // use full sync
-        fullSync = 'full' as any; // TODO
+        await this.fullSync.setTarget(handler);
       }
 
       this.resetConfirmContext();
@@ -280,8 +314,7 @@ export class Sync {
         block,
         receipts,
         start: localHeight,
-        snapSync,
-        fullSync
+        isSnapSync
       };
 
       return ConfirmStatus.Confirmed;
@@ -346,6 +379,6 @@ export class Sync {
     this.syncPromise && (await this.syncPromise);
     this.randomPickPromise && (await this.randomPickPromise);
     this.resetConfirmContext();
-    await this.abortSyncContext();
+    await this.resetSyncContext();
   }
 }

@@ -227,6 +227,7 @@ export class SnapSync {
   root!: Buffer;
   tasks: AccountTask[] = [];
   snapped: boolean = false;
+  finished: boolean = false;
 
   schedulePromise?: Promise<void>;
 
@@ -984,6 +985,7 @@ export class SnapSync {
         this.cleanAccountTasks();
         if (this.snapped && this.healer.scheduler.pending === 0) {
           // finished, break
+          this.finished = true;
           break;
         }
 
@@ -1081,6 +1083,7 @@ export class SnapSync {
     this.root = undefined as any;
     this.tasks = [];
     this.snapped = false;
+    this.finished = false;
   }
 
   /**

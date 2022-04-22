@@ -71,6 +71,8 @@ export interface SyncOptions {
   pool: HandlerPool<WireProtocolHandler>;
   snapSync: ISnapSync;
   fullSync: IFullSync;
+  enableRandomPick: boolean;
+  validate: boolean;
 }
 
 export class Sync {
@@ -78,6 +80,8 @@ export class Sync {
   readonly pool: HandlerPool<WireProtocolHandler>;
   readonly snapSync: ISnapSync;
   readonly fullSync: IFullSync;
+  readonly enableRandomPick: boolean;
+  readonly validate: boolean;
 
   syncContext?: SyncContext;
   confirmContext?: ConfirmContext;
@@ -96,6 +100,13 @@ export class Sync {
     this.pool = options.pool;
     this.snapSync = options.snapSync;
     this.fullSync = options.fullSync;
+    this.enableRandomPick = options.enableRandomPick;
+    this.validate = options.validate;
+  }
+
+  get isSyncing() {
+    this.clearFinishedSync();
+    return !!this.syncContext;
   }
 
   private resetConfirmContext(ctx?: ConfirmContext) {
@@ -111,6 +122,17 @@ export class Sync {
         await this.fullSync.abort();
       }
       this.syncContext = undefined;
+    }
+  }
+
+  private clearFinishedSync() {
+    if (this.syncContext) {
+      const { isSnapSync } = this.syncContext;
+      if (isSnapSync && this.snapSync.finished) {
+        this.syncContext = undefined;
+      } else if (!isSnapSync && this.fullSync.finished) {
+        this.syncContext = undefined;
+      }
     }
   }
 
@@ -165,14 +187,7 @@ export class Sync {
           await this.collectConfirm(ctx);
         };
 
-        if (this.syncContext) {
-          const { isSnapSync } = this.syncContext;
-          if (isSnapSync && this.snapSync.finished) {
-            this.syncContext = undefined;
-          } else if (!isSnapSync && this.fullSync.finished) {
-            this.syncContext = undefined;
-          }
-        }
+        this.clearFinishedSync();
 
         if (this.confirmContext) {
           const { td: confirmTD, confirmed, unconfirmed } = this.confirmContext;
@@ -346,11 +361,13 @@ export class Sync {
     }
 
     const block = Block.fromBlockData({ header, transactions: body }, { common: this.backend.getCommon(0), hardforkByBlockNumber: true });
-    try {
-      await preValidateBlock.call(block);
-    } catch (err) {
-      // ignore errors
-      return null;
+    if (this.validate) {
+      try {
+        await preValidateBlock.call(block);
+      } catch (err) {
+        // ignore errors
+        return null;
+      }
     }
 
     // TODO: download and validate receipts
@@ -363,13 +380,13 @@ export class Sync {
     this.channel.push(ann);
   }
 
-  start(enableRandomPick: boolean = true) {
+  start() {
     if (this.syncPromise || this.randomPickPromise) {
       throw new Error('promises exist');
     }
 
     this.syncPromise = this.syncLoop();
-    enableRandomPick && (this.randomPickPromise = this.randomPickLoop());
+    this.enableRandomPick && (this.randomPickPromise = this.randomPickLoop());
   }
 
   async abort() {

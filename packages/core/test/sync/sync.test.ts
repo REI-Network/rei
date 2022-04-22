@@ -136,9 +136,6 @@ describe('Sync', () => {
   const synchronizedListener = (ctx: SyncContext) => {
     dstBackend.setHeader(ctx.block.header);
   };
-  const changedListener = (handler: MockWireHandler, block: Block) => {
-    sync.announce({ handler: handler as any, block });
-  };
 
   before(async () => {
     const block = generateBlock(new BN(0));

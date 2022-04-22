@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events';
 import { BN, BNLike } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
 import { Channel, getRandomIntInclusive, logger, AbortableTimer } from '@rei-network/utils';
@@ -11,7 +12,7 @@ const confirmLimit = 3;
 const confirmTimeout = 3000;
 const unconfirmLimit = 3;
 
-type SyncContext = {
+export type SyncContext = {
   td: BN;
   start: BN;
   height: BN;
@@ -77,7 +78,17 @@ export interface SyncOptions {
   validate: boolean;
 }
 
-export class Sync {
+export declare interface Sync {
+  on(event: 'start', listener: (ctx: SyncContext) => void): this;
+  on(event: 'synchronized', listener: (ctx: SyncContext) => void): this;
+  on(event: 'failed', listener: () => void): this;
+
+  off(event: 'start', listener: (ctx: SyncContext) => void): this;
+  off(event: 'synchronized', listener: (ctx: SyncContext) => void): this;
+  off(event: 'failed', listener: () => void): this;
+}
+
+export class Sync extends EventEmitter {
   readonly backend: SyncBackend;
   readonly pool: HandlerPool<WireProtocolHandler>;
   readonly fetcher: IFetcher;
@@ -98,6 +109,7 @@ export class Sync {
   private randomPickPromise?: Promise<void>;
 
   constructor(options: SyncOptions) {
+    super();
     this.backend = options.backend;
     this.pool = options.pool;
     this.fetcher = options.fetcher;
@@ -311,6 +323,7 @@ export class Sync {
       };
       this.syncContext = ctx;
 
+      this.emit('start', ctx);
       // we are sure that fetching will not throw an exception
       fetching.then(({ reorg, saveBlock }) => {
         this.onFetched(ctx, reorg, saveBlock);
@@ -363,6 +376,7 @@ export class Sync {
   private async onFetched(ctx: SyncContext, reorg: boolean, saveBlock: boolean) {
     if (ctx !== this.syncContext) {
       // ignore
+      this.emit('failed');
       return;
     }
 
@@ -370,11 +384,15 @@ export class Sync {
       await this.lock.acquire();
       if (ctx !== this.syncContext) {
         // ignore
+        this.emit('failed');
         return;
       }
 
       if (reorg) {
         // TODO: broadcast new block...
+        this.emit('synchronized', ctx);
+      } else {
+        this.emit('failed');
       }
 
       if (saveBlock) {

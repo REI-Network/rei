@@ -5,7 +5,7 @@ import { Common } from '@rei-network/common';
 import { Block, BlockHeader, Receipt, Transaction } from '@rei-network/structure';
 import { NodeStatus } from '../../src/types';
 import { EMPTY_HASH } from '../../src/utils';
-import { SyncBackend, IFetcher, Sync, FetchResult, FetchingResult } from '../../src/sync/sync';
+import { SyncBackend, IFetcher, Sync, FetchResult, FetchingResult, SyncContext } from '../../src/sync/sync';
 import { HandlerPool } from '../../src/protocols/handlerPool';
 import { WireProtocolHandler } from '../../src/protocols';
 
@@ -120,21 +120,8 @@ class MockFetcher implements IFetcher {
 function generateBlock(height: BN) {
   const _common = common.copy();
   _common.setHardforkByBlockNumber(height);
-  const tx = Transaction.fromTxData(
-    {
-      value: height.clone()
-    },
-    { common: _common }
-  ).sign(privateKey);
-  const block = Block.fromBlockData(
-    {
-      header: {
-        number: height.clone()
-      },
-      transactions: [tx]
-    },
-    { common: _common }
-  );
+  const tx = Transaction.fromTxData({ value: height.clone() }, { common: _common }).sign(privateKey);
+  const block = Block.fromBlockData({ header: { number: height.clone() }, transactions: [tx] }, { common: _common });
   return block;
 }
 
@@ -146,7 +133,10 @@ describe('Sync', () => {
   const pool = new HandlerPool<MockWireHandler>();
 
   let sync!: Sync;
-  const listener = (handler: MockWireHandler, block: Block) => {
+  const synchronizedListener = (ctx: SyncContext) => {
+    dstBackend.setHeader(ctx.block.header);
+  };
+  const changedListener = (handler: MockWireHandler, block: Block) => {
     sync.announce({ handler: handler as any, block });
   };
 
@@ -168,20 +158,21 @@ describe('Sync', () => {
       fetcher,
       enableRandomPick: false,
       validate: false
-    });
+    }).on('synchronized', synchronizedListener);
     pool.handlers.forEach((handler) => {
-      handler.on('changed', listener);
+      handler.on('changed', changedListener);
     });
     sync.start();
   });
 
   afterEach(async () => {
     if (sync) {
+      sync.off('synchronized', synchronizedListener);
       await sync.abort();
       sync = undefined as any;
     }
     pool.handlers.forEach((handler) => {
-      handler.off('changed', listener);
+      handler.off('changed', changedListener);
     });
   });
 
@@ -193,7 +184,7 @@ describe('Sync', () => {
     }
 
     const latestBlock = srcBlocks[srcBlocks.length - 1];
-    for (let i = 0; i < pool.handlers.length; i++) {
+    for (let i = 0; i < 3; i++) {
       const handler = pool.handlers[i];
       handler.setBlock(latestBlock);
 
@@ -216,5 +207,6 @@ describe('Sync', () => {
     expect(fetcher.isFetching, 'should not fetching').be.false;
     await new Promise<void>((r) => setTimeout(r, 10));
     expect(sync.isSyncing, 'should start sync').be.false;
+    expect(dstBackend.getHeight().eqn(start - 1 + 5)).be.true;
   });
 });

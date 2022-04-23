@@ -4,50 +4,11 @@ import { encode } from 'rlp';
 import { Address, BN, keccak256, unpadBuffer, Account } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
+import { Database } from '@rei-network/database';
 import { Trie } from 'merkle-patricia-tree/dist/baseTrie';
-import { StateManager, StakingAccount } from '../../dist/stateManager';
-import { Snapshot, SnapshotTree } from '../../dist/stateManager/types';
-
-class MockSnap implements Snapshot {
-  _root: Buffer;
-  constructor(root: Buffer) {
-    this._root = root;
-  }
-
-  parent(): Snapshot {
-    throw new Error('this function not realized');
-  }
-
-  root() {
-    return this._root;
-  }
-
-  account(hash: Buffer): Account {
-    throw new Error('this function not realized');
-  }
-
-  accountRLP(hash: Buffer): Buffer {
-    throw new Error('this function not realized');
-  }
-
-  update(blockRoot: Buffer, destructs: Map<Buffer, Buffer>, accounts: Map<Buffer, Buffer>, storage: Map<Buffer, Buffer>): Promise<Snapshot> {
-    throw new Error('this function not realized');
-  }
-}
-
-class MockSnapTree implements SnapshotTree {
-  snapshot(blockRoot: Buffer): Snapshot {
-    return new MockSnap(blockRoot);
-  }
-
-  public callback: (accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferSet, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>) => void = () => {};
-
-  async cap(root: Buffer, layers: number): Promise<void> {}
-
-  async update(root: Buffer, parent: Buffer, accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferSet, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>): Promise<void> {
-    this.callback(accounts, destructs, storage);
-  }
-}
+import { StateManager, StakingAccount } from '../../src/stateManager';
+import { SnapTree } from '../../src/snap/snapTree';
+import { genRandomAccounts } from '../snap/util';
 
 function compareBufferMaps(map1: FunctionalBufferMap<Buffer>, map2: FunctionalBufferMap<Buffer>) {
   if (map1.size !== map2.size) {
@@ -73,23 +34,39 @@ function compareSets<k>(set1: Set<k>, set2: Set<k>) {
   }
   return true;
 }
+class MockSnapTree extends SnapTree {
+  public callback: (accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferSet, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>) => void = () => {};
+}
 
 describe('StateManager', () => {
-  const common = new Common({ chain: 'rei-testnet' });
-  common.setHardforkByBlockNumber(0);
-
-  const snapTree = new MockSnapTree();
   const address = Address.fromString('0xAE0c03FdeDB61021272922F7804505CEE2C12c78');
-  const kecAddress = keccak256(address.buf);
-  const account1 = StakingAccount.fromAccountData({ balance: new BN(12) });
-  const account2 = StakingAccount.fromAccountData({ balance: new BN(34) });
   const key1 = crypto.randomBytes(32);
   const kecKey1 = keccak256(key1);
   const value1 = crypto.randomBytes(32);
   const encodeValue1 = encode(unpadBuffer(value1));
-  const stateManager = new StateManager({
-    common,
-    snapsTree: snapTree
+  const kecAddress = keccak256(address.buf);
+  const account1 = StakingAccount.fromAccountData({ balance: new BN(12) });
+  const account2 = StakingAccount.fromAccountData({ balance: new BN(34) });
+  let stateManager: StateManager;
+  let snapTree: MockSnapTree | undefined;
+  let mockSnapTree: MockSnapTree;
+  before(async () => {
+    const common = new Common({ chain: 'rei-testnet' });
+    common.setHardforkByBlockNumber(0);
+    const cache = 100;
+    const level = require('level-mem');
+    const db = new Database(level(), common);
+    const async = true;
+    const rebuild = true;
+    const recovery = true;
+    const rootAndAccounts = await genRandomAccounts(db, 0, 0);
+    const root = rootAndAccounts.root;
+    let snapTreeTemp = await SnapTree.createSnapTree(db, cache, root, async, rebuild, recovery);
+    snapTree = snapTreeTemp as MockSnapTree;
+    stateManager = new StateManager({
+      common: common,
+      snapsTree: snapTree
+    });
   });
 
   it('should checkpoint correctly', async () => {
@@ -105,7 +82,7 @@ describe('StateManager', () => {
       expect(destructs.size === 0, '_snapDestructs should be empty').be.true;
       expect(storage.size === 0, '_snapStorage should be empty').be.true;
     };
-    snapTree.callback = callback;
+    snapTree!.callback = callback;
     await stateManager.commit();
     expect(stateManager._snapCacheList.length === 0, 'CacheList should be empty').be.true;
   });
@@ -121,7 +98,7 @@ describe('StateManager', () => {
       expect(destructs.size === 0, '_snapDestructs should be empty').be.true;
       expect(storage.size === 0, '_snapStorage should be empty').be.true;
     };
-    snapTree.callback = callback;
+    snapTree!.callback = callback;
     await stateManager.commit();
   });
 
@@ -153,7 +130,7 @@ describe('StateManager', () => {
       }
       expect(storageEqual === true, '_snapStorage should be equal').be.true;
     };
-    snapTree.callback = callback;
+    snapTree!.callback = callback;
     await stateManager.commit();
   });
 
@@ -169,7 +146,7 @@ describe('StateManager', () => {
       expect(storage.has(kecAddress), 'account1 should be deleted in _snapStorage').be.false;
       expect(compareSets(destructsSet, destructs), 'destructs should equal to destructsSet').be.true;
     };
-    snapTree.callback = callback;
+    snapTree!.callback = callback;
     await stateManager.commit();
   });
 
@@ -188,7 +165,7 @@ describe('StateManager', () => {
       expect(compareSets(destructsSet, destructs), 'destructs should equal to destructsSet').be.true;
       expect(storage.size === 0, '_snapStorage should be empty').be.true;
     };
-    snapTree.callback = callback;
+    snapTree!.callback = callback;
     await stateManager.commit();
   });
 
@@ -214,7 +191,7 @@ describe('StateManager', () => {
       expect(destructs.size === 0, 'snapDestructs should be empty').be.true;
       expect(storage.size === 0, '_snapStorage should be empty').be.true;
     };
-    snapTree.callback = callback;
+    snapTree!.callback = callback;
     await stateManager.commit();
   });
 

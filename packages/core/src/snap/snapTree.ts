@@ -7,7 +7,7 @@ import { DBatch } from './batch';
 import { DiffLayer } from './diffLayer';
 import { DiskLayer } from './diskLayer';
 import { GeneratorStats, Snapshot } from './types';
-import { SimpleAborter, wipeKeyRange } from './utils';
+import { wipeKeyRange } from './utils';
 import { asyncTraverseRawDB } from './layerIterator';
 import { journalProgress, loadSnapshot } from './journal';
 import { EMPTY_HASH, MAX_HASH } from '../utils';
@@ -40,22 +40,17 @@ export class SnapTree {
         layer = head;
         head = head.parent;
       }
-      if (async) {
-        await snaptree.waitBuild();
-      }
       return snaptree;
     } catch (error) {
       if (rebuild) {
         logger.warn('Failed to load snapshot, regenerating', 'err', error);
-        await snaptree.rebuild(root);
+        const generating = (await snaptree.rebuild(root)).generating;
+        if (!async) {
+          await generating;
+        }
         return snaptree;
       }
-      throw error;
     }
-  }
-
-  async waitBuild() {
-    // TODO
   }
 
   async disable() {
@@ -98,7 +93,7 @@ export class SnapTree {
     const ret: Snapshot[] = [];
 
     for (limit; limit > 0; limit--) {
-      if (!(layer instanceof DiskLayer) && nodisk) {
+      if (layer instanceof DiskLayer && nodisk) {
         break;
       }
       ret.push(layer!);
@@ -203,7 +198,7 @@ export class SnapTree {
     const parent = diff.parent;
     if (parent instanceof DiskLayer) {
       return;
-    } else if (parent instanceof DiskLayer) {
+    } else if (parent instanceof DiffLayer) {
       const flattened = (parent as DiffLayer).flatten() as DiffLayer;
       this.layers.set(flattened.root, flattened);
       if (this.onFlatten) {
@@ -236,14 +231,15 @@ export class SnapTree {
         }
         layer.stale = true;
       } else if (layer instanceof DiffLayer) {
-        layer.stale = true; // problem atomic.StoreUint32(&layer.stale, 1)
+        layer.stale = true;
       }
     }
 
-    logger.Info('Rebuilding state snapshot');
     const layers = new FunctionalBufferMap<Snapshot>();
-    layers.set(root, await generateSnapshot(this.diskdb, root));
+    const { base, generating } = await generateSnapshot(this.diskdb, root);
+    layers.set(root, base);
     this.layers = layers;
+    return { generating };
   }
 
   async journal(root: Buffer) {
@@ -254,7 +250,7 @@ export class SnapTree {
     let journal = rlp.encode(journalVersion);
 
     const diskroot = this.diskroot();
-    if (diskroot === Buffer.from([])) {
+    if (diskroot === Buffer.alloc(0)) {
       throw new Error('invalid disk root');
     }
     Buffer.concat([journal, rlp.encode(diskroot)]);
@@ -270,7 +266,7 @@ export class SnapTree {
   diskroot() {
     const disklayer = this.diskLayer();
     if (disklayer === undefined) {
-      return Buffer.from([]);
+      return Buffer.alloc(0);
     }
     return disklayer.root;
   }
@@ -305,6 +301,9 @@ export class SnapTree {
       throw new Error('snapshot is not constructed');
     }
     const snap = this.snapShot(root);
+    if (snap === undefined) {
+      throw new Error(`unknown snapshot,root: ${root}`);
+    }
     return snap?.genAccountIterator(seek);
   }
 
@@ -314,11 +313,14 @@ export class SnapTree {
       throw new Error('snapshot is not constructed');
     }
     const snap = this.snapShot(root);
+    if (snap === undefined) {
+      throw new Error(`unknown snapshot,root: ${root}`);
+    }
     return snap?.genStorageIterator(account, seek);
   }
 
   verify(root: Buffer) {
-    const accountIt = this.accountIterator(root, Buffer.from([]));
+    const accountIt = this.accountIterator(root, Buffer.alloc(0));
     //TODO const got = generateTrieRoot()
   }
 }
@@ -406,7 +408,7 @@ async function diffToDisk(bottom: DiffLayer): Promise<DiskLayer> {
 async function generateSnapshot(db: Database, root: Buffer) {
   const stats: GeneratorStats = { origin: EMPTY_HASH, start: Date.now(), accounts: new BN(0), slots: new BN(0), storage: new BN(0) };
   const batch = new DBatch(db);
-  const genMarker = Buffer.from([]);
+  const genMarker = undefined;
 
   batch.push(DBSaveSnapRoot(root));
   journalProgress(batch, genMarker, stats);
@@ -414,7 +416,7 @@ async function generateSnapshot(db: Database, root: Buffer) {
 
   const base = new DiskLayer(db, root);
   base.genMarker = genMarker;
-  base.generate(stats);
+  const generating = base.generate(stats);
   logger.debug('Start snapshot generation, root:', root);
-  return base;
+  return { base, generating };
 }

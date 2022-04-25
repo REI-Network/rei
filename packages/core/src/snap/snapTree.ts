@@ -1,4 +1,4 @@
-import { rlp, BN } from 'ethereumjs-util';
+import { rlp, BN, intToBuffer } from 'ethereumjs-util';
 import { Database } from '@rei-network/database';
 import { FunctionalBufferMap, FunctionalBufferSet, logger } from '@rei-network/utils';
 import { snapStorageKey, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
@@ -81,7 +81,7 @@ export class SnapTree {
           await layer.abort();
         }
         layer.stale = true;
-      } else if (layer instanceof DiffLayer) {
+      } else {
         layer.stale = true;
       }
     }
@@ -269,7 +269,7 @@ export class SnapTree {
     const parent = diff.parent;
     if (parent instanceof DiskLayer) {
       return;
-    } else if (parent instanceof DiffLayer) {
+    } else {
       // Flatten the parent into the grandparent. The flattening internally obtains a
       // write lock on grandparent.
       const flattened = parent.flatten() as DiffLayer;
@@ -312,10 +312,8 @@ export class SnapTree {
         if (layer.aborter !== undefined) {
           await layer.abort();
         }
-        layer.stale = true;
-      } else {
-        layer.stale = true;
       }
+      layer.stale = true;
     }
 
     this.layers.clear();
@@ -337,18 +335,17 @@ export class SnapTree {
     if (snap === undefined) {
       throw new Error(`snapshot ${root} missing`);
     }
-    let journal = rlp.encode(journalVersion);
 
     const diskroot = this.diskroot();
-    if (diskroot === EMPTY_HASH) {
+    if (diskroot === undefined) {
       throw new Error('invalid disk root');
     }
-    journal = Buffer.concat([journal, rlp.encode(diskroot)]);
-
-    const base = snap.journal([journal]);
+    const versionBuf = intToBuffer(journalVersion);
+    const journal: Buffer[] = [versionBuf, Buffer.from(diskroot)];
+    const base = snap.journal(journal);
     const batch = new DBatch(this.diskdb);
     // Store the journal into the database and return
-    batch.push(DBSaveSnapJournal(journal));
+    batch.push(DBSaveSnapJournal(rlp.encode(journal)));
     await batch.write();
     batch.reset();
     return base;
@@ -361,7 +358,7 @@ export class SnapTree {
   diskroot() {
     const disklayer = this.diskLayer();
     if (disklayer === undefined) {
-      return Buffer.alloc(0);
+      return undefined;
     }
     return disklayer.root;
   }

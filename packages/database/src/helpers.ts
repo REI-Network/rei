@@ -258,3 +258,11 @@ export function DBSaveSnapRecoveryNumber(number: BN) {
 export function DBDeleteSnapRecoveryNumber() {
   return DBOp.del(DBTarget.SnapRecovery);
 }
+/**
+ * Create a operation to save snapshot sync progress
+ * @param progress
+ * @returns New operation
+ */
+export function DBSaveSnapSyncProgress(progress: Buffer) {
+  return DBOp.set(DBTarget.SnapSyncProgress, progress);
+}

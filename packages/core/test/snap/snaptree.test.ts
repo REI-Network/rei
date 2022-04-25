@@ -1,10 +1,8 @@
-import { assert, expect } from 'chai';
+import { expect } from 'chai';
 import { keccak256 } from 'ethereumjs-util';
-
 import { FunctionalBufferMap } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
-
 import { SnapTree } from '../../src/snap/snapTree';
 import { AccountInfo, accountsToDiffLayer, genRandomAccounts, modifyRandomAccounts } from './util';
 import { DiskLayer } from '../../src/snap/diskLayer';
@@ -20,7 +18,7 @@ const anotherDB = new Database(level(), common);
 const async = true;
 const rebuild = true;
 const recovery = true;
-let snaptree: SnapTree | undefined;
+let snaptree: SnapTree;
 let anothorSnaptree: SnapTree | undefined;
 let root: Buffer;
 let accounts: AccountInfo[];
@@ -34,33 +32,33 @@ type LayerInfo = {
 const layers: LayerInfo[] = [];
 describe('SnapshotTree', () => {
   before(async () => {
-    const rootAndAccounts = await genRandomAccounts(db, 10, 10);
+    const rootAndAccounts = await genRandomAccounts(db, 30, 30);
     root = rootAndAccounts.root;
     accounts = rootAndAccounts.accounts;
     diskLayer = new DiskLayer(db, root);
     layers.push({ layer: diskLayer, accounts });
-    snaptree = await SnapTree.createSnapTree(db, cache, root, async, rebuild, recovery);
-    let count = 10;
+    snaptree = (await SnapTree.createSnapTree(db, cache, root, async, rebuild, recovery))!;
+    let count = 2;
     for (let i = 0; i < 9; i++) {
       const latest = layers[layers.length - 1];
       const { root, accounts } = await modifyRandomAccounts(db, latest.layer.root, latest.accounts, count);
+      const layerNow = accountsToDiffLayer(latest.layer, root, accounts);
       layers.push({
-        layer: accountsToDiffLayer(latest.layer, root, accounts),
+        layer: layerNow,
         accounts
       });
-      const layerNow = layers[layers.length - 1];
-      snaptree?.update(root, latest.layer.root, (layerNow.layer as DiffLayer).accountData, (layerNow.layer as DiffLayer).destructSet, (layerNow.layer as DiffLayer).storageData);
-      count = Math.ceil(count / 2);
+      snaptree.update(root, latest.layer.root, layerNow.accountData, layerNow.destructSet, layerNow.storageData);
+      count += 2;
     }
   });
 
   it('should snapshot succeed', async () => {
-    const layer = snaptree!.snapShot(root);
+    const layer = snaptree.snapShot(root);
     expect(layer?.root.equals(diskLayer.root), 'snapshot root should be equal').be.true;
   });
 
   it('should snapShots correctly', async () => {
-    const rets = snaptree!.snapShots(layers[layers.length - 1].layer.root, layers.length + 1, true);
+    const rets = snaptree.snapShots(layers[layers.length - 1].layer.root, layers.length + 1, true);
     expect(rets?.length === layers.length - 1, 'snapshots number should be equal').be.true;
     for (let i = 0; i < rets!.length; i++) {
       expect(rets![i].root.equals(layers[layers.length - (i + 1)].layer.root), 'snapshot root should be equal').be.true;
@@ -70,30 +68,30 @@ describe('SnapshotTree', () => {
   it('should update correctly', async () => {
     const latest = layers[layers.length - 1];
     const { root, accounts } = await modifyRandomAccounts(db, latest.layer.root, latest.accounts, 1);
+    const layerNow = accountsToDiffLayer(latest.layer, root, accounts);
     layers.push({
-      layer: accountsToDiffLayer(latest.layer, root, accounts),
+      layer: layerNow,
       accounts
     });
-    const layerNow = layers[layers.length - 1];
-    snaptree?.update(root, latest.layer.root, (layerNow.layer as DiffLayer).accountData, (layerNow.layer as DiffLayer).destructSet, (layerNow.layer as DiffLayer).storageData);
-    const snap = snaptree?.snapShot(root);
-    expect(snap?.root.equals(layerNow.layer.root), 'snapshot root should be equal');
+    snaptree.update(root, latest.layer.root, layerNow.accountData, layerNow.destructSet, layerNow.storageData);
+    const snap = snaptree.snapShot(root);
+    expect(snap.root.equals(layerNow.root), 'snapshot root should be equal').be.true;
   });
 
   it('should get diskroot correctly', async () => {
     const diskroot = snaptree?.diskroot();
-    expect(diskroot?.equals(diskLayer.root), 'snapshot root should be equal');
+    expect(diskroot?.equals(diskLayer.root), 'snapshot root should be equal').be.true;
   });
 
   it('should get diskLayer correctly', async () => {
     const disk = snaptree?.diskLayer();
-    expect(disk?.root.equals(diskLayer.root), 'snapshot root should be equal');
+    expect(disk?.root.equals(diskLayer.root), 'snapshot root should be equal').be.true;
   });
 
   it('should accountIterator correctly', async () => {
     for (const { layer, accounts } of layers) {
       const _accounts = [...accounts];
-      for await (const { hash, getValue } of snaptree!.accountIterator(layer.root, EMPTY_HASH)!) {
+      for await (const { hash, getValue } of snaptree!.accountIterator(layer.root, EMPTY_HASH)) {
         const index = _accounts.findIndex(({ address }) => keccak256(address).equals(hash));
         expect(index !== -1, 'account should exist in account list').be.true;
         const _account = getValue();
@@ -115,7 +113,7 @@ describe('SnapshotTree', () => {
         }
 
         const accountHash = keccak256(address);
-        const { iter, destructed } = snaptree?.storageIterator(layer.root, accountHash, EMPTY_HASH)!;
+        const { iter, destructed } = snaptree!.storageIterator(layer.root, accountHash, EMPTY_HASH);
         expect(destructed, 'should not be destructed').be.false;
         for await (const { hash, getValue } of iter) {
           expect(storageData.get(hash)?.val.equals(getValue()), 'storage data should be equal').be.true;
@@ -129,34 +127,34 @@ describe('SnapshotTree', () => {
   it('should journal correctly', async () => {
     for await (const layer of layers) {
       const base = await snaptree?.journal(layer.layer.root);
-      expect(base.equals(root), 'root should be equal');
+      expect(base.equals(root), 'root should be equal').be.true;
     }
   });
 
   it('should cap correctly', async () => {
     const bottom = layers[layers.length - 1];
     let layersNumber = layers.length;
-    expect(snaptree?.layers.size === layersNumber, 'layers number should be equal');
+    expect(snaptree?.layers.size === layersNumber, 'layers number should be equal').be.true;
     await snaptree?.cap(bottom.layer.root, layersNumber);
-    expect(snaptree?.layers.size === layersNumber, 'all layers should be reserved');
+    expect(snaptree?.layers.size === layersNumber, 'all layers should be reserved').be.true;
     let capNumber = 4;
     layersNumber = layersNumber - capNumber + 2;
     await snaptree?.cap(bottom.layer.root, layersNumber - 2);
-    expect(snaptree?.layers.size === layersNumber, `${layersNumber - 1} layers should be reserved`);
+    expect(snaptree?.layers.size === layersNumber, `${layersNumber - 1} layers should be reserved`).be.true;
     let diskroot = snaptree?.diskroot();
-    expect(diskroot?.equals(layers[layers.length - layersNumber].layer.root), 'diskroot should be equal');
+    expect(diskroot?.equals(layers[layers.length - layersNumber].layer.root), 'diskroot should be equal').be.true;
 
     capNumber = 7;
     layersNumber = layersNumber - capNumber + 2;
     await snaptree?.cap(bottom.layer.root, layersNumber - 2);
-    expect(snaptree?.layers.size === layersNumber, `${layersNumber - 1} layers should be reserved`);
+    expect(snaptree?.layers.size === layersNumber, `${layersNumber - 1} layers should be reserved`).be.true;
     diskroot = snaptree?.diskroot();
-    expect(diskroot?.equals(layers[layers.length - layersNumber].layer.root), 'diskroot should be equal');
+    expect(diskroot?.equals(layers[layers.length - layersNumber].layer.root), 'diskroot should be equal').be.true;
 
     await snaptree?.cap(bottom.layer.root, 0);
-    expect(snaptree?.layers.size === 1, 'all difflayers should be fallened');
+    expect(snaptree?.layers.size === 1, 'all difflayers should be fallened').be.true;
     diskroot = snaptree?.diskroot();
-    expect(diskroot?.equals(layers[layers.length - 1].layer.root), 'diskroot should be equal');
+    expect(diskroot?.equals(layers[layers.length - 1].layer.root), 'diskroot should be equal').be.true;
   });
 
   it('should disable correctly', async () => {

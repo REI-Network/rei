@@ -4,13 +4,13 @@ import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { FunctionalBufferMap } from '@rei-network/utils';
 import { Database } from '@rei-network/database';
 import { Common } from '@rei-network/common';
-import { TrieIterator } from '../../src/snap/trieIterator';
+import { KVIterator } from '../../src/snap/trieIterator';
 const level = require('level-mem');
 
 const common = new Common({ chain: 'rei-devnet' });
 common.setHardforkByBlockNumber(0);
 
-describe('TrieIterator', () => {
+describe('KVIterator', () => {
   const db = new Database(level(), common);
   const trie = new Trie(db.rawdb);
   const kv = new FunctionalBufferMap<Buffer>();
@@ -25,7 +25,7 @@ describe('TrieIterator', () => {
   });
 
   it('should trie succeed', async () => {
-    for await (const { key, val } of new TrieIterator(trie)) {
+    for await (const { key, val } of new KVIterator(trie)) {
       const _val = kv.get(key);
       expect(_val !== undefined, 'key should exist').be.true;
       expect(_val!.equals(val), 'value should be equal').be.true;

@@ -1,372 +1,432 @@
 import { EventEmitter } from 'events';
+import { BN, BNLike } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
-import { BN, KECCAK256_RLP } from 'ethereumjs-util';
-import { logger, AbortableTimer } from '@rei-network/utils';
-import { BlockHeader, Transaction, Block } from '@rei-network/structure';
-import { Node } from '../node';
-import { Fetcher } from './fetcher';
-import { preValidateBlock, preValidateHeader } from '../validation';
-import { WireProtocolHandler, maxGetBlockHeaders } from '../protocols';
+import { Channel, getRandomIntInclusive, logger, AbortableTimer } from '@rei-network/utils';
+import { Block, Receipt } from '@rei-network/structure';
+import { Common } from '@rei-network/common';
+import { preValidateBlock } from '../validation';
+import { WireProtocolHandler, HandlerPool } from '../protocols';
 
-const defaultDownloadElementsCountLimit = new BN(maxGetBlockHeaders);
-const defaultSyncInterval = 1000;
-const defaultMinSyncPeers = 3;
+const maxSnapSyncLimit = 200;
+const confirmLimit = 3;
+const confirmTimeout = 3000;
+const unconfirmLimit = 3;
 
-export interface SynchronizerOptions {
-  node: Node;
-  interval?: number;
-  minSyncPeers?: number;
-  elementsCountLimit?: BN;
+export type SyncContext = {
+  td: BN;
+  start: BN;
+  height: BN;
+  block: Block;
+  receipts: Receipt[];
+
+  isSnapSync: boolean;
+};
+
+type ConfirmContext = {
+  td: BN;
+  height: BN;
+  block: Block;
+  receipts: Receipt[];
+
+  serializedHeader: Buffer;
+  serializedReceipts: Buffer[];
+
+  confirmed: Set<string>;
+  unconfirmed: Set<string>;
+
+  timeout: NodeJS.Timeout;
+};
+
+enum ConfirmStatus {
+  Failed,
+  WaitingForConfirm,
+  Confirmed,
+  Unconfirmed
 }
 
-export declare interface Synchronizer {
-  on(event: 'start', listener: () => void): this;
-  on(event: 'synchronized', listener: () => void): this;
+export type Announcement = {
+  handler: WireProtocolHandler;
+  block?: Block;
+};
+
+export type FetchResult = {
+  isSnapSync: boolean;
+  start?: BN;
+  fetching: Promise<FetchingResult>;
+} | null;
+
+export type FetchingResult = { reorg: boolean; saveBlock: boolean };
+
+export interface IFetcher {
+  fetch(handler: WireProtocolHandler, block: Block, receipts: Receipt[]): Promise<FetchResult>;
+
+  abort(): Promise<void>;
+}
+
+export interface SyncBackend {
+  getCommon(num: BNLike): Common;
+  getHeight(): BN;
+  getTotalDifficulty(): BN;
+}
+
+export interface SyncOptions {
+  backend: SyncBackend;
+  pool: HandlerPool<WireProtocolHandler>;
+  fetcher: IFetcher;
+
+  enableRandomPick: boolean;
+  validate: boolean;
+}
+
+export declare interface Sync {
+  on(event: 'start', listener: (ctx: SyncContext) => void): this;
+  on(event: 'synchronized', listener: (ctx: SyncContext) => void): this;
   on(event: 'failed', listener: () => void): this;
 
-  off(event: 'start', listener: () => void): this;
-  off(event: 'synchronized', listener: () => void): this;
+  off(event: 'start', listener: (ctx: SyncContext) => void): this;
+  off(event: 'synchronized', listener: (ctx: SyncContext) => void): this;
   off(event: 'failed', listener: () => void): this;
 }
 
-export class Synchronizer extends EventEmitter {
-  private readonly node: Node;
-  private readonly interval: number;
-  private readonly minSyncPeers: number;
-  private readonly elementsCountLimit: BN;
-  private readonly lock = new Semaphore(1);
-  private readonly fetcher: Fetcher;
-  private readonly timer = new AbortableTimer();
+export class Sync extends EventEmitter {
+  readonly backend: SyncBackend;
+  readonly pool: HandlerPool<WireProtocolHandler>;
+  readonly fetcher: IFetcher;
+  readonly enableRandomPick: boolean;
+  readonly validate: boolean;
 
-  private forceSync: boolean = false;
+  syncContext?: SyncContext;
+  confirmContext?: ConfirmContext;
+
+  private readonly channel = new Channel<Announcement>();
+
   private aborted: boolean = false;
+  private isWorking: boolean = false; // TODO: fix this
+  private timer = new AbortableTimer();
+  private lock = new Semaphore(1);
 
-  private syncLoopPromise?: Promise<void>;
-  private localHeader?: BlockHeader;
-  private startingBlock: number = 0;
-  private highestBlock: number = 0;
+  private syncPromise?: Promise<void>;
+  private randomPickPromise?: Promise<void>;
 
-  constructor(options: SynchronizerOptions) {
+  constructor(options: SyncOptions) {
     super();
-    this.node = options.node;
-    this.interval = options.interval ?? defaultSyncInterval;
-    this.minSyncPeers = options.minSyncPeers ?? defaultMinSyncPeers;
-    this.elementsCountLimit = options.elementsCountLimit ?? defaultDownloadElementsCountLimit;
-    this.fetcher = new Fetcher({ backend: this, validateBackend: this, common: this.node.getCommon(0), downloadElementsCountLimit: this.elementsCountLimit });
+    this.backend = options.backend;
+    this.pool = options.pool;
+    this.fetcher = options.fetcher;
+    this.enableRandomPick = options.enableRandomPick;
+    this.validate = options.validate;
   }
 
-  /**
-   * Get the sync state
-   */
-  get status() {
-    return { startingBlock: this.startingBlock, highestBlock: this.highestBlock };
-  }
-
-  /**
-   * Is it syncing
-   */
   get isSyncing() {
-    return this.lock.getPermits() === 0;
+    return !!this.syncContext;
   }
 
-  private async runWithLock<T>(fn: () => Promise<T>) {
-    try {
-      await this.lock.acquire();
-      return await fn();
-    } finally {
-      this.lock.release();
+  private resetConfirmContext(ctx?: ConfirmContext) {
+    this.confirmContext && clearTimeout(this.confirmContext.timeout);
+    this.confirmContext = ctx;
+  }
+
+  private async resetSyncContext() {
+    if (this.syncContext) {
+      await this.fetcher.abort();
+      this.syncContext = undefined;
     }
   }
 
-  private async genesis(): Promise<{ header: BlockHeader; td: BN }> {
-    const { header } = await this.node.db.getBlock(0);
-    return { header, td: header.difficulty };
+  private async syncLoop() {
+    for await (const ann of this.channel) {
+      try {
+        await this.lock.acquire();
+
+        const handler = ann.handler;
+        const status = handler.status!;
+        const peerId = handler.peer.peerId;
+        const height = new BN(status.height);
+        const td = new BN(status.totalDifficulty);
+
+        let block = ann.block;
+        let receipts: Receipt[] | undefined;
+        const downloadDataFromPeer = async () => {
+          if (block && receipts) {
+            return { block, receipts };
+          }
+
+          const result = await this.downloadDataFromPeer(height, handler);
+          if (result === null) {
+            throw new Error('download data from: ' + peerId + ' failed');
+          }
+
+          block = result.block;
+          receipts = result.receipts;
+          return { block, receipts };
+        };
+
+        const resetConfirmContextToCurrent = async () => {
+          const { block, receipts } = await downloadDataFromPeer();
+
+          const ctx: ConfirmContext = {
+            td,
+            height,
+            block,
+            receipts,
+            serializedHeader: block.header.serialize(),
+            serializedReceipts: receipts.map((r) => r.serialize()),
+            confirmed: new Set<string>([peerId]),
+            unconfirmed: new Set<string>(),
+            timeout: setTimeout(() => {
+              if (this.confirmContext === ctx) {
+                this.resetConfirmContext();
+              }
+            }, confirmTimeout)
+          };
+
+          this.resetConfirmContext(ctx);
+          await this.collectConfirm(ctx);
+        };
+
+        if (this.confirmContext) {
+          const { td: confirmTD, confirmed, unconfirmed } = this.confirmContext;
+          if (confirmTD.lte(this.backend.getTotalDifficulty())) {
+            this.resetConfirmContext();
+          } else if (td.gte(confirmTD) && !confirmed.has(peerId) && !unconfirmed.has(peerId)) {
+            const { block, receipts } = await downloadDataFromPeer();
+            const status = await this.updateConfirmContext(handler, this.confirmContext, block, receipts, peerId);
+            if (status === ConfirmStatus.Confirmed || status === ConfirmStatus.WaitingForConfirm) {
+              continue;
+            }
+          }
+        }
+
+        if (this.syncContext) {
+          const { isSnapSync, height: syncHeight } = this.syncContext;
+          if (isSnapSync) {
+            if (!this.confirmContext) {
+              if (height.sub(syncHeight).gten(maxSnapSyncLimit)) {
+                await resetConfirmContextToCurrent();
+              }
+            } else {
+              const confirmHeight = this.confirmContext.height;
+              if (height.sub(confirmHeight).gten(maxSnapSyncLimit)) {
+                await resetConfirmContextToCurrent();
+              }
+            }
+          }
+        }
+
+        if (!this.syncContext && !this.confirmContext) {
+          if (td.gt(this.backend.getTotalDifficulty())) {
+            await resetConfirmContextToCurrent();
+          }
+        }
+      } catch (err) {
+        logger.warn('Sync::syncLoop, catch:', err);
+      } finally {
+        this.lock.release();
+      }
+    }
   }
 
-  // TODO: binary search.
-  private async findAncient(handler: WireProtocolHandler): Promise<{ header: BlockHeader; td: BN } | undefined> {
-    const latest = this.node.getLatestBlock().header.number.clone();
-    if (latest.eqn(0)) {
-      return await this.genesis();
-    }
-
-    while (latest.gtn(0)) {
-      if (latest.eqn(1)) {
-        return await this.genesis();
+  private async randomPickLoop() {
+    while (!this.aborted) {
+      await this.timer.wait(1000);
+      if (this.aborted) {
+        break;
       }
 
-      const count = latest.gt(this.elementsCountLimit) ? this.elementsCountLimit.clone() : latest.clone();
-      latest.isub(count.subn(1));
+      this.pickRandomPeerToSync();
+    }
+  }
 
-      let headers!: BlockHeader[];
-      try {
-        headers = await handler.getBlockHeaders(latest, count);
-      } catch (err: any) {
-        await this.handlePeerError('Synchronizer::findAncient', handler.peer.peerId, err);
+  private pickRandomPeerToSync() {
+    if (!this.isWorking && this.channel.array.length === 0) {
+      const td = this.backend.getTotalDifficulty();
+      const handlers = this.pool.handlers.filter((handler) => new BN(handler.status!.totalDifficulty).gt(td));
+      if (handlers.length === 0) {
         return;
       }
 
-      for (let i = headers.length - 1; i >= 0; i--) {
-        try {
-          const remoteHeader = headers[i];
-          const hash = remoteHeader.hash();
-          const header = await this.node.db.getHeader(hash, remoteHeader.number);
-          const td = await this.node.db.getTotalDifficulty(hash, remoteHeader.number);
-          return { header, td };
-        } catch (err: any) {
-          if (err.type === 'NotFoundError') {
-            continue;
-          }
-          logger.error('Synchronizer::findAncient, load header failed:', err);
-        }
-      }
+      this.channel.push({ handler: handlers[getRandomIntInclusive(0, handlers.length - 1)] });
     }
   }
 
-  private findTarget(handler?: WireProtocolHandler) {
-    const wire = this.node.wire;
-    if (!this.forceSync && wire.pool.handlers.length < this.minSyncPeers) {
-      // if we don’t get enough remote peers, return
+  private async collectConfirm(context: ConfirmContext) {
+    const { confirmed, unconfirmed, height } = context;
+    const td = this.backend.getTotalDifficulty();
+
+    const handlers = this.pool.handlers.filter(({ peer: { peerId }, status }) => {
+      return new BN(status!.totalDifficulty).gt(td) && !confirmed.has(peerId) && !unconfirmed.has(peerId);
+    });
+    if (handlers.length === 0) {
       return;
     }
 
-    let bestPeerHandler: WireProtocolHandler | undefined;
-    let bestHeight!: BN;
-    let bestTD!: BN;
+    const results = await Promise.all(handlers.map(this.downloadDataFromPeer.bind(this, height)));
+    for (let i = 0; i < results.length; i++) {
+      const handler = handlers[i];
+      const result = results[i];
+      if (result === null) {
+        continue;
+      }
 
-    if (handler) {
-      // if handler exists,
-      // read information from handler
-      bestPeerHandler = handler;
-      bestHeight = new BN(bestPeerHandler.status!.height);
-      bestTD = new BN(bestPeerHandler.status!.totalDifficulty);
-      if (bestTD.lte(this.node.getTotalDifficulty())) {
-        logger.debug('Synchronizer::findTarget, best TD less or equal than local TD');
-        return;
+      const status = await this.updateConfirmContext(handler, context, result.block, result.receipts, handler.peer.peerId);
+      if (status === ConfirmStatus.WaitingForConfirm) {
+        // do nothing
+      } else if (status === ConfirmStatus.Confirmed || status === ConfirmStatus.Unconfirmed) {
+        break;
       }
-    } else {
-      // if handler doesn't exist,
-      // randomly select one from the handler pool
-      bestTD = this.node.getTotalDifficulty();
-      for (const handler of wire.pool.handlers) {
-        const remoteStatus = handler.status!;
-        const td = new BN(remoteStatus.totalDifficulty);
-        if (td.gt(bestTD)) {
-          bestPeerHandler = handler;
-          bestHeight = new BN(remoteStatus.height);
-          bestTD = td;
-        }
-      }
-      if (!bestPeerHandler) {
-        logger.debug('Synchronizer::findTarget, can not find best peer handler, pool size:', wire.pool.handlers.length);
-        return;
+    }
+  }
+
+  private async updateConfirmContext(handler: WireProtocolHandler, context: ConfirmContext, block: Block, receipts: Receipt[], peerId: string): Promise<ConfirmStatus> {
+    const { serializedHeader, serializedReceipts, confirmed, unconfirmed, height, td } = context;
+
+    let confirm = true;
+    if (!block.header.serialize().equals(serializedHeader)) {
+      confirm = false;
+    }
+    if (serializedReceipts.length !== receipts.length) {
+      confirm = false;
+    }
+    for (let i = 0; i > receipts.length; i++) {
+      if (!receipts[i].serialize().equals(serializedReceipts[i])) {
+        confirm = false;
+        break;
       }
     }
 
-    return {
-      bestPeerHandler,
-      bestHeight,
-      bestTD
-    };
+    if (confirm) {
+      confirmed.add(peerId);
+    } else {
+      unconfirmed.add(peerId);
+    }
+
+    if (confirmed.size >= confirmLimit) {
+      // TODO: ban unconfirmed peers
+
+      this.resetConfirmContext();
+      await this.resetSyncContext();
+
+      const result = await this.fetcher.fetch(handler, block, receipts);
+      if (result === null) {
+        // TODO: ban handler (if needed)
+        return ConfirmStatus.Failed;
+      }
+
+      const { start, isSnapSync, fetching } = result;
+      const ctx: SyncContext = {
+        td,
+        height,
+        block,
+        receipts,
+        start: start ?? this.backend.getHeight(),
+        isSnapSync
+      };
+      this.syncContext = ctx;
+
+      this.emit('start', ctx);
+      // we are sure that fetching will not throw an exception
+      fetching.then(({ reorg, saveBlock }) => {
+        this.onFetched(ctx, reorg, saveBlock);
+      });
+
+      return ConfirmStatus.Confirmed;
+    } else if (unconfirmed.size >= unconfirmLimit) {
+      // TODO: ban confirmed peers
+      this.resetConfirmContext();
+      return ConfirmStatus.Unconfirmed;
+    } else {
+      // wait for enough confirm, do nothing
+      return ConfirmStatus.WaitingForConfirm;
+    }
   }
 
-  private syncOnce(handler?: WireProtocolHandler) {
-    return this.runWithLock(async () => {
-      const target = this.findTarget(handler);
-      if (!target) {
-        // the target peer has been disconneted or
-        // we don't have the best peer
+  private async downloadDataFromPeer(height: BN, handler: WireProtocolHandler): Promise<{ block: Block; receipts: Receipt[] } | null> {
+    const header = await handler
+      .getBlockHeaders(height, new BN(1))
+      .then((headers) => (headers.length === 1 ? headers[0] : null))
+      .catch(() => null);
+    if (header === null) {
+      return null;
+    }
+
+    const body = await handler
+      .getBlockBodies([header])
+      .then((body) => (body.length === 1 ? body[0] : null))
+      .catch(() => null);
+    if (body === null) {
+      return null;
+    }
+
+    const block = Block.fromBlockData({ header, transactions: body }, { common: this.backend.getCommon(0), hardforkByBlockNumber: true });
+    if (this.validate) {
+      try {
+        await preValidateBlock.call(block);
+      } catch (err) {
+        // ignore errors
+        return null;
+      }
+    }
+
+    // TODO: download and validate receipts
+    const receipts: Receipt[] = [];
+
+    return { block, receipts };
+  }
+
+  private async onFetched(ctx: SyncContext, reorg: boolean, saveBlock: boolean) {
+    if (ctx !== this.syncContext) {
+      // ignore
+      this.emit('failed');
+      return;
+    }
+
+    try {
+      await this.lock.acquire();
+      if (ctx !== this.syncContext) {
+        // ignore
+        this.emit('failed');
         return;
       }
 
-      const { bestPeerHandler, bestHeight, bestTD } = target;
-
-      // find common ancient
-      const result = await this.findAncient(bestPeerHandler);
-      if (!result) {
-        return;
-      }
-
-      const localHeader = result.header;
-      const localTD = result.td;
-      if (localHeader.number.eq(bestHeight)) {
-        // we already have this best block
-        logger.debug('Synchronizer::syncOnce, we already have this best block');
-        return;
-      }
-
-      // add check for reimint consensus engine
-      const reimint = this.node.reimint;
-      if (reimint.isStarted && reimint.state.hasMaj23Precommit(bestHeight)) {
-        // our consensus engine has collected enough votes for this height,
-        // so we ignore this best block
-        logger.debug('Synchronizer::syncOnce, we collected enough votes for this height');
-        return;
-      }
-
-      const peerId = bestPeerHandler.peer.peerId;
-      logger.info('💡 Get best height from:', peerId, 'best height:', bestHeight.toString(), 'local height:', localHeader.number.toString());
-      this.startingBlock = localHeader.number.toNumber();
-      this.highestBlock = bestHeight.toNumber();
-      this.emit('start');
-
-      // record local header information
-      this.localHeader = localHeader;
-      const start = localHeader.number.addn(1);
-      const totalCount = new BN(bestHeight).sub(localHeader.number);
-
-      // start fetch
-      this.fetcher.reset();
-      const { reorged, cumulativeTotalDifficulty } = await this.fetcher.fetch(start, totalCount, bestPeerHandler);
-
-      // check total difficulty
-      if (!cumulativeTotalDifficulty.add(localTD).eq(bestTD)) {
-        // await this.node.banPeer(peerId, 'invalid');
-        logger.warn('Synchronizer::syncOnce, total difficulty does not match:', peerId);
-      }
-
-      const latest = this.node.getLatestBlock();
-      const td = this.node.getTotalDifficulty();
-      logger.info('💫 Sync over, local height:', latest.header.number.toString(), 'local td:', this.node.getTotalDifficulty().toString(), 'best height:', bestHeight.toString(), 'best td:', bestTD.toString());
-      if (reorged) {
-        logger.info('💫 Synchronized');
-        this.emit('synchronized');
-        this.node.wire.broadcastNewBlock(latest, td);
+      if (reorg) {
+        // TODO: broadcast new block...
+        this.emit('synchronized', ctx);
       } else {
         this.emit('failed');
       }
-    });
-  }
 
-  /**
-   * Start the Synchronizer
-   */
-  private async syncLoop() {
-    while (!this.aborted) {
-      if (!this.isSyncing) {
-        await this.syncOnce();
+      if (saveBlock) {
+        // TODO: blockchain.putBlock
       }
-      await this.timer.wait(this.interval);
+
+      this.syncContext = undefined;
+    } catch (err) {
+      logger.warn('Sync::onFetched, catch:', err);
+    } finally {
+      this.lock.release;
     }
   }
 
-  /**
-   * Announce to Synchronizer
-   * @param handler - Handler
-   */
-  announce(handler: WireProtocolHandler) {
-    if (!this.isSyncing) {
-      this.syncOnce(handler);
-    }
+  announce(ann: Announcement) {
+    this.channel.push(ann);
   }
 
-  /**
-   * Start sync
-   */
   start() {
-    if (this.syncLoopPromise) {
-      throw new Error('repeated start');
+    if (this.syncPromise || this.randomPickPromise) {
+      throw new Error('promises exist');
     }
 
-    this.syncLoopPromise = this.syncLoop();
-    setTimeout(() => {
-      this.forceSync = true;
-    }, this.interval * 30);
+    this.syncPromise = this.syncLoop();
+    this.enableRandomPick && (this.randomPickPromise = this.randomPickLoop());
   }
 
-  /**
-   * Abort sync
-   */
   async abort() {
-    if (this.syncLoopPromise) {
-      this.aborted = true;
-      await this.fetcher.abort();
-      this.timer.abort();
-      await this.syncLoopPromise;
-      this.syncLoopPromise = undefined;
-    }
+    this.aborted = true;
+    this.timer.abort();
+    this.channel.abort();
+    this.syncPromise && (await this.syncPromise);
+    this.randomPickPromise && (await this.randomPickPromise);
+    this.resetConfirmContext();
+    await this.resetSyncContext();
   }
-
-  /////////////////// Fetcher backend ///////////////////
-
-  /**
-   * Handle peer error,
-   * ban peer when request timeout or invalid,
-   * ignore abort error
-   * @param prefix - Log prefix
-   * @param peerId - Peer id
-   * @param err - Error
-   */
-  async handlePeerError(prefix: string, peerId: string, err: any) {
-    if (typeof err.message === 'string' && err.message.startsWith('timeout')) {
-      logger.warn(prefix, 'peerId:', peerId, 'error:', err);
-      await this.node.banPeer(peerId, 'timeout');
-    } else if (err.message === 'abort') {
-      // ignore abort error...
-    } else {
-      logger.error(prefix, 'peerId:', peerId, 'error:', err);
-      await this.node.banPeer(peerId, 'invalid');
-    }
-  }
-
-  /**
-   * Process block and commit it to db
-   * @param block - Block
-   * @returns Reorg
-   */
-  async processAndCommitBlock(block: Block) {
-    try {
-      const result = await this.node.getExecutor(block._common).processBlock({ block });
-      return await this.node.commitBlock({
-        ...result,
-        block,
-        broadcast: false
-      });
-    } catch (err: any) {
-      if (err.message === 'committed' || err.message === 'aborted') {
-        return false;
-      } else {
-        throw err;
-      }
-    }
-  }
-
-  /**
-   * Validate headers
-   * @param parent - Parent block header(if it exsits)
-   * @param headers - A list of headers that need to be validated
-   * @returns
-   */
-  validateHeaders(parent: BlockHeader | undefined, headers: BlockHeader[]) {
-    headers.forEach((header, i) => {
-      preValidateHeader.call(header, i === 0 ? parent ?? this.localHeader! : headers[i - 1]);
-    });
-    return headers[headers.length - 1];
-  }
-
-  /**
-   * Validate block bodies
-   * @param headers - A list of headers
-   * @param bodies - A list of bodies, one-to-one correspondence with headers
-   */
-  validateBodies(headers: BlockHeader[], bodies: Transaction[][]) {
-    if (headers.length !== bodies.length) {
-      throw new Error('invalid bodies length');
-    }
-    headers.forEach((header, i) => {
-      if (bodies[i].length === 0 && !header.transactionsTrie.equals(KECCAK256_RLP)) {
-        throw new Error('useless');
-      }
-    });
-  }
-
-  /**
-   * Validate blocks
-   * @param blocks - A list of blocks that need to be validated
-   */
-  async validateBlocks(blocks: Block[]) {
-    await Promise.all(blocks.map((b) => preValidateBlock.call(b)));
-  }
-
-  /////////////////// Fetcher backend ///////////////////
 }

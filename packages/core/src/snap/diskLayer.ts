@@ -5,12 +5,10 @@ import { DBDeleteSnapAccount, DBDeleteSnapStorage, DBSaveSerializedSnapAccount, 
 import { snapStorageKey, snapAccountKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
 import { FunctionalBufferSet } from '@rei-network/utils';
 import { StakingAccount } from '../stateManager';
-import { EMPTY_HASH, MAX_HASH } from '../utils';
-import { verifyRangeProof } from './verifyRangeProof';
-import { TrieIterator } from './trieIterator';
+import { EMPTY_HASH, MAX_HASH, DBatch } from '../utils';
+import { KVIterator } from './trieIterator';
 import { DiffLayer } from './diffLayer';
 import { asyncTraverseRawDB } from './layerIterator';
-import { DBatch } from './batch';
 import { journalProgress } from './journal';
 import { ISnapshot, AccountData, StorageData, GeneratorStats } from './types';
 import { increaseKey, mergeProof, wipeKeyRange, SimpleAborter } from './utils';
@@ -246,7 +244,7 @@ export class DiskLayer implements ISnapshot {
 
     let proofed = false;
     try {
-      trieMore = await verifyRangeProof(root, origin, last, keys, vals, proof);
+      trieMore = await Trie.verifyRangeProof(root, origin, last, keys, vals, proof);
       proofed = true;
     } catch (err) {
       // ignore error...
@@ -297,7 +295,7 @@ export class DiskLayer implements ISnapshot {
 
     // start traversing the Trie
     const trie = _trie ?? new Trie(this.db.rawdb, root);
-    for await (const { key, val } of new TrieIterator(trie)) {
+    for await (const { key, val } of new KVIterator(trie)) {
       if (last && key.compare(last) > 0) {
         trieMore = true;
         break;

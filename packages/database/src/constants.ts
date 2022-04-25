@@ -108,6 +108,12 @@ export const SNAP_RECOVERY_KEY = Buffer.from('SnapshotRecovery');
  * snapshotDisableKey
  */
 export const SNAP_DISABLED_KEY = Buffer.from('SnapshotDisabled');
+
+/**
+ *  snapshotSyncProgress
+ */
+export const SNAP_SYNC_PROGRESS_KEY = Buffer.from('SnapshotSyncProgress');
+
 // Utility functions
 
 /**

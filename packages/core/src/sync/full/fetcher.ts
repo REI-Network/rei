@@ -2,7 +2,7 @@ import { BN } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { BlockHeader, Block, Transaction } from '@rei-network/structure';
 import { PChannel, logger } from '@rei-network/utils';
-import { WireProtocol, WireProtocolHandler } from '../protocols';
+import { WireProtocol, WireProtocolHandler } from '../../protocols';
 import { LimitedConcurrency } from './limited';
 
 const defaultDownloadBodiesLimit = 3;

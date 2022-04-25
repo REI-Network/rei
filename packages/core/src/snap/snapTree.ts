@@ -75,15 +75,13 @@ export class SnapTree {
    * in memory marks snapshots disabled globally
    */
   async disable() {
-    for (const [root, layer] of this.layers) {
+    for (const [, layer] of this.layers) {
       if (layer instanceof DiskLayer) {
         if (layer.aborter !== undefined) {
           await layer.abort();
         }
-        layer.stale = true;
-      } else {
-        layer.stale = true;
       }
+      layer.stale = true;
     }
 
     this.layers.clear();

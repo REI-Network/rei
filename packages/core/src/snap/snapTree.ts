@@ -3,7 +3,7 @@ import { Database } from '@rei-network/database';
 import { FunctionalBufferMap, FunctionalBufferSet, logger } from '@rei-network/utils';
 import { snapStorageKey, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
 import { DBDeleteSnapRoot, DBDeleteSnapAccount, DBDeleteSnapStorage, DBSaveSerializedSnapAccount, DBSaveSnapStorage, DBSaveSnapRoot, DBDeleteSnapJournal, DBDeleteSnapGenerator, DBSaveSnapDisabled, DBDeleteSnapRecoveryNumber, DBDeleteSnapDisabled, DBSaveSnapJournal } from '@rei-network/database/dist/helpers';
-import { DBatch } from './batch';
+import { DBatch } from '../utils';
 import { DiffLayer } from './diffLayer';
 import { DiskLayer } from './diskLayer';
 import { GeneratorStats, Snapshot } from './types';
@@ -14,7 +14,7 @@ import { EMPTY_HASH, MAX_HASH } from '../utils';
 
 const aggregatorMemoryLimit = 4 * 1024 * 1024;
 const idealBatchSize = 102400;
-const journalVersion = 0;
+export const journalVersion = 0;
 
 export class SnapTree {
   diskdb: Database;
@@ -125,7 +125,7 @@ export class SnapTree {
     }
     const ret: Snapshot[] = [];
 
-    for (limit; limit > 0; limit--) {
+    for (; limit > 0; limit--) {
       if (layer instanceof DiskLayer && nodisk) {
         break;
       }

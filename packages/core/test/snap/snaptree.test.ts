@@ -194,6 +194,13 @@ describe('SnapshotTree', () => {
     }
   });
 
+  it('should verify correctly', async () => {
+    for (const layer of layers) {
+      const verifyResult = await snaptree.verify(layer.layer.root);
+      expect(verifyResult === true, 'snapshot should be verified correctly').be.true;
+    }
+  });
+
   it('should cap correctly', async () => {
     let difflayersNumber = layers.length - 1;
     const bottomLayer = layers[difflayersNumber].layer;

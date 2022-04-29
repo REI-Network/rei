@@ -11,6 +11,8 @@ import { wipeKeyRange } from './utils';
 import { asyncTraverseRawDB } from './layerIterator';
 import { journalProgress, loadSnapshot } from './journal';
 import { EMPTY_HASH, MAX_HASH } from '../utils';
+import { TrieSync } from '../sync/snap/trieSync';
+import { StakingAccount } from '../stateManager';
 
 const aggregatorMemoryLimit = 4 * 1024 * 1024;
 const idealBatchSize = 102400;
@@ -433,12 +435,41 @@ export class SnapTree {
     return snap.genStorageIterator(account, seek);
   }
 
-  verify(root: Buffer) {
-    const accountIt = this.accountIterator(root, Buffer.alloc(0));
-    //TODO const got = generateTrieRoot()
+  async verify(root: Buffer) {
+    const trieSync = new TrieSync(this.diskdb);
+    trieSync.setRoot(root, async (paths, path, leaf, parent) => {
+      if (paths.length === 1) {
+        const serializedAccount = await this.diskdb.getSerializedSnapAccount(paths[0]);
+        if (!serializedAccount.equals(leaf)) {
+          throw Error('snap account not equal');
+        }
+      } else if (paths.length === 2) {
+        const storage = await this.diskdb.getSnapStorage(paths[0], paths[1]);
+        if (!storage.equals(leaf)) {
+          throw Error('snap storage not equal');
+        }
+      } else {
+        logger.warn('SnapSync::setRoot, unknown leaf node');
+      }
+    });
+
+    while (trieSync.pending > 0) {
+      const { nodeHashes, codeHashes } = trieSync.missing(10);
+      try {
+        for (const hash of nodeHashes) {
+          await trieSync.process(hash, await this.diskdb.rawdb.get(hash));
+        }
+
+        for (const hash of codeHashes) {
+          await trieSync.process(hash, await this.diskdb.rawdb.get(hash));
+        }
+      } catch (error) {
+        return false;
+      }
+    }
+    return true;
   }
 }
-
 /**
  * diffToDisk merges a bottom-most diff into the persistent disk layer underneath
  * it. The method will panic if called onto a non-bottom-most diff layer.

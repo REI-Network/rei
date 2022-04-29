@@ -1,14 +1,17 @@
 import { expect } from 'chai';
 import { keccak256, rlp, bufferToInt } from 'ethereumjs-util';
+import { BaseTrie } from 'merkle-patricia-tree';
+import { LeafNode } from 'merkle-patricia-tree/dist/trieNode';
 import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
-import { Database } from '@rei-network/database';
+import { Database, DBDeleteSnapAccount } from '@rei-network/database';
 import { SnapTree, journalVersion } from '../../src/snap/snapTree';
 import { AccountInfo, accountsToDiffLayer, genRandomAccounts, modifyRandomAccounts } from './util';
 import { DiskLayer } from '../../src/snap/diskLayer';
 import { DiffLayer, Snapshot } from '../../src/snap';
-import { EMPTY_HASH } from '../../src/utils';
+import { EMPTY_HASH, DBatch } from '../../src/utils';
 import { isDiffLayerJournal } from '../../src/snap/journal';
+import { TrieNodeIterator } from '../../src/snap/trieIterator';
 
 function journalToDiffLayer(parent: Snapshot, journalArray: any[], offset: number): Snapshot {
   if (offset > journalArray.length - 1) {
@@ -195,10 +198,33 @@ describe('SnapshotTree', () => {
   });
 
   it('should verify correctly', async () => {
-    for (const layer of layers) {
-      const verifyResult = await snaptree.verify(layer.layer.root);
-      expect(verifyResult === true, 'snapshot should be verified correctly').be.true;
+    const rawDBOpts = { keyEncoding: 'binary', valueEncoding: 'binary' };
+    const root = snaptree.diskroot()!;
+    let verifiedResult = await snaptree.verify(root);
+    expect(verifiedResult === true, 'Snap should verify correctly').be.true;
+
+    let deleteAccountKey: Buffer = Buffer.alloc(0);
+    for await (const node of new TrieNodeIterator(new BaseTrie(snaptree.diskdb.rawdb), root)) {
+      if (node instanceof LeafNode) {
+        deleteAccountKey = node.hash();
+      }
     }
+    const value = await snaptree.diskdb.rawdb.get(deleteAccountKey, rawDBOpts);
+    await snaptree.diskdb.rawdb.del(deleteAccountKey, rawDBOpts);
+    verifiedResult = await snaptree.verify(root);
+    expect(verifiedResult === false, 'Snap should not pass the verify').be.true;
+
+    await snaptree.diskdb.rawdb.put(deleteAccountKey, value);
+    verifiedResult = await snaptree.verify(root);
+    expect(verifiedResult === true, 'Snap should verify correctly').be.true;
+
+    const deletedAccountHash = layers[0].accounts[0].accountHash;
+    const batch = new DBatch(snaptree.diskdb);
+    batch.push(DBDeleteSnapAccount(deletedAccountHash));
+    await batch.write();
+    batch.reset();
+    verifiedResult = await snaptree.verify(root);
+    expect(verifiedResult === false, 'Snap should not pass the verify').be.true;
   });
 
   it('should cap correctly', async () => {

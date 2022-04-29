@@ -436,8 +436,8 @@ export class SnapTree {
   }
 
   async verify(root: Buffer) {
-    const trieSync = new TrieSync(this.diskdb);
-    trieSync.setRoot(root, async (paths, path, leaf, parent) => {
+    const trieSync = new TrieSync(this.diskdb, true);
+    await trieSync.setRoot(root, async (paths, path, leaf, parent) => {
       if (paths.length === 1) {
         const serializedAccount = await this.diskdb.getSerializedSnapAccount(paths[0]);
         if (!serializedAccount.equals(leaf)) {
@@ -457,11 +457,11 @@ export class SnapTree {
       const { nodeHashes, codeHashes } = trieSync.missing(10);
       try {
         for (const hash of nodeHashes) {
-          await trieSync.process(hash, await this.diskdb.rawdb.get(hash));
+          await trieSync.process(hash, await this.diskdb.rawdb.get(hash, { keyEncoding: 'binary', valueEncoding: 'binary' }));
         }
 
         for (const hash of codeHashes) {
-          await trieSync.process(hash, await this.diskdb.rawdb.get(hash));
+          await trieSync.process(hash, await this.diskdb.rawdb.get(hash, { keyEncoding: 'binary', valueEncoding: 'binary' }));
         }
       } catch (error) {
         return false;

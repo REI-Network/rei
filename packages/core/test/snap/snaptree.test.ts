@@ -4,7 +4,7 @@ import { BaseTrie } from 'merkle-patricia-tree';
 import { LeafNode } from 'merkle-patricia-tree/dist/trieNode';
 import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
-import { Database, DBDeleteSnapAccount } from '@rei-network/database';
+import { Database, DBDeleteSnapAccount, DBDeleteSnapStorage, DBSaveSerializedSnapAccount } from '@rei-network/database';
 import { SnapTree, journalVersion } from '../../src/snap/snapTree';
 import { AccountInfo, accountsToDiffLayer, genRandomAccounts, modifyRandomAccounts } from './util';
 import { DiskLayer } from '../../src/snap/diskLayer';
@@ -12,6 +12,28 @@ import { DiffLayer, Snapshot } from '../../src/snap';
 import { EMPTY_HASH, DBatch } from '../../src/utils';
 import { isDiffLayerJournal } from '../../src/snap/journal';
 import { TrieNodeIterator } from '../../src/snap/trieIterator';
+
+const level = require('level-mem');
+const common = new Common({ chain: 'rei-devnet' });
+common.setHardforkByBlockNumber(0);
+const cache = 100;
+const db = new Database(level(), common);
+const anotherDB = new Database(level(), common);
+const async = true;
+const rebuild = true;
+const recovery = true;
+let snaptree: SnapTree;
+let anothorSnaptree: SnapTree | undefined;
+let root: Buffer;
+let accounts: AccountInfo[];
+let diskLayer: DiskLayer;
+
+type LayerInfo = {
+  layer: Snapshot;
+  accounts: AccountInfo[];
+};
+
+const layers: LayerInfo[] = [];
 
 function journalToDiffLayer(parent: Snapshot, journalArray: any[], offset: number): Snapshot {
   if (offset > journalArray.length - 1) {
@@ -44,27 +66,22 @@ function journalToDiffLayer(parent: Snapshot, journalArray: any[], offset: numbe
 
   return DiffLayer.createDiffLayerFromParent(parent, root, destructSet, accountData, storageData);
 }
-const level = require('level-mem');
-const common = new Common({ chain: 'rei-devnet' });
-common.setHardforkByBlockNumber(0);
-const cache = 100;
-const db = new Database(level(), common);
-const anotherDB = new Database(level(), common);
-const async = true;
-const rebuild = true;
-const recovery = true;
-let snaptree: SnapTree;
-let anothorSnaptree: SnapTree | undefined;
-let root: Buffer;
-let accounts: AccountInfo[];
-let diskLayer: DiskLayer;
 
-type LayerInfo = {
-  layer: Snapshot;
-  accounts: AccountInfo[];
-};
+async function operateSnap(dbop: any) {
+  const batch = new DBatch(snaptree.diskdb);
+  batch.push(dbop);
+  await batch.write();
+  batch.reset();
+}
 
-const layers: LayerInfo[] = [];
+async function getFirstLeafNode(root: Buffer) {
+  for await (const node of new TrieNodeIterator(new BaseTrie(snaptree.diskdb.rawdb), root)) {
+    if (node instanceof LeafNode) {
+      return node.hash();
+    }
+  }
+}
+
 describe('SnapshotTree', () => {
   before(async () => {
     const rootAndAccounts = await genRandomAccounts(db, 64, 64);
@@ -201,28 +218,47 @@ describe('SnapshotTree', () => {
     const rawDBOpts = { keyEncoding: 'binary', valueEncoding: 'binary' };
     const root = snaptree.diskroot()!;
     let verifiedResult = await snaptree.verify(root);
-    expect(verifiedResult === true, 'Snap should verify correctly').be.true;
+    expect(verifiedResult, 'Snap should verify correctly').be.true;
 
-    let deleteAccountKey: Buffer = Buffer.alloc(0);
-    for await (const node of new TrieNodeIterator(new BaseTrie(snaptree.diskdb.rawdb), root)) {
-      if (node instanceof LeafNode) {
-        deleteAccountKey = node.hash();
-      }
-    }
-    const value = await snaptree.diskdb.rawdb.get(deleteAccountKey, rawDBOpts);
-    await snaptree.diskdb.rawdb.del(deleteAccountKey, rawDBOpts);
+    //delete account from db
+    let deleteKey = (await getFirstLeafNode(root))!;
+    let value = await snaptree.diskdb.rawdb.get(deleteKey, rawDBOpts);
+    await snaptree.diskdb.rawdb.del(deleteKey, rawDBOpts);
     verifiedResult = await snaptree.verify(root);
     expect(verifiedResult === false, 'Snap should not pass the verify').be.true;
 
-    await snaptree.diskdb.rawdb.put(deleteAccountKey, value);
+    await snaptree.diskdb.rawdb.put(deleteKey, value, rawDBOpts);
     verifiedResult = await snaptree.verify(root);
     expect(verifiedResult === true, 'Snap should verify correctly').be.true;
 
+    //delete account from snap
     const deletedAccountHash = layers[0].accounts[0].accountHash;
-    const batch = new DBatch(snaptree.diskdb);
-    batch.push(DBDeleteSnapAccount(deletedAccountHash));
-    await batch.write();
-    batch.reset();
+    value = await layers[0].layer.getSerializedAccount(deletedAccountHash);
+    let dbop = DBDeleteSnapAccount(deletedAccountHash);
+    await operateSnap(dbop);
+    verifiedResult = await snaptree.verify(root);
+    expect(verifiedResult === false, 'Snap should not pass the verify').be.true;
+
+    dbop = DBSaveSerializedSnapAccount(deletedAccountHash, value);
+    await operateSnap(dbop);
+    verifiedResult = await snaptree.verify(root);
+    expect(verifiedResult === true, 'Snap should not pass the verify').be.true;
+
+    //delete slot from db
+    deleteKey = (await getFirstLeafNode(layers[0].accounts[0].account.stateRoot))!;
+    value = await snaptree.diskdb.rawdb.get(deleteKey, rawDBOpts);
+    await snaptree.diskdb.rawdb.del(deleteKey, rawDBOpts);
+    verifiedResult = await snaptree.verify(root);
+    expect(verifiedResult === false, 'Snap should not pass the verify').be.true;
+
+    await snaptree.diskdb.rawdb.put(deleteKey, value, rawDBOpts);
+    verifiedResult = await snaptree.verify(root);
+    expect(verifiedResult === true, 'Snap should verify correctly').be.true;
+
+    //delete slot from snap
+    const deletedStoragHash = Array.from(layers[0].accounts[0].storageData.keys())[0];
+    dbop = DBDeleteSnapStorage(deletedAccountHash, deletedStoragHash);
+    await operateSnap(dbop);
     verifiedResult = await snaptree.verify(root);
     expect(verifiedResult === false, 'Snap should not pass the verify').be.true;
   });

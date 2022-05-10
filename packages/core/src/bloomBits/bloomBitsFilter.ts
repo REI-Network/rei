@@ -236,7 +236,7 @@ export class BloomBitsFilter {
         for (const bloom of blooms) {
           // query the bits set of this bit of this section from database.
           const bits = await getBits(bloom, section);
-          for (const num = fromBlock.clone(); num.lt(toBlock); num.iaddn(1)) {
+          for (const num = fromBlock.clone(); num.lte(toBlock); num.iaddn(1)) {
             if (!checkedNums.has(num) && checkSingleNumber(bits, sectionStart, num)) {
               checkedNums.add(num.clone());
               append(await this.filterBlock(num, addresses, topics));
@@ -248,7 +248,8 @@ export class BloomBitsFilter {
 
     // query unindexed logs.
     const maxIndexedBlockNumber = maxSection ? maxSection.addn(1).muln(config.bloomBitsSectionSize).subn(1) : new BN(0);
-    for (const num = maxIndexedBlockNumber.addn(1); num.lte(to) && num.lte(latestHeader.number); num.iaddn(1)) {
+    let startAt = maxIndexedBlockNumber.addn(1);
+    for (const num = from.gt(startAt) ? from.clone() : startAt; num.lte(to) && num.lte(latestHeader.number); num.iaddn(1)) {
       append(await this.filterBlock(num, addresses, topics));
     }
     return logs;

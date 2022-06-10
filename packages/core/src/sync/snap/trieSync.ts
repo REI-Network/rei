@@ -19,7 +19,7 @@ type SyncRequest = {
 };
 
 function compareSyncRequest(a: SyncRequest, b: SyncRequest) {
-  let res = (a.path?.length ?? 0) - (b.parent?.length ?? 0);
+  let res = (a.path?.length ?? 0) - (b.path?.length ?? 0);
   if (res === 0) {
     res = a.hash.compare(b.hash);
   }

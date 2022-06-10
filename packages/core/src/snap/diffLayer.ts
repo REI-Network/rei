@@ -19,7 +19,7 @@ export class DiffLayer implements ISnapshot {
   readonly root: Buffer;
   readonly diffed: DiffBloom;
   readonly memory: number;
-  readonly parent: Snapshot;
+  parent: Snapshot;
 
   readonly destructSet: DestructSet;
   readonly accountData: AccountData;
@@ -81,7 +81,7 @@ export class DiffLayer implements ISnapshot {
   /**
    * Calculate new bloom based on parent bloom
    */
-  private rebloom() {
+  rebloom() {
     for (const hash of this.destructSet) {
       this.diffed.add(hash);
     }
@@ -190,7 +190,7 @@ export class DiffLayer implements ISnapshot {
   /**
    * Flatten everything into a single diff at the bottom
    */
-  private flatten(): Snapshot {
+  flatten(): Snapshot {
     if (this.parent instanceof DiskLayer) {
       // we're the first in line, return ourself
       return this;

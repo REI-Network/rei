@@ -161,7 +161,7 @@ function isStorageDataJournal(journal: any): journal is StorageDataJournal {
   return true;
 }
 
-function isDiffLayerJournal(journal: any): journal is DiffLayerJournal {
+export function isDiffLayerJournal(journal: any): journal is DiffLayerJournal {
   if (!Array.isArray(journal)) {
     return false;
   }
@@ -170,7 +170,7 @@ function isDiffLayerJournal(journal: any): journal is DiffLayerJournal {
     return false;
   }
 
-  if (!(journal[0] instanceof Buffer) || !isDestructSetJournal(journal[0]) || !isAccountDataJournal(journal[1]) || !isStorageDataJournal(journal[3])) {
+  if (!(journal[0] instanceof Buffer) || !isDestructSetJournal(journal[1]) || !isAccountDataJournal(journal[2]) || !isStorageDataJournal(journal[3])) {
     return false;
   }
 

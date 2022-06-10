@@ -65,11 +65,13 @@ export class TrieSync {
   private readonly memBatch = new SyncMemBatch();
   private readonly nodeReqs = new FunctionalBufferMap<SyncRequest>();
   private readonly codeReqs = new FunctionalBufferMap<SyncRequest>();
+  private verifyMode = false;
 
   private queue = new Heap({ compar: compareSyncRequest });
 
-  constructor(backend: TrieSyncBackend) {
+  constructor(backend: TrieSyncBackend, verifyMode?: boolean) {
     this.backend = backend;
+    verifyMode && (this.verifyMode = verifyMode);
   }
 
   get pending() {
@@ -117,11 +119,11 @@ export class TrieSync {
       return;
     }
 
-    if (this.memBatch.hasNode(hash)) {
+    if (this.memBatch.hasNode(hash) && !this.verifyMode) {
       return;
     }
 
-    if (await this.backend.hasTrieNode(hash)) {
+    if ((await this.backend.hasTrieNode(hash)) && !this.verifyMode) {
       return;
     }
 
@@ -156,11 +158,11 @@ export class TrieSync {
       return;
     }
 
-    if (this.memBatch.hasCode(hash)) {
+    if (this.memBatch.hasCode(hash) && !this.verifyMode) {
       return;
     }
 
-    if (await this.backend.hasCode(hash)) {
+    if ((await this.backend.hasCode(hash)) && !this.verifyMode) {
       return;
     }
 
@@ -282,11 +284,11 @@ export class TrieSync {
       } else {
         // the value is the hash of child node, try to queue it
         const hash = value as Buffer;
-        if (this.memBatch.hasNode(hash)) {
+        if (!this.verifyMode && this.memBatch.hasNode(hash)) {
           return [];
         }
 
-        if (await this.backend.hasTrieNode(hash)) {
+        if (!this.verifyMode && (await this.backend.hasTrieNode(hash))) {
           return [];
         }
 
@@ -348,10 +350,10 @@ export class TrieSync {
    */
   private _commit(req: SyncRequest) {
     if (req.code) {
-      this.memBatch.putCode(req.hash, req.data!);
+      !this.verifyMode && this.memBatch.putCode(req.hash, req.data!);
       this.codeReqs.delete(req.hash);
     } else {
-      this.memBatch.putNode(req.hash, req.data!);
+      !this.verifyMode && this.memBatch.putNode(req.hash, req.data!);
       this.nodeReqs.delete(req.hash);
     }
 

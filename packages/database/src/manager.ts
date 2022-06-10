@@ -467,6 +467,20 @@ export class DBManager {
   }
 
   /**
+   *
+   */
+  async getSnapRecoveryNumber(): Promise<BN | null> {
+    try {
+      return new BN((await this.get(DBTarget.SnapRecovery)).readBigUint64BE().toString());
+    } catch (err: any) {
+      if (err.type === 'NotFoundError') {
+        return null;
+      }
+      throw err;
+    }
+  }
+
+  /**
    * Get snapshot sync progress
    */
   async getSnapSyncProgress(): Promise<Buffer | null> {

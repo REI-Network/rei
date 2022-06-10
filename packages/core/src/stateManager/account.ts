@@ -46,6 +46,31 @@ export class StakingAccount extends Account {
     }
   }
 
+  public static fromRlpSlimSerializedAccount(serialized: Buffer) {
+    const values = rlp.decode(serialized);
+
+    if (!Array.isArray(values)) {
+      throw new Error('Invalid slimSerialized account input. Must be array');
+    }
+
+    return StakingAccount.fromSlimValuesArray(values);
+  }
+
+  public static fromSlimValuesArray(values: Buffer[]) {
+    let [nonce, balance, stateRoot, codeHash] = values;
+    if (stateRoot.equals(Buffer.from([]))) {
+      stateRoot = KECCAK256_RLP;
+    }
+    if (codeHash.equals(Buffer.from([]))) {
+      codeHash = KECCAK256_NULL;
+    }
+    if (values.length === 4) {
+      return new StakingAccount(new BN(nonce), new BN(balance), stateRoot, codeHash);
+    } else {
+      const stakeInfo = values[4] as unknown as Buffer[];
+      return new StakingAccount(new BN(nonce), new BN(balance), stateRoot, codeHash, stakeInfo ? StakeInfo.fromValuesArray(stakeInfo) : undefined);
+    }
+  }
   /**
    * This constructor assigns and validates the values.
    * Use the static factory methods to assist in creating an Account from varying data types.
@@ -81,16 +106,22 @@ export class StakingAccount extends Account {
   }
 
   /**
-   * Returns a Buffer Array of the raw Buffers for the slim account, in order.
+   * Returns a Buffer Array of the slim raw Buffers for the account, in order
    */
   slimRaw(): Buffer[] {
-    return this.raw(); // TODO: ...
+    const rawBuffer = [bnToUnpaddedBuffer(this.nonce), bnToUnpaddedBuffer(this.balance)];
+    rawBuffer.push(this.stateRoot.equals(KECCAK256_RLP) ? Buffer.from([]) : this.stateRoot);
+    rawBuffer.push(this.codeHash.equals(KECCAK256_NULL) ? Buffer.from([]) : this.codeHash);
+    if (this.stakeInfo && !this.stakeInfo.isEmpty()) {
+      rawBuffer.push(this.stakeInfo.raw() as unknown as Buffer);
+    }
+    return rawBuffer;
   }
 
   /**
    * Returns the RLP serialization of the slim account as a `Buffer`.
    */
   slimSerialize(): Buffer {
-    return this.serialize(); // TODO: ...
+    return rlp.encode(this.slimRaw());
   }
 }

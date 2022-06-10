@@ -185,6 +185,14 @@ export function DBSaveSnapRoot(root: Buffer) {
 }
 
 /**
+ * Create a operation to delete snapshot root
+ * @returns New operation
+ */
+export function DBDeleteSnapRoot() {
+  return DBOp.del(DBTarget.SnapRoot);
+}
+
+/**
  * Create a operation to save snapshot journal
  * @param journal
  * @returns New operation
@@ -194,6 +202,13 @@ export function DBSaveSnapJournal(journal: Buffer) {
 }
 
 /**
+ * Create a operation to delete snapshot journal
+ * @returns New operation
+ */
+export function DBDeleteSnapJournal() {
+  return DBOp.del(DBTarget.SnapJournal);
+}
+/**
  * Create a operation to save snapshot generator
  * @param generator
  * @returns New operation
@@ -202,6 +217,47 @@ export function DBSaveSnapGenerator(generator: Buffer) {
   return DBOp.set(DBTarget.SnapGenerator, generator);
 }
 
+/**
+ * Create a operation to delete snapshot generator
+ * @returns New operation
+ */
+export function DBDeleteSnapGenerator() {
+  return DBOp.del(DBTarget.SnapGenerator);
+}
+
+/**
+ * Create a operation to save snapshot disabled
+ * @returns New operation
+ */
+export function DBSaveSnapDisabled() {
+  return DBOp.set(DBTarget.SnapDisabled, ['42'.charCodeAt(0), '42'.charCodeAt(1)]);
+}
+
+/**
+ * Create a operation to delete snapshot disabled
+ * @returns
+ */
+export function DBDeleteSnapDisabled() {
+  return DBOp.del(DBTarget.SnapDisabled);
+}
+
+/**
+ * Create a operation to save snapshot recovery
+ * @returns
+ */
+export function DBSaveSnapRecoveryNumber(number: BN) {
+  const buf = Buffer.alloc(8);
+  buf.writeBigInt64BE(BigInt(number.toString()));
+  return DBOp.set(DBTarget.SnapRecovery, buf);
+}
+
+/**
+ * Create a operation to delete snapshot recovery
+ * @returns
+ */
+export function DBDeleteSnapRecoveryNumber() {
+  return DBOp.del(DBTarget.SnapRecovery);
+}
 /**
  * Create a operation to save snapshot sync progress
  * @param progress

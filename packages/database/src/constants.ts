@@ -100,7 +100,17 @@ export const SNAP_JOURNAL_KEY = Buffer.from('SnapshotJournal');
 export const SNAP_GENERATOR_KEY = Buffer.from('SnapshotGenerator');
 
 /**
- * snapshotSyncProgress
+ * snapshotRecoveryKey
+ */
+export const SNAP_RECOVERY_KEY = Buffer.from('SnapshotRecovery');
+
+/**
+ * snapshotDisableKey
+ */
+export const SNAP_DISABLED_KEY = Buffer.from('SnapshotDisabled');
+
+/**
+ *  snapshotSyncProgress
  */
 export const SNAP_SYNC_PROGRESS_KEY = Buffer.from('SnapshotSyncProgress');
 

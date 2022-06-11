@@ -40,7 +40,7 @@ export class SnapMessageFactory {
     return [intToBuffer(code), _snapmessage.raw()];
   }
 
-  static serializedMessage<T extends SnapMessage>(_snapmessage: T) {
+  static serializeMessage<T extends SnapMessage>(_snapmessage: T) {
     return rlp.encode(SnapMessageFactory.rawMessage(_snapmessage));
   }
 }

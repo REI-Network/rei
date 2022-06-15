@@ -12,7 +12,7 @@ import { asyncTraverseRawDB } from './layerIterator';
 import { journalProgress, loadSnapshot } from './journal';
 import { EMPTY_HASH, MAX_HASH } from '../utils';
 import { TrieSync } from '../sync/snap/trieSync';
-import { StakingAccount } from '../stateManager';
+import { Node } from '../node';
 
 const aggregatorMemoryLimit = 4 * 1024 * 1024;
 const idealBatchSize = 102400;
@@ -22,13 +22,14 @@ export class SnapTree {
   diskdb: Database;
   cache: number;
   layers: FunctionalBufferMap<Snapshot>;
+  node: Node;
   onFlatten?: Function; // Hook invoked when the bottom most diff layers are flattened
 
-  constructor(diskdb: Database, cache: number, root: Buffer, layers: FunctionalBufferMap<Snapshot>, onFlatten?: Function) {
+  constructor(diskdb: Database, cache: number, root: Buffer, node: Node) {
     this.diskdb = diskdb;
     this.cache = cache;
-    this.layers = layers;
-    this.onFlatten = onFlatten;
+    this.layers = new FunctionalBufferMap<Snapshot>();
+    this.node = node;
   }
 
   /**
@@ -40,34 +41,32 @@ export class SnapTree {
    * or the journal is missing, there are two repair cases:
    * - if the 'recovery' parameter is true, all memory diff-layers will be discarded.
    * - otherwise, the entire snapshot is considered invalid and will be recreated
-   * @param diskdb - Persistent database to store the snapshot
-   * @param cache - Megabytes permitted to use for read caches
    * @param root - Root hash
    * @param async - Rebuild snaptree async or not
    * @param rebuild - Rebuild or not
-   * @param recovery - Recovery snapshot
    * @param onFlatten - Hook invoked when the bottom most diff layers are flattened
    * @returns
    */
-  static async createSnapTree(diskdb: Database, cache: number, root: Buffer, async: boolean, rebuild: boolean, recovery: boolean, onFlatten?: Function) {
-    const layers = new FunctionalBufferMap<Snapshot>();
-    const snaptree = new SnapTree(diskdb, cache, root, layers, onFlatten);
+  async init(root: Buffer, async: boolean, rebuild: boolean, onFlatten?: Function) {
+    this.onFlatten = onFlatten;
+    const header = this.node.latestBlock.header;
+    const recoverNumber = await this.node.db.getSnapRecoveryNumber();
+    let recovery = false;
+    recovery = recoverNumber !== null && recoverNumber.gt(header.number);
     try {
-      let head: Snapshot | undefined = await loadSnapshot(diskdb, root, recovery);
+      let head: Snapshot | undefined = await loadSnapshot(this.diskdb, root, recovery);
       //TODO check disable
       while (head !== undefined) {
-        snaptree.layers.set(head.root, head);
+        this.layers.set(head.root, head);
         head = head.parent;
       }
-      return snaptree;
     } catch (error) {
       if (rebuild) {
         logger.warn('Failed to load snapshot, regenerating', 'err', error);
-        const generating = (await snaptree.rebuild(root)).generating;
+        const generating = (await this.rebuild(root)).generating;
         if (!async) {
           await generating;
         }
-        return snaptree;
       }
     }
   }

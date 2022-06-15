@@ -23,10 +23,12 @@ import { ReimintConsensusEngine, CliqueConsensusEngine } from './consensus';
 import { isEnableRemint } from './hardforks';
 import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
 import { StateManager } from './stateManager';
+import { SnapTree } from './snap/snapTree';
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;
 const defaultChainName = 'rei-mainnet';
+const defaultSnapTreeLimit = 256;
 
 type PendingTxs = {
   txs: Transaction[];
@@ -63,6 +65,8 @@ export class Node {
   readonly reimint: ReimintConsensusEngine;
   readonly clique: CliqueConsensusEngine;
   readonly receiptsCache: ReceiptsCache;
+
+  public snaptree: SnapTree;
 
   private initPromise?: Promise<void>;
   private pendingTxsLoopPromise?: Promise<void>;
@@ -130,6 +134,7 @@ export class Node {
     this.txSync = new TxFetcher(this);
     this.bcMonitor = new BlockchainMonitor(this.db);
     this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ db: this.db });
+    this.snaptree = new SnapTree(this.db, defaultSnapTreeLimit, this.blockchain.latestBlock.header.stateRoot, this);
   }
 
   /**
@@ -180,6 +185,7 @@ export class Node {
       await this.bcMonitor.init(this.latestBlock.header);
       await this.networkdb.open();
       await this.networkMngr.init();
+      await this.snaptree.init(this.latestBlock.header.stateRoot, false, true);
     })());
   }
 

@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { keccak256, rlp, bufferToInt } from 'ethereumjs-util';
+import { keccak256, rlp, bufferToInt, BN } from 'ethereumjs-util';
 import { BaseTrie } from 'merkle-patricia-tree';
 import { LeafNode } from 'merkle-patricia-tree/dist/trieNode';
 import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
@@ -13,12 +13,18 @@ import { EMPTY_HASH, DBatch } from '../../src/utils';
 import { isDiffLayerJournal } from '../../src/snap/journal';
 import { TrieNodeIterator } from '../../src/snap/trieIterator';
 
+class MockNode {
+  public latestBlock: { header: { number: BN } } = { header: { number: new BN(1) } };
+  public db: { getSnapRecoveryNumber: any } = { getSnapRecoveryNumber: async () => new BN(0) };
+}
+
 const level = require('level-mem');
 const common = new Common({ chain: 'rei-devnet' });
 common.setHardforkByBlockNumber(0);
 const cache = 100;
 const db = new Database(level(), common);
 const anotherDB = new Database(level(), common);
+const node = new MockNode();
 const async = true;
 const rebuild = true;
 const recovery = true;
@@ -89,7 +95,9 @@ describe('SnapshotTree', () => {
     accounts = rootAndAccounts.accounts;
     diskLayer = new DiskLayer(db, root);
     layers.push({ layer: diskLayer, accounts });
-    snaptree = (await SnapTree.createSnapTree(db, cache, root, async, rebuild, recovery))!;
+    snaptree = new SnapTree(db, cache, root, node as any);
+    await snaptree.init(root, async, rebuild);
+    // snaptree = (await SnapTree.createSnapTree(db, cache, root, async, rebuild, recovery))!;
     let count = 64;
     for (let i = 0; i < 6; i++) {
       const latest = layers[layers.length - 1];
@@ -257,7 +265,7 @@ describe('SnapshotTree', () => {
 
     //delete slot from snap
     const deletedStoragHash = Array.from(layers[0].accounts[0].storageData.keys())[0];
-    dbop = DBDeleteSnapStorage(deletedAccountHash, deletedStoragHash);
+    dbop = DBDeleteSnapStorage(deletedAccountHash, deletedStoragHash as Buffer);
     await operateSnap(dbop);
     verifiedResult = await snaptree.verify(root);
     expect(verifiedResult === false, 'Snap should not pass the verify').be.true;
@@ -288,7 +296,8 @@ describe('SnapshotTree', () => {
   });
 
   it('should disable correctly', async () => {
-    anothorSnaptree = (await SnapTree.createSnapTree(anotherDB, cache, root, async, rebuild, recovery))!;
+    anothorSnaptree = new SnapTree(anotherDB, cache, root, node as any);
+    await anothorSnaptree.init(root, async, rebuild);
     for (let i = 1; i < layers.length; i++) {
       anothorSnaptree.update(layers[i].layer.root, layers[i - 1].layer.root, (layers[i].layer as DiffLayer).accountData, (layers[i].layer as DiffLayer).destructSet, (layers[i].layer as DiffLayer).storageData);
     }

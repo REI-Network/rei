@@ -1,4 +1,5 @@
 import { bufferToInt, rlp, BN, intToBuffer, bnToUnpaddedBuffer } from 'ethereumjs-util';
+import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { mustParseTransction, Transaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@rei-network/structure';
 import { logger, Channel, FunctionalBufferSet } from '@rei-network/utils';
 import { ProtocolHandler, Peer } from '@rei-network/network';
@@ -46,41 +47,52 @@ export class SnapProtocolHandler implements ProtocolHandler {
     const code = s.SnapMessageFactory.registry.getCodeByInstance(msg);
     const request = this.waitingRequests.get(code);
     if (msg instanceof s.GetAccountRange) {
-      this.applyGetAccountRange(msg);
-    } else if (msg instanceof s.AccountRange) {
-      this.applyAccountRange(msg);
+      await this.applyGetAccountRange(msg);
     } else if (msg instanceof s.GetStorageRange) {
-      this.applyGetStorageRange(msg);
-    } else if (msg instanceof s.StorageRange) {
-      this.applyStorageRange(msg);
+      await this.applyGetStorageRange(msg);
     } else if (msg instanceof s.GetByteCode) {
-      this.applyGetByteCode(msg);
-    } else if (msg instanceof s.ByteCode) {
-      this.applyByteCode(msg);
+      await this.applyGetByteCode(msg);
     } else if (msg instanceof s.GetTrieNode) {
-      this.applyGetTrieNode(msg);
-    } else if (msg instanceof s.TrieNode) {
-      this.applyTrieNode(msg);
+      await this.applyGetTrieNode(msg);
     }
   }
 
-  private applyGetAccountRange(msg: s.GetAccountRange) {
-    this.node;
+  private async applyGetAccountRange(msg: s.GetAccountRange) {
+    const [root, start, limit, responseBytes] = msg.raw();
+    const accountHash: Buffer[] = [];
+    const accountBody: Buffer[] = [];
+    const proofs: Buffer[][] = [];
+    for await (const { hash, getValue } of this.node.snaptree.accountIterator(root as Buffer, start as Buffer)) {
+      if (hash.equals(limit as Buffer)) {
+        break;
+      }
+      accountHash.push(hash);
+      const account = getValue();
+      accountBody.push(account?.slimSerialize() ?? Buffer.alloc(0));
+      proofs.push(await Trie.createProof(new Trie(this.node.db.rawdb, account?.stateRoot), hash));
+    }
+    this.send(new s.AccountRange(accountHash, accountBody, proofs));
   }
 
-  private applyAccountRange(msg: s.AccountRange) {}
+  private async applyGetStorageRange(msg: s.GetStorageRange) {
+    const [root, accountHash, startHash, limitHash, responseBytes] = msg.raw();
+    const storageHash: Buffer[] = [];
+    const storageBody: Buffer[] = [];
+    const proofs: Buffer[][] = [];
+    // for await (const { hash, getValue } of this.node.snaptree.storageIterator(root as Buffer, accountHash as Buffer, startHash as Buffer)) {
+    //   if (hash.equals(limitHash as Buffer)) {
+    //     break;
+    //   }
+    //   storageHash.push(hash);
+    //   const storage = getValue();
+    //   storageBody.push(storage?.slimSerialize() ?? Buffer.alloc(0));
+    //   proofs.push(await Trie.createProof(new Trie(this.node.db.rawdb, storage?.stateRoot), hash));
+    // }
+  }
 
-  private applyGetStorageRange(msg: s.GetStorageRange) {}
+  private async applyGetByteCode(msg: s.GetByteCode) {}
 
-  private applyStorageRange(msg: s.StorageRange) {}
-
-  private applyGetByteCode(msg: s.GetByteCode) {}
-
-  private applyByteCode(msg: s.ByteCode) {}
-
-  private applyGetTrieNode(msg: s.GetTrieNode) {}
-
-  private applyTrieNode(msg: s.TrieNode) {}
+  private async applyGetTrieNode(msg: s.GetTrieNode) {}
 
   /**
    * {@link ProtocolHandler.handshake}

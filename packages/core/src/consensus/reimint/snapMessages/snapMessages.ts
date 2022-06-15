@@ -12,11 +12,13 @@ export class GetAccountRange implements SnapMessage {
   readonly root: Buffer;
   readonly startHash: Buffer;
   readonly limitHash: Buffer;
+  readonly responseBytes: number;
 
-  constructor(root: Buffer, start: Buffer, limit: Buffer) {
+  constructor(root: Buffer, start: Buffer, limit: Buffer, responseBytes: number) {
     this.root = root;
     this.startHash = start;
     this.limitHash = limit;
+    this.responseBytes = responseBytes;
     this.validateBasic();
   }
 
@@ -27,11 +29,11 @@ export class GetAccountRange implements SnapMessage {
     if (values.length !== 2) {
       throw new Error('invalid values');
     }
-    return new GetAccountRange(values[0], values[1], values[2]);
+    return new GetAccountRange(values[0], values[1], values[2], bufferToInt(values[3]));
   }
 
   raw() {
-    return [this.root, this.startHash, this.limitHash];
+    return [this.root, this.startHash, this.limitHash, ...intToBuffer(this.responseBytes)];
   }
 
   serialize() {
@@ -44,9 +46,9 @@ export class GetAccountRange implements SnapMessage {
 export class AccountRange implements SnapMessage {
   readonly accountHash: Buffer[];
   readonly accountBody: Buffer[];
-  readonly proofs: Buffer[];
+  readonly proofs: Buffer[][];
 
-  constructor(accountHash: Buffer[], accountBody: Buffer[], proofs: Buffer[]) {
+  constructor(accountHash: Buffer[], accountBody: Buffer[], proofs: Buffer[][]) {
     this.accountHash = accountHash;
     this.accountBody = accountBody;
     this.proofs = proofs;
@@ -54,11 +56,11 @@ export class AccountRange implements SnapMessage {
 
   static readonly code = 1;
 
-  static fromValuesArray(values: Buffer[][]) {
+  static fromValuesArray(values: Buffer[][][]) {
     if (values.length !== 3) {
       throw new Error('invalid values');
     }
-    return new AccountRange(values[0], values[1], values[2]);
+    return new AccountRange(values[0][0], values[1][0], values[2]);
   }
   raw() {
     return [[...this.accountHash], [...this.accountBody], [...this.proofs]];

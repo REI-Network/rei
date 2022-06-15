@@ -10,6 +10,11 @@ import { StateManager, StakingAccount } from '../../src/stateManager';
 import { SnapTree } from '../../src/snap/snapTree';
 import { genRandomAccounts } from '../snap/util';
 
+class MockNode {
+  public latestBlock: { header: { number: BN } } = { header: { number: new BN(1) } };
+  public db: { getSnapRecoveryNumber: any } = { getSnapRecoveryNumber: async () => new BN(0) };
+}
+
 function compareBufferMaps(map1: FunctionalBufferMap<Buffer>, map2: FunctionalBufferMap<Buffer>) {
   if (map1.size !== map2.size) {
     return false;
@@ -61,7 +66,9 @@ describe('StateManager', () => {
     const recovery = true;
     const rootAndAccounts = await genRandomAccounts(db, 0, 0);
     const root = rootAndAccounts.root;
-    let snapTreeTemp = await SnapTree.createSnapTree(db, cache, root, async, rebuild, recovery);
+    const node = new MockNode();
+    let snapTreeTemp = new SnapTree(db, cache, root, node as any);
+    await snapTreeTemp.init(root, async, rebuild);
     snapTree = snapTreeTemp as MockSnapTree;
     stateManager = new StateManager({
       common: common,

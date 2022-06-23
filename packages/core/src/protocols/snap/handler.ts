@@ -11,6 +11,7 @@ import { KVIterator } from '../../snap/trieIterator';
 const softResponseLimit = 2 * 1024 * 1024;
 const maxCodeLookups = 1024;
 const maxTrieNodeLookups = 1024;
+const stateLookupSlack = 0.1;
 
 export class SnapProtocolHandler implements ProtocolHandler {
   readonly peer: Peer;
@@ -51,97 +52,91 @@ export class SnapProtocolHandler implements ProtocolHandler {
   }
 
   private async applyGetAccountRange(msg: s.GetAccountRange) {
-    const root = msg.root;
-    const start = msg.startHash;
     const limit = msg.limitHash;
-    let responseBytes = msg.responseBytes;
-    if (responseBytes > softResponseLimit) {
-      responseBytes = softResponseLimit;
-    }
+    const responseLimit = msg.responseLimit > softResponseLimit ? softResponseLimit : msg.responseLimit;
     const accountData: Buffer[][] = [];
     const proofs: Buffer[][] = [];
     let size = 0;
-    let last = EMPTY_HASH;
-    let lastAccount;
-    for await (const { hash, getValue } of this.node.snaptree.accountIterator(root, start)) {
-      last = hash;
-      lastAccount = getValue();
+    let last: Buffer | undefined = undefined;
+    const fastIter = this.node.snaptree.accountIterator(msg.rootHash, msg.startHash);
+    await fastIter.init();
 
-      if (hash.equals(start)) {
-        proofs.push(await Trie.createProof(new Trie(this.node.db.rawdb, lastAccount?.stateRoot), start));
-      }
-      accountData.push([hash, lastAccount?.slimSerialize() ?? Buffer.alloc(0)]);
-      size += (lastAccount as StakingAccount).serialize().length;
-      if (hash.compare(limit) > 0) {
+    for await (const { hash, value } of fastIter) {
+      last = hash;
+      size += hash.length + value.slimSerialize().length;
+      accountData.push([hash, value.slimSerialize()]);
+
+      if (hash.compare(limit) >= 0) {
         break;
       }
-      if (size > responseBytes) {
+      if (size > responseLimit) {
         break;
       }
     }
-    if (!last.equals(EMPTY_HASH)) {
-      proofs.push(await Trie.createProof(new Trie(this.node.db.rawdb, lastAccount?.stateRoot), last));
+    const accTrie = new Trie(this.node.db.rawdb, msg.rootHash);
+    proofs.push(await Trie.createProof(accTrie, msg.startHash));
+    if (last) {
+      proofs.push(await Trie.createProof(accTrie, last));
     }
     this.send(new s.AccountRange(accountData, proofs));
   }
 
   private async applyGetStorageRange(msg: s.GetStorageRange) {
-    const root = msg.rootHash;
-    const accountHashes = msg.accountHashes;
-    const startHash = msg.startingHash;
-    const limitHash = msg.limitHash;
-    let responseBytes = msg.responseBytes;
-
+    const responseLimit = msg.responseLimit > softResponseLimit ? softResponseLimit : msg.responseLimit;
+    const hardLimit = responseLimit * (1 + stateLookupSlack);
     const empty = Buffer.concat([EMPTY_HASH, EMPTY_HASH]);
     const max = Buffer.concat([MAX_HASH, MAX_HASH]);
-    const origin = startHash.length > 0 ? startHash : empty;
-    const limit = limitHash.length > 0 ? limitHash : max;
-    if (responseBytes > softResponseLimit) {
-      responseBytes = softResponseLimit;
-    }
+    const origin = msg.startHash.length > 0 ? msg.startHash : empty;
+    const limit = msg.limitHash.length > 0 ? msg.limitHash : max;
     let size = 0;
 
-    const storage: Buffer[][][] = [];
+    const slots: Buffer[][][] = [];
     const proofs: Buffer[][] = [];
-    for (let i = 0; i < accountHashes.length; i++) {
-      if (size > responseBytes) {
+    for (let i = 0; i < msg.accountHashes.length; i++) {
+      if (size > responseLimit) {
         break;
       }
-      const slots: Buffer[][] = [];
-      let last = EMPTY_HASH;
+
+      const storage: Buffer[][] = [];
+      let last: Buffer | undefined = undefined;
       let abort = false;
-      const { iter, destructed } = this.node.snaptree.storageIterator(root, accountHashes[i], origin);
-      for await (const { hash, getValue } of iter) {
-        if (size > responseBytes) {
+      const fastIter = this.node.snaptree.storageIterator(msg.rootHash, msg.accountHashes[i], origin);
+      await fastIter.init();
+      for await (const { hash, value } of fastIter) {
+        if (size > hardLimit) {
           abort = true;
           break;
         }
         last = hash;
-        slots.push([hash, getValue()]);
-        size += hash.length + getValue().length;
-        if (hash.compare(limit) > 1) {
+        storage.push([hash, value]);
+        size += hash.length + value.length;
+        if (hash.compare(limit) >= 0) {
           break;
         }
       }
-      storage.push(slots);
+      if (storage.length > 0) {
+        slots.push(storage);
+      }
 
       if (!origin.equals(empty) || (abort && slots.length > 0)) {
-        const accTrie = new Trie(this.node.db.rawdb, accountHashes[i]);
-        const account = await accTrie.get(accountHashes[i], true);
+        const accTrie = new Trie(this.node.db.rawdb, msg.rootHash);
+        const account = await accTrie.get(msg.accountHashes[i], true);
         const stTrie = new Trie(this.node.db.rawdb, StakingAccount.fromRlpSerializedAccount(account as Buffer).stateRoot);
         proofs.push(await Trie.createProof(stTrie, origin));
-        proofs.push(await Trie.createProof(stTrie, last));
+        if (last) {
+          proofs.push(await Trie.createProof(stTrie, last));
+        }
       }
     }
-    this.send(new s.StorageRange(storage, proofs));
+    this.send(new s.StorageRange(slots, proofs));
   }
 
   private async applyGetByteCode(msg: s.GetByteCode) {
     const hashes = msg.hashes;
     const codesHash: Buffer[] = [];
-    let responseBytes = msg.responseBytes;
-    if (responseBytes > softResponseLimit) {
-      responseBytes = softResponseLimit;
+    let responseLimit = msg.responseLimit;
+    if (responseLimit > softResponseLimit) {
+      responseLimit = softResponseLimit;
     }
     if (hashes.length > maxCodeLookups) {
       hashes.splice(maxCodeLookups);
@@ -157,7 +152,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
         codesHash.push(code);
         size += code.length;
       }
-      if (size > responseBytes) {
+      if (size > responseLimit) {
         break;
       }
     }
@@ -167,9 +162,9 @@ export class SnapProtocolHandler implements ProtocolHandler {
   private async applyGetTrieNode(msg: s.GetTrieNode) {
     const rootHash = msg.rootHash;
     const paths = msg.paths;
-    let responseBytes = msg.responseBytes;
-    if (responseBytes > softResponseLimit) {
-      responseBytes = softResponseLimit;
+    let responseLimit = msg.responseLimit;
+    if (responseLimit > softResponseLimit) {
+      responseLimit = softResponseLimit;
     }
 
     const accTrie = new Trie(this.node.db.rawdb, rootHash);
@@ -203,7 +198,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
           size += (node as Buffer).length;
         }
       }
-      if (size > responseBytes) {
+      if (size > responseLimit) {
         break;
       }
     }

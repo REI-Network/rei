@@ -13,6 +13,7 @@ import { journalProgress, loadSnapshot } from './journal';
 import { EMPTY_HASH, MAX_HASH } from '../utils';
 import { TrieSync } from '../sync/snap/trieSync';
 import { Node } from '../node';
+import { FastSnapIterator } from './fastIterator';
 
 const aggregatorMemoryLimit = 4 * 1024 * 1024;
 const idealBatchSize = 102400;
@@ -411,7 +412,13 @@ export class SnapTree {
     if (snap === undefined) {
       throw new Error(`unknown snapshot,root: ${root}`);
     }
-    return snap.genAccountIterator(seek);
+
+    return new FastSnapIterator(snap, (snap) => {
+      return {
+        iter: snap.genAccountIterator(seek),
+        stop: false
+      };
+    });
   }
 
   /**
@@ -431,7 +438,14 @@ export class SnapTree {
     if (snap === undefined) {
       throw new Error(`unknown snapshot,root: ${root}`);
     }
-    return snap.genStorageIterator(account, seek);
+
+    return new FastSnapIterator(snap, (snap) => {
+      const { iter, destructed } = snap.genStorageIterator(account, seek);
+      return {
+        iter,
+        stop: destructed
+      };
+    });
   }
 
   async verify(root: Buffer) {

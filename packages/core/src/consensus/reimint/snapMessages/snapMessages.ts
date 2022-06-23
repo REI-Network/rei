@@ -9,16 +9,16 @@ export interface SnapMessage {
 }
 
 export class GetAccountRange implements SnapMessage {
-  readonly root: Buffer;
+  readonly rootHash: Buffer;
   readonly startHash: Buffer;
   readonly limitHash: Buffer;
-  readonly responseBytes: number;
+  readonly responseLimit: number;
 
-  constructor(root: Buffer, start: Buffer, limit: Buffer, responseBytes: number) {
-    this.root = root;
-    this.startHash = start;
-    this.limitHash = limit;
-    this.responseBytes = responseBytes;
+  constructor(rootHash: Buffer, startHash: Buffer, limitHash: Buffer, responseLimit: number) {
+    this.rootHash = rootHash;
+    this.startHash = startHash;
+    this.limitHash = limitHash;
+    this.responseLimit = responseLimit;
     this.validateBasic();
   }
 
@@ -32,7 +32,7 @@ export class GetAccountRange implements SnapMessage {
   }
 
   raw() {
-    return [this.root, this.startHash, this.limitHash, ...intToBuffer(this.responseBytes)];
+    return [this.rootHash, this.startHash, this.limitHash, ...intToBuffer(this.responseLimit)];
   }
 
   serialize() {
@@ -73,16 +73,16 @@ export class AccountRange implements SnapMessage {
 export class GetStorageRange implements SnapMessage {
   readonly rootHash: Buffer;
   readonly accountHashes: Buffer[];
-  readonly startingHash: Buffer;
+  readonly startHash: Buffer;
   readonly limitHash: Buffer;
-  readonly responseBytes: number;
+  readonly responseLimit: number;
 
-  constructor(rootHash: Buffer, accountHashes: Buffer[], startingHash: Buffer, limitHash: Buffer, responseBytes: number) {
+  constructor(rootHash: Buffer, accountHashes: Buffer[], startHash: Buffer, limitHash: Buffer, responseLimit: number) {
     this.rootHash = rootHash;
     this.accountHashes = accountHashes;
-    this.startingHash = startingHash;
+    this.startHash = startHash;
     this.limitHash = limitHash;
-    this.responseBytes = responseBytes;
+    this.responseLimit = responseLimit;
     this.validateBasic();
   }
 
@@ -96,7 +96,7 @@ export class GetStorageRange implements SnapMessage {
   }
 
   raw() {
-    return [[...this.rootHash], [...this.accountHashes], [...this.startingHash], [...this.limitHash], [...intToBuffer(this.responseBytes)]];
+    return [[...this.rootHash], [...this.accountHashes], [...this.startHash], [...this.limitHash], [...intToBuffer(this.responseLimit)]];
   }
 
   serialize(): Buffer {
@@ -134,11 +134,11 @@ export class StorageRange implements SnapMessage {
 
 export class GetByteCode implements SnapMessage {
   readonly hashes: Buffer[];
-  readonly responseBytes: number;
+  readonly responseLimit: number;
 
-  constructor(hashes: Buffer[], responseBytes: number) {
+  constructor(hashes: Buffer[], responseLimit: number) {
     this.hashes = hashes;
-    this.responseBytes = responseBytes;
+    this.responseLimit = responseLimit;
     this.validateBasic();
   }
 
@@ -149,7 +149,7 @@ export class GetByteCode implements SnapMessage {
   }
 
   raw() {
-    return [[...this.hashes], [...intToBuffer(this.responseBytes)]];
+    return [[...this.hashes], [...intToBuffer(this.responseLimit)]];
   }
 
   serialize(): Buffer {
@@ -159,10 +159,10 @@ export class GetByteCode implements SnapMessage {
 }
 
 export class ByteCode implements SnapMessage {
-  readonly codesHash: Buffer[];
+  readonly codesHashes: Buffer[];
 
-  constructor(codeHash: Buffer[]) {
-    this.codesHash = codeHash;
+  constructor(codeHashes: Buffer[]) {
+    this.codesHashes = codeHashes;
     this.validateBasic();
   }
 
@@ -172,7 +172,7 @@ export class ByteCode implements SnapMessage {
   }
 
   raw() {
-    return [...this.codesHash];
+    return [...this.codesHashes];
   }
 
   serialize(): Buffer {
@@ -185,12 +185,12 @@ export class ByteCode implements SnapMessage {
 export class GetTrieNode implements SnapMessage {
   readonly rootHash: Buffer;
   readonly paths: Buffer[][];
-  readonly responseBytes: number;
+  readonly responseLimit: number;
 
-  constructor(rootHash: Buffer, paths: Buffer[][], responseBytes: number) {
+  constructor(rootHash: Buffer, paths: Buffer[][], responseLimit: number) {
     this.rootHash = rootHash;
     this.paths = paths;
-    this.responseBytes = responseBytes;
+    this.responseLimit = responseLimit;
     this.validateBasic();
   }
 
@@ -201,7 +201,7 @@ export class GetTrieNode implements SnapMessage {
   }
 
   raw() {
-    return [[[...this.rootHash]], [...this.paths], [[...intToBuffer(this.responseBytes)]]];
+    return [[[...this.rootHash]], [...this.paths], [[...intToBuffer(this.responseLimit)]]];
   }
 
   serialize(): Buffer {

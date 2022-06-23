@@ -2,7 +2,7 @@ import { BN, bnToUnpaddedBuffer, bufferToInt, intToBuffer, rlp } from 'ethereumj
 import { StakingAccount } from '../../../stateManager';
 
 export interface SnapMessage {
-  response?: number;
+  code?: number;
   raw(): any;
   serialize(): Buffer;
   validateBasic(): void;
@@ -23,7 +23,6 @@ export class GetAccountRange implements SnapMessage {
   }
 
   static readonly code = 0;
-  static readonly response = 1;
 
   static fromValuesArray(values: Buffer[]) {
     if (values.length !== 2) {
@@ -44,13 +43,11 @@ export class GetAccountRange implements SnapMessage {
 }
 
 export class AccountRange implements SnapMessage {
-  readonly accountHash: Buffer[];
-  readonly accountBody: Buffer[];
+  readonly accountData: Buffer[][] = [];
   readonly proofs: Buffer[][];
 
-  constructor(accountHash: Buffer[], accountBody: Buffer[], proofs: Buffer[][]) {
-    this.accountHash = accountHash;
-    this.accountBody = accountBody;
+  constructor(accountData: Buffer[][], proofs: Buffer[][]) {
+    this.accountData = accountData;
     this.proofs = proofs;
   }
 
@@ -60,21 +57,17 @@ export class AccountRange implements SnapMessage {
     if (values.length !== 3) {
       throw new Error('invalid values');
     }
-    return new AccountRange(values[0][0], values[1][0], values[2]);
+    return new AccountRange(values[0], values[1]);
   }
   raw() {
-    return [[...this.accountHash], [...this.accountBody], [...this.proofs]];
+    return [[...this.accountData], [...this.proofs]];
   }
 
   serialize(): Buffer {
     return rlp.encode(this.raw());
   }
 
-  validateBasic(): void {
-    if (this.accountHash.length !== this.accountBody.length) {
-      throw new Error('invaild accountHash and accountBody count');
-    }
-  }
+  validateBasic(): void {}
 }
 
 export class GetStorageRange implements SnapMessage {
@@ -94,7 +87,6 @@ export class GetStorageRange implements SnapMessage {
   }
 
   static readonly code = 2;
-  static readonly response = 3;
 
   static fromValuesArray(values: Buffer[][]) {
     if (values.length !== 3) {
@@ -115,56 +107,49 @@ export class GetStorageRange implements SnapMessage {
 }
 
 export class StorageRange implements SnapMessage {
-  readonly slotHashes: Buffer[];
-  readonly slotData: Buffer[];
-  readonly proof: Buffer[];
+  readonly storage: Buffer[][][] = [];
+  readonly proof: Buffer[][];
   static readonly code = 3;
 
-  constructor(slotHashes: Buffer[], slotData: Buffer[], proof: Buffer[]) {
-    this.slotHashes = slotHashes;
-    this.slotData = slotData;
+  constructor(storage: Buffer[][][], proof: Buffer[][]) {
+    this.storage = storage;
     this.proof = proof;
     this.validateBasic();
   }
 
-  static fromValuesArray(values: Buffer[][]) {
-    return new StorageRange(values[0], values[1], values[2]);
+  static fromValuesArray(values: Buffer[][][][]) {
+    return new StorageRange(values[0], values[1][0]);
   }
 
   raw() {
-    return [[...this.slotHashes], [...this.slotData], [...this.proof]];
+    return [[...this.storage], [...this.proof]];
   }
 
   serialize(): Buffer {
     return rlp.encode(this.raw());
   }
 
-  validateBasic(): void {
-    if (this.slotData.length !== this.slotHashes.length) {
-      throw new Error('invaild slotHash and slotData count');
-    }
-  }
+  validateBasic(): void {}
 }
 
 export class GetByteCode implements SnapMessage {
   readonly hashes: Buffer[];
-  readonly bytes: number;
+  readonly responseBytes: number;
 
-  constructor(hashes: Buffer[], bytes: number) {
+  constructor(hashes: Buffer[], responseBytes: number) {
     this.hashes = hashes;
-    this.bytes = bytes;
+    this.responseBytes = responseBytes;
     this.validateBasic();
   }
 
   static readonly code = 4;
-  static readonly response = 5;
 
   static fromValuesArray(values: Buffer[][]) {
     return new GetByteCode(values[0], bufferToInt(values[1][0]));
   }
 
   raw() {
-    return [[...this.hashes], [...intToBuffer(this.bytes)]];
+    return [[...this.hashes], [...intToBuffer(this.responseBytes)]];
   }
 
   serialize(): Buffer {
@@ -200,24 +185,23 @@ export class ByteCode implements SnapMessage {
 export class GetTrieNode implements SnapMessage {
   readonly rootHash: Buffer;
   readonly paths: Buffer[][];
-  readonly bytes: number;
+  readonly responseBytes: number;
 
-  constructor(rootHash: Buffer, paths: Buffer[][], bytes: number) {
+  constructor(rootHash: Buffer, paths: Buffer[][], responseBytes: number) {
     this.rootHash = rootHash;
     this.paths = paths;
-    this.bytes = bytes;
+    this.responseBytes = responseBytes;
     this.validateBasic();
   }
 
   static readonly code = 6;
-  static readonly response = 7;
 
   static fromValuesArray(values: Buffer[][][]) {
     return new GetTrieNode(values[0][0][1], values[1], bufferToInt(values[2][0][0]));
   }
 
   raw() {
-    return [[[...this.rootHash]], [...this.paths], [[...intToBuffer(this.bytes)]]];
+    return [[[...this.rootHash]], [...this.paths], [[...intToBuffer(this.responseBytes)]]];
   }
 
   serialize(): Buffer {
@@ -228,16 +212,16 @@ export class GetTrieNode implements SnapMessage {
 }
 
 export class TrieNode implements SnapMessage {
-  readonly nodes: Buffer[][];
+  readonly nodes: Buffer[];
 
-  constructor(nodes: Buffer[][]) {
+  constructor(nodes: Buffer[]) {
     this.nodes = nodes;
     this.validateBasic();
   }
 
   static readonly code = 7;
 
-  static fromValuesArray(values: Buffer[][]) {
+  static fromValuesArray(values: Buffer[]) {
     return new TrieNode(values);
   }
 

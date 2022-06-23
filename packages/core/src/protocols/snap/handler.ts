@@ -63,9 +63,9 @@ export class SnapProtocolHandler implements ProtocolHandler {
 
     for await (const { hash, value } of fastIter) {
       last = hash;
-      const slimSerializeValue = value.slimSerialize();
-      size += hash.length + slimSerializeValue.length;
-      accountData.push([hash, slimSerializeValue]);
+      const slimSerializedValue = value.slimSerialize();
+      size += hash.length + slimSerializedValue.length;
+      accountData.push([hash, slimSerializedValue]);
 
       if (hash.compare(limit) >= 0) {
         break;
@@ -87,8 +87,8 @@ export class SnapProtocolHandler implements ProtocolHandler {
     const hardLimit = responseLimit * (1 + stateLookupSlack);
     const empty = Buffer.concat([EMPTY_HASH, EMPTY_HASH]);
     const max = Buffer.concat([MAX_HASH, MAX_HASH]);
-    const origin = msg.startHash.length > 0 ? msg.startHash : empty;
-    const limit = msg.limitHash.length > 0 ? msg.limitHash : max;
+    let startHash: Buffer | undefined = msg.startHash;
+    let limitHash: Buffer | undefined = msg.limitHash;
     let size = 0;
 
     const slots: Buffer[][][] = [];
@@ -96,6 +96,17 @@ export class SnapProtocolHandler implements ProtocolHandler {
     for (let i = 0; i < msg.accountHashes.length; i++) {
       if (size > responseLimit) {
         break;
+      }
+
+      let origin = empty;
+      if (startHash) {
+        origin = startHash;
+        startHash = undefined;
+      }
+      let limit = max;
+      if (limitHash) {
+        limit = limitHash;
+        limitHash = undefined;
       }
 
       const storage: Buffer[][] = [];

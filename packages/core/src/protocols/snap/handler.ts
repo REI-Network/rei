@@ -63,8 +63,9 @@ export class SnapProtocolHandler implements ProtocolHandler {
 
     for await (const { hash, value } of fastIter) {
       last = hash;
-      size += hash.length + value.slimSerialize().length;
-      accountData.push([hash, value.slimSerialize()]);
+      const slimSerializeValue = value.slimSerialize();
+      size += hash.length + slimSerializeValue.length;
+      accountData.push([hash, slimSerializeValue]);
 
       if (hash.compare(limit) >= 0) {
         break;

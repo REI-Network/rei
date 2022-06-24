@@ -22,6 +22,8 @@ export interface TraceConfig {
   timeout?: string;
   // Use ast to convert synchronous functions to asynchronous, default `true`.
   toAsync?: boolean;
+  // The number of running vm scripts in batches, default 500.
+  vmScriptsBatchSize?: number;
 }
 
 /**

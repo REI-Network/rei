@@ -333,17 +333,21 @@ export class ETHController extends Controller {
     if (!query) {
       return [];
     }
-    let { fromBlock: from, toBlock: to, addresses, topics } = query;
-    from = from ? from : await this.getBlockNumberByTag('latest');
-    to = to ? to : await this.getBlockNumberByTag('latest');
+    const { fromBlock, toBlock, addresses, topics } = query;
+    const from = await this.getBlockNumberByTag(fromBlock ?? 'latest');
+    const to = await this.getBlockNumberByTag(toBlock ?? 'latest');
+    if (to.sub(from).gtn(5000)) {
+      helper.throwRpcErr('eth_getFilterLogs, too many block, max limit is 5000');
+    }
+
     const filter = this.backend.getFilter();
     const logs = await filter.filterRange(from, to, addresses, topics);
     return logs.map((log) => log.toRPCJSON());
   }
   async eth_getLogs([{ fromBlock, toBlock, address: _addresses, topics: _topics, blockhash }]: [{ fromBlock?: string; toBlock?: string; address?: string | string[]; topics?: TopicsData; blockhash?: string }]) {
-    const from = await this.getBlockNumberByTag(fromBlock ? fromBlock : 'latest');
-    const to = await this.getBlockNumberByTag(toBlock ? toBlock : 'latest');
-    if (from.sub(to).gtn(5000)) {
+    const from = await this.getBlockNumberByTag(fromBlock ?? 'latest');
+    const to = await this.getBlockNumberByTag(toBlock ?? 'latest');
+    if (to.sub(from).gtn(5000)) {
       helper.throwRpcErr('eth_getLogs, too many block, max limit is 5000');
     }
 

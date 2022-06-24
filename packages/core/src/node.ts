@@ -48,7 +48,6 @@ export class Node {
   readonly nodedb: LevelUp;
   readonly chaindb: LevelUp;
   readonly evidencedb: LevelUp;
-  readonly networkdb: LevelStore;
   readonly wire: WireProtocol;
   readonly consensus: ConsensusProtocol;
   readonly db: Database;
@@ -84,7 +83,6 @@ export class Node {
     this.chaindb = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
     this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));
     this.evidencedb = createLevelDB(path.join(this.datadir, 'evidence'));
-    this.networkdb = new LevelStore(path.join(this.datadir, 'networkdb'), { createIfMissing: true });
     this.wire = new WireProtocol(this);
     this.consensus = new ConsensusProtocol(this);
     this.accMngr = new AccountManager(options.account.keyStorePath);
@@ -118,7 +116,7 @@ export class Node {
     this.networkMngr = new NetworkManager({
       ...options.network,
       protocols: [this.wire, this.consensus],
-      datastore: this.networkdb,
+      // datastore: this.networkdb,
       nodedb: this.nodedb,
       bootnodes: [...common.bootstrapNodes(), ...(options.network.bootnodes ?? [])]
     })
@@ -178,7 +176,6 @@ export class Node {
       await this.clique.init();
       await this.bloomBitsIndexer.init();
       await this.bcMonitor.init(this.latestBlock.header);
-      await this.networkdb.open();
       await this.networkMngr.init();
     })());
   }
@@ -221,7 +218,6 @@ export class Node {
     await this.commitBlockLoopPromise;
     await this.evidencedb.close();
     await this.nodedb.close();
-    await this.networkdb.close();
     await this.chaindb.close();
   }
 

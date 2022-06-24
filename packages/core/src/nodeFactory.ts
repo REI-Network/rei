@@ -12,7 +12,7 @@ export interface MineOptions extends Omit<ConsensusEngineOptions, 'node' | 'coin
   coinbase: string;
 }
 
-export interface NetworkOptions extends Omit<NetworkManagerOptions, 'protocols' | 'nodedb' | 'datastore' | 'peerId'> {}
+export interface NetworkOptions extends Omit<NetworkManagerOptions, 'protocols' | 'nodedb' | 'peerId'> { }
 
 export interface AccountOptions extends AccountManagerConstructorOptions {
   /**
@@ -44,7 +44,7 @@ async function loadPeerId(databasePath: string) {
 
 export class NodeFactory {
   // disable constructor
-  private constructor() {}
+  private constructor() { }
 
   static async createNode(options: CreateNodeOptions) {
     const coinbase = options.mine.coinbase ? Address.fromString(options.mine.coinbase) : undefined;

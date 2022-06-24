@@ -29,6 +29,9 @@ const defaultTcpPort = 4191;
 const defaultUdpPort = 9810;
 const defaultNat = '127.0.0.1';
 
+const seedCount = 30
+const seedMaxAge = 5 * 24 * 60 * 60 * 1000;
+
 enum Libp2pPeerValue {
   installed = 1,
   connected = 0.5,
@@ -45,7 +48,6 @@ export interface NetworkManagerOptions {
   protocols: Protocol[];
   nodedb: LevelUp;
   enable: boolean;
-  datastore?: any;
   tcpPort?: number;
   udpPort?: number;
   nat?: string;
@@ -260,8 +262,27 @@ export class NetworkManager extends EventEmitter {
    * Persist new enr to db
    */
   private onENRAdded = (enr: ENR) => {
+    if (!this.checkENR(enr)) {
+      return;
+    }
+    const peerId: string = enr.id;
+    if (!this.discovered.includes(peerId)) {
+      logger.info('💬 Peer discovered:', peerId);
+      this.discovered.push(peerId);
+      if (this.discovered.length > this.maxPeers) {
+        this.discovered.shift();
+      }
+    }
     this.nodedb.persist(enr);
   };
+
+  //@todo check enr
+  private checkENR = (enr: ENR) => {
+    if (!enr.ip || !enr.nodeId) {
+      return false;
+    }
+    return true;
+  }
 
   /**
    * Execute when the enr of local node changed
@@ -367,19 +388,51 @@ export class NetworkManager extends EventEmitter {
           });
         });
       });
-      this.libp2pNode.on('peer:discovery', this.onDiscovered);
       this.libp2pNode.connectionManager.on('peer:connect', this.onConnect);
       this.libp2pNode.connectionManager.on('peer:disconnect', this.onDisconnect);
       await this.libp2pNode.start();
 
-      // load enr from nodes db.
-      await this.nodedb.load((enr) => {
-        this.libp2pNode.discv5.addEnr(enr);
+      await this.nodedb.querySeeds(seedCount, seedMaxAge, (enrs) => {
+        if (enrs.length > 0) {
+          for (let i = 0; i < enrs.length; i++) {
+            this.libp2pNode.discv5.addEnr(enrs[i]);
+          }
+        }
       });
+
+      this.checkNodes();
+
+      (this.libp2pNode.discv5 as any).sessionService.on("message", this.onMessage)
       this.libp2pNode.discv5.discv5.on('enrAdded', this.onENRAdded);
       this.libp2pNode.discv5.discv5.on('multiaddrUpdated', this.onMultiaddrUpdated);
     })();
   }
+
+  private async checkNodes() {
+    await this.initPromise;
+    while (!this.aborted) {
+      try {
+        setInterval(() => {
+          const now = Date.now();
+          this.nodedb.load((data: { k: Buffer, v: Buffer }) => {
+            const { prefix, nodeId, discvRoot, ip, field } = this.nodedb.splitNode(data.k);
+            if (!ip || !field) {
+              return;
+            }
+            if (now - parseInt(data.v.toString()) < seedMaxAge) {
+              this.nodedb.del(data.k);
+            }
+          });
+        }, 30 * 1000);
+      } catch (err) {
+        logger.error('NetworkManager::checkNodes, catch error:', err);
+      }
+    }
+  }
+
+  private onMessage = (srcId: string, src: Multiaddr): void => {
+    this.nodedb.putReceived(srcId, src.nodeAddress().address);
+  };
 
   private checkInbound(peerId: string) {
     const now = Date.now();
@@ -559,6 +612,7 @@ export class NetworkManager extends EventEmitter {
           // search discovered peer in memory
           while (this.discovered.length > 0) {
             const id = this.discovered.shift()!;
+            //@todo: get the multiaddr from nodeDB
             const addresses: { multiaddr: Multiaddr }[] | undefined = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(id));
             if (addresses && this.filterPeer({ id, addresses })) {
               peerId = id;
@@ -648,7 +702,6 @@ export class NetworkManager extends EventEmitter {
   async abort() {
     this.aborted = true;
     this.libp2pNode?.unhandle(this.protocols.map(({ protocolString }) => protocolString));
-    this.libp2pNode?.off('peer:discovery', this.onDiscovered);
     this.libp2pNode?.connectionManager.off('peer:connect', this.onConnect);
     this.libp2pNode?.connectionManager.off('peer:disconnect', this.onDisconnect);
     this.libp2pNode?.discv5?.discv5.off('enrAdded', this.onENRAdded);

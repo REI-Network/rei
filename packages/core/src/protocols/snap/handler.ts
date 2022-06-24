@@ -6,16 +6,24 @@ import * as s from '../../consensus/reimint/snapMessages';
 import { NetworkProtocol } from '../types';
 import { EMPTY_HASH, MAX_HASH } from '../../utils';
 import { StakingAccount } from '../../stateManager';
-import { KVIterator } from '../../snap/trieIterator';
+import { KECCAK256_NULL } from 'ethereumjs-util';
 
 const softResponseLimit = 2 * 1024 * 1024;
 const maxCodeLookups = 1024;
-const maxTrieNodeLookups = 1024;
 const stateLookupSlack = 0.1;
 
 export class SnapProtocolHandler implements ProtocolHandler {
   readonly peer: Peer;
   readonly protocol: SnapProtocol;
+
+  protected readonly waitingRequests = new Map<
+    number,
+    {
+      resolve: (data: any) => void;
+      reject: (reason?: any) => void;
+      timeout: NodeJS.Timeout;
+    }
+  >();
 
   constructor(protocol: SnapProtocol, peer: Peer) {
     this.peer = peer;
@@ -74,19 +82,18 @@ export class SnapProtocolHandler implements ProtocolHandler {
         break;
       }
     }
+    await fastIter.abort();
     const accTrie = new Trie(this.node.db.rawdb, msg.rootHash);
     proofs.push(await Trie.createProof(accTrie, msg.startHash));
     if (last) {
       proofs.push(await Trie.createProof(accTrie, last));
     }
-    this.send(new s.AccountRange(accountData, proofs));
+    this.send(new s.AccountRange(msg.reqID, accountData, proofs));
   }
 
   private async applyGetStorageRange(msg: s.GetStorageRange) {
     const responseLimit = msg.responseLimit > softResponseLimit ? softResponseLimit : msg.responseLimit;
     const hardLimit = responseLimit * (1 + stateLookupSlack);
-    const empty = Buffer.concat([EMPTY_HASH, EMPTY_HASH]);
-    const max = Buffer.concat([MAX_HASH, MAX_HASH]);
     let startHash: Buffer | undefined = msg.startHash;
     let limitHash: Buffer | undefined = msg.limitHash;
     let size = 0;
@@ -98,12 +105,12 @@ export class SnapProtocolHandler implements ProtocolHandler {
         break;
       }
 
-      let origin = empty;
+      let origin = EMPTY_HASH;
       if (startHash) {
         origin = startHash;
         startHash = undefined;
       }
-      let limit = max;
+      let limit = MAX_HASH;
       if (limitHash) {
         limit = limitHash;
         limitHash = undefined;
@@ -126,11 +133,12 @@ export class SnapProtocolHandler implements ProtocolHandler {
           break;
         }
       }
+      await fastIter.abort();
       if (storage.length > 0) {
         slots.push(storage);
       }
 
-      if (!origin.equals(empty) || (abort && slots.length > 0)) {
+      if (!origin.equals(MAX_HASH) || (abort && slots.length > 0)) {
         const accTrie = new Trie(this.node.db.rawdb, msg.rootHash);
         const account = await accTrie.get(msg.accountHashes[i], true);
         const stTrie = new Trie(this.node.db.rawdb, StakingAccount.fromRlpSerializedAccount(account as Buffer).stateRoot);
@@ -140,7 +148,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
         }
       }
     }
-    this.send(new s.StorageRange(slots, proofs));
+    this.send(new s.StorageRange(msg.reqID, slots, proofs));
   }
 
   private async applyGetByteCode(msg: s.GetByteCode) {
@@ -156,19 +164,20 @@ export class SnapProtocolHandler implements ProtocolHandler {
     let size = 0;
     const trie = new Trie(this.node.chaindb);
     for (let i = 0; i < hashes.length; i++) {
-      if (hashes[i] === EMPTY_HASH) {
+      if (hashes[i].equals(KECCAK256_NULL)) {
         codesHash.push(Buffer.alloc(0));
       } else {
         const codeResult = await trie.get(hashes[i]);
-        const code = codeResult ? codeResult : Buffer.alloc(0);
-        codesHash.push(code);
-        size += code.length;
+        if (codeResult) {
+          codesHash.push(codeResult);
+          size += codeResult.length;
+        }
       }
       if (size > responseLimit) {
         break;
       }
     }
-    this.send(new s.ByteCode(codesHash));
+    this.send(new s.ByteCode(msg.reqID, codesHash));
   }
 
   private async applyGetTrieNode(msg: s.GetTrieNode) {
@@ -182,7 +191,8 @@ export class SnapProtocolHandler implements ProtocolHandler {
     const accTrie = new Trie(this.node.db.rawdb, rootHash);
     const snap = this.node.snaptree.snapShot(rootHash);
     if (!snap) {
-      this.send(new s.TrieNode([]));
+      this.send(new s.TrieNode(msg.reqID, []));
+      return;
     }
 
     const nodes: Buffer[] = [];
@@ -192,29 +202,30 @@ export class SnapProtocolHandler implements ProtocolHandler {
       if (path.length === 0) {
         throw new Error('Invalid path');
       } else if (path.length === 1) {
-        const node = await accTrie.get(path[0], true);
-        const account = StakingAccount.fromRlpSerializedAccount(node!);
-        const slotTree = new Trie(this.node.db.rawdb, account.stateRoot);
-        for await (const { key, val } of new KVIterator(slotTree)) {
-          nodes.push(val);
+        const node = await accTrie.get(path[0]);
+        if (node) {
+          nodes.push(node as Buffer);
+          size += node.length;
         }
       } else {
-        const account = await snap?.getAccount(path[0]);
+        const account = await snap.getAccount(path[0]);
         if (!account) {
           break;
         }
         const slotTree = new Trie(this.node.db.rawdb, account.stateRoot);
         for (const p of path.slice(1)) {
-          const node = await slotTree.get(p, true);
-          nodes.push(node as Buffer);
-          size += (node as Buffer).length;
+          const node = await slotTree.get(p);
+          if (node) {
+            nodes.push(node);
+            size += node.length;
+          }
         }
       }
       if (size > responseLimit) {
         break;
       }
     }
-    this.send(new s.TrieNode(nodes));
+    this.send(new s.TrieNode(msg.reqID, nodes));
   }
   /**
    * {@link ProtocolHandler.handshake}

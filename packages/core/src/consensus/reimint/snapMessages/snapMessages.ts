@@ -9,12 +9,14 @@ export interface SnapMessage {
 }
 
 export class GetAccountRange implements SnapMessage {
+  readonly reqID: number;
   readonly rootHash: Buffer;
   readonly startHash: Buffer;
   readonly limitHash: Buffer;
   readonly responseLimit: number;
 
-  constructor(rootHash: Buffer, startHash: Buffer, limitHash: Buffer, responseLimit: number) {
+  constructor(reqID: number, rootHash: Buffer, startHash: Buffer, limitHash: Buffer, responseLimit: number) {
+    this.reqID = reqID;
     this.rootHash = rootHash;
     this.startHash = startHash;
     this.limitHash = limitHash;
@@ -25,14 +27,15 @@ export class GetAccountRange implements SnapMessage {
   static readonly code = 0;
 
   static fromValuesArray(values: Buffer[]) {
-    if (values.length !== 2) {
+    if (values.length !== 5) {
       throw new Error('invalid values');
     }
-    return new GetAccountRange(values[0], values[1], values[2], bufferToInt(values[3]));
+    const [reqIDBuffer, rootHash, startHash, limitHash, responseLimitBuffer] = values;
+    return new GetAccountRange(bufferToInt(reqIDBuffer), rootHash, startHash, limitHash, bufferToInt(responseLimitBuffer));
   }
 
   raw() {
-    return [this.rootHash, this.startHash, this.limitHash, ...intToBuffer(this.responseLimit)];
+    return [...intToBuffer(this.reqID), this.rootHash, this.startHash, this.limitHash, ...intToBuffer(this.responseLimit)];
   }
 
   serialize() {
@@ -43,24 +46,32 @@ export class GetAccountRange implements SnapMessage {
 }
 
 export class AccountRange implements SnapMessage {
-  readonly accountData: Buffer[][] = [];
+  readonly reqID: number;
+  readonly accountData: Buffer[][];
   readonly proofs: Buffer[][];
 
-  constructor(accountData: Buffer[][], proofs: Buffer[][]) {
+  constructor(reqID: number, accountData: Buffer[][], proofs: Buffer[][]) {
+    this.reqID = reqID;
     this.accountData = accountData;
     this.proofs = proofs;
+    this.validateBasic();
   }
 
   static readonly code = 1;
 
-  static fromValuesArray(values: Buffer[][][]) {
+  static fromValuesArray(values: (Buffer | Buffer[][])[]) {
     if (values.length !== 3) {
       throw new Error('invalid values');
     }
-    return new AccountRange(values[0], values[1]);
+    const [reqIDBuffer, accountData, proofs] = values;
+    if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(accountData) || !Array.isArray(proofs)) {
+      throw new Error('invalid values');
+    }
+    return new AccountRange(bufferToInt(reqIDBuffer), accountData, proofs);
   }
+
   raw() {
-    return [[...this.accountData], [...this.proofs]];
+    return [intToBuffer(this.reqID), [...this.accountData], [...this.proofs]];
   }
 
   serialize(): Buffer {
@@ -71,13 +82,15 @@ export class AccountRange implements SnapMessage {
 }
 
 export class GetStorageRange implements SnapMessage {
+  readonly reqID: number;
   readonly rootHash: Buffer;
   readonly accountHashes: Buffer[];
   readonly startHash: Buffer;
   readonly limitHash: Buffer;
   readonly responseLimit: number;
 
-  constructor(rootHash: Buffer, accountHashes: Buffer[], startHash: Buffer, limitHash: Buffer, responseLimit: number) {
+  constructor(reqID: number, rootHash: Buffer, accountHashes: Buffer[], startHash: Buffer, limitHash: Buffer, responseLimit: number) {
+    this.reqID = reqID;
     this.rootHash = rootHash;
     this.accountHashes = accountHashes;
     this.startHash = startHash;
@@ -88,15 +101,19 @@ export class GetStorageRange implements SnapMessage {
 
   static readonly code = 2;
 
-  static fromValuesArray(values: Buffer[][]) {
-    if (values.length !== 3) {
+  static fromValuesArray(values: (Buffer | Buffer[])[]) {
+    if (values.length !== 6) {
       throw new Error('invalid values');
     }
-    return new GetStorageRange(values[0][0], values[1], values[2][0], values[3][0], bufferToInt(values[4][0]));
+    const [reqIDBuffer, rootHash, accountHashes, startHash, limitHash, responseLimitBuffer] = values;
+    if (!(reqIDBuffer instanceof Buffer) || !(rootHash instanceof Buffer) || !Array.isArray(accountHashes) || !(startHash instanceof Buffer) || !(limitHash instanceof Buffer) || !(responseLimitBuffer instanceof Buffer)) {
+      throw new Error('invalid values');
+    }
+    return new GetStorageRange(bufferToInt(reqIDBuffer), rootHash, accountHashes, startHash, limitHash, bufferToInt(responseLimitBuffer));
   }
 
   raw() {
-    return [[...this.rootHash], [...this.accountHashes], [...this.startHash], [...this.limitHash], [...intToBuffer(this.responseLimit)]];
+    return [intToBuffer(this.reqID), this.rootHash, [...this.accountHashes], this.startHash, this.limitHash, intToBuffer(this.responseLimit)];
   }
 
   serialize(): Buffer {
@@ -107,22 +124,31 @@ export class GetStorageRange implements SnapMessage {
 }
 
 export class StorageRange implements SnapMessage {
+  readonly reqID: number;
   readonly storage: Buffer[][][] = [];
   readonly proof: Buffer[][];
   static readonly code = 3;
 
-  constructor(storage: Buffer[][][], proof: Buffer[][]) {
+  constructor(reqID: number, storage: Buffer[][][], proof: Buffer[][]) {
+    this.reqID = reqID;
     this.storage = storage;
     this.proof = proof;
     this.validateBasic();
   }
 
-  static fromValuesArray(values: Buffer[][][][]) {
-    return new StorageRange(values[0], values[1][0]);
+  static fromValuesArray(values: (Buffer | Buffer[][] | Buffer[][][])[]) {
+    if (values.length !== 3) {
+      throw new Error('invalid values');
+    }
+    const [reqIDBuffer, storage, proof] = values;
+    if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(storage) || !Array.isArray(proof)) {
+      throw new Error('invalid values');
+    }
+    return new StorageRange(bufferToInt(reqIDBuffer), storage as Buffer[][][], proof as Buffer[][]);
   }
 
   raw() {
-    return [[...this.storage], [...this.proof]];
+    return [intToBuffer(this.reqID), [...this.storage], [...this.proof]];
   }
 
   serialize(): Buffer {
@@ -133,10 +159,12 @@ export class StorageRange implements SnapMessage {
 }
 
 export class GetByteCode implements SnapMessage {
+  readonly reqID: number;
   readonly hashes: Buffer[];
   readonly responseLimit: number;
 
-  constructor(hashes: Buffer[], responseLimit: number) {
+  constructor(reqID: number, hashes: Buffer[], responseLimit: number) {
+    this.reqID = reqID;
     this.hashes = hashes;
     this.responseLimit = responseLimit;
     this.validateBasic();
@@ -144,12 +172,19 @@ export class GetByteCode implements SnapMessage {
 
   static readonly code = 4;
 
-  static fromValuesArray(values: Buffer[][]) {
-    return new GetByteCode(values[0], bufferToInt(values[1][0]));
+  static fromValuesArray(values: (Buffer | Buffer[])[]) {
+    if (values.length !== 3) {
+      throw new Error('invalid values');
+    }
+    const [reqIDBuffer, hashes, responseLimitBuffer] = values;
+    if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(hashes) || !(responseLimitBuffer instanceof Buffer)) {
+      throw new Error('invalid values');
+    }
+    return new GetByteCode(bufferToInt(reqIDBuffer), hashes, bufferToInt(responseLimitBuffer));
   }
 
   raw() {
-    return [[...this.hashes], [...intToBuffer(this.responseLimit)]];
+    return [intToBuffer(this.reqID), [...this.hashes], intToBuffer(this.responseLimit)];
   }
 
   serialize(): Buffer {
@@ -159,20 +194,30 @@ export class GetByteCode implements SnapMessage {
 }
 
 export class ByteCode implements SnapMessage {
+  readonly reqID: number;
   readonly codesHashes: Buffer[];
 
-  constructor(codeHashes: Buffer[]) {
+  constructor(reqID: number, codeHashes: Buffer[]) {
+    this.reqID = reqID;
     this.codesHashes = codeHashes;
     this.validateBasic();
   }
 
   static readonly code = 5;
-  static fromValuesArray(values: Buffer[]) {
-    return new ByteCode(values);
+  static fromValuesArray(values: (Buffer | Buffer[])[]) {
+    if (values.length !== 2) {
+      throw new Error('invalid values');
+    }
+
+    const [reqIDBuffer, codeHashes] = values;
+    if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(codeHashes)) {
+      throw new Error('invalid values');
+    }
+    return new ByteCode(bufferToInt(reqIDBuffer), codeHashes);
   }
 
   raw() {
-    return [...this.codesHashes];
+    return [intToBuffer(this.reqID), [...this.codesHashes]];
   }
 
   serialize(): Buffer {
@@ -183,11 +228,13 @@ export class ByteCode implements SnapMessage {
 }
 
 export class GetTrieNode implements SnapMessage {
+  readonly reqID: number;
   readonly rootHash: Buffer;
   readonly paths: Buffer[][];
   readonly responseLimit: number;
 
-  constructor(rootHash: Buffer, paths: Buffer[][], responseLimit: number) {
+  constructor(reqID: number, rootHash: Buffer, paths: Buffer[][], responseLimit: number) {
+    this.reqID = reqID;
     this.rootHash = rootHash;
     this.paths = paths;
     this.responseLimit = responseLimit;
@@ -196,12 +243,20 @@ export class GetTrieNode implements SnapMessage {
 
   static readonly code = 6;
 
-  static fromValuesArray(values: Buffer[][][]) {
-    return new GetTrieNode(values[0][0][1], values[1], bufferToInt(values[2][0][0]));
+  static fromValuesArray(values: (Buffer | Buffer[][])[]) {
+    if (values.length !== 4) {
+      throw new Error('invalid values');
+    }
+
+    const [reqIDBuffer, rootHash, paths, responseLimitBuffer] = values;
+    if (!(reqIDBuffer instanceof Buffer) || !(rootHash instanceof Buffer) || !Array.isArray(paths) || !(responseLimitBuffer instanceof Buffer)) {
+      throw new Error('invalid values');
+    }
+    return new GetTrieNode(bufferToInt(reqIDBuffer), rootHash, paths, bufferToInt(responseLimitBuffer));
   }
 
   raw() {
-    return [[[...this.rootHash]], [...this.paths], [[...intToBuffer(this.responseLimit)]]];
+    return [intToBuffer(this.reqID), this.rootHash, [...this.paths], intToBuffer(this.responseLimit)];
   }
 
   serialize(): Buffer {
@@ -212,21 +267,31 @@ export class GetTrieNode implements SnapMessage {
 }
 
 export class TrieNode implements SnapMessage {
+  readonly reqID: number;
   readonly nodes: Buffer[];
 
-  constructor(nodes: Buffer[]) {
+  constructor(reqID: number, nodes: Buffer[]) {
+    this.reqID = reqID;
     this.nodes = nodes;
     this.validateBasic();
   }
 
   static readonly code = 7;
 
-  static fromValuesArray(values: Buffer[]) {
-    return new TrieNode(values);
+  static fromValuesArray(values: (Buffer | Buffer[])[]) {
+    if (values.length !== 2) {
+      throw new Error('invalid values');
+    }
+
+    const [reqIDBuffer, nodes] = values;
+    if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(nodes)) {
+      throw new Error('invalid values');
+    }
+    return new TrieNode(bufferToInt(reqIDBuffer), nodes);
   }
 
   raw() {
-    return [...this.nodes];
+    return [intToBuffer(this.reqID), [...this.nodes]];
   }
 
   serialize(): Buffer {

@@ -11,8 +11,11 @@ import { KECCAK256_NULL } from 'ethereumjs-util';
 const softResponseLimit = 2 * 1024 * 1024;
 const maxCodeLookups = 1024;
 const stateLookupSlack = 0.1;
+const requestTimeout = 8 * 1000;
+const reqIDLimit = 4096;
 
 export class SnapProtocolHandler implements ProtocolHandler {
+  protected reqID = 0;
   readonly peer: Peer;
   readonly protocol: SnapProtocol;
 
@@ -34,10 +37,44 @@ export class SnapProtocolHandler implements ProtocolHandler {
     return this.protocol.node;
   }
 
+  private generateReqID() {
+    if (this.reqID > reqIDLimit) {
+      this.reqID = 0;
+    }
+    return this.reqID++;
+  }
+  /**
+   * Send request message to peer and wait for response
+   * @param msg - Request message
+   */
+  request(msg: s.SnapMessage) {
+    if (this.waitingRequests.has(msg.reqID)) {
+      throw new Error('Request already in progress');
+    }
+    return new Promise<any>((resolve, reject) => {
+      this.waitingRequests.set(msg.reqID, {
+        resolve,
+        reject,
+        timeout: setTimeout(() => {
+          this.waitingRequests.delete(msg.reqID);
+          reject(new Error(`timeout request ${msg.reqID}`));
+        }, requestTimeout)
+      });
+      this.send(msg);
+    });
+  }
+
   /**
    *{@link ProtocolHandler.abort}
    */
-  abort(): void {}
+  abort(): void {
+    for (const [, request] of this.waitingRequests) {
+      clearTimeout(request.timeout);
+      request.reject(new Error('abort'));
+    }
+    this.waitingRequests.clear();
+    this.protocol.pool.remove(this);
+  }
 
   /**
    * {@link ProtocolHandler.handle}
@@ -45,17 +82,24 @@ export class SnapProtocolHandler implements ProtocolHandler {
    */
   async handle(data: Buffer) {
     const msg = s.SnapMessageFactory.fromSerializedMessage(data);
-
-    if (msg instanceof s.GetAccountRange) {
-      await this.applyGetAccountRange(msg);
-    } else if (msg instanceof s.GetStorageRange) {
-      await this.applyGetStorageRange(msg);
-    } else if (msg instanceof s.GetByteCode) {
-      await this.applyGetByteCode(msg);
-    } else if (msg instanceof s.GetTrieNode) {
-      await this.applyGetTrieNode(msg);
+    const reqID = msg.reqID;
+    const request = this.waitingRequests.get(reqID);
+    if (request) {
+      clearTimeout(request.timeout);
+      this.waitingRequests.delete(reqID);
+      request.resolve(data);
     } else {
-      logger.warn('SnapProtocolHander::handle, unknown message');
+      if (msg instanceof s.GetAccountRange) {
+        await this.applyGetAccountRange(msg);
+      } else if (msg instanceof s.GetStorageRange) {
+        await this.applyGetStorageRange(msg);
+      } else if (msg instanceof s.GetByteCode) {
+        await this.applyGetByteCode(msg);
+      } else if (msg instanceof s.GetTrieNode) {
+        await this.applyGetTrieNode(msg);
+      } else {
+        logger.warn('SnapProtocolHander::handle, unknown message');
+      }
     }
   }
 
@@ -234,6 +278,55 @@ export class SnapProtocolHandler implements ProtocolHandler {
     return true;
   }
 
+  /**
+   * Requests an unknown number of accounts from a given account trie
+   * @param rootHash The root hash of the account trie
+   * @param startHash The start hash
+   * @param limitHash The limit hash
+   * @param responseLimit  The maximum number of bytes to send in a single response
+   * @returns
+   */
+  getAccountRange(rootHash: Buffer, startHash: Buffer, limitHash: Buffer, responseLimit: number) {
+    const msg = new s.GetAccountRange(this.generateReqID(), rootHash, startHash, limitHash, responseLimit);
+    return this.request(msg);
+  }
+
+  /**
+   * Requests the storage slots of multiple accounts' storage tries.
+   * @param rootHash The root hash
+   * @param accountHashes The hashes of the accounts
+   * @param startHash The start hash
+   * @param limitHash The limit hash
+   * @param responseLimit The maximum number of bytes to send in a single response
+   * @returns
+   */
+  getStorageRange(rootHash: Buffer, accountHashes: Buffer[], startHash: Buffer, limitHash: Buffer, responseLimit: number) {
+    const msg = new s.GetStorageRange(this.generateReqID(), rootHash, accountHashes, startHash, limitHash, responseLimit);
+    return this.request(msg);
+  }
+
+  /**
+   * Requests a number of contract byte-codes by hash.
+   * @param hashes  The hashes of the contracts
+   * @param responseLimit The maximum number of bytes to send in a single response
+   * @returns
+   */
+  getByteCode(hashes: Buffer[], responseLimit: number) {
+    const msg = new s.GetByteCode(this.generateReqID(), hashes, responseLimit);
+    return this.request(msg);
+  }
+
+  /**
+   * Requests a number of state (either account or storage) Merkle trie nodes by path
+   * @param rootHash The root hash of the trie
+   * @param paths The paths of the nodes
+   * @param responseLimit  The maximum number of bytes to send in a single response
+   * @returns
+   */
+  getTrieNode(rootHash: Buffer, paths: Buffer[][], responseLimit: number) {
+    const msg = new s.GetTrieNode(this.generateReqID(), rootHash, paths, responseLimit);
+    return this.request(msg);
+  }
   /**
    * Send message to the remote peer
    * @param msg - Message

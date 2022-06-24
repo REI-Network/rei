@@ -1,8 +1,7 @@
-import { BN, bnToUnpaddedBuffer, bufferToInt, intToBuffer, rlp } from 'ethereumjs-util';
-import { StakingAccount } from '../../../stateManager';
+import { bufferToInt, intToBuffer, rlp } from 'ethereumjs-util';
 
 export interface SnapMessage {
-  code?: number;
+  reqID: number;
   raw(): any;
   serialize(): Buffer;
   validateBasic(): void;
@@ -23,8 +22,6 @@ export class GetAccountRange implements SnapMessage {
     this.responseLimit = responseLimit;
     this.validateBasic();
   }
-
-  static readonly code = 0;
 
   static fromValuesArray(values: Buffer[]) {
     if (values.length !== 5) {
@@ -56,8 +53,6 @@ export class AccountRange implements SnapMessage {
     this.proofs = proofs;
     this.validateBasic();
   }
-
-  static readonly code = 1;
 
   static fromValuesArray(values: (Buffer | Buffer[][])[]) {
     if (values.length !== 3) {
@@ -99,8 +94,6 @@ export class GetStorageRange implements SnapMessage {
     this.validateBasic();
   }
 
-  static readonly code = 2;
-
   static fromValuesArray(values: (Buffer | Buffer[])[]) {
     if (values.length !== 6) {
       throw new Error('invalid values');
@@ -127,7 +120,6 @@ export class StorageRange implements SnapMessage {
   readonly reqID: number;
   readonly storage: Buffer[][][] = [];
   readonly proof: Buffer[][];
-  static readonly code = 3;
 
   constructor(reqID: number, storage: Buffer[][][], proof: Buffer[][]) {
     this.reqID = reqID;
@@ -170,8 +162,6 @@ export class GetByteCode implements SnapMessage {
     this.validateBasic();
   }
 
-  static readonly code = 4;
-
   static fromValuesArray(values: (Buffer | Buffer[])[]) {
     if (values.length !== 3) {
       throw new Error('invalid values');
@@ -203,7 +193,6 @@ export class ByteCode implements SnapMessage {
     this.validateBasic();
   }
 
-  static readonly code = 5;
   static fromValuesArray(values: (Buffer | Buffer[])[]) {
     if (values.length !== 2) {
       throw new Error('invalid values');
@@ -241,8 +230,6 @@ export class GetTrieNode implements SnapMessage {
     this.validateBasic();
   }
 
-  static readonly code = 6;
-
   static fromValuesArray(values: (Buffer | Buffer[][])[]) {
     if (values.length !== 4) {
       throw new Error('invalid values');
@@ -275,8 +262,6 @@ export class TrieNode implements SnapMessage {
     this.nodes = nodes;
     this.validateBasic();
   }
-
-  static readonly code = 7;
 
   static fromValuesArray(values: (Buffer | Buffer[])[]) {
     if (values.length !== 2) {

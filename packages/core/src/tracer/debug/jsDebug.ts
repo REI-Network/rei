@@ -144,6 +144,11 @@ function makeLog(step: InterpreterStep, error?: string) {
   };
 }
 
+type LogInfo = {
+  log: ReturnType<typeof makeLog>;
+  error: boolean;
+};
+
 function toAddress(data: Buffer | string) {
   return setLengthLeft(data instanceof Buffer ? data : hexStringToBuffer(data), 20);
 }
@@ -165,7 +170,7 @@ export class JSDebug implements IDebugImpl {
     toContract2(data: Buffer | string, salt: string, code: Buffer): Buffer;
     isPrecompiled(address: Buffer): boolean;
     slice(buf: Buffer, start: number, end: number): Buffer;
-    globalLog?: ReturnType<typeof makeLog>;
+    globalLogs: LogInfo[];
     globalDB?: ReturnType<typeof makeDB>;
     globalCtx: { [key: string]: any };
     globalPromise?: Promise<any>;
@@ -196,6 +201,7 @@ export class JSDebug implements IDebugImpl {
       }
       return buf.slice(start, end);
     },
+    globalLogs: [],
     globalCtx: this.debugContext,
     bigInt: bi,
     glog(...args: any[]) {
@@ -245,6 +251,27 @@ export class JSDebug implements IDebugImpl {
   }
 
   /**
+   * Run vm scripts if cached logs reach limit or force is true
+   * @param force Force run vm scripts
+   */
+  private async batchRunScripts(force: boolean = false) {
+    if ((force && this.vmContextObj.globalLogs.length > 0) || this.vmContextObj.globalLogs.length > (this.config.vmScriptsBatchSize ?? 500)) {
+      const script = new vm.Script(`
+      globalPromise = (async () => {
+        for (const { log, error } of globalLogs) {
+          await (error ? obj.fault : obj.step).call(obj, log, globalDB);
+        }
+      })();`);
+      script.runInContext(this.vmContext, { timeout: this.config.timeout ? Number(this.config.timeout) : undefined, breakOnSigint: true });
+    }
+    if (this.vmContextObj.globalPromise) {
+      await this.vmContextObj.globalPromise;
+      this.vmContextObj.globalPromise = undefined;
+      this.vmContextObj.globalLogs = [];
+    }
+  }
+
+  /**
    * CaptureLog implements the Tracer interface to trace a single step of VM execution.
    * @param step
    * @param error
@@ -255,13 +282,8 @@ export class JSDebug implements IDebugImpl {
     }
 
     try {
-      this.vmContextObj.globalLog = makeLog(step, error);
-      const script = error ? new vm.Script('globalPromise = obj.fault.call(obj, globalLog, globalDB)') : new vm.Script('globalPromise = obj.step.call(obj, globalLog, globalDB)');
-      script.runInContext(this.vmContext, { timeout: this.config.timeout ? Number(this.config.timeout) : undefined, breakOnSigint: true });
-      if (this.vmContextObj.globalPromise) {
-        await this.vmContextObj.globalPromise;
-        this.vmContextObj.globalPromise = undefined;
-      }
+      this.vmContextObj.globalLogs.push({ log: makeLog(step, error), error: !!error });
+      await this.batchRunScripts();
     } catch (err) {
       this.error(err);
     }
@@ -317,7 +339,9 @@ export class JSDebug implements IDebugImpl {
     }
 
     try {
-      new vm.Script('globalPromise = obj.result.call(obj, globalCtx, globalDB)').runInContext(this.vmContext, { timeout: this.config.timeout ? Number(this.config.timeout) : undefined, breakOnSigint: true });
+      await this.batchRunScripts(true);
+      const script = new vm.Script('globalPromise = obj.result.call(obj, globalCtx, globalDB)');
+      script.runInContext(this.vmContext, { timeout: this.config.timeout ? Number(this.config.timeout) : undefined, breakOnSigint: true });
       if (this.vmContextObj.globalPromise) {
         const result = await this.vmContextObj.globalPromise;
         this.vmContextObj.globalPromise = undefined;

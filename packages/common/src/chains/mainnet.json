@@ -85,11 +85,11 @@
     },
     {
       "name": "mainnet-hf-1",
-      "block": null
+      "block": 5607108
     },
     {
       "name": "free-staking",
-      "block": null
+      "block": 5607108
     }
   ],
   "bootstrapNodes": ["enr:-Iu4QPuZg9PrU4BZMH38e8UJ25c5BaUKnpZFwf7_1x7MGRhsX2my-MdN4Dg8oMBApmlgViCXUfAUL5nqSbywSI-mXUEEgmlkgnY0gmlwhC_zFSGJc2VjcDI1NmsxoQLqv0DBwIAlD3OyAWqz8_b1L6kIX9Otkh5HdC0n2upn-oN0Y3CCXvaDdWRwgl73","enr:-Iu4QIJ8C5wt3hInFW32Fjo3wjWtSanxpbtHilet72Zi01tHWwUPyfR2RP5BbeE76gjJ3V1goo5KPSgPXY7IRHAckUsEgmlkgnY0gmlwhC_zFSGJc2VjcDI1NmsxoQOLTB41t2bg-j_kaXW_G0J3_g6KvIgG6YzUNfaN-BIbj4N0Y3CCXviDdWRwgl75"]

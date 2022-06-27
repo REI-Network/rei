@@ -26,7 +26,7 @@ export class SnapTree {
   node: Node;
   onFlatten?: Function; // Hook invoked when the bottom most diff layers are flattened
 
-  constructor(diskdb: Database, cache: number, root: Buffer, node: Node) {
+  constructor(diskdb: Database, cache: number, node: Node) {
     this.diskdb = diskdb;
     this.cache = cache;
     this.layers = new FunctionalBufferMap<Snapshot>();
@@ -408,12 +408,12 @@ export class SnapTree {
     if (ok) {
       throw new Error('snapshot is not constructed');
     }
-    const snap = this.layers.get(root);
-    if (snap === undefined) {
+    const layer = this.layers.get(root);
+    if (layer === undefined) {
       throw new Error(`unknown snapshot,root: ${root}`);
     }
 
-    return new FastSnapIterator(snap, (snap) => {
+    return new FastSnapIterator(layer, (snap) => {
       return {
         iter: snap.genAccountIterator(seek),
         stop: false
@@ -434,12 +434,12 @@ export class SnapTree {
     if (ok) {
       throw new Error('snapshot is not constructed');
     }
-    const snap = this.layers.get(root);
-    if (snap === undefined) {
+    const layer = this.layers.get(root);
+    if (layer === undefined) {
       throw new Error(`unknown snapshot,root: ${root}`);
     }
 
-    return new FastSnapIterator(snap, (snap) => {
+    return new FastSnapIterator(layer, (snap) => {
       const { iter, destructed } = snap.genStorageIterator(account, seek);
       return {
         iter,

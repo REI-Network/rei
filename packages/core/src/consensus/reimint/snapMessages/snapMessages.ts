@@ -14,6 +14,8 @@ export class GetAccountRange implements SnapMessage {
   readonly limitHash: Buffer;
   readonly responseLimit: number;
 
+  static readonly code = 0;
+
   constructor(reqID: number, rootHash: Buffer, startHash: Buffer, limitHash: Buffer, responseLimit: number) {
     this.reqID = reqID;
     this.rootHash = rootHash;
@@ -32,7 +34,7 @@ export class GetAccountRange implements SnapMessage {
   }
 
   raw() {
-    return [...intToBuffer(this.reqID), this.rootHash, this.startHash, this.limitHash, ...intToBuffer(this.responseLimit)];
+    return [intToBuffer(this.reqID), this.rootHash, this.startHash, this.limitHash, intToBuffer(this.responseLimit)];
   }
 
   serialize() {
@@ -46,6 +48,8 @@ export class AccountRange implements SnapMessage {
   readonly reqID: number;
   readonly accountData: Buffer[][];
   readonly proofs: Buffer[][];
+
+  static readonly code = 1;
 
   constructor(reqID: number, accountData: Buffer[][], proofs: Buffer[][]) {
     this.reqID = reqID;
@@ -84,6 +88,8 @@ export class GetStorageRange implements SnapMessage {
   readonly limitHash: Buffer;
   readonly responseLimit: number;
 
+  static readonly code = 2;
+
   constructor(reqID: number, rootHash: Buffer, accountHashes: Buffer[], startHash: Buffer, limitHash: Buffer, responseLimit: number) {
     this.reqID = reqID;
     this.rootHash = rootHash;
@@ -121,6 +127,8 @@ export class StorageRange implements SnapMessage {
   readonly storage: Buffer[][][] = [];
   readonly proof: Buffer[][];
 
+  static readonly code = 3;
+
   constructor(reqID: number, storage: Buffer[][][], proof: Buffer[][]) {
     this.reqID = reqID;
     this.storage = storage;
@@ -155,6 +163,8 @@ export class GetByteCode implements SnapMessage {
   readonly hashes: Buffer[];
   readonly responseLimit: number;
 
+  static readonly code = 4;
+
   constructor(reqID: number, hashes: Buffer[], responseLimit: number) {
     this.reqID = reqID;
     this.hashes = hashes;
@@ -186,6 +196,8 @@ export class GetByteCode implements SnapMessage {
 export class ByteCode implements SnapMessage {
   readonly reqID: number;
   readonly codesHashes: Buffer[];
+
+  static readonly code = 5;
 
   constructor(reqID: number, codeHashes: Buffer[]) {
     this.reqID = reqID;
@@ -222,6 +234,8 @@ export class GetTrieNode implements SnapMessage {
   readonly paths: Buffer[][];
   readonly responseLimit: number;
 
+  static readonly code = 6;
+
   constructor(reqID: number, rootHash: Buffer, paths: Buffer[][], responseLimit: number) {
     this.reqID = reqID;
     this.rootHash = rootHash;
@@ -256,6 +270,8 @@ export class GetTrieNode implements SnapMessage {
 export class TrieNode implements SnapMessage {
   readonly reqID: number;
   readonly nodes: Buffer[];
+
+  static readonly code = 7;
 
   constructor(reqID: number, nodes: Buffer[]) {
     this.reqID = reqID;

@@ -12,7 +12,7 @@ const softResponseLimit = 2 * 1024 * 1024;
 const maxCodeLookups = 1024;
 const stateLookupSlack = 0.1;
 const requestTimeout = 8 * 1000;
-const reqIDLimit = 4096;
+const reqIDLimit = Number.MAX_SAFE_INTEGER;
 
 export class SnapProtocolHandler implements ProtocolHandler {
   protected reqID = 0;
@@ -29,8 +29,8 @@ export class SnapProtocolHandler implements ProtocolHandler {
   >();
 
   constructor(protocol: SnapProtocol, peer: Peer) {
-    this.peer = peer;
     this.protocol = protocol;
+    this.peer = peer;
   }
 
   get node() {
@@ -84,7 +84,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
     const msg = s.SnapMessageFactory.fromSerializedMessage(data);
     const reqID = msg.reqID;
     const request = this.waitingRequests.get(reqID);
-    if (request) {
+    if (request && (msg instanceof s.AccountRange || msg instanceof s.StorageRange || msg instanceof s.ByteCode || msg instanceof s.TrieNode)) {
       clearTimeout(request.timeout);
       this.waitingRequests.delete(reqID);
       request.resolve(data);
@@ -206,7 +206,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
       hashes.splice(maxCodeLookups);
     }
     let size = 0;
-    const trie = new Trie(this.node.chaindb);
+    const trie = new Trie(this.node.db.rawdb);
     for (let i = 0; i < hashes.length; i++) {
       if (hashes[i].equals(KECCAK256_NULL)) {
         codesHash.push(Buffer.alloc(0));

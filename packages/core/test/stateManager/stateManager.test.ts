@@ -39,7 +39,7 @@ function compareSets<k>(set1: Set<k>, set2: Set<k>) {
   }
   return true;
 }
-class MockSnapTree extends SnapTree {
+class MockStateManger extends StateManager {
   public callback: (accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferSet, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>) => void = () => {};
 }
 
@@ -52,9 +52,7 @@ describe('StateManager', () => {
   const kecAddress = keccak256(address.buf);
   const account1 = StakingAccount.fromAccountData({ balance: new BN(12) });
   const account2 = StakingAccount.fromAccountData({ balance: new BN(34) });
-  let stateManager: StateManager;
-  let snapTree: MockSnapTree | undefined;
-  let mockSnapTree: MockSnapTree;
+  let stateManager: MockStateManger;
   before(async () => {
     const common = new Common({ chain: 'rei-testnet' });
     common.setHardforkByBlockNumber(0);
@@ -67,10 +65,9 @@ describe('StateManager', () => {
     const rootAndAccounts = await genRandomAccounts(db, 0, 0);
     const root = rootAndAccounts.root;
     const node = new MockNode();
-    let snapTreeTemp = new SnapTree(db, cache, root, node as any);
-    await snapTreeTemp.init(root, async, rebuild);
-    snapTree = snapTreeTemp as MockSnapTree;
-    stateManager = new StateManager({
+    let snapTree = new SnapTree(db, cache, node as any);
+    await snapTree.init(root, async, rebuild);
+    stateManager = new MockStateManger({
       common: common,
       snapsTree: snapTree
     });
@@ -89,7 +86,8 @@ describe('StateManager', () => {
       expect(destructs.size === 0, '_snapDestructs should be empty').be.true;
       expect(storage.size === 0, '_snapStorage should be empty').be.true;
     };
-    snapTree!.callback = callback;
+    stateManager.callback = callback;
+    stateManager.callback(stateManager._snapAccounts!, stateManager._snapDestructs!, stateManager._snapStorage!);
     await stateManager.commit();
     expect(stateManager._snapCacheList.length === 0, 'CacheList should be empty').be.true;
   });
@@ -105,7 +103,8 @@ describe('StateManager', () => {
       expect(destructs.size === 0, '_snapDestructs should be empty').be.true;
       expect(storage.size === 0, '_snapStorage should be empty').be.true;
     };
-    snapTree!.callback = callback;
+    stateManager.callback = callback;
+    stateManager.callback(stateManager._snapAccounts!, stateManager._snapDestructs!, stateManager._snapStorage!);
     await stateManager.commit();
   });
 
@@ -137,7 +136,8 @@ describe('StateManager', () => {
       }
       expect(storageEqual === true, '_snapStorage should be equal').be.true;
     };
-    snapTree!.callback = callback;
+    stateManager.callback = callback;
+    stateManager.callback(stateManager._snapAccounts!, stateManager._snapDestructs!, stateManager._snapStorage!);
     await stateManager.commit();
   });
 
@@ -153,7 +153,8 @@ describe('StateManager', () => {
       expect(storage.has(kecAddress), 'account1 should be deleted in _snapStorage').be.false;
       expect(compareSets(destructsSet, destructs), 'destructs should equal to destructsSet').be.true;
     };
-    snapTree!.callback = callback;
+    stateManager.callback = callback;
+    stateManager.callback(stateManager._snapAccounts!, stateManager._snapDestructs!, stateManager._snapStorage!);
     await stateManager.commit();
   });
 
@@ -172,7 +173,8 @@ describe('StateManager', () => {
       expect(compareSets(destructsSet, destructs), 'destructs should equal to destructsSet').be.true;
       expect(storage.size === 0, '_snapStorage should be empty').be.true;
     };
-    snapTree!.callback = callback;
+    stateManager.callback = callback;
+    stateManager.callback(stateManager._snapAccounts!, stateManager._snapDestructs!, stateManager._snapStorage!);
     await stateManager.commit();
   });
 
@@ -198,7 +200,8 @@ describe('StateManager', () => {
       expect(destructs.size === 0, 'snapDestructs should be empty').be.true;
       expect(storage.size === 0, '_snapStorage should be empty').be.true;
     };
-    snapTree!.callback = callback;
+    stateManager.callback = callback;
+    stateManager.callback(stateManager._snapAccounts!, stateManager._snapDestructs!, stateManager._snapStorage!);
     await stateManager.commit();
   });
 

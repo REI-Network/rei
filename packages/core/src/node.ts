@@ -134,7 +134,7 @@ export class Node {
     this.txSync = new TxFetcher(this);
     this.bcMonitor = new BlockchainMonitor(this.db);
     this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ db: this.db });
-    this.snaptree = new SnapTree(this.db, defaultSnapTreeLimit, this.blockchain.latestBlock.header.stateRoot, this);
+    this.snaptree = new SnapTree(this.db, defaultSnapTreeLimit, this);
   }
 
   /**

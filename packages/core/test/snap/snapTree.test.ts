@@ -27,12 +27,12 @@ const anotherDB = new Database(level(), common);
 const node = new MockNode();
 const async = true;
 const rebuild = true;
-const recovery = true;
 let snaptree: SnapTree;
 let anothorSnaptree: SnapTree | undefined;
 let root: Buffer;
 let accounts: AccountInfo[];
 let diskLayer: DiskLayer;
+const count = 64;
 
 type LayerInfo = {
   layer: Snapshot;
@@ -90,15 +90,13 @@ async function getFirstLeafNode(root: Buffer) {
 
 describe('SnapshotTree', () => {
   before(async () => {
-    const rootAndAccounts = await genRandomAccounts(db, 64, 64);
+    const rootAndAccounts = await genRandomAccounts(db, count, count);
     root = rootAndAccounts.root;
     accounts = rootAndAccounts.accounts;
     diskLayer = new DiskLayer(db, root);
     layers.push({ layer: diskLayer, accounts });
-    snaptree = new SnapTree(db, cache, root, node as any);
+    snaptree = new SnapTree(db, cache, node as any);
     await snaptree.init(root, async, rebuild);
-    // snaptree = (await SnapTree.createSnapTree(db, cache, root, async, rebuild, recovery))!;
-    let count = 64;
     for (let i = 0; i < 6; i++) {
       const latest = layers[layers.length - 1];
       const { root, accounts } = await modifyRandomAccounts(db, latest.layer.root, latest.accounts, count);
@@ -108,7 +106,6 @@ describe('SnapshotTree', () => {
         accounts
       });
       snaptree.update(root, latest.layer.root, layerNow.accountData, layerNow.destructSet, layerNow.storageData);
-      count = Math.ceil(count / 2);
     }
   });
 
@@ -127,7 +124,7 @@ describe('SnapshotTree', () => {
 
   it('should update correctly', async () => {
     const latest = layers[layers.length - 1];
-    const { root, accounts } = await modifyRandomAccounts(db, latest.layer.root, latest.accounts, 1);
+    const { root, accounts } = await modifyRandomAccounts(db, latest.layer.root, latest.accounts, count);
     const layerNow = accountsToDiffLayer(latest.layer, root, accounts);
     layers.push({
       layer: layerNow,
@@ -151,14 +148,17 @@ describe('SnapshotTree', () => {
   it('should accountIterator correctly', async () => {
     for (const { layer, accounts } of layers) {
       const _accounts = [...accounts];
-      for await (const { hash, getValue } of snaptree.accountIterator(layer.root, EMPTY_HASH)) {
+      const fastIter = snaptree.accountIterator(layer.root, EMPTY_HASH);
+      await fastIter.init();
+      for await (const { hash, value } of fastIter) {
         const index = _accounts.findIndex(({ address }) => keccak256(address).equals(hash));
         expect(index !== -1, 'account should exist in account list').be.true;
-        const _account = getValue();
+        const _account = value;
         expect(_account !== null, 'account should not be null').be.true;
-        expect(_accounts[index].account.serialize().equals(_account!.serialize()), 'accout should be equal').be.true;
+        expect(_accounts[index].account.serialize().equals(_account.serialize()), 'accout should be equal').be.true;
         _accounts.splice(index, 1);
       }
+      await fastIter.abort();
       expect(_accounts.length, 'account list should be empty').be.equal(0);
     }
   });
@@ -173,13 +173,16 @@ describe('SnapshotTree', () => {
         }
 
         const accountHash = keccak256(address);
-        const { iter, destructed } = snaptree.storageIterator(layer.root, accountHash, EMPTY_HASH);
-        expect(destructed, 'should not be destructed').be.false;
-        for await (const { hash, getValue } of iter) {
-          expect(storageData.get(hash)?.val.equals(getValue()), 'storage data should be equal').be.true;
-          storageData.delete(hash);
+        const fastiter = snaptree.storageIterator(layer.root, accountHash, EMPTY_HASH);
+        await fastiter.init();
+        let totalCount = 0;
+        for await (const { hash, value } of fastiter) {
+          const expectStorageData = await layer.getStorage(accountHash, hash);
+          expect(expectStorageData.equals(value), 'storage data should be equal').be.true;
+          totalCount++;
         }
-        expect(storageData.size, 'storage data should be empty').be.equal(0);
+        await fastiter.abort();
+        expect(totalCount, 'total count should be equal').be.equal(layers[0].accounts[0].storageData.size);
       }
     }
   });
@@ -296,7 +299,7 @@ describe('SnapshotTree', () => {
   });
 
   it('should disable correctly', async () => {
-    anothorSnaptree = new SnapTree(anotherDB, cache, root, node as any);
+    anothorSnaptree = new SnapTree(anotherDB, cache, node as any);
     await anothorSnaptree.init(root, async, rebuild);
     for (let i = 1; i < layers.length; i++) {
       anothorSnaptree.update(layers[i].layer.root, layers[i - 1].layer.root, (layers[i].layer as DiffLayer).accountData, (layers[i].layer as DiffLayer).destructSet, (layers[i].layer as DiffLayer).storageData);

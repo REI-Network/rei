@@ -138,7 +138,7 @@ export class FullSync extends EventEmitter {
       backend: this.backend,
       validateBackend: this.backend,
       common: this.node.getCommon(0),
-      downloadElementsCountLimit: bnMaxGetBlockHeaders
+      maxGetBlockHeaders: bnMaxGetBlockHeaders
     });
   }
 

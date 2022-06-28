@@ -11,7 +11,7 @@ export interface BlockSyncOptions {
   /**
    * How many block headers/bodies have been requested to download each time(default: 128)
    */
-  downloadElementsCountLimit: BN;
+  maxGetBlockHeaders: BN;
   /**
    * How many remote handlers to download the block body at the same time(default: 3)
    */
@@ -50,7 +50,7 @@ export class BlockSync {
   private readonly backend: BlockSyncBackend;
   private readonly validateBackend: BlockSyncValidateBackend;
   private readonly common: Common;
-  private readonly downloadElementsCountLimit: BN;
+  private readonly maxGetBlockHeaders: BN;
   private readonly downloadBodiesLimit: number;
 
   private readonly useless = new Set<WireProtocolHandler>();
@@ -71,7 +71,7 @@ export class BlockSync {
     this.backend = options.backend;
     this.validateBackend = options.validateBackend;
     this.common = options.common;
-    this.downloadElementsCountLimit = options.downloadElementsCountLimit.clone();
+    this.maxGetBlockHeaders = options.maxGetBlockHeaders.clone();
     this.downloadBodiesLimit = options.downloadBodiesLimit ?? defaultDownloadBodiesLimit;
   }
 
@@ -174,8 +174,8 @@ export class BlockSync {
     let parent: BlockHeader | undefined;
     while (!this.aborted && reserveTotalCount.gtn(0)) {
       let count: BN;
-      if (reserveTotalCount.gt(this.downloadElementsCountLimit)) {
-        count = this.downloadElementsCountLimit.clone();
+      if (reserveTotalCount.gt(this.maxGetBlockHeaders)) {
+        count = this.maxGetBlockHeaders.clone();
       } else {
         count = reserveTotalCount.clone();
       }
@@ -231,7 +231,7 @@ export class BlockSync {
     }
 
     const first = blocks[0];
-    const index = first.header.number.sub(this.start).div(this.downloadElementsCountLimit).toNumber();
+    const index = first.header.number.sub(this.start).div(this.maxGetBlockHeaders).toNumber();
 
     return new Promise<void>((resolve) => {
       this.processBlocksChannel.push({

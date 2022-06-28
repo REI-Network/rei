@@ -4,9 +4,7 @@ import { Common } from '@rei-network/common';
 import { Block, BlockHeader, Transaction } from '@rei-network/structure';
 import { setLevel } from '@rei-network/utils';
 import { BlockSync, BlockSyncBackend, BlockSyncValidateBackend } from '../../src/sync/full/blockSync';
-import { CommitBlockOptions } from '../../src/types';
 import { HandlerPool, GetHandlerTimeoutError } from '../../src/protocols/handlerPool';
-import { ConsensusEngine } from '../../src/consensus';
 
 setLevel('silent');
 const common = new Common({ chain: 'rei-testnet' });
@@ -14,12 +12,6 @@ common.setHardforkByBlockNumber(0);
 const decl = 10;
 
 class MockFetcherBackend implements BlockSyncBackend, BlockSyncValidateBackend {
-  getEngineByCommon(common: Common): ConsensusEngine {
-    throw new Error('Method not implemented.');
-  }
-  commitBlock(options: CommitBlockOptions): Promise<boolean> {
-    throw new Error('Method not implemented.');
-  }
   lastestNumber?: BN;
 
   async processAndCommitBlock(block: Block) {
@@ -156,7 +148,7 @@ describe('Fetcher', () => {
   });
 
   it('should fetch successfully', async () => {
-    const fetcher = new BlockSync({ common, backend, validateBackend: backend, downloadElementsCountLimit: new BN(decl), downloadBodiesLimit: 5 });
+    const fetcher = new BlockSync({ common, backend, validateBackend: backend, maxGetBlockHeaders: new BN(decl), downloadBodiesLimit: 5 });
     const start = new BN(0);
     const totalCount = new BN(decl * 10);
     await fetcher.fetch(start, totalCount, targetHandler as any);
@@ -182,7 +174,7 @@ describe('Fetcher', () => {
   });
 
   it('should fetch failed(get peer timeout)', async () => {
-    const fetcher = new BlockSync({ common, backend, validateBackend: backend, downloadElementsCountLimit: new BN(decl), downloadBodiesLimit: 5 });
+    const fetcher = new BlockSync({ common, backend, validateBackend: backend, maxGetBlockHeaders: new BN(decl), downloadBodiesLimit: 5 });
     const start = new BN(0);
     const totalCount = new BN(decl * 10);
 
@@ -197,7 +189,7 @@ describe('Fetcher', () => {
   });
 
   it('should fetch successfully(retry get bodies)', async () => {
-    const fetcher = new BlockSync({ common, backend, validateBackend: backend, downloadElementsCountLimit: new BN(decl), downloadBodiesLimit: 5 });
+    const fetcher = new BlockSync({ common, backend, validateBackend: backend, maxGetBlockHeaders: new BN(decl), downloadBodiesLimit: 5 });
     const start = new BN(0);
     const totalCount = new BN(decl * 10);
 

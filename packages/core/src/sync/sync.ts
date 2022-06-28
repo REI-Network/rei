@@ -11,6 +11,7 @@ import { SyncInfo } from './types';
 
 const snapSyncMinTD = 201600;
 const waitingSyncDelay = 100;
+const randomPickInterval = 1000;
 
 export enum AnnouncementType {
   NewPeer,
@@ -60,6 +61,16 @@ export class Synchronizer extends EventEmitter {
     this.snap = new SnapSync(this.node.db, 1 as any);
     this.listenSyncer(this.full);
     this.listenSyncer(this.snap);
+  }
+
+  get status() {
+    if (this.full.isSyncing) {
+      return this.full.status;
+    }
+    if (this.snap.isSyncing) {
+      return this.snap.status;
+    }
+    return { startingBlock: 0, highestBlock: 0 };
   }
 
   get isSyncing() {
@@ -250,7 +261,7 @@ export class Synchronizer extends EventEmitter {
 
   private async randomPickLoop() {
     while (!this.aborted) {
-      await this.timer.wait(1000);
+      await this.timer.wait(randomPickInterval);
       if (this.aborted) {
         // exit if we have aborted
         break;

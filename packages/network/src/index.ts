@@ -454,13 +454,13 @@ export class NetworkManager extends EventEmitter {
       peer.status = PeerStatus.Installed;
       this.setPeerValue(peerId, Libp2pPeerValue.installed);
       this.clearInstallTimeout(peerId);
-      this.emit('installed', protocol.name, peer);
-      logger.info('💬 Peer installed:', peerId, 'protocol:', protocol.name);
+      this.emit('installed', protocol.protocolString, peer);
+      logger.info('💬 Peer installed:', peerId, 'protocol:', protocol.protocolString);
     } else {
       if (peer.status === PeerStatus.Installing) {
         peer.status = PeerStatus.Connected;
       }
-      logger.debug('Network::install, install protocol:', protocol.name, 'for peerId:', peerId, 'failed');
+      logger.debug('Network::install, install protocol:', protocol.protocolString, 'for peerId:', peerId, 'failed');
     }
     return success;
   }

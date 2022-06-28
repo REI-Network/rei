@@ -226,7 +226,7 @@ export class Node {
   }
 
   private onPeerInstalled = (name: string, peer: Peer) => {
-    if (name === this.wire.v1.name || name === this.wire.v2.name) {
+    if (name === this.wire.v1.protocolString || name === this.wire.v2.protocolString) {
       const handler = this.wire.getHandler(peer, false);
       handler && this.sync.announceNewPeer(handler);
     }

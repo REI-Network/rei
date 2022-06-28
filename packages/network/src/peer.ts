@@ -133,7 +133,7 @@ export class Peer {
    * @returns Message queue and protocol handler
    */
   private async makeMsgQueue(protocol: Protocol) {
-    const oldQueue = this.queueMap.get(protocol.name);
+    const oldQueue = this.queueMap.get(protocol.protocolString);
     if (oldQueue) {
       await oldQueue.abort();
     }
@@ -202,7 +202,7 @@ export class Peer {
     try {
       handshakeResult = await handler.handshake();
       if (!handshakeResult) {
-        throw new Error(`protocol ${protocol.name}, handshake failed`);
+        throw new Error(`protocol ${protocol.protocolString}, handshake failed`);
       }
       return true;
     } catch (err) {
@@ -210,7 +210,7 @@ export class Peer {
         logger.warn('Peer::installProtocol, handshake failed with remote peer:', this.peerId);
       }
       await queue.abort();
-      this.queueMap.delete(protocol.name);
+      this.queueMap.delete(protocol.protocolString);
       return false;
     }
   }

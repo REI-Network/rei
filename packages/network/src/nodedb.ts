@@ -57,14 +57,13 @@ export class NodeDB {
   /**
    * Load all remote node enr information
    */
-  async load(onData: (data: { k, v }) => void) {
+  async load(onData: (data: { k, v }) => Promise<void>) {
     const itr = this.db.iterator({ keys: true, values: true });
     for await (const [k, v] of iteratorToAsyncGenerator(itr)) {
-      const { prefix, nodeId, discvRoot, ip, field } = this.splitNode(k);
-      if (ip && field == dbNodeMessage) {
-        onData({ k, v });
+      const { ip, field } = this.splitNode(k);
+      if (ip && field === dbNodeMessage) {
+        await onData({ k, v });
       }
-      continue;
     }
   }
 
@@ -73,69 +72,38 @@ export class NodeDB {
     return this.db.del(key);
   }
 
-  async querySeeds1(n: number, maxAge: number, onData: (enrs: ENR[]) => void) {
-    const enrs: ENR[] = [];
-    const now = Date.now();
-    const itr = this.db.iterator({ keys: true, values: true });
-    for await (const [key, val] of iteratorToAsyncGenerator(itr)) {
-      const { prefix, nodeId, discvRoot, ip, field } = this.splitNode(key);
-      if (ip && field == dbNodeMessage) {
-        if (now - parseInt(val.toString()) < maxAge) {
-          enrs.push(ENR.decode(await this.db.get(Buffer.from(prefix + nodeId + discvRoot))));
-          if (enrs.length >= n) {
-            break;
-          }
-        }
-      }
-    }
-    onData(enrs);
-  }
-
   async querySeeds(n: number, maxAge: number, onData: (enrs: ENR[]) => void) {
     const enrs: ENR[] = [];
     const now = Date.now();
     const itr = this.db.iterator({ keys: true, values: true });
-    seek: for (let seeks = 0; enrs.length < n && seeks < n * 5; seeks++) {
+    for (let seeks = 0; enrs.length < n && seeks < n * 5; seeks++) {
       const randomBytes = crypto.randomBytes(32);
       const data = await itr.seek(randomBytes);
       if (!data) {
-        continue seek;
+        continue;
       }
       const [key, val] = data;
       const { prefix, nodeId, discvRoot, ip, field } = this.splitNode(key);
-      if (!ip || field != dbNodeMessage) {
-        continue seek;
+      if (!ip || field !== dbNodeMessage) {
+        continue;
       }
       if (now - parseInt(val.toString()) > maxAge) {
-        continue seek;
+        continue;
       }
-      for (let k in enrs) {
-        if (enrs[k].nodeId === nodeId) {
-          continue seek;
+      let include: boolean = false;
+      for (const enr of enrs) {
+        if (enr.nodeId === nodeId) {
+          include = true;
+          break;
         }
       }
-      enrs.push(ENR.decode(await this.db.get(Buffer.from(prefix + nodeId + discvRoot))));
+      if (!include) {
+        enrs.push(ENR.decode(await this.db.get(Buffer.from(prefix + [nodeId, discvRoot].join(":")))));
+      }
     }
     onData(enrs);
   }
 
-  async nextNode(itr: AsyncGenerator<Buffer, Buffer>) {
-    const result = await new Promise<[Buffer, Buffer] | void>((resolve, reject) => {
-      itr.next((err, key, val) => {
-        if (err) {
-          reject(err);
-        }
-        if (key === undefined || val === undefined) {
-          resolve();
-        }
-        resolve([key, val]);
-      });
-    });
-    if (!result) {
-      return;
-    }
-    return result;
-  }
   /**
    * Persist local node enr information
    */
@@ -151,15 +119,15 @@ export class NodeDB {
   }
 
   putReceived(nodeId: string, ip: string) {
-    this.db.put(Buffer.from(dbNodePrefix + nodeId + ":" + dbDiscv5Root + ":" + ip + ":" + dbNodeMessage), Buffer.from(Date.now().toString()));
+    return this.db.put(Buffer.from(dbNodePrefix + [nodeId, dbDiscv5Root, ip, dbNodeMessage].join(":")), Buffer.from(Date.now().toString()));
   }
 
   nodeKey(enr: ENR): string {
-    return dbNodePrefix + enr.nodeId + ":" + dbDiscv5Root;
+    return dbNodePrefix + [enr.nodeId, dbDiscv5Root].join(":");
   }
 
   nodeItemKey(enr: ENR, field: string): string {
-    return this.nodeKey(enr) + ":" + enr.ip + ":" + field;
+    return [this.nodeKey(enr), enr.ip, field].join(":");
   }
 
   splitNode(buffer: Buffer) {

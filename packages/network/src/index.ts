@@ -3,7 +3,7 @@ import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import { LevelUp } from 'levelup';
 import { v4, v6 } from 'is-ip';
-import { ENR } from '@gxchain2/discv5';
+import { ENR, EntryStatus } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
 import { logger, TimeoutQueue, ignoreError } from '@rei-network/utils';
 import { Peer, PeerStatus } from './peer';
@@ -11,11 +11,11 @@ import { Libp2pNode } from './libp2pnode';
 import { Protocol } from './types';
 import { ExpHeap } from './expheap';
 import { NodeDB } from './nodedb';
-import { randomOne } from './utils';
 
 export * from './peer';
 export * from './types';
 
+const checkNodeInterval = 30e3;
 const timeoutLoopInterval = 300e3;
 const dialLoopInterval1 = 2e3;
 const dialLoopInterval2 = 10e3;
@@ -42,6 +42,11 @@ type PeerInfo = {
   id: string;
   addresses: { multiaddr: Multiaddr }[];
 };
+
+type IdType = {
+  peerId: string;
+  nodeId: string
+}
 
 export interface NetworkManagerOptions {
   peerId: PeerId;
@@ -74,7 +79,7 @@ export class NetworkManager extends EventEmitter {
   private libp2pNode!: Libp2pNode;
   private aborted: boolean = false;
   private initPromise?: Promise<void>;
-
+  private messageLock = true;
   private readonly maxPeers: number;
   private readonly maxDials: number;
   private readonly options: NetworkManagerOptions;
@@ -207,19 +212,6 @@ export class NetworkManager extends EventEmitter {
     this.installTimeoutId.set(peerId, id);
   }
 
-  /**
-   * Execute when a new node is discovered
-   */
-  private onDiscovered = (id: PeerId) => {
-    const peerId: string = id.toB58String();
-    if (!this.discovered.includes(peerId)) {
-      logger.info('💬 Peer discovered:', peerId);
-      this.discovered.push(peerId);
-      if (this.discovered.length > this.maxPeers) {
-        this.discovered.shift();
-      }
-    }
-  };
 
   /**
    * Execute when a new node is connected
@@ -261,14 +253,14 @@ export class NetworkManager extends EventEmitter {
    * Execute when a new enr is discovered
    * Persist new enr to db
    */
-  private onENRAdded = (enr: ENR) => {
+  private onENRAdded = async (enr: ENR) => {
     if (!this.checkENR(enr)) {
       return;
     }
-    const peerId: string = enr.id;
+    const peerId: string = (await enr.peerId()).toB58String();
     if (!this.discovered.includes(peerId)) {
       logger.info('💬 Peer discovered:', peerId);
-      this.discovered.push(peerId);
+      this.discovered.push(enr.nodeId);
       if (this.discovered.length > this.maxPeers) {
         this.discovered.shift();
       }
@@ -393,44 +385,21 @@ export class NetworkManager extends EventEmitter {
       await this.libp2pNode.start();
 
       await this.nodedb.querySeeds(seedCount, seedMaxAge, (enrs) => {
-        if (enrs.length > 0) {
-          for (let i = 0; i < enrs.length; i++) {
-            this.libp2pNode.discv5.addEnr(enrs[i]);
-          }
+        for (let i = 0; i < enrs.length; i++) {
+          this.libp2pNode.discv5.addEnr(enrs[i]);
         }
       });
 
       this.checkNodes();
-
-      (this.libp2pNode.discv5 as any).sessionService.on("message", this.onMessage)
+      //@todo multiaddr version compatible
+      this.libp2pNode.sessionService.on("message", this.onMessage)
       this.libp2pNode.discv5.discv5.on('enrAdded', this.onENRAdded);
       this.libp2pNode.discv5.discv5.on('multiaddrUpdated', this.onMultiaddrUpdated);
     })();
   }
 
-  private async checkNodes() {
-    await this.initPromise;
-    while (!this.aborted) {
-      try {
-        setInterval(() => {
-          const now = Date.now();
-          this.nodedb.load((data: { k: Buffer, v: Buffer }) => {
-            const { prefix, nodeId, discvRoot, ip, field } = this.nodedb.splitNode(data.k);
-            if (!ip || !field) {
-              return;
-            }
-            if (now - parseInt(data.v.toString()) < seedMaxAge) {
-              this.nodedb.del(data.k);
-            }
-          });
-        }, 30 * 1000);
-      } catch (err) {
-        logger.error('NetworkManager::checkNodes, catch error:', err);
-      }
-    }
-  }
-
   private onMessage = (srcId: string, src: Multiaddr): void => {
+    //@todo cache
     this.nodedb.putReceived(srcId, src.nodeAddress().address);
   };
 
@@ -598,7 +567,6 @@ export class NetworkManager extends EventEmitter {
 
     return true;
   }
-
   /**
    * A loop to keep the number of node connections
    * Automatically load peer information from db or memory and try to dial
@@ -612,35 +580,16 @@ export class NetworkManager extends EventEmitter {
           // search discovered peer in memory
           while (this.discovered.length > 0) {
             const id = this.discovered.shift()!;
-            //@todo: get the multiaddr from nodeDB
-            const addresses: { multiaddr: Multiaddr }[] | undefined = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(id));
-            if (addresses && this.filterPeer({ id, addresses })) {
-              peerId = id;
-              logger.debug('NetworkManager::dialLoop, use a discovered peer:', peerId);
-              break;
-            }
-          }
-
-          // search discovered peer in database
-          if (!peerId) {
-            const peers: {
-              id: PeerId;
-              addresses: { multiaddr: Multiaddr }[];
-            }[] = Array.from(this.libp2pNode.peerStore.peers.values());
-
-            const filteredPeers = peers
-              .map((peer) => {
-                return {
-                  id: peer.id.toB58String(),
-                  addresses: peer.addresses
-                };
-              })
-              .filter(this.filterPeer.bind(this));
-
-            if (filteredPeers.length > 0) {
-              const { id } = randomOne(filteredPeers);
-              peerId = id;
-              logger.debug('NetworkManager::dialLoop, use a stored peer:', peerId);
+            const enr = this.libp2pNode.kbuckets.getWithPending(id);
+            if (enr && enr.status === EntryStatus.Connected) {
+              let addr = this.getLocationMultiaddr(enr.value, "tcp");
+              if (addr) {
+                if (this.filterPeer({ id, addresses: [{ multiaddr: addr }] })) {
+                  peerId = id;
+                  logger.debug('NetworkManager::dialLoop, use a discovered peer:', peerId);
+                  break;
+                }
+              }
             }
           }
 
@@ -695,6 +644,50 @@ export class NetworkManager extends EventEmitter {
       }
     }
   }
+
+  private async checkNodes() {
+    await this.initPromise;
+    while (!this.aborted) {
+      try {
+        const now = Date.now();
+        await this.nodedb.load(async (data: { k: Buffer, v: Buffer }) => {
+          if (now - parseInt(data.v.toString()) > seedMaxAge) {
+            await this.nodedb.del(data.k);
+          }
+        });
+        await new Promise((r) => setTimeout(r, checkNodeInterval));
+      } catch (err) {
+        logger.error('NetworkManager::checkNodes, catch error:', err);
+      }
+    }
+  }
+
+  private getLocationMultiaddr(enr: ENR, protocol: "udp" | "udp4" | "udp6" | "tcp" | "tcp4" | "tcp6"): Multiaddr | undefined {
+    if (protocol === "udp") {
+      return this.getLocationMultiaddr(enr, "udp4") || this.getLocationMultiaddr(enr, "udp6");
+    }
+    if (protocol === "tcp") {
+      return this.getLocationMultiaddr(enr, "tcp4") || this.getLocationMultiaddr(enr, "tcp6");
+    }
+    const isIpv6 = protocol.endsWith("6");
+    const isUdp = protocol.startsWith("udp");
+    const isTcp = protocol.startsWith("tcp");
+    const ipName = isIpv6 ? "ip6" : "ip4";
+    const ipVal = isIpv6 ? enr.ip6 : enr.ip;
+    if (!ipVal) {
+      return undefined;
+    }
+    const protoName = (isUdp && "udp") || (isTcp && "tcp");
+    if (!protoName) {
+      return undefined;
+    }
+    const protoVal = isIpv6 ? (isUdp && enr.udp6) || (isTcp && enr.tcp6) : (isUdp && enr.udp) || (isTcp && enr.tcp);
+    if (!protoVal) {
+      return undefined;
+    }
+    return new Multiaddr(`/${ipName}/${ipVal}/${protoName}/${protoVal}`);
+  }
+
 
   /**
    * Abort all remote peers and stop `libp2p`

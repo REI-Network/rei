@@ -6,193 +6,21 @@ import { Node } from '../../node';
 import { preValidateBlock, preValidateHeader } from '../../validation';
 import { WireProtocolHandler, maxGetBlockHeaders } from '../../protocols';
 import { SyncInfo } from '../types';
-import { Fetcher } from './fetcher';
+import { BlockSync, BlockSyncBackend as IBlockSyncBackend, BlockSyncValidateBackend as IBlockSyncValidateBackend } from './blockSync';
 
 const bnMaxGetBlockHeaders = new BN(maxGetBlockHeaders);
 
-export declare interface FullSync {
-  on(event: 'start', listener: (info: SyncInfo) => void): this;
-  on(event: 'finished', listener: (info: SyncInfo) => void): this;
-  on(event: 'synchronized', listener: (info: SyncInfo) => void): this;
-  on(event: 'failed', listener: (info: SyncInfo) => void): this;
-
-  off(event: 'start', listener: (info: SyncInfo) => void): this;
-  off(event: 'finished', listener: (info: SyncInfo) => void): this;
-  off(event: 'synchronized', listener: (info: SyncInfo) => void): this;
-  off(event: 'failed', listener: (info: SyncInfo) => void): this;
-}
-
-export class FullSync extends EventEmitter {
-  private readonly node: Node;
-  private readonly fetcher: Fetcher;
-
-  private syncPromise?: Promise<void>;
-
-  // sync state
-  private localHeader?: BlockHeader;
-  private startingBlock: number = 0;
-  private highestBlock: number = 0;
+class BlockSyncBackend implements IBlockSyncBackend, IBlockSyncValidateBackend {
+  private node: Node;
+  private localHeader!: BlockHeader;
 
   constructor(node: Node) {
-    super();
     this.node = node;
-    this.fetcher = new Fetcher({
-      backend: this,
-      validateBackend: this,
-      common: this.node.getCommon(0),
-      downloadElementsCountLimit: bnMaxGetBlockHeaders
-    });
   }
 
-  /**
-   * Get the sync state
-   */
-  get status() {
-    return { startingBlock: this.startingBlock, highestBlock: this.highestBlock };
-  }
-
-  /**
-   * Is it syncing
-   */
-  get isSyncing() {
-    return !!this.syncPromise;
-  }
-
-  private async genesis(): Promise<{ header: BlockHeader; td: BN }> {
-    const { header } = await this.node.db.getBlock(0);
-    return { header, td: header.difficulty };
-  }
-
-  // TODO: binary search.
-  private async findAncient(handler: WireProtocolHandler): Promise<{ header: BlockHeader; td: BN } | undefined> {
-    const latest = this.node.getLatestBlock().header.number.clone();
-    if (latest.eqn(0)) {
-      return await this.genesis();
-    }
-
-    while (latest.gtn(0)) {
-      if (latest.eqn(1)) {
-        return await this.genesis();
-      }
-
-      const count = latest.gt(bnMaxGetBlockHeaders) ? bnMaxGetBlockHeaders.clone() : latest.clone();
-      latest.isub(count.subn(1));
-
-      let headers!: BlockHeader[];
-      try {
-        headers = await handler.getBlockHeaders(latest, count);
-      } catch (err: any) {
-        await this.handlePeerError('FullSync::findAncient', handler.peer.peerId, err);
-        return;
-      }
-
-      for (let i = headers.length - 1; i >= 0; i--) {
-        try {
-          const remoteHeader = headers[i];
-          const hash = remoteHeader.hash();
-          const header = await this.node.db.getHeader(hash, remoteHeader.number);
-          const td = await this.node.db.getTotalDifficulty(hash, remoteHeader.number);
-          return { header, td };
-        } catch (err: any) {
-          if (err.type === 'NotFoundError') {
-            continue;
-          }
-          logger.error('FullSync::findAncient, load header failed:', err);
-        }
-      }
-    }
-  }
-
-  private async syncOnce(handler: WireProtocolHandler) {
-    const bestHeight = new BN(handler.status!.height);
-    const bestTD = new BN(handler.status!.totalDifficulty);
-
-    // find common ancient
-    const result = await this.findAncient(handler);
-    if (!result) {
-      return;
-    }
-
-    const localHeader = result.header;
-    const localTD = result.td;
-    if (localHeader.number.eq(bestHeight)) {
-      // we already have this best block
-      logger.debug('FullSync::syncOnce, we already have this best block');
-      return;
-    }
-
-    // add check for reimint consensus engine
-    const reimint = this.node.reimint;
-    if (reimint.isStarted && reimint.state.hasMaj23Precommit(bestHeight)) {
-      // our consensus engine has collected enough votes for this height,
-      // so we ignore this best block
-      logger.debug('FullSync::syncOnce, we collected enough votes for this height');
-      return;
-    }
-
-    const peerId = handler.peer.peerId;
-    const info: SyncInfo = {
-      bestHeight,
-      bestTD,
-      remotePeerId: peerId
-    };
-
-    this.startingBlock = localHeader.number.toNumber();
-    this.highestBlock = bestHeight.toNumber();
-    this.emit('start', info);
-
-    // save local header information
+  resetLocalHeader(localHeader: BlockHeader) {
     this.localHeader = localHeader;
-    const start = localHeader.number.addn(1);
-    const totalCount = bestHeight.sub(localHeader.number);
-
-    // start fetch
-    this.fetcher.reset();
-    const { reorged, cumulativeTotalDifficulty } = await this.fetcher.fetch(start, totalCount, handler);
-
-    // check total difficulty
-    if (!cumulativeTotalDifficulty.add(localTD).eq(bestTD)) {
-      // maybe we should ban the remote peer?
-      // await this.node.banPeer(peerId, 'invalid');
-      logger.warn('FullSync::syncOnce, total difficulty does not match:', peerId);
-    }
-
-    // send events
-    this.emit('finished', info);
-    if (reorged) {
-      this.emit('synchronized', info);
-    } else {
-      this.emit('failed', info);
-    }
   }
-
-  /**
-   * Start full sync
-   * @param handler - Handler instance
-   */
-  fullSync(handler: WireProtocolHandler) {
-    if (!this.syncPromise) {
-      this.syncPromise = this.syncOnce(handler)
-        .catch((err) => {
-          logger.error('FullSync::fullSync, catch:', err);
-        })
-        .finally(() => {
-          this.syncPromise = undefined;
-        });
-    }
-  }
-
-  /**
-   * Abort sync
-   */
-  async abort() {
-    if (this.syncPromise) {
-      await this.fetcher.abort();
-      await this.syncPromise;
-    }
-  }
-
-  /////////////////// Fetcher backend ///////////////////
 
   /**
    * Handle peer error,
@@ -272,6 +100,190 @@ export class FullSync extends EventEmitter {
   async validateBlocks(blocks: Block[]) {
     await Promise.all(blocks.map((b) => preValidateBlock.call(b)));
   }
+}
 
-  /////////////////// Fetcher backend ///////////////////
+export declare interface FullSync {
+  on(event: 'start', listener: (info: SyncInfo) => void): this;
+  on(event: 'finished', listener: (info: SyncInfo) => void): this;
+  on(event: 'synchronized', listener: (info: SyncInfo) => void): this;
+  on(event: 'failed', listener: (info: SyncInfo) => void): this;
+
+  off(event: 'start', listener: (info: SyncInfo) => void): this;
+  off(event: 'finished', listener: (info: SyncInfo) => void): this;
+  off(event: 'synchronized', listener: (info: SyncInfo) => void): this;
+  off(event: 'failed', listener: (info: SyncInfo) => void): this;
+}
+
+export class FullSync extends EventEmitter {
+  private readonly node: Node;
+  private readonly backend: BlockSyncBackend;
+  private readonly blockSync: BlockSync;
+
+  private syncPromise?: Promise<void>;
+
+  // sync state
+  private startingBlock: number = 0;
+  private highestBlock: number = 0;
+
+  constructor(node: Node) {
+    super();
+    this.node = node;
+    this.backend = new BlockSyncBackend(node);
+    this.blockSync = new BlockSync({
+      backend: this.backend,
+      validateBackend: this.backend,
+      common: this.node.getCommon(0),
+      downloadElementsCountLimit: bnMaxGetBlockHeaders
+    });
+  }
+
+  /**
+   * Get the sync state
+   */
+  get status() {
+    return { startingBlock: this.startingBlock, highestBlock: this.highestBlock };
+  }
+
+  /**
+   * Is it syncing
+   */
+  get isSyncing() {
+    return !!this.syncPromise;
+  }
+
+  private async genesis(): Promise<{ header: BlockHeader; td: BN }> {
+    const { header } = await this.node.db.getBlock(0);
+    return { header, td: header.difficulty };
+  }
+
+  // TODO: binary search.
+  private async findAncient(handler: WireProtocolHandler): Promise<{ header: BlockHeader; td: BN } | undefined> {
+    const latest = this.node.getLatestBlock().header.number.clone();
+    if (latest.eqn(0)) {
+      return await this.genesis();
+    }
+
+    while (latest.gtn(0)) {
+      if (latest.eqn(1)) {
+        return await this.genesis();
+      }
+
+      const count = latest.gt(bnMaxGetBlockHeaders) ? bnMaxGetBlockHeaders.clone() : latest.clone();
+      latest.isub(count.subn(1));
+
+      let headers!: BlockHeader[];
+      try {
+        headers = await handler.getBlockHeaders(latest, count);
+      } catch (err: any) {
+        // maybe we should ban the remote peer
+        return;
+      }
+
+      for (let i = headers.length - 1; i >= 0; i--) {
+        try {
+          const remoteHeader = headers[i];
+          const hash = remoteHeader.hash();
+          const header = await this.node.db.getHeader(hash, remoteHeader.number);
+          const td = await this.node.db.getTotalDifficulty(hash, remoteHeader.number);
+          return { header, td };
+        } catch (err: any) {
+          if (err.type === 'NotFoundError') {
+            continue;
+          }
+          logger.error('FullSync::findAncient, load header failed:', err);
+        }
+      }
+    }
+  }
+
+  private async syncOnce(handler: WireProtocolHandler) {
+    const bestHeight = new BN(handler.status!.height);
+    const bestTD = new BN(handler.status!.totalDifficulty);
+
+    // find common ancient
+    const result = await this.findAncient(handler);
+    if (!result) {
+      return;
+    }
+
+    const localHeader = result.header;
+    const localTD = result.td;
+    if (localHeader.number.eq(bestHeight)) {
+      // we already have this best block
+      logger.debug('FullSync::syncOnce, we already have this best block');
+      return;
+    }
+
+    // add check for reimint consensus engine
+    const reimint = this.node.reimint;
+    if (reimint.isStarted && reimint.state.hasMaj23Precommit(bestHeight)) {
+      // our consensus engine has collected enough votes for this height,
+      // so we ignore this best block
+      logger.debug('FullSync::syncOnce, we collected enough votes for this height');
+      return;
+    }
+
+    const peerId = handler.peer.peerId;
+    const info: SyncInfo = {
+      bestHeight,
+      bestTD,
+      remotePeerId: peerId
+    };
+
+    this.startingBlock = localHeader.number.toNumber();
+    this.highestBlock = bestHeight.toNumber();
+    this.emit('start', info);
+
+    // save local header information
+    const start = localHeader.number.addn(1);
+    const totalCount = bestHeight.sub(localHeader.number);
+    this.backend.resetLocalHeader(localHeader);
+
+    // start block sync
+    this.blockSync.reset();
+    const { reorged, cumulativeTotalDifficulty } = await this.blockSync.fetch(start, totalCount, handler);
+
+    // check total difficulty
+    if (!cumulativeTotalDifficulty.add(localTD).eq(bestTD)) {
+      // maybe we should ban the remote peer?
+      // await this.node.banPeer(peerId, 'invalid');
+      logger.warn('FullSync::syncOnce, total difficulty does not match:', peerId);
+    }
+
+    // send events
+    this.emit('finished', info);
+    if (reorged) {
+      this.emit('synchronized', info);
+    } else {
+      this.emit('failed', info);
+    }
+  }
+
+  /**
+   * Start full sync
+   * @param handler - Handler instance
+   */
+  fullSync(handler: WireProtocolHandler) {
+    if (this.syncPromise) {
+      throw new Error('full sync is working');
+    }
+
+    this.syncPromise = this.syncOnce(handler)
+      .catch((err) => {
+        logger.error('FullSync::fullSync, catch:', err);
+      })
+      .finally(() => {
+        this.syncPromise = undefined;
+      });
+  }
+
+  /**
+   * Abort sync
+   */
+  async abort() {
+    if (this.syncPromise) {
+      await this.blockSync.abort();
+      await this.syncPromise;
+    }
+  }
 }

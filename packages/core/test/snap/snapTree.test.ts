@@ -21,7 +21,6 @@ class MockNode {
 const level = require('level-mem');
 const common = new Common({ chain: 'rei-devnet' });
 common.setHardforkByBlockNumber(0);
-const cache = 100;
 const db = new Database(level(), common);
 const anotherDB = new Database(level(), common);
 const node = new MockNode();
@@ -95,7 +94,7 @@ describe('SnapshotTree', () => {
     accounts = rootAndAccounts.accounts;
     diskLayer = new DiskLayer(db, root);
     layers.push({ layer: diskLayer, accounts });
-    snaptree = new SnapTree(db, cache, node as any);
+    snaptree = new SnapTree(db, node as any);
     await snaptree.init(root, async, rebuild);
     for (let i = 0; i < 6; i++) {
       const latest = layers[layers.length - 1];
@@ -299,7 +298,7 @@ describe('SnapshotTree', () => {
   });
 
   it('should disable correctly', async () => {
-    anothorSnaptree = new SnapTree(anotherDB, cache, node as any);
+    anothorSnaptree = new SnapTree(anotherDB, node as any);
     await anothorSnaptree.init(root, async, rebuild);
     for (let i = 1; i < layers.length; i++) {
       anothorSnaptree.update(layers[i].layer.root, layers[i - 1].layer.root, (layers[i].layer as DiffLayer).accountData, (layers[i].layer as DiffLayer).destructSet, (layers[i].layer as DiffLayer).storageData);

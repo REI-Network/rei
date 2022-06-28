@@ -16,7 +16,7 @@ class MockNode {
 
   constructor(db: Database, root: Buffer) {
     this.db = db;
-    this.snaptree = new SnapTree(db, snapTreeCache, this as any);
+    this.snaptree = new SnapTree(db, this as any);
   }
 }
 
@@ -65,7 +65,6 @@ class MockHander extends SnapProtocolHandler {
 }
 
 const level = require('level-mem');
-const snapTreeCache = 100;
 const common = new Common({ chain: 'rei-devnet' });
 common.setHardforkByBlockNumber(0);
 const db = new Database(level(), common);

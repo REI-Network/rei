@@ -21,14 +21,12 @@ export const journalVersion = 0;
 
 export class SnapTree {
   diskdb: Database;
-  cache: number;
   layers: FunctionalBufferMap<Snapshot>;
   node: Node;
   onFlatten?: Function; // Hook invoked when the bottom most diff layers are flattened
 
-  constructor(diskdb: Database, cache: number, node: Node) {
+  constructor(diskdb: Database, node: Node) {
     this.diskdb = diskdb;
-    this.cache = cache;
     this.layers = new FunctionalBufferMap<Snapshot>();
     this.node = node;
   }

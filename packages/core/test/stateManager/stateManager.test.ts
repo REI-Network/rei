@@ -56,7 +56,6 @@ describe('StateManager', () => {
   before(async () => {
     const common = new Common({ chain: 'rei-testnet' });
     common.setHardforkByBlockNumber(0);
-    const cache = 100;
     const level = require('level-mem');
     const db = new Database(level(), common);
     const async = true;
@@ -65,7 +64,7 @@ describe('StateManager', () => {
     const rootAndAccounts = await genRandomAccounts(db, 0, 0);
     const root = rootAndAccounts.root;
     const node = new MockNode();
-    let snapTree = new SnapTree(db, cache, node as any);
+    let snapTree = new SnapTree(db, node as any);
     await snapTree.init(root, async, rebuild);
     stateManager = new MockStateManger({
       common: common,

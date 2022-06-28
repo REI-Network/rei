@@ -220,7 +220,7 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
    */
   send(msg: m.Message) {
     if (this.peer.isSupport(NetworkProtocol.REI_CONSENSUS)) {
-      this.peer.send(this.protocol.name, MessageFactory.serializeMessage(msg));
+      this.peer.send(this.protocol.protocolString, MessageFactory.serializeMessage(msg));
     }
   }
 

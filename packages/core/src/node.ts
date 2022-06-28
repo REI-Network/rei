@@ -18,7 +18,7 @@ import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, ReceiptsCache } from './bloomBits';
 import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
-import { WireProtocol, ConsensusProtocol } from './protocols';
+import { Wire, ConsensusProtocol } from './protocols';
 import { ReimintConsensusEngine, CliqueConsensusEngine } from './consensus';
 import { isEnableRemint } from './hardforks';
 import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
@@ -49,7 +49,7 @@ export class Node {
   readonly chaindb: LevelUp;
   readonly evidencedb: LevelUp;
   readonly networkdb: LevelStore;
-  readonly wire: WireProtocol;
+  readonly wire: Wire;
   readonly consensus: ConsensusProtocol;
   readonly db: Database;
   readonly blockchain: Blockchain;
@@ -85,7 +85,7 @@ export class Node {
     this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));
     this.evidencedb = createLevelDB(path.join(this.datadir, 'evidence'));
     this.networkdb = new LevelStore(path.join(this.datadir, 'networkdb'), { createIfMissing: true });
-    this.wire = new WireProtocol(this);
+    this.wire = new Wire(this);
     this.consensus = new ConsensusProtocol(this);
     this.accMngr = new AccountManager(options.account.keyStorePath);
     this.receiptsCache = new ReceiptsCache(options.receiptsCacheSize);
@@ -117,7 +117,7 @@ export class Node {
 
     this.networkMngr = new NetworkManager({
       ...options.network,
-      protocols: [this.wire, this.consensus],
+      protocols: [this.wire.v1, this.wire.v2, this.consensus],
       datastore: this.networkdb,
       nodedb: this.nodedb,
       bootnodes: [...common.bootstrapNodes(), ...(options.network.bootnodes ?? [])]
@@ -226,7 +226,7 @@ export class Node {
   }
 
   private onPeerInstalled = (name: string, peer: Peer) => {
-    if (name === this.wire.name) {
+    if (name === this.wire.v1.name || name === this.wire.v2.name) {
       const handler = this.wire.getHandler(peer, false);
       handler && this.sync.announceNewPeer(handler);
     }

@@ -139,30 +139,30 @@ export class Peer {
     }
     const handler = protocol.makeHandler(this);
     const queue = new MsgQueue(this, handler);
-    this.queueMap.set(protocol.name, queue);
+    this.queueMap.set(protocol.protocolString, queue);
     return { queue, handler };
   }
 
   /**
    * Get the message queue by protocol name
-   * @param name - Protocol name
+   * @param str - Protocol string
    * @returns Message queue
    */
-  getMsgQueue(name: string) {
-    const queue = this.queueMap.get(name);
+  getMsgQueue(str: string) {
+    const queue = this.queueMap.get(str);
     if (!queue) {
-      throw new Error(`Peer unknown name: ${name}`);
+      throw new Error(`Peer unknown protocol string: ${str}`);
     }
     return queue;
   }
 
   /**
    * Send data for target protocol
-   * @param name - Target protocol name
+   * @param str - Target protocol string
    * @param data - Data
    */
-  send(name: string, data: any) {
-    this.getMsgQueue(name).send(data);
+  send(str: string, data: any) {
+    this.getMsgQueue(str).send(data);
   }
 
   /**
@@ -182,11 +182,11 @@ export class Peer {
 
   /**
    * Query whether a protocol is supported
-   * @param name - Protocol name
+   * @param str - Protocol string
    * @returns `true` if supported, `false` if not
    */
-  isSupport(name: string): boolean {
-    return this.queueMap.has(name);
+  isSupport(str: string): boolean {
+    return this.queueMap.has(str);
   }
 
   /**

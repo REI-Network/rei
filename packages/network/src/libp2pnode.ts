@@ -2,7 +2,7 @@ import MPLEX from 'libp2p-mplex';
 import PeerId from 'peer-id';
 import TCP from 'libp2p-tcp';
 import secio from 'libp2p-secio';
-import { Discv5Discovery, ENR, KademliaRoutingTable } from '@gxchain2/discv5';
+import { Discv5Discovery, ENR, KademliaRoutingTable, SessionService } from '@gxchain2/discv5';
 const Libp2p = require('libp2p');
 
 export interface Libp2pNodeOptions {
@@ -69,7 +69,7 @@ export class Libp2pNode extends Libp2p {
     return (this.discv5 as any).kbuckets;
   }
 
-  get sessionService() {
+  get sessionService(): SessionService {
     return (this.discv5 as any).sessionService;
   }
 }

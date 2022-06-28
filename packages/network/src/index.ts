@@ -79,14 +79,13 @@ export class NetworkManager extends EventEmitter {
   private libp2pNode!: Libp2pNode;
   private aborted: boolean = false;
   private initPromise?: Promise<void>;
-  private messageLock = true;
   private readonly maxPeers: number;
   private readonly maxDials: number;
   private readonly options: NetworkManagerOptions;
 
   // a cache list that records all discovered peer,
   // the max size of this list is `this.maxPeers`
-  private readonly discovered: string[] = [];
+  private readonly discovered: IdType[] = [];
   // set that records all dialing peer id
   private readonly dialing = new Set<string>();
   // map that records all peers
@@ -258,12 +257,10 @@ export class NetworkManager extends EventEmitter {
       return;
     }
     const peerId: string = (await enr.peerId()).toB58String();
-    if (!this.discovered.includes(peerId)) {
-      logger.info('💬 Peer discovered:', peerId);
-      this.discovered.push(enr.nodeId);
-      if (this.discovered.length > this.maxPeers) {
-        this.discovered.shift();
-      }
+    logger.info('💬 Peer discovered:', peerId);
+    this.discovered.push({ peerId: peerId, nodeId: enr.nodeId });
+    if (this.discovered.length > this.maxPeers) {
+      this.discovered.shift();
     }
     this.nodedb.persist(enr);
   };
@@ -384,22 +381,19 @@ export class NetworkManager extends EventEmitter {
       this.libp2pNode.connectionManager.on('peer:disconnect', this.onDisconnect);
       await this.libp2pNode.start();
 
-      await this.nodedb.querySeeds(seedCount, seedMaxAge, (enrs) => {
-        for (let i = 0; i < enrs.length; i++) {
-          this.libp2pNode.discv5.addEnr(enrs[i]);
-        }
-      });
+      const enrs = await this.nodedb.querySeeds(seedCount, seedMaxAge);
+      for (const enr of enrs) {
+        this.libp2pNode.discv5.addEnr(enr);
+      }
 
       this.checkNodes();
-      //@todo multiaddr version compatible
       this.libp2pNode.sessionService.on("message", this.onMessage)
       this.libp2pNode.discv5.discv5.on('enrAdded', this.onENRAdded);
       this.libp2pNode.discv5.discv5.on('multiaddrUpdated', this.onMultiaddrUpdated);
     })();
   }
 
-  private onMessage = (srcId: string, src: Multiaddr): void => {
-    //@todo cache
+  private onMessage = (srcId: string, src): void => {
     this.nodedb.putReceived(srcId, src.nodeAddress().address);
   };
 
@@ -576,16 +570,16 @@ export class NetworkManager extends EventEmitter {
     while (!this.aborted) {
       try {
         if (this.peers.length < this.maxPeers && this.dialing.size < this.maxDials) {
-          let peerId: string | undefined;
+          let pid: string | undefined;
           // search discovered peer in memory
           while (this.discovered.length > 0) {
-            const id = this.discovered.shift()!;
-            const enr = this.libp2pNode.kbuckets.getWithPending(id);
+            const { peerId, nodeId } = this.discovered.shift()!;
+            const enr = this.libp2pNode.kbuckets.getWithPending(nodeId);
             if (enr && enr.status === EntryStatus.Connected) {
               let addr = this.getLocationMultiaddr(enr.value, "tcp");
               if (addr) {
-                if (this.filterPeer({ id, addresses: [{ multiaddr: addr }] })) {
-                  peerId = id;
+                if (this.filterPeer({ id: peerId, addresses: [{ multiaddr: addr }] })) {
+                  pid = peerId;
                   logger.debug('NetworkManager::dialLoop, use a discovered peer:', peerId);
                   break;
                 }
@@ -594,13 +588,13 @@ export class NetworkManager extends EventEmitter {
           }
 
           // try to dial a discovered peer
-          if (peerId) {
-            this.updateOutbound(peerId);
-            this.dial(peerId, this.protocols).then(async ({ success, streams }) => {
+          if (pid) {
+            this.updateOutbound(pid);
+            this.dial(pid, this.protocols).then(async ({ success, streams }) => {
               if (success) {
                 streams.forEach((stream, i) => {
                   if (stream !== null) {
-                    this.install(peerId!, this.protocols[i], stream);
+                    this.install(pid!, this.protocols[i], stream);
                   }
                 });
               }
@@ -649,12 +643,7 @@ export class NetworkManager extends EventEmitter {
     await this.initPromise;
     while (!this.aborted) {
       try {
-        const now = Date.now();
-        await this.nodedb.load(async (data: { k: Buffer, v: Buffer }) => {
-          if (now - parseInt(data.v.toString()) > seedMaxAge) {
-            await this.nodedb.del(data.k);
-          }
-        });
+        await this.nodedb.checkTimeout(seedMaxAge);
         await new Promise((r) => setTimeout(r, checkNodeInterval));
       } catch (err) {
         logger.error('NetworkManager::checkNodes, catch error:', err);

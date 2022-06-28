@@ -57,12 +57,15 @@ export class NodeDB {
   /**
    * Load all remote node enr information
    */
-  async load(onData: (data: { k, v }) => Promise<void>) {
+  async checkTimeout(seedMaxAge: number) {
+    const now = Date.now();
     const itr = this.db.iterator({ keys: true, values: true });
     for await (const [k, v] of iteratorToAsyncGenerator(itr)) {
       const { ip, field } = this.splitNode(k);
       if (ip && field === dbNodeMessage) {
-        await onData({ k, v });
+        if (now - parseInt(v.toString()) > seedMaxAge) {
+          await this.del(k);
+        }
       }
     }
   }
@@ -72,13 +75,12 @@ export class NodeDB {
     return this.db.del(key);
   }
 
-  async querySeeds(n: number, maxAge: number, onData: (enrs: ENR[]) => void) {
+  async querySeeds(n: number, maxAge: number) {
     const enrs: ENR[] = [];
     const now = Date.now();
     const itr = this.db.iterator({ keys: true, values: true });
     for (let seeks = 0; enrs.length < n && seeks < n * 5; seeks++) {
-      const randomBytes = crypto.randomBytes(32);
-      const data = await itr.seek(randomBytes);
+      const data = await this.seek(itr);
       if (!data) {
         continue;
       }
@@ -101,7 +103,7 @@ export class NodeDB {
         enrs.push(ENR.decode(await this.db.get(Buffer.from(prefix + [nodeId, discvRoot].join(":")))));
       }
     }
-    onData(enrs);
+    return enrs
   }
 
   /**
@@ -134,5 +136,14 @@ export class NodeDB {
     const str = buffer.toString();
     const [prefix, nodeId, discvRoot, ip, field] = str.split(":");
     return { prefix, nodeId, discvRoot, ip, field };
+  }
+
+  async seek(itr: AbstractIterator<Buffer, Buffer>) {
+    const randomBytes = crypto.randomBytes(32);
+    for await (const [key, val] of iteratorToAsyncGenerator(itr)) {
+      if (key.compare(randomBytes) > 0) {
+        return [key, val];
+      }
+    }
   }
 }

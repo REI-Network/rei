@@ -58,7 +58,7 @@ export class Synchronizer extends EventEmitter {
     super();
     this.node = node;
     this.full = new FullSync(node);
-    this.snap = new SnapSync(this.node.db, 1 as any);
+    this.snap = new SnapSync(this.node.db, 1 as any); // TODO
     this.listenSyncer(this.full);
     this.listenSyncer(this.snap);
   }

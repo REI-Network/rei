@@ -18,6 +18,11 @@ class BlockSyncBackend implements IBlockSyncBackend, IBlockSyncValidateBackend {
     this.node = node;
   }
 
+  /**
+   * Reset local header,
+   * local header will be used for validateHeaders
+   * @param localHeader - Header
+   */
   resetLocalHeader(localHeader: BlockHeader) {
     this.localHeader = localHeader;
   }
@@ -68,7 +73,7 @@ class BlockSyncBackend implements IBlockSyncBackend, IBlockSyncValidateBackend {
    * Validate headers
    * @param parent - Parent block header(if it exsits)
    * @param headers - A list of headers that need to be validated
-   * @returns
+   * @returns Latest header
    */
   validateHeaders(parent: BlockHeader | undefined, headers: BlockHeader[]) {
     headers.forEach((header, i) => {

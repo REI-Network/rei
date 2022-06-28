@@ -124,14 +124,14 @@ export class GetStorageRange implements SnapMessage {
 
 export class StorageRange implements SnapMessage {
   readonly reqID: number;
-  readonly storage: Buffer[][][] = [];
+  readonly slots: Buffer[][][] = [];
   readonly proof: Buffer[][];
 
   static readonly code = 3;
 
-  constructor(reqID: number, storage: Buffer[][][], proof: Buffer[][]) {
+  constructor(reqID: number, slots: Buffer[][][], proof: Buffer[][]) {
     this.reqID = reqID;
-    this.storage = storage;
+    this.slots = slots;
     this.proof = proof;
     this.validateBasic();
   }
@@ -148,7 +148,7 @@ export class StorageRange implements SnapMessage {
   }
 
   raw() {
-    return [intToBuffer(this.reqID), [...this.storage], [...this.proof]];
+    return [intToBuffer(this.reqID), [...this.slots], [...this.proof]];
   }
 
   serialize(): Buffer {
@@ -195,13 +195,13 @@ export class GetByteCode implements SnapMessage {
 
 export class ByteCode implements SnapMessage {
   readonly reqID: number;
-  readonly codesHashes: Buffer[];
+  readonly codes: Buffer[];
 
   static readonly code = 5;
 
-  constructor(reqID: number, codeHashes: Buffer[]) {
+  constructor(reqID: number, codes: Buffer[]) {
     this.reqID = reqID;
-    this.codesHashes = codeHashes;
+    this.codes = codes;
     this.validateBasic();
   }
 
@@ -218,7 +218,7 @@ export class ByteCode implements SnapMessage {
   }
 
   raw() {
-    return [intToBuffer(this.reqID), [...this.codesHashes]];
+    return [intToBuffer(this.reqID), [...this.codes]];
   }
 
   serialize(): Buffer {

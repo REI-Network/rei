@@ -197,7 +197,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
 
   private async applyGetByteCode(msg: s.GetByteCode) {
     const hashes = msg.hashes;
-    const codesHash: Buffer[] = [];
+    const codes: Buffer[] = [];
     let responseLimit = msg.responseLimit;
     if (responseLimit > softResponseLimit) {
       responseLimit = softResponseLimit;
@@ -209,11 +209,11 @@ export class SnapProtocolHandler implements ProtocolHandler {
     const trie = new Trie(this.node.db.rawdb);
     for (let i = 0; i < hashes.length; i++) {
       if (hashes[i].equals(KECCAK256_NULL)) {
-        codesHash.push(Buffer.alloc(0));
+        codes.push(Buffer.alloc(0));
       } else {
         const codeResult = await trie.get(hashes[i]);
         if (codeResult) {
-          codesHash.push(codeResult);
+          codes.push(codeResult);
           size += codeResult.length;
         }
       }
@@ -221,7 +221,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
         break;
       }
     }
-    this.send(new s.ByteCode(msg.reqID, codesHash));
+    this.send(new s.ByteCode(msg.reqID, codes));
   }
 
   private async applyGetTrieNode(msg: s.GetTrieNode) {

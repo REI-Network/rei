@@ -45,11 +45,11 @@ export class SnapMessageFactory {
   }
 }
 
-SnapMessageFactory.registry.register(s.AccountRange);
 SnapMessageFactory.registry.register(s.GetAccountRange);
-SnapMessageFactory.registry.register(s.ByteCode);
-SnapMessageFactory.registry.register(s.GetByteCode);
-SnapMessageFactory.registry.register(s.StorageRange);
+SnapMessageFactory.registry.register(s.AccountRange);
 SnapMessageFactory.registry.register(s.GetStorageRange);
+SnapMessageFactory.registry.register(s.StorageRange);
+SnapMessageFactory.registry.register(s.GetByteCode);
+SnapMessageFactory.registry.register(s.ByteCode);
 SnapMessageFactory.registry.register(s.GetTrieNode);
 SnapMessageFactory.registry.register(s.TrieNode);

@@ -267,7 +267,7 @@ export class WireProtocolHandler implements ProtocolHandler {
   }
 
   /**
-   * Get method hander according to method name
+   * Get method handler according to method name
    * @param method - Method name
    * @returns Handler function
    */
@@ -404,7 +404,7 @@ export class WireProtocolHandler implements ProtocolHandler {
       request.resolve(data);
     } else if (handler.process) {
       if (code !== 0 && !(await this.handshakePromise)) {
-        logger.warn('WireProtocolHander::handle, handshake failed');
+        logger.warn('WireProtocolHandler::handle, handshake failed');
         return;
       }
 

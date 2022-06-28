@@ -48,7 +48,7 @@ class MockFetcherBackend implements BlockSyncBackend, BlockSyncValidateBackend {
   async validateBlocks() {}
 }
 
-class MockProtocolHander {
+class MockProtocolHandler {
   peer: any;
   readonly index: number;
   readonly protocol: MockProtocol;
@@ -110,7 +110,7 @@ class MockProtocolHander {
   }
 }
 
-class MockHandlerPool extends HandlerPool<MockProtocolHander> {
+class MockHandlerPool extends HandlerPool<MockProtocolHandler> {
   timeout: number = 0;
 
   reset() {
@@ -141,9 +141,9 @@ class MockProtocol {
 describe('Fetcher', () => {
   const backend = new MockFetcherBackend();
   const protocol = new MockProtocol();
-  let targetHandler!: MockProtocolHander;
+  let targetHandler!: MockProtocolHandler;
   for (let i = 0; i < 10; i++) {
-    protocol.pool.add((targetHandler = new MockProtocolHander(i, protocol)));
+    protocol.pool.add((targetHandler = new MockProtocolHandler(i, protocol)));
   }
 
   afterEach(() => {

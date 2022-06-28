@@ -1,6 +1,10 @@
 import { getRandomIntInclusive } from '@rei-network/utils';
 
-type Getter<T> = {
+interface IHandler {
+  get id(): string;
+}
+
+type Getter<T extends IHandler> = {
   resolve(handler: T): void;
   reject(reason?: any): void;
   timeout: NodeJS.Timeout;
@@ -11,9 +15,9 @@ export class GetHandlerTimeoutError extends Error {}
 /**
  * ProtocolPool is used to manage all the handlers
  */
-export class HandlerPool<T> {
-  private idlePool = new Set<T>();
-  private busyPool = new Set<T>();
+export class HandlerPool<T extends IHandler> {
+  readonly idlePool = new Map<string, T>();
+  readonly busyPool = new Map<string, T>();
   private getterQueue: Getter<T>[] = [];
 
   private addIdleHandler(handler: T) {
@@ -21,9 +25,9 @@ export class HandlerPool<T> {
       const getter = this.getterQueue.shift()!;
       clearTimeout(getter.timeout);
       getter.resolve(handler);
-      this.busyPool.add(handler);
+      this.busyPool.set(handler.id, handler);
     } else {
-      this.idlePool.add(handler);
+      this.idlePool.set(handler.id, handler);
     }
   }
 
@@ -31,7 +35,15 @@ export class HandlerPool<T> {
    * Get all hanlders
    */
   get handlers() {
-    return [...Array.from(this.idlePool), ...Array.from(this.busyPool)];
+    return [...Array.from(this.idlePool.values()), ...Array.from(this.busyPool.values())];
+  }
+
+  /**
+   * Check if id already exists
+   * @param id
+   */
+  has(id: string) {
+    return this.busyPool.has(id) || this.idlePool.has(id);
   }
 
   /**
@@ -48,7 +60,7 @@ export class HandlerPool<T> {
    * @returns `true` if successfully deleted
    */
   remove(handler: T): boolean {
-    return this.idlePool.delete(handler) || this.busyPool.delete(handler);
+    return this.idlePool.delete(handler.id) || this.busyPool.delete(handler.id);
   }
 
   /**
@@ -58,9 +70,9 @@ export class HandlerPool<T> {
    */
   get(timeout: number = 3 * 1000) {
     if (this.idlePool.size > 0) {
-      const handler = Array.from(this.idlePool)[getRandomIntInclusive(0, this.idlePool.size - 1)];
-      this.idlePool.delete(handler);
-      this.busyPool.add(handler);
+      const handler = Array.from(this.idlePool.values())[getRandomIntInclusive(0, this.idlePool.size - 1)];
+      this.idlePool.delete(handler.id);
+      this.busyPool.set(handler.id, handler);
       return Promise.resolve(handler);
     }
     return new Promise<T>((resolve, reject) => {
@@ -81,7 +93,7 @@ export class HandlerPool<T> {
    * @param handler Handler object
    */
   put(handler: T) {
-    if (this.busyPool.delete(handler)) {
+    if (this.busyPool.delete(handler.id)) {
       this.addIdleHandler(handler);
     }
   }

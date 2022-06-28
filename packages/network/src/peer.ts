@@ -132,7 +132,13 @@ export class Peer {
    * @param protocol - Protocol object
    * @returns Message queue and protocol handler
    */
-  private async makeMsgQueue(protocol: Protocol) {
+  private async makeMsgQueue(protocol: Protocol): Promise<{
+    queue: MsgQueue;
+    handler: ProtocolHandler;
+  } | null> {
+    if (protocol.beforeMakeHandler(this)) {
+      return null;
+    }
     const oldQueue = this.queueMap.get(protocol.protocolString);
     if (oldQueue) {
       await oldQueue.abort();
@@ -196,7 +202,11 @@ export class Peer {
    * @returns Whether the handshake was successful
    */
   async installProtocol(protocol: Protocol, stream: any) {
-    const { queue, handler } = await this.makeMsgQueue(protocol);
+    const result = await this.makeMsgQueue(protocol);
+    if (!result) {
+      return false;
+    }
+    const { queue, handler } = result;
     queue.pipeStream(stream);
     let handshakeResult: undefined | boolean;
     try {

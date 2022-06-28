@@ -7,6 +7,10 @@ export abstract class BaseProtocol<T extends ProtocolHandler> implements Protoco
   readonly name: NetworkProtocol;
   readonly version: string;
 
+  beforeMakeHandler(peer: Peer): boolean {
+    return true;
+  }
+
   abstract makeHandler(peer: Peer): T;
 
   constructor(node: Node, name: NetworkProtocol, version: string) {

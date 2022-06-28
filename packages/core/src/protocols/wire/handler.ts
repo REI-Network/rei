@@ -61,6 +61,10 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
     this.txAnnouncesLoop();
   }
 
+  get id() {
+    return this.peer.peerId;
+  }
+
   get status() {
     return this._status;
   }

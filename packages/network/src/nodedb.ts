@@ -78,8 +78,15 @@ export class NodeDB {
     const enrs: ENR[] = [];
     const now = Date.now();
     const itr = this.db.iterator({ keys: true, values: true });
+    let randomBytes: Buffer = Buffer.alloc(32);
     for (let seeks = 0; enrs.length < n && seeks < n * 5; seeks++) {
-      const data = await this.seek(dbNodeMessage, itr);
+      // Seek to a random entry. The first byte is incremented by a
+      // random amount each time in order to increase the likelihood
+      // of hitting all existing nodes in very small databases.
+      const ctr = randomBytes[0];
+      randomBytes = crypto.randomBytes(32);
+      randomBytes[0] = ctr + (randomBytes[0] % 16);
+      const data = await this.seek(randomBytes, dbNodeMessage, itr);
       if (!data) {
         continue;
       }
@@ -134,8 +141,7 @@ export class NodeDB {
     return { prefix, nodeId, discvRoot, ip, field };
   }
 
-  async seek(f: string, itr: AbstractIterator<Buffer, Buffer>) {
-    const randomBytes = crypto.randomBytes(32);
+  async seek(randomBytes: Buffer, f: string, itr: AbstractIterator<Buffer, Buffer>) {
     for await (const [key, val] of iteratorToAsyncGenerator(itr)) {
       if (key.compare(randomBytes) > 0) {
         const { ip, field } = this.splitNode(key);

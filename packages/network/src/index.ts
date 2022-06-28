@@ -23,7 +23,7 @@ const inboundThrottleTime = 30e3;
 const outboundThrottleTime = 35e3;
 const installTimeoutDuration = 3e3;
 
-const defaultMaxPeers = 50;
+const defaultMaxPeers = 256 * 16; //kbucket size
 const defaultMaxDials = 4;
 const defaultTcpPort = 4191;
 const defaultUdpPort = 9810;
@@ -36,6 +36,13 @@ enum Libp2pPeerValue {
   installed = 1,
   connected = 0.5,
   incoming = 0
+}
+
+enum MessageType {
+  PING = 0,
+  PONG = 1,
+  FINDNODE = 3,
+  NODES = 4
 }
 
 type PeerInfo = {
@@ -392,8 +399,10 @@ export class NetworkManager extends EventEmitter {
     })();
   }
 
-  private onMessage = (srcId: string, src): void => {
-    this.nodedb.putReceived(srcId, src.nodeAddress().address);
+  private onMessage = (srcId: string, src, message): void => {
+    if (message.type === MessageType.PONG) {
+      this.nodedb.putReceived(srcId, src.nodeAddress().address);
+    }
   };
 
   private checkInbound(peerId: string) {

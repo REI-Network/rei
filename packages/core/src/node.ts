@@ -225,8 +225,8 @@ export class Node {
     await this.chaindb.close();
   }
 
-  private onPeerInstalled = (name: string, peer: Peer) => {
-    if (name === this.wire.v1.protocolString || name === this.wire.v2.protocolString) {
+  private onPeerInstalled = (str: string, peer: Peer) => {
+    if (str === this.wire.v1.protocolString || str === this.wire.v2.protocolString) {
       const handler = this.wire.getHandler(peer, false);
       handler && this.sync.announceNewPeer(handler);
     }

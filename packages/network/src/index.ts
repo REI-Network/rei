@@ -29,7 +29,7 @@ const defaultTcpPort = 4191;
 const defaultUdpPort = 9810;
 const defaultNat = '127.0.0.1';
 
-const seedCount = 30
+const seedCount = 30;
 const seedMaxAge = 5 * 24 * 60 * 60 * 1000;
 
 enum Libp2pPeerValue {
@@ -45,8 +45,8 @@ type PeerInfo = {
 
 type IdType = {
   peerId: string;
-  nodeId: string
-}
+  nodeId: string;
+};
 
 export interface NetworkManagerOptions {
   peerId: PeerId;
@@ -211,7 +211,6 @@ export class NetworkManager extends EventEmitter {
     this.installTimeoutId.set(peerId, id);
   }
 
-
   /**
    * Execute when a new node is connected
    */
@@ -271,7 +270,7 @@ export class NetworkManager extends EventEmitter {
       return false;
     }
     return true;
-  }
+  };
 
   /**
    * Execute when the enr of local node changed
@@ -387,7 +386,7 @@ export class NetworkManager extends EventEmitter {
       }
 
       this.checkNodes();
-      this.libp2pNode.sessionService.on("message", this.onMessage)
+      this.libp2pNode.sessionService.on('message', this.onMessage);
       this.libp2pNode.discv5.discv5.on('enrAdded', this.onENRAdded);
       this.libp2pNode.discv5.discv5.on('multiaddrUpdated', this.onMultiaddrUpdated);
     })();
@@ -576,7 +575,7 @@ export class NetworkManager extends EventEmitter {
             const { peerId, nodeId } = this.discovered.shift()!;
             const enr = this.libp2pNode.kbuckets.getWithPending(nodeId);
             if (enr && enr.status === EntryStatus.Connected) {
-              let addr = this.getLocationMultiaddr(enr.value, "tcp");
+              let addr = this.getLocationMultiaddr(enr.value, 'tcp');
               if (addr) {
                 if (this.filterPeer({ id: peerId, addresses: [{ multiaddr: addr }] })) {
                   pid = peerId;
@@ -651,22 +650,22 @@ export class NetworkManager extends EventEmitter {
     }
   }
 
-  private getLocationMultiaddr(enr: ENR, protocol: "udp" | "udp4" | "udp6" | "tcp" | "tcp4" | "tcp6"): Multiaddr | undefined {
-    if (protocol === "udp") {
-      return this.getLocationMultiaddr(enr, "udp4") || this.getLocationMultiaddr(enr, "udp6");
+  private getLocationMultiaddr(enr: ENR, protocol: 'udp' | 'udp4' | 'udp6' | 'tcp' | 'tcp4' | 'tcp6'): Multiaddr | undefined {
+    if (protocol === 'udp') {
+      return this.getLocationMultiaddr(enr, 'udp4') || this.getLocationMultiaddr(enr, 'udp6');
     }
-    if (protocol === "tcp") {
-      return this.getLocationMultiaddr(enr, "tcp4") || this.getLocationMultiaddr(enr, "tcp6");
+    if (protocol === 'tcp') {
+      return this.getLocationMultiaddr(enr, 'tcp4') || this.getLocationMultiaddr(enr, 'tcp6');
     }
-    const isIpv6 = protocol.endsWith("6");
-    const isUdp = protocol.startsWith("udp");
-    const isTcp = protocol.startsWith("tcp");
-    const ipName = isIpv6 ? "ip6" : "ip4";
+    const isIpv6 = protocol.endsWith('6');
+    const isUdp = protocol.startsWith('udp');
+    const isTcp = protocol.startsWith('tcp');
+    const ipName = isIpv6 ? 'ip6' : 'ip4';
     const ipVal = isIpv6 ? enr.ip6 : enr.ip;
     if (!ipVal) {
       return undefined;
     }
-    const protoName = (isUdp && "udp") || (isTcp && "tcp");
+    const protoName = (isUdp && 'udp') || (isTcp && 'tcp');
     if (!protoName) {
       return undefined;
     }
@@ -676,7 +675,6 @@ export class NetworkManager extends EventEmitter {
     }
     return new Multiaddr(`/${ipName}/${ipVal}/${protoName}/${protoVal}`);
   }
-
 
   /**
    * Abort all remote peers and stop `libp2p`

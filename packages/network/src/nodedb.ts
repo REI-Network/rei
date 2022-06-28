@@ -1,13 +1,13 @@
 import { LevelUp } from 'levelup';
 import { AbstractLevelDOWN, AbstractIterator } from 'abstract-leveldown';
 import { ENR } from '@gxchain2/discv5';
-import * as crypto from "crypto";
+import * as crypto from 'crypto';
 
 type DB = LevelUp<AbstractLevelDOWN<Buffer, Buffer>, AbstractIterator<Buffer, Buffer>>;
 
-const dbNodePrefix = "n:";
-const dbDiscv5Root = "v5";
-const dbNodeMessage = "lastMessage";
+const dbNodePrefix = 'n:';
+const dbDiscv5Root = 'v5';
+const dbNodeMessage = 'lastMessage';
 
 async function* iteratorToAsyncGenerator<K, V>(itr: AbstractIterator<K, V>) {
   while (true) {
@@ -27,7 +27,7 @@ async function* iteratorToAsyncGenerator<K, V>(itr: AbstractIterator<K, V>) {
     }
     yield result;
   }
-  itr.end(() => { });
+  itr.end(() => {});
 }
 
 /**
@@ -70,7 +70,6 @@ export class NodeDB {
     }
   }
 
-
   del(key: Buffer) {
     return this.db.del(key);
   }
@@ -80,15 +79,12 @@ export class NodeDB {
     const now = Date.now();
     const itr = this.db.iterator({ keys: true, values: true });
     for (let seeks = 0; enrs.length < n && seeks < n * 5; seeks++) {
-      const data = await this.seek(itr);
+      const data = await this.seek(dbNodeMessage, itr);
       if (!data) {
         continue;
       }
       const [key, val] = data;
-      const { prefix, nodeId, discvRoot, ip, field } = this.splitNode(key);
-      if (!ip || field !== dbNodeMessage) {
-        continue;
-      }
+      const { prefix, nodeId, discvRoot } = this.splitNode(key);
       if (now - parseInt(val.toString()) > maxAge) {
         continue;
       }
@@ -100,10 +96,10 @@ export class NodeDB {
         }
       }
       if (!include) {
-        enrs.push(ENR.decode(await this.db.get(Buffer.from(prefix + [nodeId, discvRoot].join(":")))));
+        enrs.push(ENR.decode(await this.db.get(Buffer.from(prefix + [nodeId, discvRoot].join(':')))));
       }
     }
-    return enrs
+    return enrs;
   }
 
   /**
@@ -121,28 +117,31 @@ export class NodeDB {
   }
 
   putReceived(nodeId: string, ip: string) {
-    return this.db.put(Buffer.from(dbNodePrefix + [nodeId, dbDiscv5Root, ip, dbNodeMessage].join(":")), Buffer.from(Date.now().toString()));
+    return this.db.put(Buffer.from(dbNodePrefix + [nodeId, dbDiscv5Root, ip, dbNodeMessage].join(':')), Buffer.from(Date.now().toString()));
   }
 
   nodeKey(enr: ENR): string {
-    return dbNodePrefix + [enr.nodeId, dbDiscv5Root].join(":");
+    return dbNodePrefix + [enr.nodeId, dbDiscv5Root].join(':');
   }
 
   nodeItemKey(enr: ENR, field: string): string {
-    return [this.nodeKey(enr), enr.ip, field].join(":");
+    return [this.nodeKey(enr), enr.ip, field].join(':');
   }
 
   splitNode(buffer: Buffer) {
     const str = buffer.toString();
-    const [prefix, nodeId, discvRoot, ip, field] = str.split(":");
+    const [prefix, nodeId, discvRoot, ip, field] = str.split(':');
     return { prefix, nodeId, discvRoot, ip, field };
   }
 
-  async seek(itr: AbstractIterator<Buffer, Buffer>) {
+  async seek(f: string, itr: AbstractIterator<Buffer, Buffer>) {
     const randomBytes = crypto.randomBytes(32);
     for await (const [key, val] of iteratorToAsyncGenerator(itr)) {
       if (key.compare(randomBytes) > 0) {
-        return [key, val];
+        const { ip, field } = this.splitNode(key);
+        if (ip && field === f) {
+          return [key, val];
+        }
       }
     }
   }

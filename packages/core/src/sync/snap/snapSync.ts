@@ -1,3 +1,4 @@
+import EventEmitter from 'events';
 import { bufferToHex, toBuffer, BN, setLengthLeft, KECCAK256_NULL, KECCAK256_RLP } from 'ethereumjs-util';
 import { BaseTrie, CheckpointTrie } from 'merkle-patricia-tree';
 import { logger, Channel, FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
@@ -5,6 +6,7 @@ import { Database, DBSaveSerializedSnapAccount, DBSaveSnapStorage, DBSaveSnapSyn
 import { StakingAccount } from '../../stateManager';
 import { EMPTY_HASH, MAX_HASH, BinaryRawDBatch, DBatch, CountLock } from '../../utils';
 import { increaseKey } from '../../snap/utils';
+import { SyncInfo } from '../types';
 import { TrieSync } from './trieSync';
 import { AccountRequest, AccountResponse, StorageRequst, StorageResponse, SnapSyncNetworkManager } from './types';
 
@@ -216,7 +218,19 @@ type SnapSyncProgressJSON = {
   tasks: AccountTaskJSON[];
 };
 
-export class SnapSync {
+export declare interface SnapSync {
+  on(event: 'start', listener: (info: SyncInfo) => void): this;
+  on(event: 'finished', listener: (info: SyncInfo) => void): this;
+  on(event: 'synchronized', listener: (info: SyncInfo) => void): this;
+  on(event: 'failed', listener: (info: SyncInfo) => void): this;
+
+  off(event: 'start', listener: (info: SyncInfo) => void): this;
+  off(event: 'finished', listener: (info: SyncInfo) => void): this;
+  off(event: 'synchronized', listener: (info: SyncInfo) => void): this;
+  off(event: 'failed', listener: (info: SyncInfo) => void): this;
+}
+
+export class SnapSync extends EventEmitter {
   readonly db: Database;
   readonly network: SnapSyncNetworkManager;
   readonly healer: HealTask;
@@ -229,15 +243,30 @@ export class SnapSync {
   snapped: boolean = false;
   finished: boolean = false;
 
-  schedulePromise?: Promise<void>;
+  private schedulePromise?: Promise<void>;
+
+  // sync state
+  private startingBlock: number = 0;
+  private highestBlock: number = 0;
 
   constructor(db: Database, network: SnapSyncNetworkManager) {
+    super();
     this.db = db;
     this.network = network;
     this.healer = new HealTask(db);
   }
 
-  get isWorking() {
+  /**
+   * Get the sync state
+   */
+  get status() {
+    return { startingBlock: this.startingBlock, highestBlock: this.highestBlock };
+  }
+
+  /**
+   * Is it syncing
+   */
+  get isSyncing() {
     return !!this.schedulePromise;
   }
 
@@ -1015,8 +1044,6 @@ export class SnapSync {
       logger.error('SnapSync::scheduleLoop, catch(when exit):', err);
     }
 
-    // clear the promise, mark self as not working
-    this.schedulePromise = undefined;
     // clear scheduler
     this.clear();
   }
@@ -1024,7 +1051,7 @@ export class SnapSync {
   /**
    * Set sync root
    */
-  async setRoot(root: Buffer) {
+  private async setRoot(root: Buffer) {
     this.root = root;
     await this.loadSyncProgress();
     await this.healer.scheduler.setRoot(this.root, async (paths, path, leaf, parent) => {
@@ -1047,17 +1074,45 @@ export class SnapSync {
   }
 
   /**
-   * Start scheduling
+   * Start snap sync with remote peer
+   * @param root
    */
-  start() {
-    if (this.isWorking) {
+  async snapSync(root: Buffer, startingBlock: number, info: SyncInfo, onFinished?: () => Promise<void>) {
+    if (this.isSyncing) {
       throw new Error('snap sync is working');
     }
 
+    this.startingBlock = startingBlock;
+    this.highestBlock = info.bestHeight.toNumber();
+    this.emit('start', info);
+
+    // set state root
+    await this.setRoot(root);
+    // reset channel
     this.channel.reset();
     // start loop
-    this.schedulePromise = this.scheduleLoop();
+    this.schedulePromise = this.scheduleLoop().finally(async () => {
+      this.clear();
+      // invoke callback if it exists
+      onFinished && (await onFinished());
+      this.schedulePromise = undefined;
+      // send events
+      this.emit('finished', info);
+      this.emit('synchronized', info);
+    });
     // put an empty value to start scheduling
+    this.channel.push();
+  }
+
+  /**
+   * Announce snapSync when a new peer joins
+   */
+  announce() {
+    if (!this.isSyncing) {
+      throw new Error("snap sync isn't working");
+    }
+
+    // put an empty value to announce coroutine
     this.channel.push();
   }
 

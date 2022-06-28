@@ -125,7 +125,7 @@ export class Node {
       .on('installed', this.onPeerInstalled)
       .on('removed', this.onPeerRemoved);
 
-    this.sync = new Synchronizer({ node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
+    this.sync = new Synchronizer(this).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
     this.txPool = new TxPool({ node: this, journal: this.datadir });
     this.txSync = new TxFetcher(this);
     this.bcMonitor = new BlockchainMonitor(this.db);
@@ -228,7 +228,7 @@ export class Node {
   private onPeerInstalled = (name: string, peer: Peer) => {
     if (name === this.wire.name) {
       const handler = this.wire.getHandler(peer, false);
-      handler && this.sync.announce(handler);
+      handler && this.sync.announceNewPeer(handler);
     }
   };
 

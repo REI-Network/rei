@@ -47,30 +47,30 @@ export class GetAccountRange implements SnapMessage {
 export class AccountRange implements SnapMessage {
   readonly reqID: number;
   readonly accountData: Buffer[][];
-  readonly proofs: Buffer[][];
+  readonly proof: Buffer[];
 
   static readonly code = 1;
 
-  constructor(reqID: number, accountData: Buffer[][], proofs: Buffer[][]) {
+  constructor(reqID: number, accountData: Buffer[][], proof: Buffer[]) {
     this.reqID = reqID;
     this.accountData = accountData;
-    this.proofs = proofs;
+    this.proof = proof;
     this.validateBasic();
   }
 
-  static fromValuesArray(values: (Buffer | Buffer[][])[]) {
+  static fromValuesArray(values: (Buffer | Buffer[] | Buffer[][])[]) {
     if (values.length !== 3) {
       throw new Error('invalid values');
     }
-    const [reqIDBuffer, accountData, proofs] = values;
-    if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(accountData) || !Array.isArray(proofs)) {
+    const [reqIDBuffer, accountData, proof] = values;
+    if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(accountData) || !Array.isArray(proof)) {
       throw new Error('invalid values');
     }
-    return new AccountRange(bufferToInt(reqIDBuffer), accountData, proofs);
+    return new AccountRange(bufferToInt(reqIDBuffer), accountData as Buffer[][], proof as Buffer[]);
   }
 
   raw() {
-    return [intToBuffer(this.reqID), [...this.accountData], [...this.proofs]];
+    return [intToBuffer(this.reqID), this.accountData, this.proof];
   }
 
   serialize(): Buffer {
@@ -112,7 +112,7 @@ export class GetStorageRange implements SnapMessage {
   }
 
   raw() {
-    return [intToBuffer(this.reqID), this.rootHash, [...this.accountHashes], this.startHash, this.limitHash, intToBuffer(this.responseLimit)];
+    return [intToBuffer(this.reqID), this.rootHash, this.accountHashes, this.startHash, this.limitHash, intToBuffer(this.responseLimit)];
   }
 
   serialize(): Buffer {
@@ -125,18 +125,18 @@ export class GetStorageRange implements SnapMessage {
 export class StorageRange implements SnapMessage {
   readonly reqID: number;
   readonly slots: Buffer[][][] = [];
-  readonly proof: Buffer[][];
+  readonly proof: Buffer[];
 
   static readonly code = 3;
 
-  constructor(reqID: number, slots: Buffer[][][], proof: Buffer[][]) {
+  constructor(reqID: number, slots: Buffer[][][], proof: Buffer[]) {
     this.reqID = reqID;
     this.slots = slots;
     this.proof = proof;
     this.validateBasic();
   }
 
-  static fromValuesArray(values: (Buffer | Buffer[][] | Buffer[][][])[]) {
+  static fromValuesArray(values: (Buffer | Buffer[] | Buffer[][][])[]) {
     if (values.length !== 3) {
       throw new Error('invalid values');
     }
@@ -144,11 +144,11 @@ export class StorageRange implements SnapMessage {
     if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(storage) || !Array.isArray(proof)) {
       throw new Error('invalid values');
     }
-    return new StorageRange(bufferToInt(reqIDBuffer), storage as Buffer[][][], proof as Buffer[][]);
+    return new StorageRange(bufferToInt(reqIDBuffer), storage as Buffer[][][], proof as Buffer[]);
   }
 
   raw() {
-    return [intToBuffer(this.reqID), [...this.slots], [...this.proof]];
+    return [intToBuffer(this.reqID), this.slots, this.proof];
   }
 
   serialize(): Buffer {
@@ -184,7 +184,7 @@ export class GetByteCode implements SnapMessage {
   }
 
   raw() {
-    return [intToBuffer(this.reqID), [...this.hashes], intToBuffer(this.responseLimit)];
+    return [intToBuffer(this.reqID), this.hashes, intToBuffer(this.responseLimit)];
   }
 
   serialize(): Buffer {
@@ -218,7 +218,7 @@ export class ByteCode implements SnapMessage {
   }
 
   raw() {
-    return [intToBuffer(this.reqID), [...this.codes]];
+    return [intToBuffer(this.reqID), this.codes];
   }
 
   serialize(): Buffer {
@@ -257,7 +257,7 @@ export class GetTrieNode implements SnapMessage {
   }
 
   raw() {
-    return [intToBuffer(this.reqID), this.rootHash, [...this.paths], intToBuffer(this.responseLimit)];
+    return [intToBuffer(this.reqID), this.rootHash, this.paths, intToBuffer(this.responseLimit)];
   }
 
   serialize(): Buffer {
@@ -292,7 +292,7 @@ export class TrieNode implements SnapMessage {
   }
 
   raw() {
-    return [intToBuffer(this.reqID), [...this.nodes]];
+    return [intToBuffer(this.reqID), this.nodes];
   }
 
   serialize(): Buffer {

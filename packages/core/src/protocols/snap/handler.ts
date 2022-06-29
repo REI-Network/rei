@@ -1,4 +1,5 @@
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
+import { KECCAK256_NULL } from 'ethereumjs-util';
 import { logger } from '@rei-network/utils';
 import { ProtocolHandler, Peer } from '@rei-network/network';
 import { SnapProtocol } from './protocol';
@@ -6,7 +7,7 @@ import * as s from '../../consensus/reimint/snapMessages';
 import { NetworkProtocol } from '../types';
 import { EMPTY_HASH, MAX_HASH } from '../../utils';
 import { StakingAccount } from '../../stateManager';
-import { KECCAK256_NULL } from 'ethereumjs-util';
+import { mergeProof } from '../../snap/utils';
 
 const softResponseLimit = 2 * 1024 * 1024;
 const maxCodeLookups = 1024;
@@ -104,10 +105,9 @@ export class SnapProtocolHandler implements ProtocolHandler {
   }
 
   private async applyGetAccountRange(msg: s.GetAccountRange) {
-    const limit = msg.limitHash;
     const responseLimit = msg.responseLimit > softResponseLimit ? softResponseLimit : msg.responseLimit;
     const accountData: Buffer[][] = [];
-    const proofs: Buffer[][] = [];
+    let proof: Buffer[] = [];
     let size = 0;
     let last: Buffer | undefined = undefined;
     const fastIter = this.node.snaptree.accountIterator(msg.rootHash, msg.startHash);
@@ -119,7 +119,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
       size += hash.length + slimSerializedValue.length;
       accountData.push([hash, slimSerializedValue]);
 
-      if (hash.compare(limit) >= 0) {
+      if (hash.compare(msg.limitHash) >= 0) {
         break;
       }
       if (size > responseLimit) {
@@ -128,11 +128,11 @@ export class SnapProtocolHandler implements ProtocolHandler {
     }
     await fastIter.abort();
     const accTrie = new Trie(this.node.db.rawdb, msg.rootHash);
-    proofs.push(await Trie.createProof(accTrie, msg.startHash));
+    proof = await Trie.createProof(accTrie, msg.startHash);
     if (last) {
-      proofs.push(await Trie.createProof(accTrie, last));
+      proof = mergeProof(proof, await Trie.createProof(accTrie, last));
     }
-    this.send(new s.AccountRange(msg.reqID, accountData, proofs));
+    this.send(new s.AccountRange(msg.reqID, accountData, proof));
   }
 
   private async applyGetStorageRange(msg: s.GetStorageRange) {
@@ -143,7 +143,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
     let size = 0;
 
     const slots: Buffer[][][] = [];
-    const proofs: Buffer[][] = [];
+    let proof: Buffer[] = [];
     for (let i = 0; i < msg.accountHashes.length; i++) {
       if (size > responseLimit) {
         break;
@@ -182,17 +182,18 @@ export class SnapProtocolHandler implements ProtocolHandler {
         slots.push(storage);
       }
 
-      if (!origin.equals(MAX_HASH) || (abort && slots.length > 0)) {
+      if (!origin.equals(EMPTY_HASH) || (abort && slots.length > 0)) {
         const accTrie = new Trie(this.node.db.rawdb, msg.rootHash);
         const account = await accTrie.get(msg.accountHashes[i], true);
         const stTrie = new Trie(this.node.db.rawdb, StakingAccount.fromRlpSerializedAccount(account as Buffer).stateRoot);
-        proofs.push(await Trie.createProof(stTrie, origin));
+        proof = await Trie.createProof(stTrie, origin);
         if (last) {
-          proofs.push(await Trie.createProof(stTrie, last));
+          proof = mergeProof(proof, await Trie.createProof(stTrie, last));
         }
+        break;
       }
     }
-    this.send(new s.StorageRange(msg.reqID, slots, proofs));
+    this.send(new s.StorageRange(msg.reqID, slots, proof));
   }
 
   private async applyGetByteCode(msg: s.GetByteCode) {

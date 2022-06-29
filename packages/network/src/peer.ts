@@ -106,7 +106,7 @@ export class MsgQueue {
       this.streamPromise = undefined;
     }
     this.handler.abort();
-    logger.info('🤐 Protocol uninstalled peer:', this.peer.peerId, 'protocol:', this.protocolString);
+    logger.info('🤐 Peer uninstalled:', this.peer.peerId, 'protocol:', this.protocolString);
   }
 }
 

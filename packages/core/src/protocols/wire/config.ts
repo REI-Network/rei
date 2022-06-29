@@ -5,3 +5,4 @@ export const maxQueuedTxs = 4096;
 export const maxQueuedBlocks = 4;
 export const maxGetBlockHeaders = 128;
 export const maxTxRetrievals = 256;
+export const maxGetReceipts = 128;

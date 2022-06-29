@@ -2,12 +2,17 @@ import { LevelUp } from 'levelup';
 import { AbstractLevelDOWN, AbstractIterator } from 'abstract-leveldown';
 import { ENR } from '@gxchain2/discv5';
 import * as crypto from 'crypto';
+import { hash, nodeId } from '@gxchain2/discv5/lib/enr/v4';
 
 type DB = LevelUp<AbstractLevelDOWN<Buffer, Buffer>, AbstractIterator<Buffer, Buffer>>;
 
 const dbNodePrefix = 'n:';
+const dbLocalprefix = 'local:';
 const dbDiscv5Root = 'v5';
-const dbNodeMessage = 'lastMessage';
+const dbNodePong = 'lastPong';
+// Local information is keyed by ID only, the full key is "local:<ID>:seq".
+// Use localItemKey to create those keys.
+const dbLocalSeq = 'seq';
 
 async function* iteratorToAsyncGenerator<K, V>(itr: AbstractIterator<K, V>) {
   while (true) {
@@ -61,49 +66,45 @@ export class NodeDB {
     const now = Date.now();
     const itr = this.db.iterator({ keys: true, values: true });
     for await (const [k, v] of iteratorToAsyncGenerator(itr)) {
-      const { ip, field } = this.splitNode(k);
-      if (ip && field === dbNodeMessage) {
+      const { nodeId, ip, field } = this.splitNodeItemKey(k);
+      if (ip && field === dbNodePong) {
         if (now - parseInt(v.toString()) > seedMaxAge) {
-          await this.del(k);
+          await this._deleteRange(this._nodeKey(nodeId));
         }
       }
     }
-  }
-
-  del(key: Buffer) {
-    return this.db.del(key);
   }
 
   async querySeeds(n: number, maxAge: number) {
     const enrs: ENR[] = [];
     const now = Date.now();
     const itr = this.db.iterator({ keys: true, values: true });
-    let randomBytes: Buffer = Buffer.alloc(32);
+    let id: Buffer = Buffer.alloc(32);
     for (let seeks = 0; enrs.length < n && seeks < n * 5; seeks++) {
       // Seek to a random entry. The first byte is incremented by a
       // random amount each time in order to increase the likelihood
       // of hitting all existing nodes in very small databases.
-      const ctr = randomBytes[0];
-      randomBytes = crypto.randomBytes(32);
-      randomBytes[0] = ctr + (randomBytes[0] % 16);
-      const data = await this.seek(randomBytes, dbNodeMessage, itr);
-      if (!data) {
-        continue;
+      const ctr = id[0];
+      id = crypto.randomBytes(32);
+      id[0] = ctr + (id[0] % 16);
+      await this.seek(Buffer.from(this._nodeKey(id.toString('hex'))), itr);
+      const enr = await this.nextNode(itr);
+      if (!enr) {
+        id[0] = 0;
+        continue; // iterator exhausted
       }
-      const [key, val] = data;
-      const { prefix, nodeId, discvRoot } = this.splitNode(key);
-      if (now - parseInt(val.toString()) > maxAge) {
+      if (now - (await this.lastPongReceived(enr.nodeId, enr.ip!)) > maxAge) {
         continue;
       }
       let include: boolean = false;
-      for (const enr of enrs) {
-        if (enr.nodeId === nodeId) {
+      for (const e of enrs) {
+        if (e.nodeId === enr.nodeId) {
           include = true;
           break;
         }
       }
       if (!include) {
-        enrs.push(ENR.decode(await this.db.get(Buffer.from(prefix + [nodeId, discvRoot].join(':')))));
+        enrs.push(enr);
       }
     }
     return enrs;
@@ -124,7 +125,7 @@ export class NodeDB {
   }
 
   putReceived(nodeId: string, ip: string) {
-    return this.db.put(Buffer.from(dbNodePrefix + [nodeId, dbDiscv5Root, ip, dbNodeMessage].join(':')), Buffer.from(Date.now().toString()));
+    return this.db.put(Buffer.from(this._nodeItemKey(nodeId, ip, dbNodePong)), Buffer.from(Date.now().toString()));
   }
 
   nodeKey(enr: ENR): string {
@@ -135,19 +136,79 @@ export class NodeDB {
     return [this.nodeKey(enr), enr.ip, field].join(':');
   }
 
-  splitNode(buffer: Buffer) {
-    const str = buffer.toString();
-    const [prefix, nodeId, discvRoot, ip, field] = str.split(':');
-    return { prefix, nodeId, discvRoot, ip, field };
+  splitNodeKey(key: Buffer) {
+    if (!this._hasPrefix(key, Buffer.from(dbNodePrefix))) {
+      return { nodeId: '', rest: '' };
+    }
+    const item = key.slice(dbNodePrefix.length);
+    const nodeId = item.slice(0, 32).toString('hex');
+    return { nodeId, rest: item.slice(32) };
   }
 
-  async seek(randomBytes: Buffer, f: string, itr: AbstractIterator<Buffer, Buffer>) {
+  splitNodeItemKey(key: Buffer) {
+    const { nodeId, rest } = this.splitNodeKey(key);
+    if (rest.toString() === dbDiscv5Root) {
+      return { nodeId };
+    }
+    const itemKey = rest.slice(dbDiscv5Root.length);
+    const [ip, field] = itemKey.toString().split(':');
+    return { nodeId, ip, field };
+  }
+
+  async lastPongReceived(nodeId: string, ip: string) {
+    const key = this._nodeItemKey(nodeId, ip, dbNodePong);
+    const value = await this.db.get(Buffer.from(key));
+    return value ? parseInt(value.toString()) : 0;
+  }
+
+  async seek(randomBytes: Buffer, itr: AbstractIterator<Buffer, Buffer>) {
+    for await (const [key] of iteratorToAsyncGenerator(itr)) {
+      if (key.compare(randomBytes) >= 0) {
+        return;
+      }
+    }
+  }
+
+  localItemKey(nodeId: string, field: string) {
+    return dbLocalprefix + [nodeId, field].join(':');
+  }
+
+  storeLocalSeq(nodeId: string, n: bigint) {
+    return this.db.put(Buffer.from(this.localItemKey(nodeId, dbLocalSeq)), Buffer.from(n.toString()));
+  }
+
+  async localSeq(nodeId: string) {
+    const seq = await this.db.get(Buffer.from(this.localItemKey(nodeId, dbLocalSeq)));
+    return seq ? BigInt(seq.toString()) : BigInt(Date.now());
+  }
+
+  private async nextNode(itr: AbstractIterator<Buffer, Buffer>) {
     for await (const [key, val] of iteratorToAsyncGenerator(itr)) {
-      if (key.compare(randomBytes) > 0) {
-        const { ip, field } = this.splitNode(key);
-        if (ip && field === f) {
-          return [key, val];
-        }
+      const { rest } = this.splitNodeKey(key);
+      if (rest.toString() !== dbDiscv5Root) {
+        continue;
+      }
+      return ENR.decode(val);
+    }
+  }
+
+  private _nodeKey(nodeId: string) {
+    return dbNodePrefix + [nodeId, dbDiscv5Root].join(':');
+  }
+
+  private _nodeItemKey(nodeId: string, ip: string, field: string) {
+    return [this._nodeKey(nodeId), ip, field].join(':');
+  }
+
+  private _hasPrefix(key: Buffer, prefix: Buffer) {
+    return key.length >= prefix.length && key.slice(0, prefix.length).equals(prefix);
+  }
+
+  private async _deleteRange(prefix: string) {
+    const itr = this.db.iterator({ keys: true });
+    for await (const [key] of iteratorToAsyncGenerator(itr)) {
+      if (this._hasPrefix(key, Buffer.from(prefix))) {
+        this.db.del(key);
       }
     }
   }

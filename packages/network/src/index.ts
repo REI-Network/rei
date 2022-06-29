@@ -5,6 +5,7 @@ import { LevelUp } from 'levelup';
 import { v4, v6 } from 'is-ip';
 import { ENR, EntryStatus } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
+import { MessageType } from '@gxchain2/discv5/lib/message';
 import { logger, TimeoutQueue, ignoreError } from '@rei-network/utils';
 import { Peer, PeerStatus } from './peer';
 import { Libp2pNode } from './libp2pnode';
@@ -15,7 +16,7 @@ import { NodeDB } from './nodedb';
 export * from './peer';
 export * from './types';
 
-const checkNodeInterval = 30e3;
+const checkNodesInterval = 30e3;
 const timeoutLoopInterval = 300e3;
 const dialLoopInterval1 = 2e3;
 const dialLoopInterval2 = 10e3;
@@ -23,7 +24,7 @@ const inboundThrottleTime = 30e3;
 const outboundThrottleTime = 35e3;
 const installTimeoutDuration = 3e3;
 
-const defaultMaxPeers = 256 * 16; //kbucket size
+const defaultMaxPeers = 50;
 const defaultMaxDials = 4;
 const defaultTcpPort = 4191;
 const defaultUdpPort = 9810;
@@ -36,13 +37,6 @@ enum Libp2pPeerValue {
   installed = 1,
   connected = 0.5,
   incoming = 0
-}
-
-enum MessageType {
-  PING = 0,
-  PONG = 1,
-  FINDNODE = 3,
-  NODES = 4
 }
 
 type PeerInfo = {
@@ -264,9 +258,17 @@ export class NetworkManager extends EventEmitter {
     }
     const peerId: string = (await enr.peerId()).toB58String();
     logger.info('💬 Peer discovered:', peerId);
-    this.discovered.push({ peerId: peerId, nodeId: enr.nodeId });
-    if (this.discovered.length > this.maxPeers) {
-      this.discovered.shift();
+    let include: boolean = false;
+    for (const id of this.discovered) {
+      if (id.peerId === peerId) {
+        return true;
+      }
+    }
+    if (!include) {
+      this.discovered.push({ peerId: peerId, nodeId: enr.nodeId });
+      if (this.discovered.length > this.maxPeers) {
+        this.discovered.shift();
+      }
     }
     this.nodedb.persist(enr);
   };
@@ -290,7 +292,9 @@ export class NetworkManager extends EventEmitter {
       // update peer announce address
       this.libp2pNode.addressManager.announce = new Set([multiaddr.toString()]);
     }
+    //@todo memory
     this.nodedb.persistLocal(enr, this.privateKey);
+    this.nodedb.storeLocalSeq(enr.nodeId, enr.seq);
   };
 
   /**
@@ -324,7 +328,7 @@ export class NetworkManager extends EventEmitter {
     } else {
       await this.nodedb.persistLocal(enr, keypair.privateKey);
     }
-
+    enr.seq = await this.nodedb.localSeq(enr.nodeId);
     return { enr, keypair };
   }
 
@@ -582,9 +586,9 @@ export class NetworkManager extends EventEmitter {
           // search discovered peer in memory
           while (this.discovered.length > 0) {
             const { peerId, nodeId } = this.discovered.shift()!;
-            const enr = this.libp2pNode.kbuckets.getWithPending(nodeId);
-            if (enr && enr.status === EntryStatus.Connected) {
-              let addr = this.getLocationMultiaddr(enr.value, 'tcp');
+            const entry = this.libp2pNode.kbuckets.getWithPending(nodeId);
+            if (entry && entry.status === EntryStatus.Connected) {
+              let addr = this.getLocationMultiaddr(entry.value, 'tcp4');
               if (addr) {
                 if (this.filterPeer({ id: peerId, addresses: [{ multiaddr: addr }] })) {
                   pid = peerId;
@@ -652,7 +656,7 @@ export class NetworkManager extends EventEmitter {
     while (!this.aborted) {
       try {
         await this.nodedb.checkTimeout(seedMaxAge);
-        await new Promise((r) => setTimeout(r, checkNodeInterval));
+        await new Promise((r) => setTimeout(r, checkNodesInterval));
       } catch (err) {
         logger.error('NetworkManager::checkNodes, catch error:', err);
       }

@@ -10,18 +10,20 @@ export class MsgQueue {
   readonly handler: ProtocolHandler;
   private readonly peer: Peer;
   private readonly queue: Channel;
+  private readonly protocolString: string;
   private aborted: boolean = false;
   private stream?: any;
   private streamPromise?: Promise<void>;
 
-  constructor(peer: Peer, handler: ProtocolHandler) {
+  constructor(peer: Peer, handler: ProtocolHandler, protocolString: string) {
     this.peer = peer;
     this.handler = handler;
+    this.protocolString = protocolString;
     this.queue = new Channel({
       drop: async (data: any) => {
         if (!this.aborted) {
           this.aborted = true;
-          logger.warn('MsgQueue::drop, Peer:', this.peer.peerId, 'message queue too large, droped:', data);
+          logger.warn('MsgQueue::drop, peer:', this.peer.peerId, 'protocol:', protocolString, 'message queue too large, droped:', data);
           await this.peer.close();
         }
       },
@@ -104,6 +106,7 @@ export class MsgQueue {
       this.streamPromise = undefined;
     }
     this.handler.abort();
+    logger.info('🤐 Peer uninstalled:', this.peer.peerId, 'protocol:', this.protocolString);
   }
 }
 
@@ -132,37 +135,43 @@ export class Peer {
    * @param protocol - Protocol object
    * @returns Message queue and protocol handler
    */
-  private async makeMsgQueue(protocol: Protocol) {
-    const oldQueue = this.queueMap.get(protocol.name);
+  private async makeMsgQueue(protocol: Protocol): Promise<{
+    queue: MsgQueue;
+    handler: ProtocolHandler;
+  } | null> {
+    if (!(await protocol.beforeMakeHandler(this))) {
+      return null;
+    }
+    const oldQueue = this.queueMap.get(protocol.protocolString);
     if (oldQueue) {
       await oldQueue.abort();
     }
     const handler = protocol.makeHandler(this);
-    const queue = new MsgQueue(this, handler);
-    this.queueMap.set(protocol.name, queue);
+    const queue = new MsgQueue(this, handler, protocol.protocolString);
+    this.queueMap.set(protocol.protocolString, queue);
     return { queue, handler };
   }
 
   /**
    * Get the message queue by protocol name
-   * @param name - Protocol name
+   * @param str - Protocol string
    * @returns Message queue
    */
-  getMsgQueue(name: string) {
-    const queue = this.queueMap.get(name);
+  getMsgQueue(str: string) {
+    const queue = this.queueMap.get(str);
     if (!queue) {
-      throw new Error(`Peer unknown name: ${name}`);
+      throw new Error(`Peer unknown protocol string: ${str}`);
     }
     return queue;
   }
 
   /**
    * Send data for target protocol
-   * @param name - Target protocol name
+   * @param str - Target protocol string
    * @param data - Data
    */
-  send(name: string, data: any) {
-    this.getMsgQueue(name).send(data);
+  send(str: string, data: any) {
+    this.getMsgQueue(str).send(data);
   }
 
   /**
@@ -182,11 +191,11 @@ export class Peer {
 
   /**
    * Query whether a protocol is supported
-   * @param name - Protocol name
+   * @param str - Protocol string
    * @returns `true` if supported, `false` if not
    */
-  isSupport(name: string): boolean {
-    return this.queueMap.has(name);
+  isSupport(str: string): boolean {
+    return this.queueMap.has(str);
   }
 
   /**
@@ -195,24 +204,43 @@ export class Peer {
    * @param stream - `libp2p` stream
    * @returns Whether the handshake was successful
    */
-  async installProtocol(protocol: Protocol, stream: any) {
-    const { queue, handler } = await this.makeMsgQueue(protocol);
+  async installProtocol(protocol: Protocol, stream: any): Promise<{ success: boolean; handler?: ProtocolHandler }> {
+    const result = await this.makeMsgQueue(protocol);
+    if (!result) {
+      return { success: false };
+    }
+    const { queue, handler } = result;
     queue.pipeStream(stream);
     let handshakeResult: undefined | boolean;
     try {
       handshakeResult = await handler.handshake();
       if (!handshakeResult) {
-        throw new Error(`protocol ${protocol.name}, handshake failed`);
+        throw new Error(`protocol ${protocol.protocolString}, handshake failed`);
       }
-      return true;
+      return { success: true, handler };
     } catch (err) {
       if (handshakeResult === undefined) {
         logger.warn('Peer::installProtocol, handshake failed with remote peer:', this.peerId);
       }
       await queue.abort();
-      this.queueMap.delete(protocol.name);
-      return false;
+      this.queueMap.delete(protocol.protocolString);
+      return { success: false };
     }
+  }
+
+  /**
+   * Uninstall protocol
+   * @param str - Protocol string
+   * @returns If succeed, return true
+   */
+  async uninstallProtocol(str: string) {
+    const queue = this.queueMap.get(str);
+    if (queue) {
+      await queue.abort();
+      this.queueMap.delete(str);
+      return true;
+    }
+    return false;
   }
 
   updateTimestamp(timestamp: number = Date.now()) {

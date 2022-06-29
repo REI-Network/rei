@@ -31,6 +31,7 @@
         "levelup": "^4.4.0",
         "merkle-patricia-tree": "^4.2.3",
         "peer-id": "^0.14.2",
-        "recast": "^0.20.4"
+        "recast": "^0.20.4",
+        "semaphore-async-await": "^1.5.1"
     }
 }

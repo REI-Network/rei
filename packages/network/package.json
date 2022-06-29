@@ -22,6 +22,7 @@
         "libp2p-secio": "^0.13.1",
         "libp2p-tcp": "^0.15.1",
         "multiaddr": "^8.1.0",
-        "peer-id": "^0.14.2"
+        "peer-id": "^0.14.2",
+        "semaphore-async-await": "^1.5.1"
     }
 }

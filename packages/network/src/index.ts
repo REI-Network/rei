@@ -477,34 +477,10 @@ export class NetworkManager extends EventEmitter {
   }
 
   /**
-   * Try to dial a remote peer
+   * Try to dial a remote peer and install procotol
    * @param peerId - Target peer id
-   * @param protocols - Array of protocols that need to be dial
-   * @returns Whether succeed and a `libp2p` stream array
+   * @returns Whether succeed
    */
-  /*
-  private async dial(peerId: string, protocols: Protocol[]) {
-    if (this.isBanned(peerId) || this.dialing.has(peerId)) {
-      return { success: false, streams: [] };
-    }
-    this.dialing.add(peerId);
-    const streams: any[] = [];
-    for (const protocol of protocols) {
-      try {
-        const { stream } = await this.libp2pNode.dialProtocol(PeerId.createFromB58String(peerId), protocol.protocolString);
-        streams.push(stream);
-      } catch (err) {
-        // ignore all errors ...
-        streams.push(null);
-      }
-    }
-    if (!this.dialing.delete(peerId) || streams.reduce((b, s) => b && s === null, true)) {
-      return { success: false, streams: [] };
-    }
-    return { success: true, streams };
-  }
-  */
-
   private async dialAndInstall(peerId: string) {
     if (this.isBanned(peerId) || this.dialing.has(peerId)) {
       return false;

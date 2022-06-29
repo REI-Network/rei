@@ -2,7 +2,6 @@ import { LevelUp } from 'levelup';
 import { AbstractLevelDOWN, AbstractIterator } from 'abstract-leveldown';
 import { ENR } from '@gxchain2/discv5';
 import * as crypto from 'crypto';
-import { hash, nodeId } from '@gxchain2/discv5/lib/enr/v4';
 
 type DB = LevelUp<AbstractLevelDOWN<Buffer, Buffer>, AbstractIterator<Buffer, Buffer>>;
 
@@ -13,7 +12,7 @@ const dbNodePong = 'lastPong';
 // Local information is keyed by ID only, the full key is "local:<ID>:seq".
 // Use localItemKey to create those keys.
 const dbLocalSeq = 'seq';
-
+//@todo release itreator when done
 async function* iteratorToAsyncGenerator<K, V>(itr: AbstractIterator<K, V>) {
   while (true) {
     const result = await new Promise<[K, V] | void>((resolve, reject) => {
@@ -48,6 +47,7 @@ export class NodeDB {
   /**
    * Load local node enr information
    */
+  //@todo del
   async loadLocal() {
     try {
       return ENR.decode(await this.db.get(Buffer.from('local')));
@@ -113,6 +113,7 @@ export class NodeDB {
   /**
    * Persist local node enr information
    */
+  //@todo del
   persistLocal(enr: ENR, privateKey: Buffer) {
     return this.db.put(Buffer.from('local'), enr.encode(privateKey));
   }
@@ -121,7 +122,7 @@ export class NodeDB {
    * Persist remote node enr information
    */
   persist(enr: ENR) {
-    this.db.put(Buffer.from(this.nodeKey(enr)), enr.encode());
+    return this.db.put(Buffer.from(this.nodeKey(enr)), enr.encode());
   }
 
   putReceived(nodeId: string, ip: string) {
@@ -205,10 +206,12 @@ export class NodeDB {
   }
 
   private async _deleteRange(prefix: string) {
+    //@todo gte lte
     const itr = this.db.iterator({ keys: true });
     for await (const [key] of iteratorToAsyncGenerator(itr)) {
+      //del
       if (this._hasPrefix(key, Buffer.from(prefix))) {
-        this.db.del(key);
+        await this.db.del(key);
       }
     }
   }

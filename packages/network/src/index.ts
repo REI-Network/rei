@@ -261,7 +261,8 @@ export class NetworkManager extends EventEmitter {
     let include: boolean = false;
     for (const id of this.discovered) {
       if (id.peerId === peerId) {
-        return true;
+        include = true;
+        break;
       }
     }
     if (!include) {
@@ -270,7 +271,7 @@ export class NetworkManager extends EventEmitter {
         this.discovered.shift();
       }
     }
-    this.nodedb.persist(enr);
+    await this.nodedb.persist(enr);
   };
 
   //@todo check enr
@@ -318,15 +319,6 @@ export class NetworkManager extends EventEmitter {
       throw new Error('IPv6 is currently not supported');
     } else {
       throw new Error('invalid ip address: ' + options.nat);
-    }
-
-    const setNAT = !!options.nat;
-
-    const localENR = await this.nodedb.loadLocal();
-    if (localENR && localENR.nodeId === enr.nodeId && (!setNAT || (setNAT && enr.ip === localENR.ip))) {
-      enr = localENR;
-    } else {
-      await this.nodedb.persistLocal(enr, keypair.privateKey);
     }
     enr.seq = await this.nodedb.localSeq(enr.nodeId);
     return { enr, keypair };

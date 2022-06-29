@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { BN } from 'ethereumjs-util';
+import { BN, bufferToHex } from 'ethereumjs-util';
 import { Channel, getRandomIntInclusive, logger, AbortableTimer } from '@rei-network/utils';
 import { Block, Receipt } from '@rei-network/structure';
 import { Node } from '../node';
@@ -128,6 +128,7 @@ export class Synchronizer extends EventEmitter {
   private async downloadBlockData(height: BN, handler: WireProtocolHandler, _block?: Block): Promise<BlockData | null> {
     if (!isV2(handler)) {
       // the remote peer must support wire v2 protocol
+      logger.debug('Synchronizer::downloadBlockData, unsupported wire v2 protocol:', handler.id);
       return null;
     }
 
@@ -141,6 +142,7 @@ export class Synchronizer extends EventEmitter {
         .then((headers) => (headers.length === 1 ? headers[0] : null))
         .catch(() => null);
       if (header === null) {
+        logger.warn('Synchronizer::downloadBlockData, download header failed:', handler.id, 'number:', height.toString());
         return null;
       }
 
@@ -150,6 +152,7 @@ export class Synchronizer extends EventEmitter {
         .then((body) => (body.length === 1 ? body[0] : null))
         .catch(() => null);
       if (body === null) {
+        logger.warn('Synchronizer::downloadBlockData, download body failed:', handler.id, 'number:', height.toString());
         return null;
       }
 
@@ -160,7 +163,8 @@ export class Synchronizer extends EventEmitter {
     try {
       await preValidateBlock.call(block);
     } catch (err) {
-      // ignore errors
+      // maybe we should ban remote peer
+      logger.warn('Synchronizer::downloadBlockData, validate block failed:', handler.id, 'err:', err);
       return null;
     }
 
@@ -170,6 +174,7 @@ export class Synchronizer extends EventEmitter {
       .then((receipts) => (receipts.length === 1 ? receipts[0] : null))
       .catch(() => null);
     if (receipts === null) {
+      logger.warn('Synchronizer::downloadBlockData, download receipts failed:', handler.id, 'number:', height.toString());
       return null;
     }
 
@@ -177,7 +182,8 @@ export class Synchronizer extends EventEmitter {
     try {
       validateReceipts(block, receipts);
     } catch (err) {
-      // ignore errors
+      // maybe we should ban remote peer
+      logger.warn('Synchronizer::downloadBlockData, validate receipts failed:', handler.id, 'err:', err);
       return null;
     }
 
@@ -227,6 +233,7 @@ export class Synchronizer extends EventEmitter {
         }
 
         if (ann.td.sub(td).gten(snapSyncMinTD)) {
+          logger.debug('Synchronizer::syncLoop, try to start a new snap sync');
           // we're about a week behind, try snap sync first
           const data = await this.downloadBlockDataFromAnn(ann);
           if (data === null) {
@@ -252,6 +259,11 @@ export class Synchronizer extends EventEmitter {
               continue;
             }
 
+            if (!isV2(handler)) {
+              // ignore v1 peer
+              continue;
+            }
+
             const _data = await this.downloadBlockData(ann.height, handler);
             if (_data !== null && this.compareBlockData(data, _data)) {
               if (++confirmed >= 2) {
@@ -262,6 +274,7 @@ export class Synchronizer extends EventEmitter {
 
           // if we have collected enough confirmations, start snap sync
           if (confirmed >= 2) {
+            logger.debug('Synchronizer::syncLoop, confirmed succeed');
             const info: SyncInfo = {
               bestHeight: new BN(ann.handler.status!.height),
               bestTD: ann.td,
@@ -269,6 +282,7 @@ export class Synchronizer extends EventEmitter {
             };
             const startingBlock = this.node.latestBlock.header.number.toNumber();
             await this.snap.snapSync(data.block.header.stateRoot, startingBlock, info, async () => {
+              logger.debug('Synchronizer::syncLoop, snapSync onFinished');
               // save block and receipts to database
               await this.node.commitBlock({
                 ...data,
@@ -277,8 +291,11 @@ export class Synchronizer extends EventEmitter {
                 td: ann.td
               });
             });
+          } else {
+            logger.debug('Synchronizer::syncLoop, confirmed failed:', confirmed);
           }
         } else {
+          logger.debug('Synchronizer::syncLoop, try to start a new full sync');
           // we're not too far behind, try full sync
           await this.full.fullSync(ann.handler);
         }

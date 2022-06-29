@@ -20,6 +20,7 @@ export function installOptions(program: any) {
   program.option('--max-peers <peers>', 'max p2p peers count');
   program.option('--max-dials <dials>', 'max p2p dials count');
   program.option('--bootnodes <bootnodes...>', 'comma separated list of bootnodes');
+  program.option('--sync <sync>', 'sync mode: full, snap', 'full');
   program.option('--datadir <path>', 'chain data dir path', path.join(os.homedir(), '.rei'));
   program.option('--keystore <keystore>', 'the datadir for keystore', 'keystore');
   program.option('--unlock <unlock>', 'comma separated list of accounts to unlock');

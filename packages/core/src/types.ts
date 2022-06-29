@@ -27,6 +27,10 @@ export interface NodeOptions {
    * Max receipts cache size
    */
   receiptsCacheSize?: number;
+  /**
+   * Sync mode, default is 'full'
+   */
+  syncMode: string;
 
   mine: ConsensusEngineConstructorOptions;
   network: NetworkManagerConstructorOptions;

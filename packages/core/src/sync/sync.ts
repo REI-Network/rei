@@ -31,6 +31,16 @@ export type BlockData = {
   receipts: Receipt[];
 };
 
+export enum SyncMode {
+  Full = 'full',
+  Snap = 'snap'
+}
+
+export interface SynchronizerOptions {
+  node: Node;
+  mode: SyncMode;
+}
+
 export declare interface Synchronizer {
   on(event: 'start', listener: () => void): this;
   on(event: 'finished', listener: () => void): this;
@@ -45,6 +55,7 @@ export declare interface Synchronizer {
 
 export class Synchronizer extends EventEmitter {
   readonly node: Node;
+  readonly mode: SyncMode;
   private full: FullSync;
   private snap: SnapSync;
   private channel = new Channel<Announcement>();
@@ -54,10 +65,11 @@ export class Synchronizer extends EventEmitter {
   private syncLoopPromise?: Promise<void>;
   private randomPickLoopPromise?: Promise<void>;
 
-  constructor(node: Node) {
+  constructor(options: SynchronizerOptions) {
     super();
-    this.node = node;
-    this.full = new FullSync(node);
+    this.node = options.node;
+    this.mode = options.mode;
+    this.full = new FullSync(options.node);
     this.snap = new SnapSync(this.node.db, 1 as any); // TODO
     this.listenSyncer(this.full);
     this.listenSyncer(this.snap);
@@ -232,7 +244,7 @@ export class Synchronizer extends EventEmitter {
           continue;
         }
 
-        if (ann.td.sub(td).gten(snapSyncMinTD) && isV2(ann.handler)) {
+        if (this.mode === SyncMode.Snap && ann.td.sub(td).gten(snapSyncMinTD) && isV2(ann.handler)) {
           logger.debug('Synchronizer::syncLoop, try to start a new snap sync');
           // we're about a week behind, try snap sync first
           const data = await this.downloadBlockDataFromAnn(ann);

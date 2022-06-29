@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { BN, bufferToHex } from 'ethereumjs-util';
+import { BN } from 'ethereumjs-util';
 import { Channel, getRandomIntInclusive, logger, AbortableTimer } from '@rei-network/utils';
 import { Block, Receipt } from '@rei-network/structure';
 import { Node } from '../node';

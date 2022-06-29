@@ -117,7 +117,7 @@ export class Node {
 
     this.networkMngr = new NetworkManager({
       ...options.network,
-      protocols: [this.wire.v2, this.wire.v1, this.consensus],
+      protocols: [[this.wire.v2, this.wire.v1], this.consensus],
       datastore: this.networkdb,
       nodedb: this.nodedb,
       bootnodes: [...common.bootstrapNodes(), ...(options.network.bootnodes ?? [])]

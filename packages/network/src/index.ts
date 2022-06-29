@@ -43,7 +43,7 @@ type PeerInfo = {
 
 export interface NetworkManagerOptions {
   peerId: PeerId;
-  protocols: Protocol[];
+  protocols: (Protocol | Protocol[])[];
   nodedb: LevelUp;
   enable: boolean;
   datastore?: any;
@@ -67,7 +67,7 @@ export declare interface NetworkManager {
  * Implement a decentralized p2p network between nodes, based on `libp2p`
  */
 export class NetworkManager extends EventEmitter {
-  private readonly protocols: Protocol[];
+  private readonly protocols: (Protocol | Protocol[])[];
   private readonly nodedb: NodeDB;
   private privateKey!: Buffer;
   private libp2pNode!: Libp2pNode;
@@ -360,17 +360,18 @@ export class NetworkManager extends EventEmitter {
     this.timeoutLoop();
 
     (async () => {
-      this.protocols.forEach((protocol) => {
-        this.libp2pNode.handle(protocol.protocolString, ({ connection, stream }) => {
-          logger.warn('handle incoming protocol:', protocol.protocolString);
-          const peerId: string = connection.remotePeer.toB58String();
-          this.install(peerId, protocol, stream).then((result) => {
-            if (!result) {
-              stream.close();
-            }
+      for (const _protocol of this.protocols) {
+        for (const protocol of Array.isArray(_protocol) ? _protocol : [_protocol]) {
+          this.libp2pNode.handle(protocol.protocolString, ({ connection, stream }) => {
+            const peerId: string = connection.remotePeer.toB58String();
+            this.install(peerId, protocol, stream).then((result) => {
+              if (!result) {
+                stream.close();
+              }
+            });
           });
-        });
-      });
+        }
+      }
       this.libp2pNode.on('peer:discovery', this.onDiscovered);
       this.libp2pNode.connectionManager.on('peer:connect', this.onConnect);
       this.libp2pNode.connectionManager.on('peer:disconnect', this.onDisconnect);
@@ -456,9 +457,6 @@ export class NetworkManager extends EventEmitter {
     if (peer.status === PeerStatus.Connected) {
       peer.status = PeerStatus.Installing;
     }
-    if (protocol.protocolString === '/rei-consensus/1') {
-      console.log('hit');
-    }
     const { success, handler } = await peer.installProtocol(protocol, stream);
     if (success) {
       // if at least one protocol is installed, we think the handshake is successful
@@ -484,6 +482,7 @@ export class NetworkManager extends EventEmitter {
    * @param protocols - Array of protocols that need to be dial
    * @returns Whether succeed and a `libp2p` stream array
    */
+  /*
   private async dial(peerId: string, protocols: Protocol[]) {
     if (this.isBanned(peerId) || this.dialing.has(peerId)) {
       return { success: false, streams: [] };
@@ -503,6 +502,34 @@ export class NetworkManager extends EventEmitter {
       return { success: false, streams: [] };
     }
     return { success: true, streams };
+  }
+  */
+
+  private async dialAndInstall(peerId: string) {
+    if (this.isBanned(peerId) || this.dialing.has(peerId)) {
+      return false;
+    }
+    this.dialing.add(peerId);
+    let success = false;
+    for (const _protocol of this.protocols) {
+      for (const protocol of Array.isArray(_protocol) ? _protocol : [_protocol]) {
+        try {
+          const { stream } = await this.libp2pNode.dialProtocol(PeerId.createFromB58String(peerId), protocol.protocolString);
+          if (await this.install(peerId, protocol, stream)) {
+            success = true;
+            break;
+          } else {
+            stream.close();
+          }
+        } catch (err) {
+          // ignore errors...
+        }
+      }
+    }
+    if (!this.dialing.delete(peerId) || !success) {
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -606,15 +633,7 @@ export class NetworkManager extends EventEmitter {
           // try to dial a discovered peer
           if (peerId) {
             this.updateOutbound(peerId);
-            this.dial(peerId, this.protocols).then(async ({ success, streams }) => {
-              if (success) {
-                streams.forEach((stream, i) => {
-                  if (stream !== null) {
-                    this.install(peerId!, this.protocols[i], stream);
-                  }
-                });
-              }
-            });
+            this.dialAndInstall(peerId);
           }
         }
       } catch (err) {
@@ -660,7 +679,11 @@ export class NetworkManager extends EventEmitter {
    */
   async abort() {
     this.aborted = true;
-    this.libp2pNode?.unhandle(this.protocols.map(({ protocolString }) => protocolString));
+    for (const _protocol of this.protocols) {
+      for (const protocol of Array.isArray(_protocol) ? _protocol : [_protocol]) {
+        this.libp2pNode?.unhandle(protocol.protocolString);
+      }
+    }
     this.libp2pNode?.off('peer:discovery', this.onDiscovered);
     this.libp2pNode?.connectionManager.off('peer:connect', this.onConnect);
     this.libp2pNode?.connectionManager.off('peer:disconnect', this.onDisconnect);

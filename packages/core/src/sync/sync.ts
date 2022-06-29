@@ -3,8 +3,8 @@ import { BN } from 'ethereumjs-util';
 import { Channel, getRandomIntInclusive, logger, AbortableTimer } from '@rei-network/utils';
 import { Block, Receipt } from '@rei-network/structure';
 import { Node } from '../node';
-import { preValidateBlock } from '../validation';
-import { WireProtocolHandler } from '../protocols';
+import { preValidateBlock, validateReceipts } from '../validation';
+import { WireProtocolHandler, isV2 } from '../protocols';
 import { FullSync } from './full';
 import { SnapSync } from './snap';
 import { SyncInfo } from './types';
@@ -126,10 +126,16 @@ export class Synchronizer extends EventEmitter {
    * @returns If the download failed, return null
    */
   private async downloadBlockData(height: BN, handler: WireProtocolHandler, _block?: Block): Promise<BlockData | null> {
+    if (!isV2(handler)) {
+      // the remote peer must support wire v2 protocol
+      return null;
+    }
+
     let block!: Block;
     if (_block) {
       block = _block;
     } else {
+      // download header
       const header = await handler
         .getBlockHeaders(height, new BN(1))
         .then((headers) => (headers.length === 1 ? headers[0] : null))
@@ -138,6 +144,7 @@ export class Synchronizer extends EventEmitter {
         return null;
       }
 
+      // download body
       const body = await handler
         .getBlockBodies([header])
         .then((body) => (body.length === 1 ? body[0] : null))
@@ -157,8 +164,22 @@ export class Synchronizer extends EventEmitter {
       return null;
     }
 
-    // TODO: download and validate receipts
-    const receipts: Receipt[] = [];
+    // download receipts
+    const receipts = await handler
+      .getReceipts([block.hash()])
+      .then((receipts) => (receipts.length === 1 ? receipts[0] : null))
+      .catch(() => null);
+    if (receipts === null) {
+      return null;
+    }
+
+    // validate receipts
+    try {
+      validateReceipts(block, receipts);
+    } catch (err) {
+      // ignore errors
+      return null;
+    }
 
     return { block, receipts };
   }
@@ -248,7 +269,13 @@ export class Synchronizer extends EventEmitter {
             };
             const startingBlock = this.node.latestBlock.header.number.toNumber();
             await this.snap.snapSync(data.block.header.stateRoot, startingBlock, info, async () => {
-              // TODO: save block and receipts to database
+              // save block and receipts to database
+              await this.node.commitBlock({
+                ...data,
+                broadcast: false,
+                force: true,
+                td: ann.td
+              });
             });
           }
         } else {

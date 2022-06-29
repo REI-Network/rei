@@ -1,3 +1,4 @@
+import { BN } from 'ethereumjs-util';
 import { NetworkManagerOptions } from '@rei-network/network';
 import { Receipt, Block } from '@rei-network/structure';
 import { ConsensusEngineOptions } from './consensus/types';
@@ -44,4 +45,6 @@ export interface CommitBlockOptions {
   broadcast: boolean;
   block: Block;
   receipts: Receipt[];
+  force?: boolean;
+  td?: BN;
 }

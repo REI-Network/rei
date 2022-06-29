@@ -426,7 +426,15 @@ export class Node {
     }
 
     // save block to the database
-    const reorged = await this.blockchain.putBlock(block, { receipts, saveTxLookup: true });
+    let reorged: boolean;
+    if (opts.force) {
+      if (opts.td === undefined) {
+        throw new Error('missing total difficulty');
+      }
+      reorged = await this.blockchain.forcePutBlock(block, { td: opts.td, receipts, saveTxLookup: true });
+    } else {
+      reorged = await this.blockchain.putBlock(block, { receipts, saveTxLookup: true });
+    }
 
     // install properties for receipts
     let lastCumulativeGasUsed = new BN(0);

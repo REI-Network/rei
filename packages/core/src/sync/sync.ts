@@ -232,7 +232,7 @@ export class Synchronizer extends EventEmitter {
           continue;
         }
 
-        if (ann.td.sub(td).gten(snapSyncMinTD)) {
+        if (ann.td.sub(td).gten(snapSyncMinTD) && isV2(ann.handler)) {
           logger.debug('Synchronizer::syncLoop, try to start a new snap sync');
           // we're about a week behind, try snap sync first
           const data = await this.downloadBlockDataFromAnn(ann);

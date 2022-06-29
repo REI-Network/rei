@@ -3,12 +3,13 @@ import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import { LevelUp } from 'levelup';
 import { v4, v6 } from 'is-ip';
+import Semaphore from 'semaphore-async-await';
 import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
 import { logger, TimeoutQueue, ignoreError } from '@rei-network/utils';
 import { Peer, PeerStatus } from './peer';
 import { Libp2pNode } from './libp2pnode';
-import { Protocol } from './types';
+import { Protocol, ProtocolHandler } from './types';
 import { ExpHeap } from './expheap';
 import { NodeDB } from './nodedb';
 import { randomOne } from './utils';
@@ -55,10 +56,10 @@ export interface NetworkManagerOptions {
 }
 
 export declare interface NetworkManager {
-  on(event: 'installed', listener: (name: string, peer: Peer) => void): this;
+  on(event: 'installed', listener: (handler: ProtocolHandler) => void): this;
   on(event: 'removed', listener: (peer: Peer) => void): this;
 
-  off(event: 'installed', listener: (name: string, peer: Peer) => void): this;
+  off(event: 'installed', listener: (handler: ProtocolHandler) => void): this;
   off(event: 'removed', listener: (peer: Peer) => void): this;
 }
 
@@ -76,6 +77,8 @@ export class NetworkManager extends EventEmitter {
   private readonly maxPeers: number;
   private readonly maxDials: number;
   private readonly options: NetworkManagerOptions;
+
+  private lock = new Semaphore(1);
 
   // a cache list that records all discovered peer,
   // the max size of this list is `this.maxPeers`
@@ -359,6 +362,7 @@ export class NetworkManager extends EventEmitter {
     (async () => {
       this.protocols.forEach((protocol) => {
         this.libp2pNode.handle(protocol.protocolString, ({ connection, stream }) => {
+          logger.warn('handle incoming protocol:', protocol.protocolString);
           const peerId: string = connection.remotePeer.toB58String();
           this.install(peerId, protocol, stream).then((result) => {
             if (!result) {
@@ -428,8 +432,11 @@ export class NetworkManager extends EventEmitter {
    * @returns Whether succeed
    */
   private async install(peerId: string, protocol: Protocol, stream: any) {
+    await this.lock.acquire();
+
     if (this.isBanned(peerId)) {
       logger.debug('Network::install, failed due to peerId:', peerId, 'is banned');
+      this.lock.release();
       return false;
     }
 
@@ -439,6 +446,7 @@ export class NetworkManager extends EventEmitter {
     if (!peer) {
       if (this.peers.length >= this.maxPeers) {
         logger.debug('Network::install, peerId:', peerId, 'failed due to too many peers installed');
+        this.lock.release();
         return false;
       }
       peer = new Peer(peerId, this);
@@ -448,13 +456,16 @@ export class NetworkManager extends EventEmitter {
     if (peer.status === PeerStatus.Connected) {
       peer.status = PeerStatus.Installing;
     }
-    const success = await peer.installProtocol(protocol, stream);
+    if (protocol.protocolString === '/rei-consensus/1') {
+      console.log('hit');
+    }
+    const { success, handler } = await peer.installProtocol(protocol, stream);
     if (success) {
       // if at least one protocol is installed, we think the handshake is successful
       peer.status = PeerStatus.Installed;
       this.setPeerValue(peerId, Libp2pPeerValue.installed);
       this.clearInstallTimeout(peerId);
-      this.emit('installed', protocol.protocolString, peer);
+      this.emit('installed', handler!);
       logger.info('💬 Peer installed:', peerId, 'protocol:', protocol.protocolString);
     } else {
       if (peer.status === PeerStatus.Installing) {
@@ -462,6 +473,8 @@ export class NetworkManager extends EventEmitter {
       }
       logger.debug('Network::install, install protocol:', protocol.protocolString, 'for peerId:', peerId, 'failed');
     }
+
+    this.lock.release();
     return success;
   }
 

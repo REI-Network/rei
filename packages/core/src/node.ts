@@ -18,7 +18,7 @@ import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, ReceiptsCache } from './bloomBits';
 import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
-import { Wire, ConsensusProtocol } from './protocols';
+import { Wire, ConsensusProtocol, WireProtocolHandler } from './protocols';
 import { ReimintConsensusEngine, CliqueConsensusEngine } from './consensus';
 import { isEnableRemint } from './hardforks';
 import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
@@ -225,10 +225,9 @@ export class Node {
     await this.chaindb.close();
   }
 
-  private onPeerInstalled = (str: string, peer: Peer) => {
-    if (str === this.wire.v1.protocolString || str === this.wire.v2.protocolString) {
-      const handler = this.wire.getHandler(peer, false);
-      handler && this.sync.announceNewPeer(handler);
+  private onPeerInstalled = (handler) => {
+    if (handler instanceof WireProtocolHandler) {
+      this.sync.announceNewPeer(handler);
     }
   };
 

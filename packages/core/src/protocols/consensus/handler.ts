@@ -3,7 +3,6 @@ import { Channel, FunctionalBufferSet, logger } from '@rei-network/utils';
 import { Peer, ProtocolHandler } from '@rei-network/network';
 import { RoundStepType, Proposal, Vote, BitArray, VoteType, VoteSet, MessageFactory, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint';
 import * as m from '../../consensus/reimint/messages';
-import { NetworkProtocol } from '../types';
 import { ConsensusProtocol } from './protocol';
 
 const peerGossipSleepDuration = 100;
@@ -219,8 +218,10 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
    * @param msg - Messsage
    */
   send(msg: m.Message) {
-    if (this.peer.isSupport(NetworkProtocol.REI_CONSENSUS)) {
+    try {
       this.peer.send(this.protocol.protocolString, MessageFactory.serializeMessage(msg));
+    } catch (err) {
+      // ignore errors...
     }
   }
 

@@ -7,12 +7,6 @@ export abstract class BaseProtocol<T extends ProtocolHandler> implements Protoco
   readonly name: NetworkProtocol;
   readonly version: string;
 
-  beforeMakeHandler(peer: Peer): boolean {
-    return true;
-  }
-
-  abstract makeHandler(peer: Peer): T;
-
   constructor(node: Node, name: NetworkProtocol, version: string) {
     this.node = node;
     this.name = name;
@@ -27,6 +21,18 @@ export abstract class BaseProtocol<T extends ProtocolHandler> implements Protoco
   }
 
   /**
+   * Before make handler hook, always return true
+   */
+  beforeMakeHandler(peer: Peer): boolean | Promise<boolean> {
+    return true;
+  }
+
+  /**
+   * Abstract make handler function
+   */
+  abstract makeHandler(peer: Peer): T;
+
+  /**
    * Get the protocol handler of the peer
    * @param peer - Peer object
    */
@@ -35,12 +41,12 @@ export abstract class BaseProtocol<T extends ProtocolHandler> implements Protoco
   getHandler(peer: Peer, throwError: false): T | undefined;
   getHandler(peer: Peer, throwError: boolean): T | undefined;
   getHandler(peer: Peer, throwError: boolean = true) {
-    if (!peer.isSupport(this.name)) {
+    if (!peer.isSupport(this.protocolString)) {
       if (throwError) {
-        throw new Error(`peer doesn't support ${this.name}`);
+        throw new Error(`peer doesn't support ${this.protocolString}`);
       }
     } else {
-      return peer.getMsgQueue(this.name).handler as T;
+      return peer.getMsgQueue(this.protocolString).handler as T;
     }
   }
 }

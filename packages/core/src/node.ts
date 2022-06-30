@@ -18,7 +18,7 @@ import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, ReceiptsCache } from './bloomBits';
 import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
-import { WireProtocol, ConsensusProtocol } from './protocols';
+import { Wire, ConsensusProtocol, WireProtocolHandler } from './protocols';
 import { ReimintConsensusEngine, CliqueConsensusEngine } from './consensus';
 import { isEnableRemint } from './hardforks';
 import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
@@ -48,7 +48,7 @@ export class Node {
   readonly nodedb: LevelUp;
   readonly chaindb: LevelUp;
   readonly evidencedb: LevelUp;
-  readonly wire: WireProtocol;
+  readonly wire: Wire;
   readonly consensus: ConsensusProtocol;
   readonly db: Database;
   readonly blockchain: Blockchain;
@@ -83,7 +83,7 @@ export class Node {
     this.chaindb = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
     this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));
     this.evidencedb = createLevelDB(path.join(this.datadir, 'evidence'));
-    this.wire = new WireProtocol(this);
+    this.wire = new Wire(this);
     this.consensus = new ConsensusProtocol(this);
     this.accMngr = new AccountManager(options.account.keyStorePath);
     this.receiptsCache = new ReceiptsCache(options.receiptsCacheSize);
@@ -115,8 +115,7 @@ export class Node {
 
     this.networkMngr = new NetworkManager({
       ...options.network,
-      protocols: [this.wire, this.consensus],
-      // datastore: this.networkdb,
+      protocols: [[this.wire.v2, this.wire.v1], this.consensus],
       nodedb: this.nodedb,
       bootnodes: [...common.bootstrapNodes(), ...(options.network.bootnodes ?? [])]
     })
@@ -221,10 +220,9 @@ export class Node {
     await this.chaindb.close();
   }
 
-  private onPeerInstalled = (name: string, peer: Peer) => {
-    if (name === this.wire.name) {
-      const handler = this.wire.getHandler(peer, false);
-      handler && this.sync.announce(handler);
+  private onPeerInstalled = (handler) => {
+    if (handler instanceof WireProtocolHandler) {
+      this.sync.announce(handler);
     }
   };
 

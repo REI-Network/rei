@@ -184,24 +184,24 @@ export default class Interpreter {
     const eventObj: InterpreterStep = {
       pc: this._runState.programCounter,
       gasLeft: this._eei.getGasLeft(),
-      gasRefund: this._eei._evm._refund,
+      gasRefund: this._eei._evm._refund.clone(),
       opcode: {
         code: opcode.code,
         name: opcode.fullName,
         fee: opcode.fee,
         isAsync: opcode.isAsync
       },
-      stack: this._runState.stack._store,
-      returnStack: this._runState.returnStack._store,
+      stack: [...this._runState.stack._store],
+      returnStack: [...this._runState.returnStack._store],
       depth: this._eei._env.depth,
       address: this._eei._env.address,
       account: this._eei._env.contract,
       stateManager: this._runState.stateManager,
-      memory: this._runState.memory._store, // Return underlying array for backwards-compatibility
-      memoryWordCount: this._runState.memoryWordCount,
+      memory: Buffer.from(this._runState.memory._store), // Return underlying array for backwards-compatibility
+      memoryWordCount: this._runState.memoryWordCount.clone(),
       codeAddress: this._eei._env.codeAddress,
       caller: this._eei._env.caller,
-      callValue: this._eei._env.callValue,
+      callValue: this._eei._env.callValue.clone(),
       callData: this._eei._env.callData
     };
 

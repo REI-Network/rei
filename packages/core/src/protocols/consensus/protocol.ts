@@ -3,7 +3,7 @@ import { Node } from '../../node';
 import { Message, Vote } from '../../consensus/reimint';
 import { NetworkProtocol } from '../types';
 import { BaseProtocol } from '../baseProtocol';
-import { ConsensusProtocolHander } from './handler';
+import { ConsensusProtocolHandler } from './handler';
 
 export interface SendMessageOptions {
   // broadcast the message but exlcude the target peers
@@ -14,8 +14,8 @@ export interface SendMessageOptions {
   broadcast?: boolean;
 }
 
-export class ConsensusProtocol extends BaseProtocol<ConsensusProtocolHander> implements Protocol {
-  private _handlers = new Set<ConsensusProtocolHander>();
+export class ConsensusProtocol extends BaseProtocol<ConsensusProtocolHandler> implements Protocol {
+  private _handlers = new Set<ConsensusProtocolHandler>();
 
   constructor(node: Node) {
     super(node, NetworkProtocol.REI_CONSENSUS, '1');
@@ -29,7 +29,7 @@ export class ConsensusProtocol extends BaseProtocol<ConsensusProtocolHander> imp
    * Add handler instance to the set
    * @param handler - Handler
    */
-  addHandler(handler: ConsensusProtocolHander) {
+  addHandler(handler: ConsensusProtocolHandler) {
     this._handlers.add(handler);
   }
 
@@ -37,7 +37,7 @@ export class ConsensusProtocol extends BaseProtocol<ConsensusProtocolHander> imp
    * Remove handler instance from the set
    * @param handler - Handler
    */
-  removeHandler(handler: ConsensusProtocolHander) {
+  removeHandler(handler: ConsensusProtocolHandler) {
     this._handlers.delete(handler);
   }
 
@@ -45,7 +45,7 @@ export class ConsensusProtocol extends BaseProtocol<ConsensusProtocolHander> imp
    * {@link Protocol.makeHandler}
    */
   makeHandler(peer: Peer) {
-    return new ConsensusProtocolHander(this, peer);
+    return new ConsensusProtocolHandler(this, peer);
   }
 
   /**

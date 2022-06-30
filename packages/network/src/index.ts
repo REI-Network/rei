@@ -4,12 +4,13 @@ import Multiaddr from 'multiaddr';
 import { LevelUp } from 'levelup';
 import { v4, v6 } from 'is-ip';
 import { ENR, EntryStatus } from '@gxchain2/discv5';
+import Semaphore from 'semaphore-async-await';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
 import { MessageType } from '@gxchain2/discv5/lib/message';
 import { logger, TimeoutQueue, ignoreError } from '@rei-network/utils';
 import { Peer, PeerStatus } from './peer';
 import { Libp2pNode } from './libp2pnode';
-import { Protocol } from './types';
+import { Protocol, ProtocolHandler } from './types';
 import { ExpHeap } from './expheap';
 import { NodeDB } from './nodedb';
 
@@ -51,7 +52,7 @@ type IdType = {
 
 export interface NetworkManagerOptions {
   peerId: PeerId;
-  protocols: Protocol[];
+  protocols: (Protocol | Protocol[])[];
   nodedb: LevelUp;
   enable: boolean;
   tcpPort?: number;
@@ -63,10 +64,10 @@ export interface NetworkManagerOptions {
 }
 
 export declare interface NetworkManager {
-  on(event: 'installed', listener: (name: string, peer: Peer) => void): this;
+  on(event: 'installed', listener: (handler: ProtocolHandler) => void): this;
   on(event: 'removed', listener: (peer: Peer) => void): this;
 
-  off(event: 'installed', listener: (name: string, peer: Peer) => void): this;
+  off(event: 'installed', listener: (handler: ProtocolHandler) => void): this;
   off(event: 'removed', listener: (peer: Peer) => void): this;
 }
 
@@ -74,7 +75,7 @@ export declare interface NetworkManager {
  * Implement a decentralized p2p network between nodes, based on `libp2p`
  */
 export class NetworkManager extends EventEmitter {
-  private readonly protocols: Protocol[];
+  private readonly protocols: (Protocol | Protocol[])[];
   private readonly nodedb: NodeDB;
   private privateKey!: Buffer;
   private libp2pNode!: Libp2pNode;
@@ -83,6 +84,8 @@ export class NetworkManager extends EventEmitter {
   private readonly maxPeers: number;
   private readonly maxDials: number;
   private readonly options: NetworkManagerOptions;
+
+  private lock = new Semaphore(1);
 
   // a cache list that records all discovered peer,
   // the max size of this list is `this.maxPeers`
@@ -369,16 +372,18 @@ export class NetworkManager extends EventEmitter {
     this.timeoutLoop();
 
     (async () => {
-      this.protocols.forEach((protocol) => {
-        this.libp2pNode.handle(protocol.protocolString, ({ connection, stream }) => {
-          const peerId: string = connection.remotePeer.toB58String();
-          this.install(peerId, protocol, stream).then((result) => {
-            if (!result) {
-              stream.close();
-            }
+      for (const _protocol of this.protocols) {
+        for (const protocol of Array.isArray(_protocol) ? _protocol : [_protocol]) {
+          this.libp2pNode.handle(protocol.protocolString, ({ connection, stream }) => {
+            const peerId: string = connection.remotePeer.toB58String();
+            this.install(peerId, protocol, stream).then((result) => {
+              if (!result) {
+                stream.close();
+              }
+            });
           });
-        });
-      });
+        }
+      }
       this.libp2pNode.connectionManager.on('peer:connect', this.onConnect);
       this.libp2pNode.connectionManager.on('peer:disconnect', this.onDisconnect);
       await this.libp2pNode.start();
@@ -448,8 +453,11 @@ export class NetworkManager extends EventEmitter {
    * @returns Whether succeed
    */
   private async install(peerId: string, protocol: Protocol, stream: any) {
+    await this.lock.acquire();
+
     if (this.isBanned(peerId)) {
       logger.debug('Network::install, failed due to peerId:', peerId, 'is banned');
+      this.lock.release();
       return false;
     }
 
@@ -459,6 +467,7 @@ export class NetworkManager extends EventEmitter {
     if (!peer) {
       if (this.peers.length >= this.maxPeers) {
         logger.debug('Network::install, peerId:', peerId, 'failed due to too many peers installed');
+        this.lock.release();
         return false;
       }
       peer = new Peer(peerId, this);
@@ -468,48 +477,55 @@ export class NetworkManager extends EventEmitter {
     if (peer.status === PeerStatus.Connected) {
       peer.status = PeerStatus.Installing;
     }
-    const success = await peer.installProtocol(protocol, stream);
+    const { success, handler } = await peer.installProtocol(protocol, stream);
     if (success) {
       // if at least one protocol is installed, we think the handshake is successful
       peer.status = PeerStatus.Installed;
       this.setPeerValue(peerId, Libp2pPeerValue.installed);
       this.clearInstallTimeout(peerId);
-      this.emit('installed', protocol.name, peer);
-      logger.info('💬 Peer installed:', peerId, 'protocol:', protocol.name);
+      this.emit('installed', handler!);
+      logger.info('💬 Peer installed:', peerId, 'protocol:', protocol.protocolString);
     } else {
       if (peer.status === PeerStatus.Installing) {
         peer.status = PeerStatus.Connected;
       }
-      logger.debug('Network::install, install protocol:', protocol.name, 'for peerId:', peerId, 'failed');
+      logger.debug('Network::install, install protocol:', protocol.protocolString, 'for peerId:', peerId, 'failed');
     }
+
+    this.lock.release();
     return success;
   }
 
   /**
-   * Try to dial a remote peer
+   * Try to dial a remote peer and install procotol
    * @param peerId - Target peer id
-   * @param protocols - Array of protocols that need to be dial
-   * @returns Whether succeed and a `libp2p` stream array
+   * @returns Whether succeed
    */
-  private async dial(peerId: string, protocols: Protocol[]) {
+  private async dialAndInstall(peerId: string) {
     if (this.isBanned(peerId) || this.dialing.has(peerId)) {
-      return { success: false, streams: [] };
+      return false;
     }
     this.dialing.add(peerId);
-    const streams: any[] = [];
-    for (const protocol of protocols) {
-      try {
-        const { stream } = await this.libp2pNode.dialProtocol(PeerId.createFromB58String(peerId), protocol.protocolString);
-        streams.push(stream);
-      } catch (err) {
-        // ignore all errors ...
-        streams.push(null);
+    let success = false;
+    for (const _protocol of this.protocols) {
+      for (const protocol of Array.isArray(_protocol) ? _protocol : [_protocol]) {
+        try {
+          const { stream } = await this.libp2pNode.dialProtocol(PeerId.createFromB58String(peerId), protocol.protocolString);
+          if (await this.install(peerId, protocol, stream)) {
+            success = true;
+            break;
+          } else {
+            stream.close();
+          }
+        } catch (err) {
+          // ignore errors...
+        }
       }
     }
-    if (!this.dialing.delete(peerId) || streams.reduce((b, s) => b && s === null, true)) {
-      return { success: false, streams: [] };
+    if (!this.dialing.delete(peerId) || !success) {
+      return false;
     }
-    return { success: true, streams };
+    return true;
   }
 
   /**
@@ -594,15 +610,7 @@ export class NetworkManager extends EventEmitter {
           // try to dial a discovered peer
           if (pid) {
             this.updateOutbound(pid);
-            this.dial(pid, this.protocols).then(async ({ success, streams }) => {
-              if (success) {
-                streams.forEach((stream, i) => {
-                  if (stream !== null) {
-                    this.install(pid!, this.protocols[i], stream);
-                  }
-                });
-              }
-            });
+            this.dialAndInstall(pid);
           }
         }
       } catch (err) {
@@ -686,7 +694,11 @@ export class NetworkManager extends EventEmitter {
    */
   async abort() {
     this.aborted = true;
-    this.libp2pNode?.unhandle(this.protocols.map(({ protocolString }) => protocolString));
+    for (const _protocol of this.protocols) {
+      for (const protocol of Array.isArray(_protocol) ? _protocol : [_protocol]) {
+        this.libp2pNode?.unhandle(protocol.protocolString);
+      }
+    }
     this.libp2pNode?.connectionManager.off('peer:connect', this.onConnect);
     this.libp2pNode?.connectionManager.off('peer:disconnect', this.onDisconnect);
     this.libp2pNode?.discv5?.discv5.off('enrAdded', this.onENRAdded);

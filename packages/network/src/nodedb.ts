@@ -45,21 +45,6 @@ export class NodeDB {
   }
 
   /**
-   * Load local node enr information
-   */
-  //@todo del
-  async loadLocal() {
-    try {
-      return ENR.decode(await this.db.get(Buffer.from('local')));
-    } catch (err: any) {
-      if (err.type === 'NotFoundError') {
-        return;
-      }
-      throw err;
-    }
-  }
-
-  /**
    * Load all remote node enr information
    */
   async checkTimeout(seedMaxAge: number) {
@@ -108,14 +93,6 @@ export class NodeDB {
       }
     }
     return enrs;
-  }
-
-  /**
-   * Persist local node enr information
-   */
-  //@todo del
-  persistLocal(enr: ENR, privateKey: Buffer) {
-    return this.db.put(Buffer.from('local'), enr.encode(privateKey));
   }
 
   /**

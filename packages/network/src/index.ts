@@ -296,8 +296,6 @@ export class NetworkManager extends EventEmitter {
       // update peer announce address
       this.libp2pNode.addressManager.announce = new Set([multiaddr.toString()]);
     }
-    //@todo memory
-    this.nodedb.persistLocal(enr, this.privateKey);
     this.nodedb.storeLocalSeq(enr.nodeId, enr.seq);
   };
 

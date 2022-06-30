@@ -13,7 +13,7 @@ const dbNodePong = 'lastPong';
 // Use localItemKey to create those keys.
 const dbLocalSeq = 'seq';
 //@todo release itreator when done
-async function* iteratorToAsyncGenerator<K, V>(itr: AbstractIterator<K, V>) {
+async function* iteratorToAsyncGenerator<K, V>(itr: AbstractIterator<K, V>, release: boolean) {
   while (true) {
     const result = await new Promise<[K, V] | void>((resolve, reject) => {
       itr.next((err, key, val) => {
@@ -31,7 +31,7 @@ async function* iteratorToAsyncGenerator<K, V>(itr: AbstractIterator<K, V>) {
     }
     yield result;
   }
-  itr.end(() => {});
+  if (release) itr.end(() => {});
 }
 
 /**
@@ -50,7 +50,7 @@ export class NodeDB {
   async checkTimeout(seedMaxAge: number) {
     const now = Date.now();
     const itr = this.db.iterator({ keys: true, values: true });
-    for await (const [k, v] of iteratorToAsyncGenerator(itr)) {
+    for await (const [k, v] of iteratorToAsyncGenerator(itr, true)) {
       const { nodeId, ip, field } = this.splitNodeItemKey(k);
       if (ip && field === dbNodePong) {
         if (now - parseInt(v.toString()) > seedMaxAge) {
@@ -140,7 +140,7 @@ export class NodeDB {
   }
 
   async seek(randomBytes: Buffer, itr: AbstractIterator<Buffer, Buffer>) {
-    for await (const [key] of iteratorToAsyncGenerator(itr)) {
+    for await (const [key] of iteratorToAsyncGenerator(itr, false)) {
       if (key.compare(randomBytes) >= 0) {
         return;
       }
@@ -161,7 +161,7 @@ export class NodeDB {
   }
 
   private async nextNode(itr: AbstractIterator<Buffer, Buffer>) {
-    for await (const [key, val] of iteratorToAsyncGenerator(itr)) {
+    for await (const [key, val] of iteratorToAsyncGenerator(itr, false)) {
       const { rest } = this.splitNodeKey(key);
       if (rest.toString() !== dbDiscv5Root) {
         continue;
@@ -183,13 +183,25 @@ export class NodeDB {
   }
 
   private async _deleteRange(prefix: string) {
-    //@todo gte lte
-    const itr = this.db.iterator({ keys: true });
-    for await (const [key] of iteratorToAsyncGenerator(itr)) {
-      //del
-      if (this._hasPrefix(key, Buffer.from(prefix))) {
-        await this.db.del(key);
+    const range = this._bytesPrefix(prefix);
+    const itr = this.db.iterator({ keys: true, gte: range.prefixBuffer, lte: range.limit });
+    for await (const [key] of iteratorToAsyncGenerator(itr, true)) {
+      await this.db.del(key);
+    }
+  }
+
+  private _bytesPrefix(prefix: string) {
+    let limit: Buffer = Buffer.alloc(prefix.length);
+    let prefixBuffer = Buffer.from(prefix);
+    for (let i = prefixBuffer.length - 1; i >= 0; i--) {
+      let c = prefixBuffer[i];
+      if (c < 0xff) {
+        limit = Buffer.alloc(i + 1);
+        prefixBuffer.copy(limit);
+        limit[i] = c + 1;
+        break;
       }
     }
+    return { prefixBuffer, limit };
   }
 }

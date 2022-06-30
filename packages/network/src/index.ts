@@ -398,6 +398,8 @@ export class NetworkManager extends EventEmitter {
     })();
   }
 
+  // Listen to the pong message of the remote node
+  // and update the timestamp of the node in the database
   private onMessage = (srcId: string, src, message): void => {
     if (message.type === MessageType.PONG) {
       this.nodedb.putReceived(srcId, src.nodeAddress().address);
@@ -661,6 +663,11 @@ export class NetworkManager extends EventEmitter {
     }
   }
 
+  /**
+   * Get multiaddr of the enr.(This is a discv5 version compatible function and needs to be deleted)
+   * @param enr - Enr information
+   * @param protocol - Protocol
+   */
   private getLocationMultiaddr(enr: ENR, protocol: 'udp' | 'udp4' | 'udp6' | 'tcp' | 'tcp4' | 'tcp6'): Multiaddr | undefined {
     if (protocol === 'udp') {
       return this.getLocationMultiaddr(enr, 'udp4') || this.getLocationMultiaddr(enr, 'udp6');

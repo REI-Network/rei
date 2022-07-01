@@ -8,6 +8,7 @@ import { NetworkProtocol } from '../types';
 import { EMPTY_HASH, MAX_HASH } from '../../utils';
 import { StakingAccount } from '../../stateManager';
 import { mergeProof } from '../../snap/utils';
+import { AccountRequest, AccountResponse, StorageRequst, StorageResponse } from '../../sync/snap/types';
 
 const softResponseLimit = 2 * 1024 * 1024;
 const maxCodeLookups = 1024;
@@ -32,6 +33,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
   constructor(protocol: SnapProtocol, peer: Peer) {
     this.protocol = protocol;
     this.peer = peer;
+    this.protocol.pool.add(this);
   }
 
   get node() {
@@ -186,7 +188,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
         const accTrie = new Trie(this.node.db.rawdb, msg.rootHash);
         const account = await accTrie.get(msg.accountHashes[i], true);
         const stTrie = new Trie(this.node.db.rawdb, StakingAccount.fromRlpSerializedAccount(account as Buffer).stateRoot);
-        proof = await Trie.createProof(stTrie, origin);
+        proof = mergeProof(proof, await Trie.createProof(stTrie, origin));
         if (last) {
           proof = mergeProof(proof, await Trie.createProof(stTrie, last));
         }
@@ -207,12 +209,11 @@ export class SnapProtocolHandler implements ProtocolHandler {
       hashes.splice(maxCodeLookups);
     }
     let size = 0;
-    const trie = new Trie(this.node.db.rawdb);
     for (let i = 0; i < hashes.length; i++) {
       if (hashes[i].equals(KECCAK256_NULL)) {
         codes.push(Buffer.alloc(0));
       } else {
-        const codeResult = await trie.get(hashes[i]);
+        const codeResult = await this.node.db.rawdb.get(hashes[i], { keyEncoding: 'binary', valueEncoding: 'binary' });
         if (codeResult) {
           codes.push(codeResult);
           size += codeResult.length;
@@ -226,50 +227,25 @@ export class SnapProtocolHandler implements ProtocolHandler {
   }
 
   private async applyGetTrieNode(msg: s.GetTrieNode) {
-    const rootHash = msg.rootHash;
-    const paths = msg.paths;
+    const hashes = msg.hashes;
     let responseLimit = msg.responseLimit;
     if (responseLimit > softResponseLimit) {
       responseLimit = softResponseLimit;
     }
 
-    const accTrie = new Trie(this.node.db.rawdb, rootHash);
-    const snap = this.node.snaptree.snapShot(rootHash);
-    if (!snap) {
-      this.send(new s.TrieNode(msg.reqID, []));
-      return;
-    }
-
     const nodes: Buffer[] = [];
     let size = 0;
-    for (let i = 0; i < paths.length; i++) {
-      const path = paths[i];
-      if (path.length === 0) {
-        throw new Error('Invalid path');
-      } else if (path.length === 1) {
-        const node = await accTrie.get(path[0]);
-        if (node) {
-          nodes.push(node as Buffer);
-          size += node.length;
-        }
-      } else {
-        const account = await snap.getAccount(path[0]);
-        if (!account) {
-          break;
-        }
-        const slotTree = new Trie(this.node.db.rawdb, account.stateRoot);
-        for (const p of path.slice(1)) {
-          const node = await slotTree.get(p);
-          if (node) {
-            nodes.push(node);
-            size += node.length;
-          }
-        }
+    for (let i = 0; i < hashes.length; i++) {
+      const node = await this.node.db.rawdb.get(hashes[i], { keyEncoding: 'binary', valueEncoding: 'binary' });
+      if (node) {
+        nodes.push(node as Buffer);
+        size += node.length;
       }
       if (size > responseLimit) {
         break;
       }
     }
+
     this.send(new s.TrieNode(msg.reqID, nodes));
   }
   /**
@@ -281,40 +257,70 @@ export class SnapProtocolHandler implements ProtocolHandler {
 
   /**
    * Requests an unknown number of accounts from a given account trie
-   * @param rootHash The root hash of the account trie
-   * @param startHash The start hash
-   * @param limitHash The limit hash
-   * @param responseLimit  The maximum number of bytes to send in a single response
+   * @param root  The root of the account trie
+   * @param req  The request
    * @returns
    */
-  getAccountRange(rootHash: Buffer, startHash: Buffer, limitHash: Buffer, responseLimit: number) {
-    const msg = new s.GetAccountRange(this.generateReqID(), rootHash, startHash, limitHash, responseLimit);
-    return this.request(msg);
+  async getAccountRange(root: Buffer, req: AccountRequest): Promise<AccountResponse | null> {
+    const msg = new s.GetAccountRange(this.generateReqID(), root, req.origin, req.limit, softResponseLimit);
+    try {
+      const data = await this.request(msg);
+      const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.AccountRange;
+      const hashes = msgInstance.accountData.map(([hash, value]) => hash);
+      const accountValues = msgInstance.accountData.map(([hash, value]) => value);
+      const accounts = accountValues.map((value) => StakingAccount.fromRlpSerializedAccount(value));
+      const cont = await Trie.verifyRangeProof(root, req.origin, req.limit, hashes, accountValues, msgInstance.proof);
+      return { hashes, accounts, cont };
+    } catch (err) {
+      logger.error(err);
+      return null;
+    }
   }
 
   /**
    * Requests the storage slots of multiple accounts' storage tries.
-   * @param rootHash The root hash
-   * @param accountHashes The hashes of the accounts
-   * @param startHash The start hash
-   * @param limitHash The limit hash
-   * @param responseLimit The maximum number of bytes to send in a single response
+   * @param root  The root of the account trie
+   * @param req The request
    * @returns
    */
-  getStorageRange(rootHash: Buffer, accountHashes: Buffer[], startHash: Buffer, limitHash: Buffer, responseLimit: number) {
-    const msg = new s.GetStorageRange(this.generateReqID(), rootHash, accountHashes, startHash, limitHash, responseLimit);
-    return this.request(msg);
+  async getStorageRange(root: Buffer, req: StorageRequst): Promise<StorageResponse | null> {
+    const msg = new s.GetStorageRange(this.generateReqID(), root, req.accounts, req.origin, req.limit, softResponseLimit);
+
+    try {
+      const data = await this.request(msg);
+      const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.StorageRange;
+      const hashes = msgInstance.slots.map((slot) => slot.map(([hash, value]) => hash));
+      const slots = msgInstance.slots.map((slot) => slot.map(([hash, value]) => value));
+      let cont = false;
+      if (msgInstance.proof.length > 0) {
+        for (let i = 0; i < hashes.length; i++) {
+          if (i == hashes.length - 1) {
+            cont = await Trie.verifyRangeProof(req.accounts[i], req.origin, hashes[i][hashes[i].length - 1], hashes[i], slots[i], msgInstance.proof);
+          }
+        }
+      }
+      return { hashes, slots, cont };
+    } catch (err) {
+      logger.error(err);
+      return null;
+    }
   }
 
   /**
    * Requests a number of contract byte-codes by hash.
    * @param hashes  The hashes of the contracts
-   * @param responseLimit The maximum number of bytes to send in a single response
    * @returns
    */
-  getByteCode(hashes: Buffer[], responseLimit: number) {
-    const msg = new s.GetByteCode(this.generateReqID(), hashes, responseLimit);
-    return this.request(msg);
+  async getByteCode(hashes: Buffer[]): Promise<Buffer[] | null> {
+    const msg = new s.GetByteCode(this.generateReqID(), hashes, softResponseLimit);
+    try {
+      const data = await this.request(msg);
+      const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.ByteCode;
+      return msgInstance.codes;
+    } catch (err) {
+      logger.error(err);
+      return null;
+    }
   }
 
   /**
@@ -324,9 +330,16 @@ export class SnapProtocolHandler implements ProtocolHandler {
    * @param responseLimit  The maximum number of bytes to send in a single response
    * @returns
    */
-  getTrieNode(rootHash: Buffer, paths: Buffer[][], responseLimit: number) {
-    const msg = new s.GetTrieNode(this.generateReqID(), rootHash, paths, responseLimit);
-    return this.request(msg);
+  async getTrieNode(hashes: Buffer[]): Promise<Buffer[] | null> {
+    const msg = new s.GetTrieNode(this.generateReqID(), hashes, softResponseLimit);
+    try {
+      const data = await this.request(msg);
+      const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.TrieNode;
+      return msgInstance.nodes;
+    } catch (err) {
+      logger.error(err);
+      return null;
+    }
   }
   /**
    * Send message to the remote peer

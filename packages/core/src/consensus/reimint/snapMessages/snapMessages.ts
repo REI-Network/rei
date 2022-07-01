@@ -230,34 +230,32 @@ export class ByteCode implements SnapMessage {
 
 export class GetTrieNode implements SnapMessage {
   readonly reqID: number;
-  readonly rootHash: Buffer;
-  readonly paths: Buffer[][];
+  readonly hashes: Buffer[];
   readonly responseLimit: number;
 
   static readonly code = 6;
 
-  constructor(reqID: number, rootHash: Buffer, paths: Buffer[][], responseLimit: number) {
+  constructor(reqID: number, hashes: Buffer[], responseLimit: number) {
     this.reqID = reqID;
-    this.rootHash = rootHash;
-    this.paths = paths;
+    this.hashes = hashes;
     this.responseLimit = responseLimit;
     this.validateBasic();
   }
 
-  static fromValuesArray(values: (Buffer | Buffer[][])[]) {
-    if (values.length !== 4) {
+  static fromValuesArray(values: (Buffer | Buffer[])[]) {
+    if (values.length !== 3) {
       throw new Error('invalid values');
     }
 
-    const [reqIDBuffer, rootHash, paths, responseLimitBuffer] = values;
-    if (!(reqIDBuffer instanceof Buffer) || !(rootHash instanceof Buffer) || !Array.isArray(paths) || !(responseLimitBuffer instanceof Buffer)) {
+    const [reqIDBuffer, hashes, responseLimitBuffer] = values;
+    if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(hashes) || !(responseLimitBuffer instanceof Buffer)) {
       throw new Error('invalid values');
     }
-    return new GetTrieNode(bufferToInt(reqIDBuffer), rootHash, paths, bufferToInt(responseLimitBuffer));
+    return new GetTrieNode(bufferToInt(reqIDBuffer), hashes, bufferToInt(responseLimitBuffer));
   }
 
   raw() {
-    return [intToBuffer(this.reqID), this.rootHash, this.paths, intToBuffer(this.responseLimit)];
+    return [intToBuffer(this.reqID), this.hashes, intToBuffer(this.responseLimit)];
   }
 
   serialize(): Buffer {

@@ -1,14 +1,14 @@
 import { expect } from 'chai';
-import { BaseTrie as Trie } from 'merkle-patricia-tree';
-import { BN, intToBuffer, keccak256, rlp, Account } from 'ethereumjs-util';
+import { BN, keccak256 } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
 import { AccountInfo, genRandomAccounts } from './util';
 import { SnapTree } from '../../src/snap/snapTree';
 import * as s from '../../src/consensus/reimint/snapMessages';
 import { SnapProtocolHandler } from '../../src/protocols/snap';
-import { StakingAccount } from '../../src/stateManager';
+import { BaseTrie } from 'merkle-patricia-tree';
 import { EMPTY_HASH, MAX_HASH } from '../../src/utils';
+import { TrieNodeIterator } from '../../src/snap/trieIterator';
 
 class MockNode {
   snaptree: SnapTree;
@@ -94,41 +94,82 @@ describe('snap protocol handler', function () {
 
   it('should getAccountRange correctly', async () => {
     const requestRoot = root;
-    const startHash = accounts[0].accountHash;
-    const limitHash = accounts[accounts.length - 1].accountHash;
-    const responseLimit = 1024;
-    const resolveMessage = 'account resolve message';
-    const callback = (data: Buffer) => {
+    let sortAccounts = accounts.sort((a, b) => a.accountHash.compare(b.accountHash));
+    const startHash = sortAccounts[0].accountHash;
+    const limitHash = sortAccounts[sortAccounts.length - 2].accountHash;
+    sortAccounts = sortAccounts.slice(0, sortAccounts.length - 1);
+    const responseLimit = 1024 * 1024;
+    const accountData = sortAccounts.map((account) => [account.accountHash, account.account.serialize()]);
+    let resolveData: Buffer;
+    const msg = new s.GetAccountRange(reqid, requestRoot, startHash, limitHash, responseLimit);
+    const callback1 = (data: Buffer) => {
+      resolveData = data;
+      const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.AccountRange;
+      expect(msgInstance.reqID === reqid, 'reqID should be equal').to.be.true;
+      for (let i = 0; i < msgInstance.accountData.length; i++) {
+        expect(msgInstance.accountData[i][0].equals(accountData[i][0]), 'accountHashes should be equal').to.be.true;
+        expect(msgInstance.accountData[i][1].equals(accountData[i][1]), 'accountBody should be equal').to.be.true;
+      }
+    };
+
+    (handler.peer as any as MockPeer).callback = callback1;
+    const data = s.SnapMessageFactory.serializeMessage(msg);
+    await handler.handle(data);
+
+    const callback2 = (data: Buffer) => {
       const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.GetAccountRange;
       expect(msgInstance.reqID === reqid, 'reqID should be equal').to.be.true;
       expect(msgInstance.rootHash.equals(requestRoot), 'requestRoot should be equal').to.be.true;
       expect(msgInstance.startHash.equals(startHash), 'startHash should be equal').to.be.true;
       expect(msgInstance.limitHash.equals(limitHash), 'limitHash should be equal').to.be.true;
-      expect(msgInstance.responseLimit === responseLimit, 'responseLimit should be equal').to.be.true;
       const waitingRequests = handler.getWaitingRequests();
       expect(waitingRequests.size === 1, 'waitingRequests should have one request').to.be.true;
       const request = waitingRequests.get(msgInstance.reqID);
       if (request) {
         clearTimeout(request.timeout);
         waitingRequests.delete(msgInstance.reqID);
-        request.resolve(resolveMessage);
+        request.resolve(resolveData);
       }
     };
-    (handler.peer as any as MockPeer).callback = callback;
-    const response = await handler.getAccountRange(requestRoot, startHash, limitHash, responseLimit);
-    expect(response === resolveMessage, 'response should be equal').to.be.true;
+    (handler.peer as any as MockPeer).callback = callback2;
+    const response = await handler.getAccountRange(requestRoot, { origin: startHash, limit: limitHash });
+    if (response) {
+      for (let i = 0; i < response.accounts.length; i++) {
+        expect(response.hashes[i].equals(accountData[i][0]), 'accountHashes should be equal').to.be.true;
+        expect(response.accounts[i].slimSerialize().equals(accountData[i][1]), 'accountBody should be equal').to.be.true;
+      }
+    }
     reqid++;
   });
 
   it('should getStorageRange correctly', async () => {
     const requestRoot = root;
     const accountHashes = accounts.map((account) => account.accountHash);
-    const hashKeys = Array.from(accounts[0].storageData.keys());
-    const startHash = hashKeys[0];
-    const limitHash = hashKeys[hashKeys.length - 1];
-    const responseLimit = 1024;
-    const resolveMessage = 'storage resolve message';
-    const callback = (data: Buffer) => {
+    const startHash = EMPTY_HASH;
+    const limitHash = MAX_HASH;
+    const responseLimit = 1024 * 1024;
+    const msg = new s.GetStorageRange(reqid, requestRoot, accountHashes, startHash, limitHash, responseLimit);
+    const storageHash = accounts.map((account) => Array.from(account.storageData.keys()).map((key) => key));
+    const stotageData = accounts.map((account) => Array.from(account.storageData.values()).map((value) => value.val));
+    let resolveData: Buffer;
+
+    const callback1 = (data: Buffer) => {
+      resolveData = data;
+      const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.StorageRange;
+      expect(msgInstance.reqID === reqid, 'reqID should be equal').to.be.true;
+      const storageData = accounts.map((account) => Array.from(account.storageData.keys()).map((key) => [key, account.storageData.get(key)!.val]));
+      for (let i = 0; i < msgInstance.slots.length; i++) {
+        for (let j = 0; j < msgInstance.slots[i].length; j++) {
+          expect(msgInstance.slots[i][j][0].equals(storageData[i][j][0]), 'storageHash should be equal').to.be.true;
+          expect(msgInstance.slots[i][j][1].equals(storageData[i][j][1]), 'storageData should be equal').to.be.true;
+        }
+      }
+    };
+    (handler.peer as any as MockPeer).callback = callback1;
+    const data = s.SnapMessageFactory.serializeMessage(msg);
+    await handler.handle(data);
+
+    const callback2 = (data: Buffer) => {
       const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.GetStorageRange;
       expect(msgInstance.reqID === reqid, 'reqID should be equal').to.be.true;
       expect(msgInstance.rootHash.equals(requestRoot), 'requestRoot should be equal').to.be.true;
@@ -137,30 +178,49 @@ describe('snap protocol handler', function () {
       }
       expect(msgInstance.startHash.equals(startHash), 'startHash should be equal').to.be.true;
       expect(msgInstance.limitHash.equals(limitHash), 'limitHash should be equal').to.be.true;
-      expect(msgInstance.responseLimit === responseLimit, 'responseLimit should be equal').to.be.true;
       const waitingRequests = handler.getWaitingRequests();
       expect(waitingRequests.size === 1, 'waitingRequests should have one request').to.be.true;
       const request = waitingRequests.get(msgInstance.reqID);
       if (request) {
         clearTimeout(request.timeout);
         waitingRequests.delete(msgInstance.reqID);
-        request.resolve(resolveMessage);
+        request.resolve(resolveData);
       }
     };
-    (handler.peer as any as MockPeer).callback = callback;
-    const response = await handler.getStorageRange(requestRoot, accountHashes, startHash, limitHash, responseLimit);
-    expect(response === resolveMessage, 'response should be equal').to.be.true;
+    (handler.peer as any as MockPeer).callback = callback2;
+    const response = await handler.getStorageRange(requestRoot, { accounts: accountHashes, roots: [], origin: startHash, limit: limitHash });
+    if (response) {
+      for (let i = 0; i < response.hashes.length; i++) {
+        for (let j = 0; j < response.slots[i].length; j++) {
+          expect(response.hashes[i][j].equals(storageHash[i][j]), 'accountHashes should be equal').to.be.true;
+          expect(response.slots[i][j].equals(stotageData[i][j]), 'storageData should be equal').to.be.true;
+        }
+      }
+    }
     reqid++;
   });
 
-  it('should getByteCode correctly', async () => {
+  it('should getByteCode  and handleGetByteCode correctly', async () => {
     const codeHashes = accounts.map((account) => keccak256(account.code));
     const responseLimit = 1024;
-    const resolveMessage = 'ByteCode resolve message';
-    const callback = (data: Buffer) => {
+    const msg = new s.GetByteCode(reqid, codeHashes, responseLimit);
+    const code = accounts.map((account) => account.code);
+    let resolveData: Buffer;
+
+    const callback1 = (data: Buffer) => {
+      resolveData = data;
+      const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.ByteCode;
+      for (let i = 0; i < msgInstance.codes.length; i++) {
+        expect(msgInstance.codes[i].equals(code[i]), 'codes should be equal').to.be.true;
+      }
+    };
+    (handler.peer as any as MockPeer).callback = callback1;
+    const data = s.SnapMessageFactory.serializeMessage(msg);
+    await handler.handle(data);
+
+    const callback2 = (data: Buffer) => {
       const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.GetByteCode;
       expect(msgInstance.reqID === reqid, 'reqID should be equal').to.be.true;
-      expect(msgInstance.responseLimit === responseLimit, 'responseLimit should be equal').to.be.true;
       for (let i = 0; i < codeHashes.length; i++) {
         expect(msgInstance.hashes[i].equals(codeHashes[i]), 'codeHashes should be equal').to.be.true;
       }
@@ -170,32 +230,52 @@ describe('snap protocol handler', function () {
       if (request) {
         clearTimeout(request.timeout);
         waitingRequests.delete(msgInstance.reqID);
-        request.resolve(resolveMessage);
+        request.resolve(resolveData);
       }
     };
-    (handler.peer as any as MockPeer).callback = callback;
-    const response = await handler.getByteCode(codeHashes, responseLimit);
-    expect(response === resolveMessage, 'response should be equal').to.be.true;
+    (handler.peer as any as MockPeer).callback = callback2;
+    const response = await handler.getByteCode(codeHashes);
+    if (response) {
+      for (let i = 0; i < response.length; i++) {
+        expect(response[i].equals(code[i]), 'codes should be equal').to.be.true;
+      }
+    }
     reqid++;
   });
 
   it('should getTrieNode correctly', async () => {
-    const requestRoot = root;
-    const paths: Buffer[][] = [];
-    for (const account of accounts) {
-      paths.push([account.accountHash, ...account.storageData.keys()]);
+    const trie = new BaseTrie(handler.node.db.rawdb, root);
+    const Interator = new TrieNodeIterator(trie);
+    let i = 0;
+    let keys: Buffer[] = [];
+    let values: Buffer[] = [];
+    for await (const node of Interator) {
+      if (i > 5) {
+        break;
+      }
+      keys.push(node.hash());
+      values.push(node.serialize());
+      i++;
     }
+
     const responseLimit = 1024;
-    const resolveMessage = 'TrieNode resolve message';
-    const callback = (data: Buffer) => {
+    const msg1 = new s.GetTrieNode(reqid, keys, responseLimit);
+    let resolveData: Buffer;
+
+    const callback1 = (data: Buffer) => {
+      resolveData = data;
+      const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.TrieNode;
+      for (let i = 0; i < msgInstance.nodes.length; i++) {
+        expect(msgInstance.nodes[i].equals(values[i]), 'nodes should be equal').to.be.true;
+      }
+    };
+    (handler.peer as any as MockPeer).callback = callback1;
+    const data1 = s.SnapMessageFactory.serializeMessage(msg1);
+    await handler.handle(data1);
+
+    const callback2 = (data: Buffer) => {
       const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.GetTrieNode;
       expect(msgInstance.reqID === reqid, 'reqID should be equal').to.be.true;
-      expect(msgInstance.responseLimit === responseLimit, 'responseLimit should be equal').to.be.true;
-      for (let i = 0; i < paths.length; i++) {
-        for (let j = 0; j < paths[i].length; j++) {
-          expect(msgInstance.paths[i][j].equals(paths[i][j]), 'paths should be equal').to.be.true;
-        }
-      }
 
       const waitingRequests = handler.getWaitingRequests();
       expect(waitingRequests.size === 1, 'waitingRequests should have one request').to.be.true;
@@ -203,126 +283,22 @@ describe('snap protocol handler', function () {
       if (request) {
         clearTimeout(request.timeout);
         waitingRequests.delete(msgInstance.reqID);
-        request.resolve(resolveMessage);
+        request.resolve(resolveData);
       }
     };
-    (handler.peer as any as MockPeer).callback = callback;
-    const response = await handler.getTrieNode(requestRoot, paths, responseLimit);
-    expect(response === resolveMessage, 'response should be equal').to.be.true;
-    reqid++;
-  });
-
-  it('should handleGetAccountRange correctly', async () => {
-    const requestRoot = root;
-    let sortAccounts = accounts.sort((a, b) => a.accountHash.compare(b.accountHash));
-    const startHash = sortAccounts[sortAccounts.length - 1].accountHash;
-    const limitHash = startHash;
-    sortAccounts = [sortAccounts[sortAccounts.length - 1]];
-    const responseLimit = 1024 * 1024;
-    let proof: Buffer[] = [];
-    let keys: Buffer[] = [];
-    let values: Buffer[] = [];
-    const accountData = sortAccounts.map((account) => [account.accountHash, account.account.serialize()]);
-    const msg = new s.GetAccountRange(reqid, requestRoot, startHash, limitHash, responseLimit);
-    const callback = (data: Buffer) => {
-      const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.AccountRange;
-      expect(msgInstance.reqID === reqid, 'reqID should be equal').to.be.true;
-      for (let i = 0; i < msgInstance.accountData.length; i++) {
-        expect(msgInstance.accountData[i][0].equals(accountData[i][0]), 'accountHashes should be equal').to.be.true;
-        expect(msgInstance.accountData[i][1].equals(accountData[i][1]), 'accountBody should be equal').to.be.true;
-      }
-      proof = msgInstance.proof;
-      keys = msgInstance.accountData.map((account) => account[0]);
-      values = msgInstance.accountData.map((account) => StakingAccount.fromRlpSlimSerializedAccount(account[1]).serialize());
-    };
-
-    (handler.peer as any as MockPeer).callback = callback;
-    const data = rlp.encode([intToBuffer(s.GetAccountRange.code), msg.raw()]);
-    await handler.handle(data);
-    expect(await Trie.verifyRangeProof(requestRoot, startHash, limitHash, keys, values, proof), 'proof should be valid');
-    reqid++;
-  });
-
-  it('should handleGetStorageRange correctly', async () => {
-    const requestRoot = root;
-    const sortAccounts = accounts.sort((a, b) => a.accountHash.compare(b.accountHash));
-    const accountHashes = sortAccounts.map((account) => account.accountHash);
-    const startHash = Array.from(sortAccounts[sortAccounts.length - 1].storageData.keys())[0];
-    const limitHash = MAX_HASH;
-    const responseLimit = 1024 * 1024;
-    const msg = new s.GetStorageRange(reqid, requestRoot, accountHashes, startHash, limitHash, responseLimit);
-    let proof: Buffer[] = [];
-    let keys: Buffer[][] = [];
-    let values: Buffer[][] = [];
-    const callback = (data: Buffer) => {
-      const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.StorageRange;
-      expect(msgInstance.reqID === reqid, 'reqID should be equal').to.be.true;
-      const storageData = sortAccounts.map((account) => Array.from(account.storageData.keys()).map((key) => [key, account.storageData.get(key)!.val]));
-      for (let i = 0; i < msgInstance.slots.length; i++) {
-        for (let j = 0; j < msgInstance.slots[i].length; j++) {
-          expect(msgInstance.slots[i][j][0].equals(storageData[i][j][0]), 'storageHash should be equal').to.be.true;
-          expect(msgInstance.slots[i][j][1].equals(storageData[i][j][1]), 'storageData should be equal').to.be.true;
-        }
-      }
-      proof = msgInstance.proof;
-      keys = msgInstance.slots.map((slot) => slot.map((slot) => slot[0]));
-      values = msgInstance.slots.map((slot) => slot.map((slot) => slot[1]));
-    };
-    (handler.peer as any as MockPeer).callback = callback;
-    const data = rlp.encode([intToBuffer(s.GetStorageRange.code), msg.raw()]);
-    await handler.handle(data);
-    await Trie.verifyRangeProof(sortAccounts[0].account.stateRoot, EMPTY_HASH, MAX_HASH, keys[0], values[0], proof);
-    reqid++;
-  });
-
-  it('should handleGetByteCode correctly', async () => {
-    const codeHashes = accounts.map((account) => keccak256(account.code));
-    const responseLimit = 1024;
-    const msg = new s.GetByteCode(reqid, codeHashes, responseLimit);
-    const code = accounts.map((account) => account.code);
-    const callback = (data: Buffer) => {
-      const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.ByteCode;
-      expect(msgInstance.reqID === reqid, 'reqID should be equal').to.be.true;
-      for (let i = 0; i < msgInstance.codes.length; i++) {
-        expect(msgInstance.codes[i].equals(code[i]), 'codes should be equal').to.be.true;
-      }
-    };
-    (handler.peer as any as MockPeer).callback = callback;
-    const data = rlp.encode([intToBuffer(s.GetByteCode.code), msg.raw()]);
-    await handler.handle(data);
-    reqid++;
-  });
-
-  it('should handleGetTrieNode correctly', async () => {
-    const requestRoot = root;
-    const responseLimit = 1024;
-    let paths = accounts.map((account) => [account.accountHash]);
-    const msg1 = new s.GetTrieNode(reqid, requestRoot, paths, responseLimit);
-    const callback1 = (data: Buffer) => {
-      const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.TrieNode;
-      expect(msgInstance.reqID === reqid, 'reqID should be equal').to.be.true;
-      const nodes = accounts.map((account) => account.account.serialize());
-      for (let i = 0; i < msgInstance.nodes.length; i++) {
-        expect(msgInstance.nodes[i].equals(nodes[i]), 'nodes should be equal').to.be.true;
-      }
-    };
-    (handler.peer as any as MockPeer).callback = callback1;
-    const data1 = rlp.encode([intToBuffer(s.GetTrieNode.code), msg1.raw()]);
-    await handler.handle(data1);
-
-    paths = accounts.map((account) => [account.accountHash].concat(Array.from(account.storageData.keys())));
-    const msg2 = new s.GetTrieNode(reqid, requestRoot, paths, responseLimit);
-    const callback2 = (data: Buffer) => {
-      const msgInstance = s.SnapMessageFactory.fromSerializedMessage(data) as s.TrieNode;
-      expect(msgInstance.reqID === reqid, 'reqID should be equal').to.be.true;
-      const nodes: Buffer[] = [];
-      accounts.forEach((account) => Array.from(account.storageData.keys()).forEach((key) => nodes.push(account.storageData.get(key)!.val)));
-      for (let i = 0; i < msgInstance.nodes.length; i++) {
-        expect(msgInstance.nodes[i].equals(nodes[i]), 'nodes should be equal').to.be.true;
-      }
-    };
-    const data2 = rlp.encode([intToBuffer(s.GetTrieNode.code), msg2.raw()]);
     (handler.peer as any as MockPeer).callback = callback2;
-    await handler.handle(data2);
+    const response = await handler.getTrieNode(keys);
+    if (response) {
+      for (let i = 0; i < response.length; i++) {
+        expect(response[i].equals(values[i]), 'nodes should be equal').to.be.true;
+      }
+    }
+    reqid++;
+  });
+
+  it('should abort correctly', async () => {
+    expect((handler.protocol.pool as any as Mockpool).has(handler), 'handler should in the pool').to.be.true;
+    handler.abort();
+    expect((handler.protocol.pool as any as Mockpool).has(handler), 'handler should removed from the pool').to.be.false;
   });
 });

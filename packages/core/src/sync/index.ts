@@ -1,1 +1,2 @@
-export * from './full/sync';
+export * from './sync';
+export * from './types';

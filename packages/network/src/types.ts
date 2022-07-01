@@ -1,8 +1,8 @@
 import { Peer } from './peer';
 
 export interface Protocol {
-  name: string;
   protocolString: string;
+  beforeMakeHandler(peer: Peer): boolean | Promise<boolean>;
   makeHandler(peer: Peer): ProtocolHandler;
 }
 

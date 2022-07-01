@@ -43,6 +43,7 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     databasePath: opts.datadir,
     chain: opts.chain,
     receiptsCacheSize: opts.receiptsCacheSize ? Number(opts.receiptsCacheSize) : undefined,
+    syncMode: opts.sync,
     mine,
     network,
     account

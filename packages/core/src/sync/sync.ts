@@ -1,432 +1,403 @@
 import { EventEmitter } from 'events';
-import { BN, BNLike } from 'ethereumjs-util';
-import Semaphore from 'semaphore-async-await';
+import { BN } from 'ethereumjs-util';
 import { Channel, getRandomIntInclusive, logger, AbortableTimer } from '@rei-network/utils';
 import { Block, Receipt } from '@rei-network/structure';
-import { Common } from '@rei-network/common';
-import { preValidateBlock } from '../validation';
-import { WireProtocolHandler, HandlerPool } from '../protocols';
+import { Node } from '../node';
+import { preValidateBlock, validateReceipts } from '../validation';
+import { WireProtocolHandler, isV2 } from '../protocols';
+import { FullSync } from './full';
+import { SnapSync } from './snap';
+import { SyncInfo } from './types';
 
-const maxSnapSyncLimit = 200;
-const confirmLimit = 3;
-const confirmTimeout = 3000;
-const unconfirmLimit = 3;
+const snapSyncMinTD = 201600;
+const waitingSyncDelay = 100;
+const randomPickInterval = 1000;
 
-export type SyncContext = {
-  td: BN;
-  start: BN;
-  height: BN;
-  block: Block;
-  receipts: Receipt[];
-
-  isSnapSync: boolean;
-};
-
-type ConfirmContext = {
-  td: BN;
-  height: BN;
-  block: Block;
-  receipts: Receipt[];
-
-  serializedHeader: Buffer;
-  serializedReceipts: Buffer[];
-
-  confirmed: Set<string>;
-  unconfirmed: Set<string>;
-
-  timeout: NodeJS.Timeout;
-};
-
-enum ConfirmStatus {
-  Failed,
-  WaitingForConfirm,
-  Confirmed,
-  Unconfirmed
+export enum AnnouncementType {
+  NewPeer,
+  NewBlock
 }
 
 export type Announcement = {
+  type: AnnouncementType;
   handler: WireProtocolHandler;
   block?: Block;
+  height: BN;
+  td: BN;
 };
 
-export type FetchResult = {
-  isSnapSync: boolean;
-  start?: BN;
-  fetching: Promise<FetchingResult>;
-} | null;
+export type BlockData = {
+  block: Block;
+  receipts: Receipt[];
+};
 
-export type FetchingResult = { reorg: boolean; saveBlock: boolean };
-
-export interface IFetcher {
-  fetch(handler: WireProtocolHandler, block: Block, receipts: Receipt[]): Promise<FetchResult>;
-
-  abort(): Promise<void>;
+export enum SyncMode {
+  Full = 'full',
+  Snap = 'snap'
 }
 
-export interface SyncBackend {
-  getCommon(num: BNLike): Common;
-  getHeight(): BN;
-  getTotalDifficulty(): BN;
+export interface SynchronizerOptions {
+  node: Node;
+  mode: SyncMode;
 }
 
-export interface SyncOptions {
-  backend: SyncBackend;
-  pool: HandlerPool<WireProtocolHandler>;
-  fetcher: IFetcher;
-
-  enableRandomPick: boolean;
-  validate: boolean;
-}
-
-export declare interface Sync {
-  on(event: 'start', listener: (ctx: SyncContext) => void): this;
-  on(event: 'synchronized', listener: (ctx: SyncContext) => void): this;
+export declare interface Synchronizer {
+  on(event: 'start', listener: () => void): this;
+  on(event: 'finished', listener: () => void): this;
+  on(event: 'synchronized', listener: () => void): this;
   on(event: 'failed', listener: () => void): this;
 
-  off(event: 'start', listener: (ctx: SyncContext) => void): this;
-  off(event: 'synchronized', listener: (ctx: SyncContext) => void): this;
+  off(event: 'start', listener: () => void): this;
+  off(event: 'finished', listener: () => void): this;
+  off(event: 'synchronized', listener: () => void): this;
   off(event: 'failed', listener: () => void): this;
 }
 
-export class Sync extends EventEmitter {
-  readonly backend: SyncBackend;
-  readonly pool: HandlerPool<WireProtocolHandler>;
-  readonly fetcher: IFetcher;
-  readonly enableRandomPick: boolean;
-  readonly validate: boolean;
-
-  syncContext?: SyncContext;
-  confirmContext?: ConfirmContext;
-
-  private readonly channel = new Channel<Announcement>();
-
+export class Synchronizer extends EventEmitter {
+  readonly node: Node;
+  readonly mode: SyncMode;
+  private full: FullSync;
+  private snap: SnapSync;
+  private channel = new Channel<Announcement>();
   private aborted: boolean = false;
-  private isWorking: boolean = false; // TODO: fix this
+  private delay = new AbortableTimer();
   private timer = new AbortableTimer();
-  private lock = new Semaphore(1);
+  private syncLoopPromise?: Promise<void>;
+  private randomPickLoopPromise?: Promise<void>;
 
-  private syncPromise?: Promise<void>;
-  private randomPickPromise?: Promise<void>;
-
-  constructor(options: SyncOptions) {
+  constructor(options: SynchronizerOptions) {
     super();
-    this.backend = options.backend;
-    this.pool = options.pool;
-    this.fetcher = options.fetcher;
-    this.enableRandomPick = options.enableRandomPick;
-    this.validate = options.validate;
+    this.node = options.node;
+    this.mode = options.mode;
+    this.full = new FullSync(options.node);
+    this.snap = new SnapSync(this.node.db, 1 as any); // TODO
+    this.listenSyncer(this.full);
+    this.listenSyncer(this.snap);
+  }
+
+  get status() {
+    if (this.full.isSyncing) {
+      return this.full.status;
+    }
+    if (this.snap.isSyncing) {
+      return this.snap.status;
+    }
+    return { startingBlock: 0, highestBlock: 0 };
   }
 
   get isSyncing() {
-    return !!this.syncContext;
+    return this.full.isSyncing || this.snap.isSyncing;
   }
 
-  private resetConfirmContext(ctx?: ConfirmContext) {
-    this.confirmContext && clearTimeout(this.confirmContext.timeout);
-    this.confirmContext = ctx;
+  get isWorking() {
+    return !!this.syncLoopPromise;
   }
 
-  private async resetSyncContext() {
-    if (this.syncContext) {
-      await this.fetcher.abort();
-      this.syncContext = undefined;
+  /**
+   * Listen syncer event
+   * @param sync - Syncer instance
+   */
+  private listenSyncer(sync: FullSync | SnapSync) {
+    sync
+      .on('start', (info) => {
+        logger.info('💡 Get best height from:', info.remotePeerId, 'best height:', info.bestHeight.toString(), 'local height:', this.node.latestBlock.header.number.toString());
+        this.emit('start');
+      })
+      .on('finished', (info) => {
+        const localHeight = this.node.latestBlock.header.number.toString();
+        const localTD = this.node.getTotalDifficulty().toString();
+        logger.info('💫 Sync over, local height:', localHeight, 'local td:', localTD, 'best height:', info.bestHeight.toString(), 'best td:', info.bestTD.toString());
+        this.emit('finished');
+      })
+      .on('synchronized', () => {
+        const latest = this.node.latestBlock;
+        const td = this.node.getTotalDifficulty();
+        this.node.wire.broadcastNewBlock(latest, td);
+        logger.info('💫 Synchronized');
+        this.emit('synchronized');
+      })
+      .on('failed', () => {
+        this.emit('failed');
+      });
+  }
+
+  /**
+   * Download block and receipts through announcement
+   * @param ann - Announcement
+   * @returns If the download failed, return null
+   */
+  private downloadBlockDataFromAnn(ann: Announcement): Promise<BlockData | null> {
+    return this.downloadBlockData(ann.height, ann.handler, ann.block);
+  }
+
+  /**
+   * Download block and receipts
+   * @param height - Best height
+   * @param handler - Handler instance
+   * @param _block - Block(if exists)
+   * @returns If the download failed, return null
+   */
+  private async downloadBlockData(height: BN, handler: WireProtocolHandler, _block?: Block): Promise<BlockData | null> {
+    if (!isV2(handler)) {
+      // the remote peer must support wire v2 protocol
+      logger.debug('Synchronizer::downloadBlockData, unsupported wire v2 protocol:', handler.id);
+      return null;
     }
+
+    let block!: Block;
+    if (_block) {
+      block = _block;
+    } else {
+      // download header
+      const header = await handler
+        .getBlockHeaders(height, new BN(1))
+        .then((headers) => (headers.length === 1 ? headers[0] : null))
+        .catch(() => null);
+      if (header === null) {
+        logger.warn('Synchronizer::downloadBlockData, download header failed:', handler.id, 'number:', height.toString());
+        return null;
+      }
+
+      // download body
+      const body = await handler
+        .getBlockBodies([header])
+        .then((body) => (body.length === 1 ? body[0] : null))
+        .catch(() => null);
+      if (body === null) {
+        logger.warn('Synchronizer::downloadBlockData, download body failed:', handler.id, 'number:', height.toString());
+        return null;
+      }
+
+      block = Block.fromBlockData({ header, transactions: body }, { common: this.node.getCommon(0), hardforkByBlockNumber: true });
+    }
+
+    // validate block
+    try {
+      await preValidateBlock.call(block);
+    } catch (err) {
+      // maybe we should ban remote peer
+      logger.warn('Synchronizer::downloadBlockData, validate block failed:', handler.id, 'err:', err);
+      return null;
+    }
+
+    // download receipts
+    const receipts = await handler
+      .getReceipts([block.hash()])
+      .then((receipts) => (receipts.length === 1 ? receipts[0] : null))
+      .catch(() => null);
+    if (receipts === null) {
+      logger.warn('Synchronizer::downloadBlockData, download receipts failed:', handler.id, 'number:', height.toString());
+      return null;
+    }
+
+    // validate receipts
+    try {
+      validateReceipts(block, receipts);
+    } catch (err) {
+      // maybe we should ban remote peer
+      logger.warn('Synchronizer::downloadBlockData, validate receipts failed:', handler.id, 'err:', err);
+      return null;
+    }
+
+    return { block, receipts };
+  }
+
+  /**
+   * Compare blockData for equality
+   * @param a - BlockData
+   * @param b - BlockData
+   * @returns Return true if equal
+   */
+  private compareBlockData(a: BlockData, b: BlockData) {
+    if (!a.block.serialize().equals(b.block.serialize())) {
+      return false;
+    }
+    if (a.receipts.length !== b.receipts.length) {
+      return false;
+    }
+    for (let i = 0; i < a.receipts.length; i++) {
+      if (!a.receipts[i].serialize().equals(b.receipts[i].serialize())) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private async syncLoop() {
     for await (const ann of this.channel) {
-      try {
-        await this.lock.acquire();
+      if (this.full.isSyncing) {
+        // full sync is working, ignore all announcement
+        continue;
+      }
 
-        const handler = ann.handler;
-        const status = handler.status!;
-        const peerId = handler.peer.peerId;
-        const height = new BN(status.height);
-        const td = new BN(status.totalDifficulty);
+      if (ann.type === AnnouncementType.NewPeer && this.snap.isSyncing) {
+        // snap sync is working, announce a new peer to it
+        this.snap.announce();
+        continue;
+      }
 
-        let block = ann.block;
-        let receipts: Receipt[] | undefined;
-        const downloadDataFromPeer = async () => {
-          if (block && receipts) {
-            return { block, receipts };
+      // we are not working, try to start a new sync
+      if (!this.full.isSyncing && !this.snap.isSyncing) {
+        const td = this.node.getTotalDifficulty();
+        if (td.gte(ann.td)) {
+          // the remote peer is behind, ignore
+          continue;
+        }
+
+        if (this.mode === SyncMode.Snap && ann.td.sub(td).gten(snapSyncMinTD) && isV2(ann.handler)) {
+          logger.debug('Synchronizer::syncLoop, try to start a new snap sync');
+          // we're about a week behind, try snap sync first
+          const data = await this.downloadBlockDataFromAnn(ann);
+          if (data === null) {
+            // download data failed,
+            // maybe we should ban the remote peer
+            continue;
           }
 
-          const result = await this.downloadDataFromPeer(height, handler);
-          if (result === null) {
-            throw new Error('download data from: ' + peerId + ' failed');
+          // sleep for a while to ensure
+          // the block has been synced by other peers
+          await this.delay.wait(waitingSyncDelay);
+          if (this.aborted) {
+            // exit if we have aborted
+            break;
           }
 
-          block = result.block;
-          receipts = result.receipts;
-          return { block, receipts };
-        };
-
-        const resetConfirmContextToCurrent = async () => {
-          const { block, receipts } = await downloadDataFromPeer();
-
-          const ctx: ConfirmContext = {
-            td,
-            height,
-            block,
-            receipts,
-            serializedHeader: block.header.serialize(),
-            serializedReceipts: receipts.map((r) => r.serialize()),
-            confirmed: new Set<string>([peerId]),
-            unconfirmed: new Set<string>(),
-            timeout: setTimeout(() => {
-              if (this.confirmContext === ctx) {
-                this.resetConfirmContext();
-              }
-            }, confirmTimeout)
-          };
-
-          this.resetConfirmContext(ctx);
-          await this.collectConfirm(ctx);
-        };
-
-        if (this.confirmContext) {
-          const { td: confirmTD, confirmed, unconfirmed } = this.confirmContext;
-          if (confirmTD.lte(this.backend.getTotalDifficulty())) {
-            this.resetConfirmContext();
-          } else if (td.gte(confirmTD) && !confirmed.has(peerId) && !unconfirmed.has(peerId)) {
-            const { block, receipts } = await downloadDataFromPeer();
-            const status = await this.updateConfirmContext(handler, this.confirmContext, block, receipts, peerId);
-            if (status === ConfirmStatus.Confirmed || status === ConfirmStatus.WaitingForConfirm) {
+          // download data from other nodes to verify the data
+          let confirmed = 0;
+          // TODO: random pick handler
+          for (const handler of this.node.wire.pool.handlers) {
+            if (handler.peer.peerId === ann.handler.peer.peerId) {
+              // ignore the current peer
               continue;
             }
-          }
-        }
 
-        if (this.syncContext) {
-          const { isSnapSync, height: syncHeight } = this.syncContext;
-          if (isSnapSync) {
-            if (!this.confirmContext) {
-              if (height.sub(syncHeight).gten(maxSnapSyncLimit)) {
-                await resetConfirmContextToCurrent();
-              }
-            } else {
-              const confirmHeight = this.confirmContext.height;
-              if (height.sub(confirmHeight).gten(maxSnapSyncLimit)) {
-                await resetConfirmContextToCurrent();
+            if (!isV2(handler)) {
+              // ignore v1 peer
+              continue;
+            }
+
+            const _data = await this.downloadBlockData(ann.height, handler);
+            if (_data !== null && this.compareBlockData(data, _data)) {
+              if (++confirmed >= 2) {
+                break;
               }
             }
           }
-        }
 
-        if (!this.syncContext && !this.confirmContext) {
-          if (td.gt(this.backend.getTotalDifficulty())) {
-            await resetConfirmContextToCurrent();
+          // if we have collected enough confirmations, start snap sync
+          if (confirmed >= 2) {
+            logger.debug('Synchronizer::syncLoop, confirmed succeed');
+            const info: SyncInfo = {
+              bestHeight: new BN(ann.handler.status!.height),
+              bestTD: ann.td,
+              remotePeerId: ann.handler.peer.peerId
+            };
+            const startingBlock = this.node.latestBlock.header.number.toNumber();
+            await this.snap.snapSync(data.block.header.stateRoot, startingBlock, info, async () => {
+              logger.debug('Synchronizer::syncLoop, snapSync onFinished');
+              // save block and receipts to database
+              await this.node.commitBlock({
+                ...data,
+                broadcast: false,
+                force: true,
+                td: ann.td
+              });
+            });
+          } else {
+            logger.debug('Synchronizer::syncLoop, confirmed failed:', confirmed);
           }
+        } else {
+          logger.debug('Synchronizer::syncLoop, try to start a new full sync');
+          // we're not too far behind, try full sync
+          await this.full.fullSync(ann.handler);
         }
-      } catch (err) {
-        logger.warn('Sync::syncLoop, catch:', err);
-      } finally {
-        this.lock.release();
       }
     }
   }
 
   private async randomPickLoop() {
     while (!this.aborted) {
-      await this.timer.wait(1000);
+      await this.timer.wait(randomPickInterval);
       if (this.aborted) {
+        // exit if we have aborted
         break;
       }
 
-      this.pickRandomPeerToSync();
-    }
-  }
+      // if we are not working, and there are no events that are not handled
+      if (!this.full.isSyncing && !this.snap.isSyncing && this.channel.array.length === 0) {
+        const td = this.node.getTotalDifficulty();
+        const handlers = this.node.wire.pool.handlers.filter((handler) => new BN(handler.status!.totalDifficulty).gt(td));
+        if (handlers.length === 0) {
+          continue;
+        }
 
-  private pickRandomPeerToSync() {
-    if (!this.isWorking && this.channel.array.length === 0) {
-      const td = this.backend.getTotalDifficulty();
-      const handlers = this.pool.handlers.filter((handler) => new BN(handler.status!.totalDifficulty).gt(td));
-      if (handlers.length === 0) {
-        return;
+        // randomly pick a peer to start sync
+        this.announceNewBlock(handlers[getRandomIntInclusive(0, handlers.length - 1)]);
       }
-
-      this.channel.push({ handler: handlers[getRandomIntInclusive(0, handlers.length - 1)] });
     }
   }
 
-  private async collectConfirm(context: ConfirmContext) {
-    const { confirmed, unconfirmed, height } = context;
-    const td = this.backend.getTotalDifficulty();
-
-    const handlers = this.pool.handlers.filter(({ peer: { peerId }, status }) => {
-      return new BN(status!.totalDifficulty).gt(td) && !confirmed.has(peerId) && !unconfirmed.has(peerId);
+  /**
+   * Announce a new block to syncer
+   * @param handler - Handler instance
+   * @param block - Block
+   */
+  announceNewBlock(handler: WireProtocolHandler, block?: Block) {
+    this.channel.push({
+      type: AnnouncementType.NewBlock,
+      handler,
+      block,
+      height: new BN(handler.status!.height),
+      td: new BN(handler.status!.totalDifficulty)
     });
-    if (handlers.length === 0) {
-      return;
-    }
-
-    const results = await Promise.all(handlers.map(this.downloadDataFromPeer.bind(this, height)));
-    for (let i = 0; i < results.length; i++) {
-      const handler = handlers[i];
-      const result = results[i];
-      if (result === null) {
-        continue;
-      }
-
-      const status = await this.updateConfirmContext(handler, context, result.block, result.receipts, handler.peer.peerId);
-      if (status === ConfirmStatus.WaitingForConfirm) {
-        // do nothing
-      } else if (status === ConfirmStatus.Confirmed || status === ConfirmStatus.Unconfirmed) {
-        break;
-      }
-    }
   }
 
-  private async updateConfirmContext(handler: WireProtocolHandler, context: ConfirmContext, block: Block, receipts: Receipt[], peerId: string): Promise<ConfirmStatus> {
-    const { serializedHeader, serializedReceipts, confirmed, unconfirmed, height, td } = context;
-
-    let confirm = true;
-    if (!block.header.serialize().equals(serializedHeader)) {
-      confirm = false;
-    }
-    if (serializedReceipts.length !== receipts.length) {
-      confirm = false;
-    }
-    for (let i = 0; i > receipts.length; i++) {
-      if (!receipts[i].serialize().equals(serializedReceipts[i])) {
-        confirm = false;
-        break;
-      }
-    }
-
-    if (confirm) {
-      confirmed.add(peerId);
-    } else {
-      unconfirmed.add(peerId);
-    }
-
-    if (confirmed.size >= confirmLimit) {
-      // TODO: ban unconfirmed peers
-
-      this.resetConfirmContext();
-      await this.resetSyncContext();
-
-      const result = await this.fetcher.fetch(handler, block, receipts);
-      if (result === null) {
-        // TODO: ban handler (if needed)
-        return ConfirmStatus.Failed;
-      }
-
-      const { start, isSnapSync, fetching } = result;
-      const ctx: SyncContext = {
-        td,
-        height,
-        block,
-        receipts,
-        start: start ?? this.backend.getHeight(),
-        isSnapSync
-      };
-      this.syncContext = ctx;
-
-      this.emit('start', ctx);
-      // we are sure that fetching will not throw an exception
-      fetching.then(({ reorg, saveBlock }) => {
-        this.onFetched(ctx, reorg, saveBlock);
-      });
-
-      return ConfirmStatus.Confirmed;
-    } else if (unconfirmed.size >= unconfirmLimit) {
-      // TODO: ban confirmed peers
-      this.resetConfirmContext();
-      return ConfirmStatus.Unconfirmed;
-    } else {
-      // wait for enough confirm, do nothing
-      return ConfirmStatus.WaitingForConfirm;
-    }
+  /**
+   * Announce syncer when a new peer joins
+   * @param handler - Handler instance
+   */
+  announceNewPeer(handler: WireProtocolHandler) {
+    this.channel.push({
+      type: AnnouncementType.NewPeer,
+      handler,
+      height: new BN(handler.status!.height),
+      td: new BN(handler.status!.totalDifficulty)
+    });
   }
 
-  private async downloadDataFromPeer(height: BN, handler: WireProtocolHandler): Promise<{ block: Block; receipts: Receipt[] } | null> {
-    const header = await handler
-      .getBlockHeaders(height, new BN(1))
-      .then((headers) => (headers.length === 1 ? headers[0] : null))
-      .catch(() => null);
-    if (header === null) {
-      return null;
-    }
-
-    const body = await handler
-      .getBlockBodies([header])
-      .then((body) => (body.length === 1 ? body[0] : null))
-      .catch(() => null);
-    if (body === null) {
-      return null;
-    }
-
-    const block = Block.fromBlockData({ header, transactions: body }, { common: this.backend.getCommon(0), hardforkByBlockNumber: true });
-    if (this.validate) {
-      try {
-        await preValidateBlock.call(block);
-      } catch (err) {
-        // ignore errors
-        return null;
-      }
-    }
-
-    // TODO: download and validate receipts
-    const receipts: Receipt[] = [];
-
-    return { block, receipts };
-  }
-
-  private async onFetched(ctx: SyncContext, reorg: boolean, saveBlock: boolean) {
-    if (ctx !== this.syncContext) {
-      // ignore
-      this.emit('failed');
-      return;
-    }
-
-    try {
-      await this.lock.acquire();
-      if (ctx !== this.syncContext) {
-        // ignore
-        this.emit('failed');
-        return;
-      }
-
-      if (reorg) {
-        // TODO: broadcast new block...
-        this.emit('synchronized', ctx);
-      } else {
-        this.emit('failed');
-      }
-
-      if (saveBlock) {
-        // TODO: blockchain.putBlock
-      }
-
-      this.syncContext = undefined;
-    } catch (err) {
-      logger.warn('Sync::onFetched, catch:', err);
-    } finally {
-      this.lock.release;
-    }
-  }
-
-  announce(ann: Announcement) {
-    this.channel.push(ann);
-  }
-
+  /**
+   * Start working
+   */
   start() {
-    if (this.syncPromise || this.randomPickPromise) {
-      throw new Error('promises exist');
+    if (this.isWorking) {
+      throw new Error('syncer is working');
     }
 
-    this.syncPromise = this.syncLoop();
-    this.enableRandomPick && (this.randomPickPromise = this.randomPickLoop());
+    this.syncLoopPromise = this.syncLoop().finally(() => {
+      this.syncLoopPromise = undefined;
+    });
+    this.randomPickLoopPromise = this.randomPickLoop().finally(() => {
+      this.randomPickLoopPromise = undefined;
+    });
   }
 
+  /**
+   * Abort
+   */
   async abort() {
-    this.aborted = true;
-    this.timer.abort();
-    this.channel.abort();
-    this.syncPromise && (await this.syncPromise);
-    this.randomPickPromise && (await this.randomPickPromise);
-    this.resetConfirmContext();
-    await this.resetSyncContext();
+    if (this.isWorking) {
+      this.aborted = true;
+      this.timer.abort();
+      this.delay.abort();
+      this.channel.abort();
+      if (this.full.isSyncing) {
+        await this.full.abort();
+      }
+      if (this.snap.isSyncing) {
+        await this.snap.abort();
+      }
+      await this.syncLoopPromise;
+      await this.randomPickLoopPromise;
+    }
   }
 }

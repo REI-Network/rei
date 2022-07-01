@@ -1,3 +1,4 @@
+import { BN } from 'ethereumjs-util';
 import { NetworkManagerOptions } from '@rei-network/network';
 import { Receipt, Block } from '@rei-network/structure';
 import { ConsensusEngineOptions } from './consensus/types';
@@ -26,6 +27,10 @@ export interface NodeOptions {
    * Max receipts cache size
    */
   receiptsCacheSize?: number;
+  /**
+   * Sync mode, default is 'full'
+   */
+  syncMode: string;
 
   mine: ConsensusEngineConstructorOptions;
   network: NetworkManagerConstructorOptions;
@@ -44,4 +49,6 @@ export interface CommitBlockOptions {
   broadcast: boolean;
   block: Block;
   receipts: Receipt[];
+  force?: boolean;
+  td?: BN;
 }

@@ -12,13 +12,13 @@ import { Transaction, Block } from '@rei-network/structure';
 import { Channel, logger } from '@rei-network/utils';
 import { AccountManager } from '@rei-network/wallet';
 import { TxPool } from './txpool';
-import { Synchronizer } from './sync';
+import { Synchronizer, SyncMode } from './sync';
 import { TxFetcher } from './txSync';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, ReceiptsCache } from './bloomBits';
 import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
-import { WireProtocol, ConsensusProtocol } from './protocols';
+import { Wire, ConsensusProtocol, WireProtocolHandler } from './protocols';
 import { ReimintConsensusEngine, CliqueConsensusEngine } from './consensus';
 import { isEnableRemint } from './hardforks';
 import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
@@ -50,7 +50,7 @@ export class Node {
   readonly chaindb: LevelUp;
   readonly evidencedb: LevelUp;
   readonly networkdb: LevelStore;
-  readonly wire: WireProtocol;
+  readonly wire: Wire;
   readonly consensus: ConsensusProtocol;
   readonly db: Database;
   readonly blockchain: Blockchain;
@@ -88,7 +88,7 @@ export class Node {
     this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));
     this.evidencedb = createLevelDB(path.join(this.datadir, 'evidence'));
     this.networkdb = new LevelStore(path.join(this.datadir, 'networkdb'), { createIfMissing: true });
-    this.wire = new WireProtocol(this);
+    this.wire = new Wire(this);
     this.consensus = new ConsensusProtocol(this);
     this.accMngr = new AccountManager(options.account.keyStorePath);
     this.receiptsCache = new ReceiptsCache(options.receiptsCacheSize);
@@ -120,7 +120,7 @@ export class Node {
 
     this.networkMngr = new NetworkManager({
       ...options.network,
-      protocols: [this.wire, this.consensus],
+      protocols: [[this.wire.v2, this.wire.v1], this.consensus],
       datastore: this.networkdb,
       nodedb: this.nodedb,
       bootnodes: [...common.bootstrapNodes(), ...(options.network.bootnodes ?? [])]
@@ -128,7 +128,7 @@ export class Node {
       .on('installed', this.onPeerInstalled)
       .on('removed', this.onPeerRemoved);
 
-    this.sync = new Synchronizer({ node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
+    this.sync = new Synchronizer({ node: this, mode: options.syncMode as SyncMode }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
     this.txPool = new TxPool({ node: this, journal: this.datadir });
     this.txSync = new TxFetcher(this);
     this.bcMonitor = new BlockchainMonitor(this.db);
@@ -230,10 +230,9 @@ export class Node {
     await this.chaindb.close();
   }
 
-  private onPeerInstalled = (name: string, peer: Peer) => {
-    if (name === this.wire.name) {
-      const handler = this.wire.getHandler(peer, false);
-      handler && this.sync.announce(handler);
+  private onPeerInstalled = (handler) => {
+    if (handler instanceof WireProtocolHandler) {
+      this.sync.announceNewPeer(handler);
     }
   };
 
@@ -432,7 +431,15 @@ export class Node {
     }
 
     // save block to the database
-    const reorged = await this.blockchain.putBlock(block, { receipts, saveTxLookup: true });
+    let reorged: boolean;
+    if (opts.force) {
+      if (opts.td === undefined) {
+        throw new Error('missing total difficulty');
+      }
+      reorged = await this.blockchain.forcePutBlock(block, { td: opts.td, receipts, saveTxLookup: true });
+    } else {
+      reorged = await this.blockchain.putBlock(block, { receipts, saveTxLookup: true });
+    }
 
     // install properties for receipts
     let lastCumulativeGasUsed = new BN(0);

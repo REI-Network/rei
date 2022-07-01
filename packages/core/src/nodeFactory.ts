@@ -5,6 +5,7 @@ import { Address } from 'ethereumjs-util';
 import { logger } from '@rei-network/utils';
 import { NetworkManagerOptions } from '@rei-network/network';
 import { ConsensusEngineOptions } from './consensus/types';
+import { SyncMode } from './sync';
 import { Node } from './node';
 import { NodeOptions, AccountManagerConstructorOptions } from './types';
 
@@ -47,6 +48,10 @@ export class NodeFactory {
   private constructor() {}
 
   static async createNode(options: CreateNodeOptions) {
+    if (options.syncMode !== SyncMode.Full && options.syncMode !== SyncMode.Snap) {
+      throw new Error(`Unknown sync mode: ${options.syncMode}`);
+    }
+
     const coinbase = options.mine.coinbase ? Address.fromString(options.mine.coinbase) : undefined;
     const node = new Node({
       ...options,

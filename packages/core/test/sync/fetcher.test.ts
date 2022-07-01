@@ -3,23 +3,15 @@ import { expect, assert } from 'chai';
 import { Common } from '@rei-network/common';
 import { Block, BlockHeader, Transaction } from '@rei-network/structure';
 import { setLevel } from '@rei-network/utils';
-import { Fetcher, FetcherBackend, FetcherValidateBackend } from '../../src/sync/full/fetcher';
-import { CommitBlockOptions } from '../../src/types';
+import { BlockSync, BlockSyncBackend, BlockSyncValidateBackend } from '../../src/sync/full/blockSync';
 import { HandlerPool, GetHandlerTimeoutError } from '../../src/protocols/handlerPool';
-import { ConsensusEngine } from '../../src/consensus';
 
 setLevel('silent');
 const common = new Common({ chain: 'rei-testnet' });
 common.setHardforkByBlockNumber(0);
 const decl = 10;
 
-class MockFetcherBackend implements FetcherBackend, FetcherValidateBackend {
-  getEngineByCommon(common: Common): ConsensusEngine {
-    throw new Error('Method not implemented.');
-  }
-  commitBlock(options: CommitBlockOptions): Promise<boolean> {
-    throw new Error('Method not implemented.');
-  }
+class MockFetcherBackend implements BlockSyncBackend, BlockSyncValidateBackend {
   lastestNumber?: BN;
 
   async processAndCommitBlock(block: Block) {
@@ -48,7 +40,7 @@ class MockFetcherBackend implements FetcherBackend, FetcherValidateBackend {
   async validateBlocks() {}
 }
 
-class MockProtocolHander {
+class MockProtocolHandler {
   peer: any;
   readonly index: number;
   readonly protocol: MockProtocol;
@@ -110,7 +102,7 @@ class MockProtocolHander {
   }
 }
 
-class MockHandlerPool extends HandlerPool<MockProtocolHander> {
+class MockHandlerPool extends HandlerPool<MockProtocolHandler> {
   timeout: number = 0;
 
   reset() {
@@ -141,9 +133,9 @@ class MockProtocol {
 describe('Fetcher', () => {
   const backend = new MockFetcherBackend();
   const protocol = new MockProtocol();
-  let targetHandler!: MockProtocolHander;
+  let targetHandler!: MockProtocolHandler;
   for (let i = 0; i < 10; i++) {
-    protocol.pool.add((targetHandler = new MockProtocolHander(i, protocol)));
+    protocol.pool.add((targetHandler = new MockProtocolHandler(i, protocol)));
   }
 
   afterEach(() => {
@@ -156,7 +148,7 @@ describe('Fetcher', () => {
   });
 
   it('should fetch successfully', async () => {
-    const fetcher = new Fetcher({ common, backend, validateBackend: backend, downloadElementsCountLimit: new BN(decl), downloadBodiesLimit: 5 });
+    const fetcher = new BlockSync({ common, backend, validateBackend: backend, maxGetBlockHeaders: new BN(decl), downloadBodiesLimit: 5 });
     const start = new BN(0);
     const totalCount = new BN(decl * 10);
     await fetcher.fetch(start, totalCount, targetHandler as any);
@@ -182,7 +174,7 @@ describe('Fetcher', () => {
   });
 
   it('should fetch failed(get peer timeout)', async () => {
-    const fetcher = new Fetcher({ common, backend, validateBackend: backend, downloadElementsCountLimit: new BN(decl), downloadBodiesLimit: 5 });
+    const fetcher = new BlockSync({ common, backend, validateBackend: backend, maxGetBlockHeaders: new BN(decl), downloadBodiesLimit: 5 });
     const start = new BN(0);
     const totalCount = new BN(decl * 10);
 
@@ -197,7 +189,7 @@ describe('Fetcher', () => {
   });
 
   it('should fetch successfully(retry get bodies)', async () => {
-    const fetcher = new Fetcher({ common, backend, validateBackend: backend, downloadElementsCountLimit: new BN(decl), downloadBodiesLimit: 5 });
+    const fetcher = new BlockSync({ common, backend, validateBackend: backend, maxGetBlockHeaders: new BN(decl), downloadBodiesLimit: 5 });
     const start = new BN(0);
     const totalCount = new BN(decl * 10);
 

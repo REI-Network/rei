@@ -24,17 +24,6 @@ export class StakingAccount extends Account {
     return StakingAccount.fromValuesArray(values);
   }
 
-  public static fromRlpSerializedSlimAccount(serialized: Buffer) {
-    const values = rlp.decode(serialized);
-
-    if (!Array.isArray(values)) {
-      throw new Error('Invalid serialized account input. Must be array');
-    }
-
-    // TODO: ...
-    return StakingAccount.fromValuesArray(values);
-  }
-
   public static fromValuesArray(values: Buffer[]) {
     const [nonce, balance, stateRoot, codeHash] = values;
 
@@ -46,7 +35,7 @@ export class StakingAccount extends Account {
     }
   }
 
-  public static fromRlpSlimSerializedAccount(serialized: Buffer) {
+  public static fromRlpSerializedSlimAccount(serialized: Buffer) {
     const values = rlp.decode(serialized);
 
     if (!Array.isArray(values)) {

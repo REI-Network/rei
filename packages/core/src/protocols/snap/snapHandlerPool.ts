@@ -6,6 +6,9 @@ const types: PeerType[] = ['account', 'storage', 'code', 'trieNode'];
 
 export class GetHandlerTimeoutError extends Error {}
 
+/**
+ * SnapHandlerPool is used to manage all the SnapProtocolHandler
+ */
 export class SnapHandlerPool {
   private idlePools = new Map<PeerType, Set<SnapProtocolHandler>>();
   private busyPools = new Map<PeerType, Set<SnapProtocolHandler>>();
@@ -22,40 +25,52 @@ export class SnapHandlerPool {
     pool.add(handler);
   }
 
-  handlers(peerType: PeerType) {
-    return [...Array.from(this.idlePools.get(peerType)!), ...Array.from(this.busyPools.get(peerType)!)];
-  }
-
+  /**
+   * Add a handler to IdlePool and busyPool
+   * @param handler
+   */
   add(handler: SnapProtocolHandler) {
     for (const type of types) {
       this.addIdleHandler(handler, type);
     }
   }
 
+  /**
+   *  Remove handler from IdlePool and busyPool
+   * @param handler
+   */
   remove(handler: SnapProtocolHandler) {
-    let removed = false;
     for (const type of types) {
-      removed = this.idlePools.get(type)!.delete(handler) || removed;
-      removed = this.busyPools.get(type)!.delete(handler) || removed;
+      this.idlePools.get(type)!.delete(handler);
+      this.busyPools.get(type)!.delete(handler);
     }
-    return removed;
   }
 
-  get(peerType: PeerType) {
-    const idlePool = this.idlePools.get(peerType)!;
+  /**
+   * Get a handler from IdlePool
+   * @param type PeerType
+   * @returns
+   */
+  getIdlePeer(type: PeerType) {
+    const idlePool = this.idlePools.get(type)!;
     if (idlePool.size > 0) {
       const handler = Array.from(idlePool)[getRandomIntInclusive(0, idlePool.size - 1)];
       idlePool.delete(handler);
-      const busyPool = this.busyPools.get(peerType)!;
+      const busyPool = this.busyPools.get(type)!;
       busyPool.add(handler);
       return handler;
     }
     return null;
   }
 
-  put(handler: SnapProtocolHandler, peerType: PeerType) {
-    if (this.busyPools.get(peerType)!.delete(handler)) {
-      this.addIdleHandler(handler, peerType);
+  /**
+   * Put back handler into IdlePool
+   * @param type
+   * @param handler
+   */
+  putBackIdlePeer(type: PeerType, handler: SnapProtocolHandler) {
+    if (this.busyPools.get(type)!.delete(handler)) {
+      this.addIdleHandler(handler, type);
     }
   }
 }

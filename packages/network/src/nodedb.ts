@@ -5,7 +5,7 @@ import * as crypto from 'crypto';
 
 type DB = LevelUp<AbstractLevelDOWN<Buffer, Buffer>, AbstractIterator<Buffer, Buffer>>;
 
-// These fields are stored per ID and IP, the full key is "n:<ID>:v4:<IP>:findfail".
+// These fields are stored per ID and IP, the full key is "n:<ID>:v5:<IP>:findfail".
 // Use nodeItemKey to create those keys.
 const dbNodePrefix = 'n:';
 const dbLocalprefix = 'local:';
@@ -149,8 +149,8 @@ export class NodeDB {
       return { nodeId: '', rest: Buffer.alloc(0) };
     }
     const item = key.slice(dbNodePrefix.length);
-    const nodeId = item.slice(0, 32).toString('hex');
-    return { nodeId, rest: item.slice(32) };
+    const nodeId = item.slice(0, 64).toString();
+    return { nodeId, rest: item.slice(64 + 1) };
   }
   /**
    * Split the nodeItemKey into nodeId, ip and field
@@ -227,7 +227,7 @@ export class NodeDB {
    */
   async nextNode(itr: AbstractIterator<Buffer, Buffer>) {
     for await (const [key, val] of iteratorToAsyncGenerator(itr, false)) {
-      const { rest } = this.splitNodeKey(key);
+      const { nodeId, rest } = this.splitNodeKey(key);
       if (rest.toString() !== dbDiscv5Root) {
         continue;
       }

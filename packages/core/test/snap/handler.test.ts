@@ -86,6 +86,8 @@ describe('snap protocol handler', function () {
     handler2 = new SnapProtocolHandler(protocol as any, peer as any);
     (handler1.peer as any as MockPeer).setHander(handler2);
     (handler2.peer as any as MockPeer).setHander(handler1);
+    await handler1.handshake();
+    await handler2.handshake();
   });
 
   it('should getAccountRange correctly', async () => {
@@ -125,10 +127,12 @@ describe('snap protocol handler', function () {
     const requestRoot = root;
     const accountHashes = accounts.map((account) => account.accountHash);
     const startHash = EMPTY_HASH;
+    // const startHash = Array.from(accounts[0].storageData.keys())[0];
     const limitHash = MAX_HASH;
+    const roots = accounts.map((account) => account.account.stateRoot);
     const storageHash = accounts.map((account) => Array.from(account.storageData.keys()).map((key) => key));
     const stotageData = accounts.map((account) => Array.from(account.storageData.values()).map((value) => value.val));
-    const response = await handler1.getStorageRange(requestRoot, { origin: startHash, limit: limitHash, roots: [], accounts: accountHashes });
+    const response = await handler1.getStorageRange(requestRoot, { origin: startHash, limit: limitHash, roots: roots, accounts: accountHashes });
     expect(response !== null, 'response should not be null').to.be.true;
     if (response) {
       for (let i = 0; i < response.hashes.length; i++) {
@@ -142,15 +146,11 @@ describe('snap protocol handler', function () {
   });
 
   it('should getCodeByte correctly ', async () => {
-    const codeHash1 = accounts.map((account) => keccak256(keccak256(account.code)));
-    const response1 = await handler1.getByteCode(codeHash1);
-    expect(response1?.length === 0, 'response should be empty').to.be.true;
-
-    const codeHashes2 = accounts.map((account) => keccak256(account.code));
-    const code2 = accounts.map((account) => account.code);
-    const response2 = await handler1.getByteCode(codeHashes2);
-    for (let i = 0; i < code2.length; i++) {
-      expect(response2![i].equals(code2[i]), 'ByteCode should be equal').to.be.true;
+    const codeHashes = accounts.map((account) => keccak256(account.code));
+    const code = accounts.map((account) => account.code);
+    const response = await handler1.getByteCode(codeHashes);
+    for (let i = 0; i < code.length; i++) {
+      expect(response![i].equals(code[i]), 'ByteCode should be equal').to.be.true;
     }
   });
 

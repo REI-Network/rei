@@ -116,8 +116,8 @@ export class NodeDB {
    * @param {string} nodeId - the node id
    * @param {string} ip - the node ip
    */
-  putReceived(nodeId: string, ip: string) {
-    return this.db.put(Buffer.from(this._nodeItemKey(nodeId, ip, dbNodePong)), Buffer.from(Date.now().toString()));
+  updatePongMessage(nodeId: string, ip: string, timestamp = Date.now()) {
+    return this.db.put(Buffer.from(this._nodeItemKey(nodeId, ip, dbNodePong)), Buffer.from(timestamp.toString()));
   }
 
   /**

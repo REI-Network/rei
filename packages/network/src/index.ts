@@ -402,7 +402,7 @@ export class NetworkManager extends EventEmitter {
   // and update the timestamp of the node in the database
   private onMessage = (srcId: string, src, message): void => {
     if (message.type === MessageType.PONG) {
-      this.nodedb.putReceived(srcId, src.nodeAddress().address);
+      this.nodedb.updatePongMessage(srcId, src.nodeAddress().address);
     }
   };
 

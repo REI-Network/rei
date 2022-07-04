@@ -1,19 +1,18 @@
-import { expect } from 'chai';
-import path from 'path';
 import levelup from 'levelup';
 import PeerId from 'peer-id';
-import { NodeDB } from '../src/nodedb';
-import { leveldown } from '@rei-network/binding';
-import { ENR, ENRKey, ENRValue } from '@gxchain2/discv5';
+import { expect, assert } from 'chai';
+import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
-import * as RLP from 'rlp';
+import { NodeDB } from '../src/nodedb';
+const memdown = require('memdown');
+
 describe('NodeDB', async () => {
-  const db = levelup(leveldown(path.join(__dirname, './database')) as any, { manifestFileMaxSize: 64 * 1024 * 1024 });
-  let nodedb = new NodeDB(db);
+  let nodedb: NodeDB;
+  const db = levelup(memdown());
   const { enr: localEnr } = await newEnr();
 
-  beforeEach(() => {
-    db.clear();
+  beforeEach(async () => {
+    await db.clear();
     nodedb = new NodeDB(db);
   });
 
@@ -36,34 +35,29 @@ describe('NodeDB', async () => {
     const { enr } = await newEnr();
     await nodedb.persist(enr);
     const n = Date.now();
-    await nodedb.putReceived(enr.nodeId, enr.ip!);
+    await nodedb.updatePongMessage(enr.nodeId, enr.ip!);
     expect(Math.ceil(n / 1000)).to.equal(Math.ceil((await nodedb.lastPongReceived(enr.nodeId, enr.ip!)) / 1000));
   });
 
-  it('should be query seed', async () => {
+  it('should be query seeds', async () => {
     const enrList: ENR[] = [];
-    const maxAge = 5 * 1000;
+    const maxAge = 50 * 1000;
     for (let i = 0; i < 100; i++) {
       const { enr } = await newEnr();
       await nodedb.persist(enr);
-      await nodedb.putReceived(enr.nodeId, enr.ip!);
+      await nodedb.updatePongMessage(enr.nodeId, enr.ip!, Date.now() - i * 1000);
       enrList.push(enr);
-    }
-    await new Promise((r) => setTimeout(r, 10 * 1000));
-    for (let i = 0; i < 50; i++) {
-      const enr = enrList[i];
-      await nodedb.putReceived(enr.nodeId, enr.ip!);
     }
     const now = Date.now();
     const result = await nodedb.querySeeds(10, maxAge);
     for (let i = 0; i < result.length; i++) {
       const time = await nodedb.lastPongReceived(result[i].nodeId, result[i].ip!);
       if (now - time > maxAge) {
-        expect(1).to.equal(0);
+        assert('should not be in the result');
       }
       for (let n = 0; n < result.length; n++) {
         if (result[i].nodeId == result[n].nodeId && i != n) {
-          expect(2).to.equal(0);
+          assert('should not be in the result');
         }
       }
     }
@@ -75,13 +69,24 @@ describe('NodeDB', async () => {
     for (let i = 0; i < 100; i++) {
       const { enr } = await newEnr();
       await nodedb.persist(enr);
-      await nodedb.putReceived(enr.nodeId, enr.ip!);
+      await nodedb.updatePongMessage(enr.nodeId, enr.ip!, Date.now() - 10 * 1000);
       enrList.push(enr);
     }
-    await new Promise((r) => setTimeout(r, 10 * 1000));
     await nodedb.checkTimeout(5 * 1000);
-    const result = await nodedb.querySeeds(100, 100 * 1000);
-    expect(result.length).to.equal(0);
+    for (let i = 0; i < enrList.length; i++) {
+      try {
+        await db.get(nodedb.nodeKey(enrList[i]));
+      } catch (error) {
+        expect((error as any).type).to.equal('NotFoundError');
+      }
+    }
+    for (let i = 0; i < enrList.length; i++) {
+      try {
+        await db.get(nodedb.nodeItemKey(enrList[i], 'lastPong'));
+      } catch (error) {
+        expect((error as any).type).to.equal('NotFoundError');
+      }
+    }
   });
 });
 
@@ -91,15 +96,6 @@ async function newEnr() {
   enr.ip = '127.0.0.1';
   enr.tcp = 4191;
   enr.udp = 9810;
-  const content: Array<ENRKey | ENRValue | number> = Array.from(enr.keys())
-    .sort((a, b) => a.localeCompare(b))
-    .map((k) => [k, enr.get(k)] as [ENRKey, ENRValue])
-    .flat();
-  content.unshift(Number(enr.seq));
-  enr.sign(RLP.encode(content), keypair.privateKey);
+  enr.encodeToValues(keypair.privateKey);
   return { enr, keypair };
-}
-
-async function sleep(time) {
-  return new Promise((resolve) => setTimeout(resolve, time));
 }

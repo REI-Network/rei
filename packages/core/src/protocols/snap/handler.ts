@@ -210,7 +210,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
           const stTrie = new Trie(this.node.db.rawdb, StakingAccount.fromRlpSerializedAccount(account).stateRoot);
           proof = await Trie.createProof(stTrie, origin);
           if (last) {
-            proof = await Trie.createProof(stTrie, last);
+            proof = mergeProof(proof, await Trie.createProof(stTrie, last));
           }
           break;
         }
@@ -366,9 +366,8 @@ export class SnapProtocolHandler implements ProtocolHandler {
         return null;
       }
       let codes: Buffer[] = new Array<Buffer>(hashes.length);
-      let j = 0;
-      for (let i = 0; i < response.codes.length; i++) {
-        for (j; j < hashes.length && !keccak256(response.codes[i]).equals(hashes[j]); ) {
+      for (let i = 0, j = 0; i < response.codes.length; i++) {
+        while (j < hashes.length && !keccak256(response.codes[i]).equals(hashes[j])) {
           j++;
         }
         if (j < hashes.length) {
@@ -400,9 +399,8 @@ export class SnapProtocolHandler implements ProtocolHandler {
         return null;
       }
       let nodes: Buffer[] = new Array<Buffer>(hashes.length);
-      let j = 0;
-      for (let i = 0; i < response.nodes.length; i++) {
-        for (j; j < hashes.length && !keccak256(response.nodes[i]).equals(hashes[j]); ) {
+      for (let i = 0, j = 0; i < response.nodes.length; i++) {
+        while (j < hashes.length && !keccak256(response.nodes[i]).equals(hashes[j])) {
           j++;
         }
         if (j < hashes.length) {

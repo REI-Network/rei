@@ -718,7 +718,7 @@ export class SnapSync extends EventEmitter {
    * @param hashes - Code hash list
    * @param res - Codes or null(if the request fails or times out)
    */
-  private async processBytecodeResponse(task: AccountTask, hashes: Buffer[], res: Buffer[] | null) {
+  private async processBytecodeResponse(task: AccountTask, hashes: Buffer[], res: Buffer[] | (Buffer | undefined)[] | null) {
     // revert
     if (res === null) {
       hashes.forEach((hash) => task.pendingCode.add(hash));
@@ -732,6 +732,11 @@ export class SnapSync extends EventEmitter {
 
       // reschedule the undelivered code
       if (i >= res.length) {
+        task.pendingCode.add(hash);
+        continue;
+      }
+
+      if (res[i] === undefined) {
         task.pendingCode.add(hash);
         continue;
       }
@@ -809,7 +814,7 @@ export class SnapSync extends EventEmitter {
    * @param hashes - Node hash list
    * @param res - Nodes or null(if the request fails or times out)
    */
-  private async processHealTrieNodeResponse(hashes: Buffer[], res: Buffer[] | null) {
+  private async processHealTrieNodeResponse(hashes: Buffer[], res: Buffer[] | (Buffer | undefined)[] | null) {
     // revert
     if (res === null) {
       hashes.forEach((hash) => this.healer.pendingTrieNode.add(hash));
@@ -822,8 +827,13 @@ export class SnapSync extends EventEmitter {
         continue;
       }
 
+      if (res[i] === undefined) {
+        this.healer.pendingTrieNode.add(hashes[i]);
+        continue;
+      }
+
       try {
-        await this.healer.scheduler.process(hashes[i], res[i]);
+        await this.healer.scheduler.process(hashes[i], res[i] as Buffer);
       } catch (err: any) {
         if (err.message === 'not found req') {
           // ignore missing request
@@ -878,7 +888,7 @@ export class SnapSync extends EventEmitter {
    * @param hashes - Code hash list
    * @param res - Codes list or null(if the request fails or times out)
    */
-  private async processHealBytecodeResponse(hashes: Buffer[], res: Buffer[] | null) {
+  private async processHealBytecodeResponse(hashes: Buffer[], res: Buffer[] | (Buffer | undefined)[] | null) {
     // revert
     if (res === null) {
       hashes.forEach((hash) => this.healer.pendingCode.add(hash));
@@ -890,9 +900,13 @@ export class SnapSync extends EventEmitter {
         this.healer.pendingCode.add(hashes[i]);
         continue;
       }
+      if (res[i] === undefined) {
+        this.healer.pendingCode.add(hashes[i]);
+        continue;
+      }
 
       try {
-        await this.healer.scheduler.process(hashes[i], res[i]);
+        await this.healer.scheduler.process(hashes[i], res[i] as Buffer);
       } catch (err: any) {
         if (err.message === 'not found req') {
           // ignore missing request

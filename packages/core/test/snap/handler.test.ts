@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { BN, keccak256 } from 'ethereumjs-util';
+import crypto from 'crypto';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
 import { AccountInfo, genRandomAccounts } from './util';
@@ -126,32 +127,53 @@ describe('snap protocol handler', function () {
   it('should getStorageRange correctly', async () => {
     const requestRoot = root;
     const accountHashes = accounts.map((account) => account.accountHash);
-    const startHash = EMPTY_HASH;
-    // const startHash = Array.from(accounts[0].storageData.keys())[0];
-    const limitHash = MAX_HASH;
+    const startHash1 = EMPTY_HASH;
+    const limitHash1 = MAX_HASH;
     const roots = accounts.map((account) => account.account.stateRoot);
     const storageHash = accounts.map((account) => Array.from(account.storageData.keys()).map((key) => key));
     const stotageData = accounts.map((account) => Array.from(account.storageData.values()).map((value) => value.val));
-    const response = await handler1.getStorageRange(requestRoot, { origin: startHash, limit: limitHash, roots: roots, accounts: accountHashes });
-    expect(response !== null, 'response should not be null').to.be.true;
-    if (response) {
-      for (let i = 0; i < response.hashes.length; i++) {
-        for (let j = 0; j < response.slots[i].length; j++) {
-          expect(response.hashes[i][j].equals(storageHash[i][j]), 'accountHashes should be equal').to.be.true;
-          expect(response.slots[i][j].equals(stotageData[i][j]), 'storageData should be equal').to.be.true;
+    const response1 = await handler1.getStorageRange(requestRoot, { origin: startHash1, limit: limitHash1, roots: roots, accounts: accountHashes });
+    expect(response1 !== null, 'response should not be null').to.be.true;
+    if (response1) {
+      for (let i = 0; i < response1.hashes.length; i++) {
+        for (let j = 0; j < response1.slots[i].length; j++) {
+          expect(response1.hashes[i][j].equals(storageHash[i][j]), 'accountHashes should be equal').to.be.true;
+          expect(response1.slots[i][j].equals(stotageData[i][j]), 'storageData should be equal').to.be.true;
         }
       }
-      expect(response.cont === false, 'cont should be false').to.be.true;
+      expect(response1.cont === false, 'cont should be false').to.be.true;
+    }
+
+    const keys = Array.from(accounts[0].storageData.keys());
+    const startHash2 = keys[0];
+    const limitHash2 = MAX_HASH;
+    const roots2 = [roots[0]];
+    const accounts2 = [accountHashes[0]];
+    const response2 = await handler1.getStorageRange(requestRoot, { origin: startHash2, limit: limitHash2, roots: roots2, accounts: accounts2 });
+    expect(response2 !== null, 'response should not be null').to.be.true;
+    if (response2) {
+      for (let i = 0; i < response2.hashes.length; i++) {
+        for (let j = 0; j < response2.slots[i].length; j++) {
+          expect(response2.hashes[i][j].equals(storageHash[i][j]), 'accountHashes should be equal').to.be.true;
+          expect(response2.slots[i][j].equals(stotageData[i][j]), 'storageData should be equal').to.be.true;
+        }
+      }
+      expect(response2.cont === false, 'cont should be false').to.be.true;
     }
   });
 
   it('should getCodeByte correctly ', async () => {
-    const codeHashes = accounts.map((account) => keccak256(account.code));
+    const codeHashes1 = accounts.map((account) => keccak256(account.code));
     const code = accounts.map((account) => account.code);
-    const response = await handler1.getByteCode(codeHashes);
+    const response = await handler1.getByteCode(codeHashes1);
     for (let i = 0; i < code.length; i++) {
       expect(response![i].equals(code[i]), 'ByteCode should be equal').to.be.true;
     }
+
+    const codeHashes2 = codeHashes1;
+    await handler1.node.db.rawdb.put(codeHashes1[0], crypto.randomBytes(100), { keyEncoding: 'binary', valueEncoding: 'binary' });
+    const response2 = await handler1.getByteCode(codeHashes2);
+    expect(response2 === null, 'response should be null').to.be.true;
   });
 
   it('should getTrieNode correctly', async () => {
@@ -161,20 +183,24 @@ describe('snap protocol handler', function () {
     let keys: Buffer[] = [];
     let values: Buffer[] = [];
     for await (const node of Interator) {
-      if (i > 5) {
+      if (i >= 5) {
         break;
       }
       keys.push(node.hash());
       values.push(node.serialize());
       i++;
     }
-    const response = await handler1.getTrieNode(keys);
-    expect(response !== null, 'response should not be null').to.be.true;
-    if (response) {
-      for (let i = 0; i < response.length; i++) {
-        expect(response[i].equals(values[i]), 'nodes should be equal').to.be.true;
+    const response1 = await handler1.getTrieNode(keys);
+    expect(response1 !== null, 'response should not be null').to.be.true;
+    if (response1) {
+      for (let i = 0; i < response1.length; i++) {
+        expect(response1[i].equals(values[i]), 'nodes should be equal').to.be.true;
       }
     }
+
+    await handler1.node.db.rawdb.put(keys[0], crypto.randomBytes(100), { keyEncoding: 'binary', valueEncoding: 'binary' });
+    const response2 = await handler1.getTrieNode(keys);
+    expect(response2 === null, 'response should be null').to.be.true;
   });
 
   it('should abort correctly', async () => {

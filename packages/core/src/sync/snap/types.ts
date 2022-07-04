@@ -30,8 +30,8 @@ export type StorageResponse = {
 export interface SnapSyncPeer {
   getAccountRange(root: Buffer, req: AccountRequest): Promise<AccountResponse | null>;
   getStorageRanges(root: Buffer, req: StorageRequst): Promise<StorageResponse | null>;
-  getByteCodes(hashes: Buffer[]): Promise<Buffer[] | null>;
-  getTrieNodes(hashes: Buffer[]): Promise<Buffer[] | null>;
+  getByteCodes(hashes: Buffer[]): Promise<(Buffer | undefined)[] | null>;
+  getTrieNodes(hashes: Buffer[]): Promise<(Buffer | undefined)[] | null>;
 }
 
 export type PeerType = 'account' | 'storage' | 'code' | 'trieNode';

@@ -718,7 +718,7 @@ export class SnapSync extends EventEmitter {
    * @param hashes - Code hash list
    * @param res - Codes or null(if the request fails or times out)
    */
-  private async processBytecodeResponse(task: AccountTask, hashes: Buffer[], res: Buffer[] | (Buffer | undefined)[] | null) {
+  private async processBytecodeResponse(task: AccountTask, hashes: Buffer[], res: (Buffer | undefined)[] | null) {
     // revert
     if (res === null) {
       hashes.forEach((hash) => task.pendingCode.add(hash));
@@ -814,7 +814,7 @@ export class SnapSync extends EventEmitter {
    * @param hashes - Node hash list
    * @param res - Nodes or null(if the request fails or times out)
    */
-  private async processHealTrieNodeResponse(hashes: Buffer[], res: Buffer[] | (Buffer | undefined)[] | null) {
+  private async processHealTrieNodeResponse(hashes: Buffer[], res: (Buffer | undefined)[] | null) {
     // revert
     if (res === null) {
       hashes.forEach((hash) => this.healer.pendingTrieNode.add(hash));
@@ -888,7 +888,7 @@ export class SnapSync extends EventEmitter {
    * @param hashes - Code hash list
    * @param res - Codes list or null(if the request fails or times out)
    */
-  private async processHealBytecodeResponse(hashes: Buffer[], res: Buffer[] | (Buffer | undefined)[] | null) {
+  private async processHealBytecodeResponse(hashes: Buffer[], res: (Buffer | undefined)[] | null) {
     // revert
     if (res === null) {
       hashes.forEach((hash) => this.healer.pendingCode.add(hash));

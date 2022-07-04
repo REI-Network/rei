@@ -5,16 +5,17 @@ import { FunctionalBufferMap, FunctionalBufferSet, getRandomIntInclusive } from 
 import { Database, DBSaveSnapStorage, DBSaveSerializedSnapAccount } from '@rei-network/database';
 import { Snapshot } from '../../src/snap/types';
 import { DiffLayer } from '../../src/snap/diffLayer';
+import { StakingAccount } from '../../src/stateManager';
 
 export class AccountInfo {
   address: Buffer;
   code: Buffer;
   accountHash: Buffer;
-  account: Account;
+  account: StakingAccount;
   storageData: FunctionalBufferMap<{ key: Buffer; val: Buffer }>;
   lastestStorageHash: Buffer;
 
-  constructor(address: Buffer, code: Buffer, accountHash: Buffer, account: Account, storageData: FunctionalBufferMap<{ key: Buffer; val: Buffer }>, lastestStorageHash: Buffer) {
+  constructor(address: Buffer, code: Buffer, accountHash: Buffer, account: StakingAccount, storageData: FunctionalBufferMap<{ key: Buffer; val: Buffer }>, lastestStorageHash: Buffer) {
     this.address = address;
     this.code = code;
     this.accountHash = accountHash;
@@ -28,7 +29,7 @@ export class AccountInfo {
     for (const [k, v] of this.storageData) {
       storageData.set(k, { key: Buffer.from(v.key), val: Buffer.from(v.val) });
     }
-    return new AccountInfo(Buffer.from(this.address), Buffer.from(this.code), Buffer.from(this.accountHash), new Account(this.account.nonce.clone(), this.account.balance.clone(), Buffer.from(this.account.stateRoot)), storageData, Buffer.from(this.lastestStorageHash));
+    return new AccountInfo(Buffer.from(this.address), Buffer.from(this.code), Buffer.from(this.accountHash), new StakingAccount(this.account.nonce.clone(), this.account.balance.clone(), Buffer.from(this.account.stateRoot)), storageData, Buffer.from(this.lastestStorageHash));
   }
 }
 
@@ -76,7 +77,7 @@ export async function genRandomAccounts(db: Database, _accounts: number, slots: 
         lastestStorageHash = storageHash;
       }
     }
-    const account = new Account(new BN(1), new BN(1), storageTrie.root, codeHash);
+    const account = new StakingAccount(new BN(1), new BN(1), storageTrie.root, codeHash);
     if (saveSnap) {
       await db.batch([DBSaveSerializedSnapAccount(accountHash, account.serialize())]);
     }

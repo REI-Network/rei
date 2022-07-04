@@ -4,8 +4,6 @@ import { SnapProtocolHandler } from './handler';
 
 const types: PeerType[] = ['account', 'storage', 'code', 'trieNode'];
 
-export class GetHandlerTimeoutError extends Error {}
-
 /**
  * SnapHandlerPool is used to manage all the SnapProtocolHandler
  */
@@ -27,7 +25,7 @@ export class SnapHandlerPool {
 
   /**
    * Add a handler to IdlePool and busyPool
-   * @param handler
+   * @param handler - SnapProtocolHandler to add
    */
   add(handler: SnapProtocolHandler) {
     for (const type of types) {
@@ -37,7 +35,7 @@ export class SnapHandlerPool {
 
   /**
    *  Remove handler from IdlePool and busyPool
-   * @param handler
+   * @param handler - SnapProtocolHandler to remove
    */
   remove(handler: SnapProtocolHandler) {
     for (const type of types) {
@@ -48,8 +46,8 @@ export class SnapHandlerPool {
 
   /**
    * Get a handler from IdlePool
-   * @param type PeerType
-   * @returns
+   * @param type - PeerType
+   * @returns Returns a handler if there is one, otherwise return null
    */
   getIdlePeer(type: PeerType) {
     const idlePool = this.idlePools.get(type)!;
@@ -65,8 +63,8 @@ export class SnapHandlerPool {
 
   /**
    * Put back handler into IdlePool
-   * @param type
-   * @param handler
+   * @param type - PeerType
+   * @param handler - SnapProtocolHandler to put back
    */
   putBackIdlePeer(type: PeerType, handler: SnapProtocolHandler) {
     if (this.busyPools.get(type)!.delete(handler)) {

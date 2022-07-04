@@ -9,7 +9,7 @@ const memdown = require('memdown');
 describe('NodeDB', async () => {
   let nodedb: NodeDB;
   const db = levelup(memdown());
-  const { enr: localEnr } = await newEnr();
+  const localEnr = await newEnr();
 
   beforeEach(async () => {
     await db.clear();
@@ -27,23 +27,23 @@ describe('NodeDB', async () => {
   });
 
   it('should be able to persist', async () => {
-    const { enr } = await newEnr();
+    const enr = await newEnr();
     await nodedb.persist(enr);
   });
 
-  it('should be putReceived and get last pong timestamp', async () => {
-    const { enr } = await newEnr();
+  it('should be update pong message succeed and get last pong timestamp', async () => {
+    const enr = await newEnr();
     await nodedb.persist(enr);
     const n = Date.now();
-    await nodedb.updatePongMessage(enr.nodeId, enr.ip!);
-    expect(Math.ceil(n / 1000)).to.equal(Math.ceil((await nodedb.lastPongReceived(enr.nodeId, enr.ip!)) / 1000));
+    await nodedb.updatePongMessage(enr.nodeId, enr.ip!, n);
+    expect(n).to.equal(await nodedb.lastPongReceived(enr.nodeId, enr.ip!));
   });
 
-  it('should be query seeds', async () => {
+  it('should be query seed nodes succeed', async () => {
     const enrList: ENR[] = [];
     const maxAge = 50 * 1000;
     for (let i = 0; i < 100; i++) {
-      const { enr } = await newEnr();
+      const enr = await newEnr();
       await nodedb.persist(enr);
       await nodedb.updatePongMessage(enr.nodeId, enr.ip!, Date.now() - i * 1000);
       enrList.push(enr);
@@ -56,7 +56,7 @@ describe('NodeDB', async () => {
         assert('should not be in the result');
       }
       for (let n = 0; n < result.length; n++) {
-        if (result[i].nodeId == result[n].nodeId && i != n) {
+        if (result[i].nodeId === result[n].nodeId && i !== n) {
           assert('should not be in the result');
         }
       }
@@ -64,10 +64,10 @@ describe('NodeDB', async () => {
     expect(result.length).to.equal(10);
   });
 
-  it('should be check time out entry', async () => {
+  it('should be able to delete expired node data', async () => {
     const enrList: ENR[] = [];
     for (let i = 0; i < 100; i++) {
-      const { enr } = await newEnr();
+      const enr = await newEnr();
       await nodedb.persist(enr);
       await nodedb.updatePongMessage(enr.nodeId, enr.ip!, Date.now() - 10 * 1000);
       enrList.push(enr);
@@ -79,8 +79,6 @@ describe('NodeDB', async () => {
       } catch (error) {
         expect((error as any).type).to.equal('NotFoundError');
       }
-    }
-    for (let i = 0; i < enrList.length; i++) {
       try {
         await db.get(nodedb.nodeItemKey(enrList[i], 'lastPong'));
       } catch (error) {
@@ -97,5 +95,5 @@ async function newEnr() {
   enr.tcp = 4191;
   enr.udp = 9810;
   enr.encodeToValues(keypair.privateKey);
-  return { enr, keypair };
+  return enr;
 }

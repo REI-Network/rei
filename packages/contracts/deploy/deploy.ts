@@ -28,6 +28,7 @@ const func: DeployFunction = async function ({ deployments, getNamedAccounts }) 
   await deployContract('StakeManager', true, [config.address, deployer, [], []]);
   await deployContract('Fee');
   await deployContract('FeePool');
+  await deployContract('EvidenceStorage', false);
   // FeeToken requires special precompile function support,
   // only available on rei-network
   // await deployContract('FeeToken');

@@ -368,7 +368,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
       let codes: Buffer[] = new Array<Buffer>(hashes.length);
       let j = 0;
       for (let i = 0; i < response.codes.length; i++) {
-        for (j; j < hashes.length && !keccak256(response.codes[j]).equals(hashes[i]); ) {
+        for (j; j < hashes.length && !keccak256(response.codes[i]).equals(hashes[j]); ) {
           j++;
         }
         if (j < hashes.length) {
@@ -402,7 +402,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
       let nodes: Buffer[] = new Array<Buffer>(hashes.length);
       let j = 0;
       for (let i = 0; i < response.nodes.length; i++) {
-        for (j; j < hashes.length && !keccak256(response.nodes[j]).equals(hashes[i]); ) {
+        for (j; j < hashes.length && !keccak256(response.nodes[i]).equals(hashes[j]); ) {
           j++;
         }
         if (j < hashes.length) {

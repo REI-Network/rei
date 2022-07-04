@@ -9,8 +9,13 @@ import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
 import * as RLP from 'rlp';
 describe('NodeDB', async () => {
   const db = levelup(leveldown(path.join(__dirname, './database')) as any, { manifestFileMaxSize: 64 * 1024 * 1024 });
-  const nodedb = new NodeDB(db);
-  const { enr: localEnr, keypair: localKeyPair } = await newEnr();
+  let nodedb = new NodeDB(db);
+  const { enr: localEnr } = await newEnr();
+
+  beforeEach(() => {
+    db.clear();
+    nodedb = new NodeDB(db);
+  });
 
   it('should be able to add local seq', async () => {
     await nodedb.storeLocalSeq(localEnr.nodeId, localEnr.seq);
@@ -23,52 +28,60 @@ describe('NodeDB', async () => {
   });
 
   it('should be able to persist', async () => {
-    const { enr, keypair } = await newEnr();
-    const content: Array<ENRKey | ENRValue | number> = Array.from(enr.keys())
-      .sort((a, b) => a.localeCompare(b))
-      .map((k) => [k, enr.get(k)] as [ENRKey, ENRValue])
-      .flat();
-    content.unshift(Number(enr.seq));
-    enr.sign(RLP.encode(content), keypair.privateKey);
+    const { enr } = await newEnr();
     await nodedb.persist(enr);
   });
 
   it('should be putReceived and get last pong timestamp', async () => {
-    const { enr, keypair } = await newEnr();
-    const content: Array<ENRKey | ENRValue | number> = Array.from(enr.keys())
-      .sort((a, b) => a.localeCompare(b))
-      .map((k) => [k, enr.get(k)] as [ENRKey, ENRValue])
-      .flat();
-    content.unshift(Number(enr.seq));
-    enr.sign(RLP.encode(content), keypair.privateKey);
+    const { enr } = await newEnr();
     await nodedb.persist(enr);
     const n = Date.now();
     await nodedb.putReceived(enr.nodeId, enr.ip!);
     expect(Math.ceil(n / 1000)).to.equal(Math.ceil((await nodedb.lastPongReceived(enr.nodeId, enr.ip!)) / 1000));
   });
 
-  it.only('should be query seed', async () => {
-    let promiseList: Promise<unknown>[] = [];
-    for (let i = 0; i < 10; i++) {
-      const { enr, keypair } = await newEnr();
-      const content: Array<ENRKey | ENRValue | number> = Array.from(enr.keys())
-        .sort((a, b) => a.localeCompare(b))
-        .map((k) => [k, enr.get(k)] as [ENRKey, ENRValue])
-        .flat();
-      content.unshift(Number(enr.seq));
-      enr.sign(RLP.encode(content), keypair.privateKey);
+  it('should be query seed', async () => {
+    const enrList: ENR[] = [];
+    const maxAge = 5 * 1000;
+    for (let i = 0; i < 100; i++) {
+      const { enr } = await newEnr();
       await nodedb.persist(enr);
-      const timer = new Promise((resolve) => {
-        setTimeout(async () => {
-          await nodedb.putReceived(enr.nodeId, enr.ip!);
-          resolve(null);
-        }, 1000 * i + 1);
-      });
-      promiseList.push(timer);
+      await nodedb.putReceived(enr.nodeId, enr.ip!);
+      enrList.push(enr);
     }
-    await Promise.all(promiseList);
-    const result = await nodedb.querySeeds(10, 1000 * 1000);
+    await new Promise((r) => setTimeout(r, 10 * 1000));
+    for (let i = 0; i < 50; i++) {
+      const enr = enrList[i];
+      await nodedb.putReceived(enr.nodeId, enr.ip!);
+    }
+    const now = Date.now();
+    const result = await nodedb.querySeeds(10, maxAge);
+    for (let i = 0; i < result.length; i++) {
+      const time = await nodedb.lastPongReceived(result[i].nodeId, result[i].ip!);
+      if (now - time > maxAge) {
+        expect(1).to.equal(0);
+      }
+      for (let n = 0; n < result.length; n++) {
+        if (result[i].nodeId == result[n].nodeId && i != n) {
+          expect(2).to.equal(0);
+        }
+      }
+    }
     expect(result.length).to.equal(10);
+  });
+
+  it('should be check time out entry', async () => {
+    const enrList: ENR[] = [];
+    for (let i = 0; i < 100; i++) {
+      const { enr } = await newEnr();
+      await nodedb.persist(enr);
+      await nodedb.putReceived(enr.nodeId, enr.ip!);
+      enrList.push(enr);
+    }
+    await new Promise((r) => setTimeout(r, 10 * 1000));
+    await nodedb.checkTimeout(5 * 1000);
+    const result = await nodedb.querySeeds(100, 100 * 1000);
+    expect(result.length).to.equal(0);
   });
 });
 
@@ -78,5 +91,15 @@ async function newEnr() {
   enr.ip = '127.0.0.1';
   enr.tcp = 4191;
   enr.udp = 9810;
+  const content: Array<ENRKey | ENRValue | number> = Array.from(enr.keys())
+    .sort((a, b) => a.localeCompare(b))
+    .map((k) => [k, enr.get(k)] as [ENRKey, ENRValue])
+    .flat();
+  content.unshift(Number(enr.seq));
+  enr.sign(RLP.encode(content), keypair.privateKey);
   return { enr, keypair };
+}
+
+async function sleep(time) {
+  return new Promise((resolve) => setTimeout(resolve, time));
 }

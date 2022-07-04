@@ -6,7 +6,8 @@
     "license": "GPL-3.0-or-later",
     "scripts": {
         "build": "tsc --build tsconfig.json",
-        "test": "mocha -r ts-node/register 'test/**/*.test.ts' --timeout 10000"
+        "test": "npm run del && mocha -r ts-node/register 'test/**/*.test.ts' --timeout 30000",
+        "del":"rm -rf ./test/database"
     },
     "devDependencies": {
         "typescript": "^4.1.2"

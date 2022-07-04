@@ -162,7 +162,7 @@ export class NodeDB {
     if (rest.toString() === dbDiscv5Root) {
       return { nodeId };
     }
-    const itemKey = rest.slice(dbDiscv5Root.length);
+    const itemKey = rest.slice(dbDiscv5Root.length + 1);
     const [ip, field] = itemKey.toString().split(':');
     return { nodeId, ip, field };
   }
@@ -175,8 +175,15 @@ export class NodeDB {
    */
   async lastPongReceived(nodeId: string, ip: string) {
     const key = this._nodeItemKey(nodeId, ip, dbNodePong);
-    const value = await this.db.get(Buffer.from(key));
-    return value ? parseInt(value.toString()) : 0;
+    try {
+      const value = await this.db.get(Buffer.from(key));
+      return value ? parseInt(value.toString()) : 0;
+    } catch (e) {
+      if ((e as any).type == 'NotFoundError') {
+        return 0;
+      }
+      throw e;
+    }
   }
 
   /**
@@ -216,8 +223,15 @@ export class NodeDB {
    * @returns {Promise<bigint>} the local enr sequence counter
    */
   async localSeq(nodeId: string) {
-    const seq = await this.db.get(Buffer.from(this.localItemKey(nodeId, dbLocalSeq)));
-    return seq ? BigInt(seq.toString()) : BigInt(Date.now());
+    try {
+      const value = await this.db.get(Buffer.from(this.localItemKey(nodeId, dbLocalSeq)));
+      return BigInt(value.toString());
+    } catch (e) {
+      if ((e as any).type == 'NotFoundError') {
+        return BigInt(0);
+      }
+      throw e;
+    }
   }
 
   /**
@@ -227,7 +241,7 @@ export class NodeDB {
    */
   async nextNode(itr: AbstractIterator<Buffer, Buffer>) {
     for await (const [key, val] of iteratorToAsyncGenerator(itr, false)) {
-      const { nodeId, rest } = this.splitNodeKey(key);
+      const { rest } = this.splitNodeKey(key);
       if (rest.toString() !== dbDiscv5Root) {
         continue;
       }

@@ -16,7 +16,7 @@ function compareBufferMaps(map1: FunctionalBufferMap<Buffer>, map2: FunctionalBu
   }
   for (const [key, val] of map1) {
     const testVal = map2.get(key);
-    if (!testVal?.equals(val)) {
+    if (!testVal!.equals(val)) {
       return false;
     }
   }
@@ -35,10 +35,6 @@ function compareSets<k>(set1: Set<k>, set2: Set<k>) {
   return true;
 }
 
-class MockStateManger extends StateManager {
-  callback: (accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferSet, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>) => void = () => {};
-}
-
 describe('StateManager', () => {
   const address = Address.fromString('0xAE0c03FdeDB61021272922F7804505CEE2C12c78');
   const key1 = crypto.randomBytes(32);
@@ -48,7 +44,7 @@ describe('StateManager', () => {
   const kecAddress = keccak256(address.buf);
   const account1 = StakingAccount.fromAccountData({ balance: new BN(12) });
   const account2 = StakingAccount.fromAccountData({ balance: new BN(34) });
-  let stateManager: MockStateManger;
+  let stateManager: StateManager;
   before(async () => {
     const common = new Common({ chain: 'rei-devnet' });
     common.setHardforkByBlockNumber(0);
@@ -58,29 +54,25 @@ describe('StateManager', () => {
     const root = rootAndAccounts.root;
     const snapTree = new SnapTree(db);
     await snapTree.init(root, true, true);
-    stateManager = new MockStateManger({
+    stateManager = new StateManager({
       common: common,
       snapsTree: snapTree
     });
   });
 
   it('should checkpoint correctly', async () => {
-    expect(stateManager._snapCacheList.length === 0, 'CacheList should be empty').be.true;
+    expect(stateManager._snapCacheList.length, 'CacheList should be empty').be.equal(0);
     await stateManager.checkpoint();
-    expect(stateManager._snapCacheList.length === 1, 'CacheList length should be equal').be.true;
+    expect(stateManager._snapCacheList.length, 'CacheList length should be equal').be.equal(1);
     const lastCache = stateManager._snapCacheList[stateManager._snapCacheList.length - 1];
-    expect(lastCache.snapAccounts?.size === 0, 'snapAccounts should be empty').be.true;
-    expect(lastCache.snapDestructs?.size === 0, 'snapDestructs should be empty').be.true;
-    expect(lastCache.snapStroge?.size === 0, 'snapStorage should be empty').be.true;
-    const callback = (accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferSet, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>) => {
-      expect(accounts.size === 0, '_snapAccounts should be empty').be.true;
-      expect(destructs.size === 0, '_snapDestructs should be empty').be.true;
-      expect(storage.size === 0, '_snapStorage should be empty').be.true;
-    };
-    stateManager.callback = callback;
-    stateManager.callback(stateManager._snapAccounts!, stateManager._snapDestructs!, stateManager._snapStorage!);
+    expect(lastCache.snapAccounts!.size, 'snapAccounts should be empty').be.equal(0);
+    expect(lastCache.snapDestructs!.size, 'snapDestructs should be empty').be.equal(0);
+    expect(lastCache.snapStroge!.size, 'snapStorage should be empty').be.equal(0);
+    expect(stateManager._snapAccounts!.size, '_snapAccounts should be empty').be.equal(0);
+    expect(stateManager._snapDestructs!.size, '_snapDestructs should be empty').be.equal(0);
+    expect(stateManager._snapStorage!.size, '_snapStorage should be empty').be.equal(0);
     await stateManager.commit();
-    expect(stateManager._snapCacheList.length === 0, 'CacheList should be empty').be.true;
+    expect(stateManager._snapCacheList.length, 'CacheList should be empty').be.equal(0);
   });
 
   it('should putAccount correctly', async () => {
@@ -89,13 +81,9 @@ describe('StateManager', () => {
     const accountMap = new FunctionalBufferMap<Buffer>();
     await stateManager.putAccount(address, account1);
     accountMap.set(kecAddress, account1.slimSerialize());
-    const callback = (accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferSet, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>) => {
-      expect(compareBufferMaps(accountMap, accounts), '_snapAccounts should be equal').be.true;
-      expect(destructs.size === 0, '_snapDestructs should be empty').be.true;
-      expect(storage.size === 0, '_snapStorage should be empty').be.true;
-    };
-    stateManager.callback = callback;
-    stateManager.callback(stateManager._snapAccounts!, stateManager._snapDestructs!, stateManager._snapStorage!);
+    expect(compareBufferMaps(accountMap, stateManager._snapAccounts!), '_snapAccounts should be equal').be.true;
+    expect(stateManager._snapDestructs!.size, '_snapDestructs should be empty').be.equal(0);
+    expect(stateManager._snapStorage!.size, '_snapStorage should be empty').be.equal(0);
     await stateManager.commit();
   });
 
@@ -113,22 +101,18 @@ describe('StateManager', () => {
     const trie = new Trie();
     await trie.put(kecKey1, encodeValue1);
     expect(accountNow.stateRoot.equals(trie.root), 'account stateroot should be equal');
-    const callback = (accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferSet, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>) => {
-      expect(destructs.size === 0, '_snapDestructs should be empty').be.true;
-      expect(compareBufferMaps(accounts, accountMap), '_snapAccounts should be equal');
-      let storageEqual = true;
-      expect(storage.size === storageMap.size, '_snapStorage size should euqual to storageMap');
-      for (const [key, value] of storage) {
-        const temp = storageMap.get(key);
-        if (!compareBufferMaps(temp!, value)) {
-          storageEqual = false;
-          break;
-        }
+    expect(stateManager._snapDestructs!.size, '_snapDestructs should be empty').be.equal(0);
+    expect(compareBufferMaps(stateManager._snapAccounts!, accountMap), '_snapAccounts should be equal');
+    let storageEqual = true;
+    expect(stateManager._snapStorage!.size, '_snapStorage size should euqual to storageMap').be.equal(storageMap.size);
+    for (const [key, value] of stateManager._snapStorage!) {
+      const temp = storageMap.get(key);
+      if (!compareBufferMaps(temp!, value)) {
+        storageEqual = false;
+        break;
       }
-      expect(storageEqual === true, '_snapStorage should be equal').be.true;
-    };
-    stateManager.callback = callback;
-    stateManager.callback(stateManager._snapAccounts!, stateManager._snapDestructs!, stateManager._snapStorage!);
+    }
+    expect(storageEqual, '_snapStorage should be equal').be.equal(true);
     await stateManager.commit();
   });
 
@@ -139,13 +123,11 @@ describe('StateManager', () => {
     await stateManager.deleteAccount(address);
     const destructsSet = new FunctionalBufferSet();
     destructsSet.add(kecAddress);
-    const callback = (accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferSet, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>) => {
-      expect(accounts.has(kecAddress), 'account1 should be deleted in _snapAccounts').be.false;
-      expect(storage.has(kecAddress), 'account1 should be deleted in _snapStorage').be.false;
-      expect(compareSets(destructsSet, destructs), 'destructs should equal to destructsSet').be.true;
-    };
-    stateManager.callback = callback;
-    stateManager.callback(stateManager._snapAccounts!, stateManager._snapDestructs!, stateManager._snapStorage!);
+
+    expect(stateManager._snapAccounts!.has(kecAddress), 'account1 should be deleted in _snapAccounts').be.false;
+    expect(stateManager._snapStorage!.has(kecAddress), 'account1 should be deleted in _snapStorage').be.false;
+    expect(compareSets(destructsSet, stateManager._snapDestructs!), 'destructs should equal to destructsSet').be.true;
+
     await stateManager.commit();
   });
 
@@ -159,13 +141,9 @@ describe('StateManager', () => {
     accountMap.set(kecAddress, account2.slimSerialize());
     const destructsSet = new FunctionalBufferSet();
     destructsSet.add(kecAddress);
-    const callback = (accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferSet, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>) => {
-      expect(compareBufferMaps(accountMap, accounts), '_snapAccounts should be equal').be.true;
-      expect(compareSets(destructsSet, destructs), 'destructs should equal to destructsSet').be.true;
-      expect(storage.size === 0, '_snapStorage should be empty').be.true;
-    };
-    stateManager.callback = callback;
-    stateManager.callback(stateManager._snapAccounts!, stateManager._snapDestructs!, stateManager._snapStorage!);
+    expect(compareBufferMaps(accountMap, stateManager._snapAccounts!), '_snapAccounts should be equal').be.true;
+    expect(compareSets(destructsSet, stateManager._snapDestructs!), 'destructs should equal to destructsSet').be.true;
+    expect(stateManager._snapStorage!.size, '_snapStorage should be empty').be.equal(0);
     await stateManager.commit();
   });
 
@@ -176,7 +154,8 @@ describe('StateManager', () => {
     storageTemp.set(kecKey1, encodeValue1);
     const storageMap = new FunctionalBufferMap<FunctionalBufferMap<Buffer>>();
     storageMap.set(kecAddress, storageTemp);
-    expect(stateManager._snapStorage?.size === storageMap.size, '_snapStorage size should euqual to storageMap');
+    await stateManager.putContractStorage(address, key1, value1);
+    expect(stateManager._snapStorage!.size, '_snapStorage size should euqual to storageMap').be.equal(storageMap.size);
     let storageEqual = true;
     for (const [key, value] of stateManager._snapStorage!) {
       const temp = storageMap.get(key);
@@ -185,14 +164,10 @@ describe('StateManager', () => {
         break;
       }
     }
-    expect(storageEqual === true, '_snapStorage should be equal').be.true;
-    const callback = (accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferSet, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>) => {
-      expect(accounts.size === 0, 'snapAccounts should be empty').be.true;
-      expect(destructs.size === 0, 'snapDestructs should be empty').be.true;
-      expect(storage.size === 0, '_snapStorage should be empty').be.true;
-    };
-    stateManager.callback = callback;
-    stateManager.callback(stateManager._snapAccounts!, stateManager._snapDestructs!, stateManager._snapStorage!);
+    await stateManager.clearContractStorage(address);
+    expect(storageEqual, '_snapStorage should be equal').be.equal(true);
+    expect(stateManager._snapDestructs!.size, 'snapDestructs should be empty').be.equal(0);
+    expect(stateManager._snapStorage!.size, '_snapStorage should be empty').be.equal(0);
     await stateManager.commit();
   });
 
@@ -200,10 +175,18 @@ describe('StateManager', () => {
     await stateManager.setStateRoot(stateManager._trie.root);
     await stateManager.checkpoint();
     await stateManager.putAccount(address, account1);
+    const lastCache = stateManager._snapCacheList[stateManager._snapCacheList.length - 1];
     await stateManager.revert();
-    expect(stateManager._snap === undefined, '_snap should be undifined').be.true;
-    expect(stateManager._snapAccounts === undefined, '_snap should be undifined').be.true;
-    expect(stateManager._snapDestructs === undefined, '_snap should be undifined').be.true;
-    expect(stateManager._snapStorage === undefined, '_snap should be undifined').be.true;
+    expect(compareBufferMaps(stateManager._snapAccounts!, lastCache.snapAccounts!), 'revert _snapAccounts should be equal').be.true;
+    expect(compareSets(stateManager._snapDestructs!, lastCache.snapDestructs!), 'revert _snapDestructs should be equal').be.true;
+    let storageEqual = true;
+    for (const [key, value] of stateManager._snapStorage!) {
+      const temp = lastCache.snapStroge!.get(key);
+      if (!compareBufferMaps(temp!, value)) {
+        storageEqual = false;
+        break;
+      }
+    }
+    expect(storageEqual, 'revert _snapStorage should be equal').be.equal(true);
   });
 });

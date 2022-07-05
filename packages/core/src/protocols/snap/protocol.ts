@@ -13,7 +13,6 @@ export class SnapProtocol extends BaseProtocol<SnapProtocolHandler> implements P
   }
 
   /**
-   *
    * {@link Protocol.makeHandler}
    */
   makeHandler(peer: Peer) {

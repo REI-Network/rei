@@ -47,10 +47,10 @@ export class StakingAccount extends Account {
 
   public static fromSlimValuesArray(values: Buffer[]) {
     let [nonce, balance, stateRoot, codeHash] = values;
-    if (stateRoot.equals(Buffer.from([]))) {
+    if (stateRoot.equals(Buffer.alloc(0))) {
       stateRoot = KECCAK256_RLP;
     }
-    if (codeHash.equals(Buffer.from([]))) {
+    if (codeHash.equals(Buffer.alloc(0))) {
       codeHash = KECCAK256_NULL;
     }
     if (values.length === 4) {

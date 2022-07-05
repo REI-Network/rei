@@ -18,23 +18,18 @@ export class SnapHandlerPool {
     }
   }
 
-  private addIdleHandler(handler: SnapProtocolHandler, peerType: PeerType) {
-    const pool = this.idlePools.get(peerType)!;
-    pool.add(handler);
-  }
-
   /**
    * Add a handler to IdlePool and busyPool
    * @param handler - SnapProtocolHandler to add
    */
   add(handler: SnapProtocolHandler) {
     for (const type of types) {
-      this.addIdleHandler(handler, type);
+      this.idlePools.get(type)!.add(handler);
     }
   }
 
   /**
-   *  Remove handler from IdlePool and busyPool
+   * Remove handler from IdlePool and busyPool
    * @param handler - SnapProtocolHandler to remove
    */
   remove(handler: SnapProtocolHandler) {
@@ -47,15 +42,14 @@ export class SnapHandlerPool {
   /**
    * Get a handler from IdlePool
    * @param type - PeerType
-   * @returns Returns a handler if there is one, otherwise return null
+   * @returns Returns a handler if exists, otherwise return null
    */
   getIdlePeer(type: PeerType) {
     const idlePool = this.idlePools.get(type)!;
     if (idlePool.size > 0) {
       const handler = Array.from(idlePool)[getRandomIntInclusive(0, idlePool.size - 1)];
       idlePool.delete(handler);
-      const busyPool = this.busyPools.get(type)!;
-      busyPool.add(handler);
+      this.busyPools.get(type)!.add(handler);
       return handler;
     }
     return null;
@@ -68,7 +62,7 @@ export class SnapHandlerPool {
    */
   putBackIdlePeer(type: PeerType, handler: SnapProtocolHandler) {
     if (this.busyPools.get(type)!.delete(handler)) {
-      this.addIdleHandler(handler, type);
+      this.idlePools.get(type)!.add(handler);
     }
   }
 }

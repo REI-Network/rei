@@ -731,12 +731,7 @@ export class SnapSync extends EventEmitter {
       const hash = hashes[i];
 
       // reschedule the undelivered code
-      if (i >= res.length) {
-        task.pendingCode.add(hash);
-        continue;
-      }
-
-      if (res[i] === undefined) {
+      if (i >= res.length || res[i] === undefined) {
         task.pendingCode.add(hash);
         continue;
       }
@@ -822,12 +817,7 @@ export class SnapSync extends EventEmitter {
     }
 
     for (let i = 0; i < hashes.length; i++) {
-      if (i >= res.length) {
-        this.healer.pendingTrieNode.add(hashes[i]);
-        continue;
-      }
-
-      if (res[i] === undefined) {
+      if (i >= res.length || res[i] === undefined) {
         this.healer.pendingTrieNode.add(hashes[i]);
         continue;
       }
@@ -896,11 +886,7 @@ export class SnapSync extends EventEmitter {
     }
 
     for (let i = 0; i < hashes.length; i++) {
-      if (i >= res.length) {
-        this.healer.pendingCode.add(hashes[i]);
-        continue;
-      }
-      if (res[i] === undefined) {
+      if (i >= res.length || res[i] === undefined) {
         this.healer.pendingCode.add(hashes[i]);
         continue;
       }

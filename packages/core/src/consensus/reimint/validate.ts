@@ -46,7 +46,7 @@ export function validateTimestamp(timestamp: number) {
 
 export function validateIndex(index: number) {
   if (index < 0 || !Number.isSafeInteger(index)) {
-    throw new Error('invalid timestamp');
+    throw new Error('invalid index');
   }
 }
 

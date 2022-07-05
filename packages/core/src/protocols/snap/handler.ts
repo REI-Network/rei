@@ -19,10 +19,10 @@ const requestTimeout = 8 * 1000;
  * SnapProtocolHandler is used to manage snap protocol communication between nodes
  */
 export class SnapProtocolHandler implements ProtocolHandler {
-  protected reqID = 0;
-  readonly softResponseLimit: number;
-  readonly protocol: SnapProtocol;
+  private reqID = 0;
+  private softResponseLimit: number;
   readonly peer: Peer;
+  readonly protocol: SnapProtocol;
 
   protected readonly waitingRequests = new Map<
     number,
@@ -44,6 +44,14 @@ export class SnapProtocolHandler implements ProtocolHandler {
    */
   get node() {
     return this.protocol.node;
+  }
+
+  /**
+   * Reset the soft response limit of handler
+   * @param limit - Limit of the response
+   */
+  resetSoftResponseLimit(limit: number) {
+    this.softResponseLimit = limit;
   }
 
   private generateReqID() {

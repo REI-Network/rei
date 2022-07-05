@@ -1,5 +1,5 @@
 import { bufferToInt, intToBuffer, rlp } from 'ethereumjs-util';
-
+import { validateHash, validateInteger } from '../validate';
 export interface SnapMessage {
   reqID: number;
   raw(): any;
@@ -41,7 +41,13 @@ export class GetAccountRange implements SnapMessage {
     return rlp.encode(this.raw());
   }
 
-  validateBasic(): void {}
+  validateBasic(): void {
+    validateInteger(this.reqID);
+    validateInteger(this.responseLimit);
+    validateHash(this.rootHash);
+    validateHash(this.startHash);
+    validateHash(this.limitHash);
+  }
 }
 
 export class AccountRange implements SnapMessage {
@@ -66,6 +72,13 @@ export class AccountRange implements SnapMessage {
     if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(accountData) || !Array.isArray(proof)) {
       throw new Error('invalid values');
     }
+
+    for (const account of accountData) {
+      if (!Array.isArray(account) || account.length !== 2) {
+        throw new Error('invalid values');
+      }
+    }
+
     return new AccountRange(bufferToInt(reqIDBuffer), accountData as Buffer[][], proof as Buffer[]);
   }
 
@@ -77,7 +90,9 @@ export class AccountRange implements SnapMessage {
     return rlp.encode(this.raw());
   }
 
-  validateBasic(): void {}
+  validateBasic(): void {
+    validateInteger(this.reqID);
+  }
 }
 
 export class GetStorageRange implements SnapMessage {
@@ -119,12 +134,21 @@ export class GetStorageRange implements SnapMessage {
     return rlp.encode(this.raw());
   }
 
-  validateBasic(): void {}
+  validateBasic(): void {
+    validateInteger(this.reqID);
+    validateInteger(this.responseLimit);
+    validateHash(this.rootHash);
+    validateHash(this.startHash);
+    validateHash(this.limitHash);
+    for (const accountHash of this.accountHashes) {
+      validateHash(accountHash);
+    }
+  }
 }
 
 export class StorageRange implements SnapMessage {
   readonly reqID: number;
-  readonly slots: Buffer[][][] = [];
+  readonly slots: Buffer[][][];
   readonly proof: Buffer[];
 
   static readonly code = 3;
@@ -144,6 +168,17 @@ export class StorageRange implements SnapMessage {
     if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(storage) || !Array.isArray(proof)) {
       throw new Error('invalid values');
     }
+    for (const slot of storage) {
+      if (!Array.isArray(slot)) {
+        throw new Error('invalid values');
+      } else {
+        for (const s of slot) {
+          if (!Array.isArray(s) || s.length !== 2) {
+            throw new Error('invalid values');
+          }
+        }
+      }
+    }
     return new StorageRange(bufferToInt(reqIDBuffer), storage as Buffer[][][], proof as Buffer[]);
   }
 
@@ -155,7 +190,9 @@ export class StorageRange implements SnapMessage {
     return rlp.encode(this.raw());
   }
 
-  validateBasic(): void {}
+  validateBasic(): void {
+    validateInteger(this.reqID);
+  }
 }
 
 export class GetByteCode implements SnapMessage {
@@ -190,7 +227,13 @@ export class GetByteCode implements SnapMessage {
   serialize(): Buffer {
     return rlp.encode(this.raw());
   }
-  validateBasic(): void {}
+  validateBasic(): void {
+    validateInteger(this.reqID);
+    validateInteger(this.responseLimit);
+    for (const hash of this.hashes) {
+      validateHash(hash);
+    }
+  }
 }
 
 export class ByteCode implements SnapMessage {
@@ -225,7 +268,9 @@ export class ByteCode implements SnapMessage {
     return rlp.encode(this.raw());
   }
 
-  validateBasic(): void {}
+  validateBasic(): void {
+    validateInteger(this.reqID);
+  }
 }
 
 export class GetTrieNode implements SnapMessage {
@@ -262,7 +307,13 @@ export class GetTrieNode implements SnapMessage {
     return rlp.encode(this.raw());
   }
 
-  validateBasic(): void {}
+  validateBasic(): void {
+    validateInteger(this.reqID);
+    validateInteger(this.responseLimit);
+    for (const hash of this.hashes) {
+      validateHash(hash);
+    }
+  }
 }
 
 export class TrieNode implements SnapMessage {
@@ -297,5 +348,7 @@ export class TrieNode implements SnapMessage {
     return rlp.encode(this.raw());
   }
 
-  validateBasic(): void {}
+  validateBasic(): void {
+    validateInteger(this.reqID);
+  }
 }

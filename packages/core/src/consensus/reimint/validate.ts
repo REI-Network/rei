@@ -50,6 +50,12 @@ export function validateIndex(index: number) {
   }
 }
 
+export function validateInteger(integer: number) {
+  if (integer < 0 || !Number.isSafeInteger(integer)) {
+    throw new Error('invalid integer');
+  }
+}
+
 export function validateVoteType(type: VoteType) {
   if (type !== VoteType.Precommit && type !== VoteType.Prevote) {
     throw new Error('invalid vote type');

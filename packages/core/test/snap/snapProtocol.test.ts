@@ -86,7 +86,7 @@ describe('snapProtocol', function () {
     const peer1 = new MockPeer();
     const peer2 = new MockPeer();
     handler1 = new SnapProtocolHandler(protocol1 as any, peer1 as any, 20000);
-    handler2 = new SnapProtocolHandler(protocol2 as any, peer2 as any, 500);
+    handler2 = new SnapProtocolHandler(protocol2 as any, peer2 as any, 20000);
     peer1.setHandler(handler2);
     peer2.setHandler(handler1);
     const trie = new BaseTrie(db.rawdb, root);
@@ -143,6 +143,7 @@ describe('snapProtocol', function () {
   });
 
   it('should getAccountRange successfully and continue is true when the responseLimit could not cover request accounts', async () => {
+    handler2.resetSoftResponseLimit(500);
     const startHash = accounts[0].accountHash;
     const limitHash = accounts[accounts.length - 1].accountHash;
     const accountData = accounts.map((account) => [account.accountHash, account.account.slimSerialize()]);
@@ -155,6 +156,7 @@ describe('snapProtocol', function () {
       expect(response!.hashes[i].equals(accountData[i][0]), 'accountHashes should be equal').be.true;
       expect(response!.accounts[i].slimSerialize().equals(accountData[i][1]), 'accountBody should be equal').be.true;
     }
+    handler2.resetSoftResponseLimit(20000);
   });
 
   it('should getStorageRange successfully continue is true', async () => {
@@ -198,6 +200,7 @@ describe('snapProtocol', function () {
   });
 
   it('should getStorageRange successfully when responseLimit could not cover request storage', async () => {
+    handler2.resetSoftResponseLimit(500);
     const startHash = EMPTY_HASH;
     const limitHash = MAX_HASH;
     const accountHashes = accounts.map((account) => account.accountHash);
@@ -215,6 +218,7 @@ describe('snapProtocol', function () {
         expect(response!.slots[i][j].equals(stotageData[i][j]), 'storageData should be equal').be.true;
       }
     }
+    handler2.resetSoftResponseLimit(20000);
   });
 
   it('should getCodeBytes successfully', async () => {

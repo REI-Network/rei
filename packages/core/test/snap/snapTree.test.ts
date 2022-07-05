@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { keccak256, rlp, bufferToInt, BN } from 'ethereumjs-util';
+import { keccak256, rlp, bufferToInt } from 'ethereumjs-util';
 import { BaseTrie } from 'merkle-patricia-tree';
 import { LeafNode } from 'merkle-patricia-tree/dist/trieNode';
 import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
@@ -13,17 +13,11 @@ import { EMPTY_HASH, DBatch } from '../../src/utils';
 import { isDiffLayerJournal } from '../../src/snap/journal';
 import { TrieNodeIterator } from '../../src/snap/trieIterator';
 
-class MockNode {
-  public latestBlock: { header: { number: BN } } = { header: { number: new BN(1) } };
-  public db: { getSnapRecoveryNumber: any } = { getSnapRecoveryNumber: async () => new BN(0) };
-}
-
 const level = require('level-mem');
 const common = new Common({ chain: 'rei-devnet' });
 common.setHardforkByBlockNumber(0);
 const db = new Database(level(), common);
 const anotherDB = new Database(level(), common);
-const node = new MockNode();
 const async = true;
 const rebuild = true;
 let snaptree: SnapTree;
@@ -94,7 +88,7 @@ describe('SnapshotTree', () => {
     accounts = rootAndAccounts.accounts;
     diskLayer = new DiskLayer(db, root);
     layers.push({ layer: diskLayer, accounts });
-    snaptree = new SnapTree(db, node as any);
+    snaptree = new SnapTree(db);
     await snaptree.init(root, async, rebuild);
     for (let i = 0; i < 6; i++) {
       const latest = layers[layers.length - 1];
@@ -144,7 +138,7 @@ describe('SnapshotTree', () => {
     expect(disk?.root.equals(diskLayer.root), 'snapshot root should be equal').be.true;
   });
 
-  it('should accountIterator correctly', async () => {
+  it('should generate accountIterator correctly', async () => {
     for (const { layer, accounts } of layers) {
       const _accounts = [...accounts];
       const fastIter = snaptree.accountIterator(layer.root, EMPTY_HASH);
@@ -162,7 +156,7 @@ describe('SnapshotTree', () => {
     }
   });
 
-  it('should storageIterator correctly', async () => {
+  it('should generate storageIterator correctly', async () => {
     for (const { layer, accounts } of layers) {
       for (const { address, storageData: _storageData } of accounts) {
         // copy storage data
@@ -298,7 +292,7 @@ describe('SnapshotTree', () => {
   });
 
   it('should disable correctly', async () => {
-    anothorSnaptree = new SnapTree(anotherDB, node as any);
+    anothorSnaptree = new SnapTree(anotherDB);
     await anothorSnaptree.init(root, async, rebuild);
     for (let i = 1; i < layers.length; i++) {
       anothorSnaptree.update(layers[i].layer.root, layers[i - 1].layer.root, (layers[i].layer as DiffLayer).accountData, (layers[i].layer as DiffLayer).destructSet, (layers[i].layer as DiffLayer).storageData);

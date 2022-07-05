@@ -13,11 +13,10 @@ import { TrieNodeIterator } from '../../src/snap/trieIterator';
 class MockNode {
   snaptree: SnapTree;
   db: Database;
-  latestBlock: { header: { number: BN } } = { header: { number: new BN(1) } };
 
   constructor(db: Database) {
     this.db = db;
-    this.snaptree = new SnapTree(db, this as any);
+    this.snaptree = new SnapTree(db);
   }
 }
 

@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { expect } from 'chai';
 import { encode } from 'rlp';
-import { Address, BN, keccak256, unpadBuffer, Account } from 'ethereumjs-util';
+import { Address, BN, keccak256, unpadBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
 import { Database } from '@rei-network/database';
@@ -9,11 +9,6 @@ import { Trie } from 'merkle-patricia-tree/dist/baseTrie';
 import { StateManager, StakingAccount } from '../../src/stateManager';
 import { SnapTree } from '../../src/snap/snapTree';
 import { genRandomAccounts } from '../snap/util';
-
-class MockNode {
-  public latestBlock: { header: { number: BN } } = { header: { number: new BN(1) } };
-  public db: { getSnapRecoveryNumber: any } = { getSnapRecoveryNumber: async () => new BN(0) };
-}
 
 function compareBufferMaps(map1: FunctionalBufferMap<Buffer>, map2: FunctionalBufferMap<Buffer>) {
   if (map1.size !== map2.size) {
@@ -39,8 +34,9 @@ function compareSets<k>(set1: Set<k>, set2: Set<k>) {
   }
   return true;
 }
+
 class MockStateManger extends StateManager {
-  public callback: (accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferSet, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>) => void = () => {};
+  callback: (accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferSet, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>) => void = () => {};
 }
 
 describe('StateManager', () => {
@@ -54,18 +50,14 @@ describe('StateManager', () => {
   const account2 = StakingAccount.fromAccountData({ balance: new BN(34) });
   let stateManager: MockStateManger;
   before(async () => {
-    const common = new Common({ chain: 'rei-testnet' });
+    const common = new Common({ chain: 'rei-devnet' });
     common.setHardforkByBlockNumber(0);
     const level = require('level-mem');
     const db = new Database(level(), common);
-    const async = true;
-    const rebuild = true;
-    const recovery = true;
     const rootAndAccounts = await genRandomAccounts(db, 0, 0);
     const root = rootAndAccounts.root;
-    const node = new MockNode();
-    let snapTree = new SnapTree(db, node as any);
-    await snapTree.init(root, async, rebuild);
+    const snapTree = new SnapTree(db);
+    await snapTree.init(root, true, true);
     stateManager = new MockStateManger({
       common: common,
       snapsTree: snapTree

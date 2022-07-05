@@ -8,7 +8,7 @@ import { getActivePrecompiles, ripemdPrecompileAddress } from '@rei-network/vm/d
 import { short } from '@rei-network/vm/dist/evm/opcodes';
 import { AccessList, AccessListItem } from '@rei-network/structure';
 import Cache from './cache';
-import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
+import { FunctionalBufferMap, FunctionalBufferSet, logger } from '@rei-network/utils';
 import { StakingAccount as Account } from './account';
 import { ISnapshot } from '../snap/types';
 import { SnapTree } from '../snap/snapTree';
@@ -42,7 +42,9 @@ export interface StateManagerOpts {
    * A {@link SecureTrie} instance
    */
   trie?: Trie;
-
+  /**
+   * A {@link SnapTree} instance
+   */
   snapsTree?: SnapTree;
 }
 
@@ -93,6 +95,7 @@ export class StateManager {
 
   // Save _snapAccounts, _snapDestructs, _snapStorage state when checkpoint for revert
   _snapCacheList: SnapCache[];
+
   /**
    * StateManager is run in DEBUG mode (default: false)
    * Taken from DEBUG environment variable
@@ -124,12 +127,7 @@ export class StateManager {
     this._accessedStorageReverted = [new Map()];
     this._snapsTree = opts.snapsTree;
     this._snapCacheList = [];
-    if (this._snapsTree) {
-      this._snap = this._snapsTree.snapShot(this._trie.root);
-      this._snapAccounts = new FunctionalBufferMap<Buffer>();
-      this._snapDestructs = new FunctionalBufferSet();
-      this._snapStorage = new FunctionalBufferMap<FunctionalBufferMap<Buffer>>();
-    }
+    this._resetSnap(this._trie.root);
 
     // Safeguard if "process" is not available (browser)
     if (process !== undefined && process.env.DEBUG) {
@@ -449,24 +447,34 @@ export class StateManager {
     if (!this._snap) {
       return {};
     }
-    const copySnapAccounts = new FunctionalBufferMap<Buffer>();
-    const copySnapDestructs = new FunctionalBufferSet();
-    const copySnapStroge = new FunctionalBufferMap<FunctionalBufferMap<Buffer>>();
 
-    this._snapAccounts?.forEach((value, key) => {
-      copySnapAccounts.set(key, value);
-    });
-    this._snapDestructs?.forEach((key) => {
-      copySnapDestructs.add(key);
-    });
-    this._snapStorage?.forEach((value, key) => {
-      const temp = new FunctionalBufferMap<Buffer>();
-      value.forEach((value, key) => {
-        temp.set(key, value);
-      });
-      copySnapStroge.set(key, temp);
-    });
-    return { snapAccounts: copySnapAccounts, snapDestructs: copySnapDestructs, snapStroge: copySnapStroge };
+    let snapAccounts: FunctionalBufferMap<Buffer> | undefined;
+    let snapDestructs: FunctionalBufferSet | undefined;
+    let snapStroge: FunctionalBufferMap<FunctionalBufferMap<Buffer>> | undefined;
+    if (this._snapAccounts) {
+      snapAccounts = new FunctionalBufferMap<Buffer>();
+      for (const [k, v] of this._snapAccounts) {
+        snapAccounts.set(k, v);
+      }
+    }
+    if (this._snapDestructs) {
+      snapDestructs = new FunctionalBufferSet();
+      for (const k of this._snapDestructs) {
+        snapDestructs.add(k);
+      }
+    }
+    if (this._snapStorage) {
+      snapStroge = new FunctionalBufferMap<FunctionalBufferMap<Buffer>>();
+      for (const [k, v] of this._snapStorage) {
+        const temp = new FunctionalBufferMap<Buffer>();
+        for (const [_k, _v] of v) {
+          temp.set(_k, _v);
+        }
+        snapStroge.set(k, temp);
+      }
+    }
+
+    return { snapAccounts, snapDestructs, snapStroge };
   }
 
   /**
@@ -478,6 +486,21 @@ export class StateManager {
       this._snapAccounts = undefined;
       this._snapDestructs = undefined;
       this._snapStorage = undefined;
+    }
+  }
+
+  /**
+   * Reset snap
+   * @param root - State root
+   */
+  private _resetSnap(root: Buffer): void {
+    if (this._snapsTree) {
+      this._snap = this._snapsTree.snapShot(root);
+      if (this._snap) {
+        this._snapAccounts = new FunctionalBufferMap<Buffer>();
+        this._snapDestructs = new FunctionalBufferSet();
+        this._snapStorage = new FunctionalBufferMap<FunctionalBufferMap<Buffer>>();
+      }
     }
   }
 
@@ -524,10 +547,16 @@ export class StateManager {
     if (this._checkpointCount === 0) {
       await this._cache.flush();
       this._clearOriginalStorageCache();
-      const parent = this._snap?.root;
-      if (parent && !parent.equals(this._trie.root)) {
-        await this._snapsTree?.update(this._trie.root, parent, this._snapAccounts!, this._snapDestructs!, this._snapStorage!);
-        await this._snapsTree?.cap(this._trie.root, 128);
+      if (this._snapsTree && this._snap) {
+        const parent = this._snap.root;
+        if (!parent.equals(this._trie.root)) {
+          try {
+            await this._snapsTree.update(this._trie.root, parent, this._snapAccounts!, this._snapDestructs!, this._snapStorage!);
+            await this._snapsTree.cap(this._trie.root, 128);
+          } catch (err) {
+            logger.error('StateManager::commit, catch error:', err);
+          }
+        }
       }
       this._cleanSnapCache();
     }
@@ -559,16 +588,18 @@ export class StateManager {
       touched.add(ripemdPrecompileAddress);
     }
     this._touched = touched;
-    const revertCache = this._snapCacheList.pop();
-    this._snapAccounts = revertCache?.snapAccounts;
-    this._snapDestructs = revertCache?.snapDestructs;
-    this._snapStorage = revertCache?.snapStroge;
+    if (this._snapCacheList.length > 0) {
+      const cache = this._snapCacheList.pop()!;
+      this._snapAccounts = cache.snapAccounts;
+      this._snapDestructs = cache.snapDestructs;
+      this._snapStorage = cache.snapStroge;
+    }
     this._checkpointCount--;
 
     if (this._checkpointCount === 0) {
       await this._cache.flush();
       this._clearOriginalStorageCache();
-      this._cleanSnapCache();
+      // this._cleanSnapCache();
     }
   }
 
@@ -608,12 +639,7 @@ export class StateManager {
     this._trie.root = stateRoot;
     this._cache.clear();
     this._storageTries = {};
-    if (this._snapsTree) {
-      this._snap = this._snapsTree.snapShot(stateRoot);
-      this._snapAccounts = new FunctionalBufferMap<Buffer>();
-      this._snapDestructs = new FunctionalBufferSet();
-      this._snapStorage = new FunctionalBufferMap<FunctionalBufferMap<Buffer>>();
-    }
+    this._resetSnap(stateRoot);
   }
 
   /**

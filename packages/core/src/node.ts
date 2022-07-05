@@ -64,8 +64,7 @@ export class Node {
   readonly reimint: ReimintConsensusEngine;
   readonly clique: CliqueConsensusEngine;
   readonly receiptsCache: ReceiptsCache;
-
-  public snaptree: SnapTree;
+  readonly snaptree: SnapTree;
 
   private initPromise?: Promise<void>;
   private pendingTxsLoopPromise?: Promise<void>;
@@ -133,7 +132,7 @@ export class Node {
     this.txSync = new TxFetcher(this);
     this.bcMonitor = new BlockchainMonitor(this.db);
     this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ db: this.db });
-    this.snaptree = new SnapTree(this.db, this);
+    this.snaptree = new SnapTree(this.db);
   }
 
   /**

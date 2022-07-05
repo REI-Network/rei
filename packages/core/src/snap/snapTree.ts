@@ -1,4 +1,4 @@
-import { rlp, BN, intToBuffer } from 'ethereumjs-util';
+import { rlp, BN, intToBuffer, bufferToHex } from 'ethereumjs-util';
 import { Database } from '@rei-network/database';
 import { FunctionalBufferMap, FunctionalBufferSet, logger } from '@rei-network/utils';
 import { snapStorageKey, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
@@ -12,7 +12,6 @@ import { asyncTraverseRawDB } from './layerIterator';
 import { journalProgress, loadSnapshot } from './journal';
 import { EMPTY_HASH, MAX_HASH } from '../utils';
 import { TrieSync } from '../sync/snap/trieSync';
-import { Node } from '../node';
 import { FastSnapIterator } from './fastIterator';
 
 const aggregatorMemoryLimit = 4 * 1024 * 1024;
@@ -20,15 +19,11 @@ const idealBatchSize = 102400;
 export const journalVersion = 0;
 
 export class SnapTree {
-  diskdb: Database;
-  layers: FunctionalBufferMap<Snapshot>;
-  node: Node;
-  onFlatten?: Function; // Hook invoked when the bottom most diff layers are flattened
+  readonly diskdb: Database;
+  readonly layers = new FunctionalBufferMap<Snapshot>();
 
-  constructor(diskdb: Database, node: Node) {
+  constructor(diskdb: Database) {
     this.diskdb = diskdb;
-    this.layers = new FunctionalBufferMap<Snapshot>();
-    this.node = node;
   }
 
   /**
@@ -43,25 +38,23 @@ export class SnapTree {
    * @param root - Root hash
    * @param async - Rebuild snaptree async or not
    * @param rebuild - Rebuild or not
-   * @param onFlatten - Hook invoked when the bottom most diff layers are flattened
-   * @returns
    */
-  async init(root: Buffer, async: boolean, rebuild: boolean, onFlatten?: Function) {
-    this.onFlatten = onFlatten;
-    const header = this.node.latestBlock.header;
-    const recoverNumber = await this.node.db.getSnapRecoveryNumber();
-    let recovery = false;
-    recovery = recoverNumber !== null && recoverNumber.gt(header.number);
+  async init(root: Buffer, async: boolean, rebuild: boolean) {
+    // TODO: recovery?
+    // const header = this.node.latestBlock.header;
+    // const recoverNumber = await this.node.db.getSnapRecoveryNumber();
+    // let recovery = false;
+    // recovery = recoverNumber !== null && recoverNumber.gt(header.number);
     try {
-      let head: Snapshot | undefined = await loadSnapshot(this.diskdb, root, recovery);
-      //TODO check disable
+      let head: Snapshot | undefined = await loadSnapshot(this.diskdb, root, true);
+      // TODO: check disable?
       while (head !== undefined) {
         this.layers.set(head.root, head);
         head = head.parent;
       }
     } catch (error) {
       if (rebuild) {
-        logger.warn('Failed to load snapshot, regenerating', 'err', error);
+        logger.warn('SnapTree::init, failed to load snapshot, regenerating', 'err', error);
         const generating = (await this.rebuild(root)).generating;
         if (!async) {
           await generating;
@@ -87,13 +80,11 @@ export class SnapTree {
     this.layers.clear();
 
     const batch = new DBatch(this.diskdb);
-
     batch.push(DBSaveSnapDisabled());
     batch.push(DBDeleteSnapRoot());
     batch.push(DBDeleteSnapJournal());
     batch.push(DBDeleteSnapGenerator());
     batch.push(DBDeleteSnapRecoveryNumber());
-
     await batch.write();
     batch.reset();
   }
@@ -155,7 +146,7 @@ export class SnapTree {
     // Generate a new snapshot on top of the parent
     const parent = this.layers.get(parentRoot);
     if (!parent) {
-      throw new Error(`parent ${parentRoot} snapshot missing`);
+      throw new Error(`parent ${bufferToHex(parentRoot)} snapshot missing`);
     }
     const snap = parent.update(root, destructs, accounts, storage);
     this.layers.set(snap.root, snap);
@@ -172,10 +163,10 @@ export class SnapTree {
     // Retrieve the head snapshot to cap from
     const snap = this.layers.get(root);
     if (!snap) {
-      throw new Error(`snapshot ${root} missing`);
+      throw new Error(`snapshot ${bufferToHex(root)} missing`);
     }
     if (!(snap instanceof DiffLayer)) {
-      throw new Error(`snapshot ${root} is disk layer`);
+      throw new Error(`snapshot ${bufferToHex(root)} is disk layer`);
     }
     // If the generator is still running, use a more aggressive cap
     if (snap.origin.genMarker !== undefined && layers > 8) {
@@ -207,6 +198,7 @@ export class SnapTree {
         }
       }
     }
+
     const remove = (root: Buffer) => {
       this.layers.delete(root);
       const datas = children.get(root);
@@ -217,7 +209,6 @@ export class SnapTree {
       }
       children.delete(root);
     };
-
     for (const [root, snap] of this.layers) {
       if (snap.stale) {
         remove(root);
@@ -230,7 +221,7 @@ export class SnapTree {
         const diff = this.layers.get(root);
         if (diff instanceof DiffLayer) {
           diff.rebloom();
-          //TODO rebloom(persisted)
+          // TODO: rebloom(persisted)
         }
         const childs = children.get(root);
         if (childs) {
@@ -272,9 +263,6 @@ export class SnapTree {
       // write lock on grandparent.
       const flattened = parent.flatten() as DiffLayer;
       this.layers.set(flattened.root, flattened);
-      if (this.onFlatten) {
-        this.onFlatten();
-      }
       diff.parent = flattened;
       if (flattened.memory < aggregatorMemoryLimit) {
         if (!(flattened.parent as DiskLayer).genMarker) {
@@ -282,6 +270,7 @@ export class SnapTree {
         }
       }
     }
+
     // If the bottom-most layer is larger than our memory cap, persist to disk
     const bottom = diff.parent as DiffLayer;
     const base = await diffToDisk(bottom);
@@ -305,7 +294,7 @@ export class SnapTree {
     batch.reset();
 
     // Iterate over and mark all layers stale
-    for (const [root, layer] of this.layers) {
+    for (const [, layer] of this.layers) {
       if (layer instanceof DiskLayer) {
         if (layer.aborter !== undefined) {
           await layer.abort();
@@ -331,7 +320,7 @@ export class SnapTree {
     // Retrieve the head snapshot to journal from var snap snapshot
     const snap = this.layers.get(root);
     if (snap === undefined) {
-      throw new Error(`snapshot ${root} missing`);
+      throw new Error(`snapshot ${bufferToHex(root)} missing`);
     }
 
     const diskroot = this.diskroot();
@@ -446,6 +435,11 @@ export class SnapTree {
     });
   }
 
+  /**
+   * Verify snapshot
+   * @param root - State root
+   * @returns Returns true if valid
+   */
   async verify(root: Buffer) {
     const trieSync = new TrieSync(this.diskdb, true);
     await trieSync.setRoot(root, async (paths, path, leaf, parent) => {
@@ -460,7 +454,7 @@ export class SnapTree {
           throw Error('snap storage not equal');
         }
       } else {
-        logger.warn('SnapSync::setRoot, unknown leaf node');
+        logger.warn('SnapTree::verify, unknown leaf node');
       }
     });
 
@@ -470,7 +464,6 @@ export class SnapTree {
         for (const hash of nodeHashes) {
           await trieSync.process(hash, await this.diskdb.rawdb.get(hash, { keyEncoding: 'binary', valueEncoding: 'binary' }));
         }
-
         for (const hash of codeHashes) {
           await trieSync.process(hash, await this.diskdb.rawdb.get(hash, { keyEncoding: 'binary', valueEncoding: 'binary' }));
         }
@@ -481,6 +474,7 @@ export class SnapTree {
     return true;
   }
 }
+
 /**
  * diffToDisk merges a bottom-most diff into the persistent disk layer underneath
  * it. The method will panic if called onto a non-bottom-most diff layer.
@@ -593,6 +587,6 @@ async function generateSnapshot(db: Database, root: Buffer) {
   const base = new DiskLayer(db, root);
   base.genMarker = genMarker;
   const generating = base.generate(stats);
-  logger.debug('Start snapshot generation, root:', root);
+  logger.debug('SnapTree::generateSnapshot, start snapshot generation, root:', bufferToHex(root));
   return { base, generating };
 }

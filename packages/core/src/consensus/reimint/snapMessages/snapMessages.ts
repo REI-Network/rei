@@ -1,5 +1,6 @@
 import { bufferToInt, intToBuffer, rlp } from 'ethereumjs-util';
 import { validateHash, validateInteger } from '../validate';
+
 export interface SnapMessage {
   reqID: number;
   raw(): any;
@@ -41,7 +42,7 @@ export class GetAccountRange implements SnapMessage {
     return rlp.encode(this.raw());
   }
 
-  validateBasic(): void {
+  validateBasic() {
     validateInteger(this.reqID);
     validateInteger(this.responseLimit);
     validateHash(this.rootHash);
@@ -72,13 +73,11 @@ export class AccountRange implements SnapMessage {
     if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(accountData) || !Array.isArray(proof)) {
       throw new Error('invalid values');
     }
-
     for (const account of accountData) {
       if (!Array.isArray(account) || account.length !== 2) {
         throw new Error('invalid values');
       }
     }
-
     return new AccountRange(bufferToInt(reqIDBuffer), accountData as Buffer[][], proof as Buffer[]);
   }
 
@@ -90,7 +89,7 @@ export class AccountRange implements SnapMessage {
     return rlp.encode(this.raw());
   }
 
-  validateBasic(): void {
+  validateBasic() {
     validateInteger(this.reqID);
   }
 }
@@ -227,7 +226,8 @@ export class GetByteCode implements SnapMessage {
   serialize(): Buffer {
     return rlp.encode(this.raw());
   }
-  validateBasic(): void {
+
+  validateBasic() {
     validateInteger(this.reqID);
     validateInteger(this.responseLimit);
     for (const hash of this.hashes) {
@@ -252,12 +252,11 @@ export class ByteCode implements SnapMessage {
     if (values.length !== 2) {
       throw new Error('invalid values');
     }
-
-    const [reqIDBuffer, codeHashes] = values;
-    if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(codeHashes)) {
+    const [reqIDBuffer, codes] = values;
+    if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(codes)) {
       throw new Error('invalid values');
     }
-    return new ByteCode(bufferToInt(reqIDBuffer), codeHashes);
+    return new ByteCode(bufferToInt(reqIDBuffer), codes);
   }
 
   raw() {
@@ -268,7 +267,7 @@ export class ByteCode implements SnapMessage {
     return rlp.encode(this.raw());
   }
 
-  validateBasic(): void {
+  validateBasic() {
     validateInteger(this.reqID);
   }
 }
@@ -291,7 +290,6 @@ export class GetTrieNode implements SnapMessage {
     if (values.length !== 3) {
       throw new Error('invalid values');
     }
-
     const [reqIDBuffer, hashes, responseLimitBuffer] = values;
     if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(hashes) || !(responseLimitBuffer instanceof Buffer)) {
       throw new Error('invalid values');
@@ -332,7 +330,6 @@ export class TrieNode implements SnapMessage {
     if (values.length !== 2) {
       throw new Error('invalid values');
     }
-
     const [reqIDBuffer, nodes] = values;
     if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(nodes)) {
       throw new Error('invalid values');

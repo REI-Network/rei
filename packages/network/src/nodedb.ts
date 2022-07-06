@@ -228,7 +228,7 @@ export class NodeDB {
       return BigInt(value.toString());
     } catch (e) {
       if ((e as any).type == 'NotFoundError') {
-        return BigInt(0);
+        return BigInt(Date.now());
       }
       throw e;
     }

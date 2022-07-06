@@ -66,10 +66,10 @@ export class Libp2pNode extends Libp2p {
   }
 
   get kbuckets(): KademliaRoutingTable {
-    return (this.discv5 as any).kbuckets;
+    return (this.discv5 as any).discv5.kbuckets;
   }
 
   get sessionService(): SessionService {
-    return (this.discv5 as any).sessionService;
+    return (this.discv5 as any).discv5.sessionService;
   }
 }

@@ -25,6 +25,7 @@ import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
 import { StateManager } from './stateManager';
 import { SnapTree } from './snap/snapTree';
 
+const maxSnapLayers = 64;
 const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;
 const defaultChainName = 'rei-mainnet';
@@ -64,7 +65,7 @@ export class Node {
   readonly reimint: ReimintConsensusEngine;
   readonly clique: CliqueConsensusEngine;
   readonly receiptsCache: ReceiptsCache;
-  readonly snaptree: SnapTree;
+  readonly snapTree: SnapTree;
 
   private initPromise?: Promise<void>;
   private pendingTxsLoopPromise?: Promise<void>;
@@ -132,7 +133,7 @@ export class Node {
     this.txSync = new TxFetcher(this);
     this.bcMonitor = new BlockchainMonitor(this.db);
     this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ db: this.db });
-    this.snaptree = new SnapTree(this.db);
+    this.snapTree = new SnapTree(this.db);
   }
 
   /**
@@ -183,7 +184,7 @@ export class Node {
       await this.bcMonitor.init(this.latestBlock.header);
       await this.networkdb.open();
       await this.networkMngr.init();
-      await this.snaptree.init(this.latestBlock.header.stateRoot, false, true);
+      await this.snapTree.init(this.latestBlock.header.stateRoot, false, true);
     })());
   }
 
@@ -223,6 +224,15 @@ export class Node {
     await this.bloomBitsIndexer.abort();
     await this.pendingTxsLoopPromise;
     await this.commitBlockLoopPromise;
+
+    // save all diff layers to disk
+    try {
+      const root = this.latestBlock.header.stateRoot;
+      await this.snapTree.cap(root, 0);
+    } catch (err) {
+      logger.warn('Node::abort, cap snap tree failed:', err);
+    }
+
     await this.evidencedb.close();
     await this.nodedb.close();
     await this.networkdb.close();
@@ -323,7 +333,11 @@ export class Node {
    * @returns State manager object
    */
   async getStateManager(root: Buffer, num: BNLike | Common) {
-    const stateManager = new StateManager({ common: num instanceof Common ? num : this.getCommon(num), trie: new Trie(this.chaindb) });
+    const stateManager = new StateManager({
+      common: num instanceof Common ? num : this.getCommon(num),
+      trie: new Trie(this.chaindb),
+      snapTree: this.snapTree
+    });
     await stateManager.setStateRoot(root);
     return stateManager;
   }
@@ -408,6 +422,7 @@ export class Node {
 
     const hash = block.hash();
     const number = block.header.number;
+    const root = block.header.stateRoot;
 
     // ensure that the block has not been committed
     try {
@@ -438,6 +453,13 @@ export class Node {
       reorged = await this.blockchain.forcePutBlock(block, { td: opts.td, receipts, saveTxLookup: true });
     } else {
       reorged = await this.blockchain.putBlock(block, { receipts, saveTxLookup: true });
+    }
+
+    // cap snap tree
+    try {
+      await this.snapTree.cap(root, maxSnapLayers);
+    } catch (err) {
+      logger.warn('Node::doCommitBlock, cap snap tree failed:', err);
     }
 
     // install properties for receipts

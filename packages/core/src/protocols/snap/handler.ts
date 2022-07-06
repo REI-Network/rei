@@ -133,7 +133,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
     let last: Buffer | undefined = undefined;
 
     try {
-      const fastIter = this.node.snaptree.accountIterator(msg.rootHash, msg.startHash);
+      const fastIter = this.node.snapTree.accountIterator(msg.rootHash, msg.startHash);
       await fastIter.init();
       for await (const { hash, value } of fastIter) {
         last = hash;
@@ -194,7 +194,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
         let last: Buffer | undefined = undefined;
         let abort = false;
 
-        const fastIter = this.node.snaptree.storageIterator(msg.rootHash, msg.accountHashes[i], origin);
+        const fastIter = this.node.snapTree.storageIterator(msg.rootHash, msg.accountHashes[i], origin);
         await fastIter.init();
         for await (const { hash, value } of fastIter) {
           if (size > hardLimit) {

@@ -41,10 +41,6 @@ export class SnapTree {
    */
   async init(root: Buffer, async: boolean, rebuild: boolean) {
     // TODO: recovery?
-    // const header = this.node.latestBlock.header;
-    // const recoverNumber = await this.node.db.getSnapRecoveryNumber();
-    // let recovery = false;
-    // recovery = recoverNumber !== null && recoverNumber.gt(header.number);
     try {
       let head: Snapshot | undefined = await loadSnapshot(this.diskdb, root, true);
       // TODO: check disable?
@@ -52,13 +48,17 @@ export class SnapTree {
         this.layers.set(head.root, head);
         head = head.parent;
       }
-    } catch (error) {
+    } catch (err) {
       if (rebuild) {
-        logger.warn('SnapTree::init, failed to load snapshot, regenerating', 'err', error);
+        logger.warn('SnapTree::init, failed to load snapshot');
         const generating = (await this.rebuild(root)).generating;
         if (!async) {
+          logger.info('📷 Start generating snapshot, this may take a while...');
           await generating;
+          logger.info('📷 Generate snapshot finished');
         }
+      } else {
+        throw err;
       }
     }
   }
@@ -183,9 +183,10 @@ export class SnapTree {
       this.layers.set(base.root, base);
       return;
     }
+
     const persisted = await this._cap(diff, layers);
 
-    // Remove any layer that is stale or links into a stale layer
+    // Get dependencies into memory
     const children = new FunctionalBufferMap<Buffer[]>();
     for (const [root, snap] of this.layers) {
       if (snap instanceof DiffLayer) {
@@ -199,6 +200,7 @@ export class SnapTree {
       }
     }
 
+    // Remove any layer that is stale or links into a stale layer
     const remove = (root: Buffer) => {
       this.layers.delete(root);
       const datas = children.get(root);
@@ -220,8 +222,7 @@ export class SnapTree {
       const rebloom = (root: Buffer) => {
         const diff = this.layers.get(root);
         if (diff instanceof DiffLayer) {
-          diff.rebloom();
-          // TODO: rebloom(persisted)
+          diff.resetParent(persisted);
         }
         const childs = children.get(root);
         if (childs) {

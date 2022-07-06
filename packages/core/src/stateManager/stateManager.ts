@@ -45,7 +45,7 @@ export interface StateManagerOpts {
   /**
    * A {@link SnapTree} instance
    */
-  snapsTree?: SnapTree;
+  snapTree?: SnapTree;
 }
 
 /**
@@ -79,7 +79,7 @@ export class StateManager {
   // State snapshot tree. It consists of one persistent base
   // layer backed by a key-value store, on top of which arbitrarily many in-memory
   // diff layers are topped
-  _snapsTree?: SnapTree;
+  _snapTree?: SnapTree;
 
   // Snapshot represents the functionality supported by a snapshot storage layer.
   _snap?: ISnapshot;
@@ -125,7 +125,7 @@ export class StateManager {
     this._originalStorageCache = new Map();
     this._accessedStorage = [new Map()];
     this._accessedStorageReverted = [new Map()];
-    this._snapsTree = opts.snapsTree;
+    this._snapTree = opts.snapTree;
     this._snapCacheList = [];
     this._resetSnap(this._trie.root);
 
@@ -144,7 +144,7 @@ export class StateManager {
     return new StateManager({
       trie: this._trie.copy(false),
       common: this._common,
-      snapsTree: this._snapsTree
+      snapTree: this._snapTree
     });
   }
 
@@ -494,8 +494,8 @@ export class StateManager {
    * @param root - State root
    */
   private _resetSnap(root: Buffer): void {
-    if (this._snapsTree) {
-      this._snap = this._snapsTree.snapShot(root);
+    if (this._snapTree) {
+      this._snap = this._snapTree.snapShot(root);
       if (this._snap) {
         this._snapAccounts = new FunctionalBufferMap<Buffer>();
         this._snapDestructs = new FunctionalBufferSet();
@@ -547,12 +547,13 @@ export class StateManager {
     if (this._checkpointCount === 0) {
       await this._cache.flush();
       this._clearOriginalStorageCache();
-      if (this._snapsTree && this._snap) {
+      if (this._snapTree && this._snap) {
         const parent = this._snap.root;
         if (!parent.equals(this._trie.root)) {
           try {
-            await this._snapsTree.update(this._trie.root, parent, this._snapAccounts!, this._snapDestructs!, this._snapStorage!);
-            await this._snapsTree.cap(this._trie.root, 128);
+            await this._snapTree.update(this._trie.root, parent, this._snapAccounts!, this._snapDestructs!, this._snapStorage!);
+            // We will cap the snapTree when committing blocks
+            // await this._snapsTree.cap(this._trie.root, 128);
           } catch (err) {
             logger.error('StateManager::commit, catch error:', err);
           }
@@ -599,6 +600,7 @@ export class StateManager {
     if (this._checkpointCount === 0) {
       await this._cache.flush();
       this._clearOriginalStorageCache();
+      // don't clear snap
       // this._cleanSnapCache();
     }
   }

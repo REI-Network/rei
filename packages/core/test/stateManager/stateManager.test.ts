@@ -56,7 +56,7 @@ describe('StateManager', () => {
     await snapTree.init(root, true, true);
     stateManager = new StateManager({
       common: common,
-      snapsTree: snapTree
+      snapTree: snapTree
     });
   });
 

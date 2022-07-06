@@ -104,7 +104,7 @@ export class NetworkManager extends EventEmitter {
   private readonly inboundHistory = new ExpHeap();
   private readonly outboundHistory = new ExpHeap();
   private outboundTimer: undefined | NodeJS.Timeout;
-  public testEnrStr: string = '';
+
   // queue that records the timeout information of the remote peer
   private readonly installTimeoutQueue = new TimeoutQueue(installTimeoutDuration);
   private readonly installTimeoutId = new Map<string, number>();
@@ -116,6 +116,10 @@ export class NetworkManager extends EventEmitter {
     this.protocols = options.protocols;
     this.nodedb = new NodeDB(options.nodedb);
     this.options = options;
+  }
+
+  get localEnr() {
+    return this.libp2pNode.discv5.discv5.enr;
   }
 
   /**
@@ -234,7 +238,7 @@ export class NetworkManager extends EventEmitter {
       this.setPeerValue(peerId, Libp2pPeerValue.incoming);
       logger.debug('Network::onConnect, too many incoming connections');
     } else {
-      logger.info(`💬 Peer ${(await ENR.decodeTxt(this.testEnrStr).peerId()).toB58String()} connect:`, peerId);
+      logger.info(`💬 Peer ${(await this.localEnr.peerId()).toB58String()} connect:`, peerId);
       this.setPeerValue(peerId, Libp2pPeerValue.connected);
       // this.createInstallTimeout(peerId);
     }
@@ -260,7 +264,7 @@ export class NetworkManager extends EventEmitter {
       return;
     }
     const peerId: string = (await enr.peerId()).toB58String();
-    logger.info(`💬 Peer ${(await ENR.decodeTxt(this.testEnrStr).peerId()).toB58String()} discovered:`, peerId);
+    logger.info(`💬 Peer ${(await this.localEnr.peerId()).toB58String()} discovered:`, peerId);
     let include: boolean = false;
     for (const id of this.discovered) {
       if (id.peerId === peerId) {
@@ -341,7 +345,6 @@ export class NetworkManager extends EventEmitter {
     return (this.initPromise = (async () => {
       const { enr, keypair } = await this.loadLocalENR(this.options);
       const strEnr = enr.encodeTxt(keypair.privateKey);
-      this.testEnrStr = strEnr;
       this.privateKey = keypair.privateKey;
       logger.info('NetworkManager::init, peerId:', this.options.peerId.toB58String());
       logger.info('NetworkManager::init,', strEnr);
@@ -371,7 +374,7 @@ export class NetworkManager extends EventEmitter {
     if (!this.options.enable) {
       return;
     }
-    //init protocols and watch events
+    //init protocols
     for (const _protocol of this.protocols) {
       for (const protocol of Array.isArray(_protocol) ? _protocol : [_protocol]) {
         this.libp2pNode.handle(protocol.protocolString, ({ connection, stream }) => {
@@ -605,7 +608,7 @@ export class NetworkManager extends EventEmitter {
               if (addr) {
                 if (this.filterPeer({ id: peerId, addresses: [{ multiaddr: addr }] })) {
                   pid = peerId;
-                  logger.debug(`NetworkManager::dialLoop, ${(await ENR.decodeTxt(this.testEnrStr).peerId()).toB58String()} use a discovered peer:`, peerId);
+                  logger.debug(`NetworkManager::dialLoop, ${(await this.localEnr.peerId()).toB58String()} use a discovered peer:`, peerId);
                   break;
                 }
               }

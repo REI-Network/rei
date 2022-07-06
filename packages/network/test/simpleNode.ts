@@ -55,9 +55,9 @@ const defaultTcpPort = 4191;
 
 async function main() {
   const bootNode = await createNode({ tcpPort: defaultTcpPort, udpPort: defaultUdpPort });
-  console.log('bootNode peerId ==> ', (await ENR.decodeTxt(bootNode.testEnrStr).peerId()).toB58String());
+  console.log('bootNode peerId ==> ', (await bootNode.localEnr.peerId()).toB58String());
   for (let i = 1; i <= 2; i++) {
-    await createNode({ tcpPort: defaultTcpPort + i, udpPort: defaultUdpPort + i, bootNodes: [bootNode.testEnrStr] });
+    await createNode({ tcpPort: defaultTcpPort + i, udpPort: defaultUdpPort + i, bootNodes: [bootNode.localEnr.encodeTxt()] });
     // await new Promise((resolve) => setTimeout(resolve, 10 * 1000));
   }
 }

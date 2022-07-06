@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import crypto from 'crypto';
-import { BN, keccak256 } from 'ethereumjs-util';
+import { keccak256 } from 'ethereumjs-util';
 import { BaseTrie } from 'merkle-patricia-tree';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
@@ -84,7 +84,7 @@ describe('SnapProtocol', function () {
     const genRandResult = await genRandomAccounts(db, 10, 10);
     root = genRandResult.root;
     accounts = genRandResult.accounts.sort((a, b) => a.accountHash.compare(b.accountHash));
-    await node.snapTree.init(root, true, true);
+    await node.snapTree.init(root, false, true);
     const peer1 = new MockPeer();
     const peer2 = new MockPeer();
     handler1 = new SnapProtocolHandler(protocol1 as any, peer1 as any, 20000);

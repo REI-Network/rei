@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
-import { Account, BN, keccak256 } from 'ethereumjs-util';
+import { BN, keccak256 } from 'ethereumjs-util';
 import { FunctionalBufferMap, FunctionalBufferSet, getRandomIntInclusive } from '@rei-network/utils';
 import { Database, DBSaveSnapStorage, DBSaveSerializedSnapAccount } from '@rei-network/database';
 import { Snapshot } from '../../src/snap/types';
@@ -79,7 +79,7 @@ export async function genRandomAccounts(db: Database, _accounts: number, slots: 
     }
     const account = new StakingAccount(new BN(1), new BN(1), storageTrie.root, codeHash);
     if (saveSnap) {
-      await db.batch([DBSaveSerializedSnapAccount(accountHash, account.serialize())]);
+      await db.batch([DBSaveSerializedSnapAccount(accountHash, account.slimSerialize())]);
     }
     await stateTrie.put(address, account.serialize());
     accounts.push(new AccountInfo(address, code, accountHash, account, storageData, lastestStorageHash!));

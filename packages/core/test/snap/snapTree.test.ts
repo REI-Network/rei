@@ -18,8 +18,6 @@ const common = new Common({ chain: 'rei-devnet' });
 common.setHardforkByBlockNumber(0);
 const db = new Database(level(), common);
 const anotherDB = new Database(level(), common);
-const async = true;
-const rebuild = true;
 let snaptree: SnapTree;
 let anothorSnaptree: SnapTree | undefined;
 let root: Buffer;
@@ -89,7 +87,7 @@ describe('SnapshotTree', () => {
     diskLayer = new DiskLayer(db, root);
     layers.push({ layer: diskLayer, accounts });
     snaptree = new SnapTree(db);
-    await snaptree.init(root, async, rebuild);
+    await snaptree.init(root, false, true);
     for (let i = 0; i < 6; i++) {
       const latest = layers[layers.length - 1];
       const { root, accounts } = await modifyRandomAccounts(db, latest.layer.root, latest.accounts, count);
@@ -293,7 +291,7 @@ describe('SnapshotTree', () => {
 
   it('should disable correctly', async () => {
     anothorSnaptree = new SnapTree(anotherDB);
-    await anothorSnaptree.init(root, async, rebuild);
+    await anothorSnaptree.init(root, false, true);
     for (let i = 1; i < layers.length; i++) {
       anothorSnaptree.update(layers[i].layer.root, layers[i - 1].layer.root, (layers[i].layer as DiffLayer).accountData, (layers[i].layer as DiffLayer).destructSet, (layers[i].layer as DiffLayer).storageData);
     }

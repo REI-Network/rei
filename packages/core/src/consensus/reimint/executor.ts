@@ -251,7 +251,7 @@ export class ReimintExecutor implements Executor {
     }
 
     const pendingCommon = block._common;
-    const vm = await this.backend.getVM(stateRoot, pendingCommon);
+    const vm = await this.backend.getVM(stateRoot, pendingCommon, true);
 
     const miner = Reimint.getMiner(block);
     const minerReward = new BN(pendingCommon.param('pow', 'minerReward'));
@@ -306,7 +306,7 @@ export class ReimintExecutor implements Executor {
 
     // get state root and vm instance
     const root = parent.header.stateRoot;
-    const vm = await this.backend.getVM(root, pendingCommon);
+    const vm = await this.backend.getVM(root, pendingCommon, true);
 
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.engine.getStakeManager(vm, block);
@@ -384,7 +384,7 @@ export class ReimintExecutor implements Executor {
   async processTx(options: ProcessTxOpts) {
     const { root, block, tx, blockGasUsed, totalAmount } = options;
     const systemCaller = Address.fromString(block._common.param('vm', 'scaddr'));
-    const vm = await this.backend.getVM(root, block._common);
+    const vm = await this.backend.getVM(root, block._common, true);
 
     let result: RunTxResult;
     if (isEnableFreeStaking(block._common)) {

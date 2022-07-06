@@ -159,8 +159,8 @@ export interface ExecutorBackend {
   readonly db: Database;
   readonly blockchain: Blockchain;
   getCommon(num: BNLike): Common;
-  getStateManager(root: Buffer, num: BNLike | Common): Promise<StateManager>;
-  getVM(root: Buffer, num: BNLike | Common): Promise<VM>;
+  getStateManager(root: Buffer, num: BNLike | Common, snap?: boolean): Promise<StateManager>;
+  getVM(root: Buffer, num: BNLike | Common, snap?: boolean): Promise<VM>;
 }
 
 export interface Executor {

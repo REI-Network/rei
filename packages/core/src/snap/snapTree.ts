@@ -143,6 +143,10 @@ export class SnapTree {
     if (root.equals(parentRoot)) {
       throw new Error('snapshot cycle');
     }
+    if (this.layers.has(root)) {
+      // Snapshot already exists
+      return;
+    }
     // Generate a new snapshot on top of the parent
     const parent = this.layers.get(parentRoot);
     if (!parent) {
@@ -150,6 +154,7 @@ export class SnapTree {
     }
     const snap = parent.update(root, destructs, accounts, storage);
     this.layers.set(snap.root, snap);
+    console.log('SnapTree::update, add', snap.root.toString('hex'), 'size:', this.layers.size);
   }
 
   /**

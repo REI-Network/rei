@@ -182,9 +182,9 @@ export class Node {
       await this.clique.init();
       await this.bloomBitsIndexer.init();
       await this.bcMonitor.init(this.latestBlock.header);
+      await this.snapTree.init(this.latestBlock.header.stateRoot, false, true);
       await this.networkdb.open();
       await this.networkMngr.init();
-      await this.snapTree.init(this.latestBlock.header.stateRoot, false, true);
     })());
   }
 

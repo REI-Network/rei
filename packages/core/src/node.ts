@@ -182,9 +182,9 @@ export class Node {
       await this.clique.init();
       await this.bloomBitsIndexer.init();
       await this.bcMonitor.init(this.latestBlock.header);
+      await this.snapTree.init(this.latestBlock.header.stateRoot, false, true);
       await this.networkdb.open();
       await this.networkMngr.init();
-      await this.snapTree.init(this.latestBlock.header.stateRoot, false, true);
     })());
   }
 
@@ -330,13 +330,14 @@ export class Node {
    * Get state manager object by state root
    * @param root - State root
    * @param num - Block number or Common
+   * @param snap - Need snapshot or not
    * @returns State manager object
    */
-  async getStateManager(root: Buffer, num: BNLike | Common) {
+  async getStateManager(root: Buffer, num: BNLike | Common, snap: boolean = false) {
     const stateManager = new StateManager({
       common: num instanceof Common ? num : this.getCommon(num),
       trie: new Trie(this.chaindb),
-      snapTree: this.snapTree
+      snapTree: snap ? this.snapTree : undefined
     });
     await stateManager.setStateRoot(root);
     return stateManager;
@@ -346,10 +347,11 @@ export class Node {
    * Get a VM object by state root
    * @param root - The state root
    * @param num - Block number or Common
+   * @param snap - Need snapshot or not
    * @returns VM object
    */
-  async getVM(root: Buffer, num: BNLike | Common) {
-    const stateManager = await this.getStateManager(root, num);
+  async getVM(root: Buffer, num: BNLike | Common, snap: boolean = false) {
+    const stateManager = await this.getStateManager(root, num, snap);
     const common = stateManager._common;
     return new VM({
       common,

@@ -11,23 +11,26 @@ import { EMPTY_HASH, MAX_HASH } from '../../src/utils';
 import { TrieNodeIterator } from '../../src/snap/trieIterator';
 
 class MockNode {
-  snaptree: SnapTree;
+  snapTree: SnapTree;
   db: Database;
 
   constructor(db: Database) {
     this.db = db;
-    this.snaptree = new SnapTree(db);
+    this.snapTree = new SnapTree(db);
   }
 }
 
 class Mockpool {
   data: SnapProtocolHandler[] = [];
+
   add(handler: SnapProtocolHandler) {
     this.data.push(handler);
   }
+
   has(handler: SnapProtocolHandler) {
     return this.data.includes(handler);
   }
+
   remove(handler: SnapProtocolHandler) {
     this.data.splice(this.data.indexOf(handler), 1);
   }
@@ -76,12 +79,12 @@ let handler2: SnapProtocolHandler;
 const trieNodeKeys: Buffer[] = [];
 const trieNodeValues: Buffer[] = [];
 
-describe('snapProtocol', function () {
+describe('SnapProtocol', function () {
   before(async () => {
     const genRandResult = await genRandomAccounts(db, 10, 10);
     root = genRandResult.root;
     accounts = genRandResult.accounts.sort((a, b) => a.accountHash.compare(b.accountHash));
-    await node.snaptree.init(root, true, true);
+    await node.snapTree.init(root, true, true);
     const peer1 = new MockPeer();
     const peer2 = new MockPeer();
     handler1 = new SnapProtocolHandler(protocol1 as any, peer1 as any, 20000);

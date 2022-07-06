@@ -322,7 +322,7 @@ export class DiffLayer implements ISnapshot {
           }
           throw new Error('missing hash in account data');
         }
-        return StakingAccount.fromRlpSerializedAccount(serializedAccount);
+        return StakingAccount.fromRlpSerializedSlimAccount(serializedAccount);
       }
     );
   }

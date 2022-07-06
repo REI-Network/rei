@@ -251,7 +251,9 @@ export class SnapProtocolHandler implements ProtocolHandler {
           const codeResult = await this.node.db.rawdb.get(hashes[i], { keyEncoding: 'binary', valueEncoding: 'binary' });
           codes.push(codeResult);
           size += codeResult.length;
-        } catch (err) {}
+        } catch (err) {
+          // ignore errors...
+        }
       }
       if (size > responseLimit) {
         break;
@@ -309,7 +311,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
       }
       const hashes = response.accountData.map(([hash]) => hash);
       const accountValues = response.accountData.map(([, value]) => value);
-      const accounts = accountValues.map((value) => StakingAccount.fromRlpSerializedAccount(value));
+      const accounts = accountValues.map((value) => StakingAccount.fromRlpSerializedSlimAccount(value));
       const end = hashes.length > 0 ? hashes[hashes.length - 1] : null;
       const cont = await Trie.verifyRangeProof(root, req.origin, end, hashes, accountValues, response.proof);
       return { hashes, accounts, cont };

@@ -80,7 +80,7 @@ class MockPeer implements SnapSyncPeer {
         { gte: snapAccountKey(req.origin), lte: snapAccountKey(req.limit) },
         (key) => key.length !== SNAP_ACCOUNT_PREFIX.length + 32,
         (key) => key.slice(SNAP_ACCOUNT_PREFIX.length),
-        (val) => StakingAccount.fromRlpSerializedAccount(val)
+        (val) => StakingAccount.fromRlpSerializedSlimAccount(val)
       )) {
         if (hashes.length >= maxAccountSize) {
           cont = true;

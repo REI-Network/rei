@@ -171,7 +171,8 @@ export class SnapTree {
       throw new Error(`snapshot ${bufferToHex(root)} missing`);
     }
     if (!(snap instanceof DiffLayer)) {
-      throw new Error(`snapshot ${bufferToHex(root)} is disk layer`);
+      // throw new Error(`snapshot ${bufferToHex(root)} is disk layer`);
+      return;
     }
     // If the generator is still running, use a more aggressive cap
     if (snap.origin.genMarker !== undefined && layers > 8) {

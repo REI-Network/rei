@@ -17,13 +17,10 @@ const level = require('level-mem');
 const common = new Common({ chain: 'rei-devnet' });
 common.setHardforkByBlockNumber(0);
 const db = new Database(level(), common);
-const anotherDB = new Database(level(), common);
 let snaptree: SnapTree;
-let anothorSnaptree: SnapTree | undefined;
 let root: Buffer;
 let accounts: AccountInfo[];
 let diskLayer: DiskLayer;
-const count = 64;
 
 type LayerInfo = {
   layer: Snapshot;
@@ -81,7 +78,7 @@ async function getFirstLeafNode(root: Buffer) {
 
 describe('SnapshotTree', () => {
   before(async () => {
-    const rootAndAccounts = await genRandomAccounts(db, count, count);
+    const rootAndAccounts = await genRandomAccounts(db, 64, 64);
     root = rootAndAccounts.root;
     accounts = rootAndAccounts.accounts;
     diskLayer = new DiskLayer(db, root);
@@ -90,7 +87,7 @@ describe('SnapshotTree', () => {
     await snaptree.init(root, false, true);
     for (let i = 0; i < 6; i++) {
       const latest = layers[layers.length - 1];
-      const { root, accounts } = await modifyRandomAccounts(db, latest.layer.root, latest.accounts, count);
+      const { root, accounts } = await modifyRandomAccounts(db, latest.layer.root, latest.accounts, 64);
       const layerNow = accountsToDiffLayer(latest.layer, root, accounts);
       layers.push({
         layer: layerNow,
@@ -115,7 +112,7 @@ describe('SnapshotTree', () => {
 
   it('should update correctly', async () => {
     const latest = layers[layers.length - 1];
-    const { root, accounts } = await modifyRandomAccounts(db, latest.layer.root, latest.accounts, count);
+    const { root, accounts } = await modifyRandomAccounts(db, latest.layer.root, latest.accounts, 64);
     const layerNow = accountsToDiffLayer(latest.layer, root, accounts);
     layers.push({
       layer: layerNow,
@@ -290,17 +287,7 @@ describe('SnapshotTree', () => {
   });
 
   it('should disable correctly', async () => {
-    anothorSnaptree = new SnapTree(anotherDB);
-    await anothorSnaptree.init(root, false, true);
-    for (let i = 1; i < layers.length; i++) {
-      anothorSnaptree.update(layers[i].layer.root, layers[i - 1].layer.root, (layers[i].layer as DiffLayer).accountData, (layers[i].layer as DiffLayer).destructSet, (layers[i].layer as DiffLayer).storageData);
-    }
-    const snapsBefore = anothorSnaptree.snapShots(layers[layers.length - 1].layer.root, layers.length, false)!;
-    for (const snap of snapsBefore) {
-      expect(snap.stale === false, 'snap stale should be false').be.true;
-    }
-    await anothorSnaptree.disable();
-    const snapsAfter = anothorSnaptree.snapShots(layers[layers.length - 1].layer.root, layers.length, false);
-    expect(snapsAfter === undefined, 'all layers should be deleted').be.true;
+    await snaptree.disable();
+    expect(snaptree.layers.size, 'all layers should be deleted').be.equal(0);
   });
 });

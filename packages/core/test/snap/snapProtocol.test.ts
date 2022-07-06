@@ -48,20 +48,14 @@ class MockProctocol {
 }
 
 class MockPeer {
-  resHandler: SnapProtocolHandler | undefined = undefined;
+  remote!: SnapProtocolHandler;
 
   send(name: string, data: Buffer) {
-    if (this.resHandler) {
-      return this.resHandler.handle(data);
-    }
+    this.remote.handle(data);
   }
 
-  setHandler(handler: SnapProtocolHandler) {
-    this.resHandler = handler;
-  }
-
-  isSupport(protocol: string) {
-    return true;
+  setRemote(handler: SnapProtocolHandler) {
+    this.remote = handler;
   }
 }
 
@@ -89,8 +83,8 @@ describe('SnapProtocol', function () {
     const peer2 = new MockPeer();
     handler1 = new SnapProtocolHandler(protocol1 as any, peer1 as any, 20000);
     handler2 = new SnapProtocolHandler(protocol2 as any, peer2 as any, 20000);
-    peer1.setHandler(handler2);
-    peer2.setHandler(handler1);
+    peer1.setRemote(handler2);
+    peer2.setRemote(handler1);
     const trie = new BaseTrie(db.rawdb, root);
     const iterator = new TrieNodeIterator(trie);
     let i = 0;

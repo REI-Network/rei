@@ -170,7 +170,7 @@ export function accountsToDiffLayer(parent: Snapshot, root: Buffer, accounts: Ac
 
   for (const { address, account, storageData: _storageData } of accounts) {
     const accountHash = keccak256(address);
-    accountData.set(accountHash, account.serialize());
+    accountData.set(accountHash, account.slimSerialize());
     let storage = storageData.get(accountHash);
     if (!storage) {
       storage = new FunctionalBufferMap<Buffer>();

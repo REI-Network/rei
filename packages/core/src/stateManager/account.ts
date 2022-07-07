@@ -99,8 +99,8 @@ export class StakingAccount extends Account {
    */
   slimRaw(): Buffer[] {
     const rawBuffer = [bnToUnpaddedBuffer(this.nonce), bnToUnpaddedBuffer(this.balance)];
-    rawBuffer.push(this.stateRoot.equals(KECCAK256_RLP) ? Buffer.from([]) : this.stateRoot);
-    rawBuffer.push(this.codeHash.equals(KECCAK256_NULL) ? Buffer.from([]) : this.codeHash);
+    rawBuffer.push(this.stateRoot.equals(KECCAK256_RLP) ? Buffer.alloc(0) : this.stateRoot);
+    rawBuffer.push(this.codeHash.equals(KECCAK256_NULL) ? Buffer.alloc(0) : this.codeHash);
     if (this.stakeInfo && !this.stakeInfo.isEmpty()) {
       rawBuffer.push(this.stakeInfo.raw() as unknown as Buffer);
     }

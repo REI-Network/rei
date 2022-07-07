@@ -152,7 +152,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
       }
       this.send(new s.AccountRange(msg.reqID, accountData, proof));
     } catch (err) {
-      logger.error('SnapProtocolHandler::applyGetAccountRange', err);
+      logger.debug('SnapProtocolHandler::applyGetAccountRange', err);
     }
   }
 
@@ -223,7 +223,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
       }
       this.send(new s.StorageRange(msg.reqID, slots, proof));
     } catch (err) {
-      logger.error('SnapProtocolHandler::applyGetStorageRange', err);
+      logger.debug('SnapProtocolHandler::applyGetStorageRange', err);
     }
   }
 
@@ -307,11 +307,20 @@ export class SnapProtocolHandler implements ProtocolHandler {
       const accountValues = response.accountData.map(([, value]) => value);
       const accounts = accountValues.map((value) => StakingAccount.fromRlpSerializedSlimAccount(value));
       const end = hashes.length > 0 ? hashes[hashes.length - 1] : null;
-      const cont = await Trie.verifyRangeProof(root, req.origin, end, hashes, accountValues, response.proof);
+      const cont = await Trie.verifyRangeProof(
+        root,
+        req.origin,
+        end,
+        hashes,
+        accounts.map((accout) => accout.serialize()),
+        response.proof
+      );
       return { hashes, accounts, cont };
     } catch (err) {
       logger.warn('SnapProtocolHandler::getAccountRange', err);
       return null;
+    } finally {
+      this.protocol.pool.putBackIdlePeer('account', this);
     }
   }
 
@@ -353,6 +362,8 @@ export class SnapProtocolHandler implements ProtocolHandler {
     } catch (err) {
       logger.warn('SnapProtocolHandler::getStorageRange', err);
       return null;
+    } finally {
+      this.protocol.pool.putBackIdlePeer('storage', this);
     }
   }
 
@@ -386,6 +397,8 @@ export class SnapProtocolHandler implements ProtocolHandler {
     } catch (err) {
       logger.warn('SnapProtocolHandler::getByteCode', err);
       return null;
+    } finally {
+      this.protocol.pool.putBackIdlePeer('code', this);
     }
   }
 
@@ -419,6 +432,8 @@ export class SnapProtocolHandler implements ProtocolHandler {
     } catch (err) {
       logger.warn('SnapProtocolHandler::getTrieNode', err);
       return null;
+    } finally {
+      this.protocol.pool.putBackIdlePeer('trieNode', this);
     }
   }
 

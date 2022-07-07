@@ -5,6 +5,12 @@ import { Database } from '@rei-network/database';
 import { DBSaveBloomBitsSectionCount, DBDeleteBloomBitsSectionCount } from '@rei-network/database/dist/helpers';
 import { ChainIndexerBackend, ChainIndexerOptions } from './types';
 
+type IndexTask = {
+  header: BlockHeader;
+  force: boolean;
+  resolve?: () => void;
+};
+
 /**
  * ChainIndexer does a post-processing job for equally sized sections of the canonical chain
  * (like BlooomBits).
@@ -18,7 +24,7 @@ export class ChainIndexer {
   private readonly backend: ChainIndexerBackend;
   private readonly sectionSize: number;
   private readonly confirmsBlockNumber: number;
-  private readonly headerQueue: Channel<BlockHeader>;
+  private readonly headerQueue: Channel<IndexTask>;
 
   private storedSections?: BN;
   private processHeaderLoopPromise?: Promise<void>;
@@ -29,9 +35,12 @@ export class ChainIndexer {
     this.backend = options.backend;
     this.sectionSize = options.sectionSize;
     this.confirmsBlockNumber = options.confirmsBlockNumber;
-    this.headerQueue = new Channel<BlockHeader>({ max: 1 });
+    this.headerQueue = new Channel<IndexTask>({ max: 1, drop: ({ resolve }) => resolve && resolve() });
   }
 
+  /**
+   * Init ChainIndexer
+   */
   init() {
     if (this.initPromise) {
       return this.initPromise;
@@ -42,18 +51,35 @@ export class ChainIndexer {
     })());
   }
 
+  /**
+   * Start index loop
+   */
   start() {
     this.processHeaderLoopPromise = this.processHeaderLoop();
   }
 
+  /**
+   * Abort index loop
+   */
   async abort() {
     this.headerQueue.abort();
     await this.processHeaderLoopPromise;
   }
 
-  async newBlockHeader(header: BlockHeader) {
+  /**
+   * Add a new index task to queue
+   * @param header - New block header
+   * @param force - Force set header
+   */
+  async newBlockHeader(header: BlockHeader, force: boolean = false) {
     await this.initPromise;
-    this.headerQueue.push(header);
+    if (!force) {
+      this.headerQueue.push({ header, force });
+    } else {
+      await new Promise<void>((resolve) => {
+        this.headerQueue.push({ header, force, resolve });
+      });
+    }
   }
 
   /**
@@ -85,9 +111,9 @@ export class ChainIndexer {
   private async processHeaderLoop() {
     await this.initPromise;
     let preHeader: BlockHeader | undefined;
-    for await (const header of this.headerQueue) {
+    for await (const { header, force, resolve } of this.headerQueue) {
       try {
-        if (preHeader !== undefined && !header.parentHash.equals(preHeader.hash())) {
+        if (!force && preHeader !== undefined && !header.parentHash.equals(preHeader.hash())) {
           const ancestor = await this.findCommonAncestor(header, preHeader);
           await this.newHeader(ancestor.number, true);
         }
@@ -95,19 +121,22 @@ export class ChainIndexer {
         preHeader = header;
       } catch (err) {
         logger.error('ChainIndexer::processHeaderLoop, catch error:', err);
+      } finally {
+        resolve && resolve();
       }
     }
   }
 
   /**
    * NewHeader notifies the indexer about new chain heads and/or reorgs.
-   * @param number Block number of newheader
-   * @param reorg If a reorg happened, invalidate all sections until that point
+   * @param number - Block number of newheader
+   * @param reorg - If a reorg happened, invalidate all sections until that point
    */
   private async newHeader(number: BN, reorg: boolean) {
     let confirmedSections: BN | undefined = number.gtn(this.confirmsBlockNumber) ? number.subn(this.confirmsBlockNumber).divn(this.sectionSize) : new BN(0);
     confirmedSections = confirmedSections.gtn(0) ? confirmedSections.subn(1) : undefined;
 
+    // TODO: remove reorg logic
     if (reorg) {
       if (confirmedSections === undefined) {
         const batch = this.backend.prune(new BN(0));

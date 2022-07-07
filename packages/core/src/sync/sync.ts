@@ -9,7 +9,8 @@ import { FullSync } from './full';
 import { SnapSync } from './snap';
 import { SyncInfo } from './types';
 
-const snapSyncMinTD = 201600;
+const snapSyncMinConfirmed = 0; // TODO: debug
+const snapSyncMinTD = 100; // TODO: debug
 const waitingSyncDelay = 100;
 const randomPickInterval = 1000;
 
@@ -285,23 +286,32 @@ export class Synchronizer extends EventEmitter {
           }
 
           // if we have collected enough confirmations, start snap sync
-          if (confirmed >= 2) {
+          if (confirmed >= snapSyncMinConfirmed) {
             logger.debug('Synchronizer::syncLoop, confirmed succeed');
             const info: SyncInfo = {
               bestHeight: new BN(ann.handler.status!.height),
               bestTD: ann.td,
               remotePeerId: ann.handler.peer.peerId
             };
+            const root = data.block.header.stateRoot;
             const startingBlock = this.node.latestBlock.header.number.toNumber();
-            await this.snap.snapSync(data.block.header.stateRoot, startingBlock, info, async () => {
-              logger.debug('Synchronizer::syncLoop, snapSync onFinished');
-              // save block and receipts to database
-              await this.node.commitBlock({
-                ...data,
-                broadcast: false,
-                force: true,
-                td: ann.td
-              });
+            await this.snap.snapSync(root, startingBlock, info, async () => {
+              if (!this.aborted) {
+                logger.debug('Synchronizer::syncLoop, snapSync onFinished');
+                try {
+                  // rebuild local snap
+                  await this.node.snapTree.rebuild(root);
+                  // save block and receipts to database
+                  await this.node.commitBlock({
+                    ...data,
+                    broadcast: false,
+                    force: true,
+                    td: ann.td
+                  });
+                } catch (err) {
+                  logger.error('Synchronizer::syncLoop, commit failed:', err);
+                }
+              }
             });
           } else {
             logger.debug('Synchronizer::syncLoop, confirmed failed:', confirmed);

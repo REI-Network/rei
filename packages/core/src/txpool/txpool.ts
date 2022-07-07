@@ -249,36 +249,41 @@ export class TxPool extends EventEmitter {
    * This should be called when canonical chain changes
    * It will update pending and queued transactions for each account with new block
    * @param newBlock - New block
+   * @param force - Force set header
    */
-  async newBlock(newBlock: Block) {
+  async newBlock(newBlock: Block, force: boolean = false) {
     await this.initPromise;
     return await this.runWithLock(async () => {
       try {
-        const originalNewBlock = newBlock;
-        let oldBlock = await this.node.db.getBlockByHashAndNumber(this.currentHeader.hash(), this.currentHeader.number);
         let discarded: Transaction[] = [];
         const included = new FunctionalBufferSet();
-        while (oldBlock.header.number.gt(newBlock.header.number)) {
-          discarded = discarded.concat(oldBlock.transactions as Transaction[]);
-          oldBlock = await this.node.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
-        }
-        while (newBlock.header.number.gt(oldBlock.header.number)) {
-          for (const tx of newBlock.transactions) {
-            included.add(tx.hash());
+        const originalNewBlock = newBlock;
+
+        if (!force) {
+          let oldBlock = await this.node.db.getBlockByHashAndNumber(this.currentHeader.hash(), this.currentHeader.number);
+          while (oldBlock.header.number.gt(newBlock.header.number)) {
+            discarded = discarded.concat(oldBlock.transactions as Transaction[]);
+            oldBlock = await this.node.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
           }
-          newBlock = await this.node.db.getBlockByHashAndNumber(newBlock.header.parentHash, newBlock.header.number.subn(1));
-        }
-        while (!oldBlock.hash().equals(newBlock.hash()) && oldBlock.header.number.gtn(0) && newBlock.header.number.gtn(0)) {
-          discarded = discarded.concat(oldBlock.transactions as Transaction[]);
-          oldBlock = await this.node.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
-          for (const tx of newBlock.transactions) {
-            included.add(tx.hash());
+          while (newBlock.header.number.gt(oldBlock.header.number)) {
+            for (const tx of newBlock.transactions) {
+              included.add(tx.hash());
+            }
+            newBlock = await this.node.db.getBlockByHashAndNumber(newBlock.header.parentHash, newBlock.header.number.subn(1));
           }
-          newBlock = await this.node.db.getBlockByHashAndNumber(newBlock.header.parentHash, newBlock.header.number.subn(1));
+          while (!oldBlock.hash().equals(newBlock.hash()) && oldBlock.header.number.gtn(0) && newBlock.header.number.gtn(0)) {
+            discarded = discarded.concat(oldBlock.transactions as Transaction[]);
+            oldBlock = await this.node.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
+            for (const tx of newBlock.transactions) {
+              included.add(tx.hash());
+            }
+            newBlock = await this.node.db.getBlockByHashAndNumber(newBlock.header.parentHash, newBlock.header.number.subn(1));
+          }
+          if (!oldBlock.hash().equals(newBlock.hash())) {
+            throw new Error('reorg failed');
+          }
         }
-        if (!oldBlock.hash().equals(newBlock.hash())) {
-          throw new Error('reorg failed');
-        }
+
         let reinject: Transaction[] = [];
         for (const tx of discarded) {
           if (!included.has(tx.hash())) {

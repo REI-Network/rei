@@ -491,7 +491,7 @@ export class Node {
     await this.initPromise;
     for await (const { options, resolve, reject } of this.commitBlockQueue) {
       try {
-        const { block, broadcast } = options;
+        const { block, broadcast, force } = options;
         const { reorged } = await this.doCommitBlock(options);
 
         // if canonical chain changes, notify to other modules
@@ -500,7 +500,7 @@ export class Node {
             this.wire.broadcastNewBlock(block, this.totalDifficulty);
           }
 
-          const promises = [this.txPool.newBlock(block), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header), this.getEngine(block._common).newBlock(block)];
+          const promises = [this.txPool.newBlock(block, force), this.bcMonitor.newBlock(block, force), this.bloomBitsIndexer.newBlockHeader(block.header, force), this.getEngine(block._common).newBlock(block)];
           await Promise.all(promises);
         }
 

@@ -184,10 +184,15 @@ export class BlockSync {
         logger.info('Download headers start:', startNumber.toString(), 'count:', count.toString(), 'from:', handler.peer.peerId);
         const headers = await handler.getBlockHeaders(startNumber, count);
         parent = this.validateBackend.validateHeaders(parent, headers);
+        if (!count.eqn(headers.length)) {
+          throw new Error('useless');
+        }
         await onData(headers);
       } catch (err: any) {
         this._abort();
-        await this.backend.handlePeerError('BlockSync::downloadHeaders', handler.peer.peerId, err);
+        if (err.message !== 'useless') {
+          await this.backend.handlePeerError('BlockSync::downloadHeaders', handler.peer.peerId, err);
+        }
         return;
       }
 

@@ -1005,6 +1005,8 @@ export class SnapSync extends EventEmitter {
           // otherwise, it might just be a peer join event, do nothing
         }
 
+        console.log('once');
+
         await this.cleanStorageTasks();
         this.cleanAccountTasks();
         if (this.snapped && this.healer.scheduler.pending === 0) {

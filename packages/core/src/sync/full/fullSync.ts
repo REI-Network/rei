@@ -184,6 +184,11 @@ export class FullSync extends EventEmitter {
         return;
       }
 
+      // remote peer lost some headers, break
+      if (headers.length === 0) {
+        return;
+      }
+
       for (let i = headers.length - 1; i >= 0; i--) {
         try {
           const remoteHeader = headers[i];

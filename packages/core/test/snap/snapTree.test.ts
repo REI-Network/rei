@@ -96,12 +96,12 @@ describe('SnapshotTree', () => {
     for (let i = 0; i < 7; i++) {
       const latest = layers[layers.length - 1];
       const { root, accounts } = await modifyRandomAccounts(db, latest.layer.root, latest.accounts, 64);
-      const layerNow = accountsToDiffLayer(latest.layer, root, accounts);
+      const layer = accountsToDiffLayer(latest.layer, root, accounts);
       layers.push({
-        layer: layerNow,
+        layer: layer,
         accounts
       });
-      snaptree.update(root, latest.layer.root, layerNow.accountData, layerNow.destructSet, layerNow.storageData);
+      snaptree.update(root, latest.layer.root, layer.accountData, layer.destructSet, layer.storageData);
     }
 
     const rets = snaptree.snapShots(layers[layers.length - 1].layer.root, layers.length, true)!;
@@ -109,6 +109,16 @@ describe('SnapshotTree', () => {
     for (let i = 0; i < rets.length; i++) {
       expect(rets[i].root.equals(layers[layers.length - (i + 1)].layer.root), 'snapshot root should be equal').be.true;
     }
+  });
+
+  it('should discard correctly', async () => {
+    const latest = layers[layers.length - 2];
+    const { root, accounts } = await modifyRandomAccounts(db, latest.layer.root, latest.accounts, 64);
+    const layer = accountsToDiffLayer(latest.layer, root, accounts);
+    snaptree.update(root, latest.layer.root, layer.accountData, layer.destructSet, layer.storageData);
+    expect(snaptree.layers.size).be.equal(9);
+    snaptree.discard(layers[layers.length - 1].layer.root);
+    expect(snaptree.layers.size).be.equal(8);
   });
 
   it('should get diskroot correctly', async () => {

@@ -171,6 +171,24 @@ export class SnapTree {
   }
 
   /**
+   * Discard all layers except from the input diffLayer to diskLayer.
+   * @param root - DiffLayer root
+   */
+  discard(root: Buffer) {
+    const snaps = new Set<Snapshot>();
+    let snap: Snapshot | undefined = this.layers.get(root);
+    while (snap !== undefined) {
+      snaps.add(snap);
+      snap = snap.parent;
+    }
+    for (const [root, snap] of this.layers) {
+      if (!snaps.has(snap)) {
+        this.layers.delete(root);
+      }
+    }
+  }
+
+  /**
    * Cap traverses downwards the snapshot tree from a head block hash until the
    * number of allowed layers are crossed. All layers beyond the permitted number
    * are flattened downwards.
@@ -418,7 +436,7 @@ export class SnapTree {
     }
     const layer = this.layers.get(root);
     if (layer === undefined) {
-      throw new Error(`unknown snapshot,root: ${root}`);
+      throw new Error(`unknown snapshot,root: ${bufferToHex(root)}`);
     }
 
     return new FastSnapIterator(layer, (snap) => {
@@ -444,7 +462,7 @@ export class SnapTree {
     }
     const layer = this.layers.get(root);
     if (layer === undefined) {
-      throw new Error(`unknown snapshot,root: ${root}`);
+      throw new Error(`unknown snapshot,root: ${bufferToHex(root)}`);
     }
 
     return new FastSnapIterator(layer, (snap) => {

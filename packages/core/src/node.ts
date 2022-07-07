@@ -25,7 +25,7 @@ import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
 import { StateManager } from './stateManager';
 import { SnapTree } from './snap/snapTree';
 
-const maxSnapLayers = 64;
+const maxSnapLayers = 128;
 const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;
 const defaultChainName = 'rei-mainnet';
@@ -457,8 +457,9 @@ export class Node {
       reorged = await this.blockchain.putBlock(block, { receipts, saveTxLookup: true });
     }
 
-    // cap snap tree
+    // discard and cap snap tree
     try {
+      this.snapTree.discard(root);
       await this.snapTree.cap(root, maxSnapLayers);
     } catch (err) {
       logger.warn('Node::doCommitBlock, cap snap tree failed:', err);

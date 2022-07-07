@@ -314,6 +314,7 @@ export class SnapTree {
     const base = await diffToDisk(bottom);
     this.layers.set(base.root, base);
     diff.parent = base;
+    console.log('SnapTree::cap, root:', base.root.toString('hex'));
     return base;
   }
 

@@ -391,18 +391,22 @@ export class NetworkManager extends EventEmitter {
     this.libp2pNode.connectionManager.on('peer:disconnect', this.onDisconnect);
     await this.libp2pNode.start();
 
+    this.libp2pNode.discv5.discv5.on('enrAdded', this.onENRAdded);
+    this.libp2pNode.sessionService.on('message', this.onMessage);
+    this.libp2pNode.discv5.discv5.on('multiaddrUpdated', this.onMultiaddrUpdated);
+
     const enrs = await this.nodedb.querySeeds(seedCount, seedMaxAge);
     for (const enr of enrs) {
       this.libp2pNode.discv5.addEnr(enr);
     }
 
     this.checkNodes();
-    this.libp2pNode.sessionService.on('message', this.onMessage);
-    this.libp2pNode.discv5.discv5.on('enrAdded', this.onENRAdded);
-    this.libp2pNode.discv5.discv5.on('multiaddrUpdated', this.onMultiaddrUpdated);
-
     this.dialLoop();
     this.timeoutLoop();
+
+    // setInterval(async () => {
+    //   console.log(`localENr ${(await this.localEnr.peerId()).toB58String()} kbucket size :==>`, this.libp2pNode.discv5.discv5.connectedPeerCount);
+    // }, 5 * 1000);
   }
 
   // Listen to the pong message of the remote node
@@ -584,6 +588,18 @@ export class NetworkManager extends EventEmitter {
 
     // make sure we don't dial too often
     if (!this.checkOutbound(id)) {
+      return false;
+    }
+
+    for (const peer of this.peers) {
+      if (peer.peerId === id) {
+        console.log('Network::filterPeer, peerId:', id, 'is dialing');
+        return false;
+      }
+    }
+
+    if (this.dialing.has(id)) {
+      console.log('Network::filterPeer, peerId:', id, 'is dialing');
       return false;
     }
 

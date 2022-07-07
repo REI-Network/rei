@@ -81,19 +81,20 @@ async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; 
 }
 
 export async function autoStartNodes(amount: number, ip: string) {
-  let nodes: NetworkManager[] = [];
+  let nodes: Promise<NetworkManager>[] = [];
   let { udp, tcp } = await getPorts(defaultUdpPort, defaultTcpPort);
   const bootNode = await createNode({ ip, tcpPort: defaultTcpPort, udpPort: defaultUdpPort });
-  nodes.push(bootNode);
+  // nodes.push(bootNode);
   const bootEnr = await bootNode.localEnr.encodeTxt();
   for (let i = 1; i <= amount; i++) {
     const ports = await getPorts(udp + i, tcp + i);
-    nodes.push(await createNode({ ip, tcpPort: ports.tcp, udpPort: ports.udp, bootNodes: [bootEnr] }));
+    nodes.push(createNode({ ip, tcpPort: ports.tcp, udpPort: ports.udp, bootNodes: [bootEnr] }));
     udp = ports.udp;
     tcp = ports.tcp;
+    console.log('node', i, 'created');
   }
   console.log('auto start nodes success');
-  return nodes;
+  return [bootNode, ...(await Promise.all(nodes))];
 }
 
 export async function bootNode(ip) {

@@ -55,7 +55,7 @@ async function install(program) {
     const ip = program.ip;
     const port = program.server;
     if (ip && port) {
-      const nodes = await autoStartNodes(3, ip);
+      const nodes = await autoStartNodes(20, ip);
       startServer(nodes, port);
     }
   }

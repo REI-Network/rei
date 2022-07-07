@@ -162,7 +162,7 @@ describe('SnapProtocol', function () {
     const roots = accounts.map((account) => account.account.stateRoot);
     const storageHash = accounts.map((account) => Array.from(account.storageData.keys()));
     const stotageData = accounts.map((account) => Array.from(account.storageData.values()).map((value) => value.val));
-    const response = await handler2.getStorageRange(root, { origin: startHash, limit: limitHash, roots: roots, accounts: accountHashes });
+    const response = await handler2.getStorageRanges(root, { origin: startHash, limit: limitHash, roots: roots, accounts: accountHashes });
     expect(response !== null, 'response should not be null').be.true;
     expect(response!.slots.length, 'slots length should be equal').be.equal(stotageData.length);
     expect(response!.slots.length, 'slots length should equal hashes length').be.equal(response!.hashes.length);
@@ -182,7 +182,7 @@ describe('SnapProtocol', function () {
     const roots = accounts.map((account) => account.account.stateRoot);
     const storageHash = accounts.map((account) => Array.from(account.storageData.keys()));
     const stotageData = accounts.map((account) => Array.from(account.storageData.values()).map((value) => value.val));
-    const response = await handler2.getStorageRange(root, { origin: startHash, limit: limitHash, roots: roots, accounts: accountHashes });
+    const response = await handler2.getStorageRanges(root, { origin: startHash, limit: limitHash, roots: roots, accounts: accountHashes });
     expect(response !== null, 'response should not be null').be.true;
     expect(response!.slots.length, 'slots length should be equal').be.equal(1);
     expect(response!.slots.length, 'slots length should equal hashes length').be.equal(response!.hashes.length);
@@ -203,7 +203,7 @@ describe('SnapProtocol', function () {
     const roots = accounts.map((account) => account.account.stateRoot);
     const storageHash = accounts.map((account) => Array.from(account.storageData.keys()));
     const stotageData = accounts.map((account) => Array.from(account.storageData.values()).map((value) => value.val));
-    const response = await handler1.getStorageRange(root, { origin: startHash, limit: limitHash, roots: roots, accounts: accountHashes });
+    const response = await handler1.getStorageRanges(root, { origin: startHash, limit: limitHash, roots: roots, accounts: accountHashes });
     expect(response !== null, 'response should not be null').be.true;
     expect(response!.slots.length < stotageData.length, 'slots length should be less than request').be.true;
     expect(response!.slots.length, 'slots length should equal hashes length').be.equal(response!.hashes.length);
@@ -220,7 +220,7 @@ describe('SnapProtocol', function () {
   it('should getCodeBytes successfully', async () => {
     const codeHashes = accounts.map((account) => keccak256(account.code));
     const code = accounts.map((account) => account.code);
-    const response = await handler2.getByteCode(codeHashes);
+    const response = await handler2.getByteCodes(codeHashes);
     expect(response !== null, 'response should not be null').be.true;
     expect(response!.length, 'code length should be equal').be.equal(code.length);
     for (let i = 0; i < code.length; i++) {
@@ -231,7 +231,7 @@ describe('SnapProtocol', function () {
   it('should getCodeBytes successfully when responseLimit could not cover request', async () => {
     const codeHashes = accounts.map((account) => keccak256(account.code));
     const code = accounts.map((account) => account.code);
-    const response = await handler1.getByteCode(codeHashes);
+    const response = await handler1.getByteCodes(codeHashes);
     expect(response !== null, 'response should not be null').be.true;
     expect(response!.length, 'code length should equal').be.equal(code.length);
     for (let i = 0; i < code.length; i++) {
@@ -245,7 +245,7 @@ describe('SnapProtocol', function () {
     const code = accounts.map((account) => account.code);
     const deleteCount = 5;
     await db.rawdb.del(codeHashes[deleteCount], { keyEncoding: 'binary', valueEncoding: 'binary' });
-    const response = await handler2.getByteCode(codeHashes);
+    const response = await handler2.getByteCodes(codeHashes);
     expect(response !== null, 'response should not be null').be.true;
     expect(response!.length, 'code length should be equal').be.equal(code.length);
     for (let i = 0; i < code.length; i++) {
@@ -260,12 +260,12 @@ describe('SnapProtocol', function () {
   it('should getCodeByte unsuccessfully', async () => {
     const codeHashes = accounts.map((account) => keccak256(account.code));
     await db.rawdb.put(codeHashes[0], crypto.randomBytes(100), { keyEncoding: 'binary', valueEncoding: 'binary' });
-    const response = await handler1.getByteCode(codeHashes);
+    const response = await handler1.getByteCodes(codeHashes);
     expect(response, 'response should be null').be.equal(null);
   });
 
   it('should getTrieNode successfully', async () => {
-    const response = await handler2.getTrieNode(trieNodeKeys);
+    const response = await handler2.getTrieNodes(trieNodeKeys);
     expect(response !== null, 'response should not be null').be.true;
     expect(response!.length, 'trieNode length should be equal').be.equal(trieNodeValues.length);
     for (let i = 0; i < trieNodeValues.length; i++) {
@@ -274,7 +274,7 @@ describe('SnapProtocol', function () {
   });
 
   it('should getTrieNode successfully when responseLimit could not cover request', async () => {
-    const response = await handler2.getTrieNode(trieNodeKeys);
+    const response = await handler2.getTrieNodes(trieNodeKeys);
     expect(response !== null, 'response should not be null').be.true;
     expect(response!.length, 'trieNode length should be equal').be.equal(trieNodeValues.length);
     for (let i = 0; i < trieNodeValues.length; i++) {
@@ -286,7 +286,7 @@ describe('SnapProtocol', function () {
   it('should getTrieNode successfully when some node missing', async () => {
     const deleteCount = 5;
     await db.rawdb.del(trieNodeKeys[deleteCount], { keyEncoding: 'binary', valueEncoding: 'binary' });
-    const response = await handler2.getTrieNode(trieNodeKeys);
+    const response = await handler2.getTrieNodes(trieNodeKeys);
     expect(response !== null, 'response should not be null').be.true;
     expect(response!.length, 'trieNode length should be equal').be.equal(trieNodeValues.length);
     for (let i = 0; i < trieNodeValues.length; i++) {
@@ -300,7 +300,7 @@ describe('SnapProtocol', function () {
 
   it('should getTrieNode unsuccessfully', async () => {
     await db.rawdb.put(trieNodeKeys[0], crypto.randomBytes(100), { keyEncoding: 'binary', valueEncoding: 'binary' });
-    const response = await handler1.getTrieNode(trieNodeKeys);
+    const response = await handler1.getTrieNodes(trieNodeKeys);
     expect(response, 'response should be null').be.equal(null);
   });
 

@@ -321,7 +321,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
    * @param req - Request data
    * @returns StorageResponse data, if something went wrong, return null
    */
-  async getStorageRange(root: Buffer, req: StorageRequst): Promise<StorageResponse | null> {
+  async getStorageRanges(root: Buffer, req: StorageRequst): Promise<StorageResponse | null> {
     try {
       const msg = new s.GetStorageRange(this.generateReqID(), root, req.accounts, req.origin, req.limit, this.softResponseLimit);
       const response = await this.request(msg);
@@ -361,7 +361,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
    * @param hashes - Hashes of the bytecodes to request
    * @returns Codes, if something went wrong, return null
    */
-  async getByteCode(hashes: Buffer[]): Promise<(Buffer | undefined)[] | null> {
+  async getByteCodes(hashes: Buffer[]): Promise<(Buffer | undefined)[] | null> {
     try {
       const msg = new s.GetByteCode(this.generateReqID(), hashes, this.softResponseLimit);
       const response = await this.request(msg);
@@ -394,7 +394,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
    * @param hashes - Hashes of the trie nodes to request
    * @returns TrieNodes, if something went wrong, return null
    */
-  async getTrieNode(hashes: Buffer[]): Promise<(Buffer | undefined)[] | null> {
+  async getTrieNodes(hashes: Buffer[]): Promise<(Buffer | undefined)[] | null> {
     try {
       const msg = new s.GetTrieNode(this.generateReqID(), hashes, defaultSoftResponseLimit);
       const response = await this.request(msg);

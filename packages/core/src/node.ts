@@ -18,7 +18,7 @@ import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, ReceiptsCache } from './bloomBits';
 import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
-import { Wire, ConsensusProtocol, WireProtocolHandler } from './protocols';
+import { Wire, ConsensusProtocol, WireProtocolHandler, SnapProtocol } from './protocols';
 import { ReimintConsensusEngine, CliqueConsensusEngine } from './consensus';
 import { isEnableRemint } from './hardforks';
 import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
@@ -53,6 +53,7 @@ export class Node {
   readonly networkdb: LevelStore;
   readonly wire: Wire;
   readonly consensus: ConsensusProtocol;
+  readonly snap: SnapProtocol;
   readonly db: Database;
   readonly blockchain: Blockchain;
   readonly networkMngr: NetworkManager;
@@ -90,6 +91,7 @@ export class Node {
     this.networkdb = new LevelStore(path.join(this.datadir, 'networkdb'), { createIfMissing: true });
     this.wire = new Wire(this);
     this.consensus = new ConsensusProtocol(this);
+    this.snap = new SnapProtocol(this);
     this.accMngr = new AccountManager(options.account.keyStorePath);
     this.receiptsCache = new ReceiptsCache(options.receiptsCacheSize);
 
@@ -120,7 +122,7 @@ export class Node {
 
     this.networkMngr = new NetworkManager({
       ...options.network,
-      protocols: [[this.wire.v2, this.wire.v1], this.consensus],
+      protocols: [[this.wire.v2, this.wire.v1], this.consensus, this.snap],
       datastore: this.networkdb,
       nodedb: this.nodedb,
       bootnodes: [...common.bootstrapNodes(), ...(options.network.bootnodes ?? [])]

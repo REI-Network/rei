@@ -133,9 +133,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
     let last: Buffer | undefined = undefined;
 
     try {
-      const fastIter = this.node.snapTree.accountIterator(msg.rootHash, msg.startHash);
-      await fastIter.init();
-      for await (const { hash, value } of fastIter) {
+      for await (const { hash, value } of this.node.snapTree.accountIterator(msg.rootHash, msg.startHash)) {
         last = hash;
         const slimSerializedValue = value.slimSerialize();
         size += hash.length + slimSerializedValue.length;
@@ -147,7 +145,6 @@ export class SnapProtocolHandler implements ProtocolHandler {
           break;
         }
       }
-      await fastIter.abort();
       const accTrie = new Trie(this.node.db.rawdb, msg.rootHash);
       proof = await Trie.createProof(accTrie, msg.startHash);
       if (last) {
@@ -194,9 +191,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
         let last: Buffer | undefined = undefined;
         let abort = false;
 
-        const fastIter = this.node.snapTree.storageIterator(msg.rootHash, msg.accountHashes[i], origin);
-        await fastIter.init();
-        for await (const { hash, value } of fastIter) {
+        for await (const { hash, value } of this.node.snapTree.storageIterator(msg.rootHash, msg.accountHashes[i], origin)) {
           if (size > hardLimit) {
             abort = true;
             break;
@@ -208,7 +203,6 @@ export class SnapProtocolHandler implements ProtocolHandler {
             break;
           }
         }
-        await fastIter.abort();
         if (storage.length > 0) {
           slots.push(storage);
         }

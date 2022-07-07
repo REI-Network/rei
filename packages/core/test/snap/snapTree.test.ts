@@ -134,9 +134,7 @@ describe('SnapshotTree', () => {
   it('should generate accountIterator correctly', async () => {
     for (const { layer, accounts } of layers) {
       const _accounts = [...accounts];
-      const fastIter = snaptree.accountIterator(layer.root, EMPTY_HASH);
-      await fastIter.init();
-      for await (const { hash, value } of fastIter) {
+      for await (const { hash, value } of snaptree.accountIterator(layer.root, EMPTY_HASH)) {
         const index = _accounts.findIndex(({ address }) => keccak256(address).equals(hash));
         expect(index !== -1, 'account should exist in account list').be.true;
         const _account = value;
@@ -144,7 +142,6 @@ describe('SnapshotTree', () => {
         expect(_accounts[index].account.serialize().equals(_account.serialize()), 'accout should be equal').be.true;
         _accounts.splice(index, 1);
       }
-      await fastIter.abort();
       expect(_accounts.length, 'account list should be empty').be.equal(0);
     }
   });
@@ -159,15 +156,12 @@ describe('SnapshotTree', () => {
         }
 
         const accountHash = keccak256(address);
-        const fastiter = snaptree.storageIterator(layer.root, accountHash, EMPTY_HASH);
-        await fastiter.init();
         let totalCount = 0;
-        for await (const { hash, value } of fastiter) {
+        for await (const { hash, value } of snaptree.storageIterator(layer.root, accountHash, EMPTY_HASH)) {
           const expectStorageData = await layer.getStorage(accountHash, hash);
           expect(expectStorageData.equals(value), 'storage data should be equal').be.true;
           totalCount++;
         }
-        await fastiter.abort();
         expect(totalCount, 'total count should be equal').be.equal(layers[0].accounts[0].storageData.size);
       }
     }

@@ -43,11 +43,11 @@ export class SnapTree {
     const doRebuild = async () => {
       const generating = (await this.rebuild(root)).generating;
       if (!async) {
-        logger.info(`📷 Start generating snapshot, root: ${bufferToHex(root)}, this may take a while...`);
+        logger.info('📷 Start generating snapshot, this may take a while...');
         await generating;
         logger.info('📷 Generate snapshot finished');
       }
-      logger.info('📷  Load snapshot, root:', bufferToHex(root));
+      logger.info('📷 Load snapshot, root:', bufferToHex(root));
     };
 
     // TODO: recovery?

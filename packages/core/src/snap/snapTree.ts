@@ -64,7 +64,7 @@ export class SnapTree {
           this.layers.set(head.root, head);
           head = head.parent;
         }
-        logger.info('📷  Load snapshot, root:', bufferToHex(root));
+        logger.info('📷 Load snapshot, root:', bufferToHex(root));
       }
     } catch (err) {
       logger.warn('SnapTree::init, failed to load snapshot');

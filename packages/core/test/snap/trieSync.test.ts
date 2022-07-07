@@ -79,7 +79,6 @@ describe('TrieSync', () => {
       const batch = new BinaryRawDBatch(backend as any);
       sync.commit(batch);
       await batch.write();
-      batch.reset();
     }
 
     for (const { address, code, account, storageData } of accounts) {

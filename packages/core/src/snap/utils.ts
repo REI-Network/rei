@@ -1,6 +1,6 @@
 import { keccak256 } from 'ethereumjs-util';
 import { FunctionalBufferSet } from '@rei-network/utils';
-import { Database, DBOp } from '@rei-network/database';
+import { DBOp } from '@rei-network/database';
 import { DBatch } from '../utils';
 import { SnapIterator } from './types';
 
@@ -90,14 +90,13 @@ export function mergeProof(proof1: Buffer[], proof2: Buffer[]) {
 
 /**
  * wipeKeyRange will delete all values between `origin` and `limit`
- * @param db - Database object
+ * @param batch - Database batch
  * @param origin - Origin
  * @param limit - Limit
  * @param genItrator - A function that generates an iterator
  * @param genDBOp - A function that generates an operator for each value
  */
-export async function wipeKeyRange<T>(db: Database, origin: Buffer, limit: Buffer, genItrator: (origin: Buffer, limit: Buffer) => SnapIterator<T>, genDBOp: (hash: Buffer) => DBOp) {
-  const batch = new DBatch(db);
+export async function wipeKeyRange<T>(batch: DBatch, origin: Buffer, limit: Buffer, genItrator: (origin: Buffer, limit: Buffer) => SnapIterator<T>, genDBOp: (hash: Buffer) => DBOp) {
   while (true) {
     let _continue = false;
     for await (const { hash } of genItrator(origin, limit)) {
@@ -109,11 +108,6 @@ export async function wipeKeyRange<T>(db: Database, origin: Buffer, limit: Buffe
         _continue = true;
         break;
       }
-    }
-
-    if (batch.length > 0) {
-      await batch.write();
-      batch.reset();
     }
 
     if (!_continue) {

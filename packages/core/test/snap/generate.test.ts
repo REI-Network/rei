@@ -72,7 +72,6 @@ describe('GenerateSnapshot', () => {
     expect(storage.toNumber()).be.equal(200 * (1 + 32 + 70) + 200 * 10 * (1 + 32 + 32 + 32));
 
     await batch.write();
-    batch.reset();
   });
 
   it('should abort succeed', async () => {

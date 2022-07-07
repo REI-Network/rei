@@ -99,7 +99,6 @@ export class SnapTree {
     batch.push(DBDeleteSnapGenerator());
     batch.push(DBDeleteSnapRecoveryNumber());
     await batch.write();
-    batch.reset();
   }
 
   /**
@@ -330,7 +329,6 @@ export class SnapTree {
     batch.push(DBDeleteSnapRecoveryNumber());
     batch.push(DBDeleteSnapDisabled());
     await batch.write();
-    batch.reset();
 
     // Iterate over and mark all layers stale
     for (const [, layer] of this.layers) {
@@ -373,7 +371,6 @@ export class SnapTree {
     // Store the journal into the database and return
     batch.push(DBSaveSnapJournal(rlp.encode(journal)));
     await batch.write();
-    batch.reset();
     return base;
   }
 
@@ -558,7 +555,7 @@ async function diffToDisk(bottom: DiffLayer): Promise<DiskLayer> {
     batch.push(DBDeleteSnapAccount(accountHash));
 
     await wipeKeyRange(
-      base.db,
+      batch,
       EMPTY_HASH,
       MAX_HASH,
       (origin, limit) =>
@@ -571,6 +568,10 @@ async function diffToDisk(bottom: DiffLayer): Promise<DiskLayer> {
         ),
       (hash: Buffer) => DBDeleteSnapStorage(accountHash, hash)
     );
+
+    if (batch.length > idealBatchSize) {
+      await batch.write();
+    }
   }
 
   // Push all updated accounts into the database
@@ -582,7 +583,6 @@ async function diffToDisk(bottom: DiffLayer): Promise<DiskLayer> {
 
     if (batch.length > idealBatchSize) {
       await batch.write();
-      batch.reset();
     }
   }
 
@@ -603,6 +603,10 @@ async function diffToDisk(bottom: DiffLayer): Promise<DiskLayer> {
         batch.push(DBDeleteSnapStorage(accountHash, storageHash));
       }
     }
+
+    if (batch.length > idealBatchSize) {
+      await batch.write();
+    }
   }
   batch.push(DBSaveSnapRoot(bottom.root));
 
@@ -610,7 +614,6 @@ async function diffToDisk(bottom: DiffLayer): Promise<DiskLayer> {
   journalProgress(batch, base.genMarker, stats as undefined | GeneratorStats);
 
   await batch.write();
-  batch.reset();
   const res = new DiskLayer(base.db, bottom.root);
   if (base.genMarker !== undefined) {
     res.genMarker = base.genMarker;
@@ -636,7 +639,6 @@ async function generateSnapshot(db: Database, root: Buffer) {
   batch.push(DBSaveSnapRoot(root));
   journalProgress(batch, genMarker, stats);
   await batch.write();
-  batch.reset();
   const base = new DiskLayer(db, root);
   base.genMarker = genMarker;
   const generating = base.generate(stats);

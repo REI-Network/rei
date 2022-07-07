@@ -161,7 +161,6 @@ export class DiskLayer implements ISnapshot {
     journalProgress(batch, this.genMarker, stats as undefined | GeneratorStats);
 
     await batch.write();
-    batch.reset;
 
     return this.root;
   }
@@ -372,7 +371,6 @@ export class DiskLayer implements ISnapshot {
         journalProgress(batch, currentLocation, stats);
 
         await batch.write();
-        batch.reset();
 
         this.genMarker = currentLocation;
       }
@@ -383,7 +381,7 @@ export class DiskLayer implements ISnapshot {
     // delete all slots for account
     const deleteAllSlotsForAccount = (accountHash: Buffer) => {
       return wipeKeyRange(
-        this.db,
+        batch,
         EMPTY_HASH,
         MAX_HASH,
         (origin, limit) =>
@@ -505,7 +503,6 @@ export class DiskLayer implements ISnapshot {
       const { exhausted, last } = await this.generateRange(this.root, SNAP_ACCOUNT_PREFIX, accOrigin, accountRange, onAccount, (value) => value);
       if (aborter.isAborted) {
         await batch.write();
-        batch.reset();
 
         aborter.abortFinished(stats);
 
@@ -529,7 +526,6 @@ export class DiskLayer implements ISnapshot {
     journalProgress(batch, undefined, stats);
 
     await batch.write();
-    batch.reset();
 
     this.genMarker = undefined;
 

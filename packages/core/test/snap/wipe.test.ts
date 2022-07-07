@@ -3,7 +3,7 @@ import { expect } from 'chai';
 import { Database } from '@rei-network/database';
 import { Common } from '@rei-network/common';
 import { wipeKeyRange } from '../../src/snap/utils';
-import { EMPTY_HASH, MAX_HASH } from '../../src/utils';
+import { DBatch, EMPTY_HASH, MAX_HASH } from '../../src/utils';
 import { asyncTraverseRawDB } from '../../src/snap';
 const level = require('level-mem');
 
@@ -37,8 +37,9 @@ describe('WipeKeyRange', () => {
 
   async function wipe(prefix: Buffer) {
     let deleted = 0;
+    const batch = new DBatch(db);
     await wipeKeyRange(
-      db,
+      batch,
       EMPTY_HASH,
       MAX_HASH,
       (origin, limit) =>
@@ -61,6 +62,7 @@ describe('WipeKeyRange', () => {
         return op as any;
       }
     );
+    await batch.write();
     return deleted;
   }
 

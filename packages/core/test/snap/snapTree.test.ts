@@ -65,7 +65,6 @@ async function operateSnap(dbop: any) {
   const batch = new DBatch(snaptree.diskdb);
   batch.push(dbop);
   await batch.write();
-  batch.reset();
 }
 
 async function getFirstLeafNode(root: Buffer) {

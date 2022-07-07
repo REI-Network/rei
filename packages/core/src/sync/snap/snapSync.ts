@@ -655,7 +655,6 @@ export class SnapSync extends EventEmitter {
         batch.push(DBSaveSnapStorage(account, res.hashes[i][j], res.slots[i][j]));
       }
       await batch.write();
-      batch.reset();
     }
 
     // if the larget state task is done, commit it
@@ -747,7 +746,6 @@ export class SnapSync extends EventEmitter {
     }
 
     await batch.write();
-    batch.reset();
 
     if (task.pending === 0) {
       await this.forwardAccoutTask(task);
@@ -837,7 +835,6 @@ export class SnapSync extends EventEmitter {
     const batch = new BinaryRawDBatch(this.db.rawdb);
     this.healer.scheduler.commit(batch);
     await batch.write();
-    batch.reset();
   }
 
   /**
@@ -906,7 +903,6 @@ export class SnapSync extends EventEmitter {
     const batch = new BinaryRawDBatch(this.db.rawdb);
     this.healer.scheduler.commit(batch);
     await batch.write();
-    batch.reset();
   }
 
   /**
@@ -941,7 +937,6 @@ export class SnapSync extends EventEmitter {
     }
 
     await batch.write();
-    batch.reset();
 
     for (let i = 0; i < res.hashes.length; i++) {
       if (task.needCode[i] || task.needState[i]) {

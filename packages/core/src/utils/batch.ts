@@ -17,12 +17,16 @@ export class DBatch {
     this.batch.push(op);
   }
 
-  write() {
-    return this.length > 0 ? this.db.batch(this.batch) : Promise.resolve();
-  }
-
-  reset() {
-    this.batch = [];
+  async write(reset: boolean = true) {
+    try {
+      if (this.length > 0) {
+        await this.db.batch(this.batch);
+      }
+    } finally {
+      if (reset) {
+        this.batch = [];
+      }
+    }
   }
 }
 
@@ -46,11 +50,15 @@ export class BinaryRawDBatch {
     });
   }
 
-  write() {
-    return this.length > 0 ? this.db.batch(this.batch as any) : Promise.resolve();
-  }
-
-  reset() {
-    this.batch = [];
+  async write(reset: boolean = true) {
+    try {
+      if (this.length > 0) {
+        await this.db.batch(this.batch as any);
+      }
+    } finally {
+      if (reset) {
+        this.batch = [];
+      }
+    }
   }
 }

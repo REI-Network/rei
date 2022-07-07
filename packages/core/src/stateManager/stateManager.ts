@@ -551,6 +551,7 @@ export class StateManager {
         const parent = this._snap.root;
         if (!parent.equals(this._trie.root)) {
           try {
+            console.log('StateManager::commit, root:', this._trie.root.toString('hex'), 'parent:', parent.toString('hex'));
             await this._snapTree.update(this._trie.root, parent, this._snapAccounts!, this._snapDestructs!, this._snapStorage!);
             // We will cap the snapTree when committing blocks
             // await this._snapsTree.cap(this._trie.root, 128);

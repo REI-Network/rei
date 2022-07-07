@@ -1,4 +1,4 @@
-import { rlp, bufferToInt, toBuffer, BN } from 'ethereumjs-util';
+import { rlp, bufferToInt, toBuffer, BN, bufferToHex } from 'ethereumjs-util';
 import { Database, DBSaveSnapGenerator } from '@rei-network/database';
 import { FunctionalBufferMap, FunctionalBufferSet, logger } from '@rei-network/utils';
 import { EMPTY_HASH, DBatch } from '../utils';
@@ -290,7 +290,7 @@ export async function loadSnapshot(db: Database, root: Buffer, recovery: boolean
     if (!recovery) {
       throw new Error('unmatched root');
     }
-    logger.warn('Snapshot is not continuous with chain');
+    logger.warn('Snapshot is not continuous with chain, snap:', bufferToHex(snapshot.root), 'blockchain:', bufferToHex(root));
   }
 
   if (!generator.done) {

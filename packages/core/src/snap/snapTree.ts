@@ -40,23 +40,36 @@ export class SnapTree {
    * @param rebuild - Rebuild or not
    */
   async init(root: Buffer, async: boolean, rebuild: boolean) {
+    const doRebuild = async () => {
+      const generating = (await this.rebuild(root)).generating;
+      if (!async) {
+        logger.info(`📷 Start generating snapshot, root: ${bufferToHex(root)}, this may take a while...`);
+        await generating;
+        logger.info('📷 Generate snapshot finished');
+      }
+      logger.info('📷  Load snapshot, root:', bufferToHex(root));
+    };
+
     // TODO: recovery?
     try {
       let head: Snapshot | undefined = await loadSnapshot(this.diskdb, root, true);
       // TODO: check disable?
-      while (head !== undefined) {
-        this.layers.set(head.root, head);
-        head = head.parent;
+      if (head && !head.root.equals(root)) {
+        // Root mismatch, rebuild
+        if (rebuild) {
+          await doRebuild();
+        }
+      } else {
+        while (head !== undefined) {
+          this.layers.set(head.root, head);
+          head = head.parent;
+        }
+        logger.info('📷  Load snapshot, root:', bufferToHex(root));
       }
     } catch (err) {
+      logger.warn('SnapTree::init, failed to load snapshot');
       if (rebuild) {
-        logger.warn('SnapTree::init, failed to load snapshot');
-        const generating = (await this.rebuild(root)).generating;
-        if (!async) {
-          logger.info('📷 Start generating snapshot, this may take a while...');
-          await generating;
-          logger.info('📷 Generate snapshot finished');
-        }
+        await doRebuild();
       } else {
         throw err;
       }
@@ -171,6 +184,7 @@ export class SnapTree {
       throw new Error(`snapshot ${bufferToHex(root)} missing`);
     }
     if (!(snap instanceof DiffLayer)) {
+      // ignore
       // throw new Error(`snapshot ${bufferToHex(root)} is disk layer`);
       return;
     }

@@ -242,7 +242,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
         codes.push(Buffer.alloc(0));
       } else {
         try {
-          const codeResult = await this.node.db.rawdb.get(hashes[i], { keyEncoding: 'binary', valueEncoding: 'binary' });
+          const codeResult = await this.node.db.getCode(hashes[i]);
           codes.push(codeResult);
           size += codeResult.length;
         } catch (err) {
@@ -268,7 +268,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
     let size = 0;
     for (let i = 0; i < hashes.length; i++) {
       try {
-        const node = await this.node.db.rawdb.get(hashes[i], { keyEncoding: 'binary', valueEncoding: 'binary' });
+        const node = await this.node.db.getTrieNode(hashes[i]);
         nodes.push(node);
         size += node.length;
       } catch (err) {

@@ -467,18 +467,18 @@ export class DBManager {
   }
 
   /**
-   *
+   * Get snapshot recovery number
    */
-  async getSnapRecoveryNumber(): Promise<BN | null> {
-    try {
-      return new BN((await this.get(DBTarget.SnapRecovery)).readBigUint64BE().toString());
-    } catch (err: any) {
-      if (err.type === 'NotFoundError') {
-        return null;
-      }
-      throw err;
-    }
-  }
+  // async getSnapRecoveryNumber(): Promise<BN | null> {
+  //   try {
+  //     return new BN((await this.get(DBTarget.SnapRecovery)).readBigUint64BE().toString());
+  //   } catch (err: any) {
+  //     if (err.type === 'NotFoundError') {
+  //       return null;
+  //     }
+  //     throw err;
+  //   }
+  // }
 
   /**
    * Get snapshot sync progress
@@ -492,6 +492,22 @@ export class DBManager {
       }
       throw err;
     }
+  }
+
+  /**
+   * Get contract code by hash
+   * @param codeHash - Code hash
+   */
+  getCode(codeHash: Buffer): Promise<Buffer> {
+    return this._db.get(codeHash, { keyEncoding: 'binary', valueEncoding: 'binary' });
+  }
+
+  /**
+   * Get trie node by hash
+   * @param hash - Node hash
+   */
+  getTrieNode(hash: Buffer): Promise<Buffer> {
+    return this._db.get(hash, { keyEncoding: 'binary', valueEncoding: 'binary' });
   }
 
   /**

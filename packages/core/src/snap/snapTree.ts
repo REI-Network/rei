@@ -512,10 +512,10 @@ export class SnapTree {
       const { nodeHashes, codeHashes } = trieSync.missing(10);
       try {
         for (const hash of nodeHashes) {
-          await trieSync.process(hash, await this.diskdb.rawdb.get(hash, { keyEncoding: 'binary', valueEncoding: 'binary' }));
+          await trieSync.process(hash, await this.diskdb.getTrieNode(hash));
         }
         for (const hash of codeHashes) {
-          await trieSync.process(hash, await this.diskdb.rawdb.get(hash, { keyEncoding: 'binary', valueEncoding: 'binary' }));
+          await trieSync.process(hash, await this.diskdb.getCode(hash));
         }
       } catch (error) {
         return false;

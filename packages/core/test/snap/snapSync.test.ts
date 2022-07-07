@@ -142,13 +142,13 @@ class MockPeer implements SnapSyncPeer {
 
   getByteCodes(hashes: Buffer[]): Promise<Buffer[] | null> {
     return this.runWithLock('code', () => {
-      return Promise.all(hashes.map((hash) => this.db.rawdb.get(hash, { keyEncoding: 'binary', valueEncoding: 'binary' })));
+      return Promise.all(hashes.map((hash) => this.db.getCode(hash)));
     });
   }
 
   getTrieNodes(hashes: Buffer[]) {
     return this.runWithLock('trieNode', () => {
-      return Promise.all(hashes.map((hash) => this.db.rawdb.get(hash, { keyEncoding: 'binary', valueEncoding: 'binary' })));
+      return Promise.all(hashes.map((hash) => this.db.getTrieNode(hash)));
     });
   }
 }
@@ -205,8 +205,8 @@ describe('SnapSync', () => {
       const dstSnapAccount = await dstDB.getSerializedSnapAccount(info.accountHash);
       expect(srcSnapAccount.equals(dstSnapAccount), 'account should be equal').be.true;
 
-      const srcCode = await srcDB.rawdb.get(info.account.codeHash, { keyEncoding: 'binary', valueEncoding: 'binary' });
-      const dstCode = await dstDB.rawdb.get(info.account.codeHash, { keyEncoding: 'binary', valueEncoding: 'binary' });
+      const srcCode = await srcDB.getCode(info.account.codeHash);
+      const dstCode = await dstDB.getCode(info.account.codeHash);
       expect(srcCode.equals(dstCode), 'code should be equal').be.true;
 
       for (const [storageHash, { val }] of info.storageData.entries()) {

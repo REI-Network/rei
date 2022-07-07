@@ -423,7 +423,7 @@ export class DiskLayer implements ISnapshot {
           }
         } else {
           // write the account
-          const data = account.serialize(); // TODO
+          const data = account.slimSerialize();
           dataLen = data.length;
           batch.push(DBSaveSerializedSnapAccount(accountHash, data));
         }

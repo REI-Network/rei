@@ -40,6 +40,30 @@ export type GenRandomAccountsResult = {
 };
 
 /**
+ * Add some empty accounts into GenRandomAccountsResult and save them to the database
+ * @param db - database
+ * @param _emptyAccounts - empty accounts number
+ * @param rawData
+ * @param saveSnap - save the snapshot to the database or not
+ * @returns
+ */
+export async function addEmptyAccounts(db: Database, _emptyAccounts: number, rawData: GenRandomAccountsResult, saveSnap = true): Promise<GenRandomAccountsResult> {
+  const stateTrie = new Trie(db.rawdb, rawData.root);
+  for (let i = 0; i < _emptyAccounts; i++) {
+    const address = crypto.randomBytes(20);
+    const accountHash = keccak256(address);
+    const account = new StakingAccount(new BN(1), new BN(1));
+    if (saveSnap) {
+      await db.batch([DBSaveSerializedSnapAccount(accountHash, account.slimSerialize())]);
+    }
+    await stateTrie.put(address, account.serialize());
+    rawData.accounts.push(new AccountInfo(address, Buffer.alloc(0), accountHash, account, new FunctionalBufferMap<{ key: Buffer; val: Buffer }>(), Buffer.alloc(0)));
+  }
+  rawData.root = stateTrie.root;
+  return rawData;
+}
+
+/**
  * Randomly generate several accounts and 10 random storage data for each account
  * @param db
  * @param _accounts

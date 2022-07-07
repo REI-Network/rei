@@ -4,7 +4,7 @@ import { keccak256 } from 'ethereumjs-util';
 import { BaseTrie } from 'merkle-patricia-tree';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
-import { AccountInfo, genRandomAccounts } from './util';
+import { AccountInfo, genRandomAccounts, addEmptyAccounts } from './util';
 import { SnapTree } from '../../src/snap/snapTree';
 import { SnapProtocolHandler } from '../../src/protocols/snap';
 import { EMPTY_HASH, MAX_HASH } from '../../src/utils';
@@ -68,6 +68,7 @@ const protocol1 = new MockProctocol('snap protocol', node);
 const protocol2 = new MockProctocol('snap protocol', node);
 let root: Buffer;
 let accounts: AccountInfo[];
+let sortAccounts: AccountInfo[];
 let handler1: SnapProtocolHandler;
 let handler2: SnapProtocolHandler;
 const trieNodeKeys: Buffer[] = [];
@@ -75,9 +76,11 @@ const trieNodeValues: Buffer[] = [];
 
 describe('SnapProtocol', function () {
   before(async () => {
-    const genRandResult = await genRandomAccounts(db, 10, 10);
+    const result = await genRandomAccounts(db, 10, 10);
+    const genRandResult = await addEmptyAccounts(db, 2, result);
     root = genRandResult.root;
-    accounts = genRandResult.accounts.sort((a, b) => a.accountHash.compare(b.accountHash));
+    accounts = genRandResult.accounts;
+    sortAccounts = genRandResult.accounts.sort((a, b) => a.accountHash.compare(b.accountHash));
     await node.snapTree.init(root, false, true);
     const peer1 = new MockPeer();
     const peer2 = new MockPeer();
@@ -109,9 +112,9 @@ describe('SnapProtocol', function () {
   });
 
   it('should getAccountRange successfully and continue is false', async () => {
-    const startHash = accounts[0].accountHash;
-    const limitHash = accounts[accounts.length - 1].accountHash;
-    const accountData = accounts.map((account) => [account.accountHash, account.account.slimSerialize()]);
+    const startHash = sortAccounts[0].accountHash;
+    const limitHash = sortAccounts[sortAccounts.length - 1].accountHash;
+    const accountData = sortAccounts.map((account) => [account.accountHash, account.account.slimSerialize()]);
     const response = await handler2.getAccountRange(root, { origin: startHash, limit: limitHash });
     expect(response !== null, 'response should not be null').be.true;
     expect(response!.accounts.length, 'accounts length should be equal').be.equal(response!.hashes.length);
@@ -124,9 +127,9 @@ describe('SnapProtocol', function () {
   });
 
   it('should getAccountRange successfully and continue is true', async () => {
-    const startHash = accounts[0].accountHash;
-    const limitHash = accounts[accounts.length - 2].accountHash;
-    const accountData = accounts.slice(0, accounts.length - 1).map((account) => [account.accountHash, account.account.slimSerialize()]);
+    const startHash = sortAccounts[0].accountHash;
+    const limitHash = sortAccounts[sortAccounts.length - 2].accountHash;
+    const accountData = sortAccounts.slice(0, sortAccounts.length - 1).map((account) => [account.accountHash, account.account.slimSerialize()]);
     const response = await handler2.getAccountRange(root, { origin: startHash, limit: limitHash });
     expect(response !== null, 'response should not be null').be.true;
     expect(response!.accounts.length, 'accounts length should be equal').be.equal(response!.hashes.length);
@@ -140,9 +143,9 @@ describe('SnapProtocol', function () {
 
   it('should getAccountRange successfully and continue is true when the responseLimit could not cover request accounts', async () => {
     handler2.resetSoftResponseLimit(500);
-    const startHash = accounts[0].accountHash;
-    const limitHash = accounts[accounts.length - 1].accountHash;
-    const accountData = accounts.map((account) => [account.accountHash, account.account.slimSerialize()]);
+    const startHash = sortAccounts[0].accountHash;
+    const limitHash = sortAccounts[sortAccounts.length - 1].accountHash;
+    const accountData = sortAccounts.map((account) => [account.accountHash, account.account.slimSerialize()]);
     const response = await handler1.getAccountRange(root, { origin: startHash, limit: limitHash });
     expect(response !== null, 'response should not be null').be.true;
     expect(response!.accounts.length, 'accounts length should be equal').be.equal(response!.hashes.length);

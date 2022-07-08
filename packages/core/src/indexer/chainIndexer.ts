@@ -115,9 +115,9 @@ export class ChainIndexer {
       try {
         if (!force && preHeader !== undefined && !header.parentHash.equals(preHeader.hash())) {
           const ancestor = await this.findCommonAncestor(header, preHeader);
-          await this.newHeader(ancestor.number, true);
+          await this.newHeader(ancestor.number, true, force);
         }
-        await this.newHeader(header.number, false);
+        await this.newHeader(header.number, false, force);
         preHeader = header;
       } catch (err) {
         logger.error('ChainIndexer::processHeaderLoop, catch error:', err);
@@ -131,8 +131,9 @@ export class ChainIndexer {
    * NewHeader notifies the indexer about new chain heads and/or reorgs.
    * @param number - Block number of newheader
    * @param reorg - If a reorg happened, invalidate all sections until that point
+   * @param force - Force set section
    */
-  private async newHeader(number: BN, reorg: boolean) {
+  private async newHeader(number: BN, reorg: boolean, force: boolean) {
     let confirmedSections: BN | undefined = number.gtn(this.confirmsBlockNumber) ? number.subn(this.confirmsBlockNumber).divn(this.sectionSize) : new BN(0);
     confirmedSections = confirmedSections.gtn(0) ? confirmedSections.subn(1) : undefined;
 
@@ -147,6 +148,14 @@ export class ChainIndexer {
         this.storedSections = confirmedSections.clone();
         await this.db.batch([...batch, DBSaveBloomBitsSectionCount(this.storedSections)]);
       }
+      return;
+    }
+
+    // force set current section
+    if (confirmedSections !== undefined && force) {
+      // save stored section count.
+      await this.db.batch([DBSaveBloomBitsSectionCount(confirmedSections)]);
+      this.storedSections = confirmedSections.clone();
       return;
     }
 

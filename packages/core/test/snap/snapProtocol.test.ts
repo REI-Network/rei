@@ -34,6 +34,10 @@ class Mockpool {
   remove(handler: SnapProtocolHandler) {
     this.data.splice(this.data.indexOf(handler), 1);
   }
+
+  putBackIdlePeer(type: string, handler: SnapProtocolHandler) {
+    // this.add(handler);
+  }
 }
 
 class MockProctocol {
@@ -73,14 +77,15 @@ let handler1: SnapProtocolHandler;
 let handler2: SnapProtocolHandler;
 const trieNodeKeys: Buffer[] = [];
 const trieNodeValues: Buffer[] = [];
+const emptyAccountCount = 2;
 
 describe('SnapProtocol', function () {
   before(async () => {
     const result = await genRandomAccounts(db, 10, 10);
-    const genRandResult = await addEmptyAccounts(db, 2, result);
+    const genRandResult = await addEmptyAccounts(db, emptyAccountCount, result);
     root = genRandResult.root;
     accounts = genRandResult.accounts;
-    sortAccounts = genRandResult.accounts.sort((a, b) => a.accountHash.compare(b.accountHash));
+    sortAccounts = [...genRandResult.accounts].sort((a, b) => a.accountHash.compare(b.accountHash));
     await node.snapTree.init(root, false, true);
     const peer1 = new MockPeer();
     const peer2 = new MockPeer();
@@ -167,7 +172,7 @@ describe('SnapProtocol', function () {
     const stotageData = accounts.map((account) => Array.from(account.storageData.values()).map((value) => value.val));
     const response = await handler2.getStorageRanges(root, { origin: startHash, limit: limitHash, roots: roots, accounts: accountHashes });
     expect(response !== null, 'response should not be null').be.true;
-    expect(response!.slots.length, 'slots length should be equal').be.equal(stotageData.length);
+    expect(response!.slots.length, 'slots length should be equal').be.equal(stotageData.length - emptyAccountCount);
     expect(response!.slots.length, 'slots length should equal hashes length').be.equal(response!.hashes.length);
     expect(response!.cont, 'continue should be false').be.equal(false);
     for (let i = 0; i < response!.hashes.length; i++) {

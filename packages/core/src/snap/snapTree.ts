@@ -427,7 +427,7 @@ export class SnapTree {
    * @param seek - Point to start traversing
    * @returns - Iterator
    */
-  async *accountIterator(root: Buffer, seek: Buffer) {
+  accountIterator(root: Buffer, seek: Buffer) {
     const ok = this.generating();
     if (ok) {
       throw new Error('snapshot is not constructed');
@@ -437,19 +437,12 @@ export class SnapTree {
       throw new Error(`unknown snapshot,root: ${bufferToHex(root)}`);
     }
 
-    const itr = new FastSnapIterator(layer, (snap) => {
+    return new FastSnapIterator(layer, (snap) => {
       return {
         iter: snap.genAccountIterator(seek),
         stop: false
       };
     });
-
-    try {
-      await itr.init();
-      yield* itr;
-    } finally {
-      await itr.abort();
-    }
   }
 
   /**
@@ -460,7 +453,7 @@ export class SnapTree {
    * @param seek - Point to start traversing
    * @returns - Iterator
    */
-  async *storageIterator(root: Buffer, account: Buffer, seek: Buffer) {
+  storageIterator(root: Buffer, account: Buffer, seek: Buffer) {
     const ok = this.generating();
     if (ok) {
       throw new Error('snapshot is not constructed');
@@ -470,20 +463,13 @@ export class SnapTree {
       throw new Error(`unknown snapshot,root: ${bufferToHex(root)}`);
     }
 
-    const itr = new FastSnapIterator(layer, (snap) => {
+    return new FastSnapIterator(layer, (snap) => {
       const { iter, destructed } = snap.genStorageIterator(account, seek);
       return {
         iter,
         stop: destructed
       };
     });
-
-    try {
-      await itr.init();
-      yield* itr;
-    } finally {
-      await itr.abort();
-    }
   }
 
   /**

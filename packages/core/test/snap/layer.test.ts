@@ -1,6 +1,6 @@
-import { expect } from 'chai';
+import { assert, expect } from 'chai';
 import { keccak256 } from 'ethereumjs-util';
-import { FunctionalBufferMap, FunctionalBufferSet, getRandomIntInclusive } from '@rei-network/utils';
+import { FunctionalBufferMap, getRandomIntInclusive } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
 import { EMPTY_HASH } from '../../src/utils';
@@ -227,16 +227,13 @@ describe('Layer', () => {
   describe('FastIterator', () => {
     it('should fast iterate account succeed', async () => {
       const { layer } = layers[2];
-      const fastIter = new FastSnapIterator(layer, (snap) => {
+      let totalCount = 0;
+      for await (const { hash, value } of new FastSnapIterator(layer, (snap) => {
         return {
           iter: snap.genAccountIterator(EMPTY_HASH),
           stop: false
         };
-      });
-      await fastIter.init();
-
-      let totalCount = 0;
-      for await (const { hash, value } of fastIter) {
+      })) {
         const expectAccount = await layer.getAccount(hash);
         expect(expectAccount?.serialize().equals(value.serialize()), 'account should be equal').be.true;
         totalCount++;
@@ -246,20 +243,16 @@ describe('Layer', () => {
 
     it('should fast iterate storage data succeed', async () => {
       const { layer } = layers[2];
-
       for (const { address } of layers[0].accounts) {
         const accountHash = keccak256(address);
-        const fastIter = new FastSnapIterator(layer, (snap) => {
+        let totalCount = 0;
+        for await (const { hash, value } of new FastSnapIterator(layer, (snap) => {
           const { iter, destructed } = snap.genStorageIterator(accountHash, EMPTY_HASH);
           return {
             iter,
             stop: destructed
           };
-        });
-        await fastIter.init();
-
-        let totalCount = 0;
-        for await (const { hash, value } of fastIter) {
+        })) {
           const expectStorageData = await layer.getStorage(accountHash, hash);
           expect(expectStorageData.equals(value), 'storage data should be equal').be.true;
           totalCount++;
@@ -270,21 +263,37 @@ describe('Layer', () => {
 
     it('should abort succeed', async () => {
       const { layer } = layers[2];
-      const fastIter = new FastSnapIterator(layer, (snap) => {
+      let index = 0;
+      for await (const element of new FastSnapIterator(layer, (snap) => {
         return {
           iter: snap.genAccountIterator(EMPTY_HASH),
           stop: false
         };
-      });
-      await fastIter.init();
-
-      let index = 0;
-      for await (const element of fastIter) {
+      })) {
         if (++index === 3) {
-          await fastIter.abort();
+          break;
         }
       }
       expect(index === 3, 'iterator should abort').be.true;
+    });
+
+    it('should skip empty buffer', async () => {
+      const { layer } = layers[2];
+      const data = (layer as DiffLayer).storageData;
+      const [accountHash, storage] = Array.from(data.entries())[0];
+      const [hash] = Array.from(storage.entries())[0];
+      storage.set(hash, Buffer.alloc(0));
+      for await (const { hash: _hash, value: _value } of new FastSnapIterator(layer, (snap) => {
+        const { iter, destructed } = snap.genStorageIterator(accountHash, EMPTY_HASH);
+        return {
+          iter: iter,
+          stop: destructed
+        };
+      })) {
+        if (hash.equals(_hash)) {
+          assert.fail('should skip empty buffer');
+        }
+      }
     });
   });
 });

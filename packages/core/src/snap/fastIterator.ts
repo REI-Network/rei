@@ -53,7 +53,7 @@ export class FastSnapIterator<T> {
   /**
    * Initialize fast iterator
    */
-  async init() {
+  private async init() {
     // track which account hashes are iterators positioned on
     const positioned = new FunctionalBufferMap<number>();
 
@@ -203,11 +203,19 @@ export class FastSnapIterator<T> {
    */
   async *[Symbol.asyncIterator](): FastSnapAsyncGenerator<T> {
     try {
+      await this.init();
+      if (this.iterators.length === 0) {
+        return;
+      }
+
       if (!this.initiated) {
         this.initiated = true;
         const hash = this.iterators[0].curr!;
         const value = this.iterators[0].getCurrValue!();
-        if (value !== null) {
+        // filter empty buffer
+        if (value instanceof Buffer && value.length > 0) {
+          yield { hash, value };
+        } else if (!(value instanceof Buffer) && value !== null) {
           yield { hash, value };
         }
       }
@@ -215,7 +223,10 @@ export class FastSnapIterator<T> {
       while (await this.next(0)) {
         const hash = this.iterators[0].curr!;
         const value = this.iterators[0].getCurrValue!();
-        if (value !== null) {
+        // filter empty buffer
+        if (value instanceof Buffer && value.length > 0) {
+          yield { hash, value };
+        } else if (!(value instanceof Buffer) && value !== null) {
           yield { hash, value };
         }
       }

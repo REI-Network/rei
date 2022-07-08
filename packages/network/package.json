@@ -6,7 +6,9 @@
     "license": "GPL-3.0-or-later",
     "scripts": {
         "build": "tsc --build tsconfig.json",
-        "test": "mocha -r ts-node/register 'test/**/*.test.ts' --timeout 10000"
+        "test": "mocha -r ts-node/register 'test/**/*.test.ts' --timeout 10000",
+        "startNodes" : "ts-node ./test/simpleNodeCmd.ts"
+        
     },
     "devDependencies": {
         "typescript": "^4.1.2"

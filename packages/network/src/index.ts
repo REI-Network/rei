@@ -404,9 +404,9 @@ export class NetworkManager extends EventEmitter {
     this.dialLoop();
     this.timeoutLoop();
 
-    // setInterval(async () => {
-    //   console.log(`localENr ${(await this.localEnr.peerId()).toB58String()} kbucket size :==>`, this.libp2pNode.discv5.discv5.connectedPeerCount);
-    // }, 5 * 1000);
+    setInterval(async () => {
+      console.log(`peerId ${(await this.localEnr.peerId()).toB58String()} ==========> connection size:`, this.libp2pNode.connectionManager.size);
+    }, 10000);
   }
 
   // Listen to the pong message of the remote node

@@ -5,11 +5,12 @@ import PeerId from 'peer-id';
 import { Peer } from '../src/peer';
 import { NetworkManager } from '../src/index';
 import { Protocol, ProtocolHandler } from '../src/types';
+import { resolve } from 'multiaddr';
 const memdown = require('memdown');
 
-const defaultUdpPort = 9810;
-const defaultTcpPort = 4191;
-const path = './simpleNodeTest.txt';
+const path = './test/simpleNodeTest.txt';
+// const defaultUdpPort = 9810;
+// const defaultTcpPort = 4191;
 // const ip = '192.168.0.50';
 class SayHi implements Protocol {
   protocolString: string;
@@ -63,6 +64,46 @@ class SayHiHandler implements ProtocolHandler {
   }
 }
 
+export async function autoStartNodes(opts: { ip: string; udpPort: number; tcpPort: number; count?: number; bootEnr?: string }) {
+  const nodes: Promise<NetworkManager>[] = [];
+  const count = opts.count ? opts.count : 10;
+  const ip = opts.ip;
+  let udpPort = opts.udpPort;
+  let tcpPort = opts.tcpPort;
+  let bootEnr = opts.bootEnr;
+  let boot: NetworkManager | undefined;
+
+  if (!bootEnr) {
+    let b = await bootNode(ip, udpPort, tcpPort);
+    boot = b.bootNode;
+    bootEnr = b.bootEnr;
+  }
+  for (let i = 1; i <= count; i++) {
+    const ports = await getPorts(udpPort + i, tcpPort + i);
+    nodes.push(createNode({ ip, tcpPort: ports.tcp, udpPort: ports.udp, bootNodes: [bootEnr] }));
+    udpPort = ports.udp;
+    udpPort = ports.tcp;
+    console.log('node', i, 'created');
+  }
+  console.log('auto start nodes success');
+  return boot ? [boot, ...(await Promise.all(nodes))] : await Promise.all(nodes);
+}
+
+export async function bootNode(ip: string, udpPort: number, tcpPort: number) {
+  let { udp, tcp } = await getPorts(udpPort, tcpPort);
+  const bootNode = await createNode({ ip, tcpPort: tcp, udpPort: udp });
+  const bootEnr = await bootNode.localEnr.encodeTxt();
+  fs.writeFile(path, bootEnr, (err) => {
+    if (err) throw err;
+    console.log('boot node enr:', bootEnr);
+  });
+  return { bootNode, bootEnr };
+}
+
+export async function startNode(ip, tcpPort, udpPort, enr) {
+  await createNode({ ip, tcpPort, udpPort, bootNodes: [enr] });
+}
+
 async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; bootNodes?: string[] }) {
   const db = levelup(memdown());
   const node = new NetworkManager({
@@ -78,36 +119,6 @@ async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; 
   await node.init();
   await node.start();
   return node;
-}
-
-export async function autoStartNodes(amount: number, ip: string) {
-  let nodes: Promise<NetworkManager>[] = [];
-  let { udp, tcp } = await getPorts(defaultUdpPort, defaultTcpPort);
-  const bootNode = await createNode({ ip, tcpPort: defaultTcpPort, udpPort: defaultUdpPort });
-  // nodes.push(bootNode);
-  const bootEnr = await bootNode.localEnr.encodeTxt();
-  for (let i = 1; i <= amount; i++) {
-    const ports = await getPorts(udp + i, tcp + i);
-    nodes.push(createNode({ ip, tcpPort: ports.tcp, udpPort: ports.udp, bootNodes: [bootEnr] }));
-    udp = ports.udp;
-    tcp = ports.tcp;
-    console.log('node', i, 'created');
-  }
-  console.log('auto start nodes success');
-  return [bootNode, ...(await Promise.all(nodes))];
-}
-
-export async function bootNode(ip) {
-  const bootNode = await createNode({ ip, tcpPort: defaultTcpPort, udpPort: defaultUdpPort });
-  const bootEnr = await bootNode.localEnr.encodeTxt();
-  fs.writeFile(path, bootEnr, (err) => {
-    if (err) throw err;
-    console.log('boot node enr:', bootEnr);
-  });
-}
-
-export async function startNode(ip, tcpPort, udpPort, enr) {
-  await createNode({ ip, tcpPort, udpPort, bootNodes: [enr] });
 }
 
 async function getPorts(udp: number, tcp: number) {

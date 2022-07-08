@@ -8,6 +8,7 @@ const types: PeerType[] = ['account', 'storage', 'code', 'trieNode'];
  * SnapHandlerPool is used to manage all the SnapProtocolHandler
  */
 export class SnapHandlerPool {
+  private statelessPool = new Map<string, SnapProtocolHandler>();
   private idlePools = new Map<PeerType, Map<string, SnapProtocolHandler>>();
   private busyPools = new Map<PeerType, Map<string, SnapProtocolHandler>>();
 
@@ -33,6 +34,7 @@ export class SnapHandlerPool {
    * @param handler - SnapProtocolHandler to remove
    */
   remove(handler: SnapProtocolHandler) {
+    this.statelessPool.delete(handler.id);
     for (const type of types) {
       this.idlePools.get(type)!.delete(handler.id);
       this.busyPools.get(type)!.delete(handler.id);
@@ -64,5 +66,30 @@ export class SnapHandlerPool {
     if (this.busyPools.get(type)!.delete(handler.id)) {
       this.idlePools.get(type)!.set(handler.id, handler);
     }
+  }
+
+  /**
+   * mark a node as stateless
+   * @param handler - Stateless peer
+   */
+  putStatelessPeer(handler: SnapProtocolHandler) {
+    let removed = false;
+    for (const type of types) {
+      removed = this.idlePools.get(type)!.delete(handler.id) || removed;
+      removed = this.busyPools.get(type)!.delete(handler.id) || removed;
+    }
+    if (removed) {
+      this.statelessPool.set(handler.id, handler);
+    }
+  }
+
+  /**
+   * Reset all stateless peers, putting them back into the idle pool
+   */
+  resetStatelessPeer() {
+    for (const [, handler] of this.statelessPool) {
+      this.add(handler);
+    }
+    this.statelessPool.clear();
   }
 }

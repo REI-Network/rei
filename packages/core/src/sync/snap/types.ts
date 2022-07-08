@@ -39,4 +39,5 @@ export type PeerType = 'account' | 'storage' | 'code' | 'trieNode';
 export interface SnapSyncNetworkManager {
   getIdlePeer(type: PeerType): SnapSyncPeer | null;
   putBackIdlePeer(type: PeerType, peer: SnapSyncPeer);
+  resetStatelessPeer(): void;
 }

@@ -54,6 +54,13 @@ export class SnapProtocolHandler implements ProtocolHandler {
   }
 
   /**
+   * Get handler pool
+   */
+  get pool() {
+    return this.protocol.pool;
+  }
+
+  /**
    * Reset the soft response limit of handler
    * @param limit - Limit of the response
    */
@@ -98,7 +105,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
       request.reject(new Error('aborted'));
     }
     this.waitingRequests.clear();
-    this.protocol.pool.remove(this);
+    this.pool.remove(this);
   }
 
   /**
@@ -294,7 +301,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
    * {@link ProtocolHandler.handshake}
    */
   handshake(): boolean | Promise<boolean> {
-    this.protocol.pool.add(this);
+    this.pool.add(this);
     return true;
   }
 
@@ -313,6 +320,11 @@ export class SnapProtocolHandler implements ProtocolHandler {
         return null;
       }
       const hashes = response.accountData.map(([hash]) => hash);
+      if (hashes.length === 0 && response.proof.length === 0) {
+        logger.debug('SnapProtocolHandler::getAccountRange, stateless peer:', this.id);
+        this.pool.putStatelessPeer(this);
+        return null;
+      }
       for (let i = 1; i < hashes.length; i++) {
         if (hashes[i - 1].compare(hashes[i]) >= 0) {
           logger.warn('SnapProtocolHandler::getAccountRange, invalid hash order');
@@ -335,7 +347,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
       logger.warn('SnapProtocolHandler::getAccountRange', err);
       return null;
     } finally {
-      this.protocol.pool.putBackIdlePeer('account', this);
+      this.pool.putBackIdlePeer('account', this);
     }
   }
 
@@ -354,6 +366,11 @@ export class SnapProtocolHandler implements ProtocolHandler {
         return null;
       }
       const hashes = response.slots.map((slot) => slot.map(([hash]) => hash));
+      if (hashes.length === 0) {
+        logger.debug('SnapProtocolHandler::getStorageRanges, stateless peer:', this.id);
+        this.pool.putStatelessPeer(this);
+        return null;
+      }
       for (const _hashes of hashes) {
         for (let i = 1; i < _hashes.length; i++) {
           if (_hashes[i - 1].compare(_hashes[i]) >= 0) {
@@ -386,7 +403,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
       logger.warn('SnapProtocolHandler::getStorageRange', err);
       return null;
     } finally {
-      this.protocol.pool.putBackIdlePeer('storage', this);
+      this.pool.putBackIdlePeer('storage', this);
     }
   }
 
@@ -401,6 +418,11 @@ export class SnapProtocolHandler implements ProtocolHandler {
       const response = await this.request(msg);
       if (!(response instanceof s.ByteCode)) {
         logger.warn('SnapProtocolHandler::getByteCode, received wrong message type');
+        return null;
+      }
+      if (response.codes.length === 0) {
+        logger.debug('SnapProtocolHandler::getByteCodes, stateless peer:', this.id);
+        this.pool.putStatelessPeer(this);
         return null;
       }
       let codes: Buffer[] = new Array<Buffer>(hashes.length);
@@ -421,7 +443,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
       logger.warn('SnapProtocolHandler::getByteCode', err);
       return null;
     } finally {
-      this.protocol.pool.putBackIdlePeer('code', this);
+      this.pool.putBackIdlePeer('code', this);
     }
   }
 
@@ -436,6 +458,11 @@ export class SnapProtocolHandler implements ProtocolHandler {
       const response = await this.request(msg);
       if (!(response instanceof s.TrieNode)) {
         logger.warn('SnapProtocolHandler::getTrieNode, received wrong message type');
+        return null;
+      }
+      if (response.nodes.length === 0) {
+        logger.debug('SnapProtocolHandler::getTrieNodes, stateless peer:', this.id);
+        this.pool.putStatelessPeer(this);
         return null;
       }
       let nodes: Buffer[] = new Array<Buffer>(hashes.length);
@@ -456,7 +483,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
       logger.warn('SnapProtocolHandler::getTrieNode', err);
       return null;
     } finally {
-      this.protocol.pool.putBackIdlePeer('trieNode', this);
+      this.pool.putBackIdlePeer('trieNode', this);
     }
   }
 

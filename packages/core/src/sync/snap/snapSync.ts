@@ -1041,6 +1041,9 @@ export class SnapSync extends EventEmitter {
       logger.error('SnapSync::scheduleLoop, catch(when exit):', err);
     }
 
+    // wait for all requests to complete
+    await this.lock.wait();
+
     // clear scheduler
     this.clear();
   }
@@ -1089,7 +1092,6 @@ export class SnapSync extends EventEmitter {
     this.channel.reset();
     // start loop
     this.schedulePromise = this.scheduleLoop().finally(async () => {
-      this.clear();
       // invoke callback if it exists
       onFinished && (await onFinished());
       this.schedulePromise = undefined;
@@ -1122,8 +1124,6 @@ export class SnapSync extends EventEmitter {
       this.channel.abort();
       // wait for loop to exit
       await this.schedulePromise;
-      // wait for all requests to complete
-      await this.lock.wait();
     }
   }
 
@@ -1136,6 +1136,7 @@ export class SnapSync extends EventEmitter {
     this.tasks = [];
     this.snapped = false;
     this.finished = false;
+    this.network.resetStatelessPeer();
   }
 
   /**

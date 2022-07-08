@@ -9,7 +9,7 @@ import { FullSync } from './full';
 import { SnapSync } from './snap';
 import { SyncInfo } from './types';
 
-const snapSyncMinConfirmed = 0; // TODO: debug
+const snapSyncMinConfirmed = 2;
 const snapSyncMinTD = 100; // TODO: debug
 const waitingSyncDelay = 100;
 const randomPickInterval = 1000;

@@ -153,11 +153,24 @@ export class ChainIndexer {
     if (confirmedSections !== undefined && (this.storedSections === undefined || confirmedSections.gt(this.storedSections))) {
       for (const currentSections = this.storedSections ? this.storedSections.clone() : new BN(0); confirmedSections.gte(currentSections); currentSections.iaddn(1)) {
         this.backend.reset(currentSections);
-        let lastHeader = currentSections.gtn(0) ? await this.db.getCanonicalHeader(currentSections.muln(this.sectionSize).subn(1)) : undefined;
+        let lastHeader: BlockHeader | undefined;
+        if (currentSections.gtn(0)) {
+          try {
+            lastHeader = await this.db.getCanonicalHeader(currentSections.muln(this.sectionSize).subn(1));
+          } catch (err) {
+            // ignore errors...
+          }
+        }
         // the first header number of the next section.
         const maxNum = currentSections.addn(1).muln(this.sectionSize);
         for (const num = currentSections.muln(this.sectionSize); num.lt(maxNum); num.iaddn(1)) {
-          const header = await this.db.getCanonicalHeader(num);
+          let header: BlockHeader;
+          try {
+            header = await this.db.getCanonicalHeader(num);
+          } catch (err) {
+            // ignore errors...
+            continue;
+          }
           if (lastHeader !== undefined && !header.parentHash.equals(lastHeader.hash())) {
             throw new Error(`parentHash is'not match, last: ${lastHeader.number.toString()}, current: ${header.number.toString()}`);
           }

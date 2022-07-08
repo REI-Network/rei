@@ -47,6 +47,13 @@ export class SnapProtocolHandler implements ProtocolHandler {
   }
 
   /**
+   * Get peer id
+   */
+  get id() {
+    return this.peer.peerId;
+  }
+
+  /**
    * Reset the soft response limit of handler
    * @param limit - Limit of the response
    */
@@ -55,7 +62,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
   }
 
   private generateReqID() {
-    if (this.reqID > Number.MAX_SAFE_INTEGER) {
+    if (this.reqID >= Number.MAX_SAFE_INTEGER) {
       this.reqID = 0;
     }
     return this.reqID++;
@@ -153,6 +160,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
       this.send(new s.AccountRange(msg.reqID, accountData, proof));
     } catch (err) {
       logger.debug('SnapProtocolHandler::applyGetAccountRange', err);
+      this.send(new s.AccountRange(msg.reqID, [], []));
     }
   }
 
@@ -224,6 +232,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
       this.send(new s.StorageRange(msg.reqID, slots, proof));
     } catch (err) {
       logger.debug('SnapProtocolHandler::applyGetStorageRange', err);
+      this.send(new s.StorageRange(msg.reqID, [], []));
     }
   }
 

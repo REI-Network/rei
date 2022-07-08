@@ -8,13 +8,13 @@ const types: PeerType[] = ['account', 'storage', 'code', 'trieNode'];
  * SnapHandlerPool is used to manage all the SnapProtocolHandler
  */
 export class SnapHandlerPool {
-  private idlePools = new Map<PeerType, Set<SnapProtocolHandler>>();
-  private busyPools = new Map<PeerType, Set<SnapProtocolHandler>>();
+  private idlePools = new Map<PeerType, Map<string, SnapProtocolHandler>>();
+  private busyPools = new Map<PeerType, Map<string, SnapProtocolHandler>>();
 
   constructor() {
     for (const type of types) {
-      this.idlePools.set(type, new Set<SnapProtocolHandler>());
-      this.busyPools.set(type, new Set<SnapProtocolHandler>());
+      this.idlePools.set(type, new Map<string, SnapProtocolHandler>());
+      this.busyPools.set(type, new Map<string, SnapProtocolHandler>());
     }
   }
 
@@ -24,7 +24,7 @@ export class SnapHandlerPool {
    */
   add(handler: SnapProtocolHandler) {
     for (const type of types) {
-      this.idlePools.get(type)!.add(handler);
+      this.idlePools.get(type)!.set(handler.id, handler);
     }
   }
 
@@ -34,8 +34,8 @@ export class SnapHandlerPool {
    */
   remove(handler: SnapProtocolHandler) {
     for (const type of types) {
-      this.idlePools.get(type)!.delete(handler);
-      this.busyPools.get(type)!.delete(handler);
+      this.idlePools.get(type)!.delete(handler.id);
+      this.busyPools.get(type)!.delete(handler.id);
     }
   }
 
@@ -47,9 +47,9 @@ export class SnapHandlerPool {
   getIdlePeer(type: PeerType) {
     const idlePool = this.idlePools.get(type)!;
     if (idlePool.size > 0) {
-      const handler = Array.from(idlePool)[getRandomIntInclusive(0, idlePool.size - 1)];
-      idlePool.delete(handler);
-      this.busyPools.get(type)!.add(handler);
+      const handler = Array.from(idlePool.values())[getRandomIntInclusive(0, idlePool.size - 1)];
+      idlePool.delete(handler.id);
+      this.busyPools.get(type)!.set(handler.id, handler);
       return handler;
     }
     return null;
@@ -61,8 +61,8 @@ export class SnapHandlerPool {
    * @param handler - SnapProtocolHandler to put back
    */
   putBackIdlePeer(type: PeerType, handler: SnapProtocolHandler) {
-    if (this.busyPools.get(type)!.delete(handler)) {
-      this.idlePools.get(type)!.add(handler);
+    if (this.busyPools.get(type)!.delete(handler.id)) {
+      this.idlePools.get(type)!.set(handler.id, handler);
     }
   }
 }

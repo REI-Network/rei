@@ -192,6 +192,8 @@ class MockNetworkManager implements SnapSyncNetworkManager {
   putBackIdlePeer(type: PeerType, peer: SnapSyncPeer) {
     this.pools.get(type)!.add(peer as MockPeer);
   }
+
+  resetStatelessPeer(): void {}
 }
 
 describe('SnapSync', () => {

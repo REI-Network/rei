@@ -41,12 +41,10 @@ class Mockpool {
 }
 
 class MockProctocol {
-  name: string;
   node: any;
   pool: Mockpool = new Mockpool();
 
-  constructor(name: string, node: any) {
-    this.name = name;
+  constructor(node: any) {
     this.node = node;
   }
 }
@@ -68,8 +66,8 @@ const common = new Common({ chain: 'rei-devnet' });
 common.setHardforkByBlockNumber(0);
 const db = new Database(level(), common);
 const node = new MockNode(db);
-const protocol1 = new MockProctocol('snap protocol', node);
-const protocol2 = new MockProctocol('snap protocol', node);
+const protocol1 = new MockProctocol(node);
+const protocol2 = new MockProctocol(node);
 let root: Buffer;
 let accounts: AccountInfo[];
 let sortAccounts: AccountInfo[];

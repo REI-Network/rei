@@ -304,6 +304,12 @@ export class SnapProtocolHandler implements ProtocolHandler {
         return null;
       }
       const hashes = response.accountData.map(([hash]) => hash);
+      for (let i = 1; i < hashes.length; i++) {
+        if (hashes[i - 1].compare(hashes[i]) >= 0) {
+          logger.warn('SnapProtocolHandler::getAccountRange, invalid hash order');
+          return null;
+        }
+      }
       const accountValues = response.accountData.map(([, value]) => value);
       const accounts = accountValues.map((value) => StakingAccount.fromRlpSerializedSlimAccount(value));
       const end = hashes.length > 0 ? hashes[hashes.length - 1] : null;
@@ -339,6 +345,14 @@ export class SnapProtocolHandler implements ProtocolHandler {
         return null;
       }
       const hashes = response.slots.map((slot) => slot.map(([hash]) => hash));
+      for (const _hashes of hashes) {
+        for (let i = 1; i < _hashes.length; i++) {
+          if (_hashes[i - 1].compare(_hashes[i]) >= 0) {
+            logger.warn('SnapProtocolHandler::getStorageRange, invalid hash order');
+            return null;
+          }
+        }
+      }
       const slots = response.slots.map((slot) => slot.map(([, value]) => value));
       if (hashes.length !== slots.length) {
         logger.warn('SnapProtocolHandler::getStorageRange, hash and slot set size mismatch');

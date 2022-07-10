@@ -122,6 +122,14 @@ export class NetworkManager extends EventEmitter {
     return this.libp2pNode.discv5.discv5.enr;
   }
 
+  async kbucketPeers() {
+    const result: string[] = [];
+    for (const enr of this.libp2pNode.kbuckets.values()) {
+      result.push((await enr.peerId()).toB58String());
+    }
+    return result;
+  }
+
   /**
    * Return all installed peers
    */
@@ -282,6 +290,24 @@ export class NetworkManager extends EventEmitter {
     await this.nodedb.persist(enr);
   };
 
+  private onDiscovered = async (PeerInfo: { id: Uint8Array; multiaddrs: Multiaddr[] }) => {
+    //@todo add peer to kbucket and fix disv5 'peer' event
+    const peerId = PeerId.createFromBytes(PeerInfo.id).toB58String();
+    let include: boolean = false;
+    for (const id of this.discovered) {
+      if (id.peerId === peerId) {
+        include = true;
+        break;
+      }
+    }
+    if (!include) {
+      this.discovered.push({ peerId: peerId, nodeId: '' });
+      if (this.discovered.length > this.maxPeers) {
+        this.discovered.shift();
+      }
+    }
+  };
+
   //@todo check enr
   private checkENR = (enr: ENR) => {
     if (!enr.ip || !enr.nodeId) {
@@ -387,6 +413,7 @@ export class NetworkManager extends EventEmitter {
         });
       }
     }
+    this.libp2pNode.on('peer:discovery', this.onDiscovered);
     this.libp2pNode.connectionManager.on('peer:connect', this.onConnect);
     this.libp2pNode.connectionManager.on('peer:disconnect', this.onDisconnect);
     await this.libp2pNode.start();
@@ -405,8 +432,12 @@ export class NetworkManager extends EventEmitter {
     this.timeoutLoop();
 
     setInterval(async () => {
-      console.log(`peerId ${(await this.localEnr.peerId()).toB58String()} ==========> connection size:`, this.libp2pNode.connectionManager.size);
+      console.log(`peerId ${(await this.localEnr.peerId()).toB58String()} ==========> connection size:`, this.libp2pNode.connections.size);
     }, 10000);
+  }
+
+  public addPeer(enr: string) {
+    this.libp2pNode.discv5.addEnr(ENR.decodeTxt(enr));
   }
 
   // Listen to the pong message of the remote node
@@ -593,13 +624,11 @@ export class NetworkManager extends EventEmitter {
 
     for (const peer of this.peers) {
       if (peer.peerId === id) {
-        console.log('Network::filterPeer, peerId:', id, 'is dialing');
         return false;
       }
     }
 
     if (this.dialing.has(id)) {
-      console.log('Network::filterPeer, peerId:', id, 'is dialing');
       return false;
     }
 
@@ -618,15 +647,22 @@ export class NetworkManager extends EventEmitter {
           // search discovered peer in memory
           while (this.discovered.length > 0) {
             const { peerId, nodeId } = this.discovered.shift()!;
-            const entry = this.libp2pNode.kbuckets.getWithPending(nodeId);
-            if (entry && entry.status === EntryStatus.Connected) {
-              let addr = this.getLocationMultiaddr(entry.value, 'tcp4');
-              if (addr) {
-                if (this.filterPeer({ id: peerId, addresses: [{ multiaddr: addr }] })) {
-                  pid = peerId;
-                  logger.debug(`NetworkManager::dialLoop, ${(await this.localEnr.peerId()).toB58String()} use a discovered peer:`, peerId);
-                  break;
-                }
+
+            let addr: { multiaddr: Multiaddr }[] = [];
+            if (nodeId !== '') {
+              let entry = this.libp2pNode.kbuckets.getValue(nodeId);
+              if (entry) {
+                addr.push({ multiaddr: this.getLocationMultiaddr(entry, 'tcp4')! });
+              }
+            } else {
+              addr = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(peerId));
+            }
+
+            if (addr) {
+              if (this.filterPeer({ id: peerId, addresses: addr })) {
+                pid = peerId;
+                logger.debug(`NetworkManager::dialLoop, ${(await this.localEnr.peerId()).toB58String()} use a discovered peer:`, peerId);
+                break;
               }
             }
           }
@@ -729,6 +765,7 @@ export class NetworkManager extends EventEmitter {
     }
     this.libp2pNode?.connectionManager.off('peer:connect', this.onConnect);
     this.libp2pNode?.connectionManager.off('peer:disconnect', this.onDisconnect);
+    this.libp2pNode?.off('peer:discovery', this.onDiscovered);
     this.libp2pNode?.discv5?.discv5.off('enrAdded', this.onENRAdded);
     this.libp2pNode?.discv5?.discv5.off('multiaddrUpdated', this.onMultiaddrUpdated);
     await Promise.all(Array.from(this._peers.values()).map((peer) => this.removePeer(peer.peerId)));

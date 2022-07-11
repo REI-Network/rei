@@ -3,6 +3,7 @@ import { BlockHeader } from '@rei-network/structure';
 import { Channel, logger } from '@rei-network/utils';
 import { Database } from '@rei-network/database';
 import { DBSaveBloomBitsSectionCount, DBDeleteBloomBitsSectionCount } from '@rei-network/database/dist/helpers';
+import { EMPTY_HASH } from '../utils';
 import { ChainIndexerBackend, ChainIndexerOptions } from './types';
 
 type IndexTask = {
@@ -173,17 +174,19 @@ export class ChainIndexer {
         // the first header number of the next section.
         const maxNum = currentSections.addn(1).muln(this.sectionSize);
         for (const num = currentSections.muln(this.sectionSize); num.lt(maxNum); num.iaddn(1)) {
-          let header: BlockHeader;
+          let header: BlockHeader | undefined;
           try {
             header = await this.db.getCanonicalHeader(num);
           } catch (err) {
             // ignore errors...
-            continue;
           }
-          if (lastHeader !== undefined && !header.parentHash.equals(lastHeader.hash())) {
+          if (lastHeader !== undefined && header !== undefined && !header.parentHash.equals(lastHeader.hash())) {
             throw new Error(`parentHash is'not match, last: ${lastHeader.number.toString()}, current: ${header.number.toString()}`);
           }
-          this.backend.process(header);
+          const number = header?.number ?? num;
+          const bloom = header?.bloom ?? Buffer.alloc(256);
+          const hash = header?.hash() ?? EMPTY_HASH;
+          this.backend.process(number, bloom, hash);
           lastHeader = header;
         }
         const batch = this.backend.commit();

@@ -13,6 +13,7 @@ import { Libp2pNode } from './libp2pnode';
 import { Protocol, ProtocolHandler } from './types';
 import { ExpHeap } from './expheap';
 import { NodeDB } from './nodedb';
+import { nodeId } from '@gxchain2/discv5/lib/enr/v4';
 
 export * from './peer';
 export * from './types';
@@ -267,12 +268,16 @@ export class NetworkManager extends EventEmitter {
    * Execute when a new enr is discovered
    * Persist new enr to db
    */
-  private onENRAdded = async (enr: ENR) => {
-    if (!this.checkENR(enr)) {
+  private onDiscovered = async (PeerInfo: { id: Uint8Array; multiaddrs: Multiaddr[] }) => {
+    const enr: ENR = (this.libp2pNode.discv5.discv5 as any).findEnr(ENR.createFromPeerId(PeerId.createFromBytes(PeerInfo.id)).nodeId);
+    this.storeNode(enr);
+  };
+
+  private storeNode = async (enr: ENR) => {
+    if (!enr || !this.checkENR(enr)) {
       return;
     }
     const peerId: string = (await enr.peerId()).toB58String();
-    logger.info(`💬 Peer ${(await this.localEnr.peerId()).toB58String()} discovered:`, peerId);
     let include: boolean = false;
     for (const id of this.discovered) {
       if (id.peerId === peerId) {
@@ -288,24 +293,6 @@ export class NetworkManager extends EventEmitter {
     }
     await this.libp2pNode.peerStore.addressBook.add(await enr.peerId(), [enr.getLocationMultiaddr('tcp')]);
     await this.nodedb.persist(enr);
-  };
-
-  private onDiscovered = async (PeerInfo: { id: Uint8Array; multiaddrs: Multiaddr[] }) => {
-    //@todo add peer to kbucket and fix disv5 'peer' event
-    const peerId = PeerId.createFromBytes(PeerInfo.id).toB58String();
-    let include: boolean = false;
-    for (const id of this.discovered) {
-      if (id.peerId === peerId) {
-        include = true;
-        break;
-      }
-    }
-    if (!include) {
-      this.discovered.push({ peerId: peerId, nodeId: '' });
-      if (this.discovered.length > this.maxPeers) {
-        this.discovered.shift();
-      }
-    }
   };
 
   //@todo check enr
@@ -418,7 +405,6 @@ export class NetworkManager extends EventEmitter {
     this.libp2pNode.connectionManager.on('peer:disconnect', this.onDisconnect);
     await this.libp2pNode.start();
 
-    this.libp2pNode.discv5.discv5.on('enrAdded', this.onENRAdded);
     this.libp2pNode.sessionService.on('message', this.onMessage);
     this.libp2pNode.discv5.discv5.on('multiaddrUpdated', this.onMultiaddrUpdated);
 
@@ -646,18 +632,8 @@ export class NetworkManager extends EventEmitter {
           let pid: string | undefined;
           // search discovered peer in memory
           while (this.discovered.length > 0) {
-            const { peerId, nodeId } = this.discovered.shift()!;
-
-            let addr: { multiaddr: Multiaddr }[] = [];
-            if (nodeId !== '') {
-              let entry = this.libp2pNode.kbuckets.getValue(nodeId);
-              if (entry) {
-                addr.push({ multiaddr: this.getLocationMultiaddr(entry, 'tcp4')! });
-              }
-            } else {
-              addr = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(peerId));
-            }
-
+            const { peerId } = this.discovered.shift()!;
+            let addr = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(peerId));
             if (addr) {
               if (this.filterPeer({ id: peerId, addresses: addr })) {
                 pid = peerId;
@@ -766,7 +742,6 @@ export class NetworkManager extends EventEmitter {
     this.libp2pNode?.connectionManager.off('peer:connect', this.onConnect);
     this.libp2pNode?.connectionManager.off('peer:disconnect', this.onDisconnect);
     this.libp2pNode?.off('peer:discovery', this.onDiscovered);
-    this.libp2pNode?.discv5?.discv5.off('enrAdded', this.onENRAdded);
     this.libp2pNode?.discv5?.discv5.off('multiaddrUpdated', this.onMultiaddrUpdated);
     await Promise.all(Array.from(this._peers.values()).map((peer) => this.removePeer(peer.peerId)));
     this.dialing.clear();

@@ -5,7 +5,6 @@ import PeerId from 'peer-id';
 import { Peer } from '../src/peer';
 import { NetworkManager } from '../src/index';
 import { Protocol, ProtocolHandler } from '../src/types';
-import { resolve } from 'multiaddr';
 const memdown = require('memdown');
 
 const path = './test/simpleNodeTest.txt';

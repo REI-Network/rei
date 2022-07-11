@@ -1,5 +1,6 @@
 import { LevelUp } from 'levelup';
 import { AbstractLevelDOWN, AbstractIterator } from 'abstract-leveldown';
+import { logger } from '@rei-network/utils';
 import { ENR } from '@gxchain2/discv5';
 import * as crypto from 'crypto';
 
@@ -57,6 +58,7 @@ export class NodeDB {
       const { nodeId, ip, field } = this.splitNodeItemKey(k);
       if (ip && field === dbNodePong) {
         if (now - parseInt(v.toString()) > seedMaxAge) {
+          logger.info(`NodeDB Deleting timeout node : ${nodeId}`);
           await this._deleteRange(this._nodeKey(nodeId));
         }
       }

@@ -13,7 +13,6 @@ import { Libp2pNode } from './libp2pnode';
 import { Protocol, ProtocolHandler } from './types';
 import { ExpHeap } from './expheap';
 import { NodeDB } from './nodedb';
-import { nodeId } from '@gxchain2/discv5/lib/enr/v4';
 
 export * from './peer';
 export * from './types';
@@ -33,8 +32,8 @@ const defaultUdpPort = 9810;
 const defaultNat = '127.0.0.1';
 
 const seedCount = 30;
-const seedMaxAge = 5 * 24 * 60 * 60 * 1000;
-
+// const seedMaxAge = 5 * 24 * 60 * 60 * 1000;
+const seedMaxAge = 10 * 1000;
 enum Libp2pPeerValue {
   installed = 1,
   connected = 0.5,

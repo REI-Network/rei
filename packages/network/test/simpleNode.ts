@@ -35,6 +35,7 @@ class SayHiHandler implements ProtocolHandler {
     this.task.push(
       setTimeout(() => {
         this.peer.send('SayHi', Buffer.from('hello'));
+        this.task.splice(this.task.length - 1);
       }, 2000)
     );
   }
@@ -51,6 +52,7 @@ class SayHiHandler implements ProtocolHandler {
       this.task.push(
         setTimeout(() => {
           this.peer.send('SayHi', Buffer.from('hello'));
+          this.task.splice(this.task.length - 1);
         }, 5000)
       );
     }
@@ -123,10 +125,16 @@ async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; 
 
 async function getPorts(udp: number, tcp: number) {
   while (await portIsOccupied(udp)) {
+    if (udp > 65535) {
+      throw new Error('udp port is out of limits');
+    }
     udp++;
   }
 
   while (await portIsOccupied(tcp)) {
+    if (tcp > 65535) {
+      throw new Error('tcp port is out of limits');
+    }
     tcp++;
   }
   return { udp, tcp };

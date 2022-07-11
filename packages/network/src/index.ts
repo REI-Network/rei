@@ -3,7 +3,7 @@ import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import { LevelUp } from 'levelup';
 import { v4, v6 } from 'is-ip';
-import { ENR, EntryStatus } from '@gxchain2/discv5';
+import { ENR } from '@gxchain2/discv5';
 import Semaphore from 'semaphore-async-await';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
 import { MessageType } from '@gxchain2/discv5/lib/message';
@@ -32,8 +32,7 @@ const defaultUdpPort = 9810;
 const defaultNat = '127.0.0.1';
 
 const seedCount = 30;
-// const seedMaxAge = 5 * 24 * 60 * 60 * 1000;
-const seedMaxAge = 10 * 1000;
+const seedMaxAge = 5 * 24 * 60 * 60 * 1000;
 enum Libp2pPeerValue {
   installed = 1,
   connected = 0.5,
@@ -422,6 +421,7 @@ export class NetworkManager extends EventEmitter {
     }, 10000);
   }
 
+  //@todo add to static pool
   public addPeer(enr: string) {
     this.libp2pNode.discv5.addEnr(ENR.decodeTxt(enr));
   }
@@ -696,37 +696,6 @@ export class NetworkManager extends EventEmitter {
         logger.error('NetworkManager::checkNodes, catch error:', err);
       }
     }
-  }
-
-  /**
-   * Get multiaddr of the enr.(This is a discv5 version compatible function and needs to be deleted)
-   * @param enr - Enr information
-   * @param protocol - Protocol
-   */
-  private getLocationMultiaddr(enr: ENR, protocol: 'udp' | 'udp4' | 'udp6' | 'tcp' | 'tcp4' | 'tcp6'): Multiaddr | undefined {
-    if (protocol === 'udp') {
-      return this.getLocationMultiaddr(enr, 'udp4') || this.getLocationMultiaddr(enr, 'udp6');
-    }
-    if (protocol === 'tcp') {
-      return this.getLocationMultiaddr(enr, 'tcp4') || this.getLocationMultiaddr(enr, 'tcp6');
-    }
-    const isIpv6 = protocol.endsWith('6');
-    const isUdp = protocol.startsWith('udp');
-    const isTcp = protocol.startsWith('tcp');
-    const ipName = isIpv6 ? 'ip6' : 'ip4';
-    const ipVal = isIpv6 ? enr.ip6 : enr.ip;
-    if (!ipVal) {
-      return undefined;
-    }
-    const protoName = (isUdp && 'udp') || (isTcp && 'tcp');
-    if (!protoName) {
-      return undefined;
-    }
-    const protoVal = isIpv6 ? (isUdp && enr.udp6) || (isTcp && enr.tcp6) : (isUdp && enr.udp) || (isTcp && enr.tcp);
-    if (!protoVal) {
-      return undefined;
-    }
-    return new Multiaddr(`/${ipName}/${ipVal}/${protoName}/${protoVal}`);
   }
 
   /**

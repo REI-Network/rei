@@ -1,8 +1,8 @@
+import * as crypto from 'crypto';
 import { LevelUp } from 'levelup';
 import { AbstractLevelDOWN, AbstractIterator } from 'abstract-leveldown';
 import { logger } from '@rei-network/utils';
 import { ENR } from '@gxchain2/discv5';
-import * as crypto from 'crypto';
 
 type DB = LevelUp<AbstractLevelDOWN<Buffer, Buffer>, AbstractIterator<Buffer, Buffer>>;
 

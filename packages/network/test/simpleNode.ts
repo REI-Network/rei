@@ -1,4 +1,3 @@
-import fs from 'fs';
 import net from 'net';
 import levelup from 'levelup';
 import PeerId from 'peer-id';
@@ -7,10 +6,6 @@ import { NetworkManager } from '../src/index';
 import { Protocol, ProtocolHandler } from '../src/types';
 const memdown = require('memdown');
 
-const path = './test/simpleNodeTest.txt';
-// const defaultUdpPort = 9810;
-// const defaultTcpPort = 4191;
-// const ip = '192.168.0.50';
 class SayHi implements Protocol {
   protocolString: string;
   beforeMakeHandler: (peer: Peer) => boolean | Promise<boolean>;
@@ -94,10 +89,6 @@ export async function bootNode(ip: string, udpPort: number, tcpPort: number) {
   let { udp, tcp } = await getPorts(udpPort, tcpPort);
   const bootNode = await createNode({ ip, tcpPort: tcp, udpPort: udp });
   const bootEnr = await bootNode.localEnr.encodeTxt();
-  // fs.writeFile(path, bootEnr, (err) => {
-  //   if (err) throw err;
-  //   console.log('boot node enr:', bootEnr);
-  // });
   return { bootNode, bootEnr };
 }
 

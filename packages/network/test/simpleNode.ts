@@ -78,7 +78,7 @@ export async function autoStartNodes(opts: { ip: string; udpPort: number; tcpPor
     bootEnr = b.bootEnr;
   }
   for (let i = 1; i <= count; i++) {
-    const ports = await getPorts(udpPort + i, tcpPort + i);
+    const ports = await getPorts(udpPort + 1, tcpPort + 1);
     nodes.push(createNode({ ip, tcpPort: ports.tcp, udpPort: ports.udp, bootNodes: [bootEnr] }));
     udpPort = ports.udp;
     tcpPort = ports.tcp;
@@ -122,15 +122,12 @@ async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; 
 }
 
 async function getPorts(udp: number, tcp: number) {
-  if (await portIsOccupied(udp)) {
-    while (await portIsOccupied(udp)) {
-      udp++;
-    }
+  while (await portIsOccupied(udp)) {
+    udp++;
   }
-  if (await portIsOccupied(tcp)) {
-    while (await portIsOccupied(tcp)) {
-      tcp++;
-    }
+
+  while (await portIsOccupied(tcp)) {
+    tcp++;
   }
   return { udp, tcp };
 }

@@ -359,6 +359,7 @@ export class NetworkManager extends EventEmitter {
       const strEnr = enr.encodeTxt(keypair.privateKey);
       this.privateKey = keypair.privateKey;
       logger.info('NetworkManager::init, peerId:', this.options.peerId.toB58String());
+      logger.info('NetworkManager::init, nodeId', enr.nodeId);
       logger.info('NetworkManager::init,', strEnr);
 
       // filter local enr

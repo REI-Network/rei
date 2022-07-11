@@ -122,9 +122,15 @@ async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; 
 }
 
 async function getPorts(udp: number, tcp: number) {
-  while ((await portIsOccupied(udp)) || (await portIsOccupied(tcp))) {
-    udp++;
-    tcp++;
+  if (await portIsOccupied(udp)) {
+    while (await portIsOccupied(udp)) {
+      udp++;
+    }
+  }
+  if (await portIsOccupied(tcp)) {
+    while (await portIsOccupied(tcp)) {
+      tcp++;
+    }
   }
   return { udp, tcp };
 }

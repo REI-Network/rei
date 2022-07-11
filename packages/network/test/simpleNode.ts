@@ -92,10 +92,10 @@ export async function bootNode(ip: string, udpPort: number, tcpPort: number) {
   let { udp, tcp } = await getPorts(udpPort, tcpPort);
   const bootNode = await createNode({ ip, tcpPort: tcp, udpPort: udp });
   const bootEnr = await bootNode.localEnr.encodeTxt();
-  fs.writeFile(path, bootEnr, (err) => {
-    if (err) throw err;
-    console.log('boot node enr:', bootEnr);
-  });
+  // fs.writeFile(path, bootEnr, (err) => {
+  //   if (err) throw err;
+  //   console.log('boot node enr:', bootEnr);
+  // });
   return { bootNode, bootEnr };
 }
 

@@ -81,7 +81,7 @@ export async function autoStartNodes(opts: { ip: string; udpPort: number; tcpPor
     const ports = await getPorts(udpPort + i, tcpPort + i);
     nodes.push(createNode({ ip, tcpPort: ports.tcp, udpPort: ports.udp, bootNodes: [bootEnr] }));
     udpPort = ports.udp;
-    udpPort = ports.tcp;
+    tcpPort = ports.tcp;
     console.log('node', i, 'created');
   }
   console.log('auto start nodes success');
@@ -117,6 +117,7 @@ async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; 
   });
   await node.init();
   await node.start();
+  console.log('create node success', 'ip:', opts.ip, 'tcpPort:', opts.tcpPort, 'udpPort:', opts.udpPort);
   return node;
 }
 

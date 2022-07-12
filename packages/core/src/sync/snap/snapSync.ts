@@ -218,19 +218,7 @@ type SnapSyncProgressJSON = {
   tasks: AccountTaskJSON[];
 };
 
-export declare interface SnapSync {
-  on(event: 'start', listener: (info: SyncInfo) => void): this;
-  on(event: 'finished', listener: (info: SyncInfo) => void): this;
-  on(event: 'synchronized', listener: (info: SyncInfo) => void): this;
-  on(event: 'failed', listener: (info: SyncInfo) => void): this;
-
-  off(event: 'start', listener: (info: SyncInfo) => void): this;
-  off(event: 'finished', listener: (info: SyncInfo) => void): this;
-  off(event: 'synchronized', listener: (info: SyncInfo) => void): this;
-  off(event: 'failed', listener: (info: SyncInfo) => void): this;
-}
-
-export class SnapSync extends EventEmitter {
+export class SnapSync {
   readonly db: Database;
   readonly network: SnapSyncNetworkManager;
   readonly healer: HealTask;
@@ -242,32 +230,14 @@ export class SnapSync extends EventEmitter {
   tasks: AccountTask[] = [];
   snapped: boolean = false;
   finished: boolean = false;
+  onFinished?: () => void;
 
   private schedulePromise?: Promise<void>;
 
-  // sync state
-  private startingBlock: number = 0;
-  private highestBlock: number = 0;
-
   constructor(db: Database, network: SnapSyncNetworkManager) {
-    super();
     this.db = db;
     this.network = network;
     this.healer = new HealTask(db);
-  }
-
-  /**
-   * Get the sync state
-   */
-  get status() {
-    return { startingBlock: this.startingBlock, highestBlock: this.highestBlock };
-  }
-
-  /**
-   * Is it syncing
-   */
-  get isSyncing() {
-    return !!this.schedulePromise;
   }
 
   /**
@@ -1012,6 +982,8 @@ export class SnapSync extends EventEmitter {
         if (this.snapped && this.healer.scheduler.pending === 0) {
           // finished, break
           this.finished = true;
+          // invoke hook
+          this.onFinished && this.onFinished();
           break;
         }
 
@@ -1051,7 +1023,7 @@ export class SnapSync extends EventEmitter {
   /**
    * Set sync root
    */
-  private async setRoot(root: Buffer) {
+  async setRoot(root: Buffer) {
     this.root = root;
     await this.loadSyncProgress();
     await this.healer.scheduler.setRoot(this.root, async (paths, path, leaf, parent) => {
@@ -1077,27 +1049,18 @@ export class SnapSync extends EventEmitter {
    * Start snap sync with remote peer
    * @param root
    */
-  async snapSync(root: Buffer, startingBlock: number, info: SyncInfo, onFinished?: () => Promise<void>) {
-    if (this.isSyncing) {
+  async snapSync(root: Buffer) {
+    if (this.schedulePromise) {
       throw new Error('snap sync is working');
     }
-
-    this.startingBlock = startingBlock;
-    this.highestBlock = info.bestHeight.toNumber();
-    this.emit('start', info);
 
     // set state root
     await this.setRoot(root);
     // reset channel
     this.channel.reset();
     // start loop
-    this.schedulePromise = this.scheduleLoop().finally(async () => {
-      // invoke callback if it exists
-      onFinished && (await onFinished());
+    this.schedulePromise = this.scheduleLoop().finally(() => {
       this.schedulePromise = undefined;
-      // send events
-      this.emit('finished', info);
-      this.emit('synchronized', info);
     });
     // put an empty value to start scheduling
     this.channel.push();
@@ -1107,7 +1070,7 @@ export class SnapSync extends EventEmitter {
    * Announce snapSync when a new peer joins
    */
   announce() {
-    if (!this.isSyncing) {
+    if (!this.schedulePromise) {
       throw new Error("snap sync isn't working");
     }
 
@@ -1119,6 +1082,7 @@ export class SnapSync extends EventEmitter {
    * Stop scheduling
    */
   async abort() {
+    this.onFinished = undefined;
     if (this.schedulePromise) {
       // abort queue
       this.channel.abort();
@@ -1142,9 +1106,120 @@ export class SnapSync extends EventEmitter {
   /**
    * Wait until snap sync finished(only for test)
    */
-  async waitUntilFinished() {
+  async wait() {
     if (this.schedulePromise) {
       await this.schedulePromise;
     }
+  }
+}
+
+export declare interface SnapSyncScheduler {
+  on(event: 'start', listener: (info: SyncInfo) => void): this;
+  on(event: 'finished', listener: (info: SyncInfo) => void): this;
+  on(event: 'synchronized', listener: (info: SyncInfo) => void): this;
+  on(event: 'failed', listener: (info: SyncInfo) => void): this;
+
+  off(event: 'start', listener: (info: SyncInfo) => void): this;
+  off(event: 'finished', listener: (info: SyncInfo) => void): this;
+  off(event: 'synchronized', listener: (info: SyncInfo) => void): this;
+  off(event: 'failed', listener: (info: SyncInfo) => void): this;
+}
+
+export class SnapSyncScheduler extends EventEmitter {
+  readonly syncer: SnapSync;
+
+  private readonly channel = new Channel<Buffer | null>();
+  private aborted: boolean = false;
+  private syncPromise?: Promise<void>;
+  private onFinished?: () => Promise<void>;
+
+  // sync state
+  latestTimestamp: number = 0;
+  private startingBlock: number = 0;
+  private highestBlock: number = 0;
+
+  constructor(syncer: SnapSync) {
+    super();
+    this.syncer = syncer;
+  }
+
+  /**
+   * Get the sync state
+   */
+  get status() {
+    return { startingBlock: this.startingBlock, highestBlock: this.highestBlock };
+  }
+
+  /**
+   * Is it syncing
+   */
+  get isSyncing() {
+    return !!this.syncPromise;
+  }
+
+  private async syncLoop() {
+    for await (const root of this.channel) {
+      // null means snap sync is complete,
+      // exit the loop
+      if (root === null) {
+        break;
+      }
+
+      if (this.syncer.root !== undefined && !this.syncer.root.equals(root)) {
+        // abort and restart sync
+        await this.syncer.abort();
+        await this.syncer.snapSync(root);
+      }
+    }
+  }
+
+  /**
+   * Reset snap sync root
+   * @param root
+   * @param onFinished
+   */
+  resetRoot(root: Buffer, onFinished?: () => Promise<void>) {
+    if (!this.aborted) {
+      // update timestamp
+      this.latestTimestamp = Date.now();
+      this.channel.push(root);
+      this.onFinished = onFinished;
+    }
+  }
+
+  // TODO: ...
+  async snapSync(root: Buffer, startingBlock: number, info: SyncInfo, onFinished?: () => Promise<void>) {
+    this.onFinished = onFinished;
+    this.startingBlock = startingBlock;
+    this.highestBlock = info.bestHeight.toNumber();
+    // send events
+    this.emit('start', info);
+
+    // update timestamp
+    this.latestTimestamp = Date.now();
+    this.syncer.onFinished = () => {
+      this.channel.push(null);
+    };
+    // immediately start snap sync
+    await this.syncer.snapSync(root);
+    // start sync
+    this.syncPromise = this.syncLoop().finally(async () => {
+      this.syncPromise = undefined;
+
+      if (!this.aborted) {
+        // invoke callback if it exists
+        this.onFinished && (await this.onFinished());
+        // send events
+        this.emit('finished', info);
+        this.emit('synchronized', info);
+      }
+    });
+  }
+
+  async abort() {
+    this.aborted = true;
+    this.channel.abort();
+    await this.syncPromise;
+    await this.syncer.abort();
   }
 }

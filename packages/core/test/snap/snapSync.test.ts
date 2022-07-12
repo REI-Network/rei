@@ -6,11 +6,10 @@ import { Common } from '@rei-network/common';
 import { FunctionalBufferMap, getRandomIntInclusive } from '@rei-network/utils';
 import { StakingAccount } from '../../src/stateManager';
 import { asyncTraverseRawDB } from '../../src/snap/layerIterator';
-import { SyncInfo } from '../../src/sync/types';
 import { SnapSync, SnapSyncNetworkManager, SnapSyncPeer, AccountRequest, AccountResponse, StorageRequst, StorageResponse, PeerType } from '../../src/sync/snap';
 import { AccountInfo, genRandomAccounts, GenRandomAccountsResult } from './util';
 import { BaseTrie } from 'merkle-patricia-tree';
-import { BN, keccak256 } from 'ethereumjs-util';
+import { keccak256 } from 'ethereumjs-util';
 const level = require('level-mem');
 
 const common = new Common({ chain: 'rei-devnet' });
@@ -18,12 +17,6 @@ common.setHardforkByBlockNumber(0);
 
 const maxAccountSize = 13;
 const maxStorageSize = 13;
-
-const emptyInfo: SyncInfo = {
-  bestHeight: new BN(0),
-  bestTD: new BN(0),
-  remotePeerId: ''
-};
 
 class MockPeer implements SnapSyncPeer {
   private readonly db: Database;
@@ -234,8 +227,8 @@ describe('SnapSync', () => {
     const dstDB = new Database(level(), common);
 
     const sync = new SnapSync(dstDB, manager);
-    await sync.snapSync(result.root, 0, emptyInfo);
-    await sync.waitUntilFinished();
+    await sync.snapSync(result.root);
+    await sync.wait();
 
     await checkSnap(dstDB);
   });
@@ -244,13 +237,13 @@ describe('SnapSync', () => {
     const dstDB = new Database(level(), common);
 
     const sync = new SnapSync(dstDB, manager);
-    await sync.snapSync(result.root, 0, emptyInfo);
+    await sync.snapSync(result.root);
 
     await new Promise((r) => setTimeout(r, 100));
     await sync.abort();
 
-    await sync.snapSync(result.root, 0, emptyInfo);
-    await sync.waitUntilFinished();
+    await sync.snapSync(result.root);
+    await sync.wait();
 
     await checkSnap(dstDB);
   });
@@ -259,7 +252,7 @@ describe('SnapSync', () => {
     const dstDB = new Database(level(), common);
 
     const sync = new SnapSync(dstDB, manager);
-    await sync.snapSync(result.root, 0, emptyInfo);
+    await sync.snapSync(result.root);
 
     await new Promise((r) => setTimeout(r, 100));
     await sync.abort();
@@ -312,8 +305,8 @@ describe('SnapSync', () => {
       result.root = trie.root;
     }
 
-    await sync.snapSync(result.root, 0, emptyInfo);
-    await sync.waitUntilFinished();
+    await sync.snapSync(result.root);
+    await sync.wait();
 
     await checkSnap(dstDB);
   });
@@ -333,8 +326,8 @@ describe('SnapSync', () => {
     const dstDB = new Database(level(), common);
 
     const sync = new SnapSync(dstDB, manager);
-    await sync.snapSync(result.root, 0, emptyInfo);
-    await sync.waitUntilFinished();
+    await sync.snapSync(result.root);
+    await sync.wait();
 
     await checkSnap(dstDB);
 

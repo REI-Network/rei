@@ -6,7 +6,7 @@ import { Node } from '../node';
 import { preValidateBlock, validateReceipts } from '../validation';
 import { WireProtocolHandler, isV2 } from '../protocols';
 import { FullSync } from './full';
-import { SnapSync } from './snap';
+import { SnapSync, SnapSyncScheduler } from './snap';
 import { SyncInfo } from './types';
 
 const snapSyncMinConfirmed = 2;
@@ -58,7 +58,7 @@ export class Synchronizer extends EventEmitter {
   readonly node: Node;
   readonly mode: SyncMode;
   private full: FullSync;
-  private snap: SnapSync;
+  private snap: SnapSyncScheduler;
   private channel = new Channel<Announcement>();
   private aborted: boolean = false;
   private delay = new AbortableTimer();
@@ -71,7 +71,7 @@ export class Synchronizer extends EventEmitter {
     this.node = options.node;
     this.mode = options.mode;
     this.full = new FullSync(options.node);
-    this.snap = new SnapSync(this.node.db, this.node.snap.pool);
+    this.snap = new SnapSyncScheduler(new SnapSync(this.node.db, this.node.snap.pool));
     this.listenSyncer(this.full);
     this.listenSyncer(this.snap);
   }
@@ -98,7 +98,7 @@ export class Synchronizer extends EventEmitter {
    * Listen syncer event
    * @param sync - Syncer instance
    */
-  private listenSyncer(sync: FullSync | SnapSync) {
+  private listenSyncer(sync: FullSync | SnapSyncScheduler) {
     sync
       .on('start', (info) => {
         logger.info('💡 Get best height from:', info.remotePeerId, 'best height:', info.bestHeight.toString(), 'local height:', this.node.latestBlock.header.number.toString());
@@ -224,6 +224,79 @@ export class Synchronizer extends EventEmitter {
     return true;
   }
 
+  /**
+   * Confirm the latest block data for snap sync
+   * @param ann - Announcement
+   * @returns confirmed peers count and block data
+   */
+  private async confirmAnn(ann: Announcement) {
+    // we're about a week behind, try snap sync first
+    const data = await this.downloadBlockDataFromAnn(ann);
+    if (data === null) {
+      // download data failed,
+      // maybe we should ban the remote peer
+      return null;
+    }
+
+    // sleep for a while to ensure
+    // the block has been synced by other peers
+    await this.delay.wait(waitingSyncDelay);
+    if (this.aborted) {
+      // exit if we have aborted
+      return null;
+    }
+
+    let confirmed = 0;
+    // TODO: random pick handler
+    for (const handler of this.node.wire.pool.handlers) {
+      if (handler.peer.peerId === ann.handler.peer.peerId) {
+        // ignore the current peer
+        continue;
+      }
+
+      if (!isV2(handler)) {
+        // ignore v1 peer
+        continue;
+      }
+
+      const _data = await this.downloadBlockData(ann.height, handler);
+      if (_data !== null && this.compareBlockData(data, _data)) {
+        if (++confirmed >= 2) {
+          break;
+        }
+      }
+    }
+
+    return { confirmed, data };
+  }
+
+  /**
+   * Make a OnFinished callback for snap sync
+   * Rebuild local snapshot and force put block to database
+   * @param ann - Announcement
+   * @param data - Block data
+   * @returns Callback
+   */
+  private makeOnFinishedCallback(ann: Announcement, data: BlockData) {
+    const root = data.block.header.stateRoot;
+    return async () => {
+      logger.debug('Synchronizer::makeOnFinishedCallback, snapSync onFinished');
+      try {
+        // rebuild local snap
+        await this.node.snapTree.rebuild(root);
+        // save block and receipts to database
+        await this.node.commitBlock({
+          ...data,
+          broadcast: false,
+          force: true,
+          td: ann.td
+        });
+      } catch (err) {
+        logger.error('Synchronizer::makeOnFinishedCallback, commit failed:', err);
+      }
+    };
+  }
+
   private async syncLoop() {
     for await (const ann of this.channel) {
       if (this.full.isSyncing) {
@@ -231,10 +304,25 @@ export class Synchronizer extends EventEmitter {
         continue;
       }
 
-      if (ann.type === AnnouncementType.NewPeer && this.snap.isSyncing) {
-        // snap sync is working, announce a new peer to it
-        this.snap.announce();
-        continue;
+      if (this.snap.isSyncing) {
+        // check if we need to notify snap of the latest stateRoot
+        if (ann.height.gtn(this.snap.status.highestBlock) && Date.now() - this.snap.latestTimestamp >= 5000) {
+          // confirm the latest block data, then reset the stateRoot of the snap
+          const result = await this.confirmAnn(ann);
+          if (result !== null) {
+            const { confirmed, data } = result;
+            if (confirmed >= snapSyncMinConfirmed) {
+              const root = data.block.header.stateRoot;
+              this.snap.resetRoot(root, this.makeOnFinishedCallback(ann, data));
+              continue;
+            }
+          }
+        }
+        if (ann.type === AnnouncementType.NewPeer) {
+          // snap sync is working, announce a new peer to it
+          this.snap.syncer.announce();
+          continue;
+        }
       }
 
       // we are not working, try to start a new sync
@@ -247,75 +335,29 @@ export class Synchronizer extends EventEmitter {
 
         if (this.mode === SyncMode.Snap && ann.td.sub(td).gten(snapSyncMinTD) && isV2(ann.handler)) {
           logger.debug('Synchronizer::syncLoop, try to start a new snap sync');
-          // we're about a week behind, try snap sync first
-          const data = await this.downloadBlockDataFromAnn(ann);
-          if (data === null) {
-            // download data failed,
-            // maybe we should ban the remote peer
+
+          // download data from other nodes to confirm the data
+          const result = await this.confirmAnn(ann);
+          if (result === null) {
             continue;
           }
 
-          // sleep for a while to ensure
-          // the block has been synced by other peers
-          await this.delay.wait(waitingSyncDelay);
-          if (this.aborted) {
-            // exit if we have aborted
-            break;
-          }
-
-          // download data from other nodes to verify the data
-          let confirmed = 0;
-          // TODO: random pick handler
-          for (const handler of this.node.wire.pool.handlers) {
-            if (handler.peer.peerId === ann.handler.peer.peerId) {
-              // ignore the current peer
-              continue;
-            }
-
-            if (!isV2(handler)) {
-              // ignore v1 peer
-              continue;
-            }
-
-            const _data = await this.downloadBlockData(ann.height, handler);
-            if (_data !== null && this.compareBlockData(data, _data)) {
-              if (++confirmed >= 2) {
-                break;
-              }
-            }
-          }
-
           // if we have collected enough confirmations, start snap sync
-          if (confirmed >= snapSyncMinConfirmed) {
-            logger.debug('Synchronizer::syncLoop, confirmed succeed');
-            const info: SyncInfo = {
-              bestHeight: new BN(ann.handler.status!.height),
-              bestTD: ann.td,
-              remotePeerId: ann.handler.peer.peerId
-            };
-            const root = data.block.header.stateRoot;
-            const startingBlock = this.node.latestBlock.header.number.toNumber();
-            await this.snap.snapSync(root, startingBlock, info, async () => {
-              if (!this.aborted) {
-                logger.debug('Synchronizer::syncLoop, snapSync onFinished');
-                try {
-                  // rebuild local snap
-                  await this.node.snapTree.rebuild(root);
-                  // save block and receipts to database
-                  await this.node.commitBlock({
-                    ...data,
-                    broadcast: false,
-                    force: true,
-                    td: ann.td
-                  });
-                } catch (err) {
-                  logger.error('Synchronizer::syncLoop, commit failed:', err);
-                }
-              }
-            });
-          } else {
+          const { confirmed, data } = result;
+          if (confirmed < snapSyncMinConfirmed) {
             logger.debug('Synchronizer::syncLoop, confirmed failed:', confirmed);
+            continue;
           }
+
+          logger.debug('Synchronizer::syncLoop, confirmed succeed');
+          const info: SyncInfo = {
+            bestHeight: new BN(ann.handler.status!.height),
+            bestTD: ann.td,
+            remotePeerId: ann.handler.peer.peerId
+          };
+          const startingBlock = this.node.latestBlock.header.number.toNumber();
+          const root = data.block.header.stateRoot;
+          await this.snap.snapSync(root, startingBlock, info, this.makeOnFinishedCallback(ann, data));
         } else {
           logger.debug('Synchronizer::syncLoop, try to start a new full sync');
           // we're not too far behind, try full sync

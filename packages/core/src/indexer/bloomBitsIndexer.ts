@@ -63,11 +63,6 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
    * Commit finalizes the section metadata and stores it into the database.
    */
   commit() {
-    // check header hash
-    if (this.headerHash.equals(EMPTY_HASH)) {
-      throw new Error('invalid header hash');
-    }
-
     const batch: DBOp[] = [];
     for (let i = 0; i < config.bloomBitLength; i++) {
       const bits = this.gen.bitset(i);

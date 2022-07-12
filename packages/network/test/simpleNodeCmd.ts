@@ -20,6 +20,8 @@ async function install(program) {
 
     .option('-e, --enr <bootEnr>', 'boot enr') //boot enr
 
+    .option('-nip,--nodesIp <nodesIp>', 'nodes ip address') //nodes ip address
+
     .parse(process.argv);
 
   if (program.server) {
@@ -28,9 +30,10 @@ async function install(program) {
     const tcp = program.tcpPort;
     const udp = program.udpPort;
     const enr = program.enr;
-    let count = program.count;
+    const count = program.count;
+    const nodesIp = program.nodesIp;
     if (ip && serverPort && tcp && udp) {
-      const nodes = await autoStartNodes({ ip, udpPort: udp, tcpPort: tcp, count, bootEnr: enr });
+      const nodes = await autoStartNodes({ ip, udpPort: udp, tcpPort: tcp, count, bootEnr: enr, nodesIp });
       startServer(nodes, serverPort);
     }
   }

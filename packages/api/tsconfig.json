@@ -9,6 +9,7 @@
   "references": [
     { "path": "../vm/tsconfig.json" },
     { "path": "../structure/tsconfig.json" },
-    { "path": "../utils/tsconfig.json" }
+    { "path": "../utils/tsconfig.json" },
+    { "path": "../rpc/tsconfig.json" }
   ]
 }

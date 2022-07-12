@@ -241,6 +241,13 @@ export class SnapSync {
   }
 
   /**
+   * Is it syncing
+   */
+  get isSyncing() {
+    return !!this.schedulePromise;
+  }
+
+  /**
    * Run promise with lock
    * @param p - Promise
    * @returns Wrapped promise
@@ -1070,7 +1077,7 @@ export class SnapSync {
    * Announce snapSync when a new peer joins
    */
   announce() {
-    if (!this.schedulePromise) {
+    if (!this.isSyncing) {
       throw new Error("snap sync isn't working");
     }
 
@@ -1128,10 +1135,10 @@ export declare interface SnapSyncScheduler {
 export class SnapSyncScheduler extends EventEmitter {
   readonly syncer: SnapSync;
 
-  private readonly channel = new Channel<Buffer | null>();
   private aborted: boolean = false;
-  private syncPromise?: Promise<void>;
   private onFinished?: () => Promise<void>;
+  private syncPromise?: Promise<void>;
+  private syncResolve?: () => void;
 
   // sync state
   latestTimestamp: number = 0;
@@ -1157,38 +1164,36 @@ export class SnapSyncScheduler extends EventEmitter {
     return !!this.syncPromise;
   }
 
-  private async syncLoop() {
-    for await (const root of this.channel) {
-      // null means snap sync is complete,
-      // exit the loop
-      if (root === null) {
-        break;
-      }
-
-      if (this.syncer.root !== undefined && !this.syncer.root.equals(root)) {
-        // abort and restart sync
-        await this.syncer.abort();
-        await this.syncer.snapSync(root);
-      }
+  /**
+   * Reset snap sync root
+   * @param root - New state root
+   * @param onFinished - On finished callback
+   */
+  async resetRoot(root: Buffer, onFinished?: () => Promise<void>) {
+    if (!this.aborted && this.syncer.root !== undefined && !this.syncer.root.equals(root)) {
+      // update timestamp
+      this.latestTimestamp = Date.now();
+      this.onFinished = onFinished;
+      // abort and restart sync
+      await this.syncer.abort();
+      await this.syncer.snapSync(root);
     }
   }
 
   /**
-   * Reset snap sync root
-   * @param root
-   * @param onFinished
+   * Start snap sync,
+   * this function will wait until snap sync finished
+   * @param root - State root
+   * @param startingBlock - Start sync block number
+   * @param info - Sync info
+   * @param onFinished - On finished callback,
+   *                     it will be invoked when sync finished
    */
-  resetRoot(root: Buffer, onFinished?: () => Promise<void>) {
-    if (!this.aborted) {
-      // update timestamp
-      this.latestTimestamp = Date.now();
-      this.channel.push(root);
-      this.onFinished = onFinished;
-    }
-  }
-
-  // TODO: ...
   async snapSync(root: Buffer, startingBlock: number, info: SyncInfo, onFinished?: () => Promise<void>) {
+    if (this.isSyncing) {
+      throw new Error('SnapSyncScheduler is working');
+    }
+
     this.onFinished = onFinished;
     this.startingBlock = startingBlock;
     this.highestBlock = info.bestHeight.toNumber();
@@ -1197,29 +1202,33 @@ export class SnapSyncScheduler extends EventEmitter {
 
     // update timestamp
     this.latestTimestamp = Date.now();
-    this.syncer.onFinished = () => {
-      this.channel.push(null);
-    };
-    // immediately start snap sync
+    // start snap sync
     await this.syncer.snapSync(root);
-    // start sync
-    this.syncPromise = this.syncLoop().finally(async () => {
+    // wait until finished
+    await (this.syncPromise = new Promise<void>((resolve) => {
+      this.syncResolve = resolve;
+      this.syncer.onFinished = () => {
+        resolve();
+      };
+    }).finally(() => {
       this.syncPromise = undefined;
-
-      if (!this.aborted) {
-        // invoke callback if it exists
-        this.onFinished && (await this.onFinished());
-        // send events
-        this.emit('finished', info);
-        this.emit('synchronized', info);
-      }
-    });
+      this.syncResolve = undefined;
+    }));
+    if (!this.aborted) {
+      // invoke callback if it exists
+      this.onFinished && (await this.onFinished());
+      // send events
+      this.emit('finished', info);
+      this.emit('synchronized', info);
+    }
   }
 
+  /**
+   * Abort sync
+   */
   async abort() {
     this.aborted = true;
-    this.channel.abort();
-    await this.syncPromise;
+    this.syncResolve && this.syncResolve();
     await this.syncer.abort();
   }
 }

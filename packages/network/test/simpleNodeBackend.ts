@@ -6,14 +6,20 @@ app.use(express.json());
 app.post('/nodeConnections', async function (req, res) {
   const nodes: { count: number; peerId: string; nodeId: string; localEnr: string; peers: string[]; kbucktPeers: string[]; kSize: number; connectionSize: number }[] = [];
   for (let i = 0; i < app.nodes.length; i++) {
-    const node = app.nodes[i];
-    const localEnr: string = node.localEnr.encodeTxt();
-    const peerId: string = (await node.localEnr.peerId()).toB58String();
-    const nodeId: string = node.localEnr.nodeId;
-    const peers = node.peers.map((peer) => peer.peerId);
-    const connectionSize: number = peers.length;
-    const kbucktPeers = await node.kbucketPeers();
-    nodes.push({ count: i, peerId, nodeId, localEnr, peers, connectionSize, kbucktPeers, kSize: kbucktPeers.length });
+    try {
+      const node = app.nodes[i];
+      const localEnr: string = node.localEnr.encodeTxt();
+      const peerId: string = (await node.localEnr.peerId()).toB58String();
+      const nodeId: string = node.localEnr.nodeId;
+      const peers = node.peers.map((peer) => peer.peerId);
+      const connectionSize: number = peers.length;
+      const kbucktPeers = await node.kbucketPeers();
+      nodes.push({ count: i, peerId, nodeId, localEnr, peers, connectionSize, kbucktPeers, kSize: kbucktPeers.length });
+    } catch (e) {
+      console.log(e);
+      res.send({ error: (e as any).message });
+      break;
+    }
   }
   res.send(nodes);
 });

@@ -311,6 +311,7 @@ export class NetworkManager extends EventEmitter {
     if (multiaddr) {
       // update peer announce address
       this.libp2pNode.addressManager.announce = new Set([multiaddr.toString()]);
+      this.localEnr.encode(this.privateKey);
     }
     this.nodedb.storeLocalSeq(enr.nodeId, enr.seq);
   };

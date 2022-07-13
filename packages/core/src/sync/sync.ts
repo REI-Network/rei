@@ -194,7 +194,7 @@ export class Synchronizer extends EventEmitter {
 
     // validate receipts
     try {
-      validateReceipts(block, receipts);
+      await validateReceipts(block, receipts);
     } catch (err) {
       // maybe we should ban remote peer
       logger.warn('Synchronizer::downloadBlockData, validate receipts failed:', handler.id, 'err:', err);

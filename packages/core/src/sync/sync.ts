@@ -9,6 +9,7 @@ import { FullSync } from './full';
 import { SnapSync, SnapSyncScheduler } from './snap';
 import { SyncInfo } from './types';
 
+const snapSyncStaleBlockNumber = 128;
 const snapSyncMinConfirmed = 2;
 const snapSyncMinTD = 100; // TODO: debug
 const waitingSyncDelay = 100;
@@ -305,15 +306,18 @@ export class Synchronizer extends EventEmitter {
       }
 
       if (this.snap.isSyncing) {
+        const remoteHeight = ann.height.toNumber();
+        const localHeight = this.snap.status.highestBlock;
         // check if we need to notify snap of the latest stateRoot
-        if (ann.height.gtn(this.snap.status.highestBlock) && Date.now() - this.snap.latestTimestamp >= 5000) {
+        if (remoteHeight - localHeight >= snapSyncStaleBlockNumber && this.snap.syncer.snapped === false) {
           // confirm the latest block data, then reset the stateRoot of the snap
           const result = await this.confirmAnn(ann);
           if (result !== null) {
             const { confirmed, data } = result;
             if (confirmed >= snapSyncMinConfirmed) {
               const root = data.block.header.stateRoot;
-              this.snap.resetRoot(root, this.makeOnFinishedCallback(ann, data));
+              logger.debug('Synchronizer::syncLoop, reset snap sync root, height:', remoteHeight);
+              await this.snap.resetRoot(remoteHeight, root, this.makeOnFinishedCallback(ann, data));
               continue;
             }
           }

@@ -982,8 +982,6 @@ export class SnapSync {
           // otherwise, it might just be a peer join event, do nothing
         }
 
-        console.log('once');
-
         await this.cleanStorageTasks();
         this.cleanAccountTasks();
         if (this.snapped && this.healer.scheduler.pending === 0) {
@@ -1141,7 +1139,6 @@ export class SnapSyncScheduler extends EventEmitter {
   private syncResolve?: () => void;
 
   // sync state
-  latestTimestamp: number = 0;
   private startingBlock: number = 0;
   private highestBlock: number = 0;
 
@@ -1166,13 +1163,13 @@ export class SnapSyncScheduler extends EventEmitter {
 
   /**
    * Reset snap sync root
+   * @param height - Highest block number
    * @param root - New state root
    * @param onFinished - On finished callback
    */
-  async resetRoot(root: Buffer, onFinished?: () => Promise<void>) {
+  async resetRoot(height: number, root: Buffer, onFinished?: () => Promise<void>) {
     if (!this.aborted && this.syncer.root !== undefined && !this.syncer.root.equals(root)) {
-      // update timestamp
-      this.latestTimestamp = Date.now();
+      this.highestBlock = height;
       this.onFinished = onFinished;
       // abort and restart sync
       await this.syncer.abort();
@@ -1200,27 +1197,25 @@ export class SnapSyncScheduler extends EventEmitter {
     // send events
     this.emit('start', info);
 
-    // update timestamp
-    this.latestTimestamp = Date.now();
     // start snap sync
     await this.syncer.snapSync(root);
     // wait until finished
-    await (this.syncPromise = new Promise<void>((resolve) => {
+    this.syncPromise = new Promise<void>((resolve) => {
       this.syncResolve = resolve;
       this.syncer.onFinished = () => {
         resolve();
       };
-    }).finally(() => {
+    }).finally(async () => {
       this.syncPromise = undefined;
       this.syncResolve = undefined;
-    }));
-    if (!this.aborted) {
-      // invoke callback if it exists
-      this.onFinished && (await this.onFinished());
-      // send events
-      this.emit('finished', info);
-      this.emit('synchronized', info);
-    }
+      if (!this.aborted) {
+        // invoke callback if it exists
+        this.onFinished && (await this.onFinished());
+        // send events
+        this.emit('finished', info);
+        this.emit('synchronized', info);
+      }
+    });
   }
 
   /**

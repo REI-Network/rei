@@ -1162,7 +1162,7 @@ export class SnapSyncScheduler extends EventEmitter {
   }
 
   /**
-   * Reset snap sync root
+   * Reset snap sync root and highest block number
    * @param height - Highest block number
    * @param root - New state root
    * @param onFinished - On finished callback
@@ -1178,8 +1178,8 @@ export class SnapSyncScheduler extends EventEmitter {
   }
 
   /**
-   * Start snap sync,
-   * this function will wait until snap sync finished
+   * Aysnc start snap sync,
+   * this function will not wait until snap sync finished
    * @param root - State root
    * @param startingBlock - Start sync block number
    * @param info - Sync info

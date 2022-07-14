@@ -1,7 +1,20 @@
-import { Controller } from './base';
+import { ApiServer } from '@rei-network/api';
 
-export class TxPoolController extends Controller {
+/**
+ * Txpool api Controller
+ */
+export class TxPoolController {
+  readonly apiServer: ApiServer;
+
+  constructor(apiServer: ApiServer) {
+    this.apiServer = apiServer;
+  }
+
+  /**
+   * Get total pool content
+   * @returns An object containing all transactions in the pool
+   */
   txpool_content() {
-    return this.backend.txPool.getPoolContent();
+    return this.apiServer.content();
   }
 }

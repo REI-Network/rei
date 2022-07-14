@@ -13,8 +13,9 @@ export class DebugController {
 
   /**
    * Trace a block by blockrlp data
-   * @param param0 - blockrlp data and options
-   * @returns
+   * @param blockRlp - block rlp encoded data
+   * @param options - options
+   * @returns Result of execution block
    */
   debug_traceBlock([blockRlp, options]: [string, any]) {
     const blockRlpBuffer = hexStringToBuffer(blockRlp);
@@ -23,7 +24,8 @@ export class DebugController {
 
   /**
    * Trace a block by block number
-   * @param param0 - block tag and options
+   * @param tag - block tag
+   * @param options - options
    * @returns Result of execution block
    */
   async debug_traceBlockByNumber([tag, options]: [string, any]) {
@@ -32,7 +34,8 @@ export class DebugController {
 
   /**
    * Trace a block by block hash
-   * @param param0 - block hash and options
+   * @param hash  - block hash
+   * @param options - options
    * @returns Result of execution block
    */
   debug_traceBlockByHash([hash, options]: [string, any]) {
@@ -41,8 +44,9 @@ export class DebugController {
 
   /**
    * Trace a transaction by transaction hash
-   * @param param0 - Transaction hash and options
-   * @returns
+   * @param hash - transaction hash
+   * @param options - options
+   * @returns Result of execution transaction
    */
   debug_traceTransaction([hash, options]: [string, any]) {
     return this.apiServer.traceTransaction(hash, options);
@@ -50,7 +54,9 @@ export class DebugController {
 
   /**
    * Trace given transaction by call vm.runCall fucntion
-   * @param param0 - call data, block tag and options
+   * @param data - call data
+   * @param tag - block tag
+   * @param options - options
    * @returns Result of execution transaction
    */
   async debug_traceCall([data, tag, options]: [CallData, string, any]) {

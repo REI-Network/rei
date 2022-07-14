@@ -20,7 +20,7 @@ export class Web3Controller {
 
   /**
    * Calulate the sha3 of a given string
-   * @param param0 - Data to calulate hash
+   * @param data - data to calculate
    * @returns Hash
    */
   web_sha3([data]: [string]) {

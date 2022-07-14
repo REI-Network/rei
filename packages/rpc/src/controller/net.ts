@@ -1,14 +1,36 @@
-import { intToHex } from 'ethereumjs-util';
-import { Controller } from './base';
+import { ApiServer } from '@rei-network/api';
 
-export class NetController extends Controller {
+/**
+ * Net api Controller
+ */
+export class NetController {
+  readonly apiServer: ApiServer;
+
+  constructor(apiServer: ApiServer) {
+    this.apiServer = apiServer;
+  }
+
+  /**
+   * Get the current network id
+   * @returns Network id
+   */
   net_version() {
-    return this.backend.chainId.toString();
+    return this.apiServer.version();
   }
+
+  /**
+   * Returns true if client is actively listening for network connections
+   * @returns Network connections state
+   */
   net_listenging() {
-    return true;
+    return this.apiServer.listening();
   }
+
+  /**
+   * Returns number of peers currently connected to the client
+   * @returns Number of connected peers
+   */
   net_peerCount() {
-    return intToHex(this.backend.networkMngr.peers.length);
+    return this.apiServer.peerCount();
   }
 }

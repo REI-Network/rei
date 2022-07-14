@@ -141,7 +141,7 @@ export class ApiServer {
    * @param options - options
    * @returns Result of execution block
    */
-  debug_traceBlock(blockRlp: Buffer, options: any) {
+  traceBlock(blockRlp: Buffer, options: any) {
     return this.node.getTracer().traceBlock(blockRlp, options);
   }
 
@@ -151,7 +151,7 @@ export class ApiServer {
    * @param options - options
    * @returns Result of execution block
    */
-  async debug_traceBlockByNumber(tag: string, options: any) {
+  async traceBlockByNumber(tag: string, options: any) {
     return this.node.getTracer().traceBlock(await this.getBlockByTag(tag), options);
   }
 
@@ -161,7 +161,7 @@ export class ApiServer {
    * @param options - options
    * @returns Result of execution block
    */
-  debug_traceBlockByHash(hash: string, options: any) {
+  traceBlockByHash(hash: string, options: any) {
     return this.node.getTracer().traceBlockByHash(hexStringToBuffer(hash), options);
   }
 
@@ -171,7 +171,7 @@ export class ApiServer {
    * @param options - options
    * @returns Result of execution transaction
    */
-  debug_traceTransaction(hash: string, options: any) {
+  traceTransaction(hash: string, options: any) {
     return this.node.getTracer().traceTx(hexStringToBuffer(hash), options);
   }
 
@@ -182,7 +182,7 @@ export class ApiServer {
    * @param options - options
    * @returns Result of execution transaction
    */
-  async debug_traceCall(data: CallData, tag: string, options: any) {
+  async traceCall(data: CallData, tag: string, options: any) {
     return this.node.getTracer().traceCall(data, await this.getBlockByTag(tag), options);
   }
 
@@ -191,7 +191,7 @@ export class ApiServer {
    * Returns the current protocol version.
    * @returns The current client version
    */
-  eth_protocolVersion() {
+  protocolVersion() {
     return '1';
   }
 
@@ -199,7 +199,7 @@ export class ApiServer {
    *  Returns an object with data about the sync status or false.
    * @returns The syncing status.
    */
-  eth_syncing() {
+  syncing() {
     if (!this.node.sync.isSyncing) {
       return false;
     }
@@ -215,7 +215,7 @@ export class ApiServer {
    *  Return the current network id
    * @returns The current network id
    */
-  eth_chainId() {
+  chainId() {
     return bnToHex(this.node.getCommon(0).chainIdBN());
   }
 
@@ -223,7 +223,7 @@ export class ApiServer {
    * Returns the client coinbase address.
    * @returns The coinbase address
    */
-  eth_coinbase() {
+  coinbase() {
     return this.node.getCurrentEngine().coinbase.toString();
   }
 
@@ -231,7 +231,7 @@ export class ApiServer {
    * Returns true if client is actively mining new blocks.
    * @returns True if the node is currently mining, otherwise false
    */
-  eth_mining() {
+  mining() {
     return this.node.getCurrentEngine().enable;
   }
 
@@ -239,7 +239,7 @@ export class ApiServer {
    * Returns the number of hashes per second that the node is mining with
    * @returns The node's hashrate
    */
-  eth_hashrate() {
+  hashrate() {
     return intToHex(0);
   }
 
@@ -247,7 +247,7 @@ export class ApiServer {
    *  Returns the current price per gas in wei
    * @returns Gas price
    */
-  eth_gasPrice() {
+  gasPrice() {
     return bnToHex(this.oracle.gasPrice);
   }
 
@@ -255,7 +255,7 @@ export class ApiServer {
    * Returns a list of addresses owned by client
    * @returns Accounts list
    */
-  eth_accounts() {
+  accounts() {
     return this.node.accMngr.totalUnlockedAccounts().map((addr) => bufferToHex(addr));
   }
 
@@ -263,7 +263,7 @@ export class ApiServer {
    * Returns the number of most recent block
    * @returns Latest block number
    */
-  eth_blockNumber() {
+  blockNumber() {
     return bnToHex(this.node.getLatestBlock().header.number);
   }
 
@@ -273,7 +273,7 @@ export class ApiServer {
    * @param tag - block tag
    * @returns Balance of the account
    */
-  async eth_getBalance(address: string, tag: any) {
+  async getBalance(address: string, tag: any) {
     const stateManager = await this.getStateManagerByTag(tag);
     const account = await stateManager.getAccount(Address.fromString(address));
     return bnToHex(account.balance);
@@ -285,7 +285,7 @@ export class ApiServer {
    * @param key  - query key
    * @param tag  - block tag
    */
-  async eth_getStorageAt(address: string, key: string, tag: any) {
+  async getStorageAt(address: string, key: string, tag: any) {
     const stateManager = await this.getStateManagerByTag(tag);
     return bufferToHex(await stateManager.getContractStorage(Address.fromString(address), setLengthLeft(hexStringToBuffer(key), 32)));
   }
@@ -296,7 +296,7 @@ export class ApiServer {
    * @param tag - block tag
    * @returns Nonce of the account
    */
-  async eth_getTransactionCount(address: string, tag: any) {
+  async getTransactionCount(address: string, tag: any) {
     const stateManager = await this.getStateManagerByTag(tag);
     const account = await stateManager.getAccount(Address.fromString(address));
     return bnToHex(account.nonce);
@@ -307,7 +307,7 @@ export class ApiServer {
    * @param hash - query hash
    * @returns Transaction count
    */
-  async eth_getBlockTransactionCountByHash(hash: string) {
+  async getBlockTransactionCountByHash(hash: string) {
     try {
       const number = (await this.node.db.getBlock(hexStringToBuffer(hash))).transactions.length;
       return intToHex(number);
@@ -321,7 +321,7 @@ export class ApiServer {
    * @param tag - query tag
    * @returns Transaction count
    */
-  async eth_getBlockTransactionCountByNumber(tag: any) {
+  async getBlockTransactionCountByNumber(tag: any) {
     try {
       const number = (await this.getBlockByTag(tag)).transactions.length;
       return intToHex(number);
@@ -335,7 +335,7 @@ export class ApiServer {
    * @param hash - query hash
    * @returns Uncle block count
    */
-  eth_getUncleCountByBlockHash(hash: string) {
+  getUncleCountByBlockHash(hash: string) {
     return intToHex(0);
   }
 
@@ -344,7 +344,7 @@ export class ApiServer {
    * @param tag - query tag
    * @returns Uncle block count
    */
-  eth_getUncleCountByBlockNumber(tag: any) {
+  getUncleCountByBlockNumber(tag: any) {
     return intToHex(0);
   }
 
@@ -354,7 +354,7 @@ export class ApiServer {
    * @param tag - block tag
    * @returns Contract code
    */
-  async eth_getCode(address: string, tag: any) {
+  async getCode(address: string, tag: any) {
     const stateManager = await this.getStateManagerByTag(tag);
     const code = await stateManager.getContractCode(Address.fromString(address));
     return bufferToHex(code);
@@ -366,7 +366,7 @@ export class ApiServer {
    * @param data - message data
    * @returns Signature
    */
-  eth_sign(address: string, data: string) {
+  sign(address: string, data: string) {
     const signature = ecsign(hashPersonalMessage(Buffer.from(data)), this.node.accMngr.getPrivateKey(address));
     return toRpcSig(signature.v, signature.r, signature.s);
   }
@@ -396,7 +396,7 @@ export class ApiServer {
    * @param data - transaction data
    * @returns Signed transaction
    */
-  async eth_signTransaction(data: CallData) {
+  async signTransaction(data: CallData) {
     const tx = await this.makeTxForUnlockedAccount(data);
     if (!(tx instanceof Transaction)) {
       return null;
@@ -409,7 +409,7 @@ export class ApiServer {
    * @param data - transaction data
    * @returns Transaction hash
    */
-  async eth_sendTransaction(data: CallData) {
+  async sendTransaction(data: CallData) {
     const tx = await this.makeTxForUnlockedAccount(data);
     if (!(tx instanceof Transaction)) {
       return null;
@@ -423,7 +423,7 @@ export class ApiServer {
    * @param rawtx - raw transaction
    * @returns Transaction hash
    */
-  async eth_sendRawTransaction(rawtx: string) {
+  async sendRawTransaction(rawtx: string) {
     const tx = TransactionFactory.fromSerializedData(hexStringToBuffer(rawtx), { common: this.node.getLatestCommon() });
     if (!(tx instanceof Transaction)) {
       return null;
@@ -438,7 +438,7 @@ export class ApiServer {
    * @param tag - block tag
    * @returns
    */
-  async eth_call(data: CallData, tag: any) {
+  async call(data: CallData, tag: any) {
     const result = await this.runCall(data, tag);
     return bufferToHex(result.execResult.returnValue);
   }
@@ -467,7 +467,7 @@ export class ApiServer {
    * @param tag - block tag
    * @returns Estimated gas limit
    */
-  async eth_estimateGas(data: CallData, tag: any) {
+  async estimateGas(data: CallData, tag: any) {
     const block = await this.getBlockByTag(tag);
     const baseFee = this.calculateBaseFee(data, block._common);
     const gas = data.gas ? hexStringToBN(data.gas) : block.header.gasLimit;
@@ -518,7 +518,7 @@ export class ApiServer {
    * @param fullTransactions - include full transactions or not
    * @returns Block data
    */
-  async eth_getBlockByHash(hash: string, fullTransactions: boolean) {
+  async getBlockByHash(hash: string, fullTransactions: boolean) {
     try {
       return ((await this.node.db.getBlock(hexStringToBuffer(hash))) as Block).toRPCJSON(false, fullTransactions);
     } catch (err) {
@@ -532,7 +532,7 @@ export class ApiServer {
    * @param fullTransactions - include full transactions or not
    * @returns Block data
    */
-  async eth_getBlockByNumber(tag: any, fullTransactions: boolean) {
+  async getBlockByNumber(tag: any, fullTransactions: boolean) {
     try {
       return (await this.getBlockByTag(tag)).toRPCJSON(tag === 'pending', fullTransactions);
     } catch (err) {
@@ -545,7 +545,7 @@ export class ApiServer {
    * @param hash - transaction hash
    * @returns Transaction data
    */
-  async eth_getTransactionByHash(hash: string) {
+  async getTransactionByHash(hash: string) {
     const hashBuffer = hexStringToBuffer(hash);
     try {
       return ((await this.node.db.getTransaction(hashBuffer)) as Transaction).toRPCJSON();
@@ -567,7 +567,7 @@ export class ApiServer {
    * @param index - transaction index
    * @returns Transaction data
    */
-  async eth_getTransactionByBlockHashAndIndex(hash: string, index: string) {
+  async getTransactionByBlockHashAndIndex(hash: string, index: string) {
     try {
       const block = await this.node.db.getBlock(hexStringToBuffer(hash));
       const tx = block.transactions[Number(index)] as Transaction;
@@ -584,7 +584,7 @@ export class ApiServer {
    * @param index - transaction index
    * @returns Transaction data
    */
-  async eth_getTransactionByBlockNumberAndIndex(tag: any, index: string) {
+  async getTransactionByBlockNumberAndIndex(tag: any, index: string) {
     try {
       const block = await this.getBlockByTag(tag);
       const tx = block.transactions[Number(index)] as Transaction;
@@ -600,7 +600,7 @@ export class ApiServer {
    * @param hash - transaction hash
    * @returns Transaction receipt
    */
-  async eth_getTransactionReceipt(hash: string) {
+  async getTransactionReceipt(hash: string) {
     try {
       return (await this.node.db.getReceipt(hexStringToBuffer(hash))).toRPCJSON();
     } catch (err) {
@@ -612,7 +612,7 @@ export class ApiServer {
    * Returns information about a uncle of a block by hash and uncle index position
    * @returns Uncle block data
    */
-  eth_getUncleByBlockHashAndIndex() {
+  getUncleByBlockHashAndIndex() {
     return null;
   }
 
@@ -620,7 +620,7 @@ export class ApiServer {
    * Returns information about a uncle of a block by number and uncle index position
    * @returns Uncle block data
    */
-  eth_getUncleByBlockNumberAndIndex() {
+  getUncleByBlockNumberAndIndex() {
     return null;
   }
 
@@ -628,28 +628,28 @@ export class ApiServer {
    * Returns a list of available compilers in the client
    * @returns Compilers
    */
-  eth_getCompilers() {
+  getCompilers() {
     return [];
   }
 
   /**
    * Returns compiled solidity code
    */
-  eth_compileSolidity() {
+  compileSolidity() {
     throw new Error('Unsupported compiler!');
   }
 
   /**
    * Returns compiled LLL code
    */
-  eth_compileLLL() {
+  compileLLL() {
     throw new Error('Unsupported compiler!');
   }
 
   /**
    * Returns compiled serpent code
    */
-  eth_compileSerpent() {
+  compileSerpent() {
     throw new Error('Unsupported compiler!');
   }
 
@@ -658,7 +658,7 @@ export class ApiServer {
    * @param param0 - filter parameters
    * @returns Filter id
    */
-  async eth_newFilter({ fromBlock, toBlock, address: _addresses, topics: _topics }: { fromBlock?: string; toBlock?: string; address?: string | string[]; topics?: TopicsData; blockhash?: string }) {
+  async newFilter({ fromBlock, toBlock, address: _addresses, topics: _topics }: { fromBlock?: string; toBlock?: string; address?: string | string[]; topics?: TopicsData; blockhash?: string }) {
     const from = await this.getBlockNumberByTag(fromBlock ? fromBlock : 'latest');
     const to = await this.getBlockNumberByTag(toBlock ? toBlock : 'latest');
     const { addresses, topics } = parseAddressesAndTopics(_addresses, _topics);
@@ -669,7 +669,7 @@ export class ApiServer {
    * Creates a filter in the node, to notify when a new block arrives
    * @returns Filter id
    */
-  eth_newBlockFilter() {
+  newBlockFilter() {
     return this.filterSystem.newFilter('newHeads');
   }
 
@@ -677,7 +677,7 @@ export class ApiServer {
    * Creates a filter in the node, to notify when new pending transactions arrive
    * @returns Filter id
    */
-  eth_newPendingTransactionFilter() {
+  newPendingTransactionFilter() {
     return this.filterSystem.newFilter('newPendingTransactions');
   }
 
@@ -686,7 +686,7 @@ export class ApiServer {
    * @param id - filter id
    * @returns `true` if sucessfully deleted
    */
-  eth_uninstallFilter(id: string) {
+  uninstallFilter(id: string) {
     return this.filterSystem.uninstall(id);
   }
 
@@ -695,7 +695,7 @@ export class ApiServer {
    * @param id - filter id
    * @returns Filter changes
    */
-  eth_getFilterChanges(id: string) {
+  getFilterChanges(id: string) {
     const changes = this.filterSystem.filterChanges(id);
     if (!changes || changes.length === 0) {
       return [];
@@ -712,7 +712,7 @@ export class ApiServer {
    * @param id - filter id
    * @returns Filter logs
    */
-  async eth_getFilterLogs(id: string) {
+  async getFilterLogs(id: string) {
     const query = this.filterSystem.getFilterQuery(id);
     if (!query) {
       return [];
@@ -721,7 +721,7 @@ export class ApiServer {
     const from = await this.getBlockNumberByTag(fromBlock ?? 'latest');
     const to = await this.getBlockNumberByTag(toBlock ?? 'latest');
     if (to.sub(from).gtn(5000)) {
-      throw new Error('eth_getFilterLogs, too many block, max limit is 5000');
+      throw new Error('getFilterLogs, too many block, max limit is 5000');
     }
 
     const filter = this.node.getFilter();
@@ -734,11 +734,11 @@ export class ApiServer {
    * @param param0 - filter parameters
    * @returns Logs
    */
-  async eth_getLogs({ fromBlock, toBlock, address: _addresses, topics: _topics, blockhash }: { fromBlock?: string; toBlock?: string; address?: string | string[]; topics?: TopicsData; blockhash?: string }) {
+  async getLogs({ fromBlock, toBlock, address: _addresses, topics: _topics, blockhash }: { fromBlock?: string; toBlock?: string; address?: string | string[]; topics?: TopicsData; blockhash?: string }) {
     const from = await this.getBlockNumberByTag(fromBlock ?? 'latest');
     const to = await this.getBlockNumberByTag(toBlock ?? 'latest');
     if (to.sub(from).gtn(5000)) {
-      throw new Error('eth_getLogs, too many block, max limit is 5000');
+      throw new Error('getLogs, too many block, max limit is 5000');
     }
 
     const { addresses, topics } = parseAddressesAndTopics(_addresses, _topics);
@@ -750,22 +750,22 @@ export class ApiServer {
   /**
    * Returns the hash of the current block, the seedHash, and the boundary condition to be met ("target").
    */
-  eth_getWork() {
-    throw new Error('Unsupported eth_getWork!');
+  getWork() {
+    throw new Error('Unsupported getWork!');
   }
 
   /**
    * Used for submitting a proof-of-work solution.
    */
-  eth_submitWork() {
-    throw new Error('Unsupported eth_submitWork!');
+  submitWork() {
+    throw new Error('Unsupported submitWork!');
   }
 
   /**
    * Used for submitting mining hashrate.
    */
-  eth_submitHashrate() {
-    throw new Error('Unsupported eth_submitHashrate!');
+  submitHashrate() {
+    throw new Error('Unsupported submitHashrate!');
   }
 
   /**
@@ -773,7 +773,7 @@ export class ApiServer {
    * @param id - subscription id
    * @returns `true` if subscription was successfully canceled
    */
-  eth_unsubscribe(id: string) {
+  unsubscribe(id: string) {
     return this.filterSystem.unsubscribe(id);
   }
 
@@ -784,13 +784,13 @@ export class ApiServer {
    * @param client - subscription client
    * @returns Subscription id
    */
-  async eth_subscribe(type: string, options: undefined | { address?: string | string[]; topics?: TopicsData }, client?: client) {
+  async subscribe(type: string, options: undefined | { address?: string | string[]; topics?: TopicsData }, client?: client) {
     if (!client) {
-      throw new Error('eth_subscribe is only supported on websocket!');
+      throw new Error('subscribe is only supported on websocket!');
     }
 
     if (type !== 'newHeads' && type !== 'logs' && type !== 'newPendingTransactions' && type !== 'syncing') {
-      throw new Error('eth_subscribe, invalid subscription type!');
+      throw new Error('subscribe, invalid subscription type!');
     }
 
     if (type === 'logs') {
@@ -807,7 +807,7 @@ export class ApiServer {
    * @param tag - Block tag
    * @returns Available crude
    */
-  async rei_getCrude(address: string, tag: string) {
+  async getCrude(address: string, tag: string) {
     const block = await this.getBlockByTag(tag);
     const common = block._common;
     const strDailyFee = common.param('vm', 'dailyFee');
@@ -832,7 +832,7 @@ export class ApiServer {
    * @param tag - Block tag
    * @returns Used crude
    */
-  async rei_getUsedCrude(address: string, tag: string) {
+  async getUsedCrude(address: string, tag: string) {
     const block = await this.getBlockByTag(tag);
     const timestamp = block.header.timestamp.toNumber();
     const state = await this.node.getStateManager(block.header.stateRoot, block._common);
@@ -847,7 +847,7 @@ export class ApiServer {
    * @param tag - Block tag
    * @returns Total deposit amount
    */
-  async rei_getTotalAmount(address: string, tag: string) {
+  async getTotalAmount(address: string, tag: string) {
     const stateManager = await this.getStateManagerByTag(tag);
     const account = await stateManager.getAccount(Address.fromString(address));
     const stakeInfo = account.getStakeInfo();
@@ -859,7 +859,7 @@ export class ApiServer {
    * @param tag - Block tag
    * @returns Daily fee
    */
-  async rei_getDailyFee(tag: string) {
+  async getDailyFee(tag: string) {
     const num = await this.getBlockNumberByTag(tag);
     const common = this.node.getCommon(num);
     const strDailyFee = common.param('vm', 'dailyFee');
@@ -874,7 +874,7 @@ export class ApiServer {
    * @param tag - Block tag
    * @returns Miner reward factor
    */
-  async rei_getMinerRewardFactor(tag: string) {
+  async getMinerRewardFactor(tag: string) {
     const num = await this.getBlockNumberByTag(tag);
     const common = this.node.getCommon(num);
     const factor = common.param('vm', 'minerRewardFactor');
@@ -888,7 +888,7 @@ export class ApiServer {
    * Get total pool content
    * @returns An object containing all transactions in the pool
    */
-  txpool_content() {
+  content() {
     return this.node.txPool.getPoolContent();
   }
 
@@ -896,7 +896,7 @@ export class ApiServer {
    * Get client version
    * @returns version data
    */
-  web3_clientVersion() {
+  clientVersion() {
     return 'Mist/v0.0.1';
   }
 
@@ -905,7 +905,7 @@ export class ApiServer {
    * @param data - Data to calulate hash
    * @returns Hash
    */
-  web_sha3(data: string) {
+  sha3(data: string) {
     return bufferToHex(keccakFromHexString(data));
   }
 
@@ -913,7 +913,7 @@ export class ApiServer {
    * Get the current network id
    * @returns Network id
    */
-  net_version() {
+  version() {
     return this.node.chainId.toString();
   }
 
@@ -921,7 +921,7 @@ export class ApiServer {
    * Returns true if client is actively listening for network connections
    * @returns network connections state
    */
-  net_listening() {
+  listening() {
     return true;
   }
 
@@ -929,7 +929,7 @@ export class ApiServer {
    * Returns number of peers currently connected to the client
    * @returns number of peers
    */
-  net_peerCount() {
+  peerCount() {
     return intToHex(this.node.networkMngr.peers.length);
   }
 }

@@ -884,26 +884,51 @@ export class ApiServer {
     return intToHex(factor);
   }
 
+  /**
+   * Get total pool content
+   * @returns An object containing all transactions in the pool
+   */
   txpool_content() {
     return this.node.txPool.getPoolContent();
   }
 
+  /**
+   * Get client version
+   * @returns version data
+   */
   web3_clientVersion() {
     return 'Mist/v0.0.1';
   }
 
+  /**
+   * Calulate the sha3 of a given string
+   * @param data - Data to calulate hash
+   * @returns Hash
+   */
   web_sha3(data: string) {
     return bufferToHex(keccakFromHexString(data));
   }
 
+  /**
+   * Get the current network id
+   * @returns Network id
+   */
   net_version() {
     return this.node.chainId.toString();
   }
 
+  /**
+   * Returns true if client is actively listening for network connections
+   * @returns network connections state
+   */
   net_listening() {
     return true;
   }
 
+  /**
+   * Returns number of peers currently connected to the client
+   * @returns number of peers
+   */
   net_peerCount() {
     return intToHex(this.node.networkMngr.peers.length);
   }

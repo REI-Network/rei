@@ -228,7 +228,7 @@ export class ApiServer {
   }
 
   /**
-   * Returns true if client is actively mining new blocks.
+   * Returns true if client is actively mining new blocks
    * @returns True if the node is currently mining, otherwise false
    */
   mining() {

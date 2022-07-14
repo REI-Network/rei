@@ -7,7 +7,7 @@ import { SyncingStatus, JSONRPC_VERSION } from './types';
  */
 export class WebsocketClient {
   readonly ws: WebSocket;
-  private closed = false;
+  closed = false;
 
   /**
    * Whether the connection is disconnected

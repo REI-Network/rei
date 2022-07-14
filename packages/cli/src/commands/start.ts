@@ -5,13 +5,14 @@ import { RpcServer } from '@rei-network/rpc';
 import { setLevel, logger } from '@rei-network/utils';
 import { SIGINT } from '../process';
 import { getPassphrase, getKeyStorePath } from './account';
+import { ApiServer } from '@rei-network/api';
 
 /**
  * Start rei node
  * @param opts - Commander options
  * @returns node and rpc server instance
  */
-export async function startNode(opts: { [option: string]: string }): Promise<[Node, undefined | RpcServer]> {
+export async function startNode(opts: { [option: string]: string }): Promise<[Node, ApiServer, undefined | RpcServer]> {
   setLevel(opts.verbosity);
   if (!fs.existsSync(opts.datadir)) {
     fs.mkdirSync(opts.datadir);
@@ -47,10 +48,12 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     network,
     account
   });
+  const apiServer = new ApiServer(node);
+  apiServer.start();
   let server: undefined | RpcServer;
   if (opts.rpc) {
     const rpc = {
-      backend: node,
+      apiServer: apiServer,
       port: opts.rpcPort ? Number(opts.rpcPort) : undefined,
       host: opts.rpcHost ? opts.rpcHost : undefined,
       apis: opts.rpcApi ? opts.rpcApi : undefined
@@ -58,8 +61,8 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     server = new RpcServer(rpc);
     await server.start();
   }
-  SIGINT(node, server);
-  return [node, server];
+  SIGINT(node, apiServer, server);
+  return [node, apiServer, server];
 }
 
 export function installStartAction(program: any) {

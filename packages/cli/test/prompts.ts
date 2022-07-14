@@ -162,8 +162,8 @@ const startPrompts = async (node: Node) => {
   try {
     program.parse(process.argv);
     const opts = program.opts();
-    const [node] = await startNode(opts);
-    SIGINT(node);
+    const [node, apiServer] = await startNode(opts);
+    SIGINT(node, apiServer);
     await startPrompts(node);
   } catch (err) {
     logger.error('Prompts start error:', err);

@@ -49,7 +49,7 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     account
   });
   const apiServer = new ApiServer(node);
-  await apiServer.start();
+  apiServer.start();
   let server: undefined | RpcServer;
   if (opts.rpc) {
     const rpc = {

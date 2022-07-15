@@ -4,26 +4,14 @@ import { AbortableTimer, Channel, logger } from '@rei-network/utils';
 import { Topics, BloomBitsFilter } from '@rei-network/core';
 import { Transaction, Log, BlockHeader } from '@rei-network/structure';
 import { Node } from '@rei-network/core';
-import { SyncingStatus } from './types';
+import { SyncingStatus, Client } from './types';
 
-export type Query = {
+type Query = {
   fromBlock?: BN;
   toBlock?: BN;
   addresses: Address[];
   topics: Topics;
 };
-
-export interface client {
-  readonly ws: WebSocket;
-  closed: boolean;
-  get isClosed(): boolean;
-  send(data: any): void;
-  close(): void;
-  notifyHeader(subscription: string, heads: BlockHeader[]): void;
-  notifyLogs(subscription: string, logs: Log[]): void;
-  notifyPendingTransactions(subscription: string, hashes: Buffer[]): void;
-  notifySyncing(subscription: string, status: SyncingStatus): void;
-}
 
 const deadline = 5 * 60 * 1000;
 
@@ -32,7 +20,7 @@ type Filter = {
   logs: Log[];
   creationTime?: number;
   query?: Query;
-  client?: client;
+  client?: Client;
 };
 
 /**
@@ -142,6 +130,14 @@ export class FilterSystem {
     }
   }
 
+  private deleteClosed(map: Map<string, Filter>) {
+    for (const [key, filter] of map) {
+      if (filter.client!.isClosed === true) {
+        map.delete(key);
+      }
+    }
+  }
+
   /**
    * Start filter system
    */
@@ -160,7 +156,7 @@ export class FilterSystem {
   /**
    * Abort filter system
    */
-  async abort() {
+  abort() {
     this.taskQueue.abort();
     this.node.bcMonitor.off('logs', this.onLogs);
     this.node.bcMonitor.off('removedLogs', this.onRemovedLogs);
@@ -182,6 +178,10 @@ export class FilterSystem {
       this.deleteTimeout(this.filterHeads, now);
       this.deleteTimeout(this.filterLogs, now);
       this.deleteTimeout(this.filterPendingTransactions, now);
+      this.deleteClosed(this.subscribeHeads);
+      this.deleteClosed(this.subscribeLogs);
+      this.deleteClosed(this.subscribePendingTransactions);
+      this.deleteClosed(this.subscribeSyncing);
 
       await this.timer.wait(deadline);
     }
@@ -230,7 +230,7 @@ export class FilterSystem {
    * @param query - Query option
    * @returns Subscription id
    */
-  subscribe(client: client, type: string, query?: Query): string {
+  subscribe(client: Client, type: string, query?: Query): string {
     const uid = genSubscriptionId();
     const filter = { hashes: [], logs: [], query, client };
     switch (type) {

@@ -7,7 +7,7 @@ import bodyParse from 'body-parser';
 import { BN, bufferToHex } from 'ethereumjs-util';
 import { logger, Channel } from '@rei-network/utils';
 import { AbiCoder } from '@ethersproject/abi';
-import { ApiServer, OutOfGasError as apiOutOfGasError, RevertError as apiRevertErrors } from '@rei-network/api';
+import { ApiServer, OutOfGasError as ApiOutOfGasError, RevertError as ApiRevertError } from '@rei-network/api';
 import { api } from './controller';
 import { JsonRPCMiddleware } from './jsonRPCMiddleware';
 import { WebsocketClient } from './client';
@@ -29,13 +29,9 @@ export class RevertError {
   readonly rpcMessage: string;
   readonly data?: string;
 
-  constructor(returnValue: Buffer | string) {
-    if (typeof returnValue === 'string') {
-      this.rpcMessage = returnValue;
-    } else {
-      this.rpcMessage = 'execution reverted: ' + coder.decode(['string'], returnValue.slice(4))[0];
-      this.data = bufferToHex(returnValue);
-    }
+  constructor(returnValue: string | Buffer, decodedReturnValue: string | undefined) {
+    this.rpcMessage = decodedReturnValue ? 'execution reverted: ' + decodedReturnValue : (returnValue as string);
+    this.data = decodedReturnValue && bufferToHex(returnValue as Buffer);
   }
 }
 
@@ -51,6 +47,7 @@ export class OutOfGasError {
     return `gas required exceeds allowance (${this.gas.toString()})`;
   }
 }
+
 export interface RpcServerOptions {
   // apiServer instance
   apiServer: ApiServer;
@@ -123,10 +120,10 @@ export class RpcServer {
       } catch (err) {
         if (err instanceof Error) {
           throw helper.makeRpcErr(err.message);
-        } else if (err instanceof apiOutOfGasError) {
+        } else if (err instanceof ApiOutOfGasError) {
           throw new OutOfGasError(err.gas);
-        } else if (err instanceof apiRevertErrors) {
-          throw new RevertError(err.returnValue);
+        } else if (err instanceof ApiRevertError) {
+          throw new RevertError(err.returnValue, err.decodedReturnValue);
         } else {
           throw err;
         }

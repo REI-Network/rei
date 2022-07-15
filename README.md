@@ -20,6 +20,7 @@ Nodejs implementation of REI-Network protocols
 | [@rei-network/network][network-package]       | [![NPM Version][network-npm-version]][network-npm-url]       | [![Network Issues][network-issues]][network-issues-url]          |
 | [@rei-network/rpc][rpc-package]               | [![NPM Version][rpc-npm-version]][rpc-npm-url]               | [![Rpc Issues][rpc-issues]][rpc-issues-url]                      |
 | [@rei-network/wallet][wallet-package]         | [![NPM Version][wallet-npm-version]][wallet-npm-url]         | [![Wallet Issues][wallet-issues]][wallet-issues-url]             |
+| [@rei-network/api][api-package]               | [![NPM Version][api-npm-version]][api-npm-url]               | [![Api Issues][api-issues]][api-issues-url]                      |
 
 ## Quick start
 
@@ -264,6 +265,11 @@ These scripts execute lint and lint:fix respectively, to all monorepo packages.
 
 [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html)
 
+[api-package]: ./packages/api
+[api-npm-version]: https://img.shields.io/npm/v/@rei-network/api
+[api-npm-url]: https://www.npmjs.org/package/@rei-network/api
+[api-issues]: https://img.shields.io/github/issues/REI-Network/rei/package:%20api?label=issues
+[api-issues-url]: https://github.com/REI-Network/rei/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+api"
 [structure-package]: ./packages/structure
 [structure-npm-version]: https://img.shields.io/npm/v/@rei-network/structure
 [structure-npm-url]: https://www.npmjs.org/package/@rei-network/structure

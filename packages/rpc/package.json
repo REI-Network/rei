@@ -1,26 +1,26 @@
 {
-    "name": "@rei-network/rpc",
-    "version": "1.0.0",
-    "main": "dist/index.js",
-    "types": "dist/index.d.ts",
-    "license": "GPL-3.0-or-later",
-    "scripts": {
-        "build": "tsc --build tsconfig.json",
-        "test": "echo @rei-network/rpc has no test cases"
-    },
-    "devDependencies": {
-        "typescript": "^4.1.2",
-        "chai": "^4.3.4",
-        "mocha": "^9.0.2"
-    },
-    "dependencies": {
-        "@ethersproject/abi": "^5.4.0",
-        "@rei-network/vm": "^1.0.0",
-        "@rei-network/structure": "^0.1.1",
-        "@rei-network/utils": "^0.1.1",
-        "body-parser": "^1.19.0",
-        "express": "^4.17.1",
-        "express-ws": "^4.0.0",
-        "uuid": "^8.3.2"
-    }
+  "name": "@rei-network/rpc",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "build": "tsc --build tsconfig.json",
+    "test": "echo @rei-network/rpc has no test cases"
+  },
+  "devDependencies": {
+    "typescript": "^4.1.2",
+    "chai": "^4.3.4",
+    "mocha": "^9.0.2"
+  },
+  "dependencies": {
+    "@ethersproject/abi": "^5.4.0",
+    "@rei-network/vm": "^1.0.0",
+    "@rei-network/structure": "^0.1.1",
+    "@rei-network/utils": "^0.1.1",
+    "body-parser": "^1.19.0",
+    "express": "^4.17.1",
+    "express-ws": "^4.0.0",
+    "uuid": "^8.3.2"
+  }
 }

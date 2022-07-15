@@ -1,13 +1,61 @@
 import { Address, BN, bufferToHex, intToHex, bnToHex, hashPersonalMessage, toRpcSig, ecsign, setLengthLeft, keccakFromHexString } from 'ethereumjs-util';
-import { hexStringToBN, hexStringToBuffer, ignoreError } from '@rei-network/utils';
+import { AbiCoder } from '@ethersproject/abi';
+import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { Node } from '@rei-network/core';
 import { StateManager } from '@rei-network/core/dist/stateManager';
 import { TransactionFactory, Transaction, Block, Log } from '@rei-network/structure';
 import { ERROR } from '@rei-network/vm/dist/exceptions';
-import { revertErrorSelector, CallData, RevertError, OutOfGasError, parseAddressesAndTopics, TopicsData } from './types';
+import { revertErrorSelector, Client, CallData, TopicsData } from './types';
 import { SimpleOracle } from './gasPriceOracle';
-import { client, FilterSystem } from './filterSystem';
+import { FilterSystem } from './filterSystem';
+
+const coder = new AbiCoder();
+export class RevertError {
+  readonly returnValue: string | Buffer;
+  readonly decodedReturnValue?: string;
+
+  constructor(returnValue: Buffer | string) {
+    this.returnValue = returnValue;
+    if (Buffer.isBuffer(returnValue)) {
+      this.decodedReturnValue = coder.decode(['string'], returnValue.slice(4))[0];
+    }
+  }
+}
+
+export class OutOfGasError {
+  readonly gas: BN;
+
+  constructor(gas: BN) {
+    this.gas = gas.clone();
+  }
+}
+
+function parseAddressesAndTopics(_addresses?: string | string[], _topics?: TopicsData) {
+  const addresses: Address[] = typeof _addresses === 'string' ? [Address.fromString(_addresses)] : _addresses?.map((addr) => Address.fromString(addr)) ?? [];
+  const topics: (Buffer | null | (Buffer | null)[])[] = _topics
+    ? _topics.map((topic) => {
+        if (topic === null) {
+          return null;
+        } else if (typeof topic === 'string') {
+          return hexStringToBuffer(topic);
+        } else if (Array.isArray(topic)) {
+          return topic.map((subTopic) => {
+            if (subTopic === null) {
+              return null;
+            }
+            if (typeof subTopic !== 'string') {
+              throw new Error('Invalid topic type');
+            }
+            return hexStringToBuffer(subTopic);
+          });
+        } else {
+          throw new Error('Invalid topic type');
+        }
+      })
+    : [];
+  return { addresses, topics };
+}
 
 /**
  * Api server
@@ -27,22 +75,15 @@ export class ApiServer {
    * Start oracle and filter system
    */
   start() {
-    return new Promise<void>((resolve, reject) => {
-      try {
-        this.oracle.start();
-        this.filterSystem.start();
-        resolve();
-      } catch (err) {
-        reject(err);
-      }
-    });
+    this.oracle.start();
+    this.filterSystem.start();
   }
 
   /**
    * Abort oracle and filter system
    */
-  async abort() {
-    await ignoreError(this.filterSystem.abort());
+  abort() {
+    this.filterSystem.abort();
     this.oracle.abort();
   }
 
@@ -791,7 +832,7 @@ export class ApiServer {
    * @param client - subscription client
    * @returns Subscription id
    */
-  async subscribe(type: string, options: undefined | { address?: string | string[]; topics?: TopicsData }, client?: client) {
+  async subscribe(type: string, options: undefined | { address?: string | string[]; topics?: TopicsData }, client?: Client) {
     if (!client) {
       throw new Error('subscribe is only supported on websocket!');
     }

@@ -1,6 +1,7 @@
 import { bufferToHex } from 'ethereumjs-util';
 import { BlockHeader, Log } from '@rei-network/structure';
-import { SyncingStatus, JSONRPC_VERSION } from './types';
+import { SyncingStatus } from '@rei-network/api';
+import { JSONRPC_VERSION } from './types';
 
 /**
  * Websocket client, used to manage websocket connections

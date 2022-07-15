@@ -27,8 +27,15 @@ export class ApiServer {
    * Start oracle and filter system
    */
   start() {
-    this.oracle.start();
-    this.filterSystem.start();
+    return new Promise<void>((resolve, reject) => {
+      try {
+        this.oracle.start();
+        this.filterSystem.start();
+        resolve();
+      } catch (err) {
+        reject(err);
+      }
+    });
   }
 
   /**

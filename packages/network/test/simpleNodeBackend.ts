@@ -35,6 +35,36 @@ app.post('/addEnr', async function (req, res) {
   }
 });
 
+app.post('/addTrustedPeer', async function (req, res) {
+  const peerId = req.body.peerId;
+  const targetId = req.body.targetId;
+  for (const node of app.nodes) {
+    if ((await node.localEnr.peerId()).toB58String() === targetId) {
+      node.addTrustedPeer(peerId);
+      res.send('success');
+    }
+  }
+});
+
+app.post('/getConnectionSize', async function (req, res) {
+  const peerId = req.body.peerId;
+  for (const node of app.nodes) {
+    if ((await node.localEnr.peerId()).toB58String() === peerId) {
+      res.send({ result: node.getConnectionSize() });
+    }
+  }
+});
+
+app.post('/isTrusted', async function (req, res) {
+  const peerId = req.body.peerId;
+  const targetId = req.body.targetId;
+  for (const node of app.nodes) {
+    if ((await node.localEnr.peerId()).toB58String() === targetId) {
+      res.send({ result: node.isTrusted(peerId) });
+    }
+  }
+});
+
 export function startServer(nodes: NetworkManager[], port: number) {
   app.nodes = nodes;
   app.listen(port);

@@ -125,6 +125,8 @@ export class NetworkManager extends EventEmitter {
   private static = new Map<string, DialTask>();
   private staticPool: DialTask[] = [];
 
+  private trusted: Set<string> = new Set();
+
   constructor(options: NetworkManagerOptions) {
     super();
     this.maxPeers = options.maxPeers ?? defaultMaxPeers;
@@ -242,10 +244,7 @@ export class NetworkManager extends EventEmitter {
     //   logger.debug('Network::onConnect, too many connection attempts');
     //   return;
     // }
-    if (this.libp2pNode.connectionManager.size > this.maxPeers) {
-      this.setPeerValue(peerId, Libp2pPeerValue.incoming);
-      logger.debug('Network::onConnect, too many incoming connections');
-    } else {
+    if (this.libp2pNode.connectionManager.size < this.maxPeers || this.trusted.has(peerId)) {
       logger.info(`💬 Peer ${(await this.localEnr.peerId()).toB58String()} connect:`, peerId);
       const task = this.static[peerId];
       if (task && task.staticPoolIndex >= 0) {
@@ -253,6 +252,9 @@ export class NetworkManager extends EventEmitter {
       }
       this.setPeerValue(peerId, Libp2pPeerValue.connected);
       // this.createInstallTimeout(peerId);
+    } else {
+      this.setPeerValue(peerId, Libp2pPeerValue.incoming);
+      logger.debug('Network::onConnect, too many incoming connections');
     }
   };
 
@@ -503,7 +505,7 @@ export class NetworkManager extends EventEmitter {
     // create a new one
     let peer = this._peers.get(peerId);
     if (!peer) {
-      if (this.peers.length >= this.maxPeers) {
+      if (this.peers.length >= this.maxPeers && !this.trusted.has(peerId)) {
         logger.debug('Network::install, peerId:', peerId, 'failed due to too many peers installed');
         this.lock.release();
         return false;
@@ -736,6 +738,22 @@ export class NetworkManager extends EventEmitter {
     this.dialing.clear();
     this._peers.clear();
     await ignoreError(this.libp2pNode?.stop());
+  }
+
+  getConnectionSize() {
+    return this.peers.length;
+  }
+
+  isTrusted(peerId: string) {
+    return this.trusted.has(peerId);
+  }
+
+  addTrustedPeer(peerId: string) {
+    this.trusted.add(peerId);
+  }
+
+  removeTrustedPeer(peerId: string) {
+    this.trusted.delete(peerId);
   }
 
   async addPeer(enr: string) {

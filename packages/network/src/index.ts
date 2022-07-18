@@ -34,6 +34,7 @@ const defaultNat = '127.0.0.1';
 const seedCount = 30;
 const seedMaxAge = 5 * 24 * 60 * 60 * 1000;
 enum Libp2pPeerValue {
+  static = 1.5,
   installed = 1,
   connected = 0.5,
   incoming = 0
@@ -47,6 +48,18 @@ type PeerInfo = {
 type IdType = {
   peerId: string;
   nodeId: string;
+};
+
+enum PeerFlag {
+  dynDialedConn = 0,
+  staticDialedConn = 1,
+  inboundConn = 2,
+  turstedConn = 3
+}
+
+type DialTask = {
+  enr: ENR;
+  staticPoolIndex: number;
 };
 
 export interface NetworkManagerOptions {
@@ -108,6 +121,10 @@ export class NetworkManager extends EventEmitter {
   private readonly installTimeoutQueue = new TimeoutQueue(installTimeoutDuration);
   private readonly installTimeoutId = new Map<string, number>();
 
+  // static peers
+  private static = new Map<string, DialTask>();
+  private staticPool: DialTask[] = [];
+
   constructor(options: NetworkManagerOptions) {
     super();
     this.maxPeers = options.maxPeers ?? defaultMaxPeers;
@@ -153,22 +170,6 @@ export class NetworkManager extends EventEmitter {
    */
   getPeer(peerId: string) {
     return this._peers.get(peerId);
-  }
-
-  /**
-   * Disconnect a installing or installled peer by peer id
-   * This will emit a `removed` event
-   * @param peerId - Target peer
-   */
-  async removePeer(peerId: string) {
-    this.timeout.delete(peerId);
-    const peer = this._peers.get(peerId);
-    if (peer) {
-      this._peers.delete(peerId);
-      await ignoreError(peer.abort());
-      await ignoreError(this.disconnect(peerId));
-      this.emit('removed', peer);
-    }
   }
 
   /**
@@ -246,6 +247,10 @@ export class NetworkManager extends EventEmitter {
       logger.debug('Network::onConnect, too many incoming connections');
     } else {
       logger.info(`💬 Peer ${(await this.localEnr.peerId()).toB58String()} connect:`, peerId);
+      const task = this.static[peerId];
+      if (task && task.staticPoolIndex >= 0) {
+        this.removeFromStaticPool(task.staticPoolIndex);
+      }
       this.setPeerValue(peerId, Libp2pPeerValue.connected);
       // this.createInstallTimeout(peerId);
     }
@@ -259,7 +264,7 @@ export class NetworkManager extends EventEmitter {
     logger.info('🤐 Peer disconnected:', peerId);
     this.dialing.delete(peerId);
     this.clearInstallTimeout(peerId);
-    this.removePeer(peerId);
+    this.removeConnect(peerId);
   };
 
   /**
@@ -289,7 +294,6 @@ export class NetworkManager extends EventEmitter {
         this.discovered.shift();
       }
     }
-    await this.libp2pNode.peerStore.addressBook.add(await enr.peerId(), [enr.getLocationMultiaddr('tcp')]);
     await this.nodedb.persist(enr);
   };
 
@@ -422,11 +426,6 @@ export class NetworkManager extends EventEmitter {
     }, 10000);
   }
 
-  //@todo add to static pool
-  public addPeer(enr: string) {
-    this.libp2pNode.discv5.addEnr(ENR.decodeTxt(enr));
-  }
-
   // Listen to the pong message of the remote node
   // and update the timestamp of the node in the database
   private onMessage = (srcId: string, src, message): void => {
@@ -449,7 +448,16 @@ export class NetworkManager extends EventEmitter {
     return !this.outboundHistory.contains(peerId);
   }
 
-  private setupOutboundTimer(now: number) {
+  private checkInstall(id: string) {
+    for (const peer of this.peers) {
+      if (peer.peerId === id) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private setupOutboundTimer(now: number, peerId: string) {
     if (!this.outboundTimer) {
       const next = this.outboundHistory.nextExpiry();
       if (next) {
@@ -459,7 +467,8 @@ export class NetworkManager extends EventEmitter {
             const _now = Date.now();
             this.outboundHistory.expire(_now);
             this.outboundTimer = undefined;
-            this.setupOutboundTimer(_now);
+            this.updateStaticPool(peerId);
+            this.setupOutboundTimer(_now, peerId);
           }, sep);
         } else {
           this.outboundHistory.expire(now);
@@ -471,7 +480,7 @@ export class NetworkManager extends EventEmitter {
   private updateOutbound(peerId: string) {
     const now = Date.now();
     this.outboundHistory.add(peerId, now + outboundThrottleTime);
-    this.setupOutboundTimer(now);
+    this.setupOutboundTimer(now, peerId);
   }
 
   /**
@@ -481,7 +490,7 @@ export class NetworkManager extends EventEmitter {
    * @param streams - `libp2p` stream array
    * @returns Whether succeed
    */
-  private async install(peerId: string, protocol: Protocol, stream: any) {
+  private async install(peerId: string, protocol: Protocol, stream: any, peerFlag: PeerFlag = PeerFlag.dynDialedConn): Promise<boolean> {
     await this.lock.acquire();
 
     if (this.isBanned(peerId)) {
@@ -510,7 +519,11 @@ export class NetworkManager extends EventEmitter {
     if (success) {
       // if at least one protocol is installed, we think the handshake is successful
       peer.status = PeerStatus.Installed;
-      this.setPeerValue(peerId, Libp2pPeerValue.installed);
+      let value: Libp2pPeerValue = Libp2pPeerValue.connected;
+      if (peerFlag === PeerFlag.staticDialedConn) {
+        value = Libp2pPeerValue.static;
+      }
+      this.setPeerValue(peerId, value);
       this.clearInstallTimeout(peerId);
       this.emit('installed', handler!);
       logger.info('💬 Peer installed:', peerId, 'protocol:', protocol.protocolString);
@@ -530,7 +543,7 @@ export class NetworkManager extends EventEmitter {
    * @param peerId - Target peer id
    * @returns Whether succeed
    */
-  private async dialAndInstall(peerId: string) {
+  private async dialAndInstall(peerId: string, flag: PeerFlag) {
     if (this.isBanned(peerId) || this.dialing.has(peerId)) {
       return false;
     }
@@ -540,7 +553,7 @@ export class NetworkManager extends EventEmitter {
       for (const protocol of Array.isArray(_protocol) ? _protocol : [_protocol]) {
         try {
           const { stream } = await this.libp2pNode.dialProtocol(PeerId.createFromB58String(peerId), protocol.protocolString);
-          if (await this.install(peerId, protocol, stream)) {
+          if (await this.install(peerId, protocol, stream, flag)) {
             success = true;
             break;
           } else {
@@ -609,10 +622,8 @@ export class NetworkManager extends EventEmitter {
       return false;
     }
 
-    for (const peer of this.peers) {
-      if (peer.peerId === id) {
-        return false;
-      }
+    if (!this.checkInstall(id)) {
+      return false;
     }
 
     if (this.dialing.has(id)) {
@@ -630,10 +641,19 @@ export class NetworkManager extends EventEmitter {
     while (!this.aborted) {
       try {
         if (this.peers.length < this.maxPeers && this.dialing.size < this.maxDials) {
+          let slots = this.maxPeers - this.libp2pNode.connectionManager.size;
+          slots -= await this.startStaticDials(slots);
+          if (slots === 0) {
+            await new Promise((r) => setTimeout(r, dialLoopInterval2));
+            continue;
+          }
           let pid: string | undefined;
           // search discovered peer in memory
           while (this.discovered.length > 0) {
             const { peerId } = this.discovered.shift()!;
+            if (this.static.has(peerId)) {
+              continue;
+            }
             let addr = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(peerId));
             if (addr) {
               if (this.filterPeer({ id: peerId, addresses: addr })) {
@@ -645,8 +665,7 @@ export class NetworkManager extends EventEmitter {
           }
           // try to dial a discovered peer
           if (pid) {
-            this.updateOutbound(pid);
-            this.dialAndInstall(pid);
+            this.startDial(pid);
           }
         }
       } catch (err) {
@@ -717,5 +736,149 @@ export class NetworkManager extends EventEmitter {
     this.dialing.clear();
     this._peers.clear();
     await ignoreError(this.libp2pNode?.stop());
+  }
+
+  async addPeer(enr: string) {
+    try {
+      const enrObj = ENR.decodeTxt(enr);
+      const peerId = (await enrObj.peerId()).toB58String();
+      if (this.static.has(peerId)) {
+        return true;
+      }
+      const task = { enr: enrObj, staticPoolIndex: -1, flag: PeerFlag.staticDialedConn };
+      this.static[peerId] = task;
+      if (await this.checkDial(enrObj)) {
+        this.addToStaticPool(task);
+      }
+      await this.libp2pNode.peerStore.addressBook.add(await enrObj.peerId(), [this.getLocationMultiaddr(enrObj, 'tcp')]);
+      // this.libp2pNode.discv5.addEnr(enrObj);
+      return true;
+    } catch (e) {
+      logger.error(e);
+      return false;
+    }
+  }
+
+  /**
+   * Disconnect a installing or installled peer by peer id
+   * This will emit a `removed` event
+   * @param peerId - Target peer
+   */
+  async removePeer(peerId: string) {
+    let task = this.static[peerId];
+    if (task) {
+      this.static.delete(peerId);
+      if (task.staticPoolIndex >= 0) {
+        this.removeFromStaticPool(task.staticPoolIndex);
+      }
+    }
+    await this.removeConnect(peerId);
+  }
+
+  private async removeConnect(peerId: string) {
+    this.timeout.delete(peerId);
+    const peer = this._peers.get(peerId);
+    if (peer) {
+      this._peers.delete(peerId);
+      await ignoreError(peer.abort());
+      await ignoreError(this.disconnect(peerId));
+      this.emit('removed', peer);
+    }
+    this.updateStaticPool(peerId);
+  }
+
+  private async startStaticDials(n: number) {
+    let count = 0;
+    for (let started = 0; started < n && this.staticPool.length > 0; started++) {
+      let index = Math.ceil(Math.random() * (this.staticPool.length - 1));
+      let task = this.staticPool[index];
+      const enr = task.enr;
+      const multiaddr = this.getLocationMultiaddr(enr, 'tcp4');
+      const peerId = (await enr.peerId()).toB58String();
+      if (multiaddr && this.filterPeer({ id: peerId, addresses: [{ multiaddr }] })) {
+        this.startDial(peerId).then(async (success) => {
+          if (!success) {
+            await this.startDial(peerId);
+          }
+          this.updateStaticPool(peerId);
+        });
+        this.removeFromStaticPool(index);
+      }
+      count++;
+    }
+    return count;
+  }
+
+  private addToStaticPool(task: DialTask) {
+    if (task.staticPoolIndex >= 0) {
+      throw new Error('task already in static pool');
+    }
+    this.staticPool.push(task);
+    task.staticPoolIndex = this.staticPool.length - 1;
+  }
+
+  private removeFromStaticPool(index: number) {
+    const task = this.staticPool[index];
+    const end = this.staticPool.length - 1;
+    this.staticPool[index] = this.staticPool[end];
+    this.staticPool[index].staticPoolIndex = index;
+    this.staticPool.pop();
+    task.staticPoolIndex = -1;
+  }
+
+  private async checkDial(enr: ENR): Promise<boolean> {
+    const localId = (await this.localEnr.peerId()).toB58String();
+    const id = (await enr.peerId()).toB58String();
+    if (id === localId) {
+      return false;
+    }
+    if (!enr.ip && !enr.tcp) {
+      return false;
+    }
+    if (this.dialing.has(id)) {
+      return false;
+    }
+    if (!this.checkInstall(id)) {
+      return false;
+    }
+    if (this.isBanned(id)) {
+      return false;
+    }
+    if (this.outboundHistory.contains(id)) {
+      return false;
+    }
+    return true;
+  }
+
+  private async updateStaticPool(id: string) {
+    let task = this.static[id];
+    if (task && task.staticPoolIndex < 0 && (await this.checkDial(task.enr))) {
+      this.addToStaticPool(task);
+    }
+  }
+
+  private async startDial(peerId: string, flag: PeerFlag = PeerFlag.dynDialedConn) {
+    this.updateOutbound(peerId);
+    return this.dialAndInstall(peerId, flag);
+  }
+
+  private getLocationMultiaddr(enr: ENR, protocol: 'udp' | 'udp4' | 'udp6' | 'tcp' | 'tcp4' | 'tcp6'): Multiaddr | undefined {
+    const isIpv6 = protocol.endsWith('6');
+    const isUdp = protocol.startsWith('udp');
+    const isTcp = protocol.startsWith('tcp');
+    const ipName = isIpv6 ? 'ip6' : 'ip4';
+    const ipVal = isIpv6 ? enr.ip6 : enr.ip;
+    if (!ipVal) {
+      return undefined;
+    }
+    const protoName = (isUdp && 'udp') || (isTcp && 'tcp');
+    if (!protoName) {
+      return undefined;
+    }
+    const protoVal = isIpv6 ? (isUdp && enr.udp6) || (isTcp && enr.tcp6) : (isUdp && enr.udp) || (isTcp && enr.tcp);
+    if (!protoVal) {
+      return undefined;
+    }
+    return new Multiaddr(`/${ipName}/${ipVal}/${protoName}/${protoVal}`);
   }
 }

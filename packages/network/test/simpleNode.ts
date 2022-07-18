@@ -62,7 +62,7 @@ class SayHiHandler implements ProtocolHandler {
 
 export async function autoStartNodes(opts: { ip: string; udpPort: number; tcpPort: number; count?: number; bootEnr?: string; nodesIp?: string }) {
   const nodes: Promise<NetworkManager>[] = [];
-  const count = opts.count ? opts.count : 10;
+  const count = opts.count || opts.count === 0 ? opts.count : 10;
   const ip = opts.ip;
   const nodesIp = opts.nodesIp ? opts.nodesIp : '127.0.0.1';
   let udpPort = opts.udpPort;

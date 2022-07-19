@@ -54,7 +54,7 @@ export class ExpHeap {
   expire(now: number) {
     let item: undefined | ExpItem;
     while ((item = this.heap.peek()) && item !== undefined && item.exp <= now) {
-      this.heap.remove();
+      return this.heap.remove();
     }
   }
 }

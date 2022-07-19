@@ -45,11 +45,6 @@ type PeerInfo = {
   addresses: { multiaddr: Multiaddr }[];
 };
 
-type IdType = {
-  peerId: string;
-  nodeId: string;
-};
-
 enum PeerFlag {
   dynDialedConn = 0,
   staticDialedConn = 1,
@@ -59,6 +54,7 @@ enum PeerFlag {
 
 type DialTask = {
   enr: ENR;
+  peerId: string;
   staticPoolIndex: number;
 };
 
@@ -101,7 +97,7 @@ export class NetworkManager extends EventEmitter {
 
   // a cache list that records all discovered peer,
   // the max size of this list is `this.maxPeers`
-  private readonly discovered: IdType[] = [];
+  private readonly discovered: string[] = [];
   // set that records all dialing peer id
   private readonly dialing = new Set<string>();
   // map that records all peers
@@ -246,7 +242,7 @@ export class NetworkManager extends EventEmitter {
     // }
     if (this.libp2pNode.connectionManager.size < this.maxPeers || this.trusted.has(peerId)) {
       logger.info(`💬 Peer ${(await this.localEnr.peerId()).toB58String()} connect:`, peerId);
-      const task = this.static[peerId];
+      const task = this.static.get(peerId);
       if (task && task.staticPoolIndex >= 0) {
         this.removeFromStaticPool(task.staticPoolIndex);
       }
@@ -266,32 +262,28 @@ export class NetworkManager extends EventEmitter {
     logger.info('🤐 Peer disconnected:', peerId);
     this.dialing.delete(peerId);
     this.clearInstallTimeout(peerId);
-    this.removeConnect(peerId);
+    this.removePeer(peerId, false);
   };
 
   /**
    * Execute when a new enr is discovered
    * Persist new enr to db
    */
-  private onDiscovered = async (PeerInfo: { id: Uint8Array; multiaddrs: Multiaddr[] }) => {
-    const enr: ENR = (this.libp2pNode.discv5.discv5 as any).findEnr(ENR.createFromPeerId(PeerId.createFromBytes(PeerInfo.id)).nodeId);
-    this.storeNode(enr);
-  };
-
-  private storeNode = async (enr: ENR) => {
+  private onDiscovered = async (peerInfo: PeerId) => {
+    const enr: ENR | undefined = (this.libp2pNode.discv5.discv5 as any).findEnr(ENR.createFromPeerId(PeerId.createFromBytes(peerInfo.id)).nodeId);
     if (!enr || !this.checkENR(enr)) {
       return;
     }
     const peerId: string = (await enr.peerId()).toB58String();
     let include: boolean = false;
     for (const id of this.discovered) {
-      if (id.peerId === peerId) {
+      if (id === peerId) {
         include = true;
         break;
       }
     }
     if (!include) {
-      this.discovered.push({ peerId: peerId, nodeId: enr.nodeId });
+      this.discovered.push(peerId);
       if (this.discovered.length > this.maxPeers) {
         this.discovered.shift();
       }
@@ -373,7 +365,7 @@ export class NetworkManager extends EventEmitter {
       // add to discovered
       for (const bootnode of bootnodes) {
         const enr = ENR.decodeTxt(bootnode);
-        this.discovered.push({ peerId: (await enr.peerId()).toB58String(), nodeId: enr.nodeId });
+        this.discovered.push((await enr.peerId()).toB58String());
       }
       this.libp2pNode = new Libp2pNode({
         ...this.options,
@@ -422,10 +414,6 @@ export class NetworkManager extends EventEmitter {
     this.checkNodes();
     this.dialLoop();
     this.timeoutLoop();
-
-    setInterval(async () => {
-      console.log(`peerId ${(await this.localEnr.peerId()).toB58String()} ==========> connection size:`, this.libp2pNode.connections.size);
-    }, 10000);
   }
 
   // Listen to the pong message of the remote node
@@ -459,7 +447,7 @@ export class NetworkManager extends EventEmitter {
     return true;
   }
 
-  private setupOutboundTimer(now: number, peerId: string) {
+  private setupOutboundTimer(now: number) {
     if (!this.outboundTimer) {
       const next = this.outboundHistory.nextExpiry();
       if (next) {
@@ -467,10 +455,10 @@ export class NetworkManager extends EventEmitter {
         if (sep > 0) {
           this.outboundTimer = setTimeout(() => {
             const _now = Date.now();
-            this.outboundHistory.expire(_now);
+            const { peerId } = this.outboundHistory.expire(_now);
             this.outboundTimer = undefined;
             this.updateStaticPool(peerId);
-            this.setupOutboundTimer(_now, peerId);
+            this.setupOutboundTimer(_now);
           }, sep);
         } else {
           this.outboundHistory.expire(now);
@@ -482,7 +470,7 @@ export class NetworkManager extends EventEmitter {
   private updateOutbound(peerId: string) {
     const now = Date.now();
     this.outboundHistory.add(peerId, now + outboundThrottleTime);
-    this.setupOutboundTimer(now, peerId);
+    this.setupOutboundTimer(now);
   }
 
   /**
@@ -649,26 +637,7 @@ export class NetworkManager extends EventEmitter {
             await new Promise((r) => setTimeout(r, dialLoopInterval2));
             continue;
           }
-          let pid: string | undefined;
-          // search discovered peer in memory
-          while (this.discovered.length > 0) {
-            const { peerId } = this.discovered.shift()!;
-            if (this.static.has(peerId)) {
-              continue;
-            }
-            let addr = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(peerId));
-            if (addr) {
-              if (this.filterPeer({ id: peerId, addresses: addr })) {
-                pid = peerId;
-                logger.debug(`NetworkManager::dialLoop, ${(await this.localEnr.peerId()).toB58String()} use a discovered peer:`, peerId);
-                break;
-              }
-            }
-          }
-          // try to dial a discovered peer
-          if (pid) {
-            this.startDial(pid);
-          }
+          this.startDiscoveryDials();
         }
       } catch (err) {
         logger.error('NetworkManager::dialLoop, catch error:', err);
@@ -699,7 +668,7 @@ export class NetworkManager extends EventEmitter {
         for (const [peerId, timestamp] of this.timeout) {
           if (now - timestamp >= timeoutLoopInterval) {
             logger.debug('NetworkManager::timeoutLoop, remove:', peerId);
-            await this.removePeer(peerId);
+            await this.removePeer(peerId, false);
           }
         }
       } catch (err) {
@@ -763,12 +732,12 @@ export class NetworkManager extends EventEmitter {
       if (this.static.has(peerId)) {
         return true;
       }
-      const task = { enr: enrObj, staticPoolIndex: -1, flag: PeerFlag.staticDialedConn };
-      this.static[peerId] = task;
+      const task = { enr: enrObj, staticPoolIndex: -1, flag: PeerFlag.staticDialedConn, peerId };
+      this.static.set(peerId, task);
       if (await this.checkDial(enrObj)) {
         this.addToStaticPool(task);
       }
-      await this.libp2pNode.peerStore.addressBook.add(await enrObj.peerId(), [this.getLocationMultiaddr(enrObj, 'tcp')]);
+      this.libp2pNode.peerStore.addressBook.add(await enrObj.peerId(), [this.getLocationMultiaddr(enrObj, 'tcp')]);
       // this.libp2pNode.discv5.addEnr(enrObj);
       return true;
     } catch (e) {
@@ -782,18 +751,16 @@ export class NetworkManager extends EventEmitter {
    * This will emit a `removed` event
    * @param peerId - Target peer
    */
-  async removePeer(peerId: string) {
-    let task = this.static[peerId];
-    if (task) {
-      this.static.delete(peerId);
-      if (task.staticPoolIndex >= 0) {
-        this.removeFromStaticPool(task.staticPoolIndex);
+  async removePeer(peerId: string, isStrict: boolean = true) {
+    if (isStrict) {
+      let task = this.static.get(peerId);
+      if (task) {
+        this.static.delete(peerId);
+        if (task.staticPoolIndex >= 0) {
+          this.removeFromStaticPool(task.staticPoolIndex);
+        }
       }
     }
-    await this.removeConnect(peerId);
-  }
-
-  private async removeConnect(peerId: string) {
     this.timeout.delete(peerId);
     const peer = this._peers.get(peerId);
     if (peer) {
@@ -805,19 +772,38 @@ export class NetworkManager extends EventEmitter {
     this.updateStaticPool(peerId);
   }
 
-  private async startStaticDials(n: number) {
+  private async startDiscoveryDials() {
+    let pid: string | undefined;
+    // search discovered peer in memory
+    while (this.discovered.length > 0) {
+      const peerId = this.discovered.shift()!;
+      if (this.static.has(peerId)) {
+        continue;
+      }
+      let addr = this.libp2pNode.peerStore.addressBook.get(PeerId.createFromB58String(peerId));
+      if (addr) {
+        if (this.filterPeer({ id: peerId, addresses: addr })) {
+          pid = peerId;
+          break;
+        }
+      }
+    }
+    // try to dial a discovered peer
+    if (pid) {
+      this.startDial(pid);
+    }
+  }
+
+  private startStaticDials(n: number) {
     let count = 0;
     for (let started = 0; started < n && this.staticPool.length > 0; started++) {
       let index = Math.ceil(Math.random() * (this.staticPool.length - 1));
       let task = this.staticPool[index];
       const enr = task.enr;
       const multiaddr = this.getLocationMultiaddr(enr, 'tcp4');
-      const peerId = (await enr.peerId()).toB58String();
+      const peerId = task.peerId;
       if (multiaddr && this.filterPeer({ id: peerId, addresses: [{ multiaddr }] })) {
-        this.startDial(peerId).then(async (success) => {
-          if (!success) {
-            await this.startDial(peerId);
-          }
+        this.startDial(peerId).then(async () => {
           this.updateStaticPool(peerId);
         });
         this.removeFromStaticPool(index);
@@ -869,7 +855,7 @@ export class NetworkManager extends EventEmitter {
   }
 
   private async updateStaticPool(id: string) {
-    let task = this.static[id];
+    let task = this.static.get(id);
     if (task && task.staticPoolIndex < 0 && (await this.checkDial(task.enr))) {
       this.addToStaticPool(task);
     }

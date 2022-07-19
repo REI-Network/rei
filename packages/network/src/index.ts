@@ -194,10 +194,6 @@ export class NetworkManager extends EventEmitter {
     return false;
   }
 
-  private isDialable(peerId: string) {
-    return !this.dialing.has(peerId) && !this._peers.has(peerId);
-  }
-
   private disconnect(peerId: string): Promise<void> {
     return this.libp2pNode.hangUp(PeerId.createFromB58String(peerId));
   }
@@ -271,7 +267,7 @@ export class NetworkManager extends EventEmitter {
    */
   private onDiscovered = async (peerInfo: PeerId) => {
     const enr: ENR | undefined = (this.libp2pNode.discv5.discv5 as any).findEnr(ENR.createFromPeerId(PeerId.createFromBytes(peerInfo.id)).nodeId);
-    if (!enr || !this.checkENR(enr)) {
+    if (!enr || !this.checkEnr(enr)) {
       return;
     }
     const peerId: string = (await enr.peerId()).toB58String();
@@ -289,14 +285,6 @@ export class NetworkManager extends EventEmitter {
       }
     }
     await this.nodedb.persist(enr);
-  };
-
-  //@todo check enr
-  private checkENR = (enr: ENR) => {
-    if (!enr.ip || !enr.nodeId) {
-      return false;
-    }
-    return true;
   };
 
   /**
@@ -434,10 +422,6 @@ export class NetworkManager extends EventEmitter {
     return true;
   }
 
-  private checkOutbound(peerId: string) {
-    return !this.outboundHistory.contains(peerId);
-  }
-
   private checkInstall(id: string) {
     for (const peer of this.peers) {
       if (peer.peerId === id) {
@@ -455,13 +439,12 @@ export class NetworkManager extends EventEmitter {
         if (sep > 0) {
           this.outboundTimer = setTimeout(() => {
             const _now = Date.now();
-            const { peerId } = this.outboundHistory.expire(_now);
+            this.updateStaticPool(this.outboundHistory.expire(_now).peerId);
             this.outboundTimer = undefined;
-            this.updateStaticPool(peerId);
             this.setupOutboundTimer(_now);
           }, sep);
         } else {
-          this.outboundHistory.expire(now);
+          this.updateStaticPool(this.outboundHistory.expire(now).peerId);
         }
       }
     }
@@ -568,55 +551,10 @@ export class NetworkManager extends EventEmitter {
    */
   private filterPeer({ id, addresses }: PeerInfo) {
     // filter all address
-    if (
-      addresses.filter(({ multiaddr }) => {
-        const options = multiaddr.toOptions();
-
-        // filter all address information containing tcp
-        if (options.transport !== 'tcp') {
-          return false;
-        }
-
-        // there are some problems with the dependencies of multiaddrs
-        const family: any = options.family;
-
-        // filter invalid address information
-        if (family === 'ipv4' || family === 4) {
-          // ipv4
-          if (options.host === '127.0.0.1') {
-            return false;
-          }
-        } else {
-          // ipv6
-          return false;
-        }
-
-        return true;
-      }).length === 0
-    ) {
+    if (!this.checkAddresses(addresses)) {
       return false;
     }
-
-    // make sure there are no repeat dials
-    if (!this.isDialable(id)) {
-      return false;
-    }
-
-    // make sure the remote node is not banned
-    if (this.isBanned(id)) {
-      return false;
-    }
-
-    // make sure we don't dial too often
-    if (!this.checkOutbound(id)) {
-      return false;
-    }
-
-    if (!this.checkInstall(id)) {
-      return false;
-    }
-
-    if (this.dialing.has(id)) {
+    if (!this.checkPeerId(id)) {
       return false;
     }
 
@@ -796,18 +734,23 @@ export class NetworkManager extends EventEmitter {
 
   private startStaticDials(n: number) {
     let count = 0;
-    for (let started = 0; started < n && this.staticPool.length > 0; started++) {
-      let index = Math.ceil(Math.random() * (this.staticPool.length - 1));
-      let task = this.staticPool[index];
+    const staticNodes = this.staticPool.filter((v, i) => {
+      let task = this.staticPool[i];
       const enr = task.enr;
       const multiaddr = this.getLocationMultiaddr(enr, 'tcp4');
       const peerId = task.peerId;
-      if (multiaddr && this.filterPeer({ id: peerId, addresses: [{ multiaddr }] })) {
-        this.startDial(peerId).then(async () => {
+      return multiaddr && this.filterPeer({ id: peerId, addresses: [{ multiaddr }] });
+    });
+    for (let started = 0; started < n && staticNodes.length > 0; started++) {
+      let index = Math.ceil(Math.random() * (this.staticPool.length - 1));
+      let task = this.staticPool[index];
+      const peerId = task.peerId;
+      this.startDial(peerId).then((success) => {
+        if (!success) {
           this.updateStaticPool(peerId);
-        });
-        this.removeFromStaticPool(index);
-      }
+        }
+      });
+      this.removeFromStaticPool(index);
       count++;
     }
     return count;
@@ -836,19 +779,10 @@ export class NetworkManager extends EventEmitter {
     if (id === localId) {
       return false;
     }
-    if (!enr.ip && !enr.tcp) {
+    if (!this.checkEnr(enr)) {
       return false;
     }
-    if (this.dialing.has(id)) {
-      return false;
-    }
-    if (!this.checkInstall(id)) {
-      return false;
-    }
-    if (this.isBanned(id)) {
-      return false;
-    }
-    if (this.outboundHistory.contains(id)) {
+    if (!this.checkPeerId(id)) {
       return false;
     }
     return true;
@@ -864,6 +798,64 @@ export class NetworkManager extends EventEmitter {
   private async startDial(peerId: string, flag: PeerFlag = PeerFlag.dynDialedConn) {
     this.updateOutbound(peerId);
     return this.dialAndInstall(peerId, flag);
+  }
+
+  private checkEnr(enr: ENR) {
+    if (!enr.ip && !enr.tcp) {
+      return false;
+    }
+    return true;
+  }
+
+  private checkPeerId(id: string) {
+    // make sure there are no repeat dials
+    if (this.dialing.has(id)) {
+      return false;
+    }
+    if (!this.checkInstall(id)) {
+      return false;
+    }
+    // make sure the remote node is not banned
+    if (this.isBanned(id)) {
+      return false;
+    }
+    // make sure we don't dial too often
+    if (this.outboundHistory.contains(id)) {
+      return false;
+    }
+    return true;
+  }
+
+  private checkAddresses(addresses: { multiaddr: Multiaddr }[]) {
+    if (
+      addresses.filter(({ multiaddr }) => {
+        const options = multiaddr.toOptions();
+
+        // filter all address information containing tcp
+        if (options.transport !== 'tcp') {
+          return false;
+        }
+
+        // there are some problems with the dependencies of multiaddrs
+        const family: any = options.family;
+
+        // filter invalid address information
+        if (family === 'ipv4' || family === 4) {
+          // ipv4
+          if (options.host === '127.0.0.1') {
+            return false;
+          }
+        } else {
+          // ipv6
+          return false;
+        }
+
+        return true;
+      }).length === 0
+    ) {
+      return false;
+    }
+    return true;
   }
 
   private getLocationMultiaddr(enr: ENR, protocol: 'udp' | 'udp4' | 'udp6' | 'tcp' | 'tcp4' | 'tcp6'): Multiaddr | undefined {

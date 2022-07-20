@@ -155,10 +155,18 @@ export class Peer extends EventEmitter {
     return this.protocols.has(protocolString);
   }
 
+  /**
+   * A hook for emiting installed event
+   * @param protocolString - Protocol string
+   */
   installedHook(protocolString: string) {
     this.emit('installed', this.protocols.get(protocolString)!.handler);
   }
 
+  /**
+   * A hook for emiting uninstalled event
+   * @param protocolString - Protocol string
+   */
   uninstalledHook(protocolString: string) {
     this.emit('uninstalled', protocolString);
   }

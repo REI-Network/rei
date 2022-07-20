@@ -22,18 +22,29 @@ enum Libp2pPeerValue {
 }
 
 export interface NetworkManagerOptions {
+  // local peer id
   peerId: PeerId;
+  // supported protocols
   protocols: (Protocol | Protocol[])[];
+  // levelup instance, used to store peer info
   nodedb: LevelUp;
+  // check inbound, default: false
   enableInboundCheck?: boolean;
+  // NAT address, default: 127.0.0.1
   nat?: string;
+  // discv5 instance
   discv5?: IDiscv5;
+  // libp2p instance
   libp2p?: ILibp2p;
+  // libp2p constructor options
   libp2pOptions?: {
+    // tcp port
     tcpPort?: number;
+    // udp port, used for discovering peers
     udpPort?: number;
+    // max connection size
     maxPeers?: number;
-    maxDials?: number;
+    // boot nodes list
     bootnodes?: string[];
   };
 }
@@ -107,7 +118,14 @@ export class NetworkManager extends EventEmitter {
    * Get installed peers
    */
   get peers() {
-    return Array.from(this._peers.values()).filter((peer) => peer.size > 0);
+    return Array.from(this._peers.values());
+  }
+
+  /**
+   * Get connection size
+   */
+  get connectionSize() {
+    return this.libp2p.connectionSize;
   }
 
   /**
@@ -229,7 +247,7 @@ export class NetworkManager extends EventEmitter {
           this.libp2p.unhandle(protocol.protocolString);
         }
       }
-      // remove liseners
+      // remove listeners
       this.libp2p.off('connect', this.onConnect);
       this.libp2p.off('disconnect', this.onDisconnect);
       this.libp2p.off('discovery', this.onDiscovered);
@@ -271,6 +289,9 @@ export class NetworkManager extends EventEmitter {
     this.channel.push(message);
   }
 
+  /**
+   * scheduleLoop will process all messages in sequence
+   */
   private async scheduleLoop() {
     for await (const message of this.channel) {
       try {
@@ -278,7 +299,7 @@ export class NetworkManager extends EventEmitter {
           const result = await this.install(message.peerId, message.protocol, message.connection, message.stream);
           message.resolve && message.resolve(result);
         } else if (message instanceof m.ConnectedMessage) {
-          this.connected(message.connection);
+          await this.connected(message.connection);
         } else if (message instanceof m.DisconnectedMessage) {
           await this.disconnected(message.connection);
         } else if (message instanceof m.DiscoveredMessage) {
@@ -299,7 +320,11 @@ export class NetworkManager extends EventEmitter {
     }
   }
 
+  /**
+   * dialLoop will keep trying to dial the discovered remote nodes
+   */
   private async dialLoop() {
+    // TODO: max dials
     // save all dialing peer id to memory
     const dialing = new Set<string>();
     while (!this.aborted) {
@@ -310,19 +335,21 @@ export class NetworkManager extends EventEmitter {
         }
       }
 
-      // filter all nodes that can be dialed
-      const dialablPeers = this.discoveredPeers.filter((peerId) => this.checkOutbound(peerId));
+      if (this._peers.size < this.libp2p.maxConnections) {
+        // filter all nodes that can be dialed
+        const dialablPeers = this.discoveredPeers.filter((peerId) => this.checkOutbound(peerId));
 
-      // pick the first one, dial
-      const peerId = dialablPeers.shift();
-      if (peerId) {
-        // add to memory map
-        dialing.add(peerId);
-        // remove from list
-        this.discoveredPeers.splice(this.discoveredPeers.indexOf(peerId), 1);
-        this.dial(peerId).finally(() => {
-          dialing.delete(peerId);
-        });
+        // pick the first one, dial
+        const peerId = dialablPeers.shift();
+        if (peerId) {
+          // add to memory map
+          dialing.add(peerId);
+          // remove from list
+          this.discoveredPeers.splice(this.discoveredPeers.indexOf(peerId), 1);
+          this.dial(peerId).finally(() => {
+            dialing.delete(peerId);
+          });
+        }
       }
 
       // TODO: abortableTimer
@@ -331,6 +358,9 @@ export class NetworkManager extends EventEmitter {
     }
   }
 
+  /**
+   * checkTimeoutLoop will periodically delete dead nodes from the database
+   */
   private async checkTimeoutLoop() {
     while (!this.aborted) {
       try {
@@ -345,6 +375,9 @@ export class NetworkManager extends EventEmitter {
     }
   }
 
+  /**
+   * removePeerLoop will periodically remove inactive nodes in _peers
+   */
   private async removePeerLoop() {
     while (!this.aborted) {
       // TODO: abortableTimer
@@ -362,6 +395,10 @@ export class NetworkManager extends EventEmitter {
 
   /**
    * Install a peer and emit a `installed` event when successful
+   * @param peerId - Peer id
+   * @param protocol - Protocol object
+   * @param connection - `libp2p` connection
+   * @param stream - `libp2p` stream, if it doesn't exist, it will be created automatically
    * @returns Whether succeed
    */
   private async install(peerId: string, protocol: Protocol, connection: Connection, stream?: Stream) {
@@ -448,6 +485,10 @@ export class NetworkManager extends EventEmitter {
     }
   }
 
+  /**
+   * Handle on connect event
+   * @param connection - `libp2p` connection
+   */
   private async connected(connection: Connection) {
     const peerId = connection.remotePeer.toB58String();
     if (this.isBanned(peerId)) {
@@ -471,6 +512,10 @@ export class NetworkManager extends EventEmitter {
     }
   }
 
+  /**
+   * Handle disconnect event
+   * @param connection - `libp2p` connection
+   */
   private async disconnected(connection: Connection) {
     const peerId = connection.remotePeer.toB58String();
     if (this._peers.has(peerId)) {
@@ -482,6 +527,10 @@ export class NetworkManager extends EventEmitter {
     }
   }
 
+  /**
+   * Handle discover event
+   * @param peerId - Peer id
+   */
   private async discovered(peerId: PeerId) {
     const enr = this.discv5.findEnr(ENR.createFromPeerId(peerId).nodeId);
     if (!enr) {
@@ -509,12 +558,21 @@ export class NetworkManager extends EventEmitter {
     await this.nodedb.persist(enr);
   }
 
+  /**
+   * Handle receive message event
+   * @param srcId - Node id
+   * @param src - Remove address
+   * @param message - Discv5 message
+   */
   private async receivedMessage(srcId: string, src: Multiaddr, message: Discv5Message) {
     if (message.type === MessageType.PONG) {
       await this.nodedb.updatePongMessage(srcId, src.nodeAddress().address);
     }
   }
 
+  /**
+   * Handle multiaddr updated event
+   */
   private async multiaddrUpdated() {
     const enr = this.discv5.localEnr;
     const multiaddr = enr.getLocationMultiaddr('tcp');

@@ -572,8 +572,9 @@ export class NetworkManager extends EventEmitter {
     while (!this.aborted) {
       try {
         if (this.peers.length < this.maxPeers && this.dialing.size < this.maxDials) {
-          let slots = this.maxPeers - this.libp2pNode.connectionManager.size;
-          slots -= await this.startStaticDials(slots);
+          let slots = this.maxDials - this.dialing.size;
+          slots = slots > this.maxPeers - this.peers.length ? this.maxPeers - this.peers.length : slots;
+          slots -= this.startStaticDials(slots);
           if (slots === 0) {
             await new Promise((r) => setTimeout(r, dialLoopInterval2));
             continue;
@@ -737,24 +738,16 @@ export class NetworkManager extends EventEmitter {
 
   private startStaticDials(n: number) {
     let count = 0;
-    const staticNodes = this.staticPool.filter((v, i) => {
-      let task = this.staticPool[i];
-      const enr = task.enr;
-      const multiaddr = this.getLocationMultiaddr(enr, 'tcp4');
-      const peerId = task.peerId;
-      return multiaddr && this.filterPeer({ id: peerId, addresses: [{ multiaddr }] });
-    });
-    for (let started = 0; started < n && staticNodes.length > 0; started++) {
+    for (let started = 0; started < n && this.staticPool.length > 0; started++) {
       let index = Math.ceil(Math.random() * (this.staticPool.length - 1));
-      let task = staticNodes[index];
+      let task = this.staticPool[index];
       const peerId = task.peerId;
       this.startDial(peerId).then((success) => {
         if (!success) {
           this.updateStaticPool(peerId);
         }
       });
-      this.removeFromStaticPool(task.staticPoolIndex);
-      staticNodes.splice(index, 1);
+      this.removeFromStaticPool(index);
       count++;
     }
     return count;

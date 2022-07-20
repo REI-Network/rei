@@ -5,7 +5,8 @@ import { Peer, NetworkManager, Protocol, ProtocolHandler, ProtocolStream } from 
 import { setLevel } from '@rei-network/utils';
 const memdown = require('memdown');
 
-setLevel('debug');
+setLevel('silent');
+// setLevel('debug');
 
 class SayHi implements Protocol {
   readonly protocolString: string = ' SayHi';
@@ -113,6 +114,15 @@ async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; 
     }
   });
   await node.init();
+  node.on('installed', (peer) => {
+    console.log('node:', node.peerId, 'installed:', peer.peerId);
+  });
+  node.on('uninstalled', (peer) => {
+    console.log('node:', node.peerId, 'uninstalled:', peer.peerId);
+  });
+  node.on('removed', (peer) => {
+    console.log('node:', node.peerId, 'removed:', peer.peerId);
+  });
   await node.start();
   console.log('create node success', 'ip:', opts.ip, 'tcpPort:', opts.tcpPort, 'udpPort:', opts.udpPort);
   return node;

@@ -1,3 +1,4 @@
+import EventEmitter from 'events';
 import pipe from 'it-pipe';
 import { Channel, logger, ignoreError } from '@rei-network/utils';
 import { Connection, Protocol, ProtocolHandler, Stream } from './types';
@@ -89,6 +90,7 @@ export class ProtocolStream {
           }
         });
         await Promise.all([sinkPromise, sourcePromise]);
+        await this.peer.uninstallProtocol(this.protocolString);
       } catch (err) {
         logger.debug('ProtocolStream::pipeStream, catch error:', err);
       }
@@ -111,6 +113,7 @@ export class ProtocolStream {
         this.streamPromise = undefined;
       }
       logger.info('🤐 Peer uninstalled:', this.peer.peerId, 'protocol:', this.protocolString);
+      this.peer.uninstalledHook(this.protocolString);
     }
   }
 }
@@ -118,9 +121,7 @@ export class ProtocolStream {
 /**
  * Peer class manages a single remote peer instance
  */
-export class Peer {
-  connection?: Connection;
-
+export class Peer extends EventEmitter {
   readonly peerId: string;
   readonly createAt: number;
   private readonly protocols = new Map<
@@ -128,10 +129,12 @@ export class Peer {
     {
       handler: ProtocolHandler;
       stream: ProtocolStream;
+      connection: Connection;
     }
   >();
 
   constructor(peerId: string, createAt: number = Date.now()) {
+    super();
     this.peerId = peerId;
     this.createAt = createAt;
   }
@@ -152,6 +155,14 @@ export class Peer {
     return this.protocols.has(protocolString);
   }
 
+  installedHook(protocolString: string) {
+    this.emit('installed', this.protocols.get(protocolString)!.handler);
+  }
+
+  uninstalledHook(protocolString: string) {
+    this.emit('uninstalled', protocolString);
+  }
+
   /**
    * Abort all protocols
    */
@@ -165,7 +176,6 @@ export class Peer {
       )
     );
     this.protocols.clear();
-    this.connection = undefined;
   }
 
   /**
@@ -186,30 +196,26 @@ export class Peer {
     if (old) {
       old.handler.abort();
       await old.stream.abort();
+      if (old.connection !== connection && old.connection._getStreams().length === 0) {
+        // disconnect the old connection if no protocol exists
+        await old.connection.close();
+      }
       this.protocols.delete(protocol.protocolString);
-    }
-    // close old connection
-    if (this.connection !== connection) {
-      this.connection && this.connection.close();
-      this.connection = connection;
     }
     // connect stream with handler
     stream.connectHandler(handler);
     // pipe new stream
     stream.pipeStream(libp2pStream);
     // handshake
-    let handshakeResult: undefined | boolean;
     try {
-      handshakeResult = await handler.handshake();
-      if (!handshakeResult) {
+      if (!(await handler.handshake())) {
         throw new Error(`protocol ${protocol.protocolString}, handshake failed`);
       }
-      this.protocols.set(protocol.protocolString, { handler, stream });
+      this.protocols.set(protocol.protocolString, { handler, stream, connection });
+      this.installedHook(protocol.protocolString);
       return { success: true, handler };
     } catch (err) {
-      if (handshakeResult === undefined) {
-        logger.warn('Peer::installProtocol, handshake failed with remote peer:', this.peerId, 'err:', err);
-      }
+      logger.warn('Peer::installProtocol, handshake failed with remote peer:', this.peerId, 'err:', err);
       handler.abort();
       await stream.abort();
       return { success: false, handler: null };

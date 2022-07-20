@@ -132,6 +132,10 @@ class Libp2pImpl extends EventEmitter implements ILibp2p {
     this.libp2pNode.addressManager.announce = new Set<string>(addresses.map((addr) => addr.toString()));
   }
 
+  getConnections(peerId: string): Connection[] | undefined {
+    return this.libp2pNode.connectionManager.connections.get(peerId);
+  }
+
   start(): Promise<void> {
     this.libp2pNode.on('peer:discovery', (...args: any[]) => this.emit('discovery', ...args));
     this.libp2pNode.connectionManager.on('peer:connect', (...args: any[]) => this.emit('connect', ...args));

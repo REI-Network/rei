@@ -52,10 +52,12 @@ export interface NetworkManagerOptions {
 }
 
 export declare interface NetworkManager {
-  on(event: 'installed', listener: (handler: ProtocolHandler) => void): this;
+  on(event: 'installed', listener: (peer: Peer, handler: ProtocolHandler) => void): this;
+  on(event: 'uninstalled', listener: (peer: Peer, protocolString: string) => void): this;
   on(event: 'removed', listener: (peer: Peer) => void): this;
 
-  off(event: 'installed', listener: (handler: ProtocolHandler) => void): this;
+  off(event: 'installed', listener: (peer: Peer, handler: ProtocolHandler) => void): this;
+  off(event: 'uninstalled', listener: (peer: Peer, protocolString: string) => void): this;
   off(event: 'removed', listener: (peer: Peer) => void): this;
 }
 
@@ -386,6 +388,12 @@ export class NetworkManager extends EventEmitter {
     let peer = this._peers.get(peerId);
     if (!peer) {
       peer = new Peer(peerId);
+      peer.on('installed', (...args: any[]) => {
+        this.emit('installed', peer, ...args);
+      });
+      peer.on('uninstalled', (...args: any[]) => {
+        this.emit('uninstalled', peer, ...args);
+      });
       this._peers.set(peerId, peer);
     }
 
@@ -400,11 +408,10 @@ export class NetworkManager extends EventEmitter {
       }
     }
 
-    const { success, handler } = await peer.installProtocol(protocol, connection, stream);
+    const { success } = await peer.installProtocol(protocol, connection, stream);
     if (success) {
       // if at least one protocol is installed, we think the handshake is successful
       this.libp2p.setPeerValue(PeerId.createFromB58String(peerId), Libp2pPeerValue.installed);
-      this.emit('installed', handler!);
       logger.info('💬 Peer installed:', peerId, 'protocol:', protocol.protocolString);
     } else {
       stream.close();
@@ -454,16 +461,16 @@ export class NetworkManager extends EventEmitter {
     }
   }
 
-  private connected(connection: Connection) {
+  private async connected(connection: Connection) {
     const peerId = connection.remotePeer.toB58String();
     if (this.isBanned(peerId)) {
-      connection.close();
+      await connection.close();
       logger.debug('Network::connected, peerId:', peerId, 'is banned');
       return;
     }
 
     if (!this.checkInbound(peerId)) {
-      connection.close();
+      await connection.close();
       logger.debug('Network::connected, peerId:', peerId, 'too many connection attempts');
       return;
     }
@@ -479,16 +486,18 @@ export class NetworkManager extends EventEmitter {
 
   private async disconnected(connection: Connection) {
     const peerId = connection.remotePeer.toB58String();
-    const peer = this._peers.get(peerId);
-    if (peer && peer.connection === connection) {
-      logger.info('🤐 Peer disconnected:', peerId);
-      await this.doRemovePeer(peerId);
+    if (this._peers.has(peerId)) {
+      const conns = this.libp2p.getConnections(peerId);
+      if (conns === undefined || conns.length === 0) {
+        logger.info('🤐 Peer disconnected:', peerId);
+        await this.doRemovePeer(peerId);
+      }
     }
   }
 
   private async discovered(peerId: PeerId) {
     const enr = this.discv5.findEnr(ENR.createFromPeerId(peerId).nodeId);
-    if (!enr || !enr.ip || !enr.tcp) {
+    if (!enr) {
       return;
     }
 
@@ -539,6 +548,7 @@ export class NetworkManager extends EventEmitter {
   private async doRemovePeer(peerId: string) {
     const peer = this._peers.get(peerId);
     if (peer) {
+      peer.removeAllListeners();
       this._peers.delete(peerId);
       await ignoreError(peer.abort());
       await ignoreError(this.libp2p.hangUp(PeerId.createFromB58String(peerId)));

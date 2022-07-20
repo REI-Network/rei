@@ -20,8 +20,9 @@ export interface ProtocolHandler {
 
 export type Connection = {
   remotePeer: PeerId;
-  close(): void;
+  close(): Promise<void>;
   newStream(protocols: string | string[]): Promise<{ stream: Stream }>;
+  _getStreams(): Stream[];
 };
 
 export type Stream = {
@@ -54,6 +55,8 @@ export interface ILibp2p extends EventEmitter {
 
   setPeerValue(peerId: PeerId | string, value: number): void;
   setAnnounce(addresses: Multiaddr[]): void;
+
+  getConnections(peerId: string): Connection[] | undefined;
 
   start(): Promise<void>;
   stop(): Promise<void>;

@@ -13,20 +13,7 @@ import { Peer } from './peer';
 import { createDefaultImpl } from './libp2pImpl';
 import { Protocol, ProtocolHandler, ILibp2p, IDiscv5, Connection, Stream } from './types';
 import * as m from './messages';
-
-const checkTimeoutInterval = 30e3;
-const removePeerLoopInterval = 5e3;
-const dialLoopInterval = 2e3;
-const removePeerThrottle = 8e3;
-const inboundThrottleTime = 30e3;
-const outboundThrottleTime = 35e3;
-
-const defaultTcpPort = 4191;
-const defaultUdpPort = 9810;
-const defaultNat = '127.0.0.1';
-
-const seedCount = 30;
-const seedMaxAge = 5 * 24 * 60 * 60 * 1000;
+import * as c from './config';
 
 enum Libp2pPeerValue {
   installed = 1,
@@ -132,9 +119,9 @@ export class NetworkManager extends EventEmitter {
     const keypair = createKeypairFromPeerId(this.options.peerId);
     let enr = ENR.createV4(keypair.publicKey);
     if (this.options.nat === undefined || v4(this.options.nat)) {
-      enr.ip = this.options.nat ?? defaultNat;
-      enr.tcp = this.options.libp2pOptions?.tcpPort ?? defaultTcpPort;
-      enr.udp = this.options.libp2pOptions?.udpPort ?? defaultUdpPort;
+      enr.ip = this.options.nat ?? c.defaultNat;
+      enr.tcp = this.options.libp2pOptions?.tcpPort ?? c.defaultTcpPort;
+      enr.udp = this.options.libp2pOptions?.udpPort ?? c.defaultUdpPort;
     } else if (this.options.nat !== undefined && v6(this.options.nat)) {
       // enr.ip6 = options.nat;
       // enr.tcp6 = options.tcpPort ?? defaultTcpPort;
@@ -214,7 +201,7 @@ export class NetworkManager extends EventEmitter {
     this.discv5.start();
 
     // load seed nodes from database
-    for (const enr of await this.nodedb.querySeeds(seedCount, seedMaxAge)) {
+    for (const enr of await this.nodedb.querySeeds(c.seedCount, c.seedMaxAge)) {
       this.discv5.addEnr(enr);
     }
 
@@ -340,21 +327,21 @@ export class NetworkManager extends EventEmitter {
 
       // TODO: abortableTimer
       // sleep for a while
-      await new Promise<void>((resolve) => setTimeout(resolve, dialLoopInterval));
+      await new Promise<void>((resolve) => setTimeout(resolve, c.dialLoopInterval));
     }
   }
 
   private async checkTimeoutLoop() {
     while (!this.aborted) {
       try {
-        await this.nodedb.checkTimeout(seedMaxAge);
+        await this.nodedb.checkTimeout(c.seedMaxAge);
       } catch (err) {
         logger.error('NetworkManager::checkTimeoutLoop, catch error:', err);
       }
 
       // TODO: abortableTimer
       // sleep for a while
-      await new Promise((resolve) => setTimeout(resolve, checkTimeoutInterval));
+      await new Promise((resolve) => setTimeout(resolve, c.checkTimeoutInterval));
     }
   }
 
@@ -362,11 +349,11 @@ export class NetworkManager extends EventEmitter {
     while (!this.aborted) {
       // TODO: abortableTimer
       // sleep for a while
-      await new Promise((resolve) => setTimeout(resolve, removePeerLoopInterval));
+      await new Promise((resolve) => setTimeout(resolve, c.removePeerLoopInterval));
 
       const now = Date.now();
       for (const [peerId, peer] of this._peers) {
-        if (peer.size === 0 && now - peer.createAt >= removePeerThrottle) {
+        if (peer.size === 0 && now - peer.createAt >= c.removePeerThrottle) {
           await this.removePeer(peerId);
         }
       }
@@ -565,7 +552,7 @@ export class NetworkManager extends EventEmitter {
     if (this.inboundHistory.contains(peerId)) {
       return false;
     }
-    this.inboundHistory.add(peerId, now + inboundThrottleTime);
+    this.inboundHistory.add(peerId, now + c.inboundThrottleTime);
     return true;
   }
 
@@ -594,7 +581,7 @@ export class NetworkManager extends EventEmitter {
 
   private updateOutbound(peerId: string) {
     const now = Date.now();
-    this.outboundHistory.add(peerId, now + outboundThrottleTime);
+    this.outboundHistory.add(peerId, now + c.outboundThrottleTime);
     this.setupOutboundTimer(now);
   }
 

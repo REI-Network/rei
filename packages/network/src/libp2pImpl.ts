@@ -6,11 +6,8 @@ import TCP from 'libp2p-tcp';
 import secio from 'libp2p-secio';
 import { Discv5Discovery, ENR, KademliaRoutingTable, SessionService } from '@gxchain2/discv5';
 import { Connection, IDiscv5, ILibp2p, Stream } from './types';
+import * as c from './config';
 const Libp2p = require('libp2p');
-
-const defaultMaxConnections = 50;
-const defaultTcpPort = 4191;
-const defaultUdpPort = 9810;
 
 export interface Libp2pNodeOptions {
   peerId: PeerId;
@@ -29,8 +26,8 @@ class Libp2pNode extends Libp2p {
     super({
       peerId: options.peerId,
       addresses: {
-        listen: [`/ip4/0.0.0.0/tcp/${options.tcpPort ?? defaultTcpPort}`],
-        noAnnounce: [`/ip4/127.0.0.1/tcp/${options.tcpPort ?? defaultTcpPort}`]
+        listen: [`/ip4/0.0.0.0/tcp/${options.tcpPort ?? c.defaultTcpPort}`],
+        noAnnounce: [`/ip4/127.0.0.1/tcp/${options.tcpPort ?? c.defaultTcpPort}`]
       },
       modules: {
         transport: [TCP],
@@ -46,13 +43,13 @@ class Libp2pNode extends Libp2p {
           autoDial: false,
           discv5: {
             enr: options.enr,
-            bindAddr: `/ip4/0.0.0.0/udp/${options.udpPort ?? defaultUdpPort}`,
+            bindAddr: `/ip4/0.0.0.0/udp/${options.udpPort ?? c.defaultUdpPort}`,
             bootEnrs: options.bootnodes ?? []
           }
         }
       },
       connectionManager: {
-        maxConnections: options.maxConnections ?? defaultMaxConnections,
+        maxConnections: options.maxConnections ?? c.defaultMaxConnections,
         minConnections: 0
       },
       dialer: {

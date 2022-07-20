@@ -26,9 +26,9 @@ app.post('/nodeConnections', async function (req, res) {
 
 app.post('/addEnr', async function (req, res) {
   const enr = req.body.enr;
-  const peerId = req.body.peerId;
+  const targetId = req.body.targetId;
   for (const node of app.nodes) {
-    if ((await node.localEnr.peerId()).toB58String() === peerId) {
+    if ((await node.localEnr.peerId()).toB58String() === targetId) {
       node.addPeer(enr);
       res.send('success');
     }
@@ -47,9 +47,9 @@ app.post('/addTrustedPeer', async function (req, res) {
 });
 
 app.post('/getConnectionSize', async function (req, res) {
-  const peerId = req.body.peerId;
+  const targetId = req.body.targetId;
   for (const node of app.nodes) {
-    if ((await node.localEnr.peerId()).toB58String() === peerId) {
+    if ((await node.localEnr.peerId()).toB58String() === targetId) {
       res.send({ result: node.getConnectionSize() });
     }
   }
@@ -61,6 +61,17 @@ app.post('/isTrusted', async function (req, res) {
   for (const node of app.nodes) {
     if ((await node.localEnr.peerId()).toB58String() === targetId) {
       res.send({ result: node.isTrusted(peerId) });
+    }
+  }
+});
+
+app.post('/removePeer', async function (req, res) {
+  const targetId = req.body.targetId;
+  const peerId = req.body.peerId;
+  for (const node of app.nodes) {
+    if ((await node.localEnr.peerId()).toB58String() === targetId) {
+      await node.removePeer(peerId);
+      res.send({ result: 'success' });
     }
   }
 });

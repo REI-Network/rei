@@ -439,8 +439,11 @@ export class NetworkManager extends EventEmitter {
         if (sep > 0) {
           this.outboundTimer = setTimeout(() => {
             const _now = Date.now();
-            this.updateStaticPool(this.outboundHistory.expire(_now).peerId);
-            this.outboundTimer = undefined;
+            const result = this.outboundHistory.expire(_now);
+            if (result) {
+              this.updateStaticPool(result.peerId);
+              this.outboundTimer = undefined;
+            }
             this.setupOutboundTimer(_now);
           }, sep);
         } else {
@@ -648,7 +651,7 @@ export class NetworkManager extends EventEmitter {
   }
 
   getConnectionSize() {
-    return this.peers.length;
+    return this.libp2pNode.connectionManager.size;
   }
 
   isTrusted(peerId: string) {
@@ -743,14 +746,15 @@ export class NetworkManager extends EventEmitter {
     });
     for (let started = 0; started < n && staticNodes.length > 0; started++) {
       let index = Math.ceil(Math.random() * (this.staticPool.length - 1));
-      let task = this.staticPool[index];
+      let task = staticNodes[index];
       const peerId = task.peerId;
       this.startDial(peerId).then((success) => {
         if (!success) {
           this.updateStaticPool(peerId);
         }
       });
-      this.removeFromStaticPool(index);
+      this.removeFromStaticPool(task.staticPoolIndex);
+      staticNodes.splice(index, 1);
       count++;
     }
     return count;

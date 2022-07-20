@@ -1,61 +1,63 @@
 import net from 'net';
 import levelup from 'levelup';
 import PeerId from 'peer-id';
-import { Peer } from '../src/peer';
-import { NetworkManager } from '../src/index';
-import { Protocol, ProtocolHandler } from '../src/types';
+import { Peer, NetworkManager, Protocol, ProtocolHandler, ProtocolStream } from '../src';
+import { setLevel } from '@rei-network/utils';
 const memdown = require('memdown');
 
+setLevel('debug');
+
 class SayHi implements Protocol {
-  protocolString: string;
-  beforeMakeHandler: (peer: Peer) => boolean | Promise<boolean>;
-  makeHandler: (peer: Peer) => ProtocolHandler;
-  constructor() {
-    this.protocolString = 'SayHi';
-    this.beforeMakeHandler = () => {
-      return true;
-    };
-    this.makeHandler = (peer: Peer) => {
-      console.log('makeHandler', peer.peerId);
-      return new SayHiHandler(peer);
-    };
+  readonly protocolString: string = ' SayHi';
+
+  async makeHandler(peer: Peer, stream: ProtocolStream) {
+    console.log('makeHandler', peer.peerId);
+    return new SayHiHandler(peer, stream);
   }
 }
 
 class SayHiHandler implements ProtocolHandler {
-  peer: Peer;
+  readonly peer: Peer;
+  readonly stream: ProtocolStream;
   task: NodeJS.Timeout[] = [];
-  constructor(peer: Peer) {
+
+  constructor(peer: Peer, stream: ProtocolStream) {
     this.peer = peer;
+    this.stream = stream;
     this.task.push(
       setTimeout(() => {
-        this.peer.send('SayHi', Buffer.from('hello'));
+        this.stream.send(Buffer.from('hello'));
+        // TODO: !!!
         this.task.splice(this.task.length - 1);
       }, 2000)
     );
   }
+
   async handshake() {
     return true;
   }
+
   async handle(data: Buffer) {
     const str = data.toString();
-    if (str == 'hello') {
+    if (str === 'hello') {
       // console.log('received hello message from peer: ', this.peer.peerId);
-      this.peer.send('SayHi', Buffer.from('hi'));
+      this.stream.send(Buffer.from('hi'));
     } else {
       // console.log('received hi message from peer: ', this.peer.peerId);
       this.task.push(
         setTimeout(() => {
-          this.peer.send('SayHi', Buffer.from('hello'));
+          this.stream.send(Buffer.from('hello'));
           this.task.splice(this.task.length - 1);
         }, 5000)
       );
     }
   }
+
   abort() {
     for (const task of this.task) {
       clearTimeout(task);
     }
+    this.task = [];
     console.log('abort');
   }
 }
@@ -101,13 +103,14 @@ async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; 
   const db = levelup(memdown());
   const node = new NetworkManager({
     peerId: await PeerId.create({ keyType: 'secp256k1' }),
-    enable: true,
     protocols: [new SayHi()],
     nodedb: db,
-    bootnodes: opts.bootNodes ? opts.bootNodes : [],
-    tcpPort: opts.tcpPort,
-    udpPort: opts.udpPort,
-    nat: opts.ip
+    nat: opts.ip,
+    libp2pOptions: {
+      bootnodes: opts.bootNodes ? opts.bootNodes : [],
+      tcpPort: opts.tcpPort,
+      udpPort: opts.udpPort
+    }
   });
   await node.init();
   await node.start();

@@ -1,3 +1,4 @@
+import PeerId from 'peer-id';
 import Heap from 'qheap';
 
 export type ExpItem = {
@@ -53,8 +54,10 @@ export class ExpHeap {
    */
   expire(now: number) {
     let item: undefined | ExpItem;
+    let result: string[] = [];
     while ((item = this.heap.peek()) && item !== undefined && item.exp <= now) {
-      return this.heap.remove();
+      result.push(this.heap.remove().peerId);
     }
+    return result;
   }
 }

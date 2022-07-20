@@ -432,6 +432,15 @@ export class NetworkManager extends EventEmitter {
   }
 
   private setupOutboundTimer(now: number) {
+    const handler = (result: string[]) => {
+      if (result.length > 0) {
+        console.log('outbound timer:', result);
+        for (const peerId of result) {
+          console.log('handler:', peerId);
+          this.updateStaticPool(peerId);
+        }
+      }
+    };
     if (!this.outboundTimer) {
       const next = this.outboundHistory.nextExpiry();
       if (next) {
@@ -439,15 +448,12 @@ export class NetworkManager extends EventEmitter {
         if (sep > 0) {
           this.outboundTimer = setTimeout(() => {
             const _now = Date.now();
-            const result = this.outboundHistory.expire(_now);
-            if (result) {
-              this.updateStaticPool(result.peerId);
-              this.outboundTimer = undefined;
-            }
+            handler(this.outboundHistory.expire(_now));
+            this.outboundTimer = undefined;
             this.setupOutboundTimer(_now);
           }, sep);
         } else {
-          this.updateStaticPool(this.outboundHistory.expire(now).peerId);
+          handler(this.outboundHistory.expire(now));
         }
       }
     }

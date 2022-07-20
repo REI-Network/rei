@@ -77,6 +77,9 @@ class Libp2pNode extends Libp2p {
   }
 }
 
+/**
+ * Impl for {@link ILibp2p}
+ */
 class Libp2pImpl extends EventEmitter implements ILibp2p {
   readonly libp2pNode: Libp2pNode;
 
@@ -148,6 +151,9 @@ class Libp2pImpl extends EventEmitter implements ILibp2p {
   }
 }
 
+/**
+ * Impl for {@link IDiscv5}
+ */
 class Discv5Impl extends EventEmitter implements IDiscv5 {
   readonly libp2pNode: Libp2pNode;
 
@@ -179,6 +185,10 @@ class Discv5Impl extends EventEmitter implements IDiscv5 {
   }
 }
 
+/**
+ * Create default `libp2p` and `discv5` impl
+ * @param options - {@link Libp2pNodeOptions}
+ */
 export function createDefaultImpl(options: Libp2pNodeOptions) {
   const node = new Libp2pNode(options);
   return {

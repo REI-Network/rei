@@ -16,6 +16,7 @@ import * as m from './messages';
 import * as c from './config';
 
 enum Libp2pPeerValue {
+  trusted = 1.5,
   installed = 1,
   connected = 0.5,
   incoming = 0
@@ -91,6 +92,11 @@ export class NetworkManager extends EventEmitter {
   private privateKey!: Buffer;
   private options: NetworkManagerOptions;
   private aborted: boolean = false;
+
+  // static peers
+  private staticPeers = new Set<string>();
+  // trusted peers
+  private trustedPeers = new Set<string>();
 
   constructor(options: NetworkManagerOptions) {
     super();
@@ -324,31 +330,34 @@ export class NetworkManager extends EventEmitter {
    * dialLoop will keep trying to dial the discovered remote nodes
    */
   private async dialLoop() {
-    // TODO: max dials
-    // save all dialing peer id to memory
-    const dialing = new Set<string>();
+    const maybeRemoveFromDiscovered = (peerId: string) => {
+      const index = this.discoveredPeers.indexOf(peerId);
+      if (index !== -1) {
+        this.discoveredPeers.splice(index, 1);
+      }
+    };
+
+    // TODO: maybe parallel dial?
     while (!this.aborted) {
-      // remove all banned and dialing and installed peers
+      // remove all invalid peers from discovered peer list
       for (const peerId of this.discoveredPeers) {
-        if (this.isBanned(peerId) || dialing.has(peerId) || this._peers.has(peerId)) {
-          this.discoveredPeers.splice(this.discoveredPeers.indexOf(peerId), 1);
+        if (this.isBanned(peerId) || this._peers.has(peerId) || peerId === this.peerId) {
+          maybeRemoveFromDiscovered(peerId);
         }
       }
 
       if (this._peers.size < this.libp2p.maxConnections) {
-        // filter all nodes that can be dialed
-        const dialablPeers = this.discoveredPeers.filter((peerId) => this.checkOutbound(peerId));
+        // filter all available static peers
+        const staticPeers = Array.from(this.staticPeers).filter((peerId) => !this._peers.has(peerId));
 
-        // pick the first one, dial
+        // filter all nodes that can be dialed
+        const dialablPeers = [...staticPeers, ...this.discoveredPeers].filter((peerId) => this.checkOutbound(peerId));
+
+        // pick the first one and dial
         const peerId = dialablPeers.shift();
         if (peerId) {
-          // add to memory map
-          dialing.add(peerId);
-          // remove from list
-          this.discoveredPeers.splice(this.discoveredPeers.indexOf(peerId), 1);
-          this.dial(peerId).finally(() => {
-            dialing.delete(peerId);
-          });
+          maybeRemoveFromDiscovered(peerId);
+          await this.dial(peerId);
         }
       }
 
@@ -435,7 +444,8 @@ export class NetworkManager extends EventEmitter {
     const { success } = await peer.installProtocol(protocol, connection, stream);
     if (success) {
       // if at least one protocol is installed, we think the handshake is successful
-      this.libp2p.setPeerValue(PeerId.createFromB58String(peerId), Libp2pPeerValue.installed);
+      const peerValue = this.trustedPeers.has(peerId) ? Libp2pPeerValue.trusted : Libp2pPeerValue.installed;
+      this.libp2p.setPeerValue(PeerId.createFromB58String(peerId), peerValue);
       logger.info('💬 Peer installed:', peerId, 'protocol:', protocol.protocolString);
     } else {
       stream.close();
@@ -503,12 +513,13 @@ export class NetworkManager extends EventEmitter {
       return;
     }
 
-    if (this.libp2p.connectionSize > this.libp2p.maxConnections) {
+    if (this.libp2p.connectionSize < this.libp2p.maxConnections || this.trustedPeers.has(peerId)) {
+      logger.info('💬 Peer connect:', peerId);
+      const peerValue = this.trustedPeers.has(peerId) ? Libp2pPeerValue.trusted : Libp2pPeerValue.connected;
+      this.libp2p.setPeerValue(PeerId.createFromB58String(peerId), peerValue);
+    } else {
       this.libp2p.setPeerValue(PeerId.createFromB58String(peerId), Libp2pPeerValue.incoming);
       logger.debug('Network::connected, too many incoming connections');
-    } else {
-      logger.info('💬 Peer connect:', peerId);
-      this.libp2p.setPeerValue(PeerId.createFromB58String(peerId), Libp2pPeerValue.connected);
     }
   }
 
@@ -644,6 +655,76 @@ export class NetworkManager extends EventEmitter {
   }
 
   /**
+   * Add static peer,
+   * network manager will keep trying to connect static peer
+   * @param enrTxt - ENR string
+   * @returns Whether the addition was successful
+   */
+  async addPeer(enrTxt: string) {
+    const enr = ENR.decodeTxt(enrTxt);
+    const peerId = await enr.peerId();
+    const peerIdTxt = peerId.toB58String();
+
+    // prevent repetition
+    if (peerIdTxt === this.peerId) {
+      return false;
+    }
+
+    // check if enr is legal
+    const addr = enr.getLocationMultiaddr('tcp');
+    if (!addr) {
+      return false;
+    }
+
+    // add id to memory set
+    this.staticPeers.add(peerIdTxt);
+    // add address to address book
+    this.libp2p.addAddress(peerId, [new Multiaddr(addr.toString())]);
+    return true;
+  }
+
+  /**
+   * Add trusted peer,
+   * network manager will always accept connection from trusted peers,
+   * even if the number of connections is full
+   * @param enrTxt - ENR string
+   */
+  async addTrustedPeer(enrTxt: string) {
+    const enr = ENR.decodeTxt(enrTxt);
+    const peerId = await enr.peerId();
+    const peerIdTxt = peerId.toB58String();
+    if (peerIdTxt !== this.peerId && !this.trustedPeers.has(peerIdTxt)) {
+      this.trustedPeers.add(peerIdTxt);
+      if (this._peers.has(peerIdTxt)) {
+        this.libp2p.setPeerValue(peerId, Libp2pPeerValue.trusted);
+      }
+    }
+  }
+
+  /**
+   * Remove trusted peer,
+   * NOTE: this method does not immediately modify peerValue
+   * @param enrTxt - ENR string
+   */
+  async removeTrustedPeer(enrTxt: string) {
+    const enr = ENR.decodeTxt(enrTxt);
+    const peerId = await enr.peerId();
+    const peerIdTxt = peerId.toB58String();
+    this.trustedPeers.delete(peerIdTxt);
+  }
+
+  /**
+   * Check remote peer is trusted
+   * @param enrTxt - ENR string
+   */
+  async isTrusted(enrTxt: string) {
+    const enr = ENR.decodeTxt(enrTxt);
+    const peerId = await enr.peerId();
+    const peerIdTxt = peerId.toB58String();
+    return this.trustedPeers.has(peerIdTxt);
+  }
+
+  /**
    * Disconnect remote peer
    * @param peerId - Peer id
    */
@@ -660,6 +741,7 @@ export class NetworkManager extends EventEmitter {
    */
   ban(peerId: string, maxAge: number = 60000) {
     this.banned.set(peerId, Date.now() + maxAge);
+    this.staticPeers.delete(peerId);
     return this.removePeer(peerId);
   }
 

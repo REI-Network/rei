@@ -1,6 +1,6 @@
 export const checkTimeoutInterval = 30e3;
 export const removePeerLoopInterval = 5e3;
-export const dialLoopInterval = 2e3;
+export const dialLoopInterval = 1e3;
 export const removePeerThrottle = 8e3;
 export const inboundThrottleTime = 30e3;
 export const outboundThrottleTime = 35e3;

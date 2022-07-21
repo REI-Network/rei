@@ -557,9 +557,6 @@ export class NetworkManager extends EventEmitter {
       }
     }
 
-    // add address to address book
-    this.libp2p.addAddress(peerId, [new Multiaddr(address.toString())]);
-
     // save enr to database
     await this.nodedb.persist(enr);
   }

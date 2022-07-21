@@ -234,11 +234,6 @@ export class NetworkManager extends EventEmitter {
     this.dialLoop();
     this.checkTimeoutLoop();
     this.removePeerLoop();
-
-    // TODO: remove
-    setInterval(() => {
-      console.log(`peerId ${this.peerId} ==========> connection size:`, this.libp2p.connectionSize, 'installed:', this.peers.length);
-    }, 10000);
   }
 
   /**

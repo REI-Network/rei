@@ -89,7 +89,7 @@ export async function autoStartNodes(opts: { ip: string; udpPort: number; tcpPor
   const result = boot ? [boot, ...(await Promise.all(nodes))] : await Promise.all(nodes);
   setInterval(() => {
     for (const node of result) {
-      console.log(`peerId ${node.peerId} ==========> connection size:`, node.connectionSize);
+      console.log(`peerId ${node.peerId} ==========> connection size:`, node.connectionSize, 'peers:', node.peers.length);
     }
   }, 10000);
   return result;

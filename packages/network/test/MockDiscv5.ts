@@ -5,57 +5,17 @@ import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId, IKeypair } from '@gxchain2/discv5/lib/keypair';
 import { IDiscv5 } from '../src/types';
 import { MessageType } from '@gxchain2/discv5/lib/message';
+import { MockWholeNetwork } from './MockWholenet';
 
-export class WholeNetwork {
-  nodes: Map<string, MoacDiscv5> = new Map();
-  constructor() {}
-
-  register(enr: ENR, discv5: MoacDiscv5) {
-    this.nodes.set(enr.nodeId, discv5);
-  }
-
-  lookUp(caller: MoacDiscv5, targetId: string, recursion: boolean = true) {
-    const target = this.nodes.get(targetId);
-    if (target) {
-      const callerId = caller.localEnr.nodeId;
-      const enrs = [target.localEnr, ...target.knownNodes.values()];
-      for (const enr of enrs) {
-        if (enr.nodeId !== callerId) {
-          //deep copy
-          const e = deepCopy(enr);
-          caller.handleEnr(e);
-        }
-      }
-      if (recursion) {
-        this.lookUp(target, caller.localEnr.nodeId, false);
-      }
-    }
-  }
-
-  sendPingMessage(caller: MoacDiscv5, targetId: string) {
-    const target = this.nodes.get(targetId);
-    if (target) {
-      target.emit('message', { srcId: caller.localEnr.nodeId, src: caller.localEnr.getLocationMultiaddr('udp'), message: { type: MessageType.PING } });
-    }
-  }
-
-  sendPongMessage(caller: MoacDiscv5, targetId: string) {
-    const target = this.nodes.get(targetId);
-    if (target) {
-      target.emit('message', { srcId: caller.localEnr.nodeId, src: caller.localEnr.getLocationMultiaddr('udp'), message: { type: MessageType.PONG } });
-    }
-  }
-}
-
-export class MoacDiscv5 extends EventEmitter implements IDiscv5 {
+export class MockDiscv5 extends EventEmitter implements IDiscv5 {
   private enr: ENR;
   keypair: IKeypair;
-  knownNodes: Map<string, ENR> = new Map();
-  wholeNetwork: WholeNetwork;
+  knownNodes = new Map<string, ENR>();
+  wholeNetwork: MockWholeNetwork;
   lookUpTimer: NodeJS.Timeout | undefined;
   liveTimer: NodeJS.Timeout | undefined;
 
-  constructor(keypair: IKeypair, enr: ENR, bootNode: ENR[], w: WholeNetwork) {
+  constructor(keypair: IKeypair, enr: ENR, bootNode: ENR[], w: MockWholeNetwork) {
     super();
     this.enr = enr;
     this.keypair = keypair;
@@ -65,6 +25,7 @@ export class MoacDiscv5 extends EventEmitter implements IDiscv5 {
         this.wholeNetwork.sendPongMessage(this, srcId);
       } else if (message.type === MessageType.PONG) {
         if (this.localEnr.ip === '127.0.0.1') {
+          // TODO
           this.localEnr.ip = '192.168.0.1';
           this.emit('multiaddrUpdated', this.localEnr.getLocationMultiaddr('udp'));
         }
@@ -107,7 +68,9 @@ export class MoacDiscv5 extends EventEmitter implements IDiscv5 {
   }
 
   stop() {
+    this.removeAllListeners();
     this.lookUpTimer && clearInterval(this.lookUpTimer);
+    this.liveTimer && clearInterval(this.liveTimer);
   }
 
   size() {
@@ -118,18 +81,18 @@ export class MoacDiscv5 extends EventEmitter implements IDiscv5 {
     if (!this.knownNodes.has(enr.nodeId) || enr.seq > this.knownNodes.get(enr.nodeId)!.seq) {
       this.knownNodes.set(enr.nodeId, enr);
       this.emit('peer', {
-        id: (await enr.peerId()).toB58String(),
+        id: await enr.peerId(),
         multiaddrs: [enr.getLocationMultiaddr('tcp')]
       });
     }
   }
+
   sign() {
     this.localEnr.encode(this.keypair.privateKey);
   }
 }
 
-//------------------------------------------------------------------------------
-async function createNode(w: WholeNetwork, bootNode: ENR[], options: { nat?: string; tcpPort?: number; udpPort?: number }) {
+async function createNode(w: MockWholeNetwork, bootNode: ENR[], options: { nat?: string; tcpPort?: number; udpPort?: number }) {
   const keypair = createKeypairFromPeerId(await PeerId.create({ keyType: 'secp256k1' }));
   let enr = ENR.createV4(keypair.publicKey);
   if (options.nat === undefined || v4(options.nat)) {
@@ -144,18 +107,18 @@ async function createNode(w: WholeNetwork, bootNode: ENR[], options: { nat?: str
   // update enr seq
   enr.seq = BigInt(Date.now());
   enr.encode(keypair.privateKey);
-  const discv5 = new MoacDiscv5(keypair, enr, bootNode, w);
+  const discv5 = new MockDiscv5(keypair, enr, bootNode, w);
   discv5.start();
   return discv5;
 }
 
 async function main() {
-  const w = new WholeNetwork();
+  const w = new MockWholeNetwork();
   let tcpPort = 4191;
   let udpPort = 9810;
-  // let nat = '192.168.0.4';
-  let list: Promise<MoacDiscv5>[] = [];
-  const bootNode = await createNode(w, [], { nat: '192.168.0.4', tcpPort, udpPort });
+  let nat = '192.168.0.4';
+  let list: Promise<MockDiscv5>[] = [];
+  const bootNode = await createNode(w, [], { nat, tcpPort, udpPort });
   for (let i = 0; i < 10; i++) {
     tcpPort += 1;
     udpPort += 1;
@@ -175,19 +138,13 @@ async function main() {
     }
   }, 4000);
 
-  // setInterval(async () => {
-  //   tcpPort += 1;
-  //   udpPort += 1;
-  //   const newOne = await createNode(w, [bootNode.localEnr], { nat, tcpPort, udpPort });
-  //   for (const node of nodes) {
-  //     node.addEnr(newOne.localEnr);
-  //   }
-  //   nodes.push(newOne);
-  // }, 8000);
+  setInterval(async () => {
+    tcpPort += 1;
+    udpPort += 1;
+    const newOne = await createNode(w, [bootNode.localEnr], { tcpPort, udpPort });
+    for (const node of nodes) {
+      node.addEnr(newOne.localEnr);
+    }
+    nodes.push(newOne);
+  }, 8000);
 }
-
-function deepCopy(enr: ENR) {
-  return ENR.decodeTxt(enr.encodeTxt());
-}
-
-main();

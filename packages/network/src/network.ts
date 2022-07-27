@@ -343,7 +343,7 @@ export class NetworkManager extends EventEmitter {
 
       if (this._peers.size < this.libp2p.maxConnections) {
         // filter all available static peers
-        const staticPeers = Array.from(this.staticPeers).filter((peerId) => !this._peers.has(peerId));
+        const staticPeers = Array.from(this.staticPeers).filter((peerId) => !this._peers.has(peerId) && !this.isBanned(peerId));
 
         // filter all nodes that can be dialed
         const dialablPeers = [...staticPeers, ...this.discoveredPeers].filter((peerId) => this.checkOutbound(peerId));

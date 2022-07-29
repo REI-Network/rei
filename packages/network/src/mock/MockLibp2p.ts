@@ -6,8 +6,8 @@ import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId, IKeypair } from '@gxchain2/discv5/lib/keypair';
 import { MockDiscv5 } from './MockDiscv5';
 import { MockWholeNetwork2 } from './MockWholenet';
-import { Libp2pNodeOptions } from '../src/libp2pImpl';
-import { Connection, ILibp2p, Stream } from '../src';
+import { Libp2pNodeOptions } from '../libp2pImpl';
+import { Connection, IDiscv5, ILibp2p, Stream } from '../types';
 import { testChannel } from './testChannel';
 export class MockStream extends EventEmitter {
   public sendChannel: testChannel<{ _bufs: Buffer[] }> | undefined;
@@ -17,7 +17,8 @@ export class MockStream extends EventEmitter {
     super();
     this.reciveChannel = reciveChannel;
   }
-  async sink(source: AsyncGenerator<Buffer>): Promise<void> {
+
+  sink = async (source: AsyncGenerator<Buffer>) => {
     //local data send
     while (true && !this.abort) {
       const { value } = await source.next();
@@ -27,21 +28,29 @@ export class MockStream extends EventEmitter {
         return;
       }
     }
-  }
-  source(): AsyncGenerator<{ _bufs: Buffer[] }> {
+  };
+
+  source = () => {
     //remote data recive
     return this.reciveChannel.data();
-  }
-  setSendChannel(channel: testChannel<{ _bufs: Buffer[] }>) {
-    this.sendChannel = channel;
-  }
+  };
+
   close() {
     this.abort = true;
     this.reciveChannel.close();
     this.emit('close');
   }
-}
 
+  passiveClose() {
+    this.abort = true;
+    this.reciveChannel.close();
+  }
+
+  setSendChannel(channel: testChannel<{ _bufs: Buffer[] }>) {
+    this.sendChannel = channel;
+  }
+}
+let count = 0;
 export class MockConnection extends EventEmitter {
   id: number;
   mockLibp2p: ILibp2p;
@@ -50,7 +59,7 @@ export class MockConnection extends EventEmitter {
   direction: 'inbound' | 'outbound';
   constructor(peerId: PeerId, direction: 'inbound' | 'outbound', libp2p: ILibp2p) {
     super();
-    this.id = Date.now();
+    this.id = count++;
     this.remotePeer = peerId;
     this.direction = direction;
     this.mockLibp2p = libp2p;
@@ -58,8 +67,8 @@ export class MockConnection extends EventEmitter {
 
   async close(): Promise<void> {
     Array.from(this.streams.values()).map((s) => s.close());
-    this.emit('close');
-    this.mockLibp2p.emit('disconnect', this);
+    this.emit('close'); //notice wholeNetwork
+    this.mockLibp2p.emit('mock:disconnect', this);
     return;
   }
 
@@ -99,10 +108,18 @@ export class MockConnection extends EventEmitter {
       return stream;
     }
   }
-  closeStream(protocol: string) {
+
+  passiveClose() {
+    Array.from(this.streams.values()).map((s) => s.passiveClose());
+    this.mockLibp2p.emit('mock:disconnect', this);
+
+    return;
+  }
+
+  passiveCloseStream(protocol: string) {
     let stream = this.streams.get(protocol);
     if (stream) {
-      stream.close();
+      stream.passiveClose();
       this.streams.delete(protocol);
     }
   }
@@ -123,13 +140,15 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   libp2pConfig: Libp2pNodeOptions;
   wholeNetwork: MockWholeNetwork2;
   abort: boolean = false;
+  isStarted: boolean = false;
+  pengingClose: Set<string> = new Set();
   constructor(config: Libp2pNodeOptions, discv5: MockDiscv5, wholeNetwork: MockWholeNetwork2) {
     super();
     this.wholeNetwork = wholeNetwork;
     this.id = config.peerId;
     this.libp2pConfig = config;
     this.enr = config.enr;
-    this.maxConntionSize = config.maxConnections ? config.maxConnections : 50;
+    this.maxConntionSize = config.maxConnections ? config.maxConnections : 15;
     this.udpPort = config.udpPort ? config.udpPort : 9527;
     this.tcpPort = config.tcpPort ? config.tcpPort : 9528;
     this.discv5 = discv5;
@@ -144,7 +163,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   }
 
   get maxConnections(): number {
-    return this.libp2pConfig.maxConnections ?? 50;
+    return this.maxConntionSize;
   }
 
   get connectionSize(): number {
@@ -170,8 +189,11 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   }
 
   addAddress(peerId: PeerId, addresses: Multiaddr[]): void {
-    this.peers.set(peerId.toB58String(), addresses);
-    this.emit('peer:discovery', peerId);
+    const add = this.peers.get(peerId.toB58String()) || [];
+    if (!add || add.toLocaleString() !== addresses.toLocaleString()) {
+      this.peers.set(peerId.toB58String(), addresses);
+      this.emit('discovery', peerId);
+    }
   }
 
   getAddress(peerId: PeerId): Multiaddr[] | undefined {
@@ -190,7 +212,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     if (connections) {
       connection = connections[0];
     } else {
-      connection = this.wholeNetwork.toConnect(this, peer);
+      connection = (await this.wholeNetwork.toConnect(this, peer)) as MockConnection;
     }
     return connection;
   }
@@ -222,18 +244,25 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   }
 
   async start(): Promise<void> {
-    this.on('connect', (connection: MockConnection) => {
+    if (this.isStarted) {
+      return;
+    }
+    this.isStarted = true;
+    this.on('mock:connect', (connection: MockConnection) => {
       const peerId = connection.remotePeer.toB58String();
       if (!this.connections.has(peerId)) {
         this.connections.set(peerId, [connection]);
       } else {
         this.connections.get(peerId)!.push(connection);
       }
-      this.emit('peer:connect', connection);
+      this.emit('connect', connection);
       this.checkMaxLimit();
     });
-    this.on('disconnect', (connection: MockConnection) => {
+    this.on('mock:disconnect', (connection: MockConnection) => {
       const peerId = connection.remotePeer.toB58String();
+      if (this.pengingClose.has(peerId)) {
+        this.pengingClose.delete(peerId);
+      }
       let storedConn = this.connections.get(peerId);
       if (storedConn && storedConn.length > 1) {
         storedConn = storedConn.filter((conn) => conn.id !== connection.id);
@@ -241,7 +270,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
       } else if (storedConn) {
         this.connections.delete(peerId);
         this.peerValues.delete(connection.remotePeer.toB58String());
-        this.emit('peer:disconnect', connection);
+        this.emit('disconnect', connection);
       }
     });
     this.on('newStream', (protocol: string, connection: MockConnection, stream: MockStream) => {
@@ -267,13 +296,19 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   }
 
   private checkMaxLimit() {
-    if (this.connectionSize >= this.maxConnections) {
+    if (this.connectionSize - this.pengingClose.size >= this.maxConnections) {
+      console.log(`${this.id.toB58String()} is full`);
       const peerValues = Array.from(this.peerValues).sort((a, b) => a[1] - b[1]);
       const disconnectPeer = peerValues[0];
       if (disconnectPeer) {
         const peerId = disconnectPeer[0];
+        if (!this.connections.has(peerId)) {
+          this.peerValues.delete(peerId);
+          return;
+        }
         for (const connections of this.connections.values()) {
           if (connections[0].remotePeer.toB58String() === peerId) {
+            this.pengingClose.add(peerId);
             connections[0].close();
             break;
           }
@@ -283,7 +318,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   }
 }
 
-async function createNode(w: MockWholeNetwork2, bootNode: ENR[], options: { nat?: string; tcpPort?: number; udpPort?: number }) {
+async function createNode(w: MockWholeNetwork2, bootNode: string[], options: { nat?: string; tcpPort?: number; udpPort?: number }) {
   const peerId = await PeerId.create({ keyType: 'secp256k1' });
   const keypair = createKeypairFromPeerId(peerId);
   let enr = ENR.createV4(keypair.publicKey);
@@ -300,8 +335,8 @@ async function createNode(w: MockWholeNetwork2, bootNode: ENR[], options: { nat?
   enr.seq = BigInt(Date.now());
   enr.encode(keypair.privateKey);
   const discv5 = new MockDiscv5(keypair, enr, bootNode, w);
-  discv5.start();
   const libp2p = new MockLibp2p({ peerId, enr, udpPort: options.udpPort, tcpPort: options.tcpPort, maxConnections: 50 }, discv5, w);
+  discv5.start();
   libp2p.start();
   return { discv5, libp2p };
 }
@@ -316,7 +351,7 @@ async function main() {
   for (let i = 0; i < 10; i++) {
     tcpPort += 1;
     udpPort += 1;
-    const node = createNode(w, [bootNode.discv5.localEnr], { tcpPort, udpPort });
+    const node = createNode(w, [bootNode.discv5.localEnr.encodeTxt()], { tcpPort, udpPort });
     list.push(node);
   }
   const nodes = [bootNode, ...(await Promise.all(list))];
@@ -366,4 +401,9 @@ async function main() {
   }, 10000);
 }
 
-main();
+const w = new MockWholeNetwork2();
+export function createMockImp(options: Libp2pNodeOptions): { libp2p: ILibp2p; discv5: IDiscv5 } {
+  const discv5 = new MockDiscv5(createKeypairFromPeerId(options.peerId), options.enr, options.bootnodes ?? [], w);
+  const libp2p = new MockLibp2p(options, discv5, w);
+  return { libp2p, discv5 };
+}

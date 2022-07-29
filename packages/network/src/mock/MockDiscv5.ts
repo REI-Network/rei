@@ -3,7 +3,7 @@ import PeerId from 'peer-id';
 import { v4, v6 } from 'is-ip';
 import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId, IKeypair } from '@gxchain2/discv5/lib/keypair';
-import { IDiscv5 } from '../src/types';
+import { IDiscv5 } from '../types';
 import { MessageType } from '@gxchain2/discv5/lib/message';
 import { MockWholeNetwork } from './MockWholenet';
 
@@ -14,8 +14,8 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
   wholeNetwork: MockWholeNetwork;
   lookUpTimer: NodeJS.Timeout | undefined;
   liveTimer: NodeJS.Timeout | undefined;
-
-  constructor(keypair: IKeypair, enr: ENR, bootNode: ENR[], w: MockWholeNetwork) {
+  isStart: boolean = false;
+  constructor(keypair: IKeypair, enr: ENR, bootNode: string[], w: MockWholeNetwork) {
     super();
     this.enr = enr;
     this.keypair = keypair;
@@ -31,8 +31,9 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
         }
       }
     });
-    for (const enr of bootNode) {
-      this.knownNodes.set(enr.nodeId, enr);
+    for (const enrStr of bootNode) {
+      let enrObj: ENR = ENR.decodeTxt(enrStr);
+      this.knownNodes.set(enrObj.nodeId, enrObj);
     }
     w.register(enr, this);
   }
@@ -55,6 +56,10 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
   }
 
   start() {
+    if (this.isStart) {
+      return;
+    }
+    this.isStart = true;
     this.lookUpTimer = setInterval(() => {
       for (const id of this.knownNodes.keys()) {
         this.wholeNetwork.lookUp(this, id);
@@ -80,11 +85,15 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
   async handleEnr(enr: ENR) {
     if (!this.knownNodes.has(enr.nodeId) || enr.seq > this.knownNodes.get(enr.nodeId)!.seq) {
       this.knownNodes.set(enr.nodeId, enr);
-      this.emit('peer', {
-        id: await enr.peerId(),
-        multiaddrs: [enr.getLocationMultiaddr('tcp')]
-      });
     }
+    const multiaddr = enr.getLocationMultiaddr('tcp');
+    if (!multiaddr) {
+      return;
+    }
+    this.emit('peer', {
+      id: await enr.peerId(),
+      multiaddrs: [multiaddr]
+    });
   }
 
   sign() {
@@ -92,7 +101,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
   }
 }
 
-async function createNode(w: MockWholeNetwork, bootNode: ENR[], options: { nat?: string; tcpPort?: number; udpPort?: number }) {
+async function createNode(w: MockWholeNetwork, bootNode: string[], options: { nat?: string; tcpPort?: number; udpPort?: number }) {
   const keypair = createKeypairFromPeerId(await PeerId.create({ keyType: 'secp256k1' }));
   let enr = ENR.createV4(keypair.publicKey);
   if (options.nat === undefined || v4(options.nat)) {
@@ -122,7 +131,7 @@ async function main() {
   for (let i = 0; i < 10; i++) {
     tcpPort += 1;
     udpPort += 1;
-    const node = createNode(w, [bootNode.localEnr], { tcpPort, udpPort });
+    const node = createNode(w, [bootNode.localEnr.encodeTxt()], { tcpPort, udpPort });
     list.push(node);
   }
   const nodes = [bootNode, ...(await Promise.all(list))];
@@ -141,7 +150,7 @@ async function main() {
   setInterval(async () => {
     tcpPort += 1;
     udpPort += 1;
-    const newOne = await createNode(w, [bootNode.localEnr], { tcpPort, udpPort });
+    const newOne = await createNode(w, [bootNode.localEnr.encodeTxt()], { tcpPort, udpPort });
     for (const node of nodes) {
       node.addEnr(newOne.localEnr);
     }

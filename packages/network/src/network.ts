@@ -11,6 +11,7 @@ import { ExpHeap } from './expheap';
 import { NodeDB } from './nodedb';
 import { Peer } from './peer';
 import { createDefaultImpl } from './libp2pImpl';
+import { createMockImp } from './mock/MockLibp2p';
 import { Protocol, ProtocolHandler, ILibp2p, IDiscv5, Connection, Stream } from './types';
 import * as m from './messages';
 import * as c from './config';
@@ -180,7 +181,12 @@ export class NetworkManager extends EventEmitter {
         throw new Error('missing libp2p options');
       }
       // create default impl instance
-      const { libp2p, discv5 } = createDefaultImpl({
+      // const { libp2p, discv5 } = createDefaultImpl({
+      //   ...this.options.libp2pOptions,
+      //   peerId: this.options.peerId,
+      //   enr
+      // });
+      const { libp2p, discv5 } = createMockImp({
         ...this.options.libp2pOptions,
         peerId: this.options.peerId,
         enr

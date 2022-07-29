@@ -8,16 +8,16 @@ const memdown = require('memdown');
 setLevel('silent');
 // setLevel('debug');
 
-class SayHi implements Protocol {
+export class SayHi implements Protocol {
   readonly protocolString: string = ' SayHi';
 
   async makeHandler(peer: Peer, stream: ProtocolStream) {
-    console.log('makeHandler', peer.peerId);
+    // console.log('makeHandler', peer.peerId);
     return new SayHiHandler(peer, stream);
   }
 }
 
-class SayHiHandler implements ProtocolHandler {
+export class SayHiHandler implements ProtocolHandler {
   readonly peer: Peer;
   readonly stream: ProtocolStream;
   task: NodeJS.Timeout[] = [];
@@ -59,7 +59,7 @@ class SayHiHandler implements ProtocolHandler {
       clearTimeout(task);
     }
     this.task = [];
-    console.log('abort');
+    // console.log('abort');
   }
 }
 

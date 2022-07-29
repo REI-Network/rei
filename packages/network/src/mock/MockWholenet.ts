@@ -1,11 +1,12 @@
 import { ENR } from '@gxchain2/discv5';
 import { MessageType } from '@gxchain2/discv5/lib/message';
+import { resolve } from 'multiaddr';
 import { MockDiscv5 } from './MockDiscv5';
 import { MockLibp2p, MockConnection, MockStream } from './MockLibp2p';
 import { testChannel } from './testChannel';
 export class MockWholeNetwork {
   nodes: Map<string, MockDiscv5> = new Map();
-
+  constructor() {}
   register(enr: ENR, discv5: MockDiscv5) {
     this.nodes.set(enr.nodeId, discv5);
   }
@@ -19,7 +20,7 @@ export class MockWholeNetwork {
         if (enr.nodeId !== callerId) {
           //deep copy
           const e = deepCopy(enr);
-          caller.handleEnr(e);
+          if (e) caller.handleEnr(e);
         }
       }
       if (recursion) {
@@ -44,7 +45,11 @@ export class MockWholeNetwork {
 }
 
 function deepCopy(enr: ENR) {
-  return ENR.decodeTxt(enr.encodeTxt());
+  try {
+    return ENR.decodeTxt(enr.encodeTxt());
+  } catch (error) {
+    return undefined;
+  }
 }
 
 export class MockWholeNetwork2 extends MockWholeNetwork {
@@ -55,27 +60,25 @@ export class MockWholeNetwork2 extends MockWholeNetwork {
   async registerPeer(peer: MockLibp2p) {
     this.peers.set(await peer.peerId.toB58String(), peer);
   }
+
   toConnect(caller: MockLibp2p, peerId: string) {
     const peer = this.peers.get(peerId);
     if (peer) {
       const callerConnect = new MockConnection(peer.peerId, 'outbound', caller);
       const targetConnect = new MockConnection(caller.peerId, 'inbound', peer);
+
       callerConnect.on('close', () => {
-        peer.emit('disconnect', targetConnect);
+        targetConnect.passiveClose();
+        // peer.emit('mock:disconnect', targetConnect);
       });
       targetConnect.on('close', () => {
-        caller.emit('disconnect', callerConnect);
+        callerConnect.passiveClose();
+        // caller.emit('mock:disconnect', callerConnect);
       });
 
       callerConnect.on('newStream', (protocol: string, channel: testChannel<{ _bufs: Buffer[] }>, stream: MockStream) => {
         let targetStream = targetConnect.inboundStreams(protocol, channel);
         stream.setSendChannel(targetStream.reciveChannel);
-        stream.on('close', () => {
-          console.log('caller stream close');
-        });
-        targetStream.on('close', () => {
-          console.log('target stream close');
-        });
       });
       targetConnect.on('newStream', (protocol: string, channel: testChannel<{ _bufs: Buffer[] }>, stream: MockStream) => {
         let callerStream = callerConnect.inboundStreams(protocol, channel);
@@ -83,14 +86,14 @@ export class MockWholeNetwork2 extends MockWholeNetwork {
       });
 
       callerConnect.on('closeStream', (protocol: string) => {
-        targetConnect.closeStream(protocol);
+        targetConnect.passiveCloseStream(protocol);
       });
       targetConnect.on('closeStream', (protocol: string) => {
-        callerConnect.closeStream(protocol);
+        callerConnect.passiveCloseStream(protocol);
       });
 
-      caller.emit('connect', callerConnect);
-      peer.emit('connect', targetConnect);
+      caller.emit('mock:connect', callerConnect);
+      peer.emit('mock:connect', targetConnect);
       return callerConnect;
     } else {
       throw new Error('peer not found');

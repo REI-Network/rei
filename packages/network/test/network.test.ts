@@ -27,7 +27,7 @@ describe('NetWork', async () => {
 
   it('should be able to trusted peer', async () => {
     let nodes: Promise<NetworkManager>[] = [];
-    let node = await createNode({ ip, tcpPort: tcpPort, udpPort: udpPort, bootNodes: [bootEnr] });
+    let node = await createNode({ ip, tcpPort: tcpPort, udpPort: udpPort, bootNodes: [bootEnr], maxPeers: 2 });
     for (let i = 0; i < 5; i++) {
       nodes.push(createNode({ ip, tcpPort, udpPort, bootNodes: [bootEnr] }));
     }
@@ -43,9 +43,52 @@ describe('NetWork', async () => {
       assert('trusted peer not found');
     }
   });
+
+  it('should be get the correct number of nodes', async () => {
+    let nodes: Promise<NetworkManager>[] = [];
+    let node = await createNode({ ip, tcpPort: tcpPort, udpPort: udpPort, bootNodes: [bootEnr] });
+    for (let i = 0; i < 10; i++) {
+      nodes.push(createNode({ ip, tcpPort, udpPort, bootNodes: [bootEnr] }));
+    }
+    await Promise.all(nodes);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 5000);
+    });
+    expect(node.peers.length).to.equal(11);
+  });
+
+  it('should be get the correct number of connections', async () => {
+    let nodes: Promise<NetworkManager>[] = [];
+    let node = await createNode({ ip, tcpPort: tcpPort, udpPort: udpPort, bootNodes: [bootEnr] });
+    for (let i = 0; i < 10; i++) {
+      nodes.push(createNode({ ip, tcpPort, udpPort, bootNodes: [bootEnr] }));
+    }
+    await Promise.all(nodes);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 5000);
+    });
+    expect(node.connectionSize).to.equal(11);
+  });
+
+  it('should be able to abort node', async () => {
+    let nodes: Promise<NetworkManager>[] = [];
+    let node = await createNode({ ip, tcpPort: tcpPort, udpPort: udpPort, bootNodes: [bootEnr] });
+    for (let i = 0; i < 10; i++) {
+      nodes.push(createNode({ ip, tcpPort, udpPort, bootNodes: [bootEnr] }));
+    }
+    await Promise.all(nodes);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 5000);
+    });
+    await node.abort();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 1000);
+    });
+    expect(bootNode.connectionSize).to.equal(10);
+  });
 });
 
-async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; bootNodes?: string[] }) {
+async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; bootNodes?: string[]; maxPeers?: number }) {
   const db = levelup(memdown());
   const node = new NetworkManager({
     peerId: await PeerId.create({ keyType: 'secp256k1' }),
@@ -56,7 +99,7 @@ async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; 
       bootnodes: opts.bootNodes ? opts.bootNodes : [],
       tcpPort: opts.tcpPort,
       udpPort: opts.udpPort,
-      maxPeers: 2
+      maxPeers: opts.maxPeers ? opts.maxPeers : 50
     }
   });
   await node.init();

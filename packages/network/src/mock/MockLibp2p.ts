@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
 import PeerId from 'peer-id';
-import Multiaddr from 'multiaddr';
+import Multiaddr, { resolve } from 'multiaddr';
 import { v4, v6 } from 'is-ip';
 import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId, IKeypair } from '@gxchain2/discv5/lib/keypair';
@@ -9,6 +9,9 @@ import { MockWholeNetwork2 } from './MockWholenet';
 import { Libp2pNodeOptions } from '../libp2pImpl';
 import { Connection, IDiscv5, ILibp2p, Stream } from '../types';
 import { testChannel } from './testChannel';
+import { Channel } from '@rei-network/utils';
+import { CheckMaxLimitMessage, ConnectionMessage, DiscoverMessage, StreamMessage } from './MockMessage';
+import { Message } from '../messages';
 export class MockStream extends EventEmitter {
   public sendChannel: testChannel<{ _bufs: Buffer[] }> | undefined;
   public reciveChannel: testChannel<{ _bufs: Buffer[] }>;
@@ -67,8 +70,9 @@ export class MockConnection extends EventEmitter {
 
   async close(): Promise<void> {
     Array.from(this.streams.values()).map((s) => s.close());
-    this.emit('close'); //notice wholeNetwork
+    this.streams.clear();
     this.mockLibp2p.emit('mock:disconnect', this);
+    this.emit('close'); //notice wholeNetwork
     return;
   }
 
@@ -85,8 +89,8 @@ export class MockConnection extends EventEmitter {
         this.emit('closeStream', protocols[0]); //notice wholeNetwork
       });
       this.streams.set(protocols[0], stream);
-      this.emit('newStream', protocols[0], channel, stream); //notice wholeNetwork
       this.mockLibp2p.emit('newStream', protocols[0], this, stream);
+      this.emit('newStream', protocols[0], channel, stream); //notice wholeNetwork
     }
     return { stream };
   }
@@ -111,8 +115,8 @@ export class MockConnection extends EventEmitter {
 
   passiveClose() {
     Array.from(this.streams.values()).map((s) => s.passiveClose());
+    this.streams.clear();
     this.mockLibp2p.emit('mock:disconnect', this);
-
     return;
   }
 
@@ -141,19 +145,20 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   wholeNetwork: MockWholeNetwork2;
   abort: boolean = false;
   isStarted: boolean = false;
-  pengingClose: Set<string> = new Set();
+  private readonly channel = new Channel<Message>();
+  private pengingClose: Set<string> = new Set();
   constructor(config: Libp2pNodeOptions, discv5: MockDiscv5, wholeNetwork: MockWholeNetwork2) {
     super();
     this.wholeNetwork = wholeNetwork;
     this.id = config.peerId;
     this.libp2pConfig = config;
     this.enr = config.enr;
-    this.maxConntionSize = config.maxConnections ? config.maxConnections : 15;
+    this.maxConntionSize = config.maxConnections ? config.maxConnections : 5;
     this.udpPort = config.udpPort ? config.udpPort : 9527;
     this.tcpPort = config.tcpPort ? config.tcpPort : 9528;
     this.discv5 = discv5;
     this.discv5.on('peer', ({ id, multiaddrs }) => {
-      this.addAddress(id, multiaddrs);
+      this.push(new DiscoverMessage(id, multiaddrs));
     });
     wholeNetwork.registerPeer(this);
   }
@@ -201,20 +206,21 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   }
 
   async dial(peer: string | PeerId | Multiaddr): Promise<Connection> {
-    if (peer instanceof Multiaddr) {
-      return undefined as any;
-    }
-    if (peer instanceof PeerId) {
-      peer = peer.toB58String();
-    }
-    let connection: MockConnection;
-    const connections = this.connections.get(peer);
-    if (connections) {
-      connection = connections[0];
-    } else {
-      connection = (await this.wholeNetwork.toConnect(this, peer)) as MockConnection;
-    }
-    return connection;
+    return new Promise((resolve) => {
+      if (peer instanceof Multiaddr) {
+        return undefined as any;
+      }
+      if (peer instanceof PeerId) {
+        peer = peer.toB58String();
+      }
+      let connection: MockConnection;
+      const connections = this.connections.get(peer);
+      if (connections) {
+        resolve(connections[0]);
+      } else {
+        this.wholeNetwork.toConnect(this.peerId.toB58String(), peer, resolve);
+      }
+    });
   }
 
   async hangUp(peerId: string | PeerId): Promise<void> {
@@ -249,36 +255,15 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     }
     this.isStarted = true;
     this.on('mock:connect', (connection: MockConnection) => {
-      const peerId = connection.remotePeer.toB58String();
-      if (!this.connections.has(peerId)) {
-        this.connections.set(peerId, [connection]);
-      } else {
-        this.connections.get(peerId)!.push(connection);
-      }
-      this.emit('connect', connection);
-      this.checkMaxLimit();
+      this.push(new ConnectionMessage(connection, true));
     });
     this.on('mock:disconnect', (connection: MockConnection) => {
-      const peerId = connection.remotePeer.toB58String();
-      if (this.pengingClose.has(peerId)) {
-        this.pengingClose.delete(peerId);
-      }
-      let storedConn = this.connections.get(peerId);
-      if (storedConn && storedConn.length > 1) {
-        storedConn = storedConn.filter((conn) => conn.id !== connection.id);
-        this.connections.set(peerId, storedConn);
-      } else if (storedConn) {
-        this.connections.delete(peerId);
-        this.peerValues.delete(connection.remotePeer.toB58String());
-        this.emit('disconnect', connection);
-      }
+      this.push(new ConnectionMessage(connection, false));
     });
     this.on('newStream', (protocol: string, connection: MockConnection, stream: MockStream) => {
-      const callback = this.protocols.get(protocol);
-      if (callback) {
-        callback({ connection, stream });
-      }
+      this.push(new StreamMessage(protocol, connection, stream));
     });
+    this.loop();
   }
 
   async stop(): Promise<void> {
@@ -297,24 +282,88 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
 
   private checkMaxLimit() {
     if (this.connectionSize - this.pengingClose.size >= this.maxConnections) {
-      console.log(`${this.id.toB58String()} is full`);
       const peerValues = Array.from(this.peerValues).sort((a, b) => a[1] - b[1]);
       const disconnectPeer = peerValues[0];
       if (disconnectPeer) {
         const peerId = disconnectPeer[0];
         if (!this.connections.has(peerId)) {
+          console.log(`[${this.peerId.toB58String()}] disconnect ${peerId}`);
           this.peerValues.delete(peerId);
+          return;
+        }
+        if (this.pengingClose.has(peerId)) {
           return;
         }
         for (const connections of this.connections.values()) {
           if (connections[0].remotePeer.toB58String() === peerId) {
-            this.pengingClose.add(peerId);
             connections[0].close();
+            this.pengingClose.add(peerId);
             break;
           }
         }
       }
     }
+  }
+
+  private push(message: Message): void {
+    this.channel.push(message);
+  }
+
+  private async loop() {
+    for await (const message of this.channel) {
+      if (message instanceof ConnectionMessage) {
+        if (message.isConnect) {
+          this.onConnction(message.connection);
+        } else {
+          this.onDisconnection(message.connection);
+        }
+      } else if (message instanceof StreamMessage) {
+        this.onStream(message.protocol, message.connection, message.stream);
+      } else if (message instanceof DiscoverMessage) {
+        this.onDiscover({ id: message.peerId, multiaddrs: message.multiaddr });
+      } else if (message instanceof CheckMaxLimitMessage) {
+        this.checkMaxLimit();
+      }
+    }
+  }
+
+  private onConnction(connection: MockConnection) {
+    const peerId = connection.remotePeer.toB58String();
+    if (!this.connections.has(peerId)) {
+      this.connections.set(peerId, [connection]);
+    } else {
+      this.connections.get(peerId)!.push(connection);
+    }
+    this.emit('connect', connection);
+    // this.checkMaxLimit();
+    this.push(new CheckMaxLimitMessage());
+  }
+
+  private onDisconnection(connection: MockConnection) {
+    const peerId = connection.remotePeer.toB58String();
+    if (this.pengingClose.has(peerId)) {
+      this.pengingClose.delete(peerId);
+    }
+    let storedConn = this.connections.get(peerId);
+    if (storedConn && storedConn.length > 1) {
+      storedConn = storedConn.filter((conn) => conn.id !== connection.id);
+      this.connections.set(peerId, storedConn);
+    } else if (storedConn) {
+      this.connections.delete(peerId);
+      this.peerValues.delete(connection.remotePeer.toB58String());
+      this.emit('disconnect', connection);
+    }
+  }
+
+  private onStream(protocol: string, connection: MockConnection, stream: MockStream) {
+    const callback = this.protocols.get(protocol);
+    if (callback) {
+      callback({ connection, stream });
+    }
+  }
+
+  private onDiscover(peer: { id: PeerId; multiaddrs: [Multiaddr] }) {
+    this.addAddress(peer.id, peer.multiaddrs);
   }
 }
 

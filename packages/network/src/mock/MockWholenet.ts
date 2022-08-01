@@ -1,9 +1,11 @@
 import { ENR } from '@gxchain2/discv5';
 import { MessageType } from '@gxchain2/discv5/lib/message';
-import { resolve } from 'multiaddr';
+import { Channel } from '@rei-network/utils';
 import { MockDiscv5 } from './MockDiscv5';
 import { MockLibp2p, MockConnection, MockStream } from './MockLibp2p';
 import { testChannel } from './testChannel';
+import { ConnectedMessage, DisconnectMessage } from './MockMessage';
+import { Message } from '../messages';
 export class MockWholeNetwork {
   nodes: Map<string, MockDiscv5> = new Map();
   constructor() {}
@@ -54,18 +56,39 @@ function deepCopy(enr: ENR) {
 
 export class MockWholeNetwork2 extends MockWholeNetwork {
   peers: Map<string, MockLibp2p> = new Map();
+  private readonly channel = new Channel<Message>();
   constructor() {
     super();
+    this.loop();
   }
   async registerPeer(peer: MockLibp2p) {
     this.peers.set(await peer.peerId.toB58String(), peer);
   }
+  private push(message: Message): void {
+    this.channel.push(message);
+  }
+  async loop() {
+    for await (const message of this.channel) {
+      if (message instanceof ConnectedMessage) {
+        message.resolve(this._toConnect(message.caller, message.target));
+      }
+    }
+  }
 
-  toConnect(caller: MockLibp2p, peerId: string) {
-    const peer = this.peers.get(peerId);
-    if (peer) {
-      const callerConnect = new MockConnection(peer.peerId, 'outbound', caller);
-      const targetConnect = new MockConnection(caller.peerId, 'inbound', peer);
+  async toConnect(caller: string, peerId: string, resolve: (connection: MockConnection) => void) {
+    this.push(new ConnectedMessage(caller, peerId, resolve));
+  }
+
+  async toDisconnect(remote: MockConnection) {
+    remote.passiveClose();
+  }
+
+  _toConnect(callerId: string, targetId: string) {
+    const caller = this.peers.get(callerId);
+    const target = this.peers.get(targetId);
+    if (caller && target) {
+      const callerConnect = new MockConnection(target.peerId, 'outbound', caller);
+      const targetConnect = new MockConnection(caller.peerId, 'inbound', target);
 
       callerConnect.on('close', () => {
         targetConnect.passiveClose();
@@ -93,7 +116,7 @@ export class MockWholeNetwork2 extends MockWholeNetwork {
       });
 
       caller.emit('mock:connect', callerConnect);
-      peer.emit('mock:connect', targetConnect);
+      target.emit('mock:connect', targetConnect);
       return callerConnect;
     } else {
       throw new Error('peer not found');

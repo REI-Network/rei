@@ -412,6 +412,11 @@ export class NetworkManager extends EventEmitter {
    * @returns Whether succeed
    */
   private async install(peerId: string, protocol: Protocol, connection: Connection, stream?: Stream) {
+    const connections = this.libp2p.getConnections(peerId);
+    if (!connections || connections.length == 0) {
+      return false;
+    }
+
     if (this.isBanned(peerId)) {
       logger.debug('Network::install, peerId:', peerId, 'failed due to banned');
       return false;
@@ -558,7 +563,7 @@ export class NetworkManager extends EventEmitter {
     const strPeerId = peerId.toB58String();
     if (!this.discoveredPeers.includes(strPeerId)) {
       this.discoveredPeers.push(strPeerId);
-      if (this.discoveredPeers.length > this.libp2p.maxConnections) {
+      if (this.discoveredPeers.length > this.libp2p.maxConnections * 2) {
         this.discoveredPeers.shift();
       }
     }

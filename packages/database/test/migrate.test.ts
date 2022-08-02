@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { expect } from 'chai';
 import { migrate } from '../src/migrate';
 import { createEncodingLevelDB, createLevelDB, createEncodingRocksDB, createRocksDB } from '../src/rawdb';
-import { expect } from 'chai';
 
 const testDir = path.join(__dirname, 'testdir');
 const fromDir = path.join(testDir, 'from');

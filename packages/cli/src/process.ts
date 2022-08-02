@@ -3,6 +3,7 @@ import { Node } from '@rei-network/core';
 import { RpcServer } from '@rei-network/rpc';
 import { logger } from '@rei-network/utils';
 import { ApiServer } from '@rei-network/api';
+import { IpcServer } from './ipc/server';
 
 process.on('uncaughtException', (err) => {
   logger.error('uncaughtException:', err);
@@ -13,7 +14,7 @@ process.on('unhandledRejection', (err) => {
 
 let SIGINTLock = false;
 
-export function SIGINT(node: Node, apiServer: ApiServer, rpc?: RpcServer) {
+export function SIGINT(node: Node, apiServer: ApiServer, ipcServer: IpcServer, rpc?: RpcServer) {
   process.on('SIGINT', async () => {
     if (!SIGINTLock) {
       try {
@@ -23,7 +24,7 @@ export function SIGINT(node: Node, apiServer: ApiServer, rpc?: RpcServer) {
           logger.error('SIGINT, timeout');
           process.exit(1);
         }, 3000);
-        await Promise.all([node.abort(), apiServer.abort(), rpc?.abort()]);
+        await Promise.all([node.abort(), apiServer.abort(), ipcServer.abort(), rpc?.abort()]);
         logger.info('SIGINT, abort finished');
         process.exit(0);
       } catch (err) {

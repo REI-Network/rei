@@ -20,12 +20,13 @@
         "@rei-network/common": "^1.0.0",
         "@rei-network/structure": "^0.1.1",
         "crc-32": "^1.2.1",
-        "encoding-down": "^6.3.0",
-        "levelup": "^4.4.0",
         "debug": "^4.3.3",
+        "encoding-down": "^6.3.0",
         "ethereumjs-util": "^7.1.4",
         "level-mem": "^5.0.1",
+        "levelup": "^4.4.0",
         "lru-cache": "^5.1.1",
+        "rocksdb": "^5.2.1",
         "semaphore-async-await": "^1.5.1"
     }
 }

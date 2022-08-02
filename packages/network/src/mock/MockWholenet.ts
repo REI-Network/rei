@@ -59,7 +59,7 @@ export class MockWholeNetwork2 extends MockWholeNetwork {
   private readonly channel = new Channel<Message>();
   constructor() {
     super();
-    this.loop();
+    // this.loop();
   }
   async registerPeer(peer: MockLibp2p) {
     this.peers.set(await peer.peerId.toB58String(), peer);
@@ -76,7 +76,8 @@ export class MockWholeNetwork2 extends MockWholeNetwork {
   }
 
   async toConnect(caller: string, peerId: string, resolve: (connection: MockConnection) => void) {
-    this.push(new ConnectedMessage(caller, peerId, resolve));
+    // this.push(new ConnectedMessage(caller, peerId, resolve));
+    resolve(this._toConnect(caller, peerId));
   }
 
   async toDisconnect(remote: MockConnection) {

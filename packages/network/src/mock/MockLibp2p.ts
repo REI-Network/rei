@@ -10,7 +10,7 @@ import { Libp2pNodeOptions } from '../libp2pImpl';
 import { Connection, IDiscv5, ILibp2p, Stream } from '../types';
 import { testChannel } from './testChannel';
 import { Channel } from '@rei-network/utils';
-import { CheckMaxLimitMessage, ConnectionMessage, DiscoverMessage, StreamMessage } from './MockMessage';
+import { CheckMaxLimitMessage, ConnectionMessage, DiscoverMessage, StreamMessage, DialMessage } from './MockMessage';
 import { Message } from '../messages';
 export class MockStream extends EventEmitter {
   public sendChannel: testChannel<{ _bufs: Buffer[] }> | undefined;
@@ -147,13 +147,14 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   isStarted: boolean = false;
   private readonly channel = new Channel<Message>();
   private pengingClose: Set<string> = new Set();
+  private checkMaxLimitTimer: NodeJS.Timer | undefined;
   constructor(config: Libp2pNodeOptions, discv5: MockDiscv5, wholeNetwork: MockWholeNetwork2) {
     super();
     this.wholeNetwork = wholeNetwork;
     this.id = config.peerId;
     this.libp2pConfig = config;
     this.enr = config.enr;
-    this.maxConntionSize = config.maxConnections ? config.maxConnections : 5;
+    this.maxConntionSize = config.maxConnections ? config.maxConnections : 50;
     this.udpPort = config.udpPort ? config.udpPort : 9527;
     this.tcpPort = config.tcpPort ? config.tcpPort : 9528;
     this.discv5 = discv5;
@@ -213,13 +214,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
       if (peer instanceof PeerId) {
         peer = peer.toB58String();
       }
-      let connection: MockConnection;
-      const connections = this.connections.get(peer);
-      if (connections) {
-        resolve(connections[0]);
-      } else {
-        this.wholeNetwork.toConnect(this.peerId.toB58String(), peer, resolve);
-      }
+      this.push(new DialMessage(peer, resolve));
     });
   }
 
@@ -264,11 +259,15 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
       this.push(new StreamMessage(protocol, connection, stream));
     });
     this.loop();
+    this.checkMaxLimitTimer = setInterval(() => {
+      this.push(new CheckMaxLimitMessage());
+    }, 30 * 1000);
   }
 
   async stop(): Promise<void> {
     this.abort = true;
     this.removeAllListeners();
+    this.checkMaxLimitTimer && clearInterval(this.checkMaxLimitTimer);
     const tasks: any[] = [];
     for (const connectionList of this.connections.values()) {
       for (const connection of connectionList) {
@@ -281,17 +280,18 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   }
 
   private checkMaxLimit() {
-    if (this.connectionSize - this.pengingClose.size >= this.maxConnections) {
+    if (this.connectionSize - this.pengingClose.size > this.maxConnections) {
       const peerValues = Array.from(this.peerValues).sort((a, b) => a[1] - b[1]);
       const disconnectPeer = peerValues[0];
       if (disconnectPeer) {
         const peerId = disconnectPeer[0];
         if (!this.connections.has(peerId)) {
-          console.log(`[${this.peerId.toB58String()}] disconnect ${peerId}`);
           this.peerValues.delete(peerId);
+          this.push(new CheckMaxLimitMessage());
           return;
         }
         if (this.pengingClose.has(peerId)) {
+          this.push(new CheckMaxLimitMessage());
           return;
         }
         for (const connections of this.connections.values()) {
@@ -323,6 +323,8 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
         this.onDiscover({ id: message.peerId, multiaddrs: message.multiaddr });
       } else if (message instanceof CheckMaxLimitMessage) {
         this.checkMaxLimit();
+      } else if (message instanceof DialMessage) {
+        this.onDial(message.peer, message.resolve);
       }
     }
   }
@@ -364,6 +366,15 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
 
   private onDiscover(peer: { id: PeerId; multiaddrs: [Multiaddr] }) {
     this.addAddress(peer.id, peer.multiaddrs);
+  }
+
+  private onDial(peer: string, resolve: (connection: MockConnection) => void) {
+    const connections = this.connections.get(peer);
+    if (connections) {
+      resolve(connections[0]);
+    } else {
+      this.wholeNetwork.toConnect(this.peerId.toB58String(), peer, resolve);
+    }
   }
 }
 

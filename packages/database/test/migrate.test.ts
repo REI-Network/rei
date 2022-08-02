@@ -5,37 +5,42 @@ import { migrate } from '../src/migrate';
 import { createEncodingLevelDB, createLevelDB, createEncodingRocksDB, createRocksDB } from '../src/rawdb';
 import { expect } from 'chai';
 
-const fromDir = path.join(__dirname, 'testdir', 'from');
-const toDir = path.join(__dirname, 'testdir', 'to');
+const testDir = path.join(__dirname, 'testdir');
+const fromDir = path.join(testDir, 'from');
+const toDir = path.join(testDir, 'to');
 
 async function testMigrate(fromCreator: typeof createEncodingLevelDB | typeof createLevelDB, toCreator: typeof createEncodingRocksDB | typeof createRocksDB) {
   const from = fromCreator(fromDir);
-  const keys: Buffer[] = [];
-  const vals: Buffer[] = [];
-  for (let i = 0; i < 100; i++) {
-    const key = crypto.randomBytes(32);
-    const val = crypto.randomBytes(32);
-    keys.push(key);
-    vals.push(val);
-    await from.put(key, val);
-  }
   const to = toCreator(toDir);
-  await migrate(from, to);
-  for (let i = 0; i < keys.length; i++) {
-    const val2 = await to.get(keys[i]);
-    expect(vals[i].equals(val2 as any), 'value should be equal');
+  try {
+    const keys: Buffer[] = [];
+    const vals: Buffer[] = [];
+    for (let i = 0; i < 100; i++) {
+      const key = crypto.randomBytes(32);
+      const val = crypto.randomBytes(32);
+      keys.push(key);
+      vals.push(val);
+      await from.put(key, val, { keyEncoding: 'binary', valueEncoding: 'binary' });
+    }
+    await migrate(from, to);
+    for (let i = 0; i < keys.length; i++) {
+      const val2 = await to.get(keys[i], { keyEncoding: 'binary', valueEncoding: 'binary' });
+      expect(vals[i].equals(val2 as any), 'value should be equal');
+    }
+  } finally {
+    await from.close();
+    await to.close();
   }
 }
 
 describe('Migrate', () => {
   beforeEach(() => {
-    fs.mkdirSync(fromDir);
-    fs.mkdirSync(toDir);
+    fs.mkdirSync(fromDir, { recursive: true });
+    fs.mkdirSync(toDir, { recursive: true });
   });
 
   afterEach(() => {
-    fs.unlinkSync(fromDir);
-    fs.unlinkSync(toDir);
+    fs.rmdirSync(testDir, { recursive: true });
   });
 
   it('should migrate leveldb to rocksdb succeed', async () => {

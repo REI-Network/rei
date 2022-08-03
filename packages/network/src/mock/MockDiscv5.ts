@@ -76,6 +76,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     this.removeAllListeners();
     this.lookUpTimer && clearInterval(this.lookUpTimer);
     this.liveTimer && clearInterval(this.liveTimer);
+    this.emit('mock:close');
   }
 
   size() {

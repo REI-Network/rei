@@ -148,13 +148,13 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   private readonly channel = new Channel<Message>();
   private pengingClose: Set<string> = new Set();
   private checkMaxLimitTimer: NodeJS.Timer | undefined;
-  constructor(config: Libp2pNodeOptions, discv5: MockDiscv5, wholeNetwork: MockWholeNetwork2) {
+  constructor(config: { peerId: PeerId; maxPeers?: number; tcpPort?: number; udpPort?: number; enr: ENR }, discv5: MockDiscv5, wholeNetwork: MockWholeNetwork2) {
     super();
     this.wholeNetwork = wholeNetwork;
     this.id = config.peerId;
     this.libp2pConfig = config;
     this.enr = config.enr;
-    this.maxConntionSize = config.maxConnections ? config.maxConnections : 50;
+    this.maxConntionSize = config.maxPeers ? config.maxPeers : 50;
     this.udpPort = config.udpPort ? config.udpPort : 9527;
     this.tcpPort = config.tcpPort ? config.tcpPort : 9528;
     this.discv5 = discv5;
@@ -266,6 +266,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
 
   async stop(): Promise<void> {
     this.abort = true;
+    this.emit('mock:close');
     this.removeAllListeners();
     this.checkMaxLimitTimer && clearInterval(this.checkMaxLimitTimer);
     const tasks: any[] = [];
@@ -395,7 +396,7 @@ async function createNode(w: MockWholeNetwork2, bootNode: string[], options: { n
   enr.seq = BigInt(Date.now());
   enr.encode(keypair.privateKey);
   const discv5 = new MockDiscv5(keypair, enr, bootNode, w);
-  const libp2p = new MockLibp2p({ peerId, enr, udpPort: options.udpPort, tcpPort: options.tcpPort, maxConnections: 50 }, discv5, w);
+  const libp2p = new MockLibp2p({ peerId, enr, udpPort: options.udpPort, tcpPort: options.tcpPort, maxPeers: 50 }, discv5, w);
   discv5.start();
   libp2p.start();
   return { discv5, libp2p };

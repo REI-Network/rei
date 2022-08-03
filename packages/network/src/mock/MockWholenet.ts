@@ -11,6 +11,9 @@ export class MockWholeNetwork {
   constructor() {}
   register(enr: ENR, discv5: MockDiscv5) {
     this.nodes.set(enr.nodeId, discv5);
+    discv5.on('mock:close', () => {
+      this.nodes.delete(enr.nodeId);
+    });
   }
 
   lookUp(caller: MockDiscv5, targetId: string, recursion: boolean = true) {
@@ -63,6 +66,9 @@ export class MockWholeNetwork2 extends MockWholeNetwork {
   }
   async registerPeer(peer: MockLibp2p) {
     this.peers.set(await peer.peerId.toB58String(), peer);
+    peer.on('mock:close', () => {
+      this.peers.delete(peer.peerId.toB58String());
+    });
   }
   private push(message: Message): void {
     this.channel.push(message);

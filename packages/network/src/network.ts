@@ -561,7 +561,7 @@ export class NetworkManager extends EventEmitter {
 
     // add peerId to memory list
     const strPeerId = peerId.toB58String();
-    if (!this.discoveredPeers.includes(strPeerId)) {
+    if (!this.discoveredPeers.includes(strPeerId) || !this._peers.has(strPeerId)) {
       this.discoveredPeers.push(strPeerId);
       if (this.discoveredPeers.length > this.libp2p.maxConnections * 2) {
         this.discoveredPeers.shift();

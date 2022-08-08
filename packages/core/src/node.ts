@@ -227,12 +227,12 @@ export class Node {
     await this.pendingTxsLoopPromise;
     await this.commitBlockLoopPromise;
 
-    // save all diff layers to disk
+    // save all diff layers and disk layers to disk
     try {
       const root = this.latestBlock.header.stateRoot;
-      await this.snapTree.cap(root, 0);
+      await this.snapTree.journal(root);
     } catch (err) {
-      logger.warn('Node::abort, cap snap tree failed:', err);
+      logger.warn('Node::abort, journal snap tree failed:', err);
     }
 
     await this.evidencedb.close();

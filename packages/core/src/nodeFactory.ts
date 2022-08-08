@@ -43,10 +43,7 @@ async function loadPeerId(databasePath: string) {
   return peerId;
 }
 
-export class NodeFactory {
-  // disable constructor
-  private constructor() {}
-
+export abstract class NodeFactory {
   static async createNode(options: CreateNodeOptions) {
     if (options.syncMode !== SyncMode.Full && options.syncMode !== SyncMode.Snap) {
       throw new Error(`Unknown sync mode: ${options.syncMode}`);

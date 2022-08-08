@@ -1178,7 +1178,7 @@ export class SnapSyncScheduler extends EventEmitter {
   }
 
   /**
-   * Aysnc start snap sync,
+   * Async start snap sync,
    * this function will not wait until snap sync finished
    * @param root - State root
    * @param startingBlock - Start sync block number

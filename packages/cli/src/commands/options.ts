@@ -7,7 +7,9 @@ export function installOptions(program: any) {
   try {
     version = JSON.parse(fs.readFileSync(path.join(__dirname, '../../package.json')).toString()).version;
     version = version ?? 'unknown';
-  } catch (err) {}
+  } catch (err) {
+    // ignore error
+  }
   program.version(version);
   program.option('--rpc', 'open rpc server');
   program.option('--rpc-port <port>', 'rpc server port');
@@ -21,6 +23,8 @@ export function installOptions(program: any) {
   program.option('--max-dials <dials>', 'max p2p dials count');
   program.option('--bootnodes <bootnodes...>', 'comma separated list of bootnodes');
   program.option('--sync <sync>', 'sync mode: full, snap', 'full');
+  program.option('--snap-trusted-height <trustedHeight>', 'snap sync trusted height.\nthis value and trustedHash are specified at the same time to take effect.\nsnap sync will start from the specified block to verify the legitimacy.\ne.g. 100');
+  program.option('--snap-trusted-hash <trustedHash>', 'snap sync trusted hash.\nthis value and trustedHeight are specified at the same time to take effect.\nsnap sync will start from the specified block to verify the legitimacy.\ne.g. 0x123...');
   program.option('--datadir <path>', 'chain data dir path', path.join(os.homedir(), '.rei'));
   program.option('--keystore <keystore>', 'the datadir for keystore', 'keystore');
   program.option('--unlock <unlock>', 'comma separated list of accounts to unlock');

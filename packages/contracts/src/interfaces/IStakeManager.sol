@@ -130,6 +130,8 @@ interface IStakeManager is IOnly {
         bytes32 hash
     ) external returns (uint256);
 
+    function initEvidenceHash(bytes32[] calldata hashes) external;
+
     function onAfterBlock(
         address _proposer,
         address[] calldata acValidators,

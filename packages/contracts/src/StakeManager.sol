@@ -521,6 +521,16 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         usedEvidence[hash] = true;
     }
 
+    /**
+     * Initialize the evidence hash, called when migrating
+     * @param hashes            Evidence hash list
+     */
+    function initEvidenceHash(bytes32[] calldata hashes) external override nonReentrant onlySystemCaller {
+        for (uint256 i = 0; i < hashes.length; i++) {
+            usedEvidence[hashes[i]] = true;
+        }
+    }
+
     // TODO: if the active validators list is exactly the same as the last list, don't modify the storage
     /**
      * After block callback, it will be called by system caller after each block is processed

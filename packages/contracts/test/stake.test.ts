@@ -231,13 +231,22 @@ describe('StakeManger', () => {
     await stakeManager.methods.reward(validator2).send({ value: minIndexVotingPower });
     expect(await isExist(), 'validator2 should be added').be.true;
 
-    // slash
-    const hash = bufferToHex(crypto.randomBytes(32));
-    await stakeManager.methods.slash(validator2, 1, hash).send();
-    expect(await isExist(), 'validator2 should be removed').be.false;
-    expect(await stakeManager.methods.usedEvidence(hash).call()).be.true;
+    // init evidence hash
+    const hash1 = bufferToHex(crypto.randomBytes(32));
+    await stakeManager.methods.initEvidenceHash([hash1]).send();
+    expect(await stakeManager.methods.usedEvidence(hash1).call()).be.true;
     try {
-      await stakeManager.methods.slash(validator2, 1, hash).send();
+      await stakeManager.methods.slash(validator2, 1, hash1).send();
+      assert.fail('should slash failed when hash exists');
+    } catch (err) {}
+
+    // slash
+    const hash2 = bufferToHex(crypto.randomBytes(32));
+    await stakeManager.methods.slash(validator2, 1, hash2).send();
+    expect(await isExist(), 'validator2 should be removed').be.false;
+    expect(await stakeManager.methods.usedEvidence(hash2).call()).be.true;
+    try {
+      await stakeManager.methods.slash(validator2, 1, hash2).send();
       assert.fail('should slash failed when hash exists');
     } catch (err) {}
   });

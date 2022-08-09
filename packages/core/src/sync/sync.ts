@@ -5,13 +5,14 @@ import { Block, Receipt } from '@rei-network/structure';
 import { Node } from '../node';
 import { preValidateBlock, validateReceipts } from '../validation';
 import { WireProtocolHandler, isV2 } from '../protocols';
-import { FullSync } from './full';
 import { SnapSync, SnapSyncScheduler } from './snap';
+import { FullSync } from './full';
 import { SyncInfo } from './types';
 
 const snapSyncStaleBlockNumber = 128;
+const snapSyncTrustedStaleBlockNumber = 896;
 const snapSyncMinConfirmed = 2;
-const snapSyncMinTD = 100; // TODO: debug
+const snapSyncMinTD = 1024;
 const waitingSyncDelay = 100;
 const randomPickInterval = 1000;
 
@@ -66,6 +67,8 @@ export class Synchronizer extends EventEmitter {
   private timer = new AbortableTimer();
   private syncLoopPromise?: Promise<void>;
   private randomPickLoopPromise?: Promise<void>;
+  private trustedHeight?: BN;
+  private trustedHash?: Buffer;
 
   constructor(options: SynchronizerOptions) {
     super();
@@ -226,12 +229,22 @@ export class Synchronizer extends EventEmitter {
   }
 
   /**
+   * Confirm the trusted block
+   * @param handler - Remote peer handler
+   * @returns is it confirmed and block data
+   */
+  private async confirmTrusted(handler: WireProtocolHandler) {
+    const data = await this.downloadBlockData(this.trustedHeight!, handler);
+    const confirmed = data && data.block.hash().equals(this.trustedHash!);
+    return { confirmed: !!confirmed, data };
+  }
+
+  /**
    * Confirm the latest block data for snap sync
    * @param ann - Announcement
    * @returns confirmed peers count and block data
    */
   private async confirmAnn(ann: Announcement) {
-    // we're about a week behind, try snap sync first
     const data = await this.downloadBlockDataFromAnn(ann);
     if (data === null) {
       // download data failed,
@@ -274,11 +287,10 @@ export class Synchronizer extends EventEmitter {
   /**
    * Make a OnFinished callback for snap sync
    * Rebuild local snapshot and force put block to database
-   * @param ann - Announcement
    * @param data - Block data
    * @returns Callback
    */
-  private makeOnFinishedCallback(ann: Announcement, data: BlockData) {
+  private makeOnFinishedCallback(data: BlockData) {
     const root = data.block.header.stateRoot;
     return async () => {
       logger.debug('Synchronizer::makeOnFinishedCallback, snapSync onFinished');
@@ -290,7 +302,8 @@ export class Synchronizer extends EventEmitter {
           ...data,
           broadcast: false,
           force: true,
-          td: ann.td
+          // total difficulty equals height
+          td: data.block.header.number
         });
       } catch (err) {
         logger.error('Synchronizer::makeOnFinishedCallback, commit failed:', err);
@@ -306,19 +319,23 @@ export class Synchronizer extends EventEmitter {
       }
 
       if (this.snap.isSyncing) {
-        const remoteHeight = ann.height.toNumber();
-        const localHeight = this.snap.status.highestBlock;
         // check if we need to notify snap of the latest stateRoot
-        if (remoteHeight - localHeight >= snapSyncStaleBlockNumber && this.snap.syncer.snapped === false) {
-          // confirm the latest block data, then reset the stateRoot of the snap
-          const result = await this.confirmAnn(ann);
-          if (result !== null) {
-            const { confirmed, data } = result;
-            if (confirmed >= snapSyncMinConfirmed) {
-              const root = data.block.header.stateRoot;
-              logger.debug('Synchronizer::syncLoop, reset snap sync root, height:', remoteHeight);
-              await this.snap.resetRoot(remoteHeight, root, this.makeOnFinishedCallback(ann, data));
-              continue;
+        if (!this.snap.syncer.snapped) {
+          const remoteHeight = ann.height.toNumber();
+          const localHeight = this.snap.status.highestBlock;
+          const staleNumber = remoteHeight - localHeight;
+          const trustedMode = this.trustedHeight && this.trustedHeight.eqn(this.snap.status.highestBlock);
+          if ((trustedMode && staleNumber >= snapSyncTrustedStaleBlockNumber) || (!trustedMode && staleNumber >= snapSyncStaleBlockNumber)) {
+            // confirm the latest block data, then reset the stateRoot of the snap
+            const result = await this.confirmAnn(ann);
+            if (result !== null) {
+              const { confirmed, data } = result;
+              if (confirmed >= snapSyncMinConfirmed) {
+                const root = data.block.header.stateRoot;
+                logger.debug('Synchronizer::syncLoop, reset snap sync root, height:', remoteHeight);
+                await this.snap.resetRoot(remoteHeight, root, this.makeOnFinishedCallback(data));
+                continue;
+              }
             }
           }
         }
@@ -337,31 +354,52 @@ export class Synchronizer extends EventEmitter {
           continue;
         }
 
-        if (this.mode === SyncMode.Snap && ann.td.sub(td).gten(snapSyncMinTD) && isV2(ann.handler)) {
+        if (this.mode === SyncMode.Snap && ann.td.sub(td).gten(snapSyncMinTD)) {
+          if (!isV2(ann.handler)) {
+            // the remote node does not support downloading receipts, ignore it
+            continue;
+          }
+
           logger.debug('Synchronizer::syncLoop, try to start a new snap sync');
 
-          // download data from other nodes to confirm the data
-          const result = await this.confirmAnn(ann);
-          if (result === null) {
-            continue;
+          let data: BlockData;
+          if (this.trustedHeight && this.trustedHash) {
+            const result = await this.confirmTrusted(ann.handler);
+            if (!result.confirmed || result.data === null) {
+              logger.debug('Synchronizer::syncLoop, trusted block confirmed failed');
+              continue;
+            }
+
+            logger.debug('Synchronizer::syncLoop, trusted block confirmed succeed');
+
+            data = result.data;
+          } else {
+            // download data from other nodes to confirm the data
+            const result = await this.confirmAnn(ann);
+            if (result === null) {
+              continue;
+            }
+
+            // if we have collected enough confirmations, start snap sync
+            if (result.confirmed < snapSyncMinConfirmed) {
+              logger.debug('Synchronizer::syncLoop, confirmed failed:', result.confirmed);
+              continue;
+            }
+
+            logger.debug('Synchronizer::syncLoop, confirmed succeed');
+
+            data = result.data;
           }
 
-          // if we have collected enough confirmations, start snap sync
-          const { confirmed, data } = result;
-          if (confirmed < snapSyncMinConfirmed) {
-            logger.debug('Synchronizer::syncLoop, confirmed failed:', confirmed);
-            continue;
-          }
-
-          logger.debug('Synchronizer::syncLoop, confirmed succeed');
+          const header = data.block.header;
           const info: SyncInfo = {
-            bestHeight: new BN(ann.handler.status!.height),
-            bestTD: ann.td,
+            bestHeight: header.number.clone(),
+            bestTD: header.number.clone(),
             remotePeerId: ann.handler.peer.peerId
           };
           const startingBlock = this.node.latestBlock.header.number.toNumber();
-          const root = data.block.header.stateRoot;
-          await this.snap.snapSync(root, startingBlock, info, this.makeOnFinishedCallback(ann, data));
+          const root = header.stateRoot;
+          await this.snap.snapSync(root, startingBlock, info, this.makeOnFinishedCallback(data));
         } else {
           logger.debug('Synchronizer::syncLoop, try to start a new full sync');
           // we're not too far behind, try full sync

@@ -124,14 +124,14 @@ export class ChainIndexer {
             header = await this.db.getCanonicalHeader(num);
           } catch (err) {
             // ignore errors...
+            // we may lose some blocks due to snapshot synchronization
           }
           if (lastHeader !== undefined && header !== undefined && !header.parentHash.equals(lastHeader.hash())) {
             throw new Error(`parentHash is'not match, last: ${lastHeader.number.toString()}, current: ${header.number.toString()}`);
           }
-          const number = header?.number ?? num;
           const bloom = header?.bloom ?? Buffer.alloc(256);
           const hash = header?.hash() ?? EMPTY_HASH;
-          this.backend.process(number, bloom, hash);
+          this.backend.process(num, bloom, hash);
           lastHeader = header;
         }
         const batch = this.backend.commit();

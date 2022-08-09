@@ -25,7 +25,7 @@ import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
 import { StateManager } from './stateManager';
 import { SnapTree } from './snap/snapTree';
 
-const maxSnapLayers = 128;
+const maxSnapLayers = 1024;
 const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;
 const defaultChainName = 'rei-mainnet';

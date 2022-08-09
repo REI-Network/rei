@@ -166,7 +166,6 @@ export class SnapTree {
     }
     const snap = parent.update(root, destructs, accounts, storage);
     this.layers.set(snap.root, snap);
-    console.log('SnapTree::update, add', snap.root.toString('hex'), 'size:', this.layers.size);
   }
 
   /**
@@ -314,7 +313,6 @@ export class SnapTree {
     const base = await diffToDisk(bottom);
     this.layers.set(base.root, base);
     diff.parent = base;
-    console.log('SnapTree::cap, root:', base.root.toString('hex'));
     return base;
   }
 

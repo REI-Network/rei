@@ -6,7 +6,7 @@ import { program } from 'commander';
 import { Address, bufferToHex, BN } from 'ethereumjs-util';
 import { Node } from '@rei-network/core';
 import { ExtraData } from '@rei-network/core/dist/consensus/reimint/extraData';
-import { hexStringToBuffer, logger } from '@rei-network/utils';
+import { hexStringToBuffer } from '@rei-network/utils';
 import { startNode, installOptions } from '../src/commands';
 import { SIGINT } from '../src/process';
 
@@ -27,25 +27,25 @@ const handler: {
   },
   rmpeer: async (node: Node, peerId: string) => {
     await node.networkMngr.removePeer(peerId);
-    logger.info('removed');
+    console.log('removed');
   },
   ban: async (node: Node, peerId: string) => {
     await node.networkMngr.ban(peerId);
-    logger.info('removed');
+    console.log('removed');
   },
   lspeers: (node: Node) => {
     for (const peer of node.networkMngr.peers) {
-      logger.info(peer.peerId);
+      console.log(peer.peerId);
     }
   },
   lsp2p: (node: Node) => {
-    logger.info(Array.from((node.networkMngr as any).libp2pNode.connectionManager.connections.keys()));
-    logger.info('size:', (node.networkMngr as any).libp2pNode.connectionManager.size);
+    console.log(Array.from((node.networkMngr as any).libp2pNode.connectionManager.connections.keys()));
+    console.log('size:', (node.networkMngr as any).libp2pNode.connectionManager.size);
   },
   lsreceipt: async (node: Node, hash: string) => {
     try {
       const receipt = await node.db.getReceipt(hexStringToBuffer(hash));
-      logger.info(JSON.stringify(receipt.toRPCJSON()));
+      console.log(JSON.stringify(receipt.toRPCJSON()));
     } catch (err: any) {
       if (err.type === 'NotFoundError') {
         return;
@@ -56,7 +56,7 @@ const handler: {
   lstx: async (node: Node, hash: string) => {
     try {
       const tx = await node.db.getTransaction(hexStringToBuffer(hash));
-      logger.info(tx.toRPCJSON());
+      console.log(tx.toRPCJSON());
     } catch (err: any) {
       if (err.type === 'NotFoundError') {
         return;
@@ -67,15 +67,15 @@ const handler: {
   lsblock: async (node: Node, hashOrHeight: string) => {
     const key = hashOrHeight.indexOf('0x') !== 0 ? Number(hashOrHeight) : hexStringToBuffer(hashOrHeight);
     const block = await node.db.getBlock(key);
-    logger.info('block', bufferToHex(block.hash()), 'on height', block.header.number.toString(), ':', block.toRPCJSON(true, false));
+    console.log('block', bufferToHex(block.hash()), 'on height', block.header.number.toString(), ':', block.toRPCJSON(true, false));
   },
   lsblock2: async (node: Node, hash: string, height: string) => {
     const block = await node.db.getBlockByHashAndNumber(hexStringToBuffer(hash), new BN(height));
-    logger.info('block', bufferToHex(block.hash()), 'on height', block.header.number.toString(), ':', block.toRPCJSON(false, false));
+    console.log('block', bufferToHex(block.hash()), 'on height', block.header.number.toString(), ':', block.toRPCJSON(false, false));
   },
   lsheight: (node: Node) => {
     const block = node.getLatestBlock();
-    logger.info('local height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
+    console.log('local height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
   },
   lsaccount: async (node: Node, address: string) => {
     const block = node.getLatestBlock();
@@ -153,7 +153,7 @@ const startPrompts = async (node: Node) => {
         await result;
       }
     } catch (err) {
-      logger.error('Prompts catch error:', err);
+      console.log('Prompts catch error:', err);
     }
   }
 };
@@ -166,7 +166,7 @@ const startPrompts = async (node: Node) => {
     SIGINT(node);
     await startPrompts(node);
   } catch (err) {
-    logger.error('Prompts start error:', err);
+    console.log('Prompts start error:', err);
     process.exit(1);
   }
 })();

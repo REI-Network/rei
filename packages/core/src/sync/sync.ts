@@ -14,6 +14,7 @@ const snapSyncTrustedStaleBlockNumber = 896;
 const snapSyncMinConfirmed = 2;
 const waitingSyncDelay = 200;
 const randomPickInterval = 1000;
+// about 1 week
 const defaultSnapSyncMinTD = 201600;
 
 export enum AnnouncementType {
@@ -149,20 +150,17 @@ export class Synchronizer extends EventEmitter {
    * Download block and receipts
    * @param height - Best height
    * @param handler - Handler instance
-   * @param _block - Block(if exists)
+   * @param block - Block(if exists)
    * @returns If the download failed, return null
    */
-  private async downloadBlockData(height: BN, handler: WireProtocolHandler, _block?: Block): Promise<BlockData | null> {
+  private async downloadBlockData(height: BN, handler: WireProtocolHandler, block?: Block): Promise<BlockData | null> {
     if (!isV2(handler)) {
       // the remote peer must support wire v2 protocol
       logger.debug('Synchronizer::downloadBlockData, unsupported wire v2 protocol:', handler.id);
       return null;
     }
 
-    let block!: Block;
-    if (_block) {
-      block = _block;
-    } else {
+    if (!block) {
       // download header
       const header = await handler
         .getBlockHeaders(height, new BN(1))

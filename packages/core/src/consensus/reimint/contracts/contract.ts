@@ -72,6 +72,16 @@ export abstract class Contract {
   }
 
   /**
+   * Deploy hardfork 2 contracts
+   * @param evm - EVM instance
+   * @param common - Common instance
+   */
+  static async deployHardfork2Contracts(evm: EVM, common: Common) {
+    // deploy stake manager contract
+    await Contract.deployContract(evm, common, 'sm');
+  }
+
+  /**
    * Deploy contract to target address
    * @param evm - EVM instance
    * @param common - Common instance

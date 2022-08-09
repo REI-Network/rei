@@ -92,7 +92,7 @@ export function isEnableRemint(common: Common) {
 }
 
 /**
- * Check whether free staking logic is enabled
+ * Check whether hardfork1 logic is enabled
  * @param common - Common instance
  * @returns Enable if `true`
  */
@@ -101,6 +101,23 @@ export function isEnableHardfork1(common: Common) {
     return common.gteHardfork('testnet-hf-1');
   } else if (common.chainName() === 'rei-mainnet') {
     return common.gteHardfork('mainnet-hf-1');
+  } else if (common.chainName() === 'rei-devnet') {
+    return false;
+  } else {
+    throw new Error('unknown chain');
+  }
+}
+
+/**
+ * Check whether free hardfork2 logic is enabled
+ * @param common - Common instance
+ * @returns Enable if `true`
+ */
+export function isEnableHardfork2(common: Common) {
+  if (common.chainName() === 'rei-testnet') {
+    return common.gteHardfork('testnet-hf-2');
+  } else if (common.chainName() === 'rei-mainnet') {
+    return common.gteHardfork('mainnet-hf-2');
   } else if (common.chainName() === 'rei-devnet') {
     return false;
   } else {

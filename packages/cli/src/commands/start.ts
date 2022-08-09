@@ -45,8 +45,8 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     chain: opts.chain,
     receiptsCacheSize: opts.receiptsCacheSize ? Number(opts.receiptsCacheSize) : undefined,
     syncMode: opts.sync,
-    trustedHeight: opts.trustedHeight ? new BN(opts.trustedHeight) : undefined,
-    trustedHash: opts.trustedHash ? toBuffer(opts.trustedHash) : undefined,
+    trustedHeight: opts.snapTrustedHeight ? new BN(opts.snapTrustedHeight) : undefined,
+    trustedHash: opts.snapTrustedHeight ? toBuffer(opts.snapTrustedHash) : undefined,
     mine,
     network,
     account

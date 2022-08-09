@@ -130,6 +130,15 @@ const handler: {
         valSet: validatorSet
       })
     );
+  },
+  lslayers: async (node: Node) => {
+    console.log('layers:', node.snapTree.layers.size);
+  },
+  lstd: async (node: Node, h: string) => {
+    const height = new BN(h);
+    const hash = await node.db.numberToHash(height);
+    const td = await node.db.getTotalDifficulty(hash, new BN(h));
+    console.log('td:', td.toNumber());
   }
 };
 

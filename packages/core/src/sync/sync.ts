@@ -13,7 +13,7 @@ const snapSyncStaleBlockNumber = 128;
 const snapSyncTrustedStaleBlockNumber = 896;
 const snapSyncMinConfirmed = 2;
 const snapSyncMinTD = 1024;
-const waitingSyncDelay = 100;
+const waitingSyncDelay = 200;
 const randomPickInterval = 1000;
 
 export enum AnnouncementType {
@@ -307,7 +307,7 @@ export class Synchronizer extends EventEmitter {
           broadcast: false,
           force: true,
           // total difficulty equals height
-          td: data.block.header.number
+          td: data.block.header.number.addn(1)
         });
       } catch (err) {
         logger.error('Synchronizer::makeOnFinishedCallback, commit failed:', err);
@@ -335,6 +335,11 @@ export class Synchronizer extends EventEmitter {
             if (result !== null) {
               const { confirmed, data } = result;
               if (confirmed >= snapSyncMinConfirmed) {
+                if (trustedMode) {
+                  logger.warn('Synchronizer::syncLoop, trusted block is stale, try to sync new block');
+                } else {
+                  logger.debug('Synchronizer::syncLoop, current block is stale, try to sync new block');
+                }
                 const root = data.block.header.stateRoot;
                 logger.debug('Synchronizer::syncLoop, reset snap sync root, height:', remoteHeight);
                 await this.snap.resetRoot(remoteHeight, root, this.makeOnFinishedCallback(data));
@@ -398,7 +403,7 @@ export class Synchronizer extends EventEmitter {
           const header = data.block.header;
           const info: SyncInfo = {
             bestHeight: header.number.clone(),
-            bestTD: header.number.clone(),
+            bestTD: header.number.addn(1),
             remotePeerId: ann.handler.peer.peerId
           };
           const startingBlock = this.node.latestBlock.header.number.toNumber();

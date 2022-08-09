@@ -989,6 +989,7 @@ export class SnapSync {
           this.finished = true;
           // invoke hook
           this.onFinished && this.onFinished();
+          this.onFinished = undefined;
           break;
         }
 
@@ -1087,7 +1088,6 @@ export class SnapSync {
    * Stop scheduling
    */
   async abort() {
-    this.onFinished = undefined;
     if (this.schedulePromise) {
       // abort queue
       this.channel.abort();

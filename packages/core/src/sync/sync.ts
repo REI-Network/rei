@@ -42,6 +42,8 @@ export enum SyncMode {
 export interface SynchronizerOptions {
   node: Node;
   mode: SyncMode;
+  trustedHeight?: BN;
+  trustedHash?: Buffer;
 }
 
 export declare interface Synchronizer {
@@ -74,6 +76,8 @@ export class Synchronizer extends EventEmitter {
     super();
     this.node = options.node;
     this.mode = options.mode;
+    this.trustedHash = options.trustedHash;
+    this.trustedHeight = options.trustedHeight;
     this.full = new FullSync(options.node);
     this.snap = new SnapSyncScheduler(new SnapSync(this.node.db, this.node.snap.pool));
     this.listenSyncer(this.full);

@@ -130,7 +130,8 @@ export class Node {
       .on('installed', this.onPeerInstalled)
       .on('removed', this.onPeerRemoved);
 
-    this.sync = new Synchronizer({ node: this, mode: options.syncMode as SyncMode }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
+    const syncOptions = { node: this, mode: options.syncMode as SyncMode, trustedHash: options.trustedHash, trustedHeight: options.trustedHeight };
+    this.sync = new Synchronizer(syncOptions).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
     this.txPool = new TxPool({ node: this, journal: this.datadir });
     this.txSync = new TxFetcher(this);
     this.bcMonitor = new BlockchainMonitor(this.db);

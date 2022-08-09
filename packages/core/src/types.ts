@@ -31,6 +31,14 @@ export interface NodeOptions {
    * Sync mode, default is 'full'
    */
   syncMode: string;
+  /**
+   * Snap sync trusted height
+   */
+  trustedHeight?: BN;
+  /**
+   * Snap sync trusted block hash
+   */
+  trustedHash?: Buffer;
 
   mine: ConsensusEngineConstructorOptions;
   network: NetworkManagerConstructorOptions;

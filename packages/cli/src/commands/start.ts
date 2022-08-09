@@ -1,5 +1,6 @@
 import fs from 'fs';
 import process from 'process';
+import { BN, toBuffer } from 'ethereumjs-util';
 import { Node, NodeFactory } from '@rei-network/core';
 import { RpcServer } from '@rei-network/rpc';
 import { setLevel, logger } from '@rei-network/utils';
@@ -44,6 +45,8 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     chain: opts.chain,
     receiptsCacheSize: opts.receiptsCacheSize ? Number(opts.receiptsCacheSize) : undefined,
     syncMode: opts.sync,
+    trustedHeight: opts.trustedHeight ? new BN(opts.trustedHeight) : undefined,
+    trustedHash: opts.trustedHash ? toBuffer(opts.trustedHash) : undefined,
     mine,
     network,
     account

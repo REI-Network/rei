@@ -24,6 +24,7 @@
         "@rei-network/utils": "^0.1.1",
         "@rei-network/wallet": "^0.1.1",
         "commander": "^6.2.1",
+        "ethereumjs-util": "^7.1.4",
         "inquirer": "^8.0.0"
     }
 }

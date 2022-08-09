@@ -12,7 +12,7 @@ import { SyncInfo } from './types';
 const snapSyncStaleBlockNumber = 128;
 const snapSyncTrustedStaleBlockNumber = 896;
 const snapSyncMinConfirmed = 2;
-const snapSyncMinTD = 1024;
+const snapSyncMinTD = 100; // TODO: debug
 const waitingSyncDelay = 200;
 const randomPickInterval = 1000;
 
@@ -300,7 +300,9 @@ export class Synchronizer extends EventEmitter {
       logger.debug('Synchronizer::makeOnFinishedCallback, snapSync onFinished');
       try {
         // rebuild local snap
-        await this.node.snapTree.rebuild(root);
+        const { generating } = await this.node.snapTree.rebuild(root);
+        // wait until generated
+        await generating;
         // save block and receipts to database
         await this.node.commitBlock({
           ...data,

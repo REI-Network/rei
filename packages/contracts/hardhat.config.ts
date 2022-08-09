@@ -36,10 +36,10 @@ export default {
           optimizer: {
             enabled: true,
             runs: 100
+          },
+          debug: {
+            revertStrings: 'strip'
           }
-          // debug: {
-          //   revertStrings: 'strip'
-          // }
         }
       }
     ]

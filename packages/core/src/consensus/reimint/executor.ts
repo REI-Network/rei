@@ -9,7 +9,7 @@ import EVM from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';
 import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executor } from '../types';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
-import { isEnableFreeStaking, isEnableHardfork1 } from '../../hardforks';
+import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2 } from '../../hardforks';
 import { StateManager } from '../../stateManager';
 import { ValidatorSet, ValidatorChanges } from './validatorSet';
 import { StakeManager, SlashReason, Fee, Contract } from './contracts';
@@ -127,13 +127,21 @@ export class ReimintExecutor implements Executor {
       logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));
     }
 
+    const callSlashV2 = pendingCommon.chainName() !== 'rei-devnet' && isEnableHardfork2(pendingCommon);
+
     // 3. call stakeManager.slash to slash validators
     for (const ev of evidence) {
       if (ev instanceof DuplicateVoteEvidence) {
         const { voteA, voteB } = ev;
         logger.debug('Reimint::afterApply, find evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
 
-        const ethLogs = await parentStakeManager.slash(ev.voteA.validator(), SlashReason.DuplicateVote);
+        let ethLogs: any[] | undefined;
+        if (callSlashV2) {
+          // if the contract has been upgraded, call the new slashing function
+          ethLogs = await parentStakeManager.slashV2(ev.voteA.validator(), SlashReason.DuplicateVote, ev.hash());
+        } else {
+          ethLogs = await parentStakeManager.slash(ev.voteA.validator(), SlashReason.DuplicateVote);
+        }
         if (ethLogs && ethLogs.length > 0) {
           logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));
         }
@@ -226,16 +234,25 @@ export class ReimintExecutor implements Executor {
     await parentStakeManager.onAfterBlock(validatorSet.active.proposer, activeSigners, priorities);
 
     const nextCommon = this.backend.getCommon(pendingBlock.header.number.addn(1));
-    // 10. deploy contracts if enable hardfork 1 is enabled in the next block
+    // 10. deploy contracts if hardfork 1 is enabled in the next block
     if (!isEnableHardfork1(pendingCommon) && isEnableHardfork1(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployHardfork1Contracts(evm, nextCommon);
     }
 
-    // 11. deploy contracts if enable free staking is enabled in the next block
+    // 11. deploy contracts if free staking is enabled in the next block
     if (!isEnableFreeStaking(pendingCommon) && isEnableFreeStaking(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployFreeStakingContracts(evm, nextCommon);
+    }
+
+    // 12. deploy contracts if hardfork 2 is enabled in the next block
+    if (!isEnableHardfork2(pendingCommon) && isEnableHardfork2(nextCommon)) {
+      const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
+      await Contract.deployHardfork2Contracts(evm, nextCommon);
+      const sm = new StakeManager(evm, pendingCommon);
+      // migrate evidence hashes
+      await sm.initEvidenceHash([...this.engine.collector.getHashes(pendingBlock.header.number.subn(1)), ...evidence.map((ev) => ev.hash())]);
     }
 
     return validatorSet;

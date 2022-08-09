@@ -1,5 +1,5 @@
 import EVM from '@rei-network/vm/dist/evm/evm';
-import { Address, BN, toBuffer } from 'ethereumjs-util';
+import { Address, BN, bufferToHex, toBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Log, Receipt } from '@rei-network/structure';
 import { ValidatorChanges, getGenesisValidators } from '../validatorSet';
@@ -221,6 +221,29 @@ export class StakeManager extends Contract {
     return this.runWithLogger(async () => {
       const { logs } = await this.executeMessage(this.makeSystemCallerMessage('slash', ['address', 'uint8'], [validator.toString(), reason]));
       return logs;
+    });
+  }
+
+  /**
+   * Slash block validator(V2)
+   * @param validator - Validator address
+   * @param reason - Slash reason
+   * @param hash - Evidence hash
+   */
+  slashV2(validator: Address, reason: SlashReason, hash: Buffer) {
+    return this.runWithLogger(async () => {
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('slash', ['address', 'uint8', 'bytes32'], [validator.toString(), reason, bufferToHex(hash)]));
+      return logs;
+    });
+  }
+
+  /**
+   * Init evidence hash, for migratine
+   * @param hashes - Hash list
+   */
+  initEvidenceHash(hashes: Buffer[]) {
+    return this.runWithLogger(async () => {
+      await this.executeMessage(this.makeSystemCallerMessage('initEvidenceHash', ['bytes32[]'], [hashes.map(bufferToHex)]));
     });
   }
 

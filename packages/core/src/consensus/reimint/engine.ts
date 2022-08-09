@@ -24,6 +24,7 @@ import { Reimint } from './reimint';
 import { WAL } from './wal';
 import { ReimintExecutor } from './executor';
 import { ExtraData } from './extraData';
+import { EvidenceCollector } from './evidenceCollector';
 
 export class SimpleNodeSigner {
   readonly node: Node;
@@ -68,19 +69,18 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   readonly evpool: EvidencePool;
   readonly executor: ReimintExecutor;
   readonly validatorSets = new ValidatorSets();
+  readonly collector: EvidenceCollector;
 
   constructor(options: ConsensusEngineOptions) {
     super(options);
 
     this.signer = new SimpleNodeSigner(this.node);
-
     const db = new EvidenceDatabase(this.node.evidencedb);
     this.evpool = new EvidencePool({ backend: db });
-
     const wal = new WAL({ path: path.join(this.node.datadir, 'WAL') });
     this.state = new StateMachine(this, this.node.consensus, this.evpool, wal, this.node.chainId, this.config, this.signer);
-
     this.executor = new ReimintExecutor(this.node, this);
+    this.collector = new EvidenceCollector(this.node.getLatestCommon());
   }
 
   /**
@@ -88,6 +88,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    */
   async init() {
     const block = this.node.getLatestBlock();
+    await this.collector.init(block.header.number, this.node.db);
     await this.evpool.init(block.header.number);
     await this._tryToMintNextBlock(block);
     await this.state.init();
@@ -134,6 +135,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    */
   async newBlock(block: Block) {
     const extraData = ExtraData.fromBlockHeader(block.header);
+    this.collector.newBlockHeader(extraData, block.header);
     await this.evpool.update(extraData.evidence, block.header.number);
   }
 

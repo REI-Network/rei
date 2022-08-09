@@ -505,6 +505,8 @@ export class Synchronizer extends EventEmitter {
       if (this.snap.isSyncing) {
         await this.snap.abort();
       }
+      this.full.removeAllListeners();
+      this.snap.removeAllListeners();
       await this.syncLoopPromise;
       await this.randomPickLoopPromise;
     }

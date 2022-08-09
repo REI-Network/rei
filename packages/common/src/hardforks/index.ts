@@ -18,5 +18,7 @@ export const hardforks = [
   ['testnet-chainstart', require('./testnet-chainstart.json')],
   ['testnet-hf-1', require('./testnet-hf-1.json')],
   ['mainnet-hf-1', require('./mainnet-hf-1.json')],
-  ['free-staking', require('./free-staking.json')]
+  ['free-staking', require('./free-staking.json')],
+  ['testnet-hf-2', require('./testnet-hf-2.json')],
+  ['mainnet-hf-2', require('./mainnet-hf-2.json')]
 ];

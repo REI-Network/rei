@@ -12,7 +12,7 @@ import { Transaction, Block } from '@rei-network/structure';
 import { Channel, logger } from '@rei-network/utils';
 import { AccountManager } from '@rei-network/wallet';
 import { TxPool } from './txpool';
-import { Synchronizer, SyncMode } from './sync';
+import { Synchronizer } from './sync';
 import { TxFetcher } from './txSync';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, ReceiptsCache } from './bloomBits';
@@ -130,8 +130,7 @@ export class Node {
       .on('installed', this.onPeerInstalled)
       .on('removed', this.onPeerRemoved);
 
-    const syncOptions = { node: this, mode: options.syncMode as SyncMode, trustedHash: options.trustedHash, trustedHeight: options.trustedHeight };
-    this.sync = new Synchronizer(syncOptions).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
+    this.sync = new Synchronizer({ ...options.sync, node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
     this.txPool = new TxPool({ node: this, journal: this.datadir });
     this.txSync = new TxFetcher(this);
     this.bcMonitor = new BlockchainMonitor(this.db);

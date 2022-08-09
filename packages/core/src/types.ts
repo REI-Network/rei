@@ -2,6 +2,7 @@ import { BN } from 'ethereumjs-util';
 import { NetworkManagerOptions } from '@rei-network/network';
 import { Receipt, Block } from '@rei-network/structure';
 import { ConsensusEngineOptions } from './consensus/types';
+import { SynchronizerOptions } from './sync';
 
 export interface ConsensusEngineConstructorOptions extends Omit<ConsensusEngineOptions, 'node'> {}
 
@@ -13,6 +14,8 @@ export interface AccountManagerConstructorOptions {
    */
   keyStorePath: string;
 }
+
+export interface SyncConstructorOptions extends Omit<SynchronizerOptions, 'node'> {}
 
 export interface NodeOptions {
   /**
@@ -28,21 +31,21 @@ export interface NodeOptions {
    */
   receiptsCacheSize?: number;
   /**
-   * Sync mode, default is 'full'
+   * Miner options
    */
-  syncMode: string;
-  /**
-   * Snap sync trusted height
-   */
-  trustedHeight?: BN;
-  /**
-   * Snap sync trusted block hash
-   */
-  trustedHash?: Buffer;
-
   mine: ConsensusEngineConstructorOptions;
+  /**
+   * Network options
+   */
   network: NetworkManagerConstructorOptions;
+  /**
+   * Account options
+   */
   account: AccountManagerConstructorOptions;
+  /**
+   * Sync options
+   */
+  sync: SyncConstructorOptions;
 }
 
 export type NodeStatus = {

@@ -12,9 +12,9 @@ import { SyncInfo } from './types';
 const snapSyncStaleBlockNumber = 128;
 const snapSyncTrustedStaleBlockNumber = 896;
 const snapSyncMinConfirmed = 2;
-const snapSyncMinTD = 100; // TODO: debug
 const waitingSyncDelay = 200;
 const randomPickInterval = 1000;
+const defaultSnapSyncMinTD = 201600;
 
 export enum AnnouncementType {
   NewPeer,
@@ -41,7 +41,8 @@ export enum SyncMode {
 
 export interface SynchronizerOptions {
   node: Node;
-  mode: SyncMode;
+  mode: string;
+  snapSyncMinTD?: number;
   trustedHeight?: BN;
   trustedHash?: Buffer;
 }
@@ -71,11 +72,16 @@ export class Synchronizer extends EventEmitter {
   private randomPickLoopPromise?: Promise<void>;
   private trustedHeight?: BN;
   private trustedHash?: Buffer;
+  private snapSyncMinTD: number;
 
   constructor(options: SynchronizerOptions) {
     super();
     this.node = options.node;
+    if (options.mode !== SyncMode.Full && options.mode !== SyncMode.Snap) {
+      throw new Error('invalid sync mode: ' + options.mode);
+    }
     this.mode = options.mode;
+    this.snapSyncMinTD = options.snapSyncMinTD ?? defaultSnapSyncMinTD;
     this.trustedHash = options.trustedHash;
     this.trustedHeight = options.trustedHeight;
     this.full = new FullSync(options.node);
@@ -365,7 +371,7 @@ export class Synchronizer extends EventEmitter {
           continue;
         }
 
-        if (this.mode === SyncMode.Snap && ann.td.sub(td).gten(snapSyncMinTD)) {
+        if (this.mode === SyncMode.Snap && ann.td.sub(td).gten(this.snapSyncMinTD)) {
           if (!isV2(ann.handler)) {
             // the remote node does not support downloading receipts, ignore it
             continue;
@@ -374,7 +380,7 @@ export class Synchronizer extends EventEmitter {
           logger.debug('Synchronizer::syncLoop, try to start a new snap sync');
 
           let data: BlockData;
-          if (this.trustedHeight && this.trustedHash) {
+          if (this.trustedHeight && this.trustedHash && this.node.latestBlock.header.number.lt(this.trustedHeight)) {
             const result = await this.confirmTrusted(ann.handler);
             if (!result.confirmed || result.data === null) {
               logger.debug('Synchronizer::syncLoop, trusted block confirmed failed');

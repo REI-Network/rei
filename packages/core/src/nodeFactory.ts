@@ -1,17 +1,14 @@
 import fs from 'fs';
 import path from 'path';
 import PeerId from 'peer-id';
-import { Address } from 'ethereumjs-util';
 import { logger } from '@rei-network/utils';
 import { NetworkManagerOptions } from '@rei-network/network';
 import { ConsensusEngineOptions } from './consensus/types';
-import { SyncMode } from './sync';
+import { SynchronizerOptions } from './sync';
 import { Node } from './node';
 import { NodeOptions, AccountManagerConstructorOptions } from './types';
 
-export interface MineOptions extends Omit<ConsensusEngineOptions, 'node' | 'coinbase'> {
-  coinbase: string;
-}
+export interface MineOptions extends Omit<ConsensusEngineOptions, 'node'> {}
 
 export interface NetworkOptions extends Omit<NetworkManagerOptions, 'protocols' | 'nodedb' | 'datastore' | 'peerId'> {}
 
@@ -23,10 +20,13 @@ export interface AccountOptions extends AccountManagerConstructorOptions {
   unlock: [string, string][];
 }
 
+export interface SyncOptions extends Omit<SynchronizerOptions, 'node'> {}
+
 export interface CreateNodeOptions extends Omit<NodeOptions, 'mine' | 'network' | 'account'> {
   mine: MineOptions;
   network: NetworkOptions;
   account: AccountOptions;
+  sync: SyncOptions;
 }
 
 async function loadPeerId(databasePath: string) {
@@ -45,17 +45,8 @@ async function loadPeerId(databasePath: string) {
 
 export abstract class NodeFactory {
   static async createNode(options: CreateNodeOptions) {
-    if (options.syncMode !== SyncMode.Full && options.syncMode !== SyncMode.Snap) {
-      throw new Error(`Unknown sync mode: ${options.syncMode}`);
-    }
-
-    const coinbase = options.mine.coinbase ? Address.fromString(options.mine.coinbase) : undefined;
     const node = new Node({
       ...options,
-      mine: {
-        ...options.mine,
-        coinbase
-      },
       network: {
         ...options.network,
         peerId: await loadPeerId(options.databasePath)
@@ -71,12 +62,11 @@ export abstract class NodeFactory {
         }
       }
     }
+    const coinbase = options.mine.coinbase;
     if (coinbase && !node.accMngr.hasUnlockedAccount(coinbase)) {
       throw new Error(`Unlock coinbase account ${coinbase.toString()} failed!`);
     }
 
-    await node.init();
-    node.start();
     return node;
   }
 }

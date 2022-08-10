@@ -6,6 +6,7 @@ import { Connection, ILibp2p, Stream } from '../../src/types';
 import { MockConnection } from './MockConnection';
 import { NetworkService } from './NetworkService';
 import { MockDiscv5 } from './MockDiscv5';
+import { MockLibp2pConfig, defaultIp, defaultTcpPort } from './MockConfig';
 
 type Mocklibp2pConfig = {
   peerId: PeerId;
@@ -44,7 +45,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     this.config = config;
     this.discv5 = discv5;
     this.networkService = networkService;
-    this.setAnnounce([new Multiaddr(`/ip4/${config.enr.ip}/tcp/${config.tcpPort ?? 6677}`)]);
+    this.setAnnounce([new Multiaddr(`/ip4/${config.enr.ip}/tcp/${config.tcpPort ?? defaultTcpPort}`)]);
   }
 
   //获取本地peerId
@@ -188,8 +189,8 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   }
 
   //监听discv5发现节点事件
-  private onDiscover({ id, multiaddrs }): void {
-    if (!this.isAbort) this.addAddress(id, multiaddrs);
+  private onDiscover(data: { id: PeerId; multiaddrs: Multiaddr[] }): void {
+    if (!this.isAbort) this.addAddress(data.id, data.multiaddrs);
   }
 
   //处理新连接(1.将连接存入connections中 2.触发'connect'事件通知networkManager 3.查看连接是否超过了最大连接数)

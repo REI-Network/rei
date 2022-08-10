@@ -7,7 +7,6 @@ import { MockStream } from './MockStream';
 type protocolName = string;
 //connectionId(自增,用于libp2p中connection删除)
 let connectionId = 0;
-
 //connection传输数据格式
 export type Data = {
   protocol: protocolName;
@@ -16,31 +15,37 @@ export type Data = {
 
 //连接管理器
 export class ConnectionManager {
+  id: string;
   //连接1
-  private c1: MockConnection;
+  conn1: MockConnection;
   //连接2
-  private c2: MockConnection;
+  conn2: MockConnection;
   //初始化两个连接对象
-  constructor(c1: MockConnection, c2: MockConnection) {
-    this.c1 = c1;
-    this.c2 = c2;
+  constructor(p1: MockLibp2p, p2: MockLibp2p) {
+    this.id = p1.peerId.toB58String() + '-' + p2.peerId.toB58String();
+    const c1 = new Channel<Data>();
+    const c2 = new Channel<Data>();
+    this.conn1 = new MockConnection(p2.peerId, p1, c1, c2);
+    this.conn2 = new MockConnection(p1.peerId, p2, c2, c1);
+    this.conn1.setConnectionManager(this);
+    this.conn2.setConnectionManager(this);
   }
 
   //被动创建stream(主动创建stream时调用,使用远端连接被动创建stream来触发协议回调)
   newStream(protocol: protocolName, targetPeedId: string) {
-    this.c1.localPeerId === targetPeedId ? this.c1.passiveNewStream(protocol) : this.c2.passiveNewStream(protocol);
+    this.conn1.localPeerId === targetPeedId ? this.conn1.passiveNewStream(protocol) : this.conn2.passiveNewStream(protocol);
   }
 
   //关闭双方连接(主动关闭连接时调用)
   closeConnections() {
-    this.c1.doClose();
-    this.c2.doClose();
+    this.conn1.doClose();
+    this.conn2.doClose();
   }
 
   //关闭双方stream(在连接关闭时调用)
   closeStream(protocol: protocolName) {
-    this.c1.doStreamClose(protocol);
-    this.c2.doStreamClose(protocol);
+    this.conn1.doStreamClose(protocol);
+    this.conn2.doStreamClose(protocol);
   }
 }
 

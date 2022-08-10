@@ -2,10 +2,12 @@ import EventEmitter from 'events';
 import { ENR } from '@gxchain2/discv5';
 import { IDiscv5 } from '../../src/types';
 import { NetworkService } from './NetworkService';
-
+import { MockDiscv5Config, localhost } from './MockConfig';
 export class MockDiscv5 extends EventEmitter implements IDiscv5 {
   //广播管理对象
   private networkService: NetworkService;
+  //discv5配置对象
+  private config: MockDiscv5Config;
   //本地节点ENR
   private enr: ENR;
   //已发现的节点集合
@@ -19,9 +21,10 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
   //是否启动状态变量
   private isStart: boolean = false;
   //初始化各属性并将boot节点加入nodes中
-  constructor(enr: ENR, bootNodes: string[], networkService: NetworkService) {
+  constructor(config: MockDiscv5Config, enr: ENR, bootNodes: string[], networkService: NetworkService) {
     super();
     this.enr = enr;
+    this.config = config;
     this.networkService = networkService;
     for (const enrStr of bootNodes) {
       this.addEnr(enrStr);
@@ -36,12 +39,8 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
 
   //添加节点ENR到nodes(已发现节点集合)中
   addEnr(enr: string | ENR): void {
-    try {
-      const enrObj = enr instanceof ENR ? enr : ENR.decodeTxt(enr);
-      this.handleEnr(enrObj);
-    } catch (error) {
-      throw Error('Discv5 :: addEnr error!!');
-    }
+    const enrObj = enr instanceof ENR ? enr : ENR.decodeTxt(enr);
+    this.handleEnr(enrObj);
   }
 
   //从nodes(已发现节点集合)中获取节点ENR
@@ -56,7 +55,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     }
     this.isStart = true;
     this.lookup();
-    this.keepLive();
+    this.keepAlive();
   }
 
   //停止节点(1.删除搜索节点定时器 2.删除节点保活定时器 3.删除发现节点集合 4.节点状态变量isAbort设置为true)
@@ -72,7 +71,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
 
   //将新节点加入发现集合中并触发'peer'事件通知外部
   private async handleEnr(enr: ENR) {
-    if (enr.peerId === this.enr.peerId || enr.ip == '127.0.0.1') {
+    if (enr.peerId === this.enr.peerId || enr.ip == localhost) {
       return;
     }
     if (!this.nodes.has(enr.nodeId) || enr.seq > this.nodes.get(enr.nodeId)!.seq) {
@@ -104,11 +103,11 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
           }
         }
       }
-    }, 2000);
+    }, this.config.lookupInterval ?? 2000);
   }
 
   //节点保活服务(1.初始化保活定时器 2.调用networkService的sendPing函数向所有已发现节点发ping请求)
-  private keepLive() {
+  private keepAlive() {
     this.keepLiveTimer = setInterval(() => {
       if (this.isAbort) {
         return;
@@ -116,7 +115,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
       for (const enr of this.nodes.values()) {
         this.networkService.sendPing(this.enr.nodeId, enr.nodeId);
       }
-    }, 5000);
+    }, this.config.keepAliveInterval ?? 5000);
   }
 
   //处理发现节点请求(1.处理请求方的最新ENR地址 2.返回本地最新ENR和所有已发现节点)
@@ -132,7 +131,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
 
   //处理pong message(判断本地enr的ip是否为localhost，若是则将ip更新并触发'multiaddr'事件通知外部)
   handlePong(ip: string) {
-    if (ip && (this.enr.ip == '127.0.0.1' || this.enr.ip != ip)) {
+    if (ip && this.enr.ip != ip) {
       this.enr.ip = ip;
       this.emit('multiaddr', this.localEnr.getLocationMultiaddr('udp'));
     }

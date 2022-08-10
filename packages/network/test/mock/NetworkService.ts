@@ -2,7 +2,6 @@ import Multiaddr from 'multiaddr';
 import { MockLibp2p } from './MockLibp2p';
 import { MockDiscv5 } from './MockDiscv5';
 import { ConnectionManager, MockConnection, Data } from './MockConnection';
-import { Channel } from '@rei-network/utils';
 import { ENR } from '@gxchain2/discv5';
 
 type PeerIdStr = string;
@@ -17,7 +16,8 @@ export class NetworkService {
   private nodes: Map<NodeIdStr, MockDiscv5> = new Map();
   //nodeIp集合
   private nodesIp: Map<string, string> = new Map();
-
+  //connectionManager集合
+  private connectionManagers: Map<string, ConnectionManager> = new Map();
   //将node注册到nodes中
   registerNode(discv5: MockDiscv5, ip: string = mockIp) {
     const nodeId = discv5.localEnr.nodeId;
@@ -67,14 +67,10 @@ export class NetworkService {
       const multiaddrs = targetMultiAddrs.map((multiaddr) => multiaddr.toString());
       for (const multiAddr of multiaddrs) {
         if (targetPeer.announce.has(multiAddr)) {
-          const c1 = new Channel<Data>();
-          const c2 = new Channel<Data>();
-          const localConn = new MockConnection(targetPeer.peerId, this.peers.get(caller)!, c1, c2);
-          const remoteConn = new MockConnection(callerPeer.peerId, targetPeer, c2, c1);
-          const manager = new ConnectionManager(localConn, remoteConn);
-          localConn.setConnectionManager(manager);
-          remoteConn.setConnectionManager(manager);
-          return localConn;
+          const manager = new ConnectionManager(targetPeer, callerPeer);
+          this.connectionManagers.set(manager.id, manager);
+          targetPeer.handleConnection(manager.conn2);
+          return manager.conn1;
         }
       }
     }
@@ -84,5 +80,20 @@ export class NetworkService {
   //设置node ip
   setIp(nodeId: string, ip: string) {
     this.nodesIp.set(nodeId, ip);
+  }
+
+  //获取connectionManager
+  getConnectionManager(id: string): ConnectionManager | undefined {
+    let manager = this.connectionManagers.get(id);
+    if (!manager) {
+      const data = id.split('-');
+      id = data[1] + '-' + data[0];
+      manager = this.connectionManagers.get(id);
+    }
+    return manager;
+  }
+
+  handleConnectionManagerClose() {
+    //todo delete connectionManager
   }
 }

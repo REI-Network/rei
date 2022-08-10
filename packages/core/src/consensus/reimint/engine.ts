@@ -13,7 +13,7 @@ import { Node } from '../../node';
 import { StateManager } from '../../stateManager';
 import { ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
-import { getConsensusTypeByCommon, isEnableFreeStaking, isEnableHardfork1, isEnableRemint } from '../../hardforks';
+import { getConsensusTypeByCommon, isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableRemint } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
@@ -69,7 +69,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   readonly evpool: EvidencePool;
   readonly executor: ReimintExecutor;
   readonly validatorSets = new ValidatorSets();
-  readonly collector: EvidenceCollector;
+  readonly collector?: EvidenceCollector;
 
   constructor(options: ConsensusEngineOptions) {
     super(options);
@@ -80,7 +80,42 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     const wal = new WAL({ path: path.join(this.node.datadir, 'WAL') });
     this.state = new StateMachine(this, this.node.consensus, this.evpool, wal, this.node.chainId, this.config, this.signer);
     this.executor = new ReimintExecutor(this.node, this);
-    this.collector = new EvidenceCollector(this.node.getLatestCommon());
+
+    const common = this.node.getLatestCommon();
+    if (isEnableHardfork2(common)) {
+      // collect all the evidence if we haven't reached hardfork2
+      return;
+    }
+    if (common.chainName() === 'rei-mainnet') {
+      common.setHardfork('mainnet-hf-2');
+    } else if (common.chainName() === 'rei-testnet') {
+      common.setHardfork('testnet-hf-2');
+    } else {
+      // collector only work on mainnet and testnet
+      return;
+    }
+
+    // load init height from common
+    const initHeight = common.param('vm', 'initHeight');
+    if (initHeight === null) {
+      // the value has not been set, no collector is required
+      return;
+    }
+    if (typeof initHeight !== 'number') {
+      throw new Error('invalid initHeight');
+    }
+
+    // load init hashes from common
+    const initHashes = common.param('vm', 'initHashes');
+    if (initHashes === null) {
+      // the value has not been set, no collector is required
+      return;
+    }
+    if (!Array.isArray(initHashes)) {
+      throw new Error('invalid initHashes');
+    }
+
+    this.collector = new EvidenceCollector(initHeight, initHashes);
   }
 
   /**
@@ -88,7 +123,11 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    */
   async init() {
     const block = this.node.getLatestBlock();
-    await this.collector.init(block.header.number, this.node.db);
+    await this.collector?.init(block.header.number, async (height: BN) => {
+      // load evidence from canonical header
+      const header = await this.node.db.getCanonicalHeader(height);
+      return ExtraData.fromBlockHeader(header).evidence.map((ev) => ev.hash());
+    });
     await this.evpool.init(block.header.number);
     await this._tryToMintNextBlock(block);
     await this.state.init();
@@ -135,8 +174,14 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    */
   async newBlock(block: Block) {
     const extraData = ExtraData.fromBlockHeader(block.header);
-    this.collector.newBlockHeader(extraData, block.header);
     await this.evpool.update(extraData.evidence, block.header.number);
+    // collect all the evidence if we haven't reached hardfork2
+    if (!isEnableHardfork2(block.header._common)) {
+      this.collector?.newBlockHeader(
+        block.header.number,
+        extraData.evidence.map((ev) => ev.hash())
+      );
+    }
   }
 
   // calculate the gas limit of next block

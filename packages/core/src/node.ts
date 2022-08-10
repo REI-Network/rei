@@ -267,7 +267,7 @@ export class Node {
    * @returns Common instance
    */
   getLatestCommon() {
-    return this.latestBlock._common;
+    return this.latestBlock._common.copy();
   }
 
   /**

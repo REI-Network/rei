@@ -248,6 +248,9 @@ export class ReimintExecutor implements Executor {
 
     // 12. deploy contracts if hardfork 2 is enabled in the next block
     if (!isEnableHardfork2(pendingCommon) && isEnableHardfork2(nextCommon)) {
+      if (!this.engine.collector) {
+        throw new Error('missing collector');
+      }
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployHardfork2Contracts(evm, nextCommon);
       const sm = new StakeManager(evm, pendingCommon);

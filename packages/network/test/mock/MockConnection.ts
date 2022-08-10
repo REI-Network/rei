@@ -148,8 +148,7 @@ export class MockConnection implements Connection {
 
   //创建新stream并存入streams集合
   private _newStream(protocol: string) {
-    const receiveChannel = new Channel<{ _bufs: Buffer[] }>();
-    const stream = new MockStream(protocol, receiveChannel, this.streamsChannel, this);
+    const stream = new MockStream(protocol, this.streamsChannel, this);
     this.streams.set(protocol, stream);
     return stream;
   }

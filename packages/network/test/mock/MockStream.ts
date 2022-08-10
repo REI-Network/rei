@@ -13,10 +13,10 @@ export class MockStream implements Stream {
   //状态属性
   private isAbort: boolean = false;
   //初始化各个通道
-  constructor(protocol: string, receiveChannel: Channel<{ _bufs: Buffer[] }>, sendChannel: Channel<Data>, connection: MockConnection) {
+  constructor(protocol: string, sendChannel: Channel<Data>, connection: MockConnection) {
     this.protocol = protocol;
     this.connection = connection;
-    this.receiveChannel = receiveChannel;
+    this.receiveChannel = new Channel<{ _bufs: Buffer[] }>();
     this.sendChannel = sendChannel;
   }
 

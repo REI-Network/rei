@@ -127,7 +127,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   //删除指定节点(遍历该节点有关的所有连接并调用connection.close())
   async hangUp(peerId: string | PeerId): Promise<void> {
     if (peerId instanceof PeerId) {
-      peerId = await peerId.toB58String();
+      peerId = peerId.toB58String();
     }
     const connections = this.connections.get(peerId);
     if (!connections) {

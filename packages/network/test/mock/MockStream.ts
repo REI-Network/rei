@@ -22,7 +22,7 @@ export class MockStream implements Stream {
 
   //遍历迭代器的输入数据并将数据push到发送通道
   sink = async (source: AsyncGenerator<Buffer, any, unknown>) => {
-    while (true && !this.isAbort) {
+    while (!this.isAbort) {
       const { value } = await source.next();
       if (value !== undefined) {
         this.sendChannel.push({ protocol: this.protocol, data: { _bufs: [value] } });

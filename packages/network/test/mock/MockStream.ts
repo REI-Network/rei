@@ -6,13 +6,13 @@ export class MockStream implements Stream {
   public protocol: string;
   //local connection
   private connection: MockConnection;
-  //远端数据接收迭代器(元素好是由connection获取远端数据后分流输入)
+  //数据接收通道
   private receiveChannel: Channel<{ _bufs: Buffer[] }>;
   //发送数据通道
   private sendChannel: Channel<Data>;
   //状态属性
   private isAbort: boolean = false;
-
+  //初始化各个通道
   constructor(protocol: string, receiveChannel: Channel<{ _bufs: Buffer[] }>, sendChannel: Channel<Data>, connection: MockConnection) {
     this.protocol = protocol;
     this.connection = connection;
@@ -20,7 +20,7 @@ export class MockStream implements Stream {
     this.sendChannel = sendChannel;
   }
 
-  //遍历迭代器的输入数据并发送至远端节点(调用connection的sendDate将数据发送至远端节点)
+  //遍历迭代器的输入数据并将数据push到发送通道
   sink = async (source: AsyncGenerator<Buffer, any, unknown>) => {
     while (true && !this.isAbort) {
       const { value } = await source.next();
@@ -32,17 +32,17 @@ export class MockStream implements Stream {
     }
   };
 
-  //接收远端数据迭代器
+  //返回远端数据迭代器
   source = () => {
     return this.receiveChannel[Symbol.asyncIterator]();
   };
 
-  //关闭stream(通知connection关闭stream)
+  //关闭stream(通知connection关闭双方stream)
   close(): void {
     this.connection.handleStreamClose(this);
   }
 
-  //关闭stream的实际操作(1.将状态变量设置为true 2.删除迭代器对象 3.调用connection的handleStreamClose来通知connection删除stream)
+  //关闭stream操作(1.将状态变量设置为true 2.停止接收数据通道)
   doClose(): void {
     if (this.isAbort) {
       return;
@@ -51,7 +51,7 @@ export class MockStream implements Stream {
     this.receiveChannel.abort();
   }
 
-  //处理远端数据
+  //接收远端数据
   handleData(data: { _bufs: Buffer[] }) {
     this.receiveChannel.push(data);
   }

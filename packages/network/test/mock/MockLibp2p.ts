@@ -16,6 +16,7 @@ type Mocklibp2pConfig = {
 };
 
 export class MockLibp2p extends EventEmitter implements ILibp2p {
+  //networkService对象
   private networkService: NetworkService;
   //节点权重集合
   private peerValues: Map<string, number> = new Map();
@@ -61,7 +62,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     return Array.from(this.connections.values()).reduce((accumulator, value) => accumulator + value.length, 0);
   }
 
-  //设置指定协议的回调函数,当指定的protocols被安装时触发
+  //设置指定协议的回调函数(当指定protocol被动安装时触发)
   handle(protocols: string | string[], callback: (input: { connection: Connection; stream: Stream }) => void): void {
     if (typeof protocols === 'string') {
       protocols = [protocols];
@@ -133,6 +134,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
       return;
     }
     await Promise.all(connections.map((c) => c.close()));
+    this.peerValues.delete(peerId);
   }
 
   //设置节点权重
@@ -172,18 +174,19 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     }
     this.isAbort = true;
     this.checkMaxLimitTimer && clearInterval(this.checkMaxLimitTimer);
-    const closeTask: Promise<void>[] = [];
+    const closeTasks: Promise<void>[] = [];
     Array.from(this.connections.values()).map((connections) => {
       for (const c of connections) {
-        closeTask.push(c.close());
+        closeTasks.push(c.close());
       }
     });
-    await Promise.all(closeTask);
+    await Promise.all(closeTasks);
     this.connections.clear();
     this.peers.clear();
     this.peerValues.clear();
     this.protocolHandlers.clear();
-    return null as any;
+    this.announce.clear();
+    this.emit('close');
   }
 
   //监听discv5发现节点事件
@@ -219,7 +222,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     }
   }
 
-  //处理新stream(根据协议名称触发对应的回调函数) //被动创建触发
+  //处理新stream并根据协议名称触发对应的回调函数(被动创建触发)
   handleNewStream(protocol: string, connection: MockConnection, stream: Stream): void {
     const callback = this.protocolHandlers.get(protocol);
     if (callback) {

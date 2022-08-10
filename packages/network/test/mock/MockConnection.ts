@@ -14,7 +14,7 @@ export type Data = {
   data: { _bufs: Buffer[] };
 };
 
-//双方连接管理器
+//连接管理器
 export class ConnectionManager {
   //连接1
   private c1: MockConnection;
@@ -26,18 +26,18 @@ export class ConnectionManager {
     this.c2 = c2;
   }
 
-  //被动创建stream(connection主动创建stream方调用,使用远端被动创建stream来触发协议回调)
+  //被动创建stream(主动创建stream时调用,使用远端连接被动创建stream来触发协议回调)
   newStream(protocol: protocolName, targetPeedId: string) {
     this.c1.localPeerId === targetPeedId ? this.c1.passiveNewStream(protocol) : this.c2.passiveNewStream(protocol);
   }
 
-  //关闭双方连接
+  //关闭双方连接(主动关闭连接时调用)
   closeConnections() {
     this.c1.doClose();
     this.c2.doClose();
   }
 
-  //关闭双方stream
+  //关闭双方stream(在连接关闭时调用)
   closeStream(protocol: protocolName) {
     this.c1.doStreamClose(protocol);
     this.c2.doStreamClose(protocol);
@@ -84,9 +84,7 @@ export class MockConnection implements Connection {
     if (typeof protocols === 'string') {
       protocols = [protocols];
     }
-    const receiveChannel = new Channel<{ _bufs: Buffer[] }>();
-    const stream = new MockStream(protocols[0], receiveChannel, this.streamsChannel, this);
-    this.streams.set(protocols[0], stream);
+    const stream = this._newStream(protocols[0]);
     //通知远程节点创建stream
     this.connectionManager?.newStream(protocols[0], this.remotePeerId.toB58String());
     return { stream };
@@ -114,9 +112,7 @@ export class MockConnection implements Connection {
 
   //被动创建stream(1.创建channel 2.使用channel初始化生stream并存入streams集合中 3.触发协议回调)
   passiveNewStream(protocol: string): void {
-    const receiveChannel = new Channel<{ _bufs: Buffer[] }>();
-    const stream = new MockStream(protocol, receiveChannel, this.streamsChannel, this);
-    this.streams.set(protocol, stream);
+    const stream = this._newStream(protocol);
     //通知libp2p触发协议回调
     this.libp2p.handleNewStream(protocol, this, stream);
   }
@@ -148,6 +144,14 @@ export class MockConnection implements Connection {
   //处理stream关闭(在connection存在情况下关闭stream时触发,通过connectionManager关闭双方stream)
   handleStreamClose(stream: MockStream): void {
     this.connectionManager?.closeStream(stream.protocol);
+  }
+
+  //创建新stream并存入streams集合
+  private _newStream(protocol: string) {
+    const receiveChannel = new Channel<{ _bufs: Buffer[] }>();
+    const stream = new MockStream(protocol, receiveChannel, this.streamsChannel, this);
+    this.streams.set(protocol, stream);
+    return stream;
   }
 
   //监听远端数据并根据协议分发给各stream

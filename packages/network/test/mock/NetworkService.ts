@@ -9,6 +9,7 @@ type PeerIdStr = string;
 type NodeIdStr = string;
 const mockIp = '192.168.0.1';
 
+//模拟网络
 export class NetworkService {
   //peer集合
   private peers: Map<PeerIdStr, MockLibp2p> = new Map();
@@ -18,11 +19,11 @@ export class NetworkService {
   private nodesIp: Map<string, string> = new Map();
 
   //将node注册到nodes中
-  registerNode(discv5: MockDiscv5) {
+  registerNode(discv5: MockDiscv5, ip: string = mockIp) {
     const nodeId = discv5.localEnr.nodeId;
     if (!this.nodes.has(nodeId)) {
       this.nodes.set(nodeId, discv5);
-      this.nodesIp.set(nodeId, mockIp);
+      this.nodesIp.set(nodeId, ip);
     }
   }
 
@@ -34,7 +35,7 @@ export class NetworkService {
     }
   }
 
-  //获取指定node所有已发现ENR(调用目标node的handleLookup)
+  //获取指定node最新ENR及其所有已发现ENR
   lookup(callerEnr: ENR, target: NodeIdStr) {
     const targetNode = this.nodes.get(target);
     if (targetNode) {
@@ -42,7 +43,7 @@ export class NetworkService {
     }
   }
 
-  //向指定node发送ping message(调用目标node的handlePing)
+  //向指定node发送ping message
   sendPing(caller: NodeIdStr, target: NodeIdStr): void {
     const targetNode = this.nodes.get(target);
     if (targetNode) {
@@ -50,7 +51,7 @@ export class NetworkService {
     }
   }
 
-  //向指定node发送pong message(调用目标node的handlePong)
+  //向指定node发送pong message
   sendPong(target: NodeIdStr): void {
     const targetNode = this.nodes.get(target);
     if (targetNode) {
@@ -58,7 +59,7 @@ export class NetworkService {
     }
   }
 
-  //连接指定peer(1.创建新的connection 2.为远端节点创建新的connection 3.两个连接分别设置远程连接 4.调用本地peer和目标peer的handleConnect来通知libp2p连接建立 5.返回本地连接对象)
+  //连接指定peer(0.搜索节点 1.创建本地connection和远端connection 2.双方连接分别设置连接管理 3.返回本地连接对象)
   dial(caller: PeerIdStr, target: PeerIdStr, targetMultiAddrs: Multiaddr[]): MockConnection {
     const targetPeer = this.peers.get(target);
     const callerPeer = this.peers.get(caller)!;

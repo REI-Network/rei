@@ -61,6 +61,9 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
 
   //停止节点(1.删除搜索节点定时器 2.删除节点保活定时器 3.删除发现节点集合 4.节点状态变量isAbort设置为true)
   stop(): void {
+    if (this.isAbort) {
+      return;
+    }
     this.isAbort = true;
     this.lookupTimer && clearInterval(this.lookupTimer);
     this.keepLiveTimer && clearInterval(this.keepLiveTimer);
@@ -73,6 +76,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
       return;
     }
     if (!this.nodes.has(enr.nodeId) || enr.seq > this.nodes.get(enr.nodeId)!.seq) {
+      //更新节点
       this.nodes.set(enr.nodeId, enr);
     }
     const multiaddr = enr.getLocationMultiaddr('tcp');
@@ -85,7 +89,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     });
   }
 
-  //搜索节点服务(1.初始化lookUp定时器 2.调用broadcastManager的lookup函数获取指定node的已发现节点 3.处理返回的ENR集合并将数据存储到nodes中)
+  //搜索节点服务(1.初始化lookUp定时器 2.调用networkService的lookup函数获取指定node的已发现节点 3.处理返回的ENR集合)
   private lookup() {
     this.lookupTimer = setInterval(async () => {
       if (this.isAbort) {
@@ -103,7 +107,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     }, 2000);
   }
 
-  //节点保活服务(1.初始化保活定时器 2.通过broadcastManager调用所有已发现节点的handlePing)
+  //节点保活服务(1.初始化保活定时器 2.调用networkService的sendPing函数向所有已发现节点发ping请求)
   private keepLive() {
     this.keepLiveTimer = setInterval(() => {
       if (this.isAbort) {
@@ -115,13 +119,13 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     }, 5000);
   }
 
-  //处理发现节点请求(返回所有已发现节点)
+  //处理发现节点请求(1.处理请求方的最新ENR地址 2.返回本地最新ENR和所有已发现节点)
   async handleFindNode(sourceEnr: ENR) {
     await this.handleEnr(sourceEnr);
     return [this.enr, ...this.nodes.values()].map((e) => this.deepCopy(e));
   }
 
-  //处理ping message请求(通过networkService调用所有已发现节点的handlePong)
+  //处理ping message请求(调用networkService的sendPong函数向请求方发送pong消息)
   handlePing(callerId: string) {
     this.networkService.sendPong(callerId);
   }

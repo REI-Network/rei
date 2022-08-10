@@ -161,10 +161,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
       return;
     }
     this.isStart = true;
-    this.init();
-    this.checkMaxLimitTimer = setInterval(() => {
-      this.checkMaxLimit();
-    }, 30 * 1000);
+    this.discv5.on('peer', this.onDiscover);
   }
 
   //停止libp2p运行(1.设置isAbort为true 2.遍历connections调用connection.close()并删除集合  )
@@ -173,6 +170,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
       return;
     }
     this.isAbort = true;
+    this.discv5.off('peer', this.onDiscover);
     this.checkMaxLimitTimer && clearInterval(this.checkMaxLimitTimer);
     const closeTasks: Promise<void>[] = [];
     Array.from(this.connections.values()).map((connections) => {
@@ -190,10 +188,8 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   }
 
   //监听discv5发现节点事件
-  private init(): void {
-    this.discv5.on('peer', ({ id, multiaddrs }) => {
-      if (!this.isAbort) this.addAddress(id, multiaddrs);
-    });
+  private onDiscover({ id, multiaddrs }): void {
+    if (!this.isAbort) this.addAddress(id, multiaddrs);
   }
 
   //处理新连接(1.将连接存入connections中 2.触发'connect'事件通知networkManager 3.查看连接是否超过了最大连接数)

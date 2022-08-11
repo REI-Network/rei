@@ -58,7 +58,7 @@ export class NodeDB {
       const { nodeId, ip, field } = this.splitNodeItemKey(k);
       if (ip && field === dbNodePong) {
         if (now - parseInt(v.toString()) > seedMaxAge) {
-          logger.info(`NodeDB Deleting timeout node : ${nodeId}`);
+          logger.debug('NodeDB::checkTimeout, deleting timeout node:', nodeId);
           await this._deleteRange(this._nodeKey(nodeId));
         }
       }

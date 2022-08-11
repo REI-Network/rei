@@ -457,7 +457,7 @@ export class NetworkManager extends EventEmitter {
         const result = await connection.newStream(protocol.protocolString);
         stream = result.stream;
       } catch (err: any) {
-        if (err.message.indexOf('protocol selection failed')) {
+        if (err.message.indexOf('protocol selection failed') !== -1) {
           logger.debug('Network::install, peerId:', peerId, 'new stream failed, error:', err);
         }
         return false;

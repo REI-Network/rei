@@ -4,7 +4,7 @@ import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import TCP from 'libp2p-tcp';
 import secio from 'libp2p-secio';
-import { Discv5Discovery, ENR, KademliaRoutingTable, SessionService } from '@gxchain2/discv5';
+import { Discv5Discovery, ENR, IKeypair, KademliaRoutingTable, SessionService } from '@gxchain2/discv5';
 import { Connection, IDiscv5, ILibp2p, Stream } from './types';
 import * as c from './config';
 const Libp2p = require('libp2p');
@@ -164,6 +164,10 @@ class Discv5Impl extends EventEmitter implements IDiscv5 {
 
   get localEnr() {
     return this.libp2pNode.discv5.discv5.enr;
+  }
+
+  get keyPair(): IKeypair {
+    return this.libp2pNode.discv5.discv5.keypair;
   }
 
   addEnr(enr: string | ENR) {

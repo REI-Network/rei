@@ -67,7 +67,7 @@ export class NetworkService {
       const multiaddrs = targetMultiAddrs.map((multiaddr) => multiaddr.toString());
       for (const multiAddr of multiaddrs) {
         if (targetPeer.announce.has(multiAddr)) {
-          const manager = new ConnectionManager(targetPeer, callerPeer);
+          const manager = new ConnectionManager(targetPeer, callerPeer, this);
           this.connectionManagers.set(manager.id, manager);
           targetPeer.handleConnection(manager.conn2);
           return manager.conn1;
@@ -93,7 +93,8 @@ export class NetworkService {
     return manager;
   }
 
-  handleConnectionManagerClose() {
-    //todo delete connectionManager
+  //删除connectionManager
+  handleConnectionManagerClose(id) {
+    this.connectionManagers.delete(id);
   }
 }

@@ -1,20 +1,11 @@
 import EventEmitter from 'events';
 import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
-import { ENR } from '@gxchain2/discv5';
 import { Connection, ILibp2p, Stream } from '../../src/types';
 import { MockConnection } from './MockConnection';
 import { NetworkService } from './NetworkService';
 import { MockDiscv5 } from './MockDiscv5';
-import { MockLibp2pConfig, defaultIp, defaultTcpPort } from './MockConfig';
-
-type Mocklibp2pConfig = {
-  peerId: PeerId;
-  maxPeers?: number;
-  tcpPort?: number;
-  udpPort?: number;
-  enr: ENR;
-};
+import { MockLibp2pConfig, defaultTcpPort } from './MockConfig';
 
 export class MockLibp2p extends EventEmitter implements ILibp2p {
   //networkService对象
@@ -30,7 +21,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   //本地discv5对象
   private discv5: MockDiscv5;
   //节点配置对象
-  private config: Mocklibp2pConfig;
+  private config: MockLibp2pConfig;
   //本地multiAddr字符串集合
   announce: Set<string> = new Set();
   //节点打开状态
@@ -40,7 +31,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   //最大连接检查定时器
   private checkMaxLimitTimer: NodeJS.Timer | undefined;
   //初始化各属性
-  constructor(config: Mocklibp2pConfig, discv5: MockDiscv5, networkService: NetworkService) {
+  constructor(config: MockLibp2pConfig, discv5: MockDiscv5, networkService: NetworkService) {
     super();
     this.config = config;
     this.discv5 = discv5;

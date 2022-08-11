@@ -3,6 +3,7 @@ import { Channel } from '@rei-network/utils';
 import { Connection, Stream } from '../../src/types';
 import { MockLibp2p } from './MockLibp2p';
 import { MockStream } from './MockStream';
+import { NetworkService } from './NetworkService';
 //协议名称类型
 type protocolName = string;
 //connectionId(自增,用于libp2p中connection删除)
@@ -20,8 +21,11 @@ export class ConnectionManager {
   conn1: MockConnection;
   //连接2
   conn2: MockConnection;
+  //networkService对象
+  networkService: NetworkService;
+
   //初始化两个连接对象
-  constructor(p1: MockLibp2p, p2: MockLibp2p) {
+  constructor(p1: MockLibp2p, p2: MockLibp2p, netWorkService: NetworkService) {
     this.id = p1.peerId.toB58String() + '-' + p2.peerId.toB58String();
     const c1 = new Channel<Data>();
     const c2 = new Channel<Data>();
@@ -40,6 +44,7 @@ export class ConnectionManager {
   closeConnections() {
     this.conn1.doClose();
     this.conn2.doClose();
+    this.networkService.handleConnectionManagerClose(this.id);
   }
 
   //关闭双方stream(在连接关闭时调用)

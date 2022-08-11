@@ -3,6 +3,11 @@ import levelup from 'levelup';
 import PeerId from 'peer-id';
 import { Peer, NetworkManager, Protocol, ProtocolHandler, ProtocolStream } from '../src';
 import { setLevel } from '@rei-network/utils';
+import { ENR } from '@gxchain2/discv5';
+import { createKeypairFromPeerId } from '@gxchain2/discv5';
+import { NetworkService } from './mock/NetworkService';
+import { MockDiscv5 } from './mock/MockDiscv5';
+import { MockLibp2p } from './mock/MockLibp2p';
 const memdown = require('memdown');
 
 setLevel('silent');
@@ -62,7 +67,7 @@ export class SayHiHandler implements ProtocolHandler {
     // console.log('abort');
   }
 }
-
+const networkService = new NetworkService();
 export async function autoStartNodes(opts: { ip: string; udpPort: number; tcpPort: number; count?: number; bootEnr?: string; nodesIp?: string }) {
   const nodes: Promise<NetworkManager>[] = [];
   const count = opts.count || opts.count === 0 ? opts.count : 10;
@@ -108,11 +113,17 @@ export async function startNode(ip, tcpPort, udpPort, enr) {
 
 async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; bootNodes?: string[] }) {
   const db = levelup(memdown());
+  const peerId = await PeerId.create({ keyType: 'secp256k1' });
+  const { enr, keypair } = createEnrAndKeypair(peerId, opts);
+  const discv5 = new MockDiscv5({ keypair, enr, bootNodes: opts.bootNodes }, networkService);
+  const libp2p = new MockLibp2p({ peerId, enr }, discv5, networkService);
   const node = new NetworkManager({
     peerId: await PeerId.create({ keyType: 'secp256k1' }),
     protocols: [new SayHi()],
     nodedb: db,
     nat: opts.ip,
+    discv5,
+    libp2p,
     libp2pOptions: {
       bootnodes: opts.bootNodes ? opts.bootNodes : [],
       tcpPort: opts.tcpPort,
@@ -166,4 +177,14 @@ function portIsOccupied(port: number) {
       }
     });
   });
+}
+
+function createEnrAndKeypair(peerId: PeerId, opts: { ip: string; tcpPort: number; udpPort: number }) {
+  const keypair = createKeypairFromPeerId(peerId);
+  let enr = ENR.createV4(keypair.publicKey);
+  enr.ip = opts.ip;
+  enr.tcp = opts.tcpPort;
+  enr.udp = opts.udpPort;
+  enr.encode(keypair.privateKey);
+  return { enr, keypair };
 }

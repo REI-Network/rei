@@ -1,5 +1,5 @@
 import EventEmitter from 'events';
-import { ENR } from '@gxchain2/discv5';
+import { ENR, IKeypair } from '@gxchain2/discv5';
 import { IDiscv5 } from '../../src/types';
 import { NetworkService } from './NetworkService';
 import { MockDiscv5Config, localhost } from './MockConfig';
@@ -10,6 +10,8 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
   private config: MockDiscv5Config;
   //本地节点ENR
   private enr: ENR;
+  //节点公私钥对;
+  public keyPair: IKeypair;
   //已发现的节点集合
   private nodes: Map<string, ENR> = new Map();
   //节点发现定时器(在指定时间间隔内搜索节点)
@@ -21,13 +23,16 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
   //是否启动状态变量
   private isStart: boolean = false;
   //初始化各属性并将boot节点加入nodes中
-  constructor(config: MockDiscv5Config, enr: ENR, bootNodes: string[], networkService: NetworkService) {
+  constructor(config: MockDiscv5Config, networkService: NetworkService) {
     super();
-    this.enr = enr;
+    this.enr = config.enr;
     this.config = config;
+    this.keyPair = config.keypair;
     this.networkService = networkService;
-    for (const enrStr of bootNodes) {
-      this.addEnr(enrStr);
+    if (config.bootNodes) {
+      for (const enrStr of config.bootNodes) {
+        this.addEnr(enrStr);
+      }
     }
     this.networkService.registerNode(this);
   }

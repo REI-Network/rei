@@ -27,6 +27,7 @@ export class ConnectionManager {
   //初始化两个连接对象
   constructor(p1: MockLibp2p, p2: MockLibp2p, netWorkService: NetworkService) {
     this.id = p1.peerId.toB58String() + '-' + p2.peerId.toB58String();
+    this.networkService = netWorkService;
     const c1 = new Channel<Data>();
     const c2 = new Channel<Data>();
     this.conn1 = new MockConnection(p2.peerId, p1, c1, c2);

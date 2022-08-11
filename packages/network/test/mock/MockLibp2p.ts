@@ -13,7 +13,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   //节点权重集合
   private peerValues: Map<string, number> = new Map();
   //发现节点集合
-  private peers: Map<string, Multiaddr[]> = new Map();
+  private addressBook: Map<string, Multiaddr[]> = new Map();
   //连接集合
   private connections: Map<string, MockConnection[]> = new Map();
   //协议回调集合
@@ -55,6 +55,16 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     return Array.from(this.connections.values()).reduce((accumulator, value) => accumulator + value.length, 0);
   }
 
+  get peers(): string[] {
+    return Array.from(this.addressBook.keys());
+  }
+
+  removeAddress(peerId: PeerId): boolean {
+    this.addressBook.delete(peerId.toB58String());
+    this.peerValues.delete(peerId.toB58String());
+    return true;
+  }
+
   //设置指定协议的回调函数(当指定protocol被动安装时触发)
   handle(protocols: string | string[], callback: (input: { connection: Connection; stream: Stream }) => void): void {
     if (typeof protocols === 'string') {
@@ -80,14 +90,14 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     if (!PeerId.isPeerId(peerId)) {
       throw new Error('peerId is not a valid PeerId');
     }
-    const add = this.peers.get(peerId.toB58String()) || [];
+    const add = this.addressBook.get(peerId.toB58String()) || [];
     add.forEach((addr) => {
       if (!addresses.find((r) => r.equals(addr))) {
         addresses.push(addr);
       }
     });
     if (addresses.length != add.length) {
-      this.peers.set(peerId.toB58String(), addresses);
+      this.addressBook.set(peerId.toB58String(), addresses);
     }
     if (add.length == 0) {
       this.emit('discovery', peerId);
@@ -96,7 +106,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
 
   //获取指定节点的multiaddr集合
   getAddress(peerId: PeerId): Multiaddr[] | undefined {
-    return this.peers.get(peerId.toB58String());
+    return this.addressBook.get(peerId.toB58String());
   }
 
   //连接指定节点(通过networkService查找对应节点并创建连接 )ƒ
@@ -111,7 +121,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     if (connections) {
       return connections[0];
     } else {
-      const targetMultiAddr = this.peers.get(peer);
+      const targetMultiAddr = this.addressBook.get(peer);
       if (targetMultiAddr) {
         const conn = this.networkService.dial(this.peerId.toB58String(), peer, targetMultiAddr);
         this.handleConnection(conn);
@@ -178,7 +188,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     });
     await Promise.all(closeTasks);
     this.connections.clear();
-    this.peers.clear();
+    this.addressBook.clear();
     this.peerValues.clear();
     this.protocolHandlers.clear();
     this.announce.clear();

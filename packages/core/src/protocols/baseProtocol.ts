@@ -1,4 +1,4 @@
-import { ProtocolHandler, Protocol, Peer } from '@rei-network/network';
+import { ProtocolHandler, Protocol, Peer, ProtocolStream } from '@rei-network/network';
 import { Node } from '../node';
 import { NetworkProtocol } from './types';
 
@@ -21,16 +21,9 @@ export abstract class BaseProtocol<T extends ProtocolHandler> implements Protoco
   }
 
   /**
-   * Before make handler hook, always return true
-   */
-  beforeMakeHandler(peer: Peer): boolean | Promise<boolean> {
-    return true;
-  }
-
-  /**
    * Abstract make handler function
    */
-  abstract makeHandler(peer: Peer): T;
+  abstract makeHandler(peer: Peer, stream: ProtocolStream): Promise<T | null>;
 
   /**
    * Get the protocol handler of the peer
@@ -46,7 +39,7 @@ export abstract class BaseProtocol<T extends ProtocolHandler> implements Protoco
         throw new Error(`peer doesn't support ${this.protocolString}`);
       }
     } else {
-      return peer.getMsgQueue(this.protocolString).handler as T;
+      return peer.getHandler(this.protocolString) as T;
     }
   }
 }

@@ -88,6 +88,9 @@ export interface ILibp2p extends EventEmitter {
   // get local peer id
   get peerId(): PeerId;
 
+  // get all peerIds in address book
+  get peers(): string[];
+
   // get max connection size
   get maxConnections(): number;
 
@@ -119,6 +122,12 @@ export interface ILibp2p extends EventEmitter {
    * @param peerId - Peer id
    */
   getAddress(peerId: PeerId): Multiaddr[] | undefined;
+
+  /**
+   * Remove addresses from address book
+   * @param peerId - Peer id
+   */
+  removeAddress(peerId: PeerId): boolean;
 
   /**
    * Dial remote peer

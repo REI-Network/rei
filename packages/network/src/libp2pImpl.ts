@@ -92,6 +92,10 @@ class Libp2pImpl extends EventEmitter implements ILibp2p {
     return this.libp2pNode.peerId;
   }
 
+  get peers(): string[] {
+    return Array.from(this.libp2pNode.peerStore.addressBook.data.keys());
+  }
+
   get maxConnections(): number {
     return this.libp2pNode.connectionManager._options.maxConnections;
   }
@@ -114,6 +118,10 @@ class Libp2pImpl extends EventEmitter implements ILibp2p {
 
   getAddress(peerId: PeerId): Multiaddr[] | undefined {
     return this.libp2pNode.peerStore.addressBook.get(peerId);
+  }
+
+  removeAddress(peerId: PeerId): boolean {
+    return this.libp2pNode.peerStore.addressBook.delete(peerId);
   }
 
   dial(peer: string | PeerId | Multiaddr): Promise<Connection> {

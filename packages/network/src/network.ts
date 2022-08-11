@@ -6,7 +6,7 @@ import { v4, v6 } from 'is-ip';
 import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
 import { Message as Discv5Message, MessageType } from '@gxchain2/discv5/lib/message';
-import { logger, ignoreError, Channel } from '@rei-network/utils';
+import { logger, ignoreError, Channel, AbortableTimer } from '@rei-network/utils';
 import { ExpHeap } from './expheap';
 import { NodeDB } from './nodedb';
 import { Peer } from './peer';
@@ -69,7 +69,6 @@ export class NetworkManager extends EventEmitter {
   private readonly discoveredPeers: string[] = [];
   private readonly _peers = new Map<string, Peer>();
   private readonly banned = new Map<string, number>();
-  private readonly enableInboundCheck: boolean;
   private readonly channel = new Channel<m.Message>({
     drop: (message) => {
       // resolve promise immediately
@@ -81,10 +80,20 @@ export class NetworkManager extends EventEmitter {
     }
   });
 
+  // loop promise and timer
+  private schedulePromise?: Promise<void>;
+  private dialPromise?: Promise<void>;
+  private dialTimer = new AbortableTimer();
+  private checkTimeoutPromise?: Promise<void>;
+  private checkTimeoutTimer = new AbortableTimer();
+  private removePeerPromise?: Promise<void>;
+  private removePeerTimer = new AbortableTimer();
+
   // inbound and outbound history contains connection timestamp,
   // in order to prevent too frequent connections
   private readonly inboundHistory = new ExpHeap();
   private readonly outboundHistory = new ExpHeap();
+  private readonly enableInboundCheck: boolean;
   private outboundTimer: undefined | NodeJS.Timeout;
 
   private libp2p!: ILibp2p;
@@ -231,10 +240,10 @@ export class NetworkManager extends EventEmitter {
     }
 
     // start loops
-    this.scheduleLoop();
-    this.dialLoop();
-    this.checkTimeoutLoop();
-    this.removePeerLoop();
+    this.schedulePromise = this.scheduleLoop();
+    this.dialPromise = this.dialLoop();
+    this.checkTimeoutPromise = this.checkTimeoutLoop();
+    this.removePeerPromise = this.removePeerLoop();
   }
 
   /**
@@ -259,11 +268,24 @@ export class NetworkManager extends EventEmitter {
       await Promise.all(Array.from(this._peers.values()).map((peer) => this.removePeer(peer.peerId)));
       this._peers.clear();
       // stop libp2p and discv5
-      await ignoreError(this.libp2p.stop());
       this.discv5.stop();
+      await ignoreError(this.libp2p.stop());
       // close channel
       this.channel.abort();
-      // TODO: stop loops
+      // abort timer
+      this.dialTimer.abort();
+      this.checkTimeoutTimer.abort();
+      this.removePeerTimer.abort();
+      // wait for loop to exit
+      await this.schedulePromise;
+      await this.dialPromise;
+      await this.checkTimeoutPromise;
+      await this.removePeerPromise;
+      // release promise objects
+      this.schedulePromise = undefined;
+      this.dialPromise = undefined;
+      this.checkTimeoutPromise = undefined;
+      this.removePeerPromise = undefined;
     }
   }
 
@@ -346,20 +368,29 @@ export class NetworkManager extends EventEmitter {
         // filter all available static peers
         const staticPeers = Array.from(this.staticPeers).filter((peerId) => !this._peers.has(peerId) && !this.isBanned(peerId));
 
+        // filter all peers in address book
+        const addressBookPeers = this.libp2p.peers.filter((peerId) => !this._peers.has(peerId) && !this.isBanned(peerId));
+
         // filter all nodes that can be dialed
-        const dialablPeers = [...staticPeers, ...this.discoveredPeers].filter((peerId) => this.checkOutbound(peerId));
+        const dialablePeers = [...staticPeers, ...this.discoveredPeers, ...addressBookPeers].filter((peerId) => this.checkOutbound(peerId));
 
         // pick the first one and dial
-        const peerId = dialablPeers.shift();
+        const peerId = dialablePeers.shift();
         if (peerId) {
+          if (staticPeers.indexOf(peerId) !== -1) {
+            logger.debug('Network::dial, try to dial peer:', peerId, 'load from static peer list');
+          } else if (this.discoveredPeers.indexOf(peerId) !== -1) {
+            logger.debug('Network::dial, try to dial peer:', peerId, 'load from discovered peer list');
+          } else {
+            logger.debug('Network::dial, try to dial peer:', peerId, 'load from address book peer list');
+          }
           maybeRemoveFromDiscovered(peerId);
           await this.dial(peerId);
         }
       }
 
-      // TODO: abortableTimer
       // sleep for a while
-      await new Promise<void>((resolve) => setTimeout(resolve, c.dialLoopInterval));
+      await this.dialTimer.wait(c.dialLoopInterval);
     }
   }
 
@@ -369,14 +400,16 @@ export class NetworkManager extends EventEmitter {
   private async checkTimeoutLoop() {
     while (!this.aborted) {
       try {
-        await this.nodedb.checkTimeout(c.seedMaxAge);
+        await this.nodedb.checkTimeout(c.seedMaxAge, (peerId) => {
+          logger.debug('NetworkManager::checkTimeoutLoop, deleting timeout node:', peerId.toB58String());
+          this.libp2p.removeAddress(peerId);
+        });
       } catch (err) {
         logger.error('NetworkManager::checkTimeoutLoop, catch error:', err);
       }
 
-      // TODO: abortableTimer
       // sleep for a while
-      await new Promise((resolve) => setTimeout(resolve, c.checkTimeoutInterval));
+      await this.checkTimeoutTimer.wait(c.checkTimeoutInterval);
     }
   }
 
@@ -385,13 +418,13 @@ export class NetworkManager extends EventEmitter {
    */
   private async removePeerLoop() {
     while (!this.aborted) {
-      // TODO: abortableTimer
       // sleep for a while
-      await new Promise((resolve) => setTimeout(resolve, c.removePeerLoopInterval));
+      await this.removePeerTimer.wait(c.removePeerLoopInterval);
 
       const now = Date.now();
       for (const [peerId, peer] of this._peers) {
         if (peer.size === 0 && now - peer.createAt >= c.removePeerThrottle) {
+          logger.debug('NetworkManager::removePeerLoop, remove peer:', peerId);
           await this.removePeer(peerId);
         }
       }
@@ -408,7 +441,8 @@ export class NetworkManager extends EventEmitter {
    */
   private async install(peerId: string, protocol: Protocol, connection: Connection, stream?: Stream) {
     const connections = this.libp2p.getConnections(peerId);
-    if (!connections || connections.length == 0) {
+    if (!connections || connections.length === 0) {
+      logger.debug('Network::install, peerId:', peerId, 'failed due to disconnected');
       return false;
     }
 
@@ -436,8 +470,8 @@ export class NetworkManager extends EventEmitter {
       try {
         const result = await connection.newStream(protocol.protocolString);
         stream = result.stream;
-      } catch (err) {
-        logger.debug('Network::install, peerId:', peerId, 'new stream failed, error:', err);
+      } catch (err: any) {
+        logger.detail('Network::install, peerId:', peerId, 'new stream failed, error:', err);
         return false;
       }
     }
@@ -469,7 +503,7 @@ export class NetworkManager extends EventEmitter {
     try {
       connection = await this.libp2p.dial(PeerId.createFromB58String(peerId));
     } catch (err) {
-      logger.debug('Network::dial, failed to dial peerId:', peerId, 'error:', err);
+      logger.detail('Network::dial, failed to dial peerId:', peerId, 'error:', err);
       return;
     }
 
@@ -730,6 +764,15 @@ export class NetworkManager extends EventEmitter {
     return new Promise<void>((resolve) => {
       this.pushMessage(new m.RemovePeerMessage(peerId, resolve));
     });
+  }
+
+  /**
+   * Get peer by id
+   * @param peerId - Target peer
+   * @returns Peer or `undefined`
+   */
+  getPeer(peerId: string) {
+    return this._peers.get(peerId);
   }
 
   /**

@@ -389,7 +389,10 @@ export class NetworkManager extends EventEmitter {
   private async checkTimeoutLoop() {
     while (!this.aborted) {
       try {
-        await this.nodedb.checkTimeout(c.seedMaxAge);
+        await this.nodedb.checkTimeout(c.seedMaxAge, (peerId) => {
+          logger.debug('NetworkManager::checkTimeoutLoop, deleting timeout node:', peerId.toB58String());
+          this.libp2p.removeAddress(peerId);
+        });
       } catch (err) {
         logger.error('NetworkManager::checkTimeoutLoop, catch error:', err);
       }

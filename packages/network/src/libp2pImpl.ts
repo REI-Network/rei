@@ -116,6 +116,10 @@ class Libp2pImpl extends EventEmitter implements ILibp2p {
     return this.libp2pNode.peerStore.addressBook.get(peerId);
   }
 
+  removeAddress(peerId: PeerId): boolean {
+    return this.libp2pNode.peerStore.addressBook.delete(peerId);
+  }
+
   dial(peer: string | PeerId | Multiaddr): Promise<Connection> {
     return this.libp2pNode.dialProtocol(peer);
   }

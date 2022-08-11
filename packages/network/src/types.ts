@@ -121,6 +121,12 @@ export interface ILibp2p extends EventEmitter {
   getAddress(peerId: PeerId): Multiaddr[] | undefined;
 
   /**
+   * Remove addresses from address book
+   * @param peerId - Peer id
+   */
+  removeAddress(peerId: PeerId): boolean;
+
+  /**
    * Dial remote peer
    * @param peer - Remote peer id or address
    */

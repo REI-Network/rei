@@ -410,6 +410,7 @@ export class NetworkManager extends EventEmitter {
       const now = Date.now();
       for (const [peerId, peer] of this._peers) {
         if (peer.size === 0 && now - peer.createAt >= c.removePeerThrottle) {
+          logger.debug('NetworkManager::removePeerLoop, remove peer:', peerId);
           await this.removePeer(peerId);
         }
       }
@@ -455,8 +456,10 @@ export class NetworkManager extends EventEmitter {
       try {
         const result = await connection.newStream(protocol.protocolString);
         stream = result.stream;
-      } catch (err) {
-        logger.debug('Network::install, peerId:', peerId, 'new stream failed, error:', err);
+      } catch (err: any) {
+        if (err.message.indexOf('protocol selection failed')) {
+          logger.debug('Network::install, peerId:', peerId, 'new stream failed, error:', err);
+        }
         return false;
       }
     }
@@ -486,9 +489,10 @@ export class NetworkManager extends EventEmitter {
     // attempt to establish a connection with the remote node
     let connection: Connection;
     try {
+      logger.debug('Network::dial, try to dial peer:', peerId);
       connection = await this.libp2p.dial(PeerId.createFromB58String(peerId));
     } catch (err) {
-      logger.debug('Network::dial, failed to dial peerId:', peerId, 'error:', err);
+      logger.detail('Network::dial, failed to dial peerId:', peerId, 'error:', err);
       return;
     }
 

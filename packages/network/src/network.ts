@@ -6,7 +6,7 @@ import { v4, v6 } from 'is-ip';
 import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
 import { Message as Discv5Message, MessageType } from '@gxchain2/discv5/lib/message';
-import { logger, ignoreError, Channel } from '@rei-network/utils';
+import { logger, ignoreError, Channel, AbortableTimer } from '@rei-network/utils';
 import { ExpHeap } from './expheap';
 import { NodeDB } from './nodedb';
 import { Peer } from './peer';
@@ -69,7 +69,6 @@ export class NetworkManager extends EventEmitter {
   private readonly discoveredPeers: string[] = [];
   private readonly _peers = new Map<string, Peer>();
   private readonly banned = new Map<string, number>();
-  private readonly enableInboundCheck: boolean;
   private readonly channel = new Channel<m.Message>({
     drop: (message) => {
       // resolve promise immediately
@@ -81,10 +80,20 @@ export class NetworkManager extends EventEmitter {
     }
   });
 
+  // loop promise and timer
+  private schedulePromise?: Promise<void>;
+  private dialPromise?: Promise<void>;
+  private dialTimer = new AbortableTimer();
+  private checkTimeoutPromise?: Promise<void>;
+  private checkTimeoutTimer = new AbortableTimer();
+  private removePeerPromise?: Promise<void>;
+  private removePeerTimer = new AbortableTimer();
+
   // inbound and outbound history contains connection timestamp,
   // in order to prevent too frequent connections
   private readonly inboundHistory = new ExpHeap();
   private readonly outboundHistory = new ExpHeap();
+  private readonly enableInboundCheck: boolean;
   private outboundTimer: undefined | NodeJS.Timeout;
 
   private libp2p!: ILibp2p;
@@ -230,10 +239,10 @@ export class NetworkManager extends EventEmitter {
     }
 
     // start loops
-    this.scheduleLoop();
-    this.dialLoop();
-    this.checkTimeoutLoop();
-    this.removePeerLoop();
+    this.schedulePromise = this.scheduleLoop();
+    this.dialPromise = this.dialLoop();
+    this.checkTimeoutPromise = this.checkTimeoutLoop();
+    this.removePeerPromise = this.removePeerLoop();
   }
 
   /**
@@ -262,7 +271,20 @@ export class NetworkManager extends EventEmitter {
       this.discv5.stop();
       // close channel
       this.channel.abort();
-      // TODO: stop loops
+      // abort timer
+      this.dialTimer.abort();
+      this.checkTimeoutTimer.abort();
+      this.removePeerTimer.abort();
+      // wait for loop to exit
+      await this.schedulePromise;
+      await this.dialPromise;
+      await this.checkTimeoutPromise;
+      await this.removePeerPromise;
+      // release promise objects
+      this.schedulePromise = undefined;
+      this.dialPromise = undefined;
+      this.checkTimeoutPromise = undefined;
+      this.removePeerPromise = undefined;
     }
   }
 
@@ -356,9 +378,8 @@ export class NetworkManager extends EventEmitter {
         }
       }
 
-      // TODO: abortableTimer
       // sleep for a while
-      await new Promise<void>((resolve) => setTimeout(resolve, c.dialLoopInterval));
+      await this.dialTimer.wait(c.dialLoopInterval);
     }
   }
 
@@ -373,9 +394,8 @@ export class NetworkManager extends EventEmitter {
         logger.error('NetworkManager::checkTimeoutLoop, catch error:', err);
       }
 
-      // TODO: abortableTimer
       // sleep for a while
-      await new Promise((resolve) => setTimeout(resolve, c.checkTimeoutInterval));
+      await this.checkTimeoutTimer.wait(c.checkTimeoutInterval);
     }
   }
 
@@ -384,9 +404,8 @@ export class NetworkManager extends EventEmitter {
    */
   private async removePeerLoop() {
     while (!this.aborted) {
-      // TODO: abortableTimer
       // sleep for a while
-      await new Promise((resolve) => setTimeout(resolve, c.removePeerLoopInterval));
+      await this.removePeerTimer.wait(c.removePeerLoopInterval);
 
       const now = Date.now();
       for (const [peerId, peer] of this._peers) {

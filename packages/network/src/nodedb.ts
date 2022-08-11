@@ -22,11 +22,11 @@ async function* iteratorToAsyncGenerator<K, V>(itr: AbstractIterator<K, V>, rele
       itr.next((err, key, val) => {
         if (err) {
           reject(err);
-        }
-        if (key === undefined || val === undefined) {
+        } else if (key === undefined || val === undefined) {
           resolve();
+        } else {
+          resolve([key, val]);
         }
-        resolve([key, val]);
       });
     });
     if (!result) {

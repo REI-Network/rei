@@ -367,12 +367,22 @@ export class NetworkManager extends EventEmitter {
         // filter all available static peers
         const staticPeers = Array.from(this.staticPeers).filter((peerId) => !this._peers.has(peerId));
 
+        // filter all peers in address book
+        const addressBookPeers = this.libp2p.peers.filter((peerId) => !this._peers.has(peerId) && !this.isBanned(peerId));
+
         // filter all nodes that can be dialed
-        const dialablPeers = [...staticPeers, ...this.discoveredPeers].filter((peerId) => this.checkOutbound(peerId));
+        const dialablePeers = [...staticPeers, ...this.discoveredPeers, ...addressBookPeers].filter((peerId) => this.checkOutbound(peerId));
 
         // pick the first one and dial
-        const peerId = dialablPeers.shift();
+        const peerId = dialablePeers.shift();
         if (peerId) {
+          if (staticPeers.indexOf(peerId) !== -1) {
+            logger.debug('Network::dial, try to dial peer:', peerId, 'load from static peer list');
+          } else if (this.discoveredPeers.indexOf(peerId) !== -1) {
+            logger.debug('Network::dial, try to dial peer:', peerId, 'load from discovered peer list');
+          } else {
+            logger.debug('Network::dial, try to dial peer:', peerId, 'load from address book peer list');
+          }
           maybeRemoveFromDiscovered(peerId);
           await this.dial(peerId);
         }
@@ -492,7 +502,6 @@ export class NetworkManager extends EventEmitter {
     // attempt to establish a connection with the remote node
     let connection: Connection;
     try {
-      logger.debug('Network::dial, try to dial peer:', peerId);
       connection = await this.libp2p.dial(PeerId.createFromB58String(peerId));
     } catch (err) {
       logger.detail('Network::dial, failed to dial peerId:', peerId, 'error:', err);

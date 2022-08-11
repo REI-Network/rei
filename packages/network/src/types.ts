@@ -88,6 +88,9 @@ export interface ILibp2p extends EventEmitter {
   // get local peer id
   get peerId(): PeerId;
 
+  // get all peerIds in address book
+  get peers(): string[];
+
   // get max connection size
   get maxConnections(): number;
 

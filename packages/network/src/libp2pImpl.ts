@@ -92,6 +92,10 @@ class Libp2pImpl extends EventEmitter implements ILibp2p {
     return this.libp2pNode.peerId;
   }
 
+  get peers(): string[] {
+    return Array.from(this.libp2pNode.peerStore.addressBook.data.keys());
+  }
+
   get maxConnections(): number {
     return this.libp2pNode.connectionManager._options.maxConnections;
   }

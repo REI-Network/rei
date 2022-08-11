@@ -245,4 +245,17 @@ export class Peer extends EventEmitter {
     }
     return false;
   }
+
+  /**
+   * Get handler by protocol string
+   * @param protocolString
+   * @returns Handler object
+   */
+  getHandler(protocolString: string) {
+    const val = this.protocols.get(protocolString);
+    if (!val) {
+      throw new Error('unknown protocol string: ' + protocolString);
+    }
+    return val.handler;
+  }
 }

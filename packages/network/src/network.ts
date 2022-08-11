@@ -267,8 +267,8 @@ export class NetworkManager extends EventEmitter {
       await Promise.all(Array.from(this._peers.values()).map((peer) => this.removePeer(peer.peerId)));
       this._peers.clear();
       // stop libp2p and discv5
-      await ignoreError(this.libp2p.stop());
       this.discv5.stop();
+      await ignoreError(this.libp2p.stop());
       // close channel
       this.channel.abort();
       // abort timer
@@ -749,6 +749,15 @@ export class NetworkManager extends EventEmitter {
     return new Promise<void>((resolve) => {
       this.pushMessage(new m.RemovePeerMessage(peerId, resolve));
     });
+  }
+
+  /**
+   * Get peer by id
+   * @param peerId - Target peer
+   * @returns Peer or `undefined`
+   */
+  getPeer(peerId: string) {
+    return this._peers.get(peerId);
   }
 
   /**

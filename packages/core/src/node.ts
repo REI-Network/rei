@@ -1,6 +1,5 @@
 import path from 'path';
 import type { LevelUp } from 'levelup';
-import LevelStore from 'datastore-level';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import { Database, createLevelDB, createEncodingLevelDB } from '@rei-network/database';
@@ -113,11 +112,15 @@ export class Node {
       hardforkByHeadBlockNumber: true
     });
 
+    const networkOptions = options.network;
     this.networkMngr = new NetworkManager({
-      ...options.network,
+      ...networkOptions,
       protocols: [[this.wire.v2, this.wire.v1], this.consensus],
       nodedb: this.nodedb,
-      bootnodes: [...common.bootstrapNodes(), ...(options.network.bootnodes ?? [])]
+      libp2pOptions: {
+        ...networkOptions.libp2pOptions,
+        bootnodes: [...common.bootstrapNodes(), ...(networkOptions.libp2pOptions!.bootnodes ?? [])]
+      }
     })
       .on('installed', this.onPeerInstalled)
       .on('removed', this.onPeerRemoved);

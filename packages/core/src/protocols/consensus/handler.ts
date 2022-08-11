@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
 import { Channel, FunctionalBufferSet, logger } from '@rei-network/utils';
-import { Peer, ProtocolHandler } from '@rei-network/network';
+import { Peer, ProtocolStream, ProtocolHandler } from '@rei-network/network';
 import { RoundStepType, Proposal, Vote, BitArray, VoteType, VoteSet, MessageFactory, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint';
 import * as m from '../../consensus/reimint/messages';
 import { ConsensusProtocol } from './protocol';
@@ -11,6 +11,7 @@ const maxKnowEvidence = 100;
 
 export class ConsensusProtocolHandler implements ProtocolHandler {
   readonly peer: Peer;
+  readonly stream: ProtocolStream;
   readonly protocol: ConsensusProtocol;
 
   private aborted: boolean = false;
@@ -39,8 +40,9 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
   private catchupCommit?: BitArray;
   /////////////// PeerRoundState ///////////////
 
-  constructor(protocol: ConsensusProtocol, peer: Peer) {
+  constructor(protocol: ConsensusProtocol, peer: Peer, stream: ProtocolStream) {
     this.peer = peer;
+    this.stream = stream;
     this.protocol = protocol;
 
     this.handshakePromise = new Promise<boolean>((resolve) => {
@@ -219,7 +221,7 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
    */
   send(msg: m.Message) {
     try {
-      this.peer.send(this.protocol.protocolString, MessageFactory.serializeMessage(msg));
+      this.stream.send(MessageFactory.serializeMessage(msg));
     } catch (err) {
       // ignore errors...
     }

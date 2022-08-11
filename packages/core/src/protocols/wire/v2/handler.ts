@@ -1,4 +1,4 @@
-import { Peer } from '@rei-network/network';
+import { Peer, ProtocolStream } from '@rei-network/network';
 import { Receipt, ReceiptRawValue } from '@rei-network/structure';
 import { WireProtocolHandler, WireProtocol } from '../handler';
 import { HandlerFunc, wireHandlerBaseFuncs } from '../wireFunctions';
@@ -43,8 +43,8 @@ const wireHandlerFuncsV2: HandlerFunc[] = [
 ];
 
 export class WireProtocolHandlerV2 extends WireProtocolHandler {
-  constructor(protocol: WireProtocol, peer: Peer) {
-    super(protocol, peer, wireHandlerFuncsV2);
+  constructor(protocol: WireProtocol, peer: Peer, stream: ProtocolStream) {
+    super(protocol, peer, stream, wireHandlerFuncsV2);
   }
 
   /**

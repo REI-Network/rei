@@ -1,4 +1,4 @@
-import { Protocol, Peer } from '@rei-network/network';
+import { Protocol, Peer, ProtocolStream } from '@rei-network/network';
 import { Node } from '../../../node';
 import { NetworkProtocol } from '../../types';
 import { BaseProtocol } from '../../baseProtocol';
@@ -16,21 +16,14 @@ export class WireProtocolV1 extends BaseProtocol<WireProtocolHandlerV1> implemen
   }
 
   /**
-   * {@link Protocol.beforeMakeHandler}
+   * {@link Protocol.makeHandler}
    */
-  beforeMakeHandler(peer: Peer): boolean {
+  async makeHandler(peer: Peer, stream: ProtocolStream) {
     // prefer to use the higher version of the wire protocol
     const handler = this.pool.idlePool.get(peer.peerId) ?? this.pool.busyPool.get(peer.peerId);
     if (handler && isV2(handler)) {
-      return false;
+      return null;
     }
-    return true;
-  }
-
-  /**
-   * {@link Protocol.makeHandler}
-   */
-  makeHandler(peer: Peer) {
-    return new WireProtocolHandlerV1(this, peer);
+    return new WireProtocolHandlerV1(this, peer, stream);
   }
 }

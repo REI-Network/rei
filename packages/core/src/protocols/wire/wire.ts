@@ -31,9 +31,9 @@ export class Wire {
         throw new Error(`peer doesn't support ${this.v1.protocolString} and ${this.v2.protocolString}`);
       }
     } else if (peer.isSupport(this.v1.protocolString)) {
-      return peer.getMsgQueue(this.v1.protocolString).handler as WireProtocolHandler;
+      return peer.getHandler(this.v1.protocolString) as WireProtocolHandler;
     } else {
-      return peer.getMsgQueue(this.v2.protocolString).handler as WireProtocolHandler;
+      return peer.getHandler(this.v2.protocolString) as WireProtocolHandler;
     }
   }
 

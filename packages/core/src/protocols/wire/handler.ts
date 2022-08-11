@@ -1,7 +1,7 @@
 import { bufferToInt, rlp, BN, intToBuffer } from 'ethereumjs-util';
 import { Transaction, Block, BlockHeader } from '@rei-network/structure';
 import { logger, Channel, FunctionalBufferSet } from '@rei-network/utils';
-import { ProtocolHandler, Peer } from '@rei-network/network';
+import { ProtocolHandler, Peer, ProtocolStream } from '@rei-network/network';
 import { Node } from '../../node';
 import { NodeStatus } from '../../types';
 import { HandlerPool } from '../handlerPool';
@@ -19,6 +19,7 @@ export interface WireProtocol {
  */
 export abstract class WireProtocolHandler implements ProtocolHandler {
   readonly peer: Peer;
+  readonly stream: ProtocolStream;
   readonly protocol: WireProtocol;
 
   private _status?: NodeStatus;
@@ -42,8 +43,9 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
   private newBlockAnnouncesQueue = new Channel<{ block: Block; td: BN }>({ max: c.maxQueuedBlocks });
   private txAnnouncesQueue = new Channel<Buffer>({ max: c.maxQueuedTxs });
 
-  constructor(protocol: WireProtocol, peer: Peer, funcs: HandlerFunc[]) {
+  constructor(protocol: WireProtocol, peer: Peer, stream: ProtocolStream, funcs: HandlerFunc[]) {
     this.peer = peer;
+    this.stream = stream;
     this.protocol = protocol;
     this.funcs = funcs;
 
@@ -140,7 +142,7 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
   send(method: string | number, data: any) {
     const handler = this.findHandler(method);
     try {
-      this.peer.send(this.protocol.protocolString, rlp.encode([intToBuffer(handler.code), handler.encode.call(this, data)]));
+      this.stream.send(rlp.encode([intToBuffer(handler.code), handler.encode.call(this, data)]));
     } catch (err) {
       // ignore errors
     }

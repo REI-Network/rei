@@ -111,12 +111,12 @@ export async function startNode(ip, tcpPort, udpPort, enr) {
   await createNode({ ip, tcpPort, udpPort, bootNodes: [enr] });
 }
 
-async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; bootNodes?: string[] }) {
+async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; bootNodes?: string[]; maxPeers?: number }) {
   const db = levelup(memdown());
   const peerId = await PeerId.create({ keyType: 'secp256k1' });
   const { enr, keypair } = createEnrAndKeypair(peerId, opts);
   const discv5 = new MockDiscv5({ keypair, enr, bootNodes: opts.bootNodes }, networkService);
-  const libp2p = new MockLibp2p({ peerId, enr }, discv5, networkService);
+  const libp2p = new MockLibp2p({ peerId, enr, maxPeers: opts.maxPeers ?? 50 }, discv5, networkService);
   enr.encode(keypair.privateKey);
   const node = new NetworkManager({
     peerId: await PeerId.create({ keyType: 'secp256k1' }),

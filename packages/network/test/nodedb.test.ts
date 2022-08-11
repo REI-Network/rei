@@ -3,8 +3,11 @@ import PeerId from 'peer-id';
 import { expect, assert } from 'chai';
 import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
+import { setLevel } from '@rei-network/utils';
 import { NodeDB } from '../src/nodedb';
 const memdown = require('memdown');
+
+setLevel('silent');
 
 describe('NodeDB', async () => {
   let nodedb: NodeDB;

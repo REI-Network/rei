@@ -97,7 +97,7 @@ export class MockConnection implements Connection {
     }
     const stream = this._newStream(protocols[0]);
     //通知远程节点创建stream
-    this.connectionManager?.newStream(protocols[0], this.remotePeerId.toB58String());
+    this.connectionManager?.newStream(protocols[0], this.remotePeer.toB58String());
     return { stream };
   }
 
@@ -159,8 +159,11 @@ export class MockConnection implements Connection {
 
   //创建新stream并存入streams集合
   private _newStream(protocol: string) {
-    const stream = new MockStream(protocol, this.streamsChannel, this);
-    this.streams.set(protocol, stream);
+    let stream = this.streams.get(protocol);
+    if (!stream) {
+      stream = new MockStream(protocol, this.streamsChannel, this);
+      this.streams.set(protocol, stream);
+    }
     return stream;
   }
 

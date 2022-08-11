@@ -117,6 +117,7 @@ async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; 
   const { enr, keypair } = createEnrAndKeypair(peerId, opts);
   const discv5 = new MockDiscv5({ keypair, enr, bootNodes: opts.bootNodes }, networkService);
   const libp2p = new MockLibp2p({ peerId, enr }, discv5, networkService);
+  enr.encode(keypair.privateKey);
   const node = new NetworkManager({
     peerId: await PeerId.create({ keyType: 'secp256k1' }),
     protocols: [new SayHi()],
@@ -141,7 +142,7 @@ async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; 
     console.log('node:', node.peerId, 'removed:', peer.peerId);
   });
   await node.start();
-  console.log('create node success', 'ip:', opts.ip, 'tcpPort:', opts.tcpPort, 'udpPort:', opts.udpPort);
+  console.log('create node success', 'peerId:', node.peerId, 'ip:', opts.ip, 'tcpPort:', opts.tcpPort, 'udpPort:', opts.udpPort);
   return node;
 }
 

@@ -76,7 +76,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
 
   //将新节点加入发现集合中并触发'peer'事件通知外部
   private async handleEnr(enr: ENR) {
-    if (enr.peerId === this.enr.peerId || enr.ip == localhost) {
+    if (enr.nodeId === this.enr.nodeId || enr.ip == localhost) {
       return;
     }
     if (!this.nodes.has(enr.nodeId) || enr.seq > this.nodes.get(enr.nodeId)!.seq) {
@@ -126,7 +126,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
   //处理发现节点请求(1.处理请求方的最新ENR地址 2.返回本地最新ENR和所有已发现节点)
   async handleFindNode(sourceEnr: ENR) {
     await this.handleEnr(sourceEnr);
-    return [this.enr, ...this.nodes.values()].map((e) => this.deepCopy(e));
+    return [this.deepCopy(this.enr), ...this.nodes.values()].map((e) => this.deepCopy(e));
   }
 
   //处理ping message请求(调用networkService的sendPong函数向请求方发送pong消息)
@@ -138,7 +138,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
   handlePong(ip: string) {
     if (ip && this.enr.ip != ip) {
       this.enr.ip = ip;
-      this.emit('multiaddr', this.localEnr.getLocationMultiaddr('udp'));
+      this.emit('multiaddrUpdated', this.localEnr.getLocationMultiaddr('udp'));
     }
   }
 

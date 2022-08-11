@@ -37,6 +37,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     this.discv5 = discv5;
     this.networkService = networkService;
     this.setAnnounce([new Multiaddr(`/ip4/${config.enr.ip}/tcp/${config.tcpPort ?? defaultTcpPort}`)]);
+    networkService.registerPeer(this);
   }
 
   //获取本地peerId
@@ -98,7 +99,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     return this.peers.get(peerId.toB58String());
   }
 
-  //连接指定节点(通过networkService查找对应节点并创建连接 )
+  //连接指定节点(通过networkService查找对应节点并创建连接 )ƒ
   async dial(peer: string | PeerId | Multiaddr): Promise<Connection> {
     if (peer instanceof Multiaddr) {
       throw new Error('Multiaddr is not supported');
@@ -106,13 +107,18 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     if (peer instanceof PeerId) {
       peer = peer.toB58String();
     }
-    const targetMultiAddr = this.peers.get(peer);
-    if (targetMultiAddr) {
-      const conn = this.networkService.dial(this.peerId.toB58String(), peer, targetMultiAddr);
-      this.handleConnection(conn);
-      return conn;
+    const connections = this.connections.get(peer);
+    if (connections) {
+      return connections[0];
     } else {
-      throw new Error('peer not found');
+      const targetMultiAddr = this.peers.get(peer);
+      if (targetMultiAddr) {
+        const conn = this.networkService.dial(this.peerId.toB58String(), peer, targetMultiAddr);
+        this.handleConnection(conn);
+        return conn;
+      } else {
+        throw new Error('peer not found');
+      }
     }
   }
 
@@ -180,9 +186,9 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
   }
 
   //监听discv5发现节点事件
-  private onDiscover(data: { id: PeerId; multiaddrs: Multiaddr[] }): void {
+  private onDiscover = (data: { id: PeerId; multiaddrs: Multiaddr[] }) => {
     if (!this.isAbort) this.addAddress(data.id, data.multiaddrs);
-  }
+  };
 
   //处理新连接(1.将连接存入connections中 2.触发'connect'事件通知networkManager 3.查看连接是否超过了最大连接数)
   handleConnection(connection: MockConnection): void {

@@ -1,7 +1,7 @@
 import Multiaddr from 'multiaddr';
 import { MockLibp2p } from './MockLibp2p';
 import { MockDiscv5 } from './MockDiscv5';
-import { ConnectionManager, MockConnection, Data } from './MockConnection';
+import { ConnectionManager, MockConnection } from './MockConnection';
 import { ENR } from '@gxchain2/discv5';
 
 type PeerIdStr = string;
@@ -67,7 +67,7 @@ export class NetworkService {
       const multiaddrs = targetMultiAddrs.map((multiaddr) => multiaddr.toString());
       for (const multiAddr of multiaddrs) {
         if (targetPeer.announce.has(multiAddr)) {
-          const manager = new ConnectionManager(targetPeer, callerPeer, this);
+          const manager = new ConnectionManager(callerPeer, targetPeer, this);
           this.connectionManagers.set(manager.id, manager);
           targetPeer.handleConnection(manager.conn2);
           return manager.conn1;

@@ -9,7 +9,6 @@ type PeerIdStr = string;
 type NodeIdStr = string;
 const mockIp = '192.168.0.1';
 
-//模拟网络
 export class NetworkService {
   //networkManager collection
   private networkManagers: NetworkManager[] = [];

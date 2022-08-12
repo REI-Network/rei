@@ -76,7 +76,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
 
   //将新节点加入发现集合中并触发'peer'事件通知外部
   private async handleEnr(enr: ENR) {
-    if (enr.nodeId === this.enr.nodeId || enr.ip == localhost) {
+    if (enr.nodeId === this.enr.nodeId || enr.ip === localhost) {
       return;
     }
     if (!this.nodes.has(enr.nodeId) || enr.seq > this.nodes.get(enr.nodeId)!.seq) {

@@ -36,7 +36,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     this.config = config;
     this.discv5 = discv5;
     this.networkService = networkService;
-    this.setAnnounce([new Multiaddr(`/ip4/${config.enr.ip}/tcp/${config.tcpPort ?? defaultTcpPort}`)]);
+    this.setAnnounce([new Multiaddr(`/ip4/${config.enr.ip}/tcp/${config.enr.tcp ?? defaultTcpPort}`)]);
     networkService.registerPeer(this);
   }
 

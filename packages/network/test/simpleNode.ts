@@ -119,7 +119,7 @@ async function createNode(opts: { ip: string; tcpPort: number; udpPort: number; 
   const libp2p = new MockLibp2p({ peerId, enr, maxPeers: opts.maxPeers ?? 50 }, discv5, networkService);
   enr.encode(keypair.privateKey);
   const node = new NetworkManager({
-    peerId: await PeerId.create({ keyType: 'secp256k1' }),
+    peerId,
     protocols: [new SayHi()],
     nodedb: db,
     nat: opts.ip,

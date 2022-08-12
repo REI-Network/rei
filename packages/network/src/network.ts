@@ -37,6 +37,10 @@ export interface NetworkManagerOptions {
   discv5?: IDiscv5;
   // libp2p instance
   libp2p?: ILibp2p;
+  //inboud throttle interval
+  inboundThrottleTime?: number;
+  //outbound throttle interval
+  outboundThrottleTime?: number;
   // libp2p constructor options
   libp2pOptions?: {
     // tcp port
@@ -653,7 +657,7 @@ export class NetworkManager extends EventEmitter {
     if (this.inboundHistory.contains(peerId)) {
       return false;
     }
-    this.inboundHistory.add(peerId, now + c.inboundThrottleTime);
+    this.inboundHistory.add(peerId, now + (this.options.inboundThrottleTime ?? c.inboundThrottleTime));
     return true;
   }
 
@@ -682,7 +686,7 @@ export class NetworkManager extends EventEmitter {
 
   private updateOutbound(peerId: string) {
     const now = Date.now();
-    this.outboundHistory.add(peerId, now + c.outboundThrottleTime);
+    this.outboundHistory.add(peerId, now + (this.options.outboundThrottleTime ?? c.outboundThrottleTime));
     this.setupOutboundTimer(now);
   }
 

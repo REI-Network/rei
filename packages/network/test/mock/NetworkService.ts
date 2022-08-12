@@ -3,6 +3,7 @@ import { MockLibp2p } from './MockLibp2p';
 import { MockDiscv5 } from './MockDiscv5';
 import { ConnectionManager, MockConnection } from './MockConnection';
 import { ENR } from '@gxchain2/discv5';
+import { NetworkManager } from '../../src';
 
 type PeerIdStr = string;
 type NodeIdStr = string;
@@ -10,6 +11,8 @@ const mockIp = '192.168.0.1';
 
 //模拟网络
 export class NetworkService {
+  //networkManager集合
+  private networkManagers: NetworkManager[] = [];
   //peer集合
   private peers: Map<PeerIdStr, MockLibp2p> = new Map();
   //node集合
@@ -18,6 +21,11 @@ export class NetworkService {
   private nodesIp: Map<string, string> = new Map();
   //connectionManager集合
   private connectionManagers: Map<string, ConnectionManager> = new Map();
+
+  addNetworkManager(networkManager: NetworkManager) {
+    this.networkManagers.push(networkManager);
+  }
+
   //将node注册到nodes中
   registerNode(discv5: MockDiscv5, ip: string = mockIp) {
     const nodeId = discv5.localEnr.nodeId;
@@ -96,5 +104,11 @@ export class NetworkService {
   //删除connectionManager
   handleConnectionManagerClose(id) {
     this.connectionManagers.delete(id);
+  }
+
+  async close() {
+    for (const networkManager of this.networkManagers) {
+      await networkManager.abort();
+    }
   }
 }

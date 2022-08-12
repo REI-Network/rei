@@ -11,6 +11,8 @@ export type MockLibp2pConfig = {
   maxPeers?: number;
   tcpPort?: number;
   udpPort?: number;
+  inboundThrottleTime?: number;
+  outboundThrottleTime?: number;
 };
 
 export type MockDiscv5Config = {

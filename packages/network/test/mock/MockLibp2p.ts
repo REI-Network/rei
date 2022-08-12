@@ -8,29 +8,29 @@ import { MockDiscv5 } from './MockDiscv5';
 import { MockLibp2pConfig, defaultTcpPort } from './MockConfig';
 
 export class MockLibp2p extends EventEmitter implements ILibp2p {
-  //networkService对象
+  //networkService instance
   private networkService: NetworkService;
-  //节点权重集合
+  //peer weight set
   private peerValues: Map<string, number> = new Map();
-  //发现节点集合
+  //set of discovered peers
   private addressBook: Map<string, Multiaddr[]> = new Map();
-  //连接集合
+  //connection collection
   private connections: Map<string, MockConnection[]> = new Map();
-  //协议回调集合
+  //protocol callback collection
   private protocolHandlers: Map<string, (input: { connection: Connection; stream: Stream }) => void> = new Map();
-  //本地discv5对象
+  //local discv5 object
   private discv5: MockDiscv5;
-  //节点配置对象
+  //node configuration object
   private config: MockLibp2pConfig;
-  //本地multiAddr字符串集合
+  //local multiAddr string collection
   announce: Set<string> = new Set();
-  //节点打开状态
+  //start state variable
   private isStart = false;
-  //状态变量
+  //stop state variable
   private isAbort: boolean = false;
-  //最大连接检查定时器
+  //maximum connection check timer
   private checkMaxLimitTimer: NodeJS.Timer | undefined;
-  //初始化各属性
+  //Initialize each property
   constructor(config: MockLibp2pConfig, discv5: MockDiscv5, networkService: NetworkService) {
     super();
     this.config = config;
@@ -40,32 +40,34 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     networkService.registerPeer(this);
   }
 
-  //获取本地peerId
+  //Get local peerId
   get peerId(): PeerId {
     return this.config.peerId;
   }
 
-  //获取最大连接数
+  //Get the maximum number of connections
   get maxConnections(): number {
     return this.config.maxPeers ?? 50;
   }
 
-  //获取当前连接数
+  //Get the current number of connections
   get connectionSize(): number {
     return Array.from(this.connections.values()).reduce((accumulator, value) => accumulator + value.length, 0);
   }
 
+  //Get Discovered nodes
   get peers(): string[] {
     return Array.from(this.addressBook.keys());
   }
 
+  //delete peer
   removeAddress(peerId: PeerId): boolean {
     this.addressBook.delete(peerId.toB58String());
     this.peerValues.delete(peerId.toB58String());
     return true;
   }
 
-  //设置指定协议的回调函数(当指定protocol被动安装时触发)
+  //Set the callback function of the specified protocol (triggered when the specified protocol is passively installed)
   handle(protocols: string | string[], callback: (input: { connection: Connection; stream: Stream }) => void): void {
     if (typeof protocols === 'string') {
       protocols = [protocols];
@@ -75,7 +77,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     });
   }
 
-  //删除指定协议回调函数
+  //Delete the specified protocol callback function
   unhandle(protocols: string | string[]): void {
     if (typeof protocols === 'string') {
       protocols = [protocols];
@@ -85,7 +87,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     });
   }
 
-  //添加节点(1.将节点存入peers中 2.若该节点为新发现节点触发'discover'事件通知networkManager)
+  //Add a node
   addAddress(peerId: PeerId, addresses: Multiaddr[]): void {
     if (!PeerId.isPeerId(peerId)) {
       throw new Error('peerId is not a valid PeerId');
@@ -104,12 +106,12 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     }
   }
 
-  //获取指定节点的multiaddr集合
+  //Get the multiaddr collection of the specified node
   getAddress(peerId: PeerId): Multiaddr[] | undefined {
     return this.addressBook.get(peerId.toB58String());
   }
 
-  //连接指定节点(通过networkService查找对应节点并创建连接 )ƒ
+  //Connect to the specified node (find the corresponding node through networkService and create a connection)
   async dial(peer: string | PeerId | Multiaddr): Promise<Connection> {
     if (peer instanceof Multiaddr) {
       throw new Error('Multiaddr is not supported');
@@ -132,7 +134,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     }
   }
 
-  //删除指定节点(遍历该节点有关的所有连接并调用connection.close())
+  //Delete the specified node (traverse all connections related to the node and call connection.close())
   async hangUp(peerId: string | PeerId): Promise<void> {
     if (peerId instanceof PeerId) {
       peerId = peerId.toB58String();
@@ -145,7 +147,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     this.peerValues.delete(peerId);
   }
 
-  //设置节点权重
+  //Set node weight
   setPeerValue(peerId: string | PeerId, value: number): void {
     if (peerId instanceof PeerId) {
       peerId = peerId.toB58String();
@@ -153,17 +155,17 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     this.peerValues.set(peerId, value);
   }
 
-  //设置本地multiaddr
+  //Set the local multiaddr
   setAnnounce(addresses: Multiaddr[]): void {
     this.announce = new Set(addresses.map((addr) => addr.toString()));
   }
 
-  //获取指定peerId的connection集合
+  //Get the connection collection of the peerId
   getConnections(peerId: string): Connection[] | undefined {
     return this.connections.get(peerId);
   }
 
-  //启动libp2p
+  //start libp2p
   async start(): Promise<void> {
     if (this.isStart) {
       return;
@@ -172,7 +174,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     this.discv5.on('peer', this.onDiscover);
   }
 
-  //停止libp2p运行(1.设置isAbort为true 2.遍历connections调用connection.close()并删除集合  )
+  //stop libp2p
   async stop(): Promise<void> {
     if (this.isAbort) {
       return;
@@ -195,12 +197,12 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     this.emit('close');
   }
 
-  //监听discv5发现节点事件
+  //Listen for discv5 discovery peer events
   private onDiscover = (data: { id: PeerId; multiaddrs: Multiaddr[] }) => {
     if (!this.isAbort) this.addAddress(data.id, data.multiaddrs);
   };
 
-  //处理新连接(1.将连接存入connections中 2.触发'connect'事件通知networkManager 3.查看连接是否超过了最大连接数)
+  //Handle new connections
   handleConnection(connection: MockConnection): void {
     const peerId = connection.remotePeer.toB58String();
     if (!this.connections.has(peerId)) {
@@ -212,7 +214,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     this.checkMaxLimit();
   }
 
-  //处理connection关闭(1.删除connection 2.触发'disconnect'事件通知networkManager)
+  //Handle connection shutdown
   handleDisConnection(connection: MockConnection): void {
     const peerId = connection.remotePeer.toB58String();
     let storedConn = this.connections.get(peerId);
@@ -226,7 +228,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     }
   }
 
-  //处理新stream并根据协议名称触发对应的回调函数(被动创建触发)
+  //Process the new stream and trigger the corresponding callback function according to the protocol name (passive creation trigger)
   handleNewStream(protocol: string, connection: MockConnection, stream: Stream): void {
     const callback = this.protocolHandlers.get(protocol);
     if (callback) {
@@ -234,7 +236,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     }
   }
 
-  //查看当前连接是否超过最大连接数,若超过则关闭权重最小节点连接
+  //Check whether the current connection exceeds the maximum number of connections, and if so, close the connection of the node with the smallest weight
   private checkMaxLimit(): void {
     if (this.connectionSize > this.maxConnections) {
       const peerValues = Array.from(this.peerValues).sort((a, b) => a[1] - b[1]);

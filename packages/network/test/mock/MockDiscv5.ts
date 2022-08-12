@@ -4,25 +4,25 @@ import { IDiscv5 } from '../../src/types';
 import { NetworkService } from './NetworkService';
 import { MockDiscv5Config, localhost } from './MockConfig';
 export class MockDiscv5 extends EventEmitter implements IDiscv5 {
-  //广播管理对象
+  //networkService instance
   private networkService: NetworkService;
-  //discv5配置对象
+  //discv5 configuration object
   private config: MockDiscv5Config;
-  //本地节点ENR
+  //local node ENR
   private enr: ENR;
-  //节点公私钥对;
+  //node public and private key pair
   public keyPair: IKeypair;
-  //已发现的节点集合
+  //discovered nodes
   private nodes: Map<string, ENR> = new Map();
-  //节点发现定时器(在指定时间间隔内搜索节点)
+  //node discovery timer (searches for nodes within a specified interval)
   private lookupTimer: NodeJS.Timer | undefined;
-  //节点保活定时器(在指定时间间隔内向所有已发现节点发ping)
+  //node discovery timer (searches for nodes within a specified interval)
   private keepLiveTimer: NodeJS.Timer | undefined;
-  //节点状态变量
+  //stop state variable
   private isAbort: boolean = false;
-  //是否启动状态变量
+  //start state variable
   private isStart: boolean = false;
-  //初始化各属性并将boot节点加入nodes中
+  //Initialize the properties and add the boot node to the nodes
   constructor(config: MockDiscv5Config, networkService: NetworkService) {
     super();
     this.enr = config.enr;
@@ -37,23 +37,23 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     this.networkService.registerNode(this);
   }
 
-  //返回本地节点ENR
+  //Return the local node ENR
   get localEnr(): ENR {
     return this.enr;
   }
 
-  //添加节点ENR到nodes(已发现节点集合)中
+  //Add the node ENR to nodes (the set of discovered nodes)
   addEnr(enr: string | ENR): void {
     const enrObj = enr instanceof ENR ? enr : ENR.decodeTxt(enr);
     this.handleEnr(enrObj);
   }
 
-  //从nodes(已发现节点集合)中获取节点ENR
+  //Get node ENR from nodes (collection of discovered nodes)
   findEnr(nodeId: string): ENR | undefined {
     return this.nodes.get(nodeId);
   }
 
-  //启动节点(1.启动搜索节点服务 2.启动节点保活服务)
+  //Start the node
   start(): void {
     if (this.isStart) {
       return;
@@ -63,7 +63,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     this.keepAlive();
   }
 
-  //停止节点(1.删除搜索节点定时器 2.删除节点保活定时器 3.删除发现节点集合 4.节点状态变量isAbort设置为true)
+  //Stop the node
   stop(): void {
     if (this.isAbort) {
       return;
@@ -74,7 +74,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     this.nodes.clear();
   }
 
-  //将新节点加入发现集合中并触发'peer'事件通知外部
+  //Add the new node to the discovery set and trigger the 'peer' event to notify the outside world
   private async handleEnr(enr: ENR) {
     if (enr.nodeId === this.enr.nodeId || enr.ip === localhost) {
       return;
@@ -93,7 +93,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     });
   }
 
-  //搜索节点服务(1.初始化lookUp定时器 2.调用networkService的lookup函数获取指定node的已发现节点 3.处理返回的ENR集合)
+  //Search for node services
   private lookup() {
     this.lookupTimer = setInterval(async () => {
       if (this.isAbort) {
@@ -111,7 +111,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     }, this.config.lookupInterval ?? 2000);
   }
 
-  //节点保活服务(1.初始化保活定时器 2.调用networkService的sendPing函数向所有已发现节点发ping请求)
+  //Node keep-alive service
   private keepAlive() {
     this.keepLiveTimer = setInterval(() => {
       if (this.isAbort) {
@@ -123,18 +123,18 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     }, this.config.keepAliveInterval ?? 5000);
   }
 
-  //处理发现节点请求(1.处理请求方的最新ENR地址 2.返回本地最新ENR和所有已发现节点)
+  //Process the discovery node request
   async handleFindNode(sourceEnr: ENR) {
     await this.handleEnr(sourceEnr);
     return [this.deepCopy(this.enr), ...this.nodes.values()].map((e) => this.deepCopy(e));
   }
 
-  //处理ping message请求(调用networkService的sendPong函数向请求方发送pong消息)
+  //Process the ping message request (call the networkService's sendPong function to send a pong message to the requester)
   handlePing(callerId: string) {
     this.networkService.sendPong(callerId);
   }
 
-  //处理pong message(判断本地enr的ip是否为localhost，若是则将ip更新并触发'multiaddr'事件通知外部)
+  //Process pong message (judging whether the ip of the local enr is localhost, if so, update the ip and trigger the 'multiaddr' event to notify the outside world)
   handlePong(ip: string) {
     if (ip && this.enr.ip != ip) {
       this.enr.ip = ip;
@@ -142,7 +142,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     }
   }
 
-  //深拷贝enr
+  //deep copy enr
   private deepCopy(enr: ENR) {
     return ENR.decodeTxt(enr.encodeTxt());
   }

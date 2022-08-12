@@ -4,27 +4,27 @@ import { Connection, Stream } from '../../src/types';
 import { MockLibp2p } from './MockLibp2p';
 import { MockStream } from './MockStream';
 import { NetworkService } from './NetworkService';
-//协议名称类型
+//protocol name type
 type protocolName = string;
-//connectionId(自增,用于libp2p中connection删除)
+//connectionId (auto increment, used for connection deletion in MockLibp2p)
 let connectionId = 0;
-//connection传输数据格式
+//connection data type
 export type Data = {
   protocol: protocolName;
   data: { _bufs: Buffer[] };
 };
 
-//连接管理器
+//connectionManager(Used to manage connections between nodes)
 export class ConnectionManager {
   id: string;
-  //连接1
+  //connection1
   conn1: MockConnection;
-  //连接2
+  //connection2
   conn2: MockConnection;
-  //networkService对象
+  //networkService instance
   networkService: NetworkService;
 
-  //初始化两个连接对象
+  //Initialize two connection objects
   constructor(p1: MockLibp2p, p2: MockLibp2p, netWorkService: NetworkService) {
     this.id = p1.peerId.toB58String() + '-' + p2.peerId.toB58String();
     this.networkService = netWorkService;
@@ -36,19 +36,19 @@ export class ConnectionManager {
     this.conn2.setConnectionManager(this);
   }
 
-  //被动创建stream(主动创建stream时调用,使用远端连接被动创建stream来触发协议回调)
+  //Passively create a stream (called when actively creating a stream, use a remote connection to passively create a stream to trigger a protocol callback)
   newStream(protocol: protocolName, targetPeedId: string) {
     this.conn1.localPeerId === targetPeedId ? this.conn1.passiveNewStream(protocol) : this.conn2.passiveNewStream(protocol);
   }
 
-  //关闭双方连接(主动关闭连接时调用)
+  //Close the connection between both parties (called when the connection is actively closed)
   closeConnections() {
     this.conn1.doClose();
     this.conn2.doClose();
     this.networkService.handleConnectionManagerClose(this.id);
   }
 
-  //关闭双方stream(在连接关闭时调用)
+  //Close both streams (called when the connection is closed)
   closeStream(protocol: protocolName) {
     this.conn1.doStreamClose(protocol);
     this.conn2.doStreamClose(protocol);
@@ -60,21 +60,21 @@ export class MockConnection implements Connection {
   id: number;
   //local libp2p
   private libp2p: MockLibp2p;
-  //远端节点PeerId
+  //remote peer PeerId
   private remotePeerId: PeerId;
-  //streams集合
+  //collection of streams
   streams: Map<protocolName, MockStream> = new Map();
-  //连接管理器
+  //connectionManager instance
   private connectionManager: ConnectionManager | undefined;
-  //发送数据至远端通道
+  //send data to remote channel
   private sendChannel: Channel<Data>;
-  //接收数据至本地通道
+  //receive data to local channel
   private receiveChannel: Channel<Data>;
-  //接收stream数据通道
+  //receive stream data channel
   private streamsChannel: Channel<Data> = new Channel();
-  //节点状态变量
+  //node state variable
   private isAbort: boolean = false;
-  //初始化各属性并开启监听远程节点和本地streams数据
+  //Initialize properties and enable monitoring of remote nodes and local streams data
   constructor(remotePeer: PeerId, libp2p: MockLibp2p, sendChannel: Channel<Data>, recevieChannel: Channel<Data>) {
     this.id = connectionId++;
     this.remotePeerId = remotePeer;
@@ -85,50 +85,50 @@ export class MockConnection implements Connection {
     this.handleLocal();
   }
 
-  //获取远端节点的PeerId
+  //Get the PeerId of the remote peer
   get remotePeer(): PeerId {
     return this.remotePeerId;
   }
 
-  //根据协议名称创建新的stream(1.创建channel 2.使用channel初始化生stream并存入streams集合中 3.通过connectionManager告知对端连接被动创键stream)
+  //Create a new stream based on the protocol name
   async newStream(protocols: string | string[]): Promise<{ stream: Stream }> {
     if (typeof protocols === 'string') {
       protocols = [protocols];
     }
     const stream = this._newStream(protocols[0]);
-    //通知远程节点创建stream
+    //notify the remote node to create a stream
     this.connectionManager?.newStream(protocols[0], this.remotePeer.toB58String());
     return { stream };
   }
 
-  //获取所有stream
+  //Get all streams
   _getStreams(): Stream[] {
     return Array.from(this.streams.values());
   }
 
-  //关闭连接(通过connectionManager关闭双方连接)
+  //Close the connection (close the connection between both parties through the connectionManager)
   async close(): Promise<void> {
     return this.connectionManager?.closeConnections();
   }
 
-  //设置连接管理器
+  //Set up connection manager
   setConnectionManager(connectionManager: ConnectionManager): void {
     this.connectionManager = connectionManager;
   }
 
-  //获取本地节点的PeerId
+  //Get the PeerId of the local peer
   get localPeerId(): string {
     return this.libp2p.peerId.toB58String();
   }
 
-  //被动创建stream(1.创建channel 2.使用channel初始化生stream并存入streams集合中 3.触发协议回调)
+  //Passively create a stream(triggered when the remote node actively creates a stream)
   passiveNewStream(protocol: string): void {
     const stream = this._newStream(protocol);
-    //通知libp2p触发协议回调
+    //notify libp2p to trigger protocol callback
     this.libp2p.handleNewStream(protocol, this, stream);
   }
 
-  //执行关闭连接操作(1.将状态变量isAbort设置为true 2.遍历streams调用close 3.通知libp2p删除连接)
+  //Execute the close connection operation
   doClose(): void {
     if (this.isAbort == true) {
       return;
@@ -143,7 +143,7 @@ export class MockConnection implements Connection {
     this.libp2p.handleDisConnection(this);
   }
 
-  //执行删除stream操作(在连接关闭时触发 1.调用stream.close() 2.将stream从streams集合中删除)
+  //Perform a delete stream operation (triggered when the connection is closed 1. call stream.close() 2. remove the stream from the streams collection)
   doStreamClose(protocol: string): void {
     let stream = this.streams.get(protocol);
     if (stream) {
@@ -152,12 +152,12 @@ export class MockConnection implements Connection {
     }
   }
 
-  //处理stream关闭(在connection存在情况下关闭stream时触发,通过connectionManager关闭双方stream)
+  //Handle stream closing (triggered when the stream is closed when the connection exists, and both streams are closed through the connectionManager)
   handleStreamClose(stream: MockStream): void {
     this.connectionManager?.closeStream(stream.protocol);
   }
 
-  //创建新stream并存入streams集合
+  //Create a new stream and store it in the streams collection
   private _newStream(protocol: string) {
     let stream = this.streams.get(protocol);
     if (!stream) {
@@ -167,7 +167,7 @@ export class MockConnection implements Connection {
     return stream;
   }
 
-  //监听远端数据并根据协议分发给各stream
+  //Monitor remote data and distribute it to each stream according to the protocol
   private async handleRemote() {
     for await (const Data of this.receiveChannel) {
       if (this.isAbort) {
@@ -181,7 +181,7 @@ export class MockConnection implements Connection {
     }
   }
 
-  //监听本地streams数据并发送至远端
+  //Listen to local streams data and send to remote
   private async handleLocal() {
     for await (const Data of this.streamsChannel) {
       if (this.isAbort) {

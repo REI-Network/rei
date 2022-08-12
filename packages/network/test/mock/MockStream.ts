@@ -2,17 +2,17 @@ import { Channel } from '@rei-network/utils';
 import { Stream } from '../../src/types';
 import { Data, MockConnection } from './MockConnection';
 export class MockStream implements Stream {
-  //协议名称
+  //protocol name
   public protocol: string;
   //local connection
   private connection: MockConnection;
-  //数据接收通道
+  //data receiving channel
   private receiveChannel: Channel<{ _bufs: Buffer[] }>;
-  //发送数据通道
+  //send data channel
   private sendChannel: Channel<Data>;
-  //状态属性
+  //state variables
   private isAbort: boolean = false;
-  //初始化各个通道
+  //Initialize each data channel
   constructor(protocol: string, sendChannel: Channel<Data>, connection: MockConnection) {
     this.protocol = protocol;
     this.connection = connection;
@@ -20,7 +20,7 @@ export class MockStream implements Stream {
     this.sendChannel = sendChannel;
   }
 
-  //遍历迭代器的输入数据并将数据push到发送通道
+  //Push the iterator input data to the send channel
   sink = async (source: AsyncGenerator<Buffer, any, unknown>) => {
     while (!this.isAbort) {
       const { value } = await source.next();
@@ -32,17 +32,17 @@ export class MockStream implements Stream {
     }
   };
 
-  //返回远端数据迭代器
+  //remote data iterator
   source = () => {
     return this.receiveChannel[Symbol.asyncIterator]();
   };
 
-  //关闭stream(通知connection关闭双方stream)
+  //Close the stream (notify the connection to close both streams)
   close(): void {
     this.connection.handleStreamClose(this);
   }
 
-  //关闭stream操作(1.将状态变量设置为true 2.停止接收数据通道)
+  //Close the stream operation
   doClose(): void {
     if (this.isAbort) {
       return;
@@ -51,7 +51,7 @@ export class MockStream implements Stream {
     this.receiveChannel.abort();
   }
 
-  //接收远端数据
+  //Receive remote data
   handleData(data: { _bufs: Buffer[] }) {
     this.receiveChannel.push(data);
   }

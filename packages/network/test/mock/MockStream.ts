@@ -1,6 +1,7 @@
 import { Channel } from '@rei-network/utils';
 import { Stream } from '../../src/types';
 import { Data, MockConnection } from './MockConnection';
+
 export class MockStream implements Stream {
   //protocol name
   public protocol: string;
@@ -12,7 +13,7 @@ export class MockStream implements Stream {
   private sendChannel: Channel<Data>;
   //state variables
   private isAbort: boolean = false;
-  //Initialize each data channel
+  //initialize each data channel
   constructor(protocol: string, sendChannel: Channel<Data>, connection: MockConnection) {
     this.protocol = protocol;
     this.connection = connection;
@@ -20,7 +21,7 @@ export class MockStream implements Stream {
     this.sendChannel = sendChannel;
   }
 
-  //Push the iterator input data to the send channel
+  //push the iterator input data to the send channel
   sink = async (source: AsyncGenerator<Buffer, any, unknown>) => {
     while (!this.isAbort) {
       const { value } = await source.next();
@@ -37,12 +38,12 @@ export class MockStream implements Stream {
     return this.receiveChannel[Symbol.asyncIterator]();
   };
 
-  //Close the stream (notify the connection to close both streams)
+  //close the stream (notify the connection to close both streams)
   close(): void {
     this.connection.handleStreamClose(this);
   }
 
-  //Close the stream operation
+  //close the stream operation
   doClose(): void {
     if (this.isAbort) {
       return;
@@ -51,7 +52,7 @@ export class MockStream implements Stream {
     this.receiveChannel.abort();
   }
 
-  //Receive remote data
+  //receive remote data
   handleData(data: { _bufs: Buffer[] }) {
     this.receiveChannel.push(data);
   }

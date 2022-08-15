@@ -29,7 +29,7 @@ describe('NetWork', async () => {
     await networkService.close();
   });
 
-  //Test whether the number of connections is normal
+  // test whether the number of connections is normal
   it('should be get the correct number of connections', async () => {
     let pendingNodes: Promise<NetworkManager>[] = [];
     for (let i = 0; i < 3; i++) {
@@ -68,7 +68,7 @@ describe('NetWork', async () => {
     ).to.equal(true);
   });
 
-  //Test whether the number of nodes is normal
+  // test whether the number of nodes is normal
   it('should be get the correct number of peers', async () => {
     let pendingNodes: Promise<NetworkManager>[] = [];
     for (let i = 0; i < 3; i++) {
@@ -107,7 +107,7 @@ describe('NetWork', async () => {
     ).to.equal(true);
   });
 
-  //Test whether deleting a node is normal
+  // test whether deleting a node is normal
   it('should be able to remove peer', async () => {
     let node1 = await createNode(networkService, { ip, tcpPort: tcpPort, udpPort: udpPort });
     let node2 = await createNode(networkService, {
@@ -166,7 +166,7 @@ describe('NetWork', async () => {
     ).to.equal(true);
   });
 
-  //Test whether the ban node is normal
+  // test whether the ban node is normal
   it('should be able to ban peer', async () => {
     let node1 = await createNode(networkService, {
       ip,
@@ -229,7 +229,7 @@ describe('NetWork', async () => {
     ).to.equal(true);
   });
 
-  //Test whether adding a static node is normal
+  // test whether adding a static node is normal
   it('should be able to connect static peer', async () => {
     let node = await createNode(networkService, { ip, tcpPort: tcpPort, udpPort: udpPort, outboundThrottleTime: 1000 });
     let staticPeer = await createNode(networkService, { ip, tcpPort: tcpPort, udpPort: udpPort, inboundThrottleTime: 1000 });
@@ -306,7 +306,7 @@ describe('NetWork', async () => {
     ).to.equal(true);
   });
 
-  //Test whether adding a trust node is normal
+  // test whether adding a trust node is normal
   it('should be able to trusted peer', async () => {
     let pendingNodes: Promise<NetworkManager>[] = [];
     let node = await createNode(networkService, {
@@ -384,7 +384,7 @@ describe('NetWork', async () => {
     ).to.equal(true);
   });
 
-  //Test whether the node abort is normal
+  // test whether the node abort is normal
   it('should be able to abort node', async () => {
     let pendingNodes: Promise<NetworkManager>[] = [];
     for (let i = 0; i < 3; i++) {
@@ -446,7 +446,7 @@ describe('NetWork', async () => {
 
 type NodeOpts = { ip: string; tcpPort: number; udpPort: number; bootNodes?: string[]; maxPeers?: number; outboundThrottleTime?: number; inboundThrottleTime?: number };
 
-//Create a test node
+// create a test node
 async function createNode(networkService: NetworkService, opts: NodeOpts) {
   const db = levelup(memdown());
   const peerId = await PeerId.create({ keyType: 'secp256k1' });
@@ -473,7 +473,8 @@ async function createNode(networkService: NetworkService, opts: NodeOpts) {
   networkService.addNetworkManager(node);
   return node;
 }
-//Create en and key pair
+
+// create en and key pair
 function createEnrAndKeypair(peerId: PeerId, opts: { ip: string; tcpPort: number; udpPort: number }) {
   const keypair = createKeypairFromPeerId(peerId);
   let enr = ENR.createV4(keypair.publicKey);

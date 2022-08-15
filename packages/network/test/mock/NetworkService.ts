@@ -10,23 +10,23 @@ type NodeIdStr = string;
 const mockIp = '192.168.0.1';
 
 export class NetworkService {
-  //networkManager collection
+  // networkManager collection
   private networkManagers: NetworkManager[] = [];
-  //peer collection
+  // peer collection
   private peers: Map<PeerIdStr, MockLibp2p> = new Map();
-  //node collection
+  // node collection
   private nodes: Map<NodeIdStr, MockDiscv5> = new Map();
-  //nodeIp collection
+  // nodeIp collection
   private nodesIp: Map<string, string> = new Map();
-  //connectionManager collection
+  // connectionManager collection
   private connectionManagers: Map<string, ConnectionManager> = new Map();
 
-  //Add a networkManager
+  // add a networkManager
   addNetworkManager(networkManager: NetworkManager) {
     this.networkManagers.push(networkManager);
   }
 
-  //Register node to nodes
+  // register node to nodes
   registerNode(discv5: MockDiscv5, ip: string = mockIp) {
     const nodeId = discv5.localEnr.nodeId;
     if (!this.nodes.has(nodeId)) {
@@ -35,7 +35,7 @@ export class NetworkService {
     }
   }
 
-  //Register peer to peers
+  // register peer to peers
   registerPeer(peer: MockLibp2p) {
     const peerId = peer.peerId.toB58String();
     if (!this.peers.has(peerId)) {
@@ -43,7 +43,7 @@ export class NetworkService {
     }
   }
 
-  //Get the latest ENR of the node and all discovered ENRs
+  // get the latest ENR of the node and all discovered ENRs
   lookup(callerEnr: ENR, target: NodeIdStr) {
     const targetNode = this.nodes.get(target);
     if (targetNode) {
@@ -51,7 +51,7 @@ export class NetworkService {
     }
   }
 
-  //Send a ping message to the node
+  // send a ping message to the node
   sendPing(caller: NodeIdStr, target: NodeIdStr): void {
     const targetNode = this.nodes.get(target);
     if (targetNode) {
@@ -59,7 +59,7 @@ export class NetworkService {
     }
   }
 
-  //Send pong message to the node
+  // send pong message to the node
   sendPong(target: NodeIdStr): void {
     const targetNode = this.nodes.get(target);
     if (targetNode) {
@@ -67,7 +67,7 @@ export class NetworkService {
     }
   }
 
-  //Connection specified peer
+  // connection specified peer
   dial(caller: PeerIdStr, target: PeerIdStr, targetMultiAddrs: Multiaddr[]): MockConnection {
     const targetPeer = this.peers.get(target);
     const callerPeer = this.peers.get(caller)!;
@@ -85,12 +85,12 @@ export class NetworkService {
     throw new Error('target peer not found');
   }
 
-  //Set node ip
+  // set node ip
   setIp(nodeId: string, ip: string) {
     this.nodesIp.set(nodeId, ip);
   }
 
-  //Get connectionManager
+  // get connectionManager
   getConnectionManager(id: string): ConnectionManager | undefined {
     let manager = this.connectionManagers.get(id);
     if (!manager) {
@@ -101,11 +101,12 @@ export class NetworkService {
     return manager;
   }
 
-  //Delete connectionManager
+  // delete connectionManager
   handleConnectionManagerClose(id) {
     this.connectionManagers.delete(id);
   }
 
+  // close all connectionManagers
   async close() {
     for (const networkManager of this.networkManagers) {
       await networkManager.abort();

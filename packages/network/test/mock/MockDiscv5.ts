@@ -3,26 +3,27 @@ import { ENR, IKeypair } from '@gxchain2/discv5';
 import { IDiscv5 } from '../../src/types';
 import { NetworkService } from './NetworkService';
 import { MockDiscv5Config, localhost } from './MockConfig';
+
 export class MockDiscv5 extends EventEmitter implements IDiscv5 {
-  //networkService instance
+  // networkService instance
   private networkService: NetworkService;
-  //discv5 configuration object
+  // discv5 configuration object
   private config: MockDiscv5Config;
-  //local node ENR
+  // local node ENR
   private enr: ENR;
-  //node public and private key pair
+  // node public and private key pair
   public keyPair: IKeypair;
-  //discovered nodes
+  // discovered nodes
   private nodes: Map<string, ENR> = new Map();
-  //node discovery timer (searches for nodes within a specified interval)
+  // node discovery timer (searches for nodes within a specified interval)
   private lookupTimer: NodeJS.Timer | undefined;
-  //node discovery timer (searches for nodes within a specified interval)
+  // node discovery timer (searches for nodes within a specified interval)
   private keepLiveTimer: NodeJS.Timer | undefined;
-  //stop state variable
+  // stop state variable
   private isAbort: boolean = false;
-  //start state variable
+  // start state variable
   private isStart: boolean = false;
-  //Initialize the properties and add the boot node to the nodes
+  // initialize the properties and add the boot node to the nodes
   constructor(config: MockDiscv5Config, networkService: NetworkService) {
     super();
     this.enr = config.enr;
@@ -37,23 +38,23 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     this.networkService.registerNode(this);
   }
 
-  //Return the local node ENR
+  // return the local node ENR
   get localEnr(): ENR {
     return this.enr;
   }
 
-  //Add the node ENR to nodes (the set of discovered nodes)
+  // add the node ENR to nodes (the set of discovered nodes)
   addEnr(enr: string | ENR): void {
     const enrObj = enr instanceof ENR ? enr : ENR.decodeTxt(enr);
     this.handleEnr(enrObj);
   }
 
-  //Get node ENR from nodes (collection of discovered nodes)
+  // get node ENR from nodes (collection of discovered nodes)
   findEnr(nodeId: string): ENR | undefined {
     return this.nodes.get(nodeId);
   }
 
-  //Start the node
+  // start the node
   start(): void {
     if (this.isStart) {
       return;
@@ -63,7 +64,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     this.keepAlive();
   }
 
-  //Stop the node
+  // stop the node
   stop(): void {
     if (this.isAbort) {
       return;
@@ -74,13 +75,13 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     this.nodes.clear();
   }
 
-  //Add the new node to the discovery set and trigger the 'peer' event to notify the outside world
+  // add the new node to the discovery set and trigger the 'peer' event to notify the outside world
   private async handleEnr(enr: ENR) {
     if (enr.nodeId === this.enr.nodeId || enr.ip === localhost) {
       return;
     }
     if (!this.nodes.has(enr.nodeId) || enr.seq > this.nodes.get(enr.nodeId)!.seq) {
-      //更新节点
+      // update node
       this.nodes.set(enr.nodeId, enr);
     }
     const multiaddr = enr.getLocationMultiaddr('tcp');
@@ -93,7 +94,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     });
   }
 
-  //Search for node services
+  // search for node services
   private lookup() {
     this.lookupTimer = setInterval(async () => {
       if (this.isAbort) {
@@ -111,7 +112,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     }, this.config.lookupInterval ?? 2000);
   }
 
-  //Node keep-alive service
+  // node keep-alive service
   private keepAlive() {
     this.keepLiveTimer = setInterval(() => {
       if (this.isAbort) {
@@ -123,18 +124,18 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     }, this.config.keepAliveInterval ?? 5000);
   }
 
-  //Process the discovery node request
+  // process the discovery node request
   async handleFindNode(sourceEnr: ENR) {
     await this.handleEnr(sourceEnr);
     return [this.deepCopy(this.enr), ...this.nodes.values()].map((e) => this.deepCopy(e));
   }
 
-  //Process the ping message request (call the networkService's sendPong function to send a pong message to the requester)
+  // process the ping message request (call the networkService's sendPong function to send a pong message to the requester)
   handlePing(callerId: string) {
     this.networkService.sendPong(callerId);
   }
 
-  //Process pong message (judging whether the ip of the local enr is localhost, if so, update the ip and trigger the 'multiaddr' event to notify the outside world)
+  // process pong message (judging whether the ip of the local enr is localhost, if so, update the ip and trigger the 'multiaddr' event to notify the outside world)
   handlePong(ip: string) {
     if (ip && this.enr.ip != ip) {
       this.enr.ip = ip;
@@ -142,7 +143,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
     }
   }
 
-  //deep copy enr
+  // deep copy enr
   private deepCopy(enr: ENR) {
     return ENR.decodeTxt(enr.encodeTxt());
   }

@@ -8,29 +8,27 @@ import { MockDiscv5 } from './MockDiscv5';
 import { MockLibp2pConfig, defaultTcpPort } from './MockConfig';
 
 export class MockLibp2p extends EventEmitter implements ILibp2p {
-  //networkService instance
+  // networkService instance
   private networkService: NetworkService;
-  //peer weight set
+  // peer weight set
   private peerValues: Map<string, number> = new Map();
-  //set of discovered peers
+  // set of discovered peers
   private addressBook: Map<string, Multiaddr[]> = new Map();
-  //connection collection
+  // connection collection
   private connections: Map<string, MockConnection[]> = new Map();
-  //protocol callback collection
+  // protocol callback collection
   private protocolHandlers: Map<string, (input: { connection: Connection; stream: Stream }) => void> = new Map();
-  //local discv5 object
+  // local discv5 object
   private discv5: MockDiscv5;
-  //node configuration object
+  // node configuration object
   private config: MockLibp2pConfig;
-  //local multiAddr string collection
+  // local multiAddr string collection
   announce: Set<string> = new Set();
-  //start state variable
+  // start state variable
   private isStart = false;
-  //stop state variable
+  // stop state variable
   private isAbort: boolean = false;
-  //maximum connection check timer
-  private checkMaxLimitTimer: NodeJS.Timer | undefined;
-  //Initialize each property
+  // initialize each property
   constructor(config: MockLibp2pConfig, discv5: MockDiscv5, networkService: NetworkService) {
     super();
     this.config = config;
@@ -40,34 +38,34 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     networkService.registerPeer(this);
   }
 
-  //Get local peerId
+  // get local peerId
   get peerId(): PeerId {
     return this.config.peerId;
   }
 
-  //Get the maximum number of connections
+  // get the maximum number of connections
   get maxConnections(): number {
     return this.config.maxPeers ?? 50;
   }
 
-  //Get the current number of connections
+  // get the current number of connections
   get connectionSize(): number {
     return Array.from(this.connections.values()).reduce((accumulator, value) => accumulator + value.length, 0);
   }
 
-  //Get Discovered nodes
+  // get discovered nodes
   get peers(): string[] {
     return Array.from(this.addressBook.keys());
   }
 
-  //delete peer
+  // delete peer
   removeAddress(peerId: PeerId): boolean {
     this.addressBook.delete(peerId.toB58String());
     this.peerValues.delete(peerId.toB58String());
     return true;
   }
 
-  //Set the callback function of the specified protocol (triggered when the specified protocol is passively installed)
+  // set the callback function of the specified protocol (triggered when the specified protocol is passively installed)
   handle(protocols: string | string[], callback: (input: { connection: Connection; stream: Stream }) => void): void {
     if (typeof protocols === 'string') {
       protocols = [protocols];
@@ -77,7 +75,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     });
   }
 
-  //Delete the specified protocol callback function
+  // delete the specified protocol callback function
   unhandle(protocols: string | string[]): void {
     if (typeof protocols === 'string') {
       protocols = [protocols];
@@ -87,7 +85,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     });
   }
 
-  //Add a node
+  // add a node
   addAddress(peerId: PeerId, addresses: Multiaddr[]): void {
     if (!PeerId.isPeerId(peerId)) {
       throw new Error('peerId is not a valid PeerId');
@@ -106,12 +104,12 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     }
   }
 
-  //Get the multiaddr collection of the specified node
+  // get the multiaddr collection of the specified node
   getAddress(peerId: PeerId): Multiaddr[] | undefined {
     return this.addressBook.get(peerId.toB58String());
   }
 
-  //Connect to the specified node (find the corresponding node through networkService and create a connection)
+  // connect to the specified node (find the corresponding node through networkService and create a connection)
   async dial(peer: string | PeerId | Multiaddr): Promise<Connection> {
     if (peer instanceof Multiaddr) {
       throw new Error('Multiaddr is not supported');
@@ -134,7 +132,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     }
   }
 
-  //Delete the specified node (traverse all connections related to the node and call connection.close())
+  // delete the specified node (traverse all connections related to the node and call connection.close())
   async hangUp(peerId: string | PeerId): Promise<void> {
     if (peerId instanceof PeerId) {
       peerId = peerId.toB58String();
@@ -147,7 +145,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     this.peerValues.delete(peerId);
   }
 
-  //Set node weight
+  // set node weight
   setPeerValue(peerId: string | PeerId, value: number): void {
     if (peerId instanceof PeerId) {
       peerId = peerId.toB58String();
@@ -155,17 +153,17 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     this.peerValues.set(peerId, value);
   }
 
-  //Set the local multiaddr
+  // set the local multiaddr
   setAnnounce(addresses: Multiaddr[]): void {
     this.announce = new Set(addresses.map((addr) => addr.toString()));
   }
 
-  //Get the connection collection of the peerId
+  // get the connection collection of the peerId
   getConnections(peerId: string): Connection[] | undefined {
     return this.connections.get(peerId);
   }
 
-  //start libp2p
+  // start libp2p
   async start(): Promise<void> {
     if (this.isStart) {
       return;
@@ -174,14 +172,13 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     this.discv5.on('peer', this.onDiscover);
   }
 
-  //stop libp2p
+  // stop libp2p
   async stop(): Promise<void> {
     if (this.isAbort) {
       return;
     }
     this.isAbort = true;
     this.discv5.off('peer', this.onDiscover);
-    this.checkMaxLimitTimer && clearInterval(this.checkMaxLimitTimer);
     const closeTasks: Promise<void>[] = [];
     Array.from(this.connections.values()).map((connections) => {
       for (const c of connections) {
@@ -197,12 +194,12 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     this.emit('close');
   }
 
-  //Listen for discv5 discovery peer events
+  // listen for discv5 discovery peer events
   private onDiscover = (data: { id: PeerId; multiaddrs: Multiaddr[] }) => {
     if (!this.isAbort) this.addAddress(data.id, data.multiaddrs);
   };
 
-  //Handle new connections
+  // handle new connections
   handleConnection(connection: MockConnection): void {
     const peerId = connection.remotePeer.toB58String();
     if (!this.connections.has(peerId)) {
@@ -214,7 +211,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     this.checkMaxLimit();
   }
 
-  //Handle connection shutdown
+  // handle connection shutdown
   handleDisConnection(connection: MockConnection): void {
     const peerId = connection.remotePeer.toB58String();
     let storedConn = this.connections.get(peerId);
@@ -228,7 +225,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     }
   }
 
-  //Process the new stream and trigger the corresponding callback function according to the protocol name (passive creation trigger)
+  // process the new stream and trigger the corresponding callback function according to the protocol name (passive creation trigger)
   handleNewStream(protocol: string, connection: MockConnection, stream: Stream): void {
     const callback = this.protocolHandlers.get(protocol);
     if (callback) {
@@ -236,7 +233,7 @@ export class MockLibp2p extends EventEmitter implements ILibp2p {
     }
   }
 
-  //Check whether the current connection exceeds the maximum number of connections, and if so, close the connection of the node with the smallest weight
+  // check whether the current connection exceeds the maximum number of connections, and if so, close the connection of the node with the smallest weight
   private checkMaxLimit(): void {
     if (this.connectionSize > this.maxConnections) {
       const peerValues = Array.from(this.peerValues).sort((a, b) => a[1] - b[1]);

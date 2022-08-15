@@ -21,11 +21,6 @@ export class NetworkService {
   // connectionManager collection
   private connectionManagers: Map<string, ConnectionManager> = new Map();
 
-  // add a networkManager
-  addNetworkManager(networkManager: NetworkManager) {
-    this.networkManagers.push(networkManager);
-  }
-
   // register node to nodes
   registerNode(discv5: MockDiscv5, ip: string = mockIp) {
     const nodeId = discv5.localEnr.nodeId;

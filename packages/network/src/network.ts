@@ -204,13 +204,13 @@ export class NetworkManager extends EventEmitter {
     }
 
     // add bootnodes to discovered list
-    for (const bootnode of this.options.libp2pOptions?.bootnodes ?? []) {
-      const enr = ENR.decodeTxt(bootnode);
-      const peerId = await enr.peerId();
-      if (!peerId.equals(this.libp2p.peerId)) {
-        this.discoveredPeers.push(peerId.toB58String());
-      }
-    }
+    // for (const bootnode of this.options.libp2pOptions?.bootnodes ?? []) {
+    //   const enr = ENR.decodeTxt(bootnode);
+    //   const peerId = await enr.peerId();
+    //   if (!peerId.equals(this.libp2p.peerId)) {
+    //     this.discoveredPeers.push(peerId.toB58String());
+    //   }
+    // }
   }
 
   /**

@@ -18,6 +18,36 @@ describe('NetWork', async () => {
   let bootEnr: string;
   let bootNode: NetworkManager;
   let networkService: NetworkService;
+  let networkManagers: NetworkManager[] = [];
+  let pending: ((value: boolean | PromiseLike<boolean>) => void)[] = [];
+
+  // create a test node
+  const createNode = async (networkService: NetworkService, opts: NodeOpts) => {
+    const db = levelup(memdown());
+    const peerId = await PeerId.create({ keyType: 'secp256k1' });
+    const { enr, keypair } = createEnrAndKeypair(peerId, opts);
+    const discv5 = new MockDiscv5({ keypair, enr, bootNodes: opts.bootNodes }, networkService);
+    const libp2p = new MockLibp2p({ peerId, enr, maxPeers: opts.maxPeers ?? 50 }, discv5, networkService);
+    const node = new NetworkManager({
+      peerId,
+      protocols: [new SayHi()],
+      nodedb: db,
+      nat: opts.ip,
+      discv5,
+      libp2p,
+      outboundThrottleTime: opts.outboundThrottleTime,
+      inboundThrottleTime: opts.inboundThrottleTime,
+      libp2pOptions: {
+        bootnodes: opts.bootNodes ? opts.bootNodes : [],
+        tcpPort: opts.tcpPort,
+        udpPort: opts.udpPort
+      }
+    });
+    await node.init();
+    await node.start();
+    networkManagers.push(node);
+    return node;
+  };
 
   beforeEach(async () => {
     networkService = new NetworkService();
@@ -26,7 +56,8 @@ describe('NetWork', async () => {
   });
 
   afterEach(async () => {
-    await networkService.close();
+    await Promise.all(pending.map((p) => p(true)));
+    await Promise.all(networkManagers.map((n) => n.abort()));
   });
 
   // test whether the number of connections is normal
@@ -46,24 +77,23 @@ describe('NetWork', async () => {
     const node = nodes[0];
     let callback: (r) => void;
     let timeout: NodeJS.Timeout;
-    const p1 = new Promise((resolve) => {
+    const p1 = new Promise<boolean>((resolve) => {
       callback = () => {
         if (node.connectionSize === 3) {
           resolve(true);
         }
       };
       node.on('installed', callback);
+      pending.push(resolve);
     });
-    const p2 = new Promise((resolve) => {
+    const p2 = new Promise<boolean>((resolve) => {
       timeout = setTimeout(resolve, 5000, false);
+      pending.push(resolve);
     });
     expect(
-      await new Promise((resolve) => {
-        Promise.race([p1, p2]).then((value) => {
-          resolve(value);
-          clearTimeout(timeout);
-          node.off('installed', callback);
-        });
+      await Promise.race([p1, p2]).finally(() => {
+        clearTimeout(timeout);
+        node.off('installed', callback);
       })
     ).to.equal(true);
   });
@@ -92,17 +122,16 @@ describe('NetWork', async () => {
         }
       };
       node.on('installed', callback);
+      pending.push(resolve);
     });
     const p2 = new Promise((resolve) => {
       timeout = setTimeout(resolve, 5000, false);
+      pending.push(resolve);
     });
     expect(
-      await new Promise((resolve) => {
-        Promise.race([p1, p2]).then((value) => {
-          resolve(value);
-          clearTimeout(timeout);
-          node.off('installed', callback);
-        });
+      await Promise.race([p1, p2]).finally(() => {
+        clearTimeout(timeout);
+        node.off('installed', callback);
       })
     ).to.equal(true);
   });
@@ -128,40 +157,38 @@ describe('NetWork', async () => {
         }
       };
       node2.on('installed', callback1);
+      pending.push(resolve);
     });
     const p2 = new Promise((resolve) => {
       timeout1 = setTimeout(resolve, 5000, false);
+      pending.push(resolve);
     });
     expect(
-      await new Promise((resolve) => {
-        Promise.race([p1, p2]).then((value) => {
-          resolve(value);
-          clearTimeout(timeout1);
-          node2.off('installed', callback1);
-        });
+      await Promise.race([p1, p2]).finally(() => {
+        clearTimeout(timeout1);
+        node2.off('installed', callback1);
       })
     ).to.equal(true);
 
     const p3 = new Promise((resolve) => {
-      callback1 = () => {
+      callback2 = () => {
         if (node2.peers.length === 0) {
           resolve(true);
         }
       };
-      node2.on('removed', callback1);
+      node2.on('removed', callback2);
+      pending.push(resolve);
     });
     const p4 = new Promise((resolve) => {
       timeout2 = setTimeout(resolve, 5000, false);
+      pending.push(resolve);
     });
     node2.removePeer(node1.peerId);
 
     expect(
-      await new Promise((resolve) => {
-        Promise.race([p3, p4]).then((value) => {
-          resolve(value);
-          clearTimeout(timeout2);
-          node2.off('removed', callback2);
-        });
+      await Promise.race([p3, p4]).finally(() => {
+        clearTimeout(timeout2);
+        node2.off('removed', callback2);
       })
     ).to.equal(true);
   });
@@ -192,39 +219,37 @@ describe('NetWork', async () => {
         }
       };
       node2.on('installed', callback1);
+      pending.push(resolve);
     });
     const p2 = new Promise((resolve) => {
       timeout1 = setTimeout(resolve, 5000, false);
+      pending.push(resolve);
     });
     expect(
-      await new Promise((resolve) => {
-        Promise.race([p1, p2]).then((value) => {
-          resolve(value);
-          clearTimeout(timeout1);
-          node2.off('installed', callback1);
-        });
+      await Promise.race([p1, p2]).finally(() => {
+        clearTimeout(timeout1);
+        node2.off('installed', callback1);
       })
     ).to.equal(true);
 
     const p3 = new Promise((resolve) => {
-      callback1 = () => {
+      callback2 = () => {
         if (node2.peers.length === 1 && node2.isBanned(node1.peerId)) {
           resolve(true);
         }
       };
-      node2.on('removed', callback1);
+      node2.on('removed', callback2);
+      pending.push(resolve);
     });
     const p4 = new Promise((resolve) => {
       timeout2 = setTimeout(resolve, 5000, false);
+      pending.push(resolve);
     });
     node2.ban(node1.peerId);
     expect(
-      await new Promise((resolve) => {
-        Promise.race([p3, p4]).then((value) => {
-          resolve(value);
-          clearTimeout(timeout2);
-          node2.off('removed', callback2);
-        });
+      await Promise.race([p3, p4]).finally(() => {
+        clearTimeout(timeout2);
+        node2.off('removed', callback2);
       })
     ).to.equal(true);
   });
@@ -246,18 +271,17 @@ describe('NetWork', async () => {
         }
       };
       node.on('installed', callback1);
+      pending.push(resolve);
     });
     const p2 = new Promise((resolve) => {
       timeout1 = setTimeout(resolve, 5000, false);
+      pending.push(resolve);
     });
     node.addPeer(staticPeer.localEnr.encodeTxt());
     expect(
-      await new Promise((resolve) => {
-        Promise.race([p1, p2]).then((value) => {
-          resolve(value);
-          clearTimeout(timeout1);
-          node.off('installed', callback1);
-        });
+      await Promise.race([p1, p2]).finally(() => {
+        clearTimeout(timeout1);
+        node.off('installed', callback1);
       })
     ).to.equal(true);
 
@@ -268,19 +292,18 @@ describe('NetWork', async () => {
         }
       };
       node.on('removed', callback2);
+      pending.push(resolve);
     });
     const p4 = new Promise((resolve) => {
       timeout2 = setTimeout(resolve, 5000, false);
+      pending.push(resolve);
     });
     staticPeer.ban(node.peerId, 1000);
 
     expect(
-      await new Promise((resolve) => {
-        Promise.race([p3, p4]).then((value) => {
-          resolve(value);
-          clearTimeout(timeout2);
-          node.off('removed', callback2);
-        });
+      await Promise.race([p3, p4]).finally(() => {
+        clearTimeout(timeout2);
+        node.off('removed', callback2);
       })
     ).to.equal(true);
 
@@ -291,17 +314,16 @@ describe('NetWork', async () => {
         }
       };
       node.on('installed', callback3);
+      pending.push(resolve);
     });
     const p6 = new Promise((resolve) => {
       timeout3 = setTimeout(resolve, 8000, false);
+      pending.push(resolve);
     });
     expect(
-      await new Promise((resolve) => {
-        Promise.race([p5, p6]).then((value) => {
-          resolve(value);
-          clearTimeout(timeout3);
-          node.off('installed', callback3);
-        });
+      await Promise.race([p5, p6]).finally(() => {
+        clearTimeout(timeout3);
+        node.off('installed', callback3);
       })
     ).to.equal(true);
   });
@@ -316,7 +338,7 @@ describe('NetWork', async () => {
       bootNodes: [bootEnr],
       maxPeers: 2
     });
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 5; i++) {
       pendingNodes.push(
         createNode(networkService, {
           ip,
@@ -334,22 +356,21 @@ describe('NetWork', async () => {
 
     const p1 = new Promise((resolve) => {
       callback1 = () => {
-        if (node.peers.length === 2) {
+        if (node.connectionSize === 2) {
           resolve(true);
         }
       };
       node.on('removed', callback1);
+      pending.push(resolve);
     });
     const p2 = new Promise((resolve) => {
       timeout1 = setTimeout(resolve, 5000, false);
+      pending.push(resolve);
     });
     expect(
-      await new Promise((resolve) => {
-        Promise.race([p1, p2]).then((value) => {
-          resolve(value);
-          clearTimeout(timeout1);
-          node.off('removed', callback1);
-        });
+      await Promise.race([p1, p2]).finally(() => {
+        clearTimeout(timeout1);
+        node.off('removed', callback1);
       })
     ).to.equal(true);
 
@@ -359,27 +380,26 @@ describe('NetWork', async () => {
 
     const p3 = new Promise((resolve) => {
       callback2 = () => {
-        if (node.peers.length === 3) {
+        if (node.connectionSize === 2) {
           resolve(true);
         }
       };
       node.on('installed', callback2);
+      pending.push(resolve);
     });
     const p4 = new Promise((resolve) => {
       timeout2 = setTimeout(resolve, 5000, false);
+      pending.push(resolve);
     });
     trusted.addPeer(node.localEnr.encodeTxt());
     expect(
-      await new Promise((resolve) => {
-        Promise.race([p3, p4]).then((value) => {
-          resolve(value);
-          clearTimeout(timeout2);
-          node.off('installed', callback2);
-          const peers = node.peers.map((peer) => peer.peerId);
-          if (!peers.includes(trusted.peerId)) {
-            assert('trusted peer not found');
-          }
-        });
+      await Promise.race([p3, p4]).finally(() => {
+        clearTimeout(timeout2);
+        node.off('installed', callback2);
+        const peers = node.peers.map((peer) => peer.peerId);
+        if (!peers.includes(trusted.peerId)) {
+          assert('trusted peer not found');
+        }
       })
     ).to.equal(true);
   });
@@ -404,18 +424,17 @@ describe('NetWork', async () => {
         }
       };
       node2.on('installed', callback1);
+      pending.push(resolve);
     });
     const p2 = new Promise((resolve) => {
       timeout1 = setTimeout(resolve, 5000, false);
+      pending.push(resolve);
     });
 
     expect(
-      await new Promise((resolve) => {
-        Promise.race([p1, p2]).then((value) => {
-          resolve(value);
-          clearTimeout(timeout1);
-          node2.off('installed', callback1);
-        });
+      await Promise.race([p1, p2]).finally(() => {
+        clearTimeout(timeout1);
+        node2.off('installed', callback1);
       })
     ).to.equal(true);
 
@@ -426,53 +445,24 @@ describe('NetWork', async () => {
         }
       };
       node2.on('removed', callback2);
+      pending.push(resolve);
     });
     const p4 = new Promise((resolve) => {
       timeout2 = setTimeout(resolve, 8000, false);
+      pending.push(resolve);
     });
     node1.abort();
 
     expect(
-      await new Promise((resolve) => {
-        Promise.race([p3, p4]).then((value) => {
-          resolve(value);
-          clearTimeout(timeout2);
-          node2.off('removed', callback2);
-        });
+      await Promise.race([p3, p4]).finally(() => {
+        clearTimeout(timeout2);
+        node2.off('removed', callback2);
       })
     ).to.equal(true);
   });
 });
 
 type NodeOpts = { ip: string; tcpPort: number; udpPort: number; bootNodes?: string[]; maxPeers?: number; outboundThrottleTime?: number; inboundThrottleTime?: number };
-
-// create a test node
-async function createNode(networkService: NetworkService, opts: NodeOpts) {
-  const db = levelup(memdown());
-  const peerId = await PeerId.create({ keyType: 'secp256k1' });
-  const { enr, keypair } = createEnrAndKeypair(peerId, opts);
-  const discv5 = new MockDiscv5({ keypair, enr, bootNodes: opts.bootNodes }, networkService);
-  const libp2p = new MockLibp2p({ peerId, enr, maxPeers: opts.maxPeers ?? 50 }, discv5, networkService);
-  const node = new NetworkManager({
-    peerId,
-    protocols: [new SayHi()],
-    nodedb: db,
-    nat: opts.ip,
-    discv5,
-    libp2p,
-    outboundThrottleTime: opts.outboundThrottleTime,
-    inboundThrottleTime: opts.inboundThrottleTime,
-    libp2pOptions: {
-      bootnodes: opts.bootNodes ? opts.bootNodes : [],
-      tcpPort: opts.tcpPort,
-      udpPort: opts.udpPort
-    }
-  });
-  await node.init();
-  await node.start();
-  networkService.addNetworkManager(node);
-  return node;
-}
 
 // create en and key pair
 function createEnrAndKeypair(peerId: PeerId, opts: { ip: string; tcpPort: number; udpPort: number }) {

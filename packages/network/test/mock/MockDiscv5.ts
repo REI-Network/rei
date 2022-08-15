@@ -95,8 +95,8 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
   }
 
   // search for node services
-  private lookup() {
-    this.lookupTimer = setInterval(async () => {
+  private async lookup() {
+    while (!this.isAbort) {
       if (this.isAbort) {
         return;
       }
@@ -109,7 +109,8 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
           }
         }
       }
-    }, this.config.lookupInterval ?? 2000);
+      await new Promise<void>((r) => setTimeout(r, this.config.lookupInterval ?? 2000));
+    }
   }
 
   // node keep-alive service
@@ -127,7 +128,7 @@ export class MockDiscv5 extends EventEmitter implements IDiscv5 {
   // process the discovery node request
   async handleFindNode(sourceEnr: ENR) {
     await this.handleEnr(sourceEnr);
-    return [this.deepCopy(this.enr), ...this.nodes.values()].map((e) => this.deepCopy(e));
+    return [this.enr, ...this.nodes.values()].map((e) => this.deepCopy(e));
   }
 
   // process the ping message request (call the networkService's sendPong function to send a pong message to the requester)

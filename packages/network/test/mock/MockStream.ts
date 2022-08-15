@@ -9,16 +9,13 @@ export class MockStream implements Stream {
   private connection: MockConnection;
   // data receiving channel
   private receiveChannel: Channel<{ _bufs: Buffer[] }>;
-  // send data channel
-  private sendChannel: Channel<Data>;
   // state variables
   private isAbort: boolean = false;
   // initialize each data channel
-  constructor(protocol: string, sendChannel: Channel<Data>, connection: MockConnection) {
+  constructor(protocol: string, connection: MockConnection) {
     this.protocol = protocol;
     this.connection = connection;
     this.receiveChannel = new Channel<{ _bufs: Buffer[] }>();
-    this.sendChannel = sendChannel;
   }
 
   // push the iterator input data to the send channel
@@ -26,7 +23,7 @@ export class MockStream implements Stream {
     while (!this.isAbort) {
       const { value } = await source.next();
       if (value !== undefined) {
-        this.sendChannel.push({ protocol: this.protocol, data: { _bufs: [value] } });
+        this.connection.sendData({ protocol: this.protocol, data: { _bufs: [value] } });
       } else {
         continue;
       }
@@ -38,12 +35,12 @@ export class MockStream implements Stream {
     return this.receiveChannel[Symbol.asyncIterator]();
   };
 
-  // close the stream (notify the connection to close both streams)
+  //close the stream (notify the connection to close both streams)
   close(): void {
     this.connection.handleStreamClose(this);
   }
 
-  // close the stream operation
+  //close the stream operation
   doClose(): void {
     if (this.isAbort) {
       return;
@@ -52,7 +49,7 @@ export class MockStream implements Stream {
     this.receiveChannel.abort();
   }
 
-  // receive remote data
+  //receive remote data
   handleData(data: { _bufs: Buffer[] }) {
     this.receiveChannel.push(data);
   }

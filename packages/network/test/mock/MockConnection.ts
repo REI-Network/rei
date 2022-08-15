@@ -29,10 +29,8 @@ export class ConnectionManager {
     this.networkService = netWorkService;
     const c1 = new Channel<Data>();
     const c2 = new Channel<Data>();
-    this.conn1 = new MockConnection(p2.peerId, p1, c1, c2);
-    this.conn2 = new MockConnection(p1.peerId, p2, c2, c1);
-    this.conn1.setConnectionManager(this);
-    this.conn2.setConnectionManager(this);
+    this.conn1 = new MockConnection(p2.peerId, p1, c1, c2, this);
+    this.conn2 = new MockConnection(p1.peerId, p2, c2, c1, this);
   }
 
   // passively create a stream (called when actively creating a stream, use a remote connection to passively create a stream to trigger a protocol callback)
@@ -69,19 +67,17 @@ export class MockConnection implements Connection {
   private sendChannel: Channel<Data>;
   // receive data to local channel
   private receiveChannel: Channel<Data>;
-  // receive stream data channel
-  private streamsChannel: Channel<Data> = new Channel();
   // node state variable
   private isAbort: boolean = false;
   // initialize properties and enable monitoring of remote nodes and local streams data
-  constructor(remotePeer: PeerId, libp2p: MockLibp2p, sendChannel: Channel<Data>, recevieChannel: Channel<Data>) {
+  constructor(remotePeer: PeerId, libp2p: MockLibp2p, sendChannel: Channel<Data>, recevieChannel: Channel<Data>, connectionManager: ConnectionManager) {
     this.id = connectionId++;
     this.remotePeerId = remotePeer;
     this.libp2p = libp2p;
     this.sendChannel = sendChannel;
     this.receiveChannel = recevieChannel;
+    this.connectionManager = connectionManager;
     this.handleRemote();
-    this.handleLocal();
   }
 
   // get the PeerId of the remote peer
@@ -110,11 +106,6 @@ export class MockConnection implements Connection {
     return this.connectionManager?.closeConnections();
   }
 
-  // set up connection manager
-  setConnectionManager(connectionManager: ConnectionManager): void {
-    this.connectionManager = connectionManager;
-  }
-
   // get the PeerId of the local peer
   get localPeerId(): string {
     return this.libp2p.peerId.toB58String();
@@ -137,7 +128,8 @@ export class MockConnection implements Connection {
       stream.doClose();
     }
     this.streams.clear();
-    this.streamsChannel.abort();
+    this.sendChannel.abort();
+    this.receiveChannel.abort();
     this.connectionManager = undefined;
     this.libp2p.handleDisConnection(this);
   }
@@ -156,11 +148,19 @@ export class MockConnection implements Connection {
     this.connectionManager?.closeStream(stream.protocol);
   }
 
+  // send data to the remote node
+  sendData(streamData: { protocol: string; data: { _bufs: [Buffer] } }) {
+    if (this.isAbort) {
+      return;
+    }
+    this.sendChannel.push(streamData);
+  }
+
   // create a new stream and store it in the streams collection
   private _newStream(protocol: string) {
     let stream = this.streams.get(protocol);
     if (!stream) {
-      stream = new MockStream(protocol, this.streamsChannel, this);
+      stream = new MockStream(protocol, this);
       this.streams.set(protocol, stream);
     }
     return stream;
@@ -168,25 +168,15 @@ export class MockConnection implements Connection {
 
   // monitor remote data and distribute it to each stream according to the protocol
   private async handleRemote() {
-    for await (const Data of this.receiveChannel) {
+    for await (const data of this.receiveChannel) {
       if (this.isAbort) {
         return;
       }
-      const protocol = Data.protocol;
+      const protocol = data.protocol;
       const stream = this.streams.get(protocol);
       if (stream) {
-        stream.handleData(Data.data);
+        stream.handleData(data.data);
       }
-    }
-  }
-
-  // listen to local streams data and send to remote
-  private async handleLocal() {
-    for await (const Data of this.streamsChannel) {
-      if (this.isAbort) {
-        return;
-      }
-      this.sendChannel.push(Data);
     }
   }
 }

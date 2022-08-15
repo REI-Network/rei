@@ -202,15 +202,6 @@ export class NetworkManager extends EventEmitter {
       this.libp2p = libp2p;
       this.discv5 = discv5;
     }
-
-    // add bootnodes to discovered list
-    // for (const bootnode of this.options.libp2pOptions?.bootnodes ?? []) {
-    //   const enr = ENR.decodeTxt(bootnode);
-    //   const peerId = await enr.peerId();
-    //   if (!peerId.equals(this.libp2p.peerId)) {
-    //     this.discoveredPeers.push(peerId.toB58String());
-    //   }
-    // }
   }
 
   /**

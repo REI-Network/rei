@@ -45,7 +45,10 @@ export class IpcClient {
       newRepl();
     });
 
-    ipc.of[ipcId].on('messaage', (data: string) => {});
+    ipc.of[ipcId].on('messaage', (data: string) => {
+      const message = JSON.parse(data);
+      logger.debug(message);
+    });
 
     ipc.of[ipcId].on('error', (err: Error) => {});
   }

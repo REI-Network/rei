@@ -52,7 +52,8 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
   const apiServer = new ApiServer(node);
   apiServer.start();
   let server: undefined | RpcServer;
-  const ipcServer = new IpcServer(apiServer, opts.ipcPort ? Number(opts.ipcPort) : undefined);
+  const ipcServer = new IpcServer(apiServer);
+  console.log('star ipc server after');
   ipcServer.start();
   if (opts.rpc) {
     const rpc = {

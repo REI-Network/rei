@@ -4,6 +4,7 @@ import { NetController } from './net';
 import { TxPoolController } from './txpool';
 import { Web3Controller } from './web3';
 import { ReiController } from './rei';
+import { AdminController } from './admin';
 
 export const api = {
   debug: DebugController,
@@ -11,5 +12,6 @@ export const api = {
   net: NetController,
   txpool: TxPoolController,
   web3: Web3Controller,
-  rei: ReiController
+  rei: ReiController,
+  admin: AdminController
 };

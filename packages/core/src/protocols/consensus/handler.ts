@@ -1,17 +1,17 @@
 import { BN } from 'ethereumjs-util';
 import { Channel, FunctionalBufferSet, logger } from '@rei-network/utils';
-import { Peer, ProtocolHandler } from '@rei-network/network';
+import { Peer, ProtocolStream, ProtocolHandler } from '@rei-network/network';
 import { RoundStepType, Proposal, Vote, BitArray, VoteType, VoteSet, MessageFactory, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint';
 import * as m from '../../consensus/reimint/messages';
-import { NetworkProtocol } from '../types';
 import { ConsensusProtocol } from './protocol';
 
 const peerGossipSleepDuration = 100;
 const maxQueuedEvidence = 100;
 const maxKnowEvidence = 100;
 
-export class ConsensusProtocolHander implements ProtocolHandler {
+export class ConsensusProtocolHandler implements ProtocolHandler {
   readonly peer: Peer;
+  readonly stream: ProtocolStream;
   readonly protocol: ConsensusProtocol;
 
   private aborted: boolean = false;
@@ -40,8 +40,9 @@ export class ConsensusProtocolHander implements ProtocolHandler {
   private catchupCommit?: BitArray;
   /////////////// PeerRoundState ///////////////
 
-  constructor(protocol: ConsensusProtocol, peer: Peer) {
+  constructor(protocol: ConsensusProtocol, peer: Peer, stream: ProtocolStream) {
     this.peer = peer;
+    this.stream = stream;
     this.protocol = protocol;
 
     this.handshakePromise = new Promise<boolean>((resolve) => {
@@ -90,13 +91,13 @@ export class ConsensusProtocolHander implements ProtocolHandler {
         if (!this.proposal) {
           const proposalMessage = this.reimint.state.genProposalMessage(this.height, this.round);
           if (proposalMessage) {
-            // logger.debug('ConsensusProtocolHander::gossipDataLoop, send proposal to:', this.peer.peerId);
+            // logger.debug('ConsensusProtocolHandler::gossipDataLoop, send proposal to:', this.peer.peerId);
             this.send(proposalMessage);
             this.setHasProposal(proposalMessage.proposal);
           }
         }
       } catch (err) {
-        logger.error('ConsensusProtocolHander::gossipDataLoop, catch error:', err);
+        logger.error('ConsensusProtocolHandler::gossipDataLoop, catch error:', err);
       }
 
       await new Promise((r) => setTimeout(r, peerGossipSleepDuration));
@@ -112,7 +113,7 @@ export class ConsensusProtocolHander implements ProtocolHandler {
           continue;
         }
       } catch (err) {
-        logger.error('ConsensusProtocolHander::gossipVotesLoop, catch error:', err);
+        logger.error('ConsensusProtocolHandler::gossipVotesLoop, catch error:', err);
       }
 
       await new Promise((r) => setTimeout(r, peerGossipSleepDuration));
@@ -127,11 +128,11 @@ export class ConsensusProtocolHander implements ProtocolHandler {
             this.knowEvidence(evidence);
             this.send(new m.DuplicateVoteEvidenceMessage(evidence));
           } else {
-            logger.warn('ConsensusProtocolHander::gossipEvidenceLoop, unknown evidence:', evidence);
+            logger.warn('ConsensusProtocolHandler::gossipEvidenceLoop, unknown evidence:', evidence);
           }
         }
       } catch (err) {
-        logger.error('ConsensusProtocolHander::gossipEvidenceLoop, catch error:', err);
+        logger.error('ConsensusProtocolHandler::gossipEvidenceLoop, catch error:', err);
       } finally {
         await new Promise((r) => setTimeout(r, peerGossipSleepDuration));
       }
@@ -177,7 +178,7 @@ export class ConsensusProtocolHander implements ProtocolHandler {
   private pickAndSend(votes: VoteSet) {
     const vote = this.pickRandom(votes);
     if (vote) {
-      // logger.debug('ConsensusProtocolHander::gossipDataLoop, send vote(h,r,h,t):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, 'to:', this.peer.peerId);
+      // logger.debug('ConsensusProtocolHandler::gossipDataLoop, send vote(h,r,h,t):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, 'to:', this.peer.peerId);
       this.sendVote(vote);
       return true;
     }
@@ -219,8 +220,10 @@ export class ConsensusProtocolHander implements ProtocolHandler {
    * @param msg - Messsage
    */
   send(msg: m.Message) {
-    if (this.peer.isSupport(NetworkProtocol.REI_CONSENSUS)) {
-      this.peer.send(this.protocol.name, MessageFactory.serializeMessage(msg));
+    try {
+      this.stream.send(MessageFactory.serializeMessage(msg));
+    } catch (err) {
+      // ignore errors...
     }
   }
 
@@ -290,10 +293,10 @@ export class ConsensusProtocolHander implements ProtocolHandler {
     } else if (msg instanceof m.DuplicateVoteEvidenceMessage) {
       this.knowEvidence(msg.evidence);
       this.reimint.addEvidence(msg.evidence).catch((err) => {
-        logger.error('ConsensusProtocolHander::handle, addEvidence, catch error:', err);
+        logger.error('ConsensusProtocolHandler::handle, addEvidence, catch error:', err);
       });
     } else {
-      logger.warn('ConsensusProtocolHander::handle, unknown message');
+      logger.warn('ConsensusProtocolHandler::handle, unknown message');
     }
   }
 

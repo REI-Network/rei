@@ -4,7 +4,7 @@ import { ConsensusEngineOptions } from './consensus/types';
 
 export interface ConsensusEngineConstructorOptions extends Omit<ConsensusEngineOptions, 'node'> {}
 
-export interface NetworkManagerConstructorOptions extends Omit<NetworkManagerOptions, 'protocols' | 'nodedb' | 'datastore'> {}
+export interface NetworkManagerConstructorOptions extends Omit<NetworkManagerOptions, 'protocols' | 'nodedb'> {}
 
 export interface AccountManagerConstructorOptions {
   /**

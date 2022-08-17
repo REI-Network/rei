@@ -172,14 +172,6 @@ export class NetworkManager extends EventEmitter {
    * Initialize
    */
   async init() {
-    // load enr from database
-    const { enr, keypair } = await this.loadLocalENR();
-    const strEnr = enr.encodeTxt(keypair.privateKey);
-    this.privateKey = keypair.privateKey;
-    logger.info('NetworkManager::init, peerId:', this.options.peerId.toB58String());
-    logger.info('NetworkManager::init, nodeId', enr.nodeId);
-    logger.info('NetworkManager::init,', strEnr);
-
     if (this.options.libp2p && this.options.discv5) {
       // directly use outside impl instance
       this.libp2p = this.options.libp2p;
@@ -188,23 +180,24 @@ export class NetworkManager extends EventEmitter {
       if (this.options.libp2pOptions === undefined) {
         throw new Error('missing libp2p options');
       }
+
+      // load enr from database
+      const { enr, keypair } = await this.loadLocalENR();
+      const strEnr = enr.encodeTxt(keypair.privateKey);
+      this.privateKey = keypair.privateKey;
+      logger.info('NetworkManager::init, peerId:', this.options.peerId.toB58String());
+      logger.info('NetworkManager::init, nodeId', enr.nodeId);
+      logger.info('NetworkManager::init,', strEnr);
+
       // create default impl instance
       const { libp2p, discv5 } = createDefaultImpl({
         ...this.options.libp2pOptions,
         peerId: this.options.peerId,
         enr
       });
+
       this.libp2p = libp2p;
       this.discv5 = discv5;
-    }
-
-    // add bootnodes to discovered list
-    for (const bootnode of this.options.libp2pOptions?.bootnodes ?? []) {
-      const enr = ENR.decodeTxt(bootnode);
-      const peerId = await enr.peerId();
-      if (!peerId.equals(this.libp2p.peerId)) {
-        this.discoveredPeers.push(peerId.toB58String());
-      }
     }
   }
 

@@ -235,7 +235,7 @@ function createEnrAndKeypair(peerId: PeerId, opts: { ip?: string; tcpPort?: numb
   return { enr, keypair };
 }
 
-async function check(node: NetworkManager, event: any, condition: () => boolean): Promise<boolean> {
+function check(node: NetworkManager, event: any, condition: () => boolean): Promise<boolean> {
   let timeout: NodeJS.Timeout;
   let callback: () => void;
   let pending: ((value: boolean) => void)[] = [];

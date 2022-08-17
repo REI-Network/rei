@@ -176,6 +176,7 @@ export class NetworkManager extends EventEmitter {
       // directly use outside impl instance
       this.libp2p = this.options.libp2p;
       this.discv5 = this.options.discv5;
+      this.privateKey = this.options.discv5.keyPair.privateKey;
     } else {
       if (this.options.libp2pOptions === undefined) {
         throw new Error('missing libp2p options');

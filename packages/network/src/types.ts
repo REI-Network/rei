@@ -1,7 +1,7 @@
 import type EventEmitter from 'events';
 import type PeerId from 'peer-id';
 import type Multiaddr from 'multiaddr';
-import type { ENR } from '@gxchain2/discv5';
+import type { ENR, IKeypair } from '@gxchain2/discv5';
 import type { Message } from '@gxchain2/discv5/lib/message';
 import type { Peer, ProtocolStream } from './peer';
 
@@ -181,6 +181,9 @@ export interface IDiscv5 extends EventEmitter {
 
   // Get local enr address
   get localEnr(): ENR;
+
+  // Get local key pair
+  get keyPair(): IKeypair;
 
   /**
    * Add enr to kbucket

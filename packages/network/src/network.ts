@@ -193,6 +193,9 @@ export class NetworkManager extends EventEmitter {
       // create default impl instance
       const { libp2p, discv5 } = createDefaultImpl({
         ...this.options.libp2pOptions,
+        bootnodes: (this.options.libp2pOptions.bootnodes ?? []).filter((value) => {
+          return ENR.decodeTxt(value).nodeId !== enr.nodeId;
+        }),
         peerId: this.options.peerId,
         enr
       });

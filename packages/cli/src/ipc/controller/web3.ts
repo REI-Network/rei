@@ -14,7 +14,7 @@ export class Web3Controller {
    * Get client version
    * @returns version data
    */
-  web3_clientVersion() {
+  clientVersion() {
     return this.apiServer.clientVersion();
   }
 
@@ -23,7 +23,7 @@ export class Web3Controller {
    * @param data - data to calculate
    * @returns Hash
    */
-  web_sha3([data]: [string]) {
+  sha3([data]: [string]) {
     return this.apiServer.sha3(data);
   }
 }

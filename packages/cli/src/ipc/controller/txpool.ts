@@ -14,7 +14,7 @@ export class TxPoolController {
    * Get total pool content
    * @returns An object containing all transactions in the pool
    */
-  txpool_content() {
+  content() {
     return this.apiServer.content();
   }
 }

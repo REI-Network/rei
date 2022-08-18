@@ -14,7 +14,7 @@ export class NetController {
    * Get the current network id
    * @returns Network id
    */
-  net_version() {
+  version() {
     return this.apiServer.version();
   }
 
@@ -22,7 +22,7 @@ export class NetController {
    * Returns true if client is actively listening for network connections
    * @returns Network connections state
    */
-  net_listenging() {
+  listenging() {
     return this.apiServer.listening();
   }
 
@@ -30,7 +30,7 @@ export class NetController {
    * Returns number of peers currently connected to the client
    * @returns Number of connected peers
    */
-  net_peerCount() {
+  peerCount() {
     return this.apiServer.peerCount();
   }
 }

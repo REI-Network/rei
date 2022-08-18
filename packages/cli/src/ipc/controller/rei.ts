@@ -16,7 +16,7 @@ export class ReiController {
    * @param tag - Block tag
    * @returns Available crude
    */
-  async rei_getCrude([address, tag]: [string, string]) {
+  async getCrude([address, tag]: [string, string]) {
     return this.apiServer.getCrude(address, tag);
   }
 
@@ -26,7 +26,7 @@ export class ReiController {
    * @param tag - Block tag
    * @returns Used crude
    */
-  async rei_getUsedCrude([address, tag]: [string, string]) {
+  async getUsedCrude([address, tag]: [string, string]) {
     return this.apiServer.getUsedCrude(address, tag);
   }
 
@@ -36,7 +36,7 @@ export class ReiController {
    * @param tag - Block tag
    * @returns Total deposit amount
    */
-  async rei_getTotalAmount([address, tag]: [string, string]) {
+  async getTotalAmount([address, tag]: [string, string]) {
     return this.apiServer.getTotalAmount(address, tag);
   }
 
@@ -45,7 +45,7 @@ export class ReiController {
    * @param tag - Block tag
    * @returns Daily fee
    */
-  async rei_getDailyFee([tag]: [string]) {
+  async getDailyFee([tag]: [string]) {
     return this.apiServer.getDailyFee(tag);
   }
 
@@ -54,7 +54,7 @@ export class ReiController {
    * @param tag - Block tag
    * @returns Miner reward factor
    */
-  async rei_getMinerRewardFactor([tag]: [string]) {
+  async getMinerRewardFactor([tag]: [string]) {
     return this.apiServer.getMinerRewardFactor(tag);
   }
 }

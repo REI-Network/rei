@@ -15,7 +15,7 @@ export class ETHController {
    * Returns the current protocol version.
    * @returns The current client version
    */
-  eth_protocolVersion() {
+  protocolVersion() {
     return this.apiServer.protocolVersion();
   }
 
@@ -23,7 +23,7 @@ export class ETHController {
    * Returns an object with data about the sync status or false
    * @returns The syncing status.
    */
-  eth_syncing() {
+  syncing() {
     return this.apiServer.syncing();
   }
 
@@ -31,11 +31,11 @@ export class ETHController {
    * Return the current network id
    * @returns The current network id
    */
-  eth_chainId() {
+  chainId() {
     return this.apiServer.chainId();
   }
 
-  eth_coinbase() {
+  coinbase() {
     return this.apiServer.coinbase();
   }
 
@@ -43,7 +43,7 @@ export class ETHController {
    * Returns true if client is actively mining new blocks
    * @returns True if the node is currently mining, otherwise false
    */
-  eth_mining() {
+  mining() {
     return this.apiServer.mining();
   }
 
@@ -51,7 +51,7 @@ export class ETHController {
    * Returns the number of hashes per second that the node is mining with
    * @returns The node's hashrate
    */
-  eth_hashrate() {
+  hashrate() {
     return this.apiServer.hashrate();
   }
 
@@ -59,7 +59,7 @@ export class ETHController {
    * Returns the current price per gas in wei
    * @returns Gas price
    */
-  eth_gasPrice() {
+  gasPrice() {
     return this.apiServer.gasPrice();
   }
 
@@ -67,7 +67,7 @@ export class ETHController {
    * Returns a list of addresses owned by client
    * @returns Accounts list
    */
-  eth_accounts() {
+  accounts() {
     return this.apiServer.accounts();
   }
 
@@ -75,7 +75,7 @@ export class ETHController {
    * Returns the number of most recent block
    * @returns Latest block number
    */
-  eth_blockNumber() {
+  blockNumber() {
     return this.apiServer.blockNumber();
   }
 
@@ -85,7 +85,7 @@ export class ETHController {
    * @param tag - block tag
    * @returns Balance of the account
    */
-  async eth_getBalance([address, tag]: [string, any]) {
+  async getBalance([address, tag]: [string, any]) {
     return this.apiServer.getBalance(address, tag);
   }
 
@@ -95,7 +95,7 @@ export class ETHController {
    * @param key  - query key
    * @param tag  - block tag
    */
-  async eth_getStorageAt([address, key, tag]: [string, string, any]) {
+  async getStorageAt([address, key, tag]: [string, string, any]) {
     return this.apiServer.getStorageAt(address, key, tag);
   }
 
@@ -105,7 +105,7 @@ export class ETHController {
    * @param tag - block tag
    * @returns Nonce of the account
    */
-  async eth_getTransactionCount([address, tag]: [string, any]) {
+  async getTransactionCount([address, tag]: [string, any]) {
     return this.apiServer.getTransactionCount(address, tag);
   }
 
@@ -114,7 +114,7 @@ export class ETHController {
    * @param hash - query hash
    * @returns Transaction count
    */
-  async eth_getBlockTransactionCountByHash([hash]: [string]) {
+  async getBlockTransactionCountByHash([hash]: [string]) {
     return this.apiServer.getBlockTransactionCountByHash(hash);
   }
 
@@ -123,7 +123,7 @@ export class ETHController {
    * @param tag - query tag
    * @returns Transaction count
    */
-  async eth_getBlockTransactionCountByNumber([tag]: [any]) {
+  async getBlockTransactionCountByNumber([tag]: [any]) {
     return this.apiServer.getBlockTransactionCountByNumber(tag);
   }
 
@@ -132,7 +132,7 @@ export class ETHController {
    * @param hash - query hash
    * @returns Uncle block count
    */
-  eth_getUncleCountByBlockHash([hash]: [string]) {
+  getUncleCountByBlockHash([hash]: [string]) {
     return this.apiServer.getUncleCountByBlockHash(hash);
   }
 
@@ -141,7 +141,7 @@ export class ETHController {
    * @param tag - query tag
    * @returns Uncle block count
    */
-  eth_getUncleCountByBlockNumber([tag]: [any]) {
+  getUncleCountByBlockNumber([tag]: [any]) {
     return this.apiServer.getUncleCountByBlockNumber(tag);
   }
 
@@ -151,7 +151,7 @@ export class ETHController {
    * @param tag - block tag
    * @returns Contract code
    */
-  async eth_getCode([address, tag]: [string, any]) {
+  async getCode([address, tag]: [string, any]) {
     return this.apiServer.getCode(address, tag);
   }
 
@@ -161,7 +161,7 @@ export class ETHController {
    * @param data - message data
    * @returns Signature
    */
-  eth_sign([address, data]: [string, string]) {
+  sign([address, data]: [string, string]) {
     return this.apiServer.sign(address, data);
   }
 
@@ -170,7 +170,7 @@ export class ETHController {
    * @param data - transaction data
    * @returns Signed transaction
    */
-  async eth_signTransaction([data]: [CallData]) {
+  async signTransaction([data]: [CallData]) {
     return this.apiServer.signTransaction(data);
   }
 
@@ -179,7 +179,7 @@ export class ETHController {
    * @param data - transaction data
    * @returns Transaction hash
    */
-  async eth_sendTransaction([data]: [CallData]) {
+  async sendTransaction([data]: [CallData]) {
     return this.apiServer.sendTransaction(data);
   }
 
@@ -188,7 +188,7 @@ export class ETHController {
    * @param rawtx - raw transaction
    * @returns Transaction hash
    */
-  async eth_sendRawTransaction([rawtx]: [string]) {
+  async sendRawTransaction([rawtx]: [string]) {
     return this.apiServer.sendRawTransaction(rawtx);
   }
 
@@ -198,7 +198,7 @@ export class ETHController {
    * @param tag - block tag
    * @returns
    */
-  async eth_call([data, tag]: [CallData, any]) {
+  async call([data, tag]: [CallData, any]) {
     return this.apiServer.call(data, tag);
   }
 
@@ -208,7 +208,7 @@ export class ETHController {
    * @param tag - block tag
    * @returns Estimated gas limit
    */
-  async eth_estimateGas([data, tag]: [CallData, any]) {
+  async estimateGas([data, tag]: [CallData, any]) {
     return this.apiServer.estimateGas(data, tag);
   }
 
@@ -218,7 +218,7 @@ export class ETHController {
    * @param fullTransactions - include full transactions or not
    * @returns Block data
    */
-  async eth_getBlockByHash([hash, fullTransactions]: [string, boolean]) {
+  async getBlockByHash([hash, fullTransactions]: [string, boolean]) {
     return this.apiServer.getBlockByHash(hash, fullTransactions);
   }
 
@@ -228,7 +228,7 @@ export class ETHController {
    * @param fullTransactions - include full transactions or not
    * @returns Block data
    */
-  async eth_getBlockByNumber([tag, fullTransactions]: [any, boolean]) {
+  async getBlockByNumber([tag, fullTransactions]: [any, boolean]) {
     return this.apiServer.getBlockByNumber(tag, fullTransactions);
   }
 
@@ -237,7 +237,7 @@ export class ETHController {
    * @param hash - transaction hash
    * @returns Transaction data
    */
-  async eth_getTransactionByHash([hash]: [string]) {
+  async getTransactionByHash([hash]: [string]) {
     return this.apiServer.getTransactionByHash(hash);
   }
 
@@ -247,7 +247,7 @@ export class ETHController {
    * @param index - transaction index
    * @returns Transaction data
    */
-  async eth_getTransactionByBlockHashAndIndex([hash, index]: [string, string]) {
+  async getTransactionByBlockHashAndIndex([hash, index]: [string, string]) {
     return this.apiServer.getTransactionByBlockHashAndIndex(hash, index);
   }
 
@@ -257,7 +257,7 @@ export class ETHController {
    * @param index - transaction index
    * @returns Transaction data
    */
-  async eth_getTransactionByBlockNumberAndIndex([tag, index]: [any, string]) {
+  async getTransactionByBlockNumberAndIndex([tag, index]: [any, string]) {
     return this.apiServer.getTransactionByBlockNumberAndIndex(tag, index);
   }
 
@@ -266,7 +266,7 @@ export class ETHController {
    * @param hash - transaction hash
    * @returns Transaction receipt
    */
-  async eth_getTransactionReceipt([hash]: [string]) {
+  async getTransactionReceipt([hash]: [string]) {
     return this.apiServer.getTransactionReceipt(hash);
   }
 
@@ -274,7 +274,7 @@ export class ETHController {
    * Returns information about a uncle of a block by hash and uncle index position
    * @returns Uncle block data
    */
-  eth_getUncleByBlockHashAndIndex() {
+  getUncleByBlockHashAndIndex() {
     return this.apiServer.getUncleByBlockHashAndIndex();
   }
 
@@ -282,7 +282,7 @@ export class ETHController {
    * Returns information about a uncle of a block by number and uncle index position
    * @returns Uncle block data
    */
-  eth_getUncleByBlockNumberAndIndex() {
+  getUncleByBlockNumberAndIndex() {
     return this.apiServer.getUncleByBlockNumberAndIndex();
   }
 
@@ -290,28 +290,28 @@ export class ETHController {
    * Returns a list of available compilers in the client
    * @returns Compilers
    */
-  eth_getCompilers() {
+  getCompilers() {
     return this.apiServer.getCompilers();
   }
 
   /**
    * Returns compiled solidity code
    */
-  eth_compileSolidity() {
+  compileSolidity() {
     return this.apiServer.compileSolidity();
   }
 
   /**
    * Returns compiled LLL code
    */
-  eth_compileLLL() {
+  compileLLL() {
     return this.apiServer.compileLLL();
   }
 
   /**
    * Returns compiled serpent code
    */
-  eth_compileSerpent() {
+  compileSerpent() {
     return this.apiServer.compileSerpent();
   }
 
@@ -320,7 +320,7 @@ export class ETHController {
    * @param param0 - filter parameters
    * @returns Filter id
    */
-  async eth_newFilter([{ fromBlock, toBlock, address: _addresses, topics: _topics }]: [{ fromBlock?: string; toBlock?: string; address?: string | string[]; topics?: TopicsData; blockhash?: string }]) {
+  async newFilter([{ fromBlock, toBlock, address: _addresses, topics: _topics }]: [{ fromBlock?: string; toBlock?: string; address?: string | string[]; topics?: TopicsData; blockhash?: string }]) {
     return this.apiServer.newFilter({ fromBlock, toBlock, address: _addresses, topics: _topics });
   }
 
@@ -328,7 +328,7 @@ export class ETHController {
    * Creates a filter in the node, to notify when a new block arrives
    * @returns Filter id
    */
-  eth_newBlockFilter() {
+  newBlockFilter() {
     return this.apiServer.newBlockFilter();
   }
 
@@ -336,7 +336,7 @@ export class ETHController {
    * Creates a filter in the node, to notify when new pending transactions arrive
    * @returns Filter id
    */
-  eth_newPendingTransactionFilter() {
+  newPendingTransactionFilter() {
     return this.apiServer.newPendingTransactionFilter();
   }
 
@@ -345,7 +345,7 @@ export class ETHController {
    * @param id - filter id
    * @returns `true` if sucessfully deleted
    */
-  eth_uninstallFilter([id]: [string]) {
+  uninstallFilter([id]: [string]) {
     return this.apiServer.uninstallFilter(id);
   }
 
@@ -354,7 +354,7 @@ export class ETHController {
    * @param id - filter id
    * @returns Filter changes
    */
-  eth_getFilterChanges([id]: [string]) {
+  getFilterChanges([id]: [string]) {
     return this.apiServer.getFilterChanges(id);
   }
 
@@ -363,7 +363,7 @@ export class ETHController {
    * @param id - filter id
    * @returns Filter logs
    */
-  async eth_getFilterLogs([id]: [string]) {
+  async getFilterLogs([id]: [string]) {
     return this.apiServer.getFilterLogs(id);
   }
 
@@ -372,28 +372,28 @@ export class ETHController {
    * @param param0 - filter parameters
    * @returns Logs
    */
-  async eth_getLogs([{ fromBlock, toBlock, address: _addresses, topics: _topics, blockhash }]: [{ fromBlock?: string; toBlock?: string; address?: string | string[]; topics?: TopicsData; blockhash?: string }]) {
+  async getLogs([{ fromBlock, toBlock, address: _addresses, topics: _topics, blockhash }]: [{ fromBlock?: string; toBlock?: string; address?: string | string[]; topics?: TopicsData; blockhash?: string }]) {
     return this.apiServer.getLogs({ fromBlock, toBlock, address: _addresses, topics: _topics, blockhash });
   }
 
   /**
    * Returns the hash of the current block, the seedHash, and the boundary condition to be met ("target").
    */
-  eth_getWork() {
+  getWork() {
     return this.apiServer.getWork();
   }
 
   /**
    * Used for submitting a proof-of-work solution.
    */
-  eth_submitWork() {
+  submitWork() {
     return this.apiServer.submitWork();
   }
 
   /**
    * Used for submitting mining hashrate.
    */
-  eth_submitHashrate() {
+  submitHashrate() {
     return this.apiServer.submitHashrate();
   }
 
@@ -402,7 +402,7 @@ export class ETHController {
    * @param id - subscription id
    * @returns `true` if subscription was successfully canceled
    */
-  eth_unsubscribe([id]: [string]) {
+  unsubscribe([id]: [string]) {
     return this.apiServer.unsubscribe(id);
   }
 
@@ -413,7 +413,7 @@ export class ETHController {
   //  * @param client - subscription client
   //  * @returns Subscription id
   //  */
-  // async eth_subscribe([type, options]: [string, undefined | { address?: string | string[]; topics?: TopicsData }], client?: WebsocketClient) {
+  // async subscribe([type, options]: [string, undefined | { address?: string | string[]; topics?: TopicsData }], client?: WebsocketClient) {
   //   return this.apiServer.subscribe(type, options, client);
   // }
 }

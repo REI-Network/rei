@@ -17,7 +17,7 @@ export class DebugController {
    * @param options - options
    * @returns Result of execution block
    */
-  debug_traceBlock([blockRlp, options]: [string, any]) {
+  traceBlock([blockRlp, options]: [string, any]) {
     const blockRlpBuffer = hexStringToBuffer(blockRlp);
     return this.apiServer.traceBlock(blockRlpBuffer, options);
   }
@@ -28,7 +28,7 @@ export class DebugController {
    * @param options - options
    * @returns Result of execution block
    */
-  async debug_traceBlockByNumber([tag, options]: [string, any]) {
+  async traceBlockByNumber([tag, options]: [string, any]) {
     return this.apiServer.traceBlockByNumber(tag, options);
   }
 
@@ -38,7 +38,7 @@ export class DebugController {
    * @param options - options
    * @returns Result of execution block
    */
-  debug_traceBlockByHash([hash, options]: [string, any]) {
+  traceBlockByHash([hash, options]: [string, any]) {
     return this.apiServer.traceBlockByHash(hash, options);
   }
 
@@ -48,7 +48,7 @@ export class DebugController {
    * @param options - options
    * @returns Result of execution transaction
    */
-  debug_traceTransaction([hash, options]: [string, any]) {
+  traceTransaction([hash, options]: [string, any]) {
     return this.apiServer.traceTransaction(hash, options);
   }
 
@@ -59,7 +59,7 @@ export class DebugController {
    * @param options - options
    * @returns Result of execution transaction
    */
-  async debug_traceCall([data, tag, options]: [CallData, string, any]) {
+  async traceCall([data, tag, options]: [CallData, string, any]) {
     return this.apiServer.traceCall(data, tag, options);
   }
 }

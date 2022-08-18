@@ -31,8 +31,8 @@ export class IpcServer {
     ipc.config.id = ipcId;
     ipc.config.maxConnections = 1;
     ipc.serve(() => {
-      ipc.server.on('connect', (data: string, socket: any) => {
-        this.send(socket, data);
+      ipc.server.on('connect', (socket) => {
+        logger.info('📦 Client connected', socket.server._pipeName);
       });
 
       ipc.server.on('message', async (data: string, socket: any) => {
@@ -47,10 +47,6 @@ export class IpcServer {
 
   abort() {
     ipc.server.stop();
-  }
-
-  private async buildReq(msg: string) {
-    const { method, params } = JSON.parse(msg);
   }
 
   private async handleReq(msg: string) {

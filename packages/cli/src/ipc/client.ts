@@ -32,6 +32,7 @@ const replProxy = {
 };
 
 export class IpcClient {
+  private replServer = repl.start({ prompt: '> ', useColors: true, ignoreUndefined: true, preview: false });
   constructor() {
     ipc.config.id = ipcId;
     ipc.config.silent = true;
@@ -40,35 +41,38 @@ export class IpcClient {
   start() {
     ipc.connectTo(ipcId, () => {
       ipc.of[ipcId].on('connect', () => {
-        ipc.of[ipcId].emit('Connected to ipc server');
+        logger.info('\n' + 'Welcome to the Rei Javascript console!');
       });
-      newRepl();
+      this.newRepl();
+      this.replServer.displayPrompt();
     });
 
     ipc.of[ipcId].on('messaage', (data: string) => {
-      const message = JSON.parse(data);
-      logger.debug(message);
+      console.log(JSON.parse(data));
+      this.replServer.displayPrompt();
     });
 
-    ipc.of[ipcId].on('error', (err: Error) => {});
+    ipc.of[ipcId].on('error', (err: Error) => {
+      console.log('Error: ' + err);
+    });
+
+    ipc.of[ipcId].on('disconnect', () => {
+      console.log('Disconnected from server, exiting...');
+      process.exit(0);
+    });
   }
 
-  send(message: JSON) {
-    ipc.of[ipcId].emit('message', message);
+  newRepl() {
+    this.replServer.context.admin = replProxy.admin;
+    this.replServer.context.debug = replProxy.debug;
+    this.replServer.context.eth = replProxy.eth;
+    this.replServer.context.net = replProxy.net;
+    this.replServer.context.txpool = replProxy.txpool;
+    this.replServer.context.web3 = replProxy.web3;
+
+    this.replServer.on('exit', () => {
+      logger.info('Received exit signal, exiting...');
+      process.exit(0);
+    });
   }
-}
-
-function newRepl() {
-  const replServer = repl.start({ prompt: '> ', useColors: true });
-  replServer.context.admin = replProxy.admin;
-  replServer.context.debug = replProxy.debug;
-  replServer.context.eth = replProxy.eth;
-  replServer.context.net = replProxy.net;
-  replServer.context.txpool = replProxy.txpool;
-  replServer.context.web3 = replProxy.web3;
-
-  replServer.on('exit', () => {
-    logger.info('Received exit signal, exiting...');
-    process.exit(0);
-  });
 }

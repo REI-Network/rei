@@ -2,7 +2,7 @@ import util from 'util';
 import ipc from 'node-ipc';
 import { ApiServer } from '@rei-network/api';
 import { api } from './controller';
-import { logger } from '@rei-network/utils';
+import { hexStringToBN, logger } from '@rei-network/utils';
 
 const defaultPort = 27777;
 const defaultApis = 'admin,debug,eth,net,txpool,web3';
@@ -31,13 +31,23 @@ export class IpcServer {
     ipc.config.id = ipcId;
     ipc.config.maxConnections = 1;
     ipc.serve(() => {
-      ipc.server.on('connect', (socket) => {
+      ipc.server.on('connect', async (socket) => {
         logger.info('📦 Client connected', socket.server._pipeName);
+        const coinbase = this.apiServer.coinbase();
+        const block = await this.apiServer.getBlockByNumber('latest', true);
+        const time = new Date(hexStringToBN(block?.timestamp!).toNumber() * 1000).toUTCString();
+        const protocolVersion = this.apiServer.protocolVersion();
+        ipc.server.emit(socket, 'load', 'Welcome to the Rei Javascript console!' + '\n' + '\n' + `coinbase: ${coinbase}` + '\n' + `at block: ${hexStringToBN(block?.number!)}  (time is:  ${time})` + '\n' + `protocol Version is : ${protocolVersion}` + '\n' + '\n' + 'To exit, press ctrl-d or type .exit');
       });
 
       ipc.server.on('message', async (data: string, socket: any) => {
-        const result = await this.handleReq(data);
-        this.send(socket, JSON.stringify(result));
+        try {
+          const result = await this.handleReq(data);
+          this.send(socket, JSON.stringify(result));
+        } catch (err: any) {
+          logger.info(err);
+          ipc.server.emit(socket, 'error', JSON.stringify(err.message));
+        }
       });
     });
 
@@ -50,19 +60,12 @@ export class IpcServer {
   }
 
   private async handleReq(msg: string) {
-    try {
-      const startAt = Date.now();
-      const { method, params } = JSON.parse(msg);
-      const controller = this.controllers.find((c) => method in c);
-      if (!controller) {
-        throw new Error(`Unknown api ${method}`);
-      }
-      try {
-        const result = await controller[method](params);
-        return util.types.isPromise(result) ? await result : result;
-      } catch (err) {}
-    } catch (error) {
-      console.log(error);
+    const { method, params } = JSON.parse(msg);
+    const controller = this.controllers.find((c) => method in c);
+    if (!controller) {
+      throw new Error(`Unknown api ${method}`);
     }
+    const result = await controller[method](params);
+    return util.types.isPromise(result) ? await result : result;
   }
 }

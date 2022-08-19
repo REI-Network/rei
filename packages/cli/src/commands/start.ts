@@ -52,7 +52,7 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
   const apiServer = new ApiServer(node);
   apiServer.start();
   let server: undefined | RpcServer;
-  const ipcServer = new IpcServer(apiServer);
+  const ipcServer = new IpcServer(apiServer, opts.datadir);
   console.log('star ipc server after');
   ipcServer.start();
   if (opts.rpc) {

@@ -32,32 +32,43 @@ const replProxy = {
 };
 
 export class IpcClient {
+  private readonly path: string;
   private replServer = repl.start({ prompt: '> ', useColors: true, ignoreUndefined: true, preview: false });
-  constructor() {
+  constructor(path: string) {
+    this.path = path;
     ipc.config.id = ipcId;
     ipc.config.silent = true;
   }
 
   start() {
-    ipc.connectTo(ipcId, () => {
+    ipc.connectTo(ipcId, this.path, () => {
       ipc.of[ipcId].on('connect', () => {
-        logger.info('\n' + 'Welcome to the Rei Javascript console!');
+        this.newRepl();
       });
-      this.newRepl();
+    });
+
+    ipc.of[ipcId].on('load', (data: string) => {
+      console.log(data);
       this.replServer.displayPrompt();
     });
 
-    ipc.of[ipcId].on('messaage', (data: string) => {
+    ipc.of[ipcId].on('message', (data: string) => {
       console.log(JSON.parse(data));
       this.replServer.displayPrompt();
     });
 
-    ipc.of[ipcId].on('error', (err: Error) => {
+    ipc.of[ipcId].on('error', (err) => {
       console.log('Error: ' + err);
+      this.replServer.displayPrompt();
+    });
+
+    ipc.of[ipcId].on('errorMessage', (err: string) => {
+      console.log('Error: ' + JSON.parse(err));
+      this.replServer.displayPrompt();
     });
 
     ipc.of[ipcId].on('disconnect', () => {
-      console.log('Disconnected from server, exiting...');
+      logger.info('Disconnected from server, exiting...');
       process.exit(0);
     });
   }

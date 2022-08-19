@@ -247,6 +247,11 @@ export class NetworkManager extends EventEmitter {
   async abort() {
     if (!this.aborted) {
       this.aborted = true;
+      // release timeout
+      if (this.outboundTimer) {
+        clearTimeout(this.outboundTimer);
+        this.outboundTimer = undefined;
+      }
       // unregister all protocols
       for (const protocols of this.protocols) {
         for (const protocol of Array.isArray(protocols) ? protocols : [protocols]) {

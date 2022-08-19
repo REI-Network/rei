@@ -2,8 +2,9 @@ import util from 'util';
 import path from 'path';
 import ipc from 'node-ipc';
 import { ApiServer } from '@rei-network/api';
-import { api } from './controller';
 import { hexStringToBN, logger } from '@rei-network/utils';
+import { api } from './controller';
+import { RpcServer } from '@rei-network/rpc';
 
 const defaultPort = 27777;
 const defaultMaxConnections = 1;
@@ -13,18 +14,20 @@ const defaultApis = 'admin,debug,eth,net,txpool,web3';
 export const ipcId = 'ipc';
 export class IpcServer {
   apiServer: ApiServer;
-  private readonly datadir;
+  private readonly datadir: string;
   private readonly controllers: { [name: string]: any }[];
+  rpcServer: RpcServer | undefined;
 
-  constructor(apiServer: ApiServer, datadir: string, networkport?: number) {
+  constructor(apiServer: ApiServer, datadir: string, rpcServer?: RpcServer, networkport?: number) {
     this.apiServer = apiServer;
     this.datadir = path.join(datadir, '/');
     ipc.config.networkPort = networkport ?? defaultPort;
+    this.rpcServer = rpcServer;
     this.controllers = defaultApis.split(',').map((name) => {
       if (!(name in api)) {
         throw new Error(`Unknown api ${name}`);
       }
-      return new api[name](this.apiServer);
+      return new api[name](this);
     });
   }
 
@@ -62,7 +65,8 @@ export class IpcServer {
     logger.info(`IPC server started on port ${ipc.config.networkPort}`);
   }
 
-  abort() {
+  async abort() {
+    await this.rpcServer?.abort();
     ipc.server.stop();
   }
 
@@ -70,7 +74,7 @@ export class IpcServer {
     const { method, params } = JSON.parse(msg);
     const controller = this.controllers.find((c) => method in c);
     if (!controller) {
-      throw new Error(`Unknown api ${method}`);
+      throw new Error(`Unknown method ${method}`);
     }
     const result = await controller[method](params);
     return util.types.isPromise(result) ? await result : result;

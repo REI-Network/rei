@@ -1,13 +1,13 @@
 import { ApiServer } from '@rei-network/api';
-
+import { IpcServer } from '../server';
 /**
  * Rei api Controller
  */
 export class ReiController {
   readonly apiServer: ApiServer;
 
-  constructor(apiServer: ApiServer) {
-    this.apiServer = apiServer;
+  constructor(ipcServer: IpcServer) {
+    this.apiServer = ipcServer.apiServer;
   }
 
   /**

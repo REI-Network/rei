@@ -1,5 +1,6 @@
 import { hexStringToBuffer } from '@rei-network/utils';
 import { ApiServer, CallData } from '@rei-network/api';
+import { IpcServer } from '../server';
 
 /**
  * Debug api Controller
@@ -7,8 +8,8 @@ import { ApiServer, CallData } from '@rei-network/api';
 export class DebugController {
   readonly apiServer: ApiServer;
 
-  constructor(apiServer: ApiServer) {
-    this.apiServer = apiServer;
+  constructor(ipcServer: IpcServer) {
+    this.apiServer = ipcServer.apiServer;
   }
 
   /**

@@ -1,4 +1,5 @@
 import { TopicsData, CallData, ApiServer } from '@rei-network/api';
+import { IpcServer } from '../server';
 // import { WebsocketClient } from '../client';
 
 /**
@@ -7,8 +8,8 @@ import { TopicsData, CallData, ApiServer } from '@rei-network/api';
 export class ETHController {
   readonly apiServer: ApiServer;
 
-  constructor(apiServer: ApiServer) {
-    this.apiServer = apiServer;
+  constructor(ipcServer: IpcServer) {
+    this.apiServer = ipcServer.apiServer;
   }
 
   /**

@@ -1,13 +1,13 @@
 import { ApiServer } from '@rei-network/api';
-
+import { IpcServer } from '../server';
 /**
  * Net api Controller
  */
 export class NetController {
   readonly apiServer: ApiServer;
 
-  constructor(apiServer: ApiServer) {
-    this.apiServer = apiServer;
+  constructor(ipcServer: IpcServer) {
+    this.apiServer = ipcServer.apiServer;
   }
 
   /**

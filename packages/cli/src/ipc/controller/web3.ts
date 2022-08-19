@@ -1,4 +1,5 @@
 import { ApiServer } from '@rei-network/api';
+import { IpcServer } from '../server';
 
 /**
  * Web3 api Controller
@@ -6,8 +7,8 @@ import { ApiServer } from '@rei-network/api';
 export class Web3Controller {
   readonly apiServer: ApiServer;
 
-  constructor(apiServer: ApiServer) {
-    this.apiServer = apiServer;
+  constructor(ipcServer: IpcServer) {
+    this.apiServer = ipcServer.apiServer;
   }
 
   /**

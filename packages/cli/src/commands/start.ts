@@ -51,10 +51,7 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
   });
   const apiServer = new ApiServer(node);
   apiServer.start();
-  let server: undefined | RpcServer;
-  const ipcServer = new IpcServer(apiServer, opts.datadir);
-  console.log('star ipc server after');
-  ipcServer.start();
+  let rpcServer: undefined | RpcServer;
   if (opts.rpc) {
     const rpc = {
       apiServer: apiServer,
@@ -62,11 +59,13 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
       host: opts.rpcHost ? opts.rpcHost : undefined,
       apis: opts.rpcApi ? opts.rpcApi : undefined
     };
-    server = new RpcServer(rpc);
-    await server.start();
+    rpcServer = new RpcServer(rpc);
+    await rpcServer.start();
   }
-  SIGINT(node, apiServer, ipcServer, server);
-  return [node, apiServer, ipcServer, server];
+  const ipcServer = new IpcServer(apiServer, opts.datadir, rpcServer);
+  ipcServer.start();
+  SIGINT(node, apiServer, ipcServer);
+  return [node, apiServer, ipcServer, rpcServer];
 }
 
 export function installStartAction(program: any) {

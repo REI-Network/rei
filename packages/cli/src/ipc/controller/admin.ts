@@ -22,9 +22,11 @@ export class AdminController {
   /**
    * Start rpc server on given options
    */
-  startRpc(port?: number, host?: string, apis?: string) {
+  async startRpc([port, host, apis]: [number?, string?, string?]) {
     if (this.ipcServer.rpcServer === undefined) {
       this.ipcServer.rpcServer = new RpcServer({ apiServer: this.ipcServer.apiServer, port, host, apis });
+      await this.ipcServer.rpcServer.start();
+      return 'rpc server started';
     } else {
       throw new Error('rpc server is already running');
     }
@@ -37,6 +39,9 @@ export class AdminController {
     if (this.ipcServer.rpcServer !== undefined) {
       await this.ipcServer.rpcServer.abort();
       this.ipcServer.rpcServer = undefined;
+      return 'rpc server stopped';
+    } else {
+      throw new Error('rpc server is not running');
     }
   }
 }

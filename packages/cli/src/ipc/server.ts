@@ -53,6 +53,7 @@ export class IpcServer {
       ipc.server.on('message', async (data: string, socket: any) => {
         try {
           const result = await this.handleReq(data);
+          console.log('result is ', result);
           this.send(socket, JSON.stringify(result));
         } catch (err: any) {
           logger.info(err);

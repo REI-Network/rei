@@ -5,7 +5,7 @@ import Multiaddr from 'multiaddr';
 import { ENR, IKeypair, createKeypairFromPeerId } from '@gxchain2/discv5';
 import { Channel, AbortableTimer, getRandomIntInclusive } from '@rei-network/utils';
 import { Connection, Stream, ILibp2p, IDiscv5 } from '../src/types';
-import { Peer, NetworkManager, Protocol, ProtocolHandler, ProtocolStream } from '../src';
+import { NetworkManager } from '../src';
 
 const memdown = require('memdown');
 
@@ -226,7 +226,7 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
       for (const [peer] of entries) {
         if (this.conns.has(peer)) {
           const conn = this.conns.get(peer)![0];
-          await this._disconnect(peer, conn.id);
+          await this.disconnect(peer, conn.id);
           break;
         } else {
           this.peerValues.delete(peer);
@@ -284,13 +284,17 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
       // emit error
       return;
     }
-    await this.service.disconnect(this.peerId.toB58String(), peer, conn.id);
     await conn.close();
     this.emit('disconnect', conn);
     conns.splice(conns.indexOf(conn), 1);
     if (conns.length === 0) {
       this.conns.delete(peer);
     }
+  }
+
+  async disconnect(peer: string, id: number) {
+    await this._disconnect(peer, id);
+    await this.service.disconnect(this.peerId.toB58String(), peer, id);
   }
 
   async onDisconnect(from: string, id: number) {
@@ -341,7 +345,7 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
       return;
     }
     for (const conn of conns) {
-      await this._disconnect(peerId, conn.id);
+      await this.disconnect(peerId, conn.id);
     }
   }
 
@@ -482,14 +486,14 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
     return this.enr;
   }
 
-  _addEnr(enr: string | ENR) {
+  asyncAddEnr(enr: string | ENR) {
     enr = enr instanceof ENR ? copyENR(enr) : ENR.decodeTxt(enr);
     this.kbucket.set(enr.nodeId, enr);
     return this.handleEnr(enr);
   }
 
   addEnr(enr: string | ENR): void {
-    this._addEnr(enr);
+    this.asyncAddEnr(enr);
   }
 
   findEnr(nodeId: string): ENR | undefined {
@@ -530,8 +534,8 @@ function defaultMockLibp2pConfig(): MockLibp2pConfig {
 
 function defaultMockDiscv5Config(): MockDiscv5Config {
   return {
-    findNodesInterval: 5,
-    pingInterval: 3,
+    findNodesInterval: 2000,
+    pingInterval: 3000,
     maxFindNodes: 16
   };
 }
@@ -605,7 +609,7 @@ export class Service {
     await network.start();
     // add bootnodes
     for (const bootnode of bootnodes) {
-      await discv5._addEnr(bootnode);
+      await discv5.asyncAddEnr(bootnode);
     }
     return ep;
   }

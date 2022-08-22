@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import EventEmitter from 'events';
 import levelup from 'levelup';
 import PeerId from 'peer-id';
@@ -5,9 +6,158 @@ import Multiaddr from 'multiaddr';
 import { ENR, IKeypair, createKeypairFromPeerId } from '@gxchain2/discv5';
 import { Channel, AbortableTimer, getRandomIntInclusive } from '@rei-network/utils';
 import { Connection, Stream, ILibp2p, IDiscv5 } from '../src/types';
-import { NetworkManager } from '../src';
+import { NetworkManager, Peer, Protocol, ProtocolHandler, ProtocolStream } from '../src';
 
 const memdown = require('memdown');
+
+// generate handshake message
+function handshake(version: number) {
+  return Buffer.from(JSON.stringify({ method: 'handshake', version }));
+}
+
+// generate request message
+function request(version: number) {
+  return Buffer.from(JSON.stringify({ method: 'request', version }));
+}
+
+// generate response message
+function response(version: number) {
+  return Buffer.from(JSON.stringify({ method: 'response', version }));
+}
+
+class MockHandler implements ProtocolHandler {
+  readonly peer: Peer;
+  readonly stream: ProtocolStream;
+  readonly protocol: MockProtocol;
+
+  private handshakeTimer?: NodeJS.Timeout;
+  private handshakeResolve?: (result: boolean) => void;
+  private requestTimer?: NodeJS.Timeout;
+  private requestResolve?: (result: boolean) => void;
+
+  constructor(protocol: MockProtocol, peer: Peer, stream: ProtocolStream) {
+    this.peer = peer;
+    this.stream = stream;
+    this.protocol = protocol;
+  }
+
+  // clear handshake info
+  private clearHandshake() {
+    if (this.handshakeTimer) {
+      clearTimeout(this.handshakeTimer);
+      this.handshakeTimer = undefined;
+    }
+    if (this.handshakeResolve) {
+      this.handshakeResolve(false);
+      this.handshakeResolve = undefined;
+    }
+  }
+
+  // clear request info
+  private clearRequest() {
+    if (this.requestTimer) {
+      clearTimeout(this.requestTimer);
+      this.requestTimer = undefined;
+    }
+    if (this.requestResolve) {
+      this.requestResolve(false);
+      this.requestResolve = undefined;
+    }
+  }
+
+  /**
+   * Handshake with remote peer,
+   * send handshake message immediately
+   * and wait for remote response
+   * @returns Whether succeed
+   */
+  handshake(): boolean | Promise<boolean> {
+    if (this.handshakeResolve) {
+      throw new Error('invalid handshake');
+    }
+    this.stream.send(handshake(this.protocol.version));
+    return new Promise<boolean>((resolve) => {
+      this.handshakeTimer = setTimeout(() => {
+        resolve(false);
+      }, 1000);
+      this.handshakeResolve = resolve;
+    }).finally(() => {
+      this.clearHandshake();
+    });
+  }
+
+  /**
+   * Handle remote message
+   * @param data - Message data
+   */
+  handle(data: Buffer): void | Promise<void> {
+    const { method, version, params } = JSON.parse(data.toString());
+    if (version !== this.protocol.version) {
+      throw new Error('invalid vesion');
+    }
+    if (method === 'handshake') {
+      if (this.handshakeResolve) {
+        this.handshakeResolve(true);
+      }
+    } else if (method === 'request') {
+      this.stream.send(response(this.protocol.version));
+    } else if (method === 'response') {
+      if (this.requestResolve) {
+        this.requestResolve(params);
+      }
+    }
+  }
+
+  /**
+   * Send request to remote peer
+   * and wait for response
+   * @returns Whether succeed
+   */
+  request() {
+    if (this.requestResolve) {
+      throw new Error('invalid request');
+    }
+    this.stream.send(request(this.protocol.version));
+    return new Promise<boolean>((resolve) => {
+      this.requestTimer = setTimeout(() => {
+        resolve(false);
+      }, 1000);
+      this.requestResolve = resolve;
+    }).finally(() => {
+      this.clearRequest();
+    });
+  }
+
+  /**
+   * Abort handler
+   */
+  abort() {
+    this.clearHandshake();
+    this.clearRequest();
+  }
+}
+
+export class MockProtocol implements Protocol {
+  readonly version: number;
+
+  constructor(version: number) {
+    this.version = version;
+  }
+
+  get protocolString() {
+    return `mock-protocol/${this.version}`;
+  }
+
+  /**
+   * Create handler for remote peer
+   * @param peer - Peer object
+   * @param stream - Stream object
+   * @returns New handler object
+   */
+  async makeHandler(peer: Peer, stream: ProtocolStream): Promise<ProtocolHandler | null> {
+    return new MockHandler(this, peer, stream);
+  }
+}
 
 class MockStream implements Stream {
   private aborted: boolean = false;

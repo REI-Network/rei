@@ -479,9 +479,9 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
   }
 
   onPong(from: ENR, realIP: string) {
-    // remove peer from pending list
     const index = this.pending.findIndex(({ nodeId }) => nodeId === from.nodeId);
     if (index !== -1) {
+      // remove peer from pending list
       this.pending.splice(index, 1);
       // add the new peer to kbucket
       this.kbucket.set(from.nodeId, from);
@@ -563,8 +563,8 @@ function defaultMockLibp2pConfig(): MockLibp2pConfig {
 
 function defaultMockDiscv5Config(): MockDiscv5Config {
   return {
-    findNodesInterval: 2000,
-    pingInterval: 3000,
+    findNodesInterval: 50,
+    pingInterval: 100,
     maxFindNodes: 16
   };
 }

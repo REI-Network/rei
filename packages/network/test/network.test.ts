@@ -1,7 +1,10 @@
 import EventEmitter from 'events';
 import { expect } from 'chai';
 import { Service, Endpoint } from './mock';
-import { getRandomIntInclusive } from '@rei-network/utils';
+import { getRandomIntInclusive, setLevel } from '@rei-network/utils';
+
+// TODO: silent
+setLevel('detail');
 
 describe('NetworkManager', () => {
   let service: Service;
@@ -59,16 +62,16 @@ describe('NetworkManager', () => {
   });
 
   it('should discover and connect succeed', async () => {
-    const { network } = randomPick(await batchCreateNodes(5));
+    const { libp2p } = randomPick(await batchCreateNodes(5));
     expect(
       await check(
-        network,
-        'installed',
+        libp2p,
+        'connect',
         () => {
-          return network.peers.length >= 4;
+          return libp2p.connectionSize >= 4;
         },
-        9000
+        90000
       )
-    ).be.true; // TODO: fix
+    ).be.true;
   });
 });

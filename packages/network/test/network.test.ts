@@ -1,7 +1,7 @@
 import EventEmitter from 'events';
 import { expect } from 'chai';
 import { getRandomIntInclusive, setLevel } from '@rei-network/utils';
-import { Service, Endpoint, MockProtocol } from './mock';
+import { Service, Endpoint, MockProtocol, MockHandler } from './mock';
 import { Protocol } from '../src';
 
 // TODO: silent
@@ -125,7 +125,8 @@ describe('NetworkManager', () => {
   });
 
   it('should discover and connect succeed', async () => {
-    const nodes = await batchCreateNodes(5);
+    const protocol = new MockProtocol(1);
+    const nodes = await batchCreateNodes(5, [protocol]);
     expect(
       await multiCheck(
         nodes.map(({ network }) => network),
@@ -138,14 +139,19 @@ describe('NetworkManager', () => {
     for (const { network, discv5, libp2p } of nodes) {
       expect(network.peers.length).be.equal(4);
       expect(network.connectionSize).be.equal(4);
-      expect(discv5.localEnr.ip).be.equal(service.getRealIPByNodeId(discv5.localEnr.nodeId));
+      expect(discv5.localEnr.ip, 'enr address should be updated').be.equal(service.getRealIPByNodeId(discv5.localEnr.nodeId));
       const otherNodes = nodes.filter((node) => !node.libp2p.peerId.equals(libp2p.peerId));
       for (const otherNode of otherNodes) {
         const addrs = libp2p.getAddress(otherNode.libp2p.peerId);
         expect(addrs !== undefined && addrs.length === 1).be.true;
         const addr = addrs![0].nodeAddress();
-        expect(addr.address === service.getRealIPByPeerId(otherNode.libp2p.peerId.toB58String()));
+        expect(addr.address, 'address book should be correct').be.equal(service.getRealIPByPeerId(otherNode.libp2p.peerId.toB58String()));
       }
     }
+
+    const { network } = randomPick(nodes);
+    const peer = randomPick(network.peers);
+    const handler = peer.getHandler(protocol.protocolString);
+    expect(await (handler as MockHandler).request()).be.true;
   });
 });

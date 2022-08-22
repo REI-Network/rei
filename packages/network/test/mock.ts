@@ -24,7 +24,7 @@ function response(version: number) {
   return Buffer.from(JSON.stringify({ method: 'response', version }));
 }
 
-class MockHandler implements ProtocolHandler {
+export class MockHandler implements ProtocolHandler {
   readonly peer: Peer;
   readonly stream: ProtocolStream;
   readonly protocol: MockProtocol;

@@ -881,11 +881,12 @@ export class Service {
 
   /**
    * Create an new endpoint
+   * @param protocols - Protocol instance
    * @param bootnodes - Bootnodes list, it will be added to kbucket
    * @param local - Whether to use the localhost address instead of the real address
    * @returns New endpoint
    */
-  async createEndpoint(bootnodes: string[] = [], local: boolean = false) {
+  async createEndpoint(protocols: (Protocol | Protocol[])[] = [], bootnodes: string[] = [], local: boolean = false) {
     // create peer id
     const peerId = await PeerId.create({ keyType: 'secp256k1' });
     // create keypaire
@@ -903,8 +904,7 @@ export class Service {
     const libp2p = new MockLibp2p(this, discv5, peerId, defaultMockLibp2pConfig());
     const network = new NetworkManager({
       peerId,
-      // TODO: protocol
-      protocols: [],
+      protocols,
       nodedb: levelup(memdown()),
       discv5,
       libp2p

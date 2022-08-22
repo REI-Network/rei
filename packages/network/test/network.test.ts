@@ -1,7 +1,8 @@
 import EventEmitter from 'events';
 import { expect } from 'chai';
-import { Service, Endpoint } from './mock';
 import { getRandomIntInclusive, setLevel } from '@rei-network/utils';
+import { Service, Endpoint } from './mock';
+import { Protocol } from '../src';
 
 // TODO: silent
 setLevel('detail');
@@ -9,15 +10,15 @@ setLevel('detail');
 describe('NetworkManager', () => {
   let service: Service;
 
-  async function batchCreateNodes(count: number) {
+  async function batchCreateNodes(count: number, protocols: (Protocol | Protocol[])[] = []) {
     if (count <= 1) {
       throw new Error('invalid count');
     }
-    const bootnode = await service.createEndpoint();
+    const bootnode = await service.createEndpoint(protocols);
     const bootnodeENR = bootnode.discv5.localEnr.encodeTxt();
     const nodes: Endpoint[] = [bootnode];
     for (let i = 0; i < count - 1; i++) {
-      nodes.push(await service.createEndpoint([bootnodeENR], true));
+      nodes.push(await service.createEndpoint(protocols, [bootnodeENR], true));
     }
     return nodes;
   }

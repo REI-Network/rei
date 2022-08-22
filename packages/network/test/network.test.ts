@@ -10,6 +10,14 @@ setLevel('detail');
 describe('NetworkManager', () => {
   let service: Service;
 
+  /**
+   * Batch create nodes,
+   * this function will create a bootnode
+   * and let other node connect with the bootnode
+   * @param count - Number of nodes
+   * @param protocols - Protocol list
+   * @returns Nodes
+   */
   async function batchCreateNodes(count: number, protocols: (Protocol | Protocol[])[] = [new MockProtocol(1)]) {
     if (count <= 1) {
       throw new Error('invalid count');
@@ -23,6 +31,11 @@ describe('NetworkManager', () => {
     return nodes;
   }
 
+  /**
+   * Radom pick an element
+   * @param array
+   * @returns
+   */
   function randomPick<T>(array: T[]): T {
     if (array.length === 0) {
       throw new Error('empty array');
@@ -30,6 +43,15 @@ describe('NetworkManager', () => {
     return array[getRandomIntInclusive(0, array.length - 1)];
   }
 
+  /**
+   * Check for a condition,
+   * if it times out, consider it a failure
+   * @param emitter - Event emitter
+   * @param event - Event name
+   * @param condition - Condition function
+   * @param duration - Timeout duration
+   * @returns Whether succeed
+   */
   function check<T extends EventEmitter>(emitter: T, event: string, condition: (emitter: T) => boolean, duration: number = 5000): Promise<boolean> {
     let timeout: NodeJS.Timeout;
     let callback: () => void;
@@ -54,6 +76,15 @@ describe('NetworkManager', () => {
     });
   }
 
+  /**
+   * Check for conditions,
+   * if it times out, consider it a failure
+   * @param emitters - Event emitter list
+   * @param event - Event name
+   * @param condition - Condition function
+   * @param duration - Timeout duration
+   * @returns Whether succeed
+   */
   function multiCheck<T extends EventEmitter>(emitters: T[], event: string, condition: (emitter: T) => boolean, duration: number = 5000) {
     let timeout: NodeJS.Timeout;
     let callbacks: (() => void)[] = [];

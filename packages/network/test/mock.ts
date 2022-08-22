@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import EventEmitter from 'events';
 import levelup from 'levelup';
 import PeerId from 'peer-id';

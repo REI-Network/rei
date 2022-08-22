@@ -135,9 +135,10 @@ describe('NetworkManager', () => {
         }
       )
     ).be.true;
-    for (const { network } of nodes) {
+    for (const { network, discv5 } of nodes) {
       expect(network.peers.length).be.equal(4);
       expect(network.connectionSize).be.equal(4);
+      expect(discv5.localEnr.ip).be.equal(service.getRealIPByNodeId(discv5.localEnr.nodeId));
     }
   });
 });

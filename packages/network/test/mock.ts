@@ -870,6 +870,24 @@ export class Service {
     this.nodesRealIP.set(nodeId, ip);
   }
 
+  /**
+   * Get real ip address by peer id
+   * @param peerId
+   * @returns Real ip address
+   */
+  getRealIPByPeerId(peerId: string) {
+    return this.peersRealIP.get(peerId)!;
+  }
+
+  /**
+   * Get real ip address by node id
+   * @param nodeId
+   * @returns Real ip address
+   */
+  getRealIPByNodeId(nodeId: string) {
+    return this.nodesRealIP.get(nodeId)!;
+  }
+
   // generate unique ip address
   private generateIP() {
     const ip = this.autoIP++;

@@ -135,10 +135,17 @@ describe('NetworkManager', () => {
         }
       )
     ).be.true;
-    for (const { network, discv5 } of nodes) {
+    for (const { network, discv5, libp2p } of nodes) {
       expect(network.peers.length).be.equal(4);
       expect(network.connectionSize).be.equal(4);
       expect(discv5.localEnr.ip).be.equal(service.getRealIPByNodeId(discv5.localEnr.nodeId));
+      const otherNodes = nodes.filter((node) => !node.libp2p.peerId.equals(libp2p.peerId));
+      for (const otherNode of otherNodes) {
+        const addrs = libp2p.getAddress(otherNode.libp2p.peerId);
+        expect(addrs !== undefined && addrs.length === 1).be.true;
+        const addr = addrs![0].nodeAddress();
+        expect(addr.address === service.getRealIPByPeerId(otherNode.libp2p.peerId.toB58String()));
+      }
     }
   });
 });

@@ -563,8 +563,8 @@ function defaultMockLibp2pConfig(): MockLibp2pConfig {
 
 function defaultMockDiscv5Config(): MockDiscv5Config {
   return {
-    findNodesInterval: 50,
-    pingInterval: 100,
+    findNodesInterval: 100,
+    pingInterval: 200,
     maxFindNodes: 16
   };
 }

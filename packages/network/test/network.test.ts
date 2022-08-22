@@ -29,7 +29,7 @@ describe('NetworkManager', () => {
     return array[getRandomIntInclusive(0, array.length - 1)];
   }
 
-  function check(emitter: EventEmitter, event: string, condition: () => boolean, duration: number = 2000): Promise<boolean> {
+  function check(emitter: EventEmitter, event: string, condition: () => boolean, duration: number = 5000): Promise<boolean> {
     let timeout: NodeJS.Timeout;
     let callback: () => void;
     let pending: ((value: boolean) => void)[] = [];
@@ -64,14 +64,9 @@ describe('NetworkManager', () => {
   it('should discover and connect succeed', async () => {
     const { libp2p } = randomPick(await batchCreateNodes(5));
     expect(
-      await check(
-        libp2p,
-        'connect',
-        () => {
-          return libp2p.connectionSize >= 4;
-        },
-        90000
-      )
+      await check(libp2p, 'connect', () => {
+        return libp2p.connectionSize >= 4;
+      })
     ).be.true;
   });
 });

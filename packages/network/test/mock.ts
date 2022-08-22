@@ -401,6 +401,7 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
   private enr: ENR;
   private service: Service;
   private kbucket = new Map<string, ENR>();
+  private pending: ENR[] = [];
   private findNodesTimer = new AbortableTimer();
   private pingTimer = new AbortableTimer();
   private findNodesPromise?: Promise<void>;
@@ -428,8 +429,13 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
 
   private async pingLoop() {
     while (!this.aborted) {
-      for (const to of this.kbucket.keys()) {
-        this.service.ping(this.enr.nodeId, this.enr.ip!, to);
+      // send a ping package to all peers in kbucket
+      for (const enr of this.kbucket.values()) {
+        this.service.ping(copyENR(this.enr), enr);
+      }
+      // send a ping package to all pending peers
+      for (const enr of this.pending) {
+        this.service.ping(copyENR(this.enr), enr);
       }
       await this.pingTimer.wait(this.config.pingInterval);
     }
@@ -454,16 +460,39 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
     });
   }
 
-  onPing(from: string, realIP: string) {
-    this.service.pong(this.enr.nodeId, realIP, from);
+  onPing(from: ENR, fromIP: string) {
+    const oldENR = this.kbucket.get(from.nodeId);
+    if (!oldENR) {
+      // the remote peer doesn't exist,
+      // add the new peer to pending list
+      const index = this.pending.findIndex(({ nodeId }) => nodeId === from.nodeId);
+      if (index !== -1) {
+        this.pending.splice(index, 1);
+      }
+      this.pending.push(from);
+    } else if (from.seq > oldENR.seq) {
+      // update local enr address
+      this.kbucket.set(from.nodeId, from);
+    }
+    // send a pong package to remote peer
+    this.service.pong(copyENR(this.enr), from, fromIP);
   }
 
-  onPong(from: string, ip: string) {
-    if (this.kbucket.has(from)) {
+  onPong(from: ENR, realIP: string) {
+    // remove peer from pending list
+    const index = this.pending.findIndex(({ nodeId }) => nodeId === from.nodeId);
+    if (index !== -1) {
+      this.pending.splice(index, 1);
+      // add the new peer to kbucket
+      this.kbucket.set(from.nodeId, from);
+    }
+    // ignore unknown pong package
+    if (!this.kbucket.has(from.nodeId)) {
       return;
     }
-    if (ip !== this.enr.ip) {
-      this.enr.ip = ip;
+    // update local enr address
+    if (realIP !== this.enr.ip) {
+      this.enr.ip = realIP;
       this.emit('multiaddrUpdated', this.enr.getLocationMultiaddr('udp'));
     }
   }
@@ -665,20 +694,24 @@ export class Service {
     return ep.discv5.onFindNodes(from);
   }
 
-  ping(from: string, ip: string, to: string) {
-    const ep = this.nodes.get(to);
+  ping(from: ENR, to: ENR) {
+    const ep = this.nodes.get(to.nodeId);
     if (!ep) {
       return;
     }
-    ep.discv5.onPing(from, this.nodesRealIP.get(from) ?? ip);
+    const realToIP = this.nodesRealIP.get(to.nodeId);
+    if (!realToIP || realToIP !== to.ip) {
+      return;
+    }
+    ep.discv5.onPing(from, this.nodesRealIP.get(from.nodeId) ?? from.ip!);
   }
 
-  pong(from: string, ip: string, to: string) {
-    const ep = this.nodes.get(to);
+  pong(from: ENR, to: ENR, realIP: string) {
+    const ep = this.nodes.get(to.nodeId);
     if (!ep) {
       return;
     }
-    ep.discv5.onPong(from, ip);
+    ep.discv5.onPong(from, realIP);
   }
 
   async abort() {

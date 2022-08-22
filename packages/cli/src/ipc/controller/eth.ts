@@ -1,6 +1,6 @@
 import { TopicsData, CallData, ApiServer } from '@rei-network/api';
+import { WebsocketClient } from '@rei-network/rpc/src/client';
 import { IpcServer } from '../server';
-// import { WebsocketClient } from '../client';
 
 /**
  * Eth api Controller
@@ -407,14 +407,14 @@ export class ETHController {
     return this.apiServer.unsubscribe(id);
   }
 
-  // /**
-  //  * Creates a new subscription for specified events
-  //  * @param type  - subscription type
-  //  * @param options - subscription options
-  //  * @param client - subscription client
-  //  * @returns Subscription id
-  //  */
-  // async subscribe([type, options]: [string, undefined | { address?: string | string[]; topics?: TopicsData }], client?: WebsocketClient) {
-  //   return this.apiServer.subscribe(type, options, client);
-  // }
+  /**
+   * Creates a new subscription for specified events
+   * @param type  - subscription type
+   * @param options - subscription options
+   * @param client - subscription client
+   * @returns Subscription id
+   */
+  async subscribe([type, options]: [string, undefined | { address?: string | string[]; topics?: TopicsData }], client?: WebsocketClient) {
+    return this.apiServer.subscribe(type, options, client);
+  }
 }

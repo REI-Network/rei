@@ -20,6 +20,10 @@ class MockStream implements Stream {
     this.protocol = protocol;
   }
 
+  /**
+   * Close stream,
+   * This method only cares about itself and does not close the remote stream
+   */
   close(): void {
     if (!this.aborted) {
       this.aborted = true;
@@ -27,6 +31,10 @@ class MockStream implements Stream {
     }
   }
 
+  /**
+   * Receive data from remote stream
+   * @param data
+   */
   receiveData(data: Buffer) {
     if (this.aborted) {
       return;
@@ -34,6 +42,11 @@ class MockStream implements Stream {
     this.output.push(data);
   }
 
+  /**
+   * Read data from local source stream
+   * and send them to remote
+   * @param source - Source stream
+   */
   sink = async (source: AsyncGenerator<Buffer, any, unknown>): Promise<void> => {
     for await (const data of source) {
       if (this.aborted) {
@@ -43,6 +56,9 @@ class MockStream implements Stream {
     }
   };
 
+  /**
+   * Receive data from remote stream
+   */
   source = async function* (this: MockStream) {
     for await (const data of this.output) {
       yield { _bufs: [data] };
@@ -64,6 +80,11 @@ class MockConn implements Connection {
     this.remotePeer = remotePeer;
   }
 
+  /**
+   * Send data to remote connection
+   * @param protocol
+   * @param data
+   */
   sendData(protocol: string, data: Buffer) {
     if (this.aborted) {
       return;
@@ -71,18 +92,25 @@ class MockConn implements Connection {
     this.libp2p.sendData(this.remotePeer.toB58String(), this.id, protocol, data);
   }
 
+  /**
+   * Receive data from remote connection
+   * @param protocol
+   * @param data
+   */
   receiveData(protocol: string, data: Buffer) {
     if (this.aborted) {
       return;
     }
     const stream = this.streams.get(protocol);
     if (!stream) {
-      // emit error
       return;
     }
     stream.receiveData(data);
   }
 
+  /**
+   * Close connection
+   */
   async close(): Promise<void> {
     if (!this.aborted) {
       this.aborted = true;
@@ -93,6 +121,7 @@ class MockConn implements Connection {
     }
   }
 
+  // create a new stream for protocol
   private _newStream(protocol: string) {
     let stream = this.streams.get(protocol);
     if (stream) {
@@ -103,6 +132,11 @@ class MockConn implements Connection {
     return stream;
   }
 
+  /**
+   * Create a new stream for protocol
+   * @param protocols
+   * @returns New stream
+   */
   async newStream(protocols: string | string[]): Promise<{ stream: Stream }> {
     if (this.aborted) {
       throw new Error('stream closed');
@@ -113,6 +147,11 @@ class MockConn implements Connection {
     return { stream: this._newStream(protocols) };
   }
 
+  /**
+   * Receive new streaming request from remote
+   * @param protocol
+   * @returns New stream
+   */
   onNewStream(protocol: string) {
     if (this.aborted) {
       return;
@@ -120,6 +159,10 @@ class MockConn implements Connection {
     return this._newStream(protocol);
   }
 
+  /**
+   * Get local streams
+   * @returns Streams
+   */
   _getStreams(): Stream[] {
     return Array.from(this.streams.values());
   }
@@ -164,6 +207,13 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
     return Array.from(this.conns.values()).reduce((accumulator, value) => accumulator + value.length, 0);
   }
 
+  /**
+   * Send data to remote libp2p
+   * @param to - Peer id
+   * @param id - Connection id
+   * @param protocol - Protocol name
+   * @param data - Data
+   */
   sendData(to: string, id: number, protocol: string, data: Buffer) {
     if (this.aborted) {
       return;
@@ -171,23 +221,34 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
     this.service.sendData(this.peerId.toB58String(), to, id, protocol, data);
   }
 
+  /**
+   * Receive data from remote libp2p
+   * @param from - Remote peer id
+   * @param id - Connection id
+   * @param protocol - Protocol nam
+   * @param data - Data
+   */
   receiveData(from: string, id: number, protocol: string, data: Buffer) {
     if (this.aborted) {
       return;
     }
     const conns = this.conns.get(from);
     if (!conns) {
-      // emit error
       return;
     }
     const conn = conns.find(({ id: _id }) => id === _id);
     if (!conn) {
-      // emit error
       return;
     }
     conn.receiveData(protocol, data);
   }
 
+  /**
+   * Create new stream for protocol
+   * @param to - Peer id
+   * @param id - Connection id
+   * @param protocol - Protocol name
+   */
   newStream(to: string, id: number, protocol: string) {
     if (this.aborted) {
       return;
@@ -195,31 +256,34 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
     this.service.newStream(this.peerId.toB58String(), to, id, protocol);
   }
 
+  /**
+   * Receive new streaming requst from remote
+   * @param from - Remote peer id
+   * @param id - Connection id
+   * @param protocol - Protocol name
+   */
   onNewStream(from: string, id: number, protocol: string) {
     if (this.aborted) {
       return;
     }
     const conns = this.conns.get(from);
     if (!conns) {
-      // emit error
       return;
     }
     const conn = conns.find(({ id: _id }) => id === _id);
     if (!conn) {
-      // emit error
       return;
     }
     const stream = conn.onNewStream(protocol);
-    // TODO: handle
     const handler = this.handlers.get(protocol);
     if (!stream || !handler) {
-      // emit error
       return;
     }
     // invoke callback
     handler({ connection: conn, stream });
   }
 
+  // check if the number of connections exceeds the maximum limit
   private async checkMaxConns() {
     while (this.connectionSize > this.maxConnections) {
       const entries = Array.from(this.peerValues).sort(([, a], [, b]) => a - b);
@@ -235,6 +299,7 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
     }
   }
 
+  // create a new connection
   private async _newConn(peer: string, id: number) {
     const peerId = PeerId.createFromB58String(peer);
     const conn = new MockConn(this, peerId, id);
@@ -249,6 +314,11 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
     return conn;
   }
 
+  /**
+   * Dial a remote node
+   * @param peer - Remote peer id
+   * @returns Connection object
+   */
   async dial(peer: string | PeerId | Multiaddr): Promise<Connection> {
     if (this.aborted) {
       throw new Error('libp2p aborted');
@@ -269,11 +339,17 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
     return await this._newConn(peer, id);
   }
 
+  /**
+   * Receive dialing request from remote
+   * @param from - Remote peer id
+   * @param id - Connection id
+   */
   async onDial(from: string, id: number) {
     await this._newConn(from, id);
   }
 
-  // TODO: support conn
+  // TODO: support conn?
+  // close a connection
   private async _disconnect(peer: string, id: number) {
     const conns = this.conns.get(peer);
     if (!conns) {
@@ -281,7 +357,6 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
     }
     const conn = conns.find(({ id: _id }) => id === _id);
     if (!conn) {
-      // emit error
       return;
     }
     await conn.close();
@@ -292,27 +367,40 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
     }
   }
 
+  /**
+   * Close a connection
+   * @param peer - Peer id
+   * @param id - Connection id
+   */
   async disconnect(peer: string, id: number) {
     await this._disconnect(peer, id);
     await this.service.disconnect(this.peerId.toB58String(), peer, id);
   }
 
+  /**
+   * Receive closing connection request from remote
+   * @param from - Remote peer id
+   * @param id - Connection id
+   */
   async onDisconnect(from: string, id: number) {
     await this._disconnect(from, id);
   }
 
+  // register handler
   handle(protocols: string | string[], callback: Handler): void {
     // NOTE: currently only string type is supported
     protocols = protocols as string;
     this.handlers.set(protocols, callback);
   }
 
+  // unregister handler
   unhandle(protocols: string | string[]): void {
     // NOTE: currently only string type is supported
     protocols = protocols as string;
     this.handlers.delete(protocols);
   }
 
+  // add address to address book
   addAddress(peerId: PeerId, addresses: Multiaddr[]): void {
     const oldAddrs = this.addressBook.get(peerId.toB58String()) || [];
     oldAddrs.forEach((addr) => {
@@ -328,14 +416,17 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
     }
   }
 
+  // get address from address book
   getAddress(peerId: PeerId): Multiaddr[] | undefined {
     return this.addressBook.get(peerId.toB58String());
   }
 
+  // remote peer from address book
   removeAddress(peerId: PeerId): boolean {
     return this.addressBook.delete(peerId.toB58String());
   }
 
+  // disconnect with special peer
   async hangUp(peerId: string | PeerId): Promise<void> {
     if (peerId instanceof PeerId) {
       peerId = peerId.toB58String();
@@ -349,6 +440,7 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
     }
   }
 
+  // set peer value
   setPeerValue(peerId: string | PeerId, value: number): void {
     if (peerId instanceof PeerId) {
       peerId = peerId.toB58String();
@@ -356,14 +448,17 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
     this.peerValues.set(peerId, value);
   }
 
+  // set announcement addresses
   setAnnounce(addresses: Multiaddr[]): void {
     this.announce = new Set<Multiaddr>(addresses);
   }
 
+  // get connections by peer
   getConnections(peerId: string): Connection[] | undefined {
     return this.conns.get(peerId);
   }
 
+  // handle discv5 `peer` event
   private onPeer = ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
     if (this.aborted) {
       return;
@@ -371,10 +466,12 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
     this.addAddress(id, multiaddrs);
   };
 
+  // start libp2p
   async start(): Promise<void> {
     this.discv5.on('peer', this.onPeer);
   }
 
+  // stop libp2p
   async stop(): Promise<void> {
     this.discv5.off('peer', this.onPeer);
     for (const peer of this.conns.keys()) {
@@ -401,6 +498,7 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
   private enr: ENR;
   private service: Service;
   private kbucket = new Map<string, ENR>();
+  // a pending list for new peers
   private pending: ENR[] = [];
   private findNodesTimer = new AbortableTimer();
   private pingTimer = new AbortableTimer();
@@ -441,6 +539,11 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
     }
   }
 
+  /**
+   * Handle an new ENR address,
+   * add it to kbucket and emit `peer` event
+   * @param enr - ENR address
+   */
   private async handleEnr(enr: ENR) {
     if (enr.nodeId === this.enr.nodeId) {
       // ignore ourself
@@ -460,6 +563,11 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
     });
   }
 
+  /**
+   * Receive ping package from remote
+   * @param from - Remote node id
+   * @param fromIP - Remote ip address
+   */
   onPing(from: ENR, fromIP: string) {
     const oldENR = this.kbucket.get(from.nodeId);
     if (!oldENR) {
@@ -472,19 +580,24 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
       this.pending.push(from);
     } else if (from.seq > oldENR.seq) {
       // update local enr address
-      this.kbucket.set(from.nodeId, from);
+      this.handleEnr(from);
     }
     // send a pong package to remote peer
     this.service.pong(copyENR(this.enr), from, fromIP);
   }
 
+  /**
+   * Receive pong package from remote
+   * @param from - Remote node id
+   * @param realIP - Real ip of local node
+   */
   onPong(from: ENR, realIP: string) {
     const index = this.pending.findIndex(({ nodeId }) => nodeId === from.nodeId);
     if (index !== -1) {
       // remove peer from pending list
       this.pending.splice(index, 1);
       // add the new peer to kbucket
-      this.kbucket.set(from.nodeId, from);
+      this.handleEnr(from);
     }
     // ignore unknown pong package
     if (!this.kbucket.has(from.nodeId)) {
@@ -497,6 +610,11 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
     }
   }
 
+  /**
+   * Receive find nodes pacakge from remote
+   * @param from - Remote node id
+   * @returns Nodes
+   */
   onFindNodes(from: string) {
     const enrs = [this.enr, ...Array.from(this.kbucket.values()).filter(({ nodeId }) => nodeId !== from)];
     if (enrs.length <= this.config.maxFindNodes) {
@@ -515,25 +633,30 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
     return this.enr;
   }
 
+  // add ENR address to kbucket
   asyncAddEnr(enr: string | ENR) {
     enr = enr instanceof ENR ? copyENR(enr) : ENR.decodeTxt(enr);
     this.kbucket.set(enr.nodeId, enr);
     return this.handleEnr(enr);
   }
 
+  // add ENR address to kbucket
   addEnr(enr: string | ENR): void {
     this.asyncAddEnr(enr);
   }
 
+  // get ENR address by node id
   findEnr(nodeId: string): ENR | undefined {
     return this.kbucket.get(nodeId);
   }
 
+  // start discv5
   start(): void {
     this.findNodesPromise = this.findNodesLoop();
     this.pingPromise = this.pingLoop();
   }
 
+  // abort discv5
   async abort() {
     if (!this.aborted) {
       this.aborted = true;
@@ -544,6 +667,7 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
     }
   }
 
+  // stop discv5
   stop(): void {
     this.abort();
   }
@@ -585,16 +709,19 @@ export class Service {
     return Array.from(this.peers.values());
   }
 
+  /**
+   * Set node real ip,
+   * this will change the ip of the pong package
+   * @param peerId - Peer id
+   * @param nodeId - Node id
+   * @param ip - Real ip
+   */
   setRealIP(peerId: string, nodeId: string, ip: string) {
     this.peersRealIP.set(peerId, ip);
     this.nodesRealIP.set(nodeId, ip);
   }
 
-  deleteRealIP(peerId: string, nodeId: string) {
-    this.peersRealIP.delete(peerId);
-    this.nodesRealIP.delete(nodeId);
-  }
-
+  // generate unique ip address
   private generateIP() {
     const ip = this.autoIP++;
     if (ip > 255) {
@@ -603,6 +730,12 @@ export class Service {
     return `192.168.0.${ip}`;
   }
 
+  /**
+   * Create an new endpoint
+   * @param bootnodes - Bootnodes list, it will be added to kbucket
+   * @param local - Whether to use the localhost address instead of the real address
+   * @returns New endpoint
+   */
   async createEndpoint(bootnodes: string[] = [], local: boolean = false) {
     // create peer id
     const peerId = await PeerId.create({ keyType: 'secp256k1' });
@@ -643,15 +776,29 @@ export class Service {
     return ep;
   }
 
+  /**
+   * Send data
+   * @param from - From peer id
+   * @param to - To peer id
+   * @param id - Connection id
+   * @param protocol - Protocol name
+   * @param data - Data
+   */
   sendData(from: string, to: string, id: number, protocol: string, data: Buffer) {
     const ep = this.peers.get(to);
     if (!ep) {
-      // emit error
       return;
     }
     ep.libp2p.receiveData(from, id, protocol, data);
   }
 
+  /**
+   * New stream
+   * @param from - From peer id
+   * @param to - To peer id
+   * @param id - Connection id
+   * @param protocol - Protocol name
+   */
   newStream(from: string, to: string, id: number, protocol: string) {
     const ep = this.peers.get(to);
     if (!ep) {
@@ -660,6 +807,13 @@ export class Service {
     ep.libp2p.onNewStream(from, id, protocol);
   }
 
+  /**
+   * Dial a peer
+   * @param from - From peer id
+   * @param to - To peer id
+   * @param addresses - Multi addresses
+   * @returns Connection id
+   */
   async dial(from: string, to: string, addresses: Multiaddr[]) {
     const ep = this.peers.get(to);
     if (!ep) {
@@ -678,6 +832,12 @@ export class Service {
     return connId;
   }
 
+  /**
+   * Close a connections
+   * @param from - From peer id
+   * @param to - To peer id
+   * @param id - Connection id
+   */
   async disconnect(from: string, to: string, id: number) {
     const ep = this.peers.get(to);
     if (!ep) {
@@ -686,6 +846,12 @@ export class Service {
     await ep.libp2p.onDisconnect(from, id);
   }
 
+  /**
+   * Find nodes
+   * @param from - From node id
+   * @param to - To node id
+   * @returns Nodes
+   */
   findNodes(from: string, to: string) {
     const ep = this.nodes.get(to);
     if (!ep) {
@@ -694,6 +860,11 @@ export class Service {
     return ep.discv5.onFindNodes(from);
   }
 
+  /**
+   * Send ping package
+   * @param from - From node id
+   * @param to - To node id
+   */
   ping(from: ENR, to: ENR) {
     const ep = this.nodes.get(to.nodeId);
     if (!ep) {
@@ -706,6 +877,12 @@ export class Service {
     ep.discv5.onPing(from, this.nodesRealIP.get(from.nodeId) ?? from.ip!);
   }
 
+  /**
+   * Send pong package
+   * @param from - From node id
+   * @param to - To node id
+   * @param realIP - Real ip address
+   */
   pong(from: ENR, to: ENR, realIP: string) {
     const ep = this.nodes.get(to.nodeId);
     if (!ep) {
@@ -714,6 +891,9 @@ export class Service {
     ep.discv5.onPong(from, realIP);
   }
 
+  /**
+   * Abort service, close all network managers
+   */
   async abort() {
     for (const { network } of this.peers.values()) {
       await network.abort();

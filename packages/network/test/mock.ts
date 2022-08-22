@@ -982,7 +982,7 @@ export class Service {
   }
 
   /**
-   * Close a connections
+   * Close a connection
    * @param from - From peer id
    * @param to - To peer id
    * @param id - Connection id

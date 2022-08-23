@@ -185,6 +185,7 @@ export class NetworkManager extends EventEmitter {
       if (this.options.libp2pOptions === undefined) {
         throw new Error('missing libp2p options');
       }
+
       // load enr from database
       const { enr, keypair } = await this.loadLocalENR();
       const strEnr = enr.encodeTxt(keypair.privateKey);
@@ -199,6 +200,7 @@ export class NetworkManager extends EventEmitter {
         peerId: this.options.peerId,
         enr
       });
+
       this.libp2p = libp2p;
       this.discv5 = discv5;
     }

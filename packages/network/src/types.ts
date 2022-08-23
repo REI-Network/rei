@@ -182,7 +182,7 @@ export interface IDiscv5 extends EventEmitter {
   // Get local enr address
   get localEnr(): ENR;
 
-  // Get local  keyPair
+  // Get local key pair
   get keyPair(): IKeypair;
 
   /**

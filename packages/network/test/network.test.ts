@@ -155,6 +155,18 @@ describe('NetworkManager', () => {
     expect(await protocol.getHandler(peer).request()).be.true;
   });
 
+  it('should update multi address when ip address changed', async () => {
+    const endpoint = randomPick(nodes);
+    const newIP = service.generateIP();
+    service.setRealIP(endpoint.network.peerId, endpoint.discv5.localEnr.nodeId, newIP);
+    expect(
+      await check(endpoint.discv5, 'multiaddrUpdated', () => {
+        return true;
+      })
+    ).be.true;
+    expect(endpoint.discv5.localEnr.ip).be.equal(newIP);
+  });
+
   it('should abort succeed', async () => {
     await service.abort();
   });

@@ -763,6 +763,7 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
     // update local enr address
     if (realIP !== this.enr.ip) {
       this.enr.ip = realIP;
+      this.enr.encodeToValues(this.keyPair.privateKey);
       this.emit('multiaddrUpdated', this.enr.getLocationMultiaddr('udp'));
     }
   }
@@ -896,8 +897,11 @@ export class Service {
     return this.nodesRealIP.get(nodeId)!;
   }
 
-  // generate unique ip address
-  private generateIP() {
+  /**
+   * Generate unique ip address
+   * @returns IP address
+   */
+  generateIP() {
     const ip = this.autoIP++;
     if (ip > 255) {
       throw new Error('too many peers');

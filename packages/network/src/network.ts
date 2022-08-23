@@ -37,9 +37,9 @@ export interface NetworkManagerOptions {
   discv5?: IDiscv5;
   // libp2p instance
   libp2p?: ILibp2p;
-  //inboud throttle interval
+  // inbound throttle interval
   inboundThrottleTime?: number;
-  //outbound throttle interval
+  // outbound throttle interval
   outboundThrottleTime?: number;
   // libp2p constructor options
   libp2pOptions?: {

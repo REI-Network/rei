@@ -4,8 +4,7 @@ import { getRandomIntInclusive, setLevel } from '@rei-network/utils';
 import { Service, Endpoint, MockProtocol } from './mock';
 import { Protocol } from '../src';
 
-// TODO: silent
-setLevel('detail');
+setLevel('silent');
 
 describe('NetworkManager', () => {
   let service: Service;

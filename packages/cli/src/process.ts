@@ -24,7 +24,7 @@ export function SIGINT(node: Node, apiServer: ApiServer, ipcServer: IpcServer) {
           logger.error('SIGINT, timeout');
           process.exit(1);
         }, 3000);
-        await Promise.all([node.abort(), apiServer.abort(), ipcServer.abort()]);
+        await Promise.all([node.abort(), apiServer.abort(), ipcServer.rpcServer?.abort(), ipcServer.abort()]);
         logger.info('SIGINT, abort finished');
         process.exit(0);
       } catch (err) {

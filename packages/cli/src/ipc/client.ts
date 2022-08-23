@@ -38,6 +38,7 @@ export class IpcClient {
     this.path = path;
     ipc.config.id = ipcId;
     ipc.config.silent = true;
+    ipc.config.sync = true;
   }
 
   start() {
@@ -58,6 +59,7 @@ export class IpcClient {
     });
 
     ipc.of[ipcId].on('error', (err) => {
+      console.log(err);
       console.log('Error: ' + err);
       this.replServer.displayPrompt();
     });

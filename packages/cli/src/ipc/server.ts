@@ -8,10 +8,10 @@ import { RpcServer } from '@rei-network/rpc';
 
 const defaultPort = 27777;
 const defaultMaxConnections = 1;
-const ipcAppspace = 'rei.';
 const defaultApis = 'admin,debug,eth,net,txpool,web3';
 
 export const ipcId = 'ipc';
+export const ipcAppspace = 'rei.';
 export class IpcServer {
   apiServer: ApiServer;
   private readonly datadir: string;
@@ -35,11 +35,12 @@ export class IpcServer {
     ipc.server.emit(socket, 'message', message);
   }
 
-  start() {
+  start(silent?: boolean) {
     ipc.config.id = ipcId;
     ipc.config.maxConnections = defaultMaxConnections;
     ipc.config.socketRoot = this.datadir;
     ipc.config.appspace = ipcAppspace;
+    ipc.config.silent = silent ? silent : false;
     ipc.serve(() => {
       ipc.server.on('connect', async (socket) => {
         logger.info(' IPC Client connected', socket.server._pipeName);
@@ -53,7 +54,6 @@ export class IpcServer {
       ipc.server.on('message', async (data: string, socket: any) => {
         try {
           const result = await this.handleReq(data);
-          console.log('result is ', result);
           this.send(socket, JSON.stringify(result));
         } catch (err: any) {
           logger.info(err);

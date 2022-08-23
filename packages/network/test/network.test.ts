@@ -1,14 +1,16 @@
 import EventEmitter from 'events';
 import { expect } from 'chai';
 import { getRandomIntInclusive, setLevel } from '@rei-network/utils';
-import { Service, Endpoint, MockProtocol, MockHandler } from './mock';
+import { Service, Endpoint, MockProtocol } from './mock';
 import { Protocol } from '../src';
 
 // TODO: silent
 setLevel('detail');
 
 describe('NetworkManager', () => {
-  let service: Service;
+  const service = new Service();
+  const protocol = new MockProtocol(1);
+  let nodes: Endpoint[];
 
   /**
    * Batch create nodes,
@@ -116,17 +118,11 @@ describe('NetworkManager', () => {
     });
   }
 
-  beforeEach(async () => {
-    service = new Service();
-  });
-
-  afterEach(async () => {
-    await service.abort();
+  it('should create nodes succeed', async () => {
+    nodes = await batchCreateNodes(5, [protocol]);
   });
 
   it('should discover and connect succeed', async () => {
-    const protocol = new MockProtocol(1);
-    const nodes = await batchCreateNodes(5, [protocol]);
     expect(
       await multiCheck(
         nodes.map(({ network }) => network),
@@ -136,6 +132,9 @@ describe('NetworkManager', () => {
         }
       )
     ).be.true;
+  });
+
+  it('should get and update multi address succeed', () => {
     for (const { network, discv5, libp2p } of nodes) {
       expect(network.peers.length).be.equal(4);
       expect(network.connectionSize).be.equal(4);
@@ -148,10 +147,15 @@ describe('NetworkManager', () => {
         expect(addr.address, 'address book should be correct').be.equal(service.getRealIPByPeerId(otherNode.libp2p.peerId.toB58String()));
       }
     }
+  });
 
+  it('should request succeed', async () => {
     const { network } = randomPick(nodes);
     const peer = randomPick(network.peers);
-    const handler = peer.getHandler(protocol.protocolString);
-    expect(await (handler as MockHandler).request()).be.true;
+    expect(await protocol.getHandler(peer).request()).be.true;
+  });
+
+  it('should abort succeed', async () => {
+    await service.abort();
   });
 });

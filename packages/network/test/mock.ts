@@ -24,7 +24,7 @@ function response(version: number) {
   return Buffer.from(JSON.stringify({ method: 'response', version }));
 }
 
-export class MockHandler implements ProtocolHandler {
+class MockHandler implements ProtocolHandler {
   readonly peer: Peer;
   readonly stream: ProtocolStream;
   readonly protocol: MockProtocol;
@@ -90,7 +90,7 @@ export class MockHandler implements ProtocolHandler {
    * @param data - Message data
    */
   handle(data: Buffer): void | Promise<void> {
-    const { method, version, params } = JSON.parse(data.toString());
+    const { method, version } = JSON.parse(data.toString());
     if (version !== this.protocol.version) {
       throw new Error('invalid vesion');
     }
@@ -102,7 +102,7 @@ export class MockHandler implements ProtocolHandler {
       this.stream.send(response(this.protocol.version));
     } else if (method === 'response') {
       if (this.requestResolve) {
-        this.requestResolve(params);
+        this.requestResolve(true);
       }
     }
   }
@@ -155,6 +155,14 @@ export class MockProtocol implements Protocol {
    */
   async makeHandler(peer: Peer, stream: ProtocolStream): Promise<ProtocolHandler | null> {
     return new MockHandler(this, peer, stream);
+  }
+
+  /**
+   * Get handler instance from peer
+   * @param peer - Peer object
+   */
+  getHandler(peer: Peer) {
+    return peer.getHandler(this.protocolString) as MockHandler;
   }
 }
 

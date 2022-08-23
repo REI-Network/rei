@@ -4,11 +4,10 @@ import process from 'process';
 import { Node, NodeFactory } from '@rei-network/core';
 import { RpcServer } from '@rei-network/rpc';
 import { setLevel, logger } from '@rei-network/utils';
+import { ApiServer } from '@rei-network/api';
+import { IpcServer, IpcClient, ipcAppspace, ipcId } from '@rei-network/ipc';
 import { SIGINT } from '../process';
 import { getPassphrase, getKeyStorePath } from './account';
-import { ApiServer } from '@rei-network/api';
-import { IpcServer, ipcAppspace, ipcId } from '../ipc/server';
-import { IpcClient } from '../ipc/client';
 
 /**
  * Start rei node
@@ -66,8 +65,7 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
   }
   const ipcServer = new IpcServer(apiServer, opts.datadir, rpcServer);
   if (opts.console) {
-    ipcServer.start(true);
-    await new Promise<void>((resolve) => setTimeout(() => resolve(), 2000));
+    await ipcServer.start();
     setLevel('silent');
     const client = new IpcClient(path.join(opts.datadir, ipcAppspace + ipcId));
     client.start();

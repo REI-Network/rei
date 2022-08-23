@@ -76,12 +76,12 @@ export class IpcClient {
   }
 
   newRepl() {
-    this.replServer.context.admin = replProxy.admin;
-    this.replServer.context.debug = replProxy.debug;
-    this.replServer.context.eth = replProxy.eth;
-    this.replServer.context.net = replProxy.net;
-    this.replServer.context.txpool = replProxy.txpool;
-    this.replServer.context.web3 = replProxy.web3;
+    this.replServer.context.admin = proxy;
+    this.replServer.context.debug = proxy;
+    this.replServer.context.eth = proxy;
+    this.replServer.context.net = proxy;
+    this.replServer.context.txpool = proxy;
+    this.replServer.context.web3 = proxy;
 
     this.replServer.on('exit', () => {
       logger.info('Received exit signal, exiting...');

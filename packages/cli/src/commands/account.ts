@@ -5,7 +5,7 @@ import inquirer from 'inquirer';
 import { bufferToHex, toChecksumAddress, Address } from 'ethereumjs-util';
 import { AccountManager } from '@rei-network/wallet';
 import { hexStringToBuffer, logger } from '@rei-network/utils';
-import { IpcClient } from '../ipc/client';
+import { IpcClient } from '@rei-network/ipc';
 
 /**
  * Get account passphrase, if the user specifies the file, read from the file, if not, let the user input

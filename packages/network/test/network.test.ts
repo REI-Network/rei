@@ -167,6 +167,21 @@ describe('NetworkManager', () => {
     expect(endpoint.discv5.localEnr.ip).be.equal(newIP);
   });
 
+  it('should connect remote peer after outbound timeout', async () => {
+    const endpoint = randomPick(nodes);
+    const peer = randomPick(endpoint.network.peers);
+    const conns = endpoint.libp2p.getConnections(peer.peerId);
+    expect(conns !== undefined && conns.length > 0).be.true;
+    const conn = randomPick(conns!);
+    // manually disconnect
+    await endpoint.libp2p.disconnect(peer.peerId, (conn as any).id);
+    expect(
+      await check(endpoint.libp2p, 'connect', () => {
+        return endpoint.libp2p.connectionSize >= 4;
+      })
+    ).be.true;
+  });
+
   it('should abort succeed', async () => {
     await service.abort();
   });

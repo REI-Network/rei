@@ -353,7 +353,7 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
   }
 
   get peers(): string[] {
-    return Array.from(this.conns.keys());
+    return Array.from(this.addressBook.keys());
   }
 
   get maxConnections(): number {
@@ -854,6 +854,7 @@ function defaultMockDiscv5Config(): MockDiscv5Config {
 const localhost = '127.0.0.1';
 const tcpPort = 4191;
 const udpPort = 9810;
+const outboundThrottleTime = 50;
 
 export class Service {
   private autoIP = 0;
@@ -937,7 +938,8 @@ export class Service {
       protocols,
       nodedb: levelup(memdown()),
       discv5,
-      libp2p
+      libp2p,
+      outboundThrottleTime
     });
     const ep = { network, libp2p, discv5 };
     // save to memory set

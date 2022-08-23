@@ -1,5 +1,5 @@
 import EventEmitter from 'events';
-import { expect } from 'chai';
+import { expect, assert } from 'chai';
 import { getRandomIntInclusive, setLevel } from '@rei-network/utils';
 import { Service, Endpoint, MockProtocol } from './mock';
 import { Protocol } from '../src';
@@ -8,8 +8,7 @@ import { Protocol } from '../src';
 setLevel('detail');
 
 describe('NetworkManager', () => {
-  const service = new Service();
-  const protocol = new MockProtocol(1);
+  let service: Service;
   let nodes: Endpoint[];
 
   /**
@@ -118,71 +117,122 @@ describe('NetworkManager', () => {
     });
   }
 
-  it('should create nodes succeed', async () => {
-    nodes = await batchCreateNodes(5, [protocol]);
-  });
+  describe('should be established and reconnected correctly', () => {
+    const protocol = new MockProtocol(1);
 
-  it('should discover and connect succeed', async () => {
-    expect(
-      await multiCheck(
-        nodes.map(({ network }) => network),
-        'installed',
-        (network) => {
-          return network.peers.length >= 4;
+    it('should create nodes succeed', async () => {
+      service = new Service();
+      nodes = await batchCreateNodes(5, [protocol]);
+    });
+
+    it('should discover and connect succeed', async () => {
+      expect(
+        await multiCheck(
+          nodes.map(({ network }) => network),
+          'installed',
+          (network) => {
+            return network.peers.length >= 4;
+          }
+        )
+      ).be.true;
+    });
+
+    it('should get and update multi address succeed', () => {
+      for (const { network, discv5, libp2p } of nodes) {
+        expect(network.peers.length).be.equal(4);
+        expect(network.connectionSize).be.equal(4);
+        expect(discv5.localEnr.ip, 'enr address should be updated').be.equal(service.getRealIPByNodeId(discv5.localEnr.nodeId));
+        const otherNodes = nodes.filter((node) => !node.libp2p.peerId.equals(libp2p.peerId));
+        for (const otherNode of otherNodes) {
+          const addrs = libp2p.getAddress(otherNode.libp2p.peerId);
+          expect(addrs !== undefined && addrs.length === 1).be.true;
+          const addr = addrs![0].nodeAddress();
+          expect(addr.address, 'address book should be correct').be.equal(service.getRealIPByPeerId(otherNode.libp2p.peerId.toB58String()));
         }
-      )
-    ).be.true;
-  });
-
-  it('should get and update multi address succeed', () => {
-    for (const { network, discv5, libp2p } of nodes) {
-      expect(network.peers.length).be.equal(4);
-      expect(network.connectionSize).be.equal(4);
-      expect(discv5.localEnr.ip, 'enr address should be updated').be.equal(service.getRealIPByNodeId(discv5.localEnr.nodeId));
-      const otherNodes = nodes.filter((node) => !node.libp2p.peerId.equals(libp2p.peerId));
-      for (const otherNode of otherNodes) {
-        const addrs = libp2p.getAddress(otherNode.libp2p.peerId);
-        expect(addrs !== undefined && addrs.length === 1).be.true;
-        const addr = addrs![0].nodeAddress();
-        expect(addr.address, 'address book should be correct').be.equal(service.getRealIPByPeerId(otherNode.libp2p.peerId.toB58String()));
       }
-    }
+    });
+
+    it('should request succeed', async () => {
+      const { network } = randomPick(nodes);
+      const peer = randomPick(network.peers);
+      expect(await protocol.getHandler(peer).request()).be.true;
+    });
+
+    it('should update multi address when ip address changed', async () => {
+      const endpoint = randomPick(nodes);
+      const newIP = service.generateIP();
+      service.setRealIP(endpoint.network.peerId, endpoint.discv5.localEnr.nodeId, newIP);
+      expect(
+        await check(endpoint.discv5, 'multiaddrUpdated', () => {
+          return true;
+        })
+      ).be.true;
+      expect(endpoint.discv5.localEnr.ip).be.equal(newIP);
+    });
+
+    it('should connect remote peer after outbound timeout', async () => {
+      const endpoint = randomPick(nodes);
+      const peer = randomPick(endpoint.network.peers);
+      const conns = endpoint.libp2p.getConnections(peer.peerId);
+      expect(conns !== undefined && conns.length > 0).be.true;
+      const conn = randomPick(conns!);
+      // manually disconnect
+      await endpoint.libp2p.disconnect(peer.peerId, (conn as any).id);
+      expect(
+        await check(endpoint.libp2p, 'connect', () => {
+          return endpoint.libp2p.connectionSize >= 4;
+        })
+      ).be.true;
+    });
+
+    it('should abort succeed', async () => {
+      await service.abort();
+      nodes = [];
+    });
   });
 
-  it('should request succeed', async () => {
-    const { network } = randomPick(nodes);
-    const peer = randomPick(network.peers);
-    expect(await protocol.getHandler(peer).request()).be.true;
-  });
+  describe('should handle the protocol correctly', () => {
+    const protocol1 = new MockProtocol(1);
+    const protocol2 = new MockProtocol(2);
+    const protocol3 = new MockProtocol(3);
+    const protocol4 = new MockProtocol(4);
 
-  it('should update multi address when ip address changed', async () => {
-    const endpoint = randomPick(nodes);
-    const newIP = service.generateIP();
-    service.setRealIP(endpoint.network.peerId, endpoint.discv5.localEnr.nodeId, newIP);
-    expect(
-      await check(endpoint.discv5, 'multiaddrUpdated', () => {
-        return true;
-      })
-    ).be.true;
-    expect(endpoint.discv5.localEnr.ip).be.equal(newIP);
-  });
+    it('should create nodes succeed', async () => {
+      service = new Service();
+      nodes = await batchCreateNodes(3, [protocol1, [protocol2, protocol3], protocol4]);
+    });
 
-  it('should connect remote peer after outbound timeout', async () => {
-    const endpoint = randomPick(nodes);
-    const peer = randomPick(endpoint.network.peers);
-    const conns = endpoint.libp2p.getConnections(peer.peerId);
-    expect(conns !== undefined && conns.length > 0).be.true;
-    const conn = randomPick(conns!);
-    // manually disconnect
-    await endpoint.libp2p.disconnect(peer.peerId, (conn as any).id);
-    expect(
-      await check(endpoint.libp2p, 'connect', () => {
-        return endpoint.libp2p.connectionSize >= 4;
-      })
-    ).be.true;
-  });
+    it('should discover and connect succeed', async () => {
+      expect(
+        await multiCheck(
+          nodes.map(({ network }) => network),
+          'installed',
+          (network) => {
+            return network.peers.length >= 2;
+          }
+        )
+      ).be.true;
+    });
 
-  it('should abort succeed', async () => {
-    await service.abort();
+    it('should handshake succeed', async () => {
+      const endpoint = randomPick(nodes);
+      expect(endpoint.network.peers.length).gt(0);
+      for (const peer of endpoint.network.peers) {
+        expect(!!peer.getHandler(protocol1.protocolString)).be.true;
+        expect(!!peer.getHandler(protocol2.protocolString)).be.true;
+        expect(!!peer.getHandler(protocol4.protocolString)).be.true;
+        try {
+          peer.getHandler(protocol3.protocolString);
+          assert.fail("protocol3 shouldn't exist");
+        } catch (err) {
+          // ignore error...
+        }
+      }
+    });
+
+    it('should abort succeed', async () => {
+      await service.abort();
+      nodes = [];
+    });
   });
 });

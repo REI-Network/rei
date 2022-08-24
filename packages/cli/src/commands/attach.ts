@@ -4,9 +4,9 @@ import { logger } from '@rei-network/utils';
 import { IpcClient } from '@rei-network/ipc';
 
 /**
- *
- * @param opts
- * @returns
+ * Get path for ipc attach link
+ * @param opts - Commander options
+ * @returns Path string
  */
 function getKeyStorePath(opts: { [option: string]: string }) {
   return path.join(opts.datadir, 'rei.ipc');

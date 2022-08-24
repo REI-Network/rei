@@ -3,6 +3,12 @@ import repl from 'repl';
 import { ipcId } from './server';
 import { logger } from '@rei-network/utils';
 
+/**
+ * Convert command line commands to json message
+ * @param method - method name
+ * @param args - args for method use
+ * @returns Json message
+ */
 function passMessageToJson(method: string, ...args) {
   return {
     method: method,
@@ -41,6 +47,9 @@ export class IpcClient {
     ipc.config.sync = true;
   }
 
+  /**
+   * Start ipc client
+   */
   start() {
     ipc.connectTo(ipcId, this.path, () => {
       ipc.of[ipcId].on('connect', () => {
@@ -74,6 +83,9 @@ export class IpcClient {
     });
   }
 
+  /**
+   * New Repl for interactive command line
+   */
   newRepl() {
     this.replServer.context.admin = proxy;
     this.replServer.context.debug = proxy;

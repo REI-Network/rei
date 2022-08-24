@@ -29,6 +29,10 @@ export class IpcServer {
     });
   }
 
+  /**
+   * Start ipc server
+   * @returns
+   */
   start() {
     return new Promise<void>((resolve) => {
       ipc.config.id = ipcId;
@@ -63,10 +67,18 @@ export class IpcServer {
     });
   }
 
+  /**
+   * Stop ipc server
+   */
   abort() {
     ipc.server.stop();
   }
 
+  /**
+   * Handle command passed from ipc client
+   * @param msg - command message
+   * @returns Handled result
+   */
   private async handleReq(msg: string) {
     const { method, params } = JSON.parse(msg);
     const controller = this.controllers.find((c) => method in c);

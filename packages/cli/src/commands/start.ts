@@ -14,7 +14,7 @@ import { getPassphrase, getKeyStorePath } from './account';
  * @param opts - Commander options
  * @returns node and rpc server instance
  */
-export async function startNode(opts: { [option: string]: string }): Promise<[Node, ApiServer, IpcServer, undefined | RpcServer]> {
+export async function startNode(opts: { [option: string]: string }): Promise<[Node, ApiServer, IpcServer, RpcServer]> {
   setLevel(opts.verbosity);
   if (!fs.existsSync(opts.datadir)) {
     fs.mkdirSync(opts.datadir);
@@ -52,15 +52,14 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
   });
   const apiServer = new ApiServer(node);
   apiServer.start();
-  let rpcServer: undefined | RpcServer;
+  const rpc = {
+    apiServer: apiServer,
+    port: opts.rpcPort ? Number(opts.rpcPort) : undefined,
+    host: opts.rpcHost ? opts.rpcHost : undefined,
+    apis: opts.rpcApi ? opts.rpcApi : undefined
+  };
+  const rpcServer = new RpcServer(rpc);
   if (opts.rpc) {
-    const rpc = {
-      apiServer: apiServer,
-      port: opts.rpcPort ? Number(opts.rpcPort) : undefined,
-      host: opts.rpcHost ? opts.rpcHost : undefined,
-      apis: opts.rpcApi ? opts.rpcApi : undefined
-    };
-    rpcServer = new RpcServer(rpc);
     await rpcServer.start();
   }
   const ipcServer = new IpcServer(apiServer, opts.datadir, rpcServer);
@@ -73,7 +72,7 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     ipcServer.start();
   }
 
-  SIGINT(node, apiServer, ipcServer);
+  SIGINT(node, apiServer, ipcServer, rpcServer);
   return [node, apiServer, ipcServer, rpcServer];
 }
 

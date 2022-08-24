@@ -4,7 +4,7 @@ import ipc from 'node-ipc';
 import { ApiServer } from '@rei-network/api';
 import { hexStringToBN, logger } from '@rei-network/utils';
 import { api } from './controller';
-import { RpcServer } from '@rei-network/rpc';
+import { RpcServer } from './types';
 
 const defaultMaxConnections = 1;
 const apis = 'admin,debug,eth,net,txpool,web3';
@@ -15,9 +15,9 @@ export class IpcServer {
   apiServer: ApiServer;
   private readonly datadir: string;
   private readonly controllers: { [name: string]: any }[];
-  rpcServer: RpcServer | undefined;
+  rpcServer: RpcServer;
 
-  constructor(apiServer: ApiServer, datadir: string, rpcServer?: RpcServer) {
+  constructor(apiServer: ApiServer, datadir: string, rpcServer: RpcServer) {
     this.apiServer = apiServer;
     this.datadir = path.join(datadir, '/');
     this.rpcServer = rpcServer;
@@ -63,8 +63,7 @@ export class IpcServer {
     });
   }
 
-  async abort() {
-    await this.rpcServer?.abort();
+  abort() {
     ipc.server.stop();
   }
 

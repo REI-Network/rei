@@ -1,4 +1,3 @@
-import { RpcServer } from '@rei-network/rpc';
 import { IpcServer } from '../server';
 /**
  * Txpool api Controller
@@ -15,16 +14,14 @@ export class AdminController {
    * @returns true if rpc server is running otherwise false
    */
   rpcRunning() {
-    const state = this.ipcServer.rpcServer !== undefined && this.ipcServer.rpcServer.isRunning === true;
-    return state;
+    return this.ipcServer.rpcServer.isRunning === true;
   }
 
   /**
    * Start rpc server on given options
    */
-  async startRpc([port, host, apis]: [number?, string?, string?]) {
-    if (this.ipcServer.rpcServer === undefined) {
-      this.ipcServer.rpcServer = new RpcServer({ apiServer: this.ipcServer.apiServer, port, host, apis });
+  async startRpc() {
+    if (!this.ipcServer.rpcServer.isRunning) {
       await this.ipcServer.rpcServer.start();
       return 'rpc server started';
     } else {
@@ -36,9 +33,8 @@ export class AdminController {
    * Stop rpc server
    */
   async stopRpc() {
-    if (this.ipcServer.rpcServer !== undefined) {
+    if (this.ipcServer.rpcServer.isRunning) {
       await this.ipcServer.rpcServer.abort();
-      this.ipcServer.rpcServer = undefined;
       return 'rpc server stopped';
     } else {
       throw new Error('rpc server is not running');

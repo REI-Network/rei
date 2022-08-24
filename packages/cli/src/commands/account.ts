@@ -5,7 +5,6 @@ import inquirer from 'inquirer';
 import { bufferToHex, toChecksumAddress, Address } from 'ethereumjs-util';
 import { AccountManager } from '@rei-network/wallet';
 import { hexStringToBuffer, logger } from '@rei-network/utils';
-import { IpcClient } from '@rei-network/ipc';
 
 /**
  * Get account passphrase, if the user specifies the file, read from the file, if not, let the user input
@@ -137,24 +136,6 @@ export function installAccountCommand(program: any) {
         console.log(`Address: ${toChecksumAddress(await manager.importKeyByPrivateKey(privateKey, passphrase))}`);
       } catch (err) {
         logger.error('Account, import, error:', err);
-      }
-    });
-}
-
-export function installIpcCommand(program: any) {
-  const ipc = new Command('ipc').description('Manage ipc connection');
-  program.addCommand(ipc);
-
-  ipc
-    .command('attach <ipcpath>')
-    .description('Attach to IPC server')
-    .action((ipcpath) => {
-      try {
-        ipcpath = path.resolve(ipcpath);
-        const client = new IpcClient(ipcpath);
-        client.start();
-      } catch (err) {
-        logger.error('IPC, attach, error:', err);
       }
     });
 }

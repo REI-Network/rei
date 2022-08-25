@@ -836,6 +836,6 @@ export class NetworkManager extends EventEmitter {
    */
   get nodeInfo(): NodeInfo {
     const localEnr = this.localEnr;
-    return { NodeUrl: localEnr.encodeTxt(), NodeID: localEnr.id, IP: localEnr.ip!, DiscPort: localEnr.udp!, TCPPort: localEnr.tcp!, ListenAddr: `${localEnr.ip}:${localEnr.udp}` };
+    return { NodeUrl: localEnr.encodeTxt(), NodeID: localEnr.id, IP: localEnr.ip!, DiscPort: localEnr.udp!, TCPPort: localEnr.tcp!, ListenAddr: `0.0.0.0:${localEnr.udp}` };
   }
 }

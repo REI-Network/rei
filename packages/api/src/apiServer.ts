@@ -980,4 +980,30 @@ export class ApiServer {
   peerCount() {
     return intToHex(this.node.networkMngr.peers.length);
   }
+
+  // Admin api
+  /**
+   * Add static peer
+   * @param enrTxt - ENR string
+   * @returns True if added sucessfully
+   */
+  async addPeer(enrTxt: string) {
+    return this.node.networkMngr.addPeer(enrTxt);
+  }
+
+  //TODO
+  /**
+   * Disconnect remote peer
+   * @param enrTxt - ENR string
+   * @returns True if added sucessfully
+   */
+  async removePeer(enrTxt: string) {}
+
+  async addTrustedPeer(enrTxt: string) {
+    return this.node.networkMngr.addTrustedPeer(enrTxt);
+  }
+
+  async removeTrutedPeer(enrTxt: string) {
+    return this.node.networkMngr.removeTrustedPeer(enrTxt);
+  }
 }

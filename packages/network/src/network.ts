@@ -718,6 +718,29 @@ export class NetworkManager extends EventEmitter {
   }
 
   /**
+   * remove static peer,
+   * remove staticPeer and break link
+   * @param enrTxt - ENR string
+   * @returns Whether the deletion of the static node was successful
+   */
+  async removeStaticPeer(enrTxt: string) {
+    const enr = ENR.decodeTxt(enrTxt);
+    const peerId = await enr.peerId();
+    const peerIdTxt = peerId.toB58String();
+
+    // prevent repetition
+    if (peerIdTxt === this.peerId) {
+      return false;
+    }
+
+    // remove id in memory set
+    this.staticPeers.delete(peerIdTxt);
+    // disconnect if connected
+    await this.removePeer(peerIdTxt);
+    return true;
+  }
+
+  /**
    * Add trusted peer,
    * network manager will always accept connection from trusted peers,
    * even if the number of connections is full

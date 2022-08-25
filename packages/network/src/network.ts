@@ -718,8 +718,7 @@ export class NetworkManager extends EventEmitter {
   }
 
   /**
-   * remove static peer,
-   * remove staticPeer and break link
+   * remove static peer
    * @param enrTxt - ENR string
    * @returns Whether the deletion of the static node was successful
    */
@@ -735,8 +734,6 @@ export class NetworkManager extends EventEmitter {
 
     // remove id in memory set
     this.staticPeers.delete(peerIdTxt);
-    // disconnect if connected
-    await this.removePeer(peerIdTxt);
     return true;
   }
 

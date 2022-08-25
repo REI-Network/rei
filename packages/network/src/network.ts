@@ -22,6 +22,15 @@ enum Libp2pPeerValue {
   incoming = 0
 }
 
+type NodeInfo = {
+  NodeUrl: string;
+  NodeID: string;
+  IP: string;
+  DiscPort: number;
+  TCPPort: number;
+  ListenAddr: string;
+};
+
 export interface NetworkManagerOptions {
   // local peer id
   peerId: PeerId;
@@ -713,34 +722,42 @@ export class NetworkManager extends EventEmitter {
    * network manager will always accept connection from trusted peers,
    * even if the number of connections is full
    * @param enrTxt - ENR string
+   * @returns Whether the trusted node is added successfully
    */
   async addTrustedPeer(enrTxt: string) {
     const enr = ENR.decodeTxt(enrTxt);
     const peerId = await enr.peerId();
     const peerIdTxt = peerId.toB58String();
-    if (peerIdTxt !== this.peerId && !this.trustedPeers.has(peerIdTxt)) {
+    if (peerIdTxt == this.peerId) {
+      return false;
+    }
+    if (!this.trustedPeers.has(peerIdTxt)) {
       this.trustedPeers.add(peerIdTxt);
       if (this._peers.has(peerIdTxt)) {
         this.libp2p.setPeerValue(peerId, Libp2pPeerValue.trusted);
       }
     }
+    return true;
   }
 
   /**
    * Remove trusted peer,
    * NOTE: this method does not immediately modify peerValue
    * @param enrTxt - ENR string
+   * @returns Whether the deletion of the trust node is successful
    */
   async removeTrustedPeer(enrTxt: string) {
     const enr = ENR.decodeTxt(enrTxt);
     const peerId = await enr.peerId();
     const peerIdTxt = peerId.toB58String();
     this.trustedPeers.delete(peerIdTxt);
+    return true;
   }
 
   /**
    * Check remote peer is trusted
    * @param enrTxt - ENR string
+   * @returns Whether it is a trusted node
    */
   async isTrusted(enrTxt: string) {
     const enr = ENR.decodeTxt(enrTxt);
@@ -791,5 +808,14 @@ export class NetworkManager extends EventEmitter {
     }
     this.banned.delete(peerId);
     return false;
+  }
+
+  /**
+   * Get local node info
+   * @returns local node info
+   */
+  get nodeInfo(): NodeInfo {
+    const localEnr = this.localEnr;
+    return { NodeUrl: localEnr.encodeTxt(), NodeID: localEnr.id, IP: localEnr.ip!, DiscPort: localEnr.udp!, TCPPort: localEnr.tcp!, ListenAddr: `${localEnr.ip}:${localEnr.udp}` };
   }
 }

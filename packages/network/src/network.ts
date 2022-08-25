@@ -22,6 +22,21 @@ enum Libp2pPeerValue {
   incoming = 0
 }
 
+type PeerInfo = {
+  nodeId: string;
+  peerId: string;
+  caps: string[];
+};
+
+type NodeInfo = {
+  nodeUrl: string;
+  nodeID: string;
+  iP: string;
+  discPort: number;
+  tcpPort: number;
+  listenAddr: string;
+};
+
 export interface NetworkManagerOptions {
   // local peer id
   peerId: PeerId;
@@ -134,6 +149,19 @@ export class NetworkManager extends EventEmitter {
    */
   get peers() {
     return Array.from(this._peers.values());
+  }
+
+  /**
+   * Get connected peers
+   */
+  get connectedPeers() {
+    return Array.from(this._peers.values()).map((peer): PeerInfo => {
+      const peerId = peer.peerId;
+      const caps = peer.protocolStrs;
+      const connection = this.libp2p.getConnections(peer.peerId)![0];
+      const nodeId = ENR.createFromPeerId(connection.remotePeer).nodeId;
+      return { peerId, nodeId, caps };
+    });
   }
 
   /**
@@ -709,38 +737,66 @@ export class NetworkManager extends EventEmitter {
   }
 
   /**
+   * remove static peer
+   * @param enrTxt - ENR string
+   * @returns Whether the deletion of the static node was successful
+   */
+  async removeStaticPeer(enrTxt: string) {
+    const enr = ENR.decodeTxt(enrTxt);
+    const peerId = await enr.peerId();
+    const peerIdTxt = peerId.toB58String();
+
+    // prevent repetition
+    if (peerIdTxt === this.peerId) {
+      return false;
+    }
+
+    // remove id in memory set
+    this.staticPeers.delete(peerIdTxt);
+    return true;
+  }
+
+  /**
    * Add trusted peer,
    * network manager will always accept connection from trusted peers,
    * even if the number of connections is full
    * @param enrTxt - ENR string
+   * @returns Whether the trusted node is added successfully
    */
   async addTrustedPeer(enrTxt: string) {
     const enr = ENR.decodeTxt(enrTxt);
     const peerId = await enr.peerId();
     const peerIdTxt = peerId.toB58String();
-    if (peerIdTxt !== this.peerId && !this.trustedPeers.has(peerIdTxt)) {
+    if (peerIdTxt == this.peerId) {
+      return false;
+    }
+    if (!this.trustedPeers.has(peerIdTxt)) {
       this.trustedPeers.add(peerIdTxt);
       if (this._peers.has(peerIdTxt)) {
         this.libp2p.setPeerValue(peerId, Libp2pPeerValue.trusted);
       }
     }
+    return true;
   }
 
   /**
    * Remove trusted peer,
    * NOTE: this method does not immediately modify peerValue
    * @param enrTxt - ENR string
+   * @returns Whether the deletion of the trust node is successful
    */
   async removeTrustedPeer(enrTxt: string) {
     const enr = ENR.decodeTxt(enrTxt);
     const peerId = await enr.peerId();
     const peerIdTxt = peerId.toB58String();
     this.trustedPeers.delete(peerIdTxt);
+    return true;
   }
 
   /**
    * Check remote peer is trusted
    * @param enrTxt - ENR string
+   * @returns Whether it is a trusted node
    */
   async isTrusted(enrTxt: string) {
     const enr = ENR.decodeTxt(enrTxt);
@@ -791,5 +847,14 @@ export class NetworkManager extends EventEmitter {
     }
     this.banned.delete(peerId);
     return false;
+  }
+
+  /**
+   * Get local node info
+   * @returns local node info
+   */
+  get nodeInfo(): NodeInfo {
+    const localEnr = this.localEnr;
+    return { nodeUrl: localEnr.encodeTxt(), nodeID: localEnr.id, iP: localEnr.ip!, discPort: localEnr.udp!, tcpPort: localEnr.tcp!, listenAddr: `0.0.0.0:${localEnr.udp}` };
   }
 }

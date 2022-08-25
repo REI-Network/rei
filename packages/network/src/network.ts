@@ -22,13 +22,19 @@ enum Libp2pPeerValue {
   incoming = 0
 }
 
+type PeerInfo = {
+  nodeId: string;
+  peerId: string;
+  caps: string[];
+};
+
 type NodeInfo = {
-  NodeUrl: string;
-  NodeID: string;
-  IP: string;
-  DiscPort: number;
-  TCPPort: number;
-  ListenAddr: string;
+  nodeUrl: string;
+  nodeID: string;
+  iP: string;
+  discPort: number;
+  tcpPort: number;
+  listenAddr: string;
 };
 
 export interface NetworkManagerOptions {
@@ -143,6 +149,19 @@ export class NetworkManager extends EventEmitter {
    */
   get peers() {
     return Array.from(this._peers.values());
+  }
+
+  /**
+   * Get connected peers
+   */
+  get connectedPeers() {
+    return Array.from(this._peers.values()).map((peer): PeerInfo => {
+      const peerId = peer.peerId;
+      const caps = peer.protocolStrs;
+      const connection = this.libp2p.getConnections(peer.peerId)![0];
+      const nodeId = ENR.createFromPeerId(connection.remotePeer).nodeId;
+      return { peerId, nodeId, caps };
+    });
   }
 
   /**
@@ -836,6 +855,6 @@ export class NetworkManager extends EventEmitter {
    */
   get nodeInfo(): NodeInfo {
     const localEnr = this.localEnr;
-    return { NodeUrl: localEnr.encodeTxt(), NodeID: localEnr.id, IP: localEnr.ip!, DiscPort: localEnr.udp!, TCPPort: localEnr.tcp!, ListenAddr: `0.0.0.0:${localEnr.udp}` };
+    return { nodeUrl: localEnr.encodeTxt(), nodeID: localEnr.id, iP: localEnr.ip!, discPort: localEnr.udp!, tcpPort: localEnr.tcp!, listenAddr: `0.0.0.0:${localEnr.udp}` };
   }
 }

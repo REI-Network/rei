@@ -85,7 +85,7 @@ export class IpcServer {
     if (!controller) {
       throw new Error(`Unknown method ${method}`);
     }
-    const result = await controller[method](params);
+    const result = controller[method](params);
     return util.types.isPromise(result) ? await result : result;
   }
 }

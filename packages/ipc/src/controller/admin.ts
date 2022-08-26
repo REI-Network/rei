@@ -14,7 +14,7 @@ export class AdminController {
    * @returns true if rpc server is running otherwise false
    */
   rpcRunning() {
-    return this.ipcServer.rpcServer.isRunning === true;
+    return this.ipcServer.rpcServer.isRunning;
   }
 
   /**

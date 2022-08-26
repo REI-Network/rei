@@ -28,15 +28,6 @@ const proxy: any = new Proxy(
   }
 );
 
-const replProxy = {
-  debug: proxy,
-  admin: proxy,
-  eth: proxy,
-  net: proxy,
-  txpool: proxy,
-  web3: proxy
-};
-
 export class IpcClient {
   private readonly path: string;
   private replServer = repl.start({ prompt: '> ', useColors: true, ignoreUndefined: true, preview: false });

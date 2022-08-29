@@ -1,6 +1,5 @@
 import path from 'path';
 import type { LevelUp } from 'levelup';
-import LevelStore from 'datastore-level';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import { Database, createLevelDB, createEncodingLevelDB } from '@rei-network/database';
@@ -18,7 +17,7 @@ import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, ReceiptsCache } from './bloomBits';
 import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
-import { WireProtocol, ConsensusProtocol } from './protocols';
+import { Wire, ConsensusProtocol, WireProtocolHandler } from './protocols';
 import { ReimintConsensusEngine, CliqueConsensusEngine } from './consensus';
 import { isEnableRemint } from './hardforks';
 import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
@@ -48,8 +47,7 @@ export class Node {
   readonly nodedb: LevelUp;
   readonly chaindb: LevelUp;
   readonly evidencedb: LevelUp;
-  readonly networkdb: LevelStore;
-  readonly wire: WireProtocol;
+  readonly wire: Wire;
   readonly consensus: ConsensusProtocol;
   readonly db: Database;
   readonly blockchain: Blockchain;
@@ -84,8 +82,7 @@ export class Node {
     this.chaindb = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
     this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));
     this.evidencedb = createLevelDB(path.join(this.datadir, 'evidence'));
-    this.networkdb = new LevelStore(path.join(this.datadir, 'networkdb'), { createIfMissing: true });
-    this.wire = new WireProtocol(this);
+    this.wire = new Wire(this);
     this.consensus = new ConsensusProtocol(this);
     this.accMngr = new AccountManager(options.account.keyStorePath);
     this.receiptsCache = new ReceiptsCache(options.receiptsCacheSize);
@@ -115,12 +112,15 @@ export class Node {
       hardforkByHeadBlockNumber: true
     });
 
+    const networkOptions = options.network;
     this.networkMngr = new NetworkManager({
-      ...options.network,
-      protocols: [this.wire, this.consensus],
-      datastore: this.networkdb,
+      ...networkOptions,
+      protocols: [[this.wire.v2, this.wire.v1], this.consensus],
       nodedb: this.nodedb,
-      bootnodes: [...common.bootstrapNodes(), ...(options.network.bootnodes ?? [])]
+      libp2pOptions: {
+        ...networkOptions.libp2pOptions,
+        bootnodes: [...common.bootstrapNodes(), ...(networkOptions.libp2pOptions!.bootnodes ?? [])]
+      }
     })
       .on('installed', this.onPeerInstalled)
       .on('removed', this.onPeerRemoved);
@@ -178,7 +178,6 @@ export class Node {
       await this.clique.init();
       await this.bloomBitsIndexer.init();
       await this.bcMonitor.init(this.latestBlock.header);
-      await this.networkdb.open();
       await this.networkMngr.init();
     })());
   }
@@ -221,14 +220,12 @@ export class Node {
     await this.commitBlockLoopPromise;
     await this.evidencedb.close();
     await this.nodedb.close();
-    await this.networkdb.close();
     await this.chaindb.close();
   }
 
-  private onPeerInstalled = (name: string, peer: Peer) => {
-    if (name === this.wire.name) {
-      const handler = this.wire.getHandler(peer, false);
-      handler && this.sync.announce(handler);
+  private onPeerInstalled = (handler) => {
+    if (handler instanceof WireProtocolHandler) {
+      this.sync.announce(handler);
     }
   };
 

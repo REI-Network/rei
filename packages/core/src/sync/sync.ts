@@ -158,7 +158,7 @@ export class Synchronizer extends EventEmitter {
         }
       }
       if (!bestPeerHandler) {
-        logger.debug('Synchronizer::findTarget, can not find best peer handler, pool size:', wire.pool.handlers.length);
+        logger.debug('Synchronizer::findTarget, can not find best peer handler, handler pool size:', wire.pool.handlers.length, 'peer size:', this.node.networkMngr.peers.length, 'connection size:', this.node.networkMngr.connectionSize);
         return;
       }
     }

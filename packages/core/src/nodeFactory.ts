@@ -12,7 +12,7 @@ export interface MineOptions extends Omit<ConsensusEngineOptions, 'node' | 'coin
   coinbase: string;
 }
 
-export interface NetworkOptions extends Omit<NetworkManagerOptions, 'protocols' | 'nodedb' | 'datastore' | 'peerId'> {}
+export interface NetworkOptions extends Omit<NetworkManagerOptions, 'protocols' | 'nodedb' | 'peerId'> {}
 
 export interface AccountOptions extends AccountManagerConstructorOptions {
   /**

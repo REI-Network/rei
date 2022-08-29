@@ -64,9 +64,9 @@ export interface RpcServerOptions {
  */
 export class RpcServer {
   readonly apiServer: ApiServer;
+  private port: number;
+  private host: string;
   private readonly sockets = new Set<net.Socket>();
-  private readonly port: number;
-  private readonly host: string;
   private readonly controllers: { [name: string]: any }[];
   private readonly reqQueue = new Channel<Request>({
     max: 1000,
@@ -244,5 +244,15 @@ export class RpcServer {
     this.reqQueue.abort();
     await this.reqPromise;
     this.reqPromise = undefined;
+  }
+
+  /**
+   * Reset host and port rpc Serve
+   * @param newHost - new host address
+   * @param newPort - new port
+   */
+  reset(newHost: string, newPort: number) {
+    this.host = newHost;
+    this.port = newPort;
   }
 }

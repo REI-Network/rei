@@ -1,5 +1,4 @@
 import fs from 'fs';
-import path from 'path';
 import process from 'process';
 import { Node, NodeFactory } from '@rei-network/core';
 import { RpcServer } from '@rei-network/rpc';
@@ -62,11 +61,12 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
   if (opts.rpc) {
     await rpcServer.start();
   }
-  const ipcServer = new IpcServer(apiServer, opts.datadir, rpcServer);
+  apiServer.setRpcServer(rpcServer);
+  const ipcServer = new IpcServer(apiServer, opts.datadir);
   if (opts.console) {
     await ipcServer.start();
     setLevel('silent');
-    const client = new IpcClient(path.join(opts.datadir, ipcAppspace + ipcId));
+    const client = new IpcClient(opts.datadir);
     client.start();
   } else {
     ipcServer.start();

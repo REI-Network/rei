@@ -3,34 +3,24 @@ import { Command } from 'commander';
 import { logger } from '@rei-network/utils';
 import { IpcClient } from '@rei-network/ipc';
 
-/**
- * Get path for ipc attach link
- * @param opts - Commander options
- * @returns Path string
- */
-function getKeyStorePath(opts: { [option: string]: string }) {
-  return path.join(opts.datadir, 'rei.ipc');
-}
-
 export function installIpcCommand(program: any) {
-  const ipc = new Command('ipc').description('Manage ipc connection');
-  program.addCommand(ipc);
-
-  ipc
+  const attach = new Command('attach')
+    .description('Manage ipc connection')
     .command('attach [ipcpath]')
     .description('Attach to IPC server')
     .action((ipcpath) => {
       try {
         if (!ipcpath) {
-          const client = new IpcClient(getKeyStorePath(program.opts()));
+          const client = new IpcClient(program.opts().datadir);
           client.start();
         } else {
           ipcpath = path.resolve(ipcpath);
-          const client = new IpcClient(ipcpath);
+          const client = new IpcClient('', ipcpath);
           client.start();
         }
       } catch (err) {
         logger.error('IPC, attach, error:', err);
       }
     });
+  program.addCommand(attach);
 }

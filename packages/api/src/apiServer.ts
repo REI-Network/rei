@@ -64,7 +64,7 @@ export class ApiServer {
   readonly node: Node;
   protected readonly oracle: SimpleOracle;
   protected readonly filterSystem: FilterSystem;
-  rpcServer: RpcServer | undefined;
+  rpcServer!: RpcServer;
 
   constructor(node: Node) {
     this.node = node;

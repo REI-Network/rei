@@ -14,31 +14,21 @@ export class AdminController {
    * @returns true if rpc server is running otherwise false
    */
   rpcRunning() {
-    return this.ipcServer.rpcServer.isRunning;
+    return this.ipcServer.apiServer.rpcRunning();
   }
 
   /**
    * Start rpc server on given options
    */
   async startRpc() {
-    if (!this.ipcServer.rpcServer.isRunning) {
-      await this.ipcServer.rpcServer.start();
-      return 'rpc server started';
-    } else {
-      throw new Error('rpc server is already running');
-    }
+    return this.ipcServer.apiServer.startRpc();
   }
 
   /**
    * Stop rpc server
    */
   async stopRpc() {
-    if (this.ipcServer.rpcServer.isRunning) {
-      await this.ipcServer.rpcServer.abort();
-      return 'rpc server stopped';
-    } else {
-      throw new Error('rpc server is not running');
-    }
+    return this.ipcServer.apiServer.stopRpc();
   }
 
   /**

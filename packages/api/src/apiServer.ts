@@ -6,7 +6,7 @@ import { Node } from '@rei-network/core';
 import { StateManager } from '@rei-network/core/dist/stateManager';
 import { TransactionFactory, Transaction, Block, Log } from '@rei-network/structure';
 import { ERROR } from '@rei-network/vm/dist/exceptions';
-import { revertErrorSelector, Client, CallData, TopicsData } from './types';
+import { revertErrorSelector, Client, CallData, TopicsData, RpcServer } from './types';
 import { SimpleOracle } from './gasPriceOracle';
 import { FilterSystem } from './filterSystem';
 
@@ -64,6 +64,7 @@ export class ApiServer {
   readonly node: Node;
   protected readonly oracle: SimpleOracle;
   protected readonly filterSystem: FilterSystem;
+  rpcServer: RpcServer | undefined;
 
   constructor(node: Node) {
     this.node = node;
@@ -85,6 +86,14 @@ export class ApiServer {
   abort() {
     this.filterSystem.abort();
     this.oracle.abort();
+  }
+
+  /**
+   * Set the rpcServer
+   * @param rpcServer - RpcServer object
+   */
+  setRpcServer(rpcServer: RpcServer) {
+    this.rpcServer = rpcServer;
   }
 
   protected async getBlockNumberByTag(tag: any): Promise<BN> {
@@ -982,6 +991,38 @@ export class ApiServer {
   }
 
   // Admin api
+  /**
+   * Returns the status of rpc server
+   * @returns true if rpc server is running otherwise false
+   */
+  rpcRunning() {
+    return this.rpcServer!.isRunning;
+  }
+
+  /**
+   * Start rpc server on given options
+   */
+  async startRpc() {
+    if (!this.rpcServer!.isRunning) {
+      await this.rpcServer!.start();
+      return 'rpc server started';
+    } else {
+      throw new Error('rpc server is already running');
+    }
+  }
+
+  /**
+   * Stop rpc server
+   */
+  async stopRpc() {
+    if (this.rpcServer!.isRunning) {
+      await this.rpcServer!.abort();
+      return 'rpc server stopped';
+    } else {
+      throw new Error('rpc server is not running');
+    }
+  }
+
   /**
    * Add static peer
    * @param enrTxt - ENR string

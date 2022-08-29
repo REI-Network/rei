@@ -25,3 +25,9 @@ export interface Client {
 }
 
 export const revertErrorSelector = Buffer.from('08c379a0', 'hex');
+
+export interface RpcServer {
+  isRunning: boolean;
+  start(): Promise<void>;
+  abort(): Promise<void>;
+}

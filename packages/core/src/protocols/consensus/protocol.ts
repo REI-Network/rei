@@ -1,4 +1,4 @@
-import { Protocol, Peer } from '@rei-network/network';
+import { Protocol, Peer, ProtocolStream } from '@rei-network/network';
 import { Node } from '../../node';
 import { Message, Vote } from '../../consensus/reimint';
 import { NetworkProtocol } from '../types';
@@ -44,8 +44,8 @@ export class ConsensusProtocol extends BaseProtocol<ConsensusProtocolHandler> im
   /**
    * {@link Protocol.makeHandler}
    */
-  makeHandler(peer: Peer) {
-    return new ConsensusProtocolHandler(this, peer);
+  async makeHandler(peer: Peer, stream: ProtocolStream) {
+    return new ConsensusProtocolHandler(this, peer, stream);
   }
 
   /**

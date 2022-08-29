@@ -56,7 +56,7 @@ class MockProtocolHandler {
   }
 
   get id() {
-    return this.peer.peerId;
+    return this.index.toString();
   }
 
   reset() {

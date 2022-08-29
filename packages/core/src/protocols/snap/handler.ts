@@ -1,7 +1,7 @@
 import { BaseTrie as Trie } from 'merkle-patricia-tree';
 import { keccak256, KECCAK256_NULL } from 'ethereumjs-util';
 import { logger } from '@rei-network/utils';
-import { ProtocolHandler, Peer } from '@rei-network/network';
+import { ProtocolHandler, Peer, ProtocolStream } from '@rei-network/network';
 import { SnapProtocol } from './protocol';
 import * as s from '../../consensus/reimint/snapMessages';
 import { EMPTY_HASH, MAX_HASH } from '../../utils';
@@ -22,6 +22,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
   private reqID = 0;
   private softResponseLimit: number;
   readonly peer: Peer;
+  readonly stream: ProtocolStream;
   readonly protocol: SnapProtocol;
 
   protected readonly waitingRequests = new Map<
@@ -33,9 +34,10 @@ export class SnapProtocolHandler implements ProtocolHandler {
     }
   >();
 
-  constructor(protocol: SnapProtocol, peer: Peer, softResponseLimit?: number) {
+  constructor(protocol: SnapProtocol, peer: Peer, stream: ProtocolStream, softResponseLimit?: number) {
     this.softResponseLimit = softResponseLimit ?? defaultSoftResponseLimit;
     this.protocol = protocol;
+    this.stream = stream;
     this.peer = peer;
   }
 
@@ -493,7 +495,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
    */
   send(msg: s.SnapMessage) {
     try {
-      this.peer.send(this.protocol.protocolString, s.SnapMessageFactory.serializeMessage(msg));
+      this.stream.send(s.SnapMessageFactory.serializeMessage(msg));
     } catch (err) {
       // ignore errors...
     }

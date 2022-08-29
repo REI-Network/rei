@@ -1,12 +1,13 @@
 {
     "name": "@rei-network/network",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
     "scripts": {
         "build": "tsc --build tsconfig.json",
-        "test": "echo @rei-network/network has no test cases"
+        "test": "mocha -r ts-node/register 'test/**/*.test.ts' --timeout 10000",
+        "startNodes" : "ts-node ./test/simpleNodeCmd.ts"
     },
     "devDependencies": {
         "typescript": "^4.1.2"

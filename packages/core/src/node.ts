@@ -1,6 +1,5 @@
 import path from 'path';
 import type { LevelUp } from 'levelup';
-import LevelStore from 'datastore-level';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
 import { Database, createLevelDB, createEncodingLevelDB } from '@rei-network/database';
@@ -50,7 +49,6 @@ export class Node {
   readonly nodedb: LevelUp;
   readonly chaindb: LevelUp;
   readonly evidencedb: LevelUp;
-  readonly networkdb: LevelStore;
   readonly wire: Wire;
   readonly consensus: ConsensusProtocol;
   readonly snap: SnapProtocol;
@@ -88,7 +86,6 @@ export class Node {
     this.chaindb = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
     this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));
     this.evidencedb = createLevelDB(path.join(this.datadir, 'evidence'));
-    this.networkdb = new LevelStore(path.join(this.datadir, 'networkdb'), { createIfMissing: true });
     this.wire = new Wire(this);
     this.consensus = new ConsensusProtocol(this);
     this.snap = new SnapProtocol(this);
@@ -120,12 +117,15 @@ export class Node {
       hardforkByHeadBlockNumber: true
     });
 
+    const networkOptions = options.network;
     this.networkMngr = new NetworkManager({
-      ...options.network,
+      ...networkOptions,
       protocols: [[this.wire.v2, this.wire.v1], this.consensus, this.snap],
-      datastore: this.networkdb,
       nodedb: this.nodedb,
-      bootnodes: [...common.bootstrapNodes(), ...(options.network.bootnodes ?? [])]
+      libp2pOptions: {
+        ...networkOptions.libp2pOptions,
+        bootnodes: [...common.bootstrapNodes(), ...(networkOptions.libp2pOptions!.bootnodes ?? [])]
+      }
     })
       .on('installed', this.onPeerInstalled)
       .on('removed', this.onPeerRemoved);
@@ -185,7 +185,6 @@ export class Node {
       await this.clique.init();
       await this.bloomBitsIndexer.init();
       await this.bcMonitor.init(this.latestBlock.header);
-      await this.networkdb.open();
       await this.networkMngr.init();
     })());
   }
@@ -237,7 +236,6 @@ export class Node {
 
     await this.evidencedb.close();
     await this.nodedb.close();
-    await this.networkdb.close();
     await this.chaindb.close();
   }
 

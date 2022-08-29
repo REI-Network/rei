@@ -1,4 +1,4 @@
-import { Protocol, Peer } from '@rei-network/network';
+import { Protocol, Peer, ProtocolStream } from '@rei-network/network';
 import { Node } from '../../node';
 import { NetworkProtocol } from '../types';
 import { BaseProtocol } from '../baseProtocol';
@@ -15,7 +15,7 @@ export class SnapProtocol extends BaseProtocol<SnapProtocolHandler> implements P
   /**
    * {@link Protocol.makeHandler}
    */
-  makeHandler(peer: Peer) {
-    return new SnapProtocolHandler(this, peer);
+  async makeHandler(peer: Peer, stream: ProtocolStream) {
+    return new SnapProtocolHandler(this, peer, stream);
   }
 }

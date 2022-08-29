@@ -126,7 +126,7 @@ export function installAccountCommand(program: any) {
     .description('Import a account from privatekey file')
     .action(async (keyfile) => {
       try {
-        const privateKey = fs.readFileSync(keyfile).toString();
+        const privateKey = fs.readFileSync(keyfile).toString().trim();
         const manager = new AccountManager(getKeyStorePath(program.opts()));
         const address = Address.fromPrivateKey(hexStringToBuffer(privateKey)).toString();
         if (manager.hasAccount(address)) {

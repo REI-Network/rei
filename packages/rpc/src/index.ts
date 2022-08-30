@@ -63,9 +63,9 @@ export interface RpcServerOptions {
  * Rpc server
  */
 export class RpcServer {
+  port: number;
+  host: string;
   readonly apiServer: ApiServer;
-  private port: number;
-  private host: string;
   private readonly sockets = new Set<net.Socket>();
   private readonly controllers: { [name: string]: any }[];
   private readonly reqQueue = new Channel<Request>({

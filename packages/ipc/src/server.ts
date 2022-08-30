@@ -4,7 +4,6 @@ import ipc from 'node-ipc';
 import { ApiServer } from '@rei-network/api';
 import { hexStringToBN, logger } from '@rei-network/utils';
 import { api } from './controller';
-import { RpcServer } from './types';
 import { ipcId, ipcAppspace } from './constants';
 
 const apis = 'admin,debug,eth,net,txpool,web3';

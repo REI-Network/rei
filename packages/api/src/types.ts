@@ -28,6 +28,9 @@ export const revertErrorSelector = Buffer.from('08c379a0', 'hex');
 
 export interface RpcServer {
   isRunning: boolean;
+  host: string;
+  port: number;
+  reset(newHost: string, newPort: number): void;
   start(): Promise<void>;
   abort(): Promise<void>;
 }

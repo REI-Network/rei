@@ -20,8 +20,8 @@ export class AdminController {
   /**
    * Start rpc server on given options
    */
-  async startRpc() {
-    return this.ipcServer.apiServer.startRpc();
+  async startRpc([host, port]: [string?, number?]) {
+    return this.ipcServer.apiServer.startRpc(host, port);
   }
 
   /**

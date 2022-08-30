@@ -61,7 +61,7 @@ export class IpcClient {
       });
 
       ipc.of[ipcId].on('errorMessage', (err: string) => {
-        console.log('Error: ' + JSON.parse(err));
+        console.log('Error: ' + err);
         this.replServer.displayPrompt();
       });
 

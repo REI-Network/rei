@@ -1002,12 +1002,13 @@ export class ApiServer {
   /**
    * Start rpc server on given options
    */
-  async startRpc() {
+  async startRpc(host?: string, port?: number) {
     if (!this.rpcServer!.isRunning) {
+      this.rpcServer.reset(host ? host : this.rpcServer.host, port ? port : this.rpcServer.port);
       await this.rpcServer!.start();
-      return 'rpc server started';
+      return `rpc server started sucessfully at ${this.rpcServer.host}:${this.rpcServer.port}`;
     } else {
-      throw new Error('rpc server is already running');
+      throw new Error(`rpc server is already running at ${this.rpcServer.host}:${this.rpcServer.port}`);
     }
   }
 
@@ -1017,7 +1018,7 @@ export class ApiServer {
   async stopRpc() {
     if (this.rpcServer!.isRunning) {
       await this.rpcServer!.abort();
-      return 'rpc server stopped';
+      return 'rpc server stopped sucessfully';
     } else {
       throw new Error('rpc server is not running');
     }

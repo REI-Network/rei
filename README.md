@@ -21,6 +21,8 @@ Nodejs implementation of REI-Network protocols
 | [@rei-network/rpc][rpc-package]               | [![NPM Version][rpc-npm-version]][rpc-npm-url]               | [![Rpc Issues][rpc-issues]][rpc-issues-url]                      |
 | [@rei-network/wallet][wallet-package]         | [![NPM Version][wallet-npm-version]][wallet-npm-url]         | [![Wallet Issues][wallet-issues]][wallet-issues-url]             |
 | [@rei-network/api][api-package]               | [![NPM Version][api-npm-version]][api-npm-url]               | [![Api Issues][api-issues]][api-issues-url]                      |
+| [@rei-network/ipc][ipc-package]               | [![NPM Version][ipc-npm-version]][ipc-npm-url]               | [![Ipc Issues][ipc-issues]][ipc-issues-url]                      |
+
 
 ## Quick start
 
@@ -59,6 +61,7 @@ Options:
 
 Commands:
   account                          Manage accounts
+  attach                           attach ipc server
 ```
 
 ### Example
@@ -325,3 +328,8 @@ These scripts execute lint and lint:fix respectively, to all monorepo packages.
 [wallet-npm-url]: https://www.npmjs.org/package/@rei-network/wallet
 [wallet-issues]: https://img.shields.io/github/issues/REI-Network/rei/package:%20wallet?label=issues
 [wallet-issues-url]: https://github.com/REI-Network/rei/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+wallet"
+[ipc-package]: ./packages/ipc
+[ipc-npm-version]: https://img.shields.io/npm/v/@rei-network/ipc
+[ipc-npm-url]: https://www.npmjs.org/package/@rei-network/ipc
+[ipc-issues]: https://img.shields.io/github/issues/REI-Network/rei/package:%20ipc?label=issues
+[ipc-issues-url]: https://github.com/REI-Network/rei/issues?q=is%3Aopen+is%3Aissue+label%3A"package%3A+ipc"

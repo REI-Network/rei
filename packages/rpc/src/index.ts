@@ -6,7 +6,6 @@ import expressws from 'express-ws';
 import bodyParse from 'body-parser';
 import { BN, bufferToHex } from 'ethereumjs-util';
 import { logger, Channel } from '@rei-network/utils';
-import { AbiCoder } from '@ethersproject/abi';
 import { ApiServer, OutOfGasError as ApiOutOfGasError, RevertError as ApiRevertError } from '@rei-network/api';
 import { JsonRPCMiddleware } from './jsonRPCMiddleware';
 import { WebsocketClient } from './client';
@@ -172,6 +171,7 @@ export class RpcServer {
       }
 
       try {
+        this.reqQueue.reset();
         const app = express();
         this.server = http.createServer(app);
         expressws(app, this.server);

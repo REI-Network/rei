@@ -178,38 +178,32 @@ export const ethModule = {
   newFilter(fromBlock?: string, toBlock?: string, _addresses?: string | string[], topics?: TopicsData) {
     passMessageToJsonAndEmit('newFilter', { fromBlock, toBlock, address: _addresses, topics: topics });
   },
-  eth_newBlockFilter() {
+  newBlockFilter() {
     passMessageToJsonAndEmit('eth_newBlockFilter');
   },
-  eth_newPendingTransactionFilter() {
+  newPendingTransactionFilter() {
     passMessageToJsonAndEmit('eth_newPendingTransactionFilter');
   },
-  eth_uninstallFilter(id: string) {
+  uninstallFilter(id: string) {
     passMessageToJsonAndEmit('eth_uninstallFilter', id);
   },
-  eth_getFilterChanges(id: string) {
+  getFilterChanges(id: string) {
     passMessageToJsonAndEmit('eth_getFilterChanges', id);
   },
-  eth_getFilterLogs(id: string) {
+  getFilterLogs(id: string) {
     passMessageToJsonAndEmit('eth_getFilterLogs', id);
   },
-  eth_getLogs(fromBlock?: string, toBlock?: string, address?: string | string[], topics?: TopicsData, blockhash?: string) {
+  getLogs(fromBlock?: string, toBlock?: string, address?: string | string[], topics?: TopicsData, blockhash?: string) {
     passMessageToJsonAndEmit('eth_getLogs', { fromBlock, toBlock, address: address, topics: topics, blockhash });
   },
-  eth_getWork() {
+  getWork() {
     passMessageToJsonAndEmit('eth_getWork');
   },
-  eth_submitWork() {
+  submitWork() {
     passMessageToJsonAndEmit('eth_submitWork');
   },
-  eth_submitHashrate() {
+  submitHashrate() {
     passMessageToJsonAndEmit('eth_submitHashrate');
-  },
-  eth_unsubscribe(id: string) {
-    passMessageToJsonAndEmit('eth_unsubscribe', id);
-  },
-  eth_subscribe(type: string, options: undefined | { address?: string | string[]; topics?: TopicsData }, client?: Client) {
-    passMessageToJsonAndEmit('eth_subscribe', type, options, client);
   }
 };
 

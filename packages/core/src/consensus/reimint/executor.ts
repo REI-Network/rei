@@ -127,8 +127,6 @@ export class ReimintExecutor implements Executor {
       logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));
     }
 
-    const callSlashV2 = pendingCommon.chainName() !== 'rei-devnet' && isEnableHardfork2(pendingCommon);
-
     // 3. call stakeManager.slash to slash validators
     for (const ev of evidence) {
       if (ev instanceof DuplicateVoteEvidence) {
@@ -136,7 +134,7 @@ export class ReimintExecutor implements Executor {
         logger.debug('Reimint::afterApply, find evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
 
         let ethLogs: any[] | undefined;
-        if (callSlashV2) {
+        if (isEnableHardfork2(pendingCommon)) {
           // if the contract has been upgraded, call the new slashing function
           ethLogs = await parentStakeManager.slashV2(ev.voteA.validator(), SlashReason.DuplicateVote, ev.hash());
         } else {

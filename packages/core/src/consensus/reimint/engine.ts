@@ -13,7 +13,7 @@ import { Node } from '../../node';
 import { StateManager } from '../../stateManager';
 import { ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
-import { getConsensusTypeByCommon, isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableRemint } from '../../hardforks';
+import { getConsensusTypeByCommon, getHardfork2InitData, isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableRemint } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
@@ -86,36 +86,15 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
       // collect all the evidence if we haven't reached hardfork2
       return;
     }
-    if (common.chainName() === 'rei-mainnet') {
-      common.setHardfork('mainnet-hf-2');
-    } else if (common.chainName() === 'rei-testnet') {
-      common.setHardfork('testnet-hf-2');
-    } else {
-      // collector only work on mainnet and testnet
+
+    const data = getHardfork2InitData(common);
+    if (data === null) {
+      // there is no initialization data, return directly
       return;
     }
 
-    // load init height from common
-    const initHeight = common.param('vm', 'initHeight');
-    if (initHeight === null) {
-      // the value has not been set, no collector is required
-      return;
-    }
-    if (typeof initHeight !== 'number') {
-      throw new Error('invalid initHeight');
-    }
-
-    // load init hashes from common
-    const initHashes = common.param('vm', 'initHashes');
-    if (initHashes === null) {
-      // the value has not been set, no collector is required
-      return;
-    }
-    if (!Array.isArray(initHashes)) {
-      throw new Error('invalid initHashes');
-    }
-
-    this.collector = new EvidenceCollector(initHeight, initHashes);
+    // create the collector
+    this.collector = new EvidenceCollector(data.initHeight, data.initHashes);
   }
 
   /**

@@ -86,6 +86,10 @@
     {
       "name": "free-staking",
       "block": 0
+    },
+    {
+      "name": "devnet-hf-2",
+      "block": 10
     }
   ],
   "bootstrapNodes": []

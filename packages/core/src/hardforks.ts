@@ -119,28 +119,7 @@ export function isEnableHardfork2(common: Common) {
   } else if (common.chainName() === 'rei-mainnet') {
     return common.gteHardfork('mainnet-hf-2');
   } else if (common.chainName() === 'rei-devnet') {
-    return false;
-  } else {
-    throw new Error('unknown chain');
-  }
-}
-
-/**
- * Get hardfork2 init data,
- * this data will be used to initialize new contracts.
- * @param common - Common instance
- * @returns Returns data if it exists, returns null if it does not exist
- */
-export function getHardfork2InitData(common: Common): null | { initHeight: number; initHashes: string[] } {
-  if (common.chainName() === 'rei-testnet') {
-    return null;
-  } else if (common.chainName() === 'rei-mainnet') {
-    return null;
-  } else if (common.chainName() === 'rei-devnet') {
-    return {
-      initHeight: 10,
-      initHashes: ['0x40cc0ab617d09276e3527f70c2d81a2dea3249a8d13b245007b6538705eda22a', '0x9c675fab47e744a8a2baef79082d4a080c6ec3a266617589216934b2cbf62834']
-    };
+    return common.gteHardfork('devnet-hf-2');
   } else {
     throw new Error('unknown chain');
   }

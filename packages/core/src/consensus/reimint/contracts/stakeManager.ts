@@ -18,7 +18,9 @@ const methods = {
   proposer: toBuffer('0xa8e4fb90'),
   reward: toBuffer('0x6353586b'),
   slash: toBuffer('0x30b409a4'),
-  onAfterBlock: toBuffer('0x9313f105')
+  onAfterBlock: toBuffer('0x9313f105'),
+  slashV2: toBuffer('0xad2c8b5e'),
+  initEvidenceHash: toBuffer('0x2854982e')
 };
 
 // event topic
@@ -232,7 +234,7 @@ export class StakeManager extends Contract {
    */
   slashV2(validator: Address, reason: SlashReason, hash: Buffer) {
     return this.runWithLogger(async () => {
-      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('slash', ['address', 'uint8', 'bytes32'], [validator.toString(), reason, bufferToHex(hash)]));
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('slashV2', ['address', 'uint8', 'bytes32'], [validator.toString(), reason, bufferToHex(hash)]));
       return logs;
     });
   }
@@ -243,6 +245,7 @@ export class StakeManager extends Contract {
    */
   initEvidenceHash(hashes: Buffer[]) {
     return this.runWithLogger(async () => {
+      console.log('hashes:', hashes);
       await this.executeMessage(this.makeSystemCallerMessage('initEvidenceHash', ['bytes32[]'], [hashes.map(bufferToHex)]));
     });
   }

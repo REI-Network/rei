@@ -69,7 +69,8 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   readonly evpool: EvidencePool;
   readonly executor: ReimintExecutor;
   readonly validatorSets = new ValidatorSets();
-  readonly collector?: EvidenceCollector;
+
+  collector?: EvidenceCollector;
 
   constructor(options: ConsensusEngineOptions) {
     super(options);
@@ -80,10 +81,33 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     const wal = new WAL({ path: path.join(this.node.datadir, 'WAL') });
     this.state = new StateMachine(this, this.node.consensus, this.evpool, wal, this.node.chainId, this.config, this.signer);
     this.executor = new ReimintExecutor(this.node, this);
+  }
+
+  /**
+   * {@link ConsensusEngine.init}
+   */
+  async init() {
+    const block = this.node.getLatestBlock();
+
+    await this.evpool.init(block.header.number);
+    await this._tryToMintNextBlock(block);
+    await this.state.init();
 
     const common = this.node.getLatestCommon();
     if (isEnableHardfork2(common)) {
       // collect all the evidence if we haven't reached hardfork2
+      return;
+    }
+
+    // set hardfork to get init data
+    if (common.chainName() === 'rei-mainnet') {
+      common.setHardfork('mainnet-hf-2');
+    } else if (common.chainName() === 'rei-testnet') {
+      common.setHardfork('testnet-hf-2');
+    } else if (common.chainName() === 'rei-devnet') {
+      common.setHardfork('devnet-hf-2');
+    } else {
+      // collector only work on mainnet and testnet
       return;
     }
 
@@ -109,21 +133,11 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
 
     // create the collector
     this.collector = new EvidenceCollector(initHeight, initHashes);
-  }
-
-  /**
-   * {@link ConsensusEngine.init}
-   */
-  async init() {
-    const block = this.node.getLatestBlock();
-    await this.collector?.init(block.header.number, async (height: BN) => {
+    await this.collector.init(block.header.number, async (height: BN) => {
       // load evidence from canonical header
       const header = await this.node.db.getCanonicalHeader(height);
       return ExtraData.fromBlockHeader(header).evidence.map((ev) => ev.hash());
     });
-    await this.evpool.init(block.header.number);
-    await this._tryToMintNextBlock(block);
-    await this.state.init();
   }
 
   protected _start() {

@@ -8,7 +8,6 @@ import { BN, bufferToHex } from 'ethereumjs-util';
 import { logger, Channel } from '@rei-network/utils';
 import { AbiCoder } from '@ethersproject/abi';
 import { ApiServer, OutOfGasError as ApiOutOfGasError, RevertError as ApiRevertError } from '@rei-network/api';
-import { api } from './controller';
 import { JsonRPCMiddleware } from './jsonRPCMiddleware';
 import { WebsocketClient } from './client';
 import { Request } from './types';
@@ -21,8 +20,6 @@ const defaultApis = 'eth,net,web3,rei';
 
 // long time-consuming requests that need to be queued for processing
 const queuedMethods = new Set<string>(['eth_getLogs', 'eth_getFilterLogs', 'debug_traceBlock', 'debug_traceBlockByNumber', 'debug_traceBlockByHash', 'debug_traceTransaction', 'debug_traceCall']);
-
-const coder = new AbiCoder();
 
 export class RevertError {
   readonly code = errors.REVERT_ERROR.code;
@@ -85,10 +82,10 @@ export class RpcServer {
     this.host = options.host ?? defaultHost;
 
     this.controllers = (options.apis ?? defaultApis).split(',').map((name) => {
-      if (!(name in api)) {
+      if (!this.apiServer.controllers.has(name)) {
         throw new Error('unknown api:' + name);
       }
-      return new api[name](this.apiServer);
+      return this.apiServer.controllers.get(name)!;
     });
   }
 
@@ -108,6 +105,7 @@ export class RpcServer {
       const startAt = Date.now();
       logger.detail('📦 Rpc served', method, 'params:', params);
 
+      method = method.split('_')[1];
       const controller = this.controllers.find((c) => method in c);
       if (!controller) {
         // method doesn't exist or unsupported method

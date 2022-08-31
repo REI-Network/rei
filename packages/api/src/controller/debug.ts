@@ -1,25 +1,19 @@
 import { hexStringToBuffer } from '@rei-network/utils';
-import { ApiServer, CallData } from '@rei-network/api';
+import { CallData } from '../types';
+import { Controller } from './base';
 
 /**
  * Debug api Controller
  */
-export class DebugController {
-  readonly apiServer: ApiServer;
-
-  constructor(apiServer: ApiServer) {
-    this.apiServer = apiServer;
-  }
-
+export class DebugController extends Controller {
   /**
    * Trace a block by blockrlp data
    * @param blockRlp - block rlp encoded data
    * @param options - options
    * @returns Result of execution block
    */
-  debug_traceBlock([blockRlp, options]: [string, any]) {
-    const blockRlpBuffer = hexStringToBuffer(blockRlp);
-    return this.apiServer.traceBlock(blockRlpBuffer, options);
+  traceBlock([blockRlp, options]: [string, any]) {
+    return this.node.getTracer().traceBlock(hexStringToBuffer(blockRlp), options);
   }
 
   /**
@@ -28,8 +22,8 @@ export class DebugController {
    * @param options - options
    * @returns Result of execution block
    */
-  async debug_traceBlockByNumber([tag, options]: [string, any]) {
-    return this.apiServer.traceBlockByNumber(tag, options);
+  async traceBlockByNumber([tag, options]: [string, any]) {
+    return this.node.getTracer().traceBlock(await this.getBlockByTag(tag), options);
   }
 
   /**
@@ -38,8 +32,8 @@ export class DebugController {
    * @param options - options
    * @returns Result of execution block
    */
-  debug_traceBlockByHash([hash, options]: [string, any]) {
-    return this.apiServer.traceBlockByHash(hash, options);
+  traceBlockByHash([hash, options]: [string, any]) {
+    return this.node.getTracer().traceBlockByHash(hexStringToBuffer(hash), options);
   }
 
   /**
@@ -48,8 +42,8 @@ export class DebugController {
    * @param options - options
    * @returns Result of execution transaction
    */
-  debug_traceTransaction([hash, options]: [string, any]) {
-    return this.apiServer.traceTransaction(hash, options);
+  traceTransaction([hash, options]: [string, any]) {
+    return this.node.getTracer().traceTx(hexStringToBuffer(hash), options);
   }
 
   /**
@@ -59,7 +53,7 @@ export class DebugController {
    * @param options - options
    * @returns Result of execution transaction
    */
-  async debug_traceCall([data, tag, options]: [CallData, string, any]) {
-    return this.apiServer.traceCall(data, tag, options);
+  async traceCall([data, tag, options]: [CallData, string, any]) {
+    return this.node.getTracer().traceCall(data, await this.getBlockByTag(tag), options);
   }
 }

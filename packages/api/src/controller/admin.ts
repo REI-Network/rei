@@ -1,34 +1,36 @@
-import { IpcServer } from '../server';
+import { Controller } from './base';
+
 /**
- * Txpool api Controller
+ * Admin api Controller
  */
-export class AdminController {
-  readonly ipcServer: IpcServer;
-
-  constructor(ipcServer: IpcServer) {
-    this.ipcServer = ipcServer;
-  }
-
-  /**
-   * Returns the status of rpc server
-   * @returns true if rpc server is running otherwise false
-   */
+export class AdminController extends Controller {
   rpcRunning() {
-    return this.ipcServer.apiServer.rpcRunning();
+    return this.rpcServer.isRunning;
   }
 
   /**
    * Start rpc server on given options
    */
   async startRpc([host, port]: [string?, number?]) {
-    return this.ipcServer.apiServer.startRpc(host, port);
+    if (!this.rpcRunning()) {
+      this.rpcServer.reset(host ? host : this.rpcServer.host, port ? port : this.rpcServer.port);
+      await this.rpcServer.start();
+      return `rpc server started sucessfully at ${this.rpcServer.host}:${this.rpcServer.port}`;
+    } else {
+      throw new Error(`rpc server is already running at ${this.rpcServer.host}:${this.rpcServer.port}`);
+    }
   }
 
   /**
    * Stop rpc server
    */
   async stopRpc() {
-    return this.ipcServer.apiServer.stopRpc();
+    if (this.rpcRunning()) {
+      await this.rpcServer!.abort();
+      return 'rpc server stopped sucessfully';
+    } else {
+      throw new Error('rpc server is not running');
+    }
   }
 
   /**
@@ -37,7 +39,7 @@ export class AdminController {
    * @returns True if added sucessfully
    */
   async addPeer([enrTxt]: [string]) {
-    return this.ipcServer.apiServer.addPeer(enrTxt);
+    return this.node.networkMngr.addPeer(enrTxt);
   }
 
   /**
@@ -46,7 +48,7 @@ export class AdminController {
    * @returns True if added sucessfully
    */
   async removePeer([enrTxt]: [string]) {
-    return this.ipcServer.apiServer.removePeer(enrTxt);
+    return this.node.networkMngr.removeStaticPeer(enrTxt);
   }
 
   /**
@@ -57,7 +59,7 @@ export class AdminController {
    * @returns Whether the trusted node is added successfully
    */
   async addTrustedPeer([enrTxt]: [string]) {
-    return this.ipcServer.apiServer.addTrustedPeer(enrTxt);
+    return this.node.networkMngr.addTrustedPeer(enrTxt);
   }
 
   /**
@@ -67,7 +69,7 @@ export class AdminController {
    * @returns Whether the deletion of the trust node is successful
    */
   async removeTrutedPeer([enrTxt]: [string]) {
-    return this.ipcServer.apiServer.removeTrutedPeer(enrTxt);
+    return this.node.networkMngr.removeTrustedPeer(enrTxt);
   }
 
   /**
@@ -75,7 +77,7 @@ export class AdminController {
    * @returns Peers information
    */
   async peers() {
-    return this.ipcServer.apiServer.peers();
+    return this.node.networkMngr.connectedPeers;
   }
 
   /**
@@ -83,7 +85,7 @@ export class AdminController {
    * @returns local node info
    */
   async nodeInfo() {
-    return this.ipcServer.apiServer.nodeInfo();
+    return this.node.networkMngr.nodeInfo;
   }
 
   /**
@@ -92,6 +94,6 @@ export class AdminController {
    * @returns Whether it is a trusted node
    */
   async isTrusted([enrTxt]: [string]) {
-    return this.ipcServer.apiServer.isTrusted(enrTxt);
+    return this.node.networkMngr.isTrusted(enrTxt);
   }
 }

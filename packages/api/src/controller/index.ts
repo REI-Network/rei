@@ -5,13 +5,14 @@ import { TxPoolController } from './txpool';
 import { Web3Controller } from './web3';
 import { ReiController } from './rei';
 import { AdminController } from './admin';
+export * from './base';
 
 export const api = {
+  admin: AdminController,
   debug: DebugController,
   eth: ETHController,
   net: NetController,
   txpool: TxPoolController,
   web3: Web3Controller,
-  rei: ReiController,
-  admin: AdminController
+  rei: ReiController
 };

@@ -3,10 +3,9 @@ import path from 'path';
 import ipc from 'node-ipc';
 import { ApiServer } from '@rei-network/api';
 import { hexStringToBN, logger } from '@rei-network/utils';
-import { api } from './controller';
 import { ipcId, ipcAppspace } from './constants';
 
-const apis = 'admin,debug,eth,net,txpool,web3';
+const apis = 'admin,debug,eth,net,rei,txpool,web3';
 
 export class IpcServer {
   apiServer: ApiServer;
@@ -17,10 +16,10 @@ export class IpcServer {
     this.apiServer = apiServer;
     this.datadir = path.join(datadir, '/');
     this.controllers = apis.split(',').map((name) => {
-      if (!(name in api)) {
-        throw new Error(`Unknown api ${name}`);
+      if (!this.apiServer.controllers.has(name)) {
+        throw new Error('unknown api:' + name);
       }
-      return new api[name](this);
+      return this.apiServer.controllers.get(name)!;
     });
   }
 
@@ -38,10 +37,11 @@ export class IpcServer {
       ipc.serve(() => {
         ipc.server.on('connect', async (socket) => {
           logger.info('IPC Client connected', socket.server._pipeName);
-          const coinbase = this.apiServer.coinbase();
-          const block = await this.apiServer.getBlockByNumber('latest', true);
+          const ethController = this.apiServer.controllers.get('eth')!;
+          const coinbase = ethController.coinbase();
+          const block = await ethController.getBlockByNumber(['latest', true]);
           const time = new Date(hexStringToBN(block?.timestamp!).toNumber() * 1000).toUTCString();
-          const protocolVersion = this.apiServer.protocolVersion();
+          const protocolVersion = ethController.protocolVersion();
           ipc.server.emit(socket, 'load', 'Welcome to the Rei Javascript console!' + '\n' + '\n' + `coinbase: ${coinbase}` + '\n' + `at block: ${hexStringToBN(block?.number!)}  (time is:  ${time})` + '\n' + `protocol Version is : ${protocolVersion}` + '\n' + '\n' + 'To exit, press ctrl-d or type .exit');
         });
 

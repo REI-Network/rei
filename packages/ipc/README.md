@@ -1,4 +1,4 @@
-# @rei-network/rpc
+# @rei-network/ipc
 
 [![NPM Version](https://img.shields.io/npm/v/@rei-network/ipc)](https://www.npmjs.org/package/@rei-network/ipc)
 ![License](https://img.shields.io/npm/l/@rei-network/ipc)

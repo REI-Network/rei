@@ -14,7 +14,7 @@ export function installConsoleCommand(program: any) {
         await client.run();
         await stopServices(service);
       } catch (err) {
-        logger.error('Start error:', err);
+        logger.error('Console, error:', err);
         process.exit(1);
       }
     });

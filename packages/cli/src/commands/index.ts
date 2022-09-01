@@ -1,4 +1,3 @@
-export * from './options';
 export * from './account';
 export * from './startup';
 export * from './attach';

@@ -14,7 +14,8 @@ export function installAttachCommand(program: any) {
         });
         await client.run();
       } catch (err) {
-        logger.error('IPC, attach, error:', err);
+        logger.error('Attach, error:', err);
+        process.exit(1);
       }
     });
 }

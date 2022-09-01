@@ -23,7 +23,6 @@ Nodejs implementation of REI-Network protocols
 | [@rei-network/api][api-package]               | [![NPM Version][api-npm-version]][api-npm-url]               | [![Api Issues][api-issues]][api-issues-url]                      |
 | [@rei-network/ipc][ipc-package]               | [![NPM Version][ipc-npm-version]][ipc-npm-url]               | [![Ipc Issues][ipc-issues]][ipc-issues-url]                      |
 
-
 ## Quick start
 
 ### Install
@@ -38,30 +37,32 @@ npm install @rei-network/cli --global
 Usage: rei [options] [command]
 
 Options:
-  -V, --version                    output the version number
-  --rpc                            open rpc server
-  --rpc-port <port>                rpc server port
-  --rpc-host <port>                rpc server host
-  --rpc-api <apis>                 rpc server apis: debug, eth, net, txpool, web3
-  --p2p-tcp-port <port>            p2p server tcp port
-  --p2p-udp-port <port>            p2p server udp port
-  --p2p-nat <ip>                   p2p server nat ip
-  --max-peers <peers>              max p2p peers count
-  --max-dials <dials>              max p2p dials count
-  --bootnodes <bootnodes...>       comma separated list of bootnodes
-  --datadir <path>                 chain data dir path (default: "~/.rei")
-  --keystore <keystore>            the datadir for keystore (default: "keystore")
-  --unlock <unlock>                comma separated list of accounts to unlock
-  --password <password>            password file to use for non-interactive password input
-  --chain <chain>                  chain name: rei-mainnet, rei-testnet
-  --mine                           mine block
-  --coinbase <address>             miner address
-  --verbosity <verbosity>          logging verbosity: silent, error, warn, info, debug, detail (default: "info")
-  -h, --help                       display help for command
+  -V, --version                              output the version number
+  --rpc                                      open rpc server
+  --rpc-port <port>                          rpc server port
+  --rpc-host <port>                          rpc server host
+  --rpc-api <apis>                           rpc server apis: debug, eth, net, txpool, web3
+  --p2p-tcp-port <port>                      p2p server tcp port
+  --p2p-udp-port <port>                      p2p server udp port
+  --p2p-nat <ip>                             p2p server nat ip
+  --max-peers <peers>                        max p2p peers count
+  --max-dials <dials>                        max p2p dials count
+  --bootnodes <bootnodes...>                 comma separated list of bootnodes
+  --datadir <path>                           chain data dir path (default: "~/.rei")
+  --keystore <keystore>                      the datadir for keystore (default: "keystore")
+  --unlock <unlock>                          comma separated list of accounts to unlock
+  --password <password>                      password file to use for non-interactive password input
+  --chain <chain>                            chain name: rei-mainnet, rei-testnet, rei-devnet
+  --mine                                     mine block
+  --coinbase <address>                       miner address
+  --verbosity <verbosity>                    logging verbosity: silent, error, warn, info, debug, detail (default: "info")
+  --receipts-cache-size <receiptsCacheSize>  receipts cache size
+  -h, --help                                 display help for command
 
 Commands:
-  account                          Manage accounts
-  attach                           attach ipc server
+  account                                    Manage accounts
+  attach [ipcpath]                           Start an interactive JavaScript environment (connect to node)
+  console                                    Start an interactive JavaScript environment
 ```
 
 ### Example

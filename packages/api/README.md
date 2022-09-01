@@ -5,7 +5,7 @@
 
 The API provides the implementation of the controllers to the outside
 
-- `admin`: Admin api to manage node
+- `admin`: Admin api for managing node
 - `debug`: Debug api for tracing blocks and transactions, includes: `debug_traceBlock`, `debug_traceTransaction` ...etc
 - `eth` ETH api for getting information from blockchain, includes: `eth_coinbase`, `eth_gasPrice` ...etc
 - `net` ETH api for getting network state

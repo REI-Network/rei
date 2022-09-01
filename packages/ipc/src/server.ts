@@ -38,7 +38,7 @@ export class IpcServer {
 
 coinbase: ${coinbase}
 at block: ${hexStringToBN(block?.number!)}  (time is:  ${time})
-protocol Version is : ${protocolVersion}
+protocol version is: ${protocolVersion}
 
 To exit, press ctrl-d or type .exit
 `

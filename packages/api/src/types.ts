@@ -1,4 +1,4 @@
-import { BlockHeader, Log } from '@rei-network/structure';
+import type { BlockHeader, Log } from '@rei-network/structure';
 
 export type SyncingStatus = { syncing: true; status: { startingBlock: string; currentBlock: string; highestBlock: string } } | false;
 
@@ -23,8 +23,6 @@ export interface Client {
   notifyPendingTransactions(subscription: string, hashes: Buffer[]): void;
   notifySyncing(subscription: string, status: SyncingStatus): void;
 }
-
-export const revertErrorSelector = Buffer.from('08c379a0', 'hex');
 
 export interface RpcServer {
   isRunning: boolean;

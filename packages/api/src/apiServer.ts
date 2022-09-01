@@ -4,8 +4,6 @@ import { SimpleOracle } from './gasPriceOracle';
 import { FilterSystem } from './filterSystem';
 import { api } from './controller';
 
-const apis = 'admin,debug,eth,net,rei,txpool,web3';
-
 /**
  * Api server
  */
@@ -13,19 +11,16 @@ export class ApiServer {
   readonly node: Node;
   readonly oracle: SimpleOracle;
   readonly filterSystem: FilterSystem;
-  readonly controllers = new Map<string, { [name: string]: any }>();
+  readonly controllers = new Map<string, any>();
   rpcServer!: RpcServer;
 
   constructor(node: Node) {
     this.node = node;
     this.oracle = new SimpleOracle(node);
     this.filterSystem = new FilterSystem(node);
-    apis.split(',').map((name) => {
-      if (!(name in api)) {
-        throw new Error(`Unknown api ${name}`);
-      }
-      this.controllers.set(name, new api[name](this));
-    });
+    for (const [name, controller] of Object.entries(api)) {
+      this.controllers.set(name, new controller(this));
+    }
   }
 
   /**
@@ -40,8 +35,8 @@ export class ApiServer {
    * Abort oracle and filter system
    */
   abort() {
-    this.filterSystem.abort();
     this.oracle.abort();
+    this.filterSystem.abort();
   }
 
   /**

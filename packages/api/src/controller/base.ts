@@ -4,10 +4,11 @@ import { Block } from '@rei-network/structure';
 import { hexStringToBuffer, hexStringToBN } from '@rei-network/utils';
 import { StateManager } from '@rei-network/core';
 import { ERROR } from '@rei-network/vm/dist/exceptions';
-import { revertErrorSelector, CallData } from '../types';
+import { CallData } from '../types';
 import { ApiServer } from '../apiServer';
 
 const coder = new AbiCoder();
+const revertErrorSelector = Buffer.from('08c379a0', 'hex');
 
 export class RevertError {
   readonly returnValue: string | Buffer;

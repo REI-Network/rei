@@ -2,10 +2,11 @@
 
 import process from 'process';
 import { program } from 'commander';
-import { installOptions, installStartAction, installAccountCommand, installIpcCommand } from './commands';
+import { installOptions, installStartAction, installAccountCommand, installAttachCommand, installConsoleCommand } from './commands';
 
 installOptions(program);
 installStartAction(program);
 installAccountCommand(program);
-installIpcCommand(program);
+installAttachCommand(program);
+installConsoleCommand(program);
 program.parse(process.argv);

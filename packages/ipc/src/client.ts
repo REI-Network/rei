@@ -4,12 +4,20 @@ import ipc from 'node-ipc';
 import { ipcId, ipcAppspace } from './constants';
 import * as modules from './modules';
 
+export interface IpcClientOptions {
+  datadir?: string;
+  ipcPath?: string;
+}
+
 export class IpcClient {
   private ipcPath: string;
   private replServer!: repl.REPLServer;
 
-  constructor(datadir: string, ipcPath?: string) {
-    this.ipcPath = ipcPath ? ipcPath : path.join(datadir, ipcAppspace + ipcId);
+  constructor({ datadir, ipcPath }: IpcClientOptions) {
+    if (datadir === undefined && ipcPath === undefined) {
+      throw new Error('invalid options');
+    }
+    this.ipcPath = ipcPath ?? path.join(datadir!, ipcAppspace + ipcId);
     ipc.config.id = ipcId;
     ipc.config.silent = true;
     ipc.config.sync = true;

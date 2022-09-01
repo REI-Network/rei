@@ -1,7 +1,7 @@
 import process from 'process';
+import { logger } from '@rei-network/utils';
 import { Node } from '@rei-network/core';
 import { RpcServer } from '@rei-network/rpc';
-import { logger } from '@rei-network/utils';
 import { ApiServer } from '@rei-network/api';
 import { IpcServer } from '@rei-network/ipc';
 

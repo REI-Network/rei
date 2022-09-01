@@ -4,7 +4,7 @@ import { Node, NodeFactory } from '@rei-network/core';
 import { RpcServer } from '@rei-network/rpc';
 import { setLevel, logger } from '@rei-network/utils';
 import { ApiServer } from '@rei-network/api';
-import { IpcServer, IpcClient, ipcAppspace, ipcId } from '@rei-network/ipc';
+import { IpcServer } from '@rei-network/ipc';
 import { SIGINT } from '../process';
 import { getPassphrase, getKeyStorePath } from './account';
 
@@ -14,10 +14,14 @@ import { getPassphrase, getKeyStorePath } from './account';
  * @returns node and rpc server instance
  */
 export async function startNode(opts: { [option: string]: string }): Promise<[Node, ApiServer, IpcServer, RpcServer]> {
+  // set logger verbosity
   setLevel(opts.verbosity);
+
+  // create dir if it doesn't exist
   if (!fs.existsSync(opts.datadir)) {
     fs.mkdirSync(opts.datadir);
   }
+
   let addresses: string[] = [];
   let passphrase: string[] = [];
   if (opts.unlock) {
@@ -41,6 +45,8 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     enable: !!opts.mine,
     coinbase: opts.coinbase
   };
+
+  // create node instance
   const node = await NodeFactory.createNode({
     databasePath: opts.datadir,
     chain: opts.chain,
@@ -49,29 +55,29 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
     network,
     account
   });
+
+  // create api server instance
   const apiServer = new ApiServer(node);
   apiServer.start();
+
   const rpc = {
-    apiServer: apiServer,
+    apiServer,
     port: opts.rpcPort ? Number(opts.rpcPort) : undefined,
     host: opts.rpcHost ? opts.rpcHost : undefined,
     apis: opts.rpcApi ? opts.rpcApi : undefined
   };
+  // create rpc server instance
   const rpcServer = new RpcServer(rpc);
   if (opts.rpc) {
     await rpcServer.start();
   }
   apiServer.setRpcServer(rpcServer);
-  const ipcServer = new IpcServer(apiServer, opts.datadir);
-  if (opts.console) {
-    await ipcServer.start();
-    setLevel('silent');
-    const client = new IpcClient(opts.datadir);
-    client.start();
-  } else {
-    ipcServer.start();
-  }
 
+  // create ipc server instance
+  const ipcServer = new IpcServer(apiServer, opts.datadir);
+  await ipcServer.start();
+
+  // handle signal
   SIGINT(node, apiServer, ipcServer, rpcServer);
   return [node, apiServer, ipcServer, rpcServer];
 }

@@ -25,7 +25,7 @@ export class IpcServer {
     return new Promise<void>((resolve) => {
       ipc.serve(() => {
         ipc.server.on('connect', async (socket) => {
-          logger.info('IPC Client connected', socket.server._pipeName);
+          logger.info('IPC client connected', socket.server._pipeName);
           const ethController = this.controllers.get('eth')!;
           const coinbase = ethController.coinbase();
           const block = await ethController.getBlockByNumber(['latest', true]);

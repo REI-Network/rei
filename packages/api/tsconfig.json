@@ -7,11 +7,8 @@
     "composite": true
   },
   "references": [
-    { "path": "../common/tsconfig.json" },
     { "path": "../core/tsconfig.json" },
-    { "path": "../rpc/tsconfig.json" },
-    { "path": "../utils/tsconfig.json" },
-    { "path": "../wallet/tsconfig.json" },
-    { "path": "../ipc/tsconfig.json" }
+    { "path": "../structure/tsconfig.json" },
+    { "path": "../utils/tsconfig.json" }
   ]
 }

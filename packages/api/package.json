@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@ethersproject/abi": "^5.4.0",
-    "@rei-network/vm": "^1.0.0",
+    "@rei-network/core": "^1.0.1",
     "@rei-network/structure": "^0.1.1",
     "@rei-network/utils": "^0.1.1"
   }

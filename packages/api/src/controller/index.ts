@@ -5,8 +5,8 @@ import { TxPoolController } from './txpool';
 import { Web3Controller } from './web3';
 import { ReiController } from './rei';
 import { AdminController } from './admin';
-export * from './base';
 
+export * from './errors';
 export const api = {
   admin: AdminController,
   debug: DebugController,

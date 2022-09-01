@@ -8,7 +8,6 @@
   },
   "references": [
     { "path": "../api/tsconfig.json" },
-    { "path": "../vm/tsconfig.json" },
     { "path": "../structure/tsconfig.json" },
     { "path": "../utils/tsconfig.json" }
   ]

@@ -1,34 +1,13 @@
 import { Address, BN } from 'ethereumjs-util';
-import { AbiCoder } from '@ethersproject/abi';
 import { Block } from '@rei-network/structure';
 import { hexStringToBuffer, hexStringToBN } from '@rei-network/utils';
 import { StateManager } from '@rei-network/core';
 import { ERROR } from '@rei-network/vm/dist/exceptions';
 import { CallData } from '../types';
 import { ApiServer } from '../apiServer';
+import { OutOfGasError, RevertError } from './errors';
 
-const coder = new AbiCoder();
 const revertErrorSelector = Buffer.from('08c379a0', 'hex');
-
-export class RevertError {
-  readonly returnValue: string | Buffer;
-  readonly decodedReturnValue?: string;
-
-  constructor(returnValue: Buffer | string) {
-    this.returnValue = returnValue;
-    if (Buffer.isBuffer(returnValue)) {
-      this.decodedReturnValue = coder.decode(['string'], returnValue.slice(4))[0];
-    }
-  }
-}
-
-export class OutOfGasError {
-  readonly gas: BN;
-
-  constructor(gas: BN) {
-    this.gas = gas.clone();
-  }
-}
 
 export class Controller {
   protected readonly server: ApiServer;

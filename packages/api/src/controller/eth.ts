@@ -3,7 +3,8 @@ import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Block, Log, Transaction, TransactionFactory } from '@rei-network/structure';
 import { Common } from '@rei-network/common';
 import { CallData, Client, TopicsData } from '../types';
-import { Controller, OutOfGasError } from './base';
+import { Controller } from './base';
+import { OutOfGasError } from './errors';
 
 function parseAddressesAndTopics(_addresses?: string | string[], _topics?: TopicsData) {
   const addresses: Address[] = typeof _addresses === 'string' ? [Address.fromString(_addresses)] : _addresses?.map((addr) => Address.fromString(addr)) ?? [];

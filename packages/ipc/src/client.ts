@@ -24,55 +24,52 @@ export class IpcClient {
   }
 
   /**
-   * Start ipc client
+   * Run ipc client
    */
-  start() {
-    ipc.connectTo(ipcId, this.ipcPath, () => {
-      this.newRepl();
+  async run() {
+    await new Promise<void>((resolve) => {
+      ipc.connectTo(ipcId, this.ipcPath, () => {
+        this.replServer = repl.start({ prompt: '> ', useColors: true, ignoreUndefined: true, preview: false });
+        this.replServer.context.admin = modules.admin;
+        this.replServer.context.debug = modules.debug;
+        this.replServer.context.eth = modules.eth;
+        this.replServer.context.net = modules.net;
+        this.replServer.context.rei = modules.rei;
+        this.replServer.context.txpool = modules.txpool;
+        this.replServer.context.web3 = modules.web3;
 
-      ipc.of[ipcId].on('load', (data: string) => {
-        console.log(data);
-        this.replServer.displayPrompt();
-      });
+        this.replServer.on('exit', () => {
+          console.log('Received exit signal');
+          ipc.disconnect(ipcId);
+        });
 
-      ipc.of[ipcId].on('message', (data: string) => {
-        console.log(JSON.parse(data));
-        this.replServer.displayPrompt();
-      });
+        ipc.of[ipcId].on('load', (data: string) => {
+          console.log(data);
+          this.replServer.displayPrompt();
+        });
 
-      ipc.of[ipcId].on('error', (err) => {
-        console.log('Error: ' + err);
-        this.replServer.displayPrompt();
-      });
+        ipc.of[ipcId].on('message', (data: string) => {
+          console.log(JSON.parse(data));
+          this.replServer.displayPrompt();
+        });
 
-      ipc.of[ipcId].on('errorMessage', (err: string) => {
-        console.log('Error: ' + err);
-        this.replServer.displayPrompt();
-      });
+        ipc.of[ipcId].on('error', (err) => {
+          console.log('Error: ' + err);
+          this.replServer.displayPrompt();
+        });
 
-      ipc.of[ipcId].on('disconnect', () => {
-        console.log('Disconnected from server, exiting...');
-        process.exit(0);
+        ipc.of[ipcId].on('errorMessage', (err: string) => {
+          console.log('Error: ' + err);
+          this.replServer.displayPrompt();
+        });
+
+        ipc.of[ipcId].on('disconnect', () => {
+          console.log('Disconnected from server');
+          this.replServer.close();
+          resolve();
+        });
       });
     });
-  }
-
-  /**
-   * New Repl for interactive command line
-   */
-  newRepl() {
-    this.replServer = repl.start({ prompt: '> ', useColors: true, ignoreUndefined: true, preview: false });
-    this.replServer.context.admin = modules.admin;
-    this.replServer.context.debug = modules.debug;
-    this.replServer.context.eth = modules.eth;
-    this.replServer.context.net = modules.net;
-    this.replServer.context.rei = modules.rei;
-    this.replServer.context.txpool = modules.txpool;
-    this.replServer.context.web3 = modules.web3;
-
-    this.replServer.on('exit', () => {
-      console.log('Received exit signal, exiting...');
-      process.exit(0);
-    });
+    console.log('IPC client exit...');
   }
 }

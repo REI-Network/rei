@@ -46,8 +46,6 @@
     "clean:build": "rm -rf packages/*/dist && rm -rf rm -rf packages/*/*.tsbuildinfo && cd packages/contracts && npm run clean:build",
     "clean:buildinfo": "rm -rf rm -rf packages/*/*.tsbuildinfo",
     "lint": "eslint packages/*/src/**.ts packages/*/test/**.ts --format=codeframe",
-    "lint:fix": "eslint packages/*/src/**.ts packages/*/test/**.ts --fix",
-    "cli": "node -r ts-node/register ./packages/cli/src/index.ts",
-    "test:prompts": "node -r ts-node/register ./packages/cli/test/prompts.ts"
+    "lint:fix": "eslint packages/*/src/**.ts packages/*/test/**.ts --fix"
   }
 }

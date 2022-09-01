@@ -34,7 +34,7 @@ export class IpcServer {
           ipc.server.emit(
             socket,
             'load',
-            `Welcome to the Rei Javascript console!
+            `Welcome to the REI JavaScript console!
 
 coinbase: ${coinbase}
 at block: ${hexStringToBN(block?.number!)}  (time is:  ${time})

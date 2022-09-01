@@ -1,6 +1,6 @@
 import { logger } from '@rei-network/utils';
 import { IpcClient } from '@rei-network/ipc';
-import { startNode } from './start';
+import { startServices, stopServices } from '../services';
 
 export function installConsoleCommand(program: any) {
   program
@@ -9,9 +9,10 @@ export function installConsoleCommand(program: any) {
     .action(async () => {
       try {
         const opts = program.opts();
-        await startNode(opts);
+        const service = await startServices(opts);
         const client = new IpcClient({ datadir: opts.datadir });
-        client.start();
+        await client.run();
+        await stopServices(service);
       } catch (err) {
         logger.error('Start error:', err);
         process.exit(1);

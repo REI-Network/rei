@@ -6,13 +6,13 @@ export function installAttachCommand(program: any) {
   program
     .command('attach [ipcpath]')
     .description('Start an interactive JavaScript environment (connect to node)')
-    .action((ipcPath) => {
+    .action(async (ipcPath) => {
       try {
         const client = new IpcClient({
           datadir: program.opts().datadir,
           ipcPath: ipcPath ? path.resolve(ipcPath) : undefined
         });
-        client.start();
+        await client.run();
       } catch (err) {
         logger.error('IPC, attach, error:', err);
       }

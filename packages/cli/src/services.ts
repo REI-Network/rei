@@ -5,15 +5,16 @@ import { RpcServer } from '@rei-network/rpc';
 import { setLevel, logger } from '@rei-network/utils';
 import { ApiServer } from '@rei-network/api';
 import { IpcServer } from '@rei-network/ipc';
-import { SIGINT } from '../process';
-import { getPassphrase, getKeyStorePath } from './account';
+import { getPassphrase, getKeyStorePath } from './utils';
+
+type Services = { node: Node; apiServer: ApiServer; rpcServer: RpcServer; ipcServer: IpcServer };
 
 /**
- * Start rei node
+ * Start services
  * @param opts - Commander options
- * @returns node and rpc server instance
+ * @returns Services instance
  */
-export async function startNode(opts: { [option: string]: string }): Promise<[Node, ApiServer, IpcServer, RpcServer]> {
+export async function startServices(opts: { [option: string]: string }): Promise<Services> {
   // set logger verbosity
   setLevel(opts.verbosity);
 
@@ -77,18 +78,25 @@ export async function startNode(opts: { [option: string]: string }): Promise<[No
   const ipcServer = new IpcServer(apiServer, opts.datadir);
   await ipcServer.start();
 
-  // handle signal
-  SIGINT(node, apiServer, ipcServer, rpcServer);
-  return [node, apiServer, ipcServer, rpcServer];
+  return { node, apiServer, ipcServer, rpcServer };
 }
 
-export function installStartAction(program: any) {
-  program.action(async () => {
-    try {
-      await startNode(program.opts());
-    } catch (err) {
-      logger.error('Start error:', err);
+/**
+ * Stop services
+ * @param param0 - Services instance
+ */
+export async function stopServices({ node, apiServer, ipcServer, rpcServer }: Services) {
+  try {
+    logger.info('exit...');
+    setTimeout(() => {
+      logger.warn('exit timeout');
       process.exit(1);
-    }
-  });
+    }, 3000);
+    await Promise.all([node.abort(), apiServer.abort(), ipcServer.abort(), rpcServer.abort()]);
+    logger.info('exit complete');
+    process.exit(0);
+  } catch (err) {
+    logger.error('catch error when exit:', err);
+    process.exit(1);
+  }
 }

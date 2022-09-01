@@ -1,12 +1,13 @@
-import ipc from 'node-ipc';
 import repl from 'repl';
 import path from 'path';
+import ipc from 'node-ipc';
 import { ipcId, ipcAppspace } from './constants';
 import * as modules from './modules';
 
 export class IpcClient {
-  private readonly ipcPath: string;
+  private ipcPath: string;
   private replServer!: repl.REPLServer;
+
   constructor(datadir: string, ipcPath?: string) {
     this.ipcPath = ipcPath ? ipcPath : path.join(datadir, ipcAppspace + ipcId);
     ipc.config.id = ipcId;
@@ -53,13 +54,13 @@ export class IpcClient {
    */
   newRepl() {
     this.replServer = repl.start({ prompt: '> ', useColors: true, ignoreUndefined: true, preview: false });
-    this.replServer.context.admin = modules.adminModule;
-    this.replServer.context.debug = modules.debugModule;
-    this.replServer.context.eth = modules.ethModule;
-    this.replServer.context.net = modules.netModule;
-    this.replServer.context.rei = modules.reiModule;
-    this.replServer.context.txpool = modules.txpoolModule;
-    this.replServer.context.web3 = modules.web3Module;
+    this.replServer.context.admin = modules.admin;
+    this.replServer.context.debug = modules.debug;
+    this.replServer.context.eth = modules.eth;
+    this.replServer.context.net = modules.net;
+    this.replServer.context.rei = modules.rei;
+    this.replServer.context.txpool = modules.txpool;
+    this.replServer.context.web3 = modules.web3;
 
     this.replServer.on('exit', () => {
       console.log('Received exit signal, exiting...');

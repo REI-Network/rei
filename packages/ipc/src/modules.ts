@@ -1,5 +1,5 @@
 import ipc from 'node-ipc';
-import { TopicsData, CallData, Client } from '@rei-network/api';
+import { TopicsData, CallData } from '@rei-network/api';
 import { ipcId } from './constants';
 
 /**
@@ -18,7 +18,7 @@ function passMessageToJsonAndEmit(method: string, ...args) {
   );
 }
 
-export const adminModule = {
+export const admin = {
   rpcRunning() {
     passMessageToJsonAndEmit('rpcRunning');
   },
@@ -51,7 +51,7 @@ export const adminModule = {
   }
 };
 
-export const debugModule = {
+export const debug = {
   traceBlock(blockRlp: string, options: any) {
     passMessageToJsonAndEmit('traceBlock', blockRlp, options);
   },
@@ -69,7 +69,7 @@ export const debugModule = {
   }
 };
 
-export const ethModule = {
+export const eth = {
   protocolVersion() {
     passMessageToJsonAndEmit('protocolVersion');
   },
@@ -207,7 +207,7 @@ export const ethModule = {
   }
 };
 
-export const netModule = {
+export const net = {
   version() {
     passMessageToJsonAndEmit('version');
   },
@@ -219,7 +219,7 @@ export const netModule = {
   }
 };
 
-export const reiModule = {
+export const rei = {
   getCrude(address: string, tag: any) {
     passMessageToJsonAndEmit('getCrude', address, tag);
   },
@@ -237,13 +237,13 @@ export const reiModule = {
   }
 };
 
-export const txpoolModule = {
+export const txpool = {
   content() {
     passMessageToJsonAndEmit('content');
   }
 };
 
-export const web3Module = {
+export const web3 = {
   clientVersion() {
     passMessageToJsonAndEmit('clientVersion');
   },

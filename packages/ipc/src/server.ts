@@ -5,22 +5,16 @@ import { ApiServer } from '@rei-network/api';
 import { hexStringToBN, logger } from '@rei-network/utils';
 import { ipcId, ipcAppspace } from './constants';
 
-const apis = 'admin,debug,eth,net,rei,txpool,web3';
-
 export class IpcServer {
-  apiServer: ApiServer;
-  private readonly datadir: string;
-  private readonly controllers: { [name: string]: any }[];
+  private readonly controllers: Map<string, any>;
 
   constructor(apiServer: ApiServer, datadir: string) {
-    this.apiServer = apiServer;
-    this.datadir = path.join(datadir, '/');
-    this.controllers = apis.split(',').map((name) => {
-      if (!this.apiServer.controllers.has(name)) {
-        throw new Error('unknown api:' + name);
-      }
-      return this.apiServer.controllers.get(name)!;
-    });
+    this.controllers = apiServer.controllers;
+    ipc.config.id = ipcId;
+    ipc.config.maxConnections = 1;
+    ipc.config.socketRoot = path.join(datadir, '/');
+    ipc.config.appspace = ipcAppspace;
+    ipc.config.silent = true;
   }
 
   /**
@@ -29,28 +23,40 @@ export class IpcServer {
    */
   start() {
     return new Promise<void>((resolve) => {
-      ipc.config.id = ipcId;
-      ipc.config.maxConnections = 1;
-      ipc.config.socketRoot = this.datadir;
-      ipc.config.appspace = ipcAppspace;
-      ipc.config.silent = true;
       ipc.serve(() => {
         ipc.server.on('connect', async (socket) => {
           logger.info('IPC Client connected', socket.server._pipeName);
-          const ethController = this.apiServer.controllers.get('eth')!;
+          const ethController = this.controllers.get('eth')!;
           const coinbase = ethController.coinbase();
           const block = await ethController.getBlockByNumber(['latest', true]);
           const time = new Date(hexStringToBN(block?.timestamp!).toNumber() * 1000).toUTCString();
           const protocolVersion = ethController.protocolVersion();
-          ipc.server.emit(socket, 'load', 'Welcome to the Rei Javascript console!' + '\n' + '\n' + `coinbase: ${coinbase}` + '\n' + `at block: ${hexStringToBN(block?.number!)}  (time is:  ${time})` + '\n' + `protocol Version is : ${protocolVersion}` + '\n' + '\n' + 'To exit, press ctrl-d or type .exit');
+          ipc.server.emit(
+            socket,
+            'load',
+            `Welcome to the Rei Javascript console!
+
+coinbase: ${coinbase}
+at block: ${hexStringToBN(block?.number!)}  (time is:  ${time})
+protocol Version is : ${protocolVersion}
+
+To exit, press ctrl-d or type .exit
+`
+          );
         });
 
         ipc.server.on('message', async (data: string, socket: any) => {
           try {
-            const result = await this.handleReq(data);
+            const { method, params } = JSON.parse(data);
+            const controller = Array.from(this.controllers.values()).find((c) => method in c);
+            if (!controller) {
+              throw new Error(`Unknown method ${method}`);
+            }
+            let result = controller[method](params);
+            result = util.types.isPromise(result) ? await result : result;
             ipc.server.emit(socket, 'message', JSON.stringify(result));
           } catch (err: any) {
-            logger.debug('IpcServer::onMessage,catch error ', err);
+            logger.debug('IpcServer::onMessage, catch error:', err);
             ipc.server.emit(socket, 'errorMessage', err.message);
           }
         });
@@ -67,20 +73,5 @@ export class IpcServer {
    */
   abort() {
     ipc.server.stop();
-  }
-
-  /**
-   * Handle command passed from ipc client
-   * @param msg - command message
-   * @returns Handled result
-   */
-  private async handleReq(msg: string) {
-    const { method, params } = JSON.parse(msg);
-    const controller = this.controllers.find((c) => method in c);
-    if (!controller) {
-      throw new Error(`Unknown method ${method}`);
-    }
-    const result = controller[method](params);
-    return util.types.isPromise(result) ? await result : result;
   }
 }

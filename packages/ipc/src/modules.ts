@@ -25,6 +25,9 @@ export const admin = {
   get nodeInfo() {
     return passMessageToJsonAndEmit('nodeInfo');
   },
+  get datadir() {
+    return passMessageToJsonAndEmit('datadir');
+  },
   rpcRunning() {
     passMessageToJsonAndEmit('rpcRunning');
   },

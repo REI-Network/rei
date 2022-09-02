@@ -21,6 +21,14 @@ export class AdminController extends Controller {
   }
 
   /**
+   * Get node datadir path
+   * @returns node datadir path
+   */
+  datadir() {
+    return this.node.datadir;
+  }
+
+  /**
    * Get whether the RPC service is running
    */
   rpcRunning() {

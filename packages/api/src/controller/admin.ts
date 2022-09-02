@@ -13,11 +13,13 @@ export class AdminController extends Controller {
    */
   async startRpc([host, port]: [string?, number?]) {
     if (!this.rpcRunning()) {
-      this.rpcServer.reset(host ? host : this.rpcServer.host, port ? port : this.rpcServer.port);
+      if (host && port) {
+        this.rpcServer.reset(host, port);
+      }
       await this.rpcServer.start();
-      return `rpc server started sucessfully at ${this.rpcServer.host}:${this.rpcServer.port}`;
+      return true;
     } else {
-      throw new Error(`rpc server is already running at ${this.rpcServer.host}:${this.rpcServer.port}`);
+      return false;
     }
   }
 
@@ -26,10 +28,10 @@ export class AdminController extends Controller {
    */
   async stopRpc() {
     if (this.rpcRunning()) {
-      await this.rpcServer!.abort();
-      return 'rpc server stopped sucessfully';
+      await this.rpcServer.abort();
+      return true;
     } else {
-      throw new Error('rpc server is not running');
+      return false;
     }
   }
 
@@ -38,7 +40,7 @@ export class AdminController extends Controller {
    * @param enrTxt - ENR string
    * @returns True if added sucessfully
    */
-  async addPeer([enrTxt]: [string]) {
+  addPeer([enrTxt]: [string]) {
     return this.node.networkMngr.addPeer(enrTxt);
   }
 
@@ -47,7 +49,7 @@ export class AdminController extends Controller {
    * @param enrTxt - ENR string
    * @returns True if added sucessfully
    */
-  async removePeer([enrTxt]: [string]) {
+  removePeer([enrTxt]: [string]) {
     return this.node.networkMngr.removeStaticPeer(enrTxt);
   }
 
@@ -58,7 +60,7 @@ export class AdminController extends Controller {
    * @param enrTxt - ENR string
    * @returns Whether the trusted node is added successfully
    */
-  async addTrustedPeer([enrTxt]: [string]) {
+  addTrustedPeer([enrTxt]: [string]) {
     return this.node.networkMngr.addTrustedPeer(enrTxt);
   }
 
@@ -68,7 +70,7 @@ export class AdminController extends Controller {
    * @param enrTxt - ENR string
    * @returns Whether the deletion of the trust node is successful
    */
-  async removeTrutedPeer([enrTxt]: [string]) {
+  removeTrutedPeer([enrTxt]: [string]) {
     return this.node.networkMngr.removeTrustedPeer(enrTxt);
   }
 
@@ -76,7 +78,7 @@ export class AdminController extends Controller {
    * Get connected peers
    * @returns Peers information
    */
-  async peers() {
+  peers() {
     return this.node.networkMngr.connectedPeers;
   }
 
@@ -84,7 +86,7 @@ export class AdminController extends Controller {
    * Get local node info
    * @returns local node info
    */
-  async nodeInfo() {
+  nodeInfo() {
     return this.node.networkMngr.nodeInfo;
   }
 
@@ -93,7 +95,7 @@ export class AdminController extends Controller {
    * @param enrTxt - ENR string
    * @returns Whether it is a trusted node
    */
-  async isTrusted([enrTxt]: [string]) {
+  isTrusted([enrTxt]: [string]) {
     return this.node.networkMngr.isTrusted(enrTxt);
   }
 }

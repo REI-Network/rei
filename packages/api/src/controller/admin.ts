@@ -11,7 +11,7 @@ export class AdminController extends Controller {
   /**
    * Start rpc server on given options
    */
-  async startRpc([host, port]: [string?, number?]) {
+  async startRPC([host, port]: [string?, number?]) {
     if (!this.rpcRunning()) {
       if (host && port) {
         this.rpcServer.reset(host, port);
@@ -26,7 +26,7 @@ export class AdminController extends Controller {
   /**
    * Stop rpc server
    */
-  async stopRpc() {
+  async stopRPC() {
     if (this.rpcRunning()) {
       await this.rpcServer.abort();
       return true;

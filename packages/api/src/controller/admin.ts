@@ -60,7 +60,7 @@ export class AdminController extends Controller {
    * @returns True if added sucessfully
    */
   addPeer([enrTxt]: [string]) {
-    return this.node.networkMngr.addPeer(enrTxt);
+    return this.node.networkMngr.addStaticPeer(enrTxt);
   }
 
   /**

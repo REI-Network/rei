@@ -726,7 +726,7 @@ export class NetworkManager extends EventEmitter {
    * @param enrTxt - ENR string
    * @returns Whether the addition was successful
    */
-  async addPeer(enrTxt: string) {
+  async addStaticPeer(enrTxt: string) {
     const enr = ENR.decodeTxt(enrTxt);
     const peerId = await enr.peerId();
     const peerIdTxt = peerId.toB58String();

@@ -4,6 +4,25 @@ import { Controller } from './base';
  * Admin api Controller
  */
 export class AdminController extends Controller {
+  /**
+   * Get connected peers
+   * @returns Peers information
+   */
+  peers() {
+    return this.node.networkMngr.connectedPeers;
+  }
+
+  /**
+   * Get local node info
+   * @returns local node info
+   */
+  nodeInfo() {
+    return this.node.networkMngr.nodeInfo;
+  }
+
+  /**
+   * Get whether the RPC service is running
+   */
   rpcRunning() {
     return this.rpcServer.isRunning;
   }
@@ -72,22 +91,6 @@ export class AdminController extends Controller {
    */
   removeTrutedPeer([enrTxt]: [string]) {
     return this.node.networkMngr.removeTrustedPeer(enrTxt);
-  }
-
-  /**
-   * Get connected peers
-   * @returns Peers information
-   */
-  peers() {
-    return this.node.networkMngr.connectedPeers;
-  }
-
-  /**
-   * Get local node info
-   * @returns local node info
-   */
-  nodeInfo() {
-    return this.node.networkMngr.nodeInfo;
   }
 
   /**

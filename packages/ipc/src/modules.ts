@@ -19,14 +19,20 @@ function passMessageToJsonAndEmit(method: string, ...args) {
 }
 
 export const admin = {
+  get peers() {
+    return passMessageToJsonAndEmit('peers');
+  },
+  get nodeInfo() {
+    return passMessageToJsonAndEmit('nodeInfo');
+  },
   rpcRunning() {
     passMessageToJsonAndEmit('rpcRunning');
   },
-  startRpc(host?: string, port?: number) {
-    passMessageToJsonAndEmit('startRpc', host, port);
+  startRPC(host?: string, port?: number) {
+    passMessageToJsonAndEmit('startRPC', host, port);
   },
-  stopRpc() {
-    passMessageToJsonAndEmit('stopRpc');
+  stopRPC() {
+    passMessageToJsonAndEmit('stopRPC');
   },
   addPeer(enrTxt: string) {
     passMessageToJsonAndEmit('addPeer', enrTxt);
@@ -39,12 +45,6 @@ export const admin = {
   },
   removeTrutedPeer(enrTxt: string) {
     passMessageToJsonAndEmit('removeTrutedPeer', enrTxt);
-  },
-  peers() {
-    passMessageToJsonAndEmit('peers');
-  },
-  nodeInfo() {
-    passMessageToJsonAndEmit('nodeInfo');
   },
   isTrusted(enrTxt: string) {
     passMessageToJsonAndEmit('isTrusted', enrTxt);

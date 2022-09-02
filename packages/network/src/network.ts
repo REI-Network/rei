@@ -29,12 +29,13 @@ type PeerInfo = {
 };
 
 type NodeInfo = {
-  nodeUrl: string;
-  nodeID: string;
-  iP: string;
-  discPort: number;
+  enr: string;
+  nodeId: string;
+  peerId: string;
+  ip: string;
   tcpPort: number;
-  listenAddr: string;
+  udpPort: number;
+  caps: (string[] | string)[];
 };
 
 export interface NetworkManagerOptions {
@@ -161,7 +162,7 @@ export class NetworkManager extends EventEmitter {
   get connectedPeers() {
     return Array.from(this._peers.values()).map((peer): PeerInfo => {
       const peerId = peer.peerId;
-      const caps = peer.protocolStrs;
+      const caps = peer.supportedProtocols;
       const connection = this.libp2p.getConnections(peer.peerId)![0];
       const nodeId = ENR.createFromPeerId(connection.remotePeer).nodeId;
       return { peerId, nodeId, caps };
@@ -867,6 +868,20 @@ export class NetworkManager extends EventEmitter {
    */
   get nodeInfo(): NodeInfo {
     const localEnr = this.localEnr;
-    return { nodeUrl: localEnr.encodeTxt(), nodeID: localEnr.id, iP: localEnr.ip!, discPort: localEnr.udp!, tcpPort: localEnr.tcp!, listenAddr: `0.0.0.0:${localEnr.udp}` };
+    return {
+      enr: localEnr.encodeTxt(),
+      nodeId: localEnr.nodeId,
+      peerId: this.peerId,
+      ip: localEnr.ip!,
+      tcpPort: localEnr.tcp!,
+      udpPort: localEnr.udp!,
+      caps: this.protocols.map((p) => {
+        if (Array.isArray(p)) {
+          return p.map(({ protocolString }) => protocolString);
+        } else {
+          return p.protocolString;
+        }
+      })
+    };
   }
 }

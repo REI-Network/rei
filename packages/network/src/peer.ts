@@ -146,7 +146,10 @@ export class Peer extends EventEmitter {
     return this.protocols.size;
   }
 
-  get protocolStrs() {
+  /**
+   * Get supported protocols
+   */
+  get supportedProtocols() {
     return Array.from(this.protocols.keys());
   }
 

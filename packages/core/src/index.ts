@@ -3,3 +3,4 @@ export * from './hardforks';
 export * from './nodeFactory';
 export * from './types';
 export * from './bloomBits';
+export * from './stateManager';

@@ -40,12 +40,12 @@
     "build:utils": "npm run build -w @rei-network/utils",
     "build:vm": "npm run build -w @rei-network/vm",
     "build:wallet": "npm run build -w @rei-network/wallet",
+    "build:api": "npm run build -w @rei-network/api",
+    "build:ipc": "npm run build -w @rei-network/ipc",
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/package-lock.json && npm run clean:build",
     "clean:build": "rm -rf packages/*/dist && rm -rf rm -rf packages/*/*.tsbuildinfo && cd packages/contracts && npm run clean:build",
     "clean:buildinfo": "rm -rf rm -rf packages/*/*.tsbuildinfo",
     "lint": "eslint packages/*/src/**.ts packages/*/test/**.ts --format=codeframe",
-    "lint:fix": "eslint packages/*/src/**.ts packages/*/test/**.ts --fix",
-    "cli": "node -r ts-node/register ./packages/cli/src/index.ts",
-    "test:prompts": "node -r ts-node/register ./packages/cli/test/prompts.ts"
+    "lint:fix": "eslint packages/*/src/**.ts packages/*/test/**.ts --fix"
   }
 }

@@ -1,4 +1,4 @@
-import { ProtocolHandler, Protocol, Peer } from '@rei-network/network';
+import { ProtocolHandler, Protocol, Peer, ProtocolStream } from '@rei-network/network';
 import { Node } from '../node';
 import { NetworkProtocol } from './types';
 
@@ -6,8 +6,6 @@ export abstract class BaseProtocol<T extends ProtocolHandler> implements Protoco
   readonly node: Node;
   readonly name: NetworkProtocol;
   readonly version: string;
-
-  abstract makeHandler(peer: Peer): T;
 
   constructor(node: Node, name: NetworkProtocol, version: string) {
     this.node = node;
@@ -23,6 +21,11 @@ export abstract class BaseProtocol<T extends ProtocolHandler> implements Protoco
   }
 
   /**
+   * Abstract make handler function
+   */
+  abstract makeHandler(peer: Peer, stream: ProtocolStream): Promise<T | null>;
+
+  /**
    * Get the protocol handler of the peer
    * @param peer - Peer object
    */
@@ -31,12 +34,12 @@ export abstract class BaseProtocol<T extends ProtocolHandler> implements Protoco
   getHandler(peer: Peer, throwError: false): T | undefined;
   getHandler(peer: Peer, throwError: boolean): T | undefined;
   getHandler(peer: Peer, throwError: boolean = true) {
-    if (!peer.isSupport(this.name)) {
+    if (!peer.isSupport(this.protocolString)) {
       if (throwError) {
-        throw new Error(`peer doesn't support ${this.name}`);
+        throw new Error(`peer doesn't support ${this.protocolString}`);
       }
     } else {
-      return peer.getMsgQueue(this.name).handler as T;
+      return peer.getHandler(this.protocolString) as T;
     }
   }
 }

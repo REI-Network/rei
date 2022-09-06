@@ -1,6 +1,6 @@
 {
     "name": "@rei-network/blockchain",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
@@ -15,8 +15,8 @@
     },
     "dependencies": {
         "@rei-network/common": "^1.0.0",
-        "@rei-network/database": "^1.0.0",
-        "@rei-network/structure": "^0.1.1",
+        "@rei-network/database": "^1.0.2",
+        "@rei-network/structure": "^0.1.2",
         "debug": "^4.3.3",
         "ethereumjs-util": "^7.1.4",
         "semaphore-async-await": "^1.5.1"

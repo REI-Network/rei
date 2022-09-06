@@ -63,6 +63,10 @@ class MockProtocolHander {
     this.peer = { peerId: `${index}` };
   }
 
+  get id() {
+    return this.index.toString();
+  }
+
   reset() {
     this.downloadHeaders.clear();
     this.downloadBodies.clear();

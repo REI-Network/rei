@@ -4,14 +4,14 @@ import net from 'net';
 import express from 'express';
 import expressws from 'express-ws';
 import bodyParse from 'body-parser';
-import { logger, ignoreError, Channel } from '@rei-network/utils';
+import { BN, bufferToHex } from 'ethereumjs-util';
+import { logger, Channel } from '@rei-network/utils';
+import { ApiServer, OutOfGasError as ApiOutOfGasError, RevertError as ApiRevertError } from '@rei-network/api';
 import { JsonRPCMiddleware } from './jsonRPCMiddleware';
-import { api } from './controller';
 import { WebsocketClient } from './client';
-import { FilterSystem } from './filterSystem';
-import { SimpleOracle } from './gasPriceOracle';
-import { Backend, Request } from './types';
+import { Request } from './types';
 import * as helper from './helper';
+import errors from './errorCodes';
 
 const defaultPort = 11451;
 const defaultHost = '127.0.0.1';
@@ -20,9 +20,33 @@ const defaultApis = 'eth,net,web3,rei';
 // long time-consuming requests that need to be queued for processing
 const queuedMethods = new Set<string>(['eth_getLogs', 'eth_getFilterLogs', 'debug_traceBlock', 'debug_traceBlockByNumber', 'debug_traceBlockByHash', 'debug_traceTransaction', 'debug_traceCall']);
 
+export class RevertError {
+  readonly code = errors.REVERT_ERROR.code;
+  readonly rpcMessage: string;
+  readonly data?: string;
+
+  constructor(returnValue: string | Buffer, decodedReturnValue: string | undefined) {
+    this.rpcMessage = decodedReturnValue ? 'execution reverted: ' + decodedReturnValue : (returnValue as string);
+    this.data = decodedReturnValue && bufferToHex(returnValue as Buffer);
+  }
+}
+
+export class OutOfGasError {
+  readonly code = errors.SERVER_ERROR.code;
+  readonly gas: BN;
+
+  constructor(gas: BN) {
+    this.gas = gas.clone();
+  }
+
+  get rpcMessage() {
+    return `gas required exceeds allowance (${this.gas.toString()})`;
+  }
+}
+
 export interface RpcServerOptions {
-  // backend instance
-  backend: Backend;
+  // apiServer instance
+  apiServer: ApiServer;
   // rpc server listening port
   port?: number;
   // rpc server listening host
@@ -35,13 +59,10 @@ export interface RpcServerOptions {
  * Rpc server
  */
 export class RpcServer {
-  readonly backend: Backend;
-  readonly filterSystem: FilterSystem;
-  readonly oracle: SimpleOracle;
-
+  port: number;
+  host: string;
+  readonly apiServer: ApiServer;
   private readonly sockets = new Set<net.Socket>();
-  private readonly port: number;
-  private readonly host: string;
   private readonly controllers: { [name: string]: any }[];
   private readonly reqQueue = new Channel<Request>({
     max: 1000,
@@ -54,18 +75,16 @@ export class RpcServer {
   private reqPromise?: Promise<void>;
 
   constructor(options: RpcServerOptions) {
-    this.backend = options.backend;
-    this.filterSystem = new FilterSystem(options.backend);
-    this.oracle = new SimpleOracle(options.backend);
+    this.apiServer = options.apiServer;
 
     this.port = options.port ?? defaultPort;
     this.host = options.host ?? defaultHost;
 
     this.controllers = (options.apis ?? defaultApis).split(',').map((name) => {
-      if (!(name in api)) {
+      if (!this.apiServer.controllers.has(name)) {
         throw new Error('unknown api:' + name);
       }
-      return new api[name](this);
+      return this.apiServer.controllers.get(name)!;
     });
   }
 
@@ -85,14 +104,27 @@ export class RpcServer {
       const startAt = Date.now();
       logger.detail('📦 Rpc served', method, 'params:', params);
 
+      method = method.split('_')[1];
       const controller = this.controllers.find((c) => method in c);
       if (!controller) {
         // method doesn't exist or unsupported method
-        throw helper.throwNotFoundErr(method);
+        throw helper.makeNotFoundErr(method);
       }
 
-      const result = controller[method](params, client);
-      resolve(util.types.isPromise(result) ? await result : result);
+      try {
+        const result = controller[method](params, client);
+        resolve(util.types.isPromise(result) ? await result : result);
+      } catch (err) {
+        if (err instanceof Error) {
+          throw helper.makeRpcErr(err.message);
+        } else if (err instanceof ApiOutOfGasError) {
+          throw new OutOfGasError(err.gas);
+        } else if (err instanceof ApiRevertError) {
+          throw new RevertError(err.returnValue, err.decodedReturnValue);
+        } else {
+          throw err;
+        }
+      }
 
       logger.debug('📦 Rpc served', method, 'usage:', Date.now() - startAt);
     } catch (err) {
@@ -139,6 +171,7 @@ export class RpcServer {
       }
 
       try {
+        this.reqQueue.reset();
         const app = express();
         this.server = http.createServer(app);
         expressws(app, this.server);
@@ -177,9 +210,6 @@ export class RpcServer {
 
           // start loop
           this.reqPromise = this.reqLoop();
-          this.filterSystem.start();
-          this.oracle.start();
-
           resolve();
         });
       } catch (err) {
@@ -212,8 +242,15 @@ export class RpcServer {
     this.reqQueue.abort();
     await this.reqPromise;
     this.reqPromise = undefined;
+  }
 
-    await ignoreError(this.filterSystem.abort());
-    this.oracle.abort();
+  /**
+   * Reset host and port rpc Serve
+   * @param newHost - new host address
+   * @param newPort - new port
+   */
+  reset(newHost: string, newPort: number) {
+    this.host = newHost;
+    this.port = newPort;
   }
 }

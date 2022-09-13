@@ -1,6 +1,6 @@
 import fs from 'fs';
 import process from 'process';
-import { Node, NodeFactory } from '@rei-network/core';
+import { Node, NodeFactory, DBType } from '@rei-network/core';
 import { RpcServer } from '@rei-network/rpc';
 import { setLevel, logger } from '@rei-network/utils';
 import { ApiServer } from '@rei-network/api';
@@ -55,7 +55,7 @@ export async function startServices(opts: { [option: string]: string }): Promise
     mine,
     network,
     account,
-    db: opts.db
+    db: opts.db === 'rocksdb' ? DBType.RocksDB : DBType.LevelDB
   });
 
   // create api server instance

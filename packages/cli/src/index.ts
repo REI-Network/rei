@@ -39,7 +39,7 @@ program.option('--mine', 'mine block');
 program.option('--coinbase <address>', 'miner address');
 program.option('--verbosity <verbosity>', 'logging verbosity: silent, error, warn, info, debug, detail', 'info');
 program.option('--receipts-cache-size <receiptsCacheSize>', 'receipts cache size');
-program.option('--db <db>', 'database type: leveldb, rocksdb');
+program.option('--db <db>', 'database type: leveldb, rocksdb', 'leveldb');
 
 // install commands
 installMigrateCommand(program);

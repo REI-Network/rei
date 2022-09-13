@@ -20,7 +20,7 @@ import { BlockchainMonitor } from './blockchainMonitor';
 import { Wire, ConsensusProtocol, WireProtocolHandler } from './protocols';
 import { ReimintConsensusEngine, CliqueConsensusEngine } from './consensus';
 import { isEnableRemint } from './hardforks';
-import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
+import { CommitBlockOptions, NodeOptions, NodeStatus, DBType } from './types';
 import { StateManager } from './stateManager';
 
 const defaultTimeoutBanTime = 60 * 5 * 1000;
@@ -79,10 +79,10 @@ export class Node {
 
   constructor(options: NodeOptions) {
     this.datadir = options.databasePath;
-    if (options.db === 'rocksdb') {
-      this.chaindb = createEncodingRocksDB(path.join(this.datadir, 'chaindbRocks'));
-      this.nodedb = createRocksDB(path.join(this.datadir, 'nodesRocks'));
-      this.evidencedb = createRocksDB(path.join(this.datadir, 'evidenceRocks'));
+    if (options.db === DBType.RocksDB) {
+      this.chaindb = createEncodingRocksDB(path.join(this.datadir, 'chaindb-rocks'));
+      this.nodedb = createRocksDB(path.join(this.datadir, 'nodes-rocks'));
+      this.evidencedb = createRocksDB(path.join(this.datadir, 'evidence-rocks'));
     } else {
       this.chaindb = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
       this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));

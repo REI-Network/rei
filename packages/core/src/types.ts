@@ -29,7 +29,7 @@ export interface NodeOptions {
   /**
    * DB type, rocksdb or leveldb, default is `leveldb`
    */
-  db?: string;
+  db: DBType;
 
   mine: ConsensusEngineConstructorOptions;
   network: NetworkManagerConstructorOptions;
@@ -48,4 +48,9 @@ export interface CommitBlockOptions {
   broadcast: boolean;
   block: Block;
   receipts: Receipt[];
+}
+
+export enum DBType {
+  LevelDB = 'leveldb',
+  RocksDB = 'rocksdb'
 }

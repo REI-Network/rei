@@ -33,10 +33,10 @@ export async function migrate(from: LevelUp, to: LevelUp) {
   }
 }
 
-export async function batchMigrate(dbs: LevelUp[][]) {
-  const task: Promise<void>[] = [];
-  for (const db of dbs) {
-    task.push(migrate(db[0], db[1]));
-  }
-  await Promise.all(task);
+/**
+ * Batch migrate leveldb to rocksdb
+ * @param dbs - Leveldb and Rocksdb instance list
+ */
+export async function batchMigrate(dbs: [LevelUp, LevelUp][]) {
+  await Promise.all(dbs.map(([db0, db1]) => migrate(db0, db1)));
 }

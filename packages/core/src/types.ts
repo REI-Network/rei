@@ -26,6 +26,10 @@ export interface NodeOptions {
    * Max receipts cache size
    */
   receiptsCacheSize?: number;
+  /**
+   * DB type, rocksdb or leveldb, default is `leveldb`
+   */
+  db?: string;
 
   mine: ConsensusEngineConstructorOptions;
   network: NetworkManagerConstructorOptions;

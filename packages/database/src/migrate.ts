@@ -32,3 +32,11 @@ export async function migrate(from: LevelUp, to: LevelUp) {
     await to.put(key, val, { keyEncoding: 'binary', valueEncoding: 'binary' });
   }
 }
+
+export async function batchMigrate(dbs: LevelUp[][]) {
+  const task: Promise<void>[] = [];
+  for (const db of dbs) {
+    task.push(migrate(db[0], db[1]));
+  }
+  await Promise.all(task);
+}

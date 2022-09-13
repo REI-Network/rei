@@ -54,7 +54,8 @@ export async function startServices(opts: { [option: string]: string }): Promise
     receiptsCacheSize: opts.receiptsCacheSize ? Number(opts.receiptsCacheSize) : undefined,
     mine,
     network,
-    account
+    account,
+    db: opts.db
   });
 
   // create api server instance

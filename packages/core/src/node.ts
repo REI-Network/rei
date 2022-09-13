@@ -2,7 +2,7 @@ import path from 'path';
 import type { LevelUp } from 'levelup';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from 'merkle-patricia-tree';
-import { Database, createLevelDB, createEncodingLevelDB } from '@rei-network/database';
+import { Database, createLevelDB, createEncodingLevelDB, createEncodingRocksDB, createRocksDB } from '@rei-network/database';
 import { NetworkManager, Peer } from '@rei-network/network';
 import { Common } from '@rei-network/common';
 import { Blockchain } from '@rei-network/blockchain';
@@ -79,9 +79,15 @@ export class Node {
 
   constructor(options: NodeOptions) {
     this.datadir = options.databasePath;
-    this.chaindb = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
-    this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));
-    this.evidencedb = createLevelDB(path.join(this.datadir, 'evidence'));
+    if (options.db === 'rocksdb') {
+      this.chaindb = createEncodingRocksDB(path.join(this.datadir, 'chaindbRocks'));
+      this.nodedb = createRocksDB(path.join(this.datadir, 'nodesRocks'));
+      this.evidencedb = createRocksDB(path.join(this.datadir, 'evidenceRocks'));
+    } else {
+      this.chaindb = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
+      this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));
+      this.evidencedb = createLevelDB(path.join(this.datadir, 'evidence'));
+    }
     this.wire = new Wire(this);
     this.consensus = new ConsensusProtocol(this);
     this.accMngr = new AccountManager(options.account.keyStorePath);

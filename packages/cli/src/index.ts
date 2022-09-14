@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import process from 'process';
 import { program } from 'commander';
-import { installStartAction, installAccountCommand, installAttachCommand, installConsoleCommand, installMigrateCommand } from './commands';
+import { installStartAction, installAccountCommand, installAttachCommand, installConsoleCommand, installMigrateCommand, installDumpCommand } from './commands';
 
 // load version from package.json
 let version = 'unknown';
@@ -42,6 +42,7 @@ program.option('--receipts-cache-size <receiptsCacheSize>', 'receipts cache size
 program.option('--db <db>', 'database type: leveldb, rocksdb', 'leveldb');
 
 // install commands
+installDumpCommand(program);
 installMigrateCommand(program);
 installStartAction(program);
 installAccountCommand(program);

@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 import { LevelUp } from 'levelup';
 import { logger } from '@rei-network/utils';
@@ -10,6 +11,9 @@ export async function installMigrateCommand(program: any) {
     .action(async () => {
       const { datadir } = program.opts();
       let dbs: [LevelUp, LevelUp][] = [];
+      if (!fs.existsSync(path.join(datadir, 'chaindb')) || !fs.existsSync(path.join(datadir, 'nodes')) || !fs.existsSync(path.join(datadir, 'evidence'))) {
+        throw new Error('Database is not exist');
+      }
       try {
         dbs = [
           [createEncodingLevelDB(path.join(datadir, 'chaindb')), createEncodingRocksDB(path.join(datadir, 'chaindb-rocks'))],
@@ -29,5 +33,9 @@ export async function installMigrateCommand(program: any) {
 }
 
 async function closeDb(dbs: [LevelUp, LevelUp][]) {
-  await Promise.all(dbs.map((db) => db.map((d) => d.close())));
+  const task: Promise<void>[] = [];
+  dbs.map((db) => {
+    db.map((d) => task.push(d.close()));
+  });
+  await Promise.all(task);
 }

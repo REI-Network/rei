@@ -47,6 +47,11 @@ export async function startServices(opts: { [option: string]: string }): Promise
     coinbase: opts.coinbase
   };
 
+  // check db parameter
+  if (opts.db !== DBType.LevelDB && opts.dbType !== DBType.RocksDB) {
+    throw new Error('Invalid db parameter');
+  }
+
   // create node instance
   const node = await NodeFactory.createNode({
     databasePath: opts.datadir,
@@ -55,7 +60,7 @@ export async function startServices(opts: { [option: string]: string }): Promise
     mine,
     network,
     account,
-    db: opts.db === 'rocksdb' ? DBType.RocksDB : DBType.LevelDB
+    db: opts.db as DBType
   });
 
   // create api server instance

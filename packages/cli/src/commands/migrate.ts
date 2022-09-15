@@ -33,5 +33,5 @@ export async function installMigrateCommand(program: any) {
 }
 
 async function closeDb(dbs: [LevelUp, LevelUp][]) {
-  await Promise.all(dbs.map(([db0, db1]) => Promise.all([db0.close(), db1.close()])));
+  return Promise.all(dbs.reduce((p, c) => p.concat(c), [] as LevelUp[]).map((db) => db.close()));
 }

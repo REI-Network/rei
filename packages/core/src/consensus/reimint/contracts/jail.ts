@@ -64,10 +64,17 @@ export class Jail extends Contract {
 
   addMissRecord(missReord: MissReord[]) {
     return this.runWithLogger(async () => {
-      const missReordToString = missReord.map((record) => {
-        return [record.address.toString(), record.missRoundNumber.toString()];
-      });
-      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('addMissRecord', ['tuple(address,uint256)[]'], [missReordToString]));
+      const { logs } = await this.executeMessage(
+        this.makeSystemCallerMessage(
+          'addMissRecord',
+          ['tuple(address,uint256)[]'],
+          [
+            missReord.map((record) => {
+              return [record.address.toString(), record.missRoundNumber.toString()];
+            })
+          ]
+        )
+      );
       return logs;
     });
   }

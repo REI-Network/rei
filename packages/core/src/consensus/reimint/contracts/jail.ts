@@ -3,7 +3,7 @@ import { Address, BN, toBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Contract } from './contract';
 
-type missReord = {
+type MissReord = {
   address: Address;
   missRoundNumber: BN;
 };
@@ -62,9 +62,13 @@ export class Jail extends Contract {
     });
   }
 
-  addMissRecord(missReord: missReord[]) {
+  addMissRecord(missReord: MissReord[]) {
     return this.runWithLogger(async () => {
-      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('addMissRecord', ['address', 'uint256'], [missReord[0].address.toString(), missReord[0].missRoundNumber.toString()]));
+      const missReordToString = missReord.map((record) => {
+        return [record.address.toString(), record.missRoundNumber.toString()];
+      });
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('addMissRecord', ['tuple(address,uint256)[]'], [missReordToString]));
+      return logs;
     });
   }
 }

@@ -21,6 +21,14 @@ contract Jail is ReentrancyGuard, Only, IJail {
 
     uint256 public override lowestRecordBlockNumber;
 
+    event Dojail(address indexed miner, uint256 indexed blockNumber);
+
+    event Unjail(address indexed miner, uint256 indexed blockNumber);
+
+    event AddMissRecord(uint256 indexed blockNumber, MissRecord[] indexed missRecords);
+
+    event ResetRecordsAmountPeriod(uint256 indexed recordsAmountPeriod, uint256 indexed blockNumber);
+
     constructor(IConfig _config) public Only(_config) {}
 
     function _addMissRecord(uint256 blockNumber, MissRecord[] memory record) private {
@@ -66,6 +74,7 @@ contract Jail is ReentrancyGuard, Only, IJail {
             lowestRecordBlockNumber = blockNumberToDelete + 1;
         }
         _addMissRecord(blockNumberNow, record);
+        emit AddMissRecord(blockNumberNow, record);
     }
 
     function _jail(address _address) private {
@@ -77,6 +86,7 @@ contract Jail is ReentrancyGuard, Only, IJail {
 
     function jail(address _address) external override nonReentrant onlySystemCaller {
         _jail(_address);
+        emit Dojail(_address, block.number);
     }
 
     function _unjail(address _address) private {
@@ -89,10 +99,12 @@ contract Jail is ReentrancyGuard, Only, IJail {
 
     function unjail() external override nonReentrant {
         _unjail(msg.sender);
+        emit Unjail(msg.sender, block.number);
     }
 
     function resetRecordsAmountPeriod(uint256 _recordsAmountPeriod) external override nonReentrant onlySystemCaller {
         recordsAmountPeriod = _recordsAmountPeriod;
+        emit ResetRecordsAmountPeriod(_recordsAmountPeriod, block.number);
     }
 
     function getMinersLength() external view override returns (uint256) {
@@ -107,8 +119,8 @@ contract Jail is ReentrancyGuard, Only, IJail {
         return miners[indexMiners.get(index)];
     }
 
-    function getMinerMissedRoundNumberPeriod(address _address) external view override returns (uint256) {
-        Miner memory miner = miners[_address];
+    function getMissedRoundNumberPeriodByIndex(uint256 index) external view override returns (uint256) {
+        Miner memory miner = miners[indexMiners.get(index)];
         return miner.missedRoundNumberPeriod;
     }
 }

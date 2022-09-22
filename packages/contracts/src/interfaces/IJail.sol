@@ -52,5 +52,5 @@ interface IJail {
 
     function getMinerByIndex(uint256 index) external view returns (Miner memory);
 
-    function getMinerMissedRoundNumberPeriod(address _address) external view returns (uint256);
+    function getMissedRoundNumberPeriodByIndex(uint256 index) external view returns (uint256);
 }

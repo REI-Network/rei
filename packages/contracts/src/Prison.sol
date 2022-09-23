@@ -11,8 +11,6 @@ import "./Only.sol";
 contract Prison is ReentrancyGuard, Only, IPrison {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
-    uint256 public override recordsAmountPeriod = 100;
-
     EnumerableMap.UintToAddressMap private indexMiners;
 
     mapping(address => Miner) public override miners;
@@ -26,8 +24,6 @@ contract Prison is ReentrancyGuard, Only, IPrison {
     event Unjail(address indexed miner, uint256 indexed blockNumber);
 
     event AddMissRecord(uint256 indexed blockNumber, MissRecord[] indexed missRecords);
-
-    event ResetRecordsAmountPeriod(uint256 indexed recordsAmountPeriod, uint256 indexed blockNumber);
 
     constructor(IConfig _config) public Only(_config) {}
 
@@ -63,8 +59,8 @@ contract Prison is ReentrancyGuard, Only, IPrison {
 
     function addMissRecord(MissRecord[] calldata record) external override nonReentrant onlySystemCaller {
         uint256 blockNumberNow = block.number;
-        if (blockNumberNow >= recordsAmountPeriod) {
-            uint256 blockNumberToDelete = blockNumberNow - recordsAmountPeriod;
+        if (blockNumberNow >= config.recordsAmountPeriod()) {
+            uint256 blockNumberToDelete = blockNumberNow - config.recordsAmountPeriod();
             if (lowestRecordBlockNumber <= blockNumberToDelete) {
                 for (uint256 i = lowestRecordBlockNumber; i <= blockNumberToDelete; i++) {
                     _deleteTimeOutMissRecord(i);
@@ -100,11 +96,6 @@ contract Prison is ReentrancyGuard, Only, IPrison {
     function unjail() external override nonReentrant {
         _unjail(msg.sender);
         emit Unjail(msg.sender, block.number);
-    }
-
-    function resetRecordsAmountPeriod(uint256 _recordsAmountPeriod) external override nonReentrant onlySystemCaller {
-        recordsAmountPeriod = _recordsAmountPeriod;
-        emit ResetRecordsAmountPeriod(_recordsAmountPeriod, block.number);
     }
 
     function getMinersLength() external view override returns (uint256) {

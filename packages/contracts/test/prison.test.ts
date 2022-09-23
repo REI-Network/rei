@@ -7,11 +7,11 @@ declare var artifacts: any;
 declare var web3: Web3;
 
 const Config = artifacts.require('Config_devnet');
-const Jail = artifacts.require('Jail');
+const Jail = artifacts.require('Prison');
 
-describe('Jail', () => {
+describe('Prison', () => {
   let config: any;
-  let jail: any;
+  let prison: any;
   let deployer: any;
   let user1: any;
 
@@ -25,7 +25,7 @@ describe('Jail', () => {
     config = new web3.eth.Contract(Config.abi, (await Config.new()).address, { from: deployer });
     await config.methods.setSystemCaller(deployer).send();
 
-    jail = new web3.eth.Contract(Jail.abi, (await Jail.new(config.options.address)).address, { from: deployer });
-    await config.methods.setJail(jail.options.address).send();
+    prison = new web3.eth.Contract(Jail.abi, (await Jail.new(config.options.address)).address, { from: deployer });
+    await config.methods.setJail(prison.options.address).send();
   });
 });

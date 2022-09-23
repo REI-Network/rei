@@ -23,6 +23,7 @@ contract DevConfig is Ownable, IConfig {
     uint256 internal mivp = 10000;
     uint256 internal scri = 5 seconds;
     uint256 internal fpi = 10 seconds;
+    uint256 internal rap = 10;
 
     /////////////////////////////////
 
@@ -126,6 +127,10 @@ contract DevConfig is Ownable, IConfig {
 
     function feePoolInterval() external view override returns (uint256) {
         return fpi;
+    }
+
+    function recordsAmountPeriod() external view override returns(uint256) {
+        return rap;
     }
 
     function getFactorByReason(uint8 reason) external view override returns (uint8) {

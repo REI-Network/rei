@@ -33,4 +33,6 @@ interface IConfig {
     function setCommissionRateInterval() external view returns (uint256);
 
     function feePoolInterval() external view returns (uint256);
+
+    function recordsAmountPeriod() external view returns(uint256);
 }

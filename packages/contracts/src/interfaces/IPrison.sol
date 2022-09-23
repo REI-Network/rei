@@ -22,8 +22,6 @@ struct MissRecord {
 }
 
 interface IPrison {
-    function recordsAmountPeriod() external view returns (uint256);
-
     function lowestRecordBlockNumber() external view returns (uint256);
 
     function miners(address miner)
@@ -43,8 +41,6 @@ interface IPrison {
     function jail(address _address) external;
 
     function unjail() external;
-
-    function resetRecordsAmountPeriod(uint256 _recordsAmountPeriod) external;
 
     function getMinersLength() external view returns (uint256);
 

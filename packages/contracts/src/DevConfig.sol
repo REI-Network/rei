@@ -75,6 +75,11 @@ contract DevConfig is Ownable, IConfig {
         fpi = _fpi;
     }
 
+
+    function setRecordsAmountPeriod(uint256 _rap) external onlyOwner {
+        rap = _rap;
+    }
+
     /////////////////////////////////
 
     function stakeManager() external view override returns (address) {

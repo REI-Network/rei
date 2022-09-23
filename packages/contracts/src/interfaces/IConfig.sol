@@ -18,6 +18,8 @@ interface IConfig {
 
     function feePool() external view returns (address);
 
+    function prison() external view returns (address);
+
     function feeToken() external view returns (address);
 
     function unstakeDelay() external view returns (uint256);

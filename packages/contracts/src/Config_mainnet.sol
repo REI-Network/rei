@@ -38,6 +38,10 @@ contract Config is IConfig {
         return 0x0000000000000000000000000000000000001007;
     }
 
+    function prison() external view override returns (address) {
+        return 0x0000000000000000000000000000000000001008;
+    }
+
     function unstakeDelay() external view override returns (uint256) {
         return 7 days;
     }

@@ -18,16 +18,16 @@ const methods = {
 };
 
 const events = {
-  Dojail: toBuffer('0x120c0e1915a6c9ceb3027875dc2b7d18e149282bd56fcb5212c412f4fbbe7d03'),
+  Jail: toBuffer('be3aa33bd245135e4e26b223d79d14ea479a47bff09f2b03c53838af1edbb14b'),
   Unjail: toBuffer('0x392ade2e433ab375e4a081f278116373f992aa104889accb306abf71042e70d8'),
   AddMissRecord: toBuffer('0x09643018f0ec0338f3696cccd484fec7a3fa3c1faf64a61b58e61d901bcbbc69'),
   ResetRecordsAmountPeriod: toBuffer('0xcba078451f52ffceb15f09fe5e19598b358ac24052b9ae82ae81e997e17bb9cb')
 };
 
 // a class used to interact with jail contract
-export class Jail extends Contract {
+export class Prison extends Contract {
   constructor(evm: EVM, common: Common) {
-    super(evm, common, methods, Address.fromString(common.param('vm', 'jladdr')));
+    super(evm, common, methods, Address.fromString(common.param('vm', 'praddr')));
   }
 
   /**

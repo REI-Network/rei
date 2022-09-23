@@ -5,10 +5,10 @@ pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/utils/EnumerableMap.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "./interfaces/IJail.sol";
+import "./interfaces/IPrison.sol";
 import "./Only.sol";
 
-contract Jail is ReentrancyGuard, Only, IJail {
+contract Prison is ReentrancyGuard, Only, IPrison {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     uint256 public override recordsAmountPeriod = 100;
@@ -21,7 +21,7 @@ contract Jail is ReentrancyGuard, Only, IJail {
 
     uint256 public override lowestRecordBlockNumber;
 
-    event Dojail(address indexed miner, uint256 indexed blockNumber);
+    event Jail(address indexed miner, uint256 indexed blockNumber);
 
     event Unjail(address indexed miner, uint256 indexed blockNumber);
 
@@ -86,7 +86,7 @@ contract Jail is ReentrancyGuard, Only, IJail {
 
     function jail(address _address) external override nonReentrant onlySystemCaller {
         _jail(_address);
-        emit Dojail(_address, block.number);
+        emit Jail(_address, block.number);
     }
 
     function _unjail(address _address) private {

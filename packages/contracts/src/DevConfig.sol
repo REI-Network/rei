@@ -16,6 +16,7 @@ contract DevConfig is Ownable, IConfig {
     address internal f = 0x0000000000000000000000000000000000001005;
     address internal fp = 0x0000000000000000000000000000000000001006;
     address internal ft = 0x0000000000000000000000000000000000001007;
+    address internal pr = 0x0000000000000000000000000000000000001008;
 
     uint256 internal ud = 1 seconds;
     uint256 internal wd = 1 seconds;
@@ -47,6 +48,10 @@ contract DevConfig is Ownable, IConfig {
 
     function setFeePool(address _fp) external onlyOwner {
         fp = _fp;
+    }
+
+    function setJail(address _pr) external onlyOwner {
+        pr = _pr;
     }
 
     function setUnstakeDelay(uint256 _ud) external onlyOwner {
@@ -97,6 +102,10 @@ contract DevConfig is Ownable, IConfig {
 
     function feeToken() external view override returns (address) {
         return ft;
+    }
+
+    function prison() external view override returns (address) {
+        return pr;
     }
 
     function unstakeDelay() external view override returns (uint256) {

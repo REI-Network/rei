@@ -21,7 +21,7 @@ struct MissRecord {
     uint256 missedRoundNumberThisBlock;
 }
 
-interface IJail {
+interface IPrison {
     function recordsAmountPeriod() external view returns (uint256);
 
     function lowestRecordBlockNumber() external view returns (uint256);

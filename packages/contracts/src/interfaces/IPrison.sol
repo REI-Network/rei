@@ -47,6 +47,4 @@ interface IPrison {
     function getMinerAddressByIndex(uint256 index) external view returns (address);
 
     function getMinerByIndex(uint256 index) external view returns (Miner memory);
-
-    function getMissedRoundNumberPeriodByIndex(uint256 index) external view returns (uint256);
 }

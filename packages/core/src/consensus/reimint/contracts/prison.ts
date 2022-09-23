@@ -20,8 +20,7 @@ const methods = {
 const events = {
   Jail: toBuffer('be3aa33bd245135e4e26b223d79d14ea479a47bff09f2b03c53838af1edbb14b'),
   Unjail: toBuffer('0x392ade2e433ab375e4a081f278116373f992aa104889accb306abf71042e70d8'),
-  AddMissRecord: toBuffer('0x09643018f0ec0338f3696cccd484fec7a3fa3c1faf64a61b58e61d901bcbbc69'),
-  ResetRecordsAmountPeriod: toBuffer('0xcba078451f52ffceb15f09fe5e19598b358ac24052b9ae82ae81e997e17bb9cb')
+  AddMissRecord: toBuffer('0x09643018f0ec0338f3696cccd484fec7a3fa3c1faf64a61b58e61d901bcbbc69')
 };
 
 // a class used to interact with jail contract
@@ -41,6 +40,11 @@ export class Prison extends Contract {
     });
   }
 
+  /**
+   * Get miner missed round number period now by index
+   * @param index - Miner index
+   * @returns missed round number period now
+   */
   getMinerMissedRoundNumberPeriod(index: BN) {
     return this.runWithLogger(async () => {
       const { returnValue } = await this.executeMessage(this.makeCallMessage('getMissedRoundNumberPeriodByIndex', ['uint256'], [index.toString()]));
@@ -48,6 +52,10 @@ export class Prison extends Contract {
     });
   }
 
+  /**
+   * Get lowest record block number
+   * @returns lowest record block number
+   */
   lowestRecordBlockNumber() {
     return this.runWithLogger(async () => {
       const { returnValue } = await this.executeMessage(this.makeCallMessage('lowestRecordBlockNumber', [], []));
@@ -55,6 +63,11 @@ export class Prison extends Contract {
     });
   }
 
+  /**
+   * Jail miner
+   * @param miner - Miner address
+   * @returns
+   */
   jail(miner: Address) {
     return this.runWithLogger(async () => {
       const { logs } = await this.executeMessage(this.makeSystemCallerMessage('jail', ['address'], [miner.toString()]));
@@ -62,6 +75,11 @@ export class Prison extends Contract {
     });
   }
 
+  /**
+   * Add miss record to persion contract per block
+   * @param missReord - Miss record
+   * @returns
+   */
   addMissRecord(missReord: MissReord[]) {
     return this.runWithLogger(async () => {
       const { logs } = await this.executeMessage(

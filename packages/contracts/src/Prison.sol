@@ -4,33 +4,32 @@ pragma solidity ^0.6.0;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/utils/EnumerableMap.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/IPrison.sol";
 import "./Only.sol";
 
-contract Prison is ReentrancyGuard, Only, IPrison {
+contract Prison is Only, IPrison {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
+    using SafeMath for uint256;
 
+    // indexed miners, including all miners with miss record
     EnumerableMap.UintToAddressMap private indexMiners;
-
+    // miner mapping, including all validators
     mapping(address => Miner) public override miners;
-
+    // missrecord mapping, indexed by block number
     mapping(uint256 => MissRecord[]) public override missRecords;
 
+    // lowest miss record blocknumber
     uint256 public override lowestRecordBlockNumber;
 
-    event Jail(address indexed miner, uint256 indexed blockNumber);
-
     event Unjail(address indexed miner, uint256 indexed blockNumber);
-
-    event AddMissRecord(uint256 indexed blockNumber, MissRecord[] indexed missRecords);
 
     constructor(IConfig _config) public Only(_config) {}
 
     function _addMissRecord(uint256 blockNumber, MissRecord[] memory record) private {
-        MissRecord[] storage missrecord = missRecords[blockNumber];
+        MissRecord[] storage missRecord = missRecords[blockNumber];
         for (uint256 i = 0; i < record.length; i++) {
-            missrecord.push(record[i]);
+            missRecord.push(record[i]);
             Miner storage miner = miners[record[i].miner];
             if (miner.jailed) {
                 continue;
@@ -46,55 +45,42 @@ contract Prison is ReentrancyGuard, Only, IPrison {
     }
 
     function _deleteTimeOutMissRecord(uint256 blockNumberToDelete) private {
-        MissRecord[] memory missrecord = missRecords[blockNumberToDelete];
-        for (uint256 i = 0; i < missrecord.length; i++) {
-            Miner storage miner = miners[missrecord[i].miner];
+        MissRecord[] memory missRecord = missRecords[blockNumberToDelete];
+        for (uint256 i = 0; i < missRecord.length; i++) {
+            Miner storage miner = miners[missRecord[i].miner];
             if (miner.unjailedBlockNumber > blockNumberToDelete || miner.jailed) {
                 continue;
             } else {
-                miner.missedRoundNumberPeriod -= missrecord[i].missedRoundNumberThisBlock;
+                miner.missedRoundNumberPeriod -= missRecord[i].missedRoundNumberThisBlock;
             }
         }
     }
 
-    function addMissRecord(MissRecord[] calldata record) external override nonReentrant onlySystemCaller {
+    function addMissRecord(MissRecord[] calldata record) external override onlySystemCaller {
         uint256 blockNumberNow = block.number;
         if (blockNumberNow >= config.recordsAmountPeriod()) {
             uint256 blockNumberToDelete = blockNumberNow - config.recordsAmountPeriod();
-            if (lowestRecordBlockNumber <= blockNumberToDelete) {
-                for (uint256 i = lowestRecordBlockNumber; i <= blockNumberToDelete; i++) {
-                    _deleteTimeOutMissRecord(i);
-                    delete missRecords[i];
-                }
+            for (uint256 i = lowestRecordBlockNumber; i <= blockNumberToDelete; i++) {
+                _deleteTimeOutMissRecord(i);
+                delete missRecords[i];
             }
             lowestRecordBlockNumber = blockNumberToDelete + 1;
         }
         _addMissRecord(blockNumberNow, record);
-        emit AddMissRecord(blockNumberNow, record);
     }
 
-    function _jail(address _address) private {
+    function jail(address _address) external override onlySystemCaller {
         Miner storage miner = miners[_address];
-        require(miner.miner != address(0), "Jail: miner is not exist");
+        require(!(miner.jailed) && miner.miner != address(0), "Jail: miner is jailed or not exist");
         miner.jailed = true;
         miner.missedRoundNumberPeriod = 0;
     }
 
-    function jail(address _address) external override nonReentrant onlySystemCaller {
-        _jail(_address);
-        emit Jail(_address, block.number);
-    }
-
-    function _unjail(address _address) private {
-        require(miners[_address].jailed, "Jail: miner is not jailed");
-        Miner storage miner = miners[_address];
-        require(miner.miner != address(0), "Jail: miner is not exist");
-        miner.jailed = false;
-        miner.unjailedBlockNumber = block.number;
-    }
-
-    function unjail() external override nonReentrant {
-        _unjail(msg.sender);
+    function unjail() external override {
+        Miner storage miner = miners[msg.sender];
+        require(!(miner.jailed) && miner.miner != address(0), "Jail: miner is jailed or not exist");
+        miner.jailed = true;
+        miner.missedRoundNumberPeriod = 0;
         emit Unjail(msg.sender, block.number);
     }
 
@@ -108,10 +94,5 @@ contract Prison is ReentrancyGuard, Only, IPrison {
 
     function getMinerByIndex(uint256 index) external view override returns (Miner memory) {
         return miners[indexMiners.get(index)];
-    }
-
-    function getMissedRoundNumberPeriodByIndex(uint256 index) external view override returns (uint256) {
-        Miner memory miner = miners[indexMiners.get(index)];
-        return miner.missedRoundNumberPeriod;
     }
 }

@@ -22,6 +22,8 @@ struct MissRecord {
 }
 
 interface IPrison {
+    function jailedMiners(uint256 index) external view returns (address);
+
     function lowestRecordBlockNumber() external view returns (uint256);
 
     function miners(address miner)
@@ -36,17 +38,9 @@ interface IPrison {
 
     function missRecords(uint256 index1, uint256 index2) external view returns (address, uint256);
 
-    function addMissRecord(MissRecord[] calldata record) external;
-
-    function jail(address _address) external;
+    function addMissRecord(MissRecord[] calldata record) external returns (address[] memory);
 
     function unjail() external payable;
-
-    function getMinersLength() external view returns (uint256);
-
-    function getMinerAddressByIndex(uint256 index) external view returns (address);
-
-    function getMinerByIndex(uint256 index) external view returns (Miner memory);
 
     function getMissRecordsLengthByBlcokNumber(uint256 blockNumber) external view returns (uint256);
 }

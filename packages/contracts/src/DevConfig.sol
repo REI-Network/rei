@@ -25,6 +25,7 @@ contract DevConfig is Ownable, IConfig {
     uint256 internal fpi = 10 seconds;
     uint256 internal rap = 10;
     uint256 internal fft = 1e21;
+    uint256 internal jtd = 10;
 
     /////////////////////////////////
 
@@ -140,6 +141,10 @@ contract DevConfig is Ownable, IConfig {
 
     function forfeit() external view override returns (uint256) {
         return fft;
+    }
+
+    function jailThreshold() external view override returns (uint256) {
+        return jtd;
     }
 
     function getFactorByReason(uint8 reason) external view override returns (uint8) {

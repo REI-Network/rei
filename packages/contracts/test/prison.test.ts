@@ -1,13 +1,11 @@
 import type Web3 from 'web3';
 import { assert, expect } from 'chai';
-import { BN, MAX_INTEGER } from 'ethereumjs-util';
-import { upTimestamp, toBN } from './utils';
 
 declare var artifacts: any;
 declare var web3: Web3;
 
 const Config = artifacts.require('Config_devnet');
-const Jail = artifacts.require('Prison');
+const Prison = artifacts.require('Prison');
 
 class RecordQueue {
   missRecords: (string | number)[][][] = [];
@@ -93,7 +91,7 @@ describe('Prison', () => {
     config = new web3.eth.Contract(Config.abi, (await Config.new()).address, { from: deployer });
     await config.methods.setSystemCaller(deployer).send();
 
-    prison = new web3.eth.Contract(Jail.abi, (await Jail.new(config.options.address)).address, { from: deployer });
+    prison = new web3.eth.Contract(Prison.abi, (await Prison.new(config.options.address)).address, { from: deployer });
     await config.methods.setJail(prison.options.address).send();
 
     recordAmountPeriod = 3;

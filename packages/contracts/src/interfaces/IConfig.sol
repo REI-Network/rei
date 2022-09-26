@@ -37,4 +37,6 @@ interface IConfig {
     function recordsAmountPeriod() external view returns (uint256);
 
     function forfeit() external view returns (uint256);
+
+    function jailThreshold() external view returns (uint256);
 }

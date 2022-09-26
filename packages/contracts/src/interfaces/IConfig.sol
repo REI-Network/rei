@@ -34,5 +34,7 @@ interface IConfig {
 
     function feePoolInterval() external view returns (uint256);
 
-    function recordsAmountPeriod() external view returns(uint256);
+    function recordsAmountPeriod() external view returns (uint256);
+
+    function forfeit() external view returns (uint256);
 }

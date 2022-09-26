@@ -40,11 +40,13 @@ interface IPrison {
 
     function jail(address _address) external;
 
-    function unjail() external;
+    function unjail() external payable;
 
     function getMinersLength() external view returns (uint256);
 
     function getMinerAddressByIndex(uint256 index) external view returns (address);
 
     function getMinerByIndex(uint256 index) external view returns (Miner memory);
+
+    function getMissRecordsLengthByBlcokNumber(uint256 blockNumber) external view returns (uint256);
 }

@@ -156,9 +156,11 @@ describe('Prison', () => {
   });
 
   it('should unjail miner successfully', async () => {
-    await prison.methods.unjail().send();
+    const forfeitAmount = await config.methods.forfeit().call();
+    await prison.methods.unjail().send({ value: forfeitAmount });
     recordQueue.push([]);
     expect((await prison.methods.miners(deployer).call()).jailed, 'Miner should be unjailed').be.equal(false);
+    expect((await web3.eth.getBalance(prison.options.address)).toString(), 'Prison balance should be equal').to.equal(forfeitAmount);
   });
 
   it('should unjail miner failed', async () => {
@@ -183,8 +185,13 @@ describe('Prison', () => {
     const minerGetByIndex = await prison.methods.getMinerByIndex(0).call();
     expect(minerGetByIndex.miner, 'Miner address should be equal').to.equal(deployer.toString());
     expect(minerGetByIndex.missedRoundNumberPeriod, 'Missed round number this block should be equal').to.equal(recordQueue.getMissRecordsNumber(deployer).toString());
-    const missedRoundNumberPeriodByIndex = await prison.methods.getMissedRoundNumberPeriodByIndex(0).call();
-    expect(missedRoundNumberPeriodByIndex, 'Missed round number this block should be equal').to.equal(recordQueue.getMissRecordsNumber(deployer).toString());
+    const blockNumber = await web3.eth.getBlockNumber();
+    const missRecordLength = await prison.methods.getMissRecordsLengthByBlcokNumber(blockNumber).call();
+    for (let i = 0; i < missRecordLength; i++) {
+      const missRecord = await prison.methods.missRecords(blockNumber, i).call();
+      expect(missRecord.miner, 'Miner address should be equal').to.equal(missedRecord6[i][0].toString());
+      expect(missRecord.missedRoundNumberThisBlock, 'Missed round number should be equal').to.equal(missedRecord6[i][1].toString());
+    }
   });
 
   it('should run correctly after enlarged record amount period', async () => {

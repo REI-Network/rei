@@ -63,8 +63,13 @@ contract Config is IConfig {
         return 1 days;
     }
 
-    function recordsAmountPeriod() external view override returns(uint256) {
+    function recordsAmountPeriod() external view override returns (uint256) {
         return 1000;
+    }
+
+    function forfeit() external view override returns (uint256) {
+        // 1000 REI
+        return 1e21;
     }
 
     function getFactorByReason(uint8 reason) external view override returns (uint8) {

@@ -35,6 +35,11 @@ export interface ProtocolHandler {
    * Abort handler
    */
   abort(): void;
+
+  /**
+   * Get the status of the remote node in the hander
+   */
+  getRemoteStatus(): { name?: string; version: number };
 }
 
 export type Connection = {

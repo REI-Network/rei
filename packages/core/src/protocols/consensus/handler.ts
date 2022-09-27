@@ -464,4 +464,7 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
       }
     }
   }
+  getRemoteStatus() {
+    return { name: this.protocol.name, version: Number(this.protocol.version), height: this.height.toNumber(), round: this.round, step: this.step, proposal: this.proposal, proposalBlockHash: this.proposalBlockHash };
+  }
 }

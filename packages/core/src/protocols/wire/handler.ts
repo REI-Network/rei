@@ -12,6 +12,8 @@ export interface WireProtocol {
   readonly node: Node;
   readonly pool: HandlerPool<WireProtocolHandler>;
   get protocolString(): string;
+  get version(): string;
+  get name(): string;
 }
 
 /**
@@ -434,5 +436,19 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
    */
   announceNewBlock(block: Block, td: BN) {
     this.newBlockAnnouncesQueue.push({ block, td });
+  }
+
+  getRemoteStatus() {
+    const result = { name: this.protocol.name, version: Number(this.protocol.version) };
+    if (!this.status) {
+      return result;
+    }
+    return {
+      ...result,
+      chainId: this.status.networkId,
+      difficulty: new BN(this.status.totalDifficulty).toNumber(),
+      height: this.status.height,
+      head: this.status.bestHash.toString('hex')
+    };
   }
 }

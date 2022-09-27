@@ -86,11 +86,11 @@ contract Prison is Only, IPrison {
 
     function unjail() external payable override onlyStakeManager {
         require(msg.value >= config.forfeit(), "Unjail: the forfeit you have to pay is not enough");
-        Miner storage miner = miners[msg.sender];
+        Miner storage miner = miners[tx.origin];
         require((miner.jailed) && miner.miner != address(0), "Jail: miner is not jailed or not exist");
         miner.jailed = false;
         miner.unjailedBlockNumber = block.number;
-        emit Unjail(msg.sender, block.number, msg.value);
+        emit Unjail(tx.origin, block.number, msg.value);
     }
 
     function getMissRecordsLengthByBlcokNumber(uint256 blockNumber) external view override returns (uint256) {

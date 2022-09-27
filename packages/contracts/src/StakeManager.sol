@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 pragma solidity ^0.6.0;
+pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
@@ -9,6 +10,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "./interfaces/IUnstakePool.sol";
 import "./interfaces/IValidatorRewardPool.sol";
 import "./interfaces/IStakeManager.sol";
+import "./interfaces/IPrison.sol";
 import "./CommissionShare.sol";
 import "./Only.sol";
 
@@ -538,6 +540,33 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         }
         for (; i < originLength; i = i.add(1)) {
             activeValidators.pop();
+        }
+    }
+
+    function addMissRecord(MissRecord[] calldata record) external onlySystemCaller {
+        IPrison prison = IPrison(config.prison());
+        address[] memory jailedMiners = prison.addMissRecord(record);
+        for (uint256 i = 0; i < jailedMiners.length; i = i.add(1)) {
+            Validator memory v = validators[jailedMiners[i]];
+            if (indexedValidators.contains(v.id) && v.commissionShare != address(0)) {
+                indexedValidators.remove(v.id);
+                emit UnindexedValidator(jailedMiners[i]);
+            }
+            totalLockedAmount = totalLockedAmount.sub(getVotingPower(v.commissionShare, jailedMiners[i]));
+        }
+    }
+
+    function unjail() external payable {
+        IPrison prison = IPrison(config.prison());
+        prison.unjail{ value: msg.value }();
+        Validator memory v = validators[msg.sender];
+        if (v.commissionShare != address(0)) {
+            uint256 votingPower = getVotingPower(v.commissionShare, msg.sender);
+            if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
+                indexedValidators.set(v.id, msg.sender);
+                emit IndexedValidator(msg.sender, votingPower);
+            }
+            totalLockedAmount = totalLockedAmount.add(votingPower);
         }
     }
 }

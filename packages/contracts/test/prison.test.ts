@@ -1,5 +1,6 @@
 import type Web3 from 'web3';
 import { assert, expect } from 'chai';
+import { BN } from 'ethereumjs-util';
 
 declare var artifacts: any;
 declare var web3: Web3;
@@ -7,47 +8,58 @@ declare var web3: Web3;
 const Config = artifacts.require('Config_devnet');
 const Prison = artifacts.require('Prison');
 
+type MissRecord = [string, number];
+type Miner = {
+  jailed: boolean;
+  address: string;
+  missedRoundNumberPeriod: number;
+  unjailedBlockNumber: number;
+};
+
 class RecordQueue {
-  missRecords: (string | number)[][][] = [];
   public queueLength: number;
-  miners: string[] = [];
+  public jailThreshold: number;
+  public minerMap: Map<string, Miner> = new Map<string, Miner>();
+  public missRecords: Map<number, MissRecord[]> = new Map<number, MissRecord[]>();
 
-  constructor(queueLength: number) {
+  constructor(queueLength: number, jailThreshold: number) {
     this.queueLength = queueLength;
+    this.jailThreshold = jailThreshold;
   }
 
-  push(record: (string | number)[][]) {
-    this.missRecords.push(record);
-    record.map((item) => {
-      if (this.miners.indexOf(item[0] as string) === -1) {
-        this.miners.push(item[0] as string);
-      }
-    });
+  push(blockNumber, record: MissRecord[]) {
+    this.missRecords.set(blockNumber, record);
     if (this.missRecords.length > this.queueLength) {
-      this.missRecords.shift();
-    }
-  }
-
-  jail(address: string) {
-    this.missRecords.map((record) => {
-      record.map((item) => {
-        if (item[0] === address) {
-          item[1] = 0;
+      const timeOutRecord = this.missRecords[0];
+      timeOutRecord.forEach((item) => {
+        const miner = this.minerMap.get(item[0]);
+        if (miner && !miner.jailed) {
+          miner.missedRoundNumberPeriod -= item[1];
         }
       });
+      this.missRecords.shift();
+    }
+    record.forEach((item) => {
+      const miner = this.minerMap.get(item[0]);
+      if (!miner) {
+        this.minerMap.set(item[0], {
+          jailed: false,
+          address: item[0],
+          missedRoundNumberPeriod: item[1],
+          unjailedBlockNumber: 0
+        });
+      } else if (!miner.jailed) {
+        miner.missedRoundNumberPeriod += item[1];
+        if (miner.missedRoundNumberPeriod >= this.jailThreshold) {
+          miner.jailed = true;
+          miner.missedRoundNumberPeriod = 0;
+        }
+      }
     });
   }
 
   getMissRecordsNumber(address: string) {
-    let missNumber = 0;
-    this.missRecords.map((record) => {
-      record.map((item) => {
-        if (item[0] === address) {
-          missNumber += item[1] as number;
-        }
-      });
-    });
-    return missNumber;
+    return this.minerMap.get(address)?.missedRoundNumberPeriod || 0;
   }
 
   resetQueueLength(newLength: number) {
@@ -60,16 +72,25 @@ class RecordQueue {
       this.missRecords.shift();
     }
   }
+
+  unjail(address: string) {
+    const miner = this.minerMap.get(address);
+    if (miner) {
+      miner.jailed = false;
+    }
+  }
 }
 
 async function checkMissRecord(queue: RecordQueue, prison: any) {
-  expect(await prison.methods.getMinersLength().call(), 'Miners length should be equal').to.equal(queue.miners.length.toString());
-  for (let i = 0; i < queue.miners.length; i++) {
-    const miner = queue.miners[i];
-    const missNumber = queue.getMissRecordsNumber(miner);
-    const minerState = await prison.methods.miners(miner).call();
-    expect(minerState.miner, 'Miner address should be equal').to.equal(miner);
-    expect(minerState.missedRoundNumberPeriod, 'Missed round number this block should be equal').to.equal(missNumber.toString());
+  const minerAddressArray = Array.from(queue.minerMap.keys());
+  for (let i = 0; i < minerAddressArray.length; i++) {
+    const minerAddress = minerAddressArray[i];
+    const miner = queue.minerMap.get(minerAddress)!;
+    const minerState = await prison.methods.miners(minerAddress).call();
+    expect(minerState.miner, 'Miner address should be equal').to.equal(minerAddress);
+    expect(minerState.missedRoundNumberPeriod, 'Missed round number this block should be equal').to.equal(miner.missedRoundNumberPeriod.toString());
+    expect(minerState.jailed, 'Jailed state should be equal').to.equal(miner.jailed);
+    expect(minerState.unjailedBlockNumber, 'Unjailed block number should be equal').to.equal(miner.unjailedBlockNumber.toString());
   }
 }
 
@@ -80,42 +101,49 @@ describe('Prison', () => {
   let user1: any;
   let recordAmountPeriod: number;
   let recordQueue: RecordQueue;
+  let missedRecordSkip: MissRecord[];
 
   before(async () => {
     const accounts = await web3.eth.getAccounts();
     deployer = accounts[0];
     user1 = accounts[1];
+    missedRecordSkip = [
+      [deployer, 1],
+      [user1, 1]
+    ];
   });
 
   it('should deploy succeed', async () => {
     config = new web3.eth.Contract(Config.abi, (await Config.new()).address, { from: deployer });
     await config.methods.setSystemCaller(deployer).send();
+    await config.methods.setStakeManager(deployer).send();
 
     prison = new web3.eth.Contract(Prison.abi, (await Prison.new(config.options.address)).address, { from: deployer });
     await config.methods.setJail(prison.options.address).send();
 
     recordAmountPeriod = 3;
-    recordQueue = new RecordQueue(recordAmountPeriod);
+    const jailThreshold = await config.methods.jailThreshold().call();
+    recordQueue = new RecordQueue(recordAmountPeriod, jailThreshold);
     await config.methods.setRecordsAmountPeriod(recordAmountPeriod).send();
     expect(await config.methods.recordsAmountPeriod().call(), 'Record amount period should be equal').to.equal(recordAmountPeriod.toString());
   });
 
   it('add missRecord scucessfully', async () => {
-    const missedRecord1 = [[deployer, 10]];
+    const missedRecord1: MissRecord[] = [[deployer, 1]];
     await prison.methods.addMissRecord(missedRecord1).send();
     recordQueue.push(missedRecord1);
     await checkMissRecord(recordQueue, prison);
-    const missedRecord2 = [
-      [deployer, 5],
-      [user1, 5]
+    const missedRecord2: MissRecord[] = [
+      [deployer, 2],
+      [user1, 2]
     ];
     await prison.methods.addMissRecord(missedRecord2).send();
     recordQueue.push(missedRecord2);
     await checkMissRecord(recordQueue, prison);
 
-    const missedRecord3 = [
-      [deployer, 5],
-      [user1, 5]
+    const missedRecord3: MissRecord[] = [
+      [deployer, 3],
+      [user1, 3]
     ];
     await prison.methods.addMissRecord(missedRecord3).send();
     recordQueue.push(missedRecord3);
@@ -127,73 +155,72 @@ describe('Prison', () => {
     await checkMissRecord(recordQueue, prison);
   });
 
-  it('should jail miner successfully', async () => {
-    await prison.methods.jail(deployer).send();
-    recordQueue.jail(deployer);
+  it('should jail miner sucessfully', async () => {
+    const jailedState = (await prison.methods.miners(deployer).call()).jailed;
+    expect(jailedState, 'Jailed state should be false').to.equal(false);
+    const missedRecord5: MissRecord[] = [
+      [deployer, 7],
+      [user1, 3]
+    ];
+    await prison.methods.addMissRecord(missedRecord5).send();
+    recordQueue.push(missedRecord5);
     await checkMissRecord(recordQueue, prison);
-    expect((await prison.methods.miners(deployer).call()).jailed, 'Miner should be jailed').be.equal(true);
+    const jailedStateAfter = (await prison.methods.miners(deployer).call()).jailed;
+    expect(jailedStateAfter, 'Jailed state should be true').to.equal(true);
   });
 
-  it('should jail miner failed', async () => {
-    try {
-      await prison.methods.jail(deployer).send();
-      recordQueue.push([]);
-      await checkMissRecord(recordQueue, prison);
-      assert.fail('Can not jail jailed miner');
-    } catch (err) {}
-  });
+  it('should unjail miner failed', async () => {
+    let failed = false;
+    const forfeitAmount = await config.methods.forfeit().call();
+    const deployerJailed = (await prison.methods.miners(deployer).call()).jailed;
+    const user1Jailed = (await prison.methods.miners(user1).call()).jailed;
+    expect(deployerJailed, 'Jailed state should be true').to.equal(true);
+    expect(user1Jailed, 'Jailed state should be false').to.equal(false);
 
-  it("should add jailed miner's missed record failed", async () => {
     try {
-      const missedRecord5 = [[deployer, 5]];
-      await prison.methods.addMissRecord(missedRecord5).send();
-      recordQueue.push([]);
-      await checkMissRecord(recordQueue, prison);
-      assert.fail('Can not add jailed miner missed record');
+      await prison.methods.unjail().send({ value: new BN(forfeitAmount).subn(1) });
+      failed = true;
     } catch (err) {}
+    recordQueue.push([]);
+    await prison.methods.addMissRecord(missedRecordSkip).send();
+    recordQueue.push(missedRecordSkip);
+    await checkMissRecord(recordQueue, prison);
+
+    await config.methods.setStakeManager(user1).send();
+    recordQueue.push([]);
+    await prison.methods.addMissRecord(missedRecordSkip).send({ from: user1 });
+    recordQueue.push(missedRecordSkip);
+    await checkMissRecord(recordQueue, prison);
+
+    try {
+      await prison.methods.unjail().send({ value: forfeitAmount, from: user1 });
+      failed = true;
+    } catch (err) {}
+    recordQueue.push([]);
+    await prison.methods.addMissRecord(missedRecordSkip).send({ from: user1 });
+    recordQueue.push(missedRecordSkip);
+    await checkMissRecord(recordQueue, prison);
+
+    if (failed) {
+      assert.fail('Unjail should failed');
+    }
+    await config.methods.setStakeManager(deployer).send();
+    recordQueue.push([]);
+    await prison.methods.addMissRecord(missedRecordSkip).send();
+    recordQueue.push(missedRecordSkip);
+    await checkMissRecord(recordQueue, prison);
   });
 
   it('should unjail miner successfully', async () => {
+    expect((await web3.eth.getBalance(prison.options.address)).toString(), 'Prison balance should be zero').to.equal('0');
     const forfeitAmount = await config.methods.forfeit().call();
     await prison.methods.unjail().send({ value: forfeitAmount });
-    recordQueue.push([]);
     expect((await prison.methods.miners(deployer).call()).jailed, 'Miner should be unjailed').be.equal(false);
     expect((await web3.eth.getBalance(prison.options.address)).toString(), 'Prison balance should be equal').to.equal(forfeitAmount);
   });
 
-  it('should unjail miner failed', async () => {
-    try {
-      await prison.methods.unjail().send();
-      recordQueue.push([]);
-      await checkMissRecord(recordQueue, prison);
-      assert.fail('Can not unjail unjailed miner');
-    } catch (err) {}
-  });
-
-  it('should get miner message successfully', async () => {
-    const missedRecord6 = [
-      [deployer, 15],
-      [user1, 5]
-    ];
-    await prison.methods.addMissRecord(missedRecord6).send();
-    recordQueue.push(missedRecord6);
-    await checkMissRecord(recordQueue, prison);
-    const deployerAddress = await prison.methods.getMinerAddressByIndex(0).call();
-    expect(deployerAddress, 'Miner address should be equal').to.equal(deployer.toString());
-    const minerGetByIndex = await prison.methods.getMinerByIndex(0).call();
-    expect(minerGetByIndex.miner, 'Miner address should be equal').to.equal(deployer.toString());
-    expect(minerGetByIndex.missedRoundNumberPeriod, 'Missed round number this block should be equal').to.equal(recordQueue.getMissRecordsNumber(deployer).toString());
-    const blockNumber = await web3.eth.getBlockNumber();
-    const missRecordLength = await prison.methods.getMissRecordsLengthByBlcokNumber(blockNumber).call();
-    for (let i = 0; i < missRecordLength; i++) {
-      const missRecord = await prison.methods.missRecords(blockNumber, i).call();
-      expect(missRecord.miner, 'Miner address should be equal').to.equal(missedRecord6[i][0].toString());
-      expect(missRecord.missedRoundNumberThisBlock, 'Missed round number should be equal').to.equal(missedRecord6[i][1].toString());
-    }
-  });
-
   it('should run correctly after enlarged record amount period', async () => {
-    const missedRecord7 = [
+    const missedRecord7: MissRecord[] = [
       [deployer, 7],
       [user1, 8]
     ];
@@ -222,7 +249,7 @@ describe('Prison', () => {
     expect(await config.methods.recordsAmountPeriod().call(), 'Record amount period should be equal').to.equal(recordAmountPeriod.toString());
     recordQueue.resetQueueLength(recordAmountPeriod);
     recordQueue.push([]);
-    const missedRecord8 = [
+    const missedRecord8: MissRecord[] = [
       [deployer, 8],
       [user1, 7]
     ];

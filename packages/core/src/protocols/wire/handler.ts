@@ -445,9 +445,7 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
     }
     return {
       ...result,
-      chainId: this.status.networkId,
       difficulty: new BN(this.status.totalDifficulty).toNumber(),
-      height: this.status.height,
       head: this.status.bestHash.toString('hex')
     };
   }

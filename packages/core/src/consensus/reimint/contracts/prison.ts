@@ -11,7 +11,7 @@ type MissReord = {
 const methods = {
   addMissRecord: toBuffer('0x18498f3a'),
   getMinerByIndex: toBuffer('0x3d19ab13'),
-  getMissedRoundNumberPeriodByIndex: toBuffer('67e23785'),
+  getMissedRoundNumberPeriodByIndex: toBuffer('0x67e23785'),
   getMinersLength: toBuffer('0x23ff9c6a'),
   jail: toBuffer('0x9bcbea52'),
   lowestRecordBlockNumber: toBuffer('0x3796c54e')

@@ -4,6 +4,8 @@ pragma solidity ^0.6.0;
 pragma experimental ABIEncoderV2;
 
 struct Miner {
+    // miner unique id
+    uint256 id;
     // validator jail status
     bool jailed;
     // validator address
@@ -22,7 +24,9 @@ struct MissRecord {
 }
 
 interface IPrison {
-    function jailedMiners(uint256 index) external view returns (address);
+    function minerId() external view returns (uint256);
+
+    function jailedRecords(uint256 index1, uint256 index2) external view returns (address);
 
     function lowestRecordBlockNumber() external view returns (uint256);
 
@@ -30,6 +34,7 @@ interface IPrison {
         external
         view
         returns (
+            uint256,
             bool,
             address,
             uint256,
@@ -38,9 +43,13 @@ interface IPrison {
 
     function missRecords(uint256 index1, uint256 index2) external view returns (address, uint256);
 
-    function addMissRecord(MissRecord[] calldata record) external returns (address[] memory);
+    function addMissRecord(MissRecord[] calldata record) external;
 
-    function unjail() external payable;
+    function unjail(address minerAddress) external payable;
 
     function getMissRecordsLengthByBlcokNumber(uint256 blockNumber) external view returns (uint256);
+
+    function getJaiedMinersLengthByBlcokNumber(uint256 blockNumber) external view returns (uint256);
+
+    function getJailedMinersLength() external view returns (uint256);
 }

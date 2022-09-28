@@ -182,7 +182,7 @@ describe('Prison', () => {
     expect(user1Jailed, 'Jailed state should be false').to.equal(false);
 
     try {
-      await prison.methods.unjail().send({ value: new BN(forfeitAmount).subn(1) });
+      await prison.methods.unjail(deployer).send({ value: new BN(forfeitAmount).subn(1) });
       failed = true;
     } catch (err) {}
     await checkMissRecord(recordQueue, prison);
@@ -191,7 +191,7 @@ describe('Prison', () => {
     await checkMissRecord(recordQueue, prison);
 
     try {
-      await prison.methods.unjail().send({ value: forfeitAmount, from: user1 });
+      await prison.methods.unjail(user1).send({ value: forfeitAmount, from: user1 });
       failed = true;
     } catch (err) {}
     await checkMissRecord(recordQueue, prison);
@@ -207,7 +207,7 @@ describe('Prison', () => {
   it('should unjail miner successfully', async () => {
     expect((await web3.eth.getBalance(prison.options.address)).toString(), 'Prison balance should be zero').to.equal('0');
     const forfeitAmount = await config.methods.forfeit().call();
-    await prison.methods.unjail().send({ value: forfeitAmount });
+    await prison.methods.unjail(deployer).send({ value: forfeitAmount });
     recordQueue.unjail(await web3.eth.getBlockNumber(), deployer);
     expect((await prison.methods.miners(deployer).call()).jailed, 'Miner should be unjailed').be.equal(false);
     expect((await web3.eth.getBalance(prison.options.address)).toString(), 'Prison balance should be equal').to.equal(forfeitAmount);

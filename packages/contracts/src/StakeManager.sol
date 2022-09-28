@@ -324,7 +324,8 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         // if validator voting power is greater than `minIndexVotingPower`,
         // add it to `indexedValidators`
         uint256 votingPower = getVotingPower(v.commissionShare, validator);
-        if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
+        (, bool jailed, , , ) = IPrison(config.prison()).miners(validator);
+        if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower() && !jailed) {
             indexedValidators.set(v.id, validator);
             emit IndexedValidator(validator, votingPower.sub(msg.value));
         }
@@ -458,6 +459,8 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         require(v.commissionShare != address(0) && !indexedValidators.contains(v.id), "StakeManager: invalid validator");
         uint256 votingPower = getVotingPower(v.commissionShare, validator);
         require(votingPower >= config.minIndexVotingPower(), "StakeManager: invalid votingPower");
+        (, bool jailed, , , ) = IPrison(config.prison()).miners(validator);
+        require(!jailed, "StakeManager: jailed validator");
         indexedValidators.set(v.id, validator);
         emit IndexedValidator(validator, votingPower);
     }
@@ -479,7 +482,8 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         }
         if (!indexedValidators.contains(v.id)) {
             uint256 votingPower = getVotingPower(v.commissionShare, validator);
-            if (votingPower >= config.minIndexVotingPower()) {
+            (, bool jailed, , , ) = IPrison(config.prison()).miners(validator);
+            if (votingPower >= config.minIndexVotingPower() && !jailed) {
                 indexedValidators.set(v.id, validator);
                 emit IndexedValidator(validator, votingPower.sub(msg.value));
             }
@@ -549,14 +553,17 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      */
     function addMissRecord(MissRecord[] calldata record) external onlySystemCaller {
         IPrison prison = IPrison(config.prison());
-        address[] memory jailedMiners = prison.addMissRecord(record);
-        for (uint256 i = 0; i < jailedMiners.length; i = i.add(1)) {
-            Validator memory v = validators[jailedMiners[i]];
-            if (indexedValidators.contains(v.id) && v.commissionShare != address(0)) {
+        prison.addMissRecord(record);
+        uint256 jailedMinersLength = prison.getJaiedMinersLengthByBlcokNumber(block.number);
+        for (uint256 i = 0; i < jailedMinersLength; i = i.add(1)) {
+            address jailedMiner = prison.jailedRecords(block.number, i);
+            Validator memory v = validators[jailedMiner];
+            require(v.commissionShare != address(0), "StakeManager: invalid validator");
+            if (indexedValidators.contains(v.id)) {
                 indexedValidators.remove(v.id);
-                emit UnindexedValidator(jailedMiners[i]);
+                emit UnindexedValidator(jailedMiner);
             }
-            totalLockedAmount = totalLockedAmount.sub(getVotingPower(v.commissionShare, jailedMiners[i]));
+            totalLockedAmount = totalLockedAmount.sub(getVotingPower(v.commissionShare, jailedMiner));
         }
     }
 
@@ -565,7 +572,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      */
     function unjail() external payable {
         IPrison prison = IPrison(config.prison());
-        prison.unjail{ value: msg.value }();
+        prison.unjail{ value: msg.value }(msg.sender);
         Validator memory v = validators[msg.sender];
         if (v.commissionShare != address(0)) {
             uint256 votingPower = getVotingPower(v.commissionShare, msg.sender);

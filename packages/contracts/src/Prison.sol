@@ -12,20 +12,29 @@ contract Prison is Only, IPrison {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
     using SafeMath for uint256;
 
+    // address array records all jailed miners, update per block
     address[] public override jailedMiners;
-
     // miner mapping, including all validators
     mapping(address => Miner) public override miners;
     // missrecord mapping, indexed by block number
     mapping(uint256 => MissRecord[]) public override missRecords;
-
     // lowest miss record blocknumber
     uint256 public override lowestRecordBlockNumber;
 
+    /**
+     * Emitted when a miner unjailed from prison
+     * @param miner         address of miner
+     * @param blockNumber   block number of unjailed
+     * @param forfeit       Amount of forfeit
+     */
     event Unjail(address indexed miner, uint256 indexed blockNumber, uint256 forfeit);
 
     constructor(IConfig _config) public Only(_config) {}
 
+    /**
+     * Add miss record into the contract, called by onlyStakeManager every block
+     * @param record        MissRecord data
+     */
     function addMissRecord(MissRecord[] calldata record) external override onlyStakeManager returns (address[] memory) {
         // delete timeout miss record
         uint256 blockNumberNow = block.number;
@@ -77,6 +86,10 @@ contract Prison is Only, IPrison {
         return jailedMiners;
     }
 
+    /**
+     * Jail the miner
+     * @param _address      address of miner
+     */
     function _jail(address _address) private {
         Miner storage miner = miners[_address];
         require(!miner.jailed && miner.miner != address(0), "Jail: miner is jailed or not exist");
@@ -84,6 +97,9 @@ contract Prison is Only, IPrison {
         miner.missedRoundNumberPeriod = 0;
     }
 
+    /**
+     * Unjail the miner
+     */
     function unjail() external payable override onlyStakeManager {
         require(msg.value >= config.forfeit(), "Unjail: the forfeit you have to pay is not enough");
         Miner storage miner = miners[tx.origin];
@@ -93,6 +109,10 @@ contract Prison is Only, IPrison {
         emit Unjail(tx.origin, block.number, msg.value);
     }
 
+    /**
+     * Get the missRecord length by blockNumber
+     * @param blockNumber       block number
+     */
     function getMissRecordsLengthByBlcokNumber(uint256 blockNumber) external view override returns (uint256) {
         return missRecords[blockNumber].length;
     }

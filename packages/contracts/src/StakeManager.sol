@@ -543,6 +543,10 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         }
     }
 
+    /**
+     * Add missRecord, only can be called by system caller
+     * @param record        Miss record
+     */
     function addMissRecord(MissRecord[] calldata record) external onlySystemCaller {
         IPrison prison = IPrison(config.prison());
         address[] memory jailedMiners = prison.addMissRecord(record);
@@ -556,6 +560,9 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         }
     }
 
+    /**
+     * Unjail from prison
+     */
     function unjail() external payable {
         IPrison prison = IPrison(config.prison());
         prison.unjail{ value: msg.value }();

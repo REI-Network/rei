@@ -78,13 +78,13 @@ contract Prison is Only, IPrison {
                 minerId = minerId.add(1);
             } else {
                 miner.missedRoundNumberPeriod = miner.missedRoundNumberPeriod.add(missRecord.missedRoundNumberThisBlock);
-                if (miner.missedRoundNumberPeriod >= config.jailThreshold() && !miner.jailed) {
-                    miner.jailed = true;
-                    miner.missedRoundNumberPeriod = 0;
-                    indexedJailedMiners.set(miner.id, miner.miner);
-                    address[] storage jailedMiner = jailedRecords[blockNumberNow];
-                    jailedMiner.push(miner.miner);
-                }
+            }
+            if (miner.missedRoundNumberPeriod >= config.jailThreshold() && !miner.jailed) {
+                miner.jailed = true;
+                miner.missedRoundNumberPeriod = 0;
+                indexedJailedMiners.set(miner.id, miner.miner);
+                address[] storage jailedMiner = jailedRecords[blockNumberNow];
+                jailedMiner.push(miner.miner);
             }
         }
     }

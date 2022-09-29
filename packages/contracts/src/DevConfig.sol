@@ -53,7 +53,7 @@ contract DevConfig is Ownable, IConfig {
         fp = _fp;
     }
 
-    function setJail(address _pr) external onlyOwner {
+    function setPrison(address _pr) external onlyOwner {
         pr = _pr;
     }
 

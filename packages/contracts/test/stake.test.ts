@@ -11,11 +11,15 @@ const CommissionShare = artifacts.require('CommissionShare');
 const StakeManager = artifacts.require('StakeManager');
 const ValidatorRewardPool = artifacts.require('ValidatorRewardPool');
 const UnstakePool = artifacts.require('UnstakePool');
+const Prison = artifacts.require('Prison');
+
+type MissRecord = [string, number];
 
 describe('StakeManger', () => {
   let config: any;
   let stakeManager: any;
   let validatorRewardPool: any;
+  let prison: any;
   let deployer: string;
   let validator1: string;
   let receiver1: string;
@@ -24,6 +28,7 @@ describe('StakeManger', () => {
   let genesis2: string;
   let validator2: string;
   let validator3: string;
+  let validator4: string;
   let unstakeDelay: number;
   let minIndexVotingPower: BN;
   let stakeId = 0;
@@ -43,6 +48,7 @@ describe('StakeManger', () => {
     genesis2 = accounts[5];
     validator2 = accounts[6];
     validator3 = accounts[7];
+    validator4 = accounts[8];
   });
 
   it('should deploy succeed', async () => {
@@ -56,6 +62,8 @@ describe('StakeManger', () => {
     await config.methods.setStakeManager(stakeManager.options.address).send();
     unstakeDelay = toBN(await config.methods.unstakeDelay().call()).toNumber();
     minIndexVotingPower = toBN(await config.methods.minIndexVotingPower().call());
+    prison = new web3.eth.Contract(Prison.abi, (await Prison.new(config.options.address)).address, { from: deployer });
+    await config.methods.setPrison(prison.options.address).send();
   });
 
   it('should initialize succeed', async () => {
@@ -65,10 +73,14 @@ describe('StakeManger', () => {
   });
 
   it('should stake failed(amount is zero)', async () => {
+    let failed = false;
     try {
       await stakeManager.methods.stake(validator1, deployer).send({ value: 0 });
-      assert.fail("shouldn't stake succeed");
+      failed = true;
     } catch (err) {}
+    if (failed) {
+      assert('stake should failed');
+    }
   });
 
   it('should stake succeed', async () => {
@@ -142,16 +154,24 @@ describe('StakeManger', () => {
     expect(validatorInfoAfter.commissionRate, 'commissionRare should be new commissionRate').be.equal(newCommissionRate.toString());
 
     await upTimestamp(deployer, setInterval - 3);
+    let failed = false;
     try {
       await stakeManager.methods.setCommissionRate(oldCommissionRate).send({ from: validator1 });
-      assert.fail('update commission rate too frequently');
+      failed = true;
     } catch (err) {}
+
+    if (failed) {
+      assert.fail('update commission rate too frequently');
+    }
 
     await upTimestamp(deployer, 3);
     try {
       await stakeManager.methods.setCommissionRate(newCommissionRate).send({ from: validator1 });
-      assert.fail('repeatedly set commission rate');
+      failed = true;
     } catch (err) {}
+    if (failed) {
+      assert.fail('repeatedly set commission rate');
+    }
   });
 
   it('should estimate correctly', async () => {
@@ -302,5 +322,43 @@ describe('StakeManger', () => {
       expect(v.validator, 'validator address should be equal').be.equal(vs[i]);
       expect(v.priority, 'validator priority should be equal').be.equal(ps[i]);
     }
+  });
+
+  it('should add missrecord and jail validator correctly', async () => {
+    await stakeManager.methods.stake(validator4, deployer).send({ value: minIndexVotingPower });
+    const v = await stakeManager.methods.validators(validator4).call();
+    expect(await stakeManager.methods.indexedValidatorsExists(v.id).call(), 'validator should in indexedValidators').to.equal(true);
+    const jailThreshold = await config.methods.jailThreshold().call();
+    const missedRecord: MissRecord[] = [[validator4, jailThreshold]];
+    await stakeManager.methods.addMissRecord(missedRecord).send();
+    const minerState = await prison.methods.miners(validator4).call();
+    expect(minerState.jailed, 'validator should be jailed').be.equal(true);
+    expect(await stakeManager.methods.indexedValidatorsExists(v.id).call(), 'validator should not in indexedValidators').to.equal(false);
+  });
+
+  it('should not index jailed validator ', async () => {
+    const v = await stakeManager.methods.validators(validator4).call();
+    expect(await stakeManager.methods.indexedValidatorsExists(v.id).call(), 'validator should not in indexedValidators').to.equal(false);
+    await stakeManager.methods.stake(validator4, deployer).send({ value: minIndexVotingPower });
+    expect(await stakeManager.methods.indexedValidatorsExists(v.id).call(), 'validator should not in indexedValidators').to.equal(false);
+    await stakeManager.methods.reward(validator4).send({ value: minIndexVotingPower });
+    expect(await stakeManager.methods.indexedValidatorsExists(v.id).call(), 'validator should not in indexedValidators').to.equal(false);
+    let failed = false;
+    try {
+      await stakeManager.methods.addIndexedValidator(v.id).send();
+      failed = true;
+    } catch (e) {}
+    if (failed) {
+      assert.fail('should not be able to add indexed validator');
+    }
+  });
+
+  it('should unjail validator correctly', async () => {
+    const forfeit = await config.methods.forfeit().call();
+    await stakeManager.methods.unjail().send({ from: validator4, value: forfeit });
+    const v = await stakeManager.methods.validators(validator4).call();
+    expect(await stakeManager.methods.indexedValidatorsExists(v.id).call(), 'validator should in indexedValidators').to.equal(true);
+    const minerState = await prison.methods.miners(validator4).call();
+    expect(minerState.jailed, 'validator should not be jailed').be.equal(false);
   });
 });

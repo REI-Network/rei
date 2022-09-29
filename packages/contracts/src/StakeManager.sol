@@ -582,5 +582,6 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
             }
             totalLockedAmount = totalLockedAmount.add(votingPower);
         }
+        {}
     }
 }

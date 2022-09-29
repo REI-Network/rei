@@ -111,10 +111,17 @@ contract Prison is Only, IPrison {
         return missRecords[blockNumber].length;
     }
 
+    /**
+     * Get the jaiedRecord lenth by blockNumber
+     * @param blockNumber       block number
+     */
     function getJaiedMinersLengthByBlcokNumber(uint256 blockNumber) external view override returns (uint256) {
         return jailedRecords[blockNumber].length;
     }
 
+    /**
+     * Get jailed Miners length
+     */
     function getJailedMinersLength() external view override returns (uint256) {
         return indexedJailedMiners.length();
     }

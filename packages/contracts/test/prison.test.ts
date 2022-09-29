@@ -251,6 +251,5 @@ describe('Prison', () => {
     await prison.methods.addMissRecord(missedRecord8).send();
     recordQueue.push(await web3.eth.getBlockNumber(), missedRecord8);
     await checkMissRecord(recordQueue, prison);
-    console.log(await prison.methods.miners(deployer).call());
   });
 });

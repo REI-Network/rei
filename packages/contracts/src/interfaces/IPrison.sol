@@ -43,7 +43,7 @@ interface IPrison {
 
     function missRecords(uint256 index1, uint256 index2) external view returns (address, uint256);
 
-    function addMissRecord(MissRecord[] calldata record) external;
+    function addMissRecord(MissRecord[] calldata record) external returns (address[] memory);
 
     function unjail(address minerAddress) external payable;
 

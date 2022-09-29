@@ -12,11 +12,11 @@ contract Prison is Only, IPrison {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
     using SafeMath for uint256;
 
-    // auto increment validator id
+    // auto increment miner id
     uint256 public override minerId = 0;
     // indexed miners, including all jailed miners
     EnumerableMap.UintToAddressMap private indexedJailedMiners;
-    // miner mapping, including all validators
+    // miner mapping, including all miners
     mapping(address => Miner) public override miners;
     // missrecord mapping, indexed by block number
     mapping(uint256 => MissRecord[]) public override missRecords;
@@ -39,7 +39,7 @@ contract Prison is Only, IPrison {
      * Add miss record into the contract, called by onlyStakeManager every block
      * @param record        MissRecord data
      */
-    function addMissRecord(MissRecord[] calldata record) external override onlyStakeManager {
+    function addMissRecord(MissRecord[] calldata record) external override onlyStakeManager returns (address[] memory) {
         // delete timeout miss record
         uint256 blockNumberNow = block.number;
         if (blockNumberNow >= config.recordsAmountPeriod()) {
@@ -47,14 +47,17 @@ contract Prison is Only, IPrison {
             for (uint256 i = lowestRecordBlockNumber; i <= blockNumberToDelete; i = i.add(1)) {
                 MissRecord[] storage missRecord = missRecords[i];
                 if (missRecord.length != 0) {
-                    for (uint256 j = missRecord.length; j > 0; j = j.sub(1)) {
-                        Miner storage miner = miners[missRecord[j.sub(1)].miner];
-                        if (miner.unjailedBlockNumber > i || miner.jailed) {
-                            continue;
-                        } else {
-                            miner.missedRoundNumberPeriod = miner.missedRoundNumberPeriod.sub(missRecord[j.sub(1)].missedRoundNumberThisBlock);
+                    for (uint256 j = missRecord.length.sub(1); j >= 0; ) {
+                        Miner storage miner = miners[missRecord[j].miner];
+                        if (miner.unjailedBlockNumber <= i && !miner.jailed) {
+                            miner.missedRoundNumberPeriod = miner.missedRoundNumberPeriod.sub(missRecord[j].missedRoundNumberThisBlock);
                         }
                         missRecord.pop();
+                        if (j == 0) {
+                            break;
+                        } else {
+                            j = j.sub(1);
+                        }
                     }
                 }
                 delete missRecords[i];
@@ -63,6 +66,7 @@ contract Prison is Only, IPrison {
         }
 
         // add new miss record
+        address[] storage jailedMiner = jailedRecords[blockNumberNow];
         MissRecord[] storage recordToAdd = missRecords[blockNumberNow];
         for (uint256 i = 0; i < record.length; i = i.add(1)) {
             MissRecord memory missRecord = record[i];
@@ -83,10 +87,10 @@ contract Prison is Only, IPrison {
                 miner.jailed = true;
                 miner.missedRoundNumberPeriod = 0;
                 indexedJailedMiners.set(miner.id, miner.miner);
-                address[] storage jailedMiner = jailedRecords[blockNumberNow];
                 jailedMiner.push(miner.miner);
             }
         }
+        return jailedMiner;
     }
 
     /**
@@ -96,7 +100,7 @@ contract Prison is Only, IPrison {
     function unjail(address minerAddress) external payable override onlyStakeManager {
         require(msg.value >= config.forfeit(), "Unjail: the forfeit you have to pay is not enough");
         Miner storage miner = miners[minerAddress];
-        require((miner.jailed) && miner.miner != address(0), "Jail: miner is not jailed or not exist");
+        require(miner.jailed && miner.miner != address(0), "Jail: miner is not jailed or not exist");
         miner.jailed = false;
         miner.unjailedBlockNumber = block.number;
         indexedJailedMiners.remove(miner.id);

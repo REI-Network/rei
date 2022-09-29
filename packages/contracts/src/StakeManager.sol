@@ -325,14 +325,15 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         // add it to `indexedValidators`
         uint256 votingPower = getVotingPower(v.commissionShare, validator);
         (, bool jailed, , , ) = IPrison(config.prison()).miners(validator);
-        if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower() && !jailed) {
-            indexedValidators.set(v.id, validator);
-            emit IndexedValidator(validator, votingPower.sub(msg.value));
+        if (!jailed) {
+            if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
+                indexedValidators.set(v.id, validator);
+                emit IndexedValidator(validator, votingPower.sub(msg.value));
+            }
+            // increase total locked amount
+            totalLockedAmount = totalLockedAmount.add(msg.value);
         }
         emit Stake(validator, msg.value, to, shares);
-
-        // increase total locked amount
-        totalLockedAmount = totalLockedAmount.add(msg.value);
     }
 
     /**
@@ -360,8 +361,11 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         unstakeQueue[id] = Unstake(validator, to, unstakeShares, timestamp);
         emit StartUnstake(id, validator, amount, to, unstakeShares, timestamp);
 
-        // decrease total locked amount
-        totalLockedAmount = totalLockedAmount.sub(amount);
+        (, bool jailed, , , ) = IPrison(config.prison()).miners(validator);
+        if (!jailed) {
+            // decrease total locked amount
+            totalLockedAmount = totalLockedAmount.sub(amount);
+        }
     }
 
     /**
@@ -480,18 +484,20 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         if (validatorReward > 0) {
             IValidatorRewardPool(config.validatorRewardPool()).reward{ value: validatorReward }(validator);
         }
-        if (!indexedValidators.contains(v.id)) {
-            uint256 votingPower = getVotingPower(v.commissionShare, validator);
-            (, bool jailed, , , ) = IPrison(config.prison()).miners(validator);
-            if (votingPower >= config.minIndexVotingPower() && !jailed) {
-                indexedValidators.set(v.id, validator);
-                emit IndexedValidator(validator, votingPower.sub(msg.value));
+        (, bool jailed, , , ) = IPrison(config.prison()).miners(validator);
+        if (!jailed) {
+            if (!indexedValidators.contains(v.id)) {
+                uint256 votingPower = getVotingPower(v.commissionShare, validator);
+                if (votingPower >= config.minIndexVotingPower()) {
+                    indexedValidators.set(v.id, validator);
+                    emit IndexedValidator(validator, votingPower.sub(msg.value));
+                }
             }
+            // increase total locked amount
+            totalLockedAmount = totalLockedAmount.add(msg.value);
         }
-        emit Reward(validator, msg.value);
 
-        // increase total locked amount
-        totalLockedAmount = totalLockedAmount.add(msg.value);
+        emit Reward(validator, msg.value);
     }
 
     /**
@@ -512,8 +518,11 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         }
         emit Slash(validator, decreasedAmount);
 
-        // decrease total locked amount
-        totalLockedAmount = totalLockedAmount.sub(decreasedAmount);
+        (, bool jailed, , , ) = IPrison(config.prison()).miners(validator);
+        if (!jailed) {
+            // decrease total locked amount
+            totalLockedAmount = totalLockedAmount.sub(decreasedAmount);
+        }
     }
 
     // TODO: if the active validators list is exactly the same as the last list, don't modify the storage
@@ -553,17 +562,16 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      */
     function addMissRecord(MissRecord[] calldata record) external onlySystemCaller {
         IPrison prison = IPrison(config.prison());
-        prison.addMissRecord(record);
-        uint256 jailedMinersLength = prison.getJaiedMinersLengthByBlcokNumber(block.number);
-        for (uint256 i = 0; i < jailedMinersLength; i = i.add(1)) {
-            address jailedMiner = prison.jailedRecords(block.number, i);
-            Validator memory v = validators[jailedMiner];
+        address[] memory jailedMiners = prison.addMissRecord(record);
+        for (uint256 i = 0; i < jailedMiners.length; i = i.add(1)) {
+            address validatorAddress = jailedMiners[i];
+            Validator memory v = validators[validatorAddress];
             require(v.commissionShare != address(0), "StakeManager: invalid validator");
             if (indexedValidators.contains(v.id)) {
                 indexedValidators.remove(v.id);
-                emit UnindexedValidator(jailedMiner);
+                emit UnindexedValidator(validatorAddress);
+                totalLockedAmount = totalLockedAmount.sub(getVotingPower(v.commissionShare, validatorAddress));
             }
-            totalLockedAmount = totalLockedAmount.sub(getVotingPower(v.commissionShare, jailedMiner));
         }
     }
 
@@ -574,14 +582,12 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         IPrison prison = IPrison(config.prison());
         prison.unjail{ value: msg.value }(msg.sender);
         Validator memory v = validators[msg.sender];
-        if (v.commissionShare != address(0)) {
-            uint256 votingPower = getVotingPower(v.commissionShare, msg.sender);
-            if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
-                indexedValidators.set(v.id, msg.sender);
-                emit IndexedValidator(msg.sender, votingPower);
-            }
-            totalLockedAmount = totalLockedAmount.add(votingPower);
+        require(v.commissionShare != address(0), "StakeManager: invalid validator");
+        uint256 votingPower = getVotingPower(v.commissionShare, msg.sender);
+        if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
+            indexedValidators.set(v.id, msg.sender);
+            emit IndexedValidator(msg.sender, votingPower);
         }
-        {}
+        totalLockedAmount = totalLockedAmount.add(votingPower);
     }
 }

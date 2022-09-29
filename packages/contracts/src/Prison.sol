@@ -130,11 +130,19 @@ contract Prison is Only, IPrison {
         return indexedJailedMiners.length();
     }
 
-    function jailedMinersByIndex(uint256 index) external view override returns (address miner) {
+    /**
+     * Get jailed miner by index
+     * @param index     index of jailed miner
+     */
+    function getJailedMinersByIndex(uint256 index) external view override returns (address miner) {
         (, miner) = indexedJailedMiners.at(index);
     }
 
-    function jailedMinersById(uint256 id) external view override returns (address) {
+    /**
+     * Get jailed miner by id
+     * @param id        id of jailed miner
+     */
+    function getJailedMinersById(uint256 id) external view override returns (address) {
         return indexedJailedMiners.get(id);
     }
 }

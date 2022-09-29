@@ -53,7 +53,7 @@ interface IPrison {
 
     function getJailedMinersLength() external view returns (uint256);
 
-    function jailedMinersByIndex(uint256 index) external view returns (address);
+    function getJailedMinersByIndex(uint256 index) external view returns (address);
 
-    function jailedMinersById(uint256 id) external view returns (address);
+    function getJailedMinersById(uint256 id) external view returns (address);
 }

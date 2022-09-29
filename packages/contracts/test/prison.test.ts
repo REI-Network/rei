@@ -214,8 +214,8 @@ describe('Prison', () => {
     const miner = await prison.methods.miners(deployer).call();
     const jailedMinerAmount = await prison.methods.getJailedMinersLength().call();
     expect(jailedMinerAmount, 'Jailed miner amount should be equal').to.equal('1');
-    const jailedAddress1 = await prison.methods.jailedMinersById(miner.id).call();
-    const jailedAddress2 = await prison.methods.jailedMinersByIndex(0).call();
+    const jailedAddress1 = await prison.methods.getJailedMinersById(miner.id).call();
+    const jailedAddress2 = await prison.methods.getJailedMinersByIndex(0).call();
     expect(jailedAddress1, 'jailed miner address1 should be equal').equal(deployer.toString());
     expect(jailedAddress2, 'jailed miner address2 should be equal').equal(deployer.toString());
   });

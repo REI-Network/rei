@@ -323,9 +323,9 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         shares = CommissionShare(v.commissionShare).mint{ value: msg.value }(to);
         // if validator voting power is greater than `minIndexVotingPower`,
         // add it to `indexedValidators`
-        uint256 votingPower = getVotingPower(v.commissionShare, validator);
         (, bool jailed, , , ) = IPrison(config.prison()).miners(validator);
         if (!jailed) {
+            uint256 votingPower = getVotingPower(v.commissionShare, validator);
             if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
                 indexedValidators.set(v.id, validator);
                 emit IndexedValidator(validator, votingPower.sub(msg.value));

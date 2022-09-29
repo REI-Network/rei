@@ -111,7 +111,7 @@ contract Prison is Only, IPrison {
      * Get the missRecord length by blockNumber
      * @param blockNumber       block number
      */
-    function getMissRecordsLengthByBlcokNumber(uint256 blockNumber) external view override returns (uint256) {
+    function getMissRecordsLengthByBlockNumber(uint256 blockNumber) external view override returns (uint256) {
         return missRecords[blockNumber].length;
     }
 
@@ -119,7 +119,7 @@ contract Prison is Only, IPrison {
      * Get the jaiedRecord lenth by blockNumber
      * @param blockNumber       block number
      */
-    function getJaiedMinersLengthByBlcokNumber(uint256 blockNumber) external view override returns (uint256) {
+    function getJaiedMinersLengthByBlockNumber(uint256 blockNumber) external view override returns (uint256) {
         return jailedRecords[blockNumber].length;
     }
 
@@ -128,5 +128,13 @@ contract Prison is Only, IPrison {
      */
     function getJailedMinersLength() external view override returns (uint256) {
         return indexedJailedMiners.length();
+    }
+
+    function jailedMinersByIndex(uint256 index) external view override returns (address miner) {
+        (, miner) = indexedJailedMiners.at(index);
+    }
+
+    function jailedMinersById(uint256 id) external view override returns (address) {
+        return indexedJailedMiners.get(id);
     }
 }

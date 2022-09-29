@@ -185,6 +185,9 @@ describe('Prison', () => {
       await prison.methods.unjail(deployer).send({ value: new BN(forfeitAmount).subn(1) });
       failed = true;
     } catch (err) {}
+    if (failed) {
+      assert.fail('Unjail should failed');
+    }
     await checkMissRecord(recordQueue, prison);
 
     await config.methods.setStakeManager(user1).send();
@@ -194,14 +197,23 @@ describe('Prison', () => {
       await prison.methods.unjail(user1).send({ value: forfeitAmount, from: user1 });
       failed = true;
     } catch (err) {}
-    await checkMissRecord(recordQueue, prison);
-
     if (failed) {
       assert.fail('Unjail should failed');
     }
+    await checkMissRecord(recordQueue, prison);
 
     await config.methods.setStakeManager(deployer).send();
     await checkMissRecord(recordQueue, prison);
+  });
+
+  it('should get jialed miners successfully', async () => {
+    const miner = await prison.methods.miners(deployer).call();
+    const jailedMinerAmount = await prison.methods.getJailedMinersLength().call();
+    expect(jailedMinerAmount, 'Jailed miner amount should be equal').to.equal('1');
+    const jailedAddress1 = await prison.methods.jailedMinersById(miner.id).call();
+    const jailedAddress2 = await prison.methods.jailedMinersByIndex(0).call();
+    expect(jailedAddress1, 'jailed miner address1 should be equal').equal(deployer.toString());
+    expect(jailedAddress2, 'jailed miner address2 should be equal').equal(deployer.toString());
   });
 
   it('should unjail miner successfully', async () => {

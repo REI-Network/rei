@@ -325,6 +325,8 @@ describe('StakeManger', () => {
   });
 
   it('should add missrecord and jail validator correctly', async () => {
+    const totalLockedAmountBefore = await stakeManager.methods.totalLockedAmount().call();
+    const votingPower = await stakeManager.methods.getVotingPowerByAddress(validator4).call();
     await stakeManager.methods.stake(validator4, deployer).send({ value: minIndexVotingPower });
     const v = await stakeManager.methods.validators(validator4).call();
     expect(await stakeManager.methods.indexedValidatorsExists(v.id).call(), 'validator should in indexedValidators').to.equal(true);
@@ -334,6 +336,8 @@ describe('StakeManger', () => {
     const minerState = await prison.methods.miners(validator4).call();
     expect(minerState.jailed, 'validator should be jailed').be.equal(true);
     expect(await stakeManager.methods.indexedValidatorsExists(v.id).call(), 'validator should not in indexedValidators').to.equal(false);
+    const totalCalAmountAfter = await stakeManager.methods.totalLockedAmount().call();
+    expect(totalCalAmountAfter, 'totalCalAmount should be equal').be.equal((Number(totalLockedAmountBefore) - Number(votingPower)).toString());
   });
 
   it('should not index jailed validator ', async () => {

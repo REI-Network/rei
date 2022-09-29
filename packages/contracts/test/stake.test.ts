@@ -337,12 +337,18 @@ describe('StakeManger', () => {
   });
 
   it('should not index jailed validator ', async () => {
+    const totalLockedAmount = await stakeManager.methods.totalLockedAmount().call();
     const v = await stakeManager.methods.validators(validator4).call();
     expect(await stakeManager.methods.indexedValidatorsExists(v.id).call(), 'validator should not in indexedValidators').to.equal(false);
-    await stakeManager.methods.stake(validator4, deployer).send({ value: minIndexVotingPower });
+
+    await stakeManager.methods.stake(validator4, deployer).send({ value: minIndexVotingPower.muln(10) });
+    expect(await stakeManager.methods.totalLockedAmount().call(), 'totalLockedAmount should be equal').be.equal(totalLockedAmount);
     expect(await stakeManager.methods.indexedValidatorsExists(v.id).call(), 'validator should not in indexedValidators').to.equal(false);
-    await stakeManager.methods.reward(validator4).send({ value: minIndexVotingPower });
+
+    await stakeManager.methods.reward(validator4).send({ value: minIndexVotingPower.muln(100) });
     expect(await stakeManager.methods.indexedValidatorsExists(v.id).call(), 'validator should not in indexedValidators').to.equal(false);
+    expect(await stakeManager.methods.totalLockedAmount().call(), 'totalLockedAmount should be equal').be.equal(totalLockedAmount);
+
     let failed = false;
     try {
       await stakeManager.methods.addIndexedValidator(v.id).send();
@@ -353,9 +359,23 @@ describe('StakeManger', () => {
     }
   });
 
+  it('totalLockedAmount should not change when validator is jailed', async () => {
+    const totalLockedAmount = await stakeManager.methods.totalLockedAmount().call();
+    await stakeManager.methods.slash(validator4, 0).send();
+    expect(await stakeManager.methods.totalLockedAmount().call(), 'totalLockedAmount should be equal').be.equal(totalLockedAmount);
+    const commissionShare = await createCommissionShareContract(validator4);
+    await commissionShare.methods.approve(stakeManager.options.address, MAX_INTEGER.toString()).send();
+    await stakeManager.methods.startUnstake(validator4, deployer, 1).send();
+    expect(await stakeManager.methods.totalLockedAmount().call(), 'totalLockedAmount should be equal').be.equal(totalLockedAmount);
+  });
+
   it('should unjail validator correctly', async () => {
     const forfeit = await config.methods.forfeit().call();
+    const totalLockedAmountBefore = await stakeManager.methods.totalLockedAmount().call();
+    const votingPower = await stakeManager.methods.getVotingPowerByAddress(validator4).call();
     await stakeManager.methods.unjail().send({ from: validator4, value: forfeit });
+    const totalLockedAmountAfter = await stakeManager.methods.totalLockedAmount().call();
+    expect(totalLockedAmountAfter, 'totalLockedAmount should be equal').be.equal((Number(totalLockedAmountBefore) + Number(votingPower)).toString());
     const v = await stakeManager.methods.validators(validator4).call();
     expect(await stakeManager.methods.indexedValidatorsExists(v.id).call(), 'validator should in indexedValidators').to.equal(true);
     const minerState = await prison.methods.miners(validator4).call();

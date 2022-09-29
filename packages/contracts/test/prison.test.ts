@@ -171,6 +171,10 @@ describe('Prison', () => {
     await checkMissRecord(recordQueue, prison);
     const jailedStateAfter = (await prison.methods.miners(deployer).call()).jailed;
     expect(jailedStateAfter, 'Jailed state should be true').to.equal(true);
+    const jailedMinerLength = await prison.methods.getJaiedMinersLengthByBlockNumber(await web3.eth.getBlockNumber()).call();
+    expect(jailedMinerLength, 'Jailed miner length should be 1').to.equal('1');
+    const jailedMiner = await prison.methods.jailedRecords(await web3.eth.getBlockNumber(), 0).call();
+    expect(jailedMiner, 'Jailed miner should be equal').to.equal(deployer);
   });
 
   it('should unjail miner failed', async () => {

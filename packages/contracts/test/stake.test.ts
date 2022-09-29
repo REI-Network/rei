@@ -371,6 +371,9 @@ describe('StakeManger', () => {
     await commissionShare.methods.approve(stakeManager.options.address, MAX_INTEGER.toString()).send();
     await stakeManager.methods.startUnstake(validator4, deployer, 1).send();
     expect(await stakeManager.methods.totalLockedAmount().call(), 'totalLockedAmount should be equal').be.equal(totalLockedAmount);
+    const claimAmount = toBN(await validatorRewardPool.methods.balanceOf(validator4).call());
+    await stakeManager.methods.startClaim(receiver2, claimAmount).send({ from: validator4 });
+    expect(await stakeManager.methods.totalLockedAmount().call(), 'totalLockedAmount should be equal').be.equal(totalLockedAmount);
   });
 
   it('should unjail validator correctly', async () => {

@@ -194,19 +194,13 @@ describe('Prison', () => {
     }
     await checkMissRecord(recordQueue, prison);
 
-    await config.methods.setStakeManager(user1).send();
-    await checkMissRecord(recordQueue, prison);
-
     try {
-      await prison.methods.unjail(user1).send({ value: forfeitAmount, from: user1 });
+      await prison.methods.unjail(user1).send({ value: forfeitAmount });
       failed = true;
     } catch (err) {}
     if (failed) {
       assert.fail('Unjail should failed');
     }
-    await checkMissRecord(recordQueue, prison);
-
-    await config.methods.setStakeManager(deployer).send();
     await checkMissRecord(recordQueue, prison);
   });
 

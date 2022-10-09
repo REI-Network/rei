@@ -74,7 +74,7 @@ export abstract class Contract {
   static async deployPrisonContracts(evm: EVM, common: Common) {
     const cfgaddr = common.param('vm', 'cfgaddr');
     // deploy prison contract
-    await Contract.deployContract(evm, common, 'prn', { types: ['address'], values: [cfgaddr] });
+    await Contract.deployContract(evm, common, 'pr', { types: ['address'], values: [cfgaddr] });
   }
   /**
    * Deploy hardfork 2 contracts

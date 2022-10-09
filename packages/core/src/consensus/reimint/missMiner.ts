@@ -23,6 +23,6 @@ export class MissMiner {
         missMinerMap.set(missminer, missRound);
       }
     }
-    return missMinerMap;
+    return Array.from(missMinerMap.entries());
   }
 }

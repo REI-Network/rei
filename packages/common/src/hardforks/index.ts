@@ -21,5 +21,5 @@ export const hardforks = [
   ['free-staking', require('./free-staking.json')],
   ['testnet-hf-2', require('./testnet-hf-2.json')],
   ['mainnet-hf-2', require('./mainnet-hf-2.json')],
-  ['jail', require('./prison.json')]
+  ['prison', require('./prison.json')]
 ];

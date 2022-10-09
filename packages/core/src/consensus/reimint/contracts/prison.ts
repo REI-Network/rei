@@ -18,7 +18,7 @@ const methods = {
 };
 
 const events = {
-  Jail: toBuffer('be3aa33bd245135e4e26b223d79d14ea479a47bff09f2b03c53838af1edbb14b'),
+  Jail: toBuffer('0xbe3aa33bd245135e4e26b223d79d14ea479a47bff09f2b03c53838af1edbb14b'),
   Unjail: toBuffer('0x392ade2e433ab375e4a081f278116373f992aa104889accb306abf71042e70d8'),
   AddMissRecord: toBuffer('0x09643018f0ec0338f3696cccd484fec7a3fa3c1faf64a61b58e61d901bcbbc69')
 };

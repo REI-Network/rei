@@ -9,7 +9,7 @@ import EVM from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';
 import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executor } from '../types';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
-import { isEnableFreeStaking, isEnableHardfork1 } from '../../hardforks';
+import { isEnableFreeStaking, isEnableHardfork1, isEnablePrison } from '../../hardforks';
 import { StateManager } from '../../stateManager';
 import { ValidatorSet, ValidatorChanges } from './validatorSet';
 import { StakeManager, SlashReason, Fee, Contract } from './contracts';
@@ -169,13 +169,27 @@ export class ReimintExecutor implements Executor {
       }
     }
 
-    // 6. call stakeManager.getTotalLockedAmountAndValidatorCount to get totalLockedAmount and validatorCount,
+    // 6.call stakeManager.addMissRecord to add miss record
+    // and jail validators whos missRecords is greater than config.jailThreshold
+    if (isEnablePrison(pendingCommon)) {
+      const missMiners = await this.engine.MissMiner.getMissMiner(pendingBlock.header);
+      const missRecords =
+        missMiners.length > 0
+          ? missMiners.map((missMiner) => {
+              return [missMiner[0].toString(), missMiner[1].toString()];
+            })
+          : [];
+      await parentStakeManager.addMissRecord(missRecords);
+      logger.info('💌Reimint::afterApply, addMissRecord:', missRecords);
+    }
+
+    // 7. call stakeManager.getTotalLockedAmountAndValidatorCount to get totalLockedAmount and validatorCount,
     //    and decide if we should enable genesis validators
     const { totalLockedAmount, validatorCount } = await parentStakeManager.getTotalLockedAmountAndValidatorCount();
     logger.debug('Reimint::afterApply, totalLockedAmount:', totalLockedAmount.toString(), 'validatorCount:', validatorCount.toString());
     const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), pendingCommon);
 
-    // 7. calculate the next validator set according to enableGenesisValidators
+    // 8. calculate the next validator set according to enableGenesisValidators
     let validatorSet: ValidatorSet;
     if (enableGenesisValidators) {
       if (!parentValidatorSet.isGenesis(pendingCommon)) {
@@ -212,7 +226,7 @@ export class ReimintExecutor implements Executor {
       }
     }
 
-    // 8. increase once
+    // 9. increase once
     validatorSet.active.incrementProposerPriority(1);
 
     const activeValidators = validatorSet.active.activeValidators();
@@ -220,19 +234,19 @@ export class ReimintExecutor implements Executor {
       throw new Error('activeValidators length is zero');
     }
 
-    // 9. call stakeManager.onAfterBlock to save active validator set
+    // 10. call stakeManager.onAfterBlock to save active validator set
     const activeSigners = activeValidators.map(({ validator }) => validator);
     const priorities = activeValidators.map(({ priority }) => priority);
     await parentStakeManager.onAfterBlock(validatorSet.active.proposer, activeSigners, priorities);
 
     const nextCommon = this.backend.getCommon(pendingBlock.header.number.addn(1));
-    // 10. deploy contracts if enable hardfork 1 is enabled in the next block
+    // 11. deploy contracts if enable hardfork 1 is enabled in the next block
     if (!isEnableHardfork1(pendingCommon) && isEnableHardfork1(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployHardfork1Contracts(evm, nextCommon);
     }
 
-    // 11. deploy contracts if enable free staking is enabled in the next block
+    // 12. deploy contracts if enable free staking is enabled in the next block
     if (!isEnableFreeStaking(pendingCommon) && isEnableFreeStaking(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployFreeStakingContracts(evm, nextCommon);

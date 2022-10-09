@@ -18,7 +18,8 @@ const methods = {
   proposer: toBuffer('0xa8e4fb90'),
   reward: toBuffer('0x6353586b'),
   slash: toBuffer('0x30b409a4'),
-  onAfterBlock: toBuffer('0x9313f105')
+  onAfterBlock: toBuffer('0x9313f105'),
+  addMissRecord: toBuffer('0x18498f3a')
 };
 
 // event topic
@@ -233,6 +234,18 @@ export class StakeManager extends Contract {
   onAfterBlock(proposer: Address, activeValidators: Address[], priorities: BN[]) {
     return this.runWithLogger(async () => {
       await this.executeMessage(this.makeSystemCallerMessage('onAfterBlock', ['address', 'address[]', 'int256[]'], [proposer.toString(), activeValidators.map((addr) => addr.toString()), priorities.map((p) => p.toString())]));
+    });
+  }
+
+  /**
+   * Add miss record to persion contract per block
+   * @param missReord - Miss record
+   * @returns
+   */
+  addMissRecord(missReord: string[][]) {
+    return this.runWithLogger(async () => {
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('addMissRecord', ['tuple(address,uint256)[]'], [missReord]));
+      return logs;
     });
   }
 }

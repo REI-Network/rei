@@ -33,6 +33,9 @@ export interface StateManager {
   accountExists(address: Address): Promise<boolean>;
   cleanupTouchedAccounts(): Promise<void>;
   clearOriginalStorageCache(): void;
+  checkpointCount(): number;
+  batchCommit(checkpointCount: number): Promise<void>;
+  batchCheckpoint(checkpointCount: number): Promise<void>;
 }
 
 export interface EIP2929StateManager extends StateManager {

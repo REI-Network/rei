@@ -19,3 +19,6 @@ packages/contracts/types
 
 # TypeScript cache
 *.tsbuildinfo
+
+# TODO:
+binding

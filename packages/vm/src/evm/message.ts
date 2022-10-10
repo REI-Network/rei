@@ -16,6 +16,10 @@ export default class Message {
   selfdestruct: any;
   delegatecall: boolean;
 
+  baseFee: BN;
+  clearStorage: boolean;
+  clearEmptyAccount: boolean;
+
   // replaced contract address, used to update the contract
   contractAddress?: Address;
 
@@ -34,6 +38,10 @@ export default class Message {
     this.selfdestruct = opts.selfdestruct; // TODO: Move from here
     this.delegatecall = opts.delegatecall || false;
     this.contractAddress = opts.contractAddress;
+
+    this.baseFee = opts.baseFee;
+    this.clearStorage = opts.clearStorage || false;
+    this.clearEmptyAccount = opts.clearEmptyAccount || false;
   }
 
   get codeAddress(): Address {

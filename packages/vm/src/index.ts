@@ -2,6 +2,7 @@ import { Account, Address } from 'ethereumjs-util';
 import { Blockchain } from '@rei-network/blockchain';
 import { Common, Chain } from '@rei-network/common';
 import { BlockHeader } from '@rei-network/structure';
+import { JSEVMBinding, init } from '../../binding/dist/evm';
 import { StateManager } from './state/index';
 import { default as runCall, RunCallOpts } from './runCall';
 import { default as runTx, RunTxOpts, RunTxResult } from './runTx';
@@ -21,6 +22,9 @@ if (!isBrowser()) {
   mcl = require('mcl-wasm');
   mclInitPromise = mcl.init(mcl.BLS12_381);
 }
+
+// init c++ binding
+init();
 
 /**
  * Options for instantiating a {@link VM}.
@@ -109,6 +113,11 @@ export interface VMOpts {
    * Get miner address callback
    */
   getMiner?: (header: BlockHeader) => Address;
+
+  /**
+   * Exposed low level database pointer
+   */
+  exposed: any;
 }
 
 /**
@@ -126,6 +135,14 @@ export class VM extends AsyncEventEmitter {
    * The blockchain the VM operates on
    */
   readonly blockchain: Blockchain;
+  /**
+   * Exposed low level database pointer
+   */
+  readonly exposed: any;
+  /**
+   * Binding object
+   */
+  readonly binding: JSEVMBinding;
 
   readonly _common: Common;
 
@@ -240,6 +257,12 @@ export class VM extends AsyncEventEmitter {
     // We cache this promisified function as it's called from the main execution loop, and
     // promisifying each time has a huge performance impact.
     this._emit = promisify(this.emit.bind(this));
+
+    // Save pointer
+    this.exposed = opts.exposed;
+
+    // Constructor binding object
+    this.binding = new JSEVMBinding(this.exposed, this._common.chainId());
   }
 
   async init(): Promise<void> {
@@ -333,7 +356,8 @@ export class VM extends AsyncEventEmitter {
     return new VM({
       stateManager: this.stateManager.copy(),
       blockchain: this.blockchain,
-      common: this._common
+      common: this._common,
+      exposed: this.exposed
     });
   }
 }

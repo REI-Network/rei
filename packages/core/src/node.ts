@@ -46,6 +46,7 @@ export class Node {
   readonly genesisHash: Buffer;
   readonly nodedb: LevelUp;
   readonly chaindb: LevelUp;
+  readonly chaindbDown: any;
   readonly evidencedb: LevelUp;
   readonly wire: Wire;
   readonly consensus: ConsensusProtocol;
@@ -79,9 +80,9 @@ export class Node {
 
   constructor(options: NodeOptions) {
     this.datadir = options.databasePath;
-    this.chaindb = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
-    this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));
-    this.evidencedb = createLevelDB(path.join(this.datadir, 'evidence'));
+    [this.chaindb, this.chaindbDown] = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
+    [this.nodedb] = createLevelDB(path.join(this.datadir, 'nodes'));
+    [this.evidencedb] = createLevelDB(path.join(this.datadir, 'evidence'));
     this.wire = new Wire(this);
     this.consensus = new ConsensusProtocol(this);
     this.accMngr = new AccountManager(options.account.keyStorePath);
@@ -168,6 +169,10 @@ export class Node {
     }
 
     return (this.initPromise = (async () => {
+      await this.chaindb.open();
+      await this.nodedb.open();
+      await this.evidencedb.open();
+
       await this.blockchain.init();
       if (this.latestBlock.header.number.eqn(0)) {
         await this.getEngine(this.latestBlock._common).generateGenesis();
@@ -335,6 +340,7 @@ export class Node {
       common,
       stateManager,
       blockchain: this.blockchain,
+      exposed: this.chaindbDown.exposed,
       getMiner: (header) => this.getEngine(header._common).getMiner(header)
     });
   }

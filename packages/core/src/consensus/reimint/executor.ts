@@ -19,6 +19,9 @@ import { ExtraData } from './extraData';
 import { ReimintConsensusEngine } from './engine';
 import { makeRunTxCallback } from './makeRunTxCallback';
 
+let sum = 0;
+let count = 0;
+
 /**
  * Calculate accumulative fee usage
  * and accumulative balance usage from receipte
@@ -282,6 +285,8 @@ export class ReimintExecutor implements Executor {
    * {@link Executor.processBlock}
    */
   async processBlock(options: ProcessBlockOpts) {
+    const startAt = Date.now();
+
     const { debug, block, force, skipConsensusValidation, skipConsensusVerify } = options;
 
     const pendingHeader = block.header;
@@ -374,6 +379,11 @@ export class ReimintExecutor implements Executor {
 
     // put the validator set in the memory cache
     this.engine.validatorSets.set(result.stateRoot, validatorSet);
+
+    const usage = Date.now() - startAt;
+    sum += usage;
+    count++;
+    console.log('process block usage:', usage, 'avg:', sum / count);
 
     return { receipts: postByzantiumTxReceiptsToReceipts(result.receipts) };
   }

@@ -1,7 +1,7 @@
 import { debug as createDebugLogger } from 'debug';
 import { Account, Address, BN, toBuffer, bufferToHex, generateAddress, generateAddress2, KECCAK256_NULL, KECCAK256_RLP, MAX_INTEGER } from 'ethereumjs-util';
 import { Block } from '@rei-network/structure';
-import { JSEVMBinding, Message as EVMCMessage } from '../../../binding/dist/evm';
+import { JSEVMBinding, Message as EVMCMessage } from '../../../binding';
 import { ERROR, VmError } from '../exceptions';
 import { StateManager } from '../state/index';
 import { IDebug } from '../types';

@@ -167,6 +167,7 @@ export default class EVM {
       isUpgrade: !!message.contractAddress,
       clearStorage: message.clearStorage,
       clearEmptyAccount: message.clearEmptyAccount,
+      author: this._tx.author?.toString(),
       accessList: this._tx.accessList
     };
 

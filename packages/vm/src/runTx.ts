@@ -343,10 +343,16 @@ async function _runTx(this: VM, opts: RunTxOpts, accessList?: EVMCAccessList): P
     }
   }
 
+  // calculate block miner address
+  let author: Address | undefined = undefined;
+  if (this._getMiner) {
+    author = this._getMiner(block.header);
+  }
+
   /*
    * Execute message
    */
-  const txContext = new TxContext(gasPrice, caller, accessList, blockGasUsed, recentHashes);
+  const txContext = new TxContext(gasPrice, caller, author, accessList, blockGasUsed, recentHashes);
   const { value, data, to } = tx;
   const message = new Message({
     caller,

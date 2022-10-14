@@ -13,7 +13,9 @@ struct Miner {
     // validator total miss round number
     uint256 missedRoundNumberPeriod;
     // validator latest unjailed block number
-    uint256 unjailedBlockNumber;
+    uint256 lastUnjailedBlockNumber;
+    // validator latest jailed block number
+    uint256 lastJailedBlockNumber;
 }
 
 struct MissRecord {
@@ -37,6 +39,7 @@ interface IPrison {
             uint256,
             bool,
             address,
+            uint256,
             uint256,
             uint256
         );

@@ -69,7 +69,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   readonly evpool: EvidencePool;
   readonly executor: ReimintExecutor;
   readonly validatorSets = new ValidatorSets();
-  readonly MissMiner: MissMiner;
+  readonly missMiner: MissMiner;
 
   constructor(options: ConsensusEngineOptions) {
     super(options);
@@ -83,7 +83,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     this.state = new StateMachine(this, this.node.consensus, this.evpool, wal, this.node.chainId, this.config, this.signer);
 
     this.executor = new ReimintExecutor(this.node, this);
-    this.MissMiner = new MissMiner(this);
+    this.missMiner = new MissMiner(this);
   }
 
   /**

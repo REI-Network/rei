@@ -40,8 +40,11 @@ contract Prison is Only, IPrison {
      * @param record        MissRecord data
      */
     function addMissRecord(MissRecord[] calldata record) external override onlyStakeManager returns (address[] memory) {
+        if (block.number < 1) {
+            return new address[](0);
+        }
         // delete timeout miss record
-        uint256 blockNumberNow = block.number;
+        uint256 blockNumberNow = block.number - 1;
         if (blockNumberNow >= config.recordsAmountPeriod()) {
             uint256 blockNumberToDelete = blockNumberNow.sub(config.recordsAmountPeriod());
             for (uint256 i = lowestRecordBlockNumber; i <= blockNumberToDelete; i = i.add(1)) {
@@ -49,7 +52,7 @@ contract Prison is Only, IPrison {
                 if (missRecord.length != 0) {
                     for (uint256 j = missRecord.length.sub(1); j >= 0; ) {
                         Miner storage miner = miners[missRecord[j].miner];
-                        if (miner.unjailedBlockNumber <= i && !miner.jailed) {
+                        if (miner.lastUnjailedBlockNumber <= i && !miner.jailed) {
                             miner.missedRoundNumberPeriod = miner.missedRoundNumberPeriod.sub(missRecord[j].missedRoundNumberThisBlock);
                         }
                         missRecord.pop();
@@ -86,6 +89,7 @@ contract Prison is Only, IPrison {
             if (miner.missedRoundNumberPeriod >= config.jailThreshold() && !miner.jailed) {
                 miner.jailed = true;
                 miner.missedRoundNumberPeriod = 0;
+                miner.lastJailedBlockNumber = block.number;
                 indexedJailedMiners.set(miner.id, miner.miner);
                 jailedMiner.push(miner.miner);
             }
@@ -102,7 +106,7 @@ contract Prison is Only, IPrison {
         Miner storage miner = miners[minerAddress];
         require(miner.jailed && miner.miner != address(0), "Jail: miner is not jailed or not exist");
         miner.jailed = false;
-        miner.unjailedBlockNumber = block.number;
+        miner.lastUnjailedBlockNumber = block.number;
         indexedJailedMiners.remove(miner.id);
         emit Unjail(minerAddress, block.number, msg.value);
     }

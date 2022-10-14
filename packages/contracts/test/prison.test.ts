@@ -13,7 +13,7 @@ type Miner = {
   jailed: boolean;
   address: string;
   missedRoundNumberPeriod: number;
-  unjailedBlockNumber: number;
+  lastUnjailedBlockNumber: number;
 };
 
 class RecordQueue {
@@ -36,7 +36,7 @@ class RecordQueue {
         if (missRecord) {
           for (let j = 0; j < missRecord.length; j++) {
             const miner = this.minerMap.get(missRecord[j][0])!;
-            if (miner.unjailedBlockNumber > i || miner.jailed) {
+            if (miner.lastUnjailedBlockNumber > i || miner.jailed) {
               continue;
             } else {
               miner.missedRoundNumberPeriod -= missRecord[j][1];
@@ -55,7 +55,7 @@ class RecordQueue {
           jailed: false,
           address: item[0],
           missedRoundNumberPeriod: item[1],
-          unjailedBlockNumber: 0
+          lastUnjailedBlockNumber: 0
         });
       } else if (!miner.jailed) {
         miner.missedRoundNumberPeriod += item[1];
@@ -79,7 +79,7 @@ class RecordQueue {
     const miner = this.minerMap.get(address);
     if (miner) {
       miner.jailed = false;
-      miner.unjailedBlockNumber = blockNumber;
+      miner.lastUnjailedBlockNumber = blockNumber;
     }
   }
 }
@@ -93,7 +93,7 @@ async function checkMissRecord(queue: RecordQueue, prison: any) {
     expect(minerState.miner, 'Miner address should be equal').to.equal(minerAddress);
     expect(minerState.missedRoundNumberPeriod, 'Missed round number this block should be equal').to.equal(miner.missedRoundNumberPeriod.toString());
     expect(minerState.jailed, 'Jailed state should be equal').to.equal(miner.jailed);
-    expect(minerState.unjailedBlockNumber, 'Unjailed block number should be equal').to.equal(miner.unjailedBlockNumber.toString());
+    expect(minerState.lastUnjailedBlockNumber, 'Unjailed block number should be equal').to.equal(miner.lastUnjailedBlockNumber.toString());
   }
 }
 

@@ -142,8 +142,23 @@ export class ReimintExecutor implements Executor {
       }
     }
 
+    // 4.call stakeManager.addMissRecord to add miss record
+    // and jail validators whos missRecords is greater than config.jailThreshold
+    if (isEnablePrison(pendingCommon)) {
+      const prevBlock = await vm.blockchain.getBlock(pendingBlock.header.parentHash);
+      const missMiners = await this.engine.missMiner.getMissMiner(prevBlock.header);
+      const missRecords = missMiners.map((missMiner) => {
+        return [missMiner[0].toString(), missMiner[1].toString()];
+      });
+      const ethLogs = await parentStakeManager.addMissRecord(missRecords);
+      if (ethLogs && ethLogs.length > 0) {
+        logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));
+      }
+      logger.info('💌Reimint::afterApply, addMissRecord:', missRecords);
+    }
+
     if (isEnableFreeStaking(pendingCommon)) {
-      // 4. filter all receipts to collect free staking changes,
+      // 5. filter all receipts to collect free staking changes,
       //    then modify user accounts based on changes
       const changes = Fee.filterReceipts(receipts, pendingCommon);
       for (const [addr, value] of changes) {
@@ -158,7 +173,7 @@ export class ReimintExecutor implements Executor {
         }
       }
 
-      // 5. calculate miner amount and distributed value,
+      // 6. calculate miner amount and distributed value,
       //    and call feePool.distribute
       const minerAmount = accBalUsage!.add(accFeeUsage!);
       const distributeValue = feePoolReward.add(accBalUsage!);
@@ -167,20 +182,6 @@ export class ReimintExecutor implements Executor {
       if (ethLogs && ethLogs.length > 0) {
         logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));
       }
-    }
-
-    // 6.call stakeManager.addMissRecord to add miss record
-    // and jail validators whos missRecords is greater than config.jailThreshold
-    if (isEnablePrison(pendingCommon)) {
-      const missMiners = await this.engine.MissMiner.getMissMiner(pendingBlock.header);
-      const missRecords =
-        missMiners.length > 0
-          ? missMiners.map((missMiner) => {
-              return [missMiner[0].toString(), missMiner[1].toString()];
-            })
-          : [];
-      await parentStakeManager.addMissRecord(missRecords);
-      logger.info('💌Reimint::afterApply, addMissRecord:', missRecords);
     }
 
     // 7. call stakeManager.getTotalLockedAmountAndValidatorCount to get totalLockedAmount and validatorCount,

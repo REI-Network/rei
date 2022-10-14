@@ -4,6 +4,7 @@ pragma solidity ^0.6.0;
 pragma experimental ABIEncoderV2;
 
 import "./IOnly.sol";
+import "./IPrison.sol";
 
 /**
  * @dev `Unstake` records the information of each unstake request.
@@ -129,4 +130,8 @@ interface IStakeManager is IOnly {
         address[] calldata acValidators,
         int256[] calldata priorities
     ) external;
+
+    function addMissRecord(MissRecord[] calldata record) external;
+
+    function unjail() external payable;
 }

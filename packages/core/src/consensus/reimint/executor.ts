@@ -382,8 +382,12 @@ export class ReimintExecutor implements Executor {
 
     const usage = Date.now() - startAt;
     sum += usage;
-    count++;
-    console.log('process block usage:', usage, 'avg:', sum / count);
+    console.log('process block usage:', usage, 'avg:', sum / count++);
+
+    if (count >= 1000) {
+      sum = 0;
+      count = 0;
+    }
 
     return { receipts: postByzantiumTxReceiptsToReceipts(result.receipts) };
   }

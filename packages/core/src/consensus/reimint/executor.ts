@@ -1,5 +1,5 @@
 import { Address, BN, bufferToHex } from 'ethereumjs-util';
-import { logger } from '@rei-network/utils';
+import { logger, FunctionalAddressMap } from '@rei-network/utils';
 import { Block, Log, Receipt } from '@rei-network/structure';
 import { RunBlockOpts, rewardAccount } from '@rei-network/vm/dist/runBlock';
 import { StateManager as IStateManager } from '@rei-network/vm/dist/state';
@@ -145,8 +145,25 @@ export class ReimintExecutor implements Executor {
     // 4.call stakeManager.addMissRecord to add miss record
     // and jail validators whos missRecords is greater than config.jailThreshold
     if (isEnablePrison(pendingCommon)) {
-      const prevBlock = await vm.blockchain.getBlock(pendingBlock.header.parentHash);
-      const missMiners = await this.engine.missMiner.getMissMiner(prevBlock.header);
+      const preBlockHeader = await this.engine.node.db.getHeader(pendingBlock.header.parentHash, pendingBlock.header.number.subn(1));
+      let missMiners: [Address, number][] = [];
+      if (preBlockHeader.number.gten(1)) {
+        const missMinerMap = new FunctionalAddressMap<number>();
+        const roundNumber = ExtraData.fromBlockHeader(preBlockHeader).round;
+        if (roundNumber > 0) {
+          const parentBlock = await this.engine.node.db.getBlock(preBlockHeader.parentHash);
+          const common = parentBlock._common;
+          const vm = await this.backend.getVM(parentBlock.header.stateRoot, common);
+          const stakeManager = this.engine.getStakeManager(vm, parentBlock);
+          const activeSets = (await this.engine.validatorSets.getActiveValSet(parentBlock.header.stateRoot, stakeManager)).copy();
+          for (let round = 0; round < roundNumber; round++) {
+            const missminer = activeSets.proposer;
+            missMinerMap.set(missminer, (missMinerMap.get(missminer) ?? 0) + 1);
+            activeSets.incrementProposerPriority(1);
+          }
+        }
+        missMiners = Array.from(missMinerMap.entries());
+      }
       const missRecords = missMiners.map((missMiner) => {
         return [missMiner[0].toString(), missMiner[1].toString()];
       });
@@ -154,7 +171,6 @@ export class ReimintExecutor implements Executor {
       if (ethLogs && ethLogs.length > 0) {
         logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));
       }
-      logger.info('💌Reimint::afterApply, addMissRecord:', missRecords);
     }
 
     if (isEnableFreeStaking(pendingCommon)) {

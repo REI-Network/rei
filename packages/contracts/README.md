@@ -13,6 +13,7 @@ REI-Network genesis contracts
 - `Fee` A smart contract for staking REI to get Crude, deployed at `0x0000000000000000000000000000000000001005`
 - `FeePool` A smart contract for distributing miner fee rewards, deployed at `0x0000000000000000000000000000000000001006`
 - `FeeToken` A smart contract for querying the user's remaining Crude quantity, deployed at `0x0000000000000000000000000000000000001007`
+- `Prison` A smart contract for jailing validator which not mint blocks on time, deployed at `0x0000000000000000000000000000000000001008`
 
 ## Install
 

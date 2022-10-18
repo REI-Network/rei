@@ -24,7 +24,6 @@ import { Reimint } from './reimint';
 import { WAL } from './wal';
 import { ReimintExecutor } from './executor';
 import { ExtraData } from './extraData';
-import { MissMiner } from './missMiner';
 
 export class SimpleNodeSigner {
   readonly node: Node;
@@ -69,7 +68,6 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   readonly evpool: EvidencePool;
   readonly executor: ReimintExecutor;
   readonly validatorSets = new ValidatorSets();
-  readonly missMiner: MissMiner;
 
   constructor(options: ConsensusEngineOptions) {
     super(options);
@@ -83,7 +81,6 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     this.state = new StateMachine(this, this.node.consensus, this.evpool, wal, this.node.chainId, this.config, this.signer);
 
     this.executor = new ReimintExecutor(this.node, this);
-    this.missMiner = new MissMiner(this);
   }
 
   /**

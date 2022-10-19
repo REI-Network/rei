@@ -243,11 +243,8 @@ export class StakeManager extends Contract {
    * @returns
    */
   addMissRecord(missRecord: string[][]) {
-    const grv = getGenesisValidators(this.common).map((gv) => gv.toString());
-    // Genesis validators are not allowed to record miss records
-    const missRecordWithoutGeneisis = missRecord.filter((mr) => !grv.includes(mr[0]));
     return this.runWithLogger(async () => {
-      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('addMissRecord', ['tuple(address,uint256)[]'], [missRecordWithoutGeneisis]));
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('addMissRecord', ['tuple(address,uint256)[]'], [missRecord]));
       return logs;
     });
   }

@@ -9,9 +9,9 @@ import EVM from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';
 import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executor } from '../types';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
-import { isEnableFreeStaking, isEnableHardfork1, isEnablePrison } from '../../hardforks';
+import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnablePrison } from '../../hardforks';
 import { StateManager } from '../../stateManager';
-import { ValidatorSet, ValidatorChanges } from './validatorSet';
+import { ValidatorSet, ValidatorChanges, getGenesisValidators } from './validatorSet';
 import { StakeManager, SlashReason, Fee, Contract } from './contracts';
 import { Reimint } from './reimint';
 import { Evidence, DuplicateVoteEvidence } from './evpool';
@@ -146,27 +146,31 @@ export class ReimintExecutor implements Executor {
     // and jail validators whos missRecords is greater than config.jailThreshold
     if (isEnablePrison(pendingCommon)) {
       const preBlockHeader = await this.engine.node.db.getHeader(pendingBlock.header.parentHash, pendingBlock.header.number.subn(1));
-      let missMiners: [Address, number][] = [];
+      let missRecords: string[][] = [];
       if (preBlockHeader.number.gten(1)) {
         const missMinerMap = new FunctionalAddressMap<number>();
         const roundNumber = ExtraData.fromBlockHeader(preBlockHeader).round;
         if (roundNumber > 0) {
-          const parentBlock = await this.engine.node.db.getBlock(preBlockHeader.parentHash);
-          const common = parentBlock._common;
-          const vm = await this.backend.getVM(parentBlock.header.stateRoot, common);
-          const stakeManager = this.engine.getStakeManager(vm, parentBlock);
-          const activeSets = (await this.engine.validatorSets.getActiveValSet(parentBlock.header.stateRoot, stakeManager)).copy();
+          const preParentBlock = await this.engine.node.db.getBlock(preBlockHeader.parentHash);
+          const common = preParentBlock._common;
+          const vm = await this.backend.getVM(preParentBlock.header.stateRoot, common);
+          const stakeManager = this.engine.getStakeManager(vm, preParentBlock);
+          const activeSets = (await this.engine.validatorSets.getActiveValSet(preParentBlock.header.stateRoot, stakeManager)).copy();
           for (let round = 0; round < roundNumber; round++) {
             const missminer = activeSets.proposer;
             missMinerMap.set(missminer, (missMinerMap.get(missminer) ?? 0) + 1);
             activeSets.incrementProposerPriority(1);
           }
+          const grv = getGenesisValidators(common).map((gv) => gv.toString());
+          const missRecordsRaw = Array.from(missMinerMap.entries()).map((missRecord) => {
+            return [missRecord[0].toString(), missRecord[1].toString()];
+          });
+
+          // Genesis validators are not allowed to record miss records
+          missRecords = missRecordsRaw.filter((missRecord) => !grv.includes(missRecord[0]));
         }
-        missMiners = Array.from(missMinerMap.entries());
       }
-      const missRecords = missMiners.map((missMiner) => {
-        return [missMiner[0].toString(), missMiner[1].toString()];
-      });
+      logger.debug('Reimint::afterApply, Add missRecords:', missRecords);
       const ethLogs = await parentStakeManager.addMissRecord(missRecords);
       if (ethLogs && ethLogs.length > 0) {
         logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));
@@ -267,6 +271,18 @@ export class ReimintExecutor implements Executor {
     if (!isEnableFreeStaking(pendingCommon) && isEnableFreeStaking(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployFreeStakingContracts(evm, nextCommon);
+    }
+
+    // 13. deploy contracts if enable hardfork 2 is enabled in the next block
+    if (!isEnableHardfork2(pendingCommon) && isEnableHardfork2(nextCommon)) {
+      const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
+      await Contract.deployHardfork2Contracts(evm, nextCommon);
+    }
+
+    // 14. deploy contracts if enable prison is enabled in the next block
+    if (!isEnablePrison(pendingCommon) && isEnablePrison(nextCommon)) {
+      const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
+      await Contract.deployPrisonContracts(evm, nextCommon);
     }
 
     return validatorSet;

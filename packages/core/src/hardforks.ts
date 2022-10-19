@@ -136,7 +136,7 @@ export function isEnableHardfork2(common: Common) {
   } else if (common.chainName() === 'rei-mainnet') {
     return common.gteHardfork('mainnet-hf-2');
   } else if (common.chainName() === 'rei-devnet') {
-    return false;
+    return common.gteHardfork('devnet-hf-2');
   } else {
     throw new Error('unknown chain');
   }

@@ -11,7 +11,7 @@ import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executo
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
 import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnablePrison } from '../../hardforks';
 import { StateManager } from '../../stateManager';
-import { ValidatorSet, ValidatorChanges, getGenesisValidators } from './validatorSet';
+import { ValidatorSet, ValidatorChanges, isGenesis } from './validatorSet';
 import { StakeManager, SlashReason, Fee, Contract } from './contracts';
 import { Reimint } from './reimint';
 import { Evidence, DuplicateVoteEvidence } from './evpool';
@@ -161,13 +161,9 @@ export class ReimintExecutor implements Executor {
             missMinerMap.set(missminer, (missMinerMap.get(missminer) ?? 0) + 1);
             activeSets.incrementProposerPriority(1);
           }
-          const grv = getGenesisValidators(common).map((gv) => gv.toString());
-          const missRecordsRaw = Array.from(missMinerMap.entries()).map((missRecord) => {
-            return [missRecord[0].toString(), missRecord[1].toString()];
-          });
-
-          // Genesis validators are not allowed to record miss records
-          missRecords = missRecordsRaw.filter((missRecord) => !grv.includes(missRecord[0]));
+          // Genesis validators are not allowed to record miss recordss
+          const missRecordsRaw = Array.from(missMinerMap.entries()).filter(([addr]) => !isGenesis(addr, common));
+          missRecords = missRecordsRaw.map(([addr, count]) => [addr.toString(), count.toString()]);
         }
       }
       logger.debug('Reimint::afterApply, Add missRecords:', missRecords);

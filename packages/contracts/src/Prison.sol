@@ -33,16 +33,16 @@ contract Prison is Only, IPrison {
      */
     event Unjail(address indexed miner, uint256 indexed blockNumber, uint256 forfeit);
 
-    constructor(IConfig _config) public Only(_config) {}
+    constructor(IConfig _config) public Only(_config) {
+        lowestRecordBlockNumber = block.number;
+    }
 
     /**
      * Add miss record into the contract, called by onlyStakeManager every block
      * @param record        MissRecord data
      */
     function addMissRecord(MissRecord[] calldata record) external override onlyStakeManager returns (address[] memory) {
-        if (block.number < 1) {
-            return new address[](0);
-        }
+        require(block.number > 0, "Prison: invaild block number");
         // delete timeout miss record
         uint256 blockNumberNow = block.number - 1;
         if (blockNumberNow >= config.recordsAmountPeriod()) {
@@ -65,7 +65,9 @@ contract Prison is Only, IPrison {
                 }
                 delete missRecords[i];
             }
-            lowestRecordBlockNumber = blockNumberToDelete.add(1);
+            if (blockNumberToDelete.add(1) > lowestRecordBlockNumber) {
+                lowestRecordBlockNumber = blockNumberToDelete.add(1);
+            }
         }
 
         // add new miss record

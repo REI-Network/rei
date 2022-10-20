@@ -117,17 +117,33 @@ describe('Prison', () => {
   });
 
   it('should deploy succeed', async () => {
+    // Update block number
+    for (let i = 0; i < 10; i++) {
+      await web3.eth.sendTransaction({ from: deployer, to: user1, value: web3.utils.toWei('1', 'ether') });
+    }
+
     config = new web3.eth.Contract(Config.abi, (await Config.new()).address, { from: deployer });
     await config.methods.setSystemCaller(deployer).send();
     await config.methods.setStakeManager(deployer).send();
 
     prison = new web3.eth.Contract(Prison.abi, (await Prison.new(config.options.address)).address, { from: deployer });
-    await config.methods.setPrison(prison.options.address).send();
-
+    const lowestRecordBlockNumber = await prison.methods.lowestRecordBlockNumber().call();
+    expect(lowestRecordBlockNumber, 'Lowest record block number should be equal').to.equal((await web3.eth.getBlockNumber()).toString());
     recordAmountPeriod = 3;
+    await config.methods.setRecordsAmountPeriod(recordAmountPeriod).send();
+
+    const missedRecord: MissRecord[] = [];
+    const checkTimes = 10;
+    for (let i = 0; i < recordAmountPeriod - 1 + checkTimes; i++) {
+      await prison.methods.addMissRecord(missedRecord).send();
+      const oldLowestRecordBlockNumber = await prison.methods.lowestRecordBlockNumber().call({ blockNumber: (await web3.eth.getBlockNumber()) - 1 });
+      const newLowestRecordBlockNumber = (await web3.eth.getBlockNumber()) - 1 - recordAmountPeriod + 1;
+      const lowestRecordBlockNumberExpect = newLowestRecordBlockNumber > oldLowestRecordBlockNumber ? newLowestRecordBlockNumber : oldLowestRecordBlockNumber;
+      expect(lowestRecordBlockNumberExpect, 'Lowest record block number should be equal').to.equal(await prison.methods.lowestRecordBlockNumber().call());
+    }
+
     const jailThreshold = await config.methods.jailThreshold().call();
     recordQueue = new RecordQueue(recordAmountPeriod, jailThreshold);
-    await config.methods.setRecordsAmountPeriod(recordAmountPeriod).send();
     expect(await config.methods.recordsAmountPeriod().call(), 'Record amount period should be equal').to.equal(recordAmountPeriod.toString());
   });
 
@@ -171,9 +187,10 @@ describe('Prison', () => {
     await checkMissRecord(recordQueue, prison);
     const jailedStateAfter = (await prison.methods.miners(deployer).call()).jailed;
     expect(jailedStateAfter, 'Jailed state should be true').to.equal(true);
-    const jailedMinerLength = await prison.methods.getJaiedMinersLengthByBlockNumber(await web3.eth.getBlockNumber()).call();
+    const blockNumberTofind = (await web3.eth.getBlockNumber()) - 1;
+    const jailedMinerLength = await prison.methods.getJaiedMinersLengthByBlockNumber(blockNumberTofind).call();
     expect(jailedMinerLength, 'Jailed miner length should be 1').to.equal('1');
-    const jailedMiner = await prison.methods.jailedRecords(await web3.eth.getBlockNumber(), 0).call();
+    const jailedMiner = await prison.methods.jailedRecords(blockNumberTofind, 0).call();
     expect(jailedMiner, 'Jailed miner should be equal').to.equal(deployer);
   });
 

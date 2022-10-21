@@ -129,4 +129,8 @@ interface IStakeManager is IOnly {
         address[] calldata acValidators,
         int256[] calldata priorities
     ) external;
+
+    function onAfterBlockRLP(address _proposer, bytes acValidators);
+
+    function activeValidatorsRLP() external view returns (bytes memory);
 }

@@ -124,3 +124,15 @@ export function isEnableFreeStaking(common: Common) {
     throw new Error('unknown chain');
   }
 }
+
+export function isEnableValidatorsRLP(common: Common) {
+  if (common.chainName() === 'rei-testnet') {
+    return common.gteHardfork('validators-rlp');
+  } else if (common.chainName() === 'rei-mainnet') {
+    return common.gteHardfork('validators-rlp');
+  } else if (common.chainName() === 'rei-devnet') {
+    return common.gteHardfork('validators-rlp');
+  } else {
+    throw new Error('unknown chain');
+  }
+}

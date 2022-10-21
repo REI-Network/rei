@@ -20,6 +20,8 @@ export abstract class Contract {
     this.address = address;
   }
 
+  static deployHardforkValRLPContract(evm: EVM, common: Common) {}
+
   /**
    * Deploy reimint contracts
    * @param evm - EVM instance

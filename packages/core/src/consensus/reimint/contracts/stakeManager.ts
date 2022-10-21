@@ -1,9 +1,9 @@
 import EVM from '@rei-network/vm/dist/evm/evm';
-import { Address, BN, toBuffer } from 'ethereumjs-util';
+import { Address, BN, toBuffer, rlp } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Log, Receipt } from '@rei-network/structure';
 import { ValidatorChanges, getGenesisValidators } from '../validatorSet';
-import { bufferToAddress, decodeInt256 } from './utils';
+import { bufferToAddress } from './utils';
 import { Contract } from './contract';
 
 // function selector of stake manager
@@ -18,7 +18,9 @@ const methods = {
   proposer: toBuffer('0xa8e4fb90'),
   reward: toBuffer('0x6353586b'),
   slash: toBuffer('0x30b409a4'),
-  onAfterBlock: toBuffer('0x9313f105')
+  onAfterBlock: toBuffer('0x9313f105'),
+  activeValidatorsRLP: toBuffer('0x2d6b97d8'),
+  onAfterBlockRLP: toBuffer('0x5cf30f2b')
 };
 
 // event topic
@@ -176,8 +178,9 @@ export class StakeManager extends Contract {
    */
   activeValidatorsLength() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('activeValidatorsLength', [], []));
-      return new BN(returnValue);
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('activeValidatorsRLP', [], []));
+      const length = rlp.decode(returnValue).length;
+      return new BN(length);
     });
   }
 
@@ -188,14 +191,12 @@ export class StakeManager extends Contract {
    */
   activeValidators(index: BN): Promise<ActiveValidator> {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('activeValidators', ['uint256'], [index.toString()]));
-      if (returnValue.length !== 2 * 32) {
-        throw new Error('invalid return value length');
-      }
-      let i = 0;
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('activeValidatorsRLP', [], []));
+      const validators = rlp.decode(returnValue);
+      const validator = validators[index.toNumber()];
       return {
-        validator: bufferToAddress(returnValue.slice(i++ * 32, i * 32)),
-        priority: decodeInt256(returnValue.slice(i++ * 32, i * 32))
+        validator: bufferToAddress(validator[0]),
+        priority: new BN(validator[2]).eq(new BN(1)) ? new BN(validator[1]).neg() : new BN(validator[1])
       };
     });
   }
@@ -232,7 +233,12 @@ export class StakeManager extends Contract {
    */
   onAfterBlock(proposer: Address, activeValidators: Address[], priorities: BN[]) {
     return this.runWithLogger(async () => {
-      await this.executeMessage(this.makeSystemCallerMessage('onAfterBlock', ['address', 'address[]', 'int256[]'], [proposer.toString(), activeValidators.map((addr) => addr.toString()), priorities.map((p) => p.toString())]));
+      const validators = activeValidators.map((addr, i) => {
+        const priority = priorities[i];
+        return [addr.toBuffer(), priority.toBuffer(), priority.isNeg() ? new BN(1).toBuffer() : new BN(0).toBuffer()];
+      });
+      const data = rlp.encode(validators);
+      await this.executeMessage(this.makeSystemCallerMessage('onAfterBlockRLP', ['address', 'bytes'], [proposer.toString(), data]));
     });
   }
 }

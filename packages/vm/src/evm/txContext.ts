@@ -1,5 +1,5 @@
 import { Address, BN } from 'ethereumjs-util';
-import { AccessList as EVMCAccessList } from '../../../binding/dist/evm';
+import { AccessList as EVMCAccessList } from '@rei-network/binding';
 
 export default class TxContext {
   gasPrice: BN;

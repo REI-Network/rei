@@ -271,7 +271,7 @@ export class Synchronizer extends EventEmitter {
     this.syncLoopPromise = this.syncLoop();
     setTimeout(() => {
       this.forceSync = true;
-    }, this.interval * 2);
+    }, this.interval * 30);
   }
 
   /**

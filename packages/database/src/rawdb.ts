@@ -1,6 +1,6 @@
 import levelup, { LevelUp } from 'levelup';
 import encoding from 'encoding-down';
-import { leveldown } from '../../binding';
+import { leveldown } from '@rei-network/binding';
 
 export const createEncodingLevelDB = (path: string): [LevelUp, any] => {
   const down = leveldown(path);

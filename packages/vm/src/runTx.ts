@@ -2,7 +2,7 @@ import { debug as createDebugLogger } from 'debug';
 import { Address, BN, toBuffer } from 'ethereumjs-util';
 import { Block, AccessList, AccessListItem, AccessListEIP2930Transaction, FeeMarketEIP1559Transaction, Transaction, TypedTransaction, Capability } from '@rei-network/structure';
 import { ConsensusType } from '@rei-network/common';
-import { AccessList as EVMCAccessList } from '../../binding';
+import { AccessList as EVMCAccessList } from '@rei-network/binding';
 import { VM } from './index';
 import Bloom from './bloom';
 import { default as EVM, EVMResult } from './evm/evm';

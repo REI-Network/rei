@@ -1,7 +1,7 @@
 import { debug as createDebugLogger } from 'debug';
 import { Account, Address, BN, toBuffer, bufferToHex, generateAddress, generateAddress2, KECCAK256_NULL, KECCAK256_RLP, MAX_INTEGER } from 'ethereumjs-util';
 import { Block } from '@rei-network/structure';
-import { JSEVMBinding, Message as EVMCMessage } from '../../../binding';
+import { JSEVMBinding, Message as EVMCMessage } from '@rei-network/binding';
 import { ERROR, VmError } from '../exceptions';
 import { StateManager } from '../state/index';
 import { IDebug } from '../types';
@@ -131,18 +131,14 @@ export default class EVM {
   _refund: BN;
   _mode: EVMWorkMode;
 
-  constructor(vm: any, txContext: TxContext, block: Block, debug?: IDebug, mode?: EVMWorkMode) {
+  constructor(vm: any, txContext: TxContext, block: Block, debug?: IDebug) {
     this._vm = vm;
     this._state = this._vm.stateManager;
     this._tx = txContext;
     this._block = block;
     this._refund = new BN(0);
     this._debug = debug;
-    if (this._debug) {
-      this._mode = EVMWorkMode.JS;
-    } else {
-      this._mode = mode ?? EVMWorkMode.Binding;
-    }
+    this._mode = vm.mode;
   }
 
   /**

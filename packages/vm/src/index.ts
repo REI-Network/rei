@@ -2,12 +2,12 @@ import { Account, Address } from 'ethereumjs-util';
 import { Blockchain } from '@rei-network/blockchain';
 import { Common, Chain } from '@rei-network/common';
 import { BlockHeader } from '@rei-network/structure';
-import { JSEVMBinding, init } from '../../binding/dist/evm';
+import { JSEVMBinding, init } from '@rei-network/binding';
 import { StateManager } from './state/index';
 import { default as runCall, RunCallOpts } from './runCall';
 import { default as runTx, RunTxOpts, RunTxResult } from './runTx';
 import { default as runBlock, RunBlockOpts, RunBlockResult } from './runBlock';
-import { EVMResult } from './evm/evm';
+import { EVMResult, EVMWorkMode } from './evm/evm';
 import { OpcodeList, getOpcodesForHF } from './evm/opcodes';
 import { precompiles } from './evm/precompiles';
 const AsyncEventEmitter = require('async-eventemitter');
@@ -115,9 +115,14 @@ export interface VMOpts {
   getMiner?: (header: BlockHeader) => Address;
 
   /**
+   * EVM work mode
+   */
+  mode?: EVMWorkMode;
+
+  /**
    * Exposed low level database pointer
    */
-  exposed: any;
+  exposed?: any;
 }
 
 /**
@@ -138,11 +143,15 @@ export class VM extends AsyncEventEmitter {
   /**
    * Exposed low level database pointer
    */
-  readonly exposed: any;
+  readonly exposed?: any;
   /**
    * Binding object
    */
-  readonly binding: JSEVMBinding;
+  readonly binding?: JSEVMBinding;
+  /**
+   * EVM work mode
+   */
+  readonly mode?: EVMWorkMode;
 
   readonly _common: Common;
 
@@ -261,8 +270,13 @@ export class VM extends AsyncEventEmitter {
     // Save pointer
     this.exposed = opts.exposed;
 
-    // Constructor binding object
-    this.binding = new JSEVMBinding(this.exposed, this._common.chainId());
+    if (this.exposed) {
+      // Constructor binding object if pointer exists
+      this.binding = new JSEVMBinding(this.exposed, this._common.chainId());
+    }
+
+    // Save evm work mode
+    this.mode = opts.mode ?? EVMWorkMode.JS;
   }
 
   async init(): Promise<void> {

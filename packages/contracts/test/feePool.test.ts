@@ -116,9 +116,9 @@ describe('FeePool', () => {
     await stakeManager.methods.stake(validator1, deployer).send({ value: 1000 });
     await stakeManager.methods.stake(validator2, deployer).send({ value: 1000 });
     await stakeManager.methods.stake(validator3, deployer).send({ value: 1000 });
-    await stakeManager.methods.setCommissionRate(validator1Rate).send({ from: validator1 });
-    await stakeManager.methods.setCommissionRate(validator2Rate).send({ from: validator2 });
-    await stakeManager.methods.setCommissionRate(validator3Rate).send({ from: validator3 });
+    await stakeManager.methods.setVoterRate(validator1Rate).send({ from: validator1 });
+    await stakeManager.methods.setVoterRate(validator2Rate).send({ from: validator2 });
+    await stakeManager.methods.setVoterRate(validator3Rate).send({ from: validator3 });
 
     await config.methods.setFeePoolInterval(0).send();
     await feePool.methods.distribute(validator1, 0).send();

@@ -51,7 +51,7 @@ contract Config is IConfig {
         return 1e23;
     }
 
-    function setCommissionRateInterval() external view override returns (uint256) {
+    function setVoterRateInterval() external view override returns (uint256) {
         return 1 days;
     }
 

@@ -28,7 +28,7 @@ struct Validator {
     // commission share contract address
     address commissionShare;
     // commission rate
-    uint256 commissionRate;
+    uint256 voterRate;
     // latest commission rate update timestamp
     uint256 updateTimestamp;
 }
@@ -112,7 +112,7 @@ interface IStakeManager is IOnly {
 
     function startClaim(address payable to, uint256 amount) external returns (uint256);
 
-    function setCommissionRate(uint256 rate) external;
+    function setVoterRate(uint256 rate) external;
 
     function unstake(uint256 id) external returns (uint256);
 

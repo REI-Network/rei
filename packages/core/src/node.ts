@@ -7,6 +7,7 @@ import { NetworkManager, Peer } from '@rei-network/network';
 import { Common } from '@rei-network/common';
 import { Blockchain } from '@rei-network/blockchain';
 import { VM } from '@rei-network/vm';
+import { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
 import { Transaction, Block } from '@rei-network/structure';
 import { Channel, logger } from '@rei-network/utils';
 import { AccountManager } from '@rei-network/wallet';
@@ -26,6 +27,7 @@ import { StateManager } from './stateManager';
 const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;
 const defaultChainName = 'rei-mainnet';
+const defaultEVMWorkMode = EVMWorkMode.JS;
 
 type PendingTxs = {
   txs: Transaction[];
@@ -62,6 +64,7 @@ export class Node {
   readonly reimint: ReimintConsensusEngine;
   readonly clique: CliqueConsensusEngine;
   readonly receiptsCache: ReceiptsCache;
+  readonly evmWorkMode: EVMWorkMode;
 
   private initPromise?: Promise<void>;
   private pendingTxsLoopPromise?: Promise<void>;
@@ -87,6 +90,7 @@ export class Node {
     this.consensus = new ConsensusProtocol(this);
     this.accMngr = new AccountManager(options.account.keyStorePath);
     this.receiptsCache = new ReceiptsCache(options.receiptsCacheSize);
+    this.evmWorkMode = (options.evm as EVMWorkMode) ?? defaultEVMWorkMode;
 
     this.chain = options.chain ?? defaultChainName;
     if (!Common.isSupportedChainName(this.chain)) {
@@ -331,15 +335,17 @@ export class Node {
    * Get a VM object by state root
    * @param root - The state root
    * @param num - Block number or Common
+   * @param mode - EVM work mode
    * @returns VM object
    */
-  async getVM(root: Buffer, num: BNLike | Common) {
+  async getVM(root: Buffer, num: BNLike | Common, mode?: EVMWorkMode) {
     const stateManager = await this.getStateManager(root, num);
     const common = stateManager._common;
     return new VM({
       common,
       stateManager,
       blockchain: this.blockchain,
+      mode: mode ?? this.evmWorkMode,
       exposed: this.chaindbDown.exposed,
       getMiner: (header) => this.getEngine(header._common).getMiner(header)
     });

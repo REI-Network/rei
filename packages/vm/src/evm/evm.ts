@@ -109,8 +109,8 @@ export function VmErrorResult(error: VmError, gasUsed: BN): ExecResult {
 }
 
 export enum EVMWorkMode {
-  JS = 'JS',
-  Binding = 'Binding'
+  JS = 'js',
+  Binding = 'binding'
 }
 
 /**

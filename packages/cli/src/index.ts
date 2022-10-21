@@ -39,6 +39,7 @@ program.option('--mine', 'mine block');
 program.option('--coinbase <address>', 'miner address');
 program.option('--verbosity <verbosity>', 'logging verbosity: silent, error, warn, info, debug, detail', 'info');
 program.option('--receipts-cache-size <receiptsCacheSize>', 'receipts cache size');
+program.option('--evm <evm>', 'evm implementation type, "js" or "binding"');
 
 // install commands
 installStartAction(program);

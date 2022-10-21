@@ -26,6 +26,10 @@ export interface NodeOptions {
    * Max receipts cache size
    */
   receiptsCacheSize?: number;
+  /**
+   * Evm implementation type
+   */
+  evm?: string;
 
   mine: ConsensusEngineConstructorOptions;
   network: NetworkManagerConstructorOptions;

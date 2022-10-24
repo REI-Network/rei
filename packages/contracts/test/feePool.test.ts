@@ -9,12 +9,14 @@ const Config = artifacts.require('Config_devnet');
 const FeePool = artifacts.require('FeePool');
 const StakeManager = artifacts.require('StakeManager');
 const ValidatorRewardPool = artifacts.require('ValidatorRewardPool');
+const Prison = artifacts.require('Prison');
 
 describe('FeePool', () => {
   let config: any;
   let feePool: any;
   let deployer: any;
   let stakeManager: any;
+  let prison: any;
   let validatorRewardPool: any;
   let validator1: any;
   let validator2: any;
@@ -41,6 +43,9 @@ describe('FeePool', () => {
 
     validatorRewardPool = new web3.eth.Contract(ValidatorRewardPool.abi, (await ValidatorRewardPool.new(config.options.address)).address, { from: deployer });
     await config.methods.setValidatorRewardPool(validatorRewardPool.options.address).send();
+
+    prison = new web3.eth.Contract(Prison.abi, (await Prison.new(config.options.address)).address, { from: deployer });
+    await config.methods.setPrison(prison.options.address).send();
 
     expect(await config.methods.feePoolInterval().call(), 'fee pool interval should be equal').be.equal('10000');
     expect(await config.methods.stakeManager().call(), 'stake manager address should be equal').be.equal(stakeManager.options.address);
@@ -116,9 +121,9 @@ describe('FeePool', () => {
     await stakeManager.methods.stake(validator1, deployer).send({ value: 1000 });
     await stakeManager.methods.stake(validator2, deployer).send({ value: 1000 });
     await stakeManager.methods.stake(validator3, deployer).send({ value: 1000 });
-    await stakeManager.methods.setCommissionRate(validator1Rate).send({ from: validator1 });
-    await stakeManager.methods.setCommissionRate(validator2Rate).send({ from: validator2 });
-    await stakeManager.methods.setCommissionRate(validator3Rate).send({ from: validator3 });
+    await stakeManager.methods.setVoterRate(validator1Rate).send({ from: validator1 });
+    await stakeManager.methods.setVoterRate(validator2Rate).send({ from: validator2 });
+    await stakeManager.methods.setVoterRate(validator3Rate).send({ from: validator3 });
 
     await config.methods.setFeePoolInterval(0).send();
     await feePool.methods.distribute(validator1, 0).send();

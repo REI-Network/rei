@@ -144,19 +144,19 @@ describe('StakeManger', () => {
   });
 
   it('should set commission rate correctly', async () => {
-    const oldCommissionRate = 0;
-    const newCommissionRate = 50;
-    const setInterval = await config.methods.setCommissionRateInterval().call();
+    const oldVoterRate = 0;
+    const newVoterRate = 50;
+    const setInterval = await config.methods.setVoterRateInterval().call();
     const validatorInfoBefore = await stakeManager.methods.validators(validator1).call();
-    expect(validatorInfoBefore.commissionRate, 'commissionRate should be 0').be.equal(oldCommissionRate.toString());
-    await stakeManager.methods.setCommissionRate(newCommissionRate).send({ from: validator1 });
+    expect(validatorInfoBefore.voterRate, 'voterRate should be 0').be.equal(oldVoterRate.toString());
+    await stakeManager.methods.setVoterRate(newVoterRate).send({ from: validator1 });
     const validatorInfoAfter = await stakeManager.methods.validators(validator1).call();
-    expect(validatorInfoAfter.commissionRate, 'commissionRare should be new commissionRate').be.equal(newCommissionRate.toString());
+    expect(validatorInfoAfter.voterRate, 'voterRate should be new voterRate').be.equal(newVoterRate.toString());
 
     await upTimestamp(deployer, setInterval - 3);
     let failed = false;
     try {
-      await stakeManager.methods.setCommissionRate(oldCommissionRate).send({ from: validator1 });
+      await stakeManager.methods.setVoterRate(oldVoterRate).send({ from: validator1 });
       failed = true;
     } catch (err) {}
 
@@ -166,7 +166,7 @@ describe('StakeManger', () => {
 
     await upTimestamp(deployer, 3);
     try {
-      await stakeManager.methods.setCommissionRate(newCommissionRate).send({ from: validator1 });
+      await stakeManager.methods.setVoterRate(newVoterRate).send({ from: validator1 });
       failed = true;
     } catch (err) {}
     if (failed) {
@@ -259,18 +259,18 @@ describe('StakeManger', () => {
     const stakeAmount = toBN(100);
     const unstakeAmount = toBN(16);
     const rewardAmount = toBN(97);
-    const commissionRate = 33;
+    const voterRate = 33;
     const receiver1BalStart = toBN(await web3.eth.getBalance(receiver1));
     const receiver2BalStart = toBN(await web3.eth.getBalance(receiver2));
     const id1 = stakeId++;
     await stakeManager.methods.stake(validator3, deployer).send({ value: stakeAmount.toString() });
     const commissionShare = await createCommissionShareContract(validator3);
-    await stakeManager.methods.setCommissionRate(commissionRate).send({ from: validator3 });
+    await stakeManager.methods.setVoterRate(voterRate).send({ from: validator3 });
     await commissionShare.methods.approve(stakeManager.options.address, MAX_INTEGER.toString()).send();
     expect(await web3.eth.getBalance(commissionShare.options.address), 'commissionShare balance should be equal').be.equal(stakeAmount.toString());
 
     await stakeManager.methods.reward(validator3).send({ value: rewardAmount });
-    const commissionAmount = rewardAmount.muln(commissionRate).divn(100);
+    const commissionAmount = rewardAmount.muln(voterRate).divn(100);
     const commissionTotalSup = toBN(await commissionShare.methods.totalSupply().call());
     const validatorKeeperAmount = rewardAmount.sub(commissionAmount);
     const claimAmount = toBN(await validatorRewardPool.methods.balanceOf(validator3).call());

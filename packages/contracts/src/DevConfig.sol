@@ -69,7 +69,7 @@ contract DevConfig is Ownable, IConfig {
         mivp = _mivp;
     }
 
-    function setSetCommissionRateInterval(uint256 _scri) external onlyOwner {
+    function setSetVoterRateInterval(uint256 _scri) external onlyOwner {
         scri = _scri;
     }
 
@@ -127,7 +127,7 @@ contract DevConfig is Ownable, IConfig {
         return mivp;
     }
 
-    function setCommissionRateInterval() external view override returns (uint256) {
+    function setVoterRateInterval() external view override returns (uint256) {
         return scri;
     }
 

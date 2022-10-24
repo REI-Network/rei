@@ -30,7 +30,7 @@ interface IConfig {
 
     function getFactorByReason(uint8 reason) external view returns (uint8);
 
-    function setCommissionRateInterval() external view returns (uint256);
+    function setVoterRateInterval() external view returns (uint256);
 
     function feePoolInterval() external view returns (uint256);
 

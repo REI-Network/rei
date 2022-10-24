@@ -156,7 +156,7 @@ task('scr', 'Set commission rate')
   .addOptionalParam('address', 'stake manager contract address')
   .setAction(async (taskArgs, { deployments, web3, artifacts }) => {
     const stakeManager = await createWeb3Contract({ name: 'StakeManager', deployments, web3, artifacts, from: taskArgs.validator, address: taskArgs.address });
-    await stakeManager.methods.setCommissionRate(taskArgs.rate).send();
+    await stakeManager.methods.setVoterRate(taskArgs.rate).send();
     console.log('Set commission rate succeed');
   });
 

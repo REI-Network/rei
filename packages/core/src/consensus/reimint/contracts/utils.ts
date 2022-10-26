@@ -20,3 +20,7 @@ export function encode(types: string[], values: any[]) {
 export function decodeInt256(buf: Buffer) {
   return new BN(coder.decode(['int256'], buf)[0].toString());
 }
+
+export function decodeBytes(buf: Buffer) {
+  return coder.decode(['bytes'], buf)[0];
+}

@@ -3,7 +3,7 @@ import { Address, BN, toBuffer, rlp } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Log, Receipt } from '@rei-network/structure';
 import { ValidatorChanges, getGenesisValidators } from '../validatorSet';
-import { bufferToAddress, decodeInt256 } from './utils';
+import { bufferToAddress, decodeInt256, decodeBytes } from './utils';
 import { Contract } from './contract';
 import { isEnableValidatorsRLP } from '../../../hardforks';
 
@@ -180,9 +180,9 @@ export class StakeManager extends Contract {
   activeValidatorsLength() {
     return this.runWithLogger(async () => {
       if (isEnableValidatorsRLP(this.common)) {
-        console.log('active validator length ------------------>');
         const { returnValue } = await this.executeMessage(this.makeCallMessage('getActiveValidatorsRLP', [], []));
-        const length = rlp.decode(returnValue).length;
+        const data = decodeBytes(returnValue);
+        const length = rlp.decode(data).length;
         return new BN(length);
       } else {
         const { returnValue } = await this.executeMessage(this.makeCallMessage('activeValidatorsLength', [], []));
@@ -199,9 +199,9 @@ export class StakeManager extends Contract {
   activeValidators(index: BN): Promise<ActiveValidator> {
     return this.runWithLogger(async () => {
       if (isEnableValidatorsRLP(this.common)) {
-        console.log('active validators ------------------>');
         const { returnValue } = await this.executeMessage(this.makeCallMessage('getActiveValidatorsRLP', [], []));
-        const validators = rlp.decode(returnValue);
+        const data = decodeBytes(returnValue);
+        const validators = rlp.decode(data);
         const validator = validators[index.toNumber()];
         return {
           validator: bufferToAddress(validator[0]),
@@ -254,7 +254,6 @@ export class StakeManager extends Contract {
   onAfterBlock(proposer: Address, activeValidators: Address[], priorities: BN[]) {
     return this.runWithLogger(async () => {
       if (isEnableValidatorsRLP(this.common)) {
-        console.log('onAfterBlock -------------->');
         const validators = activeValidators.map((addr, i) => {
           const priority = priorities[i];
           return [addr.toBuffer(), priority.toBuffer(), priority.isNeg() ? new BN(1).toBuffer() : new BN(0).toBuffer()];

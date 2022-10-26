@@ -106,7 +106,6 @@ export abstract class Contract {
     const {
       execResult: { logs, returnValue, exceptionError }
     } = await evm.executeMessage(message);
-    console.log('exceptionError ---------->', exceptionError);
     if (exceptionError) {
       throw exceptionError;
     }

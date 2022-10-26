@@ -127,11 +127,11 @@ export function isEnableFreeStaking(common: Common) {
 
 export function isEnableValidatorsRLP(common: Common) {
   if (common.chainName() === 'rei-testnet') {
-    return common.gteHardfork('validators-rlp');
+    return common.gteHardfork('devnet-hf-validators-rlp');
   } else if (common.chainName() === 'rei-mainnet') {
-    return common.gteHardfork('validators-rlp');
+    return common.gteHardfork('devnet-hf-validators-rlp');
   } else if (common.chainName() === 'rei-devnet') {
-    return common.gteHardfork('validators-rlp');
+    return common.gteHardfork('devnet-hf-validators-rlp');
   } else {
     throw new Error('unknown chain');
   }

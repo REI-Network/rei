@@ -1,7 +1,7 @@
 import { debug as createDebugLogger } from 'debug';
 import { Account, Address, BN, toBuffer, bufferToHex, generateAddress, generateAddress2, KECCAK256_NULL, KECCAK256_RLP, MAX_INTEGER } from 'ethereumjs-util';
 import { Block } from '@rei-network/structure';
-import { JSEVMBinding, Message as EVMCMessage } from '@rei-network/binding';
+import type { JSEVMBinding, Message as EVMCMessage } from '@rei-network/binding';
 import { ERROR, VmError } from '../exceptions';
 import { StateManager } from '../state/index';
 import { IDebug } from '../types';
@@ -129,7 +129,6 @@ export default class EVM {
    * Amount of gas to refund from deleting storage values
    */
   _refund: BN;
-  _mode: EVMWorkMode;
 
   constructor(vm: any, txContext: TxContext, block: Block, debug?: IDebug) {
     this._vm = vm;
@@ -138,7 +137,6 @@ export default class EVM {
     this._block = block;
     this._refund = new BN(0);
     this._debug = debug;
-    this._mode = vm.mode;
   }
 
   /**
@@ -148,6 +146,9 @@ export default class EVM {
    */
   async executeMessageWithBinding(message: Message): Promise<EVMResult> {
     const binding: JSEVMBinding = this._vm.binding;
+    if (!binding) {
+      throw new Error('missing binding instance!');
+    }
 
     // convert message format
     const evmcMessage: EVMCMessage = {
@@ -203,7 +204,7 @@ export default class EVM {
    * if an exception happens during the message execution.
    */
   async executeMessage(message: Message): Promise<EVMResult> {
-    if (this._mode === EVMWorkMode.Binding) {
+    if (this._vm.mode === EVMWorkMode.Binding) {
       return await this.executeMessageWithBinding(message);
     }
 

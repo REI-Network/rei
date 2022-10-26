@@ -2,7 +2,8 @@ import { Account, Address } from 'ethereumjs-util';
 import { Blockchain } from '@rei-network/blockchain';
 import { Common, Chain } from '@rei-network/common';
 import { BlockHeader } from '@rei-network/structure';
-import { JSEVMBinding, init } from '@rei-network/binding';
+import type { JSEVMBinding } from '@rei-network/binding';
+import { createBinding } from './binding';
 import { StateManager } from './state/index';
 import { default as runCall, RunCallOpts } from './runCall';
 import { default as runTx, RunTxOpts, RunTxResult } from './runTx';
@@ -22,9 +23,6 @@ if (!isBrowser()) {
   mcl = require('mcl-wasm');
   mclInitPromise = mcl.init(mcl.BLS12_381);
 }
-
-// init c++ binding
-init();
 
 /**
  * Options for instantiating a {@link VM}.
@@ -267,16 +265,16 @@ export class VM extends AsyncEventEmitter {
     // promisifying each time has a huge performance impact.
     this._emit = promisify(this.emit.bind(this));
 
-    // Save pointer
+    // Save leveldb pointer
     this.exposed = opts.exposed;
-
-    if (this.exposed) {
-      // Constructor binding object if pointer exists
-      this.binding = new JSEVMBinding(this.exposed, this._common.chainId());
-    }
 
     // Save evm work mode
     this.mode = opts.mode ?? EVMWorkMode.JS;
+
+    if (this.exposed && this.mode === EVMWorkMode.Binding) {
+      // Constructor binding object if pointer exists
+      this.binding = createBinding(this.exposed, this._common.chainId());
+    }
   }
 
   async init(): Promise<void> {

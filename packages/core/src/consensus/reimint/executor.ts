@@ -5,7 +5,7 @@ import { RunBlockOpts, rewardAccount } from '@rei-network/vm/dist/runBlock';
 import { StateManager as IStateManager } from '@rei-network/vm/dist/state';
 import { RunTxResult } from '@rei-network/vm/dist/runTx';
 import { VM } from '@rei-network/vm';
-import EVM from '@rei-network/vm/dist/evm/evm';
+import EVM, { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';
 import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executor } from '../types';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
@@ -306,9 +306,13 @@ export class ReimintExecutor implements Executor {
     // get parent block from database
     const parent = await this.backend.db.getBlockByHashAndNumber(block.header.parentHash, pendingHeader.number.subn(1));
 
-    // get state root and vm instance
+    // get state root
     const root = parent.header.stateRoot;
-    const vm = await this.backend.getVM(root, pendingCommon);
+    // select evm impl by debug
+    // TODO: support evmc binding debug
+    const mode: EVMWorkMode | undefined = debug ? EVMWorkMode.JS : undefined;
+    // get vm instance
+    const vm = await this.backend.getVM(root, pendingCommon, mode);
 
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.engine.getStakeManager(vm, block);
@@ -376,6 +380,8 @@ export class ReimintExecutor implements Executor {
 
     // put the validator set in the memory cache
     this.engine.validatorSets.set(result.stateRoot, validatorSet);
+
+    logger.debug('Reimint:processBlock, mode:', vm.mode ?? EVMWorkMode.JS, 'tx:', block.transactions.length, 'usage:', Date.now() - startAt);
 
     return { receipts: postByzantiumTxReceiptsToReceipts(result.receipts) };
   }

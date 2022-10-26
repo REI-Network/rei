@@ -92,7 +92,7 @@ export class Controller {
     await vm.stateManager.checkpoint();
     try {
       const result = await vm.runCall({
-        block: block as any,
+        block,
         gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
         origin: data.from ? Address.fromString(data.from) : Address.zero(),
         caller: data.from ? Address.fromString(data.from) : Address.zero(),
@@ -119,11 +119,9 @@ export class Controller {
         }
       }
 
-      await vm.stateManager.revert();
       return result;
-    } catch (err) {
+    } finally {
       await vm.stateManager.revert();
-      throw err;
     }
   }
 }

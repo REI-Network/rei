@@ -18,9 +18,9 @@ contract Prison is Only, IPrison {
     EnumerableMap.UintToAddressMap private indexedJailedMiners;
     // miner mapping, including all miners
     mapping(address => Miner) public override miners;
-    // missrecord mapping, indexed by block number
+    // miss record mapping, indexed by block number
     mapping(uint256 => MissRecord[]) public override missRecords;
-    // jail record mapping, indexed by block number
+    // jailed record mapping, indexed by block number
     mapping(uint256 => address[]) public override jailedRecords;
     // lowest miss record blocknumber
     uint256 public override lowestRecordBlockNumber;
@@ -38,19 +38,20 @@ contract Prison is Only, IPrison {
     }
 
     /**
-     * Add miss record into the contract, called by onlyStakeManager every block
-     * @param record        MissRecord data
+     * Add miss record into the contract, called by stake manager
+     * @param record        Miss record
      */
     function addMissRecord(MissRecord[] calldata record) external override onlyStakeManager returns (address[] memory) {
         require(block.number > 0, "Prison: invaild block number");
         // delete timeout miss record
         uint256 blockNumberNow = block.number - 1;
-        if (blockNumberNow >= config.recordsAmountPeriod()) {
-            uint256 blockNumberToDelete = blockNumberNow.sub(config.recordsAmountPeriod());
+        uint256 recordsAmountPeriod = config.recordsAmountPeriod();
+        if (blockNumberNow >= recordsAmountPeriod) {
+            uint256 blockNumberToDelete = blockNumberNow - recordsAmountPeriod;
             for (uint256 i = lowestRecordBlockNumber; i <= blockNumberToDelete; i = i.add(1)) {
                 MissRecord[] storage missRecord = missRecords[i];
                 if (missRecord.length != 0) {
-                    for (uint256 j = missRecord.length.sub(1); j >= 0; ) {
+                    for (uint256 j = missRecord.length - 1; j >= 0; j--) {
                         Miner storage miner = miners[missRecord[j].miner];
                         if (miner.lastUnjailedBlockNumber <= i && !miner.jailed) {
                             miner.missedRoundNumberPeriod = miner.missedRoundNumberPeriod.sub(missRecord[j].missedRoundNumberThisBlock);
@@ -58,8 +59,6 @@ contract Prison is Only, IPrison {
                         missRecord.pop();
                         if (j == 0) {
                             break;
-                        } else {
-                            j = j.sub(1);
                         }
                     }
                 }

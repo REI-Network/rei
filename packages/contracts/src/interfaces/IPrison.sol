@@ -10,7 +10,7 @@ struct Miner {
     bool jailed;
     // validator address
     address miner;
-    // validator total miss round number
+    // validator total missed round number
     uint256 missedRoundNumberPeriod;
     // validator latest unjailed block number
     uint256 lastUnjailedBlockNumber;

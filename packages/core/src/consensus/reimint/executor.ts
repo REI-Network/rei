@@ -145,8 +145,8 @@ export class ReimintExecutor implements Executor {
     // 4.call stakeManager.addMissRecord to add miss record
     // and jail validators whos missRecords is greater than config.jailThreshold
     if (isEnablePrison(pendingCommon)) {
-      const preBlockHeader = await this.engine.node.db.getHeader(pendingBlock.header.parentHash, pendingBlock.header.number.subn(1));
       let missRecords: string[][] = [];
+      const preBlockHeader = await this.engine.node.db.getHeader(pendingBlock.header.parentHash, pendingBlock.header.number.subn(1));
       if (preBlockHeader.number.gten(1)) {
         const missMinerMap = new FunctionalAddressMap<number>();
         const roundNumber = ExtraData.fromBlockHeader(preBlockHeader).round;
@@ -161,12 +161,13 @@ export class ReimintExecutor implements Executor {
             missMinerMap.set(missminer, (missMinerMap.get(missminer) ?? 0) + 1);
             activeSets.incrementProposerPriority(1);
           }
-          // Genesis validators are not allowed to record miss recordss
-          const missRecordsRaw = Array.from(missMinerMap.entries()).filter(([addr]) => !isGenesis(addr, common));
-          missRecords = missRecordsRaw.map(([addr, count]) => [addr.toString(), count.toString()]);
+          // genesis validators are not allowed to record miss recordss
+          missRecords = Array.from(missMinerMap.entries())
+            .filter(([addr]) => !isGenesis(addr, common))
+            .map(([addr, count]) => [addr.toString(), count.toString()]);
         }
       }
-      logger.debug('Reimint::afterApply, Add missRecords:', missRecords);
+      logger.debug('Reimint::afterApply, add miss records:', missRecords);
       const ethLogs = await parentStakeManager.addMissRecord(missRecords);
       if (ethLogs && ethLogs.length > 0) {
         logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));
@@ -246,6 +247,7 @@ export class ReimintExecutor implements Executor {
     // 9. increase once
     validatorSet.active.incrementProposerPriority(1);
 
+    // make sure there is at least one validator
     const activeValidators = validatorSet.active.activeValidators();
     if (activeValidators.length === 0) {
       throw new Error('activeValidators length is zero');

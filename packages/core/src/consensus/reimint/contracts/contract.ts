@@ -71,11 +71,6 @@ export abstract class Contract {
     await Contract.deployContract(evm, common, 'sm');
   }
 
-  static async deployPrisonContracts(evm: EVM, common: Common) {
-    const cfgaddr = common.param('vm', 'cfgaddr');
-    // deploy prison contract
-    await Contract.deployContract(evm, common, 'pr', { types: ['address'], values: [cfgaddr] });
-  }
   /**
    * Deploy hardfork 2 contracts
    * @param evm - EVM instance
@@ -86,6 +81,17 @@ export abstract class Contract {
     await Contract.deployContract(evm, common, 'cfg', undefined, true);
     // deploy stake manager contract
     await Contract.deployContract(evm, common, 'sm');
+  }
+
+  /**
+   * Deploy prison contract
+   * @param evm - EVM instance
+   * @param common - Common instance
+   */
+  static async deployPrisonContracts(evm: EVM, common: Common) {
+    const cfgaddr = common.param('vm', 'cfgaddr');
+    // deploy prison contract
+    await Contract.deployContract(evm, common, 'pr', { types: ['address'], values: [cfgaddr] });
   }
 
   /**

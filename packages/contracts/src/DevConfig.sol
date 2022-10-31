@@ -23,9 +23,9 @@ contract DevConfig is Ownable, IConfig {
     uint256 internal mivp = 10000;
     uint256 internal scri = 5 seconds;
     uint256 internal fpi = 10 seconds;
-    uint256 internal rap = 10;
-    uint256 internal fft = 1e21;
-    uint256 internal jtd = 10;
+    uint256 internal rap = 200;
+    uint256 internal fft = 1e18;
+    uint256 internal jtd = 20;
 
     /////////////////////////////////
 

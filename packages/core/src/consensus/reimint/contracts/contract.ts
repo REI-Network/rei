@@ -84,11 +84,11 @@ export abstract class Contract {
   }
 
   /**
-   * Deploy prison contract
+   * Deploy better POS hardfork contracts
    * @param evm - EVM instance
    * @param common - Common instance
    */
-  static async deployPrisonContracts(evm: EVM, common: Common) {
+  static async deployBetterPOSContracts(evm: EVM, common: Common) {
     const cfgaddr = common.param('vm', 'cfgaddr');
     // deploy prison contract
     await Contract.deployContract(evm, common, 'pr', { types: ['address'], values: [cfgaddr] });

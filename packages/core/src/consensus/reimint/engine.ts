@@ -13,7 +13,7 @@ import { Node } from '../../node';
 import { StateManager } from '../../stateManager';
 import { ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
-import { getConsensusTypeByCommon, isEnableFreeStaking, isEnableHardfork1, isEnableRemint, isEnableHardfork2, isEnablePrison } from '../../hardforks';
+import { getConsensusTypeByCommon, isEnableFreeStaking, isEnableHardfork1, isEnableRemint, isEnableHardfork2, isEnablePrison as isEnableBetterPOS } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
@@ -186,8 +186,8 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     if (isEnableHardfork2(common)) {
       await Contract.deployHardfork2Contracts(evm, common);
     }
-    if (isEnablePrison(common)) {
-      await Contract.deployPrisonContracts(evm, common);
+    if (isEnableBetterPOS(common)) {
+      await Contract.deployBetterPOSContracts(evm, common);
     }
 
     root = await vm.stateManager.getStateRoot();

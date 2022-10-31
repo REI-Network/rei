@@ -126,7 +126,7 @@ export function isEnableFreeStaking(common: Common) {
 }
 
 /**
- * Check whether prison logic is enabled
+ * Check whether better POS is enabled
  * @param common - Common instance
  * @returns Enable if `true`
  */
@@ -136,24 +136,24 @@ export function isEnableHardfork2(common: Common) {
   } else if (common.chainName() === 'rei-mainnet') {
     return common.gteHardfork('mainnet-hf-2');
   } else if (common.chainName() === 'rei-devnet') {
-    return common.gteHardfork('devnet-hf-2');
+    return false;
   } else {
     throw new Error('unknown chain');
   }
 }
 
 /**
- * Check whether prison logic is enabled
+ * Check whether better POS is enabled
  * @param common - Common instance
  * @returns Enable if `true`
  */
 export function isEnablePrison(common: Common) {
   if (common.chainName() === 'rei-testnet') {
-    return common.gteHardfork('prison');
+    return common.gteHardfork('better-pos');
   } else if (common.chainName() === 'rei-mainnet') {
-    return common.gteHardfork('prison');
+    return common.gteHardfork('better-pos');
   } else if (common.chainName() === 'rei-devnet') {
-    return common.gteHardfork('prison');
+    return common.gteHardfork('better-pos');
   } else {
     throw new Error('unknown chain');
   }

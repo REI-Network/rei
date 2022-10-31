@@ -87,12 +87,8 @@
       "block": 0
     },
     {
-      "name": "devnet-hf-2",
-      "block": 4
-    },
-    {
-      "name": "prison",
-      "block": 4
+      "name": "better-pos",
+      "block": 0
     }
   ],
   "bootstrapNodes": []

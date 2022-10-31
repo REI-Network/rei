@@ -64,16 +64,16 @@ contract Config is IConfig {
     }
 
     function recordsAmountPeriod() external view override returns (uint256) {
-        return 1000;
+        return 21600;
     }
 
     function forfeit() external view override returns (uint256) {
-        // 1000 REI
-        return 1e21;
+        // 20000 REI
+        return 2e22;
     }
 
     function jailThreshold() external view override returns (uint256) {
-        return 10;
+        return 300;
     }
 
     function getFactorByReason(uint8 reason) external view override returns (uint8) {

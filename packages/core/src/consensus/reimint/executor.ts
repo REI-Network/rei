@@ -280,7 +280,7 @@ export class ReimintExecutor implements Executor {
     // 14. deploy contracts if enable prison is enabled in the next block
     if (!isEnablePrison(pendingCommon) && isEnablePrison(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
-      await Contract.deployPrisonContracts(evm, nextCommon);
+      await Contract.deployBetterPOSContracts(evm, nextCommon);
     }
 
     return validatorSet;

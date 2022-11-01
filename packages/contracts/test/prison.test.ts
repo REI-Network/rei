@@ -125,6 +125,7 @@ describe('Prison', () => {
     config = new web3.eth.Contract(Config.abi, (await Config.new()).address, { from: deployer });
     await config.methods.setSystemCaller(deployer).send();
     await config.methods.setStakeManager(deployer).send();
+    await config.methods.setJailThreshold(10).send();
 
     prison = new web3.eth.Contract(Prison.abi, (await Prison.new(config.options.address)).address, { from: deployer });
     const lowestRecordBlockNumber = await prison.methods.lowestRecordBlockNumber().call();

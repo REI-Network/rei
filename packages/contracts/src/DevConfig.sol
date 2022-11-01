@@ -81,6 +81,14 @@ contract DevConfig is Ownable, IConfig {
         rap = _rap;
     }
 
+    function setForfeit(uint256 _fft) external onlyOwner {
+        fft = _fft;
+    }
+
+    function setJailThreshold(uint256 _jtd) external onlyOwner {
+        jtd = _jtd;
+    }
+
     /////////////////////////////////
 
     function stakeManager() external view override returns (address) {

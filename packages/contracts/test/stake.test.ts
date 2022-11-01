@@ -381,7 +381,7 @@ describe('StakeManger', () => {
 
   it('totalLockedAmount should not change when validator is jailed', async () => {
     const totalLockedAmount = await stakeManager.methods.totalLockedAmount().call();
-    await stakeManager.methods.slash(validator4, 0).send();
+    await stakeManager.methods.slash(validator4, 0, bufferToHex(crypto.randomBytes(32))).send();
     expect(await stakeManager.methods.totalLockedAmount().call(), 'totalLockedAmount should be equal').be.equal(totalLockedAmount);
     const commissionShare = await createCommissionShareContract(validator4);
     await commissionShare.methods.approve(stakeManager.options.address, MAX_INTEGER.toString()).send();

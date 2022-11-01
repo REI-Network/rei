@@ -94,7 +94,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * @param rate          New commission rate
      * @param timestamp     Update timestamp
      */
-    event SetVoterRate(address indexed validator, uint256 indexed rate, uint256 indexed timestamp);
+    event SetCommissionRate(address indexed validator, uint256 indexed rate, uint256 indexed timestamp);
 
     /**
      * Emitted when a new validator is indexed
@@ -300,7 +300,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         v.commissionShare = address(new CommissionShare(config, validator));
         // don't change the commision rate and the update timestamp
         // the validator may want to set commission rate immediately
-        // v.voterRate = 0;
+        // v.commissionRate = 0;
         // v.updateTimestamp = 0;
         validatorId = id.add(1);
         return v;
@@ -418,16 +418,16 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * Set validator commission rate.
      * @param rate         New commission rate
      */
-    function setVoterRate(uint256 rate) external override nonReentrant {
+    function setCommissionRate(uint256 rate) external override nonReentrant {
         require(rate <= 100, "StakeManager: commission rate is too high");
         Validator storage v = validators[msg.sender];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint256 updateTimestamp = v.updateTimestamp;
-        require(updateTimestamp == 0 || block.timestamp.sub(updateTimestamp) >= config.setVoterRateInterval(), "StakeManager: update commission rate too frequently");
-        require(v.voterRate != rate, "StakeManager: repeatedly set commission rate");
-        v.voterRate = rate;
+        require(updateTimestamp == 0 || block.timestamp.sub(updateTimestamp) >= config.setCommissionRateInterval(), "StakeManager: update commission rate too frequently");
+        require(v.commissionRate != rate, "StakeManager: repeatedly set commission rate");
+        v.commissionRate = rate;
         v.updateTimestamp = block.timestamp;
-        emit SetVoterRate(msg.sender, rate, block.timestamp);
+        emit SetCommissionRate(msg.sender, rate, block.timestamp);
     }
 
     /**
@@ -478,7 +478,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     function reward(address validator) external payable override nonReentrant onlySystemCallerOrFeePool {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
-        uint256 commissionReward = msg.value.mul(v.voterRate).div(100);
+        uint256 commissionReward = msg.value.mul(v.commissionRate).div(100);
         uint256 validatorReward = msg.value.sub(commissionReward);
         if (commissionReward > 0) {
             CommissionShare(v.commissionShare).reward{ value: commissionReward }();

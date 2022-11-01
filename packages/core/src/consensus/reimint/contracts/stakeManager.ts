@@ -245,7 +245,6 @@ export class StakeManager extends Contract {
    */
   initEvidenceHash(hashes: Buffer[]) {
     return this.runWithLogger(async () => {
-      console.log('hashes:', hashes);
       await this.executeMessage(this.makeSystemCallerMessage('initEvidenceHash', ['bytes32[]'], [hashes.map(bufferToHex)]));
     });
   }

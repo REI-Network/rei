@@ -22,9 +22,8 @@ export class EvidenceCollector {
    */
   async init(latestHeight: BN, load: (height: BN) => Promise<Buffer[]>) {
     this.currentHeight = new BN(this.initHeight);
-    for (let i = this.initHeight + 1; latestHeight.gten(i); i++) {
-      const height = new BN(i);
-      this.newBlockHeader(height, await load(new BN(height)));
+    for (let i = new BN(this.initHeight + 1); i.lte(latestHeight); i.iaddn(1)) {
+      this.newBlockHeader(i, await load(i));
     }
   }
 

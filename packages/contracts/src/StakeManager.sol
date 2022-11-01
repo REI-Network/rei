@@ -501,7 +501,9 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         uint8 reason,
         bytes32 hash
     ) external override nonReentrant onlySystemCaller returns (uint256 amount) {
+        // make sure the evidence is not duplicated
         require(!usedEvidence[hash], "StakeManager: invalid evidence");
+
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint8 factor = config.getFactorByReason(reason);

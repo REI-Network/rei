@@ -251,9 +251,10 @@ export class ReimintExecutor implements Executor {
       }
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployHardfork2Contracts(evm, nextCommon);
-      const sm = new StakeManager(evm, pendingCommon);
       // migrate evidence hashes
-      await sm.initEvidenceHash([...this.engine.collector.getHashes(pendingBlock.header.number.subn(1)), ...evidence.map((ev) => ev.hash())]);
+      const pendingStakeManager = new StakeManager(evm, pendingCommon);
+      const hashes = [...this.engine.collector.getHashes(pendingBlock.header.number.subn(1)), ...evidence.map((ev) => ev.hash())];
+      await pendingStakeManager.initEvidenceHash(hashes);
     }
 
     return validatorSet;

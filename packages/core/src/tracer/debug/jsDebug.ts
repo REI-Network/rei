@@ -108,13 +108,13 @@ function makeDB(stateManager: StateManager) {
  * @returns
  */
 function makeLog(step: InterpreterStep, error?: string) {
-  const stack = step.stack.map((bn) => bi(bn.toString())).reverse();
+  const stack = step.stack.map((bn) => bn.clone());
   Object.defineProperty(stack, 'peek', {
     value: (idx: number) => {
       if (idx < 0 || idx > stack.length - 1) {
         return bi(0);
       }
-      return stack[idx];
+      return bi(stack[stack.length - idx - 1].toString());
     }
   });
 

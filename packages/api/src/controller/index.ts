@@ -4,8 +4,11 @@ import { NetController } from './net';
 import { TxPoolController } from './txpool';
 import { Web3Controller } from './web3';
 import { ReiController } from './rei';
+import { AdminController } from './admin';
 
+export * from './errors';
 export const api = {
+  admin: AdminController,
   debug: DebugController,
   eth: ETHController,
   net: NetController,

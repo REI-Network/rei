@@ -3,10 +3,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { AbortableTimer, Channel, logger } from '@rei-network/utils';
 import { Topics, BloomBitsFilter } from '@rei-network/core';
 import { Transaction, Log, BlockHeader } from '@rei-network/structure';
-import { WebsocketClient } from './client';
-import { SyncingStatus, Backend } from './types';
+import { Node } from '@rei-network/core';
+import { SyncingStatus, Client } from './types';
 
-export type Query = {
+type Query = {
   fromBlock?: BN;
   toBlock?: BN;
   addresses: Address[];
@@ -20,7 +20,7 @@ type Filter = {
   logs: Log[];
   creationTime?: number;
   query?: Query;
-  client?: WebsocketClient;
+  client?: Client;
 };
 
 /**
@@ -65,7 +65,7 @@ type Task = LogsTask | HeadsTask | PendingTxTask | SyncingTask;
  * Filter subscribe information for client
  */
 export class FilterSystem {
-  private readonly backend: Backend;
+  private readonly node: Node;
   private readonly taskQueue = new Channel<Task>();
   private readonly timer = new AbortableTimer();
 
@@ -80,8 +80,8 @@ export class FilterSystem {
   private readonly filterPendingTransactions = new Map<string, Filter>();
   private readonly filterType = new Map<string, string>();
 
-  constructor(backend: Backend) {
-    this.backend = backend;
+  constructor(node: Node) {
+    this.node = node;
   }
 
   private onLogs = (logs) => {
@@ -97,12 +97,12 @@ export class FilterSystem {
   };
 
   private onStart = () => {
-    const status = this.backend.sync.status;
+    const status = this.node.sync.status;
     const syncingStatus: SyncingStatus = {
       syncing: true,
       status: {
         startingBlock: bufferToHex(toBuffer(status.startingBlock)),
-        currentBlock: bnToHex(this.backend.getLatestBlock().header.number),
+        currentBlock: bnToHex(this.node.getLatestBlock().header.number),
         highestBlock: bufferToHex(toBuffer(status.highestBlock))
       }
     };
@@ -130,33 +130,41 @@ export class FilterSystem {
     }
   }
 
+  private deleteClosed(map: Map<string, Filter>) {
+    for (const [key, filter] of map) {
+      if (filter.client!.isClosed === true) {
+        map.delete(key);
+      }
+    }
+  }
+
   /**
    * Start filter system
    */
   start() {
     this.timeoutLoop();
     this.taskLoop();
-    this.backend.bcMonitor.on('logs', this.onLogs);
-    this.backend.bcMonitor.on('removedLogs', this.onRemovedLogs);
-    this.backend.bcMonitor.on('newHeads', this.onNewHeads);
-    this.backend.sync.on('start', this.onStart);
-    this.backend.sync.on('failed', this.onFailed);
-    this.backend.sync.on('synchronized', this.onSynchronized);
-    this.backend.txPool.on('readies', this.onReadies);
+    this.node.bcMonitor.on('logs', this.onLogs);
+    this.node.bcMonitor.on('removedLogs', this.onRemovedLogs);
+    this.node.bcMonitor.on('newHeads', this.onNewHeads);
+    this.node.sync.on('start', this.onStart);
+    this.node.sync.on('failed', this.onFailed);
+    this.node.sync.on('synchronized', this.onSynchronized);
+    this.node.txPool.on('readies', this.onReadies);
   }
 
   /**
    * Abort filter system
    */
-  async abort() {
+  abort() {
     this.taskQueue.abort();
-    this.backend.bcMonitor.off('logs', this.onLogs);
-    this.backend.bcMonitor.off('removedLogs', this.onRemovedLogs);
-    this.backend.bcMonitor.off('newHeads', this.onNewHeads);
-    this.backend.sync.off('start', this.onStart);
-    this.backend.sync.off('failed', this.onFailed);
-    this.backend.sync.off('synchronized', this.onSynchronized);
-    this.backend.txPool.off('readies', this.onReadies);
+    this.node.bcMonitor.off('logs', this.onLogs);
+    this.node.bcMonitor.off('removedLogs', this.onRemovedLogs);
+    this.node.bcMonitor.off('newHeads', this.onNewHeads);
+    this.node.sync.off('start', this.onStart);
+    this.node.sync.off('failed', this.onFailed);
+    this.node.sync.off('synchronized', this.onSynchronized);
+    this.node.txPool.off('readies', this.onReadies);
     this.aborted = true;
     this.timer.abort();
   }
@@ -170,6 +178,10 @@ export class FilterSystem {
       this.deleteTimeout(this.filterHeads, now);
       this.deleteTimeout(this.filterLogs, now);
       this.deleteTimeout(this.filterPendingTransactions, now);
+      this.deleteClosed(this.subscribeHeads);
+      this.deleteClosed(this.subscribeLogs);
+      this.deleteClosed(this.subscribePendingTransactions);
+      this.deleteClosed(this.subscribeSyncing);
 
       await this.timer.wait(deadline);
     }
@@ -188,10 +200,10 @@ export class FilterSystem {
           for (const hash of task.hashes) {
             // make sure the block we get is on the canonical chain
             try {
-              const num: BN = await this.backend.db.hashToNumber(hash);
-              const hashInDB: Buffer = await this.backend.db.numberToHash(num);
+              const num: BN = await this.node.db.hashToNumber(hash);
+              const hashInDB: Buffer = await this.node.db.numberToHash(num);
               if (hashInDB.equals(hash)) {
-                headers.push(await this.backend.db.getHeader(hash, num));
+                headers.push(await this.node.db.getHeader(hash, num));
               }
             } catch (err) {
               // ignore errors
@@ -218,7 +230,7 @@ export class FilterSystem {
    * @param query - Query option
    * @returns Subscription id
    */
-  subscribe(client: WebsocketClient, type: string, query?: Query): string {
+  subscribe(client: Client, type: string, query?: Query): string {
     const uid = genSubscriptionId();
     const filter = { hashes: [], logs: [], query, client };
     switch (type) {

@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
 import { Channel } from '@rei-network/utils';
 import { Block, Transaction } from '@rei-network/structure';
-import { Backend } from './types';
+import { Node } from '@rei-network/core';
 
 const defaultGasPrice = 1000000000;
 
@@ -11,12 +11,12 @@ type Task = Buffer[];
  * TODO: improve oracle logic
  */
 export class SimpleOracle {
-  private backend: Backend;
+  private node: Node;
   private taskQueue = new Channel<Task>();
   private avgGasPrice?: BN;
 
-  constructor(backend: Backend) {
-    this.backend = backend;
+  constructor(node: Node) {
+    this.node = node;
   }
 
   get gasPrice() {
@@ -32,7 +32,7 @@ export class SimpleOracle {
       try {
         if (hashes.length > 0) {
           const hash = hashes[hashes.length - 1];
-          const block: Block = await this.backend.db.getBlock(hash);
+          const block: Block = await this.node.db.getBlock(hash);
           if (block.transactions.length > 0) {
             const totalGasPrice = new BN(0);
             for (const tx of block.transactions as Transaction[]) {
@@ -57,7 +57,7 @@ export class SimpleOracle {
    */
   start() {
     this.taskLoop();
-    this.backend.bcMonitor.on('newHeads', this.onNewHeads);
+    this.node.bcMonitor.on('newHeads', this.onNewHeads);
   }
 
   /**
@@ -65,6 +65,6 @@ export class SimpleOracle {
    */
   abort() {
     this.taskQueue.abort();
-    this.backend.bcMonitor.off('newHeads', this.onNewHeads);
+    this.node.bcMonitor.off('newHeads', this.onNewHeads);
   }
 }

@@ -2,6 +2,9 @@ import { bnToHex, Address, intToHex } from 'ethereumjs-util';
 import { hexStringToBN } from '@rei-network/utils';
 import { Controller } from './base';
 
+/**
+ * Rei api Controller
+ */
 export class ReiController extends Controller {
   /**
    * Estimate user available crude
@@ -9,7 +12,7 @@ export class ReiController extends Controller {
    * @param tag - Block tag
    * @returns Available crude
    */
-  async rei_getCrude([address, tag]: [string, string]) {
+  async getCrude([address, tag]: [string, string]) {
     const block = await this.getBlockByTag(tag);
     const common = block._common;
     const strDailyFee = common.param('vm', 'dailyFee');
@@ -17,7 +20,7 @@ export class ReiController extends Controller {
       return null;
     }
 
-    const state = await this.backend.getStateManager(block.header.stateRoot, common);
+    const state = await this.node.getStateManager(block.header.stateRoot, common);
     const faddr = Address.fromString(common.param('vm', 'faddr'));
     const totalAmount = (await state.getAccount(faddr)).balance;
     const timestamp = block.header.timestamp.toNumber();
@@ -34,10 +37,10 @@ export class ReiController extends Controller {
    * @param tag - Block tag
    * @returns Used crude
    */
-  async rei_getUsedCrude([address, tag]: [string, string]) {
+  async getUsedCrude([address, tag]: [string, string]) {
     const block = await this.getBlockByTag(tag);
     const timestamp = block.header.timestamp.toNumber();
-    const state = await this.backend.getStateManager(block.header.stateRoot, block._common);
+    const state = await this.node.getStateManager(block.header.stateRoot, block._common);
     const account = await state.getAccount(Address.fromString(address));
     const stakeInfo = account.getStakeInfo();
     return bnToHex(stakeInfo.estimateUsage(timestamp));
@@ -49,7 +52,7 @@ export class ReiController extends Controller {
    * @param tag - Block tag
    * @returns Total deposit amount
    */
-  async rei_getTotalAmount([address, tag]: [string, string]) {
+  async getTotalAmount([address, tag]: [string, string]) {
     const stateManager = await this.getStateManagerByTag(tag);
     const account = await stateManager.getAccount(Address.fromString(address));
     const stakeInfo = account.getStakeInfo();
@@ -61,9 +64,9 @@ export class ReiController extends Controller {
    * @param tag - Block tag
    * @returns Daily fee
    */
-  async rei_getDailyFee([tag]: [string]) {
+  async getDailyFee([tag]: [string]) {
     const num = await this.getBlockNumberByTag(tag);
-    const common = this.backend.getCommon(num);
+    const common = this.node.getCommon(num);
     const strDailyFee = common.param('vm', 'dailyFee');
     if (typeof strDailyFee !== 'string') {
       return null;
@@ -76,9 +79,9 @@ export class ReiController extends Controller {
    * @param tag - Block tag
    * @returns Miner reward factor
    */
-  async rei_getMinerRewardFactor([tag]: [string]) {
+  async getMinerRewardFactor([tag]: [string]) {
     const num = await this.getBlockNumberByTag(tag);
-    const common = this.backend.getCommon(num);
+    const common = this.node.getCommon(num);
     const factor = common.param('vm', 'minerRewardFactor');
     if (typeof factor !== 'number' || factor < 0 || factor > 100) {
       return null;

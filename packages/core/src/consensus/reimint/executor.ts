@@ -385,12 +385,23 @@ export class ReimintExecutor implements Executor {
     parentValidatorSet = new ValidatorSet(parentValidatorSet.indexed, extraData.activeValidatorSet()!);
 
     if (!skipConsensusValidation) {
+      // validate extra data basic format
       extraData.validate();
     }
 
     if (!skipConsensusVerify) {
+      // verify evidence signer
       await extraData.verifyEvidence(this.backend, this.engine);
+      // verify committed evidence
       await this.engine.evpool.checkEvidence(extraData.evidence);
+      // verify used evidence
+      if (isEnableBetterPOS(pendingCommon)) {
+        for (const ev of extraData.evidence) {
+          if (await parentStakeManager.isUsedEvidence(ev.hash())) {
+            throw new Error('used evidence');
+          }
+        }
+      }
     }
 
     let runTxOpts: any;

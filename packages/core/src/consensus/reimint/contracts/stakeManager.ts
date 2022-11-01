@@ -21,7 +21,8 @@ const methods = {
   onAfterBlock: toBuffer('0x9313f105'),
   addMissRecord: toBuffer('0x18498f3a'),
   slashV2: toBuffer('0xad2c8b5e'),
-  initEvidenceHash: toBuffer('0x2854982e')
+  initEvidenceHash: toBuffer('0x2854982e'),
+  usedEvidence: toBuffer('0x981617f5')
 };
 
 // event topic
@@ -249,6 +250,17 @@ export class StakeManager extends Contract {
   onAfterBlock(proposer: Address, activeValidators: Address[], priorities: BN[]) {
     return this.runWithLogger(async () => {
       await this.executeMessage(this.makeSystemCallerMessage('onAfterBlock', ['address', 'address[]', 'int256[]'], [proposer.toString(), activeValidators.map((addr) => addr.toString()), priorities.map((p) => p.toString())]));
+    });
+  }
+
+  /**
+   * Check if an evidence hash exists
+   * @param hash - Evidence hash
+   */
+  isUsedEvidence(hash: Buffer) {
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('usedEvidence', ['bytes32'], [bufferToHex(hash)]));
+      return new BN(returnValue).eqn(1);
     });
   }
 

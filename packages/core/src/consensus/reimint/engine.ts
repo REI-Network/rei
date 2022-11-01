@@ -13,7 +13,7 @@ import { Node } from '../../node';
 import { StateManager } from '../../stateManager';
 import { ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
-import { getConsensusTypeByCommon, isEnableFreeStaking, isEnableHardfork1, isEnableRemint, isEnableHardfork2, isEnablePrison as isEnableBetterPOS } from '../../hardforks';
+import { getConsensusTypeByCommon, isEnableRemint, isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableBetterPOS } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
@@ -24,6 +24,7 @@ import { Reimint } from './reimint';
 import { WAL } from './wal';
 import { ReimintExecutor } from './executor';
 import { ExtraData } from './extraData';
+import { EvidenceCollector } from './evidenceCollector';
 
 export class SimpleNodeSigner {
   readonly node: Node;
@@ -69,17 +70,16 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   readonly executor: ReimintExecutor;
   readonly validatorSets = new ValidatorSets();
 
+  collector?: EvidenceCollector;
+
   constructor(options: ConsensusEngineOptions) {
     super(options);
 
     this.signer = new SimpleNodeSigner(this.node);
-
     const db = new EvidenceDatabase(this.node.evidencedb);
     this.evpool = new EvidencePool({ backend: db });
-
     const wal = new WAL({ path: path.join(this.node.datadir, 'WAL') });
     this.state = new StateMachine(this, this.node.consensus, this.evpool, wal, this.node.chainId, this.config, this.signer);
-
     this.executor = new ReimintExecutor(this.node, this);
   }
 
@@ -88,9 +88,56 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    */
   async init() {
     const block = this.node.getLatestBlock();
+
     await this.evpool.init(block.header.number);
     await this._tryToMintNextBlock(block);
     await this.state.init();
+
+    const common = this.node.getLatestCommon();
+    if (isEnableHardfork2(common)) {
+      // collect all the evidence if we haven't reached hardfork2
+      return;
+    }
+
+    // set hardfork to get init data
+    if (common.chainName() === 'rei-mainnet') {
+      common.setHardfork('mainnet-hf-2');
+    } else if (common.chainName() === 'rei-testnet') {
+      common.setHardfork('testnet-hf-2');
+    } else if (common.chainName() === 'rei-devnet') {
+      common.setHardfork('devnet-hf-2');
+    } else {
+      // collector only work on mainnet and testnet
+      return;
+    }
+
+    // load init height from common
+    const initHeight = common.param('vm', 'initHeight');
+    if (initHeight === null) {
+      // the value has not been set, no collector is required
+      return;
+    }
+    if (typeof initHeight !== 'number') {
+      throw new Error('invalid initHeight');
+    }
+
+    // load init hashes from common
+    const initHashes = common.param('vm', 'initHashes');
+    if (initHashes === null) {
+      // the value has not been set, no collector is required
+      return;
+    }
+    if (!Array.isArray(initHashes)) {
+      throw new Error('invalid initHashes');
+    }
+
+    // create the collector
+    this.collector = new EvidenceCollector(initHeight, initHashes);
+    await this.collector.init(block.header.number, async (height: BN) => {
+      // load evidence from canonical header
+      const header = await this.node.db.getCanonicalHeader(height);
+      return ExtraData.fromBlockHeader(header).evidence.map((ev) => ev.hash());
+    });
   }
 
   protected _start() {
@@ -135,6 +182,13 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   async newBlock(block: Block) {
     const extraData = ExtraData.fromBlockHeader(block.header);
     await this.evpool.update(extraData.evidence, block.header.number);
+    // collect all the evidence if we haven't reached hardfork2
+    if (!isEnableHardfork2(block.header._common)) {
+      this.collector?.newBlockHeader(
+        block.header.number,
+        extraData.evidence.map((ev) => ev.hash())
+      );
+    }
   }
 
   // calculate the gas limit of next block

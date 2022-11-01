@@ -51,6 +51,8 @@ struct ActiveValidator {
 interface IStakeManager is IOnly {
     function proposer() external view returns (address);
 
+    function usedEvidence(bytes32 hash) external view returns (bool);
+
     function validatorId() external view returns (uint256);
 
     function validators(address validator)
@@ -123,13 +125,19 @@ interface IStakeManager is IOnly {
 
     function reward(address validator) external payable;
 
-    function slash(address validator, uint8 reason) external returns (uint256);
+    function slash(
+        address validator,
+        uint8 reason,
+        bytes32 hash
+    ) external returns (uint256);
 
     function onAfterBlock(
         address _proposer,
         address[] calldata acValidators,
         int256[] calldata priorities
     ) external;
+
+    function initEvidenceHash(bytes32[] calldata hashes) external;
 
     function addMissRecord(MissRecord[] calldata record) external;
 

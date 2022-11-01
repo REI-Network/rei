@@ -38,6 +38,8 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     ActiveValidator[] public override activeValidators;
     // proposer address
     address public override proposer;
+    // the hash set of the evidence that has been used
+    mapping(bytes32 => bool) public override usedEvidence;
 
     /**
      * Emitted when a validator gets a reward
@@ -504,8 +506,16 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * Slash validator, only can be called by system caller
      * @param validator         Validator address
      * @param reason            Slash reason
+     * @param hash              Evidence hash
      */
-    function slash(address validator, uint8 reason) external override nonReentrant onlySystemCaller returns (uint256 amount) {
+    function slash(
+        address validator,
+        uint8 reason,
+        bytes32 hash
+    ) external override nonReentrant onlySystemCaller returns (uint256 amount) {
+        // make sure the evidence is not duplicated
+        require(!usedEvidence[hash], "StakeManager: invalid evidence");
+
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint8 factor = config.getFactorByReason(reason);
@@ -523,6 +533,9 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
             // decrease total locked amount
             totalLockedAmount = totalLockedAmount.sub(decreasedAmount);
         }
+
+        // save evidence hash
+        usedEvidence[hash] = true;
     }
 
     // TODO: if the active validators list is exactly the same as the last list, don't modify the storage
@@ -553,6 +566,16 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         }
         for (; i < originLength; i = i.add(1)) {
             activeValidators.pop();
+        }
+    }
+
+    /**
+     * Initialize the evidence hash, called when migrating
+     * @param hashes            Evidence hash list
+     */
+    function initEvidenceHash(bytes32[] calldata hashes) external override onlySystemCaller {
+        for (uint256 i = 0; i < hashes.length; i++) {
+            usedEvidence[hashes[i]] = true;
         }
     }
 

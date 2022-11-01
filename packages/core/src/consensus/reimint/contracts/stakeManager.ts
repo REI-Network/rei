@@ -1,5 +1,5 @@
 import EVM from '@rei-network/vm/dist/evm/evm';
-import { Address, BN, toBuffer } from 'ethereumjs-util';
+import { Address, BN, bufferToHex, toBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Log, Receipt } from '@rei-network/structure';
 import { ValidatorChanges, getGenesisValidators } from '../validatorSet';
@@ -19,7 +19,9 @@ const methods = {
   reward: toBuffer('0x6353586b'),
   slash: toBuffer('0x30b409a4'),
   onAfterBlock: toBuffer('0x9313f105'),
-  addMissRecord: toBuffer('0x18498f3a')
+  addMissRecord: toBuffer('0x18498f3a'),
+  slashV2: toBuffer('0xad2c8b5e'),
+  initEvidenceHash: toBuffer('0x2854982e')
 };
 
 // event topic
@@ -226,6 +228,19 @@ export class StakeManager extends Contract {
   }
 
   /**
+   * Slash block validator(V2)
+   * @param validator - Validator address
+   * @param reason - Slash reason
+   * @param hash - Evidence hash
+   */
+  slashV2(validator: Address, reason: SlashReason, hash: Buffer) {
+    return this.runWithLogger(async () => {
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('slashV2', ['address', 'uint8', 'bytes32'], [validator.toString(), reason, bufferToHex(hash)]));
+      return logs;
+    });
+  }
+
+  /**
    * After block call back
    * @param proposer - Proposer address
    * @param activeValidators - Address list of active validator
@@ -234,6 +249,16 @@ export class StakeManager extends Contract {
   onAfterBlock(proposer: Address, activeValidators: Address[], priorities: BN[]) {
     return this.runWithLogger(async () => {
       await this.executeMessage(this.makeSystemCallerMessage('onAfterBlock', ['address', 'address[]', 'int256[]'], [proposer.toString(), activeValidators.map((addr) => addr.toString()), priorities.map((p) => p.toString())]));
+    });
+  }
+
+  /**
+   * Init evidence hash, for migratine
+   * @param hashes - Hash list
+   */
+  initEvidenceHash(hashes: Buffer[]) {
+    return this.runWithLogger(async () => {
+      await this.executeMessage(this.makeSystemCallerMessage('initEvidenceHash', ['bytes32[]'], [hashes.map(bufferToHex)]));
     });
   }
 

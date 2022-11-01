@@ -92,7 +92,7 @@ export function isEnableRemint(common: Common) {
 }
 
 /**
- * Check whether free staking logic is enabled
+ * Check whether hardfork1 logic is enabled
  * @param common - Common instance
  * @returns Enable if `true`
  */
@@ -147,7 +147,7 @@ export function isEnableHardfork2(common: Common) {
  * @param common - Common instance
  * @returns Enable if `true`
  */
-export function isEnablePrison(common: Common) {
+export function isEnableBetterPOS(common: Common) {
   if (common.chainName() === 'rei-testnet') {
     return common.gteHardfork('better-pos');
   } else if (common.chainName() === 'rei-mainnet') {

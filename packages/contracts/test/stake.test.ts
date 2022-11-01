@@ -1,6 +1,7 @@
+import crypto from 'crypto';
 import type Web3 from 'web3';
 import { assert, expect } from 'chai';
-import { BN, MAX_INTEGER } from 'ethereumjs-util';
+import { BN, MAX_INTEGER, bufferToHex } from 'ethereumjs-util';
 import { upTimestamp, toBN } from './utils';
 
 declare var artifacts: any;
@@ -183,7 +184,7 @@ describe('StakeManger', () => {
 
     stakeId++;
     await stakeManager.methods.stake(validator1, deployer).send({ value: estimateStake });
-    await stakeManager.methods.slash(validator1, 1).send();
+    await stakeManager.methods.slash(validator1, 1, bufferToHex(crypto.randomBytes(32))).send();
     await stakeManager.methods.reward(validator1).send({ value: 2000 });
     const estimateMinStake1 = await stakeManager.methods.estimateSharesToAmount(validator1, 1).call();
     expect(estimateMinStake1, 'mininual stake amount should be equal').be.equal('11');
@@ -191,15 +192,15 @@ describe('StakeManger', () => {
     await stakeManager.methods.startUnstake(validator1, deployer, wantedShares.toString()).send();
     const estimateAmount = await stakeManager.methods.estimateUnstakeAmount(validator1, wantedShares).call();
     expect(estimateAmount, 'estimateAmount should be equal').be.equal('97');
-    await stakeManager.methods.slash(validator1, 0).send();
+    await stakeManager.methods.slash(validator1, 0, bufferToHex(crypto.randomBytes(32))).send();
     const estimateAmount1 = await stakeManager.methods.estimateUnstakeAmount(validator1, wantedShares).call();
     expect(estimateAmount1, 'estimateAmount should be equal').be.equal('58');
 
-    await stakeManager.methods.slash(validator1, 1).send();
+    await stakeManager.methods.slash(validator1, 1, bufferToHex(crypto.randomBytes(32))).send();
     const wantedAmount = toBN(97);
     stakeId++;
     await stakeManager.methods.stake(validator1, deployer).send({ value: wantedAmount.toString() });
-    await stakeManager.methods.slash(validator1, 1).send();
+    await stakeManager.methods.slash(validator1, 1, bufferToHex(crypto.randomBytes(32))).send();
     await stakeManager.methods.reward(validator1).send({ value: 1000 });
     const estimateUnstakeShare = await stakeManager.methods.estimateAmountToShares(validator1, 1).call();
     expect(estimateUnstakeShare, 'estimateUnstakeShare should be equal').be.equal('1');
@@ -250,9 +251,24 @@ describe('StakeManger', () => {
     await stakeManager.methods.reward(validator2).send({ value: minIndexVotingPower });
     expect(await isExist(), 'validator2 should be added').be.true;
 
+    // init evidence hash
+    const hash1 = bufferToHex(crypto.randomBytes(32));
+    await stakeManager.methods.initEvidenceHash([hash1]).send();
+    expect(await stakeManager.methods.usedEvidence(hash1).call()).be.true;
+    try {
+      await stakeManager.methods.slash(validator2, 1, hash1).send();
+      assert.fail('should slash failed when hash exists');
+    } catch (err) {}
+
     // slash
-    await stakeManager.methods.slash(validator2, 1).send();
+    const hash2 = bufferToHex(crypto.randomBytes(32));
+    await stakeManager.methods.slash(validator2, 1, hash2).send();
     expect(await isExist(), 'validator2 should be removed').be.false;
+    expect(await stakeManager.methods.usedEvidence(hash2).call()).be.true;
+    try {
+      await stakeManager.methods.slash(validator2, 1, hash2).send();
+      assert.fail('should slash failed when hash exists');
+    } catch (err) {}
   });
 
   it('should unstake and claim correctly', async () => {

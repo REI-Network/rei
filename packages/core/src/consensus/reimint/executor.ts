@@ -9,7 +9,7 @@ import EVM from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';
 import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executor } from '../types';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
-import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnablePrison } from '../../hardforks';
+import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableBetterPOS } from '../../hardforks';
 import { StateManager } from '../../stateManager';
 import { ValidatorSet, ValidatorChanges, isGenesis } from './validatorSet';
 import { StakeManager, SlashReason, Fee, Contract } from './contracts';
@@ -133,7 +133,13 @@ export class ReimintExecutor implements Executor {
         const { voteA, voteB } = ev;
         logger.debug('Reimint::afterApply, find evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
 
-        const ethLogs = await parentStakeManager.slash(ev.voteA.validator(), SlashReason.DuplicateVote);
+        let ethLogs: any[] | undefined;
+        if (isEnableHardfork2(pendingCommon)) {
+          // if the contract has been upgraded, call the new slashing function
+          ethLogs = await parentStakeManager.slashV2(ev.voteA.validator(), SlashReason.DuplicateVote, ev.hash());
+        } else {
+          ethLogs = await parentStakeManager.slash(ev.voteA.validator(), SlashReason.DuplicateVote);
+        }
         if (ethLogs && ethLogs.length > 0) {
           logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));
         }
@@ -142,9 +148,9 @@ export class ReimintExecutor implements Executor {
       }
     }
 
-    // 4.call stakeManager.addMissRecord to add miss record
-    // and jail validators whos missRecords is greater than config.jailThreshold
-    if (isEnablePrison(pendingCommon)) {
+    // 4. call stakeManager.addMissRecord to add miss record
+    // and jail validators whos missed records is greater than config.jailThreshold
+    if (isEnableBetterPOS(pendingCommon)) {
       let missRecords: string[][] = [];
       const preBlockHeader = await this.engine.node.db.getHeader(pendingBlock.header.parentHash, pendingBlock.header.number.subn(1));
       if (preBlockHeader.number.gten(1)) {
@@ -275,10 +281,19 @@ export class ReimintExecutor implements Executor {
     if (!isEnableHardfork2(pendingCommon) && isEnableHardfork2(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployHardfork2Contracts(evm, nextCommon);
+
+      // migrate evidence hashes
+      if (!this.engine.collector) {
+        throw new Error('missing collector');
+      }
+      await Contract.deployHardfork2Contracts(evm, nextCommon);
+      const pendingStakeManager = new StakeManager(evm, pendingCommon);
+      const hashes = [...this.engine.collector.getHashes(pendingBlock.header.number.subn(1)), ...evidence.map((ev) => ev.hash())];
+      await pendingStakeManager.initEvidenceHash(hashes);
     }
 
     // 14. deploy contracts if enable prison is enabled in the next block
-    if (!isEnablePrison(pendingCommon) && isEnablePrison(nextCommon)) {
+    if (!isEnableBetterPOS(pendingCommon) && isEnableBetterPOS(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployBetterPOSContracts(evm, nextCommon);
     }

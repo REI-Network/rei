@@ -28,6 +28,10 @@ class RecordQueue {
     this.jailThreshold = jailThreshold;
   }
 
+  resetJailThreshold(newThreshold: number) {
+    this.jailThreshold = newThreshold;
+  }
+
   push(blockNumber: number, record: MissRecord[]) {
     if (blockNumber >= this.recordsAmountPeriod) {
       const blockNumberToDelete = blockNumber - this.recordsAmountPeriod;
@@ -111,8 +115,8 @@ describe('Prison', () => {
     deployer = accounts[0];
     user1 = accounts[1];
     missedRecordSkip = [
-      [deployer, 1],
-      [user1, 1]
+      [deployer, 0],
+      [user1, 0]
     ];
   });
 
@@ -242,6 +246,29 @@ describe('Prison', () => {
     await prison.methods.addMissRecord(missedRecordSkip).send();
     recordQueue.push(await web3.eth.getBlockNumber(), missedRecordSkip);
     await checkMissRecord(recordQueue, prison);
+  });
+
+  it('should reduce miss record successfully with blocks gone', async () => {
+    const missedRecordNew: MissRecord[] = [
+      [deployer, 2],
+      [user1, 1]
+    ];
+    for (let i = 0; i < recordAmountPeriod; i++) {
+      await prison.methods.addMissRecord(missedRecordNew).send();
+      recordQueue.push(await web3.eth.getBlockNumber(), missedRecordNew);
+      await checkMissRecord(recordQueue, prison);
+    }
+    const deployerMissedNumber = (await prison.methods.miners(deployer).call()).missedRoundNumberPeriod;
+    const user1MissedNumber = (await prison.methods.miners(user1).call()).missedRoundNumberPeriod;
+    expect(deployerMissedNumber, 'Missed number should be equal').to.equal((2 * recordAmountPeriod).toString());
+    expect(user1MissedNumber, 'Missed number should be equal').to.equal((1 * recordAmountPeriod).toString());
+    for (let i = 0; i < recordAmountPeriod; i++) {
+      await prison.methods.addMissRecord(missedRecordSkip).send();
+      recordQueue.push(await web3.eth.getBlockNumber(), missedRecordSkip);
+      await checkMissRecord(recordQueue, prison);
+      expect((await prison.methods.miners(deployer).call()).missedRoundNumberPeriod, 'Missed number should be equal').to.equal((deployerMissedNumber - 2 * (i + 1)).toString());
+      expect((await prison.methods.miners(user1).call()).missedRoundNumberPeriod, 'Missed number should be equal').to.equal((user1MissedNumber - 1 * (i + 1)).toString());
+    }
   });
 
   it('should run correctly after enlarged record amount period', async () => {

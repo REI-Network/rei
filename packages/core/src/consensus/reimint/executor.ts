@@ -134,7 +134,7 @@ export class ReimintExecutor implements Executor {
         logger.debug('Reimint::afterApply, find evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
 
         let ethLogs: any[] | undefined;
-        if (isEnableHardfork2(pendingCommon)) {
+        if (isEnableBetterPOS(pendingCommon)) {
           // if the contract has been upgraded, call the new slashing function
           ethLogs = await parentStakeManager.slashV2(ev.voteA.validator(), SlashReason.DuplicateVote, ev.hash());
         } else {

@@ -51,6 +51,7 @@ export async function startServices(opts: { [option: string]: string }): Promise
   const node = await NodeFactory.createNode({
     databasePath: opts.datadir,
     chain: opts.chain,
+    evm: opts.evm,
     receiptsCacheSize: opts.receiptsCacheSize ? Number(opts.receiptsCacheSize) : undefined,
     mine,
     network,

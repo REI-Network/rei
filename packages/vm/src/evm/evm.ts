@@ -1,6 +1,7 @@
 import { debug as createDebugLogger } from 'debug';
-import { Account, Address, BN, generateAddress, generateAddress2, KECCAK256_NULL, KECCAK256_RLP, MAX_INTEGER } from 'ethereumjs-util';
+import { Account, Address, BN, toBuffer, bufferToHex, generateAddress, generateAddress2, KECCAK256_NULL, KECCAK256_RLP, MAX_INTEGER } from 'ethereumjs-util';
 import { Block } from '@rei-network/structure';
+import type { JSEVMBinding, Message as EVMCMessage } from '@rei-network/binding';
 import { ERROR, VmError } from '../exceptions';
 import { StateManager } from '../state/index';
 import { IDebug } from '../types';
@@ -11,7 +12,7 @@ import EEI from './eei';
 // eslint-disable-next-line
 import { short } from './opcodes/util';
 import { Log } from './types';
-import { default as Interpreter, InterpreterOpts, RunState } from './interpreter';
+import { default as Interpreter, RunState } from './interpreter';
 
 const debug = createDebugLogger('vm:evm');
 const debugGas = createDebugLogger('vm:evm:gas');
@@ -107,6 +108,11 @@ export function VmErrorResult(error: VmError, gasUsed: BN): ExecResult {
   };
 }
 
+export enum EVMWorkMode {
+  JS = 'js',
+  Binding = 'binding'
+}
+
 /**
  * EVM is responsible for executing an EVM message fully
  * (including any nested calls and creates), processing the results
@@ -138,7 +144,70 @@ export default class EVM {
    * based on the `to` address. It checkpoints the state and reverts changes
    * if an exception happens during the message execution.
    */
+  async executeMessageWithBinding(message: Message): Promise<EVMResult> {
+    const binding: JSEVMBinding = this._vm.binding;
+    if (!binding) {
+      throw new Error('missing binding instance!');
+    }
+
+    // convert message format
+    const evmcMessage: EVMCMessage = {
+      caller: message.caller?.toString() ?? '0x' + '0'.repeat(40),
+      to: message.to?.toString(),
+      value: message.value.toString(),
+      gasLimit: message.gasLimit?.toString() ?? 0,
+      data: message.data,
+      isStatic: message.isStatic,
+      baseFee: message.baseFee?.toString() ?? 0,
+      gasPrice: this._tx.gasPrice.toString(),
+      isCreation: !message.to,
+      isUpgrade: !!message.contractAddress,
+      clearStorage: message.clearStorage,
+      clearEmptyAccount: message.clearEmptyAccount,
+      author: this._tx.author?.toString(),
+      accessList: this._tx.accessList
+    };
+
+    // run message
+    // TODO: maybe there is a better way...
+    const checkpoints = this._state.checkpointCount();
+    await this._state.batchCommit(checkpoints);
+    const root = bufferToHex(await this._state.getStateRoot());
+    let res: any;
+    try {
+      res = binding.runMessage(root, this._block.header.serialize(), evmcMessage, this._tx.blockGasUsed.toString(), () => this._tx.recentHashes);
+      await this._state.setStateRoot(toBuffer(res.stateRoot));
+    } finally {
+      await this._state.batchCheckpoint(checkpoints);
+    }
+
+    // convert result format
+    const { result, logs } = res;
+    const execResult: ExecResult = {
+      exceptionError: result.excepted ? ({ ...result.excepted, errorType: 'EvmError' } as any) : undefined,
+      gasUsed: new BN(result.gasUsed),
+      returnValue: toBuffer(result.output),
+      gasRefund: new BN(result.gasRefunded),
+      logs: logs.map(({ address, topics, data }) => [toBuffer(address), topics.map(toBuffer), toBuffer(data)])
+    };
+    const evmResult: EVMResult = {
+      createdAddress: result.newAddress ? Address.fromString(result.newAddress) : undefined,
+      gasUsed: execResult.gasUsed,
+      execResult
+    };
+    return evmResult;
+  }
+
+  /**
+   * Executes an EVM message, determining whether it's a call or create
+   * based on the `to` address. It checkpoints the state and reverts changes
+   * if an exception happens during the message execution.
+   */
   async executeMessage(message: Message): Promise<EVMResult> {
+    if (this._vm.mode === EVMWorkMode.Binding) {
+      return await this.executeMessageWithBinding(message);
+    }
+
     await this._vm._emit('beforeMessage', message);
 
     if (!message.to && this._vm._common.isActivatedEIP(2929)) {

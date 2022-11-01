@@ -1,11 +1,13 @@
 import EVM from '@rei-network/vm/dist/evm/evm';
-import { Address, BN, MAX_INTEGER } from 'ethereumjs-util';
+import { Address, BN } from 'ethereumjs-util';
 import Message from '@rei-network/vm/dist/evm/message';
 import { Common } from '@rei-network/common';
 import { hexStringToBuffer, logger } from '@rei-network/utils';
 import { EMPTY_ADDRESS } from '../../../utils';
 import { ActiveValidatorSet } from '../validatorSet';
 import { encode } from './utils';
+
+const MAX_GAS_LIMIT = new BN('9223372036854775807');
 
 export abstract class Contract {
   evm: EVM;
@@ -115,7 +117,7 @@ export abstract class Contract {
       new Message({
         contractAddress: address,
         to: address,
-        gasLimit: MAX_INTEGER,
+        gasLimit: MAX_GAS_LIMIT,
         data: args ? Buffer.concat([code, encode(args.types, args.values)]) : code
       })
     );
@@ -136,7 +138,8 @@ export abstract class Contract {
     return new Message({
       caller: EMPTY_ADDRESS,
       to: this.address,
-      gasLimit: MAX_INTEGER,
+      gasLimit: MAX_GAS_LIMIT,
+      isStatic: true,
       data: Buffer.concat([this.methods[method], encode(types, values)])
     });
   }
@@ -146,8 +149,9 @@ export abstract class Contract {
     return new Message({
       caller: Address.fromString(this.common.param('vm', 'scaddr')),
       to: this.address,
-      gasLimit: MAX_INTEGER,
+      gasLimit: MAX_GAS_LIMIT,
       value: amount,
+      isStatic: false,
       data: Buffer.concat([this.methods[method], encode(types, values)])
     });
   }

@@ -747,4 +747,29 @@ export class StateManager {
     }
     this._touched.clear();
   }
+
+  /**
+   * Get checkpoint count
+   */
+  checkpointCount() {
+    return this._checkpointCount;
+  }
+
+  /**
+   * Batch commit checkpoints
+   */
+  async batchCommit(checkpointCount: number) {
+    for (let i = 0; i < checkpointCount; i++) {
+      await this.commit();
+    }
+  }
+
+  /**
+   * Batch create checkpoints
+   */
+  async batchCheckpoint(checkpointCount: number) {
+    for (let i = 0; i < checkpointCount; i++) {
+      await this.checkpoint();
+    }
+  }
 }

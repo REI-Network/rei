@@ -4,6 +4,7 @@ import PeerId from 'peer-id';
 import { Address } from 'ethereumjs-util';
 import { logger } from '@rei-network/utils';
 import { NetworkManagerOptions } from '@rei-network/network';
+import { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
 import { ConsensusEngineOptions } from './consensus/types';
 import { Node } from './node';
 import { NodeOptions, AccountManagerConstructorOptions } from './types';
@@ -71,6 +72,10 @@ export class NodeFactory {
     }
     if (coinbase && !node.accMngr.hasUnlockedAccount(coinbase)) {
       throw new Error(`Unlock coinbase account ${coinbase.toString()} failed!`);
+    }
+
+    if (options.evm && options.evm !== EVMWorkMode.Binding && options.evm !== EVMWorkMode.JS) {
+      throw new Error(`invalid evm work mode: ${options.evm}`);
     }
 
     await node.init();

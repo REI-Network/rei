@@ -37,6 +37,7 @@ Options:
   --coinbase <address>                       miner address
   --verbosity <verbosity>                    logging verbosity: silent, error, warn, info, debug, detail (default: "info")
   --receipts-cache-size <receiptsCacheSize>  receipts cache size
+  --evm <evm>                                evm implementation type, "js" or "binding"
   -h, --help                                 display help for command
 
 Commands:

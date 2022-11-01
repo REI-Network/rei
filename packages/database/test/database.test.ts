@@ -20,7 +20,7 @@ describe('Database', () => {
     if (!fs.existsSync(testdir)) {
       fs.mkdirSync(testdir, { recursive: true });
     }
-    testdb = createEncodingLevelDB(testdir);
+    [testdb] = createEncodingLevelDB(testdir);
     const common = new Common({ chain: 'rei-testnet', hardfork: 'chainstart' });
     database = new Database(testdb, common);
 

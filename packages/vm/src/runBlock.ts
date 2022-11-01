@@ -303,6 +303,12 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
   let gasUsed = new BN(0);
   const receipts: TxReceipt[] = [];
   const txResults: RunTxResult[] = [];
+  const recentHashes: Buffer[] = [];
+  const number = block.header.number;
+  const db = this.blockchain.database;
+  for (let i = number.subn(1); i.gten(0) && i.gte(number.subn(256)); i.isubn(1)) {
+    recentHashes.push(await db.numberToHash(i));
+  }
 
   /*
    * Process transactions
@@ -345,6 +351,7 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
         ...opts.runTxOpts,
         tx,
         block,
+        recentHashes,
         blockGasUsed: gasUsed,
         debug: _debug ? opts.debug : undefined
       });

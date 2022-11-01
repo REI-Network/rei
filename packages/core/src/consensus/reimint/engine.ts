@@ -13,7 +13,7 @@ import { Node } from '../../node';
 import { StateManager } from '../../stateManager';
 import { ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
-import { getConsensusTypeByCommon, isEnableRemint, isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableBetterPOS } from '../../hardforks';
+import { getConsensusTypeByCommon, isEnableRemint, isEnableFreeStaking, loadInitData, isEnableHardfork2, isEnableBetterPOS } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
@@ -93,51 +93,17 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     await this._tryToMintNextBlock(block);
     await this.state.init();
 
-    const common = this.node.getLatestCommon();
-    if (isEnableHardfork2(common)) {
-      // collect all the evidence if we haven't reached hardfork2
-      return;
+    // create the collector if necessary
+    const initData = loadInitData(this.node.getLatestCommon());
+    if (initData) {
+      const { initHeight, initHashes } = initData;
+      this.collector = new EvidenceCollector(initHeight, initHashes);
+      await this.collector.init(block.header.number, async (height: BN) => {
+        // load evidence from canonical header
+        const header = await this.node.db.getCanonicalHeader(height);
+        return ExtraData.fromBlockHeader(header).evidence.map((ev) => ev.hash());
+      });
     }
-
-    // set hardfork to get init data
-    if (common.chainName() === 'rei-mainnet') {
-      common.setHardfork('mainnet-hf-2');
-    } else if (common.chainName() === 'rei-testnet') {
-      common.setHardfork('testnet-hf-2');
-    } else if (common.chainName() === 'rei-devnet') {
-      common.setHardfork('devnet-hf-2');
-    } else {
-      // collector only work on mainnet and testnet
-      return;
-    }
-
-    // load init height from common
-    const initHeight = common.param('vm', 'initHeight');
-    if (initHeight === null) {
-      // the value has not been set, no collector is required
-      return;
-    }
-    if (typeof initHeight !== 'number') {
-      throw new Error('invalid initHeight');
-    }
-
-    // load init hashes from common
-    const initHashes = common.param('vm', 'initHashes');
-    if (initHashes === null) {
-      // the value has not been set, no collector is required
-      return;
-    }
-    if (!Array.isArray(initHashes)) {
-      throw new Error('invalid initHashes');
-    }
-
-    // create the collector
-    this.collector = new EvidenceCollector(initHeight, initHashes);
-    await this.collector.init(block.header.number, async (height: BN) => {
-      // load evidence from canonical header
-      const header = await this.node.db.getCanonicalHeader(height);
-      return ExtraData.fromBlockHeader(header).evidence.map((ev) => ev.hash());
-    });
   }
 
   protected _start() {
@@ -231,14 +197,8 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     if (isEnableRemint(common)) {
       await Contract.deployReimintContracts(evm, common);
     }
-    if (isEnableHardfork1(common)) {
-      await Contract.deployHardfork1Contracts(evm, common);
-    }
     if (isEnableFreeStaking(common)) {
       await Contract.deployFreeStakingContracts(evm, common);
-    }
-    if (isEnableHardfork2(common)) {
-      await Contract.deployHardfork2Contracts(evm, common);
     }
     if (isEnableBetterPOS(common)) {
       await Contract.deployBetterPOSContracts(evm, common);

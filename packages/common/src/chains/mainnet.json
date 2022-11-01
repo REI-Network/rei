@@ -92,6 +92,10 @@
       "block": 5606557
     },
     {
+      "name": "mainnet-hf-2",
+      "block": null
+    },
+    {
       "name": "better-pos",
       "block": null
     }

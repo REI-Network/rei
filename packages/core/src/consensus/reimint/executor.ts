@@ -441,7 +441,7 @@ export class ReimintExecutor implements Executor {
     // put the validator set in the memory cache
     this.engine.validatorSets.set(result.stateRoot, validatorSet);
 
-    logger.debug('Reimint:processBlock, mode:', vm.mode ?? EVMWorkMode.JS, 'tx:', block.transactions.length, 'usage:', Date.now() - startAt);
+    logger.debug('Reimint::processBlock, mode:', vm.mode ?? EVMWorkMode.JS, 'tx:', block.transactions.length, 'usage:', Date.now() - startAt);
 
     return { receipts: postByzantiumTxReceiptsToReceipts(result.receipts) };
   }

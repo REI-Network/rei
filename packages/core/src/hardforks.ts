@@ -155,11 +155,23 @@ export function loadInitData(common: Common): undefined | { initHeight: number; 
     return;
   }
 
+  function isActiveHardfork(hardforks: { name: string }[], hardfork: string) {
+    return !!hardforks.filter(({ name }) => name === hardfork);
+  }
+
   // set hardfork to get init data
   if (common.chainName() === 'rei-mainnet') {
-    common.setHardfork('mainnet-hf-2');
+    if (isActiveHardfork(common.activeHardforks(), 'mainnet-hf-2')) {
+      common.setHardfork('mainnet-hf-2');
+    } else {
+      return;
+    }
   } else if (common.chainName() === 'rei-testnet') {
-    common.setHardfork('testnet-hf-2');
+    if (isActiveHardfork(common.activeHardforks(), 'testnet-hf-2')) {
+      common.setHardfork('testnet-hf-2');
+    } else {
+      return;
+    }
   } else {
     // collector only work on mainnet and testnet
     return;

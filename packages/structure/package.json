@@ -1,6 +1,6 @@
 {
     "name": "@rei-network/structure",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "license": "GPL-3.0-or-later",
@@ -16,6 +16,6 @@
     "dependencies": {
         "merkle-patricia-tree": "^4.2.3",
         "ethereumjs-util": "^7.1.4",
-        "@rei-network/common": "^1.0.0"
+        "@rei-network/common": "^1.1.1"
     }
 }

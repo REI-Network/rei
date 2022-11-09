@@ -1,0 +1,22 @@
+{
+    "name": "testnet-fix",
+    "comment": "rei-testnet fix hardfork",
+    "gasConfig": {},
+    "gasPrices": {},
+    "vm": {
+        "maxValidatorsCount": {
+            "v": 21,
+            "d": "max validator set size"
+        },
+        "minValidatorsCount": {
+            "v": 21,
+            "d": "min validator set size"
+        },
+        "minTotalLockedAmount": {
+            "v": "20000000000000000000000000",
+            "d": "min total locked amount"
+        }
+    },
+    "pow": {}
+}
+  

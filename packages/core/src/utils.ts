@@ -40,6 +40,7 @@ export function getGasLimitByCommon(common: Common): BN {
 /**
  * encode validators index list to buffer
  * @param validators - validators index list
+ * @param priorities - validators priority list
  * @returns buffer
  */
 export function validatorsEncode(data: number[], priorities: BN[]): Buffer {
@@ -54,9 +55,12 @@ export function validatorsEncode(data: number[], priorities: BN[]): Buffer {
     } else {
       bytes.push(item);
     }
+    //encode priority
     let priority = priorities[i];
-    let priorityBytes = priorityToBytes(priority);
-    buffer = Buffer.concat([buffer, Buffer.from(bytes), priorityBytes]);
+    let priorityBytes = priority.toBuffer();
+    let length = priorityBytes.length;
+    let isNegative = priority.isNeg() ? 128 : 0; // 128
+    buffer = Buffer.concat([buffer, Buffer.from(bytes), Buffer.from([isNegative + length]), priorityBytes]);
   }
   //buffer[]
   return buffer;
@@ -65,7 +69,7 @@ export function validatorsEncode(data: number[], priorities: BN[]): Buffer {
 /**
  * decode buffer to validators index list
  * @param buffer - buffer
- * @returns validators index list
+ * @returns validators index list and validators priority list
  */
 export function validatorsDecode(data: Buffer) {
   let indexList: number[] = [];
@@ -81,23 +85,27 @@ export function validatorsDecode(data: Buffer) {
       indexList.push(item);
     }
     //decode priority
-    const priorityLength = Number(data[i + 1]);
-    const priorityBytes = data.slice(i + 2, i + 2 + priorityLength + 1);
-    priorityList.push(bytesToPriority(priorityBytes));
-    i += priorityLength + 2;
+    const prioritySign = data[i + 1];
+    let isNeg = prioritySign >> 7 === 1;
+    let length = isNeg ? prioritySign - 128 : prioritySign;
+    const priorityBytes = data.slice(i + 2, i + 2 + length);
+    let bn = new BN(priorityBytes);
+    if (isNeg) bn = bn.neg();
+    priorityList.push(bn);
+    i += length + 1;
   }
   return { indexList, priorityList };
 }
 
 function intToBytesBigEndian(number: number) {
-  var bytes: number[] = [];
-  var i = 32;
+  const bytes: number[] = [];
+  let i = 32;
   do {
     bytes[--i] = number & 255;
     number = number >> 8;
   } while (i);
   let start: number = 0;
-  for (var i = 0; i < bytes.length; i++) {
+  for (let i = 0; i < bytes.length; i++) {
     if (bytes[i] !== 0) {
       start = i;
       break;
@@ -107,29 +115,12 @@ function intToBytesBigEndian(number: number) {
 }
 
 function bytesToIntBigEndian(bytes: Buffer) {
-  var val = 0;
-  for (var i = 0; i < bytes.length; ++i) {
+  let val = 0;
+  for (let i = 0; i < bytes.length; ++i) {
     val += bytes[i];
     if (i < bytes.length - 1) {
       val = val << 8;
     }
   }
   return val;
-}
-
-function priorityToBytes(bn: BN) {
-  let itemBytes = bn.toBuffer();
-  let length = Buffer.from([itemBytes.length]); // 1 byte signed
-  let isNegative = Buffer.from([bn.isNeg() ? 1 : 0]);
-  return Buffer.concat([length, isNegative, itemBytes]);
-}
-
-function bytesToPriority(bytes: Buffer) {
-  let isNegative = bytes[0];
-  let itemBytes = bytes.slice(1);
-  let bn = new BN(itemBytes);
-  if (isNegative) {
-    bn = bn.neg();
-  }
-  return bn;
 }

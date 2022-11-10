@@ -27,14 +27,20 @@ describe('ValidatorsEncoder', () => {
     new BN('626834724978240483655586'),
     new BN('48404832182288457154182435')
   ];
-  it('should encode validators index list to buffer', async () => {
-    const buffer = validatorsEncode(d1, d2);
-    expect(buffer).to.be.instanceOf(Buffer);
+
+  it('should catch list length exception', () => {
+    expect(() => validatorsEncode(d1, [])).to.throw('validators length not equal priorities length');
+    expect(() => validatorsEncode([], d2)).to.throw('validators length not equal priorities length');
   });
-  it('should decode buffer to validators index list', async () => {
+
+  it('should decode buffer to validators index list and priority list', async () => {
     const buffer = validatorsEncode(d1, d2);
     const { indexList, priorityList } = validatorsDecode(buffer);
-    console.log(indexList);
-    console.log(priorityList.map((item) => item.toString()));
+    expect(indexList.length).to.be.eq(21);
+    expect(priorityList.length).to.be.eq(21);
+    for (let i = 0; i < indexList.length; i++) {
+      expect(indexList[i]).to.be.eq(d1[i]);
+      expect(priorityList[i].toString()).to.be.eq(d2[i].toString());
+    }
   });
 });

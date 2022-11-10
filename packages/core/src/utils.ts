@@ -44,26 +44,29 @@ export function getGasLimitByCommon(common: Common): BN {
  * @returns buffer
  */
 export function validatorsEncode(data: number[], priorities: BN[]): Buffer {
-  let buffer = Buffer.from([]);
+  if (data.length !== priorities.length) {
+    throw new Error('validators length not equal priorities length');
+  }
+  const buffer: Buffer[] = [];
   for (let i = 0; i < data.length; i++) {
-    let item = data[i];
-    let bytes: number[] = [];
+    //encode validator index
+    const item = data[i];
+    let bytes: number[];
     if (item >= 223) {
       const data = intToBytesBigEndian(item);
       const length = data.length;
-      bytes = [255 - length].concat(data);
+      bytes = [255 - length, ...data];
     } else {
-      bytes.push(item);
+      bytes = [item];
     }
     //encode priority
-    let priority = priorities[i];
-    let priorityBytes = priority.toBuffer();
-    let length = priorityBytes.length;
-    let isNegative = priority.isNeg() ? 128 : 0; // 128
-    buffer = Buffer.concat([buffer, Buffer.from(bytes), Buffer.from([isNegative + length]), priorityBytes]);
+    const priority = priorities[i];
+    const priorityBytes = priority.toBuffer();
+    const length = priorityBytes.length;
+    const isNegative = priority.isNeg() ? 128 : 0;
+    buffer.push(Buffer.from(bytes), Buffer.from([isNegative + length]), priorityBytes);
   }
-  //buffer[]
-  return buffer;
+  return Buffer.concat([...buffer]);
 }
 
 /**
@@ -72,10 +75,11 @@ export function validatorsEncode(data: number[], priorities: BN[]): Buffer {
  * @returns validators index list and validators priority list
  */
 export function validatorsDecode(data: Buffer) {
-  let indexList: number[] = [];
-  let priorityList: BN[] = [];
+  const indexList: number[] = [];
+  const priorityList: BN[] = [];
   for (let i = 0; i < data.length; i++) {
-    let item = Number(data[i]);
+    //decode validator index
+    const item = Number(data[i]);
     if (item >= 223) {
       const length = 255 - item;
       const bytes = data.slice(i + 1, i + 1 + length);
@@ -86,8 +90,8 @@ export function validatorsDecode(data: Buffer) {
     }
     //decode priority
     const prioritySign = data[i + 1];
-    let isNeg = prioritySign >> 7 === 1;
-    let length = isNeg ? prioritySign - 128 : prioritySign;
+    const isNeg = prioritySign >> 7 === 1;
+    const length = isNeg ? prioritySign - 128 : prioritySign;
     const priorityBytes = data.slice(i + 2, i + 2 + length);
     let bn = new BN(priorityBytes);
     if (isNeg) bn = bn.neg();

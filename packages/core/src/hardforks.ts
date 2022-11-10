@@ -156,7 +156,7 @@ export function loadInitData(common: Common): undefined | { initHeight: number; 
   }
 
   function isActiveHardfork(hardforks: { name: string }[], hardfork: string) {
-    return !!hardforks.filter(({ name }) => name === hardfork);
+    return hardforks.filter(({ name }) => name === hardfork).length > 0;
   }
 
   // set hardfork to get init data

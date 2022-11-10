@@ -37,7 +37,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     // proposer address
     address public override proposer;
 
-    bytes private activeValidatorsRLP;
+    bytes private activeValidatorsIndexList;
 
     /**
      * Emitted when a validator gets a reward
@@ -543,14 +543,14 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         }
     }
 
-    function onAfterBlockRLP(address _proposer, bytes calldata _acValidatorsRLP) external override nonReentrant onlySystemCaller {
+    function onAfterBlockIndexList(address _proposer, bytes calldata _activeValidatorsIndexData) external override nonReentrant onlySystemCaller {
         require(_proposer != address(0), "StakeManager: invalid proposer");
-        require(_acValidatorsRLP.length > 0, "StakeManager: invalid list length");
+        require(_activeValidatorsIndexData.length > 0, "StakeManager: invalid list length");
         proposer = _proposer;
-        activeValidatorsRLP = _acValidatorsRLP;
+        activeValidatorsIndexList = _activeValidatorsIndexData;
     }
 
-    function getActiveValidatorsRLP() external view override returns (bytes memory) {
-        return activeValidatorsRLP;
+    function getActiveValidatorsIndexList() external view override returns (bytes memory) {
+        return activeValidatorsIndexList;
     }
 }

@@ -9,7 +9,7 @@ import EVM from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';
 import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executor } from '../types';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
-import { isEnableFreeStaking, isEnableHardfork1, isEnableValidatorsRLP } from '../../hardforks';
+import { isEnableFreeStaking, isEnableHardfork1, isEnableValidatorsIndex } from '../../hardforks';
 import { StateManager } from '../../stateManager';
 import { ValidatorSet, ValidatorChanges } from './validatorSet';
 import { StakeManager, SlashReason, Fee, Contract } from './contracts';
@@ -239,7 +239,7 @@ export class ReimintExecutor implements Executor {
     }
 
     // 12. deploy contracts if validators rlp is enabled in the next block
-    if (!isEnableValidatorsRLP(pendingCommon) && isEnableValidatorsRLP(nextCommon)) {
+    if (!isEnableValidatorsIndex(pendingCommon) && isEnableValidatorsIndex(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployHardforkValRLPContract(evm, nextCommon);
     }

@@ -87,7 +87,7 @@
       "block": 0
     },
     {
-      "name": "devnet-hf-validators-rlp",
+      "name": "validators-index",
       "block": 10
     }
   ],

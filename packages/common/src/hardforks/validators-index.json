@@ -1,6 +1,6 @@
 {
-  "name": "devnet-hf-validators-rlp",
-  "comment": "rei-devnet hardfork validators rlp",
+  "name": "validators-index",
+  "comment": "validators index hardfork",
   "gasConfig": {},
   "gasPrices": {},
   "vm": {

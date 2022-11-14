@@ -19,5 +19,5 @@ export const hardforks = [
   ['testnet-hf-1', require('./testnet-hf-1.json')],
   ['mainnet-hf-1', require('./mainnet-hf-1.json')],
   ['free-staking', require('./free-staking.json')],
-  ['validators-index', require('./validators-index.json')]
+  ['validator-ids', require('./validator-ids.json')]
 ];

@@ -125,13 +125,13 @@ export function isEnableFreeStaking(common: Common) {
   }
 }
 
-export function isEnableValidatorsIndex(common: Common) {
+export function isEnableValidatorIds(common: Common) {
   if (common.chainName() === 'rei-testnet') {
-    return common.gteHardfork('validators-index');
+    return common.gteHardfork('validator-ids');
   } else if (common.chainName() === 'rei-mainnet') {
-    return common.gteHardfork('validators-index');
+    return common.gteHardfork('validator-ids');
   } else if (common.chainName() === 'rei-devnet') {
-    return common.gteHardfork('validators-index');
+    return common.gteHardfork('validator-ids');
   } else {
     throw new Error('unknown chain');
   }

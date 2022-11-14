@@ -87,7 +87,7 @@
       "block": 0
     },
     {
-      "name": "validators-index",
+      "name": "validator-ids",
       "block": 10
     }
   ],

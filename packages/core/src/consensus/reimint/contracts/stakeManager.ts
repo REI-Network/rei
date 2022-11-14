@@ -3,9 +3,10 @@ import { Address, BN, toBuffer, rlp } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Log, Receipt } from '@rei-network/structure';
 import { ValidatorChanges, getGenesisValidators } from '../validatorSet';
+import { validatorsEncode, validatorsDecode } from '../../../utils';
 import { bufferToAddress, decodeInt256, decodeBytes } from './utils';
 import { Contract } from './contract';
-import { isEnableValidatorsIndex } from '../../../hardforks';
+import { isEnableValidatorIds } from '../../../hardforks';
 
 // function selector of stake manager
 const methods = {
@@ -20,8 +21,10 @@ const methods = {
   reward: toBuffer('0x6353586b'),
   slash: toBuffer('0x30b409a4'),
   onAfterBlock: toBuffer('0x9313f105'),
-  onAfterBlockIndexList: toBuffer('0x34b37401'),
-  getActiveValidatorsIndexList: toBuffer('0xad69a9c6')
+  indexedValidatorsById: toBuffer('0x36137fae'),
+  onAfterBlockValidatorIds: toBuffer('0x14215c9a'),
+  getActiveValidatorIds: toBuffer('0x86096972'),
+  validators: toBuffer('0xfa52c7d8')
 };
 
 // event topic
@@ -179,11 +182,11 @@ export class StakeManager extends Contract {
    */
   activeValidatorsLength() {
     return this.runWithLogger(async () => {
-      if (isEnableValidatorsIndex(this.common)) {
-        const { returnValue } = await this.executeMessage(this.makeCallMessage('getActiveValidatorsRLP', [], []));
-        const data = decodeBytes(returnValue);
-        const length = rlp.decode(data).length;
-        return new BN(length);
+      if (isEnableValidatorIds(this.common)) {
+        const { returnValue } = await this.executeMessage(this.makeCallMessage('getActiveValidatorIds', [], []));
+        const data = decodeBytes(returnValue) as string;
+        const { ids } = validatorsDecode(Buffer.from(data.slice(2), 'hex'));
+        return new BN(ids.length);
       } else {
         const { returnValue } = await this.executeMessage(this.makeCallMessage('activeValidatorsLength', [], []));
         return new BN(returnValue);
@@ -198,14 +201,14 @@ export class StakeManager extends Contract {
    */
   activeValidators(index: BN): Promise<ActiveValidator> {
     return this.runWithLogger(async () => {
-      if (isEnableValidatorsIndex(this.common)) {
-        const { returnValue } = await this.executeMessage(this.makeCallMessage('getActiveValidatorsRLP', [], []));
-        const data = decodeBytes(returnValue);
-        const validators = rlp.decode(data);
-        const validator = validators[index.toNumber()];
+      if (isEnableValidatorIds(this.common)) {
+        const { returnValue } = await this.executeMessage(this.makeCallMessage('getActiveValidatorIds', [], []));
+        const data = decodeBytes(returnValue) as string;
+        const { ids, priorities } = validatorsDecode(Buffer.from(data.slice(2), 'hex'));
+        const { returnValue: rv } = await this.executeMessage(this.makeCallMessage('indexedValidatorsById', ['uint256'], [ids[index.toNumber()]]));
         return {
-          validator: bufferToAddress(validator[0]),
-          priority: new BN(validator[2]).eq(new BN(1)) ? new BN(validator[1]).neg() : new BN(validator[1])
+          validator: bufferToAddress(rv),
+          priority: priorities[index.toNumber()]
         };
       } else {
         const { returnValue } = await this.executeMessage(this.makeCallMessage('activeValidators', ['uint256'], [index.toString()]));
@@ -253,12 +256,17 @@ export class StakeManager extends Contract {
    */
   onAfterBlock(proposer: Address, activeValidators: Address[], priorities: BN[]) {
     return this.runWithLogger(async () => {
-      if (isEnableValidatorsIndex(this.common)) {
-        const validators = activeValidators.map((addr, i) => {
-          const priority = priorities[i];
-          return [addr.toBuffer(), priority.toBuffer(), priority.isNeg() ? new BN(1).toBuffer() : new BN(0).toBuffer()];
+      if (isEnableValidatorIds(this.common)) {
+        const data = await Promise.all(
+          activeValidators.map((address) => {
+            const addr = address.toString();
+            return this.executeMessage(this.makeSystemCallerMessage('validators', ['address'], [addr]));
+          })
+        );
+        const ids = data.map((item) => {
+          return decodeInt256(item.returnValue.slice(0 * 32, 1 * 32)).toNumber(); //get the first property
         });
-        await this.executeMessage(this.makeSystemCallerMessage('onAfterBlockIndexList', ['address', 'bytes'], [proposer.toString(), rlp.encode(validators)]));
+        await this.executeMessage(this.makeSystemCallerMessage('onAfterBlockValidatorIds', ['address', 'bytes'], [proposer.toString(), validatorsEncode(ids, priorities)]));
       } else {
         await this.executeMessage(this.makeSystemCallerMessage('onAfterBlock', ['address', 'address[]', 'int256[]'], [proposer.toString(), activeValidators.map((addr) => addr.toString()), priorities.map((p) => p.toString())]));
       }

@@ -130,7 +130,7 @@ interface IStakeManager is IOnly {
         int256[] calldata priorities
     ) external;
 
-    function onAfterBlockIndexList(address _proposer, bytes calldata _activeValidatorsIndexData) external;
+    function onAfterBlockValidatorIds(address _proposer, bytes calldata _activeValidatorsIndexData) external;
 
-    function getActiveValidatorsIndexList() external view returns (bytes memory);
+    function getActiveValidatorIds() external view returns (bytes memory);
 }

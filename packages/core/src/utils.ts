@@ -38,19 +38,19 @@ export function getGasLimitByCommon(common: Common): BN {
 }
 
 /**
- * encode validators index list to buffer
- * @param validators - validators index list
+ * encode validators id  and priority to buffer
+ * @param validators - validators id list
  * @param priorities - validators priority list
  * @returns buffer
  */
-export function validatorsEncode(data: number[], priorities: BN[]): Buffer {
-  if (data.length !== priorities.length) {
+export function validatorsEncode(ids: number[], priorities: BN[]): Buffer {
+  if (ids.length !== priorities.length) {
     throw new Error('validators length not equal priorities length');
   }
   const buffer: Buffer[] = [];
-  for (let i = 0; i < data.length; i++) {
+  for (let i = 0; i < ids.length; i++) {
     //encode validator index
-    const item = data[i];
+    const item = ids[i];
     let bytes: number[];
     if (item >= 223) {
       const data = intToBytesBigEndian(item);
@@ -70,23 +70,23 @@ export function validatorsEncode(data: number[], priorities: BN[]): Buffer {
 }
 
 /**
- * decode buffer to validators index list
+ * decode buffer to validators id list
  * @param buffer - buffer
- * @returns validators index list and validators priority list
+ * @returns validators id list and validators priority list
  */
 export function validatorsDecode(data: Buffer) {
-  const indexList: number[] = [];
-  const priorityList: BN[] = [];
+  const ids: number[] = [];
+  const priorities: BN[] = [];
   for (let i = 0; i < data.length; i++) {
     //decode validator index
-    const item = Number(data[i]);
+    const item = data[i];
     if (item >= 223) {
       const length = 255 - item;
       const bytes = data.slice(i + 1, i + 1 + length);
-      indexList.push(bytesToIntBigEndian(bytes));
+      ids.push(bytesToIntBigEndian(bytes));
       i += length;
     } else {
-      indexList.push(item);
+      ids.push(item);
     }
     //decode priority
     const prioritySign = data[i + 1];
@@ -95,10 +95,10 @@ export function validatorsDecode(data: Buffer) {
     const priorityBytes = data.slice(i + 2, i + 2 + length);
     let bn = new BN(priorityBytes);
     if (isNeg) bn = bn.neg();
-    priorityList.push(bn);
+    priorities.push(bn);
     i += length + 1;
   }
-  return { indexList, priorityList };
+  return { ids, priorities };
 }
 
 function intToBytesBigEndian(number: number) {

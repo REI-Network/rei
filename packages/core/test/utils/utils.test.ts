@@ -35,12 +35,12 @@ describe('ValidatorsEncoder', () => {
 
   it('should decode buffer to validators index list and priority list', async () => {
     const buffer = validatorsEncode(d1, d2);
-    const { indexList, priorityList } = validatorsDecode(buffer);
-    expect(indexList.length).to.be.eq(21);
-    expect(priorityList.length).to.be.eq(21);
-    for (let i = 0; i < indexList.length; i++) {
-      expect(indexList[i]).to.be.eq(d1[i]);
-      expect(priorityList[i].toString()).to.be.eq(d2[i].toString());
+    const { ids, priorities } = validatorsDecode(buffer);
+    expect(ids.length).to.be.eq(21);
+    expect(priorities.length).to.be.eq(21);
+    for (let i = 0; i < priorities.length; i++) {
+      expect(ids[i]).to.be.eq(d1[i]);
+      expect(priorities[i].toString()).to.be.eq(d2[i].toString());
     }
   });
 });

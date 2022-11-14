@@ -6,7 +6,7 @@ import { ValidatorChanges, getGenesisValidators } from '../validatorSet';
 import { validatorsEncode, validatorsDecode } from '../../../utils';
 import { bufferToAddress, decodeInt256, decodeBytes } from './utils';
 import { Contract } from './contract';
-import { isEnableValidatorIds } from '../../../hardforks';
+import { isEnableValidatorInfos } from '../../../hardforks';
 
 // function selector of stake manager
 const methods = {
@@ -22,8 +22,8 @@ const methods = {
   slash: toBuffer('0x30b409a4'),
   onAfterBlock: toBuffer('0x9313f105'),
   indexedValidatorsById: toBuffer('0x36137fae'),
-  onAfterBlockValidatorIds: toBuffer('0x14215c9a'),
-  getActiveValidatorIds: toBuffer('0x86096972'),
+  onAfterBlockV2: toBuffer('0xfa2909d4'),
+  getActiveValidatorInfos: toBuffer('0x021c585c'),
   validators: toBuffer('0xfa52c7d8')
 };
 
@@ -182,10 +182,10 @@ export class StakeManager extends Contract {
    */
   activeValidatorsLength() {
     return this.runWithLogger(async () => {
-      if (isEnableValidatorIds(this.common)) {
-        const { returnValue } = await this.executeMessage(this.makeCallMessage('getActiveValidatorIds', [], []));
-        const data = decodeBytes(returnValue) as string;
-        const { ids } = validatorsDecode(Buffer.from(data.slice(2), 'hex'));
+      if (isEnableValidatorInfos(this.common)) {
+        const { returnValue } = await this.executeMessage(this.makeCallMessage('getActiveValidatorInfos', [], []));
+        const data = decodeBytes(returnValue);
+        const { ids } = validatorsDecode(toBuffer(data));
         return new BN(ids.length);
       } else {
         const { returnValue } = await this.executeMessage(this.makeCallMessage('activeValidatorsLength', [], []));
@@ -201,10 +201,10 @@ export class StakeManager extends Contract {
    */
   activeValidators(index: BN): Promise<ActiveValidator> {
     return this.runWithLogger(async () => {
-      if (isEnableValidatorIds(this.common)) {
-        const { returnValue } = await this.executeMessage(this.makeCallMessage('getActiveValidatorIds', [], []));
-        const data = decodeBytes(returnValue) as string;
-        const { ids, priorities } = validatorsDecode(Buffer.from(data.slice(2), 'hex'));
+      if (isEnableValidatorInfos(this.common)) {
+        const { returnValue } = await this.executeMessage(this.makeCallMessage('getActiveValidatorInfos', [], []));
+        const data = decodeBytes(returnValue);
+        const { ids, priorities } = validatorsDecode(toBuffer(data));
         const { returnValue: rv } = await this.executeMessage(this.makeCallMessage('indexedValidatorsById', ['uint256'], [ids[index.toNumber()]]));
         return {
           validator: bufferToAddress(rv),
@@ -256,7 +256,7 @@ export class StakeManager extends Contract {
    */
   onAfterBlock(proposer: Address, activeValidators: Address[], priorities: BN[]) {
     return this.runWithLogger(async () => {
-      if (isEnableValidatorIds(this.common)) {
+      if (isEnableValidatorInfos(this.common)) {
         const data = await Promise.all(
           activeValidators.map((address) => {
             const addr = address.toString();
@@ -266,7 +266,7 @@ export class StakeManager extends Contract {
         const ids = data.map((item) => {
           return decodeInt256(item.returnValue.slice(0 * 32, 1 * 32)).toNumber(); //get the first property
         });
-        await this.executeMessage(this.makeSystemCallerMessage('onAfterBlockValidatorIds', ['address', 'bytes'], [proposer.toString(), validatorsEncode(ids, priorities)]));
+        await this.executeMessage(this.makeSystemCallerMessage('onAfterBlockV2', ['address', 'bytes'], [proposer.toString(), validatorsEncode(ids, priorities)]));
       } else {
         await this.executeMessage(this.makeSystemCallerMessage('onAfterBlock', ['address', 'address[]', 'int256[]'], [proposer.toString(), activeValidators.map((addr) => addr.toString()), priorities.map((p) => p.toString())]));
       }

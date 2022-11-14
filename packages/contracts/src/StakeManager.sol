@@ -37,7 +37,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     // proposer address
     address public override proposer;
 
-    bytes private activeValidatorIds;
+    bytes private activeValidatorInfos;
 
     /**
      * Emitted when a validator gets a reward
@@ -516,41 +516,18 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     /**
      * After block callback, it will be called by system caller after each block is processed
      * @param _proposer          Proposer address
-     * @param acValidators       Active validators list
-     * @param priorities         Priority list of active validators
+     * @param _activeValidators       Active validator infos
      */
-    function onAfterBlock(
-        address _proposer,
-        address[] calldata acValidators,
-        int256[] calldata priorities
-    ) external override nonReentrant onlySystemCaller {
+    function onAfterBlock(address _proposer, bytes calldata _activeValidators) external override nonReentrant onlySystemCaller {
         require(_proposer != address(0), "StakeManager: invalid proposer");
-        require(acValidators.length == priorities.length, "StakeManager: invalid list length");
         proposer = _proposer;
-        uint256 originLength = activeValidators.length;
-        uint256 i = 0;
-        for (; i < priorities.length; i = i.add(1)) {
-            if (i < originLength) {
-                ActiveValidator storage acValidator = activeValidators[i];
-                acValidator.validator = acValidators[i];
-                acValidator.priority = priorities[i];
-            } else {
-                activeValidators.push(ActiveValidator(acValidators[i], priorities[i]));
-            }
-        }
-        for (; i < originLength; i = i.add(1)) {
-            activeValidators.pop();
-        }
+        activeValidatorInfos = _activeValidators;
     }
 
-    function onAfterBlockValidatorIds(address _proposer, bytes calldata _activeValidators) external override nonReentrant onlySystemCaller {
-        require(_proposer != address(0), "StakeManager: invalid proposer");
-        require(_activeValidators.length > 0, "StakeManager: invalid list length");
-        proposer = _proposer;
-        activeValidatorIds = _activeValidators;
-    }
-
-    function getActiveValidatorIds() external view override returns (bytes memory) {
-        return activeValidatorIds;
+    /**
+     * Get the validator infos
+     */
+    function getActiveValidatorInfos() external view override returns (bytes memory) {
+        return activeValidatorInfos;
     }
 }

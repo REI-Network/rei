@@ -124,13 +124,7 @@ interface IStakeManager is IOnly {
 
     function slash(address validator, uint8 reason) external returns (uint256);
 
-    function onAfterBlock(
-        address _proposer,
-        address[] calldata acValidators,
-        int256[] calldata priorities
-    ) external;
+    function onAfterBlock(address _proposer, bytes calldata _activeValidatorsInfos) external;
 
-    function onAfterBlockValidatorIds(address _proposer, bytes calldata _activeValidatorsIndexData) external;
-
-    function getActiveValidatorIds() external view returns (bytes memory);
+    function getActiveValidatorInfos() external view returns (bytes memory);
 }

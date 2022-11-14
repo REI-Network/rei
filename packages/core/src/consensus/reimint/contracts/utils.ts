@@ -21,6 +21,6 @@ export function decodeInt256(buf: Buffer) {
   return new BN(coder.decode(['int256'], buf)[0].toString());
 }
 
-export function decodeBytes(buf: Buffer) {
+export function decodeBytes(buf: Buffer): string {
   return coder.decode(['bytes'], buf)[0];
 }

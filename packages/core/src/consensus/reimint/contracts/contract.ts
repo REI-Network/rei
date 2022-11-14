@@ -20,7 +20,7 @@ export abstract class Contract {
     this.address = address;
   }
 
-  static async deployHardforkValRLPContract(evm: EVM, common: Common) {
+  static async deployHardforkValInfosContract(evm: EVM, common: Common) {
     await Contract.deployContract(evm, common, 'sm');
   }
 

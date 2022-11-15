@@ -224,7 +224,7 @@ export class ReimintExecutor implements Executor {
     const activeSigners = activeValidators.map(({ validator }) => validator);
     const priorities = activeValidators.map(({ priority }) => priority);
 
-    if (isEnableValidatorInfos(parentStakeManager.common)) {
+    if (isEnableValidatorInfos(pendingCommon)) {
       await parentStakeManager.onAfterBlockV2(validatorSet.active.proposer, activeSigners, priorities);
     } else {
       await parentStakeManager.onAfterBlock(validatorSet.active.proposer, activeSigners, priorities);

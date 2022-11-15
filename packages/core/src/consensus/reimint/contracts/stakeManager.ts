@@ -214,7 +214,7 @@ export class StakeManager extends Contract {
       const { returnValue } = await this.executeMessage(this.makeCallMessage('getActiveValidatorInfos', [], []));
       const data = decodeBytes(returnValue);
       const { ids, priorities } = validatorsDecode(toBuffer(data));
-      const validators: { validator: Address; priority }[] = [];
+      const validators: { validator: Address; priority: BN }[] = [];
       for (let i = 0; i < ids.length; i++) {
         const { returnValue } = await this.executeMessage(this.makeCallMessage('indexedValidatorsById', ['uint256'], [ids[i]]));
         validators.push({

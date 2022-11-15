@@ -216,7 +216,7 @@ export class StakeManager extends Contract {
       const { ids, priorities } = validatorsDecode(toBuffer(data));
       const validators: { validator: Address; priority: BN }[] = [];
       for (let i = 0; i < ids.length; i++) {
-        const { returnValue } = await this.executeMessage(this.makeCallMessage('indexedValidatorsById', ['uint256'], [ids[i]]));
+        const { returnValue } = await this.executeMessage(this.makeCallMessage('indexedValidatorsById', ['uint256'], [ids[i].toString()]));
         validators.push({
           validator: bufferToAddress(returnValue),
           priority: priorities[i]
@@ -277,7 +277,7 @@ export class StakeManager extends Contract {
         })
       );
       const ids = data.map((item) => {
-        return decodeInt256(item.returnValue.slice(0 * 32, 1 * 32)).toNumber(); //get the first property
+        return new BN(item.returnValue.slice(0 * 32, 1 * 32)); //get the first property
       });
       await this.executeMessage(this.makeSystemCallerMessage('onAfterBlockV2', ['address', 'bytes'], [proposer.toString(), validatorsEncode(ids, priorities)]));
     });

@@ -43,21 +43,20 @@ export function getGasLimitByCommon(common: Common): BN {
  * @param priorities - validators priority list
  * @returns buffer
  */
-export function validatorsEncode(ids: number[], priorities: BN[]): Buffer {
+export function validatorsEncode(ids: BN[], priorities: BN[]): Buffer {
   if (ids.length !== priorities.length) {
     throw new Error('validators length not equal priorities length');
   }
   const buffer: Buffer[] = [];
   for (let i = 0; i < ids.length; i++) {
     //encode validator index
-    const item = ids[i];
+    const id = ids[i];
+    const idBuffer = id.toBuffer();
     let bytes: number[];
-    if (item >= 223) {
-      const data = intToBytesBigEndian(item);
-      const length = data.length;
-      bytes = [255 - length, ...data];
+    if (id.gten(223)) {
+      bytes = [255 - idBuffer.length, ...idBuffer];
     } else {
-      bytes = [item];
+      bytes = [...idBuffer];
     }
     //encode priority
     const priority = priorities[i];
@@ -75,7 +74,7 @@ export function validatorsEncode(ids: number[], priorities: BN[]): Buffer {
  * @returns validators id list and validators priority list
  */
 export function validatorsDecode(data: Buffer) {
-  const ids: number[] = [];
+  const ids: BN[] = [];
   const priorities: BN[] = [];
   for (let i = 0; i < data.length; i++) {
     //decode validator index
@@ -83,10 +82,10 @@ export function validatorsDecode(data: Buffer) {
     if (item >= 223) {
       const length = 255 - item;
       const bytes = data.slice(i + 1, i + 1 + length);
-      ids.push(bytesToIntBigEndian(bytes));
+      ids.push(new BN(bytes));
       i += length;
     } else {
-      ids.push(item);
+      ids.push(new BN(item));
     }
     //decode priority
     const prioritySign = data[i + 1];
@@ -99,32 +98,4 @@ export function validatorsDecode(data: Buffer) {
     i += length + 1;
   }
   return { ids, priorities };
-}
-
-function intToBytesBigEndian(number: number) {
-  const bytes: number[] = [];
-  let i = 32;
-  do {
-    bytes[--i] = number & 255;
-    number = number >> 8;
-  } while (i);
-  let start: number = 0;
-  for (let i = 0; i < bytes.length; i++) {
-    if (bytes[i] !== 0) {
-      start = i;
-      break;
-    }
-  }
-  return bytes.slice(start);
-}
-
-function bytesToIntBigEndian(bytes: Buffer) {
-  let val = 0;
-  for (let i = 0; i < bytes.length; ++i) {
-    val += bytes[i];
-    if (i < bytes.length - 1) {
-      val = val << 8;
-    }
-  }
-  return val;
 }

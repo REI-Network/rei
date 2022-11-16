@@ -117,15 +117,13 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         IConfig _config,
         address _proposer,
         address[] memory genesisValidators,
-        int256[] memory priorities
+        bytes memory _activeValidators
     ) public Only(_config) {
-        require(genesisValidators.length == priorities.length, "StakeManager: invalid list length");
-        proposer = _proposer;
         for (uint256 i = 0; i < genesisValidators.length; i = i.add(1)) {
-            address gv = genesisValidators[i];
-            createValidator(gv);
-            activeValidators.push(ActiveValidator(gv, priorities[i]));
+            createValidator(genesisValidators[i]);
         }
+        proposer = _proposer;
+        activeValidatorInfos = _activeValidators;
     }
 
     /**

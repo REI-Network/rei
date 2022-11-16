@@ -3,9 +3,10 @@ import { Address, BN } from 'ethereumjs-util';
 import Message from '@rei-network/vm/dist/evm/message';
 import { Common } from '@rei-network/common';
 import { hexStringToBuffer, logger } from '@rei-network/utils';
+import { isEnableBetterPOS } from '../../../hardforks';
 import { EMPTY_ADDRESS } from '../../../utils';
-import { ActiveValidatorSet } from '../validatorSet';
-import { encode } from './utils';
+import { ActiveValidatorSet, genesisValidatorPriority } from '../validatorSet';
+import { encode, validatorsEncode } from './utils';
 
 const MAX_GAS_LIMIT = new BN('9223372036854775807');
 
@@ -33,15 +34,27 @@ export abstract class Contract {
    */
   static async deployReimintContracts(evm: EVM, common: Common) {
     const genesisValidators = ActiveValidatorSet.genesis(common);
+    const proposer = genesisValidators.proposer.toString();
     const activeValidators = genesisValidators.activeValidators();
     const activeSigners = activeValidators.map(({ validator }) => validator.toString());
-    const priorities = activeValidators.map(({ priority }) => priority.toString());
     const cfgaddr = common.param('vm', 'cfgaddr');
 
     // deploy config contract
     await Contract.deployContract(evm, common, 'cfg');
     // deploy stake manager contract
-    await Contract.deployContract(evm, common, 'sm', { types: ['address', 'address', 'address[]', 'int256[]'], values: [cfgaddr, genesisValidators.proposer.toString(), activeSigners, priorities] });
+    if (isEnableBetterPOS(common)) {
+      const encoded = validatorsEncode(
+        activeValidators.map((_, index) => new BN(index)),
+        activeValidators.map(() => genesisValidatorPriority.clone())
+      );
+      await Contract.deployContract(evm, common, 'sm', {
+        types: ['address', 'address', 'address[]', 'bytes'],
+        values: [cfgaddr, proposer, activeSigners, encoded]
+      });
+    } else {
+      const priorities = activeValidators.map(({ priority }) => priority.toString());
+      await Contract.deployContract(evm, common, 'sm', { types: ['address', 'address', 'address[]', 'int256[]'], values: [cfgaddr, proposer, activeSigners, priorities] });
+    }
 
     const defaultArgs = { types: ['address'], values: [cfgaddr] };
     // deploy unstake pool contract

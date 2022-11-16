@@ -2,9 +2,8 @@ import EVM from '@rei-network/vm/dist/evm/evm';
 import { Address, BN, bufferToHex, toBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Log, Receipt } from '@rei-network/structure';
-import { ValidatorChanges, getGenesisValidators } from '../validatorSet';
-import { validatorsEncode, validatorsDecode } from '../../../utils';
-import { bufferToAddress, decodeInt256, decodeBytes } from './utils';
+import { ValidatorChanges, getGenesisValidators, isGenesis } from '../validatorSet';
+import { bufferToAddress, decodeInt256, decodeBytes, validatorsEncode, validatorsDecode } from './utils';
 import { Contract } from './contract';
 
 // function selector of stake manager
@@ -186,6 +185,11 @@ export class StakeManager extends Contract {
    */
   getValidatorIdByAddress(address: Address) {
     return this.runWithLogger(async () => {
+      const gvs = getGenesisValidators(this.common);
+      const index = gvs.findIndex((gv) => gv.equals(address));
+      if (index !== -1) {
+        return new BN(index);
+      }
       const { returnValue } = await this.executeMessage(this.makeCallMessage('getVotingPowerByAddress', ['address'], [address.toString()]));
       return new BN(returnValue.slice(0, 32));
     });
@@ -227,13 +231,20 @@ export class StakeManager extends Contract {
    */
   allActiveValidators(): Promise<ActiveValidator[]> {
     return this.runWithLogger(async () => {
+      const gvs = getGenesisValidators(this.common);
       const { returnValue } = await this.executeMessage(this.makeCallMessage('getActiveValidatorInfos', [], []));
       const { ids, priorities } = validatorsDecode(toBuffer(decodeBytes(returnValue)));
       const validators: { validator: Address; priority: BN }[] = [];
       for (let i = 0; i < ids.length; i++) {
-        const { returnValue } = await this.executeMessage(this.makeCallMessage('indexedValidatorsById', ['uint256'], [ids[i].toString()]));
+        let validator: Address;
+        if (ids[i].ltn(gvs.length)) {
+          validator = gvs[ids[i].toNumber()];
+        } else {
+          const { returnValue } = await this.executeMessage(this.makeCallMessage('indexedValidatorsById', ['uint256'], [ids[i].toString()]));
+          validator = bufferToAddress(returnValue);
+        }
         validators.push({
-          validator: bufferToAddress(returnValue),
+          validator,
           priority: priorities[i]
         });
       }

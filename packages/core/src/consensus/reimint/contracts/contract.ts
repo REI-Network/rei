@@ -111,7 +111,6 @@ export abstract class Contract {
   private static async deployContract(evm: EVM, common: Common, prefix: string, args?: { types: string[]; values: any[] }, clearup?: boolean) {
     const code = hexStringToBuffer(common.param('vm', `${prefix}code`));
     const address = Address.fromString(common.param('vm', `${prefix}addr`));
-    console.log(`Deploying ${prefix} contract to ${address.toString()}`);
     if (clearup) {
       await evm._state.clearContractStorage(address);
     }

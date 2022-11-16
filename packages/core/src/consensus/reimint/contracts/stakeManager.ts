@@ -176,6 +176,18 @@ export class StakeManager extends Contract {
   }
 
   /**
+   * Get validator id by address
+   * @param address - Address
+   * @returns Validator id
+   */
+  getValidatorIdByAddress(address: Address) {
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('getVotingPowerByAddress', ['address'], [address.toString()]));
+      return new BN(returnValue.slice(0, 32));
+    });
+  }
+
+  /**
    * Get active validator set length
    * @returns Length
    */
@@ -212,8 +224,7 @@ export class StakeManager extends Contract {
   allActiveValidators(): Promise<ActiveValidator[]> {
     return this.runWithLogger(async () => {
       const { returnValue } = await this.executeMessage(this.makeCallMessage('getActiveValidatorInfos', [], []));
-      const data = decodeBytes(returnValue);
-      const { ids, priorities } = validatorsDecode(toBuffer(data));
+      const { ids, priorities } = validatorsDecode(toBuffer(decodeBytes(returnValue)));
       const validators: { validator: Address; priority: BN }[] = [];
       for (let i = 0; i < ids.length; i++) {
         const { returnValue } = await this.executeMessage(this.makeCallMessage('indexedValidatorsById', ['uint256'], [ids[i].toString()]));
@@ -270,15 +281,11 @@ export class StakeManager extends Contract {
    */
   onAfterBlockV2(proposer: Address, activeValidators: Address[], priorities: BN[]) {
     return this.runWithLogger(async () => {
-      const data = await Promise.all(
+      const ids = await Promise.all(
         activeValidators.map((address) => {
-          const addr = address.toString();
-          return this.executeMessage(this.makeSystemCallerMessage('validators', ['address'], [addr]));
+          return this.getValidatorIdByAddress(address);
         })
       );
-      const ids = data.map((item) => {
-        return new BN(item.returnValue.slice(0 * 32, 1 * 32)); //get the first property
-      });
       await this.executeMessage(this.makeSystemCallerMessage('onAfterBlockV2', ['address', 'bytes'], [proposer.toString(), validatorsEncode(ids, priorities)]));
     });
   }

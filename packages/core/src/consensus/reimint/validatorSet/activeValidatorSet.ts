@@ -49,7 +49,6 @@ export class ActiveValidatorSet {
     const proposer = await sm.proposer();
     const active: ActiveValidator[] = [];
     const activeValidatorInfos: ActiveValidatorInfo[] = [];
-
     if (isEnableValidatorInfos(sm.common)) {
       activeValidatorInfos.push(...(await sm.allActiveValidators()));
     } else {
@@ -58,7 +57,6 @@ export class ActiveValidatorSet {
         activeValidatorInfos.push(await sm.activeValidators(i));
       }
     }
-
     for (const v of activeValidatorInfos) {
       active.push({
         ...v,

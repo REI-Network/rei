@@ -262,12 +262,11 @@ export class ReimintExecutor implements Executor {
     // 10. call stakeManager.onAfterBlock to save active validator set
     const activeSigners = activeValidators.map(({ validator }) => validator);
     const priorities = activeValidators.map(({ priority }) => priority);
-    // TODO:
-    // if (isEnableValidatorInfos(pendingCommon)) {
-    //   await parentStakeManager.onAfterBlockV2(validatorSet.active.proposer, activeSigners, priorities);
-    // } else {
-    //   await parentStakeManager.onAfterBlock(validatorSet.active.proposer, activeSigners, priorities);
-    // }
+    if (isEnableBetterPOS(pendingCommon)) {
+      await parentStakeManager.onAfterBlockV2(validatorSet.active.proposer, activeSigners, priorities);
+    } else {
+      await parentStakeManager.onAfterBlock(validatorSet.active.proposer, activeSigners, priorities);
+    }
 
     const nextCommon = this.backend.getCommon(pendingBlock.header.number.addn(1));
     // 11. deploy contracts if enable hardfork 1 is enabled in the next block

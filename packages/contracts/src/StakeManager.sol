@@ -38,10 +38,11 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     ActiveValidator[] public override activeValidators;
     // proposer address
     address public override proposer;
+    // validator id and priority encoded result
+    bytes private activeValidatorInfos;
+
     // the hash set of the evidence that has been used
     mapping(bytes32 => bool) public override usedEvidence;
-
-    bytes private activeValidatorInfos;
 
     /**
      * Emitted when a validator gets a reward
@@ -542,7 +543,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
 
     /**
      * After block callback, it will be called by system caller after each block is processed
-     * @param _proposer          Proposer address
+     * @param _proposer               Proposer address
      * @param _activeValidators       Active validator infos
      */
     function onAfterBlock(address _proposer, bytes calldata _activeValidators) external override nonReentrant onlySystemCaller {

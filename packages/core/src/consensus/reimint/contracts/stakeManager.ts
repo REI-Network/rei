@@ -2,7 +2,7 @@ import EVM from '@rei-network/vm/dist/evm/evm';
 import { Address, BN, bufferToHex, toBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Log, Receipt } from '@rei-network/structure';
-import { ValidatorChanges, getGenesisValidators, isGenesis } from '../validatorSet';
+import { ValidatorChanges, getGenesisValidators } from '../validatorSet';
 import { bufferToAddress, decodeInt256, decodeBytes, validatorsEncode, validatorsDecode } from './utils';
 import { Contract } from './contract';
 

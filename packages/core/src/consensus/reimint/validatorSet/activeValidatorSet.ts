@@ -3,7 +3,7 @@ import { Common } from '@rei-network/common';
 import { StakeManager } from '../contracts';
 import { IndexedValidator } from './indexedValidatorSet';
 import { getGenesisValidators, genesisValidatorPriority, genesisValidatorVotingPower } from './genesis';
-import { isEnableValidatorInfos } from '../../../hardforks';
+// import { isEnableValidatorInfos } from '../../../hardforks';
 import { ActiveValidator as ActiveValidatorInfo } from '../contracts/stakeManager';
 const maxInt256 = new BN('7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 'hex');
 const minInt256 = new BN('8000000000000000000000000000000000000000000000000000000000000000', 'hex').neg();
@@ -49,14 +49,15 @@ export class ActiveValidatorSet {
     const proposer = await sm.proposer();
     const active: ActiveValidator[] = [];
     const activeValidatorInfos: ActiveValidatorInfo[] = [];
-    if (isEnableValidatorInfos(sm.common)) {
-      activeValidatorInfos.push(...(await sm.allActiveValidators()));
-    } else {
-      const length = await sm.activeValidatorsLength();
-      for (const i = new BN(0); i.lt(length); i.iaddn(1)) {
-        activeValidatorInfos.push(await sm.activeValidators(i));
-      }
+    // TODO:
+    // if (isEnableValidatorInfos(sm.common)) {
+    //   activeValidatorInfos.push(...(await sm.allActiveValidators()));
+    // } else {
+    const length = await sm.activeValidatorsLength();
+    for (const i = new BN(0); i.lt(length); i.iaddn(1)) {
+      activeValidatorInfos.push(await sm.activeValidators(i));
     }
+    // }
     for (const v of activeValidatorInfos) {
       active.push({
         ...v,

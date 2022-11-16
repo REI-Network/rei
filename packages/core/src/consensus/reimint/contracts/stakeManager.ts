@@ -1,5 +1,5 @@
 import EVM from '@rei-network/vm/dist/evm/evm';
-import { Address, BN, toBuffer, rlp } from 'ethereumjs-util';
+import { Address, BN, bufferToHex, toBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Log, Receipt } from '@rei-network/structure';
 import { ValidatorChanges, getGenesisValidators } from '../validatorSet';
@@ -23,7 +23,11 @@ const methods = {
   indexedValidatorsById: toBuffer('0x36137fae'),
   onAfterBlockV2: toBuffer('0xfa2909d4'),
   getActiveValidatorInfos: toBuffer('0x021c585c'),
-  validators: toBuffer('0xfa52c7d8')
+  validators: toBuffer('0xfa52c7d8'),
+  addMissRecord: toBuffer('0x18498f3a'),
+  slashV2: toBuffer('0xad2c8b5e'),
+  initEvidenceHash: toBuffer('0x2854982e'),
+  usedEvidence: toBuffer('0x981617f5')
 };
 
 // event topic
@@ -262,6 +266,19 @@ export class StakeManager extends Contract {
   }
 
   /**
+   * Slash block validator(V2)
+   * @param validator - Validator address
+   * @param reason - Slash reason
+   * @param hash - Evidence hash
+   */
+  slashV2(validator: Address, reason: SlashReason, hash: Buffer) {
+    return this.runWithLogger(async () => {
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('slashV2', ['address', 'uint8', 'bytes32'], [validator.toString(), reason, bufferToHex(hash)]));
+      return logs;
+    });
+  }
+
+  /**
    * After block call back
    * @param proposer - Proposer address
    * @param activeValidators - Address list of active validator
@@ -287,6 +304,39 @@ export class StakeManager extends Contract {
         })
       );
       await this.executeMessage(this.makeSystemCallerMessage('onAfterBlockV2', ['address', 'bytes'], [proposer.toString(), validatorsEncode(ids, priorities)]));
+    });
+  }
+
+  /**
+   * Check if an evidence hash exists
+   * @param hash - Evidence hash
+   */
+  isUsedEvidence(hash: Buffer) {
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('usedEvidence', ['bytes32'], [bufferToHex(hash)]));
+      return new BN(returnValue).eqn(1);
+    });
+  }
+
+  /**
+   * Init evidence hash, for migratine
+   * @param hashes - Hash list
+   */
+  initEvidenceHash(hashes: Buffer[]) {
+    return this.runWithLogger(async () => {
+      await this.executeMessage(this.makeSystemCallerMessage('initEvidenceHash', ['bytes32[]'], [hashes.map(bufferToHex)]));
+    });
+  }
+
+  /**
+   * Add miss record to persion contract per block
+   * @param missReord - Miss record
+   * @returns
+   */
+  addMissRecord(missRecord: string[][]) {
+    return this.runWithLogger(async () => {
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('addMissRecord', ['tuple(address,uint256)[]'], [missRecord]));
+      return logs;
     });
   }
 }

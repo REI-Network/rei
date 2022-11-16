@@ -16,12 +16,16 @@ contract DevConfig is Ownable, IConfig {
     address internal f = 0x0000000000000000000000000000000000001005;
     address internal fp = 0x0000000000000000000000000000000000001006;
     address internal ft = 0x0000000000000000000000000000000000001007;
+    address internal pr = 0x0000000000000000000000000000000000001008;
 
     uint256 internal ud = 1 seconds;
     uint256 internal wd = 1 seconds;
     uint256 internal mivp = 10000;
     uint256 internal scri = 5 seconds;
     uint256 internal fpi = 10 seconds;
+    uint256 internal rap = 200;
+    uint256 internal fft = 1e18;
+    uint256 internal jtd = 20;
 
     /////////////////////////////////
 
@@ -49,6 +53,10 @@ contract DevConfig is Ownable, IConfig {
         fp = _fp;
     }
 
+    function setPrison(address _pr) external onlyOwner {
+        pr = _pr;
+    }
+
     function setUnstakeDelay(uint256 _ud) external onlyOwner {
         ud = _ud;
     }
@@ -67,6 +75,18 @@ contract DevConfig is Ownable, IConfig {
 
     function setFeePoolInterval(uint256 _fpi) external onlyOwner {
         fpi = _fpi;
+    }
+
+    function setRecordsAmountPeriod(uint256 _rap) external onlyOwner {
+        rap = _rap;
+    }
+
+    function setForfeit(uint256 _fft) external onlyOwner {
+        fft = _fft;
+    }
+
+    function setJailThreshold(uint256 _jtd) external onlyOwner {
+        jtd = _jtd;
     }
 
     /////////////////////////////////
@@ -99,6 +119,10 @@ contract DevConfig is Ownable, IConfig {
         return ft;
     }
 
+    function prison() external view override returns (address) {
+        return pr;
+    }
+
     function unstakeDelay() external view override returns (uint256) {
         return ud;
     }
@@ -117,6 +141,18 @@ contract DevConfig is Ownable, IConfig {
 
     function feePoolInterval() external view override returns (uint256) {
         return fpi;
+    }
+
+    function recordsAmountPeriod() external view override returns (uint256) {
+        return rap;
+    }
+
+    function forfeit() external view override returns (uint256) {
+        return fft;
+    }
+
+    function jailThreshold() external view override returns (uint256) {
+        return jtd;
     }
 
     function getFactorByReason(uint8 reason) external view override returns (uint8) {

@@ -2,11 +2,13 @@ import { Account, Address } from 'ethereumjs-util';
 import { Blockchain } from '@rei-network/blockchain';
 import { Common, Chain } from '@rei-network/common';
 import { BlockHeader } from '@rei-network/structure';
+import type { JSEVMBinding } from '@rei-network/binding';
+import { createBinding } from './binding';
 import { StateManager } from './state/index';
 import { default as runCall, RunCallOpts } from './runCall';
 import { default as runTx, RunTxOpts, RunTxResult } from './runTx';
 import { default as runBlock, RunBlockOpts, RunBlockResult } from './runBlock';
-import { EVMResult } from './evm/evm';
+import { EVMResult, EVMWorkMode } from './evm/evm';
 import { OpcodeList, getOpcodesForHF } from './evm/opcodes';
 import { precompiles } from './evm/precompiles';
 const AsyncEventEmitter = require('async-eventemitter');
@@ -109,6 +111,16 @@ export interface VMOpts {
    * Get miner address callback
    */
   getMiner?: (header: BlockHeader) => Address;
+
+  /**
+   * EVM work mode
+   */
+  mode?: EVMWorkMode;
+
+  /**
+   * Exposed low level database pointer
+   */
+  exposed?: any;
 }
 
 /**
@@ -126,6 +138,18 @@ export class VM extends AsyncEventEmitter {
    * The blockchain the VM operates on
    */
   readonly blockchain: Blockchain;
+  /**
+   * Exposed low level database pointer
+   */
+  readonly exposed?: any;
+  /**
+   * Binding object
+   */
+  readonly binding?: JSEVMBinding;
+  /**
+   * EVM work mode
+   */
+  readonly mode?: EVMWorkMode;
 
   readonly _common: Common;
 
@@ -240,6 +264,17 @@ export class VM extends AsyncEventEmitter {
     // We cache this promisified function as it's called from the main execution loop, and
     // promisifying each time has a huge performance impact.
     this._emit = promisify(this.emit.bind(this));
+
+    // Save leveldb pointer
+    this.exposed = opts.exposed;
+
+    // Save evm work mode
+    this.mode = opts.mode ?? EVMWorkMode.JS;
+
+    if (this.exposed && this.mode === EVMWorkMode.Binding) {
+      // Constructor binding object if pointer exists
+      this.binding = createBinding(this.exposed, this._common.chainId());
+    }
   }
 
   async init(): Promise<void> {
@@ -333,7 +368,8 @@ export class VM extends AsyncEventEmitter {
     return new VM({
       stateManager: this.stateManager.copy(),
       blockchain: this.blockchain,
-      common: this._common
+      common: this._common,
+      exposed: this.exposed
     });
   }
 }

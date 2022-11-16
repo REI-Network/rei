@@ -157,7 +157,7 @@ export class IndexedValidatorSet {
         v.votingPower = vc.votingPower;
       }
 
-      if (!vc.update.eqn(0)) {
+      if (!vc.update.eqn(0) && this.indexed.get(vc.validator)) {
         dirty = true;
         v = v ?? this.getValidator(vc.validator);
         v.votingPower.iadd(vc.update);

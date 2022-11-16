@@ -1,38 +1,37 @@
 {
-  "name": "@rei-network/core",
-  "version": "1.0.2",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "license": "GPL-3.0-or-later",
-  "scripts": {
-    "build": "tsc --build tsconfig.json",
-    "test": "mocha -r ts-node/register 'test/**/*.test.ts' --timeout 100000 --exit",
-    "test:util": "mocha -r ts-node/register 'test/utils/utils.test.ts' --timeout 100000 --exit"
-  },
-  "devDependencies": {
-    "@types/levelup": "^4.3.0",
-    "@types/node": "^14.14.9",
-    "chai": "^4.3.4",
-    "mocha": "^9.0.2",
-    "typescript": "^4.1.2"
-  },
-  "dependencies": {
-    "@ethersproject/abi": "^5.4.0",
-    "@rei-network/vm": "^1.0.2",
-    "@rei-network/blockchain": "^1.0.2",
-    "@rei-network/common": "^1.0.0",
-    "@rei-network/database": "^1.0.2",
-    "@rei-network/network": "^0.1.3",
-    "@rei-network/structure": "^0.1.2",
-    "@rei-network/utils": "^0.1.1",
-    "@rei-network/wallet": "^0.1.1",
-    "big-integer": "^1.6.48",
-    "datastore-level": "^5.0.1",
-    "ethereumjs-util": "^7.1.4",
-    "levelup": "^4.4.0",
-    "merkle-patricia-tree": "^4.2.3",
-    "peer-id": "^0.14.2",
-    "recast": "^0.20.4",
-    "semaphore-async-await": "^1.5.1"
-  }
+    "name": "@rei-network/core",
+    "version": "1.1.2",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "license": "GPL-3.0-or-later",
+    "scripts": {
+        "build": "tsc --build tsconfig.json",
+        "test": "mocha -r ts-node/register 'test/**/*.test.ts' --timeout 100000 --exit"
+    },
+    "devDependencies": {
+        "@types/levelup": "^4.3.0",
+        "@types/node": "^14.14.9",
+        "chai": "^4.3.4",
+        "mocha": "^9.0.2",
+        "typescript": "^4.1.2"
+    },
+    "dependencies": {
+        "@ethersproject/abi": "^5.4.0",
+        "@rei-network/vm": "^1.1.2",
+        "@rei-network/blockchain": "^1.1.2",
+        "@rei-network/common": "^1.1.2",
+        "@rei-network/database": "^1.1.2",
+        "@rei-network/network": "^0.1.3",
+        "@rei-network/structure": "^0.1.4",
+        "@rei-network/utils": "^0.1.1",
+        "@rei-network/wallet": "^0.1.1",
+        "big-integer": "^1.6.48",
+        "datastore-level": "^5.0.1",
+        "ethereumjs-util": "^7.1.4",
+        "levelup": "^4.4.0",
+        "merkle-patricia-tree": "^4.2.3",
+        "peer-id": "^0.14.2",
+        "recast": "^0.20.4",
+        "semaphore-async-await": "^1.5.1"
+    }
 }

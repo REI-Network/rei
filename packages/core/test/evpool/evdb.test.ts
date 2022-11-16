@@ -23,7 +23,7 @@ describe('EvidenceDatabase', () => {
 
   before(async () => {
     await clearup();
-    rawdb = createLevelDB(testDir);
+    [rawdb] = createLevelDB(testDir);
     db = new EvidenceDatabase(rawdb);
   });
 

@@ -88,7 +88,7 @@
     },
     {
       "name": "validator-infos",
-      "block": 10
+      "block": 500
     }
   ],
   "bootstrapNodes": []

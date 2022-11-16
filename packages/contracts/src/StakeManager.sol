@@ -33,6 +33,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     // total locked amount
     uint256 public override totalLockedAmount = 0;
 
+    // Deprecate: this variable is kept for forward compatibility only
     // active validator list of next block,
     // this will be set in `afterBlock`
     ActiveValidator[] public override activeValidators;

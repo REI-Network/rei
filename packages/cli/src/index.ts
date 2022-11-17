@@ -14,7 +14,7 @@ program.version(loadVersion());
 program.option('--rpc', 'open rpc server');
 program.option('--rpc-port <port>', 'rpc server port');
 program.option('--rpc-host <port>', 'rpc server host');
-program.option('--rpc-api <apis>', 'rpc server apis: debug, eth, net, txpool, web3');
+program.option('--rpc-api <apis>', 'rpc server apis: debug, eth, net, txpool, web3, rei');
 program.option('--p2p-tcp-port <port>', 'p2p server tcp port');
 program.option('--p2p-udp-port <port>', 'p2p server udp port');
 program.option('--p2p-nat <ip>', 'p2p server nat ip');

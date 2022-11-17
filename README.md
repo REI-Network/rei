@@ -23,6 +23,15 @@ Nodejs implementation of REI-Network protocols
 | [@rei-network/api][api-package]               | [![NPM Version][api-npm-version]][api-npm-url]               | [![Api Issues][api-issues]][api-issues-url]                      |
 | [@rei-network/ipc][ipc-package]               | [![NPM Version][ipc-npm-version]][ipc-npm-url]               | [![Ipc Issues][ipc-issues]][ipc-issues-url]                      |
 
+## Requirements
+
+- node >= `14.16.1`
+- npm >= `7.0.0`
+- supported system:
+  - Windows 10+
+  - MacOS 12+
+  - Any Linux with glibc >= `2.28` and glibcxx >= `3.4.25`
+
 ## Quick start
 
 ### Install
@@ -213,58 +222,6 @@ These scripts execute lint and lint:fix respectively, to all monorepo packages.
   </details>
 
   A: Please update the node version to **14.0.0** or higher. [nvm](https://github.com/nvm-sh/nvm) may be able to help you
-
-- Q: Why do I get `CMake executable is not found` when I install `@rei-network/cli`?
-
-  <details><summary> like this </summary>
-
-  ```
-  npm ERR! code 1
-  npm ERR! path /root/.nvm/versions/node/v14.16.1/lib/node_modules/@rei-network/cli/node_modules/@rei-network/binding
-  npm ERR! command failed
-  npm ERR! command sh -c npm run install:leveldb && npm run install:napi-macros && npm run install:snappy && npm run build
-  npm ERR! > @rei-network/binding@0.0.2 install:leveldb
-  npm ERR! > test -d leveldb || git clone https://github.com/REI-Network/leveldb
-  npm ERR!
-  npm ERR!
-  npm ERR! > @rei-network/binding@0.0.2 install:napi-macros
-  npm ERR! > test -d napi-macros || git clone https://github.com/hyperdivision/napi-macros
-  npm ERR!
-  npm ERR!
-  npm ERR! > @rei-network/binding@0.0.2 install:snappy
-  npm ERR! > test -d snappy || git clone https://github.com/google/snappy
-  npm ERR!
-  npm ERR!
-  npm ERR! > @rei-network/binding@0.0.2 build
-  npm ERR! > cmake-js --CDLEVELDB_BUILD_TESTS=OFF --CDLEVELDB_BUILD_BENCHMARKS=OFF --CDLEVELDB_INSTALL=OFF --CDSNAPPY_BUILD_TESTS=OFF --CDSNAPPY_BUILD_BENCHMARKS=OFF --CDSNAPPY_INSTALL=OFF build
-  npm ERR!
-  npm ERR! [
-  npm ERR!   '/root/.nvm/versions/node/v14.16.1/bin/node',
-  npm ERR!   '/root/.nvm/versions/node/v14.16.1/lib/node_modules/@rei-network/cli/node_modules/.bin/cmake-js',
-  npm ERR!   '--CDLEVELDB_BUILD_TESTS=OFF',
-  npm ERR!   '--CDLEVELDB_BUILD_BENCHMARKS=OFF',
-  npm ERR!   '--CDLEVELDB_INSTALL=OFF',
-  npm ERR!   '--CDSNAPPY_BUILD_TESTS=OFF',
-  npm ERR!   '--CDSNAPPY_BUILD_BENCHMARKS=OFF',
-  npm ERR!   '--CDSNAPPY_INSTALL=OFF',
-  npm ERR!   'build'
-  npm ERR! ]
-  npm ERR! clone 'leveldb'...
-  npm ERR! clone 'napi-macros'...
-  npm ERR! clone 'snappy'...
-  npm ERR! info TOOL Using Unix Makefiles generator.
-  npm ERR! info DIST Downloading distribution files to: /root/.cmake-js/node-x64/v14.16.1
-  npm ERR! http DIST  - https://nodejs.org/dist/v14.16.1/SHASUMS256.txt
-  npm ERR! http DIST  - https://nodejs.org/dist/v14.16.1/node-v14.16.1-headers.tar.gz
-  npm ERR! ERR! OMG CMake executable is not found. Please use your system's package manager to install it, or you can get installers from there: http://cmake.org.
-
-  npm ERR! A complete log of this run can be found in:
-  npm ERR!     /root/.npm/_logs/2022-06-24T06_05_09_742Z-debug.log
-  ```
-
-  </details>
-
-  A: Please use your system's package manager to install cmake, like `sudo apt install cmake` or `sudo yum install cmake`
 
 ## License
 

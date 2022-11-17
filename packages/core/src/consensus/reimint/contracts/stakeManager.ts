@@ -190,7 +190,7 @@ export class StakeManager extends Contract {
       if (index !== -1) {
         return new BN(index);
       }
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('getVotingPowerByAddress', ['address'], [address.toString()]));
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('validators', ['address'], [address.toString()]));
       return new BN(returnValue.slice(0, 32));
     });
   }

@@ -1,7 +1,8 @@
 import crypto from 'crypto';
 import type Web3 from 'web3';
 import { assert, expect } from 'chai';
-import { BN, MAX_INTEGER, bufferToHex } from 'ethereumjs-util';
+import { BN, MAX_INTEGER, bufferToHex, toBuffer } from 'ethereumjs-util';
+import { validatorsDecode, validatorsEncode, decodeBytes } from '@rei-network/core/src/consensus/reimint/contracts/utils';
 import { upTimestamp, toBN } from './utils';
 
 declare var artifacts: any;
@@ -316,27 +317,30 @@ describe('StakeManger', () => {
 
   it('should correctly set active validators', async () => {
     let proposer = '0xb7e390864a90b7b923c9f9310c6f98aafe43f707';
-    let vs = [validator1, validator2, validator3];
-    let ps = ['-1', '1', '-100'];
-    await stakeManager.methods.onAfterBlock(proposer, vs, ps).send();
+    let vs = [1, 2, 3].map((item) => new BN(item));
+    let ps = ['-1', '1', '-100'].map((item) => new BN(item));
+    await stakeManager.methods.onAfterBlock(proposer, validatorsEncode(vs, ps)).send();
     expect((await stakeManager.methods.proposer().call()).toLocaleLowerCase(), 'proposer should be equal').be.equal(proposer);
-    expect(await stakeManager.methods.activeValidatorsLength().call(), 'length should be equal').be.equal('3');
+    let validatorInfos = await stakeManager.methods.getActiveValidatorInfos().call();
+    let { ids, priorities } = validatorsDecode(toBuffer(validatorInfos));
+    expect(ids.length, 'length should be equal').be.equal(3);
+    expect(priorities.length, 'length should be equal').be.equal(3);
     for (let i = 0; i < 3; i++) {
-      const v = await stakeManager.methods.activeValidators(i).call();
-      expect(v.validator, 'validator address should be equal').be.equal(vs[i]);
-      expect(v.priority, 'validator priority should be equal').be.equal(ps[i]);
+      assert(ids[i].eq(vs[i]), 'validator address should be equal');
+      assert(priorities[i].eq(ps[i]), 'validator priority should be equal');
     }
-
     proposer = '0xb7e390864a90b7b923c9f9310c6f98aafe43f708';
-    vs = [validator3, validator2];
-    ps = ['-1', '1'];
-    await stakeManager.methods.onAfterBlock(proposer, vs, ps).send();
+    vs = [3, 2].map((item) => new BN(item));
+    ps = ['-1', '1'].map((item) => new BN(item));
+    await stakeManager.methods.onAfterBlock(proposer, validatorsEncode(vs, ps)).send();
+    validatorInfos = await stakeManager.methods.getActiveValidatorInfos().call();
+    ({ ids, priorities } = validatorsDecode(toBuffer(validatorInfos)));
     expect((await stakeManager.methods.proposer().call()).toLocaleLowerCase(), 'proposer should be equal').be.equal(proposer);
-    expect(await stakeManager.methods.activeValidatorsLength().call(), 'length should be equal').be.equal('2');
+    expect(ids.length, 'length should be equal').be.equal(2);
+    expect(priorities.length, 'length should be equal').be.equal(2);
     for (let i = 0; i < 2; i++) {
-      const v = await stakeManager.methods.activeValidators(i).call();
-      expect(v.validator, 'validator address should be equal').be.equal(vs[i]);
-      expect(v.priority, 'validator priority should be equal').be.equal(ps[i]);
+      assert(ids[i].eq(vs[i]), 'validator address should be equal');
+      assert(priorities[i].eq(ps[i]), 'validator priority should be equal');
     }
   });
 

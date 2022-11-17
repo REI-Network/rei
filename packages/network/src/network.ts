@@ -26,6 +26,11 @@ type PeerInfo = {
   nodeId: string;
   peerId: string;
   caps: string[];
+  network: {
+    localAddress: string;
+    remoteAddress: string;
+  };
+  protocols: {};
 };
 
 type NodeInfo = {
@@ -163,9 +168,28 @@ export class NetworkManager extends EventEmitter {
     return Array.from(this._peers.values()).map((peer): PeerInfo => {
       const peerId = peer.peerId;
       const caps = peer.supportedProtocols;
+      const protocols = {};
+      for (const protocolName of caps) {
+        const protocalHandler = peer.getHandler(protocolName);
+        const status = protocalHandler.getRemoteStatus();
+        const name = status.name;
+        delete status.name;
+        protocols[name!] = status;
+      }
       const connection = this.libp2p.getConnections(peer.peerId)![0];
       const nodeId = ENR.createFromPeerId(connection.remotePeer).nodeId;
-      return { peerId, nodeId, caps };
+      const localEnr = this.discv5.localEnr;
+      const remoteEnr = this.discv5.findEnr(nodeId);
+      return {
+        peerId,
+        nodeId,
+        caps,
+        network: {
+          localAddress: '0.0.0.0' + ':' + localEnr.udp,
+          remoteAddress: remoteEnr ? remoteEnr.ip + ':' + remoteEnr.udp : ''
+        },
+        protocols
+      };
     });
   }
 

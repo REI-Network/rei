@@ -27,7 +27,7 @@ export class RevertError {
 
   constructor(returnValue: string | Buffer, decodedReturnValue: string | undefined) {
     this.rpcMessage = decodedReturnValue ? 'execution reverted: ' + decodedReturnValue : (returnValue as string);
-    this.data = decodedReturnValue && bufferToHex(returnValue as Buffer);
+    this.data = decodedReturnValue && 'execution reverted: ' + bufferToHex(returnValue as Buffer);
   }
 }
 

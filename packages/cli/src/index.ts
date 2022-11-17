@@ -1,23 +1,14 @@
 #!/usr/bin/env node
 
 import os from 'os';
-import fs from 'fs';
 import path from 'path';
 import process from 'process';
 import { program } from 'commander';
+import { loadVersion } from './utils';
 import { installStartAction, installAccountCommand, installAttachCommand, installConsoleCommand } from './commands';
 
-// load version from package.json
-let version = 'unknown';
-try {
-  version = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json')).toString()).version;
-  version = version ?? 'unknown';
-} catch (err) {
-  // ignore errors...
-}
-
 // set version
-program.version(version);
+program.version(loadVersion());
 
 // install options
 program.option('--rpc', 'open rpc server');

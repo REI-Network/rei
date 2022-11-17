@@ -9,13 +9,15 @@ import { api } from './controller';
  */
 export class ApiServer {
   readonly node: Node;
+  readonly version: string;
   readonly oracle: SimpleOracle;
   readonly filterSystem: FilterSystem;
   readonly controllers = new Map<string, any>();
   rpcServer!: RpcServer;
 
-  constructor(node: Node) {
+  constructor(node: Node, version: string) {
     this.node = node;
+    this.version = version;
     this.oracle = new SimpleOracle(node);
     this.filterSystem = new FilterSystem(node);
     for (const [name, controller] of Object.entries(api)) {

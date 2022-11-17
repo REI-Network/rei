@@ -63,3 +63,15 @@ export async function getPassphrase(opts: { [option: string]: string }, options?
 export function getKeyStorePath(opts: { [option: string]: string }) {
   return path.join(opts.datadir, opts.keystore);
 }
+
+export function loadVersion() {
+  // load version from package.json
+  let version = 'unknown';
+  try {
+    version = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json')).toString()).version;
+    version = version ?? 'unknown';
+  } catch (err) {
+    // ignore errors...
+  }
+  return version;
+}

@@ -5,7 +5,7 @@ import { RpcServer } from '@rei-network/rpc';
 import { setLevel, logger } from '@rei-network/utils';
 import { ApiServer } from '@rei-network/api';
 import { IpcServer } from '@rei-network/ipc';
-import { getPassphrase, getKeyStorePath } from './utils';
+import { getPassphrase, getKeyStorePath, loadVersion } from './utils';
 
 type Services = { node: Node; apiServer: ApiServer; rpcServer: RpcServer; ipcServer: IpcServer };
 
@@ -59,7 +59,7 @@ export async function startServices(opts: { [option: string]: string }): Promise
   });
 
   // create api server instance
-  const apiServer = new ApiServer(node);
+  const apiServer = new ApiServer(node, loadVersion());
   apiServer.start();
 
   const rpc = {

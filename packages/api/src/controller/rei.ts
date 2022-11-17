@@ -7,6 +7,14 @@ import { Controller } from './base';
  */
 export class ReiController extends Controller {
   /**
+   * Get client version
+   * @returns Client version
+   */
+  getVersion() {
+    return this.server.version;
+  }
+
+  /**
    * Estimate user available crude
    * @param address - Target address
    * @param tag - Block tag

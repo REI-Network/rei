@@ -309,11 +309,10 @@ export class StakeManager extends Contract {
    */
   onAfterBlockV2(proposer: Address, activeValidators: Address[], priorities: BN[]) {
     return this.runWithLogger(async () => {
-      const ids = await Promise.all(
-        activeValidators.map((address) => {
-          return this.getValidatorIdByAddress(address);
-        })
-      );
+      const ids: BN[] = [];
+      for (const address of activeValidators) {
+        ids.push(await this.getValidatorIdByAddress(address));
+      }
       await this.executeMessage(this.makeSystemCallerMessage('onAfterBlockV2', ['address', 'bytes'], [proposer.toString(), validatorsEncode(ids, priorities)]));
     });
   }

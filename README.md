@@ -50,7 +50,7 @@ Options:
   --rpc                                      open rpc server
   --rpc-port <port>                          rpc server port
   --rpc-host <port>                          rpc server host
-  --rpc-api <apis>                           rpc server apis: debug, eth, net, txpool, web3
+  --rpc-api <apis>                           rpc server apis: debug, eth, net, txpool, web3, rei
   --p2p-tcp-port <port>                      p2p server tcp port
   --p2p-udp-port <port>                      p2p server udp port
   --p2p-nat <ip>                             p2p server nat ip

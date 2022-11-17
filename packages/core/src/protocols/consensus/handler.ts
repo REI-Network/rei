@@ -464,7 +464,12 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
       }
     }
   }
+
+  /**
+   * Get remote peer status
+   * @returns Status
+   */
   getRemoteStatus() {
-    return { name: this.protocol.name, version: Number(this.protocol.version), height: this.height.toNumber(), round: this.round, step: this.step, proposal: this.proposal, proposalBlockHash: this.proposalBlockHash };
+    return { name: this.protocol.name, version: Number(this.protocol.version), height: this.height.toNumber(), round: this.round, step: this.step };
   }
 }

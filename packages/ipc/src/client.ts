@@ -49,7 +49,7 @@ export class IpcClient {
         });
 
         ipc.of[ipcId].on('message', (data: string) => {
-          console.log(JSON.parse(data));
+          console.log(JSON.stringify(JSON.parse(data), undefined, '\t'));
           this.replServer.displayPrompt();
         });
 

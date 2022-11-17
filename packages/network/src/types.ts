@@ -39,7 +39,7 @@ export interface ProtocolHandler {
   /**
    * Get the status of the remote node in the hander
    */
-  getRemoteStatus(): { name?: string; version: number };
+  getRemoteStatus(): { name: string; version: number };
 }
 
 export type Connection = {

@@ -25,12 +25,13 @@ enum Libp2pPeerValue {
 type PeerInfo = {
   nodeId: string;
   peerId: string;
+  enr: string;
   caps: string[];
+  protocols: { version: number };
   network: {
     localAddress: string;
     remoteAddress: string;
   };
-  protocols: {};
 };
 
 type NodeInfo = {
@@ -165,32 +166,43 @@ export class NetworkManager extends EventEmitter {
    * Get connected peers
    */
   get connectedPeers() {
-    return Array.from(this._peers.values()).map((peer): PeerInfo => {
-      const peerId = peer.peerId;
-      const caps = peer.supportedProtocols;
-      const protocols = {};
-      for (const protocolName of caps) {
-        const protocalHandler = peer.getHandler(protocolName);
-        const status = protocalHandler.getRemoteStatus();
-        const name = status.name;
-        delete status.name;
-        protocols[name!] = status;
+    const peers: PeerInfo[] = [];
+    for (const peer of this.peers) {
+      try {
+        const peerId = peer.peerId;
+        const caps = peer.supportedProtocols;
+        const protocols: any = {};
+        for (const protocolName of caps) {
+          const status = peer.getHandler(protocolName).getRemoteStatus();
+          protocols[status.name] = status;
+        }
+        const connections = this.libp2p.getConnections(peer.peerId);
+        if (connections === undefined || connections.length === 0) {
+          continue;
+        }
+        const connection = connections[0];
+        const nodeId = ENR.createFromPeerId(connection.remotePeer).nodeId;
+        const localEnr = this.discv5.localEnr;
+        const remoteEnr = this.discv5.findEnr(nodeId);
+        if (!localEnr.udp || !remoteEnr || !remoteEnr.ip || !remoteEnr.udp) {
+          continue;
+        }
+        peers.push({
+          peerId,
+          nodeId,
+          enr: remoteEnr.encodeTxt(),
+          caps,
+          protocols,
+          network: {
+            localAddress: '0.0.0.0:' + localEnr.udp,
+            remoteAddress: remoteEnr.ip + ':' + remoteEnr.udp
+          }
+        });
+      } catch (err) {
+        logger.debug('NetworkManager::connectedPeers, catch:', err);
       }
-      const connection = this.libp2p.getConnections(peer.peerId)![0];
-      const nodeId = ENR.createFromPeerId(connection.remotePeer).nodeId;
-      const localEnr = this.discv5.localEnr;
-      const remoteEnr = this.discv5.findEnr(nodeId);
-      return {
-        peerId,
-        nodeId,
-        caps,
-        network: {
-          localAddress: '0.0.0.0' + ':' + localEnr.udp,
-          remoteAddress: remoteEnr ? remoteEnr.ip + ':' + remoteEnr.udp : ''
-        },
-        protocols
-      };
-    });
+    }
+    return peers;
   }
 
   /**

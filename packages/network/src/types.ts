@@ -37,7 +37,7 @@ export interface ProtocolHandler {
   abort(): void;
 
   /**
-   * Get the status of the remote node in the hander
+   * Get remote status
    */
   getRemoteStatus(): { name: string; version: number };
 }

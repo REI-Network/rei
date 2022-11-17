@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import { assert } from 'console';
 import { randomBytes } from 'crypto';
 import { BN } from 'ethereumjs-util';
-import { validatorsDecode, validatorsEncode } from '../../src/utils';
+import { validatorsDecode, validatorsEncode } from '../../src/consensus/reimint/contracts/utils';
 
 describe('ValidatorsEncoder', () => {
   let length = 0;

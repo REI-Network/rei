@@ -11,6 +11,7 @@
     { "path": "../core/tsconfig.json" },
     { "path": "../rpc/tsconfig.json" },
     { "path": "../utils/tsconfig.json" },
-    { "path": "../wallet/tsconfig.json" }
+    { "path": "../wallet/tsconfig.json" },
+    { "path": "../ipc/tsconfig.json" }
   ]
 }

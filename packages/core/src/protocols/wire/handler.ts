@@ -1,4 +1,4 @@
-import { bufferToInt, rlp, BN, intToBuffer } from 'ethereumjs-util';
+import { bufferToInt, rlp, BN, intToBuffer, bufferToHex } from 'ethereumjs-util';
 import { Transaction, Block, BlockHeader } from '@rei-network/structure';
 import { logger, Channel, FunctionalBufferSet } from '@rei-network/utils';
 import { ProtocolHandler, Peer, ProtocolStream } from '@rei-network/network';
@@ -12,6 +12,8 @@ export interface WireProtocol {
   readonly node: Node;
   readonly pool: HandlerPool<WireProtocolHandler>;
   get protocolString(): string;
+  get version(): string;
+  get name(): string;
 }
 
 /**
@@ -434,5 +436,21 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
    */
   announceNewBlock(block: Block, td: BN) {
     this.newBlockAnnouncesQueue.push({ block, td });
+  }
+
+  /**
+   * Get remote peer status
+   * @returns Status
+   */
+  getRemoteStatus() {
+    const result = { name: this.protocol.name, version: Number(this.protocol.version) };
+    if (!this.status) {
+      return result;
+    }
+    return {
+      ...result,
+      difficulty: bufferToHex(this.status.totalDifficulty),
+      head: bufferToHex(this.status.bestHash)
+    };
   }
 }

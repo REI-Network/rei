@@ -13,7 +13,7 @@ import { Node } from '../../node';
 import { StateManager } from '../../stateManager';
 import { ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
-import { getConsensusTypeByCommon, isEnableFreeStaking, isEnableHardfork1, isEnableRemint } from '../../hardforks';
+import { getConsensusTypeByCommon, isEnableRemint, isEnableFreeStaking, loadInitData, isEnableHardfork2, isEnableBetterPOS } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
@@ -24,6 +24,7 @@ import { Reimint } from './reimint';
 import { WAL } from './wal';
 import { ReimintExecutor } from './executor';
 import { ExtraData } from './extraData';
+import { EvidenceCollector } from './evidenceCollector';
 
 export class SimpleNodeSigner {
   readonly node: Node;
@@ -69,17 +70,16 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   readonly executor: ReimintExecutor;
   readonly validatorSets = new ValidatorSets();
 
+  collector?: EvidenceCollector;
+
   constructor(options: ConsensusEngineOptions) {
     super(options);
 
     this.signer = new SimpleNodeSigner(this.node);
-
     const db = new EvidenceDatabase(this.node.evidencedb);
     this.evpool = new EvidencePool({ backend: db });
-
     const wal = new WAL({ path: path.join(this.node.datadir, 'WAL') });
     this.state = new StateMachine(this, this.node.consensus, this.evpool, wal, this.node.chainId, this.config, this.signer);
-
     this.executor = new ReimintExecutor(this.node, this);
   }
 
@@ -88,9 +88,22 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    */
   async init() {
     const block = this.node.getLatestBlock();
+
     await this.evpool.init(block.header.number);
     await this._tryToMintNextBlock(block);
     await this.state.init();
+
+    // create the collector if necessary
+    const initData = loadInitData(this.node.getLatestCommon());
+    if (initData) {
+      const { initHeight, initHashes } = initData;
+      this.collector = new EvidenceCollector(initHeight, initHashes);
+      await this.collector.init(block.header.number, async (height: BN) => {
+        // load evidence from canonical header
+        const header = await this.node.db.getCanonicalHeader(height);
+        return ExtraData.fromBlockHeader(header).evidence.map((ev) => ev.hash());
+      });
+    }
   }
 
   protected _start() {
@@ -135,6 +148,13 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   async newBlock(block: Block) {
     const extraData = ExtraData.fromBlockHeader(block.header);
     await this.evpool.update(extraData.evidence, block.header.number);
+    // collect all the evidence if we haven't reached hardfork2
+    if (!isEnableHardfork2(block.header._common)) {
+      this.collector?.newBlockHeader(
+        block.header.number,
+        extraData.evidence.map((ev) => ev.hash())
+      );
+    }
   }
 
   // calculate the gas limit of next block
@@ -177,12 +197,13 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     if (isEnableRemint(common)) {
       await Contract.deployReimintContracts(evm, common);
     }
-    if (isEnableHardfork1(common)) {
-      await Contract.deployHardfork1Contracts(evm, common);
-    }
     if (isEnableFreeStaking(common)) {
       await Contract.deployFreeStakingContracts(evm, common);
     }
+    if (isEnableBetterPOS(common)) {
+      await Contract.deployBetterPOSContracts(evm, common);
+    }
+
     root = await vm.stateManager.getStateRoot();
 
     if (!root.equals(genesisBlock.header.stateRoot)) {

@@ -5,6 +5,7 @@
 
 Rpc call interface of websocket and http.
 
+- `admin`: Admin api for managing node
 - `debug`: Debug api for tracing blocks and transactions, includes: `debug_traceBlock`, `debug_traceTransaction` ...etc
 
   **warning**: Debug api is very dangerous, public nodes shouldn't open
@@ -18,14 +19,6 @@ Rpc call interface of websocket and http.
 
 ```sh
 npm install @rei-network/rpc
-```
-
-## USAGE
-
-```ts
-const server = new RpcServer(34456, "127.0.0.1", "eth,net,txpool,web3", node);
-await server.start();
-await server.abort();
 ```
 
 ## License

@@ -13,6 +13,7 @@ REI-Network genesis contracts
 - `Fee` A smart contract for staking REI to get Crude, deployed at `0x0000000000000000000000000000000000001005`
 - `FeePool` A smart contract for distributing miner fee rewards, deployed at `0x0000000000000000000000000000000000001006`
 - `FeeToken` A smart contract for querying the user's remaining Crude quantity, deployed at `0x0000000000000000000000000000000000001007`
+- `Prison` A smart contract for jailing validator which not mint blocks on time, deployed at `0x0000000000000000000000000000000000001008`
 
 ## Install
 
@@ -116,77 +117,6 @@ contract LockedStake {
 }
 
 ```
-
-## Hardhat tasks
-
-```
-AVAILABLE TASKS:
-
-  abr                   Assign block reward
-  accounts              List accounts
-  afb                   Call onAfterBlock callback
-  approve               Approve commission share
-  balance               Get balance
-  check                 Check whatever you need
-  clean                 Clears the cache and deletes all artifacts
-  compile               Compiles the entire project, building all artifacts
-  console               Opens a hardhat console
-  deploy                Deploy contracts
-  du                    Do unstake
-  etherscan-verify      submit contract source code to etherscan
-  export                export contract deployment of the specified network into one file
-  export-artifacts
-  flatten               Flattens and prints contracts and their dependencies
-  gb                    Get REI balance
-  help                  Prints this message
-  lscfgaddr             List config addresses
-  node                  Starts a JSON-RPC server on top of Hardhat EVM
-  run                   Runs a user-defined script after compiling the project
-  scr                   Set commission rate
-  sourcify              submit contract source code to sourcify (https://sourcify.dev)
-  stake                 Stake for validator
-  su                    Start unstake
-  test                  Runs mocha tests
-  transfer              Transfer value to target address
-  typechain             Generate Typechain typings for compiled contracts
-  verify                Verifies contract on Etherscan
-  vp                    Visit validator voting power by address
-  vu                    Visit unstake info by id
-  vva                   Visit validator information by address
-  vvi                   Visit validator information by index
-```
-
-Any detailed options of the task can be obtained like this:
-
-```
-npx hardhat stake --help
-```
-
-## Hardhat tasks usage
-
-### Stake
-
-```
-npx hardhat --networkd rei-testnet stake --address 0x0000000000000000000000000000000000001001 --validator 0x...123 --value 100 --ether
-```
-
-stake 100 REI for 0x...123 on rei-testnet
-
-### Start unstake
-
-```
-npx hardhat --networkd rei-testnet sunstake --address 0x0000000000000000000000000000000000001001 --validator 0x...123 --shares 100 --ether
-```
-
-start unstake 100 CommissionShares for 0x...123 on rei-testnet
-
-### Unstake
-
-```
-npx hardhat --networkd rei-testnet unstake --address 0x0000000000000000000000000000000000001001 --id 0
-```
-
-unstake for id `0`
 
 ## License
 

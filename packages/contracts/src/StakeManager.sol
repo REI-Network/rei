@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 pragma solidity ^0.6.0;
+pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
@@ -9,6 +10,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "./interfaces/IUnstakePool.sol";
 import "./interfaces/IValidatorRewardPool.sol";
 import "./interfaces/IStakeManager.sol";
+import "./interfaces/IPrison.sol";
 import "./CommissionShare.sol";
 import "./Only.sol";
 
@@ -31,11 +33,17 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     // total locked amount
     uint256 public override totalLockedAmount = 0;
 
+    // Deprecate: this variable is kept for forward compatibility only
     // active validator list of next block,
     // this will be set in `afterBlock`
     ActiveValidator[] public override activeValidators;
     // proposer address
     address public override proposer;
+    // validator id and priority encoded result
+    bytes private activeValidatorInfos;
+
+    // the hash set of the evidence that has been used
+    mapping(bytes32 => bool) public override usedEvidence;
 
     /**
      * Emitted when a validator gets a reward
@@ -109,15 +117,13 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         IConfig _config,
         address _proposer,
         address[] memory genesisValidators,
-        int256[] memory priorities
+        bytes memory _activeValidators
     ) public Only(_config) {
-        require(genesisValidators.length == priorities.length, "StakeManager: invalid list length");
-        proposer = _proposer;
         for (uint256 i = 0; i < genesisValidators.length; i = i.add(1)) {
-            address gv = genesisValidators[i];
-            createValidator(gv);
-            activeValidators.push(ActiveValidator(gv, priorities[i]));
+            createValidator(genesisValidators[i]);
         }
+        proposer = _proposer;
+        activeValidatorInfos = _activeValidators;
     }
 
     /**
@@ -321,15 +327,17 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         shares = CommissionShare(v.commissionShare).mint{ value: msg.value }(to);
         // if validator voting power is greater than `minIndexVotingPower`,
         // add it to `indexedValidators`
-        uint256 votingPower = getVotingPower(v.commissionShare, validator);
-        if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
-            indexedValidators.set(v.id, validator);
-            emit IndexedValidator(validator, votingPower.sub(msg.value));
+        (, bool jailed, , , , ) = IPrison(config.prison()).miners(validator);
+        if (!jailed) {
+            uint256 votingPower = getVotingPower(v.commissionShare, validator);
+            if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
+                indexedValidators.set(v.id, validator);
+                emit IndexedValidator(validator, votingPower.sub(msg.value));
+            }
+            // increase total locked amount
+            totalLockedAmount = totalLockedAmount.add(msg.value);
         }
         emit Stake(validator, msg.value, to, shares);
-
-        // increase total locked amount
-        totalLockedAmount = totalLockedAmount.add(msg.value);
     }
 
     /**
@@ -357,8 +365,11 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         unstakeQueue[id] = Unstake(validator, to, unstakeShares, timestamp);
         emit StartUnstake(id, validator, amount, to, unstakeShares, timestamp);
 
-        // decrease total locked amount
-        totalLockedAmount = totalLockedAmount.sub(amount);
+        (, bool jailed, , , , ) = IPrison(config.prison()).miners(validator);
+        if (!jailed) {
+            // decrease total locked amount
+            totalLockedAmount = totalLockedAmount.sub(amount);
+        }
     }
 
     /**
@@ -456,6 +467,8 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         require(v.commissionShare != address(0) && !indexedValidators.contains(v.id), "StakeManager: invalid validator");
         uint256 votingPower = getVotingPower(v.commissionShare, validator);
         require(votingPower >= config.minIndexVotingPower(), "StakeManager: invalid votingPower");
+        (, bool jailed, , , , ) = IPrison(config.prison()).miners(validator);
+        require(!jailed, "StakeManager: jailed validator");
         indexedValidators.set(v.id, validator);
         emit IndexedValidator(validator, votingPower);
     }
@@ -475,25 +488,36 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         if (validatorReward > 0) {
             IValidatorRewardPool(config.validatorRewardPool()).reward{ value: validatorReward }(validator);
         }
-        if (!indexedValidators.contains(v.id)) {
-            uint256 votingPower = getVotingPower(v.commissionShare, validator);
-            if (votingPower >= config.minIndexVotingPower()) {
-                indexedValidators.set(v.id, validator);
-                emit IndexedValidator(validator, votingPower.sub(msg.value));
+        (, bool jailed, , , , ) = IPrison(config.prison()).miners(validator);
+        if (!jailed) {
+            if (!indexedValidators.contains(v.id)) {
+                uint256 votingPower = getVotingPower(v.commissionShare, validator);
+                if (votingPower >= config.minIndexVotingPower()) {
+                    indexedValidators.set(v.id, validator);
+                    emit IndexedValidator(validator, votingPower.sub(msg.value));
+                }
             }
+            // increase total locked amount
+            totalLockedAmount = totalLockedAmount.add(msg.value);
         }
-        emit Reward(validator, msg.value);
 
-        // increase total locked amount
-        totalLockedAmount = totalLockedAmount.add(msg.value);
+        emit Reward(validator, msg.value);
     }
 
     /**
      * Slash validator, only can be called by system caller
      * @param validator         Validator address
      * @param reason            Slash reason
+     * @param hash              Evidence hash
      */
-    function slash(address validator, uint8 reason) external override nonReentrant onlySystemCaller returns (uint256 amount) {
+    function slash(
+        address validator,
+        uint8 reason,
+        bytes32 hash
+    ) external override nonReentrant onlySystemCaller returns (uint256 amount) {
+        // make sure the evidence is not duplicated
+        require(!usedEvidence[hash], "StakeManager: invalid evidence");
+
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint8 factor = config.getFactorByReason(reason);
@@ -506,38 +530,76 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         }
         emit Slash(validator, decreasedAmount);
 
-        // decrease total locked amount
-        totalLockedAmount = totalLockedAmount.sub(decreasedAmount);
+        (, bool jailed, , , , ) = IPrison(config.prison()).miners(validator);
+        if (!jailed) {
+            // decrease total locked amount
+            totalLockedAmount = totalLockedAmount.sub(decreasedAmount);
+        }
+
+        // save evidence hash
+        usedEvidence[hash] = true;
     }
 
-    // TODO: if the active validators list is exactly the same as the last list, don't modify the storage
     /**
      * After block callback, it will be called by system caller after each block is processed
-     * @param _proposer          Proposer address
-     * @param acValidators       Active validators list
-     * @param priorities         Priority list of active validators
+     * @param _proposer               Proposer address
+     * @param _activeValidators       Active validator infos
      */
-    function onAfterBlock(
-        address _proposer,
-        address[] calldata acValidators,
-        int256[] calldata priorities
-    ) external override nonReentrant onlySystemCaller {
+    function onAfterBlock(address _proposer, bytes calldata _activeValidators) external override nonReentrant onlySystemCaller {
         require(_proposer != address(0), "StakeManager: invalid proposer");
-        require(acValidators.length == priorities.length, "StakeManager: invalid list length");
         proposer = _proposer;
-        uint256 originLength = activeValidators.length;
-        uint256 i = 0;
-        for (; i < priorities.length; i = i.add(1)) {
-            if (i < originLength) {
-                ActiveValidator storage acValidator = activeValidators[i];
-                acValidator.validator = acValidators[i];
-                acValidator.priority = priorities[i];
-            } else {
-                activeValidators.push(ActiveValidator(acValidators[i], priorities[i]));
+        activeValidatorInfos = _activeValidators;
+    }
+
+    /**
+     * Get the validator infos
+     */
+    function getActiveValidatorInfos() external view override returns (bytes memory) {
+        return activeValidatorInfos;
+    }
+
+    /**
+     * Initialize the evidence hash, called when migrating
+     * @param hashes            Evidence hash list
+     */
+    function initEvidenceHash(bytes32[] calldata hashes) external override onlySystemCaller {
+        for (uint256 i = 0; i < hashes.length; i++) {
+            usedEvidence[hashes[i]] = true;
+        }
+    }
+
+    /**
+     * Add missRecord, only can be called by system caller
+     * @param record        Miss record
+     */
+    function addMissRecord(MissRecord[] calldata record) external override onlySystemCaller {
+        IPrison prison = IPrison(config.prison());
+        address[] memory jailedMiners = prison.addMissRecord(record);
+        for (uint256 i = 0; i < jailedMiners.length; i = i.add(1)) {
+            address validatorAddress = jailedMiners[i];
+            Validator memory v = validators[validatorAddress];
+            require(v.commissionShare != address(0), "StakeManager: invalid validator");
+            if (indexedValidators.contains(v.id)) {
+                indexedValidators.remove(v.id);
+                emit UnindexedValidator(validatorAddress);
+                totalLockedAmount = totalLockedAmount.sub(getVotingPower(v.commissionShare, validatorAddress));
             }
         }
-        for (; i < originLength; i = i.add(1)) {
-            activeValidators.pop();
+    }
+
+    /**
+     * Unjail from prison
+     */
+    function unjail() external payable override {
+        IPrison prison = IPrison(config.prison());
+        prison.unjail{ value: msg.value }(msg.sender);
+        Validator memory v = validators[msg.sender];
+        require(v.commissionShare != address(0), "StakeManager: invalid validator");
+        uint256 votingPower = getVotingPower(v.commissionShare, msg.sender);
+        if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
+            indexedValidators.set(v.id, msg.sender);
+            emit IndexedValidator(msg.sender, votingPower);
         }
+        totalLockedAmount = totalLockedAmount.add(votingPower);
     }
 }

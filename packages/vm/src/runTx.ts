@@ -2,6 +2,7 @@ import { debug as createDebugLogger } from 'debug';
 import { Address, BN, toBuffer } from 'ethereumjs-util';
 import { Block, AccessList, AccessListItem, AccessListEIP2930Transaction, FeeMarketEIP1559Transaction, Transaction, TypedTransaction, Capability } from '@rei-network/structure';
 import { ConsensusType } from '@rei-network/common';
+import type { AccessList as EVMCAccessList } from '@rei-network/binding';
 import { VM } from './index';
 import Bloom from './bloom';
 import { default as EVM, EVMResult } from './evm/evm';
@@ -65,6 +66,11 @@ export interface RunTxOpts {
    * Debug callback
    */
   debug?: IDebug;
+
+  /**
+   * Recent hashes
+   */
+  recentHashes?: Buffer[];
 
   /**
    * Before tx callback
@@ -136,6 +142,15 @@ export default async function runTx(this: VM, opts: RunTxOpts): Promise<RunTxRes
   // create a reasonable default if no block is given
   opts.block = opts.block ?? Block.fromBlockData({}, { common: opts.tx.common });
 
+  if (!opts.recentHashes) {
+    opts.recentHashes = [];
+    const number = opts.block.header.number;
+    const db = this.blockchain.database;
+    for (let i = number.subn(1); i.gten(0) && i.gte(number.subn(256)); i.isubn(1)) {
+      opts.recentHashes.push(await db.numberToHash(i));
+    }
+  }
+
   if (opts.skipBlockGasLimitValidation !== true && opts.block.header.gasLimit.lt(opts.tx.gasLimit)) {
     throw new Error('tx has a higher gas limit than the block');
   }
@@ -157,6 +172,8 @@ export default async function runTx(this: VM, opts: RunTxOpts): Promise<RunTxRes
     debug('tx checkpoint');
   }
 
+  let accessList: EVMCAccessList | undefined = undefined;
+
   // Typed transaction specific setup tasks
   if (opts.tx.supports(Capability.EIP2718TypedTransaction) && this._common.isActivatedEIP(2718)) {
     // Is it an Access List transaction?
@@ -174,6 +191,11 @@ export default async function runTx(this: VM, opts: RunTxOpts): Promise<RunTxRes
     }
 
     const castedTx = <AccessListEIP2930Transaction>opts.tx;
+
+    accessList = [];
+    for (const accessListItem of castedTx.AccessListJSON) {
+      accessList.push([accessListItem.address, accessListItem.storageKeys]);
+    }
 
     castedTx.AccessListJSON.forEach((accessListItem: AccessListItem) => {
       const address = toBuffer(accessListItem.address);
@@ -212,10 +234,10 @@ export default async function runTx(this: VM, opts: RunTxOpts): Promise<RunTxRes
   }
 }
 
-async function _runTx(this: VM, opts: RunTxOpts): Promise<RunTxResult> {
+async function _runTx(this: VM, opts: RunTxOpts, accessList?: EVMCAccessList): Promise<RunTxResult> {
   // Casted as `any` to access the EIP2929 methods
   const state: any = this.stateManager;
-  const { tx, block } = opts;
+  const { tx, block, blockGasUsed, recentHashes, debug: debugContext } = opts;
 
   if (!block) {
     throw new Error('block required');
@@ -321,19 +343,27 @@ async function _runTx(this: VM, opts: RunTxOpts): Promise<RunTxResult> {
     }
   }
 
+  // calculate block miner address
+  let author: Address | undefined = undefined;
+  if (this._getMiner) {
+    author = this._getMiner(block.header);
+  }
+
   /*
    * Execute message
    */
-  const txContext = new TxContext(gasPrice, caller);
+  const txContext = new TxContext(gasPrice, caller, author, accessList, blockGasUsed, recentHashes);
   const { value, data, to } = tx;
   const message = new Message({
     caller,
     gasLimit,
     to,
     value,
-    data
+    data,
+    basefee: basefee.toString(),
+    clearEmptyAccount: true
   });
-  const evm = new EVM(this, txContext, block, opts.debug);
+  const evm = new EVM(this, txContext, block, debugContext);
   if (this.DEBUG) {
     debug(`Running tx=0x${tx.isSigned() ? tx.hash().toString('hex') : 'unsigned'} with caller=${caller.toString()} gasLimit=${gasLimit} to=${to ? to.toString() : ''} value=${value} data=0x${short(data)}`);
   }

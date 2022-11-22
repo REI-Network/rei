@@ -3,6 +3,7 @@ import path from 'path';
 import PeerId from 'peer-id';
 import { logger } from '@rei-network/utils';
 import { NetworkManagerOptions } from '@rei-network/network';
+import { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
 import { ConsensusEngineOptions } from './consensus/types';
 import { SynchronizerOptions } from './sync';
 import { Node } from './node';
@@ -67,6 +68,12 @@ export abstract class NodeFactory {
       throw new Error(`Unlock coinbase account ${coinbase.toString()} failed!`);
     }
 
+    if (options.evm && options.evm !== EVMWorkMode.Binding && options.evm !== EVMWorkMode.JS) {
+      throw new Error(`invalid evm work mode: ${options.evm}`);
+    }
+
+    await node.init();
+    node.start();
     return node;
   }
 }

@@ -22,6 +22,28 @@ enum Libp2pPeerValue {
   incoming = 0
 }
 
+type PeerInfo = {
+  nodeId: string;
+  peerId: string;
+  enr: string;
+  caps: string[];
+  protocols: { version: number };
+  network: {
+    localAddress: string;
+    remoteAddress: string;
+  };
+};
+
+type NodeInfo = {
+  enr: string;
+  nodeId: string;
+  peerId: string;
+  ip: string;
+  tcpPort: number;
+  udpPort: number;
+  caps: (string[] | string)[];
+};
+
 export interface NetworkManagerOptions {
   // local peer id
   peerId: PeerId;
@@ -37,6 +59,10 @@ export interface NetworkManagerOptions {
   discv5?: IDiscv5;
   // libp2p instance
   libp2p?: ILibp2p;
+  // inbound throttle interval
+  inboundThrottleTime?: number;
+  // outbound throttle interval
+  outboundThrottleTime?: number;
   // libp2p constructor options
   libp2pOptions?: {
     // tcp port
@@ -137,6 +163,49 @@ export class NetworkManager extends EventEmitter {
   }
 
   /**
+   * Get connected peers
+   */
+  get connectedPeers() {
+    const peers: PeerInfo[] = [];
+    for (const peer of this.peers) {
+      try {
+        const peerId = peer.peerId;
+        const caps = peer.supportedProtocols;
+        const protocols: any = {};
+        for (const protocolName of caps) {
+          const status = peer.getHandler(protocolName).getRemoteStatus();
+          protocols[status.name] = status;
+        }
+        const connections = this.libp2p.getConnections(peer.peerId);
+        if (connections === undefined || connections.length === 0) {
+          continue;
+        }
+        const connection = connections[0];
+        const nodeId = ENR.createFromPeerId(connection.remotePeer).nodeId;
+        const localEnr = this.discv5.localEnr;
+        const remoteEnr = this.discv5.findEnr(nodeId);
+        if (!localEnr.udp || !remoteEnr || !remoteEnr.ip || !remoteEnr.udp) {
+          continue;
+        }
+        peers.push({
+          peerId,
+          nodeId,
+          enr: remoteEnr.encodeTxt(),
+          caps,
+          protocols,
+          network: {
+            localAddress: '0.0.0.0:' + localEnr.udp,
+            remoteAddress: remoteEnr.ip + ':' + remoteEnr.udp
+          }
+        });
+      } catch (err) {
+        logger.debug('NetworkManager::connectedPeers, catch:', err);
+      }
+    }
+    return peers;
+  }
+
+  /**
    * Get connection size
    */
   get connectionSize() {
@@ -193,6 +262,9 @@ export class NetworkManager extends EventEmitter {
       // create default impl instance
       const { libp2p, discv5 } = createDefaultImpl({
         ...this.options.libp2pOptions,
+        bootnodes: (this.options.libp2pOptions.bootnodes ?? []).filter((value) => {
+          return ENR.decodeTxt(value).nodeId !== enr.nodeId;
+        }),
         peerId: this.options.peerId,
         enr
       });
@@ -245,6 +317,11 @@ export class NetworkManager extends EventEmitter {
   async abort() {
     if (!this.aborted) {
       this.aborted = true;
+      // release timeout
+      if (this.outboundTimer) {
+        clearTimeout(this.outboundTimer);
+        this.outboundTimer = undefined;
+      }
       // unregister all protocols
       for (const protocols of this.protocols) {
         for (const protocol of Array.isArray(protocols) ? protocols : [protocols]) {
@@ -359,7 +436,7 @@ export class NetworkManager extends EventEmitter {
 
       if (this._peers.size < this.libp2p.maxConnections) {
         // filter all available static peers
-        const staticPeers = Array.from(this.staticPeers).filter((peerId) => !this._peers.has(peerId));
+        const staticPeers = Array.from(this.staticPeers).filter((peerId) => !this._peers.has(peerId) && !this.isBanned(peerId));
 
         // filter all peers in address book
         const addressBookPeers = this.libp2p.peers.filter((peerId) => !this._peers.has(peerId) && !this.isBanned(peerId));
@@ -583,7 +660,7 @@ export class NetworkManager extends EventEmitter {
 
     // add peerId to memory list
     const strPeerId = peerId.toB58String();
-    if (!this.discoveredPeers.includes(strPeerId)) {
+    if (!this.discoveredPeers.includes(strPeerId) || !this._peers.has(strPeerId)) {
       this.discoveredPeers.push(strPeerId);
       if (this.discoveredPeers.length > this.libp2p.maxConnections * 2) {
         this.discoveredPeers.shift();
@@ -646,7 +723,7 @@ export class NetworkManager extends EventEmitter {
     if (this.inboundHistory.contains(peerId)) {
       return false;
     }
-    this.inboundHistory.add(peerId, now + c.inboundThrottleTime);
+    this.inboundHistory.add(peerId, now + (this.options.inboundThrottleTime ?? c.inboundThrottleTime));
     return true;
   }
 
@@ -675,7 +752,7 @@ export class NetworkManager extends EventEmitter {
 
   private updateOutbound(peerId: string) {
     const now = Date.now();
-    this.outboundHistory.add(peerId, now + c.outboundThrottleTime);
+    this.outboundHistory.add(peerId, now + (this.options.outboundThrottleTime ?? c.outboundThrottleTime));
     this.setupOutboundTimer(now);
   }
 
@@ -685,7 +762,7 @@ export class NetworkManager extends EventEmitter {
    * @param enrTxt - ENR string
    * @returns Whether the addition was successful
    */
-  async addPeer(enrTxt: string) {
+  async addStaticPeer(enrTxt: string) {
     const enr = ENR.decodeTxt(enrTxt);
     const peerId = await enr.peerId();
     const peerIdTxt = peerId.toB58String();
@@ -709,38 +786,66 @@ export class NetworkManager extends EventEmitter {
   }
 
   /**
+   * remove static peer
+   * @param enrTxt - ENR string
+   * @returns Whether the deletion of the static node was successful
+   */
+  async removeStaticPeer(enrTxt: string) {
+    const enr = ENR.decodeTxt(enrTxt);
+    const peerId = await enr.peerId();
+    const peerIdTxt = peerId.toB58String();
+
+    // prevent repetition
+    if (peerIdTxt === this.peerId) {
+      return false;
+    }
+
+    // remove id in memory set
+    this.staticPeers.delete(peerIdTxt);
+    return true;
+  }
+
+  /**
    * Add trusted peer,
    * network manager will always accept connection from trusted peers,
    * even if the number of connections is full
    * @param enrTxt - ENR string
+   * @returns Whether the trusted node is added successfully
    */
   async addTrustedPeer(enrTxt: string) {
     const enr = ENR.decodeTxt(enrTxt);
     const peerId = await enr.peerId();
     const peerIdTxt = peerId.toB58String();
-    if (peerIdTxt !== this.peerId && !this.trustedPeers.has(peerIdTxt)) {
+    if (peerIdTxt == this.peerId) {
+      return false;
+    }
+    if (!this.trustedPeers.has(peerIdTxt)) {
       this.trustedPeers.add(peerIdTxt);
       if (this._peers.has(peerIdTxt)) {
         this.libp2p.setPeerValue(peerId, Libp2pPeerValue.trusted);
       }
     }
+    return true;
   }
 
   /**
    * Remove trusted peer,
    * NOTE: this method does not immediately modify peerValue
    * @param enrTxt - ENR string
+   * @returns Whether the deletion of the trust node is successful
    */
   async removeTrustedPeer(enrTxt: string) {
     const enr = ENR.decodeTxt(enrTxt);
     const peerId = await enr.peerId();
     const peerIdTxt = peerId.toB58String();
     this.trustedPeers.delete(peerIdTxt);
+    return true;
   }
 
   /**
    * Check remote peer is trusted
    * @param enrTxt - ENR string
+   * @returns Whether it is a trusted node
    */
   async isTrusted(enrTxt: string) {
     const enr = ENR.decodeTxt(enrTxt);
@@ -791,5 +896,28 @@ export class NetworkManager extends EventEmitter {
     }
     this.banned.delete(peerId);
     return false;
+  }
+
+  /**
+   * Get local node info
+   * @returns local node info
+   */
+  get nodeInfo(): NodeInfo {
+    const localEnr = this.localEnr;
+    return {
+      enr: localEnr.encodeTxt(),
+      nodeId: localEnr.nodeId,
+      peerId: this.peerId,
+      ip: localEnr.ip!,
+      tcpPort: localEnr.tcp!,
+      udpPort: localEnr.udp!,
+      caps: this.protocols.map((p) => {
+        if (Array.isArray(p)) {
+          return p.map(({ protocolString }) => protocolString);
+        } else {
+          return p.protocolString;
+        }
+      })
+    };
   }
 }

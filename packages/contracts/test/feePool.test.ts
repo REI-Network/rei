@@ -5,6 +5,7 @@ import { toBN } from './utils';
 declare var artifacts: any;
 declare var web3: Web3;
 
+const Prison = artifacts.require('Prison');
 const Config = artifacts.require('Config_devnet');
 const FeePool = artifacts.require('FeePool');
 const StakeManager = artifacts.require('StakeManager');
@@ -35,6 +36,9 @@ describe('FeePool', () => {
 
     stakeManager = new web3.eth.Contract(StakeManager.abi, (await StakeManager.new(config.options.address, deployer, [], [])).address, { from: deployer });
     await config.methods.setStakeManager(stakeManager.options.address).send();
+
+    const prison = new web3.eth.Contract(Prison.abi, (await Prison.new(config.options.address)).address, { from: deployer });
+    await config.methods.setPrison(prison.options.address).send();
 
     feePool = new web3.eth.Contract(FeePool.abi, (await FeePool.new(config.options.address)).address, { from: deployer });
     await config.methods.setFeePool(feePool.options.address).send();

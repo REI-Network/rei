@@ -92,7 +92,7 @@ export function isEnableRemint(common: Common) {
 }
 
 /**
- * Check whether free staking logic is enabled
+ * Check whether hardfork1 logic is enabled
  * @param common - Common instance
  * @returns Enable if `true`
  */
@@ -120,6 +120,90 @@ export function isEnableFreeStaking(common: Common) {
     return common.gteHardfork('free-staking');
   } else if (common.chainName() === 'rei-devnet') {
     return common.gteHardfork('free-staking');
+  } else {
+    throw new Error('unknown chain');
+  }
+}
+
+/**
+ * Check whether better POS is enabled
+ * @param common - Common instance
+ * @returns Enable if `true`
+ */
+export function isEnableHardfork2(common: Common) {
+  if (common.chainName() === 'rei-testnet') {
+    return common.gteHardfork('testnet-hf-2');
+  } else if (common.chainName() === 'rei-mainnet') {
+    return common.gteHardfork('mainnet-hf-2');
+  } else if (common.chainName() === 'rei-devnet') {
+    return false;
+  } else {
+    throw new Error('unknown chain');
+  }
+}
+
+/**
+ * Load init data for hardfork 2
+ * @param common - Common instance
+ * @returns Init data
+ */
+export function loadInitData(common: Common): undefined | { initHeight: number; initHashes: string[] } {
+  common = common.copy();
+  if (isEnableHardfork2(common)) {
+    // it looks like hf2 is enabled,
+    // there is no need to collect hashes anymore
+    return;
+  }
+
+  function isActiveHardfork(hardforks: { name: string }[], hardfork: string) {
+    return hardforks.filter(({ name }) => name === hardfork).length > 0;
+  }
+
+  // set hardfork to get init data
+  if (common.chainName() === 'rei-mainnet') {
+    if (isActiveHardfork(common.activeHardforks(), 'mainnet-hf-2')) {
+      common.setHardfork('mainnet-hf-2');
+    } else {
+      return;
+    }
+  } else if (common.chainName() === 'rei-testnet') {
+    if (isActiveHardfork(common.activeHardforks(), 'testnet-hf-2')) {
+      common.setHardfork('testnet-hf-2');
+    } else {
+      return;
+    }
+  } else {
+    // collector only work on mainnet and testnet
+    return;
+  }
+
+  // load init height from common
+  const initHeight = common.param('vm', 'initHeight');
+  if (typeof initHeight !== 'number') {
+    throw new Error('invalid initHeight');
+  }
+
+  // load init hashes from common
+  const initHashes = common.param('vm', 'initHashes');
+  if (!Array.isArray(initHashes)) {
+    throw new Error('invalid initHashes');
+  }
+
+  return { initHeight, initHashes };
+}
+
+/**
+ * Check whether better POS is enabled
+ * @param common - Common instance
+ * @returns Enable if `true`
+ */
+export function isEnableBetterPOS(common: Common) {
+  if (common.chainName() === 'rei-testnet') {
+    return common.gteHardfork('better-pos');
+  } else if (common.chainName() === 'rei-mainnet') {
+    return common.gteHardfork('better-pos');
+  } else if (common.chainName() === 'rei-devnet') {
+    return common.gteHardfork('better-pos');
   } else {
     throw new Error('unknown chain');
   }

@@ -3,7 +3,8 @@ import { Common } from '@rei-network/common';
 import { StakeManager } from '../contracts';
 import { IndexedValidator } from './indexedValidatorSet';
 import { getGenesisValidators, genesisValidatorPriority, genesisValidatorVotingPower } from './genesis';
-
+import { isEnableBetterPOS } from '../../../hardforks';
+import { ActiveValidator as ActiveValidatorInfo } from '../contracts/stakeManager';
 const maxInt256 = new BN('7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 'hex');
 const minInt256 = new BN('8000000000000000000000000000000000000000000000000000000000000000', 'hex').neg();
 const maxProposerPriority = maxInt256;
@@ -47,16 +48,21 @@ export class ActiveValidatorSet {
   static async fromStakeManager(sm: StakeManager, getVotingPower?: (validator: Address) => BN) {
     const proposer = await sm.proposer();
     const active: ActiveValidator[] = [];
-    const length = await sm.activeValidatorsLength();
-    for (const i = new BN(0); i.lt(length); i.iaddn(1)) {
-      const av = await sm.activeValidators(i);
-
+    const activeValidatorInfos: ActiveValidatorInfo[] = [];
+    if (isEnableBetterPOS(sm.common)) {
+      activeValidatorInfos.push(...(await sm.allActiveValidators()));
+    } else {
+      const length = await sm.activeValidatorsLength();
+      for (const i = new BN(0); i.lt(length); i.iaddn(1)) {
+        activeValidatorInfos.push(await sm.activeValidators(i));
+      }
+    }
+    for (const v of activeValidatorInfos) {
       active.push({
-        ...av,
-        votingPower: getVotingPower ? getVotingPower(av.validator) : await sm.getVotingPowerByAddress(av.validator)
+        ...v,
+        votingPower: getVotingPower ? getVotingPower(v.validator) : await sm.getVotingPowerByAddress(v.validator)
       });
     }
-
     return new ActiveValidatorSet(active, proposer);
   }
 

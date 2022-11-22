@@ -15,6 +15,8 @@ contract Config_testnet is DevConfig {
         mivp = 100e18; // 100 REI
         scri = 1 days;
         fpi = 1 days;
+        rap = 21600;
+        jtd = 300;
 
         // one of testnet genesis validators
         transferOwnership(0x4779Af7e65c055979C8100f2183635E5d28c78f5);

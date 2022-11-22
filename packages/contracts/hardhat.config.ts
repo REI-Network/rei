@@ -2,7 +2,6 @@ import '@typechain/hardhat';
 import '@nomiclabs/hardhat-etherscan';
 import '@nomiclabs/hardhat-truffle5';
 import 'hardhat-deploy';
-import './tasks';
 
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
@@ -36,10 +35,10 @@ export default {
           optimizer: {
             enabled: true,
             runs: 100
+          },
+          debug: {
+            revertStrings: 'strip'
           }
-          // debug: {
-          //   revertStrings: 'strip'
-          // }
         }
       }
     ]

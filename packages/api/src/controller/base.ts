@@ -1,65 +1,23 @@
-import { Address, BN, bufferToHex } from 'ethereumjs-util';
-import { AbiCoder } from '@ethersproject/abi';
+import { Address, BN } from 'ethereumjs-util';
 import { Block } from '@rei-network/structure';
 import { hexStringToBuffer, hexStringToBN } from '@rei-network/utils';
+import { StateManager } from '@rei-network/core';
 import { ERROR } from '@rei-network/vm/dist/exceptions';
-import { StateManager } from '../types';
-import { RpcServer } from '../index';
-import errors from '../errorCodes';
-import * as helper from '../helper';
+import { CallData } from '../types';
+import { ApiServer } from '../apiServer';
+import { OutOfGasError, RevertError } from './errors';
 
-const coder = new AbiCoder();
-
-// keccak256("Error(string)").slice(0, 4)
 const revertErrorSelector = Buffer.from('08c379a0', 'hex');
 
-export type CallData = {
-  from?: string;
-  to?: string;
-  gas?: string;
-  gasPrice?: string;
-  value?: string;
-  data?: string;
-  nonce?: string;
-};
-
-export class RevertError {
-  readonly code = errors.REVERT_ERROR.code;
-  readonly rpcMessage: string;
-  readonly data?: string;
-
-  constructor(returnValue: Buffer | string) {
-    if (typeof returnValue === 'string') {
-      this.rpcMessage = returnValue;
-    } else {
-      this.rpcMessage = 'execution reverted: ' + coder.decode(['string'], returnValue.slice(4))[0];
-      this.data = bufferToHex(returnValue);
-    }
-  }
-}
-
-export class OutOfGasError {
-  readonly code = errors.SERVER_ERROR.code;
-  readonly gas: BN;
-
-  constructor(gas: BN) {
-    this.gas = gas.clone();
-  }
-
-  get rpcMessage() {
-    return `gas required exceeds allowance (${this.gas.toString()})`;
-  }
-}
-
 export class Controller {
-  protected readonly server: RpcServer;
+  protected readonly server: ApiServer;
 
-  constructor(server: RpcServer) {
+  constructor(server: ApiServer) {
     this.server = server;
   }
 
-  get backend() {
-    return this.server.backend;
+  get node() {
+    return this.server.node;
   }
 
   get filterSystem() {
@@ -70,19 +28,21 @@ export class Controller {
     return this.server.oracle;
   }
 
+  get rpcServer() {
+    return this.server.rpcServer;
+  }
+
   protected async getBlockNumberByTag(tag: any): Promise<BN> {
     if (tag === 'earliest') {
       return new BN(0);
     } else if (tag === 'latest' || tag === undefined) {
-      return this.backend.getLatestBlock().header.number.clone();
+      return this.node.getLatestBlock().header.number.clone();
     } else if (tag === 'pending') {
-      return this.backend.getLatestBlock().header.number.addn(1);
+      return this.node.getLatestBlock().header.number.addn(1);
     } else if (tag.startsWith('0x')) {
       return hexStringToBN(tag);
     } else {
-      helper.throwRpcErr('Invalid tag value');
-      // for types.
-      return new BN(0);
+      throw new Error('Invalid tag value');
     }
   }
 
@@ -90,49 +50,49 @@ export class Controller {
     let block!: Block;
     if (typeof tag === 'string') {
       if (tag === 'earliest') {
-        block = await this.backend.db.getBlock(0);
+        block = await this.node.db.getBlock(0);
       } else if (tag === 'latest') {
-        block = this.backend.getLatestBlock();
+        block = this.node.getLatestBlock();
       } else if (tag === 'pending') {
-        block = this.backend.getPendingBlock();
+        block = this.node.getPendingBlock();
       } else if (tag.startsWith('0x')) {
-        block = await this.backend.db.getBlock(hexStringToBN(tag));
+        block = await this.node.db.getBlock(hexStringToBN(tag));
       } else {
-        helper.throwRpcErr('Invalid tag value');
+        throw new Error('Invalid tag value');
       }
     } else if (typeof tag === 'object') {
       if ('blockNumber' in tag) {
-        block = await this.backend.db.getBlock(hexStringToBN(tag.blockNumber));
+        block = await this.node.db.getBlock(hexStringToBN(tag.blockNumber));
       } else if ('blockHash' in tag) {
-        block = await this.backend.db.getBlock(hexStringToBuffer(tag.blockHash));
+        block = await this.node.db.getBlock(hexStringToBuffer(tag.blockHash));
       } else {
-        helper.throwRpcErr('Invalid tag value');
+        throw new Error('Invalid tag value');
       }
     } else if (tag === undefined) {
-      block = this.backend.getLatestBlock();
+      block = this.node.getLatestBlock();
     } else {
-      helper.throwRpcErr('Invalid tag value');
+      throw new Error('Invalid tag value');
     }
     return block;
   }
 
   protected async getStateManagerByTag(tag: any): Promise<StateManager> {
     if (tag === 'pending') {
-      return this.backend.getPendingStateManager();
+      return this.node.getPendingStateManager();
     } else {
       const block = await this.getBlockByTag(tag);
-      return this.backend.getStateManager(block.header.stateRoot, block.header.number);
+      return this.node.getStateManager(block.header.stateRoot, block.header.number);
     }
   }
 
   protected async runCall(data: CallData, tag: any) {
     const block = tag instanceof Block ? tag : await this.getBlockByTag(tag);
     const gas = data.gas ? hexStringToBN(data.gas) : new BN(0xffffff);
-    const vm = await this.backend.getVM(block.header.stateRoot, block.header.number);
+    const vm = await this.node.getVM(block.header.stateRoot, block.header.number);
     await vm.stateManager.checkpoint();
     try {
       const result = await vm.runCall({
-        block: block as any,
+        block,
         gasPrice: data.gasPrice ? hexStringToBN(data.gasPrice) : undefined,
         origin: data.from ? Address.fromString(data.from) : Address.zero(),
         caller: data.from ? Address.fromString(data.from) : Address.zero(),
@@ -159,11 +119,9 @@ export class Controller {
         }
       }
 
-      await vm.stateManager.revert();
       return result;
-    } catch (err) {
+    } finally {
       await vm.stateManager.revert();
-      throw err;
     }
   }
 }

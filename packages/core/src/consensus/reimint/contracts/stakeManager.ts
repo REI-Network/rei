@@ -1,9 +1,9 @@
 import EVM from '@rei-network/vm/dist/evm/evm';
-import { Address, BN, toBuffer } from 'ethereumjs-util';
+import { Address, BN, bufferToHex, toBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Log, Receipt } from '@rei-network/structure';
 import { ValidatorChanges, getGenesisValidators } from '../validatorSet';
-import { bufferToAddress, decodeInt256 } from './utils';
+import { bufferToAddress, decodeInt256, decodeBytes, validatorsEncode, validatorsDecode } from './utils';
 import { Contract } from './contract';
 
 // function selector of stake manager
@@ -18,7 +18,15 @@ const methods = {
   proposer: toBuffer('0xa8e4fb90'),
   reward: toBuffer('0x6353586b'),
   slash: toBuffer('0x30b409a4'),
-  onAfterBlock: toBuffer('0x9313f105')
+  onAfterBlock: toBuffer('0x9313f105'),
+  indexedValidatorsById: toBuffer('0x36137fae'),
+  onAfterBlockV2: toBuffer('0xfa2909d4'),
+  getActiveValidatorInfos: toBuffer('0x021c585c'),
+  validators: toBuffer('0xfa52c7d8'),
+  addMissRecord: toBuffer('0x18498f3a'),
+  slashV2: toBuffer('0xad2c8b5e'),
+  initEvidenceHash: toBuffer('0x2854982e'),
+  usedEvidence: toBuffer('0x981617f5')
 };
 
 // event topic
@@ -171,6 +179,23 @@ export class StakeManager extends Contract {
   }
 
   /**
+   * Get validator id by address
+   * @param address - Address
+   * @returns Validator id
+   */
+  getValidatorIdByAddress(address: Address) {
+    return this.runWithLogger(async () => {
+      const gvs = getGenesisValidators(this.common);
+      const index = gvs.findIndex((gv) => gv.equals(address));
+      if (index !== -1) {
+        return new BN(index);
+      }
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('validators', ['address'], [address.toString()]));
+      return new BN(returnValue.slice(0, 32));
+    });
+  }
+
+  /**
    * Get active validator set length
    * @returns Length
    */
@@ -201,6 +226,33 @@ export class StakeManager extends Contract {
   }
 
   /**
+   * Get all active validators
+   * @returns Active validator information List
+   */
+  allActiveValidators(): Promise<ActiveValidator[]> {
+    return this.runWithLogger(async () => {
+      const gvs = getGenesisValidators(this.common);
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('getActiveValidatorInfos', [], []));
+      const { ids, priorities } = validatorsDecode(toBuffer(decodeBytes(returnValue)));
+      const validators: { validator: Address; priority: BN }[] = [];
+      for (let i = 0; i < ids.length; i++) {
+        let validator: Address;
+        if (ids[i].ltn(gvs.length)) {
+          validator = gvs[ids[i].toNumber()];
+        } else {
+          const { returnValue } = await this.executeMessage(this.makeCallMessage('indexedValidatorsById', ['uint256'], [ids[i].toString()]));
+          validator = bufferToAddress(returnValue);
+        }
+        validators.push({
+          validator,
+          priority: priorities[i]
+        });
+      }
+      return validators;
+    });
+  }
+
+  /**
    * Reward block validator
    * @param validator - Validator address
    * @param amount - Amount
@@ -225,6 +277,19 @@ export class StakeManager extends Contract {
   }
 
   /**
+   * Slash block validator(V2)
+   * @param validator - Validator address
+   * @param reason - Slash reason
+   * @param hash - Evidence hash
+   */
+  slashV2(validator: Address, reason: SlashReason, hash: Buffer) {
+    return this.runWithLogger(async () => {
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('slashV2', ['address', 'uint8', 'bytes32'], [validator.toString(), reason, bufferToHex(hash)]));
+      return logs;
+    });
+  }
+
+  /**
    * After block call back
    * @param proposer - Proposer address
    * @param activeValidators - Address list of active validator
@@ -233,6 +298,55 @@ export class StakeManager extends Contract {
   onAfterBlock(proposer: Address, activeValidators: Address[], priorities: BN[]) {
     return this.runWithLogger(async () => {
       await this.executeMessage(this.makeSystemCallerMessage('onAfterBlock', ['address', 'address[]', 'int256[]'], [proposer.toString(), activeValidators.map((addr) => addr.toString()), priorities.map((p) => p.toString())]));
+    });
+  }
+
+  /**
+   * After block call back after validator hardfork
+   * @param proposer - Proposer address
+   * @param activeValidators - Address list of active validator
+   * @param priorities - Priority list of active validator
+   */
+  onAfterBlockV2(proposer: Address, activeValidators: Address[], priorities: BN[]) {
+    return this.runWithLogger(async () => {
+      const ids: BN[] = [];
+      for (const address of activeValidators) {
+        ids.push(await this.getValidatorIdByAddress(address));
+      }
+      await this.executeMessage(this.makeSystemCallerMessage('onAfterBlockV2', ['address', 'bytes'], [proposer.toString(), validatorsEncode(ids, priorities)]));
+    });
+  }
+
+  /**
+   * Check if an evidence hash exists
+   * @param hash - Evidence hash
+   */
+  isUsedEvidence(hash: Buffer) {
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('usedEvidence', ['bytes32'], [bufferToHex(hash)]));
+      return new BN(returnValue).eqn(1);
+    });
+  }
+
+  /**
+   * Init evidence hash, for migratine
+   * @param hashes - Hash list
+   */
+  initEvidenceHash(hashes: Buffer[]) {
+    return this.runWithLogger(async () => {
+      await this.executeMessage(this.makeSystemCallerMessage('initEvidenceHash', ['bytes32[]'], [hashes.map(bufferToHex)]));
+    });
+  }
+
+  /**
+   * Add miss record to persion contract per block
+   * @param missReord - Miss record
+   * @returns
+   */
+  addMissRecord(missRecord: string[][]) {
+    return this.runWithLogger(async () => {
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('addMissRecord', ['tuple(address,uint256)[]'], [missRecord]));
+      return logs;
     });
   }
 }

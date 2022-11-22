@@ -7,6 +7,7 @@ import { NetworkManager, Peer } from '@rei-network/network';
 import { Common } from '@rei-network/common';
 import { Blockchain } from '@rei-network/blockchain';
 import { VM } from '@rei-network/vm';
+import { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
 import { Transaction, Block } from '@rei-network/structure';
 import { Channel, logger } from '@rei-network/utils';
 import { AccountManager } from '@rei-network/wallet';
@@ -28,6 +29,7 @@ const maxSnapLayers = 1024;
 const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;
 const defaultChainName = 'rei-mainnet';
+const defaultEVMWorkMode = EVMWorkMode.JS;
 
 type PendingTxs = {
   txs: Transaction[];
@@ -48,6 +50,7 @@ export class Node {
   readonly genesisHash: Buffer;
   readonly nodedb: LevelUp;
   readonly chaindb: LevelUp;
+  readonly chaindbDown: any;
   readonly evidencedb: LevelUp;
   readonly wire: Wire;
   readonly consensus: ConsensusProtocol;
@@ -65,6 +68,7 @@ export class Node {
   readonly clique: CliqueConsensusEngine;
   readonly receiptsCache: ReceiptsCache;
   readonly snapTree: SnapTree;
+  readonly evmWorkMode: EVMWorkMode;
 
   private initPromise?: Promise<void>;
   private pendingTxsLoopPromise?: Promise<void>;
@@ -83,14 +87,15 @@ export class Node {
 
   constructor(options: NodeOptions) {
     this.datadir = options.databasePath;
-    this.chaindb = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
-    this.nodedb = createLevelDB(path.join(this.datadir, 'nodes'));
-    this.evidencedb = createLevelDB(path.join(this.datadir, 'evidence'));
+    [this.chaindb, this.chaindbDown] = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
+    [this.nodedb] = createLevelDB(path.join(this.datadir, 'nodes'));
+    [this.evidencedb] = createLevelDB(path.join(this.datadir, 'evidence'));
     this.wire = new Wire(this);
     this.consensus = new ConsensusProtocol(this);
     this.snap = new SnapProtocol(this);
     this.accMngr = new AccountManager(options.account.keyStorePath);
     this.receiptsCache = new ReceiptsCache(options.receiptsCacheSize);
+    this.evmWorkMode = (options.evm as EVMWorkMode) ?? defaultEVMWorkMode;
 
     this.chain = options.chain ?? defaultChainName;
     if (!Common.isSupportedChainName(this.chain)) {
@@ -174,6 +179,10 @@ export class Node {
     }
 
     return (this.initPromise = (async () => {
+      await this.chaindb.open();
+      await this.nodedb.open();
+      await this.evidencedb.open();
+
       await this.blockchain.init();
       if (this.latestBlock.header.number.eqn(0)) {
         await this.getEngine(this.latestBlock._common).generateGenesis();
@@ -280,7 +289,7 @@ export class Node {
    * @returns Common instance
    */
   getLatestCommon() {
-    return this.latestBlock._common;
+    return this.latestBlock._common.copy();
   }
 
   /**
@@ -348,15 +357,18 @@ export class Node {
    * @param root - The state root
    * @param num - Block number or Common
    * @param snap - Need snapshot or not
+   * @param mode - EVM work mode
    * @returns VM object
    */
-  async getVM(root: Buffer, num: BNLike | Common, snap: boolean = false) {
+  async getVM(root: Buffer, num: BNLike | Common, snap: boolean = false, mode?: EVMWorkMode) {
     const stateManager = await this.getStateManager(root, num, snap);
     const common = stateManager._common;
     return new VM({
       common,
       stateManager,
       blockchain: this.blockchain,
+      mode: mode ?? this.evmWorkMode,
+      exposed: this.chaindbDown.exposed,
       getMiner: (header) => this.getEngine(header._common).getMiner(header)
     });
   }

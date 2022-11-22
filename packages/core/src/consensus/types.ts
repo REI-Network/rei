@@ -1,5 +1,6 @@
 import { Address, BNLike, BN } from 'ethereumjs-util';
 import { VM } from '@rei-network/vm';
+import { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
 import Bloom from '@rei-network/vm/dist/bloom';
 import { IDebug } from '@rei-network/vm/dist/types';
 import { Common } from '@rei-network/common';
@@ -160,7 +161,7 @@ export interface ExecutorBackend {
   readonly blockchain: Blockchain;
   getCommon(num: BNLike): Common;
   getStateManager(root: Buffer, num: BNLike | Common, snap?: boolean): Promise<StateManager>;
-  getVM(root: Buffer, num: BNLike | Common, snap?: boolean): Promise<VM>;
+  getVM(root: Buffer, num: BNLike | Common, snap?: boolean, mode?: EVMWorkMode): Promise<VM>;
 }
 
 export interface Executor {

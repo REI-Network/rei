@@ -500,4 +500,11 @@ export class SnapProtocolHandler implements ProtocolHandler {
       // ignore errors...
     }
   }
+
+  getRemoteStatus() {
+    return {
+      name: 'xxx',
+      version: 1
+    };
+  }
 }

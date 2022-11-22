@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import PeerId from 'peer-id';
+import { Address } from 'ethereumjs-util';
 import { logger } from '@rei-network/utils';
 import { NetworkManagerOptions } from '@rei-network/network';
 import { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
@@ -9,7 +10,9 @@ import { SynchronizerOptions } from './sync';
 import { Node } from './node';
 import { NodeOptions, AccountManagerConstructorOptions } from './types';
 
-export interface MineOptions extends Omit<ConsensusEngineOptions, 'node'> {}
+export interface MineOptions extends Omit<ConsensusEngineOptions, 'node' | 'coinbase'> {
+  coinbase: string;
+}
 
 export interface NetworkOptions extends Omit<NetworkManagerOptions, 'protocols' | 'nodedb' | 'peerId'> {}
 
@@ -46,8 +49,13 @@ async function loadPeerId(databasePath: string) {
 
 export abstract class NodeFactory {
   static async createNode(options: CreateNodeOptions) {
+    const coinbase = options.mine.coinbase ? Address.fromString(options.mine.coinbase) : undefined;
     const node = new Node({
       ...options,
+      mine: {
+        ...options.mine,
+        coinbase
+      },
       network: {
         ...options.network,
         peerId: await loadPeerId(options.databasePath)
@@ -63,7 +71,6 @@ export abstract class NodeFactory {
         }
       }
     }
-    const coinbase = options.mine.coinbase;
     if (coinbase && !node.accMngr.hasUnlockedAccount(coinbase)) {
       throw new Error(`Unlock coinbase account ${coinbase.toString()} failed!`);
     }

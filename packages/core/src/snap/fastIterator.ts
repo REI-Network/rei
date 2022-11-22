@@ -96,7 +96,7 @@ export class FastSnapIterator<T> {
 
     // sort by hash and priority
     this.iterators.sort((a, b) => {
-      let ret = a.curr!.compare(b.curr!);
+      let ret: number = a.curr!.compare(b.curr!);
       if (ret === 0) {
         ret = a.priority - b.priority;
       }

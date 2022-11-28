@@ -14,8 +14,8 @@
         "mocha": "^9.0.2"
     },
     "dependencies": {
-        "merkle-patricia-tree": "^4.2.3",
-        "ethereumjs-util": "^7.1.4",
-        "@rei-network/common": "^1.1.2"
+        "@rei-network/common": "^1.1.2",
+        "@rei-network/trie": "^4.3.0",
+        "ethereumjs-util": "^7.1.4"
     }
 }

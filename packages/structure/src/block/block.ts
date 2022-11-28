@@ -1,4 +1,4 @@
-import { BaseTrie as Trie } from 'merkle-patricia-tree';
+import { BaseTrie as Trie } from '@rei-network/trie';
 import { BN, rlp, keccak256, KECCAK256_RLP, bnToHex, intToHex, bufferToHex } from 'ethereumjs-util';
 import { Common, ConsensusType } from '@rei-network/common';
 import { TransactionFactory, TypedTransaction, TxOptions, FeeMarketEIP1559Transaction, Transaction, Capability } from '../tx';

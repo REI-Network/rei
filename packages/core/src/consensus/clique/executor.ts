@@ -1,5 +1,5 @@
 import { Address, BN, toBuffer } from 'ethereumjs-util';
-import { BaseTrie } from 'merkle-patricia-tree';
+import { BaseTrie } from '@rei-network/trie';
 import { VM } from '@rei-network/vm';
 import EVM from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';

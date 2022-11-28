@@ -1,5 +1,5 @@
 import { Address, bufferToHex, BN, toBuffer } from 'ethereumjs-util';
-import { BaseTrie, SecureTrie as Trie } from 'merkle-patricia-tree';
+import { BaseTrie, SecureTrie as Trie } from '@rei-network/trie';
 import { Block, BlockHeader, HeaderData, Transaction, Receipt } from '@rei-network/structure';
 import { Common } from '@rei-network/common';
 import { genesisStateByName } from '@rei-network/common/dist/genesisStates';

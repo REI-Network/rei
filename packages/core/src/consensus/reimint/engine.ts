@@ -1,7 +1,7 @@
 import path from 'path';
 import { encode } from 'rlp';
 import { Address, BN, BNLike, ecsign, intToBuffer, bufferToHex } from 'ethereumjs-util';
-import { BaseTrie, SecureTrie as Trie } from 'merkle-patricia-tree';
+import { BaseTrie, SecureTrie as Trie } from '@rei-network/trie';
 import { VM } from '@rei-network/vm';
 import EVM from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';

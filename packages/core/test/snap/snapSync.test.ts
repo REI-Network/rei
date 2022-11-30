@@ -226,7 +226,7 @@ describe('SnapSync', () => {
   it('should sync succeed', async () => {
     const dstDB = new Database(level(), common);
 
-    const sync = new SnapSync(dstDB, manager);
+    const sync = new SnapSync(dstDB, manager, true);
     await sync.snapSync(result.root);
     await sync.wait();
 
@@ -236,7 +236,7 @@ describe('SnapSync', () => {
   it('should sync succeed(abort and resume)', async () => {
     const dstDB = new Database(level(), common);
 
-    const sync = new SnapSync(dstDB, manager);
+    const sync = new SnapSync(dstDB, manager, true);
     await sync.snapSync(result.root);
 
     await new Promise((r) => setTimeout(r, 100));
@@ -251,7 +251,7 @@ describe('SnapSync', () => {
   it('should sync succeed(root changed)', async () => {
     const dstDB = new Database(level(), common);
 
-    const sync = new SnapSync(dstDB, manager);
+    const sync = new SnapSync(dstDB, manager, true);
     await sync.snapSync(result.root);
 
     await new Promise((r) => setTimeout(r, 100));
@@ -325,7 +325,7 @@ describe('SnapSync', () => {
 
     const dstDB = new Database(level(), common);
 
-    const sync = new SnapSync(dstDB, manager);
+    const sync = new SnapSync(dstDB, manager, true);
     await sync.snapSync(result.root);
     await sync.wait();
 

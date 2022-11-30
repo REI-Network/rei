@@ -1,6 +1,6 @@
 {
   "name": "@rei-network/api",
-  "version": "0.1.2",
+  "version": "1.0.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "GPL-3.0-or-later",
@@ -15,8 +15,8 @@
   },
   "dependencies": {
     "@ethersproject/abi": "^5.4.0",
-    "@rei-network/core": "^1.1.2",
-    "@rei-network/structure": "^0.1.4",
+    "@rei-network/core": "^2.0.0",
+    "@rei-network/structure": "^1.0.0",
     "@rei-network/utils": "^0.1.1"
   }
 }

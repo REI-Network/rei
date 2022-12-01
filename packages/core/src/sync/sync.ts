@@ -3,11 +3,12 @@ import { BN } from 'ethereumjs-util';
 import { Channel, getRandomIntInclusive, logger, AbortableTimer } from '@rei-network/utils';
 import { Block, Receipt } from '@rei-network/structure';
 import { Node } from '../node';
-import { preValidateBlock, validateReceipts } from '../validation';
-import { WireProtocolHandler, isV2 } from '../protocols';
+import { preValidateBlock, validateReceipts, preValidateHeader } from '../validation';
+import { WireProtocolHandler, isV2, maxGetBlockHeaders } from '../protocols';
 import { SnapSync, SnapSyncScheduler } from './snap';
 import { FullSync } from './full';
 import { SyncInfo } from './types';
+import { HeaderSync } from './snap/headerSync';
 
 const snapSyncStaleBlockNumber = 128;
 const snapSyncTrustedStaleBlockNumber = 896;
@@ -86,7 +87,14 @@ export class Synchronizer extends EventEmitter {
     this.trustedHash = options.trustedHash;
     this.trustedHeight = options.trustedHeight;
     this.full = new FullSync(options.node);
-    this.snap = new SnapSyncScheduler(new SnapSync(this.node.db, this.node.snap.pool));
+    this.snap = new SnapSyncScheduler(
+      new SnapSync(this.node.db, this.node.snap.pool),
+      new HeaderSync({
+        db: this.node.db,
+        network: this.node.wire.pool,
+        maxGetBlockHeaders: new BN(maxGetBlockHeaders)
+      })
+    );
     this.listenSyncer(this.full);
     this.listenSyncer(this.snap);
   }

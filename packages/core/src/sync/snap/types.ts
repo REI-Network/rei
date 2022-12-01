@@ -1,3 +1,5 @@
+import { BlockHeader } from '@rei-network/structure';
+import { BN } from 'ethereumjs-util';
 import type { StakingAccount } from '../../stateManager';
 
 export type AccountRequest = {
@@ -40,4 +42,13 @@ export interface SnapSyncNetworkManager {
   getIdlePeer(type: PeerType): SnapSyncPeer | null;
   putBackIdlePeer(type: PeerType, peer: SnapSyncPeer);
   resetStatelessPeer(): void;
+}
+
+export interface HeaderSyncPeer {
+  getBlockHeaders(start: BN, count: BN): Promise<BlockHeader[]>;
+}
+
+export interface HeaderSyncNetworkManager {
+  get(): Promise<HeaderSyncPeer>;
+  put(peer: HeaderSyncPeer): void;
 }

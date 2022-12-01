@@ -8,7 +8,8 @@ import { EMPTY_HASH, MAX_HASH, BinaryRawDBatch, DBatch, CountLock } from '../../
 import { increaseKey } from '../../snap/utils';
 import { SyncInfo } from '../types';
 import { TrieSync } from './trieSync';
-import { AccountRequest, AccountResponse, StorageRequst, StorageResponse, SnapSyncNetworkManager } from './types';
+import { AccountRequest, AccountResponse, StorageRequst, StorageResponse, SnapSyncNetworkManager, HeaderSyncNetworkManager } from './types';
+import { HeaderSync } from './headerSync';
 
 const maxHashBN = new BN(MAX_HASH);
 
@@ -1132,6 +1133,7 @@ export declare interface SnapSyncScheduler {
 
 export class SnapSyncScheduler extends EventEmitter {
   readonly syncer: SnapSync;
+  readonly headerSync: HeaderSync;
 
   private aborted: boolean = false;
   private onFinished?: () => Promise<void>;
@@ -1142,9 +1144,10 @@ export class SnapSyncScheduler extends EventEmitter {
   private startingBlock: number = 0;
   private highestBlock: number = 0;
 
-  constructor(syncer: SnapSync) {
+  constructor(syncer: SnapSync, headerSyncer: HeaderSync) {
     super();
     this.syncer = syncer;
+    this.headerSync = headerSyncer;
   }
 
   /**

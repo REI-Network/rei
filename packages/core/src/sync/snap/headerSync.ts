@@ -4,7 +4,6 @@ import { BlockHeader } from '@rei-network/structure';
 import { Database, DBSetBlockOrHeader, DBOp } from '@rei-network/database';
 import { logger } from '@rei-network/utils';
 import { HeaderSyncNetworkManager, HeaderSyncPeer, HeaderSyncBackend } from './types';
-import { resolve } from 'path';
 const count: BN = new BN(256);
 
 export interface HeaderSyncOptions {
@@ -25,7 +24,6 @@ export class HeaderSync extends EventEmitter {
   private getRemotePeerInterval: number;
   private useless = new Set<HeaderSyncPeer>();
   private syncPromise: Promise<void> | undefined;
-  private taskList: Array<Promise<void>> = [];
 
   constructor(options: HeaderSyncOptions) {
     super();
@@ -37,10 +35,18 @@ export class HeaderSync extends EventEmitter {
   }
 
   async start(endHeader: BlockHeader) {
-    this.syncPromise = this.headerSync(endHeader).finally(() => {
-      this.syncPromise = undefined;
-      this.releaseUseless();
-    });
+    while (!this.aborted) {
+      try {
+        this.syncPromise = this.headerSync(endHeader);
+        await this.syncPromise;
+        this.syncPromise = undefined;
+        break;
+      } catch (err) {
+        logger.warn('HeaderSync::start, header sync failed:', err);
+      }
+      await new Promise((resolve) => setInterval(resolve, 2000));
+    }
+    this.releaseUseless();
   }
 
   //reset start header
@@ -77,8 +83,7 @@ export class HeaderSync extends EventEmitter {
     //get remote peer
     const handler = await this.getRemotePeer();
     if (!handler) {
-      logger.warn('HeaderSync::download headers, get handler failed');
-      return;
+      throw new Error('HeaderSync::download headers, get handler failed');
     }
     const queryCount = new BN(0);
     let child: BlockHeader = endHeader;
@@ -108,7 +113,7 @@ export class HeaderSync extends EventEmitter {
         if (err.message !== 'useless') {
           await this.headerSyncBackEnd.handlePeerError('HeaderSync::header sync', handler, err);
         }
-        return;
+        throw err;
       }
       queryCount.iadd(count);
       end.isub(count);

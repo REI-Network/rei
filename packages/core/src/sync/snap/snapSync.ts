@@ -2,14 +2,18 @@ import EventEmitter from 'events';
 import { bufferToHex, toBuffer, BN, setLengthLeft, KECCAK256_NULL, KECCAK256_RLP } from 'ethereumjs-util';
 import { BaseTrie, CheckpointTrie } from 'merkle-patricia-tree';
 import { logger, Channel, FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
-import { Database, DBSaveSerializedSnapAccount, DBSaveSnapStorage, DBSaveSnapSyncProgress } from '@rei-network/database';
+import { Database, DBSaveSerializedSnapAccount, DBSaveSnapStorage, DBSaveSnapSyncProgress, DBSetBlockOrHeader, DBOp } from '@rei-network/database';
+import { BlockHeader } from '@rei-network/structure';
 import { StakingAccount } from '../../stateManager';
 import { EMPTY_HASH, MAX_HASH, BinaryRawDBatch, DBatch, CountLock } from '../../utils';
 import { increaseKey } from '../../snap/utils';
 import { SyncInfo } from '../types';
 import { TrieSync } from './trieSync';
-import { AccountRequest, AccountResponse, StorageRequst, StorageResponse, SnapSyncNetworkManager, HeaderSyncNetworkManager } from './types';
+import { AccountRequest, AccountResponse, StorageRequst, StorageResponse, SnapSyncNetworkManager, HeaderSyncBackend as IHeaderSyncBackend, HeaderSyncPeer } from './types';
 import { HeaderSync } from './headerSync';
+import { Node } from '../../node';
+import { preValidateHeader } from '../../validation';
+import { WireProtocolHandler } from '../../protocols';
 
 const maxHashBN = new BN(MAX_HASH);
 
@@ -1228,5 +1232,34 @@ export class SnapSyncScheduler extends EventEmitter {
     this.aborted = true;
     this.syncResolve && this.syncResolve();
     await this.syncer.abort();
+  }
+}
+
+export class HeaderSyncBackend implements IHeaderSyncBackend {
+  private node: Node;
+
+  constructor(node: Node) {
+    this.node = node;
+  }
+
+  async handlePeerError(prefix: string, peer: HeaderSyncPeer, err: any) {
+    const peerId = (peer as WireProtocolHandler).peer.peerId;
+    if (typeof err.message === 'string' && err.message.startsWith('timeout')) {
+      logger.warn(prefix, 'peerId:', peerId, 'error:', err);
+      await this.node.banPeer(peerId, 'timeout');
+    } else if (err.message === 'abort') {
+      // ignore abort error...
+    } else {
+      logger.error(prefix, 'peerId:', peerId, 'error:', err);
+      await this.node.banPeer(peerId, 'invalid');
+    }
+  }
+
+  validateHeaders(child: BlockHeader, headers: BlockHeader[]) {
+    for (let i = headers.length - 1; i >= 0; i--) {
+      preValidateHeader.call(child, headers[i]);
+      child = headers[i];
+    }
+    return child;
   }
 }

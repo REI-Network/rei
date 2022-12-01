@@ -52,3 +52,8 @@ export interface HeaderSyncNetworkManager {
   get(): Promise<HeaderSyncPeer>;
   put(peer: HeaderSyncPeer): void;
 }
+
+export interface HeaderSyncBackend {
+  handlePeerError(prefix: string, peer: HeaderSyncPeer, err: any): Promise<void>;
+  validateHeaders(child: BlockHeader, headers: BlockHeader[]): BlockHeader;
+}

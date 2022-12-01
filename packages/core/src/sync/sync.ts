@@ -5,7 +5,7 @@ import { Block, Receipt } from '@rei-network/structure';
 import { Node } from '../node';
 import { preValidateBlock, validateReceipts, preValidateHeader } from '../validation';
 import { WireProtocolHandler, isV2, maxGetBlockHeaders } from '../protocols';
-import { SnapSync, SnapSyncScheduler } from './snap';
+import { HeaderSyncBackend, SnapSync, SnapSyncScheduler } from './snap';
 import { FullSync } from './full';
 import { SyncInfo } from './types';
 import { HeaderSync } from './snap/headerSync';
@@ -91,6 +91,7 @@ export class Synchronizer extends EventEmitter {
       new SnapSync(this.node.db, this.node.snap.pool),
       new HeaderSync({
         db: this.node.db,
+        backend: new HeaderSyncBackend(this.node),
         network: this.node.wire.pool,
         maxGetBlockHeaders: new BN(maxGetBlockHeaders)
       })

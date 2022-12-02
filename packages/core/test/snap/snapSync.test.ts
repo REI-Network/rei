@@ -266,13 +266,22 @@ describe('SnapSync', () => {
   }
 
   async function verifyRoot(root: Buffer, db: Database): Promise<boolean> {
-    const trieSync = new TrieSync(db, false);
+    const trieSync = new TrieSync(db, true);
     await trieSync.setRoot(root);
-    if (trieSync.pending > 0) {
-      return false;
-    } else {
-      return true;
+    while (trieSync.pending > 0) {
+      const { nodeHashes, codeHashes } = trieSync.missing(10);
+      try {
+        for (const hash of nodeHashes) {
+          await trieSync.process(hash, await db.getTrieNode(hash));
+        }
+        for (const hash of codeHashes) {
+          await trieSync.process(hash, await db.getCode(hash));
+        }
+      } catch (error) {
+        return false;
+      }
     }
+    return true;
   }
 
   before(async () => {

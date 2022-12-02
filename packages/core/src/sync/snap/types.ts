@@ -1,5 +1,5 @@
-import { BlockHeader } from '@rei-network/structure';
 import { BN } from 'ethereumjs-util';
+import { BlockHeader } from '@rei-network/structure';
 import type { StakingAccount } from '../../stateManager';
 
 export type AccountRequest = {
@@ -53,7 +53,7 @@ export interface HeaderSyncNetworkManager {
   put(peer: HeaderSyncPeer): void;
 }
 
-export interface HeaderSyncBackend {
+export interface IHeaderSyncBackend {
   handlePeerError(prefix: string, peer: HeaderSyncPeer, err: any): Promise<void>;
   validateHeaders(child: BlockHeader, headers: BlockHeader[]): BlockHeader;
 }

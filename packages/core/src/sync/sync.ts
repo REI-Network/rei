@@ -355,9 +355,8 @@ export class Synchronizer extends EventEmitter {
                 } else {
                   logger.debug('Synchronizer::syncLoop, current block is stale, try to sync new block');
                 }
-                const root = data.block.header.stateRoot;
                 logger.debug('Synchronizer::syncLoop, reset snap sync root, height:', remoteHeight);
-                await this.snap.resetRoot(remoteHeight, root, this.makeOnFinishedCallback(data));
+                await this.snap.resetRoot(remoteHeight, data.block.header, this.makeOnFinishedCallback(data));
                 continue;
               }
             }
@@ -422,8 +421,7 @@ export class Synchronizer extends EventEmitter {
             remotePeerId: ann.handler.peer.peerId
           };
           const startingBlock = this.node.latestBlock.header.number.toNumber();
-          const root = header.stateRoot;
-          await this.snap.snapSync(root, startingBlock, info, this.makeOnFinishedCallback(data));
+          await this.snap.snapSync(header, startingBlock, info, this.makeOnFinishedCallback(data));
         } else {
           logger.debug('Synchronizer::syncLoop, try to start a new full sync');
           // we're not too far behind, try full sync

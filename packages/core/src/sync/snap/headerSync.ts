@@ -34,25 +34,25 @@ export class HeaderSync extends EventEmitter {
     this.downloadHeadersInterval = options.downloadHeadersInterval || 2000;
   }
 
-  async start(endHeader: BlockHeader) {
+  startSync(endHeader: BlockHeader) {
     if (this.syncPromise) {
       logger.warn('HeaderSync::start sync already running');
       return;
     }
-    this.syncPromise = this.headerSync(endHeader).finally(() => {
+    return (this.syncPromise = this.headerSync(endHeader).finally(() => {
       this.syncPromise = undefined;
       this.useless.forEach((h) => {
         this.wireHandlerPool.put(h);
       });
       this.useless.clear();
-    });
+    }));
   }
 
   //reset start header
   async reset(header: BlockHeader) {
     await this.abort();
     this.aborted = false;
-    this.start(header);
+    this.startSync(header);
   }
 
   //abort sync

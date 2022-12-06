@@ -1137,12 +1137,14 @@ export declare interface SnapSyncScheduler {
 
 export class SnapSyncScheduler extends EventEmitter {
   readonly syncer: SnapSync;
-  readonly headerSync: HeaderSync;
+  readonly headerSyncer: HeaderSync;
 
   private aborted: boolean = false;
   private onFinished?: () => Promise<void>;
   private syncPromise?: Promise<void>;
   private syncResolve?: () => void;
+  private headerSyncPromise?: Promise<void>;
+  private headerSyncListener: (stateRoot: Buffer) => void;
 
   // sync state
   private startingBlock: number = 0;
@@ -1151,7 +1153,11 @@ export class SnapSyncScheduler extends EventEmitter {
   constructor(syncer: SnapSync, headerSyncer: HeaderSync) {
     super();
     this.syncer = syncer;
-    this.headerSync = headerSyncer;
+    this.headerSyncer = headerSyncer;
+    this.headerSyncListener = (stateRoot: Buffer) => {
+      //todo syncer handle stateRoot
+    };
+    this.headerSyncer.on('synced', this.headerSyncListener);
   }
 
   /**
@@ -1165,7 +1171,7 @@ export class SnapSyncScheduler extends EventEmitter {
    * Is it syncing
    */
   get isSyncing() {
-    return !!this.syncPromise;
+    return !!this.syncPromise && !!this.headerSyncPromise;
   }
 
   /**
@@ -1174,13 +1180,14 @@ export class SnapSyncScheduler extends EventEmitter {
    * @param root - New state root
    * @param onFinished - On finished callback
    */
-  async resetRoot(height: number, root: Buffer, onFinished?: () => Promise<void>) {
-    if (!this.aborted && this.syncer.root !== undefined && !this.syncer.root.equals(root)) {
+  async resetRoot(height: number, header: BlockHeader, onFinished?: () => Promise<void>) {
+    if (!this.aborted && this.syncer.root !== undefined && !this.syncer.root.equals(header.stateRoot)) {
       this.highestBlock = height;
       this.onFinished = onFinished;
       // abort and restart sync
       await this.syncer.abort();
-      await this.syncer.snapSync(root);
+      await this.syncer.snapSync(header.stateRoot);
+      await this.headerSyncer.reset(header);
     }
   }
 
@@ -1193,7 +1200,7 @@ export class SnapSyncScheduler extends EventEmitter {
    * @param onFinished - On finished callback,
    *                     it will be invoked when sync finished
    */
-  async snapSync(root: Buffer, startingBlock: number, info: SyncInfo, onFinished?: () => Promise<void>) {
+  async snapSync(header: BlockHeader, startingBlock: number, info: SyncInfo, onFinished?: () => Promise<void>) {
     if (this.isSyncing) {
       throw new Error('SnapSyncScheduler is working');
     }
@@ -1205,7 +1212,8 @@ export class SnapSyncScheduler extends EventEmitter {
     this.emit('start', info);
 
     // start snap sync
-    await this.syncer.snapSync(root);
+    await this.syncer.snapSync(header.stateRoot);
+    this.headerSyncPromise = this.headerSyncer.startSync(header);
     // wait until finished
     this.syncPromise = new Promise<void>((resolve) => {
       this.syncResolve = resolve;
@@ -1215,6 +1223,9 @@ export class SnapSyncScheduler extends EventEmitter {
     }).finally(async () => {
       this.syncPromise = undefined;
       this.syncResolve = undefined;
+    });
+
+    Promise.all([this.syncPromise, this.headerSyncPromise]).finally(async () => {
       if (!this.aborted) {
         // invoke callback if it exists
         this.onFinished && (await this.onFinished());
@@ -1230,8 +1241,10 @@ export class SnapSyncScheduler extends EventEmitter {
    */
   async abort() {
     this.aborted = true;
+    this.headerSyncer.off('synced', this.headerSyncListener);
     this.syncResolve && this.syncResolve();
     await this.syncer.abort();
+    await this.headerSyncer.abort();
   }
 }
 

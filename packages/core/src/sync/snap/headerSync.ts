@@ -1,7 +1,7 @@
 import EventEmitter from 'events';
 import { BN } from 'ethereumjs-util';
 import { BlockHeader } from '@rei-network/structure';
-import { Database, DBSetBlockOrHeader, DBOp } from '@rei-network/database';
+import { Database, DBSetBlockOrHeader, DBOp, DBSaveLookups } from '@rei-network/database';
 import { logger } from '@rei-network/utils';
 import { HeaderSyncNetworkManager, HeaderSyncPeer, IHeaderSyncBackend } from './types';
 const count: BN = new BN(256);
@@ -52,7 +52,7 @@ export class HeaderSync extends EventEmitter {
   async reset(header: BlockHeader) {
     await this.abort();
     this.aborted = false;
-    this.startSync(header);
+    return this.startSync(header);
   }
 
   //abort sync
@@ -67,23 +67,30 @@ export class HeaderSync extends EventEmitter {
     const needDownload: BN[] = [];
     for (let i = new BN(1); i.lte(count); i.iaddn(1)) {
       const n = endNumbr.sub(i);
-      const hash = await this.db.numberToHash(n);
-      if (!hash) {
-        needDownload.push(n);
-        continue;
+      if (n.ltn(0)) {
+        break;
       }
-      if (i.eqn(1)) {
-        const targetHeader = await this.db.getHeader(hash, n);
-        this.emit('synced', targetHeader.stateRoot);
+      try {
+        const hash = await this.db.numberToHash(n);
+        if (i.eqn(1)) {
+          const targetHeader = await this.db.getHeader(hash, n);
+          this.emit('synced', targetHeader.stateRoot);
+        }
+      } catch (error) {
+        if ((error as any).type === 'NotFoundError') {
+          needDownload.push(n);
+          continue;
+        } else {
+          throw error;
+        }
       }
     }
-
     if (needDownload.length === 0) {
       return;
     }
     const last = needDownload[0];
     const first = needDownload[needDownload.length - 1];
-    const amount = last.sub(first);
+    const amount = last.sub(first).addn(1);
     const queryCount = new BN(0);
     const target = endHeader.number.subn(1);
     let child: BlockHeader = endHeader;
@@ -93,7 +100,7 @@ export class HeaderSync extends EventEmitter {
       let start: BN;
       let left = amount.sub(queryCount);
       if (left.gt(this.maxGetBlockHeaders)) {
-        start = last.sub(this.maxGetBlockHeaders);
+        start = last.sub(this.maxGetBlockHeaders).addn(1);
         count = this.maxGetBlockHeaders.clone();
       } else {
         start = first.clone();
@@ -115,7 +122,6 @@ export class HeaderSync extends EventEmitter {
     let time = 0;
     let handler: HeaderSyncPeer | undefined;
     while (!this.aborted) {
-      handler = await this.wireHandlerPool.get();
       try {
         const handler = await this.wireHandlerPool.get();
         const headers = await handler.getBlockHeaders(start, count);
@@ -131,11 +137,12 @@ export class HeaderSync extends EventEmitter {
         }
         break;
       } catch (err: any) {
+        console.log('download headers fail', err);
         if (handler) {
           this.useless.add(handler);
         }
         if (err.message !== 'useless') {
-          await this.headerSyncBackEnd.handlePeerError('HeaderSync::download headers failed', handler, err);
+          await this.headerSyncBackEnd.handlePeerError('HeaderSync::download headers failed', handler!, err);
         }
         if (time >= 10) {
           throw err;
@@ -151,7 +158,8 @@ export class HeaderSync extends EventEmitter {
   private async saveHeaders(headers: BlockHeader[]) {
     const dbOps: DBOp[] = [];
     headers.forEach((header) => {
-      dbOps.concat(DBSetBlockOrHeader(header));
+      dbOps.push(...DBSetBlockOrHeader(header));
+      dbOps.push(...DBSaveLookups(header.hash(), header.number));
     });
     await this.db.batch(dbOps);
   }

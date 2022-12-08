@@ -6,8 +6,7 @@
   "license": "GPL-3.0-or-later",
   "scripts": {
     "build": "tsc --build tsconfig.json",
-    "test": "mocha -r ts-node/register 'test/**/*.test.ts' --timeout 100000 --exit",
-    "test:snap": "mocha -r ts-node/register 'test/snap/headerSync.test.ts' --timeout 100000 --exit"
+    "test": "mocha -r ts-node/register 'test/**/*.test.ts' --timeout 100000 --exit"
   },
   "devDependencies": {
     "@types/levelup": "^4.3.0",

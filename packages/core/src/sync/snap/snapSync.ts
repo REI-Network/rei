@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
 import { bufferToHex, toBuffer, BN, setLengthLeft, KECCAK256_NULL, KECCAK256_RLP } from 'ethereumjs-util';
-import { BaseTrie, CheckpointTrie } from 'merkle-patricia-tree';
+import { BaseTrie, CheckpointTrie } from '@rei-network/trie';
 import { logger, Channel, FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
 import { Database, DBSaveSerializedSnapAccount, DBSaveSnapStorage, DBSaveSnapSyncProgress } from '@rei-network/database';
 import { StakingAccount } from '../../stateManager';

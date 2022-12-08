@@ -1,6 +1,6 @@
 const Set = require('core-js-pure/es/set');
 import { debug as createDebugLogger } from 'debug';
-import { SecureTrie as Trie } from 'merkle-patricia-tree';
+import { SecureTrie as Trie } from '@rei-network/trie';
 import { Address, BN, toBuffer, keccak256, KECCAK256_NULL, unpadBuffer } from 'ethereumjs-util';
 import { encode, decode } from 'rlp';
 import { Common, Chain, Hardfork } from '@rei-network/common';

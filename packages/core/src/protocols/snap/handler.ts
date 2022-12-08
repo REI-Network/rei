@@ -1,4 +1,4 @@
-import { BaseTrie as Trie } from 'merkle-patricia-tree';
+import { BaseTrie as Trie } from '@rei-network/trie';
 import { keccak256, KECCAK256_NULL } from 'ethereumjs-util';
 import { logger } from '@rei-network/utils';
 import { ProtocolHandler, Peer, ProtocolStream } from '@rei-network/network';

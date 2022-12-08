@@ -5,7 +5,7 @@ import { Address, BN, keccak256, unpadBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
 import { Database } from '@rei-network/database';
-import { Trie } from 'merkle-patricia-tree/dist/baseTrie';
+import { Trie } from '@rei-network/trie/dist/baseTrie';
 import { StateManager, StakingAccount } from '../../src/stateManager';
 import { SnapTree } from '../../src/snap/snapTree';
 import { genRandomAccounts } from '../snap/util';

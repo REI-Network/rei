@@ -134,6 +134,13 @@ class MockHandler implements ProtocolHandler {
     this.clearHandshake();
     this.clearRequest();
   }
+
+  /**
+   * Get handler status
+   */
+  getRemoteStatus() {
+    return { name: 'mock', version: 1 };
+  }
 }
 
 export class MockProtocol implements Protocol {

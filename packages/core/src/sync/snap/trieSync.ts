@@ -1,7 +1,7 @@
 import Heap from 'qheap';
 import { KECCAK256_NULL, KECCAK256_RLP } from 'ethereumjs-util';
-import { BranchNode, ExtensionNode, LeafNode, Nibbles, TrieNode, isRawNode, decodeRawNode, decodeNode } from 'merkle-patricia-tree/dist/trieNode';
-import { nibblesToBuffer } from 'merkle-patricia-tree/dist/util/nibbles';
+import { BranchNode, ExtensionNode, LeafNode, Nibbles, TrieNode, isRawNode, decodeRawNode, decodeNode } from '@rei-network/trie/dist/trieNode';
+import { nibblesToBuffer } from '@rei-network/trie/dist/util/nibbles';
 import { FunctionalBufferMap } from '@rei-network/utils';
 import { StakingAccount } from '../../stateManager';
 import { BinaryRawDBatch } from '../../utils';

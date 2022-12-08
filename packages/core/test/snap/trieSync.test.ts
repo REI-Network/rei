@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { LevelUp } from 'levelup';
-import { SecureTrie, BaseTrie } from 'merkle-patricia-tree';
-import { BranchNode, LeafNode } from 'merkle-patricia-tree/dist/trieNode';
+import { SecureTrie, BaseTrie } from '@rei-network/trie';
+import { BranchNode, LeafNode } from '@rei-network/trie/dist/trieNode';
 import { Common } from '@rei-network/common';
 import { Database, DBOpData } from '@rei-network/database';
 import { getRandomIntInclusive } from '@rei-network/utils';

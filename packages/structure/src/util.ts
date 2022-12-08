@@ -1,5 +1,5 @@
 import { BN, rlp } from 'ethereumjs-util';
-import { BaseTrie as Trie } from 'merkle-patricia-tree';
+import { BaseTrie as Trie } from '@rei-network/trie';
 import { TxOptions, Transaction } from './tx';
 
 /**

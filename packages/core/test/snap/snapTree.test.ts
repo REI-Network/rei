@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { keccak256, rlp, bufferToInt } from 'ethereumjs-util';
-import { BaseTrie } from 'merkle-patricia-tree';
-import { LeafNode } from 'merkle-patricia-tree/dist/trieNode';
+import { BaseTrie } from '@rei-network/trie';
+import { LeafNode } from '@rei-network/trie/dist/trieNode';
 import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { Database, DBDeleteSnapAccount, DBDeleteSnapStorage, DBSaveSerializedSnapAccount } from '@rei-network/database';

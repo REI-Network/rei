@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { expect } from 'chai';
-import { BaseTrie as Trie } from 'merkle-patricia-tree';
+import { BaseTrie as Trie } from '@rei-network/trie';
 import { FunctionalBufferMap } from '@rei-network/utils';
 import { Database } from '@rei-network/database';
 import { Common } from '@rei-network/common';

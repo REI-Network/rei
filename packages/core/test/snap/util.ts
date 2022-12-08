@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { SecureTrie as Trie } from 'merkle-patricia-tree';
+import { SecureTrie as Trie } from '@rei-network/trie';
 import { BN, keccak256 } from 'ethereumjs-util';
 import { FunctionalBufferMap, FunctionalBufferSet, getRandomIntInclusive } from '@rei-network/utils';
 import { Database, DBSaveSnapStorage, DBSaveSerializedSnapAccount } from '@rei-network/database';

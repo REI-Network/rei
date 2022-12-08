@@ -1,4 +1,4 @@
-import { BaseTrie } from 'merkle-patricia-tree';
+import { BaseTrie } from '@rei-network/trie';
 import { rlp } from 'ethereumjs-util';
 import { Receipt, Block } from '@rei-network/structure';
 

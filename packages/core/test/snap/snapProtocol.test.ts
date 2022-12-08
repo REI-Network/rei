@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import crypto from 'crypto';
 import { keccak256 } from 'ethereumjs-util';
-import { BaseTrie } from 'merkle-patricia-tree';
+import { BaseTrie } from '@rei-network/trie';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
 import { AccountInfo, genRandomAccounts, addEmptyAccounts } from './util';

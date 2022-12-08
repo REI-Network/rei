@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { Address, toBuffer, BN, keccak256, intToHex, bufferToHex } from 'ethereumjs-util';
-import { SecureTrie as Trie } from 'merkle-patricia-tree';
+import { SecureTrie as Trie } from '@rei-network/trie';
 import { AbiCoder } from '@ethersproject/abi';
 import { StateManager, StakingAccount } from '@rei-network/core/dist/stateManager';
 import { JSDebug } from '@rei-network/core/dist/tracer/debug/jsDebug';

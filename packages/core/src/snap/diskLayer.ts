@@ -1,4 +1,4 @@
-import { BaseTrie as Trie } from 'merkle-patricia-tree';
+import { BaseTrie as Trie } from '@rei-network/trie';
 import { KECCAK256_NULL, KECCAK256_RLP } from 'ethereumjs-util';
 import { Database } from '@rei-network/database';
 import { DBDeleteSnapAccount, DBDeleteSnapStorage, DBSaveSerializedSnapAccount, DBSaveSnapStorage } from '@rei-network/database/dist/helpers';

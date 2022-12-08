@@ -8,7 +8,7 @@ import { StakingAccount } from '../../src/stateManager';
 import { asyncTraverseRawDB } from '../../src/snap/layerIterator';
 import { SnapSync, SnapSyncNetworkManager, SnapSyncPeer, AccountRequest, AccountResponse, StorageRequst, StorageResponse, PeerType } from '../../src/sync/snap';
 import { AccountInfo, genRandomAccounts, GenRandomAccountsResult } from './util';
-import { BaseTrie } from 'merkle-patricia-tree';
+import { BaseTrie } from '@rei-network/trie';
 import { keccak256 } from 'ethereumjs-util';
 const level = require('level-mem');
 

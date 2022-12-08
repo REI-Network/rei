@@ -1,6 +1,6 @@
-import { BaseTrie as Trie } from 'merkle-patricia-tree';
-import { nibblesToBuffer } from 'merkle-patricia-tree/dist/util/nibbles';
-import { BranchNode, ExtensionNode, LeafNode, Nibbles, TrieNode } from 'merkle-patricia-tree/dist/trieNode';
+import { BaseTrie as Trie } from '@rei-network/trie';
+import { nibblesToBuffer } from '@rei-network/trie/dist/util/nibbles';
+import { BranchNode, ExtensionNode, LeafNode, Nibbles, TrieNode } from '@rei-network/trie/dist/trieNode';
 
 export type NodeEntry = { key: Buffer; val: Buffer };
 

@@ -107,7 +107,7 @@ class BlockSyncBackend implements IBlockSyncBackend, IBlockSyncValidateBackend {
   }
 }
 
-export declare interface FullSync {
+export declare interface FullSyncScheduler {
   on(event: 'start', listener: (info: SyncInfo) => void): this;
   on(event: 'finished', listener: (info: SyncInfo) => void): this;
   on(event: 'synchronized', listener: (info: SyncInfo) => void): this;
@@ -119,7 +119,7 @@ export declare interface FullSync {
   off(event: 'failed', listener: (info: SyncInfo) => void): this;
 }
 
-export class FullSync extends EventEmitter {
+export class FullSyncScheduler extends EventEmitter {
   private readonly node: Node;
   private readonly backend: BlockSyncBackend;
   private readonly blockSync: BlockSync;

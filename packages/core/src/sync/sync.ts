@@ -6,7 +6,7 @@ import { Node } from '../node';
 import { preValidateBlock, validateReceipts } from '../validation';
 import { WireProtocolHandler, isV2 } from '../protocols';
 import { SnapSync, SnapSyncScheduler } from './snap';
-import { FullSync } from './full';
+import { FullSyncScheduler } from './full';
 import { SyncInfo } from './types';
 
 const snapSyncStaleBlockNumber = 128;
@@ -63,7 +63,7 @@ export declare interface Synchronizer {
 export class Synchronizer extends EventEmitter {
   readonly node: Node;
   readonly mode: SyncMode;
-  private full: FullSync;
+  private full: FullSyncScheduler;
   private snap: SnapSyncScheduler;
   private channel = new Channel<Announcement>();
   private aborted: boolean = false;
@@ -85,7 +85,7 @@ export class Synchronizer extends EventEmitter {
     this.snapSyncMinTD = options.snapSyncMinTD ?? defaultSnapSyncMinTD;
     this.trustedHash = options.trustedHash;
     this.trustedHeight = options.trustedHeight;
-    this.full = new FullSync(options.node);
+    this.full = new FullSyncScheduler(options.node);
     this.snap = new SnapSyncScheduler(new SnapSync(this.node.db, this.node.snap.pool));
     this.listenSyncer(this.full);
     this.listenSyncer(this.snap);
@@ -113,7 +113,7 @@ export class Synchronizer extends EventEmitter {
    * Listen syncer event
    * @param sync - Syncer instance
    */
-  private listenSyncer(sync: FullSync | SnapSyncScheduler) {
+  private listenSyncer(sync: FullSyncScheduler | SnapSyncScheduler) {
     sync
       .on('start', (info) => {
         logger.info('💡 Get best height from:', info.remotePeerId, 'best height:', info.bestHeight.toString(), 'local height:', this.node.latestBlock.header.number.toString());

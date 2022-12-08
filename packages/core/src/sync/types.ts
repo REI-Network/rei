@@ -5,7 +5,3 @@ export type SyncInfo = {
   bestTD: BN;
   remotePeerId: string;
 };
-
-export type PreInfo = {
-  preRoot: Buffer;
-};

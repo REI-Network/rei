@@ -1,3 +1,3 @@
 export * from './blockSync';
-export * from './fullSync';
+export * from './scheduler';
 export * from './limited';

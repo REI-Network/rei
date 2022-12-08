@@ -4,7 +4,7 @@ import { Channel, getRandomIntInclusive, logger, AbortableTimer } from '@rei-net
 import { Block, Receipt } from '@rei-network/structure';
 import { Node } from '../node';
 import { preValidateBlock, validateReceipts } from '../validation';
-import { WireProtocolHandler, isV2, maxGetBlockHeaders } from '../protocols';
+import { WireProtocolHandler, isV2 } from '../protocols';
 import { SnapSync, SnapSyncScheduler, HeaderSyncBackend } from './snap';
 import { FullSync } from './full';
 import { SyncInfo } from './types';
@@ -92,8 +92,7 @@ export class Synchronizer extends EventEmitter {
       new HeaderSync({
         db: this.node.db,
         backend: new HeaderSyncBackend(this.node),
-        wireHandlerPool: this.node.wire.pool,
-        maxGetBlockHeaders: new BN(maxGetBlockHeaders)
+        wireHandlerPool: this.node.wire.pool
       })
     );
     this.listenSyncer(this.full);

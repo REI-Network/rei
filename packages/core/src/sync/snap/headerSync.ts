@@ -10,7 +10,6 @@ export interface HeaderSyncOptions {
   db: Database;
   backend: IHeaderSyncBackend;
   wireHandlerPool: HeaderSyncNetworkManager;
-  maxGetBlockHeaders: BN;
   downloadHeadersInterval?: number;
   testMode?: boolean;
 }
@@ -21,7 +20,7 @@ export class HeaderSync extends EventEmitter {
   readonly headerSyncBackEnd: IHeaderSyncBackend;
 
   private aborted: boolean = false;
-  private maxGetBlockHeaders: BN;
+  private maxGetBlockHeaders: BN = new BN(128);
   private downloadHeadersInterval: number;
   private useless = new Set<HeaderSyncPeer>();
   private syncPromise: Promise<void> | undefined;
@@ -32,7 +31,6 @@ export class HeaderSync extends EventEmitter {
     this.db = options.db;
     this.wireHandlerPool = options.wireHandlerPool;
     this.headerSyncBackEnd = options.backend;
-    this.maxGetBlockHeaders = options.maxGetBlockHeaders.clone();
     this.downloadHeadersInterval = options.downloadHeadersInterval || 2000;
     this.testMode = options.testMode || false;
   }

@@ -80,8 +80,7 @@ describe('HeaderSync', () => {
     const headerSync = new HeaderSync({
       db,
       backend,
-      wireHandlerPool: wirePool,
-      maxGetBlockHeaders: new BN(128)
+      wireHandlerPool: wirePool
     });
 
     headerSync.on('synced', (stateRoot: Buffer) => {
@@ -103,8 +102,7 @@ describe('HeaderSync', () => {
     const headerSync = new HeaderSync({
       db,
       backend,
-      wireHandlerPool: wirePool,
-      maxGetBlockHeaders: new BN(128)
+      wireHandlerPool: wirePool
     });
 
     headerSync.on('synced', (stateRoot: Buffer) => {
@@ -126,8 +124,7 @@ describe('HeaderSync', () => {
     const headerSync = new HeaderSync({
       db,
       backend,
-      wireHandlerPool: wirePool,
-      maxGetBlockHeaders: new BN(128)
+      wireHandlerPool: wirePool
     });
 
     headerSync.on('synced', (stateRoot: Buffer) => {
@@ -149,8 +146,7 @@ describe('HeaderSync', () => {
     const headerSync = new HeaderSync({
       db,
       backend,
-      wireHandlerPool: wirePool,
-      maxGetBlockHeaders: new BN(128)
+      wireHandlerPool: wirePool
     });
 
     headerSync.on('synced', (stateRoot: Buffer) => {
@@ -172,8 +168,7 @@ describe('HeaderSync', () => {
     const headerSync = new HeaderSync({
       db,
       backend,
-      wireHandlerPool: wirePool,
-      maxGetBlockHeaders: new BN(128)
+      wireHandlerPool: wirePool
     });
     headerSync.startSync(headers[Math.round(count / 2)]);
     await headerSync.reset(headers[headers.length - 1]);
@@ -191,8 +186,7 @@ describe('HeaderSync', () => {
     const headerSync = new HeaderSync({
       db,
       backend,
-      wireHandlerPool: wirePool,
-      maxGetBlockHeaders: new BN(128)
+      wireHandlerPool: wirePool
     });
     headerSync.startSync(headers[Math.round(count / 2)]);
     await headerSync.reset(headers[headers.length - 1]);
@@ -210,8 +204,7 @@ describe('HeaderSync', () => {
     const headerSync = new HeaderSync({
       db,
       backend,
-      wireHandlerPool: wirePool,
-      maxGetBlockHeaders: new BN(128)
+      wireHandlerPool: wirePool
     });
     headerSync.startSync(headers[Math.round(count / 2)]);
     await headerSync.reset(headers[headers.length - 1]);
@@ -229,8 +222,7 @@ describe('HeaderSync', () => {
     const headerSync = new HeaderSync({
       db,
       backend,
-      wireHandlerPool: wirePool,
-      maxGetBlockHeaders: new BN(128)
+      wireHandlerPool: wirePool
     });
     headerSync.startSync(headers[Math.round(count / 2)]);
     await headerSync.reset(headers[headers.length - 1]);
@@ -249,7 +241,6 @@ describe('HeaderSync', () => {
       db,
       backend,
       wireHandlerPool: wirePool,
-      maxGetBlockHeaders: new BN(128),
       testMode: true
     });
     try {

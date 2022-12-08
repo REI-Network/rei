@@ -74,7 +74,7 @@ describe('HeaderSync', () => {
     db = new Database(levelDB, common);
   });
 
-  it('should download 99 block headers before the specified block header to the database', async () => {
+  it('should sync block headers when the lastest block height equal to 99', async () => {
     const count = 100;
     const { headers, backend, wirePool } = initDev(count, common);
     const headerSync = new HeaderSync({
@@ -97,7 +97,7 @@ describe('HeaderSync', () => {
     }
   });
 
-  it('should download 128 block headers before the specified block header to the database', async () => {
+  it('should sync block headers when the lastest block height equal to 128', async () => {
     const count = 129;
     const { headers, backend, wirePool } = initDev(count, common);
     const headerSync = new HeaderSync({
@@ -120,7 +120,7 @@ describe('HeaderSync', () => {
     }
   });
 
-  it('should download 256 block headers before the specified block header to the database when the lastest block height equal to 256', async () => {
+  it('should sync block headers when the lastest block height equal to 256', async () => {
     const count = 257;
     const { headers, backend, wirePool } = initDev(count, common);
     const headerSync = new HeaderSync({
@@ -143,7 +143,7 @@ describe('HeaderSync', () => {
     }
   });
 
-  it('should download 256 block headers before the specified block header to the database when the lastest block height greater than 256', async () => {
+  it('should sync block headers when the lastest block height equal to 499', async () => {
     const count = 500;
     const { headers, backend, wirePool } = initDev(count, common);
     const headerSync = new HeaderSync({
@@ -166,7 +166,7 @@ describe('HeaderSync', () => {
     }
   });
 
-  it('should reset the block header and download 99 block headers before the specified block header to the database', async () => {
+  it('should reset the block header and sync block headers when the lastest block height equal to 99', async () => {
     const count = 100;
     const { headers, backend, wirePool } = initDev(count, common);
     const headerSync = new HeaderSync({
@@ -185,7 +185,7 @@ describe('HeaderSync', () => {
     }
   });
 
-  it('should reset the block header and download 128 block headers before the specified block header to the database', async () => {
+  it('should reset the block header and sync block headers when the lastest block height equal to 128', async () => {
     const count = 129;
     const { headers, backend, wirePool } = initDev(count, common);
     const headerSync = new HeaderSync({
@@ -204,7 +204,7 @@ describe('HeaderSync', () => {
     }
   });
 
-  it('should reset the block header and download 256 block headers before the specified block header to the database when the lastest block equal to 256', async () => {
+  it('should reset the block header and sync block headers when the lastest block height equal to 256', async () => {
     const count = 257;
     const { headers, backend, wirePool } = initDev(count, common);
     const headerSync = new HeaderSync({
@@ -223,7 +223,7 @@ describe('HeaderSync', () => {
     }
   });
 
-  it('should reset the block header and download 256 block headers before the specified block header to the database when the lastest block height greater than 256', async () => {
+  it('should reset the block header and sync block headers when the lastest block height equal to 499', async () => {
     const count = 500;
     const { headers, backend, wirePool } = initDev(count, common);
     const headerSync = new HeaderSync({
@@ -242,7 +242,7 @@ describe('HeaderSync', () => {
     }
   });
 
-  it('should tries to download data 10 times and throws exception', async () => {
+  it('should tries to download block headers 10 times and throws exception', async () => {
     const count = 10;
     const { headers, backend, wirePool } = initDev(count, common, 0);
     const headerSync = new HeaderSync({

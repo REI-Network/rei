@@ -42,7 +42,7 @@ export class HeaderSync extends EventEmitter {
    */
   startSync(endHeader: BlockHeader) {
     if (this.syncPromise) {
-      throw new Error('HeaderSync::start sync already running');
+      throw new Error('header sync already running');
     }
     return (this.syncPromise = this.headerSync(endHeader).finally(() => {
       this.syncPromise = undefined;

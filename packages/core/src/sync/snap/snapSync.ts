@@ -1187,7 +1187,7 @@ export class SnapSyncScheduler extends EventEmitter {
       // abort and restart sync
       await this.syncer.abort();
       await this.syncer.snapSync(header.stateRoot);
-      await this.headerSyncer.reset(header);
+      this.headerSyncer.reset(header);
     }
   }
 

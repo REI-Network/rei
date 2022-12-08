@@ -250,12 +250,12 @@ describe('HeaderSync', () => {
       backend,
       wireHandlerPool: wirePool,
       maxGetBlockHeaders: new BN(128),
-      development: true
+      testMode: true
     });
     try {
       await headerSync.startSync(headers[headers.length - 1]);
     } catch (error) {
-      assert((error as any).message === 'HeaderSync::headerSync fail: no peer');
+      assert(error === 'no peer');
     }
   });
 });

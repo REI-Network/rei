@@ -12,7 +12,7 @@ export interface HeaderSyncOptions {
   wireHandlerPool: HeaderSyncNetworkManager;
   maxGetBlockHeaders: BN;
   downloadHeadersInterval?: number;
-  development?: boolean;
+  testMode?: boolean;
 }
 
 export class HeaderSync extends EventEmitter {
@@ -25,7 +25,7 @@ export class HeaderSync extends EventEmitter {
   private downloadHeadersInterval: number;
   private useless = new Set<HeaderSyncPeer>();
   private syncPromise: Promise<void> | undefined;
-  private readonly development: boolean;
+  private readonly testMode: boolean;
 
   constructor(options: HeaderSyncOptions) {
     super();
@@ -34,13 +34,17 @@ export class HeaderSync extends EventEmitter {
     this.headerSyncBackEnd = options.backend;
     this.maxGetBlockHeaders = options.maxGetBlockHeaders.clone();
     this.downloadHeadersInterval = options.downloadHeadersInterval || 2000;
-    this.development = options.development || false;
+    this.testMode = options.testMode || false;
   }
 
+  /**
+   * Start header sync
+   * @param endHeader - end header
+   * @returns sync promise
+   */
   startSync(endHeader: BlockHeader) {
     if (this.syncPromise) {
-      logger.warn('HeaderSync::start sync already running');
-      return;
+      throw new Error('HeaderSync::start sync already running');
     }
     return (this.syncPromise = this.headerSync(endHeader).finally(() => {
       this.syncPromise = undefined;
@@ -51,20 +55,29 @@ export class HeaderSync extends EventEmitter {
     }));
   }
 
-  //reset start header
+  /**
+   * Reset header sync
+   * @param header - end header
+   * @returns sync promise
+   */
   async reset(header: BlockHeader) {
     await this.abort();
     this.aborted = false;
     return this.startSync(header);
   }
 
-  //abort sync
+  /**
+   * Abort header sync
+   */
   async abort() {
     this.aborted = true;
     await this.syncPromise;
   }
 
-  //header sync
+  /**
+   * Download the 256 block headers before the specified block header
+   * @param endHeader - specified end block header
+   */
   private async headerSync(endHeader: BlockHeader) {
     const endNumbr = endHeader.number.clone();
     const needDownload: BN[] = [];
@@ -114,17 +127,24 @@ export class HeaderSync extends EventEmitter {
         queryCount.iadd(count);
         last.isub(count);
       } catch (err) {
-        const errMsg = 'HeaderSync::headerSync fail: ' + err;
-        if (!this.development) {
-          logger.warn(errMsg);
+        if (!this.testMode) {
+          logger.warn('HeaderSync::headerSync fail: ', err);
           break;
         }
-        throw new Error(errMsg);
+        throw err;
       }
     }
   }
 
-  //download headers
+  /**
+   * Download block headers and save them to the database
+   * @param child - child block header to validate headers
+   * @param start - start block number to download
+   * @param count - block header count to download
+   * @param target - target block number to announce
+   * @param retryLimit - retry download limit
+   * @returns child block header
+   */
   private async downloadHeaders(child: BlockHeader, start: BN, count: BN, target: BN, retryLimit: number = 10) {
     let time = 0;
     while (!this.aborted) {
@@ -145,7 +165,7 @@ export class HeaderSync extends EventEmitter {
         break;
       } catch (err: any) {
         if (handler === undefined) {
-          !this.development ?? logger.warn('HeaderSync::downloadHeaders, get handler failed: ', err);
+          logger.warn('HeaderSync::downloadHeaders, get handler failed: ', err);
         } else {
           this.useless.add(handler);
           if (err.message !== 'useless') {
@@ -162,7 +182,10 @@ export class HeaderSync extends EventEmitter {
     return child;
   }
 
-  //save headers
+  /**
+   * Save block headers to the database
+   * @param headers - block headers
+   */
   private async saveHeaders(headers: BlockHeader[]) {
     const dbOps: DBOp[] = [];
     headers.forEach((header) => {

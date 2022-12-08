@@ -12,6 +12,7 @@ export interface HeaderSyncOptions {
   wireHandlerPool: HeaderSyncNetworkManager;
   maxGetBlockHeaders: BN;
   downloadHeadersInterval?: number;
+  development?: boolean;
 }
 
 export class HeaderSync extends EventEmitter {
@@ -24,6 +25,7 @@ export class HeaderSync extends EventEmitter {
   private downloadHeadersInterval: number;
   private useless = new Set<HeaderSyncPeer>();
   private syncPromise: Promise<void> | undefined;
+  private readonly development: boolean;
 
   constructor(options: HeaderSyncOptions) {
     super();
@@ -32,6 +34,7 @@ export class HeaderSync extends EventEmitter {
     this.headerSyncBackEnd = options.backend;
     this.maxGetBlockHeaders = options.maxGetBlockHeaders.clone();
     this.downloadHeadersInterval = options.downloadHeadersInterval || 2000;
+    this.development = options.development || false;
   }
 
   startSync(endHeader: BlockHeader) {
@@ -111,19 +114,23 @@ export class HeaderSync extends EventEmitter {
         queryCount.iadd(count);
         last.isub(count);
       } catch (err) {
-        logger.warn('HeaderSync::download headers fail:', err);
-        break;
+        const errMsg = 'HeaderSync::headerSync fail: ' + err;
+        if (!this.development) {
+          logger.warn(errMsg);
+          break;
+        }
+        throw new Error(errMsg);
       }
     }
   }
 
   //download headers
-  private async downloadHeaders(child: BlockHeader, start: BN, count: BN, target: BN) {
+  private async downloadHeaders(child: BlockHeader, start: BN, count: BN, target: BN, retryLimit: number = 10) {
     let time = 0;
-    let handler: HeaderSyncPeer | undefined;
     while (!this.aborted) {
+      let handler: HeaderSyncPeer | undefined;
       try {
-        const handler = await this.wireHandlerPool.get();
+        handler = await this.wireHandlerPool.get();
         const headers = await handler.getBlockHeaders(start, count);
         child = this.headerSyncBackEnd.validateHeaders(child, headers);
         if (!count.eqn(headers.length)) {
@@ -137,14 +144,15 @@ export class HeaderSync extends EventEmitter {
         }
         break;
       } catch (err: any) {
-        console.log('download headers fail', err);
-        if (handler) {
+        if (handler === undefined) {
+          !this.development ?? logger.warn('HeaderSync::downloadHeaders, get handler failed: ', err);
+        } else {
           this.useless.add(handler);
+          if (err.message !== 'useless') {
+            await this.headerSyncBackEnd.handlePeerError('HeaderSync::downloadHeaders', handler!, err);
+          }
         }
-        if (err.message !== 'useless') {
-          await this.headerSyncBackEnd.handlePeerError('HeaderSync::download headers failed', handler!, err);
-        }
-        if (time >= 10) {
+        if (time >= retryLimit) {
           throw err;
         }
       }

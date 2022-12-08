@@ -3,13 +3,14 @@ import { assert, expect } from 'chai';
 import { BlockHeader } from '@rei-network/structure';
 import { HeaderSyncPeer, HeaderSyncNetworkManager, IHeaderSyncBackend, HeaderSync } from '../../src/sync/snap';
 import { Common } from '@rei-network/common';
-import { Database, DBSetBlockOrHeader, DBOp, DBTarget } from '@rei-network/database';
+import { Database } from '@rei-network/database';
 import { preValidateHeader } from '../../src/validation';
 import { randomBytes } from 'crypto';
 
 class MockBackend implements IHeaderSyncBackend {
   async handlePeerError(prefix: string, peer: HeaderSyncPeer, err: any): Promise<void> {
     // do nothing
+    console.log('handlePeerError', prefix, peer, err);
   }
 
   validateHeaders(child: BlockHeader, headers: BlockHeader[]) {
@@ -63,10 +64,6 @@ class MockHeaderSyncNetworkManager implements HeaderSyncNetworkManager {
 const level = require('level-mem');
 
 describe('HeaderSync', () => {
-  const count = 257; //todo gt 256  lt 256   eq 256
-  let wirePool;
-  let headers: BlockHeader[];
-  let backend: MockBackend;
   let db: Database;
   let common: Common;
 
@@ -75,15 +72,57 @@ describe('HeaderSync', () => {
     common = new Common({ chain: 'rei-devnet' });
     common.setHardforkByBlockNumber(0);
     db = new Database(levelDB, common);
-    headers = createBlockHeaders(count, common);
-    backend = new MockBackend();
-    wirePool = new MockHeaderSyncNetworkManager();
-    for (let i = 0; i < wirePool.peers.length; i++) {
-      wirePool.peers[i].mockSetBlockHeaders(headers);
+  });
+
+  it('should download 99 block headers before the specified block header to the database', async () => {
+    const count = 100;
+    const { headers, backend, wirePool } = initDev(count, common);
+    const headerSync = new HeaderSync({
+      db,
+      backend,
+      wireHandlerPool: wirePool,
+      maxGetBlockHeaders: new BN(128)
+    });
+
+    headerSync.on('synced', (stateRoot: Buffer) => {
+      assert(stateRoot.equals(headers[headers.length - 2].stateRoot));
+    });
+    await headerSync.startSync(headers[headers.length - 1]);
+
+    for (let i = 0; i <= 98; i++) {
+      const header = headers[i];
+      assert((await db.getHeader(header.hash(), header.number)).stateRoot.equals(header.stateRoot));
+      assert((await db.numberToHash(header.number)).equals(header.hash()));
+      assert((await db.hashToNumber(header.hash())).eq(header.number));
     }
   });
 
-  it('should download block headers and store it in the database', async () => {
+  it('should download 128 block headers before the specified block header to the database', async () => {
+    const count = 129;
+    const { headers, backend, wirePool } = initDev(count, common);
+    const headerSync = new HeaderSync({
+      db,
+      backend,
+      wireHandlerPool: wirePool,
+      maxGetBlockHeaders: new BN(128)
+    });
+
+    headerSync.on('synced', (stateRoot: Buffer) => {
+      assert(stateRoot.equals(headers[headers.length - 2].stateRoot));
+    });
+    await headerSync.startSync(headers[headers.length - 1]);
+
+    for (let i = 0; i <= 127; i++) {
+      const header = headers[i];
+      assert((await db.getHeader(header.hash(), header.number)).stateRoot.equals(header.stateRoot));
+      assert((await db.numberToHash(header.number)).equals(header.hash()));
+      assert((await db.hashToNumber(header.hash())).eq(header.number));
+    }
+  });
+
+  it('should download 256 block headers before the specified block header to the database when the lastest block height equal to 256', async () => {
+    const count = 257;
+    const { headers, backend, wirePool } = initDev(count, common);
     const headerSync = new HeaderSync({
       db,
       backend,
@@ -99,25 +138,124 @@ describe('HeaderSync', () => {
     for (let i = 0; i <= 255; i++) {
       const header = headers[i];
       assert((await db.getHeader(header.hash(), header.number)).stateRoot.equals(header.stateRoot));
-      assert((await db.numberToHash(new BN(i))).equals(header.hash()));
-      assert((await db.hashToNumber(header.hash())).eqn(i));
+      assert((await db.numberToHash(header.number)).equals(header.hash()));
+      assert((await db.hashToNumber(header.hash())).eq(header.number));
     }
   });
 
-  it('should reset the block header and download block headers to the database', async () => {
+  it('should download 256 block headers before the specified block header to the database when the lastest block height greater than 256', async () => {
+    const count = 500;
+    const { headers, backend, wirePool } = initDev(count, common);
     const headerSync = new HeaderSync({
       db,
       backend,
       wireHandlerPool: wirePool,
       maxGetBlockHeaders: new BN(128)
     });
-    headerSync.startSync(headers[128]);
+
+    headerSync.on('synced', (stateRoot: Buffer) => {
+      assert(stateRoot.equals(headers[headers.length - 2].stateRoot));
+    });
+    await headerSync.startSync(headers[headers.length - 1]);
+
+    for (let i = 2; i <= 257; i++) {
+      const header = headers[headers.length - i];
+      assert((await db.getHeader(header.hash(), header.number)).stateRoot.equals(header.stateRoot));
+      assert((await db.numberToHash(header.number)).equals(header.hash()));
+      assert((await db.hashToNumber(header.hash())).eq(header.number));
+    }
+  });
+
+  it('should reset the block header and download 99 block headers before the specified block header to the database', async () => {
+    const count = 100;
+    const { headers, backend, wirePool } = initDev(count, common);
+    const headerSync = new HeaderSync({
+      db,
+      backend,
+      wireHandlerPool: wirePool,
+      maxGetBlockHeaders: new BN(128)
+    });
+    headerSync.startSync(headers[Math.round(count / 2)]);
     await headerSync.reset(headers[headers.length - 1]);
-    for (let i = 0; i <= 255; i++) {
+    for (let i = 0; i <= 98; i++) {
       const header = headers[i];
       assert((await db.getHeader(header.hash(), header.number)).stateRoot.equals(header.stateRoot));
-      assert((await db.numberToHash(new BN(i))).equals(header.hash()));
-      assert((await db.hashToNumber(header.hash())).eqn(i));
+      assert((await db.numberToHash(header.number)).equals(header.hash()));
+      assert((await db.hashToNumber(header.hash())).eq(header.number));
+    }
+  });
+
+  it('should reset the block header and download 128 block headers before the specified block header to the database', async () => {
+    const count = 129;
+    const { headers, backend, wirePool } = initDev(count, common);
+    const headerSync = new HeaderSync({
+      db,
+      backend,
+      wireHandlerPool: wirePool,
+      maxGetBlockHeaders: new BN(128)
+    });
+    headerSync.startSync(headers[Math.round(count / 2)]);
+    await headerSync.reset(headers[headers.length - 1]);
+    for (let i = 0; i <= 127; i++) {
+      const header = headers[i];
+      assert((await db.getHeader(header.hash(), header.number)).stateRoot.equals(header.stateRoot));
+      assert((await db.numberToHash(header.number)).equals(header.hash()));
+      assert((await db.hashToNumber(header.hash())).eq(header.number));
+    }
+  });
+
+  it('should reset the block header and download 256 block headers before the specified block header to the database', async () => {
+    const count = 257;
+    const { headers, backend, wirePool } = initDev(count, common);
+    const headerSync = new HeaderSync({
+      db,
+      backend,
+      wireHandlerPool: wirePool,
+      maxGetBlockHeaders: new BN(128)
+    });
+    headerSync.startSync(headers[Math.round(count / 2)]);
+    await headerSync.reset(headers[headers.length - 1]);
+    for (let i = 2; i <= 257; i++) {
+      const header = headers[headers.length - i];
+      assert((await db.getHeader(header.hash(), header.number)).stateRoot.equals(header.stateRoot));
+      assert((await db.numberToHash(header.number)).equals(header.hash()));
+      assert((await db.hashToNumber(header.hash())).eq(header.number));
+    }
+  });
+
+  it('should reset the block header and download 256 block headers before the specified block header to the database', async () => {
+    const count = 500;
+    const { headers, backend, wirePool } = initDev(count, common);
+    const headerSync = new HeaderSync({
+      db,
+      backend,
+      wireHandlerPool: wirePool,
+      maxGetBlockHeaders: new BN(128)
+    });
+    headerSync.startSync(headers[Math.round(count / 2)]);
+    await headerSync.reset(headers[headers.length - 1]);
+    for (let i = 2; i <= 257; i++) {
+      const header = headers[headers.length - i];
+      assert((await db.getHeader(header.hash(), header.number)).stateRoot.equals(header.stateRoot));
+      assert((await db.numberToHash(header.number)).equals(header.hash()));
+      assert((await db.hashToNumber(header.hash())).eq(header.number));
+    }
+  });
+
+  it('should tries to download data 10 times and throws exception', async () => {
+    const count = 10;
+    const { headers, backend, wirePool } = initDev(count, common, 0);
+    const headerSync = new HeaderSync({
+      db,
+      backend,
+      wireHandlerPool: wirePool,
+      maxGetBlockHeaders: new BN(128),
+      development: true
+    });
+    try {
+      await headerSync.startSync(headers[headers.length - 1]);
+    } catch (error) {
+      assert((error as any).message === 'HeaderSync::headerSync fail: no peer');
     }
   });
 });
@@ -141,4 +279,14 @@ function createBlockHeaders(num: number = 256, common: Common) {
     headers.push(header);
   }
   return headers;
+}
+
+function initDev(count: number, common: Common, peersCount?: number) {
+  let headers = createBlockHeaders(count, common);
+  let backend = new MockBackend();
+  let wirePool = new MockHeaderSyncNetworkManager(peersCount);
+  for (let i = 0; i < wirePool.peers.length; i++) {
+    (wirePool.peers[i] as any).mockSetBlockHeaders(headers);
+  }
+  return { headers, backend, wirePool };
 }

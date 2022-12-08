@@ -6,7 +6,7 @@ import { Database, DBSaveSerializedSnapAccount, DBSaveSnapStorage, DBSaveSnapSyn
 import { StakingAccount } from '../../stateManager';
 import { EMPTY_HASH, MAX_HASH, BinaryRawDBatch, DBatch, CountLock } from '../../utils';
 import { increaseKey } from '../../snap/utils';
-import { SyncInfo } from '../types';
+import { SyncInfo, PreInfo } from '../types';
 import { TrieSync } from './trieSync';
 import { AccountRequest, AccountResponse, StorageRequst, StorageResponse, SnapSyncNetworkManager } from './types';
 
@@ -224,20 +224,24 @@ export class SnapSync {
   readonly healer: HealTask;
   readonly lock = new CountLock();
 
-  private readonly channel = new Channel<void | (() => Promise<void>)>();
+  private readonly channel = new Channel<void | Buffer | (() => Promise<void>)>();
 
   root!: Buffer;
   tasks: AccountTask[] = [];
   snapped: boolean = false;
   finished: boolean = false;
+  // true if first heal is done
+  healed: boolean = false;
+  testMode: boolean;
   onFinished?: () => void;
 
   private schedulePromise?: Promise<void>;
 
-  constructor(db: Database, network: SnapSyncNetworkManager) {
+  constructor(db: Database, network: SnapSyncNetworkManager, testMode = false) {
     this.db = db;
     this.network = network;
     this.healer = new HealTask(db);
+    this.testMode = testMode;
   }
 
   /**
@@ -832,7 +836,8 @@ export class SnapSync {
 
       const hashes: Buffer[] = [];
       for (const hash of this.healer.pendingCode) {
-        hashes.push(hash);
+        hashes.push(hash); // delete?
+        // this.healer.pendingCode.delete(hash);
 
         if (hashes.length >= healCodeRequestSize) {
           break;
@@ -973,9 +978,12 @@ export class SnapSync {
   }
 
   private async scheduleLoop() {
+    let preRoot: Buffer | undefined = undefined;
     for await (const cb of this.channel) {
       try {
-        if (cb) {
+        if (cb instanceof Buffer) {
+          preRoot = cb;
+        } else if (cb) {
           // if callback exists, execute the callback
           await cb();
         } else {
@@ -985,12 +993,18 @@ export class SnapSync {
         await this.cleanStorageTasks();
         this.cleanAccountTasks();
         if (this.snapped && this.healer.scheduler.pending === 0) {
-          // finished, break
-          this.finished = true;
-          // invoke hook
-          this.onFinished && this.onFinished();
-          this.onFinished = undefined;
-          break;
+          if (this.testMode || this.healed) {
+            // finished, break
+            this.finished = true;
+            // invoke hook
+            this.onFinished && this.onFinished();
+            this.onFinished = undefined;
+            break;
+          } else if (preRoot !== undefined) {
+            this.healer.clear();
+            await this.healer.scheduler.setRoot(preRoot);
+            this.healed = true;
+          }
         }
 
         // assign all the data retrieval tasks to any free peers
@@ -1084,6 +1098,15 @@ export class SnapSync {
     this.channel.push();
   }
 
+  announcePreRoot(root: Buffer) {
+    if (!this.isSyncing) {
+      throw new Error("snap sync isn't working");
+    }
+
+    // put an empty value to announce coroutine
+    this.channel.push(root);
+  }
+
   /**
    * Stop scheduling
    */
@@ -1132,6 +1155,8 @@ export declare interface SnapSyncScheduler {
 
 export class SnapSyncScheduler extends EventEmitter {
   readonly syncer: SnapSync;
+  // Todo
+  // readonly downloader: SnapDownloader;
 
   private aborted: boolean = false;
   private onFinished?: () => Promise<void>;
@@ -1199,6 +1224,9 @@ export class SnapSyncScheduler extends EventEmitter {
 
     // start snap sync
     await this.syncer.snapSync(root);
+    // this.downloader.on('preRoot', (info: PreInfo) => {
+    //   this.syncer.announcePreRoot(info.preRoot);
+    // });
     // wait until finished
     this.syncPromise = new Promise<void>((resolve) => {
       this.syncResolve = resolve;

@@ -10,6 +10,8 @@ import { SnapSync, SnapSyncNetworkManager, SnapSyncPeer, AccountRequest, Account
 import { AccountInfo, genRandomAccounts, GenRandomAccountsResult } from './util';
 import { BaseTrie } from '@rei-network/trie';
 import { keccak256 } from 'ethereumjs-util';
+import { TrieSync } from '../../src/sync/snap/trieSync';
+
 const level = require('level-mem');
 
 const common = new Common({ chain: 'rei-devnet' });
@@ -213,53 +215,10 @@ describe('SnapSync', () => {
     }
   }
 
-  before(async () => {
-    result = await genRandomAccounts(srcDB, 30, 30, true);
-
-    const peers: MockPeer[] = [];
-    for (let i = 0; i < 20; i++) {
-      peers.push(new MockPeer(srcDB, result));
-    }
-    manager = new MockNetworkManager(peers);
-  });
-
-  it('should sync succeed', async () => {
-    const dstDB = new Database(level(), common);
-
-    const sync = new SnapSync(dstDB, manager);
-    await sync.snapSync(result.root);
-    await sync.wait();
-
-    await checkSnap(dstDB);
-  });
-
-  it('should sync succeed(abort and resume)', async () => {
-    const dstDB = new Database(level(), common);
-
-    const sync = new SnapSync(dstDB, manager);
-    await sync.snapSync(result.root);
-
-    await new Promise((r) => setTimeout(r, 100));
-    await sync.abort();
-
-    await sync.snapSync(result.root);
-    await sync.wait();
-
-    await checkSnap(dstDB);
-  });
-
-  it('should sync succeed(root changed)', async () => {
-    const dstDB = new Database(level(), common);
-
-    const sync = new SnapSync(dstDB, manager);
-    await sync.snapSync(result.root);
-
-    await new Promise((r) => setTimeout(r, 100));
-    await sync.abort();
-
-    const accounts = [...result.accounts];
+  async function modifySomeAccount(accountsToModify: AccountInfo[], db: Database, result: GenRandomAccountsResult) {
+    const accounts = [...accountsToModify];
     const changedAccounts: AccountInfo[] = [];
-    for (let i = 0; i < Math.ceil(result.accounts.length / 2); i++) {
+    for (let i = 0; i < Math.ceil(accountsToModify.length / 2); i++) {
       const index = getRandomIntInclusive(0, accounts.length - 1);
       changedAccounts.push(accounts[index]);
       accounts.splice(index, 1);
@@ -284,26 +243,92 @@ describe('SnapSync', () => {
       let stateRoot = account.account.stateRoot;
       for (const [hash, storage] of changedStorageData) {
         storage.val = crypto.randomBytes(32);
-        const trie = new BaseTrie(srcDB.rawdb, stateRoot);
+        const trie = new BaseTrie(db.rawdb, stateRoot);
         await trie.put(hash, storage.val);
-        await srcDB.batch([DBSaveSnapStorage(account.accountHash, hash, storage.val)]);
+        await db.batch([DBSaveSnapStorage(account.accountHash, hash, storage.val)]);
         stateRoot = trie.root;
       }
 
       // change code
       const code = crypto.randomBytes(100);
       const codeHash = keccak256(code);
-      await srcDB.rawdb.put(codeHash, code, { keyEncoding: 'binary', valueEncoding: 'binary' });
+      await db.rawdb.put(codeHash, code, { keyEncoding: 'binary', valueEncoding: 'binary' });
 
       // change account
       account.account.stateRoot = stateRoot;
       account.account.codeHash = codeHash;
       account.account.balance.iaddn(1);
-      const trie = new BaseTrie(srcDB.rawdb, result.root);
+      const trie = new BaseTrie(db.rawdb, result.root);
       await trie.put(account.accountHash, account.account.serialize());
-      await srcDB.batch([DBSaveSerializedSnapAccount(account.accountHash, account.account.serialize())]);
+      await db.batch([DBSaveSerializedSnapAccount(account.accountHash, account.account.serialize())]);
       result.root = trie.root;
     }
+  }
+
+  async function verifyRoot(root: Buffer, db: Database): Promise<boolean> {
+    const trieSync = new TrieSync(db, true);
+    await trieSync.setRoot(root);
+    while (trieSync.pending > 0) {
+      const { nodeHashes, codeHashes } = trieSync.missing(10);
+      try {
+        for (const hash of nodeHashes) {
+          await trieSync.process(hash, await db.getTrieNode(hash));
+        }
+        for (const hash of codeHashes) {
+          await trieSync.process(hash, await db.getCode(hash));
+        }
+      } catch (error) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  before(async () => {
+    result = await genRandomAccounts(srcDB, 30, 30, true);
+
+    const peers: MockPeer[] = [];
+    for (let i = 0; i < 20; i++) {
+      peers.push(new MockPeer(srcDB, result));
+    }
+    manager = new MockNetworkManager(peers);
+  });
+
+  it('should sync succeed', async () => {
+    const dstDB = new Database(level(), common);
+
+    const sync = new SnapSync(dstDB, manager, true);
+    await sync.snapSync(result.root);
+    await sync.wait();
+
+    await checkSnap(dstDB);
+  });
+
+  it('should sync succeed(abort and resume)', async () => {
+    const dstDB = new Database(level(), common);
+
+    const sync = new SnapSync(dstDB, manager, true);
+    await sync.snapSync(result.root);
+
+    await new Promise((r) => setTimeout(r, 100));
+    await sync.abort();
+
+    await sync.snapSync(result.root);
+    await sync.wait();
+
+    await checkSnap(dstDB);
+  });
+
+  it('should sync succeed(root changed)', async () => {
+    const dstDB = new Database(level(), common);
+
+    const sync = new SnapSync(dstDB, manager, true);
+    await sync.snapSync(result.root);
+
+    await new Promise((r) => setTimeout(r, 100));
+    await sync.abort();
+
+    await modifySomeAccount(result.accounts, srcDB, result);
 
     await sync.snapSync(result.root);
     await sync.wait();
@@ -325,7 +350,7 @@ describe('SnapSync', () => {
 
     const dstDB = new Database(level(), common);
 
-    const sync = new SnapSync(dstDB, manager);
+    const sync = new SnapSync(dstDB, manager, true);
     await sync.snapSync(result.root);
     await sync.wait();
 
@@ -337,5 +362,19 @@ describe('SnapSync', () => {
       const _value = await dstTrie.get(key);
       expect(_value && _value.equals(value), 'value should be equal').be.true;
     }
+  });
+
+  it('should sync preRoot succeed', async () => {
+    const dstDB = new Database(level(), common);
+    const preRoot = result.root;
+    await modifySomeAccount(result.accounts, srcDB, result);
+    const sync = new SnapSync(dstDB, manager);
+    await sync.snapSync(result.root);
+    await new Promise((r) => setTimeout(r, 100));
+    sync.announcePreRoot(preRoot);
+    await sync.wait();
+    await checkSnap(dstDB);
+    const preHealed = await verifyRoot(preRoot, dstDB);
+    expect(preHealed, 'preRoot should be healed').be.true;
   });
 });

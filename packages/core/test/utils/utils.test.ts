@@ -12,7 +12,7 @@ describe('ValidatorsEncoder', () => {
   beforeEach(() => {
     idList = [];
     priorityList = [];
-    length = Math.round(Math.random() * 21);
+    length = Math.round(Math.random() * 21) ?? 1;
     for (let i = 0; i < length; i++) {
       idList.push(new BN(getRandomBytes(Math.round(Math.random() * 32)))); //random id
       const negativeFlag = Math.random() > 0.5;

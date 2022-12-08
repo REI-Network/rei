@@ -5,6 +5,7 @@ import { Database, DBSetBlockOrHeader, DBOp, DBSaveLookups } from '@rei-network/
 import { logger } from '@rei-network/utils';
 import { HeaderSyncNetworkManager, HeaderSyncPeer, IHeaderSyncBackend } from './types';
 const count: BN = new BN(256);
+const maxGetBlockHeaders: BN = new BN(128);
 
 export interface HeaderSyncOptions {
   db: Database;
@@ -20,7 +21,6 @@ export class HeaderSync extends EventEmitter {
   readonly headerSyncBackEnd: IHeaderSyncBackend;
 
   private aborted: boolean = false;
-  private maxGetBlockHeaders: BN = new BN(128);
   private downloadHeadersInterval: number;
   private useless = new Set<HeaderSyncPeer>();
   private syncPromise: Promise<void> | undefined;
@@ -44,6 +44,7 @@ export class HeaderSync extends EventEmitter {
     if (this.syncPromise) {
       throw new Error('header sync already running');
     }
+    this.aborted = false;
     return (this.syncPromise = this.headerSync(endHeader).finally(() => {
       this.syncPromise = undefined;
       this.useless.forEach((h) => {
@@ -51,17 +52,6 @@ export class HeaderSync extends EventEmitter {
       });
       this.useless.clear();
     }));
-  }
-
-  /**
-   * Reset header sync
-   * @param header - end header
-   * @returns sync promise
-   */
-  async reset(header: BlockHeader) {
-    await this.abort();
-    this.aborted = false;
-    return this.startSync(header);
   }
 
   /**
@@ -81,7 +71,7 @@ export class HeaderSync extends EventEmitter {
     const needDownload: BN[] = [];
     for (let i = new BN(1); i.lte(count); i.iaddn(1)) {
       const n = endNumbr.sub(i);
-      if (n.ltn(0)) {
+      if (n.lten(0)) {
         break;
       }
       try {
@@ -113,9 +103,9 @@ export class HeaderSync extends EventEmitter {
       let count: BN;
       let start: BN;
       let left = amount.sub(queryCount);
-      if (left.gt(this.maxGetBlockHeaders)) {
-        start = last.sub(this.maxGetBlockHeaders).addn(1);
-        count = this.maxGetBlockHeaders.clone();
+      if (left.gt(maxGetBlockHeaders)) {
+        start = last.sub(maxGetBlockHeaders).addn(1);
+        count = maxGetBlockHeaders.clone();
       } else {
         start = first.clone();
         count = left.clone();

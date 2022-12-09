@@ -1071,6 +1071,7 @@ export class SnapSync {
     // set state root
     await this.setRoot(root);
     // reset channel
+    this.channel.clear();
     this.channel.reset();
     // start loop
     this.schedulePromise = this.scheduleLoop().finally(() => {

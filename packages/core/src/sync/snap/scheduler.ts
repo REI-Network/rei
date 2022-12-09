@@ -3,6 +3,7 @@ import { logger } from '@rei-network/utils';
 import { Node } from '../../node';
 import { SyncInfo, BlockData } from '../types';
 import { SnapSync } from './snapSync';
+import { HeaderSync } from './headerSync';
 
 export declare interface SnapSyncScheduler {
   on(event: 'start', listener: (info: SyncInfo) => void): this;
@@ -18,18 +19,23 @@ export declare interface SnapSyncScheduler {
 
 export class SnapSyncScheduler extends EventEmitter {
   readonly node: Node;
-  readonly syncer: SnapSync;
+  readonly snapSyncer: SnapSync;
+  readonly headerSyncer: HeaderSync;
 
-  private syncPromise?: Promise<void>;
+  private syncPromise?: Promise<[void, void]>;
 
   // sync state
   private startingBlock: number = 0;
   private highestBlock: number = 0;
 
+  private listener = (preRoot: Buffer) => this.snapSyncer.announcePreRoot(preRoot);
+
   constructor(node: Node) {
     super();
     this.node = node;
-    this.syncer = new SnapSync(this.node.db, this.node.snap.pool);
+    this.snapSyncer = new SnapSync(this.node.db, this.node.snap.pool);
+    this.headerSyncer = new HeaderSync({ db: this.node.db, backend: 1 as any, pool: this.node.wire.pool });
+    this.headerSyncer.on('preRoot', this.listener);
   }
 
   /**
@@ -74,17 +80,20 @@ export class SnapSyncScheduler extends EventEmitter {
    * @param data - Sync block data
    */
   async resetRoot(root: Buffer, startingBlock: number, info: SyncInfo, data: BlockData) {
-    if (this.syncer.root !== undefined && !this.syncer.root.equals(root)) {
+    if (this.snapSyncer.root !== undefined && !this.snapSyncer.root.equals(root)) {
       // abort
       await this.abort();
       // reset sync info
       this.startingBlock = startingBlock;
       this.highestBlock = info.bestHeight.toNumber();
       // start snap sync
-      await this.syncer.snapSync(root);
-      this.syncPromise = this.syncer.wait().finally(async () => {
+      await this.snapSyncer.snapSync(root);
+      // start header sync
+      this.headerSyncer.headerSync(data.block.header);
+      // wait until finished
+      this.syncPromise = Promise.all([this.snapSyncer.wait(), this.headerSyncer.wait()]).finally(async () => {
         this.syncPromise = undefined;
-        if (this.syncer.finished) {
+        if (this.snapSyncer.finished) {
           // save block data
           await this.saveBlockData(root, data);
           // send events
@@ -113,11 +122,13 @@ export class SnapSyncScheduler extends EventEmitter {
     // send events
     this.emit('start', info);
     // start snap sync
-    await this.syncer.snapSync(root);
+    await this.snapSyncer.snapSync(root);
+    // start header sync
+    this.headerSyncer.headerSync(data.block.header);
     // wait until finished
-    this.syncPromise = this.syncer.wait().finally(async () => {
+    this.syncPromise = Promise.all([this.snapSyncer.wait(), this.headerSyncer.wait()]).finally(async () => {
       this.syncPromise = undefined;
-      if (this.syncer.finished) {
+      if (this.snapSyncer.finished) {
         // save block data
         await this.saveBlockData(root, data);
         // send events
@@ -131,9 +142,11 @@ export class SnapSyncScheduler extends EventEmitter {
    * Abort sync
    */
   async abort() {
-    await this.syncer.abort();
+    await this.snapSyncer.abort();
+    await this.headerSyncer.abort();
     if (this.syncPromise) {
       await this.syncPromise;
     }
+    this.headerSyncer.off('preRoot', this.listener);
   }
 }

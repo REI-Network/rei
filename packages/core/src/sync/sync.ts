@@ -296,7 +296,7 @@ export class Synchronizer extends EventEmitter {
 
       if (this.snap.isSyncing) {
         // check if we need to notify snap of the latest stateRoot
-        if (!this.snap.syncer.snapped) {
+        if (!this.snap.snapSyncer.snapped) {
           const remoteHeight = ann.height.toNumber();
           const localHeight = this.snap.status.highestBlock;
           const staleNumber = remoteHeight - localHeight;
@@ -324,7 +324,7 @@ export class Synchronizer extends EventEmitter {
         }
         if (ann.type === AnnouncementType.NewPeer) {
           // snap sync is working, announce a new peer to it
-          this.snap.syncer.announce();
+          this.snap.snapSyncer.announce();
           continue;
         }
       }

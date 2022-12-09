@@ -19,6 +19,12 @@ export interface HeaderSyncOptions {
   getHandlerTimeout?: number;
 }
 
+export declare interface HeaderSync {
+  on(event: 'preRoot', listener: (preRoot: Buffer) => void): this;
+
+  off(event: 'preRoot', listener: (preRoot: Buffer) => void): this;
+}
+
 export class HeaderSync extends EventEmitter {
   readonly db: Database;
   readonly pool: HeaderSyncNetworkManager;
@@ -102,7 +108,7 @@ export class HeaderSync extends EventEmitter {
         const hash = await this.db.numberToHash(n);
         if (i.eqn(1)) {
           const targetHeader = await this.db.getHeader(hash, n);
-          this.emit('synced', targetHeader.stateRoot);
+          this.emit('preRoot', targetHeader.stateRoot);
         }
       } catch (err: any) {
         if (err.type === 'NotFoundError') {
@@ -187,7 +193,7 @@ export class HeaderSync extends EventEmitter {
       // 3. try to emit event
       const last = headers[headers.length - 1];
       if (last.number.eq(target)) {
-        this.emit('synced', last.stateRoot);
+        this.emit('preRoot', last.stateRoot);
       }
 
       // 4. save headers

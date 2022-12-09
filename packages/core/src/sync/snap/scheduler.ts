@@ -147,6 +147,5 @@ export class SnapSyncScheduler extends EventEmitter {
     if (this.syncPromise) {
       await this.syncPromise;
     }
-    this.headerSyncer.off('preRoot', this.listener);
   }
 }

@@ -50,11 +50,11 @@ export interface HeaderSyncPeer {
 }
 
 export interface HeaderSyncNetworkManager {
-  get(): Promise<HeaderSyncPeer>;
+  get(timeout?: number): Promise<HeaderSyncPeer>;
   put(peer: HeaderSyncPeer): void;
 }
 
-export interface IHeaderSyncBackend {
+export interface HeaderSyncBackend {
   handlePeerError(prefix: string, peer: HeaderSyncPeer, err: any): Promise<void>;
   validateHeaders(child: BlockHeader, headers: BlockHeader[]): BlockHeader;
 }

@@ -2,7 +2,7 @@ import { BN } from 'ethereumjs-util';
 import { assert } from 'chai';
 import { randomBytes } from 'crypto';
 import { BlockHeader, HeaderData } from '@rei-network/structure';
-import { HeaderSyncPeer, IHeaderSyncBackend, HeaderSync } from '../../src/sync/snap';
+import { HeaderSyncPeer, HeaderSyncBackend, HeaderSync, HeaderSyncOptions } from '../../src/sync/snap';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
 import { setLevel } from '@rei-network/utils';
@@ -12,7 +12,7 @@ const level = require('level-mem');
 
 setLevel('silent');
 
-class MockBackend implements IHeaderSyncBackend {
+class MockBackend implements HeaderSyncBackend {
   async handlePeerError(prefix: string, peer: HeaderSyncPeer, err: any): Promise<void> {
     // do nothing
     console.log('handlePeerError', prefix, peer, err);
@@ -97,7 +97,7 @@ describe('HeaderSync', () => {
   });
 
   it('should tries to download block headers 10 times and throws exception', async () => {
-    const { headerSync, headers } = await createHeaderSyncer(10, true, 0);
+    const { headerSync, headers } = await createHeaderSyncer(10, { throwError: true }, 0);
     let catched: any;
     try {
       headerSync.headerSync(headers[headers.length - 1]);
@@ -129,7 +129,7 @@ function createBlockHeaders(num: number = 256, common: Common) {
   return headers;
 }
 
-async function createHeaderSyncer(count: number, throwError: boolean = false, peersCount: number = 3) {
+async function createHeaderSyncer(count: number, options?: Omit<HeaderSyncOptions, 'db' | 'backend' | 'pool'>, peersCount: number = 3) {
   const levelDB = level();
   const common = new Common({ chain: 'rei-devnet' });
   common.setHardforkByBlockNumber(0);
@@ -140,7 +140,7 @@ async function createHeaderSyncer(count: number, throwError: boolean = false, pe
     const data = i % 2 === 0 ? headers : [];
     pool.add(new MockHeaderSyncPeer(data));
   }
-  const headerSync = new HeaderSync({ db, backend, pool, throwError });
+  const headerSync = new HeaderSync({ db, backend, pool, retryInterval: 1, getHandlerTimeout: 1, ...options });
   return {
     headerSync,
     headers

@@ -2,29 +2,35 @@ import EventEmitter from 'events';
 import { BN } from 'ethereumjs-util';
 import { BlockHeader } from '@rei-network/structure';
 import { Database, DBSetBlockOrHeader, DBOp, DBSaveLookups } from '@rei-network/database';
-import { logger } from '@rei-network/utils';
-import { HeaderSyncNetworkManager, HeaderSyncPeer, IHeaderSyncBackend } from './types';
+import { logger, AbortableTimer } from '@rei-network/utils';
+import { HeaderSyncNetworkManager, HeaderSyncPeer, HeaderSyncBackend } from './types';
 
 const count: BN = new BN(256);
 const maxGetBlockHeaders: BN = new BN(128);
-const downloadHeadersRetryInterval = 1000;
+const defaultRetryInterval = 1000;
+const defaultGetHandlerTimeout = 3000;
 
 export interface HeaderSyncOptions {
   db: Database;
-  backend: IHeaderSyncBackend;
+  backend: HeaderSyncBackend;
   pool: HeaderSyncNetworkManager;
   throwError?: boolean;
+  retryInterval?: number;
+  getHandlerTimeout?: number;
 }
 
 export class HeaderSync extends EventEmitter {
   readonly db: Database;
   readonly pool: HeaderSyncNetworkManager;
-  readonly backend: IHeaderSyncBackend;
+  readonly backend: HeaderSyncBackend;
 
   private aborted: boolean = false;
   private useless = new Set<HeaderSyncPeer>();
   private syncPromise: Promise<void> | undefined;
   private throwError: boolean;
+  private retry = new AbortableTimer();
+  private retryInterval: number;
+  private getHandlerTimeout: number;
 
   constructor(options: HeaderSyncOptions) {
     super();
@@ -32,6 +38,8 @@ export class HeaderSync extends EventEmitter {
     this.pool = options.pool;
     this.backend = options.backend;
     this.throwError = options.throwError ?? false;
+    this.retryInterval = options.retryInterval ?? defaultRetryInterval;
+    this.getHandlerTimeout = options.getHandlerTimeout ?? defaultGetHandlerTimeout;
   }
 
   /**
@@ -74,6 +82,7 @@ export class HeaderSync extends EventEmitter {
    */
   async abort() {
     this.aborted = true;
+    this.retry.abort();
     await this.syncPromise;
   }
 
@@ -144,13 +153,13 @@ export class HeaderSync extends EventEmitter {
       if (times++ > retryLimit) {
         throw new Error('reach retry limit');
       }
-      await new Promise((resolve) => setTimeout(resolve, downloadHeadersRetryInterval));
+      await this.retry.wait(this.retryInterval);
     };
     while (!this.aborted) {
       // 1. get handler
       let handler: HeaderSyncPeer;
       try {
-        handler = await this.pool.get();
+        handler = await this.pool.get(this.getHandlerTimeout);
       } catch (err: any) {
         logger.warn('HeaderSync::downloadHeaders, get handler failed:', err);
         await retry();

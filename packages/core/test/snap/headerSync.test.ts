@@ -7,6 +7,7 @@ import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
 import { preValidateHeader } from '../../src/validation';
 import { HandlerPool } from '../../src/protocols/handlerPool';
+const level = require('level-mem');
 
 class MockBackend implements IHeaderSyncBackend {
   async handlePeerError(prefix: string, peer: HeaderSyncPeer, err: any): Promise<void> {
@@ -24,29 +25,27 @@ class MockBackend implements IHeaderSyncBackend {
 }
 
 class MockHeaderSyncPeer implements HeaderSyncPeer {
-  public id: string;
+  readonly id: string = randomBytes(16).toString('hex');
   private headers: BlockHeader[] = [];
+
   constructor(headers: BlockHeader[] = []) {
-    this.id = randomBytes(16).toString('hex');
     this.headers = headers;
   }
-  getBlockHeaders(start: BN, count: BN): Promise<BlockHeader[]> {
-    return new Promise((resolve, reject) => {
-      const response: BlockHeader[] = [];
-      for (let i = 0; i < this.headers.length; i++) {
-        if (this.headers[i].number.gte(start)) {
-          response.push(this.headers[i]);
-        }
-        if (response.length >= count.toNumber()) {
-          break;
-        }
+
+  async getBlockHeaders(start: BN, count: BN): Promise<BlockHeader[]> {
+    const response: BlockHeader[] = [];
+    for (let i = 0; i < this.headers.length; i++) {
+      if (this.headers[i].number.gte(start)) {
+        response.push(this.headers[i]);
       }
-      resolve(response);
-    });
+      if (response.length >= count.toNumber()) {
+        break;
+      }
+    }
+    return response;
   }
 }
 
-const level = require('level-mem');
 const backend = new MockBackend();
 
 describe('HeaderSync', () => {
@@ -118,15 +117,13 @@ function createBlockHeaders(num: number = 256, common: Common) {
   return headers;
 }
 
-async function createHeaderSyncer(count: number, testMode: boolean = false, peersCount?: number) {
+async function createHeaderSyncer(count: number, peersCount: number = 10) {
   const levelDB = level();
   const common = new Common({ chain: 'rei-devnet' });
   common.setHardforkByBlockNumber(0);
   const db = new Database(levelDB, common);
   const headers = createBlockHeaders(count, common);
   const pool: HandlerPool<HeaderSyncPeer> = new HandlerPool();
-
-  peersCount = peersCount === undefined ? 10 : peersCount;
   for (let i = 0; i < peersCount; i++) {
     const data = i % 2 === 0 ? headers : [];
     pool.add(new MockHeaderSyncPeer(data));

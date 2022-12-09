@@ -1,13 +1,13 @@
 import { EventEmitter } from 'events';
 import { BN } from 'ethereumjs-util';
 import { Channel, getRandomIntInclusive, logger, AbortableTimer } from '@rei-network/utils';
-import { Block, Receipt } from '@rei-network/structure';
+import { Block } from '@rei-network/structure';
 import { Node } from '../node';
 import { preValidateBlock, validateReceipts } from '../validation';
 import { WireProtocolHandler, isV2 } from '../protocols';
-import { SnapSync, SnapSyncScheduler } from './snap';
+import { SnapSyncScheduler } from './snap';
 import { FullSyncScheduler } from './full';
-import { SyncInfo } from './types';
+import { SyncInfo, BlockData } from './types';
 
 const snapSyncStaleBlockNumber = 128;
 const snapSyncTrustedStaleBlockNumber = 896;
@@ -28,11 +28,6 @@ export type Announcement = {
   block?: Block;
   height: BN;
   td: BN;
-};
-
-export type BlockData = {
-  block: Block;
-  receipts: Receipt[];
 };
 
 export enum SyncMode {
@@ -86,7 +81,7 @@ export class Synchronizer extends EventEmitter {
     this.trustedHash = options.trustedHash;
     this.trustedHeight = options.trustedHeight;
     this.full = new FullSyncScheduler(options.node);
-    this.snap = new SnapSyncScheduler(new SnapSync(this.node.db, this.node.snap.pool));
+    this.snap = new SnapSyncScheduler(options.node);
     this.listenSyncer(this.full);
     this.listenSyncer(this.snap);
   }
@@ -292,35 +287,6 @@ export class Synchronizer extends EventEmitter {
     return { confirmed, data };
   }
 
-  /**
-   * Make a OnFinished callback for snap sync
-   * Rebuild local snapshot and force put block to database
-   * @param data - Block data
-   * @returns Callback
-   */
-  private makeOnFinishedCallback(data: BlockData) {
-    const root = data.block.header.stateRoot;
-    return async () => {
-      logger.debug('Synchronizer::makeOnFinishedCallback, snapSync onFinished');
-      try {
-        // rebuild local snap
-        const { generating } = await this.node.snapTree.rebuild(root);
-        // wait until generated
-        await generating;
-        // save block and receipts to database
-        await this.node.commitBlock({
-          ...data,
-          broadcast: false,
-          force: true,
-          // total difficulty equals height
-          td: data.block.header.number.addn(1)
-        });
-      } catch (err) {
-        logger.error('Synchronizer::makeOnFinishedCallback, commit failed:', err);
-      }
-    };
-  }
-
   private async syncLoop() {
     for await (const ann of this.channel) {
       if (this.full.isSyncing) {
@@ -334,23 +300,25 @@ export class Synchronizer extends EventEmitter {
           const remoteHeight = ann.height.toNumber();
           const localHeight = this.snap.status.highestBlock;
           const staleNumber = remoteHeight - localHeight;
-          const trustedMode = this.trustedHeight && this.trustedHeight.eqn(this.snap.status.highestBlock);
+          const trustedMode = this.trustedHeight && this.trustedHash && this.trustedHeight.eqn(localHeight);
           if ((trustedMode && staleNumber >= snapSyncTrustedStaleBlockNumber) || (!trustedMode && staleNumber >= snapSyncStaleBlockNumber)) {
             // confirm the latest block data, then reset the stateRoot of the snap
             const result = await this.confirmAnn(ann);
-            if (result !== null) {
-              const { confirmed, data } = result;
-              if (confirmed >= snapSyncMinConfirmed) {
-                if (trustedMode) {
-                  logger.warn('Synchronizer::syncLoop, trusted block is stale, try to sync new block');
-                } else {
-                  logger.debug('Synchronizer::syncLoop, current block is stale, try to sync new block');
-                }
-                const root = data.block.header.stateRoot;
-                logger.debug('Synchronizer::syncLoop, reset snap sync root, height:', remoteHeight);
-                await this.snap.resetRoot(remoteHeight, root, this.makeOnFinishedCallback(data));
-                continue;
-              }
+            if (result === null) {
+              continue;
+            }
+            const { confirmed, data } = result;
+            if (confirmed >= snapSyncMinConfirmed) {
+              logger.info('Synchronizer::syncLoop, current block is stale, try to sync new block:', remoteHeight);
+              const root = data.block.header.stateRoot;
+              const info: SyncInfo = {
+                bestHeight: ann.height,
+                bestTD: ann.height.addn(1),
+                remotePeerId: ann.handler.peer.peerId
+              };
+              const startingBlock = this.node.latestBlock.header.number.toNumber();
+              await this.snap.resetRoot(root, startingBlock, info, data);
+              continue;
             }
           }
         }
@@ -407,14 +375,14 @@ export class Synchronizer extends EventEmitter {
           }
 
           const header = data.block.header;
+          const root = header.stateRoot;
           const info: SyncInfo = {
             bestHeight: header.number.clone(),
             bestTD: header.number.addn(1),
             remotePeerId: ann.handler.peer.peerId
           };
           const startingBlock = this.node.latestBlock.header.number.toNumber();
-          const root = header.stateRoot;
-          await this.snap.snapSync(root, startingBlock, info, this.makeOnFinishedCallback(data));
+          await this.snap.snapSync(root, startingBlock, info, data);
         } else {
           logger.debug('Synchronizer::syncLoop, try to start a new full sync');
           // we're not too far behind, try full sync

@@ -227,19 +227,17 @@ export class SnapSync {
   root!: Buffer;
   tasks: AccountTask[] = [];
   snapped: boolean = false;
-  finished: boolean = false;
-  // true if first heal is done
   healed: boolean = false;
-  testMode: boolean;
-  onFinished?: () => void;
+  finished: boolean = false;
 
+  private skipSecondHealPhase: boolean;
   private schedulePromise?: Promise<void>;
 
-  constructor(db: Database, network: SnapSyncNetworkManager, testMode = false) {
+  constructor(db: Database, network: SnapSyncNetworkManager, skipSecondHealPhase: boolean = false) {
     this.db = db;
     this.network = network;
     this.healer = new HealTask(db);
-    this.testMode = testMode;
+    this.skipSecondHealPhase = skipSecondHealPhase;
   }
 
   /**
@@ -991,17 +989,15 @@ export class SnapSync {
         await this.cleanStorageTasks();
         this.cleanAccountTasks();
         if (this.snapped && this.healer.scheduler.pending === 0) {
-          if (this.testMode || this.healed) {
+          if (this.skipSecondHealPhase || this.healed) {
             // finished, break
             this.finished = true;
-            // invoke hook
-            this.onFinished && this.onFinished();
-            this.onFinished = undefined;
             break;
           } else if (preRoot !== undefined) {
+            // the first heal phase has been completed
+            this.healed = true;
             this.healer.clear();
             await this.healer.scheduler.setRoot(preRoot);
-            this.healed = true;
           }
         }
 
@@ -1130,7 +1126,7 @@ export class SnapSync {
   }
 
   /**
-   * Wait until snap sync finished(only for test)
+   * Wait until snap sync finished
    */
   async wait() {
     if (this.schedulePromise) {

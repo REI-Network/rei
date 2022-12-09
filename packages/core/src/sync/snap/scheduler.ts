@@ -1,5 +1,7 @@
 import EventEmitter from 'events';
-import { SyncInfo } from '../types';
+import { logger } from '@rei-network/utils';
+import { Node } from '../../node';
+import { SyncInfo, BlockData } from '../types';
 import { SnapSync } from './snapSync';
 
 export declare interface SnapSyncScheduler {
@@ -15,20 +17,19 @@ export declare interface SnapSyncScheduler {
 }
 
 export class SnapSyncScheduler extends EventEmitter {
+  readonly node: Node;
   readonly syncer: SnapSync;
 
-  private aborted: boolean = false;
-  private onFinished?: () => Promise<void>;
   private syncPromise?: Promise<void>;
-  private syncResolve?: () => void;
 
   // sync state
   private startingBlock: number = 0;
   private highestBlock: number = 0;
 
-  constructor(syncer: SnapSync) {
+  constructor(node: Node) {
     super();
-    this.syncer = syncer;
+    this.node = node;
+    this.syncer = new SnapSync(this.node.db, this.node.snap.pool);
   }
 
   /**
@@ -45,19 +46,52 @@ export class SnapSyncScheduler extends EventEmitter {
     return !!this.syncPromise;
   }
 
+  // Generate snapshot and save block data
+  private async saveBlockData(root: Buffer, data: BlockData) {
+    try {
+      // rebuild local snap
+      const { generating } = await this.node.snapTree.rebuild(root);
+      // wait until generated
+      await generating;
+      // save block and receipts to database
+      await this.node.commitBlock({
+        ...data,
+        broadcast: false,
+        force: true,
+        // total difficulty equals height
+        td: data.block.header.number.addn(1)
+      });
+    } catch (err) {
+      logger.error('SnapSyncScheduler::saveBlockData, commit failed:', err);
+    }
+  }
+
   /**
    * Reset snap sync root and highest block number
-   * @param height - Highest block number
    * @param root - New state root
-   * @param onFinished - On finished callback
+   * @param startingBlock - Start sync block number
+   * @param info - Sync info
+   * @param data - Sync block data
    */
-  async resetRoot(height: number, root: Buffer, onFinished?: () => Promise<void>) {
-    if (!this.aborted && this.syncer.root !== undefined && !this.syncer.root.equals(root)) {
-      this.highestBlock = height;
-      this.onFinished = onFinished;
-      // abort and restart sync
-      await this.syncer.abort();
+  async resetRoot(root: Buffer, startingBlock: number, info: SyncInfo, data: BlockData) {
+    if (this.syncer.root !== undefined && !this.syncer.root.equals(root)) {
+      // abort
+      await this.abort();
+      // reset sync info
+      this.startingBlock = startingBlock;
+      this.highestBlock = info.bestHeight.toNumber();
+      // start snap sync
       await this.syncer.snapSync(root);
+      this.syncPromise = this.syncer.wait().finally(async () => {
+        this.syncPromise = undefined;
+        if (this.syncer.finished) {
+          // save block data
+          await this.saveBlockData(root, data);
+          // send events
+          this.emit('finished', info);
+          this.emit('synchronized', info);
+        }
+      });
     }
   }
 
@@ -67,34 +101,25 @@ export class SnapSyncScheduler extends EventEmitter {
    * @param root - State root
    * @param startingBlock - Start sync block number
    * @param info - Sync info
-   * @param onFinished - On finished callback,
-   *                     it will be invoked when sync finished
+   * @param data - Sync block data
    */
-  async snapSync(root: Buffer, startingBlock: number, info: SyncInfo, onFinished?: () => Promise<void>) {
+  async snapSync(root: Buffer, startingBlock: number, info: SyncInfo, data: BlockData) {
     if (this.isSyncing) {
       throw new Error('SnapSyncScheduler is working');
     }
-
-    this.onFinished = onFinished;
+    // save sync info
     this.startingBlock = startingBlock;
     this.highestBlock = info.bestHeight.toNumber();
     // send events
     this.emit('start', info);
-
     // start snap sync
     await this.syncer.snapSync(root);
     // wait until finished
-    this.syncPromise = new Promise<void>((resolve) => {
-      this.syncResolve = resolve;
-      this.syncer.onFinished = () => {
-        resolve();
-      };
-    }).finally(async () => {
+    this.syncPromise = this.syncer.wait().finally(async () => {
       this.syncPromise = undefined;
-      this.syncResolve = undefined;
-      if (!this.aborted) {
-        // invoke callback if it exists
-        this.onFinished && (await this.onFinished());
+      if (this.syncer.finished) {
+        // save block data
+        await this.saveBlockData(root, data);
         // send events
         this.emit('finished', info);
         this.emit('synchronized', info);
@@ -106,8 +131,9 @@ export class SnapSyncScheduler extends EventEmitter {
    * Abort sync
    */
   async abort() {
-    this.aborted = true;
-    this.syncResolve && this.syncResolve();
     await this.syncer.abort();
+    if (this.syncPromise) {
+      await this.syncPromise;
+    }
   }
 }

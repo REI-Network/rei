@@ -161,10 +161,14 @@ async function checkHeaders(headerSync: HeaderSync, headers: BlockHeader[]) {
 
 async function testHeaderSync(count: number) {
   const { headerSync, headers } = await createHeaderSyncer(count);
-  headerSync.on('synced', (stateRoot: Buffer) => {
-    assert(stateRoot.equals(headers[headers.length - 2].stateRoot));
+  const promise = new Promise<void>((resolve) => {
+    headerSync.on('synced', (stateRoot: Buffer) => {
+      assert(stateRoot.equals(headers[headers.length - 2].stateRoot));
+      resolve();
+    });
   });
   await headerSync.startSync(headers[headers.length - 1]);
+  await promise;
   await checkHeaders(headerSync, headers);
 }
 
@@ -172,9 +176,13 @@ async function testHeaderSyncReset(count: number) {
   const { headerSync, headers } = await createHeaderSyncer(count);
   headerSync.startSync(headers[Math.round(count / 2)]);
   await headerSync.abort();
-  headerSync.on('synced', (stateRoot: Buffer) => {
-    assert(stateRoot.equals(headers[headers.length - 2].stateRoot));
+  const promise = new Promise<void>((resolve) => {
+    headerSync.on('synced', (stateRoot: Buffer) => {
+      assert(stateRoot.equals(headers[headers.length - 2].stateRoot));
+      resolve();
+    });
   });
   await headerSync.startSync(headers[headers.length - 1]);
+  await promise;
   await checkHeaders(headerSync, headers);
 }

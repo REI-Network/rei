@@ -42,7 +42,7 @@ export class HeaderSync extends EventEmitter {
    */
   startSync(endHeader: BlockHeader) {
     if (this.syncPromise) {
-      throw new Error('header sync already running');
+      throw new Error('Header sync is already running');
     }
     this.aborted = false;
     return (this.syncPromise = this.headerSync(endHeader).finally(() => {
@@ -80,12 +80,12 @@ export class HeaderSync extends EventEmitter {
           const targetHeader = await this.db.getHeader(hash, n);
           this.emit('synced', targetHeader.stateRoot);
         }
-      } catch (error) {
-        if ((error as any).type === 'NotFoundError') {
+      } catch (err) {
+        if ((err as any).type === 'NotFoundError') {
           needDownload.push(n);
           continue;
         } else {
-          throw error;
+          throw err;
         }
       }
     }

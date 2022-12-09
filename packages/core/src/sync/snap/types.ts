@@ -45,6 +45,7 @@ export interface SnapSyncNetworkManager {
 }
 
 export interface HeaderSyncPeer {
+  id: string;
   getBlockHeaders(start: BN, count: BN): Promise<BlockHeader[]>;
 }
 

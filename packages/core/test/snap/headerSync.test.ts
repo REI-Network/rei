@@ -1,8 +1,8 @@
 import { BN } from 'ethereumjs-util';
-import { assert, expect } from 'chai';
+import { assert } from 'chai';
 import { randomBytes } from 'crypto';
 import { BlockHeader } from '@rei-network/structure';
-import { HeaderSyncPeer, HeaderSyncNetworkManager, IHeaderSyncBackend, HeaderSync } from '../../src/sync/snap';
+import { HeaderSyncPeer, IHeaderSyncBackend, HeaderSync } from '../../src/sync/snap';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
 import { preValidateHeader } from '../../src/validation';
@@ -50,11 +50,11 @@ const level = require('level-mem');
 const backend = new MockBackend();
 
 describe('HeaderSync', () => {
-  it('should throw an exception when startSync is called repeatedly', async () => {
+  it('should throw an exception when headerSync is called repeatedly', async () => {
     const { headerSync, headers } = await createHeaderSyncer(100);
-    headerSync.startSync(headers[headers.length - 1]);
+    headerSync.headerSync(headers[headers.length - 1]);
     try {
-      headerSync.startSync(headers[headers.length - 1]);
+      headerSync.headerSync(headers[headers.length - 1]);
     } catch (err) {
       assert((err as any).message === 'Header sync is already running');
     }
@@ -96,7 +96,7 @@ describe('HeaderSync', () => {
     const count = 10;
     const { headerSync, headers } = await createHeaderSyncer(count, true, 0);
     try {
-      await headerSync.startSync(headers[headers.length - 1]);
+      await headerSync.headerSync(headers[headers.length - 1]);
     } catch (err) {
       assert((err as any).message === 'ProtocolPool get handler timeout');
     }
@@ -137,12 +137,7 @@ async function createHeaderSyncer(count: number, testMode: boolean = false, peer
     const data = i % 2 === 0 ? headers : [];
     pool.add(new MockHeaderSyncPeer(data));
   }
-  const headerSync = new HeaderSync({
-    db,
-    backend,
-    testMode,
-    wireHandlerPool: pool
-  });
+  const headerSync = new HeaderSync({ db, backend, pool });
   return {
     headerSync,
     headers
@@ -167,14 +162,14 @@ async function testHeaderSync(count: number) {
       resolve();
     });
   });
-  await headerSync.startSync(headers[headers.length - 1]);
+  await headerSync.headerSync(headers[headers.length - 1]);
   await promise;
   await checkHeaders(headerSync, headers);
 }
 
 async function testHeaderSyncReset(count: number) {
   const { headerSync, headers } = await createHeaderSyncer(count);
-  headerSync.startSync(headers[Math.round(count / 2)]);
+  headerSync.headerSync(headers[Math.round(count / 2)]);
   await headerSync.abort();
   const promise = new Promise<void>((resolve) => {
     headerSync.on('synced', (stateRoot: Buffer) => {
@@ -182,7 +177,7 @@ async function testHeaderSyncReset(count: number) {
       resolve();
     });
   });
-  await headerSync.startSync(headers[headers.length - 1]);
+  await headerSync.headerSync(headers[headers.length - 1]);
   await promise;
   await checkHeaders(headerSync, headers);
 }

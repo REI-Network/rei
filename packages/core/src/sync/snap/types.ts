@@ -1,5 +1,5 @@
-import { BN } from 'ethereumjs-util';
-import { BlockHeader } from '@rei-network/structure';
+import type { BN } from 'ethereumjs-util';
+import type { BlockHeader } from '@rei-network/structure';
 import type { StakingAccount } from '../../stateManager';
 
 export type AccountRequest = {

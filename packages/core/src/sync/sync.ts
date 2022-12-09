@@ -92,7 +92,7 @@ export class Synchronizer extends EventEmitter {
       new HeaderSync({
         db: this.node.db,
         backend: new HeaderSyncBackend(this.node),
-        wireHandlerPool: this.node.wire.pool
+        pool: this.node.wire.pool
       })
     );
     this.listenSyncer(this.full);

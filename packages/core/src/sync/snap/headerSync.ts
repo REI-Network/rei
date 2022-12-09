@@ -4,54 +4,63 @@ import { BlockHeader } from '@rei-network/structure';
 import { Database, DBSetBlockOrHeader, DBOp, DBSaveLookups } from '@rei-network/database';
 import { logger } from '@rei-network/utils';
 import { HeaderSyncNetworkManager, HeaderSyncPeer, IHeaderSyncBackend } from './types';
+
 const count: BN = new BN(256);
 const maxGetBlockHeaders: BN = new BN(128);
+const downloadHeadersRetryInterval = 1000;
 
 export interface HeaderSyncOptions {
   db: Database;
   backend: IHeaderSyncBackend;
-  wireHandlerPool: HeaderSyncNetworkManager;
-  downloadHeadersInterval?: number;
-  testMode?: boolean;
+  pool: HeaderSyncNetworkManager;
 }
 
 export class HeaderSync extends EventEmitter {
   readonly db: Database;
-  readonly wireHandlerPool: HeaderSyncNetworkManager;
-  readonly headerSyncBackEnd: IHeaderSyncBackend;
+  readonly pool: HeaderSyncNetworkManager;
+  readonly headerSyncBackend: IHeaderSyncBackend;
 
   private aborted: boolean = false;
-  private downloadHeadersInterval: number;
   private useless = new Set<HeaderSyncPeer>();
   private syncPromise: Promise<void> | undefined;
-  private readonly testMode: boolean;
 
   constructor(options: HeaderSyncOptions) {
     super();
     this.db = options.db;
-    this.wireHandlerPool = options.wireHandlerPool;
-    this.headerSyncBackEnd = options.backend;
-    this.downloadHeadersInterval = options.downloadHeadersInterval || 2000;
-    this.testMode = options.testMode || false;
+    this.pool = options.pool;
+    this.headerSyncBackend = options.backend;
   }
 
   /**
    * Start header sync
-   * @param endHeader - end header
+   * @param header - end header
    * @returns sync promise
    */
-  startSync(endHeader: BlockHeader) {
+  headerSync(header: BlockHeader) {
     if (this.syncPromise) {
       throw new Error('Header sync is already running');
     }
     this.aborted = false;
-    return (this.syncPromise = this.headerSync(endHeader).finally(() => {
-      this.syncPromise = undefined;
-      this.useless.forEach((h) => {
-        this.wireHandlerPool.put(h);
+    this.syncPromise = this.doSync(header)
+      .catch((err) => {
+        logger.error('HeaderSync::headerSync, catch error:', err);
+      })
+      .finally(() => {
+        this.syncPromise = undefined;
+        this.useless.forEach((h) => {
+          this.pool.put(h);
+        });
+        this.useless.clear();
       });
-      this.useless.clear();
-    }));
+  }
+
+  /**
+   * Wait until header sync finished
+   */
+  async wait() {
+    if (this.syncPromise) {
+      await this.syncPromise;
+    }
   }
 
   /**
@@ -64,10 +73,10 @@ export class HeaderSync extends EventEmitter {
 
   /**
    * Download the 256 block headers before the specified block header
-   * @param endHeader - specified end block header
+   * @param header - specified end block header
    */
-  private async headerSync(endHeader: BlockHeader) {
-    const endNumbr = endHeader.number.clone();
+  private async doSync(header: BlockHeader) {
+    const endNumbr = header.number.clone();
     const needDownload: BN[] = [];
     for (let i = new BN(1); i.lte(count); i.iaddn(1)) {
       const n = endNumbr.sub(i);
@@ -80,13 +89,12 @@ export class HeaderSync extends EventEmitter {
           const targetHeader = await this.db.getHeader(hash, n);
           this.emit('synced', targetHeader.stateRoot);
         }
-      } catch (err) {
-        if ((err as any).type === 'NotFoundError') {
+      } catch (err: any) {
+        if (err.type === 'NotFoundError') {
           needDownload.push(n);
           continue;
-        } else {
-          throw err;
         }
+        throw err;
       }
     }
     if (needDownload.length === 0) {
@@ -96,9 +104,8 @@ export class HeaderSync extends EventEmitter {
     const first = needDownload[needDownload.length - 1];
     const amount = last.sub(first).addn(1);
     const queryCount = new BN(0);
-    const target = endHeader.number.subn(1);
-    let child: BlockHeader = endHeader;
-
+    const target = header.number.subn(1);
+    let child: BlockHeader = header;
     while (!this.aborted && queryCount.lt(amount)) {
       let count: BN;
       let start: BN;
@@ -110,17 +117,9 @@ export class HeaderSync extends EventEmitter {
         start = first.clone();
         count = left.clone();
       }
-      try {
-        child = await this.downloadHeaders(child, start, count, target);
-        queryCount.iadd(count);
-        last.isub(count);
-      } catch (err) {
-        if (!this.testMode) {
-          logger.warn('HeaderSync::headerSync fail: ', err);
-          break;
-        }
-        throw err;
-      }
+      child = await this.downloadHeaders(child, start, count, target);
+      queryCount.iadd(count);
+      last.isub(count);
     }
   }
 
@@ -134,38 +133,49 @@ export class HeaderSync extends EventEmitter {
    * @returns child block header
    */
   private async downloadHeaders(child: BlockHeader, start: BN, count: BN, target: BN, retryLimit: number = 10) {
-    let time = 0;
-    while (!this.aborted) {
-      let handler: HeaderSyncPeer | undefined;
+    let times = 0;
+    const retry = async () => {
+      times++;
+      await new Promise((resolve) => setTimeout(resolve, downloadHeadersRetryInterval));
+    };
+    while (!this.aborted && times < retryLimit) {
+      // 1. get handler
+      let handler: HeaderSyncPeer;
       try {
-        handler = await this.wireHandlerPool.get();
-        const headers = await handler.getBlockHeaders(start, count);
-        child = this.headerSyncBackEnd.validateHeaders(child, headers);
+        handler = await this.pool.get();
+      } catch (err: any) {
+        logger.warn('HeaderSync::downloadHeaders, get handler failed:', err);
+        await retry();
+        continue;
+      }
+
+      // 2. download headers
+      let headers: BlockHeader[];
+      try {
+        headers = await handler.getBlockHeaders(start, count);
+        child = this.headerSyncBackend.validateHeaders(child, headers);
         if (!count.eqn(headers.length)) {
           throw new Error('useless');
         }
-        await this.saveHeaders(headers);
-        this.wireHandlerPool.put(handler);
-        const last = headers.pop();
-        if (last?.number.eq(target)) {
-          this.emit('synced', last.stateRoot);
-        }
-        break;
+        this.pool.put(handler);
       } catch (err: any) {
-        if (handler === undefined) {
-          logger.warn('HeaderSync::downloadHeaders, get handler failed: ', err);
-        } else {
-          this.useless.add(handler);
-          if (err.message !== 'useless') {
-            await this.headerSyncBackEnd.handlePeerError('HeaderSync::downloadHeaders', handler!, err);
-          }
+        this.useless.add(handler);
+        if (err.message !== 'useless') {
+          await this.headerSyncBackend.handlePeerError('HeaderSync::downloadHeaders', handler!, err);
         }
-        if (time >= retryLimit) {
-          throw err;
-        }
+        await retry();
+        continue;
       }
-      time++;
-      await new Promise((resolve) => setTimeout(resolve, this.downloadHeadersInterval));
+
+      // 3. try to emit event
+      const last = headers[headers.length - 1];
+      if (last.number.eq(target)) {
+        this.emit('synced', last.stateRoot);
+      }
+
+      // 4. save headers
+      await this.saveHeaders(headers);
+      break;
     }
     return child;
   }

@@ -1188,7 +1188,7 @@ export class SnapSyncScheduler extends EventEmitter {
       await this.syncer.abort();
       await this.syncer.snapSync(header.stateRoot);
       await this.headerSyncer.abort();
-      this.headerSyncer.startSync(header);
+      this.headerSyncer.headerSync(header);
     }
   }
 
@@ -1214,7 +1214,7 @@ export class SnapSyncScheduler extends EventEmitter {
 
     // start snap sync
     await this.syncer.snapSync(header.stateRoot);
-    this.headerSyncPromise = this.headerSyncer.startSync(header);
+    // this.headerSyncPromise = this.headerSyncer.headerSync(header);
     // wait until finished
     this.syncPromise = new Promise<void>((resolve) => {
       this.syncResolve = resolve;

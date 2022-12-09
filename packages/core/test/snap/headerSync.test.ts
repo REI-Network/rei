@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
-import { assert, expect } from 'chai';
+import { assert } from 'chai';
 import { randomBytes } from 'crypto';
-import { BlockHeader } from '@rei-network/structure';
+import { BlockHeader, HeaderData } from '@rei-network/structure';
 import { HeaderSyncPeer, HeaderSyncNetworkManager, IHeaderSyncBackend, HeaderSync } from '../../src/sync/snap';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
@@ -60,41 +60,40 @@ describe('HeaderSync', () => {
     }
   });
 
-  it('should sync block headers when the lastest block height equal to 99', async () => {
+  it('should sync block headers when the lastest block height equal to 100', async () => {
     await testHeaderSync(100);
   });
 
   it('should sync block headers when the lastest block height equal to 128', async () => {
-    await testHeaderSync(129);
+    await testHeaderSync(128);
   });
 
   it('should sync block headers when the lastest block height equal to 256', async () => {
-    await testHeaderSync(257);
+    await testHeaderSync(256);
   });
 
-  it('should sync block headers when the lastest block height equal to 499', async () => {
+  it('should sync block headers when the lastest block height equal to 500', async () => {
     await testHeaderSync(500);
   });
 
-  it('should reset the block header and sync block headers when the lastest block height equal to 99', async () => {
+  it('should reset the block header and sync block headers when the lastest block height equal to 100', async () => {
     await testHeaderSyncReset(100);
   });
 
   it('should reset the block header and sync block headers when the lastest block height equal to 128', async () => {
-    await testHeaderSyncReset(129);
+    await testHeaderSyncReset(128);
   });
 
   it('should reset the block header and sync block headers when the lastest block height equal to 256', async () => {
-    await testHeaderSyncReset(257);
+    await testHeaderSyncReset(256);
   });
 
-  it('should reset the block header and sync block headers when the lastest block height equal to 499', async () => {
+  it('should reset the block header and sync block headers when the lastest block height equal to 500', async () => {
     await testHeaderSyncReset(500);
   });
 
   it('should tries to download block headers 10 times and throws exception', async () => {
-    const count = 10;
-    const { headerSync, headers } = await createHeaderSyncer(count, true, 0);
+    const { headerSync, headers } = await createHeaderSyncer(10, true, 0);
     try {
       await headerSync.startSync(headers[headers.length - 1]);
     } catch (err) {
@@ -106,17 +105,12 @@ describe('HeaderSync', () => {
 function createBlockHeaders(num: number = 256, common: Common) {
   const headers: BlockHeader[] = [];
   const time = new BN(Date.now());
-  let parentHash: Buffer;
-  for (let i = 0; i < num; i++) {
-    const data = { number: new BN(i), timestamp: time.iaddn(3000), difficulty: new BN(1), gasLimit: new BN(20000000), stateRoot: randomBytes(32) };
+  const genesisHeader = BlockHeader.genesis({ timestamp: time, difficulty: new BN(1), gasLimit: new BN(20000000), stateRoot: randomBytes(32) }, { common });
+  let parentHash = genesisHeader.hash();
+  for (let i = 1; i <= num; i++) {
+    const data: HeaderData = { number: new BN(i), timestamp: time.iaddn(3000), difficulty: new BN(1), gasLimit: new BN(20000000), stateRoot: randomBytes(32) };
     const options = { common };
-    if (i === 0) {
-      const gensisHeader = BlockHeader.genesis(data, options);
-      parentHash = gensisHeader.hash();
-      headers.push(gensisHeader);
-      continue;
-    }
-    data['parentHash'] = parentHash!;
+    data.parentHash = parentHash!;
     const header = BlockHeader.fromHeaderData(data, options);
     parentHash = header.hash();
     headers.push(header);

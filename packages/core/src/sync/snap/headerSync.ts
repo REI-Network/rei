@@ -3,7 +3,7 @@ import { BN } from 'ethereumjs-util';
 import { BlockHeader } from '@rei-network/structure';
 import { Database, DBSetBlockOrHeader, DBOp, DBSaveLookups } from '@rei-network/database';
 import { logger, AbortableTimer } from '@rei-network/utils';
-import { HeaderSyncNetworkManager, HeaderSyncPeer, HeaderSyncBackend } from './types';
+import { HeaderSyncNetworkManager, HeaderSyncPeer, IHeaderSyncBackend } from './types';
 
 const count: BN = new BN(256);
 const maxGetBlockHeaders: BN = new BN(128);
@@ -12,7 +12,7 @@ const defaultGetHandlerTimeout = 3000;
 
 export interface HeaderSyncOptions {
   db: Database;
-  backend: HeaderSyncBackend;
+  backend: IHeaderSyncBackend;
   pool: HeaderSyncNetworkManager;
   throwError?: boolean;
   retryInterval?: number;
@@ -28,7 +28,7 @@ export declare interface HeaderSync {
 export class HeaderSync extends EventEmitter {
   readonly db: Database;
   readonly pool: HeaderSyncNetworkManager;
-  readonly backend: HeaderSyncBackend;
+  readonly backend: IHeaderSyncBackend;
 
   private aborted: boolean = false;
   private useless = new Set<HeaderSyncPeer>();

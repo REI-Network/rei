@@ -1,9 +1,13 @@
 import EventEmitter from 'events';
 import { logger } from '@rei-network/utils';
+import { BlockHeader } from '@rei-network/structure';
 import { Node } from '../../node';
 import { SyncInfo, BlockData } from '../types';
 import { SnapSync } from './snapSync';
 import { HeaderSync } from './headerSync';
+import { preValidateHeader } from '../../validation';
+import { WireProtocolHandler } from '../../protocols';
+import { IHeaderSyncBackend, HeaderSyncPeer } from './types';
 
 export declare interface SnapSyncScheduler {
   on(event: 'start', listener: (info: SyncInfo) => void): this;
@@ -34,7 +38,7 @@ export class SnapSyncScheduler extends EventEmitter {
     super();
     this.node = node;
     this.snapSyncer = new SnapSync(this.node.db, this.node.snap.pool);
-    this.headerSyncer = new HeaderSync({ db: this.node.db, backend: 1 as any, pool: this.node.wire.pool });
+    this.headerSyncer = new HeaderSync({ db: this.node.db, backend: new HeaderSyncBackend(node), pool: this.node.wire.pool });
     this.headerSyncer.on('preRoot', this.listener);
   }
 
@@ -147,5 +151,34 @@ export class SnapSyncScheduler extends EventEmitter {
     if (this.syncPromise) {
       await this.syncPromise;
     }
+  }
+}
+
+class HeaderSyncBackend implements IHeaderSyncBackend {
+  private node: Node;
+
+  constructor(node: Node) {
+    this.node = node;
+  }
+
+  async handlePeerError(prefix: string, peer: HeaderSyncPeer, err: any) {
+    const peerId = (peer as WireProtocolHandler).peer.peerId;
+    if (typeof err.message === 'string' && err.message.startsWith('timeout')) {
+      logger.warn(prefix, 'peerId:', peerId, 'error:', err);
+      await this.node.banPeer(peerId, 'timeout');
+    } else if (err.message === 'abort') {
+      // ignore abort error...
+    } else {
+      logger.error(prefix, 'peerId:', peerId, 'error:', err);
+      await this.node.banPeer(peerId, 'invalid');
+    }
+  }
+
+  validateHeaders(child: BlockHeader, headers: BlockHeader[]) {
+    for (let i = headers.length - 1; i >= 0; i--) {
+      preValidateHeader.call(child, headers[i]);
+      child = headers[i];
+    }
+    return child;
   }
 }

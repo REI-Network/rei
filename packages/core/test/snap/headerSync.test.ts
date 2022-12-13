@@ -2,7 +2,7 @@ import { BN } from 'ethereumjs-util';
 import { assert } from 'chai';
 import { randomBytes } from 'crypto';
 import { BlockHeader, HeaderData } from '@rei-network/structure';
-import { HeaderSyncPeer, HeaderSyncBackend, HeaderSync, HeaderSyncOptions } from '../../src/sync/snap';
+import { HeaderSyncPeer, IHeaderSyncBackend, HeaderSync, HeaderSyncOptions } from '../../src/sync/snap';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
 import { setLevel } from '@rei-network/utils';
@@ -12,7 +12,7 @@ const level = require('level-mem');
 
 setLevel('silent');
 
-class MockBackend implements HeaderSyncBackend {
+class MockBackend implements IHeaderSyncBackend {
   async handlePeerError(prefix: string, peer: HeaderSyncPeer, err: any): Promise<void> {
     // do nothing
     console.log('handlePeerError', prefix, peer, err);

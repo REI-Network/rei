@@ -138,6 +138,7 @@ export class SnapSyncScheduler extends EventEmitter {
         // send events
         this.emit('finished', info);
         this.emit('synchronized', info);
+        this.snapSyncer.clear();
       }
     });
   }

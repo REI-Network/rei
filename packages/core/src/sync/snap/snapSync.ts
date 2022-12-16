@@ -346,7 +346,6 @@ export class SnapSync {
 
       this.runWithLock(
         peer.getAccountRange(this.root, req).then((res) => {
-          // if (res !== null)
           this.channel.push(this.processAccountResponse.bind(this, task, res));
         })
       );
@@ -502,7 +501,6 @@ export class SnapSync {
 
       this.runWithLock(
         peer.getStorageRanges(this.root, req).then((res) => {
-          // if (res !== null)
           this.channel.push(this.processStorageResponse.bind(this, task, largeStateTask, req, res));
         })
       );
@@ -684,7 +682,6 @@ export class SnapSync {
 
       this.runWithLock(
         peer.getByteCodes(hashes).then((res) => {
-          // if (res !== null)
           this.channel.push(this.processBytecodeResponse.bind(this, task, hashes, res));
         })
       );
@@ -776,7 +773,6 @@ export class SnapSync {
 
       this.runWithLock(
         peer.getTrieNodes(hashes).then((res) => {
-          // if (res !== null)
           this.channel.push(this.processHealTrieNodeResponse.bind(this, hashes, res));
         })
       );
@@ -846,7 +842,6 @@ export class SnapSync {
 
       this.runWithLock(
         peer.getByteCodes(hashes).then((res) => {
-          // if (res !== null)
           this.channel.push(this.processHealBytecodeResponse.bind(this, hashes, res));
         })
       );

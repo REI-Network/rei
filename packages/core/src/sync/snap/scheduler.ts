@@ -26,7 +26,7 @@ export class SnapSyncScheduler extends EventEmitter {
   readonly snapSyncer: SnapSync;
   readonly headerSyncer: HeaderSync;
 
-  private syncPromise?: Promise<[void, void]>;
+  private syncPromise?: Promise<void>;
 
   // sync state
   private startingBlock: number = 0;
@@ -95,15 +95,17 @@ export class SnapSyncScheduler extends EventEmitter {
       // start header sync
       this.headerSyncer.headerSync(data.block.header);
       // wait until finished
-      this.syncPromise = Promise.all([this.snapSyncer.wait(), this.headerSyncer.wait()]).finally(async () => {
-        this.syncPromise = undefined;
-        if (this.snapSyncer.finished) {
+      this.syncPromise = new Promise<void>(async (resolve) => {
+        const [finished] = await Promise.all([this.snapSyncer.wait(), this.headerSyncer.wait()]);
+        if (finished) {
           // save block data
           await this.saveBlockData(root, data);
           // send events
           this.emit('finished', info);
           this.emit('synchronized', info);
         }
+        resolve();
+        this.syncPromise = undefined;
       });
     }
   }
@@ -130,16 +132,17 @@ export class SnapSyncScheduler extends EventEmitter {
     // start header sync
     this.headerSyncer.headerSync(data.block.header);
     // wait until finished
-    this.syncPromise = Promise.all([this.snapSyncer.wait(), this.headerSyncer.wait()]).finally(async () => {
-      this.syncPromise = undefined;
-      if (this.snapSyncer.finished) {
+    this.syncPromise = new Promise<void>(async (resolve) => {
+      const [finished] = await Promise.all([this.snapSyncer.wait(), this.headerSyncer.wait()]);
+      if (finished) {
         // save block data
         await this.saveBlockData(root, data);
         // send events
         this.emit('finished', info);
         this.emit('synchronized', info);
-        this.snapSyncer.clear();
       }
+      resolve();
+      this.syncPromise = undefined;
     });
   }
 

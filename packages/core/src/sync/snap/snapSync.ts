@@ -231,7 +231,7 @@ export class SnapSync {
   finished: boolean = false;
 
   private skipSecondHealPhase: boolean;
-  private schedulePromise?: Promise<void>;
+  private schedulePromise?: Promise<boolean>;
 
   constructor(db: Database, network: SnapSyncNetworkManager, skipSecondHealPhase: boolean = false) {
     this.db = db;
@@ -1029,6 +1029,14 @@ export class SnapSync {
 
     // wait for all requests to complete
     await this.lock.wait();
+
+    // save if we are finished
+    const finished = this.finished;
+
+    // clear
+    this.clear();
+
+    return finished;
   }
 
   /**
@@ -1090,6 +1098,9 @@ export class SnapSync {
     this.channel.push();
   }
 
+  /**
+   * Announce snapSync when we receive the previous state root
+   */
   announcePreRoot(root: Buffer) {
     if (!this.isSyncing) {
       throw new Error("snap sync isn't working");
@@ -1119,6 +1130,7 @@ export class SnapSync {
     this.root = undefined as any;
     this.tasks = [];
     this.snapped = false;
+    this.healed = false;
     this.finished = false;
     this.network.resetStatelessPeer();
   }
@@ -1126,9 +1138,10 @@ export class SnapSync {
   /**
    * Wait until snap sync finished
    */
-  async wait() {
+  wait() {
     if (this.schedulePromise) {
-      await this.schedulePromise;
+      return this.schedulePromise;
     }
+    return Promise.resolve(false);
   }
 }

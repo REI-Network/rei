@@ -2,10 +2,10 @@ import { BN } from 'ethereumjs-util';
 import { assert } from 'chai';
 import { randomBytes } from 'crypto';
 import { BlockHeader, HeaderData } from '@rei-network/structure';
-import { HeaderSyncPeer, IHeaderSyncBackend, HeaderSync, HeaderSyncOptions } from '../../src/sync/snap';
 import { Common } from '@rei-network/common';
-import { Database } from '@rei-network/database';
+import { Database, DBSetBlockOrHeader, DBOp, DBSaveLookups } from '@rei-network/database';
 import { setLevel } from '@rei-network/utils';
+import { HeaderSyncPeer, IHeaderSyncBackend, HeaderSync, HeaderSyncOptions } from '../../src/sync/snap';
 import { preValidateHeader } from '../../src/validation';
 import { HandlerPool } from '../../src/protocols/handlerPool';
 const level = require('level-mem');
@@ -157,6 +157,16 @@ async function checkHeaders(headerSync: HeaderSync, headers: BlockHeader[]) {
   }
 }
 
+async function saveHeaders(headerSync: HeaderSync, headers: BlockHeader[]) {
+  await headerSync.db.batch(
+    headers.reduce((dbOps: DBOp[], header) => {
+      dbOps.push(...DBSetBlockOrHeader(header));
+      dbOps.push(...DBSaveLookups(header.hash(), header.number));
+      return dbOps;
+    }, [])
+  );
+}
+
 async function testHeaderSync(count: number) {
   const { headerSync, headers } = await createHeaderSyncer(count);
   const promise = new Promise<void>((resolve) => {
@@ -166,7 +176,7 @@ async function testHeaderSync(count: number) {
     });
   });
   await headerSync.headerSync(headers[headers.length - 1]);
-  await headerSync.wait();
+  await saveHeaders(headerSync, await headerSync.wait());
   await promise;
   await checkHeaders(headerSync, headers);
 }
@@ -182,7 +192,7 @@ async function testHeaderSyncReset(count: number) {
     });
   });
   await headerSync.headerSync(headers[headers.length - 1]);
-  await headerSync.wait();
+  await saveHeaders(headerSync, await headerSync.wait());
   await promise;
   await checkHeaders(headerSync, headers);
 }

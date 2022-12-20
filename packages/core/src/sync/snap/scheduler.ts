@@ -1,6 +1,7 @@
 import EventEmitter from 'events';
 import { logger } from '@rei-network/utils';
 import { BlockHeader } from '@rei-network/structure';
+import { DBSetBlockOrHeader, DBOp, DBSaveLookups } from '@rei-network/database';
 import { Node } from '../../node';
 import { SyncInfo, BlockData } from '../types';
 import { SnapSync } from './snapSync';
@@ -96,8 +97,16 @@ export class SnapSyncScheduler extends EventEmitter {
       this.headerSyncer.headerSync(data.block.header);
       // wait until finished
       this.syncPromise = new Promise<void>(async (resolve) => {
-        const [finished] = await Promise.all([this.snapSyncer.wait(), this.headerSyncer.wait()]);
+        const [finished, headers] = await Promise.all([this.snapSyncer.wait(), this.headerSyncer.wait()]);
         if (finished) {
+          // save recent 256 headers
+          await this.node.db.batch(
+            headers.reduce((dbOps: DBOp[], header) => {
+              dbOps.push(...DBSetBlockOrHeader(header));
+              dbOps.push(...DBSaveLookups(header.hash(), header.number));
+              return dbOps;
+            }, [])
+          );
           // save block data
           await this.saveBlockData(root, data);
           // send events
@@ -133,8 +142,16 @@ export class SnapSyncScheduler extends EventEmitter {
     this.headerSyncer.headerSync(data.block.header);
     // wait until finished
     this.syncPromise = new Promise<void>(async (resolve) => {
-      const [finished] = await Promise.all([this.snapSyncer.wait(), this.headerSyncer.wait()]);
+      const [finished, headers] = await Promise.all([this.snapSyncer.wait(), this.headerSyncer.wait()]);
       if (finished) {
+        // save recent 256 headers
+        await this.node.db.batch(
+          headers.reduce((dbOps: DBOp[], header) => {
+            dbOps.push(...DBSetBlockOrHeader(header));
+            dbOps.push(...DBSaveLookups(header.hash(), header.number));
+            return dbOps;
+          }, [])
+        );
         // save block data
         await this.saveBlockData(root, data);
         // send events

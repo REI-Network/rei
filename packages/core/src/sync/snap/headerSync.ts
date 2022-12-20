@@ -1,7 +1,7 @@
 import EventEmitter from 'events';
 import { BN } from 'ethereumjs-util';
 import { BlockHeader } from '@rei-network/structure';
-import { Database, DBSetBlockOrHeader, DBOp, DBSaveLookups } from '@rei-network/database';
+import { Database } from '@rei-network/database';
 import { logger, AbortableTimer } from '@rei-network/utils';
 import { HeaderSyncNetworkManager, HeaderSyncPeer, IHeaderSyncBackend } from './types';
 
@@ -32,7 +32,7 @@ export class HeaderSync extends EventEmitter {
 
   private aborted: boolean = false;
   private useless = new Set<HeaderSyncPeer>();
-  private syncPromise: Promise<void> | undefined;
+  private syncPromise: Promise<BlockHeader[]> | undefined;
   private throwError: boolean;
   private retry = new AbortableTimer();
   private retryInterval: number;
@@ -64,6 +64,7 @@ export class HeaderSync extends EventEmitter {
         if (this.throwError) {
           throw err;
         }
+        return [];
       })
       .finally(() => {
         this.syncPromise = undefined;
@@ -77,10 +78,11 @@ export class HeaderSync extends EventEmitter {
   /**
    * Wait until header sync finished
    */
-  async wait() {
+  wait() {
     if (this.syncPromise) {
-      await this.syncPromise;
+      return this.syncPromise;
     }
+    return Promise.resolve([]);
   }
 
   /**
@@ -95,8 +97,10 @@ export class HeaderSync extends EventEmitter {
   /**
    * Download the 256 block headers before the specified block header
    * @param header - specified end block header
+   * @return all block headers
    */
   private async doSync(header: BlockHeader) {
+    // 1. find the block headers that need to be downloaded
     const endNumbr = header.number.clone();
     const needDownload: BN[] = [];
     for (let i = new BN(1); i.lte(count); i.iaddn(1)) {
@@ -119,13 +123,16 @@ export class HeaderSync extends EventEmitter {
       }
     }
     if (needDownload.length === 0) {
-      return;
+      return [];
     }
+
+    // 2. download all block headers in a loop
     const last = needDownload[0];
     const first = needDownload[needDownload.length - 1];
     const amount = last.sub(first).addn(1);
     const queryCount = new BN(0);
     const target = header.number.subn(1);
+    let headers: BlockHeader[] = [];
     let child: BlockHeader = header;
     while (!this.aborted && queryCount.lt(amount)) {
       let count: BN;
@@ -138,10 +145,17 @@ export class HeaderSync extends EventEmitter {
         start = first.clone();
         count = left.clone();
       }
-      child = await this.downloadHeaders(child, start, count, target);
+
+      // download and retry
+      const { child: _child, headers: _headers } = await this.downloadHeaders(child, start, count, target);
+
+      child = _child;
+      headers = _headers.concat(headers);
       queryCount.iadd(count);
       last.isub(count);
     }
+
+    return headers;
   }
 
   /**
@@ -155,12 +169,14 @@ export class HeaderSync extends EventEmitter {
    */
   private async downloadHeaders(child: BlockHeader, start: BN, count: BN, target: BN, retryLimit: number = 10) {
     let times = 0;
+    let headers: BlockHeader[] = [];
     const retry = async () => {
       if (times++ > retryLimit) {
         throw new Error('reach retry limit');
       }
       await this.retry.wait(this.retryInterval);
     };
+
     while (!this.aborted) {
       // 1. get handler
       let handler: HeaderSyncPeer;
@@ -173,7 +189,6 @@ export class HeaderSync extends EventEmitter {
       }
 
       // 2. download headers
-      let headers: BlockHeader[];
       try {
         headers = await handler.getBlockHeaders(start, count);
         child = this.backend.validateHeaders(child, headers);
@@ -195,17 +210,8 @@ export class HeaderSync extends EventEmitter {
       if (last.number.eq(target)) {
         this.emit('preRoot', last.stateRoot);
       }
-
-      // 4. save headers
-      await this.db.batch(
-        headers.reduce((dbOps: DBOp[], header) => {
-          dbOps.push(...DBSetBlockOrHeader(header));
-          dbOps.push(...DBSaveLookups(header.hash(), header.number));
-          return dbOps;
-        }, [])
-      );
       break;
     }
-    return child;
+    return { child, headers };
   }
 }

@@ -197,7 +197,8 @@ export class SnapTree {
     // Retrieve the head snapshot to cap from
     const snap = this.layers.get(root);
     if (!snap) {
-      throw new Error(`snapshot ${bufferToHex(root)} missing`);
+      logger.debug(`SnapTree::cap, snapshot ${bufferToHex(root)} missing`);
+      return;
     }
     if (!(snap instanceof DiffLayer)) {
       // ignore

@@ -479,15 +479,20 @@ export class SnapTree {
    * @returns Returns true if valid
    */
   async verify(root: Buffer) {
+    const snapshot = this.snapShot(root);
+    if (!snapshot) {
+      throw new Error('snapshot is missing');
+    }
+
     const trieSync = new TrieSync(this.diskdb, true);
     await trieSync.setRoot(root, async (paths, path, leaf, parent) => {
       if (paths.length === 1) {
-        const serializedAccount = await this.diskdb.getSerializedSnapAccount(paths[0]);
-        if (!serializedAccount.equals(StakingAccount.fromRlpSerializedAccount(leaf).slimSerialize())) {
+        const serializedAccount = await snapshot.getSerializedAccount(paths[0]);
+        if (!serializedAccount || !serializedAccount.equals(StakingAccount.fromRlpSerializedAccount(leaf).slimSerialize())) {
           throw Error('snap account not equal');
         }
       } else if (paths.length === 2) {
-        const storage = await this.diskdb.getSnapStorage(paths[0], paths[1]);
+        const storage = await snapshot.getStorage(paths[0], paths[1]);
         if (!storage.equals(leaf)) {
           throw Error('snap storage not equal');
         }

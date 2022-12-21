@@ -169,7 +169,7 @@ describe('SnapshotTree', () => {
   it('should journal correctly', async () => {
     const latest = layers[layers.length - 1];
     const base = await snaptree.journal(latest.layer.root);
-    expect(base.equals(root), 'root should be equal').be.true;
+    expect(base!.equals(root), 'root should be equal').be.true;
     const journalData = rlp.decode(await db.getSnapJournal()) as any as any[];
     expect(bufferToInt(journalData[0]) === journalVersion, 'JournalVersion should be equal').be.true;
     expect(journalData[1].equals(root), 'root hash should be euqal').be.true;
@@ -207,50 +207,42 @@ describe('SnapshotTree', () => {
   it('should verify correctly', async () => {
     const rawDBOpts = { keyEncoding: 'binary', valueEncoding: 'binary' };
     const root = snaptree.diskroot()!;
-    let verifiedResult = await snaptree.verify(root);
-    expect(verifiedResult, 'Snap should verify correctly').be.true;
+    expect(await snaptree.verify(root), 'Snap should verify correctly').be.true;
 
-    //delete account from db
+    // delete account from db
     let deleteKey = (await getFirstLeafNode(root))!;
     let value = await snaptree.diskdb.rawdb.get(deleteKey, rawDBOpts);
     await snaptree.diskdb.rawdb.del(deleteKey, rawDBOpts);
-    verifiedResult = await snaptree.verify(root);
-    expect(verifiedResult === false, 'Snap should not pass the verify').be.true;
+    expect(await snaptree.verify(root), 'Snap should not pass the verify').be.false;
 
     await snaptree.diskdb.rawdb.put(deleteKey, value, rawDBOpts);
-    verifiedResult = await snaptree.verify(root);
-    expect(verifiedResult === true, 'Snap should verify correctly').be.true;
+    expect(await snaptree.verify(root), 'Snap should verify correctly').be.true;
 
-    //delete account from snap
+    // delete account from snap
     const deletedAccountHash = layers[0].accounts[0].accountHash;
     value = await layers[0].layer.getSerializedAccount(deletedAccountHash);
     let dbop = DBDeleteSnapAccount(deletedAccountHash);
     await operateSnap(dbop);
-    verifiedResult = await snaptree.verify(root);
-    expect(verifiedResult === false, 'Snap should not pass the verify').be.true;
+    expect(await snaptree.verify(root), 'Snap should not pass the verify').be.false;
 
     dbop = DBSaveSerializedSnapAccount(deletedAccountHash, value);
     await operateSnap(dbop);
-    verifiedResult = await snaptree.verify(root);
-    expect(verifiedResult === true, 'Snap should not pass the verify').be.true;
+    expect(await snaptree.verify(root), 'Snap should verify correctly').be.true;
 
-    //delete slot from db
+    // delete slot from db
     deleteKey = (await getFirstLeafNode(layers[0].accounts[0].account.stateRoot))!;
     value = await snaptree.diskdb.rawdb.get(deleteKey, rawDBOpts);
     await snaptree.diskdb.rawdb.del(deleteKey, rawDBOpts);
-    verifiedResult = await snaptree.verify(root);
-    expect(verifiedResult === false, 'Snap should not pass the verify').be.true;
+    expect(await snaptree.verify(root), 'Snap should not pass the verify').be.false;
 
     await snaptree.diskdb.rawdb.put(deleteKey, value, rawDBOpts);
-    verifiedResult = await snaptree.verify(root);
-    expect(verifiedResult === true, 'Snap should verify correctly').be.true;
+    expect(await snaptree.verify(root), 'Snap should verify correctly').be.true;
 
-    //delete slot from snap
+    // delete slot from snap
     const deletedStoragHash = Array.from(layers[0].accounts[0].storageData.keys())[0];
     dbop = DBDeleteSnapStorage(deletedAccountHash, deletedStoragHash as Buffer);
     await operateSnap(dbop);
-    verifiedResult = await snaptree.verify(root);
-    expect(verifiedResult === false, 'Snap should not pass the verify').be.true;
+    expect(await snaptree.verify(root), 'Snap should not pass the verify').be.false;
   });
 
   it('should cap correctly', async () => {
@@ -264,7 +256,7 @@ describe('SnapshotTree', () => {
     expect(topLayer!.parent!.root.equals(snaptree.diskroot()!), 'parent root and diskroot should be equal').be.true;
 
     let capNumber = 2;
-    //Represents the number of layers expected to be compressed
+    // Represents the number of layers expected to be compressed
     let reserveNumber = difflayersNumber - 1 - capNumber;
     difflayersNumber = difflayersNumber - capNumber;
     survivedLayer = layers[layers.length - difflayersNumber].layer;

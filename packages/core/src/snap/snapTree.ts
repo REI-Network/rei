@@ -198,7 +198,7 @@ export class SnapTree {
     // Retrieve the head snapshot to cap from
     const snap = this.layers.get(root);
     if (!snap) {
-      logger.debug(`SnapTree::cap, snapshot ${bufferToHex(root)} missing`);
+      logger.debug('SnapTree::cap, snapshot is missing, root:', bufferToHex(root));
       return;
     }
     if (!(snap instanceof DiffLayer)) {
@@ -358,7 +358,7 @@ export class SnapTree {
     // Retrieve the head snapshot to journal from var snap snapshot
     const snap = this.layers.get(root);
     if (snap === undefined) {
-      logger.debug(`snapshot ${bufferToHex(root)} missing`);
+      logger.debug('SnapTree::journal, snapshot is missing, root:', bufferToHex(root));
       return;
     }
 

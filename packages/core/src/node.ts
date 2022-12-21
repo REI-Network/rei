@@ -184,16 +184,25 @@ export class Node {
       await this.evidencedb.open();
 
       await this.blockchain.init();
-      if (this.latestBlock.header.number.eqn(0)) {
+
+      const latest = this.latestBlock.header;
+      if (latest.number.eqn(0)) {
         await this.getEngine(this.latestBlock._common).generateGenesis();
       }
 
-      await this.snapTree.init(this.latestBlock.header.stateRoot, false, true);
+      await this.snapTree.init(latest.stateRoot, false, true);
+      if (!(await this.snapTree.verify(latest.stateRoot))) {
+        // TODO: improve log style
+        logger.warn('Node::init, snapshot is corrupted, rebuiding...');
+        const { generating } = await this.snapTree.rebuild(latest.stateRoot);
+        await generating;
+        logger.warn('Node::init, snapshot is corrupted, rebuid finised, verify again:', await this.snapTree.verify(latest.stateRoot));
+      }
       await this.txPool.init(this.latestBlock);
       await this.reimint.init();
       await this.clique.init();
       await this.bloomBitsIndexer.init();
-      await this.bcMonitor.init(this.latestBlock.header);
+      await this.bcMonitor.init(latest);
       await this.networkMngr.init();
     })());
   }

@@ -187,7 +187,7 @@ export class DiskLayer implements ISnapshot {
       this.db.rawdb,
       { gte: Buffer.concat([prefix, origin]), lte: Buffer.concat([prefix, MAX_HASH]) },
       (key) => key.length !== prefix.length + origin.length,
-      (key) => key.slice(prefix.length + origin.length),
+      (key) => key.slice(prefix.length),
       convertValue
     );
 

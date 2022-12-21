@@ -4,6 +4,7 @@ import { FunctionalBufferMap, FunctionalBufferSet, logger } from '@rei-network/u
 import { snapStorageKey, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
 import { DBDeleteSnapRoot, DBDeleteSnapAccount, DBDeleteSnapStorage, DBSaveSerializedSnapAccount, DBSaveSnapStorage, DBSaveSnapRoot, DBDeleteSnapJournal, DBDeleteSnapGenerator, DBSaveSnapDisabled, DBDeleteSnapRecoveryNumber, DBDeleteSnapDisabled, DBSaveSnapJournal } from '@rei-network/database/dist/helpers';
 import { DBatch } from '../utils';
+import { StakingAccount } from '../stateManager';
 import { DiffLayer } from './diffLayer';
 import { DiskLayer } from './diskLayer';
 import { GeneratorStats, Snapshot } from './types';
@@ -481,7 +482,7 @@ export class SnapTree {
     await trieSync.setRoot(root, async (paths, path, leaf, parent) => {
       if (paths.length === 1) {
         const serializedAccount = await this.diskdb.getSerializedSnapAccount(paths[0]);
-        if (!serializedAccount.equals(leaf)) {
+        if (!serializedAccount.equals(StakingAccount.fromRlpSerializedAccount(leaf).slimSerialize())) {
           throw Error('snap account not equal');
         }
       } else if (paths.length === 2) {

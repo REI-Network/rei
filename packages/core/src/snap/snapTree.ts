@@ -358,7 +358,8 @@ export class SnapTree {
     // Retrieve the head snapshot to journal from var snap snapshot
     const snap = this.layers.get(root);
     if (snap === undefined) {
-      throw new Error(`snapshot ${bufferToHex(root)} missing`);
+      logger.debug(`snapshot ${bufferToHex(root)} missing`);
+      return;
     }
 
     const diskroot = this.diskroot();

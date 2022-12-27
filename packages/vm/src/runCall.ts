@@ -11,6 +11,7 @@ import { default as EVM, EVMResult } from './evm/evm';
  */
 export interface RunCallOpts {
   block?: Block;
+  miner?: Address;
   gasPrice?: BN;
   origin?: Address;
   caller?: Address;
@@ -37,7 +38,14 @@ export interface RunCallOpts {
 export default async function runCall(this: VM, opts: RunCallOpts): Promise<EVMResult> {
   const block = opts.block ?? Block.fromBlockData({}, { common: this._common });
 
-  const txContext = new TxContext(opts.gasPrice ?? new BN(0), opts.origin ?? opts.caller ?? Address.zero());
+  const recentHashes: Buffer[] = [];
+  const number = block.header.number;
+  const db = this.blockchain.database;
+  for (let i = number.subn(1); i.gten(0) && i.gte(number.subn(256)); i.isubn(1)) {
+    recentHashes.push(await db.numberToHash(i));
+  }
+
+  const txContext = new TxContext(opts.gasPrice ?? new BN(0), opts.origin ?? opts.caller ?? Address.zero(), opts.miner, undefined, undefined, recentHashes);
 
   const message = new Message({
     caller: opts.caller,

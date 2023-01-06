@@ -120,10 +120,15 @@ export class ExtraData {
           throw new Error('invalid evidence count');
         }
 
-        evidence = value.map((buf) => {
-          const ev = EvidenceFactory.fromValuesArray(buf);
-          return ev;
-        });
+        evidence = value.map((buf) => EvidenceFactory.fromValuesArray(buf));
+
+        for (let i = 0; i < evidence.length; i++) {
+          for (let j = i; j < evidence.length; j++) {
+            if (evidence[i].hash().equals(evidence[j].hash())) {
+              throw new Error('repeated evidence');
+            }
+          }
+        }
 
         // calculate block hash
         headerHash = Reimint.calcBlockHeaderRawHash(header, evidence);

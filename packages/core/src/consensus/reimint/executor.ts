@@ -309,7 +309,7 @@ export class ReimintExecutor implements Executor {
    * {@link Executor.finalize}
    */
   async finalize(options: FinalizeOpts) {
-    const { block, receipts, stateRoot, parentStateRoot, round, evidence } = options;
+    let { block, receipts, stateRoot, parentStateRoot, round, evidence } = options;
     if (round === undefined || evidence === undefined || !parentStateRoot) {
       throw new Error('missing state root or round or evidence');
     }
@@ -323,6 +323,17 @@ export class ReimintExecutor implements Executor {
     const parentStakeManager = this.engine.getStakeManager(vm, block);
     const parentValidatorSet = (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager)).copy();
     parentValidatorSet.active.incrementProposerPriority(round);
+
+    // filter the evidence that has been packaged to prevent duplication
+    if (evidence && isEnableBetterPOS(pendingCommon)) {
+      let filteredEvidence: Evidence[] = [];
+      for (const ev of evidence) {
+        if (!(await parentStakeManager.isUsedEvidence(ev.hash()))) {
+          filteredEvidence.push(ev);
+        }
+      }
+      evidence = filteredEvidence;
+    }
 
     await vm.stateManager.checkpoint();
     try {

@@ -1,165 +1,174 @@
-import type Web3 from 'web3';
 import { expect } from 'chai';
-import { toBN } from './utils';
-
-declare var artifacts: any;
-declare var web3: Web3;
-
-const Prison = artifacts.require('Prison');
-const Config = artifacts.require('Config_devnet');
-const FeePool = artifacts.require('FeePool');
-const StakeManager = artifacts.require('StakeManager');
-const ValidatorRewardPool = artifacts.require('ValidatorRewardPool');
+import { ethers } from 'hardhat';
+import { Contract, ContractFactory, Signer } from 'ethers';
 
 describe('FeePool', () => {
-  let config: any;
-  let feePool: any;
-  let deployer: any;
-  let stakeManager: any;
-  let validatorRewardPool: any;
-  let validator1: any;
-  let validator2: any;
-  let validator3: any;
+  let config: Contract;
+  let feePool: Contract;
+  let stakeManager: Contract;
+  let validatorRewardPool: Contract;
+  let deployer: Signer;
+  let validator1: Signer;
+  let validator2: Signer;
+  let validator3: Signer;
+
+  let deployerAddr: string;
+  let validator1Addr: string;
+  let validator2Addr: string;
+  let validator3Addr: string;
+
+  let prisonFactory: ContractFactory;
+  let configFactory: ContractFactory;
+  let feePoolFactory: ContractFactory;
+  let stakeManagerFactory: ContractFactory;
+  let validatorRewardPoolFactory: ContractFactory;
 
   before(async () => {
-    const accounts = await web3.eth.getAccounts();
-    deployer = accounts[0];
-    validator1 = accounts[1];
-    validator2 = accounts[2];
-    validator3 = accounts[3];
+    const signers = await ethers.getSigners();
+    deployer = signers[0];
+    validator1 = signers[1];
+    validator2 = signers[2];
+    validator3 = signers[3];
+    deployerAddr = await deployer.getAddress();
+    validator1Addr = await validator1.getAddress();
+    validator2Addr = await validator2.getAddress();
+    validator3Addr = await validator3.getAddress();
+    prisonFactory = await ethers.getContractFactory('Prison');
+    configFactory = await ethers.getContractFactory('Config_devnet');
+    feePoolFactory = await ethers.getContractFactory('FeePool');
+    stakeManagerFactory = await ethers.getContractFactory('StakeManager');
+    validatorRewardPoolFactory = await ethers.getContractFactory('ValidatorRewardPool');
   });
 
   it('should deploy succeed', async () => {
-    config = new web3.eth.Contract(Config.abi, (await Config.new()).address, { from: deployer });
-    await config.methods.setSystemCaller(deployer).send();
-    await config.methods.setFeePoolInterval(10000).send();
+    config = await configFactory.connect(deployer).deploy();
+    await config.setSystemCaller(deployerAddr);
+    await config.setFeePoolInterval(10000);
 
-    stakeManager = new web3.eth.Contract(StakeManager.abi, (await StakeManager.new(config.options.address, deployer, [], [])).address, { from: deployer });
-    await config.methods.setStakeManager(stakeManager.options.address).send();
+    stakeManager = await stakeManagerFactory.connect(deployer).deploy(config.address, deployerAddr, [], []);
+    await config.setStakeManager(stakeManager.address);
+    const prison = await prisonFactory.connect(deployer).deploy(config.address);
+    await config.setPrison(prison.address);
 
-    const prison = new web3.eth.Contract(Prison.abi, (await Prison.new(config.options.address)).address, { from: deployer });
-    await config.methods.setPrison(prison.options.address).send();
+    feePool = await feePoolFactory.connect(deployer).deploy(config.address);
+    await config.setFeePool(feePool.address);
 
-    feePool = new web3.eth.Contract(FeePool.abi, (await FeePool.new(config.options.address)).address, { from: deployer });
-    await config.methods.setFeePool(feePool.options.address).send();
+    validatorRewardPool = await validatorRewardPoolFactory.connect(deployer).deploy(config.address);
+    await config.setValidatorRewardPool(validatorRewardPool.address);
 
-    validatorRewardPool = new web3.eth.Contract(ValidatorRewardPool.abi, (await ValidatorRewardPool.new(config.options.address)).address, { from: deployer });
-    await config.methods.setValidatorRewardPool(validatorRewardPool.options.address).send();
-
-    expect(await config.methods.feePoolInterval().call(), 'fee pool interval should be equal').be.equal('10000');
-    expect(await config.methods.stakeManager().call(), 'stake manager address should be equal').be.equal(stakeManager.options.address);
-    expect(await config.methods.feePool().call(), 'fee pool address should be equal').be.equal(feePool.options.address);
-    expect(await config.methods.validatorRewardPool().call(), 'validator reward pool address should be equal').be.equal(validatorRewardPool.options.address);
+    expect(await config.feePoolInterval(), 'fee pool interval should be equal').be.equal('10000');
+    expect(await config.stakeManager(), 'stake manager address should be equal').be.equal(stakeManager.address);
+    expect(await config.feePool(), 'fee pool address should be equal').be.equal(feePool.address);
+    expect(await config.validatorRewardPool(), 'validator reward pool address should be equal').be.equal(validatorRewardPool.address);
   });
 
   it('should get validators length correctly', async () => {
-    await feePool.methods.distribute(validator1, 0).send();
-    let validatorsLength = toBN(await feePool.methods.validatorsLength().call());
-    expect(validatorsLength.eqn(0), 'validators length should be equal').be.true;
+    await feePool.distribute(validator1Addr, 0);
+    let validatorsLength = await feePool.validatorsLength();
+    expect(validatorsLength.eq(0), 'validators length should be equal').be.true;
 
-    await feePool.methods.distribute(validator1, 100).send();
-    validatorsLength = toBN(await feePool.methods.validatorsLength().call());
-    expect(validatorsLength.eqn(1), 'validators length should be equal').be.true;
+    await feePool.distribute(validator1Addr, 100);
+    validatorsLength = await feePool.validatorsLength();
+    expect(validatorsLength.eq(1), 'validators length should be equal').be.true;
 
-    await feePool.methods.distribute(validator2, 100).send();
-    validatorsLength = toBN(await feePool.methods.validatorsLength().call());
-    expect(validatorsLength.eqn(2), 'validators length should be equal').be.true;
+    await feePool.distribute(validator2Addr, 100);
+    validatorsLength = await feePool.validatorsLength();
+    expect(validatorsLength.eq(2), 'validators length should be equal').be.true;
 
-    await feePool.methods.distribute(validator3, 100).send();
-    validatorsLength = toBN(await feePool.methods.validatorsLength().call());
-    expect(validatorsLength.eqn(3), 'validators length should be equal').be.true;
+    await feePool.distribute(validator3Addr, 100);
+    validatorsLength = await feePool.validatorsLength();
+    expect(validatorsLength.eq(3), 'validators length should be equal').be.true;
   });
 
   it('should distribute correctly(1)', async () => {
-    let totalShares = toBN(await feePool.methods.totalShares().call());
-    let validator2Shares = toBN(await feePool.methods.sharesOf(validator2).call());
-    let validator3Shares = toBN(await feePool.methods.sharesOf(validator3).call());
-    expect(totalShares.eqn(300), 'totalShares should be equal1').be.true;
-    expect(validator2Shares.eqn(100), 'validator2 shares should be equal').be.true;
-    expect(validator3Shares.eqn(100), 'validator3 shares should be equal').be.true;
+    let totalShares = await feePool.totalShares();
+    let validator2Shares = await feePool.sharesOf(validator2Addr);
+    let validator3Shares = await feePool.sharesOf(validator3Addr);
+    expect(totalShares.eq(300), 'totalShares should be equal1').be.true;
+    expect(validator2Shares.eq(100), 'validator2 shares should be equal').be.true;
+    expect(validator3Shares.eq(100), 'validator3 shares should be equal').be.true;
 
-    await feePool.methods.distribute(validator2, 100).send();
-    totalShares = toBN(await feePool.methods.totalShares().call());
-    validator2Shares = toBN(await feePool.methods.sharesOf(validator2).call());
-    expect(totalShares.eqn(400), 'totalShares should be equal2').be.true;
-    expect(validator2Shares.eqn(200), 'validator2 shares should be equal').be.true;
+    await feePool.distribute(validator2Addr, 100);
+    totalShares = await feePool.totalShares();
+    validator2Shares = await feePool.sharesOf(validator2Addr);
+    expect(totalShares.eq(400), 'totalShares should be equal2').be.true;
+    expect(validator2Shares.eq(200), 'validator2 shares should be equal').be.true;
 
-    await feePool.methods.distribute(validator3, 200).send();
-    totalShares = toBN(await feePool.methods.totalShares().call());
-    validator3Shares = toBN(await feePool.methods.sharesOf(validator3).call());
-    expect(totalShares.eqn(600), 'totalShares should be equal3').be.true;
-    expect(validator3Shares.eqn(300), 'validator3 shares should be equal').be.true;
+    await feePool.distribute(validator3Addr, 200);
+    totalShares = await feePool.totalShares();
+    validator3Shares = await feePool.sharesOf(validator3Addr);
+    expect(totalShares.eq(600), 'totalShares should be equal3').be.true;
+    expect(validator3Shares.eq(300), 'validator3 shares should be equal').be.true;
   });
 
   it('should accumulate correctly(2)', async () => {
-    let poolBalance = await web3.eth.getBalance(feePool.options.address);
-    expect(poolBalance, 'pool balance should be equal').be.equal('0');
+    let poolBalance = await ethers.provider.getBalance(feePool.address);
+    expect(poolBalance.toString(), 'pool balance should be equal').be.equal('0');
 
-    await feePool.methods.distribute(validator1, 0).send({ value: 600 });
-    poolBalance = await web3.eth.getBalance(feePool.options.address);
-    expect(poolBalance, 'pool balance should be equal').be.equal('600');
+    await feePool.distribute(validator1Addr, 0, { value: 600 });
+    poolBalance = await ethers.provider.getBalance(feePool.address);
+    expect(poolBalance.toString(), 'pool balance should be equal').be.equal('600');
   });
 
   it('should accumulate correctly(3)', async () => {
     const validator1Rate = 40;
     const validator2Rate = 50;
     const validator3Rate = 60;
+    const poolBalanceBefore = await ethers.provider.getBalance(feePool.address);
+    const totalSharesBefore = await feePool.totalShares();
+    const globalTimestampBefore = await feePool.globalTimestamp();
+    const validator1SharesBefore = await feePool.sharesOf(validator1Addr);
+    const validator2SharesBefore = await feePool.sharesOf(validator2Addr);
+    const validator3SharesBefore = await feePool.sharesOf(validator3Addr);
+    expect(validator1SharesBefore.eq(100), 'validator1 shares should be equal').be.true;
+    expect(validator2SharesBefore.eq(200), 'validator2 shares should be equal').be.true;
+    expect(validator3SharesBefore.eq(300), 'validator3 shares should be equal').be.true;
+    expect(poolBalanceBefore.eq(600), 'pool balance should be equal').be.true;
+    expect(totalSharesBefore.eq(600), 'totalShares should be euqal').be.true;
 
-    const poolBalanceBefore = toBN(await web3.eth.getBalance(feePool.options.address));
-    const totalSharesBefore = toBN(await feePool.methods.totalShares().call());
-    const globalTimestampBefore = toBN(await feePool.methods.globalTimestamp().call());
-    const validator1SharesBefore = toBN(await feePool.methods.sharesOf(validator1).call());
-    const validator2SharesBefore = toBN(await feePool.methods.sharesOf(validator2).call());
-    const validator3SharesBefore = toBN(await feePool.methods.sharesOf(validator3).call());
-    expect(validator1SharesBefore.eqn(100), 'validator1 shares should be equal').be.true;
-    expect(validator2SharesBefore.eqn(200), 'validator2 shares should be equal').be.true;
-    expect(validator3SharesBefore.eqn(300), 'validator3 shares should be equal').be.true;
-    expect(poolBalanceBefore.eqn(600), 'pool balance should be equal').be.true;
-    expect(totalSharesBefore.eqn(600), 'totalShares should be euqal').be.true;
+    await stakeManager.stake(validator1Addr, deployerAddr, { value: 1000 });
+    await stakeManager.stake(validator2Addr, deployerAddr, { value: 1000 });
+    await stakeManager.stake(validator3Addr, deployerAddr, { value: 1000 });
+    await stakeManager.connect(validator1).setCommissionRate(validator1Rate);
+    await stakeManager.connect(validator2).setCommissionRate(validator2Rate);
+    await stakeManager.connect(validator3).setCommissionRate(validator3Rate);
 
-    await stakeManager.methods.stake(validator1, deployer).send({ value: 1000 });
-    await stakeManager.methods.stake(validator2, deployer).send({ value: 1000 });
-    await stakeManager.methods.stake(validator3, deployer).send({ value: 1000 });
-    await stakeManager.methods.setCommissionRate(validator1Rate).send({ from: validator1 });
-    await stakeManager.methods.setCommissionRate(validator2Rate).send({ from: validator2 });
-    await stakeManager.methods.setCommissionRate(validator3Rate).send({ from: validator3 });
+    await config.setFeePoolInterval(0);
+    await feePool.distribute(validator1Addr, 0);
 
-    await config.methods.setFeePoolInterval(0).send();
-    await feePool.methods.distribute(validator1, 0).send();
-
-    const validator1Reward = toBN(await validatorRewardPool.methods.balanceOf(validator1).call());
-    const validator2Reward = toBN(await validatorRewardPool.methods.balanceOf(validator2).call());
-    const validator3Reward = toBN(await validatorRewardPool.methods.balanceOf(validator3).call());
+    const validator1Reward = await validatorRewardPool.balanceOf(validator1Addr);
+    const validator2Reward = await validatorRewardPool.balanceOf(validator2Addr);
+    const validator3Reward = await validatorRewardPool.balanceOf(validator3Addr);
     const _validator1Reward = poolBalanceBefore
       .mul(validator1SharesBefore)
       .div(totalSharesBefore)
-      .muln(100 - validator1Rate)
-      .divn(100);
+      .mul(100 - validator1Rate)
+      .div(100);
     const _validator2Reward = poolBalanceBefore
       .mul(validator2SharesBefore)
       .div(totalSharesBefore)
-      .muln(100 - validator2Rate)
-      .divn(100);
+      .mul(100 - validator2Rate)
+      .div(100);
     const _validator3Reward = poolBalanceBefore
       .mul(validator3SharesBefore)
       .div(totalSharesBefore)
-      .muln(100 - validator3Rate)
-      .divn(100);
+      .mul(100 - validator3Rate)
+      .div(100);
     expect(validator1Reward.eq(_validator1Reward), 'validator1 reward should be equal to computation').be.true;
     expect(validator2Reward.eq(_validator2Reward), 'validator2 reward should be equal to computation').be.true;
     expect(validator3Reward.eq(_validator3Reward), 'validator3 reward should be equal to computation').be.true;
 
-    const poolBalanceAfter = toBN(await web3.eth.getBalance(feePool.options.address));
-    const totalSharesAfter = toBN(await feePool.methods.totalShares().call());
-    const globalTimestampAfter = toBN(await feePool.methods.globalTimestamp().call());
-    const validator1SharesAfter = toBN(await feePool.methods.sharesOf(validator1).call());
-    const validator2SharesAfter = toBN(await feePool.methods.sharesOf(validator2).call());
-    const validator3SharesAfter = toBN(await feePool.methods.sharesOf(validator3).call());
-    expect(validator1SharesAfter.eqn(0), 'validator1 shares should be equal').be.true;
-    expect(validator2SharesAfter.eqn(0), 'validator2 shares should be equal').be.true;
-    expect(validator3SharesAfter.eqn(0), 'validator3 shares should be equal').be.true;
-    expect(poolBalanceAfter.eqn(0), 'pool balance should be equal').be.true;
-    expect(totalSharesAfter.eqn(0), 'totalShares should be euqal').be.true;
+    const poolBalanceAfter = await ethers.provider.getBalance(feePool.address);
+    const totalSharesAfter = await feePool.totalShares();
+    const globalTimestampAfter = await feePool.globalTimestamp();
+    const validator1SharesAfter = await feePool.sharesOf(validator1Addr);
+    const validator2SharesAfter = await feePool.sharesOf(validator2Addr);
+    const validator3SharesAfter = await feePool.sharesOf(validator3Addr);
+    expect(validator1SharesAfter.eq(0), 'validator1 shares should be equal').be.true;
+    expect(validator2SharesAfter.eq(0), 'validator2 shares should be equal').be.true;
+    expect(validator3SharesAfter.eq(0), 'validator3 shares should be equal').be.true;
+    expect(poolBalanceAfter.eq(0), 'pool balance should be equal').be.true;
+    expect(totalSharesAfter.eq(0), 'totalShares should be euqal').be.true;
     expect(globalTimestampAfter.gt(globalTimestampBefore), 'global timestamp should be changed').be.true;
   });
 });

@@ -196,7 +196,7 @@ export class Node {
         logger.warn('Node::init, snapshot is corrupted, rebuiding...');
         const { generating } = await this.snapTree.rebuild(latest.stateRoot);
         await generating;
-        logger.warn('Node::init, snapshot is corrupted, rebuid finised, verify again:', await this.snapTree.verify(latest.stateRoot));
+        logger.warn('Node::init, snapshot is corrupted, rebuid finished, verify again:', await this.snapTree.verify(latest.stateRoot));
       }
       await this.txPool.init(this.latestBlock);
       await this.reimint.init();

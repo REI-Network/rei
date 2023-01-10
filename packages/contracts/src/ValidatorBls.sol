@@ -31,7 +31,7 @@ contract ValidatorBls is Only, IValidatorBls {
      * @param key         Validator Bls public key.
      */
     function setBlsPublicKey(bytes memory key) public override {
-        require(key.length == 48, "BLS public key must be 48 bytes");
+        require(key.length == 48, "ValidatorBls: invalid bls public key");
         if (validatorBlsPubkey[msg.sender].length == 0) validators.push(msg.sender);
         validatorBlsPubkey[msg.sender] = key;
         emit SetBlsPublicKey(msg.sender, key);

@@ -1,6 +1,6 @@
 import { debug as createDebugLogger } from 'debug';
 import { encode } from 'rlp';
-import { BaseTrie as Trie } from 'merkle-patricia-tree';
+import { BaseTrie as Trie } from '@rei-network/trie';
 import { Account, Address, BN, intToBuffer, generateAddress } from 'ethereumjs-util';
 import { Block, Capability, TypedTransaction, FeeMarketEIP1559Transaction } from '@rei-network/structure';
 import { ConsensusType } from '@rei-network/common';

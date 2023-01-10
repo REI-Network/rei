@@ -1,7 +1,7 @@
 import path from 'path';
 import type { LevelUp } from 'levelup';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
-import { SecureTrie as Trie } from 'merkle-patricia-tree';
+import { SecureTrie as Trie } from '@rei-network/trie';
 import { Database, createLevelDB, createEncodingLevelDB } from '@rei-network/database';
 import { NetworkManager, Peer } from '@rei-network/network';
 import { Common } from '@rei-network/common';

@@ -4,8 +4,12 @@
   "gasConfig": {},
   "gasPrices": {},
   "vm": {
+    "minTotalLockedAmount": {
+        "v": "70000000000000000000000000",
+        "d": "min total locked amount"
+    },
     "initHeight": {
-      "v": 0
+      "v": 8977390
     },
     "initHashes": {
       "v": []

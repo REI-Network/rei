@@ -1,6 +1,6 @@
 {
   "name": "@rei-network/vm",
-  "version": "1.1.2",
+  "version": "2.0.0",
   "description": "An Ethereum VM implementation",
   "license": "MPL-2.0",
   "author": "mjbecze <mjbecze@gmail.com>",
@@ -11,10 +11,10 @@
   },
   "dependencies": {
     "@rei-network/binding": "1.0.0-beta.3",
-    "@rei-network/blockchain": "^1.1.2",
-    "@rei-network/common": "^1.1.2",
-    "@rei-network/structure": "^0.1.4",
-    "merkle-patricia-tree": "^4.2.1",
+    "@rei-network/blockchain": "^2.0.0",
+    "@rei-network/common": "^2.0.0",
+    "@rei-network/structure": "^1.0.0",
+    "@rei-network/trie": "^4.3.0",
     "async-eventemitter": "^0.2.4",
     "core-js-pure": "^3.0.1",
     "debug": "^2.2.0",

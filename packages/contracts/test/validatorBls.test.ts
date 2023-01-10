@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
 import { Contract, ContractFactory, Signer } from 'ethers';
-import { randomBytes } from 'crypto';
+import { getRandomBytes } from './utils';
 
 describe('ValidatorBls', () => {
   let config: Contract;
@@ -57,7 +57,3 @@ describe('ValidatorBls', () => {
     }
   });
 });
-
-function getRandomBytes(size: number) {
-  return '0x' + randomBytes(size).toString('hex');
-}

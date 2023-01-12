@@ -20,9 +20,10 @@
     },
     "dependencies": {
         "@rei-network/api": "^1.0.0",
+        "@rei-network/bls": "^0.0.1",
         "@rei-network/core": "^2.0.0",
-        "@rei-network/rpc": "^2.0.0",
         "@rei-network/ipc": "^1.0.0",
+        "@rei-network/rpc": "^2.0.0",
         "@rei-network/utils": "^0.1.1",
         "@rei-network/wallet": "^0.1.1",
         "commander": "^6.2.1",

@@ -7,7 +7,7 @@ import { NetworkManagerOptions } from '@rei-network/network';
 import { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
 import { ConsensusEngineOptions } from './consensus/types';
 import { Node } from './node';
-import { NodeOptions, AccountManagerConstructorOptions } from './types';
+import { NodeOptions, AccountManagerConstructorOptions, BlsManagerConstructorOptions } from './types';
 
 export interface MineOptions extends Omit<ConsensusEngineOptions, 'node' | 'coinbase'> {
   coinbase: string;
@@ -23,10 +23,16 @@ export interface AccountOptions extends AccountManagerConstructorOptions {
   unlock: [string, string][];
 }
 
-export interface CreateNodeOptions extends Omit<NodeOptions, 'mine' | 'network' | 'account'> {
+export interface BlsOptions extends BlsManagerConstructorOptions {
+  blsFileName?: string;
+  blsPassword?: string;
+}
+
+export interface CreateNodeOptions extends Omit<NodeOptions, 'mine' | 'network' | 'account' | 'bls'> {
   mine: MineOptions;
   network: NetworkOptions;
   account: AccountOptions;
+  bls: BlsOptions;
 }
 
 async function loadPeerId(databasePath: string) {
@@ -77,6 +83,12 @@ export class NodeFactory {
     if (options.evm && options.evm !== EVMWorkMode.Binding && options.evm !== EVMWorkMode.JS) {
       throw new Error(`invalid evm work mode: ${options.evm}`);
     }
+
+    const blsFileName = options.bls.blsFileName;
+    console.log('bls', options.bls.bls);
+    console.log('blsFileName', blsFileName);
+    console.log('blsPassword', options.bls.blsPassword);
+    blsFileName && (await node.blsMngr.unlock(path.join(options.bls.bls, blsFileName), options.bls.blsPassword!));
 
     await node.init();
     node.start();

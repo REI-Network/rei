@@ -14,6 +14,7 @@
     { "path": "../network/tsconfig.json" },
     { "path": "../structure/tsconfig.json" },
     { "path": "../utils/tsconfig.json" },
-    { "path": "../wallet/tsconfig.json" }
+    { "path": "../wallet/tsconfig.json" },
+    { "path": "../bls/tsconfig.json" },
   ]
 }

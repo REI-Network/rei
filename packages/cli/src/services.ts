@@ -1,11 +1,12 @@
 import fs from 'fs';
+import path from 'path';
 import process from 'process';
 import { Node, NodeFactory } from '@rei-network/core';
 import { RpcServer } from '@rei-network/rpc';
 import { setLevel, logger } from '@rei-network/utils';
 import { ApiServer } from '@rei-network/api';
 import { IpcServer } from '@rei-network/ipc';
-import { getPassphrase, getKeyStorePath, loadVersion } from './utils';
+import { getPassphrase, getKeyStorePath, getBlsPath, loadVersion } from './utils';
 
 type Services = { node: Node; apiServer: ApiServer; rpcServer: RpcServer; ipcServer: IpcServer };
 
@@ -29,6 +30,15 @@ export async function startServices(opts: { [option: string]: string }): Promise
     addresses = (opts.unlock as string).split(',').map((address) => address.trim());
     passphrase = await getPassphrase(opts, { addresses });
   }
+
+  if (!!opts.blsPassword !== !!opts.blsFile) {
+    throw Error('Error: blsPassword and blsFile must be used together');
+  }
+  const bls = {
+    bls: getBlsPath(opts),
+    blsFileName: opts.blsFile,
+    blsPassword: opts.blsPassword ? fs.readFileSync(path.isAbsolute(opts.blsPassword) ? opts.blsPassword : path.join(getBlsPath(opts), opts.blsPassword), 'utf-8').trim() : undefined
+  };
   const account = {
     keyStorePath: getKeyStorePath(opts),
     unlock: addresses.map((address, i): [string, string] => [address, passphrase[i]])
@@ -55,7 +65,8 @@ export async function startServices(opts: { [option: string]: string }): Promise
     receiptsCacheSize: opts.receiptsCacheSize ? Number(opts.receiptsCacheSize) : undefined,
     mine,
     network,
-    account
+    account,
+    bls
   });
 
   // create api server instance

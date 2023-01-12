@@ -11,6 +11,7 @@ import { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
 import { Transaction, Block } from '@rei-network/structure';
 import { Channel, logger } from '@rei-network/utils';
 import { AccountManager } from '@rei-network/wallet';
+import { BlsManager } from '@rei-network/bls';
 import { TxPool } from './txpool';
 import { Synchronizer } from './sync';
 import { TxFetcher } from './txSync';
@@ -65,6 +66,7 @@ export class Node {
   readonly clique: CliqueConsensusEngine;
   readonly receiptsCache: ReceiptsCache;
   readonly evmWorkMode: EVMWorkMode;
+  readonly blsMngr: BlsManager;
 
   private initPromise?: Promise<void>;
   private pendingTxsLoopPromise?: Promise<void>;
@@ -91,6 +93,7 @@ export class Node {
     this.accMngr = new AccountManager(options.account.keyStorePath);
     this.receiptsCache = new ReceiptsCache(options.receiptsCacheSize);
     this.evmWorkMode = (options.evm as EVMWorkMode) ?? defaultEVMWorkMode;
+    this.blsMngr = new BlsManager(options.bls.bls);
 
     this.chain = options.chain ?? defaultChainName;
     if (!Common.isSupportedChainName(this.chain)) {

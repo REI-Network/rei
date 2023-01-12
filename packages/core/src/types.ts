@@ -13,6 +13,10 @@ export interface AccountManagerConstructorOptions {
   keyStorePath: string;
 }
 
+export interface BlsManagerConstructorOptions {
+  bls: string;
+}
+
 export interface NodeOptions {
   /**
    * Full path of database
@@ -34,6 +38,7 @@ export interface NodeOptions {
   mine: ConsensusEngineConstructorOptions;
   network: NetworkManagerConstructorOptions;
   account: AccountManagerConstructorOptions;
+  bls: BlsManagerConstructorOptions;
 }
 
 export type NodeStatus = {

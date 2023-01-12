@@ -64,6 +64,10 @@ export function getKeyStorePath(opts: { [option: string]: string }) {
   return path.join(opts.datadir, opts.keystore);
 }
 
+export function getBlsPath(opts: { [option: string]: string }) {
+  return path.join(opts.datadir, opts.bls);
+}
+
 export function loadVersion() {
   // load version from package.json
   let version = 'unknown';

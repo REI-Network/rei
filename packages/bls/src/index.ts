@@ -13,31 +13,50 @@ export class BlsManager {
     this.datadir = datadir;
   }
 
+  /**
+   * Import chainsafe bls package
+   */
   async init() {
     this.bls = (await import('@chainsafe/bls')).default;
   }
 
-  async unlock(fullPath: string, passphrase: string) {
+  /**
+   * Unlock bls key from disk file
+   * @param fileName - bls key filename
+   * @param password - AES password
+   */
+  async unlock(fileName: string, password: string) {
     await this.init();
-    const secretkey = this.getSecrectKey(fullPath, passphrase);
+    const { secretkey, publickey } = this.getSecrectKey(fileName, password);
     this.secretKey = this.bls.SecretKey.fromBytes(secretkey);
-    this.publicKey = this.secretKey.toPublicKey();
+    this.publicKey = this.bls.PublicKey.fromHex(publickey);
+    console.log('BLS public key: ' + this.publicKey.toHex());
   }
 
+  /**
+   * Get bls public key
+   * @returns bls public key
+   */
   getPublicKey() {
     return this.publicKey;
   }
 
-  private getSecrectKey(fullPath: string, passphrase: string) {
+  private getSecrectKey(fileName: string, passphrase: string) {
+    const fullPath = path.isAbsolute(fileName) ? fileName : path.join(this.datadir, fileName);
     const blsStruct = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
     const secretkey = decrypt({ encryptedSecretKey: blsStruct.encryptedSecretKey, iv: blsStruct.iv }, passphrase);
     if (this.bls.SecretKey.fromBytes(secretkey).toPublicKey().toHex() !== blsStruct.publicKey) {
       throw new Error('Invalid passphrase');
     } else {
-      return secretkey;
+      return { secretkey, publickey: blsStruct.publicKey };
     }
   }
 
+  /**
+   * New bls key and save to disk
+   * @param passphrase - AES password for storage
+   * @returns bls public key and file path
+   */
   async newSigner(passphrase: string) {
     await this.init();
     const secretkey = this.bls.SecretKey.fromKeygen();
@@ -49,14 +68,26 @@ export class BlsManager {
     return { publickey: publickey.toHex(), path: fullPath };
   }
 
+  /**
+   * Update bls key password
+   * @param fileName - bls key filename
+   * @param passphrase - old AES password
+   * @param newPassphrase - new AES password
+   */
   async updateSigner(fileName: string, passphrase: string, newPassphrase: string) {
     await this.init();
-    const fullPath = path.join(this.datadir, fileName);
-    const secretkey = this.getSecrectKey(fullPath, passphrase);
+    const { secretkey, publickey } = this.getSecrectKey(fileName, passphrase);
     const blsStruct = encrypt(secretkey, newPassphrase);
-    fs.writeFileSync(fullPath, JSON.stringify({ ...blsStruct, publicKey: this.bls.SecretKey.fromBytes(secretkey).toPublicKey().toHex() }));
+    const fullPath = path.isAbsolute(fileName) ? fileName : path.join(this.datadir, fileName);
+    fs.writeFileSync(fullPath, JSON.stringify({ ...blsStruct, publicKey: publickey }));
   }
 
+  /**
+   * Import bls key from secret key
+   * @param secretKey - bls secret key
+   * @param passphrase - AES password for storage
+   * @returns bls public key and file path
+   */
   async importSignerBySecretKey(secretKey: string, passphrase: string) {
     await this.init();
     const blsStruct = encrypt(Buffer.from(secretKey, 'hex'), passphrase);
@@ -67,18 +98,41 @@ export class BlsManager {
     return { publickey: publickey.toHex(), path: fullPath };
   }
 
+  /**
+   * Sign message using bls key
+   * @param message - message to sign
+   * @returns signature
+   */
   signMessage(message: Buffer) {
     return this.secretKey.sign(message);
   }
 
+  /**
+   * Verify message using bls public key
+   * @param signature - signature
+   * @param message - message
+   * @returns true if signature is valid
+   */
   verifyMessage(signature: Buffer, message: Buffer) {
     return this.bls.verify(message, signature, this.publicKey.toBytes());
   }
 
+  /**
+   * Aggregate signatures
+   * @param signatures - signatures to aggregate
+   * @returns aggregated signature
+   */
   aggregateSignatures(signatures: Buffer[]) {
     return this.bls.aggregateSignatures(signatures);
   }
 
+  /**
+   * Verify aggregated signature
+   * @param aggregatedSignature - aggregated signature
+   * @param messages - messages
+   * @param publicKeys - public keys
+   * @returns true if aggregated signature is valid
+   */
   verifyMultiple(aggregatedSignature: Buffer, messages: Buffer[], publicKeys: Buffer[]) {
     return this.bls.verifyMultiple(publicKeys, messages, aggregatedSignature);
   }

@@ -6,6 +6,12 @@ import { cryptoStruct } from './types';
 
 const algorithm = 'aes-256-ctr';
 
+/**
+ * Encrypt Message using ase algorithm
+ * @param key - secret key
+ * @param passphrase - AES password
+ * @returns encrypted secret key and iv
+ */
 export function encrypt(key: Uint8Array, passphrase: string): cryptoStruct {
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv(algorithm, keccak256(Buffer.from(passphrase)), iv);
@@ -16,6 +22,12 @@ export function encrypt(key: Uint8Array, passphrase: string): cryptoStruct {
   };
 }
 
+/**
+ * Decrypt Message using ase algorithm
+ * @param secretStruct - encrypted secret key and iv
+ * @param passphrase - AES password
+ * @returns  decrypted secret key
+ */
 export function decrypt(secretStruct: cryptoStruct, passphrase: string): Buffer {
   const iv = Buffer.from(secretStruct.iv, 'hex');
   const encryptedText = Buffer.from(secretStruct.encryptedSecretKey, 'hex');
@@ -24,6 +36,11 @@ export function decrypt(secretStruct: cryptoStruct, passphrase: string): Buffer 
   return decrypted;
 }
 
+/**
+ * Generate signer file name
+ * @param publicKey - bls public key
+ * @returns signer file name
+ */
 export function signerFileName(publicKey: string): string {
   const ts = new Date();
   const utc = new Date(ts.getTime() + ts.getTimezoneOffset() * 60000);

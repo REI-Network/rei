@@ -85,10 +85,7 @@ export class NodeFactory {
     }
 
     const blsFileName = options.bls.blsFileName;
-    console.log('bls', options.bls.bls);
-    console.log('blsFileName', blsFileName);
-    console.log('blsPassword', options.bls.blsPassword);
-    blsFileName && (await node.blsMngr.unlock(path.join(options.bls.bls, blsFileName), options.bls.blsPassword!));
+    blsFileName && (await node.blsMngr.unlock(blsFileName, options.bls.blsPassword!));
 
     await node.init();
     node.start();

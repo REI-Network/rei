@@ -8,6 +8,8 @@ contract ValidatorBls is Only, IValidatorBls {
     mapping(address => bytes) private validatorBlsPubkey;
     // validators list
     address[] public override validators;
+    // bls public key exist
+    mapping(bytes => bool) private _blsPubkeyExist;
 
     /**
      * @dev Emitted when validator bls public key is set.
@@ -32,8 +34,10 @@ contract ValidatorBls is Only, IValidatorBls {
      */
     function setBlsPublicKey(bytes memory key) public override {
         require(key.length == 48, "ValidatorBls: invalid bls public key");
+        require(!_blsPubkeyExist[key], "ValidatorBls: bls public key already exist");
         if (validatorBlsPubkey[msg.sender].length == 0) validators.push(msg.sender);
         validatorBlsPubkey[msg.sender] = key;
+        _blsPubkeyExist[key] = true;
         emit SetBlsPublicKey(msg.sender, key);
     }
 
@@ -44,5 +48,23 @@ contract ValidatorBls is Only, IValidatorBls {
      */
     function getBlsPublicKey(address validator) public view override returns (bytes memory key) {
         return validatorBlsPubkey[validator];
+    }
+
+    /**
+     * Check if validator is registered.
+     * @param validator         Validator address.
+     * @return registered       True if validator is registered.
+     */
+    function isRegistered(address validator) public view override returns (bool) {
+        return validatorBlsPubkey[validator].length > 0;
+    }
+
+    /**
+     * Check if bls public key is exist.
+     * @param key         Validator bls public key.
+     * @return exist      True if bls public key is exist.
+     */
+    function blsPubkeyExist(bytes memory key) public view override returns (bool) {
+        return _blsPubkeyExist[key];
     }
 }

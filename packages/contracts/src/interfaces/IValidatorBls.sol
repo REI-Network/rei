@@ -10,4 +10,8 @@ interface IValidatorBls {
     function setBlsPublicKey(bytes calldata key) external;
 
     function getBlsPublicKey(address) external view returns (bytes memory);
+
+    function isRegistered(address) external view returns (bool);
+
+    function blsPubkeyExist(bytes calldata) external view returns (bool);
 }

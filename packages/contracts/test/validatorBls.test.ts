@@ -56,4 +56,22 @@ describe('ValidatorBls', () => {
       expect(e.message).to.equal('Transaction reverted without a reason string');
     }
   });
+
+  it('should get the validator is registered bls public key', async () => {
+    expect(await validatorBls.isRegistered(await user1.getAddress())).to.equal(false);
+    await validatorBls.connect(user1).setBlsPublicKey(getRandomBytes(48));
+    expect(await validatorBls.isRegistered(await user1.getAddress())).to.equal(true);
+  });
+
+  it('should the bls public key can only be set once', async () => {
+    const blsPublicKey = getRandomBytes(48);
+    expect(await validatorBls.blsPubkeyExist(blsPublicKey)).to.equal(false);
+    await validatorBls.connect(user1).setBlsPublicKey(blsPublicKey);
+    expect(await validatorBls.blsPubkeyExist(blsPublicKey)).to.equal(true);
+    try {
+      await validatorBls.connect(deployer).setBlsPublicKey(blsPublicKey);
+    } catch (error) {
+      expect(error.message).to.equal('Transaction reverted without a reason string');
+    }
+  });
 });

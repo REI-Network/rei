@@ -24,7 +24,7 @@ contract ValidatorBls is Only, IValidatorBls {
      * Get validators length.
      * @return length     Validators length.
      */
-    function getValidatorsLength() public view override returns (uint256 length) {
+    function validatorsLength() public view override returns (uint256 length) {
         return validators.length;
     }
 
@@ -64,7 +64,7 @@ contract ValidatorBls is Only, IValidatorBls {
      * @param key         Validator bls public key.
      * @return exist      True if bls public key is exist.
      */
-    function blsPubkeyExist(bytes memory key) public view override returns (bool) {
+    function blsPublicKeyExist(bytes memory key) public view override returns (bool) {
         return _blsPubkeyExist[key];
     }
 }

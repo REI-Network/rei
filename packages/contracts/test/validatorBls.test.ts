@@ -37,11 +37,11 @@ describe('ValidatorBls', () => {
   });
 
   it('should get validators length', async () => {
-    expect(await validatorBls.getValidatorsLength()).to.equal(0);
+    expect(await validatorBls.validatorsLength()).to.equal(0);
     await validatorBls.connect(user1).setBlsPublicKey(getRandomBytes(48));
-    expect(await validatorBls.getValidatorsLength()).to.equal(1);
+    expect(await validatorBls.validatorsLength()).to.equal(1);
     await validatorBls.connect(user1).setBlsPublicKey(getRandomBytes(48));
-    expect(await validatorBls.getValidatorsLength()).to.equal(1);
+    expect(await validatorBls.validatorsLength()).to.equal(1);
   });
 
   it('should get validators', async () => {
@@ -65,9 +65,9 @@ describe('ValidatorBls', () => {
 
   it('should the bls public key can only be set once', async () => {
     const blsPublicKey = getRandomBytes(48);
-    expect(await validatorBls.blsPubkeyExist(blsPublicKey)).to.equal(false);
+    expect(await validatorBls.blsPublicKeyExist(blsPublicKey)).to.equal(false);
     await validatorBls.connect(user1).setBlsPublicKey(blsPublicKey);
-    expect(await validatorBls.blsPubkeyExist(blsPublicKey)).to.equal(true);
+    expect(await validatorBls.blsPublicKeyExist(blsPublicKey)).to.equal(true);
     try {
       await validatorBls.connect(deployer).setBlsPublicKey(blsPublicKey);
     } catch (error) {

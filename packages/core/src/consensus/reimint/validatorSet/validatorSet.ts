@@ -1,6 +1,6 @@
 import { FunctionalAddressMap } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
-import { StakeManager } from '../contracts';
+import { StakeManager, ValidatorBls } from '../contracts';
 import { IndexedValidatorSet, IndexedValidator } from './indexedValidatorSet';
 import { ActiveValidatorSet } from './activeValidatorSet';
 import { isGenesis, genesisValidatorVotingPower } from './genesis';
@@ -13,6 +13,8 @@ export interface LoadOptions {
   genesis?: boolean;
   // active validator set
   active?: ActiveValidatorSet;
+  // validator bls contract
+  bls?: ValidatorBls;
 }
 
 export class ValidatorSet {
@@ -45,7 +47,7 @@ export class ValidatorSet {
       });
       indexed = new IndexedValidatorSet(_indexed);
     } else {
-      indexed = await IndexedValidatorSet.fromStakeManager(sm);
+      indexed = await IndexedValidatorSet.fromStakeManager(sm, options?.bls);
 
       if (options?.sort) {
         const maxCount = sm.common.param('vm', 'maxValidatorsCount');
@@ -100,10 +102,10 @@ export class ValidatorSet {
    * @param common - Common instance
    * @returns New ValidatorSet instance
    */
-  copyAndMerge(changes: ValidatorChanges, common: Common) {
+  async copyAndMerge(changes: ValidatorChanges, common: Common, bls?: ValidatorBls) {
     const indexed = this.indexed.copy();
     const active = this.active.copy();
-    if (indexed.merge(changes)) {
+    if (await indexed.merge(changes, bls)) {
       const maxCount = common.param('vm', 'maxValidatorsCount');
       active.merge(indexed.sort(maxCount));
       active.computeNewPriorities(this.active);

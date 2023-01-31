@@ -89,6 +89,10 @@
     {
       "name": "better-pos",
       "block": 0
+    },
+    {
+      "name": "validator-bls",
+      "block": 100
     }
   ],
   "bootstrapNodes": []

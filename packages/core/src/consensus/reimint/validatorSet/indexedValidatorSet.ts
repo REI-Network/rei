@@ -2,7 +2,7 @@ import Heap from 'qheap';
 import { Address, BN } from 'ethereumjs-util';
 import { FunctionalAddressMap } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
-import { StakeManager } from '../contracts';
+import { StakeManager, ValidatorBls } from '../contracts';
 import { ValidatorChanges } from './validatorChanges';
 import { isGenesis, getGenesisValidators, genesisValidatorVotingPower } from './genesis';
 
@@ -12,6 +12,8 @@ export type IndexedValidator = {
   validator: Address;
   // voting power
   votingPower: BN;
+  // validator bls public key
+  blsPublicKey?: Buffer;
 };
 
 // copy a `IndexedValidator`
@@ -31,7 +33,7 @@ export class IndexedValidatorSet {
    * @param sm - Stake manager instance
    * @returns IndexedValidatorSet instance
    */
-  static async fromStakeManager(sm: StakeManager) {
+  static async fromStakeManager(sm: StakeManager, bls?: ValidatorBls) {
     const indexed = new FunctionalAddressMap<IndexedValidator>();
     const length = await sm.indexedValidatorsLength();
     for (const i = new BN(0); i.lt(length); i.iaddn(1)) {
@@ -43,10 +45,16 @@ export class IndexedValidatorSet {
 
       const votingPower = await sm.getVotingPowerByIndex(i);
       if (votingPower.gtn(0)) {
-        indexed.set(validator, {
-          validator,
-          votingPower
-        });
+        const indexValidator: IndexedValidator = { validator, votingPower };
+        if (bls) {
+          const blsPublicKey = await bls.getBlsPublicKey(validator);
+          if (blsPublicKey === undefined) {
+            continue;
+          }
+          indexValidator.blsPublicKey = blsPublicKey;
+        }
+
+        indexed.set(validator, indexValidator);
       }
     }
 
@@ -141,7 +149,7 @@ export class IndexedValidatorSet {
    * Merge validator set changes
    * @param changes - `ValidatorChanges` instance
    */
-  merge(changes: ValidatorChanges) {
+  async merge(changes: ValidatorChanges, bls?: ValidatorBls) {
     // TODO: if the changed validator is an active validator, the active list maybe not be dirty
     let dirty = false;
 
@@ -155,6 +163,12 @@ export class IndexedValidatorSet {
         dirty = true;
         v = this.getValidator(vc.validator);
         v.votingPower = vc.votingPower;
+        if (changes.blsValidators.has(vc.validator)) {
+          v.blsPublicKey = changes.blsValidators.get(vc.validator);
+          changes.blsValidators.delete(vc.validator);
+        } else if (bls) {
+          v.blsPublicKey = await bls.getBlsPublicKey(vc.validator);
+        }
       }
 
       if (!vc.update.eqn(0) && this.indexed.get(vc.validator)) {
@@ -166,6 +180,10 @@ export class IndexedValidatorSet {
         }
       }
     }
+
+    changes.blsValidators.forEach((blsPublicKey, validator) => {
+      this.contains(validator) ?? (this.getValidator(validator).blsPublicKey = blsPublicKey);
+    });
 
     return dirty;
   }

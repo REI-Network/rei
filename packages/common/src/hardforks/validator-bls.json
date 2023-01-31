@@ -1,0 +1,15 @@
+{
+  "name": "validator-bls",
+  "comment": "validator bls hardfork",
+  "gasConfig": {},
+  "gasPrices": {},
+  "vm": {
+    "preBlsAddress": {
+      "v": "0x0000000000000000000000000000000000000000"
+    },
+    "postBlsAddress": {
+      "v": "0x0000000000000000000000000000000000000000"
+    }
+  },
+  "pow": {}
+}

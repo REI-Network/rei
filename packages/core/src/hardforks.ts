@@ -208,3 +208,15 @@ export function isEnableBetterPOS(common: Common) {
     throw new Error('unknown chain');
   }
 }
+
+export function isEnableValidatorBls(common: Common) {
+  if (common.chainName() === 'rei-testnet') {
+    return common.gteHardfork('validator-bls');
+  } else if (common.chainName() === 'rei-mainnet') {
+    return common.gteHardfork('validator-bls');
+  } else if (common.chainName() === 'rei-devnet') {
+    return common.gteHardfork('validator-bls');
+  } else {
+    throw new Error('unknown chain');
+  }
+}

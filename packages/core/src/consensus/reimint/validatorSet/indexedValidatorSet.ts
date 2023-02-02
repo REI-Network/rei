@@ -46,14 +46,7 @@ export class IndexedValidatorSet {
       const votingPower = await sm.getVotingPowerByIndex(i);
       if (votingPower.gtn(0)) {
         const indexValidator: IndexedValidator = { validator, votingPower };
-        if (bls) {
-          const blsPublicKey = await bls.getBlsPublicKey(validator);
-          if (blsPublicKey === undefined) {
-            continue;
-          }
-          indexValidator.blsPublicKey = blsPublicKey;
-        }
-
+        if (bls) indexValidator.blsPublicKey = await bls.getBlsPublicKey(validator);
         indexed.set(validator, indexValidator);
       }
     }
@@ -157,18 +150,14 @@ export class IndexedValidatorSet {
       this.indexed.delete(uv);
     }
 
+    const newValidators = new Set<Address>();
     for (const vc of changes.changes.values()) {
       let v: IndexedValidator | undefined;
       if (vc.votingPower) {
         dirty = true;
         v = this.getValidator(vc.validator);
         v.votingPower = vc.votingPower;
-        if (changes.blsValidators.has(vc.validator)) {
-          v.blsPublicKey = changes.blsValidators.get(vc.validator);
-          changes.blsValidators.delete(vc.validator);
-        } else if (bls) {
-          v.blsPublicKey = await bls.getBlsPublicKey(vc.validator);
-        }
+        newValidators.add(vc.validator);
       }
 
       if (!vc.update.eqn(0) && this.indexed.get(vc.validator)) {
@@ -177,12 +166,22 @@ export class IndexedValidatorSet {
         v.votingPower.iadd(vc.update);
         if (v.votingPower.isZero()) {
           this.indexed.delete(vc.validator);
+          changes.blsValidators.delete(vc.validator);
         }
       }
     }
 
+    for (const addr of newValidators) {
+      if (changes.blsValidators.has(addr)) {
+        continue;
+      } else if (bls) {
+        const blsPublicKey = await bls.getBlsPublicKey(addr);
+        changes.blsValidators.set(addr, blsPublicKey);
+      }
+    }
+
     changes.blsValidators.forEach((blsPublicKey, validator) => {
-      this.contains(validator) ?? (this.getValidator(validator).blsPublicKey = blsPublicKey);
+      if (this.contains(validator)) this.getValidator(validator).blsPublicKey = blsPublicKey;
     });
 
     return dirty;
@@ -219,7 +218,7 @@ export class IndexedValidatorSet {
     });
 
     for (const v of this.indexed.values()) {
-      heap.push(v);
+      if (v.blsPublicKey !== undefined) heap.push(v);
       // if the heap length is too large, remove the minimum one
       while (heap.length > maxCount) {
         heap.remove();

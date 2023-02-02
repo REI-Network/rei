@@ -1,9 +1,10 @@
-import { Address, toBuffer } from 'ethereumjs-util';
+import { Address, toBuffer, BN } from 'ethereumjs-util';
 import EVM from '@rei-network/vm/dist/evm/evm';
 import { Common } from '@rei-network/common';
 import { Receipt } from '@rei-network/structure';
 import { ValidatorChanges } from '../validatorSet';
 import { Contract } from './contract';
+import { decodeBytes, decodeInt256, bufferToAddress } from './utils';
 
 const methods = {
   validators: toBuffer('0x35aa2e44'),
@@ -11,7 +12,7 @@ const methods = {
   setBlsPublicKey: toBuffer('0xdd9e4222'),
   getBlsPublicKey: toBuffer('0x647e0e98'),
   isRegistered: toBuffer('0xc3c5a547'),
-  blsPubkeyExist: toBuffer('0x90232a32')
+  blsPublicKeyExist: toBuffer('0x90232a32')
 };
 
 const event = {
@@ -29,9 +30,8 @@ export class ValidatorBls extends Contract {
       if (receipt.logs.length > 0) {
         for (const log of receipt.logs) {
           if (log.address.equals(blsAddr.buf) && log.topics.length === 3 && log.topics[0].equals(event['SetBlsPublicKey'])) {
-            const validator = log.topics[1];
-            const blsPublicKey = log.topics[2];
-            changes.setBlsPublicKey(new Address(validator), blsPublicKey);
+            //get validator address and bls public key
+            changes.setBlsPublicKey(bufferToAddress(log.topics[1]), toBuffer(decodeBytes(log.topics[2])));
           }
         }
       }
@@ -39,24 +39,37 @@ export class ValidatorBls extends Contract {
   }
 
   async isRegistered(address: Address) {
-    return false;
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('isRegistered', ['address'], [address.toString()]));
+      return new BN(returnValue).eqn(1);
+    });
   }
 
-  async setBlsPublicKey(blsPublicKey: Buffer) {}
-
   async getBlsPublicKey(validator: Address) {
-    return Buffer.alloc(0);
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('getBlsPublicKey', ['address'], [validator.toString()]));
+      return toBuffer(decodeBytes(returnValue));
+    });
   }
 
   async validatorsLength() {
-    return 0;
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('validatorsLength', [], []));
+      return decodeInt256(returnValue);
+    });
   }
 
-  async validators(index: number) {
-    return Address.zero();
+  async validators(index: BN) {
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('validators', ['uint256'], [index.toString()]));
+      return bufferToAddress(returnValue);
+    });
   }
 
   async blsPubkeyExist(blsPublicKey: Buffer) {
-    return false;
+    return this.runWithLogger(async () => {
+      const { returnValue } = await this.executeMessage(this.makeCallMessage('blsPublicKeyExist', ['bytes'], [blsPublicKey]));
+      return new BN(returnValue).eqn(1);
+    });
   }
 }

@@ -209,7 +209,6 @@ export class ReimintExecutor implements Executor {
 
     let validatorSet: ValidatorSet = parentValidatorSet;
     const nextCommon = this.backend.getCommon(pendingBlock.header.number.addn(1));
-
     // 15. modify validatorBls contract address
     if (!isEnableValidatorBls(pendingCommon) && isEnableValidatorBls(nextCommon)) {
       const preAddr = nextCommon.param('vm', 'preBlsAddress');
@@ -225,20 +224,19 @@ export class ReimintExecutor implements Executor {
       await vm.stateManager.putAccount(postAddr, post);
       const validatorBls = this.engine.getValidatorBls(vm, pendingBlock, pendingCommon);
       validatorSet = await ValidatorSet.fromStakeManager(parentStakeManager, { sort: true, bls: validatorBls });
-    }
-
-    const changes = new ValidatorChanges(pendingCommon);
-    StakeManager.filterReceiptsChanges(changes, receipts, pendingCommon);
-    if (logs.length > 0) {
-      StakeManager.filterLogsChanges(changes, logs, pendingCommon);
-    }
-
-    // 7. filter all receipts to collect validatorBls changes,
-    if (isEnableValidatorBls(pendingCommon)) {
-      ValidatorBls.filterReceiptsChanges(changes, receipts, pendingCommon);
-      validatorSet.copyAndMerge(changes, pendingCommon, this.engine.getValidatorBls(vm, pendingBlock, pendingCommon));
     } else {
-      validatorSet.copyAndMerge(changes, pendingCommon);
+      const changes = new ValidatorChanges(pendingCommon);
+      StakeManager.filterReceiptsChanges(changes, receipts, pendingCommon);
+      if (logs.length > 0) {
+        StakeManager.filterLogsChanges(changes, logs, pendingCommon);
+      }
+      // 7. filter all receipts to collect validatorBls changes,
+      if (isEnableValidatorBls(pendingCommon)) {
+        ValidatorBls.filterReceiptsChanges(changes, receipts, pendingCommon);
+        validatorSet.copyAndMerge(changes, pendingCommon, this.engine.getValidatorBls(vm, pendingBlock, pendingCommon));
+      } else {
+        validatorSet.copyAndMerge(changes, pendingCommon);
+      }
     }
 
     // 9. increase once
@@ -254,6 +252,7 @@ export class ReimintExecutor implements Executor {
       if (!parentValidatorSet.isGenesis(pendingCommon)) {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, create a new genesis validator set');
         // if the parent validator set isn't a genesis validator set, we create a new one
+        //@todo get correct genesis indexedValidatorSet
         validatorSet = ValidatorSet.genesis(pendingCommon);
       } else {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, copy from parent');
@@ -522,17 +521,6 @@ export class ReimintExecutor implements Executor {
     };
   }
 
-  //todo check locked voting power
-  /**
-   * @todo
-   * Traverse the indexValidators collection,
-   * 1. Check whether the validator is registered with Bls public
-   * 2. Calculate the sum of votingPower and exclude validator's votingPower to check whether it reaches miniTotalVotingPower
-   * checkoutTotalLockedVotingPower
-   *
-   * 1. Cache validatorset after hard fork
-   * 2. Change the set of validators according to the log, and judge whether the minimum total locking weight needs to be verified
-   */
   private checkoutTotalLockedVotingPower(indexedValidatorSet: IndexedValidatorSet) {
     let totalLockedAmount = new BN(0);
     indexedValidatorSet.indexed.forEach((v) => totalLockedAmount.add(v.votingPower));

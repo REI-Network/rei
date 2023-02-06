@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { hexStringToBuffer } from '@rei-network/utils';
 import { decrypt, encrypt, signerFileName } from './utils';
 import { Bls, SecretKey, PublicKey } from './types';
 
@@ -30,7 +31,6 @@ export class BlsManager {
     const { secretkey, publickey } = this.getSecrectKey(fileName, password);
     this.secretKey = this.bls.SecretKey.fromBytes(secretkey);
     this.publicKey = this.bls.PublicKey.fromHex(publickey);
-    console.log('BLS public key: ' + this.publicKey.toHex());
   }
 
   /**
@@ -90,7 +90,7 @@ export class BlsManager {
    */
   async importSignerBySecretKey(secretKey: string, passphrase: string) {
     await this.init();
-    const blsStruct = encrypt(Buffer.from(secretKey, 'hex'), passphrase);
+    const blsStruct = encrypt(hexStringToBuffer(secretKey), passphrase);
     const publickey = this.bls.SecretKey.fromHex(secretKey).toPublicKey();
     const fullPath = path.join(this.datadir, signerFileName(publickey.toHex()));
     fs.mkdirSync(path.dirname(fullPath), { mode: 0o700, recursive: true });
@@ -113,8 +113,8 @@ export class BlsManager {
    * @param message - message
    * @returns true if signature is valid
    */
-  verifyMessage(signature: Buffer, message: Buffer) {
-    return this.bls.verify(message, signature, this.publicKey.toBytes());
+  verifyMessage(signature: Uint8Array, message: Uint8Array) {
+    return this.bls.verify(this.publicKey.toBytes(), message, signature);
   }
 
   /**
@@ -122,7 +122,7 @@ export class BlsManager {
    * @param signatures - signatures to aggregate
    * @returns aggregated signature
    */
-  aggregateSignatures(signatures: Buffer[]) {
+  aggregateSignatures(signatures: Uint8Array[]) {
     return this.bls.aggregateSignatures(signatures);
   }
 
@@ -133,7 +133,7 @@ export class BlsManager {
    * @param publicKeys - public keys
    * @returns true if aggregated signature is valid
    */
-  verifyMultiple(aggregatedSignature: Buffer, messages: Buffer[], publicKeys: Buffer[]) {
+  verifyMultiple(aggregatedSignature: Uint8Array, messages: Uint8Array[], publicKeys: Uint8Array[]) {
     return this.bls.verifyMultiple(publicKeys, messages, aggregatedSignature);
   }
 }

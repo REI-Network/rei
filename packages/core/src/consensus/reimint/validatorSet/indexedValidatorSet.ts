@@ -1,6 +1,6 @@
 import Heap from 'qheap';
 import { Address, BN } from 'ethereumjs-util';
-import { FunctionalAddressMap } from '@rei-network/utils';
+import { FunctionalAddressMap, FunctionalAddressSet } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { StakeManager, ValidatorBls } from '../contracts';
 import { ValidatorChanges } from './validatorChanges';
@@ -46,7 +46,9 @@ export class IndexedValidatorSet {
       const votingPower = await sm.getVotingPowerByIndex(i);
       if (votingPower.gtn(0)) {
         const indexValidator: IndexedValidator = { validator, votingPower };
-        if (bls) indexValidator.blsPublicKey = await bls.getBlsPublicKey(validator);
+        if (bls) {
+          indexValidator.blsPublicKey = await bls.getBlsPublicKey(validator);
+        }
         indexed.set(validator, indexValidator);
       }
     }
@@ -150,7 +152,7 @@ export class IndexedValidatorSet {
       this.indexed.delete(uv);
     }
 
-    const newValidators = new Set<Address>();
+    const newValidators = new FunctionalAddressSet();
     for (const vc of changes.changes.values()) {
       let v: IndexedValidator | undefined;
       if (vc.votingPower) {
@@ -167,14 +169,13 @@ export class IndexedValidatorSet {
         if (v.votingPower.isZero()) {
           this.indexed.delete(vc.validator);
           changes.blsValidators.delete(vc.validator);
+          newValidators.delete(vc.validator);
         }
       }
     }
 
     for (const addr of newValidators) {
-      if (changes.blsValidators.has(addr)) {
-        continue;
-      } else if (bls) {
+      if (changes.blsValidators.has(addr)! && bls) {
         const blsPublicKey = await bls.getBlsPublicKey(addr);
         changes.blsValidators.set(addr, blsPublicKey);
       }
@@ -217,8 +218,8 @@ export class IndexedValidatorSet {
       }
     });
 
-    for (const v of this.indexed.values()) {
-      if (v.blsPublicKey !== undefined) heap.push(v);
+    for (const v of Array.from(this.indexed.values()).filter((v) => v.blsPublicKey !== undefined)) {
+      heap.push(v);
       // if the heap length is too large, remove the minimum one
       while (heap.length > maxCount) {
         heap.remove();

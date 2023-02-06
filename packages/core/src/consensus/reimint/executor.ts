@@ -209,6 +209,7 @@ export class ReimintExecutor implements Executor {
 
     let validatorSet: ValidatorSet = parentValidatorSet;
     const nextCommon = this.backend.getCommon(pendingBlock.header.number.addn(1));
+
     // 15. modify validatorBls contract address
     if (!isEnableValidatorBls(pendingCommon) && isEnableValidatorBls(nextCommon)) {
       const preAddr = nextCommon.param('vm', 'preBlsAddress');
@@ -252,7 +253,7 @@ export class ReimintExecutor implements Executor {
       if (!parentValidatorSet.isGenesis(pendingCommon)) {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, create a new genesis validator set');
         // if the parent validator set isn't a genesis validator set, we create a new one
-        //@todo get correct genesis indexedValidatorSet
+        // @todo get correct genesis indexedValidatorSet
         validatorSet = ValidatorSet.genesis(pendingCommon);
       } else {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, copy from parent');
@@ -262,14 +263,7 @@ export class ReimintExecutor implements Executor {
       // 9. increase once
       validatorSet.active.incrementProposerPriority(1);
     } else {
-      if (parentValidatorSet.isGenesis(pendingCommon)) {
-        logger.debug('Reimint::afterApply, DisableGenesisValidators, create a new normal validator set');
-        // if the parent validator set is a genesis validator set, we create a new set from state trie
-        // validatorSet = await ValidatorSet.fromStakeManager(parentStakeManager, { sort: true });
-        //@todo retrofit genesis indexedValidatorSet
-      } else {
-        //do noting
-      }
+      //do noting
     }
 
     // make sure there is at least one validator

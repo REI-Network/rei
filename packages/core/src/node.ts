@@ -247,6 +247,7 @@ export class Node {
     // save all diff layers and disk layers to disk
     try {
       const root = this.latestBlock.header.stateRoot;
+      await this.snapTree.cap(root, 0);
       await this.snapTree.journal(root);
     } catch (err) {
       logger.warn('Node::abort, journal snap tree failed:', err);

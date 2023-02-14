@@ -603,6 +603,8 @@ async function diffToDisk(bottom: DiffLayer): Promise<DiskLayer> {
   }
   batch.push(DBSaveSnapRoot(bottom.root));
 
+  logger.debug('diffToDisk, DBSaveSnapRoot:', bottom.root.toString('hex'));
+
   // Write out the generator progress marker and report
   journalProgress(batch, base.genMarker, stats as undefined | GeneratorStats);
 
@@ -630,6 +632,9 @@ async function generateSnapshot(db: Database, root: Buffer) {
   const genMarker = undefined;
 
   batch.push(DBSaveSnapRoot(root));
+
+  logger.debug('generateSnapshot, DBSaveSnapRoot:', root.toString('hex'));
+
   journalProgress(batch, genMarker, stats);
   await batch.write();
   const base = new DiskLayer(db, root);

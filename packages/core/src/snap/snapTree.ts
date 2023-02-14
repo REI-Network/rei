@@ -290,12 +290,16 @@ export class SnapTree {
       if (diff.parent instanceof DiffLayer) {
         diff = diff.parent;
       } else {
+        logger.debug('_cap, layers not enough, layers:', layers, 'size:', this.layers.size);
+
         return;
       }
     }
 
     const parent = diff.parent;
     if (parent instanceof DiskLayer) {
+      logger.debug('_cap, hit disk layer, layers:', layers, 'size:', this.layers.size);
+
       return;
     } else {
       // Flatten the parent into the grandparent. The flattening internally obtains a
@@ -305,10 +309,14 @@ export class SnapTree {
       diff.parent = flattened;
       if (flattened.memory < aggregatorMemoryLimit) {
         if (!(flattened.parent as DiskLayer).genMarker) {
+          logger.debug('_cap, memory too low, layers:', layers, 'size:', this.layers.size);
+
           return;
         }
       }
     }
+
+    logger.debug('_cap, diff to disk, layers:', layers, 'size:', this.layers.size);
 
     // If the bottom-most layer is larger than our memory cap, persist to disk
     const bottom = diff.parent as DiffLayer;

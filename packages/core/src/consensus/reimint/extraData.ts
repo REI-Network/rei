@@ -6,10 +6,11 @@ import { BlockHeader, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
 import { ActiveValidatorSet } from './validatorSet';
 import { Evidence, DuplicateVoteEvidence, EvidenceFactory } from './evpool';
 import { Reimint } from '../reimint';
-import { Vote, VoteType, VoteSet } from './vote';
+import { Vote, VoteType, VoteSet, VoteVersion } from './vote';
 import { Proposal } from './proposal';
 import * as v from './validate';
 import { ReimintConsensusEngine } from './engine';
+import { isBls } from '../../hardforks';
 
 export interface ExtraDataOptions {
   chainId: number;
@@ -193,6 +194,7 @@ export class ExtraData {
               index: i - 3,
               chainId
             },
+            isBls(header._common) ? VoteVersion.blsSignature : VoteVersion.ecdsaSignature,
             signature
           );
           const conflicting = voteSet.addVote(vote);

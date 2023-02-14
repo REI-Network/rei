@@ -1,5 +1,3 @@
-import fs from 'fs';
-import path from 'path';
 import crypto from 'crypto';
 import { keccak256 } from 'ethereumjs-util';
 import { cryptoStruct } from './types';

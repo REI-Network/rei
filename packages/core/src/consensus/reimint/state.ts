@@ -10,7 +10,7 @@ import { Reimint } from './reimint';
 import { IProcessBlockResult, IStateMachineBackend, IStateMachineP2PBackend, ISigner, IConfig, IEvidencePool, IWAL, IDebug, RoundStepType } from './types';
 import { StateMachineMessage, StateMachineTimeout, StateMachineEndHeight, StateMachineMsg } from './stateMessages';
 import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from './messages';
-import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, DuplicateVotesError } from './vote';
+import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, DuplicateVotesError, VoteVersion } from './vote';
 import { Proposal } from './proposal';
 import { Evidence, DuplicateVoteEvidence } from './evpool';
 import { TimeoutTicker } from './timeoutTicker';
@@ -475,7 +475,7 @@ export class StateMachine {
         POLRound: this.validRound,
         hash: this.validBlock.hash()
       });
-      proposal.signature = this.signer!.sign(proposal.getMessageToSign());
+      proposal.signature = this.signer!.sign(proposal.getMessageToSign()) as Buffer;
 
       this._newMessage(new StateMachineMessage('', new ProposalMessage(proposal)));
       this._newMessage(new StateMachineMessage('', new ProposalBlockMessage(this.validBlock)));
@@ -504,27 +504,36 @@ export class StateMachine {
       return;
     }
 
-    const vote = new Vote({
-      chainId: this.chainId,
-      type,
-      height: this.height,
-      round: this.round,
-      hash,
-      index
-    });
-    vote.signature = this.signer.sign(vote.getMessageToSign());
-    this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
-
-    if (this.debug?.conflictVotes) {
-      const vote = new Vote({
+    const version = this.backend.getVoteVersion(this.height);
+    const vote = new Vote(
+      {
         chainId: this.chainId,
         type,
         height: this.height,
         round: this.round,
-        hash: crypto.randomBytes(32),
+        hash,
         index
-      });
+      },
+      version
+    );
+    vote.signature = this.signer.sign(vote.getMessageToSign());
+    vote.blsSignature = vote.version == VoteVersion.blsSignature ? this.signer.sign(vote.getMessageToBlsSign()) : undefined;
+    this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
+
+    if (this.debug?.conflictVotes) {
+      const vote = new Vote(
+        {
+          chainId: this.chainId,
+          type,
+          height: this.height,
+          round: this.round,
+          hash: crypto.randomBytes(32),
+          index
+        },
+        version
+      );
       vote.signature = this.signer.sign(vote.getMessageToSign());
+      vote.blsSignature = vote.version == VoteVersion.blsSignature ? this.signer.sign(vote.getMessageToBlsSign()) : undefined;
 
       this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
     }

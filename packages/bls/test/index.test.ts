@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { assert, expect, should } from 'chai';
-import { BlsManager } from '../src/index';
+import { BlsManager } from '../src/blsManager';
 import { decrypt } from '../src/utils';
 import { Bls } from '../src/types';
 
@@ -59,7 +59,7 @@ describe('BlsManager', () => {
   it('should signMessage and verifySignature successfully', async () => {
     const message = 'reireirei';
     const signature = blsManager.signMessage(Buffer.from(message));
-    const verifyResult = blsManager.verifyMessage(signature.toBytes(), Buffer.from(message));
+    const verifyResult = blsManager.verifyMessage(blsManager.getPublicKey(), signature.toBytes(), Buffer.from(message));
     expect(verifyResult).to.equal(true, 'verify result should be true');
   });
 

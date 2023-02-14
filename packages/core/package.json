@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "@ethersproject/abi": "^5.4.0",
-    "@rei-network/vm": "^2.0.0",
     "@rei-network/blockchain": "^2.0.0",
     "@rei-network/bls": "^0.0.1",
     "@rei-network/common": "^2.0.0",
@@ -26,6 +25,7 @@
     "@rei-network/structure": "^1.0.0",
     "@rei-network/trie": "^4.3.0",
     "@rei-network/utils": "^0.1.1",
+    "@rei-network/vm": "^2.0.0",
     "@rei-network/wallet": "^0.1.1",
     "big-integer": "^1.6.48",
     "datastore-level": "^5.0.1",

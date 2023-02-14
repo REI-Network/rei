@@ -1,5 +1,6 @@
 import { Address, BN, ecsign, ecrecover, rlp, intToBuffer, bnToUnpaddedBuffer, rlphash, bufferToInt } from 'ethereumjs-util';
 import { FunctionalBufferMap, logger } from '@rei-network/utils';
+import { importBls } from '@rei-network/bls';
 import { ActiveValidatorSet } from './validatorSet';
 import { BitArray } from './bitArray';
 import * as v from './validate';
@@ -16,6 +17,11 @@ export class ConflictingVotesError extends Error {
 }
 
 export class DuplicateVotesError extends Error {}
+
+export enum VoteVersion {
+  ecdsaSignature,
+  blsSignature
+}
 
 export enum VoteType {
   Proposal,
@@ -39,7 +45,9 @@ export class Vote {
   readonly round: number;
   readonly hash: Buffer;
   readonly index: number;
+  readonly version: VoteVersion;
   private _signature?: Buffer;
+  private _blsSignature?: Buffer;
 
   static fromSerializedVote(serialized: Buffer) {
     const values = rlp.decode(serialized);
@@ -50,31 +58,56 @@ export class Vote {
   }
 
   static fromValuesArray(values: Buffer[]) {
-    if (values.length !== 7) {
+    if (values.length == 8) {
+      const [chainId, type, height, round, hash, index, version, signature] = values;
+      if (bufferToInt(version) != VoteVersion.ecdsaSignature) {
+        throw new Error('invalid vote version');
+      }
+      return new Vote(
+        {
+          chainId: bufferToInt(chainId),
+          type: bufferToInt(type),
+          height: new BN(height),
+          round: bufferToInt(round),
+          hash,
+          index: bufferToInt(index)
+        },
+        bufferToInt(version),
+        signature
+      );
+    } else if (values.length == 9) {
+      const [chainId, type, height, round, hash, index, version, signature, blsSignature] = values;
+      if (bufferToInt(version) != VoteVersion.blsSignature) {
+        throw new Error('invalid vote version');
+      }
+      return new Vote(
+        {
+          chainId: bufferToInt(chainId),
+          type: bufferToInt(type),
+          height: new BN(height),
+          round: bufferToInt(round),
+          hash,
+          index: bufferToInt(index)
+        },
+        bufferToInt(version),
+        signature,
+        blsSignature
+      );
+    } else {
       throw new Error('invalid values length');
     }
-    const [chainId, type, height, round, hash, index, signature] = values;
-    return new Vote(
-      {
-        chainId: bufferToInt(chainId),
-        type: bufferToInt(type),
-        height: new BN(height),
-        round: bufferToInt(round),
-        hash,
-        index: bufferToInt(index)
-      },
-      signature
-    );
   }
 
-  constructor(data: VoteData, signature?: Buffer) {
+  constructor(data: VoteData, version: number, signature?: Buffer, blsSignature?: Buffer) {
     this.chainId = data.chainId;
     this.type = data.type;
     this.height = data.height.clone();
     this.round = data.round;
     this.hash = data.hash;
     this.index = data.index;
+    this.version = version;
     this._signature = signature;
+    this._blsSignature = blsSignature;
     this.validateBasic();
   }
 
@@ -89,24 +122,53 @@ export class Vote {
     }
   }
 
+  get blsSignature(): Buffer | undefined {
+    if (this.version == VoteVersion.blsSignature) {
+      return this._blsSignature;
+    }
+  }
+
+  set blsSignature(blsSignature: Buffer | undefined) {
+    if (this.version == VoteVersion.blsSignature) {
+      if (blsSignature !== undefined) {
+        v.validateBlsSignature(blsSignature);
+        this._blsSignature = blsSignature;
+      }
+    } else {
+      throw new Error('invalid version');
+    }
+  }
+
   getMessageToSign() {
     return rlphash([intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.index)]);
+  }
+
+  getMessageToBlsSign() {
+    return rlphash([intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash]);
   }
 
   isSigned() {
     return this._signature && this._signature.length > 0;
   }
 
-  sign(privateKey: Buffer) {
-    const { r, s, v } = ecsign(this.getMessageToSign(), privateKey);
-    this.signature = Buffer.concat([r, s, intToBuffer(v - 27)]);
+  isBlsSigned() {
+    return this._blsSignature && this._blsSignature.length > 0;
   }
 
   raw() {
     if (!this.isSigned()) {
       throw new Error('missing signature');
     }
-    return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.index), this._signature!];
+    if (this.version == VoteVersion.ecdsaSignature) {
+      return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.index), intToBuffer(this.version), this._signature!];
+    } else if (this.version == VoteVersion.blsSignature) {
+      if (!this.isBlsSigned()) {
+        throw new Error('missing bls signature');
+      }
+      return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.index), intToBuffer(this.version), this._signature!, this._blsSignature!];
+    } else {
+      throw new Error('invalid version');
+    }
   }
 
   serialize() {
@@ -122,6 +184,9 @@ export class Vote {
     if (this.isSigned()) {
       v.validateSignature(this._signature!);
     }
+    if (this.version == VoteVersion.blsSignature && this.isBlsSigned()) {
+      v.validateBlsSignature(this._blsSignature!);
+    }
   }
 
   validateSignature(valSet: ActiveValidatorSet) {
@@ -131,6 +196,17 @@ export class Vote {
     const validator = this.validator();
     if (!validator.equals(valSet.getValidatorByIndex(this.index))) {
       throw new Error('invalid signature');
+    }
+    if (this.version == VoteVersion.blsSignature) {
+      const bls = importBls();
+      // Todo: get public key from validator
+      let pubKey: Uint8Array = Buffer.from('');
+      // pubKey = valSet.getPublicKeyByIndex(this.index);
+      if (!bls.verify(pubKey, this.getMessageToBlsSign(), this.blsSignature!)) {
+        throw new Error('invalid bls signature');
+      }
+    } else {
+      throw new Error('invalid version');
     }
     return validator;
   }

@@ -1,6 +1,6 @@
 import { keccak256, rlp, BN } from 'ethereumjs-util';
 import { ActiveValidatorSet } from '../validatorSet';
-import { Vote } from '../vote';
+import { Vote, VoteVersion } from '../vote';
 
 export interface Evidence {
   height: BN;
@@ -75,6 +75,14 @@ export class DuplicateVoteEvidence implements Evidence {
     }
     if (!this.voteA.isSigned() || !this.voteB.isSigned()) {
       throw new Error('invalid votes(unsigned)');
+    }
+    if (this.voteA.version !== this.voteB.version) {
+      throw new Error('invalid votes(version)');
+    }
+    if (this.voteA.version == VoteVersion.blsSignature) {
+      if (!this.voteA.isBlsSigned() || !this.voteB.isBlsSigned()) {
+        throw new Error('invalid votes(unBlsSigned)');
+      }
     }
     if (!this.voteA.height.eq(this.voteB.height) || this.voteA.round !== this.voteB.round || this.voteA.type !== this.voteB.type || this.voteA.chainId !== this.voteB.chainId || this.voteA.index !== this.voteB.index) {
       throw new Error('invalid votes(vote content)');

@@ -10,6 +10,7 @@ import { Vote } from '../vote';
 export interface ISigner {
   address(): Address;
   sign(msg: Buffer): Buffer;
+  signBls(msg: Buffer): Buffer;
 }
 
 export interface IConfig {
@@ -45,6 +46,7 @@ export interface IStateMachineBackend {
   getCommon(num: BNLike): Common;
   preProcessBlock(block: Block): Promise<IProcessBlockResult | undefined>;
   commitBlock(block: Block, result: IProcessBlockResult): Promise<void>;
+  getVoteVersion(num: BNLike): number;
 }
 
 export interface IStateMachineP2PBackend {

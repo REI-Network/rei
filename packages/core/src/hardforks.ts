@@ -208,3 +208,20 @@ export function isEnableBetterPOS(common: Common) {
     throw new Error('unknown chain');
   }
 }
+
+/**
+ * Check whether better POS is enabled
+ * @param common - Common instance
+ * @returns Enable if `true`
+ */
+export function isBls(common: Common) {
+  if (common.chainName() === 'rei-testnet') {
+    return common.gteHardfork('bls');
+  } else if (common.chainName() === 'rei-mainnet') {
+    return common.gteHardfork('bls');
+  } else if (common.chainName() === 'rei-devnet') {
+    return common.gteHardfork('bls');
+  } else {
+    throw new Error('unknown chain');
+  }
+}

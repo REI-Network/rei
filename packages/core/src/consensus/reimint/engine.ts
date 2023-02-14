@@ -13,7 +13,7 @@ import { Node } from '../../node';
 import { StateManager } from '../../stateManager';
 import { ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
-import { getConsensusTypeByCommon, isEnableRemint, isEnableFreeStaking, loadInitData, isEnableHardfork2, isEnableBetterPOS } from '../../hardforks';
+import { getConsensusTypeByCommon, isEnableRemint, isEnableFreeStaking, loadInitData, isEnableHardfork2, isEnableBetterPOS, isBls } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
@@ -25,6 +25,7 @@ import { WAL } from './wal';
 import { ReimintExecutor } from './executor';
 import { ExtraData } from './extraData';
 import { EvidenceCollector } from './evidenceCollector';
+import { VoteVersion } from './vote';
 
 export class SimpleNodeSigner {
   readonly node: Node;
@@ -44,6 +45,14 @@ export class SimpleNodeSigner {
     }
     const signature = ecsign(msg, this.node.accMngr.getPrivateKey(coinbase));
     return Buffer.concat([signature.r, signature.s, intToBuffer(signature.v - 27)]);
+  }
+
+  signBls(msg: Buffer): Buffer {
+    const pubKey = this.node.blsMngr.getPublicKey();
+    if (!pubKey) {
+      throw new Error('empty bls public key');
+    }
+    return Buffer.from(this.node.blsMngr.signMessage(msg).toBytes());
   }
 }
 
@@ -318,5 +327,9 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     }
   }
 
+  getVoteVersion(num: BNLike): number {
+    const common = this.getCommon(num);
+    return isBls(common) ? VoteVersion.blsSignature : VoteVersion.ecdsaSignature;
+  }
   ///////////// Backend Logic ////////////////
 }

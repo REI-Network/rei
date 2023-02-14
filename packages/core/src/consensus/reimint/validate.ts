@@ -38,6 +38,12 @@ export function validateSignature(signature: Buffer) {
   }
 }
 
+export function validateBlsSignature(blsSignature: Buffer) {
+  if (blsSignature.length !== 96) {
+    throw new Error('invalid bls signature');
+  }
+}
+
 export function validateTimestamp(timestamp: number) {
   if (timestamp < 0 || !Number.isSafeInteger(timestamp)) {
     throw new Error('invalid timestamp');

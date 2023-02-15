@@ -75,3 +75,15 @@ describe('ValidatorBls', () => {
     }
   });
 });
+
+describe('ValidatorBlsSwitch', () => {
+  it('should set validator bls public key', async () => {
+    const ValidatorBlsSwitchFactory: ContractFactory = await ethers.getContractFactory('ValidatorBlsSwitch');
+    const validatorBlsSwitch: Contract = await ValidatorBlsSwitchFactory.deploy();
+    try {
+      await validatorBlsSwitch.fallback();
+    } catch (err) {
+      expect(err.reason).to.equal('Transaction reverted without a reason string');
+    }
+  });
+});

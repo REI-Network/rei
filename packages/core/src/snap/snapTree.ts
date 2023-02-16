@@ -180,11 +180,16 @@ export class SnapTree {
       snaps.add(snap);
       snap = snap.parent;
     }
+    let size = 0;
     for (const [root, snap] of this.layers) {
       if (!snaps.has(snap)) {
+        size++;
+        // TODO:
+        // snap.stale = true;
         this.layers.delete(root);
       }
     }
+    logger.debug('SnapTree::discard, size:', size);
   }
 
   /**
@@ -223,6 +228,8 @@ export class SnapTree {
     }
 
     const persisted = await this._cap(diff, layers);
+
+    logger.debug('cap2, size:', this.layers.size);
 
     // Get dependencies into memory
     const children = new FunctionalBufferMap<Buffer[]>();
@@ -271,6 +278,9 @@ export class SnapTree {
       };
       rebloom(persisted.root);
     }
+
+    logger.debug('cap1, size:', this.layers.size);
+
     return;
   }
 
@@ -316,13 +326,14 @@ export class SnapTree {
       }
     }
 
-    logger.debug('_cap, diff to disk, layers:', layers, 'size:', this.layers.size);
-
     // If the bottom-most layer is larger than our memory cap, persist to disk
     const bottom = diff.parent as DiffLayer;
     const base = await diffToDisk(bottom);
     this.layers.set(base.root, base);
     diff.parent = base;
+
+    logger.debug('_cap, diff to disk, layers:', layers, 'size:', this.layers.size);
+
     return base;
   }
 

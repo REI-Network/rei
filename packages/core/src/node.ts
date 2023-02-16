@@ -493,11 +493,11 @@ export class Node {
       logger.warn('Node::doCommitBlock, cap snap tree failed:', err);
     }
 
-    // TODO: debug
+    // TODO: remove debug code
     if (await this.snapTree.verify(root)) {
-      logger.debug('Node::doCommitBlock, verify ok');
+      logger.debug('Node::doCommitBlock, verify ok, size:', this.snapTree.layers.size);
     } else {
-      logger.error('Node::doCommitBlock, verify failed');
+      logger.error('Node::doCommitBlock, verify failed, size', this.snapTree.layers.size);
     }
 
     // install properties for receipts

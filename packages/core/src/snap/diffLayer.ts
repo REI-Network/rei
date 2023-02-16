@@ -15,10 +15,10 @@ class DiffBloom extends Bloom {
 }
 
 export class DiffLayer implements ISnapshot {
-  readonly origin: DiskLayer;
   readonly root: Buffer;
   readonly memory: number;
   diffed: DiffBloom;
+  origin: DiskLayer;
   parent: Snapshot;
 
   readonly destructSet: DestructSet;
@@ -94,14 +94,14 @@ export class DiffLayer implements ISnapshot {
   }
 
   /**
-   * Reset parent layer
-   * @param parent - New parent layer
+   * Reset origin layer
+   * @param origin - New origin disk layer
    */
-  resetParent(parent: Snapshot) {
-    this.parent = parent;
-    if (parent instanceof DiffLayer) {
+  resetOrigin(origin: DiskLayer) {
+    this.origin = origin;
+    if (this.parent instanceof DiffLayer) {
       // if the parent layer is a diff layer, copy the bloom from it
-      this.diffed = parent.diffed.copy();
+      this.diffed = this.parent.diffed.copy();
     } else {
       // otherwise, create an empty one
       this.diffed = new DiffBloom();

@@ -180,16 +180,11 @@ export class SnapTree {
       snaps.add(snap);
       snap = snap.parent;
     }
-    let size = 0;
     for (const [root, snap] of this.layers) {
       if (!snaps.has(snap)) {
-        size++;
-        // TODO:
-        // snap.stale = true;
         this.layers.delete(root);
       }
     }
-    logger.debug('SnapTree::discard, size:', size);
   }
 
   /**
@@ -203,12 +198,10 @@ export class SnapTree {
     // Retrieve the head snapshot to cap from
     const snap = this.layers.get(root);
     if (!snap) {
-      logger.debug('SnapTree::cap, snapshot is missing, root:', bufferToHex(root));
+      logger.warn('SnapTree::cap, snapshot is missing, root:', bufferToHex(root));
       return;
     }
     if (!(snap instanceof DiffLayer)) {
-      // ignore
-      // throw new Error(`snapshot ${bufferToHex(root)} is disk layer`);
       return;
     }
     // If the generator is still running, use a more aggressive cap
@@ -228,8 +221,6 @@ export class SnapTree {
     }
 
     const persisted = await this._cap(diff, layers);
-
-    logger.debug('cap2, size:', this.layers.size);
 
     // Get dependencies into memory
     const children = new FunctionalBufferMap<Buffer[]>();
@@ -267,7 +258,7 @@ export class SnapTree {
       const rebloom = (root: Buffer) => {
         const diff = this.layers.get(root);
         if (diff instanceof DiffLayer) {
-          diff.resetParent(persisted);
+          diff.resetOrigin(persisted);
         }
         const childs = children.get(root);
         if (childs) {
@@ -278,8 +269,6 @@ export class SnapTree {
       };
       rebloom(persisted.root);
     }
-
-    logger.debug('cap1, size:', this.layers.size);
 
     return;
   }
@@ -300,27 +289,22 @@ export class SnapTree {
       if (diff.parent instanceof DiffLayer) {
         diff = diff.parent;
       } else {
-        logger.debug('_cap, layers not enough, layers:', layers, 'size:', this.layers.size);
-
         return;
       }
     }
 
     const parent = diff.parent;
-    if (parent instanceof DiskLayer) {
-      logger.debug('_cap, hit disk layer, layers:', layers, 'size:', this.layers.size);
-
+    if (parent instanceof DiskLayer || parent.parent instanceof DiskLayer) {
       return;
     } else {
       // Flatten the parent into the grandparent. The flattening internally obtains a
       // write lock on grandparent.
       const flattened = parent.flatten() as DiffLayer;
+      parent.stale = true;
       this.layers.set(flattened.root, flattened);
       diff.parent = flattened;
       if (flattened.memory < aggregatorMemoryLimit) {
         if (!(flattened.parent as DiskLayer).genMarker) {
-          logger.debug('_cap, memory too low, layers:', layers, 'size:', this.layers.size);
-
           return;
         }
       }
@@ -329,10 +313,9 @@ export class SnapTree {
     // If the bottom-most layer is larger than our memory cap, persist to disk
     const bottom = diff.parent as DiffLayer;
     const base = await diffToDisk(bottom);
+    bottom.stale = true;
     this.layers.set(base.root, base);
     diff.parent = base;
-
-    logger.debug('_cap, diff to disk, layers:', layers, 'size:', this.layers.size);
 
     return base;
   }
@@ -377,7 +360,7 @@ export class SnapTree {
     // Retrieve the head snapshot to journal from var snap snapshot
     const snap = this.layers.get(root);
     if (snap === undefined) {
-      logger.debug('SnapTree::journal, snapshot is missing, root:', bufferToHex(root));
+      logger.warn('SnapTree::journal, snapshot is missing, root:', bufferToHex(root));
       return;
     }
 
@@ -623,8 +606,6 @@ async function diffToDisk(bottom: DiffLayer): Promise<DiskLayer> {
   }
   batch.push(DBSaveSnapRoot(bottom.root));
 
-  logger.debug('diffToDisk, DBSaveSnapRoot:', bottom.root.toString('hex'));
-
   // Write out the generator progress marker and report
   journalProgress(batch, base.genMarker, stats as undefined | GeneratorStats);
 
@@ -653,13 +634,10 @@ async function generateSnapshot(db: Database, root: Buffer) {
 
   batch.push(DBSaveSnapRoot(root));
 
-  logger.debug('generateSnapshot, DBSaveSnapRoot:', root.toString('hex'));
-
   journalProgress(batch, genMarker, stats);
   await batch.write();
   const base = new DiskLayer(db, root);
   base.genMarker = genMarker;
   const generating = base.generate(stats);
-  logger.debug('SnapTree::generateSnapshot, start snapshot generation, root:', bufferToHex(root));
   return { base, generating };
 }

@@ -113,6 +113,11 @@ export abstract class Contract {
     await Contract.deployContract(evm, common, 'pr', { types: ['address'], values: [cfgaddr] });
   }
 
+  static async deloyValidatorBlsSwitchContract(evm: EVM, common: Common) {
+    const preAddr = common.param('vm', 'preAddr');
+    await Contract.deployContract(evm, common, 'pre');
+  }
+
   /**
    * Deploy contract to target address
    * @param evm - EVM instance

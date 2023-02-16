@@ -225,6 +225,10 @@ export class ReimintExecutor implements Executor {
       await vm.stateManager.putAccount(postAddr, post);
       const validatorBls = this.engine.getValidatorBls(vm, pendingBlock, pendingCommon);
       validatorSet = await ValidatorSet.fromStakeManager(parentStakeManager, { sort: true, bls: validatorBls });
+
+      // deploy validatorBlsSwitch contract
+      const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
+      await Contract.deloyValidatorBlsSwitchContract(evm, nextCommon);
     } else {
       const changes = new ValidatorChanges(pendingCommon);
       StakeManager.filterReceiptsChanges(changes, receipts, pendingCommon);

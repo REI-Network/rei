@@ -53,7 +53,7 @@ describe('ValidatorBls', () => {
     try {
       await validatorBls.connect(user1).setBlsPublicKey(getRandomBytes(10));
     } catch (e) {
-      expect(e.message).to.equal('Transaction reverted without a reason string');
+      expect((e as any).message).to.equal('Transaction reverted without a reason string');
     }
   });
 
@@ -70,8 +70,8 @@ describe('ValidatorBls', () => {
     expect(await validatorBls.blsPublicKeyExist(blsPublicKey)).to.equal(true);
     try {
       await validatorBls.connect(deployer).setBlsPublicKey(blsPublicKey);
-    } catch (error) {
-      expect(error.message).to.equal('Transaction reverted without a reason string');
+    } catch (e) {
+      expect((e as any).message).to.equal('Transaction reverted without a reason string');
     }
   });
 });
@@ -82,8 +82,8 @@ describe('ValidatorBlsSwitch', () => {
     const validatorBlsSwitch: Contract = await ValidatorBlsSwitchFactory.deploy();
     try {
       await validatorBlsSwitch.fallback();
-    } catch (err) {
-      expect(err.reason).to.equal('Transaction reverted without a reason string');
+    } catch (e) {
+      expect((e as any).reason).to.equal('Transaction reverted without a reason string');
     }
   });
 });

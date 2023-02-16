@@ -519,6 +519,7 @@ export class SnapTree {
           await trieSync.process(hash, await this.diskdb.getCode(hash));
         }
       } catch (error) {
+        logger.warn('SnapTree::verify, catch error:', error);
         return false;
       }
     }

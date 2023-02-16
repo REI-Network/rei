@@ -493,6 +493,13 @@ export class Node {
       logger.warn('Node::doCommitBlock, cap snap tree failed:', err);
     }
 
+    // TODO: debug
+    if (await this.snapTree.verify(root)) {
+      logger.debug('Node::doCommitBlock, verify ok');
+    } else {
+      logger.error('Node::doCommitBlock, verify failed');
+    }
+
     // install properties for receipts
     let lastCumulativeGasUsed = new BN(0);
     for (let i = 0; i < receipts.length; i++) {

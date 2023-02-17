@@ -212,8 +212,8 @@ export class ReimintExecutor implements Executor {
 
     // 15. modify validatorBls contract address
     if (!isEnableValidatorBls(pendingCommon) && isEnableValidatorBls(nextCommon)) {
-      const preAddr = nextCommon.param('vm', 'preBlsAddress');
-      const postAddr = nextCommon.param('vm', 'postBlsAddress');
+      const preAddr = nextCommon.param('vm', 'preAddr');
+      const postAddr = nextCommon.param('vm', 'postAddr');
       if (preAddr === undefined || postAddr === undefined) {
         throw new Error('Reimint::afterApply, load bls contract failed');
       }

@@ -114,7 +114,6 @@ export abstract class Contract {
   }
 
   static async deloyValidatorBlsSwitchContract(evm: EVM, common: Common) {
-    const preAddr = common.param('vm', 'preAddr');
     await Contract.deployContract(evm, common, 'pre');
   }
 

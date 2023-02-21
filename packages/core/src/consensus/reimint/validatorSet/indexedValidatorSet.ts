@@ -119,28 +119,6 @@ export class IndexedValidatorSet {
   }
 
   /**
-   * Check validator set is a genesis validator set,
-   * the genesis validator set contains only the genesis validator
-   * @returns `true` if it is
-   */
-  isGenesis(common: Common) {
-    const genesisValidators = getGenesisValidators(common);
-    if (genesisValidators.length !== this.length) {
-      return false;
-    }
-
-    for (const gv of genesisValidators) {
-      if (!this.contains(gv)) {
-        return false;
-      }
-      if (!this.getVotingPower(gv).eq(genesisValidatorVotingPower)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /**
    * Merge validator set changes
    * @param changes - `ValidatorChanges` instance
    */

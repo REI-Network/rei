@@ -3,7 +3,7 @@
     "type": "dpos",
     "algorithm": "reimint",
     "reimint": {
-      "period": 3
+        "period": 3
     }
   },
   "name": "rei-mainnet",

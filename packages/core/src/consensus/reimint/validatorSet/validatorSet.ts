@@ -1,7 +1,6 @@
-import { FunctionalAddressMap } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { StakeManager, ValidatorBls } from '../contracts';
-import { IndexedValidatorSet, IndexedValidator } from './indexedValidatorSet';
+import { IndexedValidatorSet } from './indexedValidatorSet';
 import { ActiveValidatorSet } from './activeValidatorSet';
 import { isGenesis, genesisValidatorVotingPower } from './genesis';
 import { ValidatorChanges } from './validatorChanges';
@@ -28,27 +27,16 @@ export class ValidatorSet {
    * @returns ValidatorSet instance
    */
   static async fromStakeManager(sm: StakeManager, options?: LoadOptions) {
-    let indexed: IndexedValidatorSet;
     let active: ActiveValidatorSet;
-
+    const indexed = await IndexedValidatorSet.fromStakeManager(sm, options?.bls);
     if (options?.genesis) {
-      const _indexed = new FunctionalAddressMap<IndexedValidator>();
       active = await ActiveValidatorSet.fromStakeManager(sm, (val) => {
         if (!isGenesis(val, sm.common)) {
           throw new Error('unknown validator: ' + val.toString());
         }
-
-        const vp = genesisValidatorVotingPower.clone();
-        _indexed.set(val, {
-          validator: val,
-          votingPower: vp
-        });
-        return vp;
+        return genesisValidatorVotingPower.clone();
       });
-      indexed = new IndexedValidatorSet(_indexed);
     } else {
-      indexed = await IndexedValidatorSet.fromStakeManager(sm, options?.bls);
-
       if (options?.sort) {
         const maxCount = sm.common.param('vm', 'maxValidatorsCount');
         active = ActiveValidatorSet.fromActiveValidators(indexed.sort(maxCount));
@@ -85,7 +73,7 @@ export class ValidatorSet {
    * @returns `true` if it is
    */
   isGenesis(common: Common) {
-    return this.indexed.isGenesis(common) && this.active.isGenesis(common);
+    return this.active.isGenesis(common);
   }
 
   /**

@@ -3,10 +3,11 @@ import { Common } from '@rei-network/common';
 import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@rei-network/structure';
 import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../../utils';
 import { ISigner } from './types';
-import { ExtraData } from './extraData';
+import { ExtraData, ExtraDataVersion } from './extraData';
 import { Proposal } from './proposal';
 import { VoteType, VoteSet } from './vote';
 import { Evidence } from './evpool';
+import { isBls } from '../../hardforks';
 
 const defaultRound = 0;
 const defaultPOLRound = -1;
@@ -182,9 +183,10 @@ export class Reimint {
         hash: headerHash
       });
       proposal.signature = options.signer.sign(proposal.getMessageToSign());
-      const extraData = new ExtraData(round, commitRound, POLRound, evidence, proposal, options?.voteSet);
+      const version = isBls(header._common) ? ExtraDataVersion.blsSignature : ExtraDataVersion.ecdsaSignature;
+      const extraData = new ExtraData(round, commitRound, POLRound, evidence, proposal, version, options?.voteSet);
       return {
-        header: BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize(validaterSetSize)]) }, options),
+        header: BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize({ validaterSetSize })]) }, options),
         proposal
       };
     } else {
@@ -219,7 +221,8 @@ export class Reimint {
    * @returns Complete block
    */
   static generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], evidence: Evidence[], proposal: Proposal, commitRound: number, votes: VoteSet, options?: BlockOptions) {
-    const extraData = new ExtraData(proposal.round, commitRound, proposal.POLRound, evidence, proposal, votes);
+    const version = isBls(options?.common!) ? ExtraDataVersion.blsSignature : ExtraDataVersion.ecdsaSignature;
+    const extraData = new ExtraData(proposal.round, commitRound, proposal.POLRound, evidence, proposal, version, votes, { chainId: options!.common!.chainId(), type: VoteType.Precommit, height: new BN(data.number), round: commitRound, hash: proposal.hash });
     data = formatHeaderData(data);
     const header = BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize()]) }, options);
     return new Block(header, transactions, undefined, options);

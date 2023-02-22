@@ -123,13 +123,13 @@ export class Vote {
   }
 
   get blsSignature(): Buffer | undefined {
-    if (this.version == VoteVersion.blsSignature) {
+    if (this.version === VoteVersion.blsSignature) {
       return this._blsSignature;
     }
   }
 
   set blsSignature(blsSignature: Buffer | undefined) {
-    if (this.version == VoteVersion.blsSignature) {
+    if (this.version === VoteVersion.blsSignature) {
       if (blsSignature !== undefined) {
         v.validateBlsSignature(blsSignature);
         this._blsSignature = blsSignature;
@@ -159,9 +159,9 @@ export class Vote {
     if (!this.isSigned()) {
       throw new Error('missing signature');
     }
-    if (this.version == VoteVersion.ecdsaSignature) {
+    if (this.version === VoteVersion.ecdsaSignature) {
       return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.index), intToBuffer(this.version), this._signature!];
-    } else if (this.version == VoteVersion.blsSignature) {
+    } else if (this.version === VoteVersion.blsSignature) {
       if (!this.isBlsSigned()) {
         throw new Error('missing bls signature');
       }
@@ -184,7 +184,7 @@ export class Vote {
     if (this.isSigned()) {
       v.validateSignature(this._signature!);
     }
-    if (this.version == VoteVersion.blsSignature && this.isBlsSigned()) {
+    if (this.version === VoteVersion.blsSignature && this.isBlsSigned()) {
       v.validateBlsSignature(this._blsSignature!);
     }
   }
@@ -196,17 +196,6 @@ export class Vote {
     const validator = this.validator();
     if (!validator.equals(valSet.getValidatorByIndex(this.index))) {
       throw new Error('invalid signature');
-    }
-    if (this.version == VoteVersion.blsSignature) {
-      const bls = importBls();
-      // Todo: get public key from validator
-      let pubKey: Uint8Array = Buffer.from('');
-      // pubKey = valSet.getPublicKeyByIndex(this.index);
-      if (!bls.verify(pubKey, this.getMessageToBlsSign(), this.blsSignature!)) {
-        throw new Error('invalid bls signature');
-      }
-    } else {
-      throw new Error('invalid version');
     }
     return validator;
   }
@@ -402,6 +391,12 @@ export class VoteSet {
 
   isCommit() {
     return this.signedMsgType === VoteType.Precommit && !!this.maj23;
+  }
+
+  getAggregateSignature() {
+    const bls = importBls();
+    const sigs = (this.votes.filter((v) => !!v && !!v.blsSignature) as Vote[]).map((v) => v.blsSignature!);
+    return bls.aggregateSignatures(sigs);
   }
 }
 

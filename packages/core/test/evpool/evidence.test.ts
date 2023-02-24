@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { assert, expect } from 'chai';
 import { Address, BN } from 'ethereumjs-util';
 import { DuplicateVoteEvidence } from '../../src/consensus/reimint/evpool';
-import { Vote, VoteType } from '../../src/consensus/reimint/vote';
+import { Vote, VoteType, VoteVersion } from '../../src/consensus/reimint/vote';
 import { MockAccountManager } from '../util';
 
 const accMngr = new MockAccountManager([
@@ -10,6 +10,7 @@ const accMngr = new MockAccountManager([
   ['bar', Address.fromString('0xd1e52f6eacbb95f5f8512ff129cbd6360e549b0b'), Buffer.from('db0558cc5f24dd09c390a25c7958a678e7efa0f286053da5df53dcecdba2a13c', 'hex')]
 ]);
 
+const version = VoteVersion.ecdsaSignature;
 class MockValidatorSet {
   private validators: Address[];
 
@@ -35,23 +36,29 @@ function shouldFailed(fn: () => void, message?: string) {
 
 describe('DuplicateVoteEvidence', () => {
   it('should failed(unsigned)', () => {
-    const vote1 = new Vote({
-      height: new BN(1),
-      round: 0,
-      chainId: 100,
-      type: VoteType.Precommit,
-      hash: crypto.randomBytes(32),
-      index: 0
-    });
+    const vote1 = new Vote(
+      {
+        height: new BN(1),
+        round: 0,
+        chainId: 100,
+        type: VoteType.Precommit,
+        hash: crypto.randomBytes(32),
+        index: 0
+      },
+      version
+    );
 
-    const vote2 = new Vote({
-      height: new BN(1),
-      round: 0,
-      chainId: 100,
-      type: VoteType.Precommit,
-      hash: crypto.randomBytes(32),
-      index: 0
-    });
+    const vote2 = new Vote(
+      {
+        height: new BN(1),
+        round: 0,
+        chainId: 100,
+        type: VoteType.Precommit,
+        hash: crypto.randomBytes(32),
+        index: 0
+      },
+      version
+    );
 
     shouldFailed(() => {
       DuplicateVoteEvidence.fromVotes(vote1, vote2);
@@ -59,24 +66,30 @@ describe('DuplicateVoteEvidence', () => {
   });
 
   it('should failed(vote content)', () => {
-    const vote1 = new Vote({
-      height: new BN(1),
-      round: 1,
-      chainId: 100,
-      type: VoteType.Precommit,
-      hash: crypto.randomBytes(32),
-      index: 0
-    });
+    const vote1 = new Vote(
+      {
+        height: new BN(1),
+        round: 1,
+        chainId: 100,
+        type: VoteType.Precommit,
+        hash: crypto.randomBytes(32),
+        index: 0
+      },
+      version
+    );
     vote1.sign(accMngr.n2p('foo'));
 
-    const vote2 = new Vote({
-      height: new BN(1),
-      round: 2,
-      chainId: 100,
-      type: VoteType.Precommit,
-      hash: crypto.randomBytes(32),
-      index: 0
-    });
+    const vote2 = new Vote(
+      {
+        height: new BN(1),
+        round: 2,
+        chainId: 100,
+        type: VoteType.Precommit,
+        hash: crypto.randomBytes(32),
+        index: 0
+      },
+      version
+    );
     vote2.sign(accMngr.n2p('foo'));
 
     shouldFailed(() => {
@@ -86,24 +99,30 @@ describe('DuplicateVoteEvidence', () => {
 
   it('should failed(vote content)', () => {
     const hash = crypto.randomBytes(32);
-    const vote1 = new Vote({
-      height: new BN(1),
-      round: 0,
-      chainId: 100,
-      type: VoteType.Precommit,
-      hash: hash,
-      index: 0
-    });
+    const vote1 = new Vote(
+      {
+        height: new BN(1),
+        round: 0,
+        chainId: 100,
+        type: VoteType.Precommit,
+        hash: hash,
+        index: 0
+      },
+      version
+    );
     vote1.sign(accMngr.n2p('foo'));
 
-    const vote2 = new Vote({
-      height: new BN(1),
-      round: 0,
-      chainId: 100,
-      type: VoteType.Precommit,
-      hash: hash,
-      index: 0
-    });
+    const vote2 = new Vote(
+      {
+        height: new BN(1),
+        round: 0,
+        chainId: 100,
+        type: VoteType.Precommit,
+        hash: hash,
+        index: 0
+      },
+      version
+    );
     vote2.sign(accMngr.n2p('foo'));
 
     shouldFailed(() => {
@@ -112,24 +131,30 @@ describe('DuplicateVoteEvidence', () => {
   });
 
   it('should failed(vote content)', () => {
-    const vote1 = new Vote({
-      height: new BN(1),
-      round: 0,
-      chainId: 100,
-      type: VoteType.Precommit,
-      hash: crypto.randomBytes(32),
-      index: 0
-    });
+    const vote1 = new Vote(
+      {
+        height: new BN(1),
+        round: 0,
+        chainId: 100,
+        type: VoteType.Precommit,
+        hash: crypto.randomBytes(32),
+        index: 0
+      },
+      version
+    );
     vote1.sign(accMngr.n2p('foo'));
 
-    const vote2 = new Vote({
-      height: new BN(1),
-      round: 0,
-      chainId: 100,
-      type: VoteType.Precommit,
-      hash: crypto.randomBytes(32),
-      index: 0
-    });
+    const vote2 = new Vote(
+      {
+        height: new BN(1),
+        round: 0,
+        chainId: 100,
+        type: VoteType.Precommit,
+        hash: crypto.randomBytes(32),
+        index: 0
+      },
+      version
+    );
     vote2.sign(accMngr.n2p('bar'));
 
     shouldFailed(() => {
@@ -138,24 +163,30 @@ describe('DuplicateVoteEvidence', () => {
   });
 
   it('should failed(sort)', () => {
-    const vote1 = new Vote({
-      height: new BN(1),
-      round: 0,
-      chainId: 100,
-      type: VoteType.Precommit,
-      hash: crypto.randomBytes(32),
-      index: 0
-    });
+    const vote1 = new Vote(
+      {
+        height: new BN(1),
+        round: 0,
+        chainId: 100,
+        type: VoteType.Precommit,
+        hash: crypto.randomBytes(32),
+        index: 0
+      },
+      version
+    );
     vote1.sign(accMngr.n2p('foo'));
 
-    const vote2 = new Vote({
-      height: new BN(1),
-      round: 0,
-      chainId: 100,
-      type: VoteType.Precommit,
-      hash: crypto.randomBytes(32),
-      index: 0
-    });
+    const vote2 = new Vote(
+      {
+        height: new BN(1),
+        round: 0,
+        chainId: 100,
+        type: VoteType.Precommit,
+        hash: crypto.randomBytes(32),
+        index: 0
+      },
+      version
+    );
     vote2.sign(accMngr.n2p('foo'));
 
     shouldFailed(() => {
@@ -165,24 +196,30 @@ describe('DuplicateVoteEvidence', () => {
   });
 
   it('should failed(validator index)', () => {
-    const vote1 = new Vote({
-      height: new BN(1),
-      round: 0,
-      chainId: 100,
-      type: VoteType.Precommit,
-      hash: crypto.randomBytes(32),
-      index: 1
-    });
+    const vote1 = new Vote(
+      {
+        height: new BN(1),
+        round: 0,
+        chainId: 100,
+        type: VoteType.Precommit,
+        hash: crypto.randomBytes(32),
+        index: 1
+      },
+      version
+    );
     vote1.sign(accMngr.n2p('foo'));
 
-    const vote2 = new Vote({
-      height: new BN(1),
-      round: 0,
-      chainId: 100,
-      type: VoteType.Precommit,
-      hash: crypto.randomBytes(32),
-      index: 1
-    });
+    const vote2 = new Vote(
+      {
+        height: new BN(1),
+        round: 0,
+        chainId: 100,
+        type: VoteType.Precommit,
+        hash: crypto.randomBytes(32),
+        index: 1
+      },
+      version
+    );
     vote2.sign(accMngr.n2p('foo'));
 
     shouldFailed(() => {
@@ -192,24 +229,30 @@ describe('DuplicateVoteEvidence', () => {
   });
 
   it('should verify successfully', () => {
-    const vote1 = new Vote({
-      height: new BN(1),
-      round: 0,
-      chainId: 100,
-      type: VoteType.Precommit,
-      hash: crypto.randomBytes(32),
-      index: 0
-    });
+    const vote1 = new Vote(
+      {
+        height: new BN(1),
+        round: 0,
+        chainId: 100,
+        type: VoteType.Precommit,
+        hash: crypto.randomBytes(32),
+        index: 0
+      },
+      version
+    );
     vote1.sign(accMngr.n2p('foo'));
 
-    const vote2 = new Vote({
-      height: new BN(1),
-      round: 0,
-      chainId: 100,
-      type: VoteType.Precommit,
-      hash: crypto.randomBytes(32),
-      index: 0
-    });
+    const vote2 = new Vote(
+      {
+        height: new BN(1),
+        round: 0,
+        chainId: 100,
+        type: VoteType.Precommit,
+        hash: crypto.randomBytes(32),
+        index: 0
+      },
+      version
+    );
     vote2.sign(accMngr.n2p('foo'));
     const ev = DuplicateVoteEvidence.fromVotes(vote2, vote1);
     ev.verify(new MockValidatorSet([accMngr.n2a('foo')]) as any);

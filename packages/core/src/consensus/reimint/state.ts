@@ -517,7 +517,7 @@ export class StateMachine {
       version
     );
     vote.signature = this.signer.sign(vote.getMessageToSign());
-    vote.blsSignature = vote.version == VoteVersion.blsSignature ? this.signer.sign(vote.getMessageToBlsSign()) : undefined;
+    vote.blsSignature = vote.version == VoteVersion.blsSignature ? this.signer.signBls(vote.getMessageToBlsSign()) : undefined;
     this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
 
     if (this.debug?.conflictVotes) {
@@ -533,7 +533,7 @@ export class StateMachine {
         version
       );
       vote.signature = this.signer.sign(vote.getMessageToSign());
-      vote.blsSignature = vote.version == VoteVersion.blsSignature ? this.signer.sign(vote.getMessageToBlsSign()) : undefined;
+      vote.blsSignature = vote.version == VoteVersion.blsSignature ? this.signer.signBls(vote.getMessageToBlsSign()) : undefined;
 
       this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
     }

@@ -147,6 +147,11 @@ export class Vote {
     return rlphash([intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash]);
   }
 
+  sign(privateKey: Buffer) {
+    const { r, s, v } = ecsign(this.getMessageToSign(), privateKey);
+    this.signature = Buffer.concat([r, s, intToBuffer(v - 27)]);
+  }
+
   isSigned() {
     return this._signature && this._signature.length > 0;
   }

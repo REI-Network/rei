@@ -29,7 +29,8 @@ export class ValidatorSet {
   static async fromStakeManager(sm: StakeManager, options?: LoadOptions) {
     let active: ActiveValidatorSet;
     const indexed = await IndexedValidatorSet.fromStakeManager(sm, options?.bls);
-    if (options?.genesis) {
+    const minCount = sm.common.param('vm', 'minValidatorsCount');
+    if (options?.genesis || indexed.length < minCount) {
       active = await ActiveValidatorSet.fromStakeManager(sm, (val) => {
         if (!isGenesis(val, sm.common)) {
           throw new Error('unknown validator: ' + val.toString());

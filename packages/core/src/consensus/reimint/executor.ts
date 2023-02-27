@@ -224,8 +224,8 @@ export class ReimintExecutor implements Executor {
     const nextCommon = this.backend.getCommon(pendingBlock.header.number.addn(1));
     // 15. modify validatorBls contract address
     if (!isEnableValidatorBls(pendingCommon) && isEnableValidatorBls(nextCommon)) {
-      const preAddr = nextCommon.param('vm', 'preAddr');
-      const postAddr = nextCommon.param('vm', 'postAddr');
+      const preAddr = nextCommon.param('vm', 'preaddr');
+      const postAddr = nextCommon.param('vm', 'postaddr');
       if (preAddr === undefined || postAddr === undefined) {
         throw new Error('Reimint::afterApply, load bls contract failed');
       }
@@ -234,8 +234,8 @@ export class ReimintExecutor implements Executor {
       const post = await vm.stateManager.getAccount(addr);
       post.stateRoot = pre.stateRoot;
       post.codeHash = pre.codeHash;
-      await vm.stateManager.putAccount(postAddr, post);
-      const validatorBls = this.engine.getValidatorBls(vm, pendingBlock, pendingCommon);
+      await vm.stateManager.putAccount(addr, post);
+      const validatorBls = this.engine.getValidatorBls(vm, pendingBlock, nextCommon);
       validatorSet = await ValidatorSet.fromStakeManager(parentStakeManager, { sort: true, bls: validatorBls });
       // deploy validatorBlsSwitch contract
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);

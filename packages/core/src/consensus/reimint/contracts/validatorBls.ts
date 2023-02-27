@@ -21,11 +21,11 @@ const event = {
 
 export class ValidatorBls extends Contract {
   constructor(evm: EVM, common: Common) {
-    super(evm, common, methods, Address.fromString(common.param('vm', 'postBlsAddress')));
+    super(evm, common, methods, Address.fromString(common.param('vm', 'postaddr')));
   }
 
   static filterReceiptsChanges(changes: ValidatorChanges, receipts: Receipt[], common: Common) {
-    const blsAddr = Address.fromString(common.param('vm', 'postBlsAddress'));
+    const blsAddr = Address.fromString(common.param('vm', 'postaddr'));
     for (const receipt of receipts) {
       if (receipt.logs.length > 0) {
         for (const log of receipt.logs) {

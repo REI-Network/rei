@@ -92,7 +92,7 @@
     },
     {
       "name": "validator-bls",
-      "block": 100
+      "block": 50
     }
   ],
   "bootstrapNodes": []

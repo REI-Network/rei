@@ -76,14 +76,16 @@ describe('ValidatorBls', () => {
   });
 });
 
-describe('ValidatorBlsSwitch', () => {
+describe('ValidatorBlsFallback', () => {
   it('should set validator bls public key', async () => {
-    const ValidatorBlsSwitchFactory: ContractFactory = await ethers.getContractFactory('ValidatorBlsSwitch');
-    const validatorBlsSwitch: Contract = await ValidatorBlsSwitchFactory.deploy();
+    const fallBackFactory: ContractFactory = await ethers.getContractFactory('ValidatorBlsFallback');
+    const fallback: Contract = await fallBackFactory.deploy();
+    const validatorBlsFactory: ContractFactory = await ethers.getContractFactory('ValidatorBls');
+    const validatorBls: Contract = await validatorBlsFactory.attach(fallback.address);
     try {
-      await validatorBlsSwitch.fallback();
+      await validatorBls.setBlsPublicKey(getRandomBytes(48));
     } catch (e) {
-      expect((e as any).reason).to.equal('Transaction reverted without a reason string');
+      expect((e as any).message).to.equal('Transaction reverted without a reason string');
     }
   });
 });

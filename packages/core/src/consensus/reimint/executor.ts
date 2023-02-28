@@ -236,21 +236,24 @@ export class ReimintExecutor implements Executor {
       post.codeHash = pre.codeHash;
       await vm.stateManager.putAccount(addr, post);
       const validatorBls = this.engine.getValidatorBls(vm, pendingBlock, nextCommon);
-      validatorSet = await ValidatorSet.fromStakeManager(parentStakeManager, { sort: true, bls: validatorBls });
+      const indexed = await IndexedValidatorSet.fromStakeManager(parentStakeManager, validatorBls);
+      const { totalLockedAmount, validatorCount } = this.checkoutTotalLockedVotingPower(indexed, true);
+      if (Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), pendingCommon)) {
+        validatorSet = new ValidatorSet(validatorSet.indexed.copy(), ActiveValidatorSet.genesis(pendingCommon));
+      } else {
+        validatorSet = await ValidatorSet.fromStakeManager(parentStakeManager, { sort: true, bls: validatorBls });
+      }
       // deploy validatorBlsSwitch contract
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
-      await Contract.deloyValidatorBlsSwitchContract(evm, nextCommon);
+      await Contract.deloyValidatorBlsFallbackContract(evm, nextCommon);
     }
-
-    // 9. increase once
-    validatorSet.active.incrementProposerPriority(1);
 
     // 8.get totalLockedAmount and validatorCount by the merged validatorSet,
     //    and decide if we should enable genesis validators
-    let enableGenesisValidators: boolean;
-    const { totalLockedAmount, validatorCount } = this.checkoutTotalLockedVotingPower(validatorSet.indexed);
+
+    const { totalLockedAmount, validatorCount } = isEnableValidatorBls(pendingCommon) ? this.checkoutTotalLockedVotingPower(validatorSet.indexed, true) : this.checkoutTotalLockedVotingPower(validatorSet.indexed);
     logger.debug('Reimint::afterApply, totalLockedAmount:', totalLockedAmount.toString(), 'validatorCount:', validatorCount.toString());
-    enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), pendingCommon);
+    const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), pendingCommon);
     if (enableGenesisValidators) {
       if (!parentValidatorSet.isGenesis(pendingCommon)) {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, create a new genesis validator set');
@@ -261,11 +264,12 @@ export class ReimintExecutor implements Executor {
         // if the parent validator set is a genesis validator set, we copy the set from the parent
         validatorSet = new ValidatorSet(validatorSet.indexed.copy(), parentValidatorSet.active.copy());
       }
-      // 9. increase once
-      validatorSet.active.incrementProposerPriority(1);
     } else {
       //do noting
     }
+
+    // 9. increase once
+    validatorSet.active.incrementProposerPriority(1);
 
     // make sure there is at least one validator
     const activeValidators = validatorSet.active.activeValidators();
@@ -526,9 +530,20 @@ export class ReimintExecutor implements Executor {
     };
   }
 
-  private checkoutTotalLockedVotingPower(indexedValidatorSet: IndexedValidatorSet) {
+  private checkoutTotalLockedVotingPower(indexedValidatorSet: IndexedValidatorSet, flag?: boolean) {
     let totalLockedAmount = new BN(0);
-    indexedValidatorSet.indexed.forEach((v) => totalLockedAmount.add(v.votingPower));
+    let validatorCount = new BN(0);
+    if (flag) {
+      indexedValidatorSet.indexed.forEach((v) => {
+        if (v.blsPublicKey !== undefined) {
+          totalLockedAmount.add(v.votingPower);
+          validatorCount.addn(1);
+        }
+      });
+    } else {
+      indexedValidatorSet.indexed.forEach((v) => totalLockedAmount.add(v.votingPower));
+      validatorCount = new BN(indexedValidatorSet.length);
+    }
     return { totalLockedAmount, validatorCount: new BN(indexedValidatorSet.length) };
   }
 }

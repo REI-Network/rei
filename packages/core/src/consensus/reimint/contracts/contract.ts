@@ -113,7 +113,7 @@ export abstract class Contract {
     await Contract.deployContract(evm, common, 'pr', { types: ['address'], values: [cfgaddr] });
   }
 
-  static async deloyValidatorBlsSwitchContract(evm: EVM, common: Common) {
+  static async deloyValidatorBlsFallbackContract(evm: EVM, common: Common) {
     await Contract.deployContract(evm, common, 'pre');
   }
 

@@ -216,9 +216,9 @@ export class ReimintExecutor implements Executor {
     // 7. filter all receipts to collect validatorBls changes,
     if (isEnableValidatorBls(pendingCommon)) {
       ValidatorBls.filterReceiptsChanges(changes, receipts, pendingCommon);
-      validatorSet.copyAndMerge(changes, pendingCommon, this.engine.getValidatorBls(vm, pendingBlock, pendingCommon));
+      validatorSet = await validatorSet.copyAndMerge(changes, pendingCommon, this.engine.getValidatorBls(vm, pendingBlock, pendingCommon));
     } else {
-      validatorSet.copyAndMerge(changes, pendingCommon);
+      validatorSet = await validatorSet.copyAndMerge(changes, pendingCommon);
     }
 
     const nextCommon = this.backend.getCommon(pendingBlock.header.number.addn(1));
@@ -241,7 +241,7 @@ export class ReimintExecutor implements Executor {
       if (Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), pendingCommon)) {
         validatorSet = new ValidatorSet(validatorSet.indexed.copy(), ActiveValidatorSet.genesis(pendingCommon));
       } else {
-        validatorSet = await ValidatorSet.fromStakeManager(parentStakeManager, { sort: true, bls: validatorBls });
+        validatorSet = await ValidatorSet.fromStakeManager(parentStakeManager, { sort: true, bls: validatorBls }); //todo new activeValidator
       }
       // deploy validatorBlsSwitch contract
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
@@ -531,19 +531,21 @@ export class ReimintExecutor implements Executor {
   }
 
   private checkoutTotalLockedVotingPower(indexedValidatorSet: IndexedValidatorSet, flag?: boolean) {
-    let totalLockedAmount = new BN(0);
-    let validatorCount = new BN(0);
+    const totalLockedAmount = new BN(0);
+    const validatorCount = new BN(0);
     if (flag) {
-      indexedValidatorSet.indexed.forEach((v) => {
+      for (const v of indexedValidatorSet.indexed.values()) {
         if (v.blsPublicKey !== undefined) {
-          totalLockedAmount.add(v.votingPower);
-          validatorCount.addn(1);
+          totalLockedAmount.iadd(v.votingPower);
+          validatorCount.iaddn(1);
         }
-      });
+      }
     } else {
-      indexedValidatorSet.indexed.forEach((v) => totalLockedAmount.add(v.votingPower));
-      validatorCount = new BN(indexedValidatorSet.length);
+      for (const v of indexedValidatorSet.indexed.values()) {
+        totalLockedAmount.iadd(v.votingPower);
+        validatorCount.iaddn(1);
+      }
     }
-    return { totalLockedAmount, validatorCount: new BN(indexedValidatorSet.length) };
+    return { totalLockedAmount, validatorCount };
   }
 }

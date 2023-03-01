@@ -153,15 +153,17 @@ export class IndexedValidatorSet {
     }
 
     for (const addr of newValidators) {
-      if (changes.blsValidators.has(addr)! && bls) {
+      if (!changes.blsValidators.has(addr) && bls) {
         const blsPublicKey = await bls.getBlsPublicKey(addr);
         changes.blsValidators.set(addr, blsPublicKey);
       }
     }
 
-    changes.blsValidators.forEach((blsPublicKey, validator) => {
-      if (this.contains(validator)) this.getValidator(validator).blsPublicKey = blsPublicKey;
-    });
+    for (const [addr, blsPublicKey] of changes.blsValidators) {
+      if (this.contains(addr)) {
+        this.getValidator(addr).blsPublicKey = blsPublicKey;
+      }
+    }
 
     return dirty;
   }

@@ -26,7 +26,7 @@ describe('BlsVote', () => {
     ]);
   });
 
-  it('should raw and fromSerializedVote successfully for blsSingature', () => {
+  it('should raw and fromSerializedVote successfully for blsSignature', () => {
     const vote0 = new Vote(
       {
         height: new BN(1),

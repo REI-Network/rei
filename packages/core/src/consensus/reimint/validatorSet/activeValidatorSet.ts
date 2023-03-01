@@ -23,7 +23,7 @@ export type ActiveValidator = {
 };
 
 // clone a `ActiveValidator`
-function copyActiveValidator(av: ActiveValidator) {
+export function copyActiveValidator(av: ActiveValidator) {
   return {
     ...av,
     priority: av.priority.clone(),

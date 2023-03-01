@@ -96,7 +96,6 @@ export interface ExtraDataVoteInfo {
 }
 export interface ExtraDataValidateOptions {
   validaterSetSize?: number;
-  voteInfo?: ExtraDataVoteInfo;
 }
 
 export enum ExtraDataVersion {
@@ -113,8 +112,14 @@ export class ExtraData {
   readonly version: ExtraDataVersion;
   readonly voteSet?: VoteSet;
   readonly voteInfo?: ExtraDataVoteInfo;
-  private _blsAggregateSignature?: Buffer;
+  readonly _blsAggregateSignature?: Buffer;
 
+  /**
+   * New ExtraData from BlockHeader
+   * @param header - BlockHeader
+   * @param options - validator set
+   * @returns ExtraData
+   */
   static fromBlockHeader(header: BlockHeader, options?: ExtraDataFromBlockHeaderOptions) {
     if (header.extraData.length <= CLIQUE_EXTRA_VANITY) {
       throw new Error('invalid header');
@@ -122,6 +127,12 @@ export class ExtraData {
     return ExtraData.fromSerializedData(header.extraData.slice(CLIQUE_EXTRA_VANITY), { ...options, header, chainId: header._common.chainIdBN().toNumber() });
   }
 
+  /**
+   * New ExtraData from serialized data
+   * @param serialized - serialized data
+   * @param options - ExtraDataOptions
+   * @returns ExtraData
+   */
   static fromSerializedData(serialized: Buffer, options: ExtraDataOptions) {
     const values = rlp.decode(serialized) as unknown as EXElements;
     if (!Array.isArray(values)) {
@@ -130,6 +141,12 @@ export class ExtraData {
     return ExtraData.fromValuesArray(values, options);
   }
 
+  /**
+   * New ExtraData from values array
+   * @param values - values array
+   * @param ExtraDataOptions
+   * @returns ExtraData
+   */
   static fromValuesArray(values: EXElements, { header, valSet, chainId }: ExtraDataOptions) {
     // the additional extra data should include at lease 3 elements(EXEvidenceList + EXRoundAndPOLRound, EXVote(proposal))
     if (values.length < 3) {
@@ -393,14 +410,19 @@ export class ExtraData {
     if (voteSet && voteSet.signedMsgType !== VoteType.Precommit) {
       throw new Error('invalid vote set type');
     }
-    if (version === ExtraDataVersion.blsSignature && voteSet) {
-      this._blsAggregateSignature = Buffer.from(voteSet.getAggregateSignature());
+    this._blsAggregateSignature = blsAggregateSignature;
+    if (version === ExtraDataVersion.blsSignature && voteSet && voteSet.getAggregateSignature() !== undefined) {
+      this._blsAggregateSignature = Buffer.from(voteSet.getAggregateSignature() as Buffer);
     }
     this.voteInfo = voteInfo;
-    this._blsAggregateSignature = blsAggregateSignature;
     this.validateBasic();
   }
 
+  /**
+   * Generate raw extra data
+   * @param validaterOptions - validater options
+   * @returns
+   */
   raw(validaterOptions?: ExtraDataValidateOptions) {
     const raw: rlp.Input = [];
     raw.push(this.evidence.map((ev) => EvidenceFactory.rawEvidence(ev)));
@@ -429,10 +451,12 @@ export class ExtraData {
         }
       }
     } else if (this.version === ExtraDataVersion.blsSignature) {
-      if (validaterOptions?.voteInfo?.chainId === undefined || validaterOptions?.voteInfo?.type === undefined || validaterOptions?.voteInfo?.height === undefined || validaterOptions?.voteInfo?.round === undefined || validaterOptions?.voteInfo?.hash === undefined) {
-        throw new Error('missing validater options');
+      if (this.voteInfo?.chainId === undefined || this.voteInfo?.type === undefined || this.voteInfo?.height === undefined || this?.voteInfo?.round === undefined || this?.voteInfo?.hash === undefined) {
+        raw.push([]);
+      } else {
+        raw.push([intToBuffer(this.voteInfo.chainId), intToBuffer(this.voteInfo.type), bnToUnpaddedBuffer(this.voteInfo.height), intToBuffer(this.voteInfo.round), this.voteInfo.hash]);
       }
-      raw.push([intToBuffer(validaterOptions.voteInfo.chainId), intToBuffer(validaterOptions.voteInfo.type), bnToUnpaddedBuffer(validaterOptions.voteInfo.height), intToBuffer(validaterOptions.voteInfo.round), validaterOptions.voteInfo.hash]);
+
       raw.push(this._blsAggregateSignature ? this._blsAggregateSignature : Buffer.alloc(0));
       if (this.voteSet) {
         const maj23Hash = this.voteSet.maj23!;
@@ -441,7 +465,7 @@ export class ExtraData {
             this.voteSet.votesBitArray.setIndex(vote.index, true);
           }
         }
-        raw.push(this.voteSet.votesBitArray.toBuffer());
+        raw.push(this.voteSet.votesBitArray.serialize());
       } else {
         if (validaterOptions?.validaterSetSize === undefined) {
           throw new Error('missing validater set size');
@@ -450,25 +474,39 @@ export class ExtraData {
         for (let i = 0; i < validaterOptions.validaterSetSize; i++) {
           bitArray.setIndex(i, false);
         }
-        raw.push(bitArray.toBuffer());
+        raw.push(bitArray.serialize());
       }
     }
     return raw;
   }
 
+  /**
+   * Generate serialized extra data
+   * @param validaterOptions - validater options
+   * @returns
+   */
   serialize(validaterOptions?: ExtraDataValidateOptions) {
     return rlp.encode(this.raw(validaterOptions));
   }
 
+  /**
+   * Get active validator set
+   * @returns active validator set
+   */
   activeValidatorSet() {
     return this.voteSet?.valSet;
   }
-
+  /**
+   * Validate extradata round and POLRound
+   */
   validateBasic() {
     v.validateRound(this.round);
     v.validatePOLRound(this.POLRound);
   }
 
+  /**
+   * Validate extradata
+   */
   validate() {
     if (this.version === ExtraDataVersion.ecdsaSignature) {
       if (!this.voteSet || this.voteSet.voteCount() === 0 || !this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash)) {
@@ -481,6 +519,11 @@ export class ExtraData {
     }
   }
 
+  /**
+   * Verify evidence in extradata
+   * @param backend - backend
+   * @param engine - consensus engine
+   */
   async verifyEvidence(backend: ExtraDataValidateBackend, engine: ReimintConsensusEngine) {
     for (const ev of this.evidence) {
       if (ev instanceof DuplicateVoteEvidence) {

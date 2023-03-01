@@ -98,8 +98,9 @@ export class BitArray {
     return trueIndices;
   }
 
+  // Todo: fix this
   toBuffer() {
-    const buffer = Buffer.from(new Uint8Array(Math.ceil(this.length / 8)));
+    const buffer = Buffer.from(new Uint8Array(this.elems.length * 4));
     for (let i = 0; i < this.elems.length; i++) {
       buffer.writeInt32LE(this.elems[i], i * 4);
     }

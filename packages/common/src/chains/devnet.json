@@ -89,6 +89,10 @@
     {
       "name": "better-pos",
       "block": 0
+    },
+    {
+      "name": "bls",
+      "block": 0
     }
   ],
   "bootstrapNodes": []

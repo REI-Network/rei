@@ -49,6 +49,11 @@ export class Vote {
   private _signature?: Buffer;
   private _blsSignature?: Buffer;
 
+  /**
+   * New vote from serialized data
+   * @param serialized - Serialized vote
+   * @returns Vote
+   */
   static fromSerializedVote(serialized: Buffer) {
     const values = rlp.decode(serialized);
     if (!Array.isArray(values)) {
@@ -57,6 +62,11 @@ export class Vote {
     return Vote.fromValuesArray(values as any);
   }
 
+  /**
+   * New vote from values array
+   * @param values - Values array
+   * @returns Vote
+   */
   static fromValuesArray(values: Buffer[]) {
     if (values.length == 8) {
       const [chainId, type, height, round, hash, index, version, signature] = values;
@@ -111,10 +121,16 @@ export class Vote {
     this.validateBasic();
   }
 
+  /**
+   * Get vote signature
+   */
   get signature(): Buffer | undefined {
     return this._signature;
   }
 
+  /**
+   * Set vote signature
+   */
   set signature(signature: Buffer | undefined) {
     if (signature !== undefined) {
       v.validateSignature(signature);
@@ -122,12 +138,19 @@ export class Vote {
     }
   }
 
+  /**
+   * Get vote bls signature
+   * @returns bls signature
+   */
   get blsSignature(): Buffer | undefined {
     if (this.version === VoteVersion.blsSignature) {
       return this._blsSignature;
     }
   }
 
+  /**
+   * Set vote bls signature
+   */
   set blsSignature(blsSignature: Buffer | undefined) {
     if (this.version === VoteVersion.blsSignature) {
       if (blsSignature !== undefined) {
@@ -139,27 +162,51 @@ export class Vote {
     }
   }
 
+  /**
+   * Get message to sign
+   * @returns message to sign
+   */
   getMessageToSign() {
     return rlphash([intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.index)]);
   }
 
+  /**
+   * Get message to sign for bls
+   * @returns message to sign for bls
+   */
   getMessageToBlsSign() {
     return rlphash([intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash]);
   }
 
+  /**
+   * Sign vote
+   * @param privateKey - Private key
+   */
   sign(privateKey: Buffer) {
     const { r, s, v } = ecsign(this.getMessageToSign(), privateKey);
     this.signature = Buffer.concat([r, s, intToBuffer(v - 27)]);
   }
 
+  /**
+   * Is vote signed
+   * @returns True if vote is signed, false otherwise
+   */
   isSigned() {
     return this._signature && this._signature.length > 0;
   }
 
+  /**
+   * Is vote bls signed
+   * @returns True if vote is bls signed, false otherwise
+   */
   isBlsSigned() {
     return this._blsSignature && this._blsSignature.length > 0;
   }
 
+  /**
+   * Vote raw data
+   * @returns Raw data
+   */
   raw() {
     if (!this.isSigned()) {
       throw new Error('missing signature');
@@ -176,10 +223,17 @@ export class Vote {
     }
   }
 
+  /**
+   * Vote serialized data
+   * @returns Serialized data
+   */
   serialize() {
     return rlp.encode(this.raw());
   }
 
+  /**
+   * Validate vote basicly
+   */
   validateBasic() {
     v.validateVoteType(this.type);
     v.validateIndex(this.index);
@@ -194,6 +248,11 @@ export class Vote {
     }
   }
 
+  /**
+   * Validate vote signature
+   * @param valSet - Active validator set
+   * @returns Validator address
+   */
   validateSignature(valSet: ActiveValidatorSet) {
     if (this.index >= valSet.length) {
       throw new Error('invalid index');
@@ -281,6 +340,11 @@ export class VoteSet {
     return !result;
   }
 
+  /**
+   * Add vote to vote set
+   * @param vote - Vote
+   * @returns
+   */
   addVote(vote: Vote) {
     if (!vote.height.eq(this.height) || vote.round !== this.round || vote.type !== this.signedMsgType) {
       logger.detail('VoteSet::addVote, invalid vote');
@@ -295,6 +359,12 @@ export class VoteSet {
     return this.addVerifiedVote(vote, votingPower);
   }
 
+  /**
+   * Get vote by validator index and vote hash
+   * @param valIndex - Validator index
+   * @param hash - vote hash
+   * @returns
+   */
   getVote(valIndex: number, hash: Buffer) {
     let vote = this.votes[valIndex];
     if (vote && vote.hash.equals(hash)) {
@@ -303,10 +373,21 @@ export class VoteSet {
     return this.votesByBlock.get(hash)?.getByIndex(valIndex);
   }
 
+  /**
+   * Get vote by validator index
+   * @param index - Validator index
+   * @returns
+   */
   getVoteByIndex(index: number) {
     return this.votes[index];
   }
 
+  /**
+   * Add verified vote to vote set
+   * @param vote - Vote
+   * @param votingPower - Voting power
+   * @returns
+   */
   addVerifiedVote(vote: Vote, votingPower: BN) {
     let conflicting: Vote | undefined;
     const idx = vote.index;
@@ -360,6 +441,12 @@ export class VoteSet {
     return undefined;
   }
 
+  /**
+   * Set peer maj23  hash
+   * @param peerId - Peer id
+   * @param hash - proposal hash 2 out of 3 verified
+   * @returns
+   */
   setPeerMaj23(peerId: string, hash: Buffer) {
     const existing = this.peerMaj23s.get(peerId);
     if (existing) {
@@ -378,18 +465,35 @@ export class VoteSet {
     }
   }
 
+  /**
+   * Get peer maj23 hash
+   * @returns peer maj23 hash
+   */
   hasTwoThirdsMajority() {
     return !!this.maj23;
   }
 
+  /**
+   * Check if has 2/3 majority
+   * @returns
+   */
   hasTwoThirdsAny() {
     return this.sum.gt(this.valSet.totalVotingPower.muln(2).divn(3));
   }
 
+  /**
+   * Get vote count
+   * @returns vote count
+   */
   voteCount() {
     return this.votes.filter((v) => !!v).length;
   }
 
+  /**
+   * Get bit array by block id
+   * @param hash
+   * @returns
+   */
   bitArrayByBlockID(hash: Buffer) {
     return this.votesByBlock.get(hash)?.bitArray.copy();
   }
@@ -398,9 +502,16 @@ export class VoteSet {
     return this.signedMsgType === VoteType.Precommit && !!this.maj23;
   }
 
+  /**
+   * Get aggregate signature
+   * @returns aggregate signature
+   */
   getAggregateSignature() {
     const bls = importBls();
     const sigs = (this.votes.filter((v) => !!v && !!v.blsSignature) as Vote[]).map((v) => v.blsSignature!);
+    if (sigs.length === 0) {
+      return undefined;
+    }
     return bls.aggregateSignatures(sigs);
   }
 }

@@ -155,7 +155,9 @@ export class IndexedValidatorSet {
     for (const addr of newValidators) {
       if (!changes.blsValidators.has(addr) && bls) {
         const blsPublicKey = await bls.getBlsPublicKey(addr);
-        changes.blsValidators.set(addr, blsPublicKey);
+        if (blsPublicKey.length > 0) {
+          changes.blsValidators.set(addr, blsPublicKey);
+        }
       }
     }
 

@@ -208,6 +208,7 @@ export class ReimintExecutor implements Executor {
     }
 
     let validatorSet: ValidatorSet = parentValidatorSet.copy();
+    let indexedValidatorSet: IndexedValidatorSet = parentValidatorSet.indexed.copy();
     const changes = new ValidatorChanges(pendingCommon);
     StakeManager.filterReceiptsChanges(changes, receipts, pendingCommon);
     if (logs.length > 0) {
@@ -216,9 +217,9 @@ export class ReimintExecutor implements Executor {
     // 7. filter all receipts to collect validatorBls changes,
     if (isEnableValidatorBls(pendingCommon)) {
       ValidatorBls.filterReceiptsChanges(changes, receipts, pendingCommon);
-      validatorSet = await validatorSet.copyAndMerge(changes, pendingCommon, this.engine.getValidatorBls(vm, pendingBlock, pendingCommon));
+      indexedValidatorSet.merge(changes, this.engine.getValidatorBls(vm, pendingBlock, pendingCommon));
     } else {
-      validatorSet = await validatorSet.copyAndMerge(changes, pendingCommon);
+      indexedValidatorSet.merge(changes);
     }
 
     const nextCommon = this.backend.getCommon(pendingBlock.header.number.addn(1));
@@ -250,22 +251,25 @@ export class ReimintExecutor implements Executor {
 
     // 8.get totalLockedAmount and validatorCount by the merged validatorSet,
     //    and decide if we should enable genesis validators
-
-    const { totalLockedAmount, validatorCount } = isEnableValidatorBls(pendingCommon) ? this.checkoutTotalLockedVotingPower(validatorSet.indexed, true) : this.checkoutTotalLockedVotingPower(validatorSet.indexed);
+    const { totalLockedAmount, validatorCount } = isEnableValidatorBls(pendingCommon) ? this.checkoutTotalLockedVotingPower(indexedValidatorSet, true) : this.checkoutTotalLockedVotingPower(indexedValidatorSet);
     logger.debug('Reimint::afterApply, totalLockedAmount:', totalLockedAmount.toString(), 'validatorCount:', validatorCount.toString());
     const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), pendingCommon);
     if (enableGenesisValidators) {
       if (!parentValidatorSet.isGenesis(pendingCommon)) {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, create a new genesis validator set');
         // if the parent validator set isn't a genesis validator set, we create a new one
-        validatorSet = new ValidatorSet(validatorSet.indexed.copy(), ActiveValidatorSet.genesis(pendingCommon));
+        validatorSet = new ValidatorSet(indexedValidatorSet, ActiveValidatorSet.genesis(pendingCommon));
       } else {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, copy from parent');
         // if the parent validator set is a genesis validator set, we copy the set from the parent
-        validatorSet = new ValidatorSet(validatorSet.indexed.copy(), parentValidatorSet.active.copy());
+        validatorSet = new ValidatorSet(indexedValidatorSet, parentValidatorSet.active.copy());
       }
     } else {
-      //do noting
+      const maxCount = pendingCommon.param('vm', 'maxValidatorsCount');
+      const active = parentValidatorSet.active.copy();
+      active.merge(indexedValidatorSet.sort(maxCount));
+      active.computeNewPriorities(parentValidatorSet.active.copy());
+      validatorSet = new ValidatorSet(indexedValidatorSet, active);
     }
 
     // 9. increase once

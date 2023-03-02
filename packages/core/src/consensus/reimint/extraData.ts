@@ -6,7 +6,7 @@ import { BlockHeader, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
 import { ActiveValidatorSet } from './validatorSet';
 import { Evidence, DuplicateVoteEvidence, EvidenceFactory } from './evpool';
 import { BitArray, Reimint } from '../reimint';
-import { Vote, VoteType, VoteSet, VoteVersion } from './vote';
+import { Vote, VoteType, VoteSet, SignType } from './vote';
 import { Proposal } from './proposal';
 import * as v from './validate';
 import { ReimintConsensusEngine } from './engine';
@@ -30,7 +30,7 @@ export type EXEmptyVote = [];
 export type EXRoundAndPOLRound = [Buffer, Buffer] | [Buffer, Buffer, Buffer];
 export type EXEvidenceList = (Buffer | Buffer[])[];
 export type EXVoteinfo = [Buffer, Buffer, Buffer, Buffer, Buffer];
-export type EXVoteSetBitArray = Buffer;
+export type EXVoteSetBitArray = (Buffer | Buffer[])[];
 export type EXAggregateSignature = Buffer;
 export type EXElement = EXEmptyVote | EXVote | EXRoundAndPOLRound | EXEvidenceList | EXVoteinfo | EXVoteSetBitArray;
 export type EXElements = EXElement[];
@@ -74,7 +74,11 @@ function isEXVoteinfo(ele: EXElement): ele is EXVoteinfo {
 }
 
 function isEXVoteSetBitArray(ele: EXElement): ele is EXVoteSetBitArray {
-  return ele instanceof Buffer;
+  if (Array.isArray(ele) && ele.length === 2 && ele[0] instanceof Buffer && Array.isArray(ele[1])) {
+    return ele[1].every((item) => item instanceof Buffer);
+  } else {
+    return false;
+  }
 }
 
 function isEXAggregateSignature(ele: EXElement): ele is EXAggregateSignature {
@@ -98,18 +102,13 @@ export interface ExtraDataValidateOptions {
   validaterSetSize?: number;
 }
 
-export enum ExtraDataVersion {
-  ecdsaSignature,
-  blsSignature
-}
-
 export class ExtraData {
   readonly evidence: Evidence[];
   readonly round: number;
   readonly commitRound: number;
   readonly POLRound: number;
   readonly proposal: Proposal;
-  readonly version: ExtraDataVersion;
+  readonly version: SignType;
   readonly voteSet?: VoteSet;
   readonly voteInfo?: ExtraDataVoteInfo;
   readonly _blsAggregateSignature?: Buffer;
@@ -163,9 +162,8 @@ export class ExtraData {
     let voteSet: VoteSet | undefined;
     let voteInfo: ExtraDataVoteInfo | undefined;
     let blsAggregateSignature: Buffer | undefined;
-    const voteVoersion = isBls(header._common) ? VoteVersion.blsSignature : VoteVersion.ecdsaSignature;
-    const extraDataVersion = isBls(header._common) ? ExtraDataVersion.blsSignature : ExtraDataVersion.ecdsaSignature;
-    if (extraDataVersion == ExtraDataVersion.blsSignature) {
+    const signType = isBls(header._common) ? SignType.blsSignature : SignType.ecdsaSignature;
+    if (signType === SignType.blsSignature) {
       if (values.length !== 6) {
         throw new Error('invliad values');
       }
@@ -263,11 +261,12 @@ export class ExtraData {
           if (!isEXVoteSetBitArray(value)) {
             throw new Error('invliad values');
           }
-          const bitArray = BitArray.fromSerializedBitArray(value);
-          const len = bitArray.length;
-          const pubKeys: Buffer[] = [];
-          let sum: BN = new BN(0);
+
           if (valSet) {
+            const bitArray = BitArray.fromValuesArray(value);
+            const len = bitArray.length;
+            const pubKeys: Buffer[] = [];
+            let sum: BN = new BN(0);
             for (let i = 0; i < len; i++) {
               if (bitArray.getIndex(i)) {
                 pubKeys.push((valSet as exActiveValidatorSet).getBlsPublickeyByIndex(i));
@@ -283,9 +282,11 @@ export class ExtraData {
               voteSet.maj23 = voteInfo!.hash;
             }
           }
+        } else {
+          throw new Error('invliad values');
         }
       }
-      return new ExtraData(round, commitRound, POLRound, evidence, proposal, extraDataVersion, voteSet, voteInfo, blsAggregateSignature);
+      return new ExtraData(round, commitRound, POLRound, evidence, proposal, signType, voteSet, voteInfo, blsAggregateSignature);
     } else {
       if (valSet) {
         // validator size + 1(evidence list) + 1(round and POLRound list) + 1(proposal)
@@ -383,7 +384,7 @@ export class ExtraData {
                 index: i - 3,
                 chainId
               },
-              voteVoersion,
+              signType,
               signature
             );
             const conflicting = voteSet.addVote(vote);
@@ -395,11 +396,11 @@ export class ExtraData {
           }
         }
       }
-      return new ExtraData(round, commitRound, POLRound, evidence, proposal, extraDataVersion, voteSet);
+      return new ExtraData(round, commitRound, POLRound, evidence, proposal, signType, voteSet);
     }
   }
 
-  constructor(round: number, commitRound: number, POLRound: number, evidence: Evidence[], proposal: Proposal, version: ExtraDataVersion, voteSet?: VoteSet, voteInfo?: ExtraDataVoteInfo, blsAggregateSignature?: Buffer) {
+  constructor(round: number, commitRound: number, POLRound: number, evidence: Evidence[], proposal: Proposal, version: SignType, voteSet?: VoteSet, voteInfo?: ExtraDataVoteInfo, blsAggregateSignature?: Buffer) {
     this.round = round;
     this.commitRound = commitRound;
     this.POLRound = POLRound;
@@ -411,8 +412,9 @@ export class ExtraData {
       throw new Error('invalid vote set type');
     }
     this._blsAggregateSignature = blsAggregateSignature;
-    if (version === ExtraDataVersion.blsSignature && voteSet && voteSet.getAggregateSignature() !== undefined) {
-      this._blsAggregateSignature = Buffer.from(voteSet.getAggregateSignature() as Buffer);
+    const voteSetAggregateSignature = voteSet && voteSet.getAggregateSignature();
+    if (version === SignType.blsSignature && voteSet && voteSetAggregateSignature !== undefined) {
+      this._blsAggregateSignature = Buffer.from(voteSetAggregateSignature);
     }
     this.voteInfo = voteInfo;
     this.validateBasic();
@@ -432,7 +434,7 @@ export class ExtraData {
       raw.push([intToBuffer(this.round), intToBuffer(this.POLRound + 1), intToBuffer(this.commitRound)]);
     }
     raw.push(this.proposal.signature!);
-    if (this.version === ExtraDataVersion.ecdsaSignature) {
+    if (this.version === SignType.ecdsaSignature) {
       if (this.voteSet) {
         const maj23Hash = this.voteSet.maj23!;
         for (const vote of this.voteSet.votes) {
@@ -450,7 +452,7 @@ export class ExtraData {
           raw.push([]);
         }
       }
-    } else if (this.version === ExtraDataVersion.blsSignature) {
+    } else if (this.version === SignType.blsSignature) {
       if (this.voteInfo?.chainId === undefined || this.voteInfo?.type === undefined || this.voteInfo?.height === undefined || this?.voteInfo?.round === undefined || this?.voteInfo?.hash === undefined) {
         raw.push([]);
       } else {
@@ -465,7 +467,7 @@ export class ExtraData {
             this.voteSet.votesBitArray.setIndex(vote.index, true);
           }
         }
-        raw.push(this.voteSet.votesBitArray.serialize());
+        raw.push(this.voteSet.votesBitArray.raw());
       } else {
         if (validaterOptions?.validaterSetSize === undefined) {
           throw new Error('missing validater set size');
@@ -474,7 +476,7 @@ export class ExtraData {
         for (let i = 0; i < validaterOptions.validaterSetSize; i++) {
           bitArray.setIndex(i, false);
         }
-        raw.push(bitArray.serialize());
+        raw.push(bitArray.raw());
       }
     }
     return raw;
@@ -508,11 +510,11 @@ export class ExtraData {
    * Validate extradata
    */
   validate() {
-    if (this.version === ExtraDataVersion.ecdsaSignature) {
+    if (this.version === SignType.ecdsaSignature) {
       if (!this.voteSet || this.voteSet.voteCount() === 0 || !this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash)) {
         throw new Error('invalid vote set');
       }
-    } else if (this.version === ExtraDataVersion.blsSignature) {
+    } else if (this.version === SignType.blsSignature) {
       if (!this.voteSet || !this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash) || !this._blsAggregateSignature) {
         throw new Error('invalid vote set');
       }

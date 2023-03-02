@@ -18,7 +18,7 @@ export class ConflictingVotesError extends Error {
 
 export class DuplicateVotesError extends Error {}
 
-export enum VoteVersion {
+export enum SignType {
   ecdsaSignature,
   blsSignature
 }
@@ -45,7 +45,7 @@ export class Vote {
   readonly round: number;
   readonly hash: Buffer;
   readonly index: number;
-  readonly version: VoteVersion;
+  readonly version: SignType;
   private _signature?: Buffer;
   private _blsSignature?: Buffer;
 
@@ -79,7 +79,7 @@ export class Vote {
           hash,
           index: bufferToInt(index)
         },
-        VoteVersion.ecdsaSignature,
+        SignType.ecdsaSignature,
         signature
       );
     } else if (values.length === 8) {
@@ -93,7 +93,7 @@ export class Vote {
           hash,
           index: bufferToInt(index)
         },
-        VoteVersion.blsSignature,
+        SignType.blsSignature,
         signature,
         blsSignature
       );
@@ -102,7 +102,7 @@ export class Vote {
     }
   }
 
-  constructor(data: VoteData, version: VoteVersion, signature?: Buffer, blsSignature?: Buffer) {
+  constructor(data: VoteData, version: SignType, signature?: Buffer, blsSignature?: Buffer) {
     this.chainId = data.chainId;
     this.type = data.type;
     this.height = data.height.clone();
@@ -137,7 +137,7 @@ export class Vote {
    * @returns bls signature
    */
   get blsSignature(): Buffer | undefined {
-    if (this.version === VoteVersion.blsSignature) {
+    if (this.version === SignType.blsSignature) {
       return this._blsSignature;
     }
   }
@@ -146,7 +146,7 @@ export class Vote {
    * Set vote bls signature
    */
   set blsSignature(blsSignature: Buffer | undefined) {
-    if (this.version === VoteVersion.blsSignature) {
+    if (this.version === SignType.blsSignature) {
       if (blsSignature !== undefined) {
         v.validateBlsSignature(blsSignature);
         this._blsSignature = blsSignature;
@@ -205,9 +205,9 @@ export class Vote {
     if (!this.isSigned()) {
       throw new Error('missing signature');
     }
-    if (this.version === VoteVersion.ecdsaSignature) {
+    if (this.version === SignType.ecdsaSignature) {
       return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.index), this._signature!];
-    } else if (this.version === VoteVersion.blsSignature) {
+    } else if (this.version === SignType.blsSignature) {
       if (!this.isBlsSigned()) {
         throw new Error('missing bls signature');
       }
@@ -237,7 +237,7 @@ export class Vote {
     if (this.isSigned()) {
       v.validateSignature(this._signature!);
     }
-    if (this.version === VoteVersion.blsSignature && this.isBlsSigned()) {
+    if (this.version === SignType.blsSignature && this.isBlsSigned()) {
       v.validateBlsSignature(this._blsSignature!);
     }
   }

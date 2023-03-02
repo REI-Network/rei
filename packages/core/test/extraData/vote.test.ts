@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { expect } from 'chai';
 import { Address, BN, ecsign, intToBuffer } from 'ethereumjs-util';
-import { Vote, VoteType, VoteVersion, VoteSet } from '../../src/consensus/reimint/vote';
+import { Vote, VoteType, SignType, VoteSet } from '../../src/consensus/reimint/vote';
 import { MockAccountManager } from '../util';
 import { Bls, SecretKey, initBls, importBls } from '@rei-network/bls';
 import { ActiveValidatorSet, ActiveValidator } from '../../src/consensus/reimint/validatorSet';
@@ -36,7 +36,7 @@ describe('BlsVote', () => {
         hash: crypto.randomBytes(32),
         index: 0
       },
-      VoteVersion.blsSignature
+      SignType.blsSignature
     );
     const { r, s, v } = ecsign(vote0.getMessageToSign(), accMngr.n2p('validator1'));
     const signature = Buffer.concat([r, s, intToBuffer(v - 27)]);
@@ -81,7 +81,7 @@ describe('BlsVote', () => {
             hash: voteHash,
             index: index
           },
-          VoteVersion.blsSignature
+          SignType.blsSignature
         )
       );
     });

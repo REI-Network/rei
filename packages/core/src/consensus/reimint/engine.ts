@@ -25,7 +25,7 @@ import { WAL } from './wal';
 import { ReimintExecutor } from './executor';
 import { ExtraData } from './extraData';
 import { EvidenceCollector } from './evidenceCollector';
-import { VoteVersion } from './vote';
+import { SignType } from './vote';
 
 export class SimpleNodeSigner {
   readonly node: Node;
@@ -329,7 +329,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
 
   getVoteVersion(num: BNLike): number {
     const common = this.getCommon(num);
-    return isBls(common) ? VoteVersion.blsSignature : VoteVersion.ecdsaSignature;
+    return isBls(common) ? SignType.blsSignature : SignType.ecdsaSignature;
   }
   ///////////// Backend Logic ////////////////
 }

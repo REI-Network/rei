@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { expect } from 'chai';
 import { Address, BN, ecsign, intToBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
-import { Vote, VoteType, VoteVersion, VoteSet, Reimint, ExtraData, ExtraDataVersion, Proposal } from '../../src/consensus/reimint';
+import { Vote, VoteType, VoteSet, Reimint, ExtraData, SignType, Proposal } from '../../src/consensus/reimint';
 import { MockAccountManager } from '../util';
 import { Bls, SecretKey, initBls, importBls } from '@rei-network/bls';
 import { ActiveValidatorSet, ActiveValidator, copyActiveValidator } from '../../src/consensus/reimint/validatorSet';
@@ -74,7 +74,7 @@ describe('extraDataBls', () => {
         hash: crypto.randomBytes(32),
         index: 0
       },
-      VoteVersion.blsSignature
+      SignType.blsSignature
     );
     const voteB = new Vote(
       {
@@ -85,7 +85,7 @@ describe('extraDataBls', () => {
         hash: crypto.randomBytes(32),
         index: 0
       },
-      VoteVersion.blsSignature
+      SignType.blsSignature
     );
     const evidenceSignatureA = ecsign(voteA.getMessageToSign(), accMngr.nameToPrivKey.get('validator1')!);
     const evidenceSignatureB = ecsign(voteB.getMessageToSign(), accMngr.nameToPrivKey.get('validator1')!);
@@ -115,7 +115,7 @@ describe('extraDataBls', () => {
           hash: headerRawHash,
           index: index
         },
-        VoteVersion.blsSignature
+        SignType.blsSignature
       );
       const privateKey = Array.from(accMngr.nameToPrivKey.values())[index];
       const signature = ecsign(vote.getMessageToSign(), privateKey);
@@ -142,7 +142,7 @@ describe('extraDataBls', () => {
     });
     const proposalSignature = ecsign(proposal.getMessageToSign(), accMngr.n2p('validator1')!);
     proposal.signature = Buffer.concat([proposalSignature.r, proposalSignature.s, intToBuffer(proposalSignature.v - 27)]);
-    const extraData = new ExtraData(0, 0, 0, [evidence], proposal, ExtraDataVersion.blsSignature, voteSet, { chainId: common.chainId(), type: VoteType.Precommit, height: height, round: 0, hash: proposal.hash });
+    const extraData = new ExtraData(0, 0, 0, [evidence], proposal, SignType.blsSignature, voteSet, { chainId: common.chainId(), type: VoteType.Precommit, height: height, round: 0, hash: proposal.hash });
     const serialized = extraData.serialize();
     const finalHeader = BlockHeader.fromHeaderData({ extraData: Buffer.concat([blockHeader.extraData as Buffer, serialized]), number: height }, { common: common });
     const extraData2 = ExtraData.fromBlockHeader(finalHeader, { valSet: valSet });

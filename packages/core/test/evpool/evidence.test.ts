@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { assert, expect } from 'chai';
 import { Address, BN } from 'ethereumjs-util';
 import { DuplicateVoteEvidence } from '../../src/consensus/reimint/evpool';
-import { Vote, VoteType, VoteVersion } from '../../src/consensus/reimint/vote';
+import { Vote, VoteType, SignType } from '../../src/consensus/reimint/vote';
 import { MockAccountManager } from '../util';
 
 const accMngr = new MockAccountManager([
@@ -10,7 +10,7 @@ const accMngr = new MockAccountManager([
   ['bar', Address.fromString('0xd1e52f6eacbb95f5f8512ff129cbd6360e549b0b'), Buffer.from('db0558cc5f24dd09c390a25c7958a678e7efa0f286053da5df53dcecdba2a13c', 'hex')]
 ]);
 
-const version = VoteVersion.ecdsaSignature;
+const version = SignType.ecdsaSignature;
 class MockValidatorSet {
   private validators: Address[];
 

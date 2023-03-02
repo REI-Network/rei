@@ -10,7 +10,7 @@ import { Reimint } from './reimint';
 import { IProcessBlockResult, IStateMachineBackend, IStateMachineP2PBackend, ISigner, IConfig, IEvidencePool, IWAL, IDebug, RoundStepType } from './types';
 import { StateMachineMessage, StateMachineTimeout, StateMachineEndHeight, StateMachineMsg } from './stateMessages';
 import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from './messages';
-import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, DuplicateVotesError, VoteVersion } from './vote';
+import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, DuplicateVotesError, SignType } from './vote';
 import { Proposal } from './proposal';
 import { Evidence, DuplicateVoteEvidence } from './evpool';
 import { TimeoutTicker } from './timeoutTicker';
@@ -517,7 +517,7 @@ export class StateMachine {
       version
     );
     vote.signature = this.signer.sign(vote.getMessageToSign());
-    vote.blsSignature = vote.version == VoteVersion.blsSignature ? this.signer.signBls(vote.getMessageToBlsSign()) : undefined;
+    vote.blsSignature = vote.version == SignType.blsSignature ? this.signer.signBls(vote.getMessageToBlsSign()) : undefined;
     this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
 
     if (this.debug?.conflictVotes) {
@@ -533,7 +533,7 @@ export class StateMachine {
         version
       );
       vote.signature = this.signer.sign(vote.getMessageToSign());
-      vote.blsSignature = vote.version == VoteVersion.blsSignature ? this.signer.signBls(vote.getMessageToBlsSign()) : undefined;
+      vote.blsSignature = vote.version == SignType.blsSignature ? this.signer.signBls(vote.getMessageToBlsSign()) : undefined;
 
       this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
     }

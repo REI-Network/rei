@@ -445,12 +445,6 @@ export class ExtraData {
 
       raw.push(this._blsAggregateSignature ? this._blsAggregateSignature : Buffer.alloc(0));
       if (this.voteSet) {
-        const maj23Hash = this.voteSet.maj23!;
-        for (const vote of this.voteSet.votes) {
-          if (vote !== undefined && vote.hash.equals(maj23Hash)) {
-            this.voteSet.votesBitArray.setIndex(vote.index, true);
-          }
-        }
         raw.push(this.voteSet.votesBitArray.raw());
       } else {
         if (validaterOptions?.validaterSetSize === undefined) {

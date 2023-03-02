@@ -20,9 +20,6 @@ export interface ExtraDataOptions {
 }
 
 // TODO: add bls public key, remove the interface
-interface exActiveValidatorSet extends ActiveValidatorSet {
-  getBlsPublickeyByIndex(index: number): Buffer;
-}
 export interface ExtraDataFromBlockHeaderOptions extends Omit<ExtraDataOptions, 'header' | 'chainId'> {}
 
 export type EXVote = Buffer;
@@ -264,23 +261,8 @@ export class ExtraData {
 
           if (valSet) {
             const bitArray = BitArray.fromValuesArray(value);
-            const len = bitArray.length;
-            const pubKeys: Buffer[] = [];
-            let sum: BN = new BN(0);
-            for (let i = 0; i < len; i++) {
-              if (bitArray.getIndex(i)) {
-                pubKeys.push((valSet as exActiveValidatorSet).getBlsPublickeyByIndex(i));
-                sum.iadd(valSet.getVotingPower(valSet.getValidatorByIndex(i)));
-              }
-            }
-            const bls = importBls();
             const voteinfoBuffer = rlphash([intToBuffer(voteInfo!.chainId), intToBuffer(voteInfo!.type), bnToUnpaddedBuffer(voteInfo!.height), intToBuffer(voteInfo!.round), voteInfo!.hash]);
-            if (!bls.verifyAggregate(pubKeys, voteinfoBuffer, blsAggregateSignature!)) {
-              throw new Error('invalid bls aggregate signature');
-            }
-            if (sum.gt(valSet.totalVotingPower.muln(2).divn(3)) && voteSet) {
-              voteSet.maj23 = voteInfo!.hash;
-            }
+            voteSet!.setgetAggregateSignature(blsAggregateSignature!, bitArray, voteinfoBuffer, voteInfo!.hash);
           }
         } else {
           throw new Error('invliad values');

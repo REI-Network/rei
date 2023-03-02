@@ -5,6 +5,9 @@ import { ActiveValidatorSet } from './validatorSet';
 import { BitArray } from './bitArray';
 import * as v from './validate';
 
+interface exActiveValidatorSet extends ActiveValidatorSet {
+  getBlsPublickeyByIndex(index: number): Buffer;
+}
 export class ConflictingVotesError extends Error {
   voteA: Vote;
   voteB: Vote;
@@ -306,6 +309,7 @@ export class VoteSet {
   signedMsgType: VoteType;
   valSet: ActiveValidatorSet;
   version: SignType;
+  _aggregateSignature: Uint8Array | undefined;
 
   votesBitArray: BitArray;
   votes: (Vote | undefined)[];
@@ -498,17 +502,29 @@ export class VoteSet {
     return this.signedMsgType === VoteType.Precommit && !!this.maj23;
   }
 
-  /**
-   * Get aggregate signature
-   * @returns aggregate signature
-   */
   getAggregateSignature() {
+    return this._aggregateSignature;
+  }
+
+  setgetAggregateSignature(sig: Uint8Array, bitArray: BitArray, voteinfoHash: Buffer, hash: Buffer) {
     const bls = importBls();
-    const sigs = (this.votes.filter((v) => !!v && !!v.blsSignature) as Vote[]).map((v) => v.blsSignature!);
-    if (sigs.length === 0) {
-      return undefined;
+    const len = bitArray.length;
+    const pubKeys: Buffer[] = [];
+    let sum: BN = new BN(0);
+    for (let i = 0; i < len; i++) {
+      if (bitArray.getIndex(i)) {
+        pubKeys.push((this.valSet as exActiveValidatorSet).getBlsPublickeyByIndex(i));
+        sum.iadd(this.valSet.getVotingPower(this.valSet.getValidatorByIndex(i)));
+      }
     }
-    return bls.aggregateSignatures(sigs);
+    if (!bls.verifyAggregate(pubKeys, voteinfoHash, sig)) {
+      throw new Error('invalid bls aggregate signature');
+    }
+    this._aggregateSignature = sig;
+    this.votesBitArray = bitArray;
+    if (sum.gt(this.valSet.totalVotingPower.muln(2).divn(3))) {
+      this.maj23 = hash;
+    }
   }
 }
 

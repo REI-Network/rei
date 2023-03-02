@@ -47,7 +47,10 @@ export class IndexedValidatorSet {
       if (votingPower.gtn(0)) {
         const indexValidator: IndexedValidator = { validator, votingPower };
         if (bls) {
-          indexValidator.blsPublicKey = await bls.getBlsPublicKey(validator);
+          const blsPublicKey = await bls.getBlsPublicKey(validator);
+          if (blsPublicKey.length > 0) {
+            indexValidator.blsPublicKey = blsPublicKey;
+          }
         }
         indexed.set(validator, indexValidator);
       }
@@ -187,7 +190,7 @@ export class IndexedValidatorSet {
    * @param maxCount - Max active validator count
    * @returns - Active validator list
    */
-  sort(maxCount: number) {
+  sort(maxCount: number, flag?: boolean) {
     // create a heap to keep the maximum count validator
     const heap = new Heap({
       compar: (a: IndexedValidator, b: IndexedValidator) => {
@@ -200,7 +203,8 @@ export class IndexedValidatorSet {
       }
     });
 
-    for (const v of Array.from(this.indexed.values()).filter((v) => v.blsPublicKey !== undefined)) {
+    const indexed = flag ? Array.from(this.indexed.values()).filter((v) => v.blsPublicKey !== undefined) : this.indexed.values();
+    for (const v of indexed) {
       heap.push(v);
       // if the heap length is too large, remove the minimum one
       while (heap.length > maxCount) {

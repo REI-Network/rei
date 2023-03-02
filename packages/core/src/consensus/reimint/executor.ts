@@ -222,6 +222,7 @@ export class ReimintExecutor implements Executor {
       indexedValidatorSet.merge(changes);
     }
 
+    let blsFlag = false;
     const nextCommon = this.backend.getCommon(pendingBlock.header.number.addn(1));
     // 15. modify validatorBls contract address
     if (!isEnableValidatorBls(pendingCommon) && isEnableValidatorBls(nextCommon)) {
@@ -237,21 +238,15 @@ export class ReimintExecutor implements Executor {
       post.codeHash = pre.codeHash;
       await vm.stateManager.putAccount(addr, post);
       const validatorBls = this.engine.getValidatorBls(vm, pendingBlock, nextCommon);
-      const indexed = await IndexedValidatorSet.fromStakeManager(parentStakeManager, validatorBls);
-      const { totalLockedAmount, validatorCount } = this.checkoutTotalLockedVotingPower(indexed, true);
-      if (Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), pendingCommon)) {
-        validatorSet = new ValidatorSet(validatorSet.indexed.copy(), ActiveValidatorSet.genesis(pendingCommon));
-      } else {
-        validatorSet = await ValidatorSet.fromStakeManager(parentStakeManager, { sort: true, bls: validatorBls }); //todo new activeValidator
-      }
-      // deploy validatorBlsSwitch contract
+      indexedValidatorSet = await IndexedValidatorSet.fromStakeManager(parentStakeManager, validatorBls);
+      // deploy validatorBlsFallback contract
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deloyValidatorBlsFallbackContract(evm, nextCommon);
     }
 
     // 8.get totalLockedAmount and validatorCount by the merged validatorSet,
     //    and decide if we should enable genesis validators
-    const { totalLockedAmount, validatorCount } = isEnableValidatorBls(pendingCommon) ? this.checkoutTotalLockedVotingPower(indexedValidatorSet, true) : this.checkoutTotalLockedVotingPower(indexedValidatorSet);
+    const { totalLockedAmount, validatorCount } = this.checkoutTotalLockedVotingPower(indexedValidatorSet, isEnableValidatorBls(pendingCommon) || blsFlag);
     logger.debug('Reimint::afterApply, totalLockedAmount:', totalLockedAmount.toString(), 'validatorCount:', validatorCount.toString());
     const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), pendingCommon);
     if (enableGenesisValidators) {
@@ -267,7 +262,7 @@ export class ReimintExecutor implements Executor {
     } else {
       const maxCount = pendingCommon.param('vm', 'maxValidatorsCount');
       const active = parentValidatorSet.active.copy();
-      active.merge(indexedValidatorSet.sort(maxCount));
+      active.merge(indexedValidatorSet.sort(maxCount, isEnableValidatorBls(pendingCommon) || blsFlag));
       active.computeNewPriorities(parentValidatorSet.active.copy());
       validatorSet = new ValidatorSet(indexedValidatorSet, active);
     }
@@ -342,7 +337,7 @@ export class ReimintExecutor implements Executor {
     const minerReward = new BN(pendingCommon.param('pow', 'minerReward'));
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.engine.getStakeManager(vm, block);
-    const parentValidatorSet = (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager)).copy();
+    const parentValidatorSet: ValidatorSet = isEnableValidatorBls(pendingCommon) ? (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager, this.engine.getValidatorBls(vm, block, pendingCommon))).copy() : (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager)).copy();
     parentValidatorSet.active.incrementProposerPriority(round);
 
     await vm.stateManager.checkpoint();
@@ -401,7 +396,8 @@ export class ReimintExecutor implements Executor {
 
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.engine.getStakeManager(vm, block);
-    let parentValidatorSet = await this.engine.validatorSets.getValSet(root, parentStakeManager);
+
+    let parentValidatorSet: ValidatorSet = isEnableValidatorBls(pendingCommon) ? (await this.engine.validatorSets.getValSet(root, parentStakeManager, this.engine.getValidatorBls(vm, block, pendingCommon))).copy() : (await this.engine.validatorSets.getValSet(root, parentStakeManager)).copy();
 
     const extraData = ExtraData.fromBlockHeader(pendingHeader, { valSet: parentValidatorSet.active });
     const miner = extraData.proposal.proposer();

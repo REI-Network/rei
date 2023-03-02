@@ -1,11 +1,11 @@
+import { BN } from 'ethereumjs-util';
 import { FunctionalBufferMap } from '@rei-network/utils';
-import { StakeManager } from '../contracts';
+import { StakeManager, ValidatorBls } from '../contracts';
 import { Reimint } from '../reimint';
 import { ValidatorSet, LoadOptions } from './validatorSet';
 import { IndexedValidatorSet } from './indexedValidatorSet';
 import { ActiveValidatorSet } from './activeValidatorSet';
 import { isGenesis, genesisValidatorVotingPower } from './genesis';
-
 const maxSize = 100;
 
 /**
@@ -23,18 +23,33 @@ export class ValidatorSets {
    * @param stateRoot - Target state root
    * @param sm - `StakeManager` instance
    */
-  async getValSet(stateRoot: Buffer, sm?: StakeManager) {
+  async getValSet(stateRoot: Buffer, sm?: StakeManager, bls?: ValidatorBls) {
     const indexed = this.indexedSets.get(stateRoot);
     const active = this.activeSets.get(stateRoot);
     if (!indexed || !active) {
       if (!sm) {
         throw new Error('missing state root: ' + stateRoot.toString('hex'));
       }
-
-      const { totalLockedAmount, validatorCount } = await sm.getTotalLockedAmountAndValidatorCount();
+      //todo check bls public key
+      if (!bls) {
+        const { totalLockedAmount, validatorCount } = await sm.getTotalLockedAmountAndValidatorCount();
+        const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
+        const options: LoadOptions = enableGenesisValidators ? { genesis: true } : { active };
+        const valSet = await ValidatorSet.fromStakeManager(sm, options);
+        this.set(stateRoot, valSet);
+        return valSet;
+      }
+      const totalLockedAmount = new BN(0);
+      const validatorCount = new BN(0);
+      const indexedValidatorSet = await IndexedValidatorSet.fromStakeManager(sm, bls);
+      for (const v of indexedValidatorSet.indexed.values()) {
+        if (v.blsPublicKey !== undefined) {
+          totalLockedAmount.iadd(v.votingPower);
+          validatorCount.iaddn(1);
+        }
+      }
       const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
-      const options: LoadOptions = enableGenesisValidators ? { genesis: true } : { active };
-      const valSet = await ValidatorSet.fromStakeManager(sm, options);
+      const valSet = enableGenesisValidators ? new ValidatorSet(indexedValidatorSet, ActiveValidatorSet.genesis(sm.common)) : new ValidatorSet(indexedValidatorSet, ActiveValidatorSet.fromActiveValidators(indexedValidatorSet.sort(sm.common.param('vm', 'maxValidatorsCount'))));
       this.set(stateRoot, valSet);
       return valSet;
     } else {

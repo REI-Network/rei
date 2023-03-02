@@ -68,11 +68,8 @@ export class Vote {
    * @returns Vote
    */
   static fromValuesArray(values: Buffer[]) {
-    if (values.length == 8) {
-      const [chainId, type, height, round, hash, index, version, signature] = values;
-      if (bufferToInt(version) != VoteVersion.ecdsaSignature) {
-        throw new Error('invalid vote version');
-      }
+    if (values.length === 7) {
+      const [chainId, type, height, round, hash, index, signature] = values;
       return new Vote(
         {
           chainId: bufferToInt(chainId),
@@ -82,14 +79,11 @@ export class Vote {
           hash,
           index: bufferToInt(index)
         },
-        bufferToInt(version),
+        VoteVersion.ecdsaSignature,
         signature
       );
-    } else if (values.length == 9) {
-      const [chainId, type, height, round, hash, index, version, signature, blsSignature] = values;
-      if (bufferToInt(version) != VoteVersion.blsSignature) {
-        throw new Error('invalid vote version');
-      }
+    } else if (values.length === 8) {
+      const [chainId, type, height, round, hash, index, signature, blsSignature] = values;
       return new Vote(
         {
           chainId: bufferToInt(chainId),
@@ -99,7 +93,7 @@ export class Vote {
           hash,
           index: bufferToInt(index)
         },
-        bufferToInt(version),
+        VoteVersion.blsSignature,
         signature,
         blsSignature
       );
@@ -108,7 +102,7 @@ export class Vote {
     }
   }
 
-  constructor(data: VoteData, version: number, signature?: Buffer, blsSignature?: Buffer) {
+  constructor(data: VoteData, version: VoteVersion, signature?: Buffer, blsSignature?: Buffer) {
     this.chainId = data.chainId;
     this.type = data.type;
     this.height = data.height.clone();
@@ -212,12 +206,12 @@ export class Vote {
       throw new Error('missing signature');
     }
     if (this.version === VoteVersion.ecdsaSignature) {
-      return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.index), intToBuffer(this.version), this._signature!];
+      return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.index), this._signature!];
     } else if (this.version === VoteVersion.blsSignature) {
       if (!this.isBlsSigned()) {
         throw new Error('missing bls signature');
       }
-      return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.index), intToBuffer(this.version), this._signature!, this._blsSignature!];
+      return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.index), this._signature!, this._blsSignature!];
     } else {
       throw new Error('invalid version');
     }

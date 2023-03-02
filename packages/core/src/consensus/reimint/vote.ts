@@ -503,10 +503,14 @@ export class VoteSet {
   }
 
   getAggregateSignature() {
+    if (!this._aggregateSignature) {
+      const bls = importBls();
+      this._aggregateSignature = bls.aggregateSignatures(this.votes.filter((v) => !!v).map((v) => v!.blsSignature!));
+    }
     return this._aggregateSignature;
   }
 
-  setgetAggregateSignature(sig: Uint8Array, bitArray: BitArray, voteinfoHash: Buffer, hash: Buffer) {
+  setAggregateSignature(sig: Uint8Array, bitArray: BitArray, voteinfoHash: Buffer, hash: Buffer) {
     const bls = importBls();
     const len = bitArray.length;
     const pubKeys: Buffer[] = [];

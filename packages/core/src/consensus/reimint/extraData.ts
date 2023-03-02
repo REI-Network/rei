@@ -262,7 +262,7 @@ export class ExtraData {
           if (valSet) {
             const bitArray = BitArray.fromValuesArray(value);
             const voteinfoBuffer = rlphash([intToBuffer(voteInfo!.chainId), intToBuffer(voteInfo!.type), bnToUnpaddedBuffer(voteInfo!.height), intToBuffer(voteInfo!.round), voteInfo!.hash]);
-            voteSet!.setgetAggregateSignature(blsAggregateSignature!, bitArray, voteinfoBuffer, voteInfo!.hash);
+            voteSet!.setAggregateSignature(blsAggregateSignature!, bitArray, voteinfoBuffer, voteInfo!.hash);
           }
         } else {
           throw new Error('invliad values');

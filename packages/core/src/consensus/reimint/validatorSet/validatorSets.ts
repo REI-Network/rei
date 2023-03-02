@@ -49,7 +49,7 @@ export class ValidatorSets {
         }
       }
       const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
-      const valSet = enableGenesisValidators ? new ValidatorSet(indexedValidatorSet, ActiveValidatorSet.genesis(sm.common)) : new ValidatorSet(indexedValidatorSet, ActiveValidatorSet.fromActiveValidators(indexedValidatorSet.sort(sm.common.param('vm', 'maxValidatorsCount'))));
+      const valSet = enableGenesisValidators ? new ValidatorSet(indexedValidatorSet, ActiveValidatorSet.genesis(sm.common)) : new ValidatorSet(indexedValidatorSet, ActiveValidatorSet.fromActiveValidators(indexedValidatorSet.sort(sm.common.param('vm', 'maxValidatorsCount'), true)));
       this.set(stateRoot, valSet);
       return valSet;
     } else {

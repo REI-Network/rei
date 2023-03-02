@@ -96,6 +96,6 @@ describe('BlsVote', () => {
     });
     const aggregateSignature = voteSet.getAggregateSignature();
     const pubKeys = secretKeys.map((sk) => sk.toPublicKey().toBytes());
-    expect(bls.verifyAggregate(pubKeys, votes[0].getMessageToBlsSign(), aggregateSignature)).to.be.true;
+    expect(bls.verifyAggregate(pubKeys, votes[0].getMessageToBlsSign(), aggregateSignature!)).to.be.true;
   });
 });

@@ -153,6 +153,16 @@ describe('extraDataBls', () => {
     expect(extraData2.voteInfo?.round === extraData.voteInfo?.round, 'voteInfo should be equal').to.be.true;
     expect(extraData2.voteInfo?.type === extraData.voteInfo?.type, 'voteInfo should be equal').to.be.true;
     expect(extraData2.voteInfo?.hash.equals(extraData.voteInfo?.hash!), 'voteInfo should be equal').to.be.true;
+    expect(extraData2.round === extraData.round, 'round should be equal').to.be.true;
+    expect(extraData2.proposal?.hash.equals(extraData.proposal?.hash!), 'proposal should be equal').to.be.true;
+    expect(extraData2.proposal?.height.eq(extraData.proposal?.height!), 'proposal should be equal').to.be.true;
+    expect(extraData2.proposal?.round === extraData.proposal?.round, 'proposal should be equal').to.be.true;
+    expect(extraData2.proposal?.POLRound === extraData.proposal?.POLRound, 'proposal should be equal').to.be.true;
+    expect(extraData2.proposal?.type === extraData.proposal?.type, 'proposal should be equal').to.be.true;
+    expect(extraData2.proposal?.signature!.equals(extraData.proposal?.signature!), 'proposal should be equal').to.be.true;
+    extraData.evidence.forEach((evidence, index) => {
+      expect(evidence.hash().equals(extraData2.evidence[index].hash()), 'evidence should be equal').to.be.true;
+    });
     extraData2.validateBasic();
   });
 });

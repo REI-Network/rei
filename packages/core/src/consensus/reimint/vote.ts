@@ -305,6 +305,7 @@ export class VoteSet {
   round: number;
   signedMsgType: VoteType;
   valSet: ActiveValidatorSet;
+  version: SignType;
 
   votesBitArray: BitArray;
   votes: (Vote | undefined)[];
@@ -313,19 +314,20 @@ export class VoteSet {
   votesByBlock = new FunctionalBufferMap<BlockVotes>();
   peerMaj23s = new Map<string, Buffer>();
 
-  constructor(chainId: number, height: BN, round: number, signedMsgType: VoteType, valSet: ActiveValidatorSet) {
+  constructor(chainId: number, height: BN, round: number, signedMsgType: VoteType, valSet: ActiveValidatorSet, version: SignType) {
     this.chainId = chainId;
     this.height = height.clone();
     this.round = round;
     this.signedMsgType = signedMsgType;
     this.valSet = valSet;
+    this.version = version;
     this.votesBitArray = new BitArray(valSet.length);
     this.votes = new Array<Vote | undefined>(valSet.length);
     this.sum = new BN(0);
   }
 
   preValidate(vote: Vote) {
-    if (!vote.height.eq(this.height) || vote.round !== this.round || vote.type !== this.signedMsgType) {
+    if (!vote.height.eq(this.height) || vote.round !== this.round || vote.type !== this.signedMsgType || vote.version !== this.version) {
       return false;
     }
 
@@ -340,7 +342,7 @@ export class VoteSet {
    * @returns
    */
   addVote(vote: Vote) {
-    if (!vote.height.eq(this.height) || vote.round !== this.round || vote.type !== this.signedMsgType) {
+    if (!vote.height.eq(this.height) || vote.round !== this.round || vote.type !== this.signedMsgType || vote.version !== this.version) {
       logger.detail('VoteSet::addVote, invalid vote');
       return;
     }
@@ -519,16 +521,18 @@ export class HeightVoteSet {
   chainId: number;
   height: BN;
   valSet: ActiveValidatorSet;
+  version: SignType;
 
   round: number;
   roundVoteSets = new Map<number, RoundVoteSet>();
   peerCatchupRounds = new Map<string, number[]>();
 
-  constructor(chainId: number, height: BN, valSet: ActiveValidatorSet) {
+  constructor(chainId: number, height: BN, valSet: ActiveValidatorSet, version: SignType) {
     this.chainId = chainId;
     this.height = height.clone();
     this.valSet = valSet;
     this.round = 0;
+    this.version = version;
   }
 
   reset(height: BN, valSet: ActiveValidatorSet) {
@@ -559,8 +563,8 @@ export class HeightVoteSet {
       throw new Error('addRound for an existing round');
     }
     this.roundVoteSets.set(round, {
-      prevotes: new VoteSet(this.chainId, this.height, round, VoteType.Prevote, this.valSet),
-      precommits: new VoteSet(this.chainId, this.height, round, VoteType.Precommit, this.valSet)
+      prevotes: new VoteSet(this.chainId, this.height, round, VoteType.Prevote, this.valSet, this.version),
+      precommits: new VoteSet(this.chainId, this.height, round, VoteType.Precommit, this.valSet, this.version)
     });
   }
 

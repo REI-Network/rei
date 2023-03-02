@@ -219,7 +219,7 @@ export class ExtraData {
              * but it doesn't matter,
              * because the validator voting power is same
              */
-            voteSet = new VoteSet(chainId, header.number, commitRound, VoteType.Precommit, valSet);
+            voteSet = new VoteSet(chainId, header.number, commitRound, VoteType.Precommit, valSet, signType);
           }
         } else if (i === 2) {
           if (!isEXVote(value)) {
@@ -347,7 +347,7 @@ export class ExtraData {
              * but it doesn't matter,
              * because the validator voting power is same
              */
-            voteSet = new VoteSet(chainId, header.number, commitRound, VoteType.Precommit, valSet);
+            voteSet = new VoteSet(chainId, header.number, commitRound, VoteType.Precommit, valSet, signType);
           }
         } else if (i === 2) {
           if (!isEXVote(value)) {
@@ -412,9 +412,11 @@ export class ExtraData {
       throw new Error('invalid vote set type');
     }
     this._blsAggregateSignature = blsAggregateSignature;
-    const voteSetAggregateSignature = voteSet && voteSet.getAggregateSignature();
-    if (version === SignType.blsSignature && voteSet && voteSetAggregateSignature !== undefined) {
-      this._blsAggregateSignature = Buffer.from(voteSetAggregateSignature);
+    if (!blsAggregateSignature) {
+      const voteSetAggregateSignature = voteSet && voteSet.getAggregateSignature();
+      if (version === SignType.blsSignature && voteSet && voteSetAggregateSignature !== undefined) {
+        this._blsAggregateSignature = Buffer.from(voteSetAggregateSignature);
+      }
     }
     this.voteInfo = voteInfo;
     this.validateBasic();

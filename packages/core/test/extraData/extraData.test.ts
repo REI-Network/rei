@@ -128,7 +128,7 @@ describe('extraDataBls', () => {
       secretKeys.map((sk) => Buffer.from(sk.toPublicKey().toBytes()))
     );
 
-    const voteSet = new VoteSet(common.chainId(), height, 0, VoteType.Precommit, valSet);
+    const voteSet = new VoteSet(common.chainId(), height, 0, VoteType.Precommit, valSet, SignType.blsSignature);
 
     votes.forEach((vote) => {
       voteSet.addVote(vote);

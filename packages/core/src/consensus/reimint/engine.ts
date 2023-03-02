@@ -326,10 +326,5 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
       }
     }
   }
-
-  getVoteVersion(num: BNLike): number {
-    const common = this.getCommon(num);
-    return isBls(common) ? SignType.blsSignature : SignType.ecdsaSignature;
-  }
   ///////////// Backend Logic ////////////////
 }

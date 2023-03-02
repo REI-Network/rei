@@ -86,7 +86,7 @@ describe('BlsVote', () => {
       );
     });
     const valSet = new ActiveValidatorSet(activeValidators);
-    const voteSet = new VoteSet(100, new BN(1), 0, VoteType.Precommit, valSet);
+    const voteSet = new VoteSet(100, new BN(1), 0, VoteType.Precommit, valSet, SignType.blsSignature);
     votes.forEach((vote, index) => {
       const privateKey = Array.from(accMngr.nameToPrivKey.values())[index];
       const signature = ecsign(vote.getMessageToSign(), privateKey);

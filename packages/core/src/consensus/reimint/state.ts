@@ -16,6 +16,7 @@ import { Evidence, DuplicateVoteEvidence } from './evpool';
 import { TimeoutTicker } from './timeoutTicker';
 import { ExtraData } from './extraData';
 import { ActiveValidatorSet } from './validatorSet';
+import { isBls } from '../../hardforks';
 
 const SkipTimeoutCommit = true;
 const WaitForTxs = true;
@@ -504,7 +505,7 @@ export class StateMachine {
       return;
     }
 
-    const version = this.backend.getVoteVersion(this.height);
+    const version = isBls(this.backend.getCommon(this.height)) ? SignType.blsSignature : SignType.ecdsaSignature;
     const vote = new Vote(
       {
         chainId: this.chainId,
@@ -517,7 +518,7 @@ export class StateMachine {
       version
     );
     vote.signature = this.signer.sign(vote.getMessageToSign());
-    vote.blsSignature = vote.version == SignType.blsSignature ? this.signer.signBls(vote.getMessageToBlsSign()) : undefined;
+    vote.blsSignature = vote.version === SignType.blsSignature ? this.signer.signBls(vote.getMessageToBlsSign()) : undefined;
     this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
 
     if (this.debug?.conflictVotes) {
@@ -1030,7 +1031,9 @@ export class StateMachine {
       this.lockedBlockResult = undefined;
       this.validRound = -1;
       this.validBlock = undefined;
-      this.votes = new HeightVoteSet(this.chainId, this.height, this.validators);
+      const nextCommon = this.backend.getCommon(this.height);
+      const signType = isBls(nextCommon) ? SignType.blsSignature : SignType.ecdsaSignature;
+      this.votes = new HeightVoteSet(this.chainId, this.height, this.validators, signType);
       this.commitRound = -1;
       this.triggeredTimeoutPrecommit = false;
       this.msgQueue.clear();

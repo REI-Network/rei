@@ -1,8 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { assert, expect, should } from 'chai';
+import { assert, expect } from 'chai';
 import { BlsManager } from '../src/blsManager';
-import { decrypt } from '../src/utils';
 import { Bls } from '../src/types';
 
 describe('BlsManager', () => {

@@ -147,7 +147,7 @@ describe('extraDataBls', () => {
     const finalHeader = BlockHeader.fromHeaderData({ extraData: Buffer.concat([blockHeader.extraData as Buffer, serialized]), number: height }, { common: common });
     const extraData2 = ExtraData.fromBlockHeader(finalHeader, { valSet: valSet });
 
-    expect(extraData2._blsAggregateSignature?.equals(extraData._blsAggregateSignature!), 'blsAggregateSignature should be equal').to.be.true;
+    expect(extraData2.blsAggregateSignature?.equals(extraData.blsAggregateSignature!), 'blsAggregateSignature should be equal').to.be.true;
     expect(extraData2.voteInfo?.chainId === extraData.voteInfo?.chainId, 'voteInfo should be equal').to.be.true;
     expect(extraData2.voteInfo?.height.eq(extraData.voteInfo?.height!), 'voteInfo should be equal').to.be.true;
     expect(extraData2.voteInfo?.round === extraData.voteInfo?.round, 'voteInfo should be equal').to.be.true;

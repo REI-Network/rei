@@ -109,7 +109,7 @@ export class ExtraData {
   readonly version: SignType;
   readonly voteSet?: VoteSet;
   readonly voteInfo?: ExtraDataVoteInfo;
-  readonly _blsAggregateSignature?: Buffer;
+  readonly blsAggregateSignature?: Buffer;
 
   /**
    * New ExtraData from BlockHeader
@@ -397,11 +397,11 @@ export class ExtraData {
     if (voteSet && voteSet.signedMsgType !== VoteType.Precommit) {
       throw new Error('invalid vote set type');
     }
-    this._blsAggregateSignature = blsAggregateSignature;
-    if (!blsAggregateSignature) {
+    this.blsAggregateSignature = blsAggregateSignature;
+    if (version === SignType.blsSignature && !blsAggregateSignature) {
       const voteSetAggregateSignature = voteSet && voteSet.getAggregateSignature();
-      if (version === SignType.blsSignature && voteSet && voteSetAggregateSignature !== undefined) {
-        this._blsAggregateSignature = Buffer.from(voteSetAggregateSignature);
+      if (voteSetAggregateSignature !== undefined) {
+        this.blsAggregateSignature = Buffer.from(voteSetAggregateSignature);
       }
     }
     this.voteInfo = voteInfo;
@@ -447,7 +447,7 @@ export class ExtraData {
         raw.push([intToBuffer(this.voteInfo.chainId), intToBuffer(this.voteInfo.type), bnToUnpaddedBuffer(this.voteInfo.height), intToBuffer(this.voteInfo.round), this.voteInfo.hash]);
       }
 
-      raw.push(this._blsAggregateSignature ? this._blsAggregateSignature : Buffer.alloc(0));
+      raw.push(this.blsAggregateSignature ? this.blsAggregateSignature : Buffer.alloc(0));
       if (this.voteSet) {
         raw.push(this.voteSet.votesBitArray.raw());
       } else {
@@ -497,7 +497,7 @@ export class ExtraData {
         throw new Error('invalid vote set');
       }
     } else if (this.version === SignType.blsSignature) {
-      if (!this.voteSet || !this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash) || !this._blsAggregateSignature) {
+      if (!this.voteSet || !this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash) || !this.blsAggregateSignature) {
         throw new Error('invalid vote set');
       }
     }

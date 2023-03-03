@@ -222,7 +222,7 @@ export class Reimint {
    */
   static generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], evidence: Evidence[], proposal: Proposal, commitRound: number, votes: VoteSet, options?: BlockOptions) {
     const version = isBls(options?.common!) ? SignType.blsSignature : SignType.ecdsaSignature;
-    const extraData = new ExtraData(proposal.round, commitRound, proposal.POLRound, evidence, proposal, version, votes, { chainId: options!.common!.chainId(), type: VoteType.Precommit, height: new BN(data.number!), round: commitRound, hash: proposal.hash });
+    const extraData = new ExtraData(proposal.round, commitRound, proposal.POLRound, evidence, proposal, version, votes);
     data = formatHeaderData(data);
     const header = BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize()]) }, options);
     return new Block(header, transactions, undefined, options);

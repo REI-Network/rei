@@ -142,17 +142,12 @@ describe('extraDataBls', () => {
     });
     const proposalSignature = ecsign(proposal.getMessageToSign(), accMngr.n2p('validator1')!);
     proposal.signature = Buffer.concat([proposalSignature.r, proposalSignature.s, intToBuffer(proposalSignature.v - 27)]);
-    const extraData = new ExtraData(0, 0, 0, [evidence], proposal, SignType.blsSignature, voteSet, { chainId: common.chainId(), type: VoteType.Precommit, height: height, round: 0, hash: proposal.hash });
+    const extraData = new ExtraData(0, 0, 0, [evidence], proposal, SignType.blsSignature, voteSet);
     const serialized = extraData.serialize();
     const finalHeader = BlockHeader.fromHeaderData({ extraData: Buffer.concat([blockHeader.extraData as Buffer, serialized]), number: height }, { common: common });
     const extraData2 = ExtraData.fromBlockHeader(finalHeader, { valSet: valSet });
 
     expect(extraData2.blsAggregateSignature?.equals(extraData.blsAggregateSignature!), 'blsAggregateSignature should be equal').to.be.true;
-    expect(extraData2.voteInfo?.chainId === extraData.voteInfo?.chainId, 'voteInfo should be equal').to.be.true;
-    expect(extraData2.voteInfo?.height.eq(extraData.voteInfo?.height!), 'voteInfo should be equal').to.be.true;
-    expect(extraData2.voteInfo?.round === extraData.voteInfo?.round, 'voteInfo should be equal').to.be.true;
-    expect(extraData2.voteInfo?.type === extraData.voteInfo?.type, 'voteInfo should be equal').to.be.true;
-    expect(extraData2.voteInfo?.hash.equals(extraData.voteInfo?.hash!), 'voteInfo should be equal').to.be.true;
     expect(extraData2.round === extraData.round, 'round should be equal').to.be.true;
     expect(extraData2.proposal?.hash.equals(extraData.proposal?.hash!), 'proposal should be equal').to.be.true;
     expect(extraData2.proposal?.height.eq(extraData.proposal?.height!), 'proposal should be equal').to.be.true;

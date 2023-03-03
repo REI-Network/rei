@@ -25,10 +25,9 @@ export type EXVote = Buffer;
 export type EXEmptyVote = [];
 export type EXRoundAndPOLRound = [Buffer, Buffer] | [Buffer, Buffer, Buffer];
 export type EXEvidenceList = (Buffer | Buffer[])[];
-export type EXVoteinfo = [Buffer, Buffer, Buffer, Buffer, Buffer];
 export type EXVoteSetBitArray = (Buffer | Buffer[])[];
 export type EXAggregateSignature = Buffer;
-export type EXElement = EXEmptyVote | EXVote | EXRoundAndPOLRound | EXEvidenceList | EXVoteinfo | EXVoteSetBitArray;
+export type EXElement = EXEmptyVote | EXVote | EXRoundAndPOLRound | EXEvidenceList | EXVoteSetBitArray;
 export type EXElements = EXElement[];
 
 function isEXVote(ele: EXElement): ele is EXVote {
@@ -58,19 +57,6 @@ function isEXEvidenceList(ele: EXElement): ele is EXEvidenceList {
   }
   return true;
 }
-
-function isEXVoteinfo(ele: EXElement): ele is EXVoteinfo {
-  if (!Array.isArray(ele) || ele.length !== 5) {
-    return false;
-  }
-  for (const item of ele) {
-    if (!(item instanceof Buffer)) {
-      return false;
-    }
-  }
-  return true;
-}
-
 function isEXVoteSetBitArray(ele: EXElement): ele is EXVoteSetBitArray {
   if (Array.isArray(ele) && ele.length === 2 && ele[0] instanceof Buffer && Array.isArray(ele[1])) {
     return ele[1].every((item) => item instanceof Buffer);
@@ -108,7 +94,6 @@ export class ExtraData {
   readonly proposal: Proposal;
   readonly version: SignType;
   readonly voteSet?: VoteSet;
-  readonly voteInfo?: ExtraDataVoteInfo;
   readonly blsAggregateSignature?: Buffer;
 
   /**
@@ -158,11 +143,10 @@ export class ExtraData {
     let proposal!: Proposal;
     let evidence!: Evidence[];
     let voteSet: VoteSet | undefined;
-    let voteInfo: ExtraDataVoteInfo | undefined;
     let blsAggregateSignature: Buffer | undefined;
     const signType = isBls(header._common) ? SignType.blsSignature : SignType.ecdsaSignature;
     if (signType === SignType.blsSignature) {
-      if (values.length !== 6) {
+      if (values.length !== 5) {
         throw new Error('invliad values');
       }
       for (let i = 0; i < values.length; i++) {
@@ -239,40 +223,32 @@ export class ExtraData {
             proposal.validateSignature(proposer);
           }
         } else if (i === 3) {
-          if (!isEXVoteinfo(value)) {
-            throw new Error('invliad values');
-          }
-          const [chainId, type, height, round, hash] = value;
-          voteInfo = {
-            chainId: bufferToInt(chainId),
-            type: bufferToInt(type),
-            height: new BN(height),
-            round: bufferToInt(round),
-            hash: hash
-          };
-          if (voteInfo.chainId !== header._common.chainIdBN().toNumber() || !voteInfo.height.eq(header.number) || voteInfo.round !== commitRound || !voteInfo.hash.equals(headerHash) || voteInfo.type !== VoteType.Precommit) {
-            throw new Error('invalid voteInfo');
-          }
-        } else if (i === 4) {
           if (!isEXAggregateSignature(value)) {
             throw new Error('invliad values');
           }
           blsAggregateSignature = value;
-        } else if (i === 5) {
+        } else if (i === 4) {
           if (!isEXVoteSetBitArray(value)) {
             throw new Error('invliad values');
           }
 
           if (valSet) {
             const bitArray = BitArray.fromValuesArray(value);
-            const voteinfoBuffer = rlphash([intToBuffer(voteInfo!.chainId), intToBuffer(voteInfo!.type), bnToUnpaddedBuffer(voteInfo!.height), intToBuffer(voteInfo!.round), voteInfo!.hash]);
+            const voteInfo = {
+              chainId: chainId,
+              type: VoteType.Precommit,
+              hash: headerHash,
+              height: header.number,
+              round: commitRound
+            };
+            const voteinfoBuffer = rlphash([intToBuffer(voteInfo.chainId), intToBuffer(voteInfo.type), bnToUnpaddedBuffer(voteInfo.height), intToBuffer(voteInfo.round), voteInfo.hash]);
             voteSet!.setAggregateSignature(blsAggregateSignature!, bitArray, voteinfoBuffer, voteInfo!.hash);
           }
         } else {
           throw new Error('invliad values');
         }
       }
-      return new ExtraData(round, commitRound, POLRound, evidence, proposal, signType, voteSet, voteInfo, blsAggregateSignature);
+      return new ExtraData(round, commitRound, POLRound, evidence, proposal, signType, voteSet, blsAggregateSignature);
     } else {
       if (valSet) {
         // validator size + 1(evidence list) + 1(round and POLRound list) + 1(proposal)
@@ -386,7 +362,7 @@ export class ExtraData {
     }
   }
 
-  constructor(round: number, commitRound: number, POLRound: number, evidence: Evidence[], proposal: Proposal, version: SignType, voteSet?: VoteSet, voteInfo?: ExtraDataVoteInfo, blsAggregateSignature?: Buffer) {
+  constructor(round: number, commitRound: number, POLRound: number, evidence: Evidence[], proposal: Proposal, version: SignType, voteSet?: VoteSet, blsAggregateSignature?: Buffer) {
     this.round = round;
     this.commitRound = commitRound;
     this.POLRound = POLRound;
@@ -404,7 +380,6 @@ export class ExtraData {
         this.blsAggregateSignature = Buffer.from(voteSetAggregateSignature);
       }
     }
-    this.voteInfo = voteInfo;
     this.validateBasic();
   }
 
@@ -441,12 +416,6 @@ export class ExtraData {
         }
       }
     } else if (this.version === SignType.blsSignature) {
-      if (this.voteInfo?.chainId === undefined || this.voteInfo?.type === undefined || this.voteInfo?.height === undefined || this?.voteInfo?.round === undefined || this?.voteInfo?.hash === undefined) {
-        raw.push([]);
-      } else {
-        raw.push([intToBuffer(this.voteInfo.chainId), intToBuffer(this.voteInfo.type), bnToUnpaddedBuffer(this.voteInfo.height), intToBuffer(this.voteInfo.round), this.voteInfo.hash]);
-      }
-
       raw.push(this.blsAggregateSignature ? this.blsAggregateSignature : Buffer.alloc(0));
       if (this.voteSet) {
         raw.push(this.voteSet.votesBitArray.raw());

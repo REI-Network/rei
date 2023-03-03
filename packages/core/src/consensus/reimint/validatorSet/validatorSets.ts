@@ -30,39 +30,30 @@ export class ValidatorSets {
       if (!sm) {
         throw new Error('missing state root: ' + stateRoot.toString('hex'));
       }
-      //todo check bls public key
+
+      let validatorSet: ValidatorSet;
       if (!bls) {
         const { totalLockedAmount, validatorCount } = await sm.getTotalLockedAmountAndValidatorCount();
         const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
         const options: LoadOptions = enableGenesisValidators ? { genesis: true } : { active };
-        const valSet = await ValidatorSet.fromStakeManager(sm, options);
-        this.set(stateRoot, valSet);
-        return valSet;
+        validatorSet = await ValidatorSet.fromStakeManager(sm, options);
+      } else {
+        let activeSet: ActiveValidatorSet;
+        const indexedValidatorSet = await IndexedValidatorSet.fromStakeManager(sm, bls);
+        const { totalLockedAmount, validatorCount } = indexedValidatorSet.getTotalLockVotingPower(true);
+        const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
+        activeSet = enableGenesisValidators
+          ? await ActiveValidatorSet.fromStakeManager(sm, (val) => {
+              if (!isGenesis(val, sm.common)) {
+                throw new Error('unknown validator: ' + val.toString());
+              }
+              return genesisValidatorVotingPower.clone();
+            })
+          : ActiveValidatorSet.fromActiveValidators(indexedValidatorSet.sort(sm.common.param('vm', 'maxValidatorsCount'), true));
+        validatorSet = new ValidatorSet(indexedValidatorSet, activeSet);
       }
-
-      const totalLockedAmount = new BN(0);
-      const validatorCount = new BN(0);
-      const indexedValidatorSet = await IndexedValidatorSet.fromStakeManager(sm, bls);
-      for (const v of indexedValidatorSet.indexed.values()) {
-        if (v.blsPublicKey !== undefined) {
-          totalLockedAmount.iadd(v.votingPower);
-          validatorCount.iaddn(1);
-        }
-      }
-
-      let activeSet: ActiveValidatorSet;
-      const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
-      activeSet = enableGenesisValidators
-        ? await ActiveValidatorSet.fromStakeManager(sm, (val) => {
-            if (!isGenesis(val, sm.common)) {
-              throw new Error('unknown validator: ' + val.toString());
-            }
-            return genesisValidatorVotingPower.clone();
-          })
-        : ActiveValidatorSet.fromActiveValidators(indexedValidatorSet.sort(sm.common.param('vm', 'maxValidatorsCount'), true));
-      const valSet = new ValidatorSet(indexedValidatorSet, activeSet);
-      this.set(stateRoot, valSet);
-      return valSet;
+      this.set(stateRoot, validatorSet);
+      return validatorSet;
     } else {
       return new ValidatorSet(indexed, active);
     }

@@ -20,7 +20,15 @@ export type ActiveValidator = {
   priority: BN;
   // voting power
   votingPower: BN;
+  // bls public key
+  blsPublicKey?: Buffer;
 };
+
+/**
+ * @todo:
+ *  1.genesis active validator should get the bls public key by common
+ *  2.fromStakeManager function should get the bls public key by validatorBls contract
+ * */
 
 // clone a `ActiveValidator`
 function copyActiveValidator(av: ActiveValidator) {

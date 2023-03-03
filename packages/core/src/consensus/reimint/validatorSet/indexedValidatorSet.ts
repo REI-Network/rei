@@ -215,4 +215,23 @@ export class IndexedValidatorSet {
 
     return activeValidators;
   }
+
+  getTotalLockVotingPower(flag?: boolean) {
+    const totalLockedAmount = new BN(0);
+    const validatorCount = new BN(0);
+    if (flag) {
+      for (const v of this.indexed.values()) {
+        if (v.blsPublicKey !== undefined) {
+          totalLockedAmount.iadd(v.votingPower);
+          validatorCount.iaddn(1);
+        }
+      }
+    } else {
+      for (const v of this.indexed.values()) {
+        totalLockedAmount.iadd(v.votingPower);
+        validatorCount.iaddn(1);
+      }
+    }
+    return { totalLockedAmount, validatorCount };
+  }
 }

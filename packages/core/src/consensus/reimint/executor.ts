@@ -244,7 +244,7 @@ export class ReimintExecutor implements Executor {
 
     // 8. get totalLockedAmount and validatorCount by the merged validatorSet,
     //    and decide if we should enable genesis validators
-    const { totalLockedAmount, validatorCount } = this.checkoutTotalLockedVotingPower(indexedValidatorSet, isEnableValidatorBls(nextCommon));
+    const { totalLockedAmount, validatorCount } = indexedValidatorSet.getTotalLockVotingPower(isEnableValidatorBls(nextCommon));
     logger.debug('Reimint::afterApply, totalLockedAmount:', totalLockedAmount.toString(), 'validatorCount:', validatorCount.toString());
     const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), nextCommon);
     if (enableGenesisValidators) {
@@ -526,24 +526,5 @@ export class ReimintExecutor implements Executor {
       bloom: result.bloom,
       root: await vm.stateManager.getStateRoot()
     };
-  }
-
-  private checkoutTotalLockedVotingPower(indexedValidatorSet: IndexedValidatorSet, flag?: boolean) {
-    const totalLockedAmount = new BN(0);
-    const validatorCount = new BN(0);
-    if (flag) {
-      for (const v of indexedValidatorSet.indexed.values()) {
-        if (v.blsPublicKey !== undefined) {
-          totalLockedAmount.iadd(v.votingPower);
-          validatorCount.iaddn(1);
-        }
-      }
-    } else {
-      for (const v of indexedValidatorSet.indexed.values()) {
-        totalLockedAmount.iadd(v.votingPower);
-        validatorCount.iaddn(1);
-      }
-    }
-    return { totalLockedAmount, validatorCount };
   }
 }

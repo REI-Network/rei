@@ -309,7 +309,7 @@ export class VoteSet {
   signedMsgType: VoteType;
   valSet: ActiveValidatorSet;
   version: SignType;
-  _aggregateSignature: Uint8Array | undefined;
+  aggregateSignature: Uint8Array | undefined;
 
   votesBitArray: BitArray;
   votes: (Vote | undefined)[];
@@ -442,7 +442,7 @@ export class VoteSet {
   }
 
   /**
-   * Set peer maj23  hash
+   * Set peer maj23 hash
    * @param peerId - Peer id
    * @param hash - proposal hash 2 out of 3 verified
    * @returns
@@ -514,21 +514,21 @@ export class VoteSet {
     if (!this.hasTwoThirdsMajority()) {
       throw new Error('Not enough votes to aggregate signature');
     }
-    if (!this._aggregateSignature) {
+    if (!this.aggregateSignature) {
       const bls = importBls();
-      this._aggregateSignature = bls.aggregateSignatures(this.votes.filter((v) => !!v).map((v) => v!.blsSignature!));
+      this.aggregateSignature = bls.aggregateSignatures(this.votes.filter((v) => !!v).map((v) => v!.blsSignature!));
     }
-    return this._aggregateSignature;
+    return this.aggregateSignature;
   }
 
   /**
-   * Set aggregate blsSignature
-   * @param sig - blsSignature
+   * Verify and accept aggregate blsSignature
+   * @param sig - bls signature
    * @param bitArray - bit array
-   * @param voteinfoHash - voteinfo hash
+   * @param msgHash - message hash
    * @param hash - block hash
    */
-  setAggregateSignature(sig: Uint8Array, bitArray: BitArray, voteinfoHash: Buffer, hash: Buffer) {
+  acceptAggregateSignature(sig: Uint8Array, bitArray: BitArray, msgHash: Buffer, hash: Buffer) {
     const bls = importBls();
     const len = bitArray.length;
     const pubKeys: Buffer[] = [];
@@ -539,7 +539,8 @@ export class VoteSet {
         sum.iadd(this.valSet.getVotingPower(this.valSet.getValidatorByIndex(i)));
       }
     }
-    if (!bls.verifyAggregate(pubKeys, voteinfoHash, sig)) {
+
+    if (!bls.verifyAggregate(pubKeys, msgHash, sig)) {
       throw new Error('invalid bls aggregate signature');
     }
 
@@ -548,7 +549,7 @@ export class VoteSet {
     }
 
     this.maj23 = hash;
-    this._aggregateSignature = sig;
+    this.aggregateSignature = sig;
     this.votesBitArray = bitArray;
   }
 }

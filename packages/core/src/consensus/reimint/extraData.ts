@@ -146,9 +146,6 @@ export class ExtraData {
     let blsAggregateSignature: Buffer | undefined;
     const signType = isBls(header._common) ? SignType.blsSignature : SignType.ecdsaSignature;
     if (signType === SignType.blsSignature) {
-      if (values.length !== 5) {
-        throw new Error('invliad values');
-      }
       for (let i = 0; i < values.length; i++) {
         const value = values[i];
         if (i === 0) {
@@ -241,8 +238,8 @@ export class ExtraData {
               height: header.number,
               round: commitRound
             };
-            const voteinfoBuffer = rlphash([intToBuffer(voteInfo.chainId), intToBuffer(voteInfo.type), bnToUnpaddedBuffer(voteInfo.height), intToBuffer(voteInfo.round), voteInfo.hash]);
-            voteSet!.setAggregateSignature(blsAggregateSignature!, bitArray, voteinfoBuffer, voteInfo!.hash);
+            const msgHash = rlphash([intToBuffer(voteInfo.chainId), intToBuffer(voteInfo.type), bnToUnpaddedBuffer(voteInfo.height), intToBuffer(voteInfo.round), voteInfo.hash]);
+            voteSet!.acceptAggregateSignature(blsAggregateSignature!, bitArray, msgHash, voteInfo!.hash);
           }
         } else {
           throw new Error('invliad values');
@@ -424,9 +421,6 @@ export class ExtraData {
           throw new Error('missing validater set size');
         }
         const bitArray = new BitArray(validaterOptions.validaterSetSize);
-        for (let i = 0; i < validaterOptions.validaterSetSize; i++) {
-          bitArray.setIndex(i, false);
-        }
         raw.push(bitArray.raw());
       }
     }

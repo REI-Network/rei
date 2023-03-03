@@ -5,6 +5,7 @@ import { Channel, logger } from '@rei-network/utils';
 import { Block, BlockHeader } from '@rei-network/structure';
 import { isEmptyHash, EMPTY_HASH } from '../../utils';
 import { preValidateBlock, preValidateHeader } from '../../validation';
+import { isBls } from '../../hardforks';
 import { PendingBlock } from '../pendingBlock';
 import { Reimint } from './reimint';
 import { IProcessBlockResult, IStateMachineBackend, IStateMachineP2PBackend, ISigner, IConfig, IEvidencePool, IWAL, IDebug, RoundStepType } from './types';
@@ -16,7 +17,6 @@ import { Evidence, DuplicateVoteEvidence } from './evpool';
 import { TimeoutTicker } from './timeoutTicker';
 import { ExtraData } from './extraData';
 import { ActiveValidatorSet } from './validatorSet';
-import { isBls } from '../../hardforks';
 
 const SkipTimeoutCommit = true;
 const WaitForTxs = true;
@@ -505,7 +505,7 @@ export class StateMachine {
       return;
     }
 
-    const voteVersion = isBls(this.backend.getCommon(this.height)) && type === VoteType.Precommit ? SignType.blsSignature : SignType.ecdsaSignature;
+    const voteVersion = isBls(this.pendingBlock!.common) && type === VoteType.Precommit ? SignType.blsSignature : SignType.ecdsaSignature;
     const vote = new Vote(
       {
         chainId: this.chainId,
@@ -1036,8 +1036,7 @@ export class StateMachine {
       this.lockedBlockResult = undefined;
       this.validRound = -1;
       this.validBlock = undefined;
-      const nextCommon = this.backend.getCommon(this.height);
-      const signType = isBls(nextCommon) ? SignType.blsSignature : SignType.ecdsaSignature;
+      const signType = isBls(pendingBlock.common) ? SignType.blsSignature : SignType.ecdsaSignature;
       this.votes = new HeightVoteSet(this.chainId, this.height, this.validators, signType);
       this.commitRound = -1;
       this.triggeredTimeoutPrecommit = false;

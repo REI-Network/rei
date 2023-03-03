@@ -53,12 +53,10 @@ describe('BlsVote', () => {
     expect(vote0.type).to.be.equal(vote1.type);
     expect(vote0.hash.compare(vote1.hash)).to.be.equal(0);
     expect(vote0.index).to.be.equal(vote1.index);
+    expect(vote0.version).to.be.equal(vote1.version);
     expect(vote0.signature.compare(vote1.signature!)).to.be.equal(0);
     expect(vote0.blsSignature.compare(vote1.blsSignature!)).to.be.equal(0);
-    expect(vote0.version).to.be.equal(vote1.version);
-
-    const address = vote0.validator().toString();
-    expect(address).to.be.equal(accMngr.n2a('validator1').toString());
+    expect(vote0.validator().equals(vote1.validator())).be.true;
   });
 
   it('should get votset aggregate signature successfully for blsSingature', async () => {

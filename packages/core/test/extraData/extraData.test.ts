@@ -2,19 +2,19 @@ import crypto from 'crypto';
 import { expect } from 'chai';
 import { Address, BN, ecsign, intToBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
-import { Vote, VoteType, VoteSet, Reimint, ExtraData, SignType, Proposal } from '../../src/consensus/reimint';
-import { MockAccountManager } from '../util';
 import { Bls, SecretKey, initBls, importBls } from '@rei-network/bls';
+import { BlockHeader } from '@rei-network/structure';
+import { Vote, VoteType, VoteSet, Reimint, ExtraData, SignType, Proposal } from '../../src/consensus/reimint';
 import { ActiveValidatorSet, ActiveValidator, copyActiveValidator } from '../../src/consensus/reimint/validatorSet';
 import { DuplicateVoteEvidence } from '../../src/consensus';
-import { BlockHeader } from '@rei-network/structure';
+import { MockAccountManager } from '../util';
 
 type MockActiveValidator = {
   ActiveValidator: ActiveValidator;
   blsPublicKey: Buffer;
 };
 
-class mockActiveValidatorSet extends ActiveValidatorSet {
+class MockActiveValidatorSet extends ActiveValidatorSet {
   blsPublicKeys: MockActiveValidator[];
 
   constructor(validators: ActiveValidator[], blsPublicKeys: Buffer[], proposer?: Address) {
@@ -32,7 +32,7 @@ class mockActiveValidatorSet extends ActiveValidatorSet {
   }
 
   copy() {
-    return new mockActiveValidatorSet(
+    return new MockActiveValidatorSet(
       this.activeValidators().map(copyActiveValidator),
       this.blsPublicKeys.map((v) => v.blsPublicKey),
       this.proposer
@@ -93,9 +93,9 @@ describe('extraDataBls', () => {
     voteB.signature = Buffer.concat([evidenceSignatureB.r, evidenceSignatureB.s, intToBuffer(evidenceSignatureB.v - 27)]);
     voteA.blsSignature = Buffer.from(accMngr.n2b(accMngr.addressToName.get(voteA.validator())!).sign(voteA.getMessageToBlsSign()).toBytes());
     voteB.blsSignature = Buffer.from(accMngr.n2b(accMngr.addressToName.get(voteB.validator())!).sign(voteB.getMessageToBlsSign()).toBytes());
-    const Vote1 = voteA.hash.compare(voteB.hash) > 0 ? voteB : voteA;
-    const Vote2 = voteA.hash.compare(voteB.hash) > 0 ? voteA : voteB;
-    const evidence = new DuplicateVoteEvidence(Vote1, Vote2);
+    const vote1 = voteA.hash.compare(voteB.hash) > 0 ? voteB : voteA;
+    const vote2 = voteA.hash.compare(voteB.hash) > 0 ? voteA : voteB;
+    const evidence = new DuplicateVoteEvidence(vote1, vote2);
     const headerRawHash = Reimint.calcBlockHeaderRawHash(blockHeader, [evidence]);
 
     const votes: Vote[] = [];
@@ -123,7 +123,7 @@ describe('extraDataBls', () => {
       vote.blsSignature = Buffer.from(accMngr.n2b(accMngr.addressToName.get(vote.validator())!).sign(vote.getMessageToBlsSign()).toBytes());
       votes.push(vote);
     });
-    const valSet = new mockActiveValidatorSet(
+    const valSet = new MockActiveValidatorSet(
       activeValidators,
       secretKeys.map((sk) => Buffer.from(sk.toPublicKey().toBytes()))
     );

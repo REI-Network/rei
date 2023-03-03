@@ -38,11 +38,10 @@ export class ValidatorSets {
         const options: LoadOptions = enableGenesisValidators ? { genesis: true } : { active };
         validatorSet = await ValidatorSet.fromStakeManager(sm, options);
       } else {
-        let activeSet: ActiveValidatorSet;
         const indexedValidatorSet = await IndexedValidatorSet.fromStakeManager(sm, bls);
         const { totalLockedAmount, validatorCount } = indexedValidatorSet.getTotalLockVotingPower(true);
         const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
-        activeSet = enableGenesisValidators
+        const activeSet = enableGenesisValidators
           ? await ActiveValidatorSet.fromStakeManager(sm, (val) => {
               if (!isGenesis(val, sm.common)) {
                 throw new Error('unknown validator: ' + val.toString());

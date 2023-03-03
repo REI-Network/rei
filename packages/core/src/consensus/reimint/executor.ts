@@ -209,23 +209,19 @@ export class ReimintExecutor implements Executor {
 
     let validatorSet: ValidatorSet = parentValidatorSet.copy();
     let indexedValidatorSet: IndexedValidatorSet = parentValidatorSet.indexed.copy();
+    const nextCommon = this.backend.getCommon(pendingBlock.header.number.addn(1));
     const changes = new ValidatorChanges(pendingCommon);
     StakeManager.filterReceiptsChanges(changes, receipts, pendingCommon);
     if (logs.length > 0) {
       StakeManager.filterLogsChanges(changes, logs, pendingCommon);
     }
-    // 7. filter all receipts to collect validatorBls changes,
+
+    // 7. filter all receipts to collect validatorBls changes
     if (isEnableValidatorBls(pendingCommon)) {
       ValidatorBls.filterReceiptsChanges(changes, receipts, pendingCommon);
       indexedValidatorSet.merge(changes, this.engine.getValidatorBls(vm, pendingBlock, pendingCommon));
-    } else {
-      indexedValidatorSet.merge(changes);
-    }
-
-    let blsFlag = false;
-    const nextCommon = this.backend.getCommon(pendingBlock.header.number.addn(1));
-    // 15. modify validatorBls contract address
-    if (!isEnableValidatorBls(pendingCommon) && isEnableValidatorBls(nextCommon)) {
+    } else if (!isEnableValidatorBls(pendingCommon) && isEnableValidatorBls(nextCommon)) {
+      // modify validatorBls contract address
       const preAddr = nextCommon.param('vm', 'preaddr');
       const postAddr = nextCommon.param('vm', 'postaddr');
       if (preAddr === undefined || postAddr === undefined) {
@@ -242,27 +238,29 @@ export class ReimintExecutor implements Executor {
       // deploy validatorBlsFallback contract
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deloyValidatorBlsFallbackContract(evm, nextCommon);
+    } else {
+      indexedValidatorSet.merge(changes);
     }
 
     // 8.get totalLockedAmount and validatorCount by the merged validatorSet,
     //    and decide if we should enable genesis validators
-    const { totalLockedAmount, validatorCount } = this.checkoutTotalLockedVotingPower(indexedValidatorSet, isEnableValidatorBls(pendingCommon) || blsFlag);
+    const { totalLockedAmount, validatorCount } = this.checkoutTotalLockedVotingPower(indexedValidatorSet, isEnableValidatorBls(nextCommon));
     logger.debug('Reimint::afterApply, totalLockedAmount:', totalLockedAmount.toString(), 'validatorCount:', validatorCount.toString());
-    const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), pendingCommon);
+    const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), nextCommon);
     if (enableGenesisValidators) {
-      if (!parentValidatorSet.isGenesis(pendingCommon)) {
+      if (!parentValidatorSet.isGenesis(nextCommon)) {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, create a new genesis validator set');
         // if the parent validator set isn't a genesis validator set, we create a new one
-        validatorSet = new ValidatorSet(indexedValidatorSet, ActiveValidatorSet.genesis(pendingCommon));
+        validatorSet = new ValidatorSet(indexedValidatorSet, ActiveValidatorSet.genesis(nextCommon));
       } else {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, copy from parent');
         // if the parent validator set is a genesis validator set, we copy the set from the parent
         validatorSet = new ValidatorSet(indexedValidatorSet, parentValidatorSet.active.copy());
       }
     } else {
-      const maxCount = pendingCommon.param('vm', 'maxValidatorsCount');
+      const maxCount = nextCommon.param('vm', 'maxValidatorsCount');
       const active = parentValidatorSet.active.copy();
-      active.merge(indexedValidatorSet.sort(maxCount, isEnableValidatorBls(pendingCommon) || blsFlag));
+      active.merge(indexedValidatorSet.sort(maxCount, isEnableValidatorBls(nextCommon)));
       active.computeNewPriorities(parentValidatorSet.active.copy());
       validatorSet = new ValidatorSet(indexedValidatorSet, active);
     }

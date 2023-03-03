@@ -542,9 +542,12 @@ export class VoteSet {
     if (!bls.verifyAggregate(pubKeys, voteinfoHash, sig)) {
       throw new Error('invalid bls aggregate signature');
     }
-    if (sum.gt(this.valSet.totalVotingPower.muln(2).divn(3))) {
-      this.maj23 = hash;
+
+    if (sum.lt(this.valSet.totalVotingPower.muln(2).divn(3))) {
+      throw new Error('not enough voting power');
     }
+
+    this.maj23 = hash;
     this._aggregateSignature = sig;
     this.votesBitArray = bitArray;
   }

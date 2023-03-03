@@ -505,7 +505,7 @@ export class StateMachine {
       return;
     }
 
-    const version = isBls(this.backend.getCommon(this.height)) ? SignType.blsSignature : SignType.ecdsaSignature;
+    const voteVersion = isBls(this.backend.getCommon(this.height)) && type === VoteType.Precommit ? SignType.blsSignature : SignType.ecdsaSignature;
     const vote = new Vote(
       {
         chainId: this.chainId,
@@ -515,7 +515,7 @@ export class StateMachine {
         hash,
         index
       },
-      version
+      voteVersion
     );
     vote.signature = this.signer.sign(vote.getMessageToSign());
     if (vote.version === SignType.blsSignature) {
@@ -534,7 +534,7 @@ export class StateMachine {
           hash: crypto.randomBytes(32),
           index
         },
-        version
+        voteVersion
       );
       vote.signature = this.signer.sign(vote.getMessageToSign());
       if (vote.version === SignType.blsSignature) {

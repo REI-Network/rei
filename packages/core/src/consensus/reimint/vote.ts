@@ -604,7 +604,7 @@ export class HeightVoteSet {
       throw new Error('addRound for an existing round');
     }
     this.roundVoteSets.set(round, {
-      prevotes: new VoteSet(this.chainId, this.height, round, VoteType.Prevote, this.valSet, this.version),
+      prevotes: new VoteSet(this.chainId, this.height, round, VoteType.Prevote, this.valSet, SignType.ecdsaSignature),
       precommits: new VoteSet(this.chainId, this.height, round, VoteType.Precommit, this.valSet, this.version)
     });
   }

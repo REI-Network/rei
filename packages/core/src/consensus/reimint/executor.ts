@@ -244,7 +244,7 @@ export class ReimintExecutor implements Executor {
       await Contract.deloyValidatorBlsFallbackContract(evm, nextCommon);
     }
 
-    // 8.get totalLockedAmount and validatorCount by the merged validatorSet,
+    // 8. get totalLockedAmount and validatorCount by the merged validatorSet,
     //    and decide if we should enable genesis validators
     const { totalLockedAmount, validatorCount } = this.checkoutTotalLockedVotingPower(indexedValidatorSet, isEnableValidatorBls(pendingCommon) || blsFlag);
     logger.debug('Reimint::afterApply, totalLockedAmount:', totalLockedAmount.toString(), 'validatorCount:', validatorCount.toString());

@@ -59,22 +59,6 @@ export class IndexedValidatorSet {
     return new IndexedValidatorSet(indexed);
   }
 
-  /**
-   * Create a genesis validator set
-   * @param common - Common instance
-   * @returns IndexedValidatorSet instance
-   */
-  static genesis(common: Common) {
-    const indexed = new FunctionalAddressMap<IndexedValidator>();
-    for (const gv of getGenesisValidators(common)) {
-      indexed.set(gv, {
-        validator: gv,
-        votingPower: genesisValidatorVotingPower.clone()
-      });
-    }
-    return new IndexedValidatorSet(indexed);
-  }
-
   constructor(indexed: Map<Address, IndexedValidator>) {
     this.indexed = indexed;
   }

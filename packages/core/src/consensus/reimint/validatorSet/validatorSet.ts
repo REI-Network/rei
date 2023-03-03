@@ -51,17 +51,6 @@ export class ValidatorSet {
     return new ValidatorSet(indexed, active);
   }
 
-  /**
-   * Create a genesis validator set
-   * @param common - Common instance
-   * @returns ValidatorSet instance
-   */
-  static genesis(common: Common) {
-    const indexed = IndexedValidatorSet.genesis(common);
-    const active = ActiveValidatorSet.genesis(common);
-    return new ValidatorSet(indexed, active);
-  }
-
   constructor(indexed: IndexedValidatorSet, active: ActiveValidatorSet) {
     this.indexed = indexed;
     this.active = active;

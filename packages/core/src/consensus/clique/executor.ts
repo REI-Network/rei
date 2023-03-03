@@ -42,15 +42,15 @@ export class CliqueExecutor implements Executor {
    *          (if the next block is in Reimint consensus)
    */
   async afterApply(vm: VM, pendingBlock: Block) {
-    let validatorSet: ValidatorSet | undefined;
+    let validatorSet!: ValidatorSet;
     const nextCommon = this.backend.getCommon(pendingBlock.header.number.addn(1));
     if (isEnableRemint(nextCommon)) {
       // deploy system contracts
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployReimintContracts(evm, nextCommon);
 
-      // create genesis validator set
-      validatorSet = ValidatorSet.genesis(nextCommon);
+      // TODO: create genesis validator set
+      // validatorSet = ValidatorSet.genesis(nextCommon);
     }
 
     return validatorSet;

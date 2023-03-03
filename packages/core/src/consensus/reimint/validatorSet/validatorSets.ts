@@ -39,6 +39,7 @@ export class ValidatorSets {
         this.set(stateRoot, valSet);
         return valSet;
       }
+
       const totalLockedAmount = new BN(0);
       const validatorCount = new BN(0);
       const indexedValidatorSet = await IndexedValidatorSet.fromStakeManager(sm, bls);
@@ -48,8 +49,18 @@ export class ValidatorSets {
           validatorCount.iaddn(1);
         }
       }
+
+      let activeSet: ActiveValidatorSet;
       const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
-      const valSet = enableGenesisValidators ? new ValidatorSet(indexedValidatorSet, ActiveValidatorSet.genesis(sm.common)) : new ValidatorSet(indexedValidatorSet, ActiveValidatorSet.fromActiveValidators(indexedValidatorSet.sort(sm.common.param('vm', 'maxValidatorsCount'), true)));
+      activeSet = enableGenesisValidators
+        ? await ActiveValidatorSet.fromStakeManager(sm, (val) => {
+            if (!isGenesis(val, sm.common)) {
+              throw new Error('unknown validator: ' + val.toString());
+            }
+            return genesisValidatorVotingPower.clone();
+          })
+        : ActiveValidatorSet.fromActiveValidators(indexedValidatorSet.sort(sm.common.param('vm', 'maxValidatorsCount'), true));
+      const valSet = new ValidatorSet(indexedValidatorSet, activeSet);
       this.set(stateRoot, valSet);
       return valSet;
     } else {

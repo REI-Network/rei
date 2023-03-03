@@ -59,7 +59,7 @@ describe('BlsManager', () => {
   it('should signMessage and verifySignature successfully', async () => {
     const message = 'reireirei';
     const signature = blsManager.signMessage(Buffer.from(message));
-    const verifyResult = blsManager.verifyMessage(blsManager.getPublicKey(), signature.toBytes(), Buffer.from(message));
+    const verifyResult = blsManager.verifyMessage(blsManager.getPublicKey().toBytes(), Buffer.from(message), signature.toBytes());
     expect(verifyResult).to.equal(true, 'verify result should be true');
   });
 

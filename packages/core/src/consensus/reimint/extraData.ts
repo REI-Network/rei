@@ -11,7 +11,6 @@ import { Proposal } from './proposal';
 import * as v from './validate';
 import { ReimintConsensusEngine } from './engine';
 import { isBls } from '../../hardforks';
-import { importBls } from '@rei-network/bls';
 
 export interface ExtraDataOptions {
   chainId: number;
@@ -64,8 +63,10 @@ function isEXVoteinfo(ele: EXElement): ele is EXVoteinfo {
   if (!Array.isArray(ele) || ele.length !== 5) {
     return false;
   }
-  if (!(ele[0] instanceof Buffer) || !(ele[1] instanceof Buffer) || !(ele[2] instanceof Buffer) || !(ele[3] instanceof Buffer) || !(ele[4] instanceof Buffer)) {
-    return false;
+  for (const item of ele) {
+    if (!(item instanceof Buffer)) {
+      return false;
+    }
   }
   return true;
 }
@@ -249,6 +250,9 @@ export class ExtraData {
             round: bufferToInt(round),
             hash: hash
           };
+          if (voteInfo.chainId !== header._common.chainIdBN().toNumber() || !voteInfo.height.eq(header.number) || voteInfo.round !== commitRound || !voteInfo.hash.equals(headerHash) || voteInfo.type !== VoteType.Precommit) {
+            throw new Error('invalid voteInfo');
+          }
         } else if (i === 4) {
           if (!isEXAggregateSignature(value)) {
             throw new Error('invliad values');

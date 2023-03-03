@@ -498,11 +498,22 @@ export class VoteSet {
     return this.votesByBlock.get(hash)?.bitArray.copy();
   }
 
+  /**
+   * Check if is commit
+   * @returns true if is commit
+   */
   isCommit() {
     return this.signedMsgType === VoteType.Precommit && !!this.maj23;
   }
 
+  /**
+   * Get aggregate blsSignature
+   * @returns aggregate signature
+   */
   getAggregateSignature() {
+    if (!this.hasTwoThirdsAny()) {
+      throw new Error('Not enough votes to aggregate signature');
+    }
     if (!this._aggregateSignature) {
       const bls = importBls();
       this._aggregateSignature = bls.aggregateSignatures(this.votes.filter((v) => !!v).map((v) => v!.blsSignature!));
@@ -510,6 +521,13 @@ export class VoteSet {
     return this._aggregateSignature;
   }
 
+  /**
+   * Set aggregate blsSignature
+   * @param sig - blsSignature
+   * @param bitArray - bit array
+   * @param voteinfoHash - voteinfo hash
+   * @param hash - block hash
+   */
   setAggregateSignature(sig: Uint8Array, bitArray: BitArray, voteinfoHash: Buffer, hash: Buffer) {
     const bls = importBls();
     const len = bitArray.length;

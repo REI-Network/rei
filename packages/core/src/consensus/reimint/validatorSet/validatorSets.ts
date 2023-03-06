@@ -39,7 +39,7 @@ export class ValidatorSets {
         validatorSet = await ValidatorSet.fromStakeManager(sm, options);
       } else {
         const indexedValidatorSet = await IndexedValidatorSet.fromStakeManager(sm, bls);
-        const { totalLockedAmount, validatorCount } = indexedValidatorSet.getTotalLockVotingPower(true);
+        const { totalLockedAmount, validatorCount } = indexedValidatorSet.getTotalLockedVotingPowerAndValidatorCount(true);
         const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
         const activeSet = enableGenesisValidators
           ? await ActiveValidatorSet.fromStakeManager(sm, (val) => {

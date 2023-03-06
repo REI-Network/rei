@@ -244,7 +244,7 @@ export class ReimintExecutor implements Executor {
 
     // 8. get totalLockedAmount and validatorCount by the merged validatorSet,
     //    and decide if we should enable genesis validators
-    const { totalLockedAmount, validatorCount } = indexedValidatorSet.getTotalLockVotingPower(isEnableValidatorBls(nextCommon));
+    const { totalLockedAmount, validatorCount } = indexedValidatorSet.getTotalLockedVotingPowerAndValidatorCount(isEnableValidatorBls(nextCommon));
     logger.debug('Reimint::afterApply, totalLockedAmount:', totalLockedAmount.toString(), 'validatorCount:', validatorCount.toString());
     const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), nextCommon);
     if (enableGenesisValidators) {

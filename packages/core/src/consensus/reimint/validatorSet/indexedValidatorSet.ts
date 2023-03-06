@@ -171,6 +171,7 @@ export class IndexedValidatorSet {
   /**
    * Sort for a active validator list
    * @param maxCount - Max active validator count
+   * @param flag - Filter bls public key or not
    * @returns - Active validator list
    */
   sort(maxCount: number, flag?: boolean) {
@@ -216,11 +217,11 @@ export class IndexedValidatorSet {
   }
 
   /**
-   * Get total locked voting power
+   * Get total locked voting power and validator count
    * @param flag - Whether to filter out validators without bls public key
-   * @returns Total locked voting power
+   * @returns Total locked voting power and validator count
    */
-  getTotalLockVotingPower(flag?: boolean) {
+  getTotalLockedVotingPowerAndValidatorCount(flag?: boolean) {
     const totalLockedAmount = new BN(0);
     const validatorCount = new BN(0);
     if (flag) {

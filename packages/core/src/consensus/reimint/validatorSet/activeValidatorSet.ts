@@ -5,6 +5,7 @@ import { IndexedValidator } from './indexedValidatorSet';
 import { getGenesisValidators, genesisValidatorPriority, genesisValidatorVotingPower } from './genesis';
 import { isEnableBetterPOS } from '../../../hardforks';
 import { ActiveValidator as ActiveValidatorInfo } from '../contracts/stakeManager';
+
 const maxInt256 = new BN('7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 'hex');
 const minInt256 = new BN('8000000000000000000000000000000000000000000000000000000000000000', 'hex').neg();
 const maxProposerPriority = maxInt256;

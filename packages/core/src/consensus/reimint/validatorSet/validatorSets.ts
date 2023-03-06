@@ -1,4 +1,3 @@
-import { BN } from 'ethereumjs-util';
 import { FunctionalBufferMap } from '@rei-network/utils';
 import { StakeManager, ValidatorBls } from '../contracts';
 import { Reimint } from '../reimint';
@@ -6,6 +5,7 @@ import { ValidatorSet, LoadOptions } from './validatorSet';
 import { IndexedValidatorSet } from './indexedValidatorSet';
 import { ActiveValidatorSet } from './activeValidatorSet';
 import { isGenesis, genesisValidatorVotingPower } from './genesis';
+
 const maxSize = 100;
 
 /**

@@ -3,7 +3,7 @@ pragma solidity ^0.6.0;
 import "./Only.sol";
 import "./interfaces/IValidatorBls.sol";
 
-contract ValidatorBls is Only, IValidatorBls {
+contract ValidatorBls is IValidatorBls {
     //validator bls public key
     mapping(address => bytes) private validatorBlsPubkey;
     // validators list
@@ -14,11 +14,9 @@ contract ValidatorBls is Only, IValidatorBls {
     /**
      * @dev Emitted when validator bls public key is set.
      * @param validator Validator address.
-     * @param blsPubicKey Validator bls public key.
+     * @param blsPublicKey Validator bls public key.
      */
     event SetBlsPublicKey(address indexed validator, bytes indexed blsPublicKey);
-
-    constructor(IConfig _config) public Only(_config) {}
 
     /**
      * Get validators length.
@@ -35,7 +33,11 @@ contract ValidatorBls is Only, IValidatorBls {
     function setBlsPublicKey(bytes memory key) public override {
         require(key.length == 48, "ValidatorBls: invalid bls public key");
         require(!_blsPubkeyExist[key], "ValidatorBls: bls public key already exist");
-        if (validatorBlsPubkey[msg.sender].length == 0) validators.push(msg.sender);
+        if (validatorBlsPubkey[msg.sender].length == 0) {
+            validators.push(msg.sender);
+        } else {
+            _blsPubkeyExist[validatorBlsPubkey[msg.sender]] = false;
+        }
         validatorBlsPubkey[msg.sender] = key;
         _blsPubkeyExist[key] = true;
         emit SetBlsPublicKey(msg.sender, key);

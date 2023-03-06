@@ -97,6 +97,11 @@ export class ValidatorChanges {
     }
   }
 
+  /**
+   * Someone register bls public key for validator
+   * @param validator - Validator address
+   * @param blsPublicKey - BLS public key
+   */
   setBlsPublicKey(validator: Address, blsPublicKey: Buffer) {
     this.blsValidators.set(validator, blsPublicKey);
   }

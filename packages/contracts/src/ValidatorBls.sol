@@ -16,7 +16,7 @@ contract ValidatorBls is Only, IValidatorBls {
      * @param validator Validator address.
      * @param blsPubicKey Validator bls public key.
      */
-    event SetBlsPublicKey(address indexed validator, bytes indexed blsPubicKey);
+    event SetBlsPublicKey(address indexed validator, bytes indexed blsPublicKey);
 
     constructor(IConfig _config) public Only(_config) {}
 

@@ -24,6 +24,12 @@ export class ValidatorBls extends Contract {
     super(evm, common, methods, Address.fromString(common.param('vm', 'postaddr')));
   }
 
+  /**
+   * Filter validator bls public key changes from receipts
+   * @param changes - Validator changes
+   * @param receipts - Receipts
+   * @param common - Common instance
+   */
   static filterReceiptsChanges(changes: ValidatorChanges, receipts: Receipt[], common: Common) {
     const blsAddr = Address.fromString(common.param('vm', 'postaddr'));
     for (const receipt of receipts) {
@@ -38,38 +44,15 @@ export class ValidatorBls extends Contract {
     }
   }
 
-  async isRegistered(address: Address) {
-    return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('isRegistered', ['address'], [address.toString()]));
-      return new BN(returnValue).eqn(1);
-    });
-  }
-
+  /**
+   * Get validator bls public key
+   * @param validator - Validator address
+   * @returns - BLS public key
+   */
   async getBlsPublicKey(validator: Address) {
     return this.runWithLogger(async () => {
       const { returnValue } = await this.executeMessage(this.makeCallMessage('getBlsPublicKey', ['address'], [validator.toString()]));
       return toBuffer(decodeBytes(returnValue));
-    });
-  }
-
-  async validatorsLength() {
-    return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('validatorsLength', [], []));
-      return decodeInt256(returnValue);
-    });
-  }
-
-  async validators(index: BN) {
-    return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('validators', ['uint256'], [index.toString()]));
-      return bufferToAddress(returnValue);
-    });
-  }
-
-  async blsPubkeyExist(blsPublicKey: Buffer) {
-    return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('blsPublicKeyExist', ['bytes'], [blsPublicKey]));
-      return new BN(returnValue).eqn(1);
     });
   }
 }

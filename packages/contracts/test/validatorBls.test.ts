@@ -4,7 +4,6 @@ import { Contract, ContractFactory, Signer } from 'ethers';
 import { getRandomBytes } from './utils';
 
 describe('ValidatorBls', () => {
-  let config: Contract;
   let validatorBls: Contract;
   let deployer: Signer;
   let user1: Signer;
@@ -22,9 +21,7 @@ describe('ValidatorBls', () => {
   });
 
   beforeEach(async () => {
-    config = await configFactory.connect(deployer).deploy();
-    await config.setSystemCaller(deployerAddr);
-    validatorBls = await validatorBlsFactory.connect(deployer).deploy(config.address);
+    validatorBls = await validatorBlsFactory.connect(deployer).deploy();
   });
 
   it('should set validator bls public key', async () => {

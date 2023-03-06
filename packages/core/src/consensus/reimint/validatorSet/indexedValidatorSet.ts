@@ -1,10 +1,9 @@
 import Heap from 'qheap';
 import { Address, BN } from 'ethereumjs-util';
 import { FunctionalAddressMap, FunctionalAddressSet } from '@rei-network/utils';
-import { Common } from '@rei-network/common';
 import { StakeManager, ValidatorBls } from '../contracts';
 import { ValidatorChanges } from './validatorChanges';
-import { isGenesis, getGenesisValidators, genesisValidatorVotingPower } from './genesis';
+import { isGenesis } from './genesis';
 
 // validator information
 export type IndexedValidator = {

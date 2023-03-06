@@ -216,6 +216,11 @@ export class IndexedValidatorSet {
     return activeValidators;
   }
 
+  /**
+   * Get total locked voting power
+   * @param flag - Whether to filter out validators without bls public key
+   * @returns Total locked voting power
+   */
   getTotalLockVotingPower(flag?: boolean) {
     const totalLockedAmount = new BN(0);
     const validatorCount = new BN(0);

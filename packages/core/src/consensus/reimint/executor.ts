@@ -274,7 +274,7 @@ export class ReimintExecutor implements Executor {
       throw new Error('activeValidators length is zero');
     }
 
-    // 11. call stakeManager.onAfterBlock to save active validator set
+    // 10. call stakeManager.onAfterBlock to save active validator set
     const activeSigners = activeValidators.map(({ validator }) => validator);
     const priorities = activeValidators.map(({ priority }) => priority);
     if (isEnableBetterPOS(pendingCommon)) {
@@ -289,13 +289,13 @@ export class ReimintExecutor implements Executor {
       await Contract.deployHardfork1Contracts(evm, nextCommon);
     }
 
-    // 13. deploy contracts if enable free staking is enabled in the next block
+    // 12. deploy contracts if enable free staking is enabled in the next block
     if (!isEnableFreeStaking(pendingCommon) && isEnableFreeStaking(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployFreeStakingContracts(evm, nextCommon);
     }
 
-    // 14. deploy contracts if enable hardfork 2 is enabled in the next block
+    // 13. deploy contracts if enable hardfork 2 is enabled in the next block
     if (!isEnableHardfork2(pendingCommon) && isEnableHardfork2(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployHardfork2Contracts(evm, nextCommon);
@@ -310,7 +310,7 @@ export class ReimintExecutor implements Executor {
       await pendingStakeManager.initEvidenceHash(hashes);
     }
 
-    // 15. deploy contracts if enable prison is enabled in the next block
+    // 14. deploy contracts if enable prison is enabled in the next block
     if (!isEnableBetterPOS(pendingCommon) && isEnableBetterPOS(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployBetterPOSContracts(evm, nextCommon);

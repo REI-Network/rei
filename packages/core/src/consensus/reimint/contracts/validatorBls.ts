@@ -7,12 +7,7 @@ import { Contract } from './contract';
 import { decodeBytes, bufferToAddress } from './utils';
 
 const methods = {
-  validators: toBuffer('0x35aa2e44'),
-  validatorsLength: toBuffer('0xf1105a7e'),
-  setBlsPublicKey: toBuffer('0xdd9e4222'),
-  getBlsPublicKey: toBuffer('0x647e0e98'),
-  isRegistered: toBuffer('0xc3c5a547'),
-  blsPublicKeyExist: toBuffer('0x90232a32')
+  getBlsPublicKey: toBuffer('0x647e0e98')
 };
 
 const event = {

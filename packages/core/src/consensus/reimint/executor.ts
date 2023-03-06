@@ -222,16 +222,16 @@ export class ReimintExecutor implements Executor {
       indexedValidatorSet.merge(changes, this.engine.getValidatorBls(vm, pendingBlock, pendingCommon));
     } else if (!isEnableValidatorBls(pendingCommon) && isEnableValidatorBls(nextCommon)) {
       // modify validatorBls contract address
-      const preAddr = nextCommon.param('vm', 'preaddr');
+      const fallbackAddr = nextCommon.param('vm', 'fallbackaddr');
       const postAddr = nextCommon.param('vm', 'postaddr');
-      if (preAddr === undefined || postAddr === undefined) {
+      if (fallbackAddr === undefined || postAddr === undefined) {
         throw new Error('Reimint::afterApply, load bls contract failed');
       }
       const addr = Address.fromString(postAddr);
-      const pre = await vm.stateManager.getAccount(Address.fromString(preAddr));
+      const fallback = await vm.stateManager.getAccount(Address.fromString(fallbackAddr));
       const post = await vm.stateManager.getAccount(addr);
-      post.stateRoot = pre.stateRoot;
-      post.codeHash = pre.codeHash;
+      post.stateRoot = fallback.stateRoot;
+      post.codeHash = fallback.codeHash;
       await vm.stateManager.putAccount(addr, post);
       const validatorBls = this.engine.getValidatorBls(vm, pendingBlock, nextCommon);
       indexedValidatorSet = await IndexedValidatorSet.fromStakeManager(parentStakeManager, validatorBls);

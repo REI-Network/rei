@@ -4,13 +4,13 @@
   "gasConfig": {},
   "gasPrices": {},
   "vm": {
-    "preaddr": {
+    "fallbackaddr": {
       "v": "0x094319890280E2c6430091FEc44822540229ca62"
     },
     "postaddr": {
       "v": "0x0000000000000000000000000000000000001009"
     },
-    "precode": {
+    "fallbackcode": {
       "v": "0x6080604052348015600f57600080fd5b50600080fdfea2646970667358221220ac8195b1504fb35c3c59e09944d61d49e771e16ac1ba953f9217efbbe1dd76c764736f6c63430006020033"
     }
   },

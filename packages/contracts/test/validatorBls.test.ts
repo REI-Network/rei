@@ -3,6 +3,8 @@ import { ethers } from 'hardhat';
 import { Contract, ContractFactory, Signer } from 'ethers';
 import { getRandomBytes } from './utils';
 
+const genesisAddress = ['0xFF96A3BfF24DA3d686FeA7BD4bEB5ccFD7868DdE', '0x809FaE291f79c9953577Ee9007342cff84014b1c', '0x57B80007d142297Bc383A741E4c1dd18e4C75754', '0x8d187Ee877EeFF8698De6808568FD9f1415c7f91', '0x5eB85b475068F7cAA22B2758D58C4B100A418684'];
+
 describe('ValidatorBls', () => {
   let validatorBls: Contract;
   let deployer: Signer;
@@ -10,18 +12,23 @@ describe('ValidatorBls', () => {
   let deployerAddr: string;
   let user1Addr: string;
   let validatorBlsFactory: ContractFactory;
-  let configFactory: ContractFactory;
+  const genesisBlsPublickeys = genesisAddress.map(() => getRandomBytes(48));
 
   before(async () => {
     [deployer, user1] = await ethers.getSigners();
     deployerAddr = await deployer.getAddress();
     user1Addr = await user1.getAddress();
     validatorBlsFactory = await ethers.getContractFactory('ValidatorBls');
-    configFactory = await ethers.getContractFactory('Config_devnet');
   });
 
   beforeEach(async () => {
-    validatorBls = await validatorBlsFactory.connect(deployer).deploy();
+    validatorBls = await validatorBlsFactory.connect(deployer).deploy(genesisAddress, genesisBlsPublickeys);
+  });
+
+  it('should get genesis validators bls public key', async () => {
+    for (let i = 0; i < genesisAddress.length; i++) {
+      expect(await validatorBls.getBlsPublicKey(genesisAddress[i])).to.equal(genesisBlsPublickeys[i]);
+    }
   });
 
   it('should set validator bls public key', async () => {
@@ -34,16 +41,16 @@ describe('ValidatorBls', () => {
   });
 
   it('should get validators length', async () => {
-    expect(await validatorBls.validatorsLength()).to.equal(0);
+    expect(await validatorBls.validatorsLength()).to.equal(5);
     await validatorBls.connect(user1).setBlsPublicKey(getRandomBytes(48));
-    expect(await validatorBls.validatorsLength()).to.equal(1);
+    expect(await validatorBls.validatorsLength()).to.equal(6);
     await validatorBls.connect(user1).setBlsPublicKey(getRandomBytes(48));
-    expect(await validatorBls.validatorsLength()).to.equal(1);
+    expect(await validatorBls.validatorsLength()).to.equal(6);
   });
 
   it('should get validators', async () => {
     await validatorBls.connect(user1).setBlsPublicKey(getRandomBytes(48));
-    expect(await validatorBls.validators(0)).to.equal(await user1.getAddress());
+    expect(await validatorBls.validators(5)).to.equal(await user1.getAddress());
   });
 
   it("should set correttly validator's bls public key", async () => {

@@ -1,6 +1,6 @@
 pragma solidity ^0.6.0;
+pragma experimental ABIEncoderV2;
 
-import "./Only.sol";
 import "./interfaces/IValidatorBls.sol";
 
 contract ValidatorBls is IValidatorBls {
@@ -17,6 +17,16 @@ contract ValidatorBls is IValidatorBls {
      * @param blsPublicKey Validator bls public key.
      */
     event SetBlsPublicKey(address indexed validator, bytes indexed blsPublicKey);
+
+    constructor(address[] memory genesisAddrs, bytes[] memory genesisBlsPublicKey) public {
+        require(genesisAddrs.length == genesisBlsPublicKey.length, "ValidatorBls: invalid genesis validators");
+        //register genesis validators
+        for (uint256 i = 0; i < genesisAddrs.length; i++) {
+            validators.push(genesisAddrs[i]);
+            validatorBlsPubkey[genesisAddrs[i]] = genesisBlsPublicKey[i];
+            _blsPubkeyExist[genesisBlsPublicKey[i]] = true;
+        }
+    }
 
     /**
      * Get validators length.

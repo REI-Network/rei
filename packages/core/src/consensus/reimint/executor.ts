@@ -216,7 +216,7 @@ export class ReimintExecutor implements Executor {
       StakeManager.filterLogsChanges(changes, logs, pendingCommon);
     }
 
-    // 7. filter all receipts to collect validatorBls changes
+    // 7. filter all receipts to collect changes
     if (isEnableValidatorBls(pendingCommon)) {
       ValidatorBls.filterReceiptsChanges(changes, receipts, pendingCommon);
       indexedValidatorSet.merge(changes, this.engine.getValidatorBls(vm, pendingBlock, pendingCommon));
@@ -283,19 +283,19 @@ export class ReimintExecutor implements Executor {
       await parentStakeManager.onAfterBlock(validatorSet.active.proposer, activeSigners, priorities);
     }
 
-    // 11. deploy contracts if enable hardfork 1 is enabled in the next block
+    // 11. deploy contracts if hardfork 1 is enabled in the next block
     if (!isEnableHardfork1(pendingCommon) && isEnableHardfork1(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployHardfork1Contracts(evm, nextCommon);
     }
 
-    // 12. deploy contracts if enable free staking is enabled in the next block
+    // 12. deploy contracts if free staking is enabled in the next block
     if (!isEnableFreeStaking(pendingCommon) && isEnableFreeStaking(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployFreeStakingContracts(evm, nextCommon);
     }
 
-    // 13. deploy contracts if enable hardfork 2 is enabled in the next block
+    // 13. deploy contracts if hardfork 2 is enabled in the next block
     if (!isEnableHardfork2(pendingCommon) && isEnableHardfork2(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployHardfork2Contracts(evm, nextCommon);
@@ -310,7 +310,7 @@ export class ReimintExecutor implements Executor {
       await pendingStakeManager.initEvidenceHash(hashes);
     }
 
-    // 14. deploy contracts if enable prison is enabled in the next block
+    // 14. deploy contracts if prison is enabled in the next block
     if (!isEnableBetterPOS(pendingCommon) && isEnableBetterPOS(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployBetterPOSContracts(evm, nextCommon);

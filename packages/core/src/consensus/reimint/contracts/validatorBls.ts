@@ -1,10 +1,10 @@
-import { Address, toBuffer, BN } from 'ethereumjs-util';
+import { Address, toBuffer } from 'ethereumjs-util';
 import EVM from '@rei-network/vm/dist/evm/evm';
 import { Common } from '@rei-network/common';
 import { Receipt } from '@rei-network/structure';
 import { ValidatorChanges } from '../validatorSet';
 import { Contract } from './contract';
-import { decodeBytes, decodeInt256, bufferToAddress } from './utils';
+import { decodeBytes, bufferToAddress } from './utils';
 
 const methods = {
   validators: toBuffer('0x35aa2e44'),

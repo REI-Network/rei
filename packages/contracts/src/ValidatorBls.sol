@@ -4,7 +4,7 @@ import "./Only.sol";
 import "./interfaces/IValidatorBls.sol";
 
 contract ValidatorBls is IValidatorBls {
-    //validator bls public key
+    // validator bls public key
     mapping(address => bytes) private validatorBlsPubkey;
     // validators list
     address[] public override validators;

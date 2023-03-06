@@ -22,6 +22,7 @@ export class ValidatorSets {
    * load from stake manager if it doesn't exist
    * @param stateRoot - Target state root
    * @param sm - `StakeManager` instance
+   * @param bls - `ValidatorBls` instance
    */
   async getValSet(stateRoot: Buffer, sm?: StakeManager, bls?: ValidatorBls) {
     const indexed = this.indexedSets.get(stateRoot);

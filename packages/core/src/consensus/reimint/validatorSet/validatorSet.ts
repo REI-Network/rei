@@ -30,12 +30,16 @@ export class ValidatorSet {
     let active: ActiveValidatorSet;
     const indexed = await IndexedValidatorSet.fromStakeManager(sm, options?.bls);
     if (options?.genesis) {
-      active = await ActiveValidatorSet.fromStakeManager(sm, (val) => {
-        if (!isGenesis(val, sm.common)) {
-          throw new Error('unknown validator: ' + val.toString());
-        }
-        return genesisValidatorVotingPower.clone();
-      });
+      active = await ActiveValidatorSet.fromStakeManager(
+        sm,
+        (val) => {
+          if (!isGenesis(val, sm.common)) {
+            throw new Error('unknown validator: ' + val.toString());
+          }
+          return genesisValidatorVotingPower.clone();
+        },
+        options?.bls
+      );
     } else {
       if (options?.sort) {
         const maxCount = sm.common.param('vm', 'maxValidatorsCount');
@@ -44,7 +48,7 @@ export class ValidatorSet {
       } else if (options?.active) {
         active = options.active;
       } else {
-        active = await ActiveValidatorSet.fromStakeManager(sm, (val) => indexed.getVotingPower(val));
+        active = await ActiveValidatorSet.fromStakeManager(sm, (val) => indexed.getVotingPower(val), options?.bls);
       }
     }
 

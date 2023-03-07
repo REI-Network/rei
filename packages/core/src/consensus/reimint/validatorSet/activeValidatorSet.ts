@@ -1,9 +1,9 @@
 import { Address, BN } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
-import { StakeManager } from '../contracts';
+import { StakeManager, ValidatorBls } from '../contracts';
 import { IndexedValidator } from './indexedValidatorSet';
 import { getGenesisValidators, genesisValidatorPriority, genesisValidatorVotingPower } from './genesis';
-import { isEnableBetterPOS } from '../../../hardforks';
+import { isEnableBetterPOS, isEnableValidatorBls } from '../../../hardforks';
 import { ActiveValidator as ActiveValidatorInfo } from '../contracts/stakeManager';
 
 const maxInt256 = new BN('7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 'hex');
@@ -12,6 +12,12 @@ const maxProposerPriority = maxInt256;
 const minProposerPriority = minInt256;
 
 const priorityWindowSizeFactor = 2;
+
+// genesis validator information
+type GenesisInfo = {
+  address: string;
+  publicKey: string;
+};
 
 // active validator information
 export type ActiveValidator = {
@@ -54,7 +60,7 @@ export class ActiveValidatorSet {
    * @param getVotingPower - Get voting power callback, if it is undefined, it will read data from state trie
    * @returns ActiveValidatorSet instance
    */
-  static async fromStakeManager(sm: StakeManager, getVotingPower?: (validator: Address) => BN) {
+  static async fromStakeManager(sm: StakeManager, getVotingPower?: (validator: Address) => BN, bls?: ValidatorBls) {
     const proposer = await sm.proposer();
     const active: ActiveValidator[] = [];
     const activeValidatorInfos: ActiveValidatorInfo[] = [];
@@ -69,7 +75,8 @@ export class ActiveValidatorSet {
     for (const v of activeValidatorInfos) {
       active.push({
         ...v,
-        votingPower: getVotingPower ? getVotingPower(v.validator) : await sm.getVotingPowerByAddress(v.validator)
+        votingPower: getVotingPower ? getVotingPower(v.validator) : await sm.getVotingPowerByAddress(v.validator),
+        blsPublicKey: bls ? await bls.getBlsPublicKey(v.validator) : undefined
       });
     }
     return new ActiveValidatorSet(active, proposer);
@@ -98,11 +105,21 @@ export class ActiveValidatorSet {
    */
   static genesis(common: Common) {
     const active: ActiveValidator[] = [];
+    let keys: undefined | Map<string, string> = undefined;
+
+    if (isEnableValidatorBls(common)) {
+      keys = new Map<string, string>();
+      for (const genesis of common.param('vm', 'gensisBlsPublicKey') as GenesisInfo[]) {
+        keys.set(genesis.address, genesis.publicKey);
+      }
+    }
+
     for (const gv of getGenesisValidators(common)) {
       active.push({
         validator: gv,
         priority: genesisValidatorPriority.clone(),
-        votingPower: genesisValidatorVotingPower.clone()
+        votingPower: genesisValidatorVotingPower.clone(),
+        blsPublicKey: keys ? Buffer.from(keys.get(gv.toString())!) : undefined
       });
     }
     return new ActiveValidatorSet(active);

@@ -534,18 +534,16 @@ export class VoteSet {
     const pubKeys: Buffer[] = [];
     let sum: BN = new BN(0);
     for (let i = 0; i < len; i++) {
-      if (bitArray.getIndex(i)) {
-        pubKeys.push((this.valSet as exActiveValidatorSet).getBlsPublickeyByIndex(i));
+      const temp = bitArray.getIndex(i);
+      if (temp) {
+        const pubKey = this.valSet.getBlsPublickeyByIndex(i);
+        pubKeys.push(pubKey);
         sum.iadd(this.valSet.getVotingPower(this.valSet.getValidatorByIndex(i)));
       }
     }
 
-    if (!bls.verifyAggregate(pubKeys, msgHash, sig)) {
-      throw new Error('invalid bls aggregate signature');
-    }
-
-    if (sum.lt(this.valSet.totalVotingPower.muln(2).divn(3))) {
-      throw new Error('not enough voting power');
+    if (!bls.verifyAggregate(pubKeys, msgHash, sig) || sum.lt(this.valSet.totalVotingPower.muln(2).divn(3))) {
+      return;
     }
 
     this.maj23 = hash;

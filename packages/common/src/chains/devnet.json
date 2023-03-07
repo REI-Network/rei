@@ -92,7 +92,7 @@
     },
     {
       "name": "bls",
-      "block": 0
+      "block": 5
     }
   ],
   "bootstrapNodes": []

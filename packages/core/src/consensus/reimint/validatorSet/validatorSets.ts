@@ -1,10 +1,9 @@
 import { FunctionalBufferMap } from '@rei-network/utils';
 import { StakeManager, ValidatorBls } from '../contracts';
 import { Reimint } from '../reimint';
-import { ValidatorSet, LoadOptions } from './validatorSet';
+import { ValidatorSet } from './validatorSet';
 import { IndexedValidatorSet } from './indexedValidatorSet';
 import { ActiveValidatorSet } from './activeValidatorSet';
-import { isGenesis, genesisValidatorVotingPower } from './genesis';
 
 const maxSize = 100;
 
@@ -35,18 +34,7 @@ export class ValidatorSets {
       const indexedValidatorSet = await IndexedValidatorSet.fromStakeManager(sm, bls);
       const { totalLockedAmount, validatorCount } = indexedValidatorSet.getTotalLockedVotingPowerAndValidatorCount(blsFlag);
       const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
-      const activeSet = enableGenesisValidators
-        ? await ActiveValidatorSet.fromStakeManager(
-            sm,
-            (val) => {
-              if (!isGenesis(val, sm.common)) {
-                throw new Error('unknown validator: ' + val.toString());
-              }
-              return genesisValidatorVotingPower.clone();
-            },
-            bls
-          )
-        : ActiveValidatorSet.fromActiveValidators(indexedValidatorSet.sort(sm.common.param('vm', 'maxValidatorsCount'), blsFlag));
+      const activeSet = enableGenesisValidators ? await ActiveValidatorSet.fromStakeManager(sm, { genesis: true, bls }) : ActiveValidatorSet.fromActiveValidators(indexedValidatorSet.sort(sm.common.param('vm', 'maxValidatorsCount'), blsFlag));
       const validatorSet = new ValidatorSet(indexedValidatorSet, activeSet);
       this.set(stateRoot, validatorSet);
       return validatorSet;
@@ -70,18 +58,7 @@ export class ValidatorSets {
 
       const { totalLockedAmount, validatorCount } = await sm.getTotalLockedAmountAndValidatorCount();
       const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
-      active = await ActiveValidatorSet.fromStakeManager(
-        sm,
-        enableGenesisValidators
-          ? (val) => {
-              if (!isGenesis(val, sm.common)) {
-                throw new Error('unknown validator: ' + val.toString());
-              }
-
-              return genesisValidatorVotingPower.clone();
-            }
-          : undefined
-      );
+      active = await ActiveValidatorSet.fromStakeManager(sm, { genesis: enableGenesisValidators });
       this.set(stateRoot, active);
     }
     return active;

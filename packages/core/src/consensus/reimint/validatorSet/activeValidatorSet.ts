@@ -2,7 +2,7 @@ import { Address, BN } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { StakeManager, ValidatorBls } from '../contracts';
 import { IndexedValidator } from './indexedValidatorSet';
-import { getGenesisValidators, genesisValidatorPriority, genesisValidatorVotingPower } from './genesis';
+import { getGenesisValidators, genesisValidatorPriority, genesisValidatorVotingPower, isGenesis } from './genesis';
 import { isEnableBetterPOS, isEnableValidatorBls } from '../../../hardforks';
 import { ActiveValidator as ActiveValidatorInfo } from '../contracts/stakeManager';
 
@@ -14,33 +14,45 @@ const minProposerPriority = minInt256;
 const priorityWindowSizeFactor = 2;
 
 // genesis validator bls infos
-const genesisValidatorInfos = new Map<string, string>(
+const genesisValidatorInfos = new Map<string, Map<string, string>>([
   [
-    {
-      address: '0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde',
-      publicKey: '0xe4f75966f66de932f8588d7e43cebffa72b94959e7f2b25ab467528857f143fefd49e2321da1cd8d819e5ef4a4cd18a3'
-    },
-    {
-      address: '0x809fae291f79c9953577ee9007342cff84014b1c',
-      publicKey: '0xb075545c9343c3c77b55c235c70498e3a778e650d3b41119135264d1f18af4c1b4d2d6652a86e74239a8e6c895dcffd4'
-    },
-    {
-      address: '0x57b80007d142297bc383a741e4c1dd18e4c75754',
-      publicKey: '0xece169fa620dbe26eba06cf16d32eb9ce62b1b3f21208126ab27ee75f7d1a22e0a04f2c641f43440d28015c29a5f8b2c'
-    },
-    {
-      address: '0x8d187ee877eeff8698de6808568fd9f1415c7f91',
-      publicKey: '0xd35c4584f50333fdf5568cfb56fbeaea8bbf470f43ddf348d2c87eb21d0904e3041e99b21a08365160e1b98888c6bd86'
-    },
-    {
-      address: '0x5eb85b475068f7caa22b2758d58c4b100a418684',
-      publicKey: '0x126dc3438b328146495c41e4b325cc4ee18a0b792e0eb3942e5881ff5e190c4a5f922a0aed6193608da745a5ef9bebba'
-    }
-  ].map((v) => {
-    return [v.address, v.publicKey];
-  })
-);
+    'rei-devnet',
+    new Map<string, string>([
+      ['0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde', '0xe4f75966f66de932f8588d7e43cebffa72b94959e7f2b25ab467528857f143fefd49e2321da1cd8d819e5ef4a4cd18a3'],
+      ['0x809fae291f79c9953577ee9007342cff84014b1c', '0xb075545c9343c3c77b55c235c70498e3a778e650d3b41119135264d1f18af4c1b4d2d6652a86e74239a8e6c895dcffd4'],
+      ['0x57b80007d142297bc383a741e4c1dd18e4c75754', '0xece169fa620dbe26eba06cf16d32eb9ce62b1b3f21208126ab27ee75f7d1a22e0a04f2c641f43440d28015c29a5f8b2c'],
+      ['0x8d187ee877eeff8698de6808568fd9f1415c7f91', '0xd35c4584f50333fdf5568cfb56fbeaea8bbf470f43ddf348d2c87eb21d0904e3041e99b21a08365160e1b98888c6bd86'],
+      ['0x5eb85b475068f7caa22b2758d58c4b100a418684', '0x126dc3438b328146495c41e4b325cc4ee18a0b792e0eb3942e5881ff5e190c4a5f922a0aed6193608da745a5ef9bebba']
+    ])
+  ],
+  [
+    'rei-testnet',
+    new Map<string, string>([
+      ['0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde', '0xe4f75966f66de932f8588d7e43cebffa72b94959e7f2b25ab467528857f143fefd49e2321da1cd8d819e5ef4a4cd18a3'],
+      ['0x809fae291f79c9953577ee9007342cff84014b1c', '0xb075545c9343c3c77b55c235c70498e3a778e650d3b41119135264d1f18af4c1b4d2d6652a86e74239a8e6c895dcffd4'],
+      ['0x57b80007d142297bc383a741e4c1dd18e4c75754', '0xece169fa620dbe26eba06cf16d32eb9ce62b1b3f21208126ab27ee75f7d1a22e0a04f2c641f43440d28015c29a5f8b2c'],
+      ['0x8d187ee877eeff8698de6808568fd9f1415c7f91', '0xd35c4584f50333fdf5568cfb56fbeaea8bbf470f43ddf348d2c87eb21d0904e3041e99b21a08365160e1b98888c6bd86'],
+      ['0x5eb85b475068f7caa22b2758d58c4b100a418684', '0x126dc3438b328146495c41e4b325cc4ee18a0b792e0eb3942e5881ff5e190c4a5f922a0aed6193608da745a5ef9bebba']
+    ])
+  ],
+  [
+    'rei-mainnet',
+    new Map<string, string>([
+      ['0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde', '0xe4f75966f66de932f8588d7e43cebffa72b94959e7f2b25ab467528857f143fefd49e2321da1cd8d819e5ef4a4cd18a3'],
+      ['0x809fae291f79c9953577ee9007342cff84014b1c', '0xb075545c9343c3c77b55c235c70498e3a778e650d3b41119135264d1f18af4c1b4d2d6652a86e74239a8e6c895dcffd4'],
+      ['0x57b80007d142297bc383a741e4c1dd18e4c75754', '0xece169fa620dbe26eba06cf16d32eb9ce62b1b3f21208126ab27ee75f7d1a22e0a04f2c641f43440d28015c29a5f8b2c'],
+      ['0x8d187ee877eeff8698de6808568fd9f1415c7f91', '0xd35c4584f50333fdf5568cfb56fbeaea8bbf470f43ddf348d2c87eb21d0904e3041e99b21a08365160e1b98888c6bd86'],
+      ['0x5eb85b475068f7caa22b2758d58c4b100a418684', '0x126dc3438b328146495c41e4b325cc4ee18a0b792e0eb3942e5881ff5e190c4a5f922a0aed6193608da745a5ef9bebba']
+    ])
+  ]
+]);
 
+export interface LoadOptions {
+  // is it a genesis active validator set
+  genesis?: boolean;
+  // validator bls contract instance
+  bls?: ValidatorBls;
+}
 // active validator information
 export type ActiveValidator = {
   // validator address
@@ -52,12 +64,6 @@ export type ActiveValidator = {
   // bls public key
   blsPublicKey?: Buffer;
 };
-
-/**
- * @todo:
- *  1.genesis active validator should get the bls public key by common
- *  2.fromStakeManager function should get the bls public key by validatorBls contract
- * */
 
 // clone a `ActiveValidator`
 function copyActiveValidator(av: ActiveValidator) {
@@ -79,10 +85,10 @@ export class ActiveValidatorSet {
   /**
    * Load active validator set from state trie
    * @param sm - Stake manager instance
-   * @param getVotingPower - Get voting power callback, if it is undefined, it will read data from state trie
+   * @param options - ActiveValidatorSet load options
    * @returns ActiveValidatorSet instance
    */
-  static async fromStakeManager(sm: StakeManager, getVotingPower?: (validator: Address) => BN, bls?: ValidatorBls) {
+  static async fromStakeManager(sm: StakeManager, options: LoadOptions) {
     const proposer = await sm.proposer();
     const active: ActiveValidator[] = [];
     const activeValidatorInfos: ActiveValidatorInfo[] = [];
@@ -94,11 +100,19 @@ export class ActiveValidatorSet {
         activeValidatorInfos.push(await sm.activeValidators(i));
       }
     }
+
     for (const v of activeValidatorInfos) {
       active.push({
         ...v,
-        votingPower: getVotingPower ? getVotingPower(v.validator) : await sm.getVotingPowerByAddress(v.validator),
-        blsPublicKey: bls ? await bls.getBlsPublicKey(v.validator) : undefined
+        votingPower: options.genesis
+          ? (() => {
+              if (!isGenesis(v.validator, sm.common)) {
+                throw new Error('unknown validator: ' + v.toString());
+              }
+              return genesisValidatorVotingPower.clone();
+            })()
+          : await sm.getVotingPowerByAddress(v.validator),
+        blsPublicKey: options.bls ? await options.bls.getBlsPublicKey(v.validator) : undefined
       });
     }
     return new ActiveValidatorSet(active, proposer);
@@ -126,20 +140,26 @@ export class ActiveValidatorSet {
    * @returns ActiveValidatorSet instance
    */
   static genesis(common: Common) {
-    let blsFlag = false;
     const active: ActiveValidator[] = [];
-
-    if (isEnableValidatorBls(common)) {
-      blsFlag = true;
-    }
+    const blsFlag = isEnableValidatorBls(common);
 
     for (const gv of getGenesisValidators(common)) {
-      active.push({
+      const ac = {
         validator: gv,
         priority: genesisValidatorPriority.clone(),
         votingPower: genesisValidatorVotingPower.clone(),
-        blsPublicKey: blsFlag ? Buffer.from(genesisValidatorInfos.get(gv.toString())!) : undefined
-      });
+        blsPublicKey: undefined
+      } as ActiveValidator;
+
+      if (blsFlag) {
+        const blsPublicKey = genesisValidatorInfos.get(common.chainName())!.get(gv.toString());
+        if (!blsPublicKey) {
+          throw new Error(`genesis BLS public key of ${gv.toString()} is not found`);
+        }
+        ac.blsPublicKey = Buffer.from(blsPublicKey);
+      }
+
+      active.push(ac);
     }
     return new ActiveValidatorSet(active);
   }

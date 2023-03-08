@@ -20,41 +20,6 @@ export class ValidatorSet {
   readonly indexed: IndexedValidatorSet;
   readonly active: ActiveValidatorSet;
 
-  /**
-   * Load validator set from state trie
-   * @param sm - Stake manager instance
-   * @param options - Load options
-   * @returns ValidatorSet instance
-   */
-  static async fromStakeManager(sm: StakeManager, options?: LoadOptions) {
-    let active: ActiveValidatorSet;
-    const indexed = await IndexedValidatorSet.fromStakeManager(sm, options?.bls);
-    if (options?.genesis) {
-      active = await ActiveValidatorSet.fromStakeManager(
-        sm,
-        (val) => {
-          if (!isGenesis(val, sm.common)) {
-            throw new Error('unknown validator: ' + val.toString());
-          }
-          return genesisValidatorVotingPower.clone();
-        },
-        options?.bls
-      );
-    } else {
-      if (options?.sort) {
-        const maxCount = sm.common.param('vm', 'maxValidatorsCount');
-        active = ActiveValidatorSet.fromActiveValidators(indexed.sort(maxCount));
-        // now, the priority of active validator is all 0
-      } else if (options?.active) {
-        active = options.active;
-      } else {
-        active = await ActiveValidatorSet.fromStakeManager(sm, (val) => indexed.getVotingPower(val), options?.bls);
-      }
-    }
-
-    return new ValidatorSet(indexed, active);
-  }
-
   constructor(indexed: IndexedValidatorSet, active: ActiveValidatorSet) {
     this.indexed = indexed;
     this.active = active;
@@ -75,22 +40,5 @@ export class ValidatorSet {
    */
   copy() {
     return new ValidatorSet(this.indexed.copy(), this.active.copy());
-  }
-
-  /**
-   * Copy self and merge changes
-   * @param changes - Validator set changes
-   * @param common - Common instance
-   * @returns New ValidatorSet instance
-   */
-  async copyAndMerge(changes: ValidatorChanges, common: Common, bls?: ValidatorBls) {
-    const indexed = this.indexed.copy();
-    const active = this.active.copy();
-    if (await indexed.merge(changes, bls)) {
-      const maxCount = common.param('vm', 'maxValidatorsCount');
-      active.merge(indexed.sort(maxCount));
-      active.computeNewPriorities(this.active);
-    }
-    return new ValidatorSet(indexed, active);
   }
 }

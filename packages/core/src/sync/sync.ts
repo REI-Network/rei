@@ -4,7 +4,7 @@ import { Channel, getRandomIntInclusive, logger, AbortableTimer } from '@rei-net
 import { Block } from '@rei-network/structure';
 import { Node } from '../node';
 import { preValidateBlock, validateReceipts } from '../validation';
-import { WireProtocolHandler, isV2 } from '../protocols';
+import { WireProtocolHandler, isV2, SnapProtocolHandler } from '../protocols';
 import { SnapSyncScheduler } from './snap';
 import { FullSyncScheduler } from './full';
 import { SyncInfo, BlockData } from './types';
@@ -22,13 +22,24 @@ export enum AnnouncementType {
   NewBlock
 }
 
-export type Announcement = {
+type SnapAnnouncement = {
+  type: AnnouncementType;
+  handler: SnapProtocolHandler;
+};
+
+type WireAnnouncement = {
   type: AnnouncementType;
   handler: WireProtocolHandler;
   block?: Block;
   height: BN;
   td: BN;
 };
+
+export type Announcement = SnapAnnouncement | WireAnnouncement;
+
+function isWireAnnouncement(ann: Announcement): ann is WireAnnouncement {
+  return !(ann.handler instanceof SnapProtocolHandler);
+}
 
 export enum SyncMode {
   Full = 'full',
@@ -134,10 +145,10 @@ export class Synchronizer extends EventEmitter {
 
   /**
    * Download block and receipts through announcement
-   * @param ann - Announcement
+   * @param ann - Wire announcement
    * @returns If the download failed, return null
    */
-  private downloadBlockDataFromAnn(ann: Announcement): Promise<BlockData | null> {
+  private downloadBlockDataFromAnn(ann: WireAnnouncement): Promise<BlockData | null> {
     return this.downloadBlockData(ann.height, ann.handler, ann.block);
   }
 
@@ -244,10 +255,10 @@ export class Synchronizer extends EventEmitter {
 
   /**
    * Confirm the latest block data for snap sync
-   * @param ann - Announcement
+   * @param ann - Wire announcement
    * @returns confirmed peers count and block data
    */
-  private async confirmAnn(ann: Announcement) {
+  private async confirmAnn(ann: WireAnnouncement) {
     const data = await this.downloadBlockDataFromAnn(ann);
     if (data === null) {
       // download data failed,
@@ -294,9 +305,11 @@ export class Synchronizer extends EventEmitter {
         continue;
       }
 
+      const isWire = isWireAnnouncement(ann);
+
       if (this.snap.isSyncing) {
         // check if we need to notify snap of the latest stateRoot
-        if (!this.snap.snapSyncer.snapped) {
+        if (isWire && !this.snap.snapSyncer.snapped) {
           const remoteHeight = ann.height.toNumber();
           const localHeight = this.snap.status.highestBlock;
           const staleNumber = remoteHeight - localHeight;
@@ -322,11 +335,15 @@ export class Synchronizer extends EventEmitter {
             }
           }
         }
-        if (ann.type === AnnouncementType.NewPeer) {
+        if (!isWire && ann.type === AnnouncementType.NewPeer) {
           // snap sync is working, announce a new peer to it
           this.snap.snapSyncer.announce();
           continue;
         }
+      }
+
+      if (!isWire) {
+        continue;
       }
 
       // we are not working, try to start a new sync
@@ -433,13 +450,20 @@ export class Synchronizer extends EventEmitter {
    * Announce syncer when a new peer joins
    * @param handler - Handler instance
    */
-  announceNewPeer(handler: WireProtocolHandler) {
-    this.channel.push({
-      type: AnnouncementType.NewPeer,
-      handler,
-      height: new BN(handler.status!.height),
-      td: new BN(handler.status!.totalDifficulty)
-    });
+  announceNewPeer(handler: WireProtocolHandler | SnapProtocolHandler) {
+    if (handler instanceof WireProtocolHandler) {
+      this.channel.push({
+        type: AnnouncementType.NewPeer,
+        handler,
+        height: new BN(handler.status!.height),
+        td: new BN(handler.status!.totalDifficulty)
+      });
+    } else {
+      this.channel.push({
+        type: AnnouncementType.NewPeer,
+        handler
+      });
+    }
   }
 
   /**

@@ -18,7 +18,7 @@ import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, ReceiptsCache } from './bloomBits';
 import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
-import { Wire, ConsensusProtocol, WireProtocolHandler, SnapProtocol } from './protocols';
+import { Wire, ConsensusProtocol, WireProtocolHandler, SnapProtocol, SnapProtocolHandler } from './protocols';
 import { ReimintConsensusEngine, CliqueConsensusEngine } from './consensus';
 import { isEnableRemint } from './hardforks';
 import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
@@ -264,8 +264,8 @@ export class Node {
     await this.chaindb.close();
   }
 
-  private onPeerInstalled = (handler) => {
-    if (handler instanceof WireProtocolHandler) {
+  private onPeerInstalled = (peer, handler) => {
+    if (handler instanceof WireProtocolHandler || handler instanceof SnapProtocolHandler) {
       this.sync.announceNewPeer(handler);
     }
   };

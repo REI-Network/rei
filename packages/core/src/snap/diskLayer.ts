@@ -1,5 +1,5 @@
 import { BaseTrie as Trie } from '@rei-network/trie';
-import { KECCAK256_NULL, KECCAK256_RLP } from 'ethereumjs-util';
+import { BN, KECCAK256_NULL, KECCAK256_RLP } from 'ethereumjs-util';
 import { Database } from '@rei-network/database';
 import { DBDeleteSnapAccount, DBDeleteSnapStorage, DBSaveSerializedSnapAccount, DBSaveSnapStorage } from '@rei-network/database/dist/helpers';
 import { snapStorageKey, snapAccountKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
@@ -521,6 +521,8 @@ export class DiskLayer implements ISnapshot {
 
       accOrigin = nextAccOrigin;
       accountRange = accountCheckRange;
+
+      console.log('account progress:', new BN(nextAccOrigin).muln(100).div(new BN(MAX_HASH)).toNumber(), '%');
     }
 
     journalProgress(batch, undefined, stats);

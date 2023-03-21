@@ -494,11 +494,11 @@ export class Node {
     }
 
     // TODO: remove debug code
-    if (await this.snapTree.verify(root)) {
-      logger.debug('Node::doCommitBlock, verify ok, size:', this.snapTree.layers.size);
-    } else {
-      logger.error('Node::doCommitBlock, verify failed, size', this.snapTree.layers.size);
-    }
+    // if (await this.snapTree.verify(root)) {
+    //   logger.debug('Node::doCommitBlock, verify ok, size:', this.snapTree.layers.size);
+    // } else {
+    //   logger.error('Node::doCommitBlock, verify failed, size', this.snapTree.layers.size);
+    // }
 
     // install properties for receipts
     let lastCumulativeGasUsed = new BN(0);

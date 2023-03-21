@@ -473,7 +473,7 @@ export class DiskLayer implements ISnapshot {
 
         let storeOrigin = storeMarker ?? EMPTY_HASH;
         while (true) {
-          const { exhausted, last } = await this.generateRange(account.stateRoot, SNAP_STORAGE_PREFIX, storeOrigin, storageCheckRange, onStorage, (value) => value);
+          const { exhausted, last } = await this.generateRange(account.stateRoot, Buffer.concat([SNAP_STORAGE_PREFIX, accountHash]), storeOrigin, storageCheckRange, onStorage, (value) => value);
           if (aborter.isAborted) {
             return true;
           }

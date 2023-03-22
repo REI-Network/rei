@@ -207,13 +207,6 @@ export class Node {
       }
 
       await this.snapTree.init(latest.stateRoot, false, true);
-      // if (!(await this.snapTree.verify(latest.stateRoot))) {
-      //   // TODO: improve log style
-      //   logger.warn('Node::init, snapshot is corrupted, rebuiding...');
-      //   const { generating } = await this.snapTree.rebuild(latest.stateRoot);
-      //   await generating;
-      //   logger.warn('Node::init, snapshot is corrupted, rebuid finished, verify again:', await this.snapTree.verify(latest.stateRoot));
-      // }
       await this.txPool.init(this.latestBlock);
       await this.reimint.init();
       await this.clique.init();
@@ -496,13 +489,6 @@ export class Node {
     } catch (err) {
       logger.warn('Node::doCommitBlock, cap snap tree failed:', err);
     }
-
-    // TODO: remove debug code
-    // if (await this.snapTree.verify(root)) {
-    //   logger.debug('Node::doCommitBlock, verify ok, size:', this.snapTree.layers.size);
-    // } else {
-    //   logger.error('Node::doCommitBlock, verify failed, size', this.snapTree.layers.size);
-    // }
 
     // install properties for receipts
     let lastCumulativeGasUsed = new BN(0);

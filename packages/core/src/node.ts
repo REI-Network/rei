@@ -210,9 +210,11 @@ export class Node {
 
       await this.snapTree.init(latest.stateRoot, false, true);
       if (!this.skipVerifySnap) {
+        logger.info('📷 Verifing snaphot...');
         if (!(await this.snapTree.verify(latest.stateRoot))) {
           logger.warn('Node::init, verify snapshot failed, rebuilding...');
-          await this.snapTree.rebuild(latest.stateRoot);
+          const { generating } = await this.snapTree.rebuild(latest.stateRoot);
+          await generating;
         }
       }
 

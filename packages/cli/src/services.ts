@@ -101,7 +101,7 @@ export async function stopServices({ node, apiServer, ipcServer, rpcServer }: Se
     setTimeout(() => {
       logger.warn('exit timeout');
       process.exit(1);
-    }, 3000);
+    }, 10000);
     await Promise.all([node.abort(), apiServer.abort(), ipcServer.abort(), rpcServer.abort()]);
     logger.info('exit complete');
     process.exit(0);

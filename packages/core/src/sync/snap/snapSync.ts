@@ -248,6 +248,33 @@ export class SnapSync {
   }
 
   /**
+   * Get snap sync status
+   */
+  get status() {
+    if (!this.snapped) {
+      const unfinished = new BN(0);
+      for (const task of this.tasks) {
+        if (task.done) {
+          continue;
+        }
+        unfinished.iadd(new BN(task.last).sub(new BN(task.next)));
+      }
+      return {
+        phase: 'snap',
+        progress: new BN(MAX_HASH).sub(unfinished).muln(100).div(new BN(MAX_HASH)).toNumber()
+      };
+    } else if (!this.healed) {
+      return {
+        phase: 'heal'
+      };
+    } else {
+      return {
+        phase: 'finished'
+      };
+    }
+  }
+
+  /**
    * Run promise with lock
    * @param p - Promise
    * @returns Wrapped promise
@@ -974,6 +1001,27 @@ export class SnapSync {
   }
 
   private async scheduleLoop() {
+    let lastestPhase: string | undefined = undefined;
+    let lastestProgress: number | undefined;
+    // when the status changed, print
+    const logStatus = () => {
+      const { phase, progress } = this.status;
+      if (phase !== lastestPhase || progress !== lastestProgress) {
+        if (phase === 'snap') {
+          logger.info(`📷 Downloading snapshot, progress: ${progress}%`);
+        } else if (phase === 'heal') {
+          if (lastestPhase === 'snap') {
+            logger.info(`📷 Downloading snapshot, progress: ${100}%`);
+          }
+          logger.info('📷 Healing snapshot...');
+        } else {
+          logger.info('📷 Healing snapshot finished');
+        }
+        lastestPhase = phase;
+        lastestProgress = progress;
+      }
+    };
+
     let preRoot: Buffer | undefined = undefined;
     for await (const cb of this.channel) {
       try {
@@ -1011,6 +1059,8 @@ export class SnapSync {
           this.assignHealTrieNodeTasks();
           this.assignHealBytecodeTasks();
         }
+
+        logStatus();
       } catch (err) {
         logger.error('SnapSync::scheduleLoop, catch:', err);
       }
@@ -1027,16 +1077,12 @@ export class SnapSync {
       logger.error('SnapSync::scheduleLoop, catch(when exit):', err);
     }
 
+    logStatus();
+
     // wait for all requests to complete
     await this.lock.wait();
 
-    // save if we are finished
-    const finished = this.finished;
-
-    // clear
-    this.clear();
-
-    return finished;
+    return this.finished;
   }
 
   /**
@@ -1090,12 +1136,10 @@ export class SnapSync {
    * Announce snapSync when a new peer joins
    */
   announce() {
-    if (!this.isSyncing) {
-      throw new Error("snap sync isn't working");
+    if (this.isSyncing) {
+      // put an empty value to announce coroutine
+      this.channel.push();
     }
-
-    // put an empty value to announce coroutine
-    this.channel.push();
   }
 
   /**

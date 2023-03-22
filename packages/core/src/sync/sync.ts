@@ -305,45 +305,40 @@ export class Synchronizer extends EventEmitter {
         continue;
       }
 
-      const isWire = isWireAnnouncement(ann);
-
-      if (this.snap.isSyncing) {
-        // check if we need to notify snap of the latest stateRoot
-        if (isWire && !this.snap.snapSyncer.snapped) {
-          const remoteHeight = ann.height.toNumber();
-          const localHeight = this.snap.status.highestBlock;
-          const staleNumber = remoteHeight - localHeight;
-          const trustedMode = this.trustedHeight && this.trustedHash && this.trustedHeight.eqn(localHeight);
-          if ((trustedMode && staleNumber >= snapSyncTrustedStaleBlockNumber) || (!trustedMode && staleNumber >= snapSyncStaleBlockNumber)) {
-            // confirm the latest block data, then reset the stateRoot of the snap
-            const result = await this.confirmAnn(ann);
-            if (result === null) {
-              continue;
-            }
-            const { confirmed, data } = result;
-            if (confirmed >= snapSyncMinConfirmed) {
-              logger.info('Synchronizer::syncLoop, current block is stale, try to sync new block:', remoteHeight);
-              const root = data.block.header.stateRoot;
-              const info: SyncInfo = {
-                bestHeight: ann.height,
-                bestTD: ann.height.addn(1),
-                remotePeerId: ann.handler.peer.peerId
-              };
-              const startingBlock = this.node.latestBlock.header.number.toNumber();
-              await this.snap.resetRoot(root, startingBlock, info, data);
-              continue;
-            }
-          }
-        }
-        if (!isWire && ann.type === AnnouncementType.NewPeer) {
-          // snap sync is working, announce a new peer to it
-          this.snap.snapSyncer.announce();
-          continue;
-        }
+      if (isWireAnnouncement(ann) && ann.type === AnnouncementType.NewPeer && this.snap.isSyncing) {
+        // snap sync is working, announce a new peer to it
+        this.snap.snapSyncer.announce();
+        continue;
+      } else if (!isWireAnnouncement(ann)) {
+        continue;
       }
 
-      if (!isWire) {
-        continue;
+      // check if we need to notify snap of the latest stateRoot
+      if (this.snap.isSyncing && !this.snap.snapSyncer.snapped) {
+        const remoteHeight = ann.height.toNumber();
+        const localHeight = this.snap.status.highestBlock;
+        const staleNumber = remoteHeight - localHeight;
+        const trustedMode = this.trustedHeight && this.trustedHash && this.trustedHeight.eqn(localHeight);
+        if ((trustedMode && staleNumber >= snapSyncTrustedStaleBlockNumber) || (!trustedMode && staleNumber >= snapSyncStaleBlockNumber)) {
+          // confirm the latest block data, then reset the stateRoot of the snap
+          const result = await this.confirmAnn(ann);
+          if (result === null) {
+            continue;
+          }
+          const { confirmed, data } = result;
+          if (confirmed >= snapSyncMinConfirmed) {
+            logger.info('Synchronizer::syncLoop, current block is stale, try to sync new block:', remoteHeight);
+            const root = data.block.header.stateRoot;
+            const info: SyncInfo = {
+              bestHeight: ann.height,
+              bestTD: ann.height.addn(1),
+              remotePeerId: ann.handler.peer.peerId
+            };
+            const startingBlock = this.node.latestBlock.header.number.toNumber();
+            await this.snap.resetRoot(root, startingBlock, info, data);
+            continue;
+          }
+        }
       }
 
       // we are not working, try to start a new sync

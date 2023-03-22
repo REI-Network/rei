@@ -78,6 +78,36 @@ export class SnapTree {
   }
 
   /**
+   * Abort snap tree,
+   * save all diff layers and disk layers to the disk
+   * @param root - Latest block state root
+   */
+  async abort(root: Buffer) {
+    try {
+      // abort disk layer
+      for (const [, layer] of this.layers) {
+        if (layer instanceof DiskLayer) {
+          if (layer.aborter !== undefined) {
+            await layer.abort();
+          }
+        }
+      }
+
+      this.discard(root);
+      // TODO: save more diff layers
+      await this.cap(root, 0);
+
+      for (const [root, snap] of this.layers) {
+        logger.debug('SnapTree::abort, root:', root.toString('hex'), 'snap root:', snap.root.toString('hex'), 'parent:', !!snap.parent);
+      }
+
+      await this.journal(root);
+    } catch (err) {
+      logger.warn('SnapTree::abort, catch:', err);
+    }
+  }
+
+  /**
    * Interrupts any pending snapshot generator,deletes all the snapshot
    * in memory marks snapshots disabled globally
    */

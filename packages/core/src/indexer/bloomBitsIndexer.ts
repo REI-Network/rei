@@ -3,7 +3,6 @@ import { DBSaveBloomBits, DBOp, Database } from '@rei-network/database';
 import { BloomBitsGenerator, bloomBitsConfig as config } from '../bloomBits';
 import { ChainIndexer } from './chainIndexer';
 import { BloomBitsIndexerOptions, ChainIndexerBackend } from './types';
-import { EMPTY_HASH } from '../utils';
 
 /**
  * BloomBitsIndexer implements ChainIndexerBackend, used to retrieve bloom

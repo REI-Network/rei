@@ -206,45 +206,49 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
    * @param data - Received data
    */
   async handle(data: Buffer) {
-    const decoded = rlp.decode(data);
-    if (!Array.isArray(decoded) || decoded.length !== 2) {
-      throw new Error('invalid decoded values');
-    }
-
-    const [codeBuf, valuesArray]: any = decoded;
-    const code = bufferToInt(codeBuf);
-    const handler = this.findHandler(code);
-    data = handler.decode.call(this, valuesArray);
-
-    const request = this.waitingRequests.get(code);
-    if (request) {
-      clearTimeout(request.timeout);
-      this.waitingRequests.delete(code);
-      request.resolve(data);
-    } else if (handler.process) {
-      if (code !== 0 && !(await this.handshakePromise)) {
-        logger.warn('WireProtocolHandler::handle, handshake failed');
-        return;
+    try {
+      const decoded = rlp.decode(data);
+      if (!Array.isArray(decoded) || decoded.length !== 2) {
+        throw new Error('invalid decoded values');
       }
 
-      const result = handler.process.call(this, data);
-      if (result) {
-        if (Array.isArray(result)) {
-          const [method, resps] = result;
-          this.send(method, resps);
-        } else {
-          result
-            .then((response) => {
-              if (response) {
-                const [method, resps] = response;
-                this.send(method, resps);
-              }
-            })
-            .catch((err) => {
-              logger.error('HandlerBase::process, catch error:', err);
-            });
+      const [codeBuf, valuesArray]: any = decoded;
+      const code = bufferToInt(codeBuf);
+      const handler = this.findHandler(code);
+      data = handler.decode.call(this, valuesArray);
+
+      const request = this.waitingRequests.get(code);
+      if (request) {
+        clearTimeout(request.timeout);
+        this.waitingRequests.delete(code);
+        request.resolve(data);
+      } else if (handler.process) {
+        if (code !== 0 && !(await this.handshakePromise)) {
+          logger.warn('WireProtocolHandler::handle, handshake failed');
+          return;
+        }
+
+        const result = handler.process.call(this, data);
+        if (result) {
+          if (Array.isArray(result)) {
+            const [method, resps] = result;
+            this.send(method, resps);
+          } else {
+            result
+              .then((response) => {
+                if (response) {
+                  const [method, resps] = response;
+                  this.send(method, resps);
+                }
+              })
+              .catch((err) => {
+                logger.error('HandlerBase::process, catch error:', err);
+              });
+          }
         }
       }
+    } catch (err) {
+      logger.error('HandlerBase::handle, catch error:', err);
     }
   }
 

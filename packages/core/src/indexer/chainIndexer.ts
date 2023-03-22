@@ -8,6 +8,7 @@ import { ChainIndexerBackend, ChainIndexerOptions } from './types';
 
 type IndexTask = {
   header: BlockHeader;
+  force: boolean;
   resolve?: () => void;
 };
 
@@ -29,6 +30,7 @@ export class ChainIndexer {
   private storedSections?: BN;
   private processHeaderLoopPromise?: Promise<void>;
   private initPromise?: Promise<void>;
+  private aborted: boolean = false;
 
   constructor(options: ChainIndexerOptions) {
     this.db = options.db;
@@ -62,6 +64,7 @@ export class ChainIndexer {
    * Abort index loop
    */
   async abort() {
+    this.aborted = true;
     this.headerQueue.abort();
     await this.processHeaderLoopPromise;
   }
@@ -74,10 +77,10 @@ export class ChainIndexer {
   async newBlockHeader(header: BlockHeader, force: boolean = false) {
     await this.initPromise;
     if (!force) {
-      this.headerQueue.push({ header });
+      this.headerQueue.push({ header, force });
     } else {
       await new Promise<void>((resolve) => {
-        this.headerQueue.push({ header, resolve });
+        this.headerQueue.push({ header, resolve, force });
       });
     }
   }
@@ -87,9 +90,9 @@ export class ChainIndexer {
    */
   private async processHeaderLoop() {
     await this.initPromise;
-    for await (const { header, resolve } of this.headerQueue) {
+    for await (const { header, force, resolve } of this.headerQueue) {
       try {
-        await this.newHeader(header.number);
+        await this.processNewHeader(header.number, force);
       } catch (err) {
         logger.error('ChainIndexer::processHeaderLoop, catch error:', err);
       } finally {
@@ -100,13 +103,16 @@ export class ChainIndexer {
 
   /**
    * NewHeader notifies the indexer about new chain heads and/or reorgs.
-   * @param number - Block number of newheader
+   * @param number - Block number of new header
+   * @param force - Whether to force index
    */
-  private async newHeader(number: BN) {
+  async processNewHeader(number: BN, force: boolean) {
     let confirmedSections: BN | undefined = number.gtn(this.confirmsBlockNumber) ? number.subn(this.confirmsBlockNumber).divn(this.sectionSize) : new BN(0);
     confirmedSections = confirmedSections.gtn(0) ? confirmedSections.subn(1) : undefined;
     if (confirmedSections !== undefined && (this.storedSections === undefined || confirmedSections.gt(this.storedSections))) {
-      for (const currentSections = this.storedSections ? this.storedSections.clone() : new BN(0); confirmedSections.gte(currentSections); currentSections.iaddn(1)) {
+      let latestProgress: number | undefined = undefined;
+      const currentSections = this.storedSections ? this.storedSections.clone() : new BN(0);
+      while (confirmedSections.gte(currentSections)) {
         this.backend.reset(currentSections);
         let lastHeader: BlockHeader | undefined;
         if (currentSections.gtn(0)) {
@@ -138,6 +144,26 @@ export class ChainIndexer {
         // save stored section count.
         await this.db.batch([...batch, DBSaveBloomBitsSectionCount(currentSections)]);
         this.storedSections = currentSections.clone();
+
+        // increase the sections
+        currentSections.iaddn(1);
+
+        // log progress
+        if (force) {
+          const progress = currentSections.muln(100).div(confirmedSections).toNumber();
+          if (latestProgress !== progress) {
+            logger.info(`📷 Indexing snapshot, progress: ${progress}%`);
+            latestProgress = progress;
+          }
+        }
+
+        if (this.aborted) {
+          // exit if we are aborted
+          return;
+        }
+      }
+      if (force && latestProgress !== 100) {
+        logger.info(`📷 Indexing snapshot, progress: ${100}%`);
       }
     }
   }

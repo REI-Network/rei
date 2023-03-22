@@ -115,6 +115,7 @@ export class SnapSyncScheduler extends EventEmitter {
         }
         resolve();
         this.syncPromise = undefined;
+        this.snapSyncer.clear();
       });
     }
   }
@@ -160,6 +161,7 @@ export class SnapSyncScheduler extends EventEmitter {
       }
       resolve();
       this.syncPromise = undefined;
+      this.snapSyncer.clear();
     });
   }
 

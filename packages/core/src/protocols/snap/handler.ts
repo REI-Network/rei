@@ -9,7 +9,7 @@ import { StakingAccount } from '../../stateManager';
 import { mergeProof } from '../../snap/utils';
 import { AccountRequest, AccountResponse, StorageRequst, StorageResponse } from '../../sync/snap/types';
 
-const defaultSoftResponseLimit = 2 * 1024 * 1024;
+const defaultSoftResponseLimit = 512 * 1024;
 const maxCodeLookups = 1024;
 const maxTrieNodeLookups = 1024;
 const stateLookupSlack = 0.1;
@@ -114,25 +114,29 @@ export class SnapProtocolHandler implements ProtocolHandler {
    * {@link ProtocolHandler.handle}
    */
   async handle(data: Buffer) {
-    const msg = s.SnapMessageFactory.fromSerializedMessage(data);
-    const reqID = msg.reqID;
-    const request = this.waitingRequests.get(reqID);
-    if (request && (msg instanceof s.AccountRange || msg instanceof s.StorageRange || msg instanceof s.ByteCode || msg instanceof s.TrieNode)) {
-      clearTimeout(request.timeout);
-      this.waitingRequests.delete(reqID);
-      request.resolve(msg);
-    } else {
-      if (msg instanceof s.GetAccountRange) {
-        await this.applyGetAccountRange(msg);
-      } else if (msg instanceof s.GetStorageRange) {
-        await this.applyGetStorageRange(msg);
-      } else if (msg instanceof s.GetByteCode) {
-        await this.applyGetByteCode(msg);
-      } else if (msg instanceof s.GetTrieNode) {
-        await this.applyGetTrieNode(msg);
+    try {
+      const msg = s.SnapMessageFactory.fromSerializedMessage(data);
+      const reqID = msg.reqID;
+      const request = this.waitingRequests.get(reqID);
+      if (request && (msg instanceof s.AccountRange || msg instanceof s.StorageRange || msg instanceof s.ByteCode || msg instanceof s.TrieNode)) {
+        clearTimeout(request.timeout);
+        this.waitingRequests.delete(reqID);
+        request.resolve(msg);
       } else {
-        logger.warn('SnapProtocolHandler::handle, unknown message');
+        if (msg instanceof s.GetAccountRange) {
+          await this.applyGetAccountRange(msg);
+        } else if (msg instanceof s.GetStorageRange) {
+          await this.applyGetStorageRange(msg);
+        } else if (msg instanceof s.GetByteCode) {
+          await this.applyGetByteCode(msg);
+        } else if (msg instanceof s.GetTrieNode) {
+          await this.applyGetTrieNode(msg);
+        } else {
+          logger.warn('SnapProtocolHandler::handle, unknown message');
+        }
       }
+    } catch (err) {
+      logger.error('SnapProtocolHandler::handle, catch error:', err);
     }
   }
 

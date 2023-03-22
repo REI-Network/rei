@@ -3,7 +3,7 @@ import { BN, KECCAK256_NULL, KECCAK256_RLP } from 'ethereumjs-util';
 import { Database } from '@rei-network/database';
 import { DBDeleteSnapAccount, DBDeleteSnapStorage, DBSaveSerializedSnapAccount, DBSaveSnapStorage } from '@rei-network/database/dist/helpers';
 import { snapStorageKey, snapAccountKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
-import { FunctionalBufferSet } from '@rei-network/utils';
+import { FunctionalBufferSet, logger } from '@rei-network/utils';
 import { StakingAccount } from '../stateManager';
 import { EMPTY_HASH, MAX_HASH, DBatch } from '../utils';
 import { KVIterator } from './trieIterator';
@@ -522,7 +522,7 @@ export class DiskLayer implements ISnapshot {
       accOrigin = nextAccOrigin;
       accountRange = accountCheckRange;
 
-      console.log('account progress:', new BN(nextAccOrigin).muln(100).div(new BN(MAX_HASH)).toNumber(), '%');
+      logger.info(`📷 Generating snapshot, progress: ${new BN(nextAccOrigin).muln(100).div(new BN(MAX_HASH)).toNumber()}%`);
     }
 
     journalProgress(batch, undefined, stats);
@@ -534,6 +534,8 @@ export class DiskLayer implements ISnapshot {
     if (aborter.isAborted) {
       aborter.abortFinished();
     }
+
+    logger.info(`📷 Generating snapshot, progress: ${100}%`);
   }
 
   /**

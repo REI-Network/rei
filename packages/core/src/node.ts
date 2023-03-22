@@ -106,8 +106,14 @@ export class Node {
     this.db = new Database(this.chaindb, common);
     this.networkId = common.networkIdBN().toNumber();
     this.chainId = common.chainIdBN().toNumber();
-    this.clique = new CliqueConsensusEngine({ ...options.mine, node: this });
-    this.reimint = new ReimintConsensusEngine({ ...options.mine, node: this });
+    this.clique = new CliqueConsensusEngine({
+      ...options.mine,
+      node: this
+    });
+    this.reimint = new ReimintConsensusEngine({
+      ...options.mine,
+      node: this
+    });
 
     const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
     this.genesisHash = genesisBlock.hash();
@@ -135,11 +141,21 @@ export class Node {
       .on('installed', this.onPeerInstalled)
       .on('removed', this.onPeerRemoved);
 
-    this.sync = new Synchronizer({ ...options.sync, node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
-    this.txPool = new TxPool({ node: this, journal: this.datadir });
+    this.sync = new Synchronizer({
+      ...options.sync,
+      node: this
+    })
+      .on('synchronized', this.onSyncOver)
+      .on('failed', this.onSyncOver);
+    this.txPool = new TxPool({
+      node: this,
+      journal: this.datadir
+    });
     this.txSync = new TxFetcher(this);
     this.bcMonitor = new BlockchainMonitor(this.db);
-    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ db: this.db });
+    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({
+      db: this.db
+    });
     this.snapTree = new SnapTree(this.db);
   }
 
@@ -191,19 +207,22 @@ export class Node {
       }
 
       await this.snapTree.init(latest.stateRoot, false, true);
-      if (!(await this.snapTree.verify(latest.stateRoot))) {
-        // TODO: improve log style
-        logger.warn('Node::init, snapshot is corrupted, rebuiding...');
-        const { generating } = await this.snapTree.rebuild(latest.stateRoot);
-        await generating;
-        logger.warn('Node::init, snapshot is corrupted, rebuid finished, verify again:', await this.snapTree.verify(latest.stateRoot));
-      }
+      // if (!(await this.snapTree.verify(latest.stateRoot))) {
+      //   // TODO: improve log style
+      //   logger.warn('Node::init, snapshot is corrupted, rebuiding...');
+      //   const { generating } = await this.snapTree.rebuild(latest.stateRoot);
+      //   await generating;
+      //   logger.warn('Node::init, snapshot is corrupted, rebuid finished, verify again:', await this.snapTree.verify(latest.stateRoot));
+      // }
       await this.txPool.init(this.latestBlock);
       await this.reimint.init();
       await this.clique.init();
       await this.bloomBitsIndexer.init();
       await this.bcMonitor.init(latest);
       await this.networkMngr.init();
+
+      // check whether the snapshot index is created during initialization
+      await this.bloomBitsIndexer.processNewHeader(latest.number, true);
     })());
   }
 
@@ -234,30 +253,9 @@ export class Node {
     this.networkMngr.off('removed', this.onPeerRemoved);
     this.pendingTxsQueue.abort();
     this.commitBlockQueue.abort();
-    await this.clique.abort();
-    await this.reimint.abort();
-    await this.networkMngr.abort();
-    await this.sync.abort();
-    await this.txPool.abort();
     this.txSync.abort();
-    await this.bloomBitsIndexer.abort();
-    await this.pendingTxsLoopPromise;
-    await this.commitBlockLoopPromise;
 
-    // save all diff layers and disk layers to disk
-    try {
-      const root = this.latestBlock.header.stateRoot;
-      this.snapTree.discard(root);
-      await this.snapTree.cap(root, 0);
-
-      for (const [root, snap] of this.snapTree.layers) {
-        logger.debug('abort, root:', root.toString('hex'), 'snap root:', snap.root.toString('hex'), 'parent:', !!snap.parent);
-      }
-
-      await this.snapTree.journal(root);
-    } catch (err) {
-      logger.warn('Node::abort, journal snap tree failed:', err);
-    }
+    await Promise.all([this.clique.abort(), this.reimint.abort(), this.networkMngr.abort(), this.sync.abort(), this.txPool.abort(), this.bloomBitsIndexer.abort(), this.snapTree.abort(this.latestBlock.header.stateRoot), this.pendingTxsLoopPromise, this.commitBlockLoopPromise]);
 
     await this.evidencedb.close();
     await this.nodedb.close();
@@ -295,7 +293,9 @@ export class Node {
    * @returns Common object
    */
   getCommon(num: BNLike) {
-    const common = new Common({ chain: this.chain });
+    const common = new Common({
+      chain: this.chain
+    });
     common.setHardforkByBlockNumber(num);
     return common;
   }
@@ -480,7 +480,11 @@ export class Node {
       if (opts.td === undefined) {
         throw new Error('missing total difficulty');
       }
-      reorged = await this.blockchain.forcePutBlock(block, { td: opts.td, receipts, saveTxLookup: true });
+      reorged = await this.blockchain.forcePutBlock(block, {
+        td: opts.td,
+        receipts,
+        saveTxLookup: true
+      });
     } else {
       reorged = await this.blockchain.putBlock(block, { receipts, saveTxLookup: true });
     }
@@ -577,7 +581,11 @@ export class Node {
   async commitBlock(options: CommitBlockOptions) {
     await this.initPromise;
     return new Promise<boolean>((resolve, reject) => {
-      this.commitBlockQueue.push({ options, resolve, reject });
+      this.commitBlockQueue.push({
+        options,
+        resolve,
+        reject
+      });
     });
   }
 

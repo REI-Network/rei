@@ -34,6 +34,10 @@ export interface NodeOptions {
    * Evm implementation type
    */
   evm?: string;
+  /**
+   * Whether skip verifing snapshot
+   */
+  skipVerifySnap?: boolean;
 
   /**
    * Miner options

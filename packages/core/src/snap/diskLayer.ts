@@ -351,6 +351,8 @@ export class DiskLayer implements ISnapshot {
    * Generate snapshot
    */
   private async _generate(aborter: GenerateAborter, stats: GeneratorStats) {
+    logger.info('📷 Generating snapshot...');
+
     let accMarker: Buffer | null = null;
     let accountRange = accountCheckRange;
 

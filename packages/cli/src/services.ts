@@ -60,6 +60,7 @@ export async function startServices(opts: { [option: string]: string }): Promise
     databasePath: opts.datadir,
     chain: opts.chain,
     evm: opts.evm,
+    skipVerifySnap: opts.skipVerifySnap as any,
     receiptsCacheSize: opts.receiptsCacheSize ? Number(opts.receiptsCacheSize) : undefined,
     sync,
     mine,

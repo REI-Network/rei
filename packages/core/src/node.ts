@@ -69,6 +69,7 @@ export class Node {
   readonly receiptsCache: ReceiptsCache;
   readonly snapTree: SnapTree;
   readonly evmWorkMode: EVMWorkMode;
+  readonly skipVerifySnap?: boolean;
 
   private initPromise?: Promise<void>;
   private pendingTxsLoopPromise?: Promise<void>;
@@ -96,6 +97,7 @@ export class Node {
     this.accMngr = new AccountManager(options.account.keyStorePath);
     this.receiptsCache = new ReceiptsCache(options.receiptsCacheSize);
     this.evmWorkMode = (options.evm as EVMWorkMode) ?? defaultEVMWorkMode;
+    this.skipVerifySnap = options.skipVerifySnap;
 
     this.chain = options.chain ?? defaultChainName;
     if (!Common.isSupportedChainName(this.chain)) {
@@ -207,6 +209,13 @@ export class Node {
       }
 
       await this.snapTree.init(latest.stateRoot, false, true);
+      if (!this.skipVerifySnap) {
+        if (!(await this.snapTree.verify(latest.stateRoot))) {
+          logger.warn('Node::init, verify snapshot failed, rebuilding...');
+          await this.snapTree.rebuild(latest.stateRoot);
+        }
+      }
+
       await this.txPool.init(this.latestBlock);
       await this.reimint.init();
       await this.clique.init();

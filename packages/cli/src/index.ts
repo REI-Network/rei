@@ -25,6 +25,7 @@ program.option('--sync <sync>', 'sync mode: full, snap', 'full');
 program.option('--snap-trusted-height <trustedHeight>', 'snap sync trusted height.\nthis value and trustedHash are specified at the same time to take effect.\nsnap sync will start from the specified block to verify the legitimacy.\ne.g. 100');
 program.option('--snap-trusted-hash <trustedHash>', 'snap sync trusted hash.\nthis value and trustedHeight are specified at the same time to take effect.\nsnap sync will start from the specified block to verify the legitimacy.\ne.g. 0x123...');
 program.option('--snap-min-td <minTD>', 'minimum total difficulty difference for snap sync');
+program.option('--skip-verify-snap', 'whether skip verifing snapshot');
 program.option('--datadir <path>', 'chain data dir path', path.join(os.homedir(), '.rei'));
 program.option('--keystore <keystore>', 'the datadir for keystore', 'keystore');
 program.option('--unlock <unlock>', 'comma separated list of accounts to unlock');

@@ -293,16 +293,17 @@ export async function loadSnapshot(db: Database, root: Buffer, recovery: boolean
     logger.warn('Snapshot is not continuous with chain, snap:', bufferToHex(snapshot.root), 'blockchain:', bufferToHex(root));
   }
 
-  if (!generator.done) {
-    base.genMarker = generator.marker;
-    base.generate({
-      origin: generator.marker,
-      start: Date.now(),
-      accounts: generator.accounts,
-      slots: generator.slots,
-      storage: generator.storage
-    });
-  }
+  // TODO: Do not continue to generate snapshots!
+  // if (!generator.done) {
+  //   base.genMarker = generator.marker;
+  //   base.generate({
+  //     origin: generator.marker,
+  //     start: Date.now(),
+  //     accounts: generator.accounts,
+  //     slots: generator.slots,
+  //     storage: generator.storage
+  //   });
+  // }
 
   return snapshot;
 }

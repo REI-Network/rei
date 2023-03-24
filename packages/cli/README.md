@@ -28,6 +28,17 @@ Options:
   --max-peers <peers>                        max p2p peers count
   --max-dials <dials>                        max p2p dials count
   --bootnodes <bootnodes...>                 comma separated list of bootnodes
+  --sync <sync>                              sync mode: full, snap (default: "full")
+  --snap-trusted-height <trustedHeight>      snap sync trusted height.
+                                             this value and trustedHash are specified at the same time to take effect.
+                                             snap sync will start from the specified block to verify the legitimacy.
+                                             e.g. 100
+  --snap-trusted-hash <trustedHash>          snap sync trusted hash.
+                                             this value and trustedHeight are specified at the same time to take effect.
+                                             snap sync will start from the specified block to verify the legitimacy.
+                                             e.g. 0x123...
+  --snap-min-td <minTD>                      minimum total difficulty difference for snap sync
+  --skip-verify-snap                         whether skip verifing snapshot
   --datadir <path>                           chain data dir path (default: "~/.rei")
   --keystore <keystore>                      the datadir for keystore (default: "keystore")
   --unlock <unlock>                          comma separated list of accounts to unlock

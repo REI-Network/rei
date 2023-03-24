@@ -312,6 +312,7 @@ describe('SnapSync', () => {
 
     await new Promise((r) => setTimeout(r, 100));
     await sync.abort();
+    sync.clear();
 
     await sync.snapSync(result.root);
     await sync.wait();
@@ -327,6 +328,7 @@ describe('SnapSync', () => {
 
     await new Promise((r) => setTimeout(r, 100));
     await sync.abort();
+    sync.clear();
 
     await modifySomeAccount(result.accounts, srcDB, result);
 

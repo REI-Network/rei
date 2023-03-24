@@ -153,7 +153,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
     let last: Buffer | undefined = undefined;
 
     try {
-      for await (const { hash, value } of this.node.snapTree.accountIterator(msg.rootHash, msg.startHash)) {
+      for await (const { hash, value } of this.node.snapTree!.accountIterator(msg.rootHash, msg.startHash)) {
         last = hash;
         const slimSerializedValue = value.slimSerialize();
         size += hash.length + slimSerializedValue.length;
@@ -212,7 +212,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
         let last: Buffer | undefined = undefined;
         let abort = false;
 
-        for await (const { hash, value } of this.node.snapTree.storageIterator(msg.rootHash, msg.accountHashes[i], origin)) {
+        for await (const { hash, value } of this.node.snapTree!.storageIterator(msg.rootHash, msg.accountHashes[i], origin)) {
           if (size > hardLimit) {
             abort = true;
             break;

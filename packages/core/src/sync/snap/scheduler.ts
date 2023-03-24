@@ -61,7 +61,7 @@ export class SnapSyncScheduler extends EventEmitter {
   private async saveBlockData(root: Buffer, data: BlockData) {
     try {
       // rebuild local snap
-      const { generating } = await this.node.snapTree.rebuild(root);
+      const { generating } = await this.node.snapTree!.rebuild(root);
       // wait until generated
       await generating;
       // save block and receipts to database

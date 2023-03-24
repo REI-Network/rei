@@ -39,6 +39,7 @@ export class SnapTree {
    * @param root - Root hash
    * @param async - Rebuild snaptree async or not
    * @param rebuild - Rebuild or not
+   * @return Whether the initialization is successful
    */
   async init(root: Buffer, async: boolean, rebuild: boolean) {
     const doRebuild = async () => {
@@ -59,6 +60,7 @@ export class SnapTree {
         // Root mismatch, rebuild
         if (rebuild) {
           await doRebuild();
+          return false;
         }
       } else {
         while (head !== undefined) {
@@ -71,10 +73,12 @@ export class SnapTree {
       logger.warn('SnapTree::init, failed to load snapshot');
       if (rebuild) {
         await doRebuild();
+        return false;
       } else {
         throw err;
       }
     }
+    return true;
   }
 
   /**

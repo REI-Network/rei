@@ -3,7 +3,7 @@ import type { LevelUp } from 'levelup';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from '@rei-network/trie';
 import { Database, createLevelDB, createEncodingLevelDB } from '@rei-network/database';
-import { NetworkManager, Peer } from '@rei-network/network';
+import { NetworkManager, Peer, Protocol } from '@rei-network/network';
 import { Common } from '@rei-network/common';
 import { Blockchain } from '@rei-network/blockchain';
 import { VM } from '@rei-network/vm';
@@ -12,7 +12,7 @@ import { Transaction, Block } from '@rei-network/structure';
 import { Channel, logger } from '@rei-network/utils';
 import { AccountManager } from '@rei-network/wallet';
 import { TxPool } from './txpool';
-import { Synchronizer } from './sync';
+import { Synchronizer, SyncMode } from './sync';
 import { TxFetcher } from './txSync';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, ReceiptsCache } from './bloomBits';
@@ -67,7 +67,7 @@ export class Node {
   readonly reimint: ReimintConsensusEngine;
   readonly clique: CliqueConsensusEngine;
   readonly receiptsCache: ReceiptsCache;
-  readonly snapTree: SnapTree;
+  readonly snapTree?: SnapTree;
   readonly evmWorkMode: EVMWorkMode;
   readonly skipVerifySnap?: boolean;
 
@@ -130,10 +130,16 @@ export class Node {
       hardforkByHeadBlockNumber: true
     });
 
+    const protocols: (Protocol | Protocol[])[] = [[this.wire.v2, this.wire.v1], this.consensus];
+    // enable the snapshot protocol only when the snapshot is synchronized
+    if (options.sync.mode === SyncMode.Snap) {
+      protocols.push(this.snap);
+    }
+
     const networkOptions = options.network;
     this.networkMngr = new NetworkManager({
       ...networkOptions,
-      protocols: [[this.wire.v2, this.wire.v1], this.consensus, this.snap],
+      protocols,
       nodedb: this.nodedb,
       libp2pOptions: {
         ...networkOptions.libp2pOptions,
@@ -158,7 +164,11 @@ export class Node {
     this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({
       db: this.db
     });
-    this.snapTree = new SnapTree(this.db);
+
+    // enable snapshot generation only during snapshot synchronization
+    if (options.sync.mode === SyncMode.Snap) {
+      this.snapTree = new SnapTree(this.db);
+    }
   }
 
   /**
@@ -208,8 +218,7 @@ export class Node {
         await this.getEngine(this.latestBlock._common).generateGenesis();
       }
 
-      await this.snapTree.init(latest.stateRoot, false, true);
-      if (!this.skipVerifySnap) {
+      if (this.snapTree && (await this.snapTree.init(latest.stateRoot, false, true)) && !this.skipVerifySnap) {
         logger.info('📷 Verifing snaphot...');
         if (!(await this.snapTree.verify(latest.stateRoot))) {
           logger.warn('Node::init, verify snapshot failed, rebuilding...');
@@ -259,7 +268,12 @@ export class Node {
     this.commitBlockQueue.abort();
     this.txSync.abort();
 
-    await Promise.all([this.clique.abort(), this.reimint.abort(), this.networkMngr.abort(), this.sync.abort(), this.txPool.abort(), this.bloomBitsIndexer.abort(), this.snapTree.abort(this.latestBlock.header.stateRoot), this.pendingTxsLoopPromise, this.commitBlockLoopPromise]);
+    const promises = [this.clique.abort(), this.reimint.abort(), this.networkMngr.abort(), this.sync.abort(), this.txPool.abort(), this.bloomBitsIndexer.abort(), this.pendingTxsLoopPromise, this.commitBlockLoopPromise];
+    if (this.snapTree) {
+      promises.push(this.snapTree.abort(this.latestBlock.header.stateRoot));
+    }
+
+    await Promise.all(promises);
 
     await this.evidencedb.close();
     await this.nodedb.close();
@@ -493,12 +507,14 @@ export class Node {
       reorged = await this.blockchain.putBlock(block, { receipts, saveTxLookup: true });
     }
 
-    // discard and cap snap tree
-    try {
-      this.snapTree.discard(root);
-      await this.snapTree.cap(root, maxSnapLayers);
-    } catch (err) {
-      logger.warn('Node::doCommitBlock, cap snap tree failed:', err);
+    if (this.snapTree) {
+      // discard and cap snap tree
+      try {
+        this.snapTree.discard(root);
+        await this.snapTree.cap(root, maxSnapLayers);
+      } catch (err) {
+        logger.warn('Node::doCommitBlock, cap snap tree failed:', err);
+      }
     }
 
     // install properties for receipts

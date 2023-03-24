@@ -305,11 +305,11 @@ export class Synchronizer extends EventEmitter {
         continue;
       }
 
-      if (isWireAnnouncement(ann) && ann.type === AnnouncementType.NewPeer && this.snap.isSyncing) {
-        // snap sync is working, announce a new peer to it
-        this.snap.snapSyncer.announce();
-        continue;
-      } else if (!isWireAnnouncement(ann)) {
+      if (!isWireAnnouncement(ann)) {
+        if (ann.type === AnnouncementType.NewPeer && this.snap.isSyncing) {
+          // snap sync is working, announce a new peer to it
+          this.snap.snapSyncer.announce();
+        }
         continue;
       }
 

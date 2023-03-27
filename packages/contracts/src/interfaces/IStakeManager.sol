@@ -49,33 +49,19 @@ struct ActiveValidator {
  * @dev see {StakeManager}
  */
 interface IStakeManager is IOnly {
+    function freezed(address validator) external view returns (bool);
+
     function proposer() external view returns (address);
 
     function usedEvidence(bytes32 hash) external view returns (bool);
 
     function validatorId() external view returns (uint256);
 
-    function validators(address validator)
-        external
-        view
-        returns (
-            uint256,
-            address,
-            uint256,
-            uint256
-        );
+    function validators(address validator) external view returns (uint256, address, uint256, uint256);
 
     function unstakeId() external view returns (uint256);
 
-    function unstakeQueue(uint256 id)
-        external
-        view
-        returns (
-            address,
-            address payable,
-            uint256,
-            uint256
-        );
+    function unstakeQueue(uint256 id) external view returns (address, address payable, uint256, uint256);
 
     function totalLockedAmount() external view returns (uint256);
 
@@ -107,11 +93,7 @@ interface IStakeManager is IOnly {
 
     function stake(address validator, address to) external payable returns (uint256);
 
-    function startUnstake(
-        address validator,
-        address payable to,
-        uint256 shares
-    ) external returns (uint256);
+    function startUnstake(address validator, address payable to, uint256 shares) external returns (uint256);
 
     function startClaim(address payable to, uint256 amount) external returns (uint256);
 
@@ -125,11 +107,7 @@ interface IStakeManager is IOnly {
 
     function reward(address validator) external payable;
 
-    function slash(
-        address validator,
-        uint8 reason,
-        bytes32 hash
-    ) external returns (uint256);
+    function slash(address validator, uint8 reason, bytes32 hash) external returns (uint256);
 
     function onAfterBlock(address _proposer, bytes calldata _activeValidatorsInfos) external;
 
@@ -140,4 +118,8 @@ interface IStakeManager is IOnly {
     function addMissRecord(MissRecord[] calldata record) external;
 
     function unjail() external payable;
+
+    function freeze(address validator, bytes32 hash) external;
+
+    function unfreeze(address validator, uint8 factor) external returns (uint256);
 }

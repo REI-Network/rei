@@ -132,7 +132,7 @@ export class ReimintExecutor implements Executor {
       if (ev instanceof DuplicateVoteEvidence) {
         const { voteA, voteB } = ev;
         logger.debug('Reimint::afterApply, find evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
-
+        //@todo freeze validator
         let ethLogs: any[] | undefined;
         if (isEnableBetterPOS(pendingCommon)) {
           // if the contract has been upgraded, call the new slashing function

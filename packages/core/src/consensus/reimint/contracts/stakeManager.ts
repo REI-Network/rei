@@ -349,4 +349,11 @@ export class StakeManager extends Contract {
       return logs;
     });
   }
+
+  /**
+   * @todo freeze validator(call stakeManager.sol to freeze the validator)
+   * @param validator - Validator address
+   * @param hash - Evidence hash
+   * */
+  freeze(validator: Address, hash: Buffer) {}
 }

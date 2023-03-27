@@ -45,6 +45,8 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     // the hash set of the evidence that has been used
     mapping(bytes32 => bool) public override usedEvidence;
 
+    mapping(address => bool) public override freezed;
+
     /**
      * Emitted when a validator gets a reward
      * NOTE: this event is never shown in the block,
@@ -113,12 +115,15 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      */
     event UnindexedValidator(address indexed validator);
 
-    constructor(
-        IConfig _config,
-        address _proposer,
-        address[] memory genesisValidators,
-        bytes memory _activeValidators
-    ) public Only(_config) {
+    /**
+     * Emitted when a validator is frozen
+     * @param validator     Validator address
+     */
+    event Freeze(address indexed validator);
+
+    event Unfreeze(address indexed validator, uint256 indexed amount);
+
+    constructor(IConfig _config, address _proposer, address[] memory genesisValidators, bytes memory _activeValidators) public Only(_config) {
         for (uint256 i = 0; i < genesisValidators.length; i = i.add(1)) {
             createValidator(genesisValidators[i]);
         }
@@ -131,6 +136,11 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      */
     modifier onlySystemCallerOrFeePool() {
         require(msg.sender == config.systemCaller() || msg.sender == config.feePool(), "Only: only system caller or fee pool");
+        _;
+    }
+
+    modifier unfreezed(address validator) {
+        require(!freezed[validator], "StakeManager: validator is freezed");
         _;
     }
 
@@ -314,7 +324,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * @param validator    Validator address
      * @param to           Receiver address
      */
-    function stake(address validator, address to) external payable override nonReentrant returns (uint256 shares) {
+    function stake(address validator, address to) external payable override nonReentrant unfreezed(validator) returns (uint256 shares) {
         require(uint160(validator) > 2000, "StakeManager: invalid validator");
         require(uint160(to) > 2000, "StakeManager: invalid receiver");
         require(msg.value > 0, "StakeManager: invalid value");
@@ -343,12 +353,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     /**
      * Do start unstake, it will mint unstake shares and add a record to `unstakeQueue`
      */
-    function _startUnstake(
-        address validator,
-        Validator memory v,
-        address payable to,
-        uint256 amount
-    ) private returns (uint256 id) {
+    function _startUnstake(address validator, Validator memory v, address payable to, uint256 amount) private returns (uint256 id) {
         if (indexedValidators.contains(v.id) && getVotingPower(v.commissionShare, validator) < config.minIndexVotingPower()) {
             // if the validator's voting power is less than `minIndexVotingPower`, remove him from `indexedValidators`
             indexedValidators.remove(v.id);
@@ -381,11 +386,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * @param shares       Number of shares to be burned
      * @return             Unstake id(if amount is zero, return MAX_UINT256)
      */
-    function startUnstake(
-        address validator,
-        address payable to,
-        uint256 shares
-    ) external override nonReentrant returns (uint256) {
+    function startUnstake(address validator, address payable to, uint256 shares) external override nonReentrant unfreezed(validator) returns (uint256) {
         require(uint160(to) > 2000, "StakeManager: invalid receiver");
         require(shares > 0, "StakeManager: invalid shares");
         Validator memory v = validators[validator];
@@ -407,7 +408,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * @param amount       Number of REI
      * @return             Unstake id
      */
-    function startClaim(address payable to, uint256 amount) external override nonReentrant returns (uint256) {
+    function startClaim(address payable to, uint256 amount) external override nonReentrant unfreezed(msg.sender) returns (uint256) {
         require(uint160(to) > 2000, "StakeManager: invalid receiver");
         require(amount > 0, "StakeManager: invalid amount");
         Validator memory v = validators[msg.sender];
@@ -439,6 +440,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     function unstake(uint256 id) external override nonReentrant returns (uint256 amount) {
         Unstake memory u = unstakeQueue[id];
         require(u.validator != address(0), "StakeManager: invalid unstake id");
+        require(!freezed[u.validator], "StakeManager: validator is freezed");
         require(u.timestamp <= block.timestamp, "StakeManager: invalid unstake timestamp");
         amount = IUnstakePool(config.unstakePool()).withdraw(u.validator, u.unstakeShares, u.to);
         emit DoUnstake(id, u.validator, u.to, amount);
@@ -510,11 +512,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * @param reason            Slash reason
      * @param hash              Evidence hash
      */
-    function slash(
-        address validator,
-        uint8 reason,
-        bytes32 hash
-    ) external override nonReentrant onlySystemCaller returns (uint256 amount) {
+    function slash(address validator, uint8 reason, bytes32 hash) external override nonReentrant onlySystemCaller returns (uint256 amount) {
         // make sure the evidence is not duplicated
         require(!usedEvidence[hash], "StakeManager: invalid evidence");
 
@@ -601,5 +599,45 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
             emit IndexedValidator(msg.sender, votingPower);
         }
         totalLockedAmount = totalLockedAmount.add(votingPower);
+    }
+
+    function freeze(address validator, bytes32 hash) external override onlySystemCaller unfreezed(validator) {
+        // make sure the evidence is not duplicated
+        require(!usedEvidence[hash], "StakeManager: invalid evidence");
+        freezed[validator] = true;
+        Validator memory v = validators[validator];
+
+        if (indexedValidators.contains(v.id)) {
+            // if the validator's voting power is less than `minIndexVotingPower`, remove him from `_indexedValidators`
+            indexedValidators.remove(v.id);
+            emit UnindexedValidator(validator);
+        }
+
+        (, bool jailed, , , , ) = IPrison(config.prison()).miners(validator);
+        if (!jailed) {
+            // decrease total locked amount
+            totalLockedAmount = totalLockedAmount.sub(getVotingPower(v.commissionShare, validator));
+        }
+
+        // save evidence hash
+        usedEvidence[hash] = true;
+        emit Freeze(validator);
+    }
+
+    function unfreeze(address validator, uint8 factor) external override onlySystemCaller returns (uint256 amount) {
+        require(factor > 0 && factor <= 100, "StakeManager: invalid percentage");
+        Validator memory v = validators[validator];
+
+        require(v.commissionShare != address(0), "StakeManager: invalid validator");
+        uint256 decreasedAmount = CommissionShare(v.commissionShare).slash(factor).add(IValidatorRewardPool(config.validatorRewardPool()).slash(validator, factor)).add(IUnstakePool(config.unstakePool()).slash(validator, factor));
+        amount = decreasedAmount.add(IUnstakePool(config.unstakePool()).slash(validator, factor));
+
+        if (!indexedValidators.contains(v.id) && getVotingPower(v.commissionShare, validator) >= config.minIndexVotingPower()) {
+            indexedValidators.set(v.id, validator);
+            emit IndexedValidator(validator, getVotingPower(v.commissionShare, validator));
+        }
+
+        freezed[validator] = false;
+        emit Unfreeze(validator, amount);
     }
 }

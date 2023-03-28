@@ -217,9 +217,9 @@ export function isEnableBetterPOS(common: Common) {
  */
 export function blockNumber2TotalDifficulty(number: BN, common: Common) {
   if (common.chainName() === 'rei-testnet') {
-    return number.addn(1);
-  } else if (common.chainName() === 'rei-mainnet') {
     return number.addn(6000000);
+  } else if (common.chainName() === 'rei-mainnet') {
+    return number.addn(1);
   } else if (common.chainName() === 'rei-devnet') {
     return number.addn(1);
   } else {

@@ -208,3 +208,21 @@ export function isEnableBetterPOS(common: Common) {
     throw new Error('unknown chain');
   }
 }
+
+/**
+ * Calculate total difficulty by block number.
+ * @param number - Block number
+ * @param common - Common instance
+ * @returns Total difficulty
+ */
+export function blockNumber2TotalDifficulty(number: BN, common: Common) {
+  if (common.chainName() === 'rei-testnet') {
+    return number.addn(1);
+  } else if (common.chainName() === 'rei-mainnet') {
+    return number.addn(6000000);
+  } else if (common.chainName() === 'rei-devnet') {
+    return number.addn(1);
+  } else {
+    throw new Error('unknown chain');
+  }
+}

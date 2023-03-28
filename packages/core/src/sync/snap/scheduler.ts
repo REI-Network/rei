@@ -3,6 +3,7 @@ import { logger } from '@rei-network/utils';
 import { BlockHeader } from '@rei-network/structure';
 import { DBSetBlockOrHeader, DBOp, DBSaveLookups } from '@rei-network/database';
 import { Node } from '../../node';
+import { blockNumber2TotalDifficulty } from '../../hardforks';
 import { SyncInfo, BlockData } from '../types';
 import { SnapSync } from './snapSync';
 import { HeaderSync } from './headerSync';
@@ -69,8 +70,7 @@ export class SnapSyncScheduler extends EventEmitter {
         ...data,
         broadcast: false,
         force: true,
-        // total difficulty equals height
-        td: data.block.header.number.addn(1)
+        td: blockNumber2TotalDifficulty(data.block.header.number, data.block._common)
       });
     } catch (err) {
       logger.error('SnapSyncScheduler::saveBlockData, commit failed:', err);

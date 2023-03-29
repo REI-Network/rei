@@ -11,7 +11,7 @@ import { SyncInfo, BlockData } from './types';
 
 const snapSyncStaleBlockNumber = 128;
 const snapSyncTrustedStaleBlockNumber = 896;
-const snapSyncMinConfirmed = 0;
+const snapSyncMinConfirmed = 2;
 const waitingSyncDelay = 200;
 const randomPickInterval = 1000;
 // about 1 week

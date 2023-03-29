@@ -107,8 +107,6 @@ interface IStakeManager is IOnly {
 
     function reward(address validator) external payable;
 
-    function slash(address validator, uint8 reason, bytes32 hash) external returns (uint256);
-
     function onAfterBlock(address _proposer, bytes calldata _activeValidatorsInfos) external;
 
     function getActiveValidatorInfos() external view returns (bytes memory);
@@ -121,5 +119,5 @@ interface IStakeManager is IOnly {
 
     function freeze(address validator, bytes32 hash) external;
 
-    function unfreeze(address validator, uint8 factor) external returns (uint256);
+    function unfreeze(address validator, uint8 factor) external;
 }

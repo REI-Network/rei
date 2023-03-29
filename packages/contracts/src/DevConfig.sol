@@ -27,6 +27,8 @@ contract DevConfig is Ownable, IConfig {
     uint256 internal fft = 1e18;
     uint256 internal jtd = 20;
 
+    address public override communityAddress = 0x0000000000000000000000000000000000000000;
+
     /////////////////////////////////
 
     function setStakeManager(address _s) external onlyOwner {
@@ -168,5 +170,9 @@ contract DevConfig is Ownable, IConfig {
     // a simple function to get blockchain timestamp for test
     function blockTimestamp() external view returns (uint256) {
         return block.timestamp;
+    }
+
+    function setCommunityAddress(address communityAddr) external override onlyOwner {
+        communityAddress = communityAddr;
     }
 }

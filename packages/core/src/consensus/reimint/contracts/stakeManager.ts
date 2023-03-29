@@ -26,7 +26,8 @@ const methods = {
   addMissRecord: toBuffer('0x18498f3a'),
   slashV2: toBuffer('0xad2c8b5e'),
   initEvidenceHash: toBuffer('0x2854982e'),
-  usedEvidence: toBuffer('0x981617f5')
+  usedEvidence: toBuffer('0x981617f5'),
+  freeze: toBuffer('0x4a12e253')
 };
 
 // event topic
@@ -355,5 +356,10 @@ export class StakeManager extends Contract {
    * @param validator - Validator address
    * @param hash - Evidence hash
    * */
-  freeze(validator: Address, hash: Buffer) {}
+  freeze(validator: Address, hash: Buffer) {
+    return this.runWithLogger(async () => {
+      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('freeze', ['address', 'bytes32'], [validator.toString(), bufferToHex(hash)]));
+      return logs;
+    });
+  }
 }

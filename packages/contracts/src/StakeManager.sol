@@ -479,7 +479,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * Reward validator, only can be called by system caller or fee pool
      * @param validator         Validator address
      */
-    function reward(address validator) external payable override nonReentrant onlySystemCallerOrFeePool {
+    function reward(address validator) external payable override unfreezed(validator) nonReentrant onlySystemCallerOrFeePool {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint256 commissionReward = msg.value.mul(v.commissionRate).div(100);
@@ -504,38 +504,6 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         }
 
         emit Reward(validator, msg.value);
-    }
-
-    /**
-     * Slash validator, only can be called by system caller
-     * @param validator         Validator address
-     * @param reason            Slash reason
-     * @param hash              Evidence hash
-     */
-    function slash(address validator, uint8 reason, bytes32 hash) external override nonReentrant onlySystemCaller returns (uint256 amount) {
-        // make sure the evidence is not duplicated
-        require(!usedEvidence[hash], "StakeManager: invalid evidence");
-
-        Validator memory v = validators[validator];
-        require(v.commissionShare != address(0), "StakeManager: invalid validator");
-        uint8 factor = config.getFactorByReason(reason);
-        uint256 decreasedAmount = CommissionShare(v.commissionShare).slash(factor).add(IValidatorRewardPool(config.validatorRewardPool()).slash(validator, factor));
-        amount = decreasedAmount.add(IUnstakePool(config.unstakePool()).slash(validator, factor));
-        if (indexedValidators.contains(v.id) && getVotingPower(v.commissionShare, validator) < config.minIndexVotingPower()) {
-            // if the validator's voting power is less than `minIndexVotingPower`, remove him from `_indexedValidators`
-            indexedValidators.remove(v.id);
-            emit UnindexedValidator(validator);
-        }
-        emit Slash(validator, decreasedAmount);
-
-        (, bool jailed, , , , ) = IPrison(config.prison()).miners(validator);
-        if (!jailed) {
-            // decrease total locked amount
-            totalLockedAmount = totalLockedAmount.sub(decreasedAmount);
-        }
-
-        // save evidence hash
-        usedEvidence[hash] = true;
     }
 
     /**
@@ -624,20 +592,22 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         emit Freeze(validator);
     }
 
-    function unfreeze(address validator, uint8 factor) external override onlySystemCaller returns (uint256 amount) {
-        require(factor > 0 && factor <= 100, "StakeManager: invalid percentage");
+    function unfreeze(address validator, uint8 factor) external override {
+        require(msg.sender == config.communityAddress(), "StakeManager: only community can unfreeze");
+        require(factor <= 100, "StakeManager: invalid percentage");
+
         Validator memory v = validators[validator];
-
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
+
         uint256 decreasedAmount = CommissionShare(v.commissionShare).slash(factor).add(IValidatorRewardPool(config.validatorRewardPool()).slash(validator, factor)).add(IUnstakePool(config.unstakePool()).slash(validator, factor));
-        amount = decreasedAmount.add(IUnstakePool(config.unstakePool()).slash(validator, factor));
 
-        if (!indexedValidators.contains(v.id) && getVotingPower(v.commissionShare, validator) >= config.minIndexVotingPower()) {
+        uint256 votingPower = getVotingPower(v.commissionShare, validator);
+        if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
             indexedValidators.set(v.id, validator);
-            emit IndexedValidator(validator, getVotingPower(v.commissionShare, validator));
+            emit IndexedValidator(validator, votingPower);
         }
-
+        totalLockedAmount = totalLockedAmount.add(votingPower);
         freezed[validator] = false;
-        emit Unfreeze(validator, amount);
+        emit Unfreeze(validator, decreasedAmount);
     }
 }

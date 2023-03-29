@@ -39,4 +39,8 @@ interface IConfig {
     function forfeit() external view returns (uint256);
 
     function jailThreshold() external view returns (uint256);
+
+    function communityAddress() external view returns (address);
+
+    function setCommunityAddress(address communityAddr) external;
 }

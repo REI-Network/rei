@@ -9,7 +9,7 @@ import EVM, { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';
 import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executor } from '../types';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
-import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableBetterPOS } from '../../hardforks';
+import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableBetterPOS, isEnableFeatEvidence } from '../../hardforks';
 import { StateManager } from '../../stateManager';
 import { ValidatorSet, ValidatorChanges, isGenesis } from './validatorSet';
 import { StakeManager, SlashReason, Fee, Contract } from './contracts';
@@ -134,7 +134,10 @@ export class ReimintExecutor implements Executor {
         logger.debug('Reimint::afterApply, find evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
         //@todo freeze validator
         let ethLogs: any[] | undefined;
-        if (isEnableBetterPOS(pendingCommon)) {
+
+        if (isEnableFeatEvidence(pendingCommon)) {
+          ethLogs = await parentStakeManager.freeze(ev.voteA.validator(), ev.hash());
+        } else if (isEnableBetterPOS(pendingCommon)) {
           // if the contract has been upgraded, call the new slashing function
           ethLogs = await parentStakeManager.slashV2(ev.voteA.validator(), SlashReason.DuplicateVote, ev.hash());
         } else {

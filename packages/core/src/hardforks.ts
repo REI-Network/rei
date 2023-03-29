@@ -208,3 +208,15 @@ export function isEnableBetterPOS(common: Common) {
     throw new Error('unknown chain');
   }
 }
+
+export function isEnableFeatEvidence(common: Common) {
+  if (common.chainName() === 'rei-testnet') {
+    return common.gteHardfork('feat-evidence');
+  } else if (common.chainName() === 'rei-mainnet') {
+    return common.gteHardfork('feat-evidence');
+  } else if (common.chainName() === 'rei-devnet') {
+    return common.gteHardfork('feat-evidence');
+  } else {
+    throw new Error('unknown chain');
+  }
+}

@@ -2,6 +2,7 @@
 
 pragma solidity ^0.6.0;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IConfig.sol";
 
 /**
@@ -9,7 +10,9 @@ import "./interfaces/IConfig.sol";
  * In rei-network, system contracts can be updated through hard forks,
  * and DAO logic will be added in the futhure.
  */
-contract Config is IConfig {
+contract Config is IConfig, Ownable {
+    address public override communityAddress = 0x0000000000000000000000000000000000000000;
+
     function stakeManager() external view override returns (address) {
         return 0x0000000000000000000000000000000000001001;
     }
@@ -82,5 +85,9 @@ contract Config is IConfig {
         } else {
             revert("Config: invalid reason");
         }
+    }
+
+    function setCommunityAddress(address communityAddr) external override onlyOwner {
+        communityAddress = communityAddr;
     }
 }

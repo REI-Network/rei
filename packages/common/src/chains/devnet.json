@@ -89,6 +89,10 @@
     {
       "name": "better-pos",
       "block": 0
+    },
+    {
+      "name": "feat-evidence",
+      "block": 100
     }
   ],
   "bootstrapNodes": []

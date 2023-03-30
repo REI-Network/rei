@@ -1,6 +1,6 @@
 import { BN } from 'ethereumjs-util';
 import { compressBytes } from './compress';
-import { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, BLOOM_BITS_SECTION_COUNT, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, CLIQUE_SIGNERS_KEY as CLIQUE_SIGNER_STATES_KEY, CLIQUE_VOTES_KEY, CLIQUE_BLOCK_SIGNERS_KEY, receiptsKey, txLookupKey, bloomBitsKey } from './constants';
+import { HEADS_KEY, HEAD_HEADER_KEY, HEAD_BLOCK_KEY, BLOOM_BITS_SECTION_COUNT, tdKey, headerKey, bodyKey, numberToHashKey, hashToNumberKey, CLIQUE_SIGNERS_KEY as CLIQUE_SIGNER_STATES_KEY, CLIQUE_VOTES_KEY, CLIQUE_BLOCK_SIGNERS_KEY, receiptsKey, txLookupKey, bloomBitsKey, snapAccountKey, snapStorageKey, SNAP_ROOT_KEY, SNAP_JOURNAL_KEY, SNAP_GENERATOR_KEY, SNAP_RECOVERY_KEY, SNAP_DISABLED_KEY, SNAP_SYNC_PROGRESS_KEY } from './constants';
 import { CacheMap } from './manager';
 
 export enum DBTarget {
@@ -17,9 +17,17 @@ export enum DBTarget {
   CliqueBlockSigners,
 
   Receipts = 100,
-  TxLookup = 101,
-  BloomBits = 102,
-  BloomBitsSectionCount = 103
+  TxLookup,
+  BloomBits,
+  BloomBitsSectionCount,
+  SnapAccount,
+  SnapStorage,
+  SnapRoot,
+  SnapJournal,
+  SnapGenerator,
+  SnapRecovery,
+  SnapDisabled,
+  SnapSyncProgress
 }
 
 /**
@@ -42,6 +50,8 @@ export type DatabaseKey = {
   bit?: number;
   section?: BN;
   hash?: Buffer;
+  accountHash?: Buffer;
+  storageHash?: Buffer;
 };
 
 /**
@@ -132,6 +142,38 @@ export class DBOp {
         this.baseDBOp.valueEncoding = 'none';
         break;
       }
+      case DBTarget.SnapAccount: {
+        this.baseDBOp.key = snapAccountKey(key!.accountHash!);
+        this.cacheString = 'snapAccount';
+        break;
+      }
+      case DBTarget.SnapStorage: {
+        this.baseDBOp.key = snapStorageKey(key!.accountHash!, key!.storageHash!);
+        this.cacheString = 'snapStorage';
+        break;
+      }
+      case DBTarget.SnapRoot: {
+        this.baseDBOp.key = SNAP_ROOT_KEY;
+        break;
+      }
+      case DBTarget.SnapJournal: {
+        this.baseDBOp.key = SNAP_JOURNAL_KEY;
+        break;
+      }
+      case DBTarget.SnapGenerator: {
+        this.baseDBOp.key = SNAP_GENERATOR_KEY;
+        break;
+      }
+      case DBTarget.SnapRecovery: {
+        this.baseDBOp.key = SNAP_RECOVERY_KEY;
+      }
+      case DBTarget.SnapDisabled: {
+        this.baseDBOp.key = SNAP_DISABLED_KEY;
+      }
+      case DBTarget.SnapSyncProgress: {
+        this.baseDBOp.key = SNAP_SYNC_PROGRESS_KEY;
+        break;
+      }
     }
   }
 
@@ -160,9 +202,9 @@ export class DBOp {
   }
 
   public updateCache(cacheMap: CacheMap) {
-    if (this.cacheString && cacheMap[this.cacheString] && Buffer.isBuffer(this.baseDBOp.value)) {
+    if (this.cacheString && cacheMap[this.cacheString]) {
       if (this.baseDBOp.type == 'put') {
-        cacheMap[this.cacheString].set(this.baseDBOp.key, this.baseDBOp.value);
+        Buffer.isBuffer(this.baseDBOp.value) && cacheMap[this.cacheString].set(this.baseDBOp.key, this.baseDBOp.value);
       } else if (this.baseDBOp.type == 'del') {
         cacheMap[this.cacheString].del(this.baseDBOp.key);
       } else {

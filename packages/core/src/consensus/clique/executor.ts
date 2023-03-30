@@ -63,7 +63,7 @@ export class CliqueExecutor implements Executor {
     const { block, stateRoot } = options;
 
     const pendingCommon = block._common;
-    const vm = await this.backend.getVM(stateRoot, pendingCommon);
+    const vm = await this.backend.getVM(stateRoot, pendingCommon, true);
 
     const miner = Clique.getMiner(block);
     const minerReward = new BN(pendingCommon.param('pow', 'minerReward'));
@@ -113,7 +113,7 @@ export class CliqueExecutor implements Executor {
 
     // get state root and vm instance
     const root = parent.stateRoot;
-    const vm = await this.backend.getVM(root, pendingCommon);
+    const vm = await this.backend.getVM(root, pendingCommon, true);
 
     if (!skipConsensusValidation) {
       Clique.consensusValidateHeader(pendingHeader, this.backend.blockchain);
@@ -162,7 +162,7 @@ export class CliqueExecutor implements Executor {
    */
   async processTx(options: ProcessTxOpts) {
     const { root } = options;
-    const vm = await this.backend.getVM(root, options.block._common);
+    const vm = await this.backend.getVM(root, options.block._common, true);
     const result = await vm.runTx(options);
     return {
       receipt: postByzantiumTxReceiptsToReceipts([result.receipt])[0],

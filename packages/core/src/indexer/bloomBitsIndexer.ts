@@ -1,5 +1,4 @@
 import { BN } from 'ethereumjs-util';
-import { BlockHeader } from '@rei-network/structure';
 import { DBSaveBloomBits, DBOp, Database } from '@rei-network/database';
 import { BloomBitsGenerator, bloomBitsConfig as config } from '../bloomBits';
 import { ChainIndexer } from './chainIndexer';
@@ -48,9 +47,15 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
    * will ensure a sequential order of headers.
    * @param header BlockHeader
    */
-  process(header: BlockHeader): void {
-    this.gen.addBloom(header.number.sub(this.section.muln(config.bloomBitsSectionSize)).toNumber(), header.bloom);
-    this.headerHash = header.hash();
+  // process(header: BlockHeader): void {
+  //   this.gen.addBloom(header.number.sub(this.section.muln(config.bloomBitsSectionSize)).toNumber(), header.bloom);
+  //   this.headerHash = header.hash();
+  // }
+
+  // TODO
+  process(number: BN, bloom: Buffer, hash: Buffer) {
+    this.gen.addBloom(number.sub(this.section.muln(config.bloomBitsSectionSize)).toNumber(), bloom);
+    this.headerHash = hash;
   }
 
   /**

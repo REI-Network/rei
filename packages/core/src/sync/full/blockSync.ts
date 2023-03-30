@@ -2,16 +2,16 @@ import { BN } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { BlockHeader, Block, Transaction } from '@rei-network/structure';
 import { PChannel, logger } from '@rei-network/utils';
-import { WireProtocol, WireProtocolHandler } from '../protocols';
+import { WireProtocol, WireProtocolHandler } from '../../protocols';
 import { LimitedConcurrency } from './limited';
 
 const defaultDownloadBodiesLimit = 3;
 
-export interface FetcherOptions {
+export interface BlockSyncOptions {
   /**
    * How many block headers/bodies have been requested to download each time(default: 128)
    */
-  downloadElementsCountLimit: BN;
+  maxGetBlockHeaders: BN;
   /**
    * How many remote handlers to download the block body at the same time(default: 3)
    */
@@ -21,21 +21,21 @@ export interface FetcherOptions {
    */
   common: Common;
   /**
-   * Fetcher backend used to process blocks
+   * BlockSync backend used to process blocks
    */
-  backend: FetcherBackend;
+  backend: BlockSyncBackend;
   /**
-   * Fetcher validate backend used to validate block headers/bodies
+   * BlockSync validate backend used to validate block headers/bodies
    */
-  validateBackend: FetcherValidateBackend;
+  validateBackend: BlockSyncValidateBackend;
 }
 
-export interface FetcherBackend {
+export interface BlockSyncBackend {
   handlePeerError(prefix: string, peerId: string, err: any): Promise<void>;
   processAndCommitBlock(block: Block): Promise<boolean>;
 }
 
-export interface FetcherValidateBackend {
+export interface BlockSyncValidateBackend {
   validateHeaders(parent: BlockHeader | undefined, headers: BlockHeader[]): BlockHeader;
   validateBodies(headers: BlockHeader[], bodies: Transaction[][]): void;
   validateBlocks(blocks): Promise<void>;
@@ -46,11 +46,11 @@ type ProcessBlocks = {
   resolve: () => void;
 };
 
-export class Fetcher {
-  private readonly backend: FetcherBackend;
-  private readonly validateBackend: FetcherValidateBackend;
+export class BlockSync {
+  private readonly backend: BlockSyncBackend;
+  private readonly validateBackend: BlockSyncValidateBackend;
   private readonly common: Common;
-  private readonly downloadElementsCountLimit: BN;
+  private readonly maxGetBlockHeaders: BN;
   private readonly downloadBodiesLimit: number;
 
   private readonly useless = new Set<WireProtocolHandler>();
@@ -67,16 +67,16 @@ export class Fetcher {
   private aborted = false;
   private start!: BN;
 
-  constructor(options: FetcherOptions) {
+  constructor(options: BlockSyncOptions) {
     this.backend = options.backend;
     this.validateBackend = options.validateBackend;
     this.common = options.common;
-    this.downloadElementsCountLimit = options.downloadElementsCountLimit.clone();
+    this.maxGetBlockHeaders = options.maxGetBlockHeaders.clone();
     this.downloadBodiesLimit = options.downloadBodiesLimit ?? defaultDownloadBodiesLimit;
   }
 
   /**
-   * Reset fetcher
+   * Reset block syncer
    */
   reset() {
     this.aborted = false;
@@ -84,7 +84,7 @@ export class Fetcher {
   }
 
   /**
-   * Abort fetcher
+   * Abort block syncer
    */
   private _abort() {
     this.aborted = true;
@@ -92,7 +92,7 @@ export class Fetcher {
   }
 
   /**
-   * Abort fetcher and wait until exit
+   * Abort block syncer and wait until exit
    */
   async abort() {
     this._abort();
@@ -103,7 +103,7 @@ export class Fetcher {
    * Start fetch blocks from the target handler,
    * fetcher will only download headers from the target handler,
    * but download bodies from all connected handlers(choose one at random),
-   * at the same time, fetcher will process all blocks sorted by block number
+   * at the same time, block syncer will process all blocks sorted by block number
    * @param start - Start download number
    * @param totalCount - Number of download blocks
    * @param handler - Target handler
@@ -159,7 +159,7 @@ export class Fetcher {
 
     // handle errors, if an error occurs
     if (error) {
-      await this.backend.handlePeerError('Fetcher::fetch', handler.peer.peerId, error);
+      await this.backend.handlePeerError('BlockSync::fetch', handler.peer.peerId, error);
     }
 
     return {
@@ -174,8 +174,8 @@ export class Fetcher {
     let parent: BlockHeader | undefined;
     while (!this.aborted && reserveTotalCount.gtn(0)) {
       let count: BN;
-      if (reserveTotalCount.gt(this.downloadElementsCountLimit)) {
-        count = this.downloadElementsCountLimit.clone();
+      if (reserveTotalCount.gt(this.maxGetBlockHeaders)) {
+        count = this.maxGetBlockHeaders.clone();
       } else {
         count = reserveTotalCount.clone();
       }
@@ -184,10 +184,15 @@ export class Fetcher {
         logger.info('Download headers start:', startNumber.toString(), 'count:', count.toString(), 'from:', handler.peer.peerId);
         const headers = await handler.getBlockHeaders(startNumber, count);
         parent = this.validateBackend.validateHeaders(parent, headers);
+        if (!count.eqn(headers.length)) {
+          throw new Error('useless');
+        }
         await onData(headers);
       } catch (err: any) {
         this._abort();
-        await this.backend.handlePeerError('Fetcher::downloadHeaders', handler.peer.peerId, err);
+        if (err.message !== 'useless') {
+          await this.backend.handlePeerError('BlockSync::downloadHeaders', handler.peer.peerId, err);
+        }
         return;
       }
 
@@ -203,7 +208,7 @@ export class Fetcher {
         handler = await wire.pool.get();
       } catch (err) {
         this._abort();
-        logger.warn('Fetcher::downloadBodies, get handler failed:', err);
+        logger.warn('BlockSync::downloadBodies, get handler failed:', err);
         return;
       }
 
@@ -219,7 +224,7 @@ export class Fetcher {
       } catch (err: any) {
         this.useless.add(handler);
         if (err.message !== 'useless') {
-          await this.backend.handlePeerError('Fetcher::downloadBodies', handler.peer.peerId, err);
+          await this.backend.handlePeerError('BlockSync::downloadBodies', handler.peer.peerId, err);
         }
       }
     }
@@ -231,7 +236,7 @@ export class Fetcher {
     }
 
     const first = blocks[0];
-    const index = first.header.number.sub(this.start).div(this.downloadElementsCountLimit).toNumber();
+    const index = first.header.number.sub(this.start).div(this.maxGetBlockHeaders).toNumber();
 
     return new Promise<void>((resolve) => {
       this.processBlocksChannel.push({

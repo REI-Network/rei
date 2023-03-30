@@ -3,7 +3,7 @@ import type { LevelUp } from 'levelup';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from '@rei-network/trie';
 import { Database, createLevelDB, createEncodingLevelDB } from '@rei-network/database';
-import { NetworkManager, Peer } from '@rei-network/network';
+import { NetworkManager, Peer, Protocol } from '@rei-network/network';
 import { Common } from '@rei-network/common';
 import { Blockchain } from '@rei-network/blockchain';
 import { VM } from '@rei-network/vm';
@@ -13,18 +13,20 @@ import { Channel, logger } from '@rei-network/utils';
 import { AccountManager } from '@rei-network/wallet';
 import { BlsManager } from '@rei-network/bls';
 import { TxPool } from './txpool';
-import { Synchronizer } from './sync';
+import { Synchronizer, SyncMode } from './sync';
 import { TxFetcher } from './txSync';
 import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, ReceiptsCache } from './bloomBits';
 import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
-import { Wire, ConsensusProtocol, WireProtocolHandler } from './protocols';
+import { Wire, ConsensusProtocol, WireProtocolHandler, SnapProtocol, SnapProtocolHandler } from './protocols';
 import { ReimintConsensusEngine, CliqueConsensusEngine } from './consensus';
 import { isEnableRemint } from './hardforks';
 import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
 import { StateManager } from './stateManager';
+import { SnapTree } from './snap/snapTree';
 
+const maxSnapLayers = 1024;
 const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;
 const defaultChainName = 'rei-mainnet';
@@ -53,6 +55,7 @@ export class Node {
   readonly evidencedb: LevelUp;
   readonly wire: Wire;
   readonly consensus: ConsensusProtocol;
+  readonly snap: SnapProtocol;
   readonly db: Database;
   readonly blockchain: Blockchain;
   readonly networkMngr: NetworkManager;
@@ -65,8 +68,10 @@ export class Node {
   readonly reimint: ReimintConsensusEngine;
   readonly clique: CliqueConsensusEngine;
   readonly receiptsCache: ReceiptsCache;
+  readonly snapTree?: SnapTree;
   readonly evmWorkMode: EVMWorkMode;
   readonly blsMngr: BlsManager;
+  readonly skipVerifySnap?: boolean;
 
   private initPromise?: Promise<void>;
   private pendingTxsLoopPromise?: Promise<void>;
@@ -90,10 +95,12 @@ export class Node {
     [this.evidencedb] = createLevelDB(path.join(this.datadir, 'evidence'));
     this.wire = new Wire(this);
     this.consensus = new ConsensusProtocol(this);
+    this.snap = new SnapProtocol(this);
     this.accMngr = new AccountManager(options.account.keyStorePath);
     this.receiptsCache = new ReceiptsCache(options.receiptsCacheSize);
     this.evmWorkMode = (options.evm as EVMWorkMode) ?? defaultEVMWorkMode;
     this.blsMngr = new BlsManager(options.bls.bls);
+    this.skipVerifySnap = options.skipVerifySnap;
 
     this.chain = options.chain ?? defaultChainName;
     if (!Common.isSupportedChainName(this.chain)) {
@@ -104,8 +111,14 @@ export class Node {
     this.db = new Database(this.chaindb, common);
     this.networkId = common.networkIdBN().toNumber();
     this.chainId = common.chainIdBN().toNumber();
-    this.clique = new CliqueConsensusEngine({ ...options.mine, node: this });
-    this.reimint = new ReimintConsensusEngine({ ...options.mine, node: this });
+    this.clique = new CliqueConsensusEngine({
+      ...options.mine,
+      node: this
+    });
+    this.reimint = new ReimintConsensusEngine({
+      ...options.mine,
+      node: this
+    });
 
     const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
     this.genesisHash = genesisBlock.hash();
@@ -120,10 +133,16 @@ export class Node {
       hardforkByHeadBlockNumber: true
     });
 
+    const protocols: (Protocol | Protocol[])[] = [[this.wire.v2, this.wire.v1], this.consensus];
+    // enable the snapshot protocol only when the snapshot is synchronized
+    if (options.sync.mode === SyncMode.Snap) {
+      protocols.push(this.snap);
+    }
+
     const networkOptions = options.network;
     this.networkMngr = new NetworkManager({
       ...networkOptions,
-      protocols: [[this.wire.v2, this.wire.v1], this.consensus],
+      protocols,
       nodedb: this.nodedb,
       libp2pOptions: {
         ...networkOptions.libp2pOptions,
@@ -133,11 +152,26 @@ export class Node {
       .on('installed', this.onPeerInstalled)
       .on('removed', this.onPeerRemoved);
 
-    this.sync = new Synchronizer({ node: this }).on('synchronized', this.onSyncOver).on('failed', this.onSyncOver);
-    this.txPool = new TxPool({ node: this, journal: this.datadir });
+    this.sync = new Synchronizer({
+      ...options.sync,
+      node: this
+    })
+      .on('synchronized', this.onSyncOver)
+      .on('failed', this.onSyncOver);
+    this.txPool = new TxPool({
+      node: this,
+      journal: this.datadir
+    });
     this.txSync = new TxFetcher(this);
     this.bcMonitor = new BlockchainMonitor(this.db);
-    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({ db: this.db });
+    this.bloomBitsIndexer = BloomBitsIndexer.createBloomBitsIndexer({
+      db: this.db
+    });
+
+    // enable snapshot generation only during snapshot synchronization
+    if (options.sync.mode === SyncMode.Snap) {
+      this.snapTree = new SnapTree(this.db);
+    }
   }
 
   /**
@@ -181,16 +215,30 @@ export class Node {
       await this.evidencedb.open();
 
       await this.blockchain.init();
-      if (this.latestBlock.header.number.eqn(0)) {
+
+      const latest = this.latestBlock.header;
+      if (latest.number.eqn(0)) {
         await this.getEngine(this.latestBlock._common).generateGenesis();
+      }
+
+      if (this.snapTree && (await this.snapTree.init(latest.stateRoot, false, true)) && !this.skipVerifySnap) {
+        logger.info('📷 Verifing snaphot...');
+        if (!(await this.snapTree.verify(latest.stateRoot))) {
+          logger.warn('Node::init, verify snapshot failed, rebuilding...');
+          const { generating } = await this.snapTree.rebuild(latest.stateRoot);
+          await generating;
+        }
       }
 
       await this.txPool.init(this.latestBlock);
       await this.reimint.init();
       await this.clique.init();
       await this.bloomBitsIndexer.init();
-      await this.bcMonitor.init(this.latestBlock.header);
+      await this.bcMonitor.init(latest);
       await this.networkMngr.init();
+
+      // check whether the snapshot index is created during initialization
+      await this.bloomBitsIndexer.processNewHeader(latest.number, true);
     })());
   }
 
@@ -221,23 +269,23 @@ export class Node {
     this.networkMngr.off('removed', this.onPeerRemoved);
     this.pendingTxsQueue.abort();
     this.commitBlockQueue.abort();
-    await this.clique.abort();
-    await this.reimint.abort();
-    await this.networkMngr.abort();
-    await this.sync.abort();
-    await this.txPool.abort();
     this.txSync.abort();
-    await this.bloomBitsIndexer.abort();
-    await this.pendingTxsLoopPromise;
-    await this.commitBlockLoopPromise;
+
+    const promises = [this.clique.abort(), this.reimint.abort(), this.networkMngr.abort(), this.sync.abort(), this.txPool.abort(), this.bloomBitsIndexer.abort(), this.pendingTxsLoopPromise, this.commitBlockLoopPromise];
+    if (this.snapTree) {
+      promises.push(this.snapTree.abort(this.latestBlock.header.stateRoot));
+    }
+
+    await Promise.all(promises);
+
     await this.evidencedb.close();
     await this.nodedb.close();
     await this.chaindb.close();
   }
 
-  private onPeerInstalled = (handler) => {
-    if (handler instanceof WireProtocolHandler) {
-      this.sync.announce(handler);
+  private onPeerInstalled = (peer, handler) => {
+    if (handler instanceof WireProtocolHandler || handler instanceof SnapProtocolHandler) {
+      this.sync.announceNewPeer(handler);
     }
   };
 
@@ -266,7 +314,9 @@ export class Node {
    * @returns Common object
    */
   getCommon(num: BNLike) {
-    const common = new Common({ chain: this.chain });
+    const common = new Common({
+      chain: this.chain
+    });
     common.setHardforkByBlockNumber(num);
     return common;
   }
@@ -326,10 +376,15 @@ export class Node {
    * Get state manager object by state root
    * @param root - State root
    * @param num - Block number or Common
+   * @param snap - Need snapshot or not
    * @returns State manager object
    */
-  async getStateManager(root: Buffer, num: BNLike | Common) {
-    const stateManager = new StateManager({ common: num instanceof Common ? num : this.getCommon(num), trie: new Trie(this.chaindb) });
+  async getStateManager(root: Buffer, num: BNLike | Common, snap: boolean = false) {
+    const stateManager = new StateManager({
+      common: num instanceof Common ? num : this.getCommon(num),
+      trie: new Trie(this.chaindb),
+      snapTree: snap ? this.snapTree : undefined
+    });
     await stateManager.setStateRoot(root);
     return stateManager;
   }
@@ -338,11 +393,12 @@ export class Node {
    * Get a VM object by state root
    * @param root - The state root
    * @param num - Block number or Common
+   * @param snap - Need snapshot or not
    * @param mode - EVM work mode
    * @returns VM object
    */
-  async getVM(root: Buffer, num: BNLike | Common, mode?: EVMWorkMode) {
-    const stateManager = await this.getStateManager(root, num);
+  async getVM(root: Buffer, num: BNLike | Common, snap: boolean = false, mode?: EVMWorkMode) {
+    const stateManager = await this.getStateManager(root, num, snap);
     const common = stateManager._common;
     return new VM({
       common,
@@ -417,6 +473,7 @@ export class Node {
 
     const hash = block.hash();
     const number = block.header.number;
+    const root = block.header.stateRoot;
 
     // ensure that the block has not been committed
     try {
@@ -439,7 +496,29 @@ export class Node {
     }
 
     // save block to the database
-    const reorged = await this.blockchain.putBlock(block, { receipts, saveTxLookup: true });
+    let reorged: boolean;
+    if (opts.force) {
+      if (opts.td === undefined) {
+        throw new Error('missing total difficulty');
+      }
+      reorged = await this.blockchain.forcePutBlock(block, {
+        td: opts.td,
+        receipts,
+        saveTxLookup: true
+      });
+    } else {
+      reorged = await this.blockchain.putBlock(block, { receipts, saveTxLookup: true });
+    }
+
+    if (this.snapTree) {
+      // discard and cap snap tree
+      try {
+        this.snapTree.discard(root);
+        await this.snapTree.cap(root, maxSnapLayers);
+      } catch (err) {
+        logger.warn('Node::doCommitBlock, cap snap tree failed:', err);
+      }
+    }
 
     // install properties for receipts
     let lastCumulativeGasUsed = new BN(0);
@@ -465,7 +544,7 @@ export class Node {
     await this.initPromise;
     for await (const { options, resolve, reject } of this.commitBlockQueue) {
       try {
-        const { block, broadcast } = options;
+        const { block, broadcast, force } = options;
         const { reorged } = await this.doCommitBlock(options);
 
         // if canonical chain changes, notify to other modules
@@ -474,7 +553,7 @@ export class Node {
             this.wire.broadcastNewBlock(block, this.totalDifficulty);
           }
 
-          const promises = [this.txPool.newBlock(block), this.bcMonitor.newBlock(block), this.bloomBitsIndexer.newBlockHeader(block.header), this.getEngine(block._common).newBlock(block)];
+          const promises = [this.txPool.newBlock(block, force), this.bcMonitor.newBlock(block, force), this.bloomBitsIndexer.newBlockHeader(block.header, force), this.getEngine(block._common).newBlock(block)];
           await Promise.all(promises);
         }
 
@@ -518,7 +597,11 @@ export class Node {
   async commitBlock(options: CommitBlockOptions) {
     await this.initPromise;
     return new Promise<boolean>((resolve, reject) => {
-      this.commitBlockQueue.push({ options, resolve, reject });
+      this.commitBlockQueue.push({
+        options,
+        resolve,
+        reject
+      });
     });
   }
 

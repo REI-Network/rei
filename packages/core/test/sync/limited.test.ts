@@ -1,5 +1,5 @@
 import { expect, assert } from 'chai';
-import { LimitedConcurrency } from '../../src/sync/limited';
+import { LimitedConcurrency } from '../../src/sync/full';
 
 enum Status {
   Unknown,

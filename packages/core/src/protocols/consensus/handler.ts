@@ -251,52 +251,56 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
    * {@link ProtocolHandler.handle}
    */
   async handle(data: Buffer) {
-    const msg = MessageFactory.fromSerializedMessage(data);
-    if (msg instanceof m.HandshakeMessage) {
-      this.applyHandshakeMessage(msg);
-    } else if (msg instanceof m.NewRoundStepMessage) {
-      this.applyNewRoundStepMessage(msg);
-    } else if (msg instanceof m.NewValidBlockMessage) {
-      this.applyNewValidBlockMessage(msg);
-    } else if (msg instanceof m.HasVoteMessage) {
-      this.applyHasVoteMessage(msg);
-    } else if (msg instanceof m.ProposalMessage) {
-      this.setHasProposal(msg.proposal);
-      // pre validate the proposal message before adding it to the state machine message queue
-      if (this.reimint.state.preValidateProposal(msg.proposal)) {
-        this.reimint.state.newMessage(this.peer.peerId, msg);
+    try {
+      const msg = MessageFactory.fromSerializedMessage(data);
+      if (msg instanceof m.HandshakeMessage) {
+        this.applyHandshakeMessage(msg);
+      } else if (msg instanceof m.NewRoundStepMessage) {
+        this.applyNewRoundStepMessage(msg);
+      } else if (msg instanceof m.NewValidBlockMessage) {
+        this.applyNewValidBlockMessage(msg);
+      } else if (msg instanceof m.HasVoteMessage) {
+        this.applyHasVoteMessage(msg);
+      } else if (msg instanceof m.ProposalMessage) {
+        this.setHasProposal(msg.proposal);
+        // pre validate the proposal message before adding it to the state machine message queue
+        if (this.reimint.state.preValidateProposal(msg.proposal)) {
+          this.reimint.state.newMessage(this.peer.peerId, msg);
+        }
+      } else if (msg instanceof m.ProposalPOLMessage) {
+        this.applyProposalPOLMessage(msg);
+      } else if (msg instanceof m.VoteMessage) {
+        const vote = msg.vote;
+        this.ensureVoteBitArrays(vote.height, this.reimint.state.getValSetSize());
+        this.setHasVote(vote.height, vote.round, vote.type, vote.index);
+        // pre validate the vote message before adding it to the state machine message queue
+        if (this.reimint.state.preValidateVote(msg.vote)) {
+          this.reimint.state.newMessage(this.peer.peerId, msg);
+        }
+      } else if (msg instanceof m.VoteSetMaj23Message) {
+        this.reimint.state.setVoteMaj23(msg.height, msg.round, msg.type, this.peer.peerId, msg.hash);
+        const voteSetBitsMessage = this.reimint.state.genVoteSetBitsMessage(msg.height, msg.round, msg.type, msg.hash);
+        voteSetBitsMessage && this.send(voteSetBitsMessage);
+      } else if (msg instanceof m.VoteSetBitsMessage) {
+        this.applyVoteSetBitsMessage(msg);
+      } else if (msg instanceof m.GetProposalBlockMessage) {
+        const proposalBlock = this.reimint.state.getProposalBlock(msg.hash);
+        proposalBlock && this.send(new m.ProposalBlockMessage(proposalBlock));
+      } else if (msg instanceof m.ProposalBlockMessage) {
+        // check if we need the proposal block message before adding it to the state machine message queue
+        if (this.reimint.state.preValidateProposalBlock()) {
+          this.reimint.state.newMessage(this.peer.peerId, msg);
+        }
+      } else if (msg instanceof m.DuplicateVoteEvidenceMessage) {
+        this.knowEvidence(msg.evidence);
+        this.reimint.addEvidence(msg.evidence).catch((err) => {
+          logger.error('ConsensusProtocolHandler::handle, addEvidence, catch error:', err);
+        });
+      } else {
+        logger.warn('ConsensusProtocolHandler::handle, unknown message');
       }
-    } else if (msg instanceof m.ProposalPOLMessage) {
-      this.applyProposalPOLMessage(msg);
-    } else if (msg instanceof m.VoteMessage) {
-      const vote = msg.vote;
-      this.ensureVoteBitArrays(vote.height, this.reimint.state.getValSetSize());
-      this.setHasVote(vote.height, vote.round, vote.type, vote.index);
-      // pre validate the vote message before adding it to the state machine message queue
-      if (this.reimint.state.preValidateVote(msg.vote)) {
-        this.reimint.state.newMessage(this.peer.peerId, msg);
-      }
-    } else if (msg instanceof m.VoteSetMaj23Message) {
-      this.reimint.state.setVoteMaj23(msg.height, msg.round, msg.type, this.peer.peerId, msg.hash);
-      const voteSetBitsMessage = this.reimint.state.genVoteSetBitsMessage(msg.height, msg.round, msg.type, msg.hash);
-      voteSetBitsMessage && this.send(voteSetBitsMessage);
-    } else if (msg instanceof m.VoteSetBitsMessage) {
-      this.applyVoteSetBitsMessage(msg);
-    } else if (msg instanceof m.GetProposalBlockMessage) {
-      const proposalBlock = this.reimint.state.getProposalBlock(msg.hash);
-      proposalBlock && this.send(new m.ProposalBlockMessage(proposalBlock));
-    } else if (msg instanceof m.ProposalBlockMessage) {
-      // check if we need the proposal block message before adding it to the state machine message queue
-      if (this.reimint.state.preValidateProposalBlock()) {
-        this.reimint.state.newMessage(this.peer.peerId, msg);
-      }
-    } else if (msg instanceof m.DuplicateVoteEvidenceMessage) {
-      this.knowEvidence(msg.evidence);
-      this.reimint.addEvidence(msg.evidence).catch((err) => {
-        logger.error('ConsensusProtocolHandler::handle, addEvidence, catch error:', err);
-      });
-    } else {
-      logger.warn('ConsensusProtocolHandler::handle, unknown message');
+    } catch (err) {
+      logger.error('ConsensusProtocolHandler::handle, catch error:', err);
     }
   }
 

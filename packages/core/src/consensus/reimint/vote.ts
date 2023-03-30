@@ -8,6 +8,7 @@ import * as v from './validate';
 interface exActiveValidatorSet extends ActiveValidatorSet {
   getBlsPublickeyByIndex(index: number): Buffer;
 }
+
 export class ConflictingVotesError extends Error {
   voteA: Vote;
   voteB: Vote;
@@ -536,7 +537,7 @@ export class VoteSet {
     for (let i = 0; i < len; i++) {
       const temp = bitArray.getIndex(i);
       if (temp) {
-        const pubKey = this.valSet.getBlsPublickeyByIndex(i);
+        const pubKey = (this.valSet as exActiveValidatorSet).getBlsPublickeyByIndex(i);
         pubKeys.push(pubKey);
         sum.iadd(this.valSet.getVotingPower(this.valSet.getValidatorByIndex(i)));
       }

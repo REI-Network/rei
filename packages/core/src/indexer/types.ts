@@ -1,5 +1,4 @@
 import { BN } from 'ethereumjs-util';
-import { BlockHeader } from '@rei-network/structure';
 import { Database, DBOp } from '@rei-network/database';
 
 /**
@@ -20,7 +19,10 @@ export interface ChainIndexerBackend {
    * will ensure a sequential order of headers.
    * @param header
    */
-  process(header: BlockHeader): void;
+  // process(header: BlockHeader): void;
+
+  // TODO
+  process(number: BN, bloom: Buffer, hash: Buffer): void;
 
   /**
    * Commit finalizes the section metadata and stores it into the database.

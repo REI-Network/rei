@@ -15,10 +15,10 @@
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^4.27.0",
     "@typescript-eslint/parser": "^4.27.0",
+    "eslint": "^6.8.0",
     "eslint-config-prettier": "^6.11.0",
     "eslint-plugin-prettier": "^3.1.3",
     "husky": "^7.0.4",
-    "eslint": "^6.8.0",
     "prettier": "^2.0.5",
     "prettier-plugin-solidity": "1.0.0-beta.6",
     "ts-node": "^10.8.1"
@@ -43,8 +43,8 @@
     "build:api": "npm run build -w @rei-network/api",
     "build:ipc": "npm run build -w @rei-network/ipc",
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/package-lock.json && npm run clean:build",
-    "clean:build": "rm -rf packages/*/dist && rm -rf rm -rf packages/*/*.tsbuildinfo && cd packages/contracts && npm run clean:build",
-    "clean:buildinfo": "rm -rf rm -rf packages/*/*.tsbuildinfo",
+    "clean:build": "rm -rf packages/*/dist && rm -rf packages/*/*.tsbuildinfo && cd packages/contracts && npm run clean:build",
+    "clean:buildinfo": "rm -rf packages/*/*.tsbuildinfo",
     "lint": "eslint packages/*/src/**.ts packages/*/test/**.ts --format=codeframe",
     "lint:fix": "eslint packages/*/src/**.ts packages/*/test/**.ts --fix"
   }

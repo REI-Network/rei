@@ -6,6 +6,7 @@ import { logger } from '@rei-network/utils';
 import { NetworkManagerOptions } from '@rei-network/network';
 import { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
 import { ConsensusEngineOptions } from './consensus/types';
+import { SynchronizerOptions } from './sync';
 import { Node } from './node';
 import { NodeOptions, AccountManagerConstructorOptions } from './types';
 
@@ -23,10 +24,13 @@ export interface AccountOptions extends AccountManagerConstructorOptions {
   unlock: [string, string][];
 }
 
+export interface SyncOptions extends Omit<SynchronizerOptions, 'node'> {}
+
 export interface CreateNodeOptions extends Omit<NodeOptions, 'mine' | 'network' | 'account'> {
   mine: MineOptions;
   network: NetworkOptions;
   account: AccountOptions;
+  sync: SyncOptions;
 }
 
 async function loadPeerId(databasePath: string) {
@@ -43,10 +47,7 @@ async function loadPeerId(databasePath: string) {
   return peerId;
 }
 
-export class NodeFactory {
-  // disable constructor
-  private constructor() {}
-
+export abstract class NodeFactory {
   static async createNode(options: CreateNodeOptions) {
     const coinbase = options.mine.coinbase ? Address.fromString(options.mine.coinbase) : undefined;
     const node = new Node({

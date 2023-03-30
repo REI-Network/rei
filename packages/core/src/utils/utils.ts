@@ -5,6 +5,7 @@ import { CLIQUE_EXTRA_VANITY, Receipt, Log } from '@rei-network/structure';
 import { hexStringToBN } from '@rei-network/utils';
 
 export const EMPTY_HASH = Buffer.alloc(32);
+export const MAX_HASH = Buffer.from('ff'.repeat(32), 'hex');
 export const EMPTY_ADDRESS = Address.zero();
 export const EMPTY_EXTRA_DATA = Buffer.alloc(CLIQUE_EXTRA_VANITY);
 export const EMPTY_MIX_HASH = Buffer.alloc(32);

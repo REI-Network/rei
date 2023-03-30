@@ -16,9 +16,9 @@ import * as m from './messages';
 import * as c from './config';
 
 enum Libp2pPeerValue {
-  trusted = 1.5,
-  installed = 1,
-  connected = 0.5,
+  trusted = 1,
+  installed = 0.66,
+  connected = 0.33,
   incoming = 0
 }
 

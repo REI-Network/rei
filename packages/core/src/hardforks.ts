@@ -209,13 +209,13 @@ export function isEnableBetterPOS(common: Common) {
   }
 }
 
-export function isEnableFeatEvidence(common: Common) {
+export function isEnableDao(common: Common) {
   if (common.chainName() === 'rei-testnet') {
-    return common.gteHardfork('feat-evidence');
+    return common.gteHardfork('rei-dao');
   } else if (common.chainName() === 'rei-mainnet') {
-    return common.gteHardfork('feat-evidence');
+    return common.gteHardfork('rei-dao');
   } else if (common.chainName() === 'rei-devnet') {
-    return common.gteHardfork('feat-evidence');
+    return common.gteHardfork('rei-dao');
   }
 }
 /**

@@ -1,6 +1,6 @@
 {
-  "name": "feat-evidence",
-  "comment": "feat evidence hardfork",
+  "name": "rei-dao",
+  "comment": "rei dao hardfork",
   "gasConfig": {},
   "gasPrices": {},
   "vm": {

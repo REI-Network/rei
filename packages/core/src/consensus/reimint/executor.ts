@@ -9,7 +9,7 @@ import EVM, { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';
 import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executor } from '../types';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
-import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableBetterPOS, isEnableFeatEvidence } from '../../hardforks';
+import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableBetterPOS, isEnableDao } from '../../hardforks';
 import { StateManager } from '../../stateManager';
 import { ValidatorSet, ValidatorChanges, isGenesis } from './validatorSet';
 import { StakeManager, SlashReason, Fee, Contract } from './contracts';
@@ -135,7 +135,7 @@ export class ReimintExecutor implements Executor {
         //@todo freeze validator
         let ethLogs: any[] | undefined;
 
-        if (isEnableFeatEvidence(pendingCommon)) {
+        if (isEnableDao(pendingCommon)) {
           ethLogs = await parentStakeManager.freeze(ev.voteA.validator(), ev.hash());
         } else if (isEnableBetterPOS(pendingCommon)) {
           // if the contract has been upgraded, call the new slashing function

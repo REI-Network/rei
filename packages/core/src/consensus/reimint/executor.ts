@@ -9,7 +9,7 @@ import EVM, { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';
 import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executor } from '../types';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
-import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableBetterPOS, isEnableValidatorBls } from '../../hardforks';
+import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableBetterPOS, isEnableDAO } from '../../hardforks';
 import { StateManager } from '../../stateManager';
 import { ValidatorSet, ValidatorChanges, isGenesis, IndexedValidatorSet, ActiveValidatorSet } from './validatorSet';
 import { StakeManager, SlashReason, Fee, Contract, ValidatorBls } from './contracts';
@@ -217,15 +217,15 @@ export class ReimintExecutor implements Executor {
     }
 
     // 7. filter all receipts to collect changes
-    if (isEnableValidatorBls(pendingCommon)) {
+    if (isEnableDAO(pendingCommon)) {
       ValidatorBls.filterReceiptsChanges(changes, receipts, pendingCommon);
       indexedValidatorSet.merge(changes, this.engine.getValidatorBls(vm, pendingBlock, pendingCommon));
-    } else if (!isEnableValidatorBls(pendingCommon) && isEnableValidatorBls(nextCommon)) {
+    } else if (!isEnableDAO(pendingCommon) && isEnableDAO(nextCommon)) {
       // modify validatorBls contract address
       const fallbackAddr = nextCommon.param('vm', 'fallbackaddr');
       const postAddr = nextCommon.param('vm', 'postaddr');
       if (fallbackAddr === undefined || postAddr === undefined) {
-        throw new Error('Reimint::afterApply, load bls contract failed');
+        throw new Error('load bls contract addresses failed');
       }
       const addr = Address.fromString(postAddr);
       const fallback = await vm.stateManager.getAccount(Address.fromString(fallbackAddr));
@@ -244,7 +244,7 @@ export class ReimintExecutor implements Executor {
 
     // 8. get totalLockedAmount and validatorCount by the merged validatorSet,
     //    and decide if we should enable genesis validators
-    const { totalLockedAmount, validatorCount } = indexedValidatorSet.getTotalLockedVotingPowerAndValidatorCount(isEnableValidatorBls(nextCommon));
+    const { totalLockedAmount, validatorCount } = indexedValidatorSet.getTotalLockedVotingPowerAndValidatorCount(isEnableDAO(nextCommon));
     logger.debug('Reimint::afterApply, totalLockedAmount:', totalLockedAmount.toString(), 'validatorCount:', validatorCount.toString());
     const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), nextCommon);
     if (enableGenesisValidators) {
@@ -260,7 +260,7 @@ export class ReimintExecutor implements Executor {
     } else {
       const maxCount = nextCommon.param('vm', 'maxValidatorsCount');
       const active = parentValidatorSet.active.copy();
-      active.merge(indexedValidatorSet.sort(maxCount, isEnableValidatorBls(nextCommon)));
+      active.merge(indexedValidatorSet.sort(maxCount, isEnableDAO(nextCommon)));
       active.computeNewPriorities(parentValidatorSet.active.copy());
       validatorSet = new ValidatorSet(indexedValidatorSet, active);
     }
@@ -335,7 +335,7 @@ export class ReimintExecutor implements Executor {
     const minerReward = new BN(pendingCommon.param('pow', 'minerReward'));
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.engine.getStakeManager(vm, block);
-    const parentValidatorSet: ValidatorSet = isEnableValidatorBls(pendingCommon) ? (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager, this.engine.getValidatorBls(vm, block, pendingCommon))).copy() : (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager)).copy();
+    const parentValidatorSet: ValidatorSet = isEnableDAO(pendingCommon) ? (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager, this.engine.getValidatorBls(vm, block, pendingCommon))).copy() : (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager)).copy();
     parentValidatorSet.active.incrementProposerPriority(round);
 
     // filter the evidence that has been packaged to prevent duplication
@@ -406,7 +406,7 @@ export class ReimintExecutor implements Executor {
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.engine.getStakeManager(vm, block);
 
-    let parentValidatorSet: ValidatorSet = isEnableValidatorBls(pendingCommon) ? (await this.engine.validatorSets.getValSet(root, parentStakeManager, this.engine.getValidatorBls(vm, block, pendingCommon))).copy() : (await this.engine.validatorSets.getValSet(root, parentStakeManager)).copy();
+    let parentValidatorSet: ValidatorSet = isEnableDAO(pendingCommon) ? (await this.engine.validatorSets.getValSet(root, parentStakeManager, this.engine.getValidatorBls(vm, block, pendingCommon))).copy() : (await this.engine.validatorSets.getValSet(root, parentStakeManager)).copy();
 
     const extraData = ExtraData.fromBlockHeader(pendingHeader, { valSet: parentValidatorSet.active });
     const miner = extraData.proposal.proposer();

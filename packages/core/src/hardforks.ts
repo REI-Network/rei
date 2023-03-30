@@ -209,15 +209,23 @@ export function isEnableBetterPOS(common: Common) {
   }
 }
 
-export function isEnableValidatorBls(common: Common) {
+/**
+ * Check whether better DAO is enabled
+ * @param common - Common instance
+ * @returns Enable if `true`
+ */
+export function isEnableDAO(common: Common) {
   if (common.chainName() === 'rei-testnet') {
-    return common.gteHardfork('validator-bls');
+    return common.gteHardfork('rei-dao');
   } else if (common.chainName() === 'rei-mainnet') {
-    return common.gteHardfork('validator-bls');
+    return common.gteHardfork('rei-dao');
   } else if (common.chainName() === 'rei-devnet') {
-    return common.gteHardfork('validator-bls');
+    return common.gteHardfork('rei-dao');
+  } else {
+    throw new Error('unknown chain');
   }
 }
+
 /**
  * Calculate total difficulty by block number.
  * @param number - Block number
@@ -231,23 +239,6 @@ export function blockNumber2TotalDifficulty(number: BN, common: Common) {
     return number.addn(1);
   } else if (common.chainName() === 'rei-devnet') {
     return number.addn(1);
-  } else {
-    throw new Error('unknown chain');
-  }
-}
-
-/**
- * Check whether better POS is enabled
- * @param common - Common instance
- * @returns Enable if `true`
- */
-export function isBls(common: Common) {
-  if (common.chainName() === 'rei-testnet') {
-    return common.gteHardfork('bls');
-  } else if (common.chainName() === 'rei-mainnet') {
-    return common.gteHardfork('bls');
-  } else if (common.chainName() === 'rei-devnet') {
-    return common.gteHardfork('bls');
   } else {
     throw new Error('unknown chain');
   }

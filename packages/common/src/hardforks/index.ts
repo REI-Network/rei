@@ -22,5 +22,5 @@ export const hardforks = [
   ['testnet-hf-2', require('./testnet-hf-2.json')],
   ['mainnet-hf-2', require('./mainnet-hf-2.json')],
   ['better-pos', require('./better-pos.json')],
-  ['bls', require('./bls.json')]
+  ['rei-dao', require('./rei-dao.json')]
 ];

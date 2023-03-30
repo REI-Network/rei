@@ -1,6 +1,6 @@
 {
-  "name": "validator-bls",
-  "comment": "validator bls hardfork",
+  "name": "rei-dao",
+  "comment": "rei-dao bls hardfork",
   "gasConfig": {},
   "gasPrices": {},
   "vm": {

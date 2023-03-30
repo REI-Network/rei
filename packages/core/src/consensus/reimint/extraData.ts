@@ -3,6 +3,7 @@ import { VM } from '@rei-network/vm';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
 import { BlockHeader, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
+import { isEnableDAO } from '../../hardforks';
 import { ActiveValidatorSet } from './validatorSet';
 import { Evidence, DuplicateVoteEvidence, EvidenceFactory } from './evpool';
 import { BitArray, Reimint } from '../reimint';
@@ -10,7 +11,6 @@ import { Vote, VoteType, VoteSet, SignType } from './vote';
 import { Proposal } from './proposal';
 import * as v from './validate';
 import { ReimintConsensusEngine } from './engine';
-import { isBls } from '../../hardforks';
 
 export interface ExtraDataOptions {
   chainId: number;
@@ -144,7 +144,7 @@ export class ExtraData {
     let evidence!: Evidence[];
     let voteSet: VoteSet | undefined;
     let blsAggregateSignature: Buffer | undefined;
-    const signType = isBls(header._common) ? SignType.blsSignature : SignType.ecdsaSignature;
+    const signType = isEnableDAO(header._common) ? SignType.blsSignature : SignType.ecdsaSignature;
     if (signType === SignType.blsSignature) {
       for (let i = 0; i < values.length; i++) {
         const value = values[i];

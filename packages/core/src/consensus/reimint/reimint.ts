@@ -7,7 +7,7 @@ import { ExtraData } from './extraData';
 import { Proposal } from './proposal';
 import { VoteType, VoteSet, SignType } from './vote';
 import { Evidence } from './evpool';
-import { isBls } from '../../hardforks';
+import { isEnableDAO } from '../../hardforks';
 
 const defaultRound = 0;
 const defaultPOLRound = -1;
@@ -183,7 +183,7 @@ export class Reimint {
         hash: headerHash
       });
       proposal.signature = options.signer.sign(proposal.getMessageToSign());
-      const version = isBls(header._common) ? SignType.blsSignature : SignType.ecdsaSignature;
+      const version = isEnableDAO(header._common) ? SignType.blsSignature : SignType.ecdsaSignature;
       const extraData = new ExtraData(round, commitRound, POLRound, evidence, proposal, version, options?.voteSet);
       return {
         header: BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize({ validaterSetSize })]) }, options),
@@ -221,7 +221,7 @@ export class Reimint {
    * @returns Complete block
    */
   static generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], evidence: Evidence[], proposal: Proposal, commitRound: number, votes: VoteSet, options?: BlockOptions) {
-    const version = isBls(options?.common!) ? SignType.blsSignature : SignType.ecdsaSignature;
+    const version = isEnableDAO(options?.common!) ? SignType.blsSignature : SignType.ecdsaSignature;
     const extraData = new ExtraData(proposal.round, commitRound, proposal.POLRound, evidence, proposal, version, votes);
     data = formatHeaderData(data);
     const header = BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize()]) }, options);

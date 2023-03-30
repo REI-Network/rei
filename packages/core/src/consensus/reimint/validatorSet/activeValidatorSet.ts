@@ -3,7 +3,7 @@ import { Common } from '@rei-network/common';
 import { StakeManager, ValidatorBls } from '../contracts';
 import { IndexedValidator } from './indexedValidatorSet';
 import { getGenesisValidators, genesisValidatorPriority, genesisValidatorVotingPower, isGenesis } from './genesis';
-import { isEnableBetterPOS, isEnableValidatorBls } from '../../../hardforks';
+import { isEnableBetterPOS, isEnableDAO } from '../../../hardforks';
 import { ActiveValidator as ActiveValidatorInfo } from '../contracts/stakeManager';
 
 const maxInt256 = new BN('7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 'hex');
@@ -53,6 +53,7 @@ export interface LoadOptions {
   // validator bls contract instance
   bls?: ValidatorBls;
 }
+
 // active validator information
 export type ActiveValidator = {
   // validator address
@@ -141,7 +142,7 @@ export class ActiveValidatorSet {
    */
   static genesis(common: Common) {
     const active: ActiveValidator[] = [];
-    const blsFlag = isEnableValidatorBls(common);
+    const blsFlag = isEnableDAO(common);
 
     for (const gv of getGenesisValidators(common)) {
       const ac = {
@@ -152,7 +153,7 @@ export class ActiveValidatorSet {
       } as ActiveValidator;
 
       if (blsFlag) {
-        const blsPublicKey = genesisValidatorInfos.get(common.chainName())!.get(gv.toString());
+        const blsPublicKey = genesisValidatorInfos.get(common.chainName())?.get(gv.toString());
         if (!blsPublicKey) {
           throw new Error(`genesis BLS public key of ${gv.toString()} is not found`);
         }

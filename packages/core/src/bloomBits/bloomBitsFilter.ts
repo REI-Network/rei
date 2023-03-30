@@ -2,6 +2,7 @@ import { Address, BN, keccak256 } from 'ethereumjs-util';
 import { Log, Receipt, Block } from '@rei-network/structure';
 import { FunctionalBNMap, FunctionalBNSet } from '@rei-network/utils';
 import { Database } from '@rei-network/database';
+import { EMPTY_HASH } from '../utils';
 import { ReceiptsCache } from './receiptsCache';
 import { bloomBitsConfig as config } from './config';
 
@@ -201,7 +202,13 @@ export class BloomBitsFilter {
         const getSenctionHash = async (section: BN) => {
           let hash = headCache.get(section);
           if (!hash) {
-            hash = await this.backend.db.numberToHash(section.addn(1).muln(config.bloomBitsSectionSize).subn(1));
+            try {
+              hash = await this.backend.db.numberToHash(section.addn(1).muln(config.bloomBitsSectionSize).subn(1));
+            } catch (err) {
+              // ignore error
+              // we may lose some blocks due to snapshot synchronization
+              hash = EMPTY_HASH;
+            }
             headCache.set(section, hash);
           }
           return hash;
@@ -263,9 +270,15 @@ export class BloomBitsFilter {
    * @returns All logs that meet the conditions
    */
   async filterBlock(blockHashOrNumber: Buffer | BN | number, addresses: Address[], topics: Topics) {
-    const receipts = await this.backend.receiptsCache.get(blockHashOrNumber, this.backend.db);
-    const logs = await this.checkBlockMatches(receipts, addresses, topics);
-    logs.forEach((log) => (log.removed = false));
+    let logs: Log[] = [];
+    try {
+      const receipts = await this.backend.receiptsCache.get(blockHashOrNumber, this.backend.db);
+      logs = await this.checkBlockMatches(receipts, addresses, topics);
+      logs.forEach((log) => (log.removed = false));
+    } catch (err) {
+      // ignore error...
+      // we may lose some blocks due to snapshot synchronization
+    }
     return logs;
   }
 }

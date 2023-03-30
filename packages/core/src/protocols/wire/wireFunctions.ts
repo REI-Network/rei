@@ -142,7 +142,7 @@ export const wireHandlerBaseFuncs: HandlerFunc[] = [
       this.knowBlocks([bestHash]);
       const totalDifficulty = td.toBuffer();
       this.updateStatus({ height, bestHash, totalDifficulty });
-      this.node.sync.announce(this);
+      this.node.sync.announceNewBlock(this, block);
     }
   },
   {

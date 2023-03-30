@@ -37,7 +37,21 @@ export interface RunCallOpts {
 export default async function runCall(this: VM, opts: RunCallOpts): Promise<EVMResult> {
   const block = opts.block ?? Block.fromBlockData({}, { common: this._common });
 
-  const txContext = new TxContext(opts.gasPrice ?? new BN(0), opts.origin ?? opts.caller ?? Address.zero());
+  // load recent hashes
+  const recentHashes: Buffer[] = [];
+  const number = block.header.number;
+  const db = this.blockchain.database;
+  for (let i = number.subn(1); i.gten(0) && i.gte(number.subn(256)); i.isubn(1)) {
+    recentHashes.push(await db.numberToHash(i));
+  }
+
+  // calculate block miner address
+  let author: Address | undefined = undefined;
+  if (this._getMiner) {
+    author = this._getMiner(block.header);
+  }
+
+  const txContext = new TxContext(opts.gasPrice ?? new BN(0), opts.origin ?? opts.caller ?? Address.zero(), author, undefined, undefined, recentHashes);
 
   const message = new Message({
     caller: opts.caller,

@@ -323,13 +323,13 @@ export class ReimintExecutor implements Executor {
    * {@link Executor.finalize}
    */
   async finalize(options: FinalizeOpts) {
-    const { block, receipts, stateRoot, parentStateRoot, round, evidence } = options;
+    let { block, receipts, stateRoot, parentStateRoot, round, evidence } = options;
     if (round === undefined || evidence === undefined || !parentStateRoot) {
       throw new Error('missing state root or round or evidence');
     }
 
     const pendingCommon = block._common;
-    const vm = await this.backend.getVM(stateRoot, pendingCommon);
+    const vm = await this.backend.getVM(stateRoot, pendingCommon, true);
 
     const miner = Reimint.getMiner(block);
     const minerReward = new BN(pendingCommon.param('pow', 'minerReward'));
@@ -337,6 +337,17 @@ export class ReimintExecutor implements Executor {
     const parentStakeManager = this.engine.getStakeManager(vm, block);
     const parentValidatorSet: ValidatorSet = isEnableValidatorBls(pendingCommon) ? (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager, this.engine.getValidatorBls(vm, block, pendingCommon))).copy() : (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager)).copy();
     parentValidatorSet.active.incrementProposerPriority(round);
+
+    // filter the evidence that has been packaged to prevent duplication
+    if (evidence && isEnableBetterPOS(pendingCommon)) {
+      let filteredEvidence: Evidence[] = [];
+      for (const ev of evidence) {
+        if (!(await parentStakeManager.isUsedEvidence(ev.hash()))) {
+          filteredEvidence.push(ev);
+        }
+      }
+      evidence = filteredEvidence;
+    }
 
     await vm.stateManager.checkpoint();
     try {
@@ -390,7 +401,7 @@ export class ReimintExecutor implements Executor {
     // TODO: support evmc binding debug
     const mode: EVMWorkMode | undefined = debug ? EVMWorkMode.JS : undefined;
     // get vm instance
-    const vm = await this.backend.getVM(root, pendingCommon, mode);
+    const vm = await this.backend.getVM(root, pendingCommon, true, mode);
 
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.engine.getStakeManager(vm, block);
@@ -492,7 +503,7 @@ export class ReimintExecutor implements Executor {
   async processTx(options: ProcessTxOpts) {
     const { root, block, tx, blockGasUsed, totalAmount } = options;
     const systemCaller = Address.fromString(block._common.param('vm', 'scaddr'));
-    const vm = await this.backend.getVM(root, block._common);
+    const vm = await this.backend.getVM(root, block._common, true);
 
     let result: RunTxResult;
     if (isEnableFreeStaking(block._common)) {

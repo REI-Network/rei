@@ -17,6 +17,11 @@ export interface PutBlockOptions {
   saveTxLookup?: boolean;
 }
 
+export interface ForcePutBlockOptions extends PutBlockOptions {
+  // Total difficulty
+  td: BN;
+}
+
 export interface BlockchainInterface {
   /**
    * Adds a block to the blockchain.
@@ -929,6 +934,137 @@ export class Blockchain implements BlockchainInterface {
         }
         // save hash to number lookup info even if rebuild not needed
         dbOps.push(DBSetHashToNumber(blockHash, blockNumber));
+      }
+
+      const ops = dbOps.concat(this._saveHeadOps());
+      await this.database.batch(ops);
+
+      // Clique: update signer votes and state
+      if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique && ancientHeaderNumber) {
+        await this._cliqueDeleteSnapshots(ancientHeaderNumber.addn(1));
+        for (const number = ancientHeaderNumber.addn(1); number.lte(header.number); number.iaddn(1)) {
+          const canonicalHeader = await this._getCanonicalHeader(number);
+          await this._cliqueBuildSnapshots(canonicalHeader);
+        }
+      }
+
+      if (reorg) {
+        await this.updateLatest();
+      }
+
+      return reorg;
+    });
+  }
+
+  /**
+   * Force update current header
+   */
+  async forcePutBlock(item: Block | BlockHeader, options: ForcePutBlockOptions) {
+    return await this.runWithLock<boolean>(async () => {
+      const block =
+        item instanceof BlockHeader
+          ? new Block(item, undefined, undefined, {
+              common: this._common,
+              hardforkByBlockNumber: true
+            })
+          : item;
+      const isGenesis = block.isGenesis();
+      const isHeader = item instanceof BlockHeader;
+
+      // we cannot overwrite the Genesis block after initializing the Blockchain
+      if (isGenesis) {
+        throw new Error('Cannot put a genesis block: create a new Blockchain');
+      }
+
+      const { header } = block;
+      const blockHash = header.hash();
+      const blockNumber = header.number;
+      let dbOps: DBOp[] = [];
+
+      if (!block._common.chainIdBN().eq(this._common.chainIdBN())) {
+        throw new Error('Chain mismatch while trying to put block or header');
+      }
+
+      if (this._validateBlocks && !isGenesis) {
+        // this calls into `getBlock`, which is why we cannot lock yet
+        await block.validate(this, isHeader);
+      }
+
+      if (this._validateConsensus) {
+        if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Ethash) {
+          // do nothing
+        }
+
+        if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique) {
+          const valid = header.cliqueVerifySignature(this.cliqueActiveSigners());
+          if (!valid) {
+            throw new Error('invalid PoA block signature (clique)');
+          }
+
+          if (this.cliqueCheckRecentlySigned(header)) {
+            throw new Error('recently signed');
+          }
+
+          // validate checkpoint signers towards active signers on epoch transition blocks
+          if (header.cliqueIsEpochTransition()) {
+            // note: keep votes on epoch transition blocks in case of reorgs.
+            // only active (non-stale) votes will counted (if vote.blockNumber >= lastEpochBlockNumber)
+
+            const checkpointSigners = header.cliqueEpochTransitionSigners();
+            const activeSigners = this.cliqueActiveSigners();
+            for (const [i, cSigner] of checkpointSigners.entries()) {
+              if (!activeSigners[i] || !activeSigners[i].equals(cSigner)) {
+                throw new Error(`checkpoint signer not found in active signers list at index ${i}: ${cSigner.toString()}`);
+              }
+            }
+          }
+        }
+      }
+
+      if (block._common.consensusType() !== ConsensusType.ProofOfStake) {
+        // load total difficulty from input options
+        const td = options.td;
+
+        // save total difficulty to the database
+        dbOps = dbOps.concat(DBSetTD(td, blockNumber, blockHash));
+      }
+
+      // save header/block to the database
+      dbOps = dbOps.concat(DBSetBlockOrHeader(block));
+      // save receipts to the database
+      options?.receipts && (dbOps = dbOps.concat(DBSaveReceipts(options.receipts, blockHash, blockNumber)));
+      // save tx lookup to the database
+      options?.saveTxLookup && (dbOps = dbOps.concat(DBSaveTxLookup(block)));
+
+      let ancientHeaderNumber: undefined | BN;
+      // force reorg
+      const reorg = true;
+      // if total difficulty is higher than current, add it to canonical chain
+      if (reorg) {
+        if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique) {
+          ancientHeaderNumber = (await this._findAncient(header)).number;
+        }
+
+        this._headHeaderHash = blockHash;
+        if (item instanceof Block) {
+          this._headBlockHash = blockHash;
+        }
+        if (this._hardforkByHeadBlockNumber) {
+          this._common.setHardforkByBlockNumber(blockNumber);
+        }
+
+        // TODO SET THIS IN CONSTRUCTOR
+        if (block.isGenesis()) {
+          this._genesis = blockHash;
+        }
+
+        // delete higher number assignments and overwrite stale canonical chain
+        await this._deleteCanonicalChainReferences(blockNumber.addn(1), blockHash, dbOps);
+        // from the current header block, check the blockchain in reverse (i.e.
+        // traverse `parentHash`) until `numberToHash` matches the current
+        // number/hash in the canonical chain also: overwrite any heads if these
+        // heads are stale in `_heads` and `_headBlockHash`
+        await this._rebuildCanonical(header, dbOps);
       }
 
       const ops = dbOps.concat(this._saveHeadOps());

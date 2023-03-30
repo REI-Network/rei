@@ -24,6 +24,9 @@ export class ValidatorChanges {
   // new unindexed validator address set
   unindexedValidators = new FunctionalAddressSet();
 
+  // reigster bls public key validators
+  blsValidators = new FunctionalAddressMap<Buffer>();
+
   constructor(common: Common) {
     this.common = common;
   }
@@ -92,5 +95,14 @@ export class ValidatorChanges {
     if (!isGenesis(validator, this.common)) {
       this.getChange(validator).update.isub(value);
     }
+  }
+
+  /**
+   * Someone register bls public key for validator
+   * @param validator - Validator address
+   * @param blsPublicKey - BLS public key
+   */
+  setBlsPublicKey(validator: Address, blsPublicKey: Buffer) {
+    this.blsValidators.set(validator, blsPublicKey);
   }
 }

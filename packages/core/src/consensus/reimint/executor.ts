@@ -9,10 +9,10 @@ import EVM, { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';
 import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executor } from '../types';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
-import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableBetterPOS } from '../../hardforks';
+import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableBetterPOS, isEnableValidatorBls } from '../../hardforks';
 import { StateManager } from '../../stateManager';
-import { ValidatorSet, ValidatorChanges, isGenesis } from './validatorSet';
-import { StakeManager, SlashReason, Fee, Contract } from './contracts';
+import { ValidatorSet, ValidatorChanges, isGenesis, IndexedValidatorSet, ActiveValidatorSet } from './validatorSet';
+import { StakeManager, SlashReason, Fee, Contract, ValidatorBls } from './contracts';
 import { Reimint } from './reimint';
 import { Evidence, DuplicateVoteEvidence } from './evpool';
 import { ExtraData } from './extraData';
@@ -207,47 +207,62 @@ export class ReimintExecutor implements Executor {
       }
     }
 
-    // 7. call stakeManager.getTotalLockedAmountAndValidatorCount to get totalLockedAmount and validatorCount,
-    //    and decide if we should enable genesis validators
-    const { totalLockedAmount, validatorCount } = await parentStakeManager.getTotalLockedAmountAndValidatorCount();
-    logger.debug('Reimint::afterApply, totalLockedAmount:', totalLockedAmount.toString(), 'validatorCount:', validatorCount.toString());
-    const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), pendingCommon);
+    let validatorSet: ValidatorSet = parentValidatorSet.copy();
+    let indexedValidatorSet: IndexedValidatorSet = parentValidatorSet.indexed.copy();
+    const nextCommon = this.backend.getCommon(pendingBlock.header.number.addn(1));
+    const changes = new ValidatorChanges(pendingCommon);
+    StakeManager.filterReceiptsChanges(changes, receipts, pendingCommon);
+    if (logs.length > 0) {
+      StakeManager.filterLogsChanges(changes, logs, pendingCommon);
+    }
 
-    // 8. calculate the next validator set according to enableGenesisValidators
-    let validatorSet: ValidatorSet;
+    // 7. filter all receipts to collect changes
+    if (isEnableValidatorBls(pendingCommon)) {
+      ValidatorBls.filterReceiptsChanges(changes, receipts, pendingCommon);
+      indexedValidatorSet.merge(changes, this.engine.getValidatorBls(vm, pendingBlock, pendingCommon));
+    } else if (!isEnableValidatorBls(pendingCommon) && isEnableValidatorBls(nextCommon)) {
+      // modify validatorBls contract address
+      const fallbackAddr = nextCommon.param('vm', 'fallbackaddr');
+      const postAddr = nextCommon.param('vm', 'postaddr');
+      if (fallbackAddr === undefined || postAddr === undefined) {
+        throw new Error('Reimint::afterApply, load bls contract failed');
+      }
+      const addr = Address.fromString(postAddr);
+      const fallback = await vm.stateManager.getAccount(Address.fromString(fallbackAddr));
+      const post = await vm.stateManager.getAccount(addr);
+      post.stateRoot = fallback.stateRoot;
+      post.codeHash = fallback.codeHash;
+      await vm.stateManager.putAccount(addr, post);
+      const validatorBls = this.engine.getValidatorBls(vm, pendingBlock, nextCommon);
+      indexedValidatorSet = await IndexedValidatorSet.fromStakeManager(parentStakeManager, validatorBls);
+      // deploy validatorBlsFallback contract
+      const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
+      await Contract.deloyValidatorBlsFallbackContract(evm, nextCommon);
+    } else {
+      indexedValidatorSet.merge(changes);
+    }
+
+    // 8. get totalLockedAmount and validatorCount by the merged validatorSet,
+    //    and decide if we should enable genesis validators
+    const { totalLockedAmount, validatorCount } = indexedValidatorSet.getTotalLockedVotingPowerAndValidatorCount(isEnableValidatorBls(nextCommon));
+    logger.debug('Reimint::afterApply, totalLockedAmount:', totalLockedAmount.toString(), 'validatorCount:', validatorCount.toString());
+    const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), nextCommon);
     if (enableGenesisValidators) {
-      if (!parentValidatorSet.isGenesis(pendingCommon)) {
+      if (!parentValidatorSet.isGenesis(nextCommon)) {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, create a new genesis validator set');
         // if the parent validator set isn't a genesis validator set, we create a new one
-        validatorSet = ValidatorSet.genesis(pendingCommon);
+        validatorSet = new ValidatorSet(indexedValidatorSet, ActiveValidatorSet.genesis(nextCommon));
       } else {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, copy from parent');
         // if the parent validator set is a genesis validator set, we copy the set from the parent
-        validatorSet = parentValidatorSet.copy();
+        validatorSet = new ValidatorSet(indexedValidatorSet, parentValidatorSet.active.copy());
       }
     } else {
-      if (parentValidatorSet.isGenesis(pendingCommon)) {
-        logger.debug('Reimint::afterApply, DisableGenesisValidators, create a new normal validator set');
-        // if the parent validator set is a genesis validator set, we create a new set from state trie
-        validatorSet = await ValidatorSet.fromStakeManager(parentStakeManager, { sort: true });
-      } else {
-        logger.debug('Reimint::afterApply, DisableGenesisValidators, copy from parent and merge changes');
-        // filter changes
-        const changes = new ValidatorChanges(pendingCommon);
-        StakeManager.filterReceiptsChanges(changes, receipts, pendingCommon);
-        if (logs.length > 0) {
-          StakeManager.filterLogsChanges(changes, logs, pendingCommon);
-        }
-        for (const uv of changes.unindexedValidators) {
-          logger.debug('Reimint::processBlock, unindexedValidators, address:', uv.toString());
-        }
-        for (const vc of changes.changes.values()) {
-          logger.debug('Reimint::processBlock, change, address:', vc.validator.toString(), 'votingPower:', vc.votingPower?.toString(), 'update:', vc.update.toString());
-        }
-
-        // merge changes
-        validatorSet = parentValidatorSet!.copyAndMerge(changes, pendingCommon);
-      }
+      const maxCount = nextCommon.param('vm', 'maxValidatorsCount');
+      const active = parentValidatorSet.active.copy();
+      active.merge(indexedValidatorSet.sort(maxCount, isEnableValidatorBls(nextCommon)));
+      active.computeNewPriorities(parentValidatorSet.active.copy());
+      validatorSet = new ValidatorSet(indexedValidatorSet, active);
     }
 
     // 9. increase once
@@ -268,20 +283,19 @@ export class ReimintExecutor implements Executor {
       await parentStakeManager.onAfterBlock(validatorSet.active.proposer, activeSigners, priorities);
     }
 
-    const nextCommon = this.backend.getCommon(pendingBlock.header.number.addn(1));
-    // 11. deploy contracts if enable hardfork 1 is enabled in the next block
+    // 11. deploy contracts if hardfork 1 is enabled in the next block
     if (!isEnableHardfork1(pendingCommon) && isEnableHardfork1(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployHardfork1Contracts(evm, nextCommon);
     }
 
-    // 12. deploy contracts if enable free staking is enabled in the next block
+    // 12. deploy contracts if free staking is enabled in the next block
     if (!isEnableFreeStaking(pendingCommon) && isEnableFreeStaking(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployFreeStakingContracts(evm, nextCommon);
     }
 
-    // 13. deploy contracts if enable hardfork 2 is enabled in the next block
+    // 13. deploy contracts if hardfork 2 is enabled in the next block
     if (!isEnableHardfork2(pendingCommon) && isEnableHardfork2(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployHardfork2Contracts(evm, nextCommon);
@@ -296,7 +310,7 @@ export class ReimintExecutor implements Executor {
       await pendingStakeManager.initEvidenceHash(hashes);
     }
 
-    // 14. deploy contracts if enable prison is enabled in the next block
+    // 14. deploy contracts if prison is enabled in the next block
     if (!isEnableBetterPOS(pendingCommon) && isEnableBetterPOS(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployBetterPOSContracts(evm, nextCommon);
@@ -321,7 +335,7 @@ export class ReimintExecutor implements Executor {
     const minerReward = new BN(pendingCommon.param('pow', 'minerReward'));
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.engine.getStakeManager(vm, block);
-    const parentValidatorSet = (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager)).copy();
+    const parentValidatorSet: ValidatorSet = isEnableValidatorBls(pendingCommon) ? (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager, this.engine.getValidatorBls(vm, block, pendingCommon))).copy() : (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager)).copy();
     parentValidatorSet.active.incrementProposerPriority(round);
 
     // filter the evidence that has been packaged to prevent duplication
@@ -391,7 +405,8 @@ export class ReimintExecutor implements Executor {
 
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.engine.getStakeManager(vm, block);
-    let parentValidatorSet = await this.engine.validatorSets.getValSet(root, parentStakeManager);
+
+    let parentValidatorSet: ValidatorSet = isEnableValidatorBls(pendingCommon) ? (await this.engine.validatorSets.getValSet(root, parentStakeManager, this.engine.getValidatorBls(vm, block, pendingCommon))).copy() : (await this.engine.validatorSets.getValSet(root, parentStakeManager)).copy();
 
     const extraData = ExtraData.fromBlockHeader(pendingHeader, { valSet: parentValidatorSet.active });
     const miner = extraData.proposal.proposer();
@@ -455,10 +470,20 @@ export class ReimintExecutor implements Executor {
     const result = await vm.runBlock(runBlockOptions);
 
     const activeValidators = validatorSet.active.activeValidators();
+    const indexedValidators = Array.from(validatorSet.indexed.indexed.values());
     logger.debug(
       'Reimint::processBlock, activeValidators:',
       activeValidators.map(({ validator, priority }) => {
-        return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${validatorSet!.indexed.getVotingPower(validator).toString()}`;
+        return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${isGenesis(validator, pendingCommon) ? '1' : validatorSet!.indexed.getVotingPower(validator).toString()}`;
+      }),
+      'next proposer:',
+      validatorSet.active.proposer.toString()
+    );
+
+    logger.debug(
+      'Reimint::processBlock, indexValidatorSet:',
+      indexedValidators.map(({ validator, votingPower }) => {
+        return `address: ${validator.toString()} | votingPower: ${votingPower.toString()} `;
       }),
       'next proposer:',
       validatorSet.active.proposer.toString()

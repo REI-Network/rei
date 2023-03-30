@@ -45,10 +45,9 @@ function createValidatorSet(validators: { [name: string]: number | BN }) {
 
 describe('ValidatorSet', () => {
   it('should fill genesis validators', () => {
-    const vs = ValidatorSet.genesis(common);
+    const active = ActiveValidatorSet.genesis(common).activeValidators();
     const genesisValidators = common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr)) as Address[];
     genesisValidators.sort((a, b) => a.buf.compare(b.buf) as 1 | -1 | 0);
-    const active = vs.active.activeValidators();
     for (let i = 0; i < genesisValidators.length; i++) {
       expect(active[i].validator.equals(genesisValidators[i]), 'genesis validator address should be equal');
     }

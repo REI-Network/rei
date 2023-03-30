@@ -17,7 +17,7 @@ import { getConsensusTypeByCommon, isEnableRemint, isEnableFreeStaking, loadInit
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
-import { StakeManager, Contract, Fee, FeePool } from './contracts';
+import { StakeManager, Contract, Fee, FeePool, ValidatorBls } from './contracts';
 import { StateMachine } from './state';
 import { Evidence, EvidencePool, EvidenceDatabase } from './evpool';
 import { Reimint } from './reimint';
@@ -231,6 +231,11 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   getStakeManager(vm: VM, block: Block, common?: Common) {
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
     return new StakeManager(evm, common ?? block._common);
+  }
+
+  getValidatorBls(vm: VM, block: Block, common?: Common) {
+    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
+    return new ValidatorBls(evm, common ?? block._common);
   }
 
   /**

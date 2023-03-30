@@ -1,10 +1,9 @@
 import { FunctionalBufferMap } from '@rei-network/utils';
-import { StakeManager } from '../contracts';
+import { StakeManager, ValidatorBls } from '../contracts';
 import { Reimint } from '../reimint';
-import { ValidatorSet, LoadOptions } from './validatorSet';
+import { ValidatorSet } from './validatorSet';
 import { IndexedValidatorSet } from './indexedValidatorSet';
 import { ActiveValidatorSet } from './activeValidatorSet';
-import { isGenesis, genesisValidatorVotingPower } from './genesis';
 
 const maxSize = 100;
 
@@ -22,21 +21,23 @@ export class ValidatorSets {
    * load from stake manager if it doesn't exist
    * @param stateRoot - Target state root
    * @param sm - `StakeManager` instance
+   * @param bls - `ValidatorBls` instance
    */
-  async getValSet(stateRoot: Buffer, sm?: StakeManager) {
+  async getValSet(stateRoot: Buffer, sm?: StakeManager, bls?: ValidatorBls) {
     const indexed = this.indexedSets.get(stateRoot);
     const active = this.activeSets.get(stateRoot);
     if (!indexed || !active) {
       if (!sm) {
         throw new Error('missing state root: ' + stateRoot.toString('hex'));
       }
-
-      const { totalLockedAmount, validatorCount } = await sm.getTotalLockedAmountAndValidatorCount();
+      const blsFlag = bls !== undefined;
+      const indexedValidatorSet = await IndexedValidatorSet.fromStakeManager(sm, bls);
+      const { totalLockedAmount, validatorCount } = indexedValidatorSet.getTotalLockedVotingPowerAndValidatorCount(blsFlag);
       const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
-      const options: LoadOptions = enableGenesisValidators ? { genesis: true } : { active };
-      const valSet = await ValidatorSet.fromStakeManager(sm, options);
-      this.set(stateRoot, valSet);
-      return valSet;
+      const activeSet = enableGenesisValidators ? await ActiveValidatorSet.fromStakeManager(sm, { genesis: true, bls }) : ActiveValidatorSet.fromActiveValidators(indexedValidatorSet.sort(sm.common.param('vm', 'maxValidatorsCount'), blsFlag));
+      const validatorSet = new ValidatorSet(indexedValidatorSet, activeSet);
+      this.set(stateRoot, validatorSet);
+      return validatorSet;
     } else {
       return new ValidatorSet(indexed, active);
     }
@@ -57,18 +58,7 @@ export class ValidatorSets {
 
       const { totalLockedAmount, validatorCount } = await sm.getTotalLockedAmountAndValidatorCount();
       const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
-      active = await ActiveValidatorSet.fromStakeManager(
-        sm,
-        enableGenesisValidators
-          ? (val) => {
-              if (!isGenesis(val, sm.common)) {
-                throw new Error('unknown validator: ' + val.toString());
-              }
-
-              return genesisValidatorVotingPower.clone();
-            }
-          : undefined
-      );
+      active = await ActiveValidatorSet.fromStakeManager(sm, { genesis: enableGenesisValidators });
       this.set(stateRoot, active);
     }
     return active;

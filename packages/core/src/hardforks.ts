@@ -209,6 +209,15 @@ export function isEnableBetterPOS(common: Common) {
   }
 }
 
+export function isEnableValidatorBls(common: Common) {
+  if (common.chainName() === 'rei-testnet') {
+    return common.gteHardfork('validator-bls');
+  } else if (common.chainName() === 'rei-mainnet') {
+    return common.gteHardfork('validator-bls');
+  } else if (common.chainName() === 'rei-devnet') {
+    return common.gteHardfork('validator-bls');
+  }
+}
 /**
  * Calculate total difficulty by block number.
  * @param number - Block number

@@ -1,10 +1,9 @@
 import Heap from 'qheap';
 import { Address, BN } from 'ethereumjs-util';
-import { FunctionalAddressMap } from '@rei-network/utils';
-import { Common } from '@rei-network/common';
-import { StakeManager } from '../contracts';
+import { FunctionalAddressMap, FunctionalAddressSet } from '@rei-network/utils';
+import { StakeManager, ValidatorBls } from '../contracts';
 import { ValidatorChanges } from './validatorChanges';
-import { isGenesis, getGenesisValidators, genesisValidatorVotingPower } from './genesis';
+import { isGenesis } from './genesis';
 
 // validator information
 export type IndexedValidator = {
@@ -12,6 +11,8 @@ export type IndexedValidator = {
   validator: Address;
   // voting power
   votingPower: BN;
+  // validator bls public key
+  blsPublicKey?: Buffer;
 };
 
 // copy a `IndexedValidator`
@@ -31,7 +32,7 @@ export class IndexedValidatorSet {
    * @param sm - Stake manager instance
    * @returns IndexedValidatorSet instance
    */
-  static async fromStakeManager(sm: StakeManager) {
+  static async fromStakeManager(sm: StakeManager, bls?: ValidatorBls) {
     const indexed = new FunctionalAddressMap<IndexedValidator>();
     const length = await sm.indexedValidatorsLength();
     for (const i = new BN(0); i.lt(length); i.iaddn(1)) {
@@ -43,29 +44,17 @@ export class IndexedValidatorSet {
 
       const votingPower = await sm.getVotingPowerByIndex(i);
       if (votingPower.gtn(0)) {
-        indexed.set(validator, {
-          validator,
-          votingPower
-        });
+        const indexValidator: IndexedValidator = { validator, votingPower };
+        if (bls) {
+          const blsPublicKey = await bls.getBlsPublicKey(validator);
+          if (blsPublicKey.length > 0) {
+            indexValidator.blsPublicKey = blsPublicKey;
+          }
+        }
+        indexed.set(validator, indexValidator);
       }
     }
 
-    return new IndexedValidatorSet(indexed);
-  }
-
-  /**
-   * Create a genesis validator set
-   * @param common - Common instance
-   * @returns IndexedValidatorSet instance
-   */
-  static genesis(common: Common) {
-    const indexed = new FunctionalAddressMap<IndexedValidator>();
-    for (const gv of getGenesisValidators(common)) {
-      indexed.set(gv, {
-        validator: gv,
-        votingPower: genesisValidatorVotingPower.clone()
-      });
-    }
     return new IndexedValidatorSet(indexed);
   }
 
@@ -116,32 +105,10 @@ export class IndexedValidatorSet {
   }
 
   /**
-   * Check validator set is a genesis validator set,
-   * the genesis validator set contains only the genesis validator
-   * @returns `true` if it is
-   */
-  isGenesis(common: Common) {
-    const genesisValidators = getGenesisValidators(common);
-    if (genesisValidators.length !== this.length) {
-      return false;
-    }
-
-    for (const gv of genesisValidators) {
-      if (!this.contains(gv)) {
-        return false;
-      }
-      if (!this.getVotingPower(gv).eq(genesisValidatorVotingPower)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /**
    * Merge validator set changes
    * @param changes - `ValidatorChanges` instance
    */
-  merge(changes: ValidatorChanges) {
+  async merge(changes: ValidatorChanges, bls?: ValidatorBls) {
     // TODO: if the changed validator is an active validator, the active list maybe not be dirty
     let dirty = false;
 
@@ -149,12 +116,14 @@ export class IndexedValidatorSet {
       this.indexed.delete(uv);
     }
 
+    const newValidators = new FunctionalAddressSet();
     for (const vc of changes.changes.values()) {
       let v: IndexedValidator | undefined;
       if (vc.votingPower) {
         dirty = true;
         v = this.getValidator(vc.validator);
         v.votingPower = vc.votingPower;
+        newValidators.add(vc.validator);
       }
 
       if (!vc.update.eqn(0) && this.indexed.get(vc.validator)) {
@@ -163,7 +132,24 @@ export class IndexedValidatorSet {
         v.votingPower.iadd(vc.update);
         if (v.votingPower.isZero()) {
           this.indexed.delete(vc.validator);
+          changes.blsValidators.delete(vc.validator);
+          newValidators.delete(vc.validator);
         }
+      }
+    }
+
+    for (const addr of newValidators) {
+      if (!changes.blsValidators.has(addr) && bls) {
+        const blsPublicKey = await bls.getBlsPublicKey(addr);
+        if (blsPublicKey.length > 0) {
+          changes.blsValidators.set(addr, blsPublicKey);
+        }
+      }
+    }
+
+    for (const [addr, blsPublicKey] of changes.blsValidators) {
+      if (this.contains(addr)) {
+        this.getValidator(addr).blsPublicKey = blsPublicKey;
       }
     }
 
@@ -185,9 +171,10 @@ export class IndexedValidatorSet {
   /**
    * Sort for a active validator list
    * @param maxCount - Max active validator count
+   * @param flag - Filter bls public key or not
    * @returns - Active validator list
    */
-  sort(maxCount: number) {
+  sort(maxCount: number, flag?: boolean) {
     // create a heap to keep the maximum count validator
     const heap = new Heap({
       compar: (a: IndexedValidator, b: IndexedValidator) => {
@@ -200,7 +187,8 @@ export class IndexedValidatorSet {
       }
     });
 
-    for (const v of this.indexed.values()) {
+    const indexed = flag ? Array.from(this.indexed.values()).filter((v) => v.blsPublicKey !== undefined) : this.indexed.values();
+    for (const v of indexed) {
       heap.push(v);
       // if the heap length is too large, remove the minimum one
       while (heap.length > maxCount) {
@@ -226,5 +214,29 @@ export class IndexedValidatorSet {
     });
 
     return activeValidators;
+  }
+
+  /**
+   * Get total locked voting power and validator count
+   * @param flag - Whether to filter out validators without bls public key
+   * @returns Total locked voting power and validator count
+   */
+  getTotalLockedVotingPowerAndValidatorCount(flag?: boolean) {
+    const totalLockedAmount = new BN(0);
+    const validatorCount = new BN(0);
+    if (flag) {
+      for (const v of this.indexed.values()) {
+        if (v.blsPublicKey !== undefined) {
+          totalLockedAmount.iadd(v.votingPower);
+          validatorCount.iaddn(1);
+        }
+      }
+    } else {
+      for (const v of this.indexed.values()) {
+        totalLockedAmount.iadd(v.votingPower);
+        validatorCount.iaddn(1);
+      }
+    }
+    return { totalLockedAmount, validatorCount };
   }
 }

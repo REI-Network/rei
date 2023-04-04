@@ -57,15 +57,6 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
     event Reward(address indexed validator, uint256 indexed value);
 
     /**
-     * Emitted when a validator is slashed
-     * NOTE: this event is never shown in the block,
-     *       because the `slash` function is only called by the system caller
-     * @param validator     Validator address
-     * @param value         Slashed amount
-     */
-    event Slash(address indexed validator, uint256 indexed value);
-
-    /**
      * Emitted when the user stakes
      * @param validator     Validator address
      * @param value         Stake value

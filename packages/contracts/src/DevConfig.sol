@@ -17,6 +17,7 @@ contract DevConfig is Ownable, IConfig {
     address internal fp = 0x0000000000000000000000000000000000001006;
     address internal ft = 0x0000000000000000000000000000000000001007;
     address internal pr = 0x0000000000000000000000000000000000001008;
+    address internal caddr = 0xFF96A3BfF24DA3d686FeA7BD4bEB5ccFD7868DdE;
 
     uint256 internal ud = 1 seconds;
     uint256 internal wd = 1 seconds;
@@ -26,8 +27,6 @@ contract DevConfig is Ownable, IConfig {
     uint256 internal rap = 200;
     uint256 internal fft = 1e18;
     uint256 internal jtd = 20;
-
-    address public override communityAddress = 0x0000000000000000000000000000000000000000;
 
     /////////////////////////////////
 
@@ -172,7 +171,11 @@ contract DevConfig is Ownable, IConfig {
         return block.timestamp;
     }
 
+    function communityAddress() external view override returns (address) {
+        return caddr;
+    }
+
     function setCommunityAddress(address communityAddr) external override onlyOwner {
-        communityAddress = communityAddr;
+        caddr = communityAddr;
     }
 }

@@ -113,6 +113,13 @@ export abstract class Contract {
     await Contract.deployContract(evm, common, 'pr', { types: ['address'], values: [cfgaddr] });
   }
 
+  static async deployReiDaoContracts(evm: EVM, common: Common) {
+    await Contract.deployContract(evm, common, 'cfg', undefined, true);
+    console.log('deployed cfg');
+    await Contract.deployContract(evm, common, 'sm');
+    console.log('deployed sm');
+  }
+
   /**
    * Deploy contract to target address
    * @param evm - EVM instance

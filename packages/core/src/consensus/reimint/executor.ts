@@ -305,6 +305,11 @@ export class ReimintExecutor implements Executor {
       await Contract.deployBetterPOSContracts(evm, nextCommon);
     }
 
+    if (!isEnableDao(pendingCommon) && isEnableDao(nextCommon)) {
+      const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
+      await Contract.deployReiDaoContracts(evm, nextCommon);
+    }
+
     return validatorSet;
   }
 

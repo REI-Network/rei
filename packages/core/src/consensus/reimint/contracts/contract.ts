@@ -115,9 +115,7 @@ export abstract class Contract {
 
   static async deployReiDaoContracts(evm: EVM, common: Common) {
     await Contract.deployContract(evm, common, 'cfg', undefined, true);
-    console.log('deployed cfg');
     await Contract.deployContract(evm, common, 'sm');
-    console.log('deployed sm');
   }
 
   /**

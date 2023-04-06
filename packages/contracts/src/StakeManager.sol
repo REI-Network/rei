@@ -552,19 +552,14 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         prison.unjail{ value: msg.value }(msg.sender);
         Validator memory v = validators[msg.sender];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
-        uint256 votingPower = getVotingPower(v.commissionShare, msg.sender);
-        if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
-            indexedValidators.set(v.id, msg.sender);
-            emit IndexedValidator(msg.sender, votingPower);
-        }
-        totalLockedAmount = totalLockedAmount.add(votingPower);
+        _checkVotingPower(v, msg.sender);
     }
 
     function freeze(address validator, bytes32 hash) external override onlySystemCaller unfreezed(validator) {
         // make sure the evidence is not duplicated
         require(!usedEvidence[hash], "StakeManager: invalid evidence");
-        freezed[validator] = true;
         Validator memory v = validators[validator];
+        require(v.commissionShare != address(0), "StakeManager: invalid validator");
 
         if (indexedValidators.contains(v.id)) {
             // if the validator's voting power is less than `minIndexVotingPower`, remove him from `_indexedValidators`
@@ -580,25 +575,35 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
 
         // save evidence hash
         usedEvidence[hash] = true;
+        freezed[validator] = true;
         emit Freeze(validator);
     }
 
-    function unfreeze(address validator, uint8 factor) external override {
+    function unfreeze(address validator, uint256 factor) external override {
         require(msg.sender == config.communityAddress(), "StakeManager: only community can unfreeze");
-        require(factor <= 100, "StakeManager: invalid percentage");
-
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
 
-        uint256 decreasedAmount = CommissionShare(v.commissionShare).slash(factor).add(IValidatorRewardPool(config.validatorRewardPool()).slash(validator, factor)).add(IUnstakePool(config.unstakePool()).slash(validator, factor));
+        uint256 decreasedAmount;
+        if (factor == 0) {
+            //do nothing
+        } else if (factor < 100) {
+            decreasedAmount = CommissionShare(v.commissionShare).slash(uint8(factor)).add(IValidatorRewardPool(config.validatorRewardPool()).slash(validator, uint8(factor))).add(IUnstakePool(config.unstakePool()).slash(validator, uint8(factor)));
+        } else {
+            IValidatorRewardPool(config.validatorRewardPool()).slashV2(validator, factor);
+        }
 
+        _checkVotingPower(v, validator);
+        freezed[validator] = false;
+        emit Unfreeze(validator, decreasedAmount);
+    }
+
+    function _checkVotingPower(Validator memory v, address validator) private {
         uint256 votingPower = getVotingPower(v.commissionShare, validator);
         if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
             indexedValidators.set(v.id, validator);
             emit IndexedValidator(validator, votingPower);
         }
         totalLockedAmount = totalLockedAmount.add(votingPower);
-        freezed[validator] = false;
-        emit Unfreeze(validator, decreasedAmount);
     }
 }

@@ -49,4 +49,12 @@ contract ValidatorRewardPool is ReentrancyGuard, Only, IValidatorRewardPool {
             Address.sendValue(address(0), amount);
         }
     }
+
+    function slashV2(address validator, uint256 fine) external override nonReentrant onlyStakeManager {
+        require(fine <= balanceOf[validator], "ValidatorRewardPool: insufficient balance");
+        balanceOf[validator] = balanceOf[validator].sub(fine);
+        if (fine > 0) {
+            Address.sendValue(address(0), fine);
+        }
+    }
 }

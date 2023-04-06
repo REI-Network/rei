@@ -119,5 +119,5 @@ interface IStakeManager is IOnly {
 
     function freeze(address validator, bytes32 hash) external;
 
-    function unfreeze(address validator, uint8 factor) external;
+    function unfreeze(address validator, uint256 factor) external;
 }

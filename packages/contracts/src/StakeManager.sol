@@ -328,8 +328,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         shares = CommissionShare(v.commissionShare).mint{ value: msg.value }(to);
         // if validator voting power is greater than `minIndexVotingPower`,
         // add it to `indexedValidators`
-        (, bool jailed, , , , ) = IPrison(config.prison()).miners(validator);
-        if (!jailed) {
+        if (!_isjailed(validator)) {
             uint256 votingPower = getVotingPower(v.commissionShare, validator);
             if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
                 indexedValidators.set(v.id, validator);
@@ -361,8 +360,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         unstakeQueue[id] = Unstake(validator, to, unstakeShares, timestamp);
         emit StartUnstake(id, validator, amount, to, unstakeShares, timestamp);
 
-        (, bool jailed, , , , ) = IPrison(config.prison()).miners(validator);
-        if (!jailed) {
+        if (!_isjailed(validator)) {
             // decrease total locked amount
             totalLockedAmount = totalLockedAmount.sub(amount);
         }
@@ -460,8 +458,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         require(v.commissionShare != address(0) && !indexedValidators.contains(v.id), "StakeManager: invalid validator");
         uint256 votingPower = getVotingPower(v.commissionShare, validator);
         require(votingPower >= config.minIndexVotingPower(), "StakeManager: invalid votingPower");
-        (, bool jailed, , , , ) = IPrison(config.prison()).miners(validator);
-        require(!jailed, "StakeManager: jailed validator");
+        require(!_isjailed(validator), "StakeManager: jailed validator");
         indexedValidators.set(v.id, validator);
         emit IndexedValidator(validator, votingPower);
     }
@@ -481,8 +478,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         if (validatorReward > 0) {
             IValidatorRewardPool(config.validatorRewardPool()).reward{ value: validatorReward }(validator);
         }
-        (, bool jailed, , , , ) = IPrison(config.prison()).miners(validator);
-        if (!jailed) {
+        if (!_isjailed(validator)) {
             if (!indexedValidators.contains(v.id)) {
                 uint256 votingPower = getVotingPower(v.commissionShare, validator);
                 if (votingPower >= config.minIndexVotingPower()) {
@@ -567,8 +563,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
             emit UnindexedValidator(validator);
         }
 
-        (, bool jailed, , , , ) = IPrison(config.prison()).miners(validator);
-        if (!jailed) {
+        if (!_isjailed(validator)) {
             // decrease total locked amount
             totalLockedAmount = totalLockedAmount.sub(getVotingPower(v.commissionShare, validator));
         }
@@ -579,7 +574,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         emit Freeze(validator);
     }
 
-    function unfreeze(address validator, uint256 factor) external override {
+    function unfreeze(address validator, uint256 factor) external override returns (uint256 amount) {
         require(msg.sender == config.communityAddress(), "StakeManager: only community can unfreeze");
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
@@ -587,23 +582,32 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         uint256 decreasedAmount;
         if (factor == 0) {
             //do nothing
-        } else if (factor < 100) {
-            decreasedAmount = CommissionShare(v.commissionShare).slash(uint8(factor)).add(IValidatorRewardPool(config.validatorRewardPool()).slash(validator, uint8(factor))).add(IUnstakePool(config.unstakePool()).slash(validator, uint8(factor)));
+        } else if (factor <= 100) {
+            decreasedAmount = CommissionShare(v.commissionShare).slash(uint8(factor)).add(IValidatorRewardPool(config.validatorRewardPool()).slash(validator, uint8(factor)));
+            amount = decreasedAmount.add(IUnstakePool(config.unstakePool()).slash(validator, uint8(factor)));
         } else {
-            IValidatorRewardPool(config.validatorRewardPool()).slashV2(validator, factor);
+            decreasedAmount = IValidatorRewardPool(config.validatorRewardPool()).slashV2(validator, factor);
+            amount = decreasedAmount;
         }
 
         _checkVotingPower(v, validator);
         freezed[validator] = false;
-        emit Unfreeze(validator, decreasedAmount);
+        emit Unfreeze(validator, amount);
     }
 
     function _checkVotingPower(Validator memory v, address validator) private {
-        uint256 votingPower = getVotingPower(v.commissionShare, validator);
-        if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
-            indexedValidators.set(v.id, validator);
-            emit IndexedValidator(validator, votingPower);
+        if (!_isjailed(validator)) {
+            uint256 votingPower = getVotingPower(v.commissionShare, validator);
+            if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
+                indexedValidators.set(v.id, validator);
+                emit IndexedValidator(validator, votingPower);
+            }
+            totalLockedAmount = totalLockedAmount.add(votingPower);
         }
-        totalLockedAmount = totalLockedAmount.add(votingPower);
+    }
+
+    function _isjailed(address validator) private view returns (bool) {
+        (, bool jailed, , , , ) = IPrison(config.prison()).miners(validator);
+        return jailed;
     }
 }

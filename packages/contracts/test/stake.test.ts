@@ -34,6 +34,7 @@ describe('StakeManger', () => {
   let unstakeDelay: number;
   let minIndexVotingPower: BN;
   let stakeId = 0;
+  let communityAddr: string;
 
   async function createCommissionShareContract(validator: string) {
     const v = await stakeManager.methods.validators(validator).call();
@@ -51,6 +52,7 @@ describe('StakeManger', () => {
     validator2 = accounts[6];
     validator3 = accounts[7];
     validator4 = accounts[8];
+    communityAddr = accounts[9];
   });
 
   it('should deploy succeed', async () => {
@@ -66,6 +68,7 @@ describe('StakeManger', () => {
     minIndexVotingPower = toBN(await config.methods.minIndexVotingPower().call());
     prison = new web3.eth.Contract(Prison.abi, (await Prison.new(config.options.address)).address, { from: deployer });
     await config.methods.setPrison(prison.options.address).send();
+    await config.methods.setCommunityAddress(communityAddr).send();
   });
 
   it('should initialize succeed', async () => {
@@ -185,7 +188,8 @@ describe('StakeManger', () => {
 
     stakeId++;
     await stakeManager.methods.stake(validator1, deployer).send({ value: estimateStake });
-    await stakeManager.methods.slash(validator1, 1, bufferToHex(crypto.randomBytes(32))).send();
+    await stakeManager.methods.freeze(validator1, bufferToHex(crypto.randomBytes(32))).send();
+    await stakeManager.methods.unfreeze(validator1, 100).send({ from: communityAddr });
     await stakeManager.methods.reward(validator1).send({ value: 2000 });
     const estimateMinStake1 = await stakeManager.methods.estimateSharesToAmount(validator1, 1).call();
     expect(estimateMinStake1, 'mininual stake amount should be equal').be.equal('11');
@@ -193,15 +197,18 @@ describe('StakeManger', () => {
     await stakeManager.methods.startUnstake(validator1, deployer, wantedShares.toString()).send();
     const estimateAmount = await stakeManager.methods.estimateUnstakeAmount(validator1, wantedShares).call();
     expect(estimateAmount, 'estimateAmount should be equal').be.equal('97');
-    await stakeManager.methods.slash(validator1, 0, bufferToHex(crypto.randomBytes(32))).send();
+    await stakeManager.methods.freeze(validator1, bufferToHex(crypto.randomBytes(32))).send();
+    await stakeManager.methods.unfreeze(validator1, 40).send({ from: communityAddr });
     const estimateAmount1 = await stakeManager.methods.estimateUnstakeAmount(validator1, wantedShares).call();
     expect(estimateAmount1, 'estimateAmount should be equal').be.equal('58');
 
-    await stakeManager.methods.slash(validator1, 1, bufferToHex(crypto.randomBytes(32))).send();
+    await stakeManager.methods.freeze(validator1, bufferToHex(crypto.randomBytes(32))).send();
+    await stakeManager.methods.unfreeze(validator1, 100).send({ from: communityAddr });
     const wantedAmount = toBN(97);
     stakeId++;
     await stakeManager.methods.stake(validator1, deployer).send({ value: wantedAmount.toString() });
-    await stakeManager.methods.slash(validator1, 1, bufferToHex(crypto.randomBytes(32))).send();
+    await stakeManager.methods.freeze(validator1, bufferToHex(crypto.randomBytes(32))).send();
+    await stakeManager.methods.unfreeze(validator1, 100).send({ from: communityAddr });
     await stakeManager.methods.reward(validator1).send({ value: 1000 });
     const estimateUnstakeShare = await stakeManager.methods.estimateAmountToShares(validator1, 1).call();
     expect(estimateUnstakeShare, 'estimateUnstakeShare should be equal').be.equal('1');
@@ -263,7 +270,8 @@ describe('StakeManger', () => {
 
     // slash
     const hash2 = bufferToHex(crypto.randomBytes(32));
-    await stakeManager.methods.slash(validator2, 1, hash2).send();
+    await stakeManager.methods.freeze(validator2, hash2).send();
+    await stakeManager.methods.unfreeze(validator2, 100).send({ from: communityAddr });
     expect(await isExist(), 'validator2 should be removed').be.false;
     expect(await stakeManager.methods.usedEvidence(hash2).call()).be.true;
     try {
@@ -385,7 +393,8 @@ describe('StakeManger', () => {
 
   it('totalLockedAmount should not change when validator is jailed', async () => {
     const totalLockedAmount = await stakeManager.methods.totalLockedAmount().call();
-    await stakeManager.methods.slash(validator4, 0, bufferToHex(crypto.randomBytes(32))).send();
+    await stakeManager.methods.freeze(validator4, bufferToHex(crypto.randomBytes(32))).send();
+    await stakeManager.methods.unfreeze(validator4, 0).send({ from: communityAddr });
     expect(await stakeManager.methods.totalLockedAmount().call(), 'totalLockedAmount should be equal').be.equal(totalLockedAmount);
     const commissionShare = await createCommissionShareContract(validator4);
     await commissionShare.methods.approve(stakeManager.options.address, MAX_INTEGER.toString()).send();

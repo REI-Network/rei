@@ -467,7 +467,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
      * Reward validator, only can be called by system caller or fee pool
      * @param validator         Validator address
      */
-    function reward(address validator) external payable override unfreezed(validator) nonReentrant onlySystemCallerOrFeePool {
+    function reward(address validator) external payable override nonReentrant onlySystemCallerOrFeePool {
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
         uint256 commissionReward = msg.value.mul(v.commissionRate).div(100);
@@ -535,7 +535,9 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
             if (indexedValidators.contains(v.id)) {
                 indexedValidators.remove(v.id);
                 emit UnindexedValidator(validatorAddress);
-                totalLockedAmount = totalLockedAmount.sub(getVotingPower(v.commissionShare, validatorAddress));
+                if (!freezed[validatorAddress]) {
+                    totalLockedAmount = totalLockedAmount.sub(getVotingPower(v.commissionShare, validatorAddress));
+                }
             }
         }
     }
@@ -548,10 +550,17 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         prison.unjail{ value: msg.value }(msg.sender);
         Validator memory v = validators[msg.sender];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
-        _checkVotingPower(v, msg.sender);
+        if (!freezed[msg.sender]) {
+            uint256 votingPower = getVotingPower(v.commissionShare, msg.sender);
+            if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
+                indexedValidators.set(v.id, msg.sender);
+                emit IndexedValidator(msg.sender, votingPower);
+            }
+            totalLockedAmount = totalLockedAmount.add(votingPower);
+        }
     }
 
-    function freeze(address validator, bytes32 hash) external override onlySystemCaller unfreezed(validator) {
+    function freeze(address validator, bytes32 hash) external override onlySystemCaller {
         // make sure the evidence is not duplicated
         require(!usedEvidence[hash], "StakeManager: invalid evidence");
         Validator memory v = validators[validator];
@@ -563,7 +572,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
             emit UnindexedValidator(validator);
         }
 
-        if (!_isjailed(validator)) {
+        if (!_isjailed(validator) && !freezed[validator]) {
             // decrease total locked amount
             totalLockedAmount = totalLockedAmount.sub(getVotingPower(v.commissionShare, validator));
         }
@@ -576,6 +585,8 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
 
     function unfreeze(address validator, uint256 factor) external override returns (uint256 amount) {
         require(msg.sender == config.communityAddress(), "StakeManager: only community can unfreeze");
+        require(freezed[validator], "StakeManager: not freezed");
+
         Validator memory v = validators[validator];
         require(v.commissionShare != address(0), "StakeManager: invalid validator");
 
@@ -590,12 +601,6 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
             amount = decreasedAmount;
         }
 
-        _checkVotingPower(v, validator);
-        freezed[validator] = false;
-        emit Unfreeze(validator, amount);
-    }
-
-    function _checkVotingPower(Validator memory v, address validator) private {
         if (!_isjailed(validator)) {
             uint256 votingPower = getVotingPower(v.commissionShare, validator);
             if (!indexedValidators.contains(v.id) && votingPower >= config.minIndexVotingPower()) {
@@ -604,6 +609,9 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
             }
             totalLockedAmount = totalLockedAmount.add(votingPower);
         }
+
+        freezed[validator] = false;
+        emit Unfreeze(validator, amount);
     }
 
     function _isjailed(address validator) private view returns (bool) {

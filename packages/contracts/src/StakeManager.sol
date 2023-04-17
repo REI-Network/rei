@@ -478,7 +478,7 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         if (validatorReward > 0) {
             IValidatorRewardPool(config.validatorRewardPool()).reward{ value: validatorReward }(validator);
         }
-        if (!_isjailed(validator)) {
+        if (!_isjailed(validator) && !freezed[validator]) {
             if (!indexedValidators.contains(v.id)) {
                 uint256 votingPower = getVotingPower(v.commissionShare, validator);
                 if (votingPower >= config.minIndexVotingPower()) {

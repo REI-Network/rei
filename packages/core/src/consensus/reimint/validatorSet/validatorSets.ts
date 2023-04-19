@@ -1,6 +1,5 @@
 import { FunctionalBufferMap } from '@rei-network/utils';
 import { StakeManager, ValidatorBls } from '../contracts';
-import { Reimint } from '../reimint';
 import { ValidatorSet } from './validatorSet';
 import { IndexedValidatorSet } from './indexedValidatorSet';
 import { ActiveValidatorSet } from './activeValidatorSet';

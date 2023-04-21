@@ -1,6 +1,7 @@
 import '@typechain/hardhat';
 import '@nomicfoundation/hardhat-toolbox';
 import '@nomiclabs/hardhat-ethers';
+import './tasks';
 
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
@@ -55,52 +56,6 @@ export default {
       url: 'http://127.0.0.1:11451',
       accounts,
       chainId: 23579
-    },
-    mainnet: {
-      url: `https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`,
-      accounts,
-      gasPrice: 1e11,
-      chainId: 1
-    },
-    ropsten: {
-      url: `https://ropsten.infura.io/v3/${process.env.INFURA_API_KEY}`,
-      accounts,
-      chainId: 3,
-      live: true,
-      saveDeployments: true,
-      tags: ['staging'],
-      gasPrice: 1e11,
-      gasMultiplier: 2
-    },
-    rinkeby: {
-      url: `https://rinkeby.infura.io/v3/${process.env.INFURA_API_KEY}`,
-      accounts,
-      chainId: 4,
-      live: true,
-      saveDeployments: true,
-      tags: ['staging'],
-      gasPrice: 1e11,
-      gasMultiplier: 2
-    },
-    goerli: {
-      url: `https://goerli.infura.io/v3/${process.env.INFURA_API_KEY}`,
-      accounts,
-      chainId: 5,
-      live: true,
-      saveDeployments: true,
-      tags: ['staging'],
-      gasPrice: 1e11,
-      gasMultiplier: 2
-    },
-    kovan: {
-      url: `https://kovan.infura.io/v3/${process.env.INFURA_API_KEY}`,
-      accounts,
-      chainId: 42,
-      live: true,
-      saveDeployments: true,
-      tags: ['staging'],
-      gasPrice: 1e11,
-      gasMultiplier: 2
     },
     'rei-testnet': {
       url: 'https://rpc-testnet.rei.network/',

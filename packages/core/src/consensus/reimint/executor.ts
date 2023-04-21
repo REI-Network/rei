@@ -251,7 +251,12 @@ export class ReimintExecutor implements Executor {
       if (!parentValidatorSet.isGenesis(nextCommon)) {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, create a new genesis validator set');
         // if the parent validator set isn't a genesis validator set, we create a new one
-        validatorSet = new ValidatorSet(indexedValidatorSet, ActiveValidatorSet.genesis(nextCommon));
+        if (isEnableDAO(nextCommon)) {
+          const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
+          validatorSet = new ValidatorSet(indexedValidatorSet, await ActiveValidatorSet.genesis(nextCommon, new ValidatorBls(evm, nextCommon)));
+        } else {
+          validatorSet = new ValidatorSet(indexedValidatorSet, await ActiveValidatorSet.genesis(nextCommon));
+        }
       } else {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, copy from parent');
         // if the parent validator set is a genesis validator set, we copy the set from the parent

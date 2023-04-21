@@ -33,7 +33,8 @@ export abstract class Contract {
    * @param common - Common instance
    */
   static async deployReimintContracts(evm: EVM, common: Common) {
-    const genesisValidators = ActiveValidatorSet.genesis(common);
+    // NOTE: there is no need to care whether the bls contract exists
+    const genesisValidators = await ActiveValidatorSet.genesis(common);
     const proposer = genesisValidators.proposer.toString();
     const activeValidators = genesisValidators.activeValidators();
     const activeSigners = activeValidators.map(({ validator }) => validator.toString());

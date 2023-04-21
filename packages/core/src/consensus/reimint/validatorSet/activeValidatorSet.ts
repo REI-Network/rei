@@ -2,8 +2,8 @@ import { Address, BN } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { StakeManager, ValidatorBls } from '../contracts';
 import { IndexedValidator } from './indexedValidatorSet';
-import { getGenesisValidators, getGenesisBlsPublicKey, genesisValidatorPriority, genesisValidatorVotingPower, isGenesis } from './genesis';
-import { isEnableBetterPOS, isEnableDAO } from '../../../hardforks';
+import { getGenesisValidators, genesisValidatorPriority, genesisValidatorVotingPower, isGenesis } from './genesis';
+import { isEnableBetterPOS } from '../../../hardforks';
 import { ActiveValidator as ActiveValidatorInfo } from '../contracts/stakeManager';
 
 const maxInt256 = new BN('7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 'hex');
@@ -112,27 +112,21 @@ export class ActiveValidatorSet {
   /**
    * Create genesis validator set
    * @param common - Common instance
+   * @param bls - Bls contract instance
    * @returns ActiveValidatorSet instance
    */
-  static genesis(common: Common) {
+  static async genesis(common: Common, bls?: ValidatorBls) {
     const active: ActiveValidator[] = [];
-    const blsFlag = isEnableDAO(common);
-
     for (const gv of getGenesisValidators(common)) {
-      const ac = {
+      const av: ActiveValidator = {
         validator: gv,
         priority: genesisValidatorPriority.clone(),
         votingPower: genesisValidatorVotingPower.clone(),
-        blsPublicKey: undefined
-      } as ActiveValidator;
+        blsPublicKey: bls ? await bls.getBlsPublicKey(gv) : undefined
+      };
 
-      if (blsFlag) {
-        ac.blsPublicKey = getGenesisBlsPublicKey(gv, common);
-      }
-
-      active.push(ac);
+      active.push(av);
     }
-
     return new ActiveValidatorSet(active);
   }
 

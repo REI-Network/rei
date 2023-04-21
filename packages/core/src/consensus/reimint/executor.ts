@@ -339,7 +339,12 @@ export class ReimintExecutor implements Executor {
     const minerReward = new BN(pendingCommon.param('pow', 'minerReward'));
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.engine.getStakeManager(vm, block);
-    const parentValidatorSet: ValidatorSet = isEnableDAO(pendingCommon) ? (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager, this.engine.getValidatorBls(vm, block, pendingCommon))).copy() : (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager)).copy();
+    let parentValidatorSet: ValidatorSet;
+    if (isEnableDAO(pendingCommon)) {
+      parentValidatorSet = (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager, this.engine.getValidatorBls(vm, block, pendingCommon))).copy();
+    } else {
+      parentValidatorSet = (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager)).copy();
+    }
     parentValidatorSet.active.incrementProposerPriority(round);
 
     // filter the evidence that has been packaged to prevent duplication

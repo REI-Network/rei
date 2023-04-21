@@ -16,7 +16,8 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^2.0.0",
     "@types/chai": "^4.2.21",
-    "solidity-docgen": "^0.5.13",
-    "hardhat": "^2.12.5"
+    "dotenv": "^16.0.3",
+    "hardhat": "^2.12.5",
+    "solidity-docgen": "^0.5.13"
   }
 }

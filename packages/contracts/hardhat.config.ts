@@ -1,13 +1,13 @@
 import '@typechain/hardhat';
 import '@nomicfoundation/hardhat-toolbox';
 import '@nomiclabs/hardhat-ethers';
+import * as dotenv from 'dotenv';
 import './tasks';
 
-// You need to export an object to set up your config
-// Go to https://hardhat.org/config/ to learn more
+dotenv.config();
 
 const accounts = {
-  mnemonic: process.env.MNEMONIC || 'test test test test test test test test test test test junk'
+  mnemonic: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
 };
 
 /**
@@ -45,31 +45,19 @@ export default {
   },
   networks: {
     localhost: {
-      live: false,
-      saveDeployments: true,
-      url: 'http://127.0.0.1:8545',
-      loggingEnabled: true
+      url: 'http://127.0.0.1:8545'
     },
     'rei-devnet': {
-      live: false,
-      saveDeployments: true,
       url: 'http://127.0.0.1:11451',
-      accounts,
-      chainId: 23579
+      accounts
     },
     'rei-testnet': {
       url: 'https://rpc-testnet.rei.network/',
-      accounts,
-      chainId: 12357,
-      live: true,
-      saveDeployments: true
+      accounts
     },
     'rei-mainnet': {
       url: 'https://rpc-mainnet.rei.network/',
-      accounts,
-      chainId: 47805,
-      live: true,
-      saveDeployments: true
+      accounts
     }
   },
   paths: {

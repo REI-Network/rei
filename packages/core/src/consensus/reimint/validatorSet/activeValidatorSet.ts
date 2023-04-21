@@ -2,7 +2,7 @@ import { Address, BN } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { StakeManager, ValidatorBls } from '../contracts';
 import { IndexedValidator } from './indexedValidatorSet';
-import { getGenesisValidators, genesisValidatorPriority, genesisValidatorVotingPower, isGenesis } from './genesis';
+import { getGenesisValidators, getGenesisBlsPublicKey, genesisValidatorPriority, genesisValidatorVotingPower, isGenesis } from './genesis';
 import { isEnableBetterPOS, isEnableDAO } from '../../../hardforks';
 import { ActiveValidator as ActiveValidatorInfo } from '../contracts/stakeManager';
 
@@ -12,47 +12,6 @@ const maxProposerPriority = maxInt256;
 const minProposerPriority = minInt256;
 
 const priorityWindowSizeFactor = 2;
-
-// genesis validator bls infos
-const genesisValidatorInfos = new Map<string, Map<string, string>>([
-  [
-    'rei-devnet',
-    new Map<string, string>([
-      ['0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde', '0xe4f75966f66de932f8588d7e43cebffa72b94959e7f2b25ab467528857f143fefd49e2321da1cd8d819e5ef4a4cd18a3'],
-      ['0x809fae291f79c9953577ee9007342cff84014b1c', '0xb075545c9343c3c77b55c235c70498e3a778e650d3b41119135264d1f18af4c1b4d2d6652a86e74239a8e6c895dcffd4'],
-      ['0x57b80007d142297bc383a741e4c1dd18e4c75754', '0xece169fa620dbe26eba06cf16d32eb9ce62b1b3f21208126ab27ee75f7d1a22e0a04f2c641f43440d28015c29a5f8b2c'],
-      ['0x8d187ee877eeff8698de6808568fd9f1415c7f91', '0xd35c4584f50333fdf5568cfb56fbeaea8bbf470f43ddf348d2c87eb21d0904e3041e99b21a08365160e1b98888c6bd86'],
-      ['0x5eb85b475068f7caa22b2758d58c4b100a418684', '0x126dc3438b328146495c41e4b325cc4ee18a0b792e0eb3942e5881ff5e190c4a5f922a0aed6193608da745a5ef9bebba']
-    ])
-  ],
-  [
-    'rei-testnet',
-    new Map<string, string>([
-      ['0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde', '0xe4f75966f66de932f8588d7e43cebffa72b94959e7f2b25ab467528857f143fefd49e2321da1cd8d819e5ef4a4cd18a3'],
-      ['0x809fae291f79c9953577ee9007342cff84014b1c', '0xb075545c9343c3c77b55c235c70498e3a778e650d3b41119135264d1f18af4c1b4d2d6652a86e74239a8e6c895dcffd4'],
-      ['0x57b80007d142297bc383a741e4c1dd18e4c75754', '0xece169fa620dbe26eba06cf16d32eb9ce62b1b3f21208126ab27ee75f7d1a22e0a04f2c641f43440d28015c29a5f8b2c'],
-      ['0x8d187ee877eeff8698de6808568fd9f1415c7f91', '0xd35c4584f50333fdf5568cfb56fbeaea8bbf470f43ddf348d2c87eb21d0904e3041e99b21a08365160e1b98888c6bd86'],
-      ['0x5eb85b475068f7caa22b2758d58c4b100a418684', '0x126dc3438b328146495c41e4b325cc4ee18a0b792e0eb3942e5881ff5e190c4a5f922a0aed6193608da745a5ef9bebba']
-    ])
-  ],
-  [
-    'rei-mainnet',
-    new Map<string, string>([
-      ['0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde', '0xe4f75966f66de932f8588d7e43cebffa72b94959e7f2b25ab467528857f143fefd49e2321da1cd8d819e5ef4a4cd18a3'],
-      ['0x809fae291f79c9953577ee9007342cff84014b1c', '0xb075545c9343c3c77b55c235c70498e3a778e650d3b41119135264d1f18af4c1b4d2d6652a86e74239a8e6c895dcffd4'],
-      ['0x57b80007d142297bc383a741e4c1dd18e4c75754', '0xece169fa620dbe26eba06cf16d32eb9ce62b1b3f21208126ab27ee75f7d1a22e0a04f2c641f43440d28015c29a5f8b2c'],
-      ['0x8d187ee877eeff8698de6808568fd9f1415c7f91', '0xd35c4584f50333fdf5568cfb56fbeaea8bbf470f43ddf348d2c87eb21d0904e3041e99b21a08365160e1b98888c6bd86'],
-      ['0x5eb85b475068f7caa22b2758d58c4b100a418684', '0x126dc3438b328146495c41e4b325cc4ee18a0b792e0eb3942e5881ff5e190c4a5f922a0aed6193608da745a5ef9bebba']
-    ])
-  ]
-]);
-
-export interface LoadOptions {
-  // is it a genesis active validator set
-  genesis?: boolean;
-  // validator bls contract instance
-  bls?: ValidatorBls;
-}
 
 // active validator information
 export type ActiveValidator = {
@@ -86,12 +45,14 @@ export class ActiveValidatorSet {
   /**
    * Load active validator set from state trie
    * @param sm - Stake manager instance
-   * @param options - ActiveValidatorSet load options
+   * @param bls - Bls contract instance
    * @returns ActiveValidatorSet instance
    */
-  static async fromStakeManager(sm: StakeManager, options: LoadOptions) {
+  static async fromStakeManager(sm: StakeManager, bls?: ValidatorBls) {
+    // load proposer address
     const proposer = await sm.proposer();
-    const active: ActiveValidator[] = [];
+
+    // according to different hard forks, load active validators
     const activeValidatorInfos: ActiveValidatorInfo[] = [];
     if (isEnableBetterPOS(sm.common)) {
       activeValidatorInfos.push(...(await sm.allActiveValidators()));
@@ -102,20 +63,33 @@ export class ActiveValidatorSet {
       }
     }
 
+    const active: ActiveValidator[] = [];
+    let genesis: boolean | undefined = undefined;
     for (const v of activeValidatorInfos) {
+      // make sure the validator set is consistent
+      const _genesis = isGenesis(v.validator, sm.common);
+      if (genesis === undefined) {
+        genesis = _genesis;
+      } else if (genesis !== _genesis) {
+        throw new Error('invalid validator set, mix of genesis validators and common validators');
+      }
+
+      // load voting power
+      const votingPower = _genesis ? genesisValidatorVotingPower.clone() : await sm.getVotingPowerByAddress(v.validator);
+
+      // load bls public key(if exists)
+      let blsPublicKey: Buffer | undefined = undefined;
+      if (bls) {
+        blsPublicKey = await bls.getBlsPublicKey(v.validator);
+      }
+
       active.push({
         ...v,
-        votingPower: options.genesis
-          ? (() => {
-              if (!isGenesis(v.validator, sm.common)) {
-                throw new Error('unknown validator: ' + v.toString());
-              }
-              return genesisValidatorVotingPower.clone();
-            })()
-          : await sm.getVotingPowerByAddress(v.validator),
-        blsPublicKey: options.bls ? await options.bls.getBlsPublicKey(v.validator) : undefined
+        votingPower,
+        blsPublicKey
       });
     }
+
     return new ActiveValidatorSet(active, proposer);
   }
 
@@ -153,15 +127,12 @@ export class ActiveValidatorSet {
       } as ActiveValidator;
 
       if (blsFlag) {
-        const blsPublicKey = genesisValidatorInfos.get(common.chainName())?.get(gv.toString());
-        if (!blsPublicKey) {
-          throw new Error(`genesis BLS public key of ${gv.toString()} is not found`);
-        }
-        ac.blsPublicKey = Buffer.from(blsPublicKey);
+        ac.blsPublicKey = getGenesisBlsPublicKey(gv, common);
       }
 
       active.push(ac);
     }
+
     return new ActiveValidatorSet(active);
   }
 

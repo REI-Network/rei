@@ -47,7 +47,8 @@ export class ValidatorBls extends Contract {
   async getBlsPublicKey(validator: Address) {
     return this.runWithLogger(async () => {
       const { returnValue } = await this.executeMessage(this.makeCallMessage('getBlsPublicKey', ['address'], [validator.toString()]));
-      return toBuffer(decodeBytes(returnValue));
+      const pk = toBuffer(decodeBytes(returnValue));
+      return pk.length === 0 ? undefined : pk;
     });
   }
 }

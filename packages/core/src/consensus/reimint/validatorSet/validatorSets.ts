@@ -1,6 +1,5 @@
 import { FunctionalBufferMap } from '@rei-network/utils';
 import { StakeManager, ValidatorBls } from '../contracts';
-import { Reimint } from '../reimint';
 import { ValidatorSet } from './validatorSet';
 import { IndexedValidatorSet } from './indexedValidatorSet';
 import { ActiveValidatorSet } from './activeValidatorSet';
@@ -24,18 +23,16 @@ export class ValidatorSets {
    * @param bls - `ValidatorBls` instance
    */
   async getValSet(stateRoot: Buffer, sm?: StakeManager, bls?: ValidatorBls) {
-    const indexed = this.indexedSets.get(stateRoot);
-    const active = this.activeSets.get(stateRoot);
+    let indexed = this.indexedSets.get(stateRoot);
+    let active = this.activeSets.get(stateRoot);
     if (!indexed || !active) {
       if (!sm) {
         throw new Error('missing state root: ' + stateRoot.toString('hex'));
       }
-      const blsFlag = bls !== undefined;
-      const indexedValidatorSet = await IndexedValidatorSet.fromStakeManager(sm, bls);
-      const { totalLockedAmount, validatorCount } = indexedValidatorSet.getTotalLockedVotingPowerAndValidatorCount(blsFlag);
-      const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
-      const activeSet = enableGenesisValidators ? await ActiveValidatorSet.fromStakeManager(sm, { genesis: true, bls }) : ActiveValidatorSet.fromActiveValidators(indexedValidatorSet.sort(sm.common.param('vm', 'maxValidatorsCount'), blsFlag));
-      const validatorSet = new ValidatorSet(indexedValidatorSet, activeSet);
+
+      const indexed = await IndexedValidatorSet.fromStakeManager(sm, bls);
+      const active = await ActiveValidatorSet.fromStakeManager(sm, bls);
+      const validatorSet = new ValidatorSet(indexed, active);
       this.set(stateRoot, validatorSet);
       return validatorSet;
     } else {
@@ -48,17 +45,16 @@ export class ValidatorSets {
    * load from stake manager if it doesn't exist
    * @param stateRoot - Target state root
    * @param sm - `StakeManager` instance
+   * @param bls - `ValidatorBls` instance
    */
-  async getActiveValSet(stateRoot: Buffer, sm?: StakeManager) {
+  async getActiveValSet(stateRoot: Buffer, sm?: StakeManager, bls?: ValidatorBls) {
     let active = this.activeSets.get(stateRoot);
     if (!active) {
       if (!sm) {
         throw new Error('missing state root: ' + stateRoot.toString('hex'));
       }
 
-      const { totalLockedAmount, validatorCount } = await sm.getTotalLockedAmountAndValidatorCount();
-      const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), sm.common);
-      active = await ActiveValidatorSet.fromStakeManager(sm, { genesis: enableGenesisValidators });
+      active = await ActiveValidatorSet.fromStakeManager(sm, bls);
       this.set(stateRoot, active);
     }
     return active;

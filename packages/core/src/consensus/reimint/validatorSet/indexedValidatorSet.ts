@@ -29,7 +29,8 @@ export class IndexedValidatorSet {
 
   /**
    * Load indexed validator set from state trie
-   * @param sm - Stake manager instance
+   * @param sm - `StakeManager` instance
+   * @param bls - `ValidatorBls` instance
    * @returns IndexedValidatorSet instance
    */
   static async fromStakeManager(sm: StakeManager, bls?: ValidatorBls) {
@@ -37,6 +38,7 @@ export class IndexedValidatorSet {
     const length = await sm.indexedValidatorsLength();
     for (const i = new BN(0); i.lt(length); i.iaddn(1)) {
       const validator = await sm.indexedValidatorsByIndex(i);
+
       // exclude genesis validators
       if (isGenesis(validator, sm.common)) {
         continue;
@@ -46,10 +48,7 @@ export class IndexedValidatorSet {
       if (votingPower.gtn(0)) {
         const indexValidator: IndexedValidator = { validator, votingPower };
         if (bls) {
-          const blsPublicKey = await bls.getBlsPublicKey(validator);
-          if (blsPublicKey.length > 0) {
-            indexValidator.blsPublicKey = blsPublicKey;
-          }
+          indexValidator.blsPublicKey = await bls.getBlsPublicKey(validator);
         }
         indexed.set(validator, indexValidator);
       }
@@ -107,11 +106,9 @@ export class IndexedValidatorSet {
   /**
    * Merge validator set changes
    * @param changes - `ValidatorChanges` instance
+   * @param bls - `ValidatorBls` instance
    */
   async merge(changes: ValidatorChanges, bls?: ValidatorBls) {
-    // TODO: if the changed validator is an active validator, the active list maybe not be dirty
-    let dirty = false;
-
     for (const uv of changes.unindexedValidators) {
       this.indexed.delete(uv);
     }
@@ -120,14 +117,12 @@ export class IndexedValidatorSet {
     for (const vc of changes.changes.values()) {
       let v: IndexedValidator | undefined;
       if (vc.votingPower) {
-        dirty = true;
         v = this.getValidator(vc.validator);
         v.votingPower = vc.votingPower;
         newValidators.add(vc.validator);
       }
 
       if (!vc.update.eqn(0) && this.indexed.get(vc.validator)) {
-        dirty = true;
         v = v ?? this.getValidator(vc.validator);
         v.votingPower.iadd(vc.update);
         if (v.votingPower.isZero()) {
@@ -141,7 +136,7 @@ export class IndexedValidatorSet {
     for (const addr of newValidators) {
       if (!changes.blsValidators.has(addr) && bls) {
         const blsPublicKey = await bls.getBlsPublicKey(addr);
-        if (blsPublicKey.length > 0) {
+        if (blsPublicKey) {
           changes.blsValidators.set(addr, blsPublicKey);
         }
       }
@@ -152,8 +147,6 @@ export class IndexedValidatorSet {
         this.getValidator(addr).blsPublicKey = blsPublicKey;
       }
     }
-
-    return dirty;
   }
 
   /**

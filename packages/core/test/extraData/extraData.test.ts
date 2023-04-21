@@ -47,7 +47,7 @@ describe('extraDataBls', () => {
   const secretKeys: SecretKey[] = [];
   const height = new BN(2);
   before(async () => {
-    common = new Common({ chain: 'rei-devnet', hardfork: 'bls' });
+    common = new Common({ chain: 'rei-devnet', hardfork: 'rei-dao' });
     await initBls();
     bls = importBls();
     for (let i = 0; i < 6; i++) {

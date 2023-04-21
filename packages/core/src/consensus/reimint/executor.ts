@@ -219,7 +219,7 @@ export class ReimintExecutor implements Executor {
     // 7. filter all receipts to collect changes
     if (isEnableDAO(pendingCommon)) {
       ValidatorBls.filterReceiptsChanges(changes, receipts, pendingCommon);
-      indexedValidatorSet.merge(changes, this.engine.getValidatorBls(vm, pendingBlock, pendingCommon));
+      await indexedValidatorSet.merge(changes, this.engine.getValidatorBls(vm, pendingBlock, pendingCommon));
     } else if (!isEnableDAO(pendingCommon) && isEnableDAO(nextCommon)) {
       // modify validatorBls contract address
       const fallbackAddr = nextCommon.param('vm', 'fallbackaddr');
@@ -239,7 +239,7 @@ export class ReimintExecutor implements Executor {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deloyValidatorBlsFallbackContract(evm, nextCommon);
     } else {
-      indexedValidatorSet.merge(changes);
+      await indexedValidatorSet.merge(changes);
     }
 
     // 8. get totalLockedAmount and validatorCount by the merged validatorSet,
@@ -252,8 +252,7 @@ export class ReimintExecutor implements Executor {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, create a new genesis validator set');
         // if the parent validator set isn't a genesis validator set, we create a new one
         if (isEnableDAO(nextCommon)) {
-          const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
-          validatorSet = new ValidatorSet(indexedValidatorSet, await ActiveValidatorSet.genesis(nextCommon, new ValidatorBls(evm, nextCommon)));
+          validatorSet = new ValidatorSet(indexedValidatorSet, await ActiveValidatorSet.genesis(nextCommon, this.engine.getValidatorBls(vm, pendingBlock, pendingCommon)));
         } else {
           validatorSet = new ValidatorSet(indexedValidatorSet, await ActiveValidatorSet.genesis(nextCommon));
         }

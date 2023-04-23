@@ -5,10 +5,6 @@ import { ActiveValidatorSet } from './validatorSet';
 import { BitArray } from './bitArray';
 import * as v from './validate';
 
-interface exActiveValidatorSet extends ActiveValidatorSet {
-  getBlsPublickeyByIndex(index: number): Buffer;
-}
-
 export class ConflictingVotesError extends Error {
   voteA: Vote;
   voteB: Vote;
@@ -537,7 +533,10 @@ export class VoteSet {
     for (let i = 0; i < len; i++) {
       const temp = bitArray.getIndex(i);
       if (temp) {
-        const pubKey = (this.valSet as exActiveValidatorSet).getBlsPublickeyByIndex(i);
+        const pubKey = this.valSet.activeValidators()[i].blsPublicKey;
+        if (!pubKey) {
+          throw new Error('missing validator public key');
+        }
         pubKeys.push(pubKey);
         sum.iadd(this.valSet.getVotingPower(this.valSet.getValidatorByIndex(i)));
       }

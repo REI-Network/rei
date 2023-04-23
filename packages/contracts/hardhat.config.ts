@@ -6,9 +6,7 @@ import './tasks';
 
 dotenv.config();
 
-const accounts = {
-  mnemonic: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : []
-};
+const accounts = process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [];
 
 /**
  * @type import('hardhat/config').HardhatUserConfig

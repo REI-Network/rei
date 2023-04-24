@@ -25,7 +25,6 @@ import { WAL } from './wal';
 import { ReimintExecutor } from './executor';
 import { ExtraData } from './extraData';
 import { EvidenceCollector } from './evidenceCollector';
-import { SignType } from './vote';
 
 export class SimpleNodeSigner {
   readonly node: Node;
@@ -233,6 +232,13 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     return new StakeManager(evm, common ?? block._common);
   }
 
+  /**
+   * Get validator bls contract object
+   * @param vm - Target vm instance
+   * @param block - Target block
+   * @param common - Common instance
+   * @returns validator bls contract object
+   */
   getValidatorBls(vm: VM, block: Block, common?: Common) {
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
     return new ValidatorBls(evm, common ?? block._common);

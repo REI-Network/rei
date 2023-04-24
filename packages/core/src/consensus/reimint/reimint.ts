@@ -181,7 +181,7 @@ export abstract class Reimint {
     proposal.signature = signer.sign(proposal.getMessageToSign());
     // determine the signature type
     const version = isEnableDAO(header._common) ? SignType.blsSignature : SignType.ecdsaSignature;
-    const extraData = new ExtraData(round, commitRound, POLRound, evidence, proposal, version, options?.voteSet, options?.voteSet?.aggregatedSignature);
+    const extraData = new ExtraData(round, commitRound, POLRound, evidence, proposal, version, options?.voteSet);
     return {
       header: BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize({ validaterSetSize })]) }, options),
       proposal
@@ -214,7 +214,7 @@ export abstract class Reimint {
    */
   static generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], evidence: Evidence[], proposal: Proposal, commitRound: number, votes: VoteSet, options?: BlockOptions) {
     const version = isEnableDAO(options?.common!) ? SignType.blsSignature : SignType.ecdsaSignature;
-    const extraData = new ExtraData(proposal.round, commitRound, proposal.POLRound, evidence, proposal, version, votes, votes.aggregatedSignature);
+    const extraData = new ExtraData(proposal.round, commitRound, proposal.POLRound, evidence, proposal, version, votes);
     data = formatHeaderData(data);
     const header = BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize()]) }, options);
     return new Block(header, transactions, undefined, options);

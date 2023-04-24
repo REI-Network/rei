@@ -94,7 +94,6 @@ export class ExtraData {
   readonly proposal: Proposal;
   readonly version: SignType;
   readonly voteSet?: VoteSet;
-  readonly blsAggregateSignature?: Buffer;
 
   /**
    * New ExtraData from BlockHeader
@@ -245,7 +244,7 @@ export class ExtraData {
           throw new Error('invliad values');
         }
       }
-      return new ExtraData(round, commitRound, POLRound, evidence, proposal, signType, voteSet, blsAggregateSignature);
+      return new ExtraData(round, commitRound, POLRound, evidence, proposal, signType, voteSet);
     } else {
       if (valSet) {
         // validator size + 1(evidence list) + 1(round and POLRound list) + 1(proposal)
@@ -359,7 +358,7 @@ export class ExtraData {
     }
   }
 
-  constructor(round: number, commitRound: number, POLRound: number, evidence: Evidence[], proposal: Proposal, version: SignType, voteSet?: VoteSet, blsAggregateSignature?: Buffer) {
+  constructor(round: number, commitRound: number, POLRound: number, evidence: Evidence[], proposal: Proposal, version: SignType, voteSet?: VoteSet) {
     if (voteSet && voteSet.signedMsgType !== VoteType.Precommit) {
       throw new Error('invalid vote set type');
     }
@@ -371,7 +370,6 @@ export class ExtraData {
     this.evidence = evidence;
     this.voteSet = voteSet;
     this.version = version;
-    this.blsAggregateSignature = blsAggregateSignature;
     this.validateBasic();
   }
 
@@ -408,16 +406,19 @@ export class ExtraData {
         }
       }
     } else if (this.version === SignType.blsSignature) {
-      raw.push(this.blsAggregateSignature ? this.blsAggregateSignature : Buffer.alloc(0));
       if (this.voteSet) {
+        raw.push(this.voteSet.getAggregatedSignature());
         raw.push(this.voteSet.votesBitArray.raw());
       } else {
+        raw.push(Buffer.alloc(0));
         if (validaterOptions?.validaterSetSize === undefined) {
           throw new Error('missing validater set size');
         }
         const bitArray = new BitArray(validaterOptions.validaterSetSize);
         raw.push(bitArray.raw());
       }
+    } else {
+      throw new Error(`unknown version: ${this.version}`);
     }
     return raw;
   }
@@ -440,7 +441,7 @@ export class ExtraData {
   }
 
   /**
-   * Validate extradata round and POLRound
+   * Validate extra data round and POLRound
    */
   validateBasic() {
     v.validateRound(this.round);
@@ -448,7 +449,7 @@ export class ExtraData {
   }
 
   /**
-   * Validate extradata
+   * Validate extra data
    */
   validate() {
     if (this.version === SignType.ecdsaSignature) {
@@ -456,9 +457,11 @@ export class ExtraData {
         throw new Error('invalid vote set');
       }
     } else if (this.version === SignType.blsSignature) {
-      if (!this.voteSet || !this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash) || !this.blsAggregateSignature) {
+      if (!this.voteSet || !this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash)) {
         throw new Error('invalid vote set');
       }
+    } else {
+      throw new Error(`unknown version: ${this.version}`);
     }
   }
 

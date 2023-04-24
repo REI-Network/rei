@@ -504,10 +504,10 @@ export class VoteSet {
   }
 
   /**
-   * Get aggregate blsSignature
-   * @returns aggregate signature
+   * Get aggregated blsSignature
+   * @returns Aggregated signature
    */
-  getAggregateSignature() {
+  getAggregatedSignature() {
     if (!this.hasTwoThirdsMajority()) {
       throw new Error('Not enough votes to aggregate signature');
     }

@@ -92,7 +92,7 @@ describe('BlsVote', () => {
       vote.blsSignature = Buffer.from(accMngr.n2b(accMngr.addressToName.get(vote.validator())!).sign(vote.getMessageToBlsSign()).toBytes());
       voteSet.addVote(vote);
     });
-    const aggregateSignature = voteSet.getAggregateSignature();
+    const aggregateSignature = voteSet.getAggregatedSignature();
     const pubKeys = secretKeys.map((sk) => sk.toPublicKey().toBytes());
     expect(bls.verifyAggregate(pubKeys, votes[0].getMessageToBlsSign(), aggregateSignature!)).to.be.true;
   });

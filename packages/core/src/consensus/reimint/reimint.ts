@@ -44,9 +44,6 @@ export function formatHeaderData(data?: HeaderData) {
 }
 
 export interface ReimintBlockOptions extends BlockOptions {
-  // whether try to sign the block
-  signer?: ISigner;
-
   // reimint round
   round?: number;
 
@@ -76,10 +73,7 @@ export interface ReimintBlockOptions_SignerExists extends Omit<ReimintBlockOptio
 
 export interface ReimintBlockOptions_SignerNotExists extends Omit<ReimintBlockOptions, 'signer'> {}
 
-export class Reimint {
-  // disable constructor
-  private constructor() {}
-
+export abstract class Reimint {
   /**
    * Calculate block or block header hash
    * @param data - Block or block header
@@ -160,38 +154,38 @@ export class Reimint {
    * Generate block header, proposal and fill extra data by options
    * @param data - Block header data
    * @param options - Reimint block options
+   * @param signer - Signer
    * @returns Header and proposal
    */
-  static generateBlockHeaderAndProposal(data: HeaderData, options: ReimintBlockOptions): { header: BlockHeader; proposal?: Proposal } {
+  static generateBlockHeaderAndProposal(data: HeaderData, options: ReimintBlockOptions, signer: ISigner): { header: BlockHeader; proposal: Proposal } {
     const header = BlockHeader.fromHeaderData(data, options);
-    if (options.signer) {
-      data = formatHeaderData(data);
+    data = formatHeaderData(data);
 
-      const round = options.round ?? defaultRound;
-      const commitRound = options.commitRound ?? round;
-      const POLRound = options.POLRound ?? defaultPOLRound;
-      const validaterSetSize = options.validatorSetSize ?? defaultValidaterSetSize;
-      const evidence = options.evidence ?? defaultEvidence;
+    const round = options.round ?? defaultRound;
+    const commitRound = options.commitRound ?? round;
+    const POLRound = options.POLRound ?? defaultPOLRound;
+    const validaterSetSize = options.validatorSetSize ?? defaultValidaterSetSize;
+    const evidence = options.evidence ?? defaultEvidence;
 
-      // calculate block hash
-      const headerHash = Reimint.calcBlockHeaderRawHash(header, evidence);
-      const proposal = new Proposal({
-        round,
-        POLRound,
-        height: header.number,
-        type: VoteType.Proposal,
-        hash: headerHash
-      });
-      proposal.signature = options.signer.sign(proposal.getMessageToSign());
-      const version = isEnableDAO(header._common) ? SignType.blsSignature : SignType.ecdsaSignature;
-      const extraData = new ExtraData(round, commitRound, POLRound, evidence, proposal, version, options?.voteSet);
-      return {
-        header: BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize({ validaterSetSize })]) }, options),
-        proposal
-      };
-    } else {
-      return { header };
-    }
+    // calculate block hash
+    const headerHash = Reimint.calcBlockHeaderRawHash(header, evidence);
+    // create proposal
+    const proposal = new Proposal({
+      round,
+      POLRound,
+      height: header.number,
+      type: VoteType.Proposal,
+      hash: headerHash
+    });
+    // generate signature
+    proposal.signature = signer.sign(proposal.getMessageToSign());
+    // determine the signature type
+    const version = isEnableDAO(header._common) ? SignType.blsSignature : SignType.ecdsaSignature;
+    const extraData = new ExtraData(round, commitRound, POLRound, evidence, proposal, version, options?.voteSet, options?.voteSet?.aggregatedSignature);
+    return {
+      header: BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize({ validaterSetSize })]) }, options),
+      proposal
+    };
   }
 
   /**
@@ -199,13 +193,11 @@ export class Reimint {
    * @param data - Block data
    * @param transactions - Transactions
    * @param options - Reimint block options
+   * @param signer - Signer
    * @returns Block and proposal
    */
-  static generateBlockAndProposal(data: HeaderData, transactions: TypedTransaction[], options: ReimintBlockOptions_SignerExists): { block: Block; proposal: Proposal };
-  static generateBlockAndProposal(data: HeaderData, transactions: TypedTransaction[], options: ReimintBlockOptions_SignerNotExists): { block: Block };
-  static generateBlockAndProposal(data: HeaderData, transactions: TypedTransaction[], options: ReimintBlockOptions): { block: Block; proposal?: Proposal };
-  static generateBlockAndProposal(data: HeaderData, transactions: TypedTransaction[], options: ReimintBlockOptions): { block: Block; proposal?: Proposal } {
-    const { header, proposal } = Reimint.generateBlockHeaderAndProposal(data, options);
+  static generateBlockAndProposal(data: HeaderData, transactions: TypedTransaction[], options: ReimintBlockOptions, signer: ISigner): { block: Block; proposal: Proposal } {
+    const { header, proposal } = Reimint.generateBlockHeaderAndProposal(data, options, signer);
     return { block: new Block(header, transactions, undefined, options), proposal };
   }
 
@@ -222,7 +214,7 @@ export class Reimint {
    */
   static generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], evidence: Evidence[], proposal: Proposal, commitRound: number, votes: VoteSet, options?: BlockOptions) {
     const version = isEnableDAO(options?.common!) ? SignType.blsSignature : SignType.ecdsaSignature;
-    const extraData = new ExtraData(proposal.round, commitRound, proposal.POLRound, evidence, proposal, version, votes);
+    const extraData = new ExtraData(proposal.round, commitRound, proposal.POLRound, evidence, proposal, version, votes, votes.aggregatedSignature);
     data = formatHeaderData(data);
     const header = BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize()]) }, options);
     return new Block(header, transactions, undefined, options);

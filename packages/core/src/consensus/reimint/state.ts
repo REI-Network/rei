@@ -457,14 +457,18 @@ export class StateMachine {
     pendingBlock.stop();
     const blockData = await pendingBlock.finalize({ round, evidence });
 
-    return Reimint.generateBlockAndProposal(blockData.header, blockData.transactions, {
-      signer,
-      round,
-      POLRound,
-      evidence,
-      validatorSetSize,
-      common
-    });
+    return Reimint.generateBlockAndProposal(
+      blockData.header,
+      blockData.transactions,
+      {
+        round,
+        POLRound,
+        evidence,
+        validatorSetSize,
+        common
+      },
+      signer
+    );
   }
 
   private decideProposal(height: BN, round: number) {

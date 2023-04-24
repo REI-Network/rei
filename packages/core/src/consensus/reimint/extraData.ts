@@ -239,7 +239,7 @@ export class ExtraData {
               round: commitRound
             };
             const msgHash = rlphash([intToBuffer(voteInfo.chainId), intToBuffer(voteInfo.type), bnToUnpaddedBuffer(voteInfo.height), intToBuffer(voteInfo.round), voteInfo.hash]);
-            voteSet!.acceptAggregateSignature(blsAggregateSignature!, bitArray, msgHash, voteInfo!.hash);
+            voteSet!.setAggregatedSignature(blsAggregateSignature!, bitArray, msgHash, voteInfo!.hash);
           }
         } else {
           throw new Error('invliad values');
@@ -360,6 +360,10 @@ export class ExtraData {
   }
 
   constructor(round: number, commitRound: number, POLRound: number, evidence: Evidence[], proposal: Proposal, version: SignType, voteSet?: VoteSet, blsAggregateSignature?: Buffer) {
+    if (voteSet && voteSet.signedMsgType !== VoteType.Precommit) {
+      throw new Error('invalid vote set type');
+    }
+
     this.round = round;
     this.commitRound = commitRound;
     this.POLRound = POLRound;
@@ -367,16 +371,7 @@ export class ExtraData {
     this.evidence = evidence;
     this.voteSet = voteSet;
     this.version = version;
-    if (voteSet && voteSet.signedMsgType !== VoteType.Precommit) {
-      throw new Error('invalid vote set type');
-    }
     this.blsAggregateSignature = blsAggregateSignature;
-    if (version === SignType.blsSignature && !blsAggregateSignature) {
-      const voteSetAggregateSignature = voteSet && voteSet.getAggregateSignature();
-      if (voteSetAggregateSignature !== undefined) {
-        this.blsAggregateSignature = Buffer.from(voteSetAggregateSignature);
-      }
-    }
     this.validateBasic();
   }
 
@@ -443,6 +438,7 @@ export class ExtraData {
   activeValidatorSet() {
     return this.voteSet?.valSet;
   }
+
   /**
    * Validate extradata round and POLRound
    */

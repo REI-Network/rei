@@ -306,7 +306,7 @@ export class VoteSet {
   signedMsgType: VoteType;
   valSet: ActiveValidatorSet;
   version: SignType;
-  aggregateSignature: Uint8Array | undefined;
+  aggregatedSignature: Buffer | undefined;
 
   votesBitArray: BitArray;
   votes: (Vote | undefined)[];
@@ -511,21 +511,21 @@ export class VoteSet {
     if (!this.hasTwoThirdsMajority()) {
       throw new Error('Not enough votes to aggregate signature');
     }
-    if (!this.aggregateSignature) {
+    if (!this.aggregatedSignature) {
       const bls = importBls();
-      this.aggregateSignature = bls.aggregateSignatures(this.votes.filter((v) => !!v).map((v) => v!.blsSignature!));
+      this.aggregatedSignature = Buffer.from(bls.aggregateSignatures(this.votes.filter((v) => !!v).map((v) => v!.blsSignature!)));
     }
-    return this.aggregateSignature;
+    return this.aggregatedSignature;
   }
 
   /**
-   * Verify and accept aggregate blsSignature
+   * Verify and set aggregated blsSignature
    * @param sig - bls signature
    * @param bitArray - bit array
    * @param msgHash - message hash
    * @param hash - block hash
    */
-  acceptAggregateSignature(sig: Uint8Array, bitArray: BitArray, msgHash: Buffer, hash: Buffer) {
+  setAggregatedSignature(sig: Buffer, bitArray: BitArray, msgHash: Buffer, hash: Buffer) {
     const bls = importBls();
     const len = bitArray.length;
     const pubKeys: Buffer[] = [];
@@ -547,7 +547,7 @@ export class VoteSet {
     }
 
     this.maj23 = hash;
-    this.aggregateSignature = sig;
+    this.aggregatedSignature = sig;
     this.votesBitArray = bitArray;
   }
 }

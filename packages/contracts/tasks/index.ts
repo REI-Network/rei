@@ -25,6 +25,28 @@ task('deploy-bls', 'Deploy validator bls contract')
     console.log('contract deployed at:', validatorBls.address);
   });
 
+task('register', 'Register bls public key')
+  .addParam('validatorInfo', 'format: address1:pk1,address2:pk2,...')
+  .setAction(async function (args, { ethers }) {
+    const ValidatorBls = await ethers.getContractFactory('ValidatorBls');
+    const validatorBls = ValidatorBls.attach('0x0000000000000000000000000000000000001009');
+    for (const info of (args.genesisInfo as string).split(',')) {
+      const index = info.indexOf(':');
+      if (index === -1) {
+        throw new Error('invalid genesis info');
+      }
+      const address = info.substring(0, index);
+      const pk = info.substring(index + 1);
+      if (!address.startsWith('0x') || address.length !== 42 || !pk.startsWith('0x') || pk.length !== 98) {
+        throw new Error('invalid genesis info');
+      }
+      const tx = await validatorBls.setBlsPublicKey(pk);
+      console.log('register for', address, 'tx sent:', tx.hash);
+      await tx.wait();
+      console.log('register for', address, 'finished');
+    }
+  });
+
 task('stake', 'Stake for validators')
   .addParam('validatorInfo', 'Validator address and ethers value, format: address1:value1,address2:value2,...')
   .setAction(async function (args, { ethers }) {

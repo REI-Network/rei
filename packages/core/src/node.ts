@@ -214,6 +214,7 @@ export class Node {
       await this.nodedb.open();
       await this.evidencedb.open();
 
+      await this.blsMngr.init();
       await this.blockchain.init();
 
       const latest = this.latestBlock.header;

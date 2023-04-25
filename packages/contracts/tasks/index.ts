@@ -28,19 +28,24 @@ task('deploy-bls', 'Deploy validator bls contract')
 task('register', 'Register bls public key')
   .addParam('validatorInfo', 'format: address1:pk1,address2:pk2,...')
   .setAction(async function (args, { ethers }) {
+    const signers = await ethers.getSigners();
     const ValidatorBls = await ethers.getContractFactory('ValidatorBls');
     const validatorBls = ValidatorBls.attach('0x0000000000000000000000000000000000001009');
     for (const info of (args.genesisInfo as string).split(',')) {
       const index = info.indexOf(':');
       if (index === -1) {
-        throw new Error('invalid genesis info');
+        throw new Error('invalid validator info');
       }
       const address = info.substring(0, index);
       const pk = info.substring(index + 1);
       if (!address.startsWith('0x') || address.length !== 42 || !pk.startsWith('0x') || pk.length !== 98) {
-        throw new Error('invalid genesis info');
+        throw new Error('invalid validator info');
       }
-      const tx = await validatorBls.setBlsPublicKey(pk);
+      const validators = signers.filter(({ address: _address }) => _address.toLocaleLowerCase() === address.toLocaleLowerCase());
+      if (validators.length === 0) {
+        throw new Error(`unknown validator: ${address}`);
+      }
+      const tx = await validatorBls.connect(validators[0]).setBlsPublicKey(pk);
       console.log('register for', address, 'tx sent:', tx.hash);
       await tx.wait();
       console.log('register for', address, 'finished');

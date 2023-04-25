@@ -92,7 +92,7 @@
     },
     {
       "name": "rei-dao",
-      "block": 5
+      "block": 50
     }
   ],
   "bootstrapNodes": []

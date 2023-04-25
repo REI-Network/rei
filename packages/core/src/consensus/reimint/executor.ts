@@ -259,7 +259,11 @@ export class ReimintExecutor implements Executor {
       } else {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, copy from parent');
         // if the parent validator set is a genesis validator set, we copy the set from the parent
-        validatorSet = new ValidatorSet(indexedValidatorSet, parentValidatorSet.active.copy());
+        if (!isEnableDAO(pendingCommon) && isEnableDAO(nextCommon)) {
+          validatorSet = new ValidatorSet(indexedValidatorSet, await ActiveValidatorSet.genesis(nextCommon, this.engine.getValidatorBls(vm, pendingBlock, nextCommon)));
+        } else {
+          validatorSet = new ValidatorSet(indexedValidatorSet, parentValidatorSet.active.copy());
+        }
       }
     } else {
       const maxCount = nextCommon.param('vm', 'maxValidatorsCount');
@@ -482,8 +486,8 @@ export class ReimintExecutor implements Executor {
     const indexedValidators = Array.from(validatorSet.indexed.indexed.values());
     logger.debug(
       'Reimint::processBlock, activeValidators:',
-      activeValidators.map(({ validator, priority }) => {
-        return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${isGenesis(validator, pendingCommon) ? '1' : validatorSet!.indexed.getVotingPower(validator).toString()}`;
+      activeValidators.map(({ validator, priority, blsPublicKey }) => {
+        return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${isGenesis(validator, pendingCommon) ? '1' : validatorSet!.indexed.getVotingPower(validator).toString()} | pk: ${!!blsPublicKey ? 'exsits' : "doesn't exist"}`;
       }),
       'next proposer:',
       validatorSet.active.proposer.toString()
@@ -491,8 +495,8 @@ export class ReimintExecutor implements Executor {
 
     logger.debug(
       'Reimint::processBlock, indexValidatorSet:',
-      indexedValidators.map(({ validator, votingPower }) => {
-        return `address: ${validator.toString()} | votingPower: ${votingPower.toString()} `;
+      indexedValidators.map(({ validator, votingPower, blsPublicKey }) => {
+        return `address: ${validator.toString()} | votingPower: ${votingPower.toString()} | pk: ${!!blsPublicKey ? 'exsits' : "doesn't exist"}`;
       }),
       'next proposer:',
       validatorSet.active.proposer.toString()

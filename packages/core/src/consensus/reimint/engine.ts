@@ -11,9 +11,9 @@ import { genesisStateByName } from '@rei-network/common/dist/genesisStates';
 import { logger, ignoreError } from '@rei-network/utils';
 import { Node } from '../../node';
 import { StateManager } from '../../stateManager';
-import { ValidatorSets } from './validatorSet';
+import { ActiveValidatorSet, ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
-import { getConsensusTypeByCommon, isEnableRemint, isEnableFreeStaking, loadInitData, isEnableHardfork2, isEnableBetterPOS } from '../../hardforks';
+import { getConsensusTypeByCommon, isEnableRemint, isEnableFreeStaking, loadInitData, isEnableHardfork2, isEnableBetterPOS, isEnableDAO } from '../../hardforks';
 import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
 import { BaseConsensusEngine } from '../engine';
 import { IProcessBlockResult } from './types';
@@ -145,7 +145,12 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     const vm = await this.node.getVM(header.stateRoot, header._common);
     const nextCommon = this.node.getCommon(block.header.number.addn(1));
     const sm = this.getStakeManager(vm, block, nextCommon);
-    const valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm);
+    let valSet: ActiveValidatorSet;
+    if (isEnableDAO(nextCommon)) {
+      valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm, this.getValidatorBls(vm, block, nextCommon));
+    } else {
+      valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm);
+    }
 
     await this.state.newBlockHeader(header, valSet, pendingBlock);
   }

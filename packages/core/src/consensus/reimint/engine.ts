@@ -143,11 +143,10 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     pendingBlock.complete(difficulty, gasLimit);
 
     const vm = await this.node.getVM(header.stateRoot, header._common);
-    const nextCommon = this.node.getCommon(block.header.number.addn(1));
-    const sm = this.getStakeManager(vm, block, nextCommon);
+    const sm = this.getStakeManager(vm, block, header._common);
     let valSet: ActiveValidatorSet;
-    if (isEnableDAO(nextCommon)) {
-      valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm, this.getValidatorBls(vm, block, nextCommon));
+    if (isEnableDAO(header._common)) {
+      valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm, this.getValidatorBls(vm, block, header._common));
     } else {
       valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm);
     }

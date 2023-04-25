@@ -31,7 +31,7 @@ task('register', 'Register bls public key')
     const signers = await ethers.getSigners();
     const ValidatorBls = await ethers.getContractFactory('ValidatorBls');
     const validatorBls = ValidatorBls.attach('0x0000000000000000000000000000000000001009');
-    for (const info of (args.genesisInfo as string).split(',')) {
+    for (const info of (args.validatorInfo as string).split(',')) {
       const index = info.indexOf(':');
       if (index === -1) {
         throw new Error('invalid validator info');
@@ -44,6 +44,10 @@ task('register', 'Register bls public key')
       const validators = signers.filter(({ address: _address }) => _address.toLocaleLowerCase() === address.toLocaleLowerCase());
       if (validators.length === 0) {
         throw new Error(`unknown validator: ${address}`);
+      }
+      const ethBalance = await ethers.provider.getBalance(validators[0].address);
+      if (ethBalance.eq(0)) {
+        throw new Error(`zero eth balance: ${validators[0].address}`);
       }
       const tx = await validatorBls.connect(validators[0]).setBlsPublicKey(pk);
       console.log('register for', address, 'tx sent:', tx.hash);
@@ -143,7 +147,7 @@ task('transfer', 'Transfer ethers to accounts')
   .addParam('accountsInfo', 'format: address1:value1,address2:value2,...')
   .setAction(async function (args, { ethers }) {
     const signer = (await ethers.getSigners())[0];
-    for (const info of (args.validatorInfo as string).split(',')) {
+    for (const info of (args.accountsInfo as string).split(',')) {
       const index = info.indexOf(':');
       if (index === -1) {
         throw new Error('invalid validator info');

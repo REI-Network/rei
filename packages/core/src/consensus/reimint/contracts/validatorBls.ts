@@ -30,9 +30,9 @@ export class ValidatorBls extends Contract {
     for (const receipt of receipts) {
       if (receipt.logs.length > 0) {
         for (const log of receipt.logs) {
-          if (log.address.equals(blsAddr.buf) && log.topics.length === 3 && log.topics[0].equals(event['SetBlsPublicKey'])) {
+          if (log.address.equals(blsAddr.buf) && log.topics.length === 2 && log.topics[0].equals(event['SetBlsPublicKey'])) {
             //get validator address and bls public key
-            changes.setBlsPublicKey(bufferToAddress(log.topics[1]), log.topics[2]);
+            changes.setBlsPublicKey(bufferToAddress(log.topics[1]), log.data.slice(64, 112));
           }
         }
       }

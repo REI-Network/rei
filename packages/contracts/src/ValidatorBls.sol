@@ -18,7 +18,7 @@ contract ValidatorBls is IValidatorBls {
      * @param validator Validator address.
      * @param blsPublicKey Validator bls public key.
      */
-    event SetBlsPublicKey(address indexed validator, bytes indexed blsPublicKey);
+    event SetBlsPublicKey(address indexed validator, bytes blsPublicKey);
 
     constructor(address[] memory genesisAddrs, bytes[] memory genesisBlsPublicKey) public {
         require(genesisAddrs.length == genesisBlsPublicKey.length, "ValidatorBls: invalid genesis validators");

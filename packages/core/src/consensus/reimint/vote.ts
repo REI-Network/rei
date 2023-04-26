@@ -542,7 +542,7 @@ export class VoteSet {
       }
     }
 
-    if (!bls.verifyAggregate(pubKeys, msgHash, sig) || sum.lt(this.valSet.totalVotingPower.muln(2).divn(3))) {
+    if (!bls.verifyAggregate(pubKeys, msgHash, sig) || sum.lte(this.valSet.totalVotingPower.muln(2).divn(3))) {
       return;
     }
 

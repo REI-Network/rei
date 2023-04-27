@@ -213,6 +213,20 @@ export class ActiveValidatorSet {
   }
 
   /**
+   * Get active validator bls public key by address
+   * @param validator - Address
+   * @returns Bls public key
+   */
+  getBlsPublicKey(validator: Address) {
+    const av = this.active.find(({ validator: _validator }) => _validator.equals(validator));
+    const pk = av?.blsPublicKey;
+    if (!pk) {
+      throw new Error('unknown validator, ' + validator.toString());
+    }
+    return pk;
+  }
+
+  /**
    * Increase proposer priority
    * @param times - Increase times
    */

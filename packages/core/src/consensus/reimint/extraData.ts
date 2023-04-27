@@ -7,7 +7,7 @@ import { isEnableDAO } from '../../hardforks';
 import { ActiveValidatorSet } from './validatorSet';
 import { Evidence, DuplicateVoteEvidence, EvidenceFactory } from './evpool';
 import { BitArray, Reimint } from '../reimint';
-import { Vote, VoteType, VoteSet, SignType } from './vote';
+import { Vote, VoteType, VoteSet, SignatureType } from './vote';
 import { Proposal } from './proposal';
 import * as v from './validate';
 import { ReimintConsensusEngine } from './engine';
@@ -65,7 +65,7 @@ function isEXVoteSetBitArray(ele: EXElement): ele is EXVoteSetBitArray {
   }
 }
 
-function isEXAggregateSignature(ele: EXElement): ele is EXAggregateSignature {
+function isEXAggregatedSignature(ele: EXElement): ele is EXAggregateSignature {
   return ele instanceof Buffer;
 }
 
@@ -92,7 +92,7 @@ export class ExtraData {
   readonly commitRound: number;
   readonly POLRound: number;
   readonly proposal: Proposal;
-  readonly version: SignType;
+  readonly version: SignatureType;
   readonly voteSet?: VoteSet;
 
   /**
@@ -143,8 +143,8 @@ export class ExtraData {
     let evidence!: Evidence[];
     let voteSet: VoteSet | undefined;
     let blsAggregateSignature: Buffer | undefined;
-    const signType = isEnableDAO(header._common) ? SignType.blsSignature : SignType.ecdsaSignature;
-    if (signType === SignType.blsSignature) {
+    const signatureType = isEnableDAO(header._common) ? SignatureType.BLS : SignatureType.ECDSA;
+    if (signatureType === SignatureType.BLS) {
       for (let i = 0; i < values.length; i++) {
         const value = values[i];
         if (i === 0) {
@@ -197,7 +197,7 @@ export class ExtraData {
              * but it doesn't matter,
              * because the validator voting power is same
              */
-            voteSet = new VoteSet(chainId, header.number, commitRound, VoteType.Precommit, valSet, signType);
+            voteSet = new VoteSet(chainId, header.number, commitRound, VoteType.Precommit, valSet, signatureType);
           }
         } else if (i === 2) {
           if (!isEXVote(value)) {
@@ -219,7 +219,7 @@ export class ExtraData {
             proposal.validateSignature(proposer);
           }
         } else if (i === 3) {
-          if (!isEXAggregateSignature(value)) {
+          if (!isEXAggregatedSignature(value)) {
             throw new Error('invliad values');
           }
           blsAggregateSignature = value;
@@ -244,7 +244,7 @@ export class ExtraData {
           throw new Error('invliad values');
         }
       }
-      return new ExtraData(round, commitRound, POLRound, evidence, proposal, signType, voteSet);
+      return new ExtraData(round, commitRound, POLRound, evidence, proposal, signatureType, voteSet);
     } else {
       if (valSet) {
         // validator size + 1(evidence list) + 1(round and POLRound list) + 1(proposal)
@@ -305,7 +305,7 @@ export class ExtraData {
              * but it doesn't matter,
              * because the validator voting power is same
              */
-            voteSet = new VoteSet(chainId, header.number, commitRound, VoteType.Precommit, valSet, signType);
+            voteSet = new VoteSet(chainId, header.number, commitRound, VoteType.Precommit, valSet, signatureType);
           }
         } else if (i === 2) {
           if (!isEXVote(value)) {
@@ -342,7 +342,7 @@ export class ExtraData {
                 index: i - 3,
                 chainId
               },
-              signType,
+              signatureType,
               signature
             );
             const conflicting = voteSet.addVote(vote);
@@ -354,11 +354,11 @@ export class ExtraData {
           }
         }
       }
-      return new ExtraData(round, commitRound, POLRound, evidence, proposal, signType, voteSet);
+      return new ExtraData(round, commitRound, POLRound, evidence, proposal, signatureType, voteSet);
     }
   }
 
-  constructor(round: number, commitRound: number, POLRound: number, evidence: Evidence[], proposal: Proposal, version: SignType, voteSet?: VoteSet) {
+  constructor(round: number, commitRound: number, POLRound: number, evidence: Evidence[], proposal: Proposal, version: SignatureType, voteSet?: VoteSet) {
     if (voteSet && voteSet.signedMsgType !== VoteType.Precommit) {
       throw new Error('invalid vote set type');
     }
@@ -387,7 +387,7 @@ export class ExtraData {
       raw.push([intToBuffer(this.round), intToBuffer(this.POLRound + 1), intToBuffer(this.commitRound)]);
     }
     raw.push(this.proposal.signature!);
-    if (this.version === SignType.ecdsaSignature) {
+    if (this.version === SignatureType.ECDSA) {
       if (this.voteSet) {
         const maj23Hash = this.voteSet.maj23!;
         for (const vote of this.voteSet.votes) {
@@ -405,7 +405,7 @@ export class ExtraData {
           raw.push([]);
         }
       }
-    } else if (this.version === SignType.blsSignature) {
+    } else {
       if (this.voteSet) {
         raw.push(this.voteSet.getAggregatedSignature());
         raw.push(this.voteSet.votesBitArray.raw());
@@ -417,8 +417,6 @@ export class ExtraData {
         const bitArray = new BitArray(validaterOptions.validaterSetSize);
         raw.push(bitArray.raw());
       }
-    } else {
-      throw new Error(`unknown version: ${this.version}`);
     }
     return raw;
   }
@@ -452,11 +450,11 @@ export class ExtraData {
    * Validate extra data
    */
   validate() {
-    if (this.version === SignType.ecdsaSignature) {
+    if (this.version === SignatureType.ECDSA) {
       if (!this.voteSet || this.voteSet.voteCount() === 0 || !this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash)) {
         throw new Error('invalid vote set');
       }
-    } else if (this.version === SignType.blsSignature) {
+    } else if (this.version === SignatureType.BLS) {
       if (!this.voteSet || !this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash)) {
         throw new Error('invalid vote set');
       }

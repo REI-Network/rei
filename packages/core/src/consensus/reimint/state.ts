@@ -11,7 +11,7 @@ import { Reimint } from './reimint';
 import { IProcessBlockResult, IStateMachineBackend, IStateMachineP2PBackend, ISigner, IConfig, IEvidencePool, IWAL, IDebug, RoundStepType } from './types';
 import { StateMachineMessage, StateMachineTimeout, StateMachineEndHeight, StateMachineMsg } from './stateMessages';
 import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from './messages';
-import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, DuplicateVotesError, SignType } from './vote';
+import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, DuplicateVotesError, SignatureType } from './vote';
 import { Proposal } from './proposal';
 import { Evidence, DuplicateVoteEvidence } from './evpool';
 import { TimeoutTicker } from './timeoutTicker';
@@ -277,9 +277,9 @@ export class StateMachine {
     }
 
     this.votes.addVote(vote, peerId);
-    logger.debug('StateMachine::addVote, vote(h,r,h,t,v):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, vote.validator().toString(), 'from:', peerId);
+    logger.debug('StateMachine::addVote, vote(h,r,h,t,v):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, vote.getValidator().toString(), 'from:', peerId);
 
-    if (peerId === '' && this.signer && vote.validator().equals(this.signer.address())) {
+    if (peerId === '' && this.signer && vote.getValidator().equals(this.signer.address())) {
       this.p2p.broadcastVote(vote);
       logger.debug('StateMachine::addVote, broadcastVote');
     } else {
@@ -373,13 +373,13 @@ export class StateMachine {
         // }
 
         const { voteA, voteB } = err;
-        if (!this.debug?.conflictVotes && this.signer && vote.validator().equals(this.signer.address())) {
+        if (!this.debug?.conflictVotes && this.signer && vote.getValidator().equals(this.signer.address())) {
           // found conflicting vote from ourselves
-          logger.warn('local conflicting(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
+          logger.warn('local conflicting(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.getValidator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
           return;
         }
 
-        logger.debug('StateMachine::tryAddVote, catch duplicate vote evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
+        logger.debug('StateMachine::tryAddVote, catch duplicate vote evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.getValidator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
         this.evpool.addEvidence(DuplicateVoteEvidence.fromVotes(voteA, voteB));
       } else if (err instanceof DuplicateVotesError) {
         logger.detail('StateMachine::tryAddVote, duplicate votes from:', peerId);
@@ -509,7 +509,7 @@ export class StateMachine {
       return;
     }
 
-    const voteVersion = isEnableDAO(this.pendingBlock!.common) && type === VoteType.Precommit ? SignType.blsSignature : SignType.ecdsaSignature;
+    const signatureType = isEnableDAO(this.pendingBlock!.common) && type === VoteType.Precommit ? SignatureType.BLS : SignatureType.ECDSA;
     const vote = new Vote(
       {
         chainId: this.chainId,
@@ -519,12 +519,9 @@ export class StateMachine {
         hash,
         index
       },
-      voteVersion
+      signatureType
     );
     vote.signature = this.signer.sign(vote.getMessageToSign());
-    if (vote.version === SignType.blsSignature) {
-      vote.blsSignature = this.signer.signBls(vote.getMessageToBlsSign());
-    }
 
     this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
 
@@ -538,12 +535,9 @@ export class StateMachine {
           hash: crypto.randomBytes(32),
           index
         },
-        voteVersion
+        signatureType
       );
       vote.signature = this.signer.sign(vote.getMessageToSign());
-      if (vote.version === SignType.blsSignature) {
-        vote.blsSignature = this.signer.signBls(vote.getMessageToBlsSign());
-      }
 
       this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
     }
@@ -917,7 +911,7 @@ export class StateMachine {
             }
 
             const vote = msg.vote;
-            logger.debug('StateMachine::replay, vote, height:', vote.height.toString(), 'round:', vote.round, 'type:', vote.type, 'hash:', bufferToHex(vote.hash), 'validator:', vote.validator().toString(), 'from:', message.peerId);
+            logger.debug('StateMachine::replay, vote, height:', vote.height.toString(), 'round:', vote.round, 'type:', vote.type, 'hash:', bufferToHex(vote.hash), 'validator:', vote.getValidator().toString(), 'from:', message.peerId);
           } else if (msg instanceof ProposalBlockMessage) {
             // create block instance from block buffer
             const block = msg.toBlock({ common: this.backend.getCommon(0), hardforkByBlockNumber: true });
@@ -1040,7 +1034,7 @@ export class StateMachine {
       this.lockedBlockResult = undefined;
       this.validRound = -1;
       this.validBlock = undefined;
-      const signType = isEnableDAO(pendingBlock.common) ? SignType.blsSignature : SignType.ecdsaSignature;
+      const signType = isEnableDAO(pendingBlock.common) ? SignatureType.BLS : SignatureType.ECDSA;
       this.votes = new HeightVoteSet(this.chainId, this.height, this.validators, signType);
       this.commitRound = -1;
       this.triggeredTimeoutPrecommit = false;

@@ -60,4 +60,8 @@ export class MockAccountManager {
     }
     return blsSecretKey;
   }
+
+  a2b(address: Address) {
+    return this.n2b(this.a2n(address));
+  }
 }

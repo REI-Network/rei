@@ -3,7 +3,7 @@ import { Block, BlockBuffer, BlockOptions } from '@rei-network/structure';
 import { RoundStepType } from '../types';
 import { Proposal } from '../proposal';
 import { BitArray, BitArrayRaw } from '../bitArray';
-import { Vote, VoteType, SignType } from '../vote';
+import { Vote, VoteType, SignatureType } from '../vote';
 import { DuplicateVoteEvidence } from '../evpool';
 import * as v from '../validate';
 
@@ -227,9 +227,6 @@ export class VoteMessage implements Message {
 
   validateBasic() {
     if (!this.vote.isSigned()) {
-      throw new Error('invalid vote');
-    }
-    if (this.vote.version == SignType.blsSignature && !this.vote.isBlsSigned()) {
       throw new Error('invalid vote');
     }
   }

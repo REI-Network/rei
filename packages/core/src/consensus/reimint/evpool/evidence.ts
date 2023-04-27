@@ -1,6 +1,6 @@
 import { keccak256, rlp, BN } from 'ethereumjs-util';
 import { ActiveValidatorSet } from '../validatorSet';
-import { Vote, SignType } from '../vote';
+import { Vote, SignatureType } from '../vote';
 
 export interface Evidence {
   height: BN;
@@ -52,7 +52,7 @@ export class DuplicateVoteEvidence implements Evidence {
 
   verify(valSet: ActiveValidatorSet) {
     const validator = valSet.getValidatorByIndex(this.voteA.index);
-    if (!validator.equals(this.voteA.validator())) {
+    if (!validator.equals(this.voteA.getValidator())) {
       throw new Error('invalid votes(validator index)');
     }
   }
@@ -76,13 +76,8 @@ export class DuplicateVoteEvidence implements Evidence {
     if (!this.voteA.isSigned() || !this.voteB.isSigned()) {
       throw new Error('invalid votes(unsigned)');
     }
-    if (this.voteA.version !== this.voteB.version) {
+    if (this.voteA.signatureType !== this.voteB.signatureType) {
       throw new Error('invalid votes(version)');
-    }
-    if (this.voteA.version == SignType.blsSignature) {
-      if (!this.voteA.isBlsSigned() || !this.voteB.isBlsSigned()) {
-        throw new Error('invalid votes(unBlsSigned)');
-      }
     }
     if (!this.voteA.height.eq(this.voteB.height) || this.voteA.round !== this.voteB.round || this.voteA.type !== this.voteB.type || this.voteA.chainId !== this.voteB.chainId || this.voteA.index !== this.voteB.index) {
       throw new Error('invalid votes(vote content)');
@@ -90,7 +85,7 @@ export class DuplicateVoteEvidence implements Evidence {
     if (this.voteA.hash.equals(this.voteB.hash)) {
       throw new Error('invalid votes(same hash)');
     }
-    if (!this.voteA.validator().equals(this.voteB.validator())) {
+    if (!this.voteA.getValidator().equals(this.voteB.getValidator())) {
       throw new Error('invalid votes(unequal validator)');
     }
     const [voteA, voteB] = DuplicateVoteEvidence.sortVote(this.voteA, this.voteB);

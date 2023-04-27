@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { expect } from 'chai';
-import { Address, BN, ecsign, intToBuffer } from 'ethereumjs-util';
-import { Vote, VoteType, SignType, VoteSet } from '../../src/consensus/reimint/vote';
+import { Address, BN } from 'ethereumjs-util';
+import { Vote, VoteType, SignatureType, VoteSet } from '../../src/consensus/reimint/vote';
 import { MockAccountManager } from '../util';
 import { Bls, SecretKey, initBls, importBls } from '@rei-network/bls';
 import { ActiveValidatorSet, ActiveValidator } from '../../src/consensus/reimint/validatorSet';
@@ -26,7 +26,7 @@ describe('BlsVote', () => {
     ]);
   });
 
-  it('should raw and fromSerializedVote successfully for blsSignature', () => {
+  it('should raw and fromSerializedVote successfully for bls signature', () => {
     const vote0 = new Vote(
       {
         height: new BN(1),
@@ -34,15 +34,12 @@ describe('BlsVote', () => {
         chainId: 100,
         type: VoteType.Precommit,
         hash: crypto.randomBytes(32),
-        index: 0
+        index: 0,
+        validator: accMngr.n2a('validator1')
       },
-      SignType.blsSignature
+      SignatureType.BLS
     );
-    const { r, s, v } = ecsign(vote0.getMessageToSign(), accMngr.n2p('validator1'));
-    const signature = Buffer.concat([r, s, intToBuffer(v - 27)]);
-    const blsSignature = accMngr.n2b('validator1').sign(vote0.getMessageToBlsSign());
-    vote0.signature = signature;
-    vote0.blsSignature = Buffer.from(blsSignature.toBytes());
+    vote0.signature = Buffer.from(accMngr.n2b('validator1').sign(vote0.getMessageToSign()).toBytes());
 
     const serializedVote = vote0.serialize();
 
@@ -53,13 +50,12 @@ describe('BlsVote', () => {
     expect(vote0.type).to.be.equal(vote1.type);
     expect(vote0.hash.compare(vote1.hash)).to.be.equal(0);
     expect(vote0.index).to.be.equal(vote1.index);
-    expect(vote0.version).to.be.equal(vote1.version);
+    expect(vote0.signatureType).to.be.equal(vote1.signatureType);
     expect(vote0.signature.compare(vote1.signature!)).to.be.equal(0);
-    expect(vote0.blsSignature.compare(vote1.blsSignature!)).to.be.equal(0);
-    expect(vote0.validator().equals(vote1.validator())).be.true;
+    expect(vote0.getValidator().equals(vote1.getValidator())).be.true;
   });
 
-  it('should get votset aggregate signature successfully for blsSingature', async () => {
+  it('should get vote set aggregated signature successfully for bls singature', async () => {
     const voteHash = crypto.randomBytes(32);
     const activeValidators: ActiveValidator[] = [];
     const votes: Vote[] = [];
@@ -67,7 +63,8 @@ describe('BlsVote', () => {
       activeValidators.push({
         validator: address,
         votingPower: new BN(100 * (index + 1)),
-        priority: new BN(0)
+        priority: new BN(0),
+        blsPublicKey: Buffer.from(accMngr.a2b(address).toPublicKey().toBytes())
       });
       votes.push(
         new Vote(
@@ -77,23 +74,21 @@ describe('BlsVote', () => {
             chainId: 100,
             type: VoteType.Precommit,
             hash: voteHash,
-            index: index
+            index: index,
+            validator: address
           },
-          SignType.blsSignature
+          SignatureType.BLS
         )
       );
     });
     const valSet = new ActiveValidatorSet(activeValidators);
-    const voteSet = new VoteSet(100, new BN(1), 0, VoteType.Precommit, valSet, SignType.blsSignature);
-    votes.forEach((vote, index) => {
-      const privateKey = Array.from(accMngr.nameToPrivKey.values())[index];
-      const signature = ecsign(vote.getMessageToSign(), privateKey);
-      vote.signature = Buffer.concat([signature.r, signature.s, intToBuffer(signature.v - 27)]);
-      vote.blsSignature = Buffer.from(accMngr.n2b(accMngr.addressToName.get(vote.validator())!).sign(vote.getMessageToBlsSign()).toBytes());
+    const voteSet = new VoteSet(100, new BN(1), 0, VoteType.Precommit, valSet, SignatureType.BLS);
+    votes.forEach((vote) => {
+      vote.signature = Buffer.from(accMngr.n2b(accMngr.addressToName.get(vote.getValidator())!).sign(vote.getMessageToSign()).toBytes());
       voteSet.addVote(vote);
     });
-    const aggregateSignature = voteSet.getAggregatedSignature();
+    const aggregatedSignature = voteSet.getAggregatedSignature();
     const pubKeys = secretKeys.map((sk) => sk.toPublicKey().toBytes());
-    expect(bls.verifyAggregate(pubKeys, votes[0].getMessageToBlsSign(), aggregateSignature!)).to.be.true;
+    expect(bls.verifyAggregate(pubKeys, votes[0].getMessageToSign(), aggregatedSignature)).to.be.true;
   });
 });

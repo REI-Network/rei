@@ -131,14 +131,14 @@ export class ReimintExecutor implements Executor {
     for (const ev of evidence) {
       if (ev instanceof DuplicateVoteEvidence) {
         const { voteA, voteB } = ev;
-        logger.debug('Reimint::afterApply, find evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.validator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
+        logger.debug('Reimint::afterApply, find evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.getValidator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
 
         let ethLogs: any[] | undefined;
         if (isEnableBetterPOS(pendingCommon)) {
           // if the contract has been upgraded, call the new slashing function
-          ethLogs = await parentStakeManager.slashV2(ev.voteA.validator(), SlashReason.DuplicateVote, ev.hash());
+          ethLogs = await parentStakeManager.slashV2(ev.voteA.getValidator(), SlashReason.DuplicateVote, ev.hash());
         } else {
-          ethLogs = await parentStakeManager.slash(ev.voteA.validator(), SlashReason.DuplicateVote);
+          ethLogs = await parentStakeManager.slash(ev.voteA.getValidator(), SlashReason.DuplicateVote);
         }
         if (ethLogs && ethLogs.length > 0) {
           logs = logs.concat(ethLogs.map((raw) => Log.fromValuesArray(raw)));

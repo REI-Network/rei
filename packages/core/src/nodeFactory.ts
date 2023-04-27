@@ -77,9 +77,6 @@ export abstract class NodeFactory {
         }
       }
     }
-    if (coinbase && !node.accMngr.hasUnlockedAccount(coinbase)) {
-      throw new Error(`Unlock coinbase account ${coinbase.toString()} failed!`);
-    }
 
     if (options.evm && options.evm !== EVMWorkMode.Binding && options.evm !== EVMWorkMode.JS) {
       throw new Error(`invalid evm work mode: ${options.evm}`);

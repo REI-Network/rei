@@ -291,13 +291,14 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    * {@link ConsensusEngine.generatePendingBlock}
    */
   generatePendingBlock(headerData: HeaderData, common: Common) {
-    if (this.node.accMngr.hasUnlockedAccount(this.signer.address())) {
-      const { block } = Reimint.generateBlockAndProposal(headerData, [], { common }, { signer: this.signer, signatureType: isEnableDAO(common) ? SignatureType.BLS : SignatureType.ECDSA });
+    const signatureType = isEnableDAO(common) ? SignatureType.BLS : SignatureType.ECDSA;
+    if ((signatureType === SignatureType.ECDSA && this.signer.ecdsaUnlocked()) || (signatureType === SignatureType.BLS && this.signer.blsPublicKey())) {
+      const { block } = Reimint.generateBlockAndProposal(headerData, [], { common }, { signer: this.signer, signatureType });
       return block;
-    } else {
-      const header = BlockHeader.fromHeaderData(headerData, { common });
-      return new Block(header, [], undefined, { common });
     }
+    // return empty block
+    const header = BlockHeader.fromHeaderData(headerData, { common });
+    return new Block(header, [], undefined, { common });
   }
 
   /**

@@ -515,18 +515,17 @@ export class VoteSet {
 
   /**
    * Verify and set aggregated blsSignature
-   * @param sig - bls signature
+   * @param signature - bls signature
    * @param bitArray - bit array
    * @param msgHash - message hash
-   * @param hash - block hash
+   * @param blockHash - block hash
    */
-  setAggregatedSignature(sig: Buffer, bitArray: BitArray, msgHash: Buffer, hash: Buffer) {
+  setAggregatedSignature(signature: Buffer, bitArray: BitArray, msgHash: Buffer, blockHash: Buffer) {
     const len = bitArray.length;
     const pubKeys: Buffer[] = [];
     let sum: BN = new BN(0);
     for (let i = 0; i < len; i++) {
-      const temp = bitArray.getIndex(i);
-      if (temp) {
+      if (bitArray.getIndex(i)) {
         const pubKey = this.valSet.activeValidators()[i].blsPublicKey;
         if (!pubKey) {
           throw new Error('missing validator public key');
@@ -536,12 +535,12 @@ export class VoteSet {
       }
     }
 
-    if (!importBls().verifyAggregate(pubKeys, msgHash, sig) || sum.lte(this.valSet.totalVotingPower.muln(2).divn(3))) {
+    if (!importBls().verifyAggregate(pubKeys, msgHash, signature) || sum.lte(this.valSet.totalVotingPower.muln(2).divn(3))) {
       return;
     }
 
-    this.maj23 = hash;
-    this.aggregatedSignature = sig;
+    this.maj23 = blockHash;
+    this.aggregatedSignature = signature;
     this.votesBitArray = bitArray;
   }
 }

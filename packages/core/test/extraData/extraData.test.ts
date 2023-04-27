@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { expect } from 'chai';
-import { Address, BN, ecsign, intToBuffer } from 'ethereumjs-util';
+import { Address, BN, intToBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { SecretKey, initBls, importBls } from '@rei-network/bls';
 import { BlockHeader } from '@rei-network/structure';
@@ -11,17 +11,17 @@ import { MockAccountManager } from '../util';
 
 describe('extraDataBls', () => {
   let accMngr: MockAccountManager;
-  let common: Common;
+  const common = new Common({ chain: 'rei-devnet', hardfork: 'rei-dao' });
   const secretKeys: SecretKey[] = [];
   const height = new BN(2);
+
   before(async () => {
-    common = new Common({ chain: 'rei-devnet', hardfork: 'rei-dao' });
     await initBls();
     secretKeys.push(importBls().SecretKey.fromKeygen());
     accMngr = new MockAccountManager([['validator1', Address.fromString('0x3289621709f5b35d09b4335e129907ac367a0593'), Buffer.from('d8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0', 'hex'), secretKeys[0]]]);
   });
 
-  it('should raw and fromSerializedVote successfully for blsSignature', async () => {
+  it('should raw and fromSerializedVote successfully for bls signature', async () => {
     const blockHeader = BlockHeader.fromHeaderData({ extraData: Buffer.alloc(32), number: height }, { common: common });
     const voteA = new Vote(
       {
@@ -83,15 +83,18 @@ describe('extraDataBls', () => {
     votes.forEach((vote) => {
       voteSet.addVote(vote);
     });
-    const proposal = new Proposal({
-      type: VoteType.Proposal,
-      height: height,
-      round: 0,
-      POLRound: 0,
-      hash: headerRawHash
-    });
-    const proposalSignature = ecsign(proposal.getMessageToSign(), accMngr.n2p('validator1')!);
-    proposal.signature = Buffer.concat([proposalSignature.r, proposalSignature.s, intToBuffer(proposalSignature.v - 27)]);
+    const proposal = new Proposal(
+      {
+        type: VoteType.Proposal,
+        height: height,
+        round: 0,
+        POLRound: 0,
+        hash: headerRawHash,
+        proposer: accMngr.n2a('validator1')
+      },
+      SignatureType.BLS
+    );
+    proposal.signature = Buffer.from(accMngr.n2b('validator1').sign(proposal.getMessageToSign()).toBytes());
     const extraData = new ExtraData(0, 0, 0, [evidence], proposal, SignatureType.BLS, voteSet);
     const serialized = extraData.serialize();
     const finalHeader = BlockHeader.fromHeaderData({ extraData: Buffer.concat([blockHeader.extraData as Buffer, serialized]), number: height }, { common: common });

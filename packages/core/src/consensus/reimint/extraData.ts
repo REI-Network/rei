@@ -131,7 +131,7 @@ export class ExtraData {
   static fromValuesArray(values: EXElements, { header, valSet, chainId }: ExtraDataOptions) {
     // the additional extra data should include at lease 3 elements(EXEvidenceList + EXRoundAndPOLRound, EXVote(proposal))
     if (values.length < 3) {
-      throw new Error('invliad values');
+      throw new Error('invalid values');
     }
 
     let round!: number;
@@ -143,222 +143,158 @@ export class ExtraData {
     let evidence!: Evidence[];
     let voteSet: VoteSet | undefined;
     let aggregatedSignature: Buffer | undefined;
+
+    // decide signature type by common object
     const signatureType = isEnableDAO(header._common) ? SignatureType.BLS : SignatureType.ECDSA;
-    if (signatureType === SignatureType.BLS) {
-      for (let i = 0; i < values.length; i++) {
-        const value = values[i];
-        if (i === 0) {
-          if (!isEXEvidenceList(value)) {
-            throw new Error('invliad values');
-          }
 
-          const maxEvidenceCount = header._common.param('vm', 'maxEvidenceCount');
-          if (typeof maxEvidenceCount !== 'number') {
-            throw new Error('invalid maxEvidenceCount');
-          }
-
-          if (value.length > maxEvidenceCount) {
-            throw new Error('invalid evidence count');
-          }
-
-          evidence = value.map((buf) => {
-            const ev = EvidenceFactory.fromValuesArray(buf);
-            return ev;
-          });
-
-          // calculate block hash
-          headerHash = Reimint.calcBlockHeaderRawHash(header, evidence);
-        } else if (i === 1) {
-          if (!isEXRoundAndPOLRound(value)) {
-            throw new Error('invliad values');
-          }
-          round = bufferToInt(value[0]);
-          POLRound = bufferToInt(value[1]) - 1;
-          if (value.length === 3) {
-            commitRound = bufferToInt(value[2]);
-            if (commitRound === round) {
-              throw new Error('commitRound equals round, but round list length is 3');
-            }
-          } else {
-            commitRound = round;
-          }
-
-          if (valSet) {
-            // increase validator set by round
-            valSet = valSet.copy();
-            valSet.incrementProposerPriority(round);
-
-            // get proposer address by round
-            proposer = valSet.proposer;
-
-            /**
-             * create a vote set,
-             * commitRound and valSet.round may be different,
-             * but it doesn't matter,
-             * because the validator voting power is same
-             */
-            voteSet = new VoteSet(chainId, header.number, commitRound, VoteType.Precommit, valSet, signatureType);
-          }
-        } else if (i === 2) {
-          if (!isEXVote(value)) {
-            throw new Error('invliad values');
-          }
-
-          const signature = value;
-          proposal = new Proposal(
-            {
-              round,
-              POLRound,
-              height: header.number,
-              type: VoteType.Proposal,
-              hash: headerHash,
-              proposer
-            },
-            signatureType,
-            signature
-          );
-          if (valSet) {
-            proposal.validateSignature(valSet);
-          }
-        } else if (i === 3) {
-          if (!isEXAggregatedSignature(value)) {
-            throw new Error('invliad values');
-          }
-          aggregatedSignature = value;
-        } else if (i === 4) {
-          if (!isEXVoteSetBitArray(value)) {
-            throw new Error('invliad values');
-          }
-
-          if (valSet) {
-            const bitArray = BitArray.fromValuesArray(value);
-            const voteInfo = {
-              chainId: chainId,
-              type: VoteType.Precommit,
-              hash: headerHash,
-              height: header.number,
-              round: commitRound
-            };
-            const msgHash = rlphash([intToBuffer(voteInfo.chainId), intToBuffer(voteInfo.type), bnToUnpaddedBuffer(voteInfo.height), intToBuffer(voteInfo.round), voteInfo.hash]);
-            voteSet!.setAggregatedSignature(aggregatedSignature!, bitArray, msgHash, voteInfo!.hash);
-          }
-        } else {
-          throw new Error('invliad values');
+    // add a ECDSA vote to vote set
+    const addECDSAVote = (value: EXElement, index: number) => {
+      if (isEXVote(value)) {
+        if (!voteSet) {
+          return;
         }
+
+        const signature = value;
+        const vote = new Vote(
+          {
+            type: VoteType.Precommit,
+            hash: headerHash,
+            height: header.number,
+            round: commitRound,
+            index: index - 3,
+            chainId
+          },
+          signatureType,
+          signature
+        );
+        const conflicting = voteSet.addVote(vote);
+        if (conflicting) {
+          throw new Error('conflicting vote');
+        }
+      } else if (!isEXEmptyVote(value)) {
+        throw new Error('invalid values');
       }
-      return new ExtraData(round, commitRound, POLRound, evidence, proposal, signatureType, voteSet);
-    } else {
-      if (valSet) {
+    };
+
+    // check values array length
+    if (valSet) {
+      if (signatureType === SignatureType.ECDSA) {
         // validator size + 1(evidence list) + 1(round and POLRound list) + 1(proposal)
         if (values.length !== valSet.length + 3) {
           throw new Error('invalid values length');
         }
-      }
-
-      for (let i = 0; i < values.length; i++) {
-        const value = values[i];
-        if (i === 0) {
-          if (!isEXEvidenceList(value)) {
-            throw new Error('invliad values');
-          }
-
-          const maxEvidenceCount = header._common.param('vm', 'maxEvidenceCount');
-          if (typeof maxEvidenceCount !== 'number') {
-            throw new Error('invalid maxEvidenceCount');
-          }
-
-          if (value.length > maxEvidenceCount) {
-            throw new Error('invalid evidence count');
-          }
-
-          evidence = value.map((buf) => {
-            const ev = EvidenceFactory.fromValuesArray(buf);
-            return ev;
-          });
-
-          // calculate block hash
-          headerHash = Reimint.calcBlockHeaderRawHash(header, evidence);
-        } else if (i === 1) {
-          if (!isEXRoundAndPOLRound(value)) {
-            throw new Error('invliad values');
-          }
-          round = bufferToInt(value[0]);
-          POLRound = bufferToInt(value[1]) - 1;
-          if (value.length === 3) {
-            commitRound = bufferToInt(value[2]);
-            if (commitRound === round) {
-              throw new Error('commitRound equals round, but round list length is 3');
-            }
-          } else {
-            commitRound = round;
-          }
-
-          if (valSet) {
-            // increase validator set by round
-            valSet = valSet.copy();
-            valSet.incrementProposerPriority(round);
-
-            // get proposer address by round
-            proposer = valSet.proposer;
-
-            /**
-             * create a vote set,
-             * commitRound and valSet.round may be different,
-             * but it doesn't matter,
-             * because the validator voting power is same
-             */
-            voteSet = new VoteSet(chainId, header.number, commitRound, VoteType.Precommit, valSet, signatureType);
-          }
-        } else if (i === 2) {
-          if (!isEXVote(value)) {
-            throw new Error('invliad values');
-          }
-
-          const signature = value;
-          proposal = new Proposal(
-            {
-              round,
-              POLRound,
-              height: header.number,
-              type: VoteType.Proposal,
-              hash: headerHash
-            },
-            signatureType,
-            signature
-          );
-          if (valSet) {
-            proposal.validateSignature(valSet);
-          }
-        } else {
-          if (isEXVote(value)) {
-            if (!voteSet) {
-              break;
-            }
-
-            const signature = value;
-            const vote = new Vote(
-              {
-                type: VoteType.Precommit,
-                hash: headerHash,
-                height: header.number,
-                round: commitRound,
-                index: i - 3,
-                chainId
-              },
-              signatureType,
-              signature
-            );
-            const conflicting = voteSet.addVote(vote);
-            if (conflicting) {
-              throw new Error('conflicting vote');
-            }
-          } else if (!isEXEmptyVote(value)) {
-            throw new Error('invliad values');
-          }
+      } else {
+        // 1(evidence list) + 1(round and POLRound list) + 1(proposal) + 1(aggregatedSignature) + 1(bitArray)
+        if (values.length !== 5) {
+          throw new Error('invalid values length');
         }
       }
-      return new ExtraData(round, commitRound, POLRound, evidence, proposal, signatureType, voteSet);
     }
+
+    for (let i = 0; i < values.length; i++) {
+      const value = values[i];
+      if (i === 0) {
+        if (!isEXEvidenceList(value)) {
+          throw new Error('invalid values');
+        }
+
+        const maxEvidenceCount = header._common.param('vm', 'maxEvidenceCount');
+        if (typeof maxEvidenceCount !== 'number') {
+          throw new Error('invalid maxEvidenceCount');
+        }
+
+        if (value.length > maxEvidenceCount) {
+          throw new Error('invalid evidence count');
+        }
+
+        // create evidences from values array
+        evidence = value.map((buf) => EvidenceFactory.fromValuesArray(buf));
+
+        // calculate block hash
+        headerHash = Reimint.calcBlockHeaderRawHash(header, evidence);
+      } else if (i === 1) {
+        if (!isEXRoundAndPOLRound(value)) {
+          throw new Error('invalid values');
+        }
+        round = bufferToInt(value[0]);
+        POLRound = bufferToInt(value[1]) - 1;
+        if (value.length === 3) {
+          commitRound = bufferToInt(value[2]);
+          if (commitRound === round) {
+            throw new Error('commitRound equals round, but round list length is 3');
+          }
+        } else {
+          commitRound = round;
+        }
+
+        if (valSet) {
+          // increase validator set by round
+          valSet = valSet.copy();
+          valSet.incrementProposerPriority(round);
+
+          // get proposer address by round
+          proposer = valSet.proposer;
+
+          /**
+           * create a vote set,
+           * commitRound and valSet.round may be different,
+           * but it doesn't matter,
+           * because the validator voting power is same
+           */
+          voteSet = new VoteSet(chainId, header.number, commitRound, VoteType.Precommit, valSet, signatureType);
+        }
+      } else if (i === 2) {
+        if (!isEXVote(value)) {
+          throw new Error('invalid values');
+        }
+
+        const signature = value;
+        proposal = new Proposal(
+          {
+            round,
+            POLRound,
+            height: header.number,
+            type: VoteType.Proposal,
+            hash: headerHash,
+            proposer: signatureType === SignatureType.BLS ? proposer : undefined
+          },
+          signatureType,
+          signature
+        );
+        if (valSet) {
+          proposal.validateSignature(valSet);
+        }
+      } else if (i === 3) {
+        if (signatureType === SignatureType.ECDSA) {
+          addECDSAVote(value, i);
+        } else {
+          if (!isEXAggregatedSignature(value)) {
+            throw new Error('invalid values');
+          }
+          aggregatedSignature = value;
+        }
+      } else if (i === 4) {
+        if (signatureType === SignatureType.ECDSA) {
+          addECDSAVote(value, i);
+        } else {
+          if (!isEXVoteSetBitArray(value)) {
+            throw new Error('invalid values');
+          }
+
+          if (valSet) {
+            const msgHash = rlphash([intToBuffer(chainId), intToBuffer(VoteType.Precommit), bnToUnpaddedBuffer(header.number), intToBuffer(commitRound), headerHash]);
+            voteSet!.setAggregatedSignature(aggregatedSignature!, BitArray.fromValuesArray(value), msgHash, headerHash);
+          }
+        }
+      } else {
+        if (signatureType === SignatureType.ECDSA) {
+          addECDSAVote(value, i);
+        } else {
+          throw new Error('invalid values');
+        }
+      }
+    }
+    return new ExtraData(round, commitRound, POLRound, evidence, proposal, signatureType, voteSet);
   }
 
   constructor(round: number, commitRound: number, POLRound: number, evidence: Evidence[], proposal: Proposal, version: SignatureType, voteSet?: VoteSet) {

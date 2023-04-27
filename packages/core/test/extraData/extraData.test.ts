@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { expect } from 'chai';
-import { Address, BN, intToBuffer } from 'ethereumjs-util';
+import { Address, BN } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { SecretKey, initBls, importBls } from '@rei-network/bls';
 import { BlockHeader } from '@rei-network/structure';

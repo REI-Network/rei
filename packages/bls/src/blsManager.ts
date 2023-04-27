@@ -39,7 +39,7 @@ export class BlsManager {
    * Get bls public key
    * @returns bls public key
    */
-  getPublicKey() {
+  getPublicKey(): PublicKey | undefined {
     return this.publicKey;
   }
 

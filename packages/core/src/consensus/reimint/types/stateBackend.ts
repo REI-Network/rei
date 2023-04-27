@@ -9,8 +9,10 @@ import { Vote } from '../vote';
 
 export interface ISigner {
   address(): Address;
-  sign(msg: Buffer): Buffer;
-  signBls(msg: Buffer): Buffer;
+  ecdsaUnlocked(): boolean;
+  ecdsaSign(msg: Buffer): Buffer;
+  blsPublicKey(): Buffer | undefined;
+  blsSign(msg: Buffer): Buffer;
 }
 
 export interface IConfig {

@@ -25,6 +25,7 @@ import { WAL } from './wal';
 import { ReimintExecutor } from './executor';
 import { ExtraData } from './extraData';
 import { EvidenceCollector } from './evidenceCollector';
+import { SignatureType } from './vote';
 
 export class SimpleNodeSigner {
   readonly node: Node;
@@ -37,20 +38,28 @@ export class SimpleNodeSigner {
     return this.node.getCurrentEngine().coinbase;
   }
 
-  sign(msg: Buffer): Buffer {
+  ecdsaUnlocked(): boolean {
     const coinbase = this.node.getCurrentEngine().coinbase;
     if (isEmptyAddress(coinbase)) {
-      throw new Error('empty coinbase');
+      return false;
     }
-    const signature = ecsign(msg, this.node.accMngr.getPrivateKey(coinbase));
+    return this.node.accMngr.hasUnlockedAccount(coinbase);
+  }
+
+  ecdsaSign(msg: Buffer): Buffer {
+    const signature = ecsign(msg, this.node.accMngr.getPrivateKey(this.node.getCurrentEngine().coinbase));
     return Buffer.concat([signature.r, signature.s, intToBuffer(signature.v - 27)]);
   }
 
-  signBls(msg: Buffer): Buffer {
+  blsPublicKey(): Buffer | undefined {
     const pubKey = this.node.blsMngr.getPublicKey();
     if (!pubKey) {
-      throw new Error('empty bls public key');
+      return pubKey;
     }
+    return Buffer.from(pubKey.toBytes());
+  }
+
+  blsSign(msg: Buffer): Buffer {
     return Buffer.from(this.node.blsMngr.signMessage(msg).toBytes());
   }
 }
@@ -283,7 +292,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
    */
   generatePendingBlock(headerData: HeaderData, common: Common) {
     if (this.node.accMngr.hasUnlockedAccount(this.signer.address())) {
-      const { block } = Reimint.generateBlockAndProposal(headerData, [], { common }, this.signer);
+      const { block } = Reimint.generateBlockAndProposal(headerData, [], { common }, { signer: this.signer, signatureType: isEnableDAO(common) ? SignatureType.BLS : SignatureType.ECDSA });
       return block;
     } else {
       const header = BlockHeader.fromHeaderData(headerData, { common });

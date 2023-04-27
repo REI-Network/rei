@@ -142,7 +142,7 @@ export class ExtraData {
     let proposal!: Proposal;
     let evidence!: Evidence[];
     let voteSet: VoteSet | undefined;
-    let blsAggregateSignature: Buffer | undefined;
+    let aggregatedSignature: Buffer | undefined;
     const signatureType = isEnableDAO(header._common) ? SignatureType.BLS : SignatureType.ECDSA;
     if (signatureType === SignatureType.BLS) {
       for (let i = 0; i < values.length; i++) {
@@ -211,18 +211,20 @@ export class ExtraData {
               POLRound,
               height: header.number,
               type: VoteType.Proposal,
-              hash: headerHash
+              hash: headerHash,
+              proposer
             },
+            signatureType,
             signature
           );
-          if (proposer) {
-            proposal.validateSignature(proposer);
+          if (valSet) {
+            proposal.validateSignature(valSet);
           }
         } else if (i === 3) {
           if (!isEXAggregatedSignature(value)) {
             throw new Error('invliad values');
           }
-          blsAggregateSignature = value;
+          aggregatedSignature = value;
         } else if (i === 4) {
           if (!isEXVoteSetBitArray(value)) {
             throw new Error('invliad values');
@@ -238,7 +240,7 @@ export class ExtraData {
               round: commitRound
             };
             const msgHash = rlphash([intToBuffer(voteInfo.chainId), intToBuffer(voteInfo.type), bnToUnpaddedBuffer(voteInfo.height), intToBuffer(voteInfo.round), voteInfo.hash]);
-            voteSet!.setAggregatedSignature(blsAggregateSignature!, bitArray, msgHash, voteInfo!.hash);
+            voteSet!.setAggregatedSignature(aggregatedSignature!, bitArray, msgHash, voteInfo!.hash);
           }
         } else {
           throw new Error('invliad values');
@@ -321,10 +323,11 @@ export class ExtraData {
               type: VoteType.Proposal,
               hash: headerHash
             },
+            signatureType,
             signature
           );
-          if (proposer) {
-            proposal.validateSignature(proposer);
+          if (valSet) {
+            proposal.validateSignature(valSet);
           }
         } else {
           if (isEXVote(value)) {

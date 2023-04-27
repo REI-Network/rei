@@ -1,5 +1,7 @@
-import { Address, BN, intToBuffer, ecsign, ecrecover, rlphash, bnToUnpaddedBuffer, rlp, bufferToInt } from 'ethereumjs-util';
-import { VoteType } from './vote';
+import { Address, BN, intToBuffer, ecsign, ecrecover, rlphash, bnToUnpaddedBuffer, rlp, bufferToInt, toBuffer } from 'ethereumjs-util';
+import { importBls } from '@rei-network/bls';
+import { ActiveValidatorSet } from './validatorSet';
+import { VoteType, SignatureType } from './vote';
 import * as v from './validate';
 
 export interface ProposalData {
@@ -8,6 +10,7 @@ export interface ProposalData {
   round: number;
   POLRound: number;
   hash: Buffer;
+  proposer?: Address;
 }
 
 export class Proposal {
@@ -16,8 +19,16 @@ export class Proposal {
   readonly round: number;
   readonly POLRound: number;
   readonly hash: Buffer;
+  readonly proposer?: Address;
+
+  readonly signatureType: SignatureType;
   private _signature?: Buffer;
 
+  /**
+   * Create a new proposal from a serialized proposal.
+   * @param serialized - Serialized proposal
+   * @returns Proposal
+   */
   static fromSerializedProposal(serialized: Buffer) {
     const values = rlp.decode(serialized);
     if (!Array.isArray(values)) {
@@ -26,70 +37,156 @@ export class Proposal {
     return Proposal.fromValuesArray(values as any);
   }
 
+  /**
+   * Create a new proposal from values array
+   * @param values - Values array
+   * @returns Proposal
+   */
   static fromValuesArray(values: Buffer[]) {
-    if (values.length !== 6) {
-      throw new Error('invalid proposal');
+    if (values.length === 6) {
+      const [type, height, round, POLRound, hash, signature] = values;
+      return new Proposal(
+        {
+          type: bufferToInt(type),
+          height: new BN(height),
+          round: bufferToInt(round),
+          POLRound: bufferToInt(POLRound) - 1,
+          hash
+        },
+        SignatureType.ECDSA,
+        signature
+      );
+    } else if (values.length === 7) {
+      const [type, height, round, POLRound, hash, proposer, signature] = values;
+      return new Proposal(
+        {
+          type: bufferToInt(type),
+          height: new BN(height),
+          round: bufferToInt(round),
+          POLRound: bufferToInt(POLRound) - 1,
+          hash,
+          proposer: new Address(proposer)
+        },
+        SignatureType.BLS,
+        signature
+      );
+    } else {
+      throw new Error('invalid values length');
     }
-
-    const [type, height, round, POLRound, hash, signature] = values;
-
-    return new Proposal(
-      {
-        type: bufferToInt(type),
-        height: new BN(height),
-        round: bufferToInt(round),
-        POLRound: bufferToInt(POLRound) - 1,
-        hash
-      },
-      signature
-    );
   }
 
-  constructor(data: ProposalData, signature?: Buffer) {
+  constructor(data: ProposalData, signatureType: SignatureType, signature?: Buffer) {
     this.type = data.type;
     this.height = data.height.clone();
     this.round = data.round;
     this.POLRound = data.POLRound;
     this.hash = data.hash;
+    this.proposer = data.proposer;
+    this.signatureType = signatureType;
     this._signature = signature;
     this.validateBasic();
   }
 
+  /**
+   * Get signature
+   */
   get signature(): Buffer | undefined {
     return this._signature;
   }
 
+  /**
+   * Set signature
+   */
   set signature(signature: Buffer | undefined) {
     if (signature !== undefined) {
-      v.validateSignature(signature);
+      if (this.signatureType === SignatureType.ECDSA) {
+        v.validateSignature(signature);
+      } else {
+        v.validateBlsSignature(signature);
+      }
       this._signature = signature;
     }
   }
 
+  /**
+   * Get message to sign
+   * @returns Message to sign
+   */
   getMessageToSign() {
     return rlphash([intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.POLRound + 1), this.hash]);
   }
 
+  /**
+   * Get proposer address
+   * @returns Proposer address
+   */
+  getProposer() {
+    if (!this.isSigned()) {
+      throw new Error('missing signature');
+    }
+    if (this.signatureType === SignatureType.ECDSA) {
+      const r = this._signature!.slice(0, 32);
+      const s = this._signature!.slice(32, 64);
+      const v = new BN(this._signature!.slice(64, 65)).addn(27);
+      return Address.fromPublicKey(ecrecover(this.getMessageToSign(), v, r, s));
+    } else {
+      if (!this.proposer) {
+        throw new Error('missing proposer');
+      }
+      return this.proposer;
+    }
+  }
+
+  /**
+   * Is vote signed
+   * @returns True if vote is signed, false otherwise
+   */
   isSigned() {
     return this._signature && this._signature.length > 0;
   }
 
+  /**
+   * Sign proposal
+   * @param privateKey - ECDSA or BLS private key
+   */
   sign(privateKey: Buffer) {
-    const { r, s, v } = ecsign(this.getMessageToSign(), privateKey);
-    this.signature = Buffer.concat([r, s, intToBuffer(v - 27)]);
+    if (this.signatureType === SignatureType.ECDSA) {
+      const { r, s, v } = ecsign(this.getMessageToSign(), privateKey);
+      this.signature = Buffer.concat([r, s, intToBuffer(v - 27)]);
+    } else {
+      this.signature = Buffer.from(importBls().sign(privateKey, this.getMessageToSign()));
+    }
   }
 
+  /**
+   * Proposal raw data
+   * @returns Raw data
+   */
   raw() {
     if (!this.isSigned()) {
       throw new Error('missing signature');
     }
-    return [intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.POLRound + 1), this.hash, this._signature!];
+    if (this.signatureType === SignatureType.ECDSA) {
+      return [intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.POLRound + 1), this.hash, this._signature!];
+    } else {
+      if (!this.proposer) {
+        throw new Error('missing proposer');
+      }
+      return [intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.POLRound + 1), this.hash, toBuffer(this.proposer), this._signature!];
+    }
   }
 
+  /**
+   * Proposal serialized data
+   * @returns Serialized data
+   */
   serialize() {
     return rlp.encode(this.raw());
   }
 
+  /**
+   * Validate proposal basicly
+   */
   validateBasic() {
     if (this.type !== VoteType.Proposal) {
       throw new Error('invalid vote type');
@@ -99,24 +196,29 @@ export class Proposal {
     v.validatePOLRound(this.POLRound);
     v.validateHash(this.hash);
     if (this.isSigned()) {
-      v.validateSignature(this._signature!);
+      if (this.signatureType === SignatureType.ECDSA) {
+        v.validateSignature(this._signature!);
+      } else {
+        v.validateBlsSignature(this._signature!);
+      }
     }
   }
 
-  validateSignature(proposer: Address) {
-    const recoveredProposer = this.proposer();
-    if (!proposer.equals(recoveredProposer)) {
-      throw new Error('invalid signature');
-    }
-  }
-
-  proposer() {
+  /**
+   * Validate proposal signature
+   * @param valSet - Active validator set
+   */
+  validateSignature(valSet: ActiveValidatorSet) {
     if (!this.isSigned()) {
       throw new Error('missing signature');
     }
-    const r = this._signature!.slice(0, 32);
-    const s = this._signature!.slice(32, 64);
-    const v = new BN(this._signature!.slice(64, 65)).addn(27);
-    return Address.fromPublicKey(ecrecover(this.getMessageToSign(), v, r, s));
+    if (!valSet.proposer.equals(this.getProposer())) {
+      throw new Error('invalid signature');
+    }
+    if (this.signatureType === SignatureType.BLS) {
+      if (!importBls().verify(valSet.getBlsPublicKey(valSet.proposer), this.getMessageToSign(), this.signature!)) {
+        throw new Error('invalid signature');
+      }
+    }
   }
 }

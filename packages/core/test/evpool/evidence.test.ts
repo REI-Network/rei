@@ -10,8 +10,6 @@ const accMngr = new MockAccountManager([
   ['bar', Address.fromString('0xd1e52f6eacbb95f5f8512ff129cbd6360e549b0b'), Buffer.from('db0558cc5f24dd09c390a25c7958a678e7efa0f286053da5df53dcecdba2a13c', 'hex')]
 ]);
 
-const version = SignatureType.ECDSA;
-
 class MockValidatorSet {
   private validators: Address[];
 
@@ -46,7 +44,7 @@ describe('DuplicateVoteEvidence', () => {
         hash: crypto.randomBytes(32),
         index: 0
       },
-      version
+      SignatureType.ECDSA
     );
 
     const vote2 = new Vote(
@@ -58,7 +56,7 @@ describe('DuplicateVoteEvidence', () => {
         hash: crypto.randomBytes(32),
         index: 0
       },
-      version
+      SignatureType.ECDSA
     );
 
     shouldFailed(() => {
@@ -76,7 +74,7 @@ describe('DuplicateVoteEvidence', () => {
         hash: crypto.randomBytes(32),
         index: 0
       },
-      version
+      SignatureType.ECDSA
     );
     vote1.sign(accMngr.n2p('foo'));
 
@@ -89,7 +87,7 @@ describe('DuplicateVoteEvidence', () => {
         hash: crypto.randomBytes(32),
         index: 0
       },
-      version
+      SignatureType.ECDSA
     );
     vote2.sign(accMngr.n2p('foo'));
 
@@ -109,7 +107,7 @@ describe('DuplicateVoteEvidence', () => {
         hash: hash,
         index: 0
       },
-      version
+      SignatureType.ECDSA
     );
     vote1.sign(accMngr.n2p('foo'));
 
@@ -122,7 +120,7 @@ describe('DuplicateVoteEvidence', () => {
         hash: hash,
         index: 0
       },
-      version
+      SignatureType.ECDSA
     );
     vote2.sign(accMngr.n2p('foo'));
 
@@ -141,7 +139,7 @@ describe('DuplicateVoteEvidence', () => {
         hash: crypto.randomBytes(32),
         index: 0
       },
-      version
+      SignatureType.ECDSA
     );
     vote1.sign(accMngr.n2p('foo'));
 
@@ -154,7 +152,7 @@ describe('DuplicateVoteEvidence', () => {
         hash: crypto.randomBytes(32),
         index: 0
       },
-      version
+      SignatureType.ECDSA
     );
     vote2.sign(accMngr.n2p('bar'));
 
@@ -173,7 +171,7 @@ describe('DuplicateVoteEvidence', () => {
         hash: crypto.randomBytes(32),
         index: 0
       },
-      version
+      SignatureType.ECDSA
     );
     vote1.sign(accMngr.n2p('foo'));
 
@@ -186,7 +184,7 @@ describe('DuplicateVoteEvidence', () => {
         hash: crypto.randomBytes(32),
         index: 0
       },
-      version
+      SignatureType.ECDSA
     );
     vote2.sign(accMngr.n2p('foo'));
 
@@ -206,7 +204,7 @@ describe('DuplicateVoteEvidence', () => {
         hash: crypto.randomBytes(32),
         index: 1
       },
-      version
+      SignatureType.ECDSA
     );
     vote1.sign(accMngr.n2p('foo'));
 
@@ -219,7 +217,7 @@ describe('DuplicateVoteEvidence', () => {
         hash: crypto.randomBytes(32),
         index: 1
       },
-      version
+      SignatureType.ECDSA
     );
     vote2.sign(accMngr.n2p('foo'));
 
@@ -239,7 +237,7 @@ describe('DuplicateVoteEvidence', () => {
         hash: crypto.randomBytes(32),
         index: 0
       },
-      version
+      SignatureType.ECDSA
     );
     vote1.sign(accMngr.n2p('foo'));
 
@@ -252,7 +250,7 @@ describe('DuplicateVoteEvidence', () => {
         hash: crypto.randomBytes(32),
         index: 0
       },
-      version
+      SignatureType.ECDSA
     );
     vote2.sign(accMngr.n2p('foo'));
     const ev = DuplicateVoteEvidence.fromVotes(vote2, vote1);

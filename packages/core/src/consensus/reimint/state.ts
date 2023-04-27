@@ -31,7 +31,7 @@ export class StateMachine {
 
   private readonly backend: IStateMachineBackend;
   private readonly p2p: IStateMachineP2PBackend;
-  private readonly signer?: ISigner;
+  private readonly signer: ISigner;
   private readonly config: IConfig;
   private readonly evpool: IEvidencePool;
   private readonly wal: IWAL;
@@ -79,7 +79,7 @@ export class StateMachine {
   private commitRound: number = -1;
   /////////////// RoundState ///////////////
 
-  constructor(backend: IStateMachineBackend, p2p: IStateMachineP2PBackend, evpool: IEvidencePool, wal: IWAL, chainId: number, config: IConfig, signer?: ISigner, debug?: IDebug) {
+  constructor(backend: IStateMachineBackend, p2p: IStateMachineP2PBackend, evpool: IEvidencePool, wal: IWAL, chainId: number, config: IConfig, signer: ISigner, debug?: IDebug) {
     this.backend = backend;
     this.p2p = p2p;
     this.chainId = chainId;
@@ -190,7 +190,7 @@ export class StateMachine {
       throw new Error('invalid proposal POL round');
     }
 
-    proposal.validateSignature(this.validators.proposer);
+    proposal.validateSignature(this.validators);
 
     this.proposal = proposal;
     this.proposalBlockHash = proposal.hash;
@@ -228,7 +228,7 @@ export class StateMachine {
 
     const extraData = ExtraData.fromBlockHeader(block.header);
     const hash = extraData.proposal.hash;
-    const proposer = extraData.proposal.proposer();
+    const proposer = extraData.proposal.getProposer();
     const evidence = extraData.evidence;
 
     /**
@@ -368,12 +368,8 @@ export class StateMachine {
       await this.addVote(vote, peerId);
     } catch (err) {
       if (err instanceof ConflictingVotesError) {
-        // if (!this.signer) {
-        //   return;
-        // }
-
         const { voteA, voteB } = err;
-        if (!this.debug?.conflictVotes && this.signer && vote.getValidator().equals(this.signer.address())) {
+        if (!this.debug?.conflictVotes && vote.getValidator().equals(this.signer.address())) {
           // found conflicting vote from ourselves
           logger.warn('local conflicting(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.getValidator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
           return;
@@ -431,7 +427,7 @@ export class StateMachine {
     }
   }
 
-  private async createBlockAndProposal() {
+  private async createBlockAndProposal(signatureType: SignatureType) {
     if (!this.pendingBlock || !this.pendingBlock.parentHash.equals(this.parentHash)) {
       throw new Error('missing pending block');
     }
@@ -451,7 +447,7 @@ export class StateMachine {
     const height = this.height.clone();
     const evpool = this.evpool;
     const pendingBlock = this.pendingBlock;
-    const signer = this.signer!;
+    const signer = this.signer;
 
     const evidence = await evpool.pickEvidence(height, maxEvidenceCount);
     pendingBlock.stop();
@@ -467,25 +463,67 @@ export class StateMachine {
         validatorSetSize,
         common
       },
-      signer
+      {
+        signer,
+        signatureType
+      }
     );
   }
 
+  private decideSignatureTypeAndIndex(): { signatureType: SignatureType; index: number } | undefined {
+    const index = this.validators.getIndexByAddress(this.signer.address());
+    if (index === undefined) {
+      logger.debug('StateMachine::decideSignatureTypeAndIndex, undefined index');
+      return;
+    }
+
+    const signatureType = isEnableDAO(this.pendingBlock!.common) ? SignatureType.BLS : SignatureType.ECDSA;
+    if (signatureType === SignatureType.BLS) {
+      const publicKey = this.signer.blsPublicKey();
+      if (!publicKey || !this.validators.getBlsPublicKey(this.signer.address()).equals(publicKey)) {
+        logger.debug('StateMachine::decideSignatureTypeAndIndex, empty bls public key or bls public key mismatch');
+        return;
+      }
+    } else {
+      if (!this.signer.ecdsaUnlocked()) {
+        logger.debug('StateMachine::decideSignatureTypeAndIndex, empty ecdsa signer');
+        return;
+      }
+    }
+
+    return { signatureType, index };
+  }
+
   private decideProposal(height: BN, round: number) {
+    const result = this.decideSignatureTypeAndIndex();
+    if (!result) {
+      return;
+    }
+
+    const signatureType = result.signatureType;
+
     if (this.validBlock) {
-      const proposal = new Proposal({
-        type: VoteType.Proposal,
-        height: this.validBlock.header.number,
-        round,
-        POLRound: this.validRound,
-        hash: this.validBlock.hash()
-      });
-      proposal.signature = this.signer!.sign(proposal.getMessageToSign()) as Buffer;
+      const proposal = new Proposal(
+        {
+          type: VoteType.Proposal,
+          height: this.validBlock.header.number,
+          round,
+          POLRound: this.validRound,
+          hash: this.validBlock.hash(),
+          proposer: signatureType === SignatureType.BLS ? this.signer.address() : undefined
+        },
+        signatureType
+      );
+      if (signatureType === SignatureType.BLS) {
+        proposal.signature = this.signer.blsSign(proposal.getMessageToSign());
+      } else {
+        proposal.signature = this.signer.ecdsaSign(proposal.getMessageToSign());
+      }
 
       this._newMessage(new StateMachineMessage('', new ProposalMessage(proposal)));
       this._newMessage(new StateMachineMessage('', new ProposalBlockMessage(this.validBlock)));
     } else {
-      this.createBlockAndProposal()
+      this.createBlockAndProposal(signatureType)
         .then(({ block, proposal }) => {
           this._newMessage(new StateMachineMessage('', new ProposalMessage(proposal)));
           this._newMessage(new StateMachineMessage('', new ProposalBlockMessage(block)));
@@ -497,19 +535,13 @@ export class StateMachine {
   }
 
   private signVote(type: VoteType, hash: Buffer) {
-    // logger.debug('StateMachine::signVote, type:', type, 'hash:', bufferToHex(hash));
-    if (!this.signer) {
-      logger.debug('StateMachine::signVote, empty signer');
+    const result = this.decideSignatureTypeAndIndex();
+    if (!result) {
       return;
     }
 
-    const index = this.validators.getIndexByAddress(this.signer.address());
-    if (index === undefined) {
-      logger.debug('StateMachine::signVote, undefined index');
-      return;
-    }
+    const { signatureType, index } = result;
 
-    const signatureType = isEnableDAO(this.pendingBlock!.common) && type === VoteType.Precommit ? SignatureType.BLS : SignatureType.ECDSA;
     const vote = new Vote(
       {
         chainId: this.chainId,
@@ -517,11 +549,16 @@ export class StateMachine {
         height: this.height,
         round: this.round,
         hash,
-        index
+        index,
+        validator: signatureType === SignatureType.BLS ? this.signer.address() : undefined
       },
       signatureType
     );
-    vote.signature = this.signer.sign(vote.getMessageToSign());
+    if (signatureType === SignatureType.BLS) {
+      vote.signature = this.signer.blsSign(vote.getMessageToSign());
+    } else {
+      vote.signature = this.signer.ecdsaSign(vote.getMessageToSign());
+    }
 
     this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
 
@@ -533,11 +570,16 @@ export class StateMachine {
           height: this.height,
           round: this.round,
           hash: crypto.randomBytes(32),
-          index
+          index,
+          validator: signatureType === SignatureType.BLS ? this.signer.address() : undefined
         },
         signatureType
       );
-      vote.signature = this.signer.sign(vote.getMessageToSign());
+      if (signatureType === SignatureType.BLS) {
+        vote.signature = this.signer.blsSign(vote.getMessageToSign());
+      } else {
+        vote.signature = this.signer.ecdsaSign(vote.getMessageToSign());
+      }
 
       this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
     }
@@ -562,11 +604,6 @@ export class StateMachine {
     };
 
     this._schedule(this.config.proposeDuration(round), height, round, RoundStepType.Propose);
-
-    if (!this.signer) {
-      logger.debug('StateMachine::enterPropose, empty signer');
-      return await update();
-    }
 
     if (!this.validators.proposer.equals(this.signer.address())) {
       logger.debug('StateMachine::enterPropose, invalid proposer');
@@ -926,7 +963,7 @@ export class StateMachine {
             }
 
             const proposal = msg.proposal;
-            logger.debug('StateMachine::replay, proposal, height:', proposal.height.toString(), 'round:', proposal.round, 'hash:', bufferToHex(proposal.hash), 'proposer:', proposal.proposer().toString(), 'from:', message.peerId);
+            logger.debug('StateMachine::replay, proposal, height:', proposal.height.toString(), 'round:', proposal.round, 'hash:', bufferToHex(proposal.hash), 'proposer:', proposal.getProposer().toString(), 'from:', message.peerId);
           } else {
             logger.warn('StateMachine::replay, something is wrong, invalid message:', message);
             continue;

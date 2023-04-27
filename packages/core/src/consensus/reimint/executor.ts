@@ -422,7 +422,7 @@ export class ReimintExecutor implements Executor {
     let parentValidatorSet: ValidatorSet = isEnableDAO(pendingCommon) ? (await this.engine.validatorSets.getValSet(root, parentStakeManager, this.engine.getValidatorBls(vm, block, pendingCommon))).copy() : (await this.engine.validatorSets.getValSet(root, parentStakeManager)).copy();
 
     const extraData = ExtraData.fromBlockHeader(pendingHeader, { valSet: parentValidatorSet.active });
-    const miner = extraData.proposal.proposer();
+    const miner = extraData.proposal.getProposer();
 
     // now, parentValidatorSet has increased extraData.proposal.round times
     parentValidatorSet = new ValidatorSet(parentValidatorSet.indexed, extraData.activeValidatorSet()!);

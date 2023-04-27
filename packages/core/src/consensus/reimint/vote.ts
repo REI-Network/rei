@@ -176,6 +176,10 @@ export class Vote {
     return this._signature && this._signature.length > 0;
   }
 
+  /**
+   * Sign vote
+   * @param privateKey - ECDSA or BLS private key
+   */
   sign(privateKey: Buffer) {
     if (this.signatureType === SignatureType.ECDSA) {
       const { r, s, v } = ecsign(this.getMessageToSign(), privateKey);
@@ -237,6 +241,9 @@ export class Vote {
    * @returns Validator address
    */
   validateSignature(valSet: ActiveValidatorSet) {
+    if (!this.isSigned()) {
+      throw new Error('missing signature');
+    }
     if (this.index >= valSet.length) {
       throw new Error('invalid index');
     }
@@ -311,6 +318,11 @@ export class VoteSet {
     this.sum = new BN(0);
   }
 
+  /**
+   * Pre-validate vote for p2p network
+   * @param vote - Vote
+   * @returns
+   */
   preValidate(vote: Vote) {
     if (!vote.height.eq(this.height) || vote.round !== this.round || vote.type !== this.signedMsgType || vote.signatureType !== this.version) {
       return false;

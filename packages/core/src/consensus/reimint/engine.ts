@@ -154,8 +154,8 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     const vm = await this.node.getVM(header.stateRoot, header._common);
     const sm = this.getStakeManager(vm, block, header._common);
     let valSet: ActiveValidatorSet;
-    if (isEnableDAO(header._common)) {
-      valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm, this.getValidatorBls(vm, block, header._common));
+    if (isEnableDAO(pendingBlock.common)) {
+      valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm, this.getValidatorBls(vm, block, pendingBlock.common));
     } else {
       valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm);
     }

@@ -1,4 +1,4 @@
-import { rlp, intToBuffer, bufferToInt, BNLike, Address, bnToUnpaddedBuffer, BN, rlphash } from 'ethereumjs-util';
+import { rlp, intToBuffer, bufferToInt, BNLike, Address, bnToUnpaddedBuffer, BN, rlphash, toBuffer } from 'ethereumjs-util';
 import { VM } from '@rei-network/vm';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
@@ -21,14 +21,15 @@ export interface ExtraDataOptions {
 // TODO: add bls public key, remove the interface
 export interface ExtraDataFromBlockHeaderOptions extends Omit<ExtraDataOptions, 'header' | 'chainId'> {}
 
-export type EXVote = Buffer;
-export type EXEmptyVote = [];
-export type EXRoundAndPOLRound = [Buffer, Buffer] | [Buffer, Buffer, Buffer];
-export type EXEvidenceList = (Buffer | Buffer[])[];
-export type EXVoteSetBitArray = (Buffer | Buffer[])[];
-export type EXAggregateSignature = Buffer;
-export type EXElement = EXEmptyVote | EXVote | EXRoundAndPOLRound | EXEvidenceList | EXVoteSetBitArray;
-export type EXElements = EXElement[];
+type EXVote = Buffer;
+type EXEmptyVote = [];
+type EXRoundAndPOLRound = [Buffer, Buffer] | [Buffer, Buffer, Buffer];
+type EXEvidenceList = (Buffer | Buffer[])[];
+type EXVoteSetBitArray = (Buffer | Buffer[])[];
+type EXProposalList = [Buffer, Buffer];
+type EXAggregatedSignature = Buffer;
+type EXElement = EXEmptyVote | EXVote | EXRoundAndPOLRound | EXEvidenceList | EXVoteSetBitArray | EXProposalList;
+type EXElements = EXElement[];
 
 function isEXVote(ele: EXElement): ele is EXVote {
   return ele instanceof Buffer;
@@ -57,6 +58,7 @@ function isEXEvidenceList(ele: EXElement): ele is EXEvidenceList {
   }
   return true;
 }
+
 function isEXVoteSetBitArray(ele: EXElement): ele is EXVoteSetBitArray {
   if (Array.isArray(ele) && ele.length === 2 && ele[0] instanceof Buffer && Array.isArray(ele[1])) {
     return ele[1].every((item) => item instanceof Buffer);
@@ -65,7 +67,11 @@ function isEXVoteSetBitArray(ele: EXElement): ele is EXVoteSetBitArray {
   }
 }
 
-function isEXAggregatedSignature(ele: EXElement): ele is EXAggregateSignature {
+function isEXProposalList(ele: EXElement): ele is EXProposalList {
+  return Array.isArray(ele) && ele.length === 2 && ele[0] instanceof Buffer && ele[1] instanceof Buffer;
+}
+
+function isEXAggregatedSignature(ele: EXElement): ele is EXAggregatedSignature {
   return ele instanceof Buffer;
 }
 
@@ -138,7 +144,6 @@ export class ExtraData {
     let commitRound!: number;
     let POLRound!: number;
     let headerHash!: Buffer;
-    let proposer: Address | undefined;
     let proposal!: Proposal;
     let evidence!: Evidence[];
     let voteSet: VoteSet | undefined;
@@ -232,9 +237,6 @@ export class ExtraData {
           valSet = valSet.copy();
           valSet.incrementProposerPriority(round);
 
-          // get proposer address by round
-          proposer = valSet.proposer;
-
           /**
            * create a vote set,
            * commitRound and valSet.round may be different,
@@ -244,23 +246,41 @@ export class ExtraData {
           voteSet = new VoteSet(chainId, header.number, commitRound, VoteType.Precommit, valSet, signatureType);
         }
       } else if (i === 2) {
-        if (!isEXVote(value)) {
-          throw new Error('invalid values');
+        if (signatureType === SignatureType.ECDSA) {
+          if (!isEXVote(value)) {
+            throw new Error('invalid values');
+          }
+
+          proposal = new Proposal(
+            {
+              round,
+              POLRound,
+              height: header.number,
+              type: VoteType.Proposal,
+              hash: headerHash
+            },
+            signatureType,
+            value
+          );
+        } else {
+          if (!isEXProposalList(value)) {
+            throw new Error('invalid values');
+          }
+
+          proposal = new Proposal(
+            {
+              round,
+              POLRound,
+              height: header.number,
+              type: VoteType.Proposal,
+              hash: headerHash,
+              proposer: new Address(value[0])
+            },
+            signatureType,
+            value[1]
+          );
         }
 
-        const signature = value;
-        proposal = new Proposal(
-          {
-            round,
-            POLRound,
-            height: header.number,
-            type: VoteType.Proposal,
-            hash: headerHash,
-            proposer: signatureType === SignatureType.BLS ? proposer : undefined
-          },
-          signatureType,
-          signature
-        );
         if (valSet) {
           proposal.validateSignature(valSet);
         }
@@ -325,8 +345,8 @@ export class ExtraData {
     } else {
       raw.push([intToBuffer(this.round), intToBuffer(this.POLRound + 1), intToBuffer(this.commitRound)]);
     }
-    raw.push(this.proposal.signature!);
     if (this.version === SignatureType.ECDSA) {
+      raw.push(this.proposal.signature!);
       if (this.voteSet) {
         const maj23Hash = this.voteSet.maj23!;
         for (const vote of this.voteSet.votes) {
@@ -345,6 +365,7 @@ export class ExtraData {
         }
       }
     } else {
+      raw.push([toBuffer(this.proposal.getProposer()), this.proposal.signature!]);
       if (this.voteSet) {
         raw.push(this.voteSet.getAggregatedSignature());
         raw.push(this.voteSet.votesBitArray.raw());

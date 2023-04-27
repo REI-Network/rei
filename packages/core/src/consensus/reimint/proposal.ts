@@ -130,10 +130,7 @@ export class Proposal {
       const v = new BN(this._signature!.slice(64, 65)).addn(27);
       return Address.fromPublicKey(ecrecover(this.getMessageToSign(), v, r, s));
     } else {
-      if (!this.proposer) {
-        throw new Error('missing proposer');
-      }
-      return this.proposer;
+      return this.proposer!;
     }
   }
 
@@ -169,10 +166,7 @@ export class Proposal {
     if (this.signatureType === SignatureType.ECDSA) {
       return [intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.POLRound + 1), this.hash, this._signature!];
     } else {
-      if (!this.proposer) {
-        throw new Error('missing proposer');
-      }
-      return [intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.POLRound + 1), this.hash, toBuffer(this.proposer), this._signature!];
+      return [intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.POLRound + 1), this.hash, toBuffer(this.proposer!), this._signature!];
     }
   }
 
@@ -195,6 +189,11 @@ export class Proposal {
     v.validateRound(this.round);
     v.validatePOLRound(this.POLRound);
     v.validateHash(this.hash);
+    if (this.signatureType === SignatureType.BLS) {
+      if (!this.proposer) {
+        throw new Error('missing proposer address');
+      }
+    }
     if (this.isSigned()) {
       if (this.signatureType === SignatureType.ECDSA) {
         v.validateSignature(this._signature!);

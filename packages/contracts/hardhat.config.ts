@@ -43,7 +43,8 @@ export default {
   },
   networks: {
     localhost: {
-      url: 'http://127.0.0.1:8545'
+      url: 'http://127.0.0.1:8545',
+      accounts
     },
     'rei-devnet': {
       url: 'http://127.0.0.1:11451',

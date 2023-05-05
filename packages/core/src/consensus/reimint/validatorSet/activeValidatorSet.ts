@@ -5,6 +5,7 @@ import { IndexedValidator } from './indexedValidatorSet';
 import { getGenesisValidators, genesisValidatorPriority, genesisValidatorVotingPower, isGenesis } from './genesis';
 import { isEnableBetterPOS } from '../../../hardforks';
 import { ActiveValidator as ActiveValidatorInfo } from '../contracts/stakeManager';
+import { ValidatorChanges } from './validatorChanges';
 
 const maxInt256 = new BN('7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 'hex');
 const minInt256 = new BN('8000000000000000000000000000000000000000000000000000000000000000', 'hex').neg();
@@ -333,6 +334,16 @@ export class ActiveValidatorSet {
       }
     }
     return true;
+  }
+
+  /**
+   * Update active bls public key according to validatorChanges
+   * @param changes - Validator changes
+   */
+  reload(changes: ValidatorChanges) {
+    changes.blsValidators.forEach((pk, validator) => {
+      this.active.find(({ validator: _validator }) => _validator.equals(validator))!.blsPublicKey = pk;
+    });
   }
 
   // compute removed voting power

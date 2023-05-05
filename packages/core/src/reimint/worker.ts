@@ -4,12 +4,12 @@ import { BlockHeader, Transaction } from '@rei-network/structure';
 import { logger, nowTimestamp } from '@rei-network/utils';
 import { PendingTxMap } from '../txpool';
 import { Node } from '../node';
-import { ReimintConsensusEngine } from './engine';
+import { ReimintEngine } from './engine';
 import { PendingBlock } from './pendingBlock';
 
 export interface WorkerOptions {
   node: Node;
-  engine: ReimintConsensusEngine;
+  engine: ReimintEngine;
 }
 
 /**
@@ -17,7 +17,7 @@ export interface WorkerOptions {
  */
 export class Worker {
   private readonly node: Node;
-  private readonly engine: ReimintConsensusEngine;
+  private readonly engine: ReimintEngine;
   private readonly lock = new Semaphore(1);
 
   private pendingBlock?: PendingBlock;

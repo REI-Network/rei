@@ -46,7 +46,7 @@ export interface IProcessBlockResult {
 
 export interface IStateMachineBackend {
   getCommon(num: BNLike): Common;
-  preProcessBlock(block: Block): Promise<IProcessBlockResult | undefined>;
+  preprocessBlock(block: Block): Promise<IProcessBlockResult | undefined>;
   commitBlock(block: Block, result: IProcessBlockResult): Promise<void>;
 }
 

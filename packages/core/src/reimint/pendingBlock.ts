@@ -8,12 +8,12 @@ import { PendingTxMap } from '../txpool';
 import { EMPTY_ADDRESS, EMPTY_NONCE, EMPTY_MIX_HASH, EMPTY_EXTRA_DATA } from '../utils';
 import { isEnableFreeStaking } from '../hardforks';
 import { FinalizeOpts, ProcessTxResult } from './executor';
-import { ReimintConsensusEngine } from './engine';
+import { ReimintEngine } from './engine';
 
 export interface PendingBlockFinalizeOpts extends Pick<FinalizeOpts, 'round' | 'evidence'> {}
 
 export class PendingBlock {
-  private engine: ReimintConsensusEngine;
+  private engine: ReimintEngine;
   private lock = new Semaphore(1);
 
   private _common: Common;
@@ -45,7 +45,7 @@ export class PendingBlock {
 
   private totalAmount?: BN;
 
-  constructor(engine: ReimintConsensusEngine, parentHash: Buffer, parentStateRoot: Buffer, number: BN, timestamp: BN, common: Common, extraData?: Buffer) {
+  constructor(engine: ReimintEngine, parentHash: Buffer, parentStateRoot: Buffer, number: BN, timestamp: BN, common: Common, extraData?: Buffer) {
     if (extraData && extraData.length !== 32) {
       throw new Error('invalid extra data length');
     }

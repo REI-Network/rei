@@ -1,10 +1,10 @@
 import { BN } from 'ethereumjs-util';
 import { NetworkManagerOptions } from '@rei-network/network';
 import { Receipt, Block } from '@rei-network/structure';
-import { ConsensusEngineOptions } from './reimint';
+import { ReimintEngineOptions } from './reimint';
 import { SynchronizerOptions } from './sync';
 
-export interface ConsensusEngineConstructorOptions extends Omit<ConsensusEngineOptions, 'node'> {}
+export interface ConsensusEngineConstructorOptions extends Omit<ReimintEngineOptions, 'node'> {}
 
 export interface NetworkManagerConstructorOptions extends Omit<NetworkManagerOptions, 'protocols' | 'nodedb'> {}
 

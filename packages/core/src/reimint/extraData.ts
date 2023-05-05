@@ -11,7 +11,7 @@ import { BitArray } from './bitArray';
 import { Vote, VoteType, VoteSet, SignatureType } from './vote';
 import { Proposal } from './proposal';
 import * as v from './validate';
-import { ReimintConsensusEngine } from './engine';
+import { ReimintEngine } from './engine';
 
 export interface ExtraDataOptions {
   chainId: number;
@@ -428,7 +428,7 @@ export class ExtraData {
    * @param backend - backend
    * @param engine - consensus engine
    */
-  async verifyEvidence(backend: ExtraDataValidateBackend, engine: ReimintConsensusEngine) {
+  async verifyEvidence(backend: ExtraDataValidateBackend, engine: ReimintEngine) {
     for (const ev of this.evidence) {
       if (ev instanceof DuplicateVoteEvidence) {
         const parentBlock = await backend.db.getBlock(ev.height.subn(1));

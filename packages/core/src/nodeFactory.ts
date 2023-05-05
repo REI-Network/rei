@@ -5,12 +5,12 @@ import { Address } from 'ethereumjs-util';
 import { logger } from '@rei-network/utils';
 import { NetworkManagerOptions } from '@rei-network/network';
 import { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
-import { ConsensusEngineOptions } from './reimint';
+import { ReimintEngineOptions } from './reimint';
 import { SynchronizerOptions } from './sync';
 import { Node } from './node';
 import { NodeOptions, AccountManagerConstructorOptions, BlsManagerConstructorOptions } from './types';
 
-export interface MineOptions extends Omit<ConsensusEngineOptions, 'node' | 'coinbase'> {
+export interface MineOptions extends Omit<ReimintEngineOptions, 'node' | 'coinbase'> {
   coinbase: string;
 }
 

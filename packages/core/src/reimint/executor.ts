@@ -20,7 +20,7 @@ import { StakeManager, SlashReason, Fee, Contract, ValidatorBls } from './contra
 import { Reimint } from './reimint';
 import { Evidence, DuplicateVoteEvidence } from './evpool';
 import { ExtraData } from './extraData';
-import { ReimintConsensusEngine } from './engine';
+import { ReimintEngine } from './engine';
 import { makeRunTxCallback } from './makeRunTxCallback';
 
 export interface FinalizeOpts {
@@ -101,13 +101,7 @@ function calcAccUsage(receipts: Receipt[]) {
 }
 
 export class ReimintExecutor {
-  private readonly backend: ExecutorBackend;
-  private readonly engine: ReimintConsensusEngine;
-
-  constructor(backend: ExecutorBackend, engine: ReimintConsensusEngine) {
-    this.backend = backend;
-    this.engine = engine;
-  }
+  constructor(private readonly backend: ExecutorBackend, private readonly engine: ReimintEngine) {}
 
   /**
    * Assign block reward to miner,

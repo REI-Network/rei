@@ -27,16 +27,18 @@ import { EvidenceCollector } from './evidenceCollector';
 import { SignatureType } from './vote';
 
 export class SimpleNodeSigner {
-  readonly node: Node;
+  constructor(private readonly node: Node) {}
 
-  constructor(node: Node) {
-    this.node = node;
-  }
-
+  /**
+   * Get signer address
+   */
   address(): Address {
     return this.node.reimint.coinbase;
   }
 
+  /**
+   * Check if the ECDSA private key is unlocked
+   */
   ecdsaUnlocked(): boolean {
     const coinbase = this.node.reimint.coinbase;
     if (isEmptyAddress(coinbase)) {
@@ -45,11 +47,20 @@ export class SimpleNodeSigner {
     return this.node.accMngr.hasUnlockedAccount(coinbase);
   }
 
+  /**
+   * ECDSA sign message
+   * @param msg - Message hash
+   * @returns ECDSA signature
+   */
   ecdsaSign(msg: Buffer): Buffer {
     const signature = ecsign(msg, this.node.accMngr.getPrivateKey(this.node.reimint.coinbase));
     return Buffer.concat([signature.r, signature.s, intToBuffer(signature.v - 27)]);
   }
 
+  /**
+   * Get BLS public key
+   * @returns Undefined if doesn't exsit
+   */
   blsPublicKey(): Buffer | undefined {
     const pubKey = this.node.blsMngr.getPublicKey();
     if (!pubKey) {
@@ -58,6 +69,11 @@ export class SimpleNodeSigner {
     return Buffer.from(pubKey.toBytes());
   }
 
+  /**
+   * BLS sign message
+   * @param msg - Message hash
+   * @returns BLS signature
+   */
   blsSign(msg: Buffer): Buffer {
     return Buffer.from(this.node.blsMngr.signMessage(msg).toBytes());
   }
@@ -79,7 +95,7 @@ export class SimpleConfig {
 }
 
 export class SimpleBackend {
-  constructor(private engine: ReimintConsensusEngine) {}
+  constructor(private readonly engine: ReimintEngine) {}
 
   /**
    * Get common instance by number
@@ -95,7 +111,7 @@ export class SimpleBackend {
    * @param block - Target block
    * @returns Pre process block result
    */
-  preProcessBlock(block: Block) {
+  preprocessBlock(block: Block) {
     return this.engine.executor.processBlock({ block, skipConsensusValidation: true });
   }
 
@@ -125,12 +141,12 @@ export class SimpleBackend {
   }
 }
 
-export interface ConsensusEngineOptions {
+export interface ReimintEngineOptions {
   node: Node;
   coinbase?: Address;
 }
 
-export class ReimintConsensusEngine {
+export class ReimintEngine {
   readonly node: Node;
   readonly worker: Worker;
   readonly state: StateMachine;
@@ -148,7 +164,7 @@ export class ReimintConsensusEngine {
 
   collector?: EvidenceCollector;
 
-  constructor(options: ConsensusEngineOptions) {
+  constructor(options: ReimintEngineOptions) {
     this.node = options.node;
     this._coinbase = options.coinbase ?? EMPTY_ADDRESS;
     this.worker = new Worker({ node: this.node, engine: this });

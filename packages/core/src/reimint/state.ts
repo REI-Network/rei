@@ -646,7 +646,7 @@ export class StateMachine {
     try {
       preValidateHeader.call(this.proposalBlock.header, this.parent);
       await preValidateBlock.call(this.proposalBlock);
-      this.proposalBlockResult = await this.backend.preProcessBlock(this.proposalBlock);
+      this.proposalBlockResult = await this.backend.preprocessBlock(this.proposalBlock);
       validateResult = true;
     } catch (err: any) {
       if (err.message === 'committed') {
@@ -871,7 +871,7 @@ export class StateMachine {
       try {
         preValidateHeader.call(this.proposalBlock.header, this.parent);
         await preValidateBlock.call(this.proposalBlock);
-        this.proposalBlockResult = await this.backend.preProcessBlock(this.proposalBlock);
+        this.proposalBlockResult = await this.backend.preprocessBlock(this.proposalBlock);
       } catch (err: any) {
         if (err.message !== 'committed') {
           logger.warn('StateMachine::finalizeCommit, preValidateHeaderAndBlock or process block failed:', err);

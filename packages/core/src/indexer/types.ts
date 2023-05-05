@@ -1,5 +1,5 @@
-import { BN } from 'ethereumjs-util';
-import { Database, DBOp } from '@rei-network/database';
+import type { BN } from 'ethereumjs-util';
+import type { Database, DBOp } from '@rei-network/database';
 
 /**
  * ChainIndexerBackend defines the methods needed to process chain segments in

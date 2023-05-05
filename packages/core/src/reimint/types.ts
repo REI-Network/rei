@@ -1,11 +1,11 @@
-import { Address, BN, BNLike } from 'ethereumjs-util';
-import { Block, Receipt } from '@rei-network/structure';
-import { Common } from '@rei-network/common';
-import { SendMessageOptions } from '../protocols/consensus';
-import { StateMachineMsg } from './stateMessages';
-import { Message } from './messages';
-import { Evidence } from './evpool';
-import { Vote } from './vote';
+import type { Address, BN, BNLike } from 'ethereumjs-util';
+import type { Block, Receipt } from '@rei-network/structure';
+import type { Common } from '@rei-network/common';
+import type { SendMessageOptions } from '../protocols/consensus';
+import type { StateMachineMsg } from './stateMessages';
+import type { Message } from './messages';
+import type { Evidence } from './evpool';
+import type { Vote } from './vote';
 
 export interface ISigner {
   address(): Address;

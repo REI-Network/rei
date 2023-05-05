@@ -1,6 +1,6 @@
 import { Protocol, Peer, ProtocolStream } from '@rei-network/network';
 import { Node } from '../../../node';
-import { NetworkProtocol } from '../../types';
+import { NetworkProtocol } from '../../enum';
 import { BaseProtocol } from '../../baseProtocol';
 import { HandlerPool } from '../../handlerPool';
 import { isV2 } from '../helper';

@@ -368,14 +368,6 @@ export class ReimintEngine {
   }
 
   /**
-   * Get miner address
-   * @param block - Block or block header
-   */
-  getMiner(block: Block | BlockHeader) {
-    return Reimint.getMiner(block);
-  }
-
-  /**
    * Generate genesis state
    */
   async generateGenesis() {

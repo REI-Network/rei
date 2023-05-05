@@ -20,7 +20,7 @@ import { BloomBitsFilter, ReceiptsCache } from './bloomBits';
 import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
 import { Wire, ConsensusProtocol, WireProtocolHandler, SnapProtocol, SnapProtocolHandler } from './protocols';
-import { ReimintEngine } from './reimint';
+import { ReimintEngine, Reimint } from './reimint';
 import { NodeOptions, NodeStatus } from './types';
 import { StateManager } from './stateManager';
 import { SnapTree } from './snap/snapTree';
@@ -381,7 +381,7 @@ export class Node {
       blockchain: this.blockchain,
       mode: mode ?? this.evmWorkMode,
       exposed: this.chaindbDown.exposed,
-      getMiner: (header) => this.reimint.getMiner(header)
+      getMiner: (header) => Reimint.getMiner(header)
     });
   }
 

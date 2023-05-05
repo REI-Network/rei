@@ -2,21 +2,17 @@ import { toBuffer, setLengthLeft, Address, BN, rlphash } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@rei-network/structure';
 import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../utils';
+import { isEnableDAO } from '../hardforks';
 import { ISigner } from './types';
 import { ExtraData } from './extraData';
 import { Proposal } from './proposal';
 import { VoteType, VoteSet, SignatureType } from './vote';
 import { Evidence } from './evpool';
-import { isEnableDAO } from '../hardforks';
 
 const defaultRound = 0;
 const defaultPOLRound = -1;
 const defaultValidaterSetSize = 1;
 const defaultEvidence = [];
-
-const minGasLimit = 5000;
-const gasLimitFloor = 10000000;
-const gasLimitCeil = 10000000;
 
 /**
  * Format header extra data,
@@ -225,42 +221,5 @@ export abstract class Reimint {
     data = formatHeaderData(data);
     const header = BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize()]) }, options);
     return new Block(header, transactions, undefined, options);
-  }
-
-  /**
-   * Calculate next block gas limit
-   * @param parentGasLimit - Parent block gas limit
-   * @param parentGasUsed - Parent block gas used
-   * @returns Next block gas limit
-   */
-  static calcGasLimit(parentGasLimit: BN, parentGasUsed: BN) {
-    const contrib = parentGasUsed.muln(3).divn(2).divn(1024);
-    const decay = parentGasLimit.divn(1024).subn(1);
-
-    /*
-      strategy(copy from geth): gasLimit of block-to-mine is set based on parent's
-      gasUsed value.  if parentGasUsed > parentGasLimit * (2/3) then we
-      increase it, otherwise lower it (or leave it unchanged if it's right
-      at that usage) the amount increased/decreased depends on how far away
-      from parentGasLimit * (2/3) parentGasUsed is.
-    */
-    let limit = parentGasLimit.sub(decay).add(contrib);
-    if (limit.ltn(minGasLimit)) {
-      limit = new BN(minGasLimit);
-    }
-
-    if (limit.ltn(gasLimitFloor)) {
-      limit = parentGasLimit.add(decay);
-      if (limit.gtn(gasLimitFloor)) {
-        limit = new BN(gasLimitFloor);
-      }
-    } else if (limit.gtn(gasLimitCeil)) {
-      limit = parentGasLimit.sub(decay);
-      if (limit.ltn(gasLimitCeil)) {
-        limit = new BN(gasLimitCeil);
-      }
-    }
-
-    return limit;
   }
 }

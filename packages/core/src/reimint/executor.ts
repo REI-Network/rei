@@ -382,7 +382,12 @@ export class ReimintExecutor {
   }
 
   /**
-   * {@link Executor.finalize}
+   * Finalize a pending block,
+   * assign block reward to miner and
+   * do other things(afterApply) and
+   * calculate finalized state root
+   * @param options - Finalize options
+   * @return FinalizeResult
    */
   async finalize(options: FinalizeOpts) {
     let { block, receipts, stateRoot, parentStateRoot, round, evidence } = options;
@@ -435,7 +440,9 @@ export class ReimintExecutor {
   }
 
   /**
-   * {@link Executor.processBlock}
+   * Process a block
+   * @param options - Process block options
+   * @returns ProcessBlockResult or undefined
    */
   async processBlock(options: ProcessBlockOpts) {
     const startAt = Date.now();
@@ -565,7 +572,9 @@ export class ReimintExecutor {
   }
 
   /**
-   * {@link Executor.processTx}
+   * Process a transaction
+   * @param options - Process transaction options
+   * @returns ProcessTxResult
    */
   async processTx(options: ProcessTxOpts) {
     const { root, block, tx, blockGasUsed, totalAmount } = options;

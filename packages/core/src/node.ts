@@ -245,6 +245,7 @@ export class Node {
     this.txSync.start();
     this.bloomBitsIndexer.start();
     this.networkMngr.start();
+    this.reimint.start();
 
     this.pendingTxsLoopPromise = this.pendingTxsLoop();
     this.commitBlockLoopPromise = this.commitBlockLoop();

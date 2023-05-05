@@ -14,8 +14,8 @@ import { StateManager } from '../stateManager';
 import { ActiveValidatorSet, ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../utils';
 import { isEnableFreeStaking, loadInitData, isEnableHardfork2, isEnableBetterPOS, isEnableDAO } from '../hardforks';
-import { Worker } from './worker';
 import { IProcessBlockResult } from './types';
+import { Worker } from './worker';
 import { StakeManager, Contract, Fee, FeePool, ValidatorBls } from './contracts';
 import { StateMachine } from './state';
 import { Evidence, EvidencePool, EvidenceDatabase } from './evpool';
@@ -78,6 +78,53 @@ export class SimpleConfig {
   }
 }
 
+export class SimpleBackend {
+  constructor(private engine: ReimintConsensusEngine) {}
+
+  /**
+   * Get common instance by number
+   * @param num - Number
+   */
+  getCommon(num: BNLike) {
+    return this.engine.node.getCommon(num);
+  }
+
+  /**
+   * Pre process block, skip consensus validation,
+   * ensure the state root is correct
+   * @param block - Target block
+   * @returns Pre process block result
+   */
+  preProcessBlock(block: Block) {
+    return this.engine.executor.processBlock({ block, skipConsensusValidation: true });
+  }
+
+  /**
+   * Commit single block
+   * @param block - Block
+   */
+  async commitBlock(block: Block, result: IProcessBlockResult) {
+    try {
+      const reorged = await this.engine.node.commitBlock({
+        receipts: result.receipts,
+        block,
+        broadcast: true
+      });
+      if (reorged) {
+        logger.info('⛏️  Mint block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
+        // try to continue minting
+        this.engine.node.tryToMintNextBlock();
+      }
+    } catch (err: any) {
+      if (err.message === 'committed' || err.message === 'aborted') {
+        // ignore errors...
+      } else {
+        logger.error('ReimintConsensusEngine::commitBlock, catch error:', err);
+      }
+    }
+  }
+}
+
 export interface ConsensusEngineOptions {
   node: Node;
   coinbase?: Address;
@@ -89,6 +136,7 @@ export class ReimintConsensusEngine {
   readonly state: StateMachine;
   readonly config: SimpleConfig = new SimpleConfig();
   readonly signer: SimpleNodeSigner;
+  readonly backend: SimpleBackend;
   readonly evpool: EvidencePool;
   readonly executor: ReimintExecutor;
   readonly validatorSets = new ValidatorSets();
@@ -105,22 +153,23 @@ export class ReimintConsensusEngine {
     this._coinbase = options.coinbase ?? EMPTY_ADDRESS;
     this.worker = new Worker({ node: this.node, engine: this });
     this.signer = new SimpleNodeSigner(this.node);
+    this.backend = new SimpleBackend(this);
     const db = new EvidenceDatabase(this.node.evidencedb);
     this.evpool = new EvidencePool({ backend: db });
     const wal = new WAL({ path: path.join(this.node.datadir, 'WAL') });
-    this.state = new StateMachine(this, this.node.consensus, this.evpool, wal, this.node.chainId, this.config, this.signer);
+    this.state = new StateMachine(this.backend, this.node.consensus, this.evpool, wal, this.node.chainId, this.config, this.signer);
     this.executor = new ReimintExecutor(this.node, this);
   }
 
   /**
-   * {@link ConsensusEngine.coinbase}
+   * Get current coinbase address
    */
   get coinbase() {
     return this._coinbase;
   }
 
   /**
-   * {@link ConsensusEngine.init}
+   * Init engine
    */
   async init() {
     const block = this.node.getLatestBlock();
@@ -153,20 +202,17 @@ export class ReimintConsensusEngine {
   }
 
   /**
-   * {@link ConsensusEngine.start}
+   * Start working
    */
   start() {
-    if (this.msgLoopPromise) {
-      // ignore start
-      return;
+    if (!this.msgLoopPromise) {
+      this.msgLoopPromise = this.msgLoop();
+      this.state.start();
     }
-
-    this.msgLoopPromise = this.msgLoop();
-    this.state.start();
   }
 
   /**
-   * {@link ConsensusEngine.abort}
+   * Stop working
    */
   async abort() {
     if (this.msgLoopPromise) {
@@ -178,14 +224,16 @@ export class ReimintConsensusEngine {
   }
 
   /**
-   * {@link ConsensusEngine.tryToMintNextBlock}
+   * Try to mint a block after this block
+   * @param block - New block
    */
   tryToMintNextBlock(block: Block) {
     this.msgQueue.push(block);
   }
 
   /**
-   * {@link ConsensusEngine.addTxs}
+   * Add pending transactions to worker
+   * @param txs - Pending transactions
    */
   addTxs(txs: Map<Buffer, Transaction[]>) {
     return this.worker.addTxs(txs);
@@ -223,7 +271,8 @@ export class ReimintConsensusEngine {
   }
 
   /**
-   * {@link ConsensusEngine.newBlock}
+   * Process the new block
+   * @param block - New block
    */
   async newBlock(block: Block) {
     const extraData = ExtraData.fromBlockHeader(block.header);
@@ -252,35 +301,6 @@ export class ReimintConsensusEngine {
       for (const handler of this.node.consensus.handlers) {
         handler.sendEvidence(evidence);
       }
-    }
-  }
-
-  /**
-   * {@link ConsensusEngine.generateGenesis}
-   */
-  async generateGenesis() {
-    const common = this.getCommon(0);
-    const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
-    const stateManager = new StateManager({ common, trie: new Trie(this.node.chaindb) });
-    await stateManager.generateGenesis(genesisStateByName(this.node.chain));
-    let root = await stateManager.getStateRoot();
-
-    // deploy system contracts
-    const vm = await this.node.getVM(root, common);
-    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
-    await Contract.deployReimintContracts(evm, common);
-    if (isEnableFreeStaking(common)) {
-      await Contract.deployFreeStakingContracts(evm, common);
-    }
-    if (isEnableBetterPOS(common)) {
-      await Contract.deployBetterPOSContracts(evm, common);
-    }
-
-    root = await vm.stateManager.getStateRoot();
-
-    if (!root.equals(genesisBlock.header.stateRoot)) {
-      logger.error('State root not equal', bufferToHex(root), bufferToHex(genesisBlock.header.stateRoot));
-      throw new Error('state root not equal');
     }
   }
 
@@ -332,14 +352,51 @@ export class ReimintConsensusEngine {
   }
 
   /**
-   * {@link ConsensusEngine.getMiner}
+   * Get miner address
+   * @param block - Block or block header
    */
   getMiner(block: Block | BlockHeader) {
     return Reimint.getMiner(block);
   }
 
   /**
-   * {@link ConsensusEngine.generatePendingBlock}
+   * Generate genesis state
+   */
+  async generateGenesis() {
+    const common = this.node.getCommon(0);
+    const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
+    const stateManager = new StateManager({ common, trie: new Trie(this.node.chaindb) });
+    await stateManager.generateGenesis(genesisStateByName(this.node.chain));
+    let root = await stateManager.getStateRoot();
+
+    // deploy system contracts
+    const vm = await this.node.getVM(root, common);
+    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
+    await Contract.deployReimintContracts(evm, common);
+    if (isEnableFreeStaking(common)) {
+      await Contract.deployFreeStakingContracts(evm, common);
+    }
+    if (isEnableBetterPOS(common)) {
+      await Contract.deployBetterPOSContracts(evm, common);
+    }
+
+    root = await vm.stateManager.getStateRoot();
+
+    if (!root.equals(genesisBlock.header.stateRoot)) {
+      logger.error('State root not equal', bufferToHex(root), bufferToHex(genesisBlock.header.stateRoot));
+      throw new Error('state root not equal');
+    }
+  }
+
+  /**
+   * Create a simple signed block by data,
+   * the header data can be incompleted,
+   * because the block created is only to
+   * ensure that the correct miner can be obtained during `processTx`
+   * @param data - Header data
+   * @param common - Common instance
+   * @param transactions - List of transaction
+   * @returns Block
    */
   generatePendingBlock(headerData: HeaderData, common: Common) {
     const signatureType = isEnableDAO(common) ? SignatureType.BLS : SignatureType.ECDSA;
@@ -353,7 +410,9 @@ export class ReimintConsensusEngine {
   }
 
   /**
-   * {@link ConsensusEngine.generateReceiptTrie}
+   * Generate receipt trie
+   * @param transactions - Transactions
+   * @param receipts - Receipts
    */
   async generateReceiptTrie(transactions: Transaction[], receipts: Receipt[]): Promise<Buffer> {
     const trie = new BaseTrie();
@@ -362,50 +421,4 @@ export class ReimintConsensusEngine {
     }
     return trie.root;
   }
-
-  ///////////// Backend Logic ////////////////
-
-  /**
-   * Get common instance by number
-   * @param num - Number
-   */
-  getCommon(num: BNLike) {
-    return this.node.getCommon(num);
-  }
-
-  /**
-   * Pre process block, skip consensus validation,
-   * ensure the state root is correct
-   * @param block - Target block
-   * @returns Pre process block result
-   */
-  preProcessBlock(block: Block) {
-    return this.executor.processBlock({ block, skipConsensusValidation: true });
-  }
-
-  /**
-   * Commit single block
-   * @param block - Block
-   */
-  async commitBlock(block: Block, result: IProcessBlockResult) {
-    try {
-      const reorged = await this.node.commitBlock({
-        receipts: result.receipts,
-        block,
-        broadcast: true
-      });
-      if (reorged) {
-        logger.info('⛏️  Mint block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
-        // try to continue minting
-        this.node.tryToMintNextBlock();
-      }
-    } catch (err: any) {
-      if (err.message === 'committed' || err.message === 'aborted') {
-        // ignore errors...
-      } else {
-        logger.error('ReimintConsensusEngine::commitBlock, catch error:', err);
-      }
-    }
-  }
-  ///////////// Backend Logic ////////////////
 }

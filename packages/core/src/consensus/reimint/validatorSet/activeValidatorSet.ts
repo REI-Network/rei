@@ -340,13 +340,14 @@ export class ActiveValidatorSet {
    * Update active bls public key according to validatorChanges
    * @param changes - Validator changes
    */
-  reload(changes: ValidatorChanges) {
+  reloadBlsPublicKey(changes: ValidatorChanges) {
     changes.blsValidators.forEach((pk, validator) => {
-      this.active.find((v) => {
-        if (v.validator.equals(validator)) {
-          v.blsPublicKey = pk;
+      for (const av of this.active) {
+        if (av.validator.equals(validator)) {
+          av.blsPublicKey = pk;
+          break;
         }
-      });
+      }
     });
   }
 

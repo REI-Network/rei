@@ -263,7 +263,9 @@ export class ReimintExecutor implements Executor {
           validatorSet = new ValidatorSet(indexedValidatorSet, await ActiveValidatorSet.genesis(nextCommon, this.engine.getValidatorBls(vm, pendingBlock, nextCommon)));
         } else {
           const active = parentValidatorSet.active.copy();
-          active.reload(changes);
+          if (isEnableDAO(pendingCommon)) {
+            active.reloadBlsPublicKey(changes);
+          }
           validatorSet = new ValidatorSet(indexedValidatorSet, active);
         }
       }

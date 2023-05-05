@@ -3,7 +3,7 @@ import { ethers } from 'hardhat';
 import { assert, expect } from 'chai';
 import { BN, MAX_INTEGER, bufferToHex, toBuffer } from 'ethereumjs-util';
 import { Contract, ContractFactory, Signer, BigNumber } from 'ethers';
-import { validatorsDecode, validatorsEncode } from '@rei-network/core/src/consensus/reimint/contracts/utils';
+import { validatorsDecode, validatorsEncode } from '@rei-network/core/dist/reimint/contracts/utils';
 import { upTimestamp } from './utils';
 
 type MissRecord = [string, number];

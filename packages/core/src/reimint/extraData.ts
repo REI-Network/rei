@@ -3,10 +3,11 @@ import { VM } from '@rei-network/vm';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
 import { BlockHeader, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
-import { isEnableDAO } from '../../hardforks';
+import { isEnableDAO } from '../hardforks';
 import { ActiveValidatorSet } from './validatorSet';
 import { Evidence, DuplicateVoteEvidence, EvidenceFactory } from './evpool';
-import { BitArray, Reimint } from '../reimint';
+import { Reimint } from './reimint';
+import { BitArray } from './bitArray';
 import { Vote, VoteType, VoteSet, SignatureType } from './vote';
 import { Proposal } from './proposal';
 import * as v from './validate';
@@ -18,7 +19,6 @@ export interface ExtraDataOptions {
   valSet?: ActiveValidatorSet;
 }
 
-// TODO: add bls public key, remove the interface
 export interface ExtraDataFromBlockHeaderOptions extends Omit<ExtraDataOptions, 'header' | 'chainId'> {}
 
 type EXVote = Buffer;

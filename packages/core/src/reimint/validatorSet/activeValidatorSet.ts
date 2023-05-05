@@ -3,7 +3,7 @@ import { Common } from '@rei-network/common';
 import { StakeManager, ValidatorBls } from '../contracts';
 import { IndexedValidator } from './indexedValidatorSet';
 import { getGenesisValidators, genesisValidatorPriority, genesisValidatorVotingPower, isGenesis } from './genesis';
-import { isEnableBetterPOS } from '../../../hardforks';
+import { isEnableBetterPOS } from '../../hardforks';
 import { ActiveValidator as ActiveValidatorInfo } from '../contracts/stakeManager';
 
 const maxInt256 = new BN('7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 'hex');

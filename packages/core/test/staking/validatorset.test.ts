@@ -2,7 +2,7 @@ import { expect, assert } from 'chai';
 import { Address, BN, MAX_INTEGER } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { FunctionalAddressMap } from '@rei-network/utils';
-import { ValidatorSet, IndexedValidatorSet, IndexedValidator, ActiveValidatorSet } from '../../src/consensus/reimint/validatorSet';
+import { ValidatorSet, IndexedValidatorSet, IndexedValidator, ActiveValidatorSet } from '../../src/reimint/validatorSet';
 import { MockAccountManager } from '../util';
 
 const common = new Common({ chain: 'rei-testnet' });

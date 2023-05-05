@@ -5,17 +5,16 @@ import { hexStringToBN } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { BlockHeader, setCustomHashFunction, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
 import { StateManager } from './stateManager';
-import { ConsensusType } from './consensus/types';
-import { Reimint } from './consensus/reimint/reimint';
-import { Fee } from './consensus/reimint/contracts';
-import { bufferToAddress } from './consensus/reimint/contracts/utils';
+import { Reimint } from './reimint';
+import { Fee } from './reimint/contracts';
+import { bufferToAddress } from './reimint/contracts/utils';
 const assert = require('assert');
 
 /**
  * Set custom block hash function
  */
 setCustomHashFunction((header: BlockHeader) => {
-  if (header.extraData.length <= CLIQUE_EXTRA_VANITY || getConsensusTypeByCommon(header._common) === ConsensusType.Clique) {
+  if (header.extraData.length <= CLIQUE_EXTRA_VANITY) {
     return rlphash(header.raw());
   } else {
     return Reimint.calcBlockHash(header);
@@ -56,40 +55,6 @@ addPrecompile(
     param: 'free-staking'
   }
 );
-
-/**
- * Get consensus engine type by common instance
- * @param common - Common instance
- * @returns Consensus type
- */
-export function getConsensusTypeByCommon(common: Common) {
-  if (common.chainName() === 'rei-testnet') {
-    return ConsensusType.Reimint;
-  } else if (common.chainName() === 'rei-mainnet') {
-    return ConsensusType.Reimint;
-  } else if (common.chainName() === 'rei-devnet') {
-    return ConsensusType.Reimint;
-  } else {
-    throw new Error('unknown chain');
-  }
-}
-
-/**
- * Check whether reimint logic is enabled
- * @param common - Common instance
- * @returns Enable if `true`
- */
-export function isEnableRemint(common: Common) {
-  if (common.chainName() === 'rei-testnet') {
-    return true;
-  } else if (common.chainName() === 'rei-mainnet') {
-    return true;
-  } else if (common.chainName() === 'rei-devnet') {
-    return true;
-  } else {
-    throw new Error('unknown chain');
-  }
-}
 
 /**
  * Check whether hardfork1 logic is enabled

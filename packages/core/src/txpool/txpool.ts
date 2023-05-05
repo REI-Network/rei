@@ -15,7 +15,7 @@ import { TxPoolAccount, TxPoolOptions } from './types';
 import { txSlots, checkTxIntrinsicGas } from './utils';
 import { isEnableFreeStaking } from '../hardforks';
 import { validateTx } from '../validation';
-import { Fee } from '../consensus/reimint/contracts';
+import { Fee } from '../reimint/contracts';
 
 const defaultTxMaxSize = 32768 * 4;
 const defaultPriceLimit = new BN(1);

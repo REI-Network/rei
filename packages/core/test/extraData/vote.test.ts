@@ -1,10 +1,10 @@
 import crypto from 'crypto';
 import { expect } from 'chai';
 import { Address, BN } from 'ethereumjs-util';
-import { Vote, VoteType, SignatureType, VoteSet } from '../../src/consensus/reimint/vote';
+import { Vote, VoteType, SignatureType, VoteSet } from '../../src/reimint/vote';
 import { MockAccountManager } from '../util';
 import { Bls, SecretKey, initBls, importBls } from '@rei-network/bls';
-import { ActiveValidatorSet, ActiveValidator } from '../../src/consensus/reimint/validatorSet';
+import { ActiveValidatorSet, ActiveValidator } from '../../src/reimint/validatorSet';
 
 describe('BlsVote', () => {
   let bls: Bls;

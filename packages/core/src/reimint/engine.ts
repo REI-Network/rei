@@ -8,14 +8,13 @@ import TxContext from '@rei-network/vm/dist/evm/txContext';
 import { Block, HeaderData, BlockHeader, Transaction, Receipt } from '@rei-network/structure';
 import { Common } from '@rei-network/common';
 import { genesisStateByName } from '@rei-network/common/dist/genesisStates';
-import { logger, ignoreError } from '@rei-network/utils';
-import { Node } from '../../node';
-import { StateManager } from '../../stateManager';
+import { logger, ignoreError, Channel } from '@rei-network/utils';
+import { Node } from '../node';
+import { StateManager } from '../stateManager';
 import { ActiveValidatorSet, ValidatorSets } from './validatorSet';
-import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../../utils';
-import { getConsensusTypeByCommon, isEnableRemint, isEnableFreeStaking, loadInitData, isEnableHardfork2, isEnableBetterPOS, isEnableDAO } from '../../hardforks';
-import { ConsensusEngine, ConsensusEngineOptions, ConsensusType } from '../types';
-import { BaseConsensusEngine } from '../engine';
+import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../utils';
+import { isEnableFreeStaking, loadInitData, isEnableHardfork2, isEnableBetterPOS, isEnableDAO } from '../hardforks';
+import { Worker } from './worker';
 import { IProcessBlockResult } from './types';
 import { StakeManager, Contract, Fee, FeePool, ValidatorBls } from './contracts';
 import { StateMachine } from './state';
@@ -35,11 +34,11 @@ export class SimpleNodeSigner {
   }
 
   address(): Address {
-    return this.node.getCurrentEngine().coinbase;
+    return this.node.reimint.coinbase;
   }
 
   ecdsaUnlocked(): boolean {
-    const coinbase = this.node.getCurrentEngine().coinbase;
+    const coinbase = this.node.reimint.coinbase;
     if (isEmptyAddress(coinbase)) {
       return false;
     }
@@ -47,7 +46,7 @@ export class SimpleNodeSigner {
   }
 
   ecdsaSign(msg: Buffer): Buffer {
-    const signature = ecsign(msg, this.node.accMngr.getPrivateKey(this.node.getCurrentEngine().coinbase));
+    const signature = ecsign(msg, this.node.accMngr.getPrivateKey(this.node.reimint.coinbase));
     return Buffer.concat([signature.r, signature.s, intToBuffer(signature.v - 27)]);
   }
 
@@ -79,7 +78,14 @@ export class SimpleConfig {
   }
 }
 
-export class ReimintConsensusEngine extends BaseConsensusEngine implements ConsensusEngine {
+export interface ConsensusEngineOptions {
+  node: Node;
+  coinbase?: Address;
+}
+
+export class ReimintConsensusEngine {
+  readonly node: Node;
+  readonly worker: Worker;
   readonly state: StateMachine;
   readonly config: SimpleConfig = new SimpleConfig();
   readonly signer: SimpleNodeSigner;
@@ -87,17 +93,30 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
   readonly executor: ReimintExecutor;
   readonly validatorSets = new ValidatorSets();
 
+  protected _coinbase: Address;
+
+  protected msgLoopPromise?: Promise<void>;
+  protected readonly msgQueue = new Channel<Block>({ max: 1 });
+
   collector?: EvidenceCollector;
 
   constructor(options: ConsensusEngineOptions) {
-    super(options);
-
+    this.node = options.node;
+    this._coinbase = options.coinbase ?? EMPTY_ADDRESS;
+    this.worker = new Worker({ node: this.node, engine: this });
     this.signer = new SimpleNodeSigner(this.node);
     const db = new EvidenceDatabase(this.node.evidencedb);
     this.evpool = new EvidencePool({ backend: db });
     const wal = new WAL({ path: path.join(this.node.datadir, 'WAL') });
     this.state = new StateMachine(this, this.node.consensus, this.evpool, wal, this.node.chainId, this.config, this.signer);
     this.executor = new ReimintExecutor(this.node, this);
+  }
+
+  /**
+   * {@link ConsensusEngine.coinbase}
+   */
+  get coinbase() {
+    return this._coinbase;
   }
 
   /**
@@ -123,13 +142,53 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     }
   }
 
-  protected _start() {
-    logger.debug('ReimintConsensusEngine::start');
+  private async msgLoop() {
+    for await (const block of this.msgQueue) {
+      try {
+        await this._tryToMintNextBlock(block);
+      } catch (err) {
+        logger.error('BaseConsensusEngine::msgLoop, catch error:', err);
+      }
+    }
+  }
+
+  /**
+   * {@link ConsensusEngine.start}
+   */
+  start() {
+    if (this.msgLoopPromise) {
+      // ignore start
+      return;
+    }
+
+    this.msgLoopPromise = this.msgLoop();
     this.state.start();
   }
 
-  protected async _abort() {
-    await ignoreError(this.state.abort());
+  /**
+   * {@link ConsensusEngine.abort}
+   */
+  async abort() {
+    if (this.msgLoopPromise) {
+      this.msgQueue.abort();
+      await this.msgLoopPromise;
+      this.msgLoopPromise = undefined;
+      await ignoreError(this.state.abort());
+    }
+  }
+
+  /**
+   * {@link ConsensusEngine.tryToMintNextBlock}
+   */
+  tryToMintNextBlock(block: Block) {
+    this.msgQueue.push(block);
+  }
+
+  /**
+   * {@link ConsensusEngine.addTxs}
+   */
+  addTxs(txs: Map<Buffer, Transaction[]>) {
+    return this.worker.addTxs(txs);
   }
 
   /**
@@ -180,13 +239,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
 
   // calculate the gas limit of next block
   private calcGasLimit(parent: BlockHeader) {
-    const nextCommon = this.node.getCommon(parent.number.addn(1));
-    if (getConsensusTypeByCommon(parent._common) === ConsensusType.Clique) {
-      return getGasLimitByCommon(nextCommon);
-    } else {
-      // return Reimint.calcGasLimit(parent.gasLimit, parent.gasUsed);
-      return getGasLimitByCommon(nextCommon);
-    }
+    return getGasLimitByCommon(this.node.getCommon(parent.number.addn(1)));
   }
 
   /**
@@ -215,9 +268,7 @@ export class ReimintConsensusEngine extends BaseConsensusEngine implements Conse
     // deploy system contracts
     const vm = await this.node.getVM(root, common);
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
-    if (isEnableRemint(common)) {
-      await Contract.deployReimintContracts(evm, common);
-    }
+    await Contract.deployReimintContracts(evm, common);
     if (isEnableFreeStaking(common)) {
       await Contract.deployFreeStakingContracts(evm, common);
     }

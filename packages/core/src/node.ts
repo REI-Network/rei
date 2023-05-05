@@ -20,8 +20,7 @@ import { BloomBitsFilter, ReceiptsCache } from './bloomBits';
 import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
 import { Wire, ConsensusProtocol, WireProtocolHandler, SnapProtocol, SnapProtocolHandler } from './protocols';
-import { ReimintConsensusEngine, CliqueConsensusEngine } from './consensus';
-import { isEnableRemint } from './hardforks';
+import { ReimintConsensusEngine } from './reimint';
 import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
 import { StateManager } from './stateManager';
 import { SnapTree } from './snap/snapTree';
@@ -66,7 +65,6 @@ export class Node {
   readonly bcMonitor: BlockchainMonitor;
   readonly accMngr: AccountManager;
   readonly reimint: ReimintConsensusEngine;
-  readonly clique: CliqueConsensusEngine;
   readonly receiptsCache: ReceiptsCache;
   readonly snapTree?: SnapTree;
   readonly evmWorkMode: EVMWorkMode;
@@ -111,10 +109,6 @@ export class Node {
     this.db = new Database(this.chaindb, common);
     this.networkId = common.networkIdBN().toNumber();
     this.chainId = common.chainIdBN().toNumber();
-    this.clique = new CliqueConsensusEngine({
-      ...options.mine,
-      node: this
-    });
     this.reimint = new ReimintConsensusEngine({
       ...options.mine,
       node: this
@@ -219,7 +213,7 @@ export class Node {
 
       const latest = this.latestBlock.header;
       if (latest.number.eqn(0)) {
-        await this.getEngine(this.latestBlock._common).generateGenesis();
+        await this.reimint.generateGenesis();
       }
 
       if (this.snapTree && (await this.snapTree.init(latest.stateRoot, false, true)) && !this.skipVerifySnap) {
@@ -233,7 +227,6 @@ export class Node {
 
       await this.txPool.init(this.latestBlock);
       await this.reimint.init();
-      await this.clique.init();
       await this.bloomBitsIndexer.init();
       await this.bcMonitor.init(latest);
       await this.networkMngr.init();
@@ -272,7 +265,7 @@ export class Node {
     this.commitBlockQueue.abort();
     this.txSync.abort();
 
-    const promises = [this.clique.abort(), this.reimint.abort(), this.networkMngr.abort(), this.sync.abort(), this.txPool.abort(), this.bloomBitsIndexer.abort(), this.pendingTxsLoopPromise, this.commitBlockLoopPromise];
+    const promises = [this.reimint.abort(), this.networkMngr.abort(), this.sync.abort(), this.txPool.abort(), this.bloomBitsIndexer.abort(), this.pendingTxsLoopPromise, this.commitBlockLoopPromise];
     if (this.snapTree) {
       promises.push(this.snapTree.abort(this.latestBlock.header.stateRoot));
     }
@@ -302,11 +295,7 @@ export class Node {
    * It will try to continue mint a new block after the latest block
    */
   tryToMintNextBlock() {
-    const engine = this.getCurrentEngine();
-    if (!engine.isStarted) {
-      engine.start();
-    }
-    engine.tryToMintNextBlock(this.latestBlock);
+    this.reimint.tryToMintNextBlock(this.latestBlock);
   }
 
   /**
@@ -347,33 +336,6 @@ export class Node {
   }
 
   /**
-   * Get executor by common instance
-   * @param common - Common instance
-   * @returns Executor
-   */
-  getExecutor(common: Common) {
-    return this.getEngine(common).executor;
-  }
-
-  /**
-   * Get engine by common instance
-   * @param common - Common instance
-   * @returns Engine
-   */
-  getEngine(common: Common) {
-    return isEnableRemint(common) ? this.reimint : this.clique;
-  }
-
-  /**
-   * Get current working consensus engine
-   * @returns Consensus engine
-   */
-  getCurrentEngine() {
-    const nextCommon = this.getCommon(this.latestBlock.header.number.addn(1));
-    return this.getEngine(nextCommon);
-  }
-
-  /**
    * Get state manager object by state root
    * @param root - State root
    * @param num - Block number or Common
@@ -407,7 +369,7 @@ export class Node {
       blockchain: this.blockchain,
       mode: mode ?? this.evmWorkMode,
       exposed: this.chaindbDown.exposed,
-      getMiner: (header) => this.getEngine(header._common).getMiner(header)
+      getMiner: (header) => this.reimint.getMiner(header)
     });
   }
 
@@ -434,16 +396,16 @@ export class Node {
    * @returns Pending block
    */
   getPendingBlock() {
-    const engine = this.getCurrentEngine();
-    const pendingBlock = engine.worker.getPendingBlock();
+    const pendingBlock = this.reimint.worker.getPendingBlock();
     const lastest = this.latestBlock;
     if (pendingBlock) {
+      // TODO: transactions
       const { header, transactions } = pendingBlock.makeBlockData();
       header.stateRoot = header.stateRoot ?? lastest.header.stateRoot;
-      return engine.generatePendingBlock(header, pendingBlock.common, transactions);
+      return this.reimint.generatePendingBlock(header, pendingBlock.common);
     } else {
       const nextNumber = lastest.header.number.addn(1);
-      return engine.generatePendingBlock(
+      return this.reimint.generatePendingBlock(
         {
           parentHash: lastest.hash(),
           stateRoot: lastest.header.stateRoot,
@@ -459,8 +421,7 @@ export class Node {
    * @returns State manager instance
    */
   getPendingStateManager() {
-    const engine = this.getCurrentEngine();
-    const pendingBlock = engine.worker.getPendingBlock();
+    const pendingBlock = this.reimint.worker.getPendingBlock();
     if (pendingBlock) {
       return this.getStateManager(pendingBlock.pendingStateRoot, pendingBlock.common);
     } else {
@@ -490,10 +451,8 @@ export class Node {
 
     // if we are now under the reimint consensus,
     // we will refuse to roll back the block
-    if (isEnableRemint(block._common)) {
-      if (block.header.number.lte(this.latestBlock.header.number)) {
-        throw new Error('reimint revert');
-      }
+    if (block.header.number.lte(this.latestBlock.header.number)) {
+      throw new Error('reimint revert');
     }
 
     // save block to the database
@@ -554,7 +513,7 @@ export class Node {
             this.wire.broadcastNewBlock(block, this.totalDifficulty);
           }
 
-          const promises = [this.txPool.newBlock(block, force), this.bcMonitor.newBlock(block, force), this.bloomBitsIndexer.newBlockHeader(block.header, force), this.getEngine(block._common).newBlock(block)];
+          const promises = [this.txPool.newBlock(block, force), this.bcMonitor.newBlock(block, force), this.bloomBitsIndexer.newBlockHeader(block.header, force), this.reimint.newBlock(block)];
           await Promise.all(promises);
         }
 
@@ -580,7 +539,7 @@ export class Node {
           for (const handler of this.wire.pool.handlers) {
             handler.announceTx(hashes);
           }
-          await this.getCurrentEngine().addTxs(readies);
+          await this.reimint.addTxs(readies);
         }
         task.resolve(results);
       } catch (err) {

@@ -7,10 +7,7 @@ export interface EvidenceConstructor extends ContructorWithCode<Evidence> {
   fromValuesArray(values: any[]): Evidence;
 }
 
-export class EvidenceFactory {
-  // disable constructor
-  private constructor() {}
-
+export abstract class EvidenceFactory {
   static registry = new Registry<Evidence, EvidenceConstructor>();
 
   static fromSerializedEvidence(serialized: Buffer) {

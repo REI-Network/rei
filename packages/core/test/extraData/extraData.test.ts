@@ -4,9 +4,7 @@ import { Address, BN } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { SecretKey, initBls, importBls } from '@rei-network/bls';
 import { BlockHeader } from '@rei-network/structure';
-import { Vote, VoteType, VoteSet, Reimint, ExtraData, SignatureType, Proposal } from '../../src/consensus/reimint';
-import { ActiveValidatorSet, ActiveValidator } from '../../src/consensus/reimint/validatorSet';
-import { DuplicateVoteEvidence } from '../../src/consensus';
+import { DuplicateVoteEvidence, Vote, VoteType, VoteSet, Reimint, ExtraData, SignatureType, Proposal, ActiveValidatorSet, ActiveValidator } from '../../src/reimint';
 import { MockAccountManager } from '../util';
 
 describe('extraDataBls', () => {

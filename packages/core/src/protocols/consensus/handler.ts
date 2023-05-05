@@ -1,8 +1,8 @@
 import { BN } from 'ethereumjs-util';
 import { Channel, FunctionalBufferSet, logger } from '@rei-network/utils';
 import { Peer, ProtocolStream, ProtocolHandler } from '@rei-network/network';
-import { RoundStepType, Proposal, Vote, BitArray, VoteType, VoteSet, MessageFactory, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint';
-import * as m from '../../consensus/reimint/messages';
+import { RoundStepType, Proposal, Vote, BitArray, VoteType, VoteSet, MessageFactory, Evidence, DuplicateVoteEvidence } from '../../reimint';
+import * as m from '../../reimint/messages';
 import { ConsensusProtocol } from './protocol';
 
 const peerGossipSleepDuration = 100;
@@ -52,12 +52,15 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
       if (result) {
         this.protocol.addHandler(this);
 
-        // start gossip loop
-        if (this.reimint.isStarted) {
-          this.onEngineStart();
-        } else {
-          this.reimint.on('start', this.onEngineStart);
+        // broadcast all cached evidence
+        for (const ev of this.node.reimint.evpool.pendingEvidence) {
+          this.evidenceQueue.push(ev);
         }
+
+        // start gossip loops
+        this.gossipDataLoop();
+        this.gossipVotesLoop();
+        this.gossipEvidenceLoop();
 
         // send round step message
         const newRoundMsg = this.reimint.state.genNewRoundStepMessage();
@@ -73,17 +76,6 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
   get reimint() {
     return this.protocol.node.reimint;
   }
-
-  private onEngineStart = () => {
-    // broadcast all cached evidence
-    for (const ev of this.node.reimint.evpool.pendingEvidence) {
-      this.evidenceQueue.push(ev);
-    }
-
-    this.gossipDataLoop();
-    this.gossipVotesLoop();
-    this.gossipEvidenceLoop();
-  };
 
   private async gossipDataLoop() {
     while (!this.aborted) {
@@ -210,7 +202,6 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
    */
   abort() {
     this.aborted = true;
-    this.reimint.off('start', this.onEngineStart);
     this.protocol.removeHandler(this);
     this.evidenceQueue.abort();
   }

@@ -6,8 +6,8 @@ import { TypedTransaction, Transaction } from '@rei-network/structure';
 import { logger } from '@rei-network/utils';
 import { VM } from '@rei-network/vm';
 import { StateManager as IStateManager } from '@rei-network/vm/dist/state';
-import { StateManager } from '../../stateManager';
-import { validateTx } from '../../validation';
+import { StateManager } from '../stateManager';
+import { validateTx } from '../validation';
 import { encode } from './contracts';
 
 const usageTopic = toBuffer('0x873c82cd37aaacdcf736cbb6beefc8da36d474b65ad23aaa1b1c6fbd875f7076');

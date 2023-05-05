@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 import { expect } from 'chai';
-import { FileGroup, GroupFileReader, makeGroupFilePath } from '../../src/consensus/reimint/wal';
+import { FileGroup, GroupFileReader, makeGroupFilePath } from '../../src/reimint/wal';
 
 class MockFileGroup {
   readonly path: string;

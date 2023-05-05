@@ -1,13 +1,13 @@
 import { toBuffer, setLengthLeft, Address, BN, rlphash } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@rei-network/structure';
-import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../../utils';
+import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../utils';
 import { ISigner } from './types';
 import { ExtraData } from './extraData';
 import { Proposal } from './proposal';
 import { VoteType, VoteSet, SignatureType } from './vote';
 import { Evidence } from './evpool';
-import { isEnableDAO } from '../../hardforks';
+import { isEnableDAO } from '../hardforks';
 
 const defaultRound = 0;
 const defaultPOLRound = -1;

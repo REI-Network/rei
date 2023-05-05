@@ -3,8 +3,8 @@ import { Address, BN } from 'ethereumjs-util';
 import Message from '@rei-network/vm/dist/evm/message';
 import { Common } from '@rei-network/common';
 import { hexStringToBuffer, logger } from '@rei-network/utils';
-import { isEnableBetterPOS } from '../../../hardforks';
-import { EMPTY_ADDRESS } from '../../../utils';
+import { isEnableBetterPOS } from '../../hardforks';
+import { EMPTY_ADDRESS } from '../../utils';
 import { ActiveValidatorSet, genesisValidatorPriority } from '../validatorSet';
 import { encode, validatorsEncode } from './utils';
 

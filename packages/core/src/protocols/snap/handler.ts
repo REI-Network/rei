@@ -3,7 +3,7 @@ import { keccak256, KECCAK256_NULL } from 'ethereumjs-util';
 import { logger } from '@rei-network/utils';
 import { ProtocolHandler, Peer, ProtocolStream } from '@rei-network/network';
 import { SnapProtocol } from './protocol';
-import * as s from '../../consensus/reimint/snapMessages';
+import * as s from '../../reimint/snapMessages';
 import { EMPTY_HASH, MAX_HASH } from '../../utils';
 import { StakingAccount } from '../../stateManager';
 import { mergeProof } from '../../snap/utils';

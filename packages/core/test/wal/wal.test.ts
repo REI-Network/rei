@@ -3,7 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { BN } from 'ethereumjs-util';
 import { assert, expect } from 'chai';
-import { WAL, WALReader, StateMachineEndHeight, StateMachineMessage, StateMachineMsg, RoundStepType, GetProposalBlockMessage, NewRoundStepMessage } from '../../src/consensus/reimint';
+import { WAL, WALReader, StateMachineEndHeight, StateMachineMessage, StateMachineMsg, RoundStepType, GetProposalBlockMessage, NewRoundStepMessage } from '../../src/reimint';
 
 const testDir = path.join(__dirname, 'test-dir');
 const wal = new WAL({ path: testDir });

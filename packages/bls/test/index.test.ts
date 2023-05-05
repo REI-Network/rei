@@ -26,7 +26,7 @@ describe('BlsManager', () => {
     blsPath1 = result.path;
     publickey1 = result.publickey;
     await blsManager.unlock(blsPath1, password);
-    expect(blsManager.getPublicKey().toHex()).to.equal(publickey1, 'public key should be equal');
+    expect(blsManager.getPublicKey()!.toHex()).to.equal(publickey1, 'public key should be equal');
   });
 
   it('should update bls key successfully', async () => {
@@ -42,7 +42,7 @@ describe('BlsManager', () => {
     }
 
     await blsManager.unlock(blsPath1, newPassword);
-    expect(blsManager.getPublicKey().toHex()).to.equal(publickey1, 'public key should be equal');
+    expect(blsManager.getPublicKey()!.toHex()).to.equal(publickey1, 'public key should be equal');
   });
 
   it('should import bls key successfully', async () => {
@@ -52,13 +52,13 @@ describe('BlsManager', () => {
     blsPath2 = result.path;
     publickey2 = result.publickey;
     await blsManager.unlock(blsPath2, anotherPassword);
-    expect(blsManager.getPublicKey().toHex()).to.equal(publickey2, 'public key should be equal');
+    expect(blsManager.getPublicKey()!.toHex()).to.equal(publickey2, 'public key should be equal');
   });
 
   it('should signMessage and verifySignature successfully', async () => {
     const message = 'reireirei';
     const signature = blsManager.signMessage(Buffer.from(message));
-    const verifyResult = blsManager.verifyMessage(blsManager.getPublicKey().toBytes(), Buffer.from(message), signature.toBytes());
+    const verifyResult = blsManager.verifyMessage(blsManager.getPublicKey()!.toBytes(), Buffer.from(message), signature.toBytes());
     expect(verifyResult).to.equal(true, 'verify result should be true');
   });
 

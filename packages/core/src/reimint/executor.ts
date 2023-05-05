@@ -1,16 +1,20 @@
-import { Address, BN, bufferToHex } from 'ethereumjs-util';
+import { Address, BN, BNLike, bufferToHex } from 'ethereumjs-util';
+import { Database } from '@rei-network/database';
 import { logger, FunctionalAddressMap } from '@rei-network/utils';
-import { Block, Log, Receipt } from '@rei-network/structure';
+import { Blockchain } from '@rei-network/blockchain';
+import { Common } from '@rei-network/common';
+import { Block, Log, Receipt, TypedTransaction } from '@rei-network/structure';
 import { RunBlockOpts, rewardAccount } from '@rei-network/vm/dist/runBlock';
 import { StateManager as IStateManager } from '@rei-network/vm/dist/state';
 import { RunTxResult } from '@rei-network/vm/dist/runTx';
 import { VM } from '@rei-network/vm';
+import Bloom from '@rei-network/vm/dist/bloom';
+import { IDebug } from '@rei-network/vm/dist/types';
 import EVM, { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';
-import { ExecutorBackend, FinalizeOpts, ProcessBlockOpts, ProcessTxOpts, Executor } from '../types';
-import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../../utils';
-import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableBetterPOS, isEnableDAO } from '../../hardforks';
-import { StateManager } from '../../stateManager';
+import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../utils';
+import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableBetterPOS, isEnableDAO } from '../hardforks';
+import { StateManager } from '../stateManager';
 import { ValidatorSet, ValidatorChanges, isGenesis, IndexedValidatorSet, ActiveValidatorSet } from './validatorSet';
 import { StakeManager, SlashReason, Fee, Contract, ValidatorBls } from './contracts';
 import { Reimint } from './reimint';
@@ -18,6 +22,56 @@ import { Evidence, DuplicateVoteEvidence } from './evpool';
 import { ExtraData } from './extraData';
 import { ReimintConsensusEngine } from './engine';
 import { makeRunTxCallback } from './makeRunTxCallback';
+
+export interface FinalizeOpts {
+  block: Block;
+  stateRoot: Buffer;
+  receipts: Receipt[];
+
+  round?: number;
+  evidence?: Evidence[];
+  parentStateRoot?: Buffer;
+}
+
+export interface FinalizeResult {
+  finalizedStateRoot: Buffer;
+}
+
+export interface ProcessBlockOpts {
+  block: Block;
+  force?: boolean;
+  debug?: IDebug;
+  skipConsensusValidation?: boolean;
+  skipConsensusVerify?: boolean;
+}
+
+export interface ProcessBlockResult {
+  receipts: Receipt[];
+}
+
+export interface ProcessTxOpts {
+  block: Block;
+  root: Buffer;
+  tx: TypedTransaction;
+  blockGasUsed?: BN;
+
+  totalAmount?: BN;
+}
+
+export interface ProcessTxResult {
+  receipt: Receipt;
+  gasUsed: BN;
+  bloom: Bloom;
+  root: Buffer;
+}
+
+export interface ExecutorBackend {
+  readonly db: Database;
+  readonly blockchain: Blockchain;
+  getCommon(num: BNLike): Common;
+  getStateManager(root: Buffer, num: BNLike | Common, snap?: boolean): Promise<StateManager>;
+  getVM(root: Buffer, num: BNLike | Common, snap?: boolean, mode?: EVMWorkMode): Promise<VM>;
+}
 
 /**
  * Calculate accumulative fee usage
@@ -46,7 +100,7 @@ function calcAccUsage(receipts: Receipt[]) {
   };
 }
 
-export class ReimintExecutor implements Executor {
+export class ReimintExecutor {
   private readonly backend: ExecutorBackend;
   private readonly engine: ReimintConsensusEngine;
 

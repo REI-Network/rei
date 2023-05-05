@@ -1,6 +1,6 @@
 import { BN, bnToUnpaddedBuffer, bufferToInt, intToBuffer, rlp } from 'ethereumjs-util';
 import { Message, MessageFactory } from '../messages';
-import { RoundStepType } from '../types';
+import { RoundStepType } from '../enum';
 import * as v from '../validate';
 
 export interface StateMachineMsg {

@@ -5,7 +5,7 @@ import { Address } from 'ethereumjs-util';
 import { logger } from '@rei-network/utils';
 import { NetworkManagerOptions } from '@rei-network/network';
 import { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
-import { ConsensusEngineOptions } from './consensus/types';
+import { ConsensusEngineOptions } from './reimint';
 import { SynchronizerOptions } from './sync';
 import { Node } from './node';
 import { NodeOptions, AccountManagerConstructorOptions, BlsManagerConstructorOptions } from './types';

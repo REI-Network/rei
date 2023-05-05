@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { expect } from 'chai';
 import { BN, bufferToHex } from 'ethereumjs-util';
 import { getRandomIntInclusive } from '@rei-network/utils';
-import { EvidenceCollector } from '../src/consensus/reimint/evidenceCollector';
+import { EvidenceCollector } from '../src/reimint/evidenceCollector';
 
 describe('EvidenceCollector', () => {
   const evidence = new Map<number, Buffer[]>();

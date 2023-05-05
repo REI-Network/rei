@@ -1,10 +1,10 @@
 import fs from 'fs';
 import path from 'path';
-import { Common } from '@rei-network/common';
-import { Journal } from '../../src/txpool/journal';
-import { Transaction } from '@rei-network/structure';
 import { expect } from 'chai';
+import { Common } from '@rei-network/common';
+import { Transaction } from '@rei-network/structure';
 import { FunctionalBufferMap, hexStringToBuffer, setLevel } from '@rei-network/utils';
+import { Journal } from '../../src/txpool/journal';
 
 setLevel('silent');
 class MockNode {

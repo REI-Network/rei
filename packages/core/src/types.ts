@@ -1,7 +1,7 @@
 import { BN } from 'ethereumjs-util';
 import { NetworkManagerOptions } from '@rei-network/network';
 import { Receipt, Block } from '@rei-network/structure';
-import { ConsensusEngineOptions } from './consensus/types';
+import { ConsensusEngineOptions } from './reimint';
 import { SynchronizerOptions } from './sync';
 
 export interface ConsensusEngineConstructorOptions extends Omit<ConsensusEngineOptions, 'node'> {}

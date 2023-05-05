@@ -7,13 +7,13 @@ import { Common } from '@rei-network/common';
 import { PendingTxMap } from '../txpool';
 import { EMPTY_ADDRESS, EMPTY_NONCE, EMPTY_MIX_HASH, EMPTY_EXTRA_DATA } from '../utils';
 import { isEnableFreeStaking } from '../hardforks';
-import { ConsensusEngine, FinalizeOpts, ProcessTxResult } from './types';
-import { ReimintConsensusEngine } from './reimint/engine';
+import { FinalizeOpts, ProcessTxResult } from './executor';
+import { ReimintConsensusEngine } from './engine';
 
 export interface PendingBlockFinalizeOpts extends Pick<FinalizeOpts, 'round' | 'evidence'> {}
 
 export class PendingBlock {
-  private engine: ConsensusEngine;
+  private engine: ReimintConsensusEngine;
   private lock = new Semaphore(1);
 
   private _common: Common;
@@ -45,7 +45,7 @@ export class PendingBlock {
 
   private totalAmount?: BN;
 
-  constructor(engine: ConsensusEngine, parentHash: Buffer, parentStateRoot: Buffer, number: BN, timestamp: BN, common: Common, extraData?: Buffer) {
+  constructor(engine: ReimintConsensusEngine, parentHash: Buffer, parentStateRoot: Buffer, number: BN, timestamp: BN, common: Common, extraData?: Buffer) {
     if (extraData && extraData.length !== 32) {
       throw new Error('invalid extra data length');
     }
@@ -179,7 +179,7 @@ export class PendingBlock {
       // if free staking is enable, initialize variables
       if (isEnableFreeStaking(this._common)) {
         if (this.totalAmount === undefined) {
-          this.totalAmount = await (this.engine as ReimintConsensusEngine).getTotalAmount(this._parentStateRoot, this._common);
+          this.totalAmount = await this.engine.getTotalAmount(this._parentStateRoot, this._common);
         }
       }
 

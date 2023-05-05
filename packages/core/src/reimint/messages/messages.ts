@@ -1,9 +1,9 @@
 import { rlp, BN, bnToUnpaddedBuffer, intToBuffer, bufferToInt } from 'ethereumjs-util';
 import { Block, BlockBuffer, BlockOptions } from '@rei-network/structure';
-import { RoundStepType } from '../types';
+import { RoundStepType } from '../enum';
 import { Proposal } from '../proposal';
 import { BitArray, BitArrayRaw } from '../bitArray';
-import { Vote, VoteType, SignatureType } from '../vote';
+import { Vote, VoteType } from '../vote';
 import { DuplicateVoteEvidence } from '../evpool';
 import * as v from '../validate';
 

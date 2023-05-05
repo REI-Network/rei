@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import process from 'process';
-import { BN, toBuffer } from 'ethereumjs-util';
 import { Node, NodeFactory } from '@rei-network/core';
 import { RpcServer } from '@rei-network/rpc';
 import { setLevel, logger } from '@rei-network/utils';
@@ -32,55 +31,32 @@ export async function startServices(opts: { [option: string]: string }): Promise
     passphrase = await getPassphrase(opts, { addresses });
   }
 
-  if (!!opts.blsPassword !== !!opts.blsFile) {
-    throw Error('Error: blsPassword and blsFile must be used together');
-  }
-  const bls = {
-    bls: getBlsPath(opts),
-    blsFileName: opts.blsFile,
-    blsPassword: opts.blsPassword ? fs.readFileSync(path.isAbsolute(opts.blsPassword) ? opts.blsPassword : path.join(getBlsPath(opts), opts.blsPassword), 'utf-8').trim() : undefined
-  };
-  const account = {
-    keyStorePath: getKeyStorePath(opts),
-    unlock: addresses.map((address, i): [string, string] => [address, passphrase[i]])
-  };
-  const network = {
-    nat: opts.p2pNat,
-    libp2pOptions: {
-      tcpPort: opts.p2pTcpPort ? Number(opts.p2pTcpPort) : undefined,
-      udpPort: opts.p2pUdpPort ? Number(opts.p2pUdpPort) : undefined,
-      maxPeers: opts.maxPeers ? Number(opts.maxPeers) : undefined,
-      bootnodes: opts.bootnodes ? (opts.bootnodes as unknown as string[]) : undefined
-    }
-  };
-  const mine = {
-    enable: !!opts.mine,
-    coinbase: opts.coinbase
-  };
-  // TODO:
-  const sync = {
-    mode: opts.sync,
-    snapSyncMinTD: opts.snapMinTd ? Number(opts.snapMinTd) : undefined,
-    trustedHeight: opts.snapTrustedHeight ? new BN(opts.snapTrustedHeight) : undefined,
-    trustedHash: opts.snapTrustedHeight ? toBuffer(opts.snapTrustedHash) : undefined
-  };
-
   // create node instance
   const node = await NodeFactory.createNode({
+    unlock: addresses.map((address, i): [string, string] => [address, passphrase[i]]),
+    blsFileName: opts.blsFile,
+    blsPassword: opts.blsPassword ? fs.readFileSync(path.isAbsolute(opts.blsPassword) ? opts.blsPassword : path.join(getBlsPath(opts), opts.blsPassword), 'utf-8').trim() : undefined,
     databasePath: opts.datadir,
     chain: opts.chain,
-    evm: opts.evm,
-    skipVerifySnap: opts.skipVerifySnap as any,
     receiptsCacheSize: opts.receiptsCacheSize ? Number(opts.receiptsCacheSize) : undefined,
-    sync,
-    mine,
-    network,
-    account,
-    bls
+    evmWorkMode: opts.evm,
+    skipVerifySnap: opts.skipVerifySnap as unknown as boolean,
+    coinbase: opts.coinbase,
+    tcpPort: opts.p2pTcpPort ? Number(opts.p2pTcpPort) : undefined,
+    udpPort: opts.p2pUdpPort ? Number(opts.p2pUdpPort) : undefined,
+    bootnodes: opts.bootnodes ? (opts.bootnodes as unknown as string[]) : undefined,
+    keyStorePath: getKeyStorePath(opts),
+    blsPath: getBlsPath(opts),
+    syncMode: opts.sync,
+    snapSyncMinTD: opts.snapMinTd ? Number(opts.snapMinTd) : undefined,
+    trustedHeight: opts.snapTrustedHeight,
+    trustedHash: opts.snapTrustedHeight
   });
 
-  // create api server instance
+  // create API server instance
   const apiServer = new ApiServer(node, loadVersion());
+
+  // start API server
   apiServer.start();
 
   const rpc = {
@@ -89,15 +65,19 @@ export async function startServices(opts: { [option: string]: string }): Promise
     host: opts.rpcHost ? opts.rpcHost : undefined,
     apis: opts.rpcApi ? opts.rpcApi : undefined
   };
-  // create rpc server instance
+  // create RPC server instance
   const rpcServer = new RpcServer(rpc);
   if (opts.rpc) {
+    // start RPC server if it is enabled
     await rpcServer.start();
   }
+
   apiServer.setRpcServer(rpcServer);
 
-  // create ipc server instance
+  // create IPC server instance
   const ipcServer = new IpcServer(apiServer, opts.datadir);
+
+  // start IPC server
   await ipcServer.start();
 
   return { node, apiServer, ipcServer, rpcServer };

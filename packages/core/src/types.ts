@@ -1,24 +1,7 @@
-import { BN } from 'ethereumjs-util';
-import { NetworkManagerOptions } from '@rei-network/network';
-import { Receipt, Block } from '@rei-network/structure';
-import { ReimintEngineOptions } from './reimint';
-import { SynchronizerOptions } from './sync';
-
-export interface ConsensusEngineConstructorOptions extends Omit<ReimintEngineOptions, 'node'> {}
-
-export interface NetworkManagerConstructorOptions extends Omit<NetworkManagerOptions, 'protocols' | 'nodedb'> {}
-
-export interface AccountManagerConstructorOptions {
-  /**
-   * Keystore full path
-   */
-  keyStorePath: string;
-}
-
-export interface BlsManagerConstructorOptions {
-  bls: string;
-}
-export interface SyncConstructorOptions extends Omit<SynchronizerOptions, 'node'> {}
+import type { Address, BN } from 'ethereumjs-util';
+import type PeerId from 'peer-id';
+import type { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
+import type { SyncMode } from './sync';
 
 export interface NodeOptions {
   /**
@@ -36,32 +19,55 @@ export interface NodeOptions {
   /*
    * Evm implementation type
    */
-  evm?: string;
+  evmWorkMode?: EVMWorkMode;
   /**
    * Whether skip verifing snapshot
    */
   skipVerifySnap?: boolean;
-
   /**
-   * Miner options
+   * Miner address
    */
-  mine: ConsensusEngineConstructorOptions;
+  coinbase?: Address;
   /**
-   * Network options
+   * Peer id
    */
-  network: NetworkManagerConstructorOptions;
+  peerId: PeerId;
   /**
-   * Account options
+   * P2P TCP port
    */
-  account: AccountManagerConstructorOptions;
+  tcpPort?: number;
   /**
-   * Bls options
+   * P2p UDP port
    */
-  bls: BlsManagerConstructorOptions;
+  udpPort?: number;
   /**
-   * Sync options
+   * Boot nodes list
    */
-  sync: SyncConstructorOptions;
+  bootnodes?: string[];
+  /**
+   * Keystore full path
+   */
+  keyStorePath: string;
+  /**
+   * BLS file path
+   */
+  blsPath: string;
+  /**
+   * Sync mode
+   */
+  syncMode?: SyncMode;
+  /**
+   * Snap sync min total difficulty
+   */
+  snapSyncMinTD?: number;
+  /**
+   * Trusted height
+   */
+  trustedHeight?: BN;
+  /**
+   * Trusted block hash
+   */
+  trustedHash?: Buffer;
 }
 
 export type NodeStatus = {
@@ -71,11 +77,3 @@ export type NodeStatus = {
   bestHash: Buffer;
   genesisHash: Buffer;
 };
-
-export interface CommitBlockOptions {
-  broadcast: boolean;
-  block: Block;
-  receipts: Receipt[];
-  force?: boolean;
-  td?: BN;
-}

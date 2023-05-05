@@ -8,7 +8,7 @@ import { Common } from '@rei-network/common';
 import { Blockchain } from '@rei-network/blockchain';
 import { VM } from '@rei-network/vm';
 import { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
-import { Transaction, Block } from '@rei-network/structure';
+import { Transaction, Block, Receipt } from '@rei-network/structure';
 import { Channel, logger } from '@rei-network/utils';
 import { AccountManager } from '@rei-network/wallet';
 import { BlsManager } from '@rei-network/bls';
@@ -21,7 +21,7 @@ import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
 import { Wire, ConsensusProtocol, WireProtocolHandler, SnapProtocol, SnapProtocolHandler } from './protocols';
 import { ReimintEngine } from './reimint';
-import { CommitBlockOptions, NodeOptions, NodeStatus } from './types';
+import { NodeOptions, NodeStatus } from './types';
 import { StateManager } from './stateManager';
 import { SnapTree } from './snap/snapTree';
 
@@ -30,6 +30,7 @@ const defaultTimeoutBanTime = 60 * 5 * 1000;
 const defaultInvalidBanTime = 60 * 10 * 1000;
 const defaultChainName = 'rei-mainnet';
 const defaultEVMWorkMode = EVMWorkMode.JS;
+const defaultSyncMode = SyncMode.Full;
 
 type PendingTxs = {
   txs: Transaction[];
@@ -41,6 +42,14 @@ type CommitBlock = {
   resolve: (result: boolean) => void;
   reject: (reason?: any) => void;
 };
+
+export interface CommitBlockOptions {
+  broadcast: boolean;
+  block: Block;
+  receipts: Receipt[];
+  force?: boolean;
+  td?: BN;
+}
 
 export class Node {
   readonly datadir: string;
@@ -94,10 +103,10 @@ export class Node {
     this.wire = new Wire(this);
     this.consensus = new ConsensusProtocol(this);
     this.snap = new SnapProtocol(this);
-    this.accMngr = new AccountManager(options.account.keyStorePath);
+    this.accMngr = new AccountManager(options.keyStorePath);
     this.receiptsCache = new ReceiptsCache(options.receiptsCacheSize);
-    this.evmWorkMode = (options.evm as EVMWorkMode) ?? defaultEVMWorkMode;
-    this.blsMngr = new BlsManager(options.bls.bls);
+    this.evmWorkMode = options.evmWorkMode ?? defaultEVMWorkMode;
+    this.blsMngr = new BlsManager(options.blsPath);
     this.skipVerifySnap = options.skipVerifySnap;
 
     this.chain = options.chain ?? defaultChainName;
@@ -110,8 +119,8 @@ export class Node {
     this.networkId = common.networkIdBN().toNumber();
     this.chainId = common.chainIdBN().toNumber();
     this.reimint = new ReimintEngine({
-      ...options.mine,
-      node: this
+      node: this,
+      coinbase: options.coinbase
     });
 
     const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
@@ -129,26 +138,28 @@ export class Node {
 
     const protocols: (Protocol | Protocol[])[] = [[this.wire.v2, this.wire.v1], this.consensus];
     // enable the snapshot protocol only when the snapshot is synchronized
-    if (options.sync.mode === SyncMode.Snap) {
+    if (options.syncMode === SyncMode.Snap) {
       protocols.push(this.snap);
     }
 
-    const networkOptions = options.network;
     this.networkMngr = new NetworkManager({
-      ...networkOptions,
+      peerId: options.peerId,
       protocols,
       nodedb: this.nodedb,
       libp2pOptions: {
-        ...networkOptions.libp2pOptions,
-        bootnodes: [...common.bootstrapNodes(), ...(networkOptions.libp2pOptions!.bootnodes ?? [])]
+        tcpPort: options.tcpPort,
+        udpPort: options.udpPort,
+        bootnodes: [...common.bootstrapNodes(), ...(options.bootnodes ?? [])]
       }
     })
       .on('installed', this.onPeerInstalled)
       .on('removed', this.onPeerRemoved);
-
     this.sync = new Synchronizer({
-      ...options.sync,
-      node: this
+      node: this,
+      mode: options.syncMode ?? defaultSyncMode,
+      snapSyncMinTD: options.snapSyncMinTD,
+      trustedHash: options.trustedHash,
+      trustedHeight: options.trustedHeight
     })
       .on('synchronized', this.onSyncOver)
       .on('failed', this.onSyncOver);
@@ -163,7 +174,7 @@ export class Node {
     });
 
     // enable snapshot generation only during snapshot synchronization
-    if (options.sync.mode === SyncMode.Snap) {
+    if (options.syncMode === SyncMode.Snap) {
       this.snapTree = new SnapTree(this.db);
     }
   }

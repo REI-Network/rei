@@ -342,7 +342,11 @@ export class ActiveValidatorSet {
    */
   reload(changes: ValidatorChanges) {
     changes.blsValidators.forEach((pk, validator) => {
-      this.active.find(({ validator: _validator }) => _validator.equals(validator))!.blsPublicKey = pk;
+      this.active.find((v) => {
+        if (v.validator.equals(validator)) {
+          v.blsPublicKey = pk;
+        }
+      });
     });
   }
 

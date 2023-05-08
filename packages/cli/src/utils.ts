@@ -3,8 +3,8 @@ import path from 'path';
 import inquirer from 'inquirer';
 
 /**
- * Get account passphrase, if the user specifies the file, read from the file, if not, let the user input
- * @param opts - Commander options
+ * Get passphrase, if the user specifies the file, read from the file, if not, let the user input
+ * @param password - Password
  * @param options.address - Address that requires passphrase
  * @param options.repeat - Does the user need to enter the passphrase twice
  * @param options.message - Message displayed when the user enters the passphrase

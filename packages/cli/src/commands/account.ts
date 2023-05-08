@@ -33,7 +33,7 @@ export function installAccountCommand(program: any) {
         const manager = new AccountManager(getKeyStorePath(program.opts()));
         const { address, path } = await manager.newAccount(passphrase);
         console.log('\nYour new key was generated\n');
-        console.log('Public address of the key :', toChecksumAddress(address.toString()));
+        console.log('Public address of the key:', toChecksumAddress(address.toString()));
         console.log('Path of the secret key file:', path, '\n');
         console.log('- You can share your public address with anyone. Others need it to interact with you.');
         console.log('- You must NEVER share the secret key with anyone! The key controls access to your funds!');

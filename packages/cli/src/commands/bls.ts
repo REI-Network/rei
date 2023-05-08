@@ -17,8 +17,9 @@ export function installBlsCommand(program: any) {
         const manager = new BlsManager(getBlsPath(program.opts()));
         const { publickey, path } = await manager.newSigner(passphrase);
         console.log('\nYour new key was generated\n');
-        console.log('PublicKey :', publickey);
+        console.log('Public key:', publickey);
         console.log('Path of the secret key file:', path, '\n');
+        console.log('If you have not registered the BLS public key, please go to https://dao.rei.network to register.');
         console.log('- You can share your publickey with anyone. Others need it to interact with you.');
         console.log('- You must NEVER share the secret key with anyone! The key controls access to your block signature!');
         console.log("- You must BACKUP your key file! Without the key, it's impossible to access block signature!");
@@ -51,7 +52,7 @@ export function installBlsCommand(program: any) {
         const manager = new BlsManager(getBlsPath(program.opts()));
         const passphrase = (await getPassphrase(program.opts().blsPassword, { repeat: true, message: 'Your new bls key is locked with a password. Please give a password. Do not forget this password.' }))[0];
         const { publickey, path } = await manager.importSignerBySecretKey(secrecKey, passphrase);
-        console.log('PublicKey :', publickey);
+        console.log('Public key:', publickey);
         console.log('Path of the secret key file:', path, '\n');
       } catch (err) {
         logger.error('Bls, import, error:', err);

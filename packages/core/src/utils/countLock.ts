@@ -1,8 +1,16 @@
+/**
+ * A simple count lock,
+ * when the count reaches 0, the lock will be released
+ */
 export class CountLock {
   private lock?: Promise<void>;
   private resolve?: () => void;
   private count: number = 0;
 
+  /**
+   * Increase count
+   * @param count - Count number
+   */
   increase(count: number = 1) {
     if (this.count === 0) {
       this.lock = new Promise((r) => {
@@ -13,6 +21,10 @@ export class CountLock {
     this.count += count;
   }
 
+  /**
+   * Decrease count
+   * @param count - Count number
+   */
   decrease(count: number = 1) {
     if (this.count - count < 0) {
       throw new Error('invalid decrease');
@@ -27,6 +39,9 @@ export class CountLock {
     }
   }
 
+  /**
+   * Wait until the count reaches 0
+   */
   wait() {
     return this.lock ?? Promise.resolve();
   }

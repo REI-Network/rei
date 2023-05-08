@@ -29,16 +29,13 @@ export async function startServices(opts: { [option: string]: string }): Promise
   let passphrase: string[] = [];
   if (opts.unlock) {
     addresses = (opts.unlock as string).split(',').map((address) => address.trim());
-    passphrase = await getPassphrase(opts, { addresses });
+    passphrase = await getPassphrase(opts.password, { addresses });
   }
 
-  if (!!opts.blsPassword !== !!opts.blsFile) {
-    throw Error('Error: blsPassword and blsFile must be used together');
-  }
   const bls = {
     bls: getBlsPath(opts),
     blsFileName: opts.blsFile,
-    blsPassword: opts.blsPassword ? fs.readFileSync(path.isAbsolute(opts.blsPassword) ? opts.blsPassword : path.join(getBlsPath(opts), opts.blsPassword), 'utf-8').trim() : undefined
+    blsPassword: (await getPassphrase(opts.blsPassword))[0]
   };
   const account = {
     keyStorePath: getKeyStorePath(opts),

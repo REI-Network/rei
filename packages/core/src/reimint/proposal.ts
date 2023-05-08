@@ -1,7 +1,7 @@
 import { Address, BN, intToBuffer, ecsign, ecrecover, rlphash, bnToUnpaddedBuffer, rlp, bufferToInt, toBuffer } from 'ethereumjs-util';
 import { importBls } from '@rei-network/bls';
 import { ActiveValidatorSet } from './validatorSet';
-import { VoteType, SignatureType } from './vote';
+import { VoteType, SignatureType } from './enum';
 import * as v from './validate';
 
 export interface ProposalData {

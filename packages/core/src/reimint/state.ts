@@ -6,13 +6,13 @@ import { Block, BlockHeader } from '@rei-network/structure';
 import { isEmptyHash, EMPTY_HASH } from '../utils';
 import { preValidateBlock, preValidateHeader } from '../validation';
 import { isEnableDAO } from '../hardforks';
+import { ConsensusMessage, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from '../protocols/consensus/messages';
 import { PendingBlock } from './pendingBlock';
 import { Reimint } from './reimint';
-import { RoundStepType } from './enum';
+import { RoundStepType, VoteType, SignatureType } from './enum';
 import { IProcessBlockResult, IStateMachineBackend, IStateMachineP2PBackend, ISigner, IConfig, IEvidencePool, IWAL, IDebug } from './types';
-import { StateMachineMessage, StateMachineTimeout, StateMachineEndHeight, StateMachineMsg } from './stateMessages';
-import { Message, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from './messages';
-import { HeightVoteSet, Vote, VoteType, ConflictingVotesError, DuplicateVotesError, SignatureType } from './vote';
+import { StateMachineMessage, StateMachineTimeout, StateMachineEndHeight, StateMachineMsg } from './messages/index';
+import { HeightVoteSet, Vote, ConflictingVotesError, DuplicateVotesError } from './vote';
 import { Proposal } from './proposal';
 import { Evidence, DuplicateVoteEvidence } from './evpool';
 import { TimeoutTicker } from './timeoutTicker';
@@ -1102,7 +1102,7 @@ export class StateMachine {
    * @param peerId - Remote peer id, if the message comes from local, the peer id is ''
    * @param msg - Message
    */
-  newMessage(peerId: string, msg: Message) {
+  newMessage(peerId: string, msg: ConsensusMessage) {
     if (this.isStarted) {
       this._newMessage(new StateMachineMessage(peerId, msg));
     }

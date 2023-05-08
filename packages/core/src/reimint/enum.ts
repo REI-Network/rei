@@ -8,3 +8,14 @@ export enum RoundStepType {
   PrecommitWait,
   Commit
 }
+
+export enum SignatureType {
+  ECDSA,
+  BLS
+}
+
+export enum VoteType {
+  Proposal,
+  Prevote,
+  Precommit
+}

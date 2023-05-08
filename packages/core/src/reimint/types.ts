@@ -2,8 +2,8 @@ import type { Address, BN, BNLike } from 'ethereumjs-util';
 import type { Block, Receipt } from '@rei-network/structure';
 import type { Common } from '@rei-network/common';
 import type { SendMessageOptions } from '../protocols/consensus';
-import type { StateMachineMsg } from './stateMessages';
-import type { Message } from './messages';
+import type { ConsensusMessage } from '../protocols/consensus/messages';
+import type { StateMachineMsg } from './messages/index';
 import type { Evidence } from './evpool';
 import type { Vote } from './vote';
 
@@ -52,7 +52,7 @@ export interface IStateMachineBackend {
 
 export interface IStateMachineP2PBackend {
   broadcastVote(vote: Vote): void;
-  broadcastMessage(msg: Message, options: SendMessageOptions): void;
+  broadcastMessage(msg: ConsensusMessage, options: SendMessageOptions): void;
 }
 
 export interface IDebug {

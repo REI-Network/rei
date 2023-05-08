@@ -1,8 +1,9 @@
 import { BN } from 'ethereumjs-util';
 import { Channel, FunctionalBufferSet, logger } from '@rei-network/utils';
 import { Peer, ProtocolStream, ProtocolHandler } from '@rei-network/network';
-import { RoundStepType, Proposal, Vote, BitArray, VoteType, VoteSet, MessageFactory, Evidence, DuplicateVoteEvidence } from '../../reimint';
-import * as m from '../../reimint/messages';
+import { RoundStepType, Proposal, Vote, BitArray, VoteType, VoteSet, Evidence, DuplicateVoteEvidence } from '../../reimint';
+import { ConsensusMessageFactory } from './messages';
+import * as m from './messages';
 import { ConsensusProtocol } from './protocol';
 
 const peerGossipSleepDuration = 100;
@@ -210,9 +211,9 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
    * Send message to the remote peer
    * @param msg - Messsage
    */
-  send(msg: m.Message) {
+  send(msg: m.ConsensusMessage) {
     try {
-      this.stream.send(MessageFactory.serializeMessage(msg));
+      this.stream.send(ConsensusMessageFactory.serializeMessage(msg));
     } catch (err) {
       // ignore errors...
     }
@@ -243,7 +244,7 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
    */
   async handle(data: Buffer) {
     try {
-      const msg = MessageFactory.fromSerializedMessage(data);
+      const msg = ConsensusMessageFactory.fromSerializedMessage(data);
       if (msg instanceof m.HandshakeMessage) {
         this.applyHandshakeMessage(msg);
       } else if (msg instanceof m.NewRoundStepMessage) {

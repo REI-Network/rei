@@ -1,5 +1,5 @@
 import { BN } from 'ethereumjs-util';
-import { StateMachineTimeout } from './stateMessages';
+import { StateMachineTimeout } from './messages/index';
 
 export class TimeoutTicker {
   private maxHeight?: BN;

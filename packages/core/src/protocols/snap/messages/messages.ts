@@ -1,5 +1,6 @@
 import { bufferToInt, intToBuffer, rlp } from 'ethereumjs-util';
-import { validateHash, validateInteger } from '../validate';
+// TODO:
+import { validateHash, validateInteger } from '../../../reimint/validate';
 
 export interface SnapMessage {
   reqID: number;

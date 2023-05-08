@@ -1,5 +1,5 @@
 import { rlp, bufferToInt, intToBuffer } from 'ethereumjs-util';
-import { ContructorWithCode, Registry } from '../registry';
+import { ContructorWithCode, Registry } from '../../utils';
 import * as e from './evidence';
 import { Evidence } from './evidence';
 

@@ -6,7 +6,8 @@ import { isEnableDAO } from '../hardforks';
 import { ISigner } from './types';
 import { ExtraData } from './extraData';
 import { Proposal } from './proposal';
-import { VoteType, VoteSet, SignatureType } from './vote';
+import { VoteType, SignatureType } from './enum';
+import { VoteSet } from './vote';
 import { Evidence } from './evpool';
 
 const defaultRound = 0;

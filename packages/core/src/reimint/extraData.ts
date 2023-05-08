@@ -4,13 +4,14 @@ import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
 import { BlockHeader, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
 import { isEnableDAO } from '../hardforks';
+import * as v from './validate';
 import { ActiveValidatorSet } from './validatorSet';
+import { VoteType, SignatureType } from './enum';
 import { Evidence, DuplicateVoteEvidence, EvidenceFactory } from './evpool';
 import { Reimint } from './reimint';
 import { BitArray } from './bitArray';
-import { Vote, VoteType, VoteSet, SignatureType } from './vote';
+import { Vote, VoteSet } from './vote';
 import { Proposal } from './proposal';
-import * as v from './validate';
 import { ReimintEngine } from './engine';
 
 export interface ExtraDataOptions {

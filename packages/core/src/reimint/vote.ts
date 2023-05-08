@@ -1,9 +1,10 @@
 import { Address, BN, ecsign, ecrecover, rlp, intToBuffer, bnToUnpaddedBuffer, rlphash, bufferToInt, toBuffer } from 'ethereumjs-util';
 import { FunctionalBufferMap, logger } from '@rei-network/utils';
 import { importBls } from '@rei-network/bls';
+import * as v from './validate';
 import { ActiveValidatorSet } from './validatorSet';
 import { BitArray } from './bitArray';
-import * as v from './validate';
+import { VoteType, SignatureType } from './enum';
 
 export class ConflictingVotesError extends Error {
   voteA: Vote;
@@ -17,17 +18,6 @@ export class ConflictingVotesError extends Error {
 }
 
 export class DuplicateVotesError extends Error {}
-
-export enum SignatureType {
-  ECDSA,
-  BLS
-}
-
-export enum VoteType {
-  Proposal,
-  Prevote,
-  Precommit
-}
 
 export interface VoteData {
   chainId: number;

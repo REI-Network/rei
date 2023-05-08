@@ -14,6 +14,7 @@ import { StateManager } from '../stateManager';
 import { ActiveValidatorSet, ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../utils';
 import { isEnableFreeStaking, loadInitData, isEnableHardfork2, isEnableBetterPOS, isEnableDAO } from '../hardforks';
+import { SignatureType } from './enum';
 import { IProcessBlockResult } from './types';
 import { Worker } from './worker';
 import { StakeManager, Contract, Fee, FeePool, ValidatorBls } from './contracts';
@@ -24,7 +25,6 @@ import { WAL } from './wal';
 import { ReimintExecutor } from './executor';
 import { ExtraData } from './extraData';
 import { EvidenceCollector } from './evidenceCollector';
-import { SignatureType } from './vote';
 
 export class SimpleNodeSigner {
   constructor(private readonly node: Node) {}

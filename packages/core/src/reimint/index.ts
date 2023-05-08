@@ -1,7 +1,5 @@
 export * from './evpool';
 export * from './messages';
-export * from './snapMessages';
-export * from './stateMessages';
 export * from './validatorSet';
 export * from './wal';
 export * from './bitArray';
@@ -13,7 +11,6 @@ export * from './extraData';
 export * from './makeRunTxCallback';
 export * from './pendingBlock';
 export * from './proposal';
-export * from './registry';
 export * from './reimint';
 export * from './state';
 export * from './timeoutTicker';

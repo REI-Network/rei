@@ -1,7 +1,7 @@
 import { rlp, intToBuffer, bufferToInt } from 'ethereumjs-util';
-import { SnapMessage } from './snapMessages';
-import * as s from './snapMessages';
-import { ContructorWithCode, Registry } from '../registry';
+import { ContructorWithCode, Registry } from '../../../utils';
+import * as m from './messages';
+import { SnapMessage } from './messages';
 
 export interface SnapMessageContrutor extends ContructorWithCode<SnapMessage> {
   fromValuesArray(values: any[]): SnapMessage;
@@ -45,11 +45,11 @@ export class SnapMessageFactory {
   }
 }
 
-SnapMessageFactory.registry.register(s.GetAccountRange);
-SnapMessageFactory.registry.register(s.AccountRange);
-SnapMessageFactory.registry.register(s.GetStorageRange);
-SnapMessageFactory.registry.register(s.StorageRange);
-SnapMessageFactory.registry.register(s.GetByteCode);
-SnapMessageFactory.registry.register(s.ByteCode);
-SnapMessageFactory.registry.register(s.GetTrieNode);
-SnapMessageFactory.registry.register(s.TrieNode);
+SnapMessageFactory.registry.register(m.GetAccountRange);
+SnapMessageFactory.registry.register(m.AccountRange);
+SnapMessageFactory.registry.register(m.GetStorageRange);
+SnapMessageFactory.registry.register(m.StorageRange);
+SnapMessageFactory.registry.register(m.GetByteCode);
+SnapMessageFactory.registry.register(m.ByteCode);
+SnapMessageFactory.registry.register(m.GetTrieNode);
+SnapMessageFactory.registry.register(m.TrieNode);

@@ -1,6 +1,6 @@
 import { bufferToInt, intToBuffer, setLengthLeft, BN } from 'ethereumjs-util';
 import { logger } from '@rei-network/utils';
-import { StateMachineMsg, StateMachineEndHeight, StateMachineMsgFactory } from '../stateMessages';
+import { StateMachineMsg, StateMachineEndHeight, StateMachineMsgFactory } from '../messages';
 import { FileGroup, GroupFileReader } from './fileGroup';
 import { crc32 } from './crc32';
 

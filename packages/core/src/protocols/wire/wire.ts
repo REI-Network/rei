@@ -2,7 +2,7 @@ import { BN } from 'ethereumjs-util';
 import { Block } from '@rei-network/structure';
 import { Peer } from '@rei-network/network';
 import { Node } from '../../node';
-import { HandlerPool } from '../handlerPool';
+import { HandlerPool } from './handlerPool';
 import { WireProtocolHandler } from './handler';
 import { WireProtocolV1 } from './v1';
 import { WireProtocolV2 } from './v2';

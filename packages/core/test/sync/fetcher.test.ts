@@ -4,7 +4,7 @@ import { Common } from '@rei-network/common';
 import { Block, BlockHeader, Transaction } from '@rei-network/structure';
 import { setLevel } from '@rei-network/utils';
 import { BlockSync, BlockSyncBackend, BlockSyncValidateBackend } from '../../src/sync/full/blockSync';
-import { HandlerPool, GetHandlerTimeoutError } from '../../src/protocols/handlerPool';
+import { HandlerPool, GetHandlerTimeoutError } from '../../src/protocols/wire/handlerPool';
 
 setLevel('silent');
 const common = new Common({ chain: 'rei-testnet' });

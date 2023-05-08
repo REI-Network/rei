@@ -1,5 +1,4 @@
 import fs from 'fs';
-import path from 'path';
 import process from 'process';
 import { Node, NodeFactory } from '@rei-network/core';
 import { RpcServer } from '@rei-network/rpc';
@@ -28,14 +27,14 @@ export async function startServices(opts: { [option: string]: string }): Promise
   let passphrase: string[] = [];
   if (opts.unlock) {
     addresses = (opts.unlock as string).split(',').map((address) => address.trim());
-    passphrase = await getPassphrase(opts, { addresses });
+    passphrase = await getPassphrase(opts.password, { addresses });
   }
 
   // create node instance
   const node = await NodeFactory.createNode({
     unlock: addresses.map((address, i): [string, string] => [address, passphrase[i]]),
     blsFileName: opts.blsFile,
-    blsPassword: opts.blsPassword ? fs.readFileSync(path.isAbsolute(opts.blsPassword) ? opts.blsPassword : path.join(getBlsPath(opts), opts.blsPassword), 'utf-8').trim() : undefined,
+    blsPassword: (await getPassphrase(opts.blsPassword))[0],
     databasePath: opts.datadir,
     chain: opts.chain,
     receiptsCacheSize: opts.receiptsCacheSize ? Number(opts.receiptsCacheSize) : undefined,

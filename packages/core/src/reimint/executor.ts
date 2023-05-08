@@ -310,7 +310,11 @@ export class ReimintExecutor {
         if (!isEnableDAO(pendingCommon) && isEnableDAO(nextCommon)) {
           validatorSet = new ValidatorSet(indexedValidatorSet, await ActiveValidatorSet.genesis(nextCommon, this.engine.getValidatorBls(vm, pendingBlock, nextCommon)));
         } else {
-          validatorSet = new ValidatorSet(indexedValidatorSet, parentValidatorSet.active.copy());
+          const active = parentValidatorSet.active.copy();
+          if (isEnableDAO(pendingCommon)) {
+            active.reloadBlsPublicKey(changes);
+          }
+          validatorSet = new ValidatorSet(indexedValidatorSet, active);
         }
       }
     } else {

@@ -27,10 +27,12 @@ task('deploy-bls', 'Deploy validator bls contract')
 
 task('register', 'Register bls public key')
   .addParam('validatorInfo', 'format: address1:pk1,address2:pk2,...')
+  .addParam('contractAddr', 'ValidatorBls contract address')
   .setAction(async function (args, { ethers }) {
     const signers = await ethers.getSigners();
     const ValidatorBls = await ethers.getContractFactory('ValidatorBls');
-    const validatorBls = ValidatorBls.attach('0x0000000000000000000000000000000000001009');
+    // before hardfork 0x094319890280E2c6430091FEc44822540229ca62, after hardfork 0x0000000000000000000000000000000000001009
+    const validatorBls = ValidatorBls.attach(args.contractAddr);
     for (const info of (args.validatorInfo as string).split(',')) {
       const index = info.indexOf(':');
       if (index === -1) {

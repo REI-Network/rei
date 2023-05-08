@@ -11,11 +11,11 @@ import inquirer from 'inquirer';
  * @param options.forceInput - Whether to force the user to enter the passphrase
  * @returns
  */
-export async function getPassphrase(opts: { [option: string]: string }, options?: { addresses?: string[]; repeat?: boolean; message?: string; forceInput?: boolean }) {
+export async function getPassphrase(password?: string, options?: { addresses?: string[]; repeat?: boolean; message?: string; forceInput?: boolean }) {
   let passphrase: string[];
-  if (!options?.forceInput && opts.password) {
-    const password = fs.readFileSync(opts.password).toString();
-    passphrase = password.split('\n').map((p) => p.trim());
+  if (!options?.forceInput && password) {
+    const realPassword = fs.readFileSync(password).toString();
+    passphrase = realPassword.split('\n').map((p) => p.trim());
     if (options?.addresses && passphrase.length < options.addresses.length) {
       throw new Error('Passphrase length is less than addresses length');
     }

@@ -7,10 +7,7 @@ export interface StateMachineMsgContrutor extends ContructorWithCode<StateMachin
   fromValuesArray(values: any[]): StateMachineMsg;
 }
 
-export class StateMachineMsgFactory {
-  // disable constructor
-  private constructor() {}
-
+export abstract class StateMachineMsgFactory {
   static registry = new Registry<StateMachineMsg, StateMachineMsgContrutor>();
 
   static fromSerializedMessage(serialized: Buffer): StateMachineMsg {

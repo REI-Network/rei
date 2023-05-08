@@ -7,9 +7,7 @@ export interface SnapMessageContrutor extends ContructorWithCode<SnapMessage> {
   fromValuesArray(values: any[]): SnapMessage;
 }
 
-export class SnapMessageFactory {
-  private constructor() {}
-
+export abstract class SnapMessageFactory {
   static registry = new Registry<SnapMessage, SnapMessageContrutor>();
 
   static fromSerializedMessage(serialized: Buffer): SnapMessage {

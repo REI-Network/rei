@@ -104,7 +104,7 @@ export class FileGroup {
 
   private requireHead() {
     if (!this.head) {
-      throw new Error("head doesn't exsit");
+      throw new Error("head doesn't exist");
     }
   }
 

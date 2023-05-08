@@ -16,7 +16,7 @@ const defaultEvidence = [];
 
 /**
  * Format header extra data,
- * create empty 32 bytes if it doesn't exsit,
+ * create empty 32 bytes if it doesn't exist,
  * delete anything after 32 bytes
  * @param data - Header data
  * @returns Header data

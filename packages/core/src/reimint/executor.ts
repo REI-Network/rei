@@ -542,7 +542,7 @@ export class ReimintExecutor {
     logger.debug(
       'Reimint::processBlock, activeValidators:',
       activeValidators.map(({ validator, priority, blsPublicKey }) => {
-        return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${isGenesis(validator, pendingCommon) ? '1' : validatorSet!.indexed.getVotingPower(validator).toString()} | pk: ${!!blsPublicKey ? 'exsits' : "doesn't exist"}`;
+        return `address: ${validator.toString()} | priority: ${priority.toString()} | votingPower: ${isGenesis(validator, pendingCommon) ? '1' : validatorSet!.indexed.getVotingPower(validator).toString()} | pk: ${!!blsPublicKey ? 'exists' : "doesn't exist"}`;
       }),
       'next proposer:',
       validatorSet.active.proposer.toString()
@@ -551,7 +551,7 @@ export class ReimintExecutor {
     logger.debug(
       'Reimint::processBlock, indexValidatorSet:',
       indexedValidators.map(({ validator, votingPower, blsPublicKey }) => {
-        return `address: ${validator.toString()} | votingPower: ${votingPower.toString()} | pk: ${!!blsPublicKey ? 'exsits' : "doesn't exist"}`;
+        return `address: ${validator.toString()} | votingPower: ${votingPower.toString()} | pk: ${!!blsPublicKey ? 'exists' : "doesn't exist"}`;
       }),
       'next proposer:',
       validatorSet.active.proposer.toString()

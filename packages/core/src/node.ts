@@ -403,7 +403,7 @@ export class Node {
 
   /**
    * Get current pending block,
-   * if current pending block doesn't exsit,
+   * if current pending block doesn't exist,
    * it will return an empty block
    * @returns Pending block
    */

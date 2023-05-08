@@ -73,7 +73,7 @@ export class Worker {
    * @param _txs - Transactions
    */
   async addTxs(_txs: Map<Buffer, Transaction[]>) {
-    // if the pendingHeader doesn't exsit,
+    // if the pendingHeader doesn't exist,
     // ignore new pending transaction
     if (!this.pendingBlock) {
       return;

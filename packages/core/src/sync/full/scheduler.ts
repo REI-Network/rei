@@ -71,7 +71,7 @@ class BlockSyncBackend implements IBlockSyncBackend, IBlockSyncValidateBackend {
 
   /**
    * Validate headers
-   * @param parent - Parent block header(if it exsits)
+   * @param parent - Parent block header(if it exists)
    * @param headers - A list of headers that need to be validated
    * @returns Latest header
    */

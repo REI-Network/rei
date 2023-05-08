@@ -59,7 +59,7 @@ export class SimpleNodeSigner {
 
   /**
    * Get BLS public key
-   * @returns Undefined if doesn't exsit
+   * @returns Undefined if doesn't exist
    */
   blsPublicKey(): Buffer | undefined {
     const pubKey = this.node.blsMngr.getPublicKey();

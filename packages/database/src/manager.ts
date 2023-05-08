@@ -392,7 +392,7 @@ export class DBManager {
 
   /**
    * Get section count of database
-   * @returns section count or undefined(if doesn't exsit)
+   * @returns section count or undefined(if doesn't exist)
    */
   async getStoredSectionCount() {
     try {

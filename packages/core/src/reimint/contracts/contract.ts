@@ -1,5 +1,5 @@
-import EVM from '@rei-network/vm/dist/evm/evm';
 import { Address, BN } from 'ethereumjs-util';
+import EVM from '@rei-network/vm/dist/evm/evm';
 import Message from '@rei-network/vm/dist/evm/message';
 import { Common } from '@rei-network/common';
 import { hexStringToBuffer, logger } from '@rei-network/utils';

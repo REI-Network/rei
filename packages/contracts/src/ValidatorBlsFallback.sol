@@ -2,7 +2,7 @@
 
 pragma solidity ^0.6.0;
 
-contract ValidatorBlsFallback {
+contract ValidatorBLSFallback {
     fallback() external {
         revert("ValidatorBls: the bls public key registration contract has been switched");
     }

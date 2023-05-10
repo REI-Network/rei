@@ -1,5 +1,5 @@
 import { FunctionalBufferMap } from '@rei-network/utils';
-import { StakeManager, ValidatorBls } from '../contracts';
+import { StakeManager, ValidatorBLS } from '../contracts';
 import { ValidatorSet } from './validatorSet';
 import { IndexedValidatorSet } from './indexedValidatorSet';
 import { ActiveValidatorSet } from './activeValidatorSet';
@@ -22,7 +22,7 @@ export class ValidatorSets {
    * @param sm - `StakeManager` instance
    * @param bls - `ValidatorBls` instance
    */
-  async getValSet(stateRoot: Buffer, sm?: StakeManager, bls?: ValidatorBls) {
+  async getValSet(stateRoot: Buffer, sm?: StakeManager, bls?: ValidatorBLS) {
     let indexed = this.indexedSets.get(stateRoot);
     let active = this.activeSets.get(stateRoot);
     if (!indexed || !active) {
@@ -47,7 +47,7 @@ export class ValidatorSets {
    * @param sm - `StakeManager` instance
    * @param bls - `ValidatorBls` instance
    */
-  async getActiveValSet(stateRoot: Buffer, sm?: StakeManager, bls?: ValidatorBls) {
+  async getActiveValSet(stateRoot: Buffer, sm?: StakeManager, bls?: ValidatorBLS) {
     let active = this.activeSets.get(stateRoot);
     if (!active) {
       if (!sm) {

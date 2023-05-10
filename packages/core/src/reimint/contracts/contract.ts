@@ -119,7 +119,7 @@ export abstract class Contract {
    * @param evm - EVM instance
    * @param common - Common instance
    */
-  static async deloyValidatorBlsFallbackContract(evm: EVM, common: Common) {
+  static async deloyValidatorBLSFallbackContract(evm: EVM, common: Common) {
     await Contract.deployContract(evm, common, 'fallback', undefined, true);
   }
 

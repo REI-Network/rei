@@ -3,30 +3,30 @@
 pragma solidity ^0.6.0;
 pragma experimental ABIEncoderV2;
 
-import "./interfaces/IValidatorBls.sol";
+import "./interfaces/IValidatorBLS.sol";
 
-contract ValidatorBls is IValidatorBls {
-    // validator bls public key
-    mapping(address => bytes) private validatorBlsPubkey;
+contract ValidatorBLS is IValidatorBLS {
+    // validator BLS public key
+    mapping(address => bytes) private validatorBLSPubkey;
     // validators list
     address[] public override validators;
-    // bls public key exist
-    mapping(bytes => bool) private _blsPubkeyExist;
+    // BLS public key exist
+    mapping(bytes => bool) private _BLSPubkeyExist;
 
     /**
-     * @dev Emitted when validator bls public key is set.
+     * @dev Emitted when validator BLS public key is set.
      * @param validator Validator address.
-     * @param blsPublicKey Validator bls public key.
+     * @param BLSPublicKey Validator BLS public key.
      */
-    event SetBlsPublicKey(address indexed validator, bytes blsPublicKey);
+    event SetBLSPublicKey(address indexed validator, bytes BLSPublicKey);
 
-    constructor(address[] memory genesisAddrs, bytes[] memory genesisBlsPublicKey) public {
-        require(genesisAddrs.length == genesisBlsPublicKey.length, "ValidatorBls: invalid genesis validators");
+    constructor(address[] memory genesisAddrs, bytes[] memory genesisBLSPublicKey) public {
+        require(genesisAddrs.length == genesisBLSPublicKey.length, "ValidatorBLS: invalid genesis validators");
         //register genesis validators
         for (uint256 i = 0; i < genesisAddrs.length; i++) {
             validators.push(genesisAddrs[i]);
-            validatorBlsPubkey[genesisAddrs[i]] = genesisBlsPublicKey[i];
-            _blsPubkeyExist[genesisBlsPublicKey[i]] = true;
+            validatorBLSPubkey[genesisAddrs[i]] = genesisBLSPublicKey[i];
+            _BLSPubkeyExist[genesisBLSPublicKey[i]] = true;
         }
     }
 
@@ -39,29 +39,29 @@ contract ValidatorBls is IValidatorBls {
     }
 
     /**
-     * Set validator bls public key.
-     * @param key         Validator Bls public key.
+     * Set validator BLS public key.
+     * @param key         Validator BLS public key.
      */
-    function setBlsPublicKey(bytes memory key) public override {
-        require(key.length == 48, "ValidatorBls: invalid bls public key");
-        require(!_blsPubkeyExist[key], "ValidatorBls: bls public key already exist");
-        if (validatorBlsPubkey[msg.sender].length == 0) {
+    function setBLSPublicKey(bytes memory key) public override {
+        require(key.length == 48, "ValidatorBLS: invalid BLS public key");
+        require(!_BLSPubkeyExist[key], "ValidatorBLS: BLS public key already exist");
+        if (validatorBLSPubkey[msg.sender].length == 0) {
             validators.push(msg.sender);
         } else {
-            _blsPubkeyExist[validatorBlsPubkey[msg.sender]] = false;
+            _BLSPubkeyExist[validatorBLSPubkey[msg.sender]] = false;
         }
-        validatorBlsPubkey[msg.sender] = key;
-        _blsPubkeyExist[key] = true;
-        emit SetBlsPublicKey(msg.sender, key);
+        validatorBLSPubkey[msg.sender] = key;
+        _BLSPubkeyExist[key] = true;
+        emit SetBLSPublicKey(msg.sender, key);
     }
 
     /**
-     * Get validator bls public key.
+     * Get validator BLS public key.
      * @param validator         Validator address.
-     * @return key              Validator bls public key.
+     * @return key              Validator BLS public key.
      */
-    function getBlsPublicKey(address validator) public view override returns (bytes memory key) {
-        return validatorBlsPubkey[validator];
+    function getBLSPublicKey(address validator) public view override returns (bytes memory key) {
+        return validatorBLSPubkey[validator];
     }
 
     /**
@@ -70,15 +70,15 @@ contract ValidatorBls is IValidatorBls {
      * @return registered       True if validator is registered.
      */
     function isRegistered(address validator) public view override returns (bool) {
-        return validatorBlsPubkey[validator].length > 0;
+        return validatorBLSPubkey[validator].length > 0;
     }
 
     /**
-     * Check if bls public key is exist.
-     * @param key         Validator bls public key.
-     * @return exist      True if bls public key is exist.
+     * Check if BLS public key is exist.
+     * @param key         Validator BLS public key.
+     * @return exist      True if BLS public key is exist.
      */
-    function blsPublicKeyExist(bytes memory key) public view override returns (bool) {
-        return _blsPubkeyExist[key];
+    function isBLSPublicKeyExist(bytes memory key) public view override returns (bool) {
+        return _BLSPubkeyExist[key];
     }
 }

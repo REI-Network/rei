@@ -17,7 +17,7 @@ import { isEnableFreeStaking, loadInitData, isEnableHardfork2, isEnableBetterPOS
 import { SignatureType } from './enum';
 import { IProcessBlockResult } from './types';
 import { Worker } from './worker';
-import { StakeManager, Contract, Fee, FeePool, ValidatorBls } from './contracts';
+import { StakeManager, Contract, Fee, FeePool, ValidatorBLS } from './contracts';
 import { StateMachine } from './state';
 import { Evidence, EvidencePool, EvidenceDatabase } from './evpool';
 import { Reimint } from './reimint';
@@ -278,7 +278,7 @@ export class ReimintEngine {
     const sm = this.getStakeManager(vm, block, header._common);
     let valSet: ActiveValidatorSet;
     if (isEnableDAO(pendingBlock.common)) {
-      valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm, this.getValidatorBls(vm, block, pendingBlock.common));
+      valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm, this.getValidatorBLS(vm, block, pendingBlock.common));
     } else {
       valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm);
     }
@@ -339,9 +339,9 @@ export class ReimintEngine {
    * @param common - Common instance
    * @returns validator bls contract object
    */
-  getValidatorBls(vm: VM, block: Block, common?: Common) {
+  getValidatorBLS(vm: VM, block: Block, common?: Common) {
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
-    return new ValidatorBls(evm, common ?? block._common);
+    return new ValidatorBLS(evm, common ?? block._common);
   }
 
   /**

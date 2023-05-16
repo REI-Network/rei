@@ -560,6 +560,11 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         }
     }
 
+    /**
+     * Freeze validator
+     * @param validator         Validator address
+     * @param hash              Evidence hash
+     */
     function freeze(address validator, bytes32 hash) external override onlySystemCaller {
         // make sure the evidence is not duplicated
         require(!usedEvidence[hash], "StakeManager: invalid evidence");
@@ -583,6 +588,11 @@ contract StakeManager is ReentrancyGuard, Only, IStakeManager {
         emit Freeze(validator);
     }
 
+    /**
+     * Unfreeze validator
+     * @param validator         Validator address
+     * @param factor            Unfreeze slash factor
+     */
     function unfreeze(address validator, uint256 factor) external override returns (uint256 amount) {
         require(msg.sender == config.communityAddress(), "StakeManager: only community can unfreeze");
         require(freezed[validator], "StakeManager: not freezed");

@@ -133,6 +133,8 @@ export class ReimintExecutor {
    * @returns New validator set
    */
   async afterApply(vm: VM, pendingBlock: Block, receipts: Receipt[], evidence: Evidence[], miner: Address, totalReward: BN, parentStateRoot: Buffer, parentValidatorSet: ValidatorSet, parentStakeManager: StakeManager) {
+    const parentCommon = this.engine.node.getCommon(pendingBlock.header.number.subn(1));
+    const parentVM = await this.engine.node.getVM(parentStateRoot, parentCommon);
     const pendingCommon = pendingBlock._common;
 
     let accFeeUsage: BN | undefined;
@@ -149,7 +151,7 @@ export class ReimintExecutor {
       let minerFactor: BN;
       const totalBlockReward = totalReward.sub(accBalUsage);
       if (isEnableDAO(pendingCommon)) {
-        minerFactor = (await this.engine.configCache.get(parentStateRoot, pendingBlock)).minerRewardFactor;
+        minerFactor = await this.engine.getConfig(parentVM, pendingBlock, parentCommon).minerRewardFactor();
       } else {
         const numberMinerFactor = pendingCommon.param('vm', 'minerRewardFactor');
         if (typeof numberMinerFactor !== 'number' || numberMinerFactor > 100 || numberMinerFactor < 0) {
@@ -301,7 +303,15 @@ export class ReimintExecutor {
     //    and decide if we should enable genesis validators
     const { totalLockedAmount, validatorCount } = indexedValidatorSet.getTotalLockedVotingPowerAndValidatorCount(isEnableDAO(nextCommon));
     logger.debug('Reimint::afterApply, totalLockedAmount:', totalLockedAmount.toString(), 'validatorCount:', validatorCount.toString());
-    const enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), nextCommon);
+    let enableGenesisValidators: boolean;
+    if (isEnableDAO(nextCommon)) {
+      const config = this.engine.getConfig(parentVM, pendingBlock, parentCommon);
+      const minTotalLockedAmount = await config.minTotalLockedAmount();
+      const minValidatorsCount = await config.minValidatorsCount();
+      enableGenesisValidators = totalLockedAmount.gte(minTotalLockedAmount) && validatorCount.gte(minValidatorsCount);
+    } else {
+      enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), nextCommon);
+    }
     if (enableGenesisValidators) {
       if (!parentValidatorSet.isGenesis(nextCommon)) {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, create a new genesis validator set');
@@ -325,7 +335,18 @@ export class ReimintExecutor {
         }
       }
     } else {
-      const maxCount = nextCommon.param('vm', 'maxValidatorsCount');
+      let maxCount: number;
+      if (isEnableDAO(pendingCommon)) {
+        maxCount = (await this.engine.getConfig(parentVM, pendingBlock, parentCommon).maxValidatorsCount()).toNumber();
+      } else {
+        maxCount = nextCommon.param('vm', 'maxValidatorsCount');
+        if (typeof maxCount !== 'number' || maxCount === 0) {
+          throw new Error('invalid maxCount');
+        }
+      }
+      if (maxCount === 0) {
+        throw new Error('invalid maxCount');
+      }
       const active = parentValidatorSet.active.copy();
       active.merge(indexedValidatorSet.sort(maxCount, isEnableDAO(nextCommon)));
       active.computeNewPriorities(parentValidatorSet.active.copy());
@@ -400,6 +421,8 @@ export class ReimintExecutor {
       throw new Error('missing state root or round or evidence');
     }
 
+    const parentCommon = this.engine.node.getCommon(block.header.number.subn(1));
+    const parentVM = await this.engine.node.getVM(parentStateRoot, parentCommon);
     const pendingCommon = block._common;
     const vm = await this.backend.getVM(stateRoot, pendingCommon, true);
 
@@ -409,7 +432,7 @@ export class ReimintExecutor {
     let minerReward: BN;
     let parentValidatorSet: ValidatorSet;
     if (isEnableDAO(pendingCommon)) {
-      minerReward = (await this.engine.configCache.get(parentStateRoot, block)).minerReward;
+      minerReward = await this.engine.getConfig(parentVM, block, parentCommon).minerReward();
       const bls = this.engine.getValidatorBls(vm, block, pendingCommon);
       parentValidatorSet = (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager, bls)).copy();
     } else {
@@ -477,18 +500,21 @@ export class ReimintExecutor {
     // get parent block from database
     const parent = await this.backend.db.getBlockByHashAndNumber(block.header.parentHash, pendingHeader.number.subn(1));
 
-    // get state root
-    const root = parent.header.stateRoot;
+    // get parent state root
+    const parentStateRoot = parent.header.stateRoot;
+    const parentCommon = this.engine.node.getCommon(block.header.number.subn(1));
+    // get parent vm instance
+    const parentVM = await this.engine.node.getVM(parentStateRoot, parentCommon);
     // select evm impl by debug
     // TODO: support evmc binding debug
     const mode: EVMWorkMode | undefined = debug ? EVMWorkMode.JS : undefined;
     // get vm instance
-    const vm = await this.backend.getVM(root, pendingCommon, true, mode);
+    const vm = await this.backend.getVM(parentStateRoot, pendingCommon, true, mode);
 
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.engine.getStakeManager(vm, block);
 
-    let parentValidatorSet: ValidatorSet = isEnableDAO(pendingCommon) ? (await this.engine.validatorSets.getValSet(root, parentStakeManager, this.engine.getValidatorBls(vm, block, pendingCommon))).copy() : (await this.engine.validatorSets.getValSet(root, parentStakeManager)).copy();
+    let parentValidatorSet: ValidatorSet = isEnableDAO(pendingCommon) ? (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager, this.engine.getValidatorBls(vm, block, pendingCommon))).copy() : (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager)).copy();
 
     const extraData = ExtraData.fromBlockHeader(pendingHeader, { valSet: parentValidatorSet.active });
     const miner = extraData.proposal.getProposer();
@@ -533,7 +559,7 @@ export class ReimintExecutor {
     let validatorSet!: ValidatorSet;
     const runBlockOptions: RunBlockOpts = {
       block,
-      root,
+      root: parentStateRoot,
       debug,
       generate: false,
       skipBlockValidation: true,
@@ -541,7 +567,7 @@ export class ReimintExecutor {
         let reward: BN;
         if (isEnableDAO(pendingCommon)) {
           // load reward from config contract
-          reward = (await this.engine.configCache.get(root, block)).minerReward;
+          reward = await this.engine.getConfig(parentVM, block, parentCommon).minerReward();
         } else {
           // use outside reward
           reward = outsideReward;
@@ -552,7 +578,7 @@ export class ReimintExecutor {
         // assign all balances of systemCaller to miner
         const blockReward = (await state.getAccount(systemCaller)).balance;
         const receipts = postByzantiumTxReceiptsToReceipts(postByzantiumTxReceipts);
-        validatorSet = await this.afterApply(vm, block, receipts, extraData.evidence, miner, blockReward, root, parentValidatorSet, parentStakeManager);
+        validatorSet = await this.afterApply(vm, block, receipts, extraData.evidence, miner, blockReward, parentStateRoot, parentValidatorSet, parentStakeManager);
       },
       runTxOpts
     };

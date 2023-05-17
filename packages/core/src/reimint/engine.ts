@@ -25,7 +25,6 @@ import { WAL } from './wal';
 import { ReimintExecutor } from './executor';
 import { ExtraData } from './extraData';
 import { EvidenceCollector } from './evidenceCollector';
-import { ConfigCache } from './configCache';
 
 export class SimpleNodeSigner {
   constructor(private readonly node: Node) {}
@@ -156,7 +155,6 @@ export class ReimintEngine {
   readonly backend: SimpleBackend;
   readonly evpool: EvidencePool;
   readonly executor: ReimintExecutor;
-  readonly configCache: ConfigCache;
   readonly validatorSets = new ValidatorSets();
 
   protected _coinbase: Address;
@@ -177,7 +175,6 @@ export class ReimintEngine {
     const wal = new WAL({ path: path.join(this.node.datadir, 'WAL') });
     this.state = new StateMachine(this.backend, this.node.consensus, this.evpool, wal, this.node.chainId, this.config, this.signer);
     this.executor = new ReimintExecutor(this.node, this);
-    this.configCache = new ConfigCache(this);
   }
 
   /**

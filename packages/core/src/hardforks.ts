@@ -41,6 +41,7 @@ addPrecompile(
 
     const state = opts._VM.stateManager as StateManager;
     const totalAmount = await Fee.getTotalAmount(state);
+    // TODO
     const dailyFee = hexStringToBN(state._common.param('vm', 'dailyFee'));
     const stakeInfo = (await state.getAccount(address)).getStakeInfo();
     const fee = stakeInfo.estimateFee(timestamp.toNumber(), totalAmount, dailyFee);

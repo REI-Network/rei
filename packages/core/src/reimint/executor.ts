@@ -125,13 +125,14 @@ export class ReimintExecutor {
    * @param receipts - Transaction receipts
    * @param miner - Miner address
    * @param totalReward - Total block reward
-   *                      totalReward = common.param('pow', 'minerRewardFactor') + accBalUsage + etc(if some one transfer REI to system caller address)
+   *                      totalReward = minerReward + accBalUsage + etc(if some one transfer REI to system caller address)
+   * @param parentStateRoot - Parent state trie root
    * @param parentValidatorSet - Validator set loaded from parent state trie
    * @param parentStakeManager - Stake manager contract instance
    *                             (used to load totalLockedAmount and validatorCount and validatorSet if need)
    * @returns New validator set
    */
-  async afterApply(vm: VM, pendingBlock: Block, receipts: Receipt[], evidence: Evidence[], miner: Address, totalReward: BN, parentValidatorSet: ValidatorSet, parentStakeManager: StakeManager) {
+  async afterApply(vm: VM, pendingBlock: Block, receipts: Receipt[], evidence: Evidence[], miner: Address, totalReward: BN, parentStateRoot: Buffer, parentValidatorSet: ValidatorSet, parentStakeManager: StakeManager) {
     const pendingCommon = pendingBlock._common;
 
     let accFeeUsage: BN | undefined;
@@ -145,18 +146,24 @@ export class ReimintExecutor {
       accFeeUsage = result.accFeeUsage;
       accBalUsage = result.accBalUsage;
 
+      let minerFactor: BN;
       const totalBlockReward = totalReward.sub(accBalUsage);
-      const minerFactor = pendingCommon.param('vm', 'minerRewardFactor');
-      if (typeof minerFactor !== 'number' || minerFactor > 100 || minerFactor < 0) {
-        throw new Error('invalid miner factor');
+      if (isEnableDAO(pendingCommon)) {
+        minerFactor = (await this.engine.configCache.get(parentStateRoot, pendingBlock)).minerRewardFactor;
+      } else {
+        const numberMinerFactor = pendingCommon.param('vm', 'minerRewardFactor');
+        if (typeof numberMinerFactor !== 'number' || numberMinerFactor > 100 || numberMinerFactor < 0) {
+          throw new Error('invalid miner factor');
+        }
+        minerFactor = new BN(numberMinerFactor);
       }
 
       /**
        * If free staking is enable,
-       * minerReward = (totalReward - accBalUsage) * common.param('vm', 'minerRewardFactor') / 100
+       * minerReward = (totalReward - accBalUsage) * minerRewardFactor / 100
        * feePoolReward = totalReward - minerReward
        */
-      minerReward = totalBlockReward.muln(minerFactor).divn(100);
+      minerReward = totalBlockReward.mul(minerFactor).divn(100);
       feePoolReward = totalBlockReward.sub(minerReward);
     } else {
       /**
@@ -397,13 +404,16 @@ export class ReimintExecutor {
     const vm = await this.backend.getVM(stateRoot, pendingCommon, true);
 
     const miner = Reimint.getMiner(block);
-    const minerReward = new BN(pendingCommon.param('pow', 'minerReward'));
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.engine.getStakeManager(vm, block);
+    let minerReward: BN;
     let parentValidatorSet: ValidatorSet;
     if (isEnableDAO(pendingCommon)) {
-      parentValidatorSet = (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager, this.engine.getValidatorBls(vm, block, pendingCommon))).copy();
+      minerReward = (await this.engine.configCache.get(parentStateRoot, block)).minerReward;
+      const bls = this.engine.getValidatorBls(vm, block, pendingCommon);
+      parentValidatorSet = (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager, bls)).copy();
     } else {
+      minerReward = new BN(pendingCommon.param('pow', 'minerReward'));
       parentValidatorSet = (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager)).copy();
     }
     parentValidatorSet.active.incrementProposerPriority(round);
@@ -423,7 +433,7 @@ export class ReimintExecutor {
     try {
       await this.assignBlockReward(vm.stateManager, systemCaller, minerReward);
       const blockReward = (await vm.stateManager.getAccount(systemCaller)).balance;
-      const validatorSet = await this.afterApply(vm, block, receipts, evidence, miner, blockReward, parentValidatorSet, parentStakeManager);
+      const validatorSet = await this.afterApply(vm, block, receipts, evidence, miner, blockReward, parentStateRoot, parentValidatorSet, parentStakeManager);
       await vm.stateManager.commit();
       const finalizedStateRoot = await vm.stateManager.getStateRoot();
 
@@ -527,14 +537,22 @@ export class ReimintExecutor {
       debug,
       generate: false,
       skipBlockValidation: true,
-      assignBlockReward: async (state, reward) => {
+      assignBlockReward: async (state, outsideReward) => {
+        let reward: BN;
+        if (isEnableDAO(pendingCommon)) {
+          // load reward from config contract
+          reward = (await this.engine.configCache.get(root, block)).minerReward;
+        } else {
+          // use outside reward
+          reward = outsideReward;
+        }
         await this.assignBlockReward(state, systemCaller, reward);
       },
       afterApply: async (state, { receipts: postByzantiumTxReceipts }) => {
         // assign all balances of systemCaller to miner
         const blockReward = (await state.getAccount(systemCaller)).balance;
         const receipts = postByzantiumTxReceiptsToReceipts(postByzantiumTxReceipts);
-        validatorSet = await this.afterApply(vm, block, receipts, extraData.evidence, miner, blockReward, parentValidatorSet, parentStakeManager);
+        validatorSet = await this.afterApply(vm, block, receipts, extraData.evidence, miner, blockReward, root, parentValidatorSet, parentStakeManager);
       },
       runTxOpts
     };

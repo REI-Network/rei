@@ -6,9 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IConfig.sol";
 
 /**
- * Config contract for mainnet.
- * In rei-network, system contracts can be updated through hard forks,
- * and DAO logic will be added in the futhure.
+ * Config contract for mainnet
  */
 contract Config is Ownable, IConfig {
     constructor() public {

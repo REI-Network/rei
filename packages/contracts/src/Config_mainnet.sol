@@ -12,6 +12,7 @@ import "./interfaces/IConfig.sol";
  */
 contract Config is Ownable, IConfig {
     constructor() public {
+        // TODO:
         transferOwnership(0x513E20C58FfB430dbEBd685513e142D5468bA4D3);
     }
 

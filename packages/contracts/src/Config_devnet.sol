@@ -10,7 +10,7 @@ import "./interfaces/IConfig.sol";
  */
 contract Config_devnet is Ownable, IConfig {
     constructor() public {
-        transferOwnership(0x809FaE291f79c9953577Ee9007342cff84014b1c);
+        transferOwnership(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266);
     }
 
     address public override stakeManager = 0x0000000000000000000000000000000000001001;

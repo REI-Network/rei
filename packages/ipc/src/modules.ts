@@ -237,6 +237,9 @@ export const rei = {
   },
   getMinerRewardFactor(tag: string) {
     passMessageToJsonAndEmit('getMinerRewardFactor', tag);
+  },
+  getMinerInfo(tag: string) {
+    passMessageToJsonAndEmit('getMinerInfo', tag);
   }
 };
 

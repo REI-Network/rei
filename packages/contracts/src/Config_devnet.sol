@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IConfig.sol";
 
 /**
- * Config contract for test
+ * Config contract for devnet
  */
 contract Config_devnet is Ownable, IConfig {
     constructor() public {

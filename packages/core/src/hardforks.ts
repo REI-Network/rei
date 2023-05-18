@@ -1,7 +1,7 @@
 import { rlphash, Address, BN, setLengthRight, setLengthLeft } from 'ethereumjs-util';
 import { addPrecompile, PrecompileAvailabilityCheck } from '@rei-network/vm/dist/evm/precompiles';
 import { OOGResult } from '@rei-network/vm/dist/evm/evm';
-import { hexStringToBN } from '@rei-network/utils';
+import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { BlockHeader, setCustomHashFunction, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
 import { StateManager } from './stateManager';
@@ -41,8 +41,15 @@ addPrecompile(
 
     const state = opts._VM.stateManager as StateManager;
     const totalAmount = await Fee.getTotalAmount(state);
-    // TODO
-    const dailyFee = hexStringToBN(state._common.param('vm', 'dailyFee'));
+
+    // load daily fee
+    let dailyFee: BN;
+    if (isEnableDAO(state._common)) {
+      dailyFee = new BN(await state.getContractStorage(Address.fromString('0x0000000000000000000000000000000000001000'), setLengthLeft(hexStringToBuffer('0x15'), 32)));
+    } else {
+      dailyFee = hexStringToBN(state._common.param('vm', 'dailyFee'));
+    }
+
     const stakeInfo = (await state.getAccount(address)).getStakeInfo();
     const fee = stakeInfo.estimateFee(timestamp.toNumber(), totalAmount, dailyFee);
 

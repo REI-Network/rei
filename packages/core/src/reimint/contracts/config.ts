@@ -11,6 +11,7 @@ const methods = {
   dailyFee: toBuffer('0x9306fd3d'),
   minerRewardFactor: toBuffer('0x2a0453be')
 };
+
 export class Config extends Contract {
   constructor(evm: EVM, common: Common) {
     super(evm, common, methods, Address.fromString(common.param('vm', 'cfgaddr')));

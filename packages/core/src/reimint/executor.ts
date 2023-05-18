@@ -150,7 +150,7 @@ export class ReimintExecutor {
 
       let minerFactor: BN;
       const totalBlockReward = totalReward.sub(accBalUsage);
-      if (isEnableDAO(pendingCommon)) {
+      if (isEnableDAO(parentCommon)) {
         minerFactor = await this.engine.getConfig(parentVM, pendingBlock, parentCommon).minerRewardFactor();
       } else {
         const numberMinerFactor = pendingCommon.param('vm', 'minerRewardFactor');
@@ -292,9 +292,9 @@ export class ReimintExecutor {
       await vm.stateManager.putAccount(addr, post);
       const validatorBls = this.engine.getValidatorBls(vm, pendingBlock, nextCommon);
       indexedValidatorSet = await IndexedValidatorSet.fromStakeManager(parentStakeManager, validatorBls);
-      // deploy validatorBlsFallback contract
+      // deploy DAO contracts
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
-      await Contract.deloyValidatorBlsFallbackContract(evm, nextCommon);
+      await Contract.deloyDAOContracts(evm, nextCommon);
     } else {
       await indexedValidatorSet.merge(changes);
     }
@@ -305,10 +305,10 @@ export class ReimintExecutor {
     logger.debug('Reimint::afterApply, totalLockedAmount:', totalLockedAmount.toString(), 'validatorCount:', validatorCount.toString());
     let enableGenesisValidators: boolean;
     if (isEnableDAO(nextCommon)) {
-      const config = this.engine.getConfig(parentVM, pendingBlock, parentCommon);
+      const config = this.engine.getConfig(vm, pendingBlock);
       const minTotalLockedAmount = await config.minTotalLockedAmount();
       const minValidatorsCount = await config.minValidatorsCount();
-      enableGenesisValidators = totalLockedAmount.gte(minTotalLockedAmount) && validatorCount.gte(minValidatorsCount);
+      enableGenesisValidators = totalLockedAmount.lt(minTotalLockedAmount) || validatorCount.lt(minValidatorsCount);
     } else {
       enableGenesisValidators = Reimint.isEnableGenesisValidators(totalLockedAmount, validatorCount.toNumber(), nextCommon);
     }
@@ -336,8 +336,8 @@ export class ReimintExecutor {
       }
     } else {
       let maxCount: number;
-      if (isEnableDAO(pendingCommon)) {
-        maxCount = (await this.engine.getConfig(parentVM, pendingBlock, parentCommon).maxValidatorsCount()).toNumber();
+      if (isEnableDAO(nextCommon)) {
+        maxCount = (await this.engine.getConfig(vm, pendingBlock).maxValidatorsCount()).toNumber();
       } else {
         maxCount = nextCommon.param('vm', 'maxValidatorsCount');
         if (typeof maxCount !== 'number' || maxCount === 0) {
@@ -431,7 +431,7 @@ export class ReimintExecutor {
     const parentStakeManager = this.engine.getStakeManager(vm, block);
     let minerReward: BN;
     let parentValidatorSet: ValidatorSet;
-    if (isEnableDAO(pendingCommon)) {
+    if (isEnableDAO(parentCommon)) {
       minerReward = await this.engine.getConfig(parentVM, block, parentCommon).minerReward();
       const bls = this.engine.getValidatorBls(vm, block, pendingCommon);
       parentValidatorSet = (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager, bls)).copy();
@@ -565,7 +565,7 @@ export class ReimintExecutor {
       skipBlockValidation: true,
       assignBlockReward: async (state, outsideReward) => {
         let reward: BN;
-        if (isEnableDAO(pendingCommon)) {
+        if (isEnableDAO(parentCommon)) {
           // load reward from config contract
           reward = await this.engine.getConfig(parentVM, block, parentCommon).minerReward();
         } else {

@@ -115,12 +115,13 @@ export abstract class Contract {
   }
 
   /**
-   * Deploy ValidatorBlsFallback contract
+   * Deploy DAO hardfork contracts
    * @param evm - EVM instance
    * @param common - Common instance
    */
-  static async deloyValidatorBlsFallbackContract(evm: EVM, common: Common) {
+  static async deloyDAOContracts(evm: EVM, common: Common) {
     await Contract.deployContract(evm, common, 'fallback', undefined, true);
+    await Contract.deployContract(evm, common, 'cfg', undefined, true);
   }
 
   /**

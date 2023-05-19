@@ -104,6 +104,16 @@ export abstract class Contract {
   }
 
   /**
+   * Deploy hardfork 3 contracts
+   * @param evm - EVM instance
+   * @param common - Common instance
+   */
+  static async deployHardfork3Contracts(evm: EVM, common: Common) {
+    // deploy config contract
+    await Contract.deployContract(evm, common, 'cfg', undefined, true);
+  }
+
+  /**
    * Deploy better POS hardfork contracts
    * @param evm - EVM instance
    * @param common - Common instance
@@ -121,7 +131,6 @@ export abstract class Contract {
    */
   static async deloyDAOContracts(evm: EVM, common: Common) {
     await Contract.deployContract(evm, common, 'fallback', undefined, true);
-    await Contract.deployContract(evm, common, 'cfg', undefined, true);
   }
 
   /**

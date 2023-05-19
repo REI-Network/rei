@@ -13,7 +13,7 @@ import { IDebug } from '@rei-network/vm/dist/types';
 import EVM, { EVMWorkMode } from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';
 import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../utils';
-import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableBetterPOS, isEnableDAO } from '../hardforks';
+import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableHardfork3, isEnableBetterPOS, isEnableDAO } from '../hardforks';
 import { StateManager } from '../stateManager';
 import { ValidatorSet, ValidatorChanges, isGenesis, IndexedValidatorSet, ActiveValidatorSet } from './validatorSet';
 import { StakeManager, SlashReason, Fee, Contract, ValidatorBls } from './contracts';
@@ -403,6 +403,12 @@ export class ReimintExecutor {
     if (!isEnableBetterPOS(pendingCommon) && isEnableBetterPOS(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployBetterPOSContracts(evm, nextCommon);
+    }
+
+    // 15. deploy contracts if hardfork 3 is enabled in the next block
+    if (!isEnableHardfork3(pendingCommon) && isEnableHardfork3(nextCommon)) {
+      const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
+      await Contract.deployHardfork3Contracts(evm, nextCommon);
     }
 
     return validatorSet;

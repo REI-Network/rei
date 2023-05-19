@@ -99,7 +99,7 @@ export function isEnableFreeStaking(common: Common) {
 }
 
 /**
- * Check whether better POS is enabled
+ * Check whether hardfork2 logic is enabled
  * @param common - Common instance
  * @returns Enable if `true`
  */
@@ -177,6 +177,23 @@ export function isEnableBetterPOS(common: Common) {
     return common.gteHardfork('better-pos');
   } else if (common.chainName() === 'rei-devnet') {
     return common.gteHardfork('better-pos');
+  } else {
+    throw new Error('unknown chain');
+  }
+}
+
+/**
+ * Check whether hardfork3 logic is enabled
+ * @param common - Common instance
+ * @returns Enable if `true`
+ */
+export function isEnableHardfork3(common: Common) {
+  if (common.chainName() === 'rei-testnet') {
+    return common.gteHardfork('testnet-hf-3');
+  } else if (common.chainName() === 'rei-mainnet') {
+    return common.gteHardfork('mainnet-hf-3');
+  } else if (common.chainName() === 'rei-devnet') {
+    return false;
   } else {
     throw new Error('unknown chain');
   }

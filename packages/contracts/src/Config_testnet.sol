@@ -51,7 +51,7 @@ contract Config_testnet is Ownable, IConfig {
 
     uint256 public override minTotalLockedAmount = 21e20;
 
-    uint256 public override minerReward;
+    uint256 public override minerReward = 2e18;
 
     uint256 public override dailyFee = 1440e18;
 

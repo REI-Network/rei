@@ -56,6 +56,7 @@ export interface ProcessTxOpts {
   blockGasUsed?: BN;
 
   totalAmount?: BN;
+  dailyFee?: BN;
 }
 
 export interface ProcessTxResult {
@@ -542,11 +543,20 @@ export class ReimintExecutor {
       }
     }
 
+    let dailyFee: BN | undefined = undefined;
+    if (isEnableDAO(parentCommon)) {
+      // load dailyFee from config contract
+      dailyFee = await this.engine.getConfig(parentVM, block, parentCommon).dailyFee();
+    } else {
+      // load dailyFee from common
+      dailyFee = undefined;
+    }
+
     let runTxOpts: any;
     if (isEnableFreeStaking(pendingCommon)) {
       runTxOpts = {
         skipBalance: true,
-        ...makeRunTxCallback(systemCaller, Address.fromString(pendingCommon.param('vm', 'faddr')), block.header.timestamp.toNumber(), await Fee.getTotalAmount(vm.stateManager))
+        ...makeRunTxCallback(systemCaller, Address.fromString(pendingCommon.param('vm', 'faddr')), block.header.timestamp.toNumber(), await Fee.getTotalAmount(vm.stateManager), dailyFee)
       };
     } else {
       runTxOpts = {
@@ -619,7 +629,7 @@ export class ReimintExecutor {
    * @returns ProcessTxResult
    */
   async processTx(options: ProcessTxOpts) {
-    const { root, block, tx, blockGasUsed, totalAmount } = options;
+    const { root, block, tx, blockGasUsed, totalAmount, dailyFee } = options;
     const systemCaller = Address.fromString(block._common.param('vm', 'scaddr'));
     const vm = await this.backend.getVM(root, block._common, true);
 
@@ -636,7 +646,7 @@ export class ReimintExecutor {
         tx,
         block,
         blockGasUsed,
-        ...makeRunTxCallback(systemCaller, feeAddr, block.header.timestamp.toNumber(), totalAmount)
+        ...makeRunTxCallback(systemCaller, feeAddr, block.header.timestamp.toNumber(), totalAmount, dailyFee)
       });
     } else {
       result = await vm.runTx({

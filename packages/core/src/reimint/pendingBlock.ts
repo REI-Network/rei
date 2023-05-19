@@ -6,7 +6,7 @@ import { logger } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { PendingTxMap } from '../txpool';
 import { EMPTY_ADDRESS, EMPTY_NONCE, EMPTY_MIX_HASH, EMPTY_EXTRA_DATA } from '../utils';
-import { isEnableFreeStaking } from '../hardforks';
+import { isEnableDAO, isEnableFreeStaking } from '../hardforks';
 import { FinalizeOpts, ProcessTxResult } from './executor';
 import { ReimintEngine } from './engine';
 
@@ -44,6 +44,7 @@ export class PendingBlock {
   private stopped: boolean = false;
 
   private totalAmount?: BN;
+  private dailyFee?: BN;
 
   constructor(engine: ReimintEngine, parentHash: Buffer, parentStateRoot: Buffer, number: BN, timestamp: BN, common: Common, extraData?: Buffer) {
     if (extraData && extraData.length !== 32) {
@@ -183,6 +184,20 @@ export class PendingBlock {
         }
       }
 
+      // load parent block header
+      const parent = await this.engine.node.db.getHeader(this.parentHash, this.number.subn(1));
+      const parentCommon = parent._common;
+      // load parent vm
+      const parentVM = await this.engine.node.getVM(parent.stateRoot, parentCommon);
+
+      // if dao is enable, load daily fee from contract
+      if (isEnableDAO(parentCommon)) {
+        if (this.dailyFee === undefined) {
+          const config = await this.engine.getConfig(parentVM, pendingBlock);
+          this.dailyFee = await config.dailyFee();
+        }
+      }
+
       let tx = txs.peek();
       while (tx) {
         try {
@@ -194,7 +209,8 @@ export class PendingBlock {
               root: this.latestStateRoot ?? this._parentStateRoot,
               block: pendingBlock,
               blockGasUsed: this.gasUsed,
-              totalAmount: this.totalAmount
+              totalAmount: this.totalAmount,
+              dailyFee: this.dailyFee
             });
           } catch (err) {
             txs.pop();

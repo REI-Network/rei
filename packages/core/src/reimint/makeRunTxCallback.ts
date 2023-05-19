@@ -12,7 +12,7 @@ import { encode } from './contracts';
 
 const usageTopic = toBuffer('0x873c82cd37aaacdcf736cbb6beefc8da36d474b65ad23aaa1b1c6fbd875f7076');
 
-export function makeRunTxCallback(systemCaller: Address, feeAddr: Address, timestamp: number, totalAmount: BN) {
+export function makeRunTxCallback(systemCaller: Address, feeAddr: Address, timestamp: number, totalAmount: BN, dailyFee?: BN) {
   let feeLeft!: BN;
   let balanceLeft!: BN;
   let logs!: EthereumLog[];
@@ -20,7 +20,7 @@ export function makeRunTxCallback(systemCaller: Address, feeAddr: Address, times
   const beforeTx = async (state: IStateManager, tx: TypedTransaction, txCost: BN) => {
     const caller = tx.getSenderAddress();
     const fromAccount = await state.getAccount(caller);
-    const { fee } = await validateTx(tx as Transaction, timestamp, state as StateManager, totalAmount);
+    const { fee } = await validateTx(tx as Transaction, timestamp, state as StateManager, totalAmount, dailyFee);
 
     feeLeft = fee!;
     balanceLeft = fromAccount.balance.sub(tx.value);

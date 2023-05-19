@@ -12,7 +12,7 @@ import { PendingTxMap } from './pendingMap';
 import { TxPricedList } from './txPricedList';
 import { Journal } from './journal';
 import { txSlots, checkTxIntrinsicGas } from './utils';
-import { isEnableFreeStaking } from '../hardforks';
+import { isEnableDAO, isEnableFreeStaking } from '../hardforks';
 import { validateTx } from '../validation';
 import { Fee } from '../reimint/contracts';
 
@@ -152,6 +152,7 @@ export class TxPool extends EventEmitter {
   private rejournalInterval: number;
 
   private totalAmount?: BN;
+  private dailyFee?: BN;
 
   constructor(options: TxPoolOptions) {
     super();
@@ -270,6 +271,15 @@ export class TxPool extends EventEmitter {
         this.totalAmount = await Fee.getTotalAmount(this.currentStateManager);
       } else {
         this.totalAmount = undefined;
+      }
+
+      if (isEnableDAO(this.currentHeader._common)) {
+        const parent = await this.node.db.getHeader(this.currentHeader.parentHash, this.currentHeader.number.subn(1));
+        const parentVM = await this.node.getVM(parent.stateRoot, parent._common);
+        const config = await this.node.reimint.getConfig(parentVM, block);
+        this.dailyFee = await config.dailyFee();
+      } else {
+        this.dailyFee = undefined;
       }
 
       if (this.journal) {
@@ -613,7 +623,7 @@ export class TxPool extends EventEmitter {
       const currentTimestamp = this.currentHeader.timestamp.toNumber();
 
       // validate transaction
-      await validateTx(tx as Transaction, currentTimestamp + period, this.currentStateManager, this.totalAmount);
+      await validateTx(tx as Transaction, currentTimestamp + period, this.currentStateManager, this.totalAmount, this.dailyFee);
 
       if (!checkTxIntrinsicGas(tx)) {
         throw new Error('checkTxIntrinsicGas failed');

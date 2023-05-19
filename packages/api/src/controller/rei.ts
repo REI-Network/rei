@@ -121,12 +121,28 @@ export class ReiController extends Controller {
    * @returns Miner reward factor
    */
   async getMinerRewardFactor([tag]: [string]) {
-    const num = await this.getBlockNumberByTag(tag);
-    const common = this.node.getCommon(num);
-    const factor = common.param('vm', 'minerRewardFactor');
-    if (typeof factor !== 'number' || factor < 0 || factor > 100) {
-      return null;
+    const block = await this.getBlockByTag(tag);
+
+    let factor: number | undefined = undefined;
+    if (block.header.number.gten(1)) {
+      const parent = await this.node.db.getHeader(block.header.parentHash, block.header.number.subn(1));
+      const parentCommon = parent._common;
+      if (isEnableDAO(parentCommon)) {
+        // load minerRewardFactor from contract
+        const parentVM = await this.node.getVM(parent.stateRoot, parentCommon);
+        const config = await this.node.reimint.getConfig(parentVM, block, parentCommon);
+        factor = (await config.minerRewardFactor()).toNumber();
+      }
     }
+
+    // load minerRewardFactor from common
+    if (factor === undefined) {
+      factor = block._common.param('vm', 'minerRewardFactor');
+      if (typeof factor !== 'number' || factor < 0 || factor > 100) {
+        return null;
+      }
+    }
+
     return intToHex(factor);
   }
 }

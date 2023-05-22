@@ -17,6 +17,9 @@ export class Config extends Contract {
     super(evm, common, methods, Address.fromString(common.param('vm', 'cfgaddr')));
   }
 
+  /**
+   * Get max validators count
+   */
   maxValidatorsCount() {
     return this.runWithLogger(async () => {
       const { returnValue } = await this.executeMessage(this.makeCallMessage('maxValidatorsCount', [], []));
@@ -24,6 +27,9 @@ export class Config extends Contract {
     });
   }
 
+  /**
+   * Get min validators count
+   */
   minValidatorsCount() {
     return this.runWithLogger(async () => {
       const { returnValue } = await this.executeMessage(this.makeCallMessage('minValidatorsCount', [], []));
@@ -31,6 +37,9 @@ export class Config extends Contract {
     });
   }
 
+  /**
+   * Get min total lock amount
+   */
   minTotalLockedAmount() {
     return this.runWithLogger(async () => {
       const { returnValue } = await this.executeMessage(this.makeCallMessage('minTotalLockedAmount', [], []));
@@ -38,6 +47,9 @@ export class Config extends Contract {
     });
   }
 
+  /**
+   * Get miner reward
+   */
   minerReward() {
     return this.runWithLogger(async () => {
       const { returnValue } = await this.executeMessage(this.makeCallMessage('minerReward', [], []));
@@ -45,6 +57,9 @@ export class Config extends Contract {
     });
   }
 
+  /**
+   * Get daily fee
+   */
   dailyFee() {
     return this.runWithLogger(async () => {
       const { returnValue } = await this.executeMessage(this.makeCallMessage('dailyFee', [], []));
@@ -52,6 +67,9 @@ export class Config extends Contract {
     });
   }
 
+  /**
+   * Get miner reward factor
+   */
   minerRewardFactor() {
     return this.runWithLogger(async () => {
       const { returnValue } = await this.executeMessage(this.makeCallMessage('minerRewardFactor', [], []));

@@ -1,6 +1,6 @@
 import path from 'path';
 import { expect, assert } from 'chai';
-import { Address, BN, bufferToInt, setLengthLeft, toBuffer, bufferToHex } from 'ethereumjs-util';
+import { Address, BN, setLengthLeft, toBuffer, bufferToHex } from 'ethereumjs-util';
 import EVM from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';
 import Message from '@rei-network/vm/dist/evm/message';
@@ -112,7 +112,7 @@ describe('StorageLoader', () => {
 
   it('should load uint256 type storage', async () => {
     const storage = await storageLoader.loadStorageSlot(StorageLoader.indexToSlotIndex(new BN(0)));
-    expect(bufferToInt(storage)).to.equal(1);
+    expect(new BN(storage).toString()).to.equal('1');
   });
 
   it('should load bytes32 type storage', async () => {
@@ -126,7 +126,7 @@ describe('StorageLoader', () => {
     assert(length.eqn(10));
     for (let i = 0; i < 10; i++) {
       const elementSlot = storageLoader.getArrayStorageIndex(slot, new BN(i));
-      expect(bufferToInt(await storageLoader.loadStorageSlot(elementSlot))).to.equals(i);
+      expect(new BN(await storageLoader.loadStorageSlot(elementSlot)).toString()).to.equals(i.toString());
     }
   });
 
@@ -144,7 +144,7 @@ describe('StorageLoader', () => {
     const slot = StorageLoader.indexToSlotIndex(new BN(4));
     for (let i = 0; i < 10; i++) {
       const elementSlot = storageLoader.getMappingStorageIndex(slot, new BN(i).toBuffer());
-      expect(bufferToInt(await storageLoader.loadStorageSlot(elementSlot))).to.equals(i);
+      expect(new BN(await storageLoader.loadStorageSlot(elementSlot)).toString()).to.equals(i.toString());
     }
   });
 
@@ -164,7 +164,7 @@ describe('StorageLoader', () => {
         expect(bufferToHex(await storageLoader.loadStorageSlot(propertySlot))).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
       }
       if (i === 1) {
-        expect(bufferToInt(await storageLoader.loadStorageSlot(propertySlot))).to.equals(321);
+        expect(new BN(await storageLoader.loadStorageSlot(propertySlot)).toString()).to.equals('321');
       }
     }
   });
@@ -182,7 +182,7 @@ describe('StorageLoader', () => {
           expect(bufferToHex(await storageLoader.loadStorageSlot(propertySlot))).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
         }
         if (j === 1) {
-          expect(bufferToInt(await storageLoader.loadStorageSlot(propertySlot))).to.equals(321);
+          expect(new BN(await storageLoader.loadStorageSlot(propertySlot)).toString()).to.equals('321');
         }
       }
     }
@@ -198,7 +198,7 @@ describe('StorageLoader', () => {
           expect(bufferToHex(await storageLoader.loadStorageSlot(propertySlot))).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
         }
         if (j === 1) {
-          expect(bufferToInt(await storageLoader.loadStorageSlot(propertySlot))).to.equals(321);
+          expect(new BN(await storageLoader.loadStorageSlot(propertySlot)).toString()).to.equals('321');
         }
       }
     }

@@ -300,7 +300,13 @@ export class ReimintExecutor {
       await indexedValidatorSet.merge(changes);
     }
 
-    // 8. get totalLockedAmount and validatorCount by the merged validatorSet,
+    // 8. deploy contracts if hardfork 3 is enabled in the next block
+    if (!isEnableHardfork3(pendingCommon) && isEnableHardfork3(nextCommon)) {
+      const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
+      await Contract.deployHardfork3Contracts(evm, nextCommon);
+    }
+
+    // 9. get totalLockedAmount and validatorCount by the merged validatorSet,
     //    and decide if we should enable genesis validators
     const { totalLockedAmount, validatorCount } = indexedValidatorSet.getTotalLockedVotingPowerAndValidatorCount(isEnableDAO(nextCommon));
     logger.debug('Reimint::afterApply, totalLockedAmount:', totalLockedAmount.toString(), 'validatorCount:', validatorCount.toString());
@@ -354,7 +360,7 @@ export class ReimintExecutor {
       validatorSet = new ValidatorSet(indexedValidatorSet, active);
     }
 
-    // 9. increase once
+    // 10. increase once
     validatorSet.active.incrementProposerPriority(1);
 
     // make sure there is at least one validator
@@ -363,7 +369,7 @@ export class ReimintExecutor {
       throw new Error('activeValidators length is zero');
     }
 
-    // 10. call stakeManager.onAfterBlock to save active validator set
+    // 11. call stakeManager.onAfterBlock to save active validator set
     const activeSigners = activeValidators.map(({ validator }) => validator);
     const priorities = activeValidators.map(({ priority }) => priority);
     if (isEnableBetterPOS(pendingCommon)) {
@@ -372,19 +378,19 @@ export class ReimintExecutor {
       await parentStakeManager.onAfterBlock(validatorSet.active.proposer, activeSigners, priorities);
     }
 
-    // 11. deploy contracts if hardfork 1 is enabled in the next block
+    // 12. deploy contracts if hardfork 1 is enabled in the next block
     if (!isEnableHardfork1(pendingCommon) && isEnableHardfork1(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployHardfork1Contracts(evm, nextCommon);
     }
 
-    // 12. deploy contracts if free staking is enabled in the next block
+    // 13. deploy contracts if free staking is enabled in the next block
     if (!isEnableFreeStaking(pendingCommon) && isEnableFreeStaking(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployFreeStakingContracts(evm, nextCommon);
     }
 
-    // 13. deploy contracts if hardfork 2 is enabled in the next block
+    // 14. deploy contracts if hardfork 2 is enabled in the next block
     if (!isEnableHardfork2(pendingCommon) && isEnableHardfork2(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployHardfork2Contracts(evm, nextCommon);
@@ -399,16 +405,10 @@ export class ReimintExecutor {
       await pendingStakeManager.initEvidenceHash(hashes);
     }
 
-    // 14. deploy contracts if prison is enabled in the next block
+    // 15. deploy contracts if prison is enabled in the next block
     if (!isEnableBetterPOS(pendingCommon) && isEnableBetterPOS(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployBetterPOSContracts(evm, nextCommon);
-    }
-
-    // 15. deploy contracts if hardfork 3 is enabled in the next block
-    if (!isEnableHardfork3(pendingCommon) && isEnableHardfork3(nextCommon)) {
-      const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
-      await Contract.deployHardfork3Contracts(evm, nextCommon);
     }
 
     return validatorSet;

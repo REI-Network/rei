@@ -58,66 +58,66 @@ contract Config is Ownable, IConfig {
 
     uint256 public override minerRewardFactor = 90;
 
-    event ConfigChange();
+    event ConfigChanged();
 
     function setUnstakeDelay(uint256 _unstakeDelay) external override onlyOwner {
         unstakeDelay = _unstakeDelay;
-        emit ConfigChange();
+        emit ConfigChanged();
     }
 
     function setWithdrawDelay(uint256 _withdrawDelay) external override onlyOwner {
         withdrawDelay = _withdrawDelay;
-        emit ConfigChange();
+        emit ConfigChanged();
     }
 
     function setSetCommissionRateInterval(uint256 _setCommissionRateInterval) external override onlyOwner {
         setCommissionRateInterval = _setCommissionRateInterval;
-        emit ConfigChange();
+        emit ConfigChanged();
     }
 
     function setFeePoolInterval(uint256 _feePoolInterval) external override onlyOwner {
         feePoolInterval = _feePoolInterval;
-        emit ConfigChange();
+        emit ConfigChanged();
     }
 
     function setForfeit(uint256 _forfeit) external override onlyOwner {
         forfeit = _forfeit;
-        emit ConfigChange();
+        emit ConfigChanged();
     }
 
     function setJailThreshold(uint256 _jailThreshold) external override onlyOwner {
         jailThreshold = _jailThreshold;
-        emit ConfigChange();
+        emit ConfigChanged();
     }
 
     function setMaxValidatorsCount(uint256 _maxValidatorsCount) external override onlyOwner {
         maxValidatorsCount = _maxValidatorsCount;
-        emit ConfigChange();
+        emit ConfigChanged();
     }
 
     function setMinValidatorsCount(uint256 _minValidatorsCount) external override onlyOwner {
         minValidatorsCount = _minValidatorsCount;
-        emit ConfigChange();
+        emit ConfigChanged();
     }
 
     function setMinTotalLockedAmount(uint256 _minTotalLockedAmount) external override onlyOwner {
         minTotalLockedAmount = _minTotalLockedAmount;
-        emit ConfigChange();
+        emit ConfigChanged();
     }
 
     function setMinerReward(uint256 _minerReward) external override onlyOwner {
         minerReward = _minerReward;
-        emit ConfigChange();
+        emit ConfigChanged();
     }
 
     function setDailyFee(uint256 _dailyFee) external override onlyOwner {
         dailyFee = _dailyFee;
-        emit ConfigChange();
+        emit ConfigChanged();
     }
 
     function setMinerRewardFactor(uint256 _minerRewardFactor) external override onlyOwner {
         minerRewardFactor = _minerRewardFactor;
-        emit ConfigChange();
+        emit ConfigChanged();
     }
 
     function getFactorByReason(uint8 reason) external view override returns (uint8) {

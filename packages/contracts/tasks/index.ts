@@ -93,7 +93,7 @@ task('deploy-bls', 'Deploy validator bls contract')
 
 task('register', 'Register bls public key')
   .addParam('validatorInfo', 'format: address1:pk1,address2:pk2,...')
-  .addParam('contractAddr', 'ValidatorBls contract address')
+  .addParam('contractAddr', 'ValidatorBls contract address', '0x0000000000000000000000000000000000001009')
   .setAction(async function (args, { ethers }) {
     const signers = await ethers.getSigners();
     const ValidatorBls = await ethers.getContractFactory('ValidatorBls');

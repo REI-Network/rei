@@ -59,34 +59,6 @@ contract Config_devnet is Ownable, IConfig {
 
     event ConfigChange();
 
-    function setStakeManager(address _stakeManager) external onlyOwner {
-        stakeManager = _stakeManager;
-    }
-
-    function setSystemCaller(address _systemCaller) external onlyOwner {
-        systemCaller = _systemCaller;
-    }
-
-    function setUnstakePool(address _unstakePool) external onlyOwner {
-        unstakePool = _unstakePool;
-    }
-
-    function setValidatorRewardPool(address _validatorRewardPool) external onlyOwner {
-        validatorRewardPool = _validatorRewardPool;
-    }
-
-    function setFee(address _fee) external onlyOwner {
-        fee = _fee;
-    }
-
-    function setFeePool(address _feePool) external onlyOwner {
-        feePool = _feePool;
-    }
-
-    function setPrison(address _prison) external onlyOwner {
-        prison = _prison;
-    }
-
     function setUnstakeDelay(uint256 _unstakeDelay) external override onlyOwner {
         unstakeDelay = _unstakeDelay;
         emit ConfigChange();
@@ -94,11 +66,6 @@ contract Config_devnet is Ownable, IConfig {
 
     function setWithdrawDelay(uint256 _withdrawDelay) external override onlyOwner {
         withdrawDelay = _withdrawDelay;
-        emit ConfigChange();
-    }
-
-    function setMinIndexVotingPower(uint256 _minIndexVotingPower) external onlyOwner {
-        minIndexVotingPower = _minIndexVotingPower;
         emit ConfigChange();
     }
 
@@ -120,10 +87,6 @@ contract Config_devnet is Ownable, IConfig {
     function setJailThreshold(uint256 _jailThreshold) external override onlyOwner {
         jailThreshold = _jailThreshold;
         emit ConfigChange();
-    }
-
-    function setRecordsAmountPeriod(uint256 _recordsAmountPeriod) external onlyOwner {
-        recordsAmountPeriod = _recordsAmountPeriod;
     }
 
     function setMaxValidatorsCount(uint256 _maxValidatorsCount) external override onlyOwner {

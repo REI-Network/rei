@@ -59,34 +59,6 @@ contract Config_testnet is Ownable, IConfig {
 
     event ConfigChange();
 
-    function setStakeManager(address _stakeManager) external onlyOwner {
-        stakeManager = _stakeManager;
-    }
-
-    function setSystemCaller(address _systemCaller) external onlyOwner {
-        systemCaller = _systemCaller;
-    }
-
-    function setUnstakePool(address _unstakePool) external onlyOwner {
-        unstakePool = _unstakePool;
-    }
-
-    function setValidatorRewardPool(address _validatorRewardPool) external onlyOwner {
-        validatorRewardPool = _validatorRewardPool;
-    }
-
-    function setFee(address _fee) external onlyOwner {
-        fee = _fee;
-    }
-
-    function setFeePool(address _feePool) external onlyOwner {
-        feePool = _feePool;
-    }
-
-    function setPrison(address _prison) external onlyOwner {
-        prison = _prison;
-    }
-
     function setUnstakeDelay(uint256 _unstakeDelay) external override onlyOwner {
         unstakeDelay = _unstakeDelay;
         emit ConfigChange();

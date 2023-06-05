@@ -135,12 +135,12 @@ describe('StorageLoader', () => {
 
   it('should load uint256 type storage', async () => {
     const storage = await storageLoader.loadStorageSlot(StorageLoader.indexToSlotIndex(new BN(0)));
-    expect(new BN(storage).toString()).to.equal('1');
+    expect(StorageLoader.decode(storage, 'uint256').toString()).to.equal('1');
   });
 
   it('should load bytes32 type storage', async () => {
     const storage = await storageLoader.loadStorageSlot(StorageLoader.indexToSlotIndex(new BN(1)));
-    assert(setLengthLeft(storage, 32).equals(toBuffer('0x0000000000000000000000000000000000000000000000000000000000000001')));
+    assert(storage.equals(toBuffer('0x0000000000000000000000000000000000000000000000000000000000000001')));
   });
 
   it('should load uint256[] type storage', async () => {
@@ -175,7 +175,7 @@ describe('StorageLoader', () => {
     const slot = StorageLoader.indexToSlotIndex(new BN(5));
     for (let i = 0; i < 10; i++) {
       const elementSlot = storageLoader.getMappingStorageIndex(slot, setLengthLeft(new BN(i).toBuffer(), 32));
-      expect(bufferToHex(await storageLoader.loadStorageSlot(elementSlot))).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
+      expect(StorageLoader.decode(await storageLoader.loadStorageSlot(elementSlot), 'address')).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
     }
   });
 
@@ -184,7 +184,7 @@ describe('StorageLoader', () => {
     for (let i = 0; i < 2; i++) {
       const propertySlot = storageLoader.getStructStorageIndex(slot, new BN(i));
       if (i === 0) {
-        expect(bufferToHex(await storageLoader.loadStorageSlot(propertySlot))).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
+        expect(StorageLoader.decode(await storageLoader.loadStorageSlot(propertySlot), 'address')).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
       }
       if (i === 1) {
         expect(new BN(await storageLoader.loadStorageSlot(propertySlot)).toString()).to.equals('321');
@@ -202,7 +202,7 @@ describe('StorageLoader', () => {
       for (let j = 0; j < 2; j++) {
         const propertySlot = storageLoader.getStructStorageIndex(elementSlot, new BN(j));
         if (j === 0) {
-          expect(bufferToHex(await storageLoader.loadStorageSlot(propertySlot))).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
+          expect(StorageLoader.decode(await storageLoader.loadStorageSlot(propertySlot), 'address')).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
         }
         if (j === 1) {
           expect(new BN(await storageLoader.loadStorageSlot(propertySlot)).toString()).to.equals('321');
@@ -218,7 +218,7 @@ describe('StorageLoader', () => {
       for (let j = 0; j < 2; j++) {
         const propertySlot = storageLoader.getStructStorageIndex(elementSlot, new BN(j));
         if (j === 0) {
-          expect(bufferToHex(await storageLoader.loadStorageSlot(propertySlot))).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
+          expect(StorageLoader.decode(await storageLoader.loadStorageSlot(propertySlot), 'address')).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
         }
         if (j === 1) {
           expect(new BN(await storageLoader.loadStorageSlot(propertySlot)).toString()).to.equals('321');
@@ -245,7 +245,7 @@ describe('StorageLoader', () => {
   it('should load address type storage', async () => {
     const slot = StorageLoader.indexToSlotIndex(new BN(13));
     const storage = await storageLoader.loadStorageSlot(slot);
-    expect(bufferToHex(storage)).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
+    expect(StorageLoader.decode(storage, 'address')).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
   });
 
   it('should load mapping(address => struct) type storage ', async () => {
@@ -253,13 +253,13 @@ describe('StorageLoader', () => {
     const elementSlot1 = storageLoader.getMappingStorageIndex(slot, toBuffer('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde'));
     const propertySlot1 = storageLoader.getStructStorageIndex(elementSlot1, new BN(0));
     const propertySlot2 = storageLoader.getStructStorageIndex(elementSlot1, new BN(1));
-    expect(bufferToHex(await storageLoader.loadStorageSlot(propertySlot1))).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
+    expect(StorageLoader.decode(await storageLoader.loadStorageSlot(propertySlot1), 'address')).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
     expect(new BN(await storageLoader.loadStorageSlot(propertySlot2)).toString()).to.equals('321');
 
     const elementSlot2 = storageLoader.getMappingStorageIndex(slot, toBuffer('0xedfe730a3589de207c54df997514a7f5a3683603'));
     const propertySlot3 = storageLoader.getStructStorageIndex(elementSlot2, new BN(0));
     const propertySlot4 = storageLoader.getStructStorageIndex(elementSlot2, new BN(1));
-    expect(bufferToHex(await storageLoader.loadStorageSlot(propertySlot3))).to.equals('0xedfe730a3589de207c54df997514a7f5a3683603');
+    expect(StorageLoader.decode(await storageLoader.loadStorageSlot(propertySlot3), 'address')).to.equals('0xedfe730a3589de207c54df997514a7f5a3683603');
     expect(new BN(await storageLoader.loadStorageSlot(propertySlot4)).toString()).to.equals('123');
   });
 

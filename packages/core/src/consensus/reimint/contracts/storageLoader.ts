@@ -1,5 +1,8 @@
-import { Address, BN, keccak256, setLengthLeft } from 'ethereumjs-util';
+import { Address, BN, bufferToHex, keccak256, setLengthLeft } from 'ethereumjs-util';
+import { AbiCoder } from '@ethersproject/abi';
 import { StateManager } from '../../../stateManager/stateManager';
+
+const coder = new AbiCoder();
 
 export class StorageLoader {
   private readonly stateManager: StateManager; // The state manager
@@ -20,7 +23,7 @@ export class StorageLoader {
   }
 
   /**
-   * get the storage index for a mapping
+   * Get the storage index for a mapping
    * @param slotIndex The slot index of the mapping
    * @param key The key of the mapping
    * @returns The storage index
@@ -30,7 +33,7 @@ export class StorageLoader {
   }
 
   /**
-   * get the storage index for an array
+   * Get the storage index for an array
    * @param slotIndex The slot index of the array
    * @param index The index of the array
    * @param step The step of the element, it can be understood as how many storage slots the element occupies
@@ -41,7 +44,7 @@ export class StorageLoader {
   }
 
   /**
-   * get the storage index for a struct
+   * Get the storage index for a struct
    * @param slotIndex The slot index of the struct
    * @param index The index of the struct
    * @returns The storage index
@@ -56,7 +59,7 @@ export class StorageLoader {
    * @returns The storage slot
    */
   async loadStorageSlot(slotIndex: Buffer): Promise<Buffer> {
-    return await this.stateManager.getContractStorage(this.address, slotIndex);
+    return setLengthLeft(await this.stateManager.getContractStorage(this.address, slotIndex), 32);
   }
 
   /**
@@ -87,6 +90,42 @@ export class StorageLoader {
         tempBufferArray.push(tempSlot);
       }
       return Buffer.concat(tempBufferArray);
+    }
+  }
+
+  /**
+   * Decode the storage slot to the corresponding type
+   * @param slotStorage The storage slot to decode
+   * @param type The type to decode
+   * @returns The decoded value
+   */
+  static decode(slotStorage: Buffer, type: string) {
+    if (slotStorage.length !== 32) {
+      throw new Error('slotStorage length is not 32');
+    }
+    switch (type) {
+      case 'bytes32':
+        return slotStorage;
+      case 'address':
+        return bufferToHex(slotStorage.slice(12, 32));
+      case 'bool':
+        return Boolean(slotStorage.slice(31, 32)[0]);
+      case 'uint8':
+      case 'uint16':
+      case 'uint32':
+      case 'uint64':
+      case 'uint128':
+      case 'uint256':
+        return new BN(slotStorage);
+      case 'int8':
+      case 'int16':
+      case 'int32':
+      case 'int64':
+      case 'int128':
+      case 'int256':
+        return new BN(coder.decode(['int256'], slotStorage)[0].toString());
+      default:
+        throw new Error('unknown type: ' + type);
     }
   }
 }

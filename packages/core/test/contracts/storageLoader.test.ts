@@ -133,6 +133,14 @@ describe('StorageLoader', () => {
     storageLoader = new StorageLoader(stateManager, exampleContractAddress);
   });
 
+  it('should not decode storage slot  which the length is less than 32 bytes', async () => {
+    try {
+      StorageLoader.decode(Buffer.from([0]), 'uint256');
+    } catch (error) {
+      expect((error as any).message).to.equal('slotStorage length is not 32');
+    }
+  });
+
   it('should load uint256 type storage', async () => {
     const storage = await storageLoader.loadStorageSlot(StorageLoader.indexToSlotIndex(new BN(0)));
     expect(StorageLoader.decode(storage, 'uint256').toString()).to.equal('1');

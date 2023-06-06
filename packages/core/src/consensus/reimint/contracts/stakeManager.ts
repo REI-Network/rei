@@ -1,10 +1,12 @@
 import EVM from '@rei-network/vm/dist/evm/evm';
-import { Address, BN, bufferToHex, toBuffer } from 'ethereumjs-util';
+import { Address, BN, bufferToHex, setLengthLeft, toBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Log, Receipt } from '@rei-network/structure';
 import { ValidatorChanges, getGenesisValidators } from '../validatorSet';
-import { bufferToAddress, decodeInt256, decodeBytes, validatorsEncode, validatorsDecode } from './utils';
+import { bufferToAddress, decodeInt256, validatorsEncode, validatorsDecode } from './utils';
 import { Contract } from './contract';
+import { StateManager } from '../../../stateManager';
+import { StorageLoader } from './storageLoader';
 
 // function selector of stake manager
 const methods = {
@@ -53,6 +55,8 @@ export type ActiveValidator = {
 
 // a class used to interact with the stake manager contract
 export class StakeManager extends Contract {
+  private storageLoader: StorageLoader;
+
   /**
    * Filter validator set changes from receipts
    * @param changes - `ValidatorChanges` instance
@@ -102,6 +106,7 @@ export class StakeManager extends Contract {
 
   constructor(evm: EVM, common: Common) {
     super(evm, common, methods, Address.fromString(common.param('vm', 'smaddr')));
+    this.storageLoader = new StorageLoader(evm._state as StateManager, Address.fromString(common.param('vm', 'smaddr')));
   }
 
   /**
@@ -110,8 +115,8 @@ export class StakeManager extends Contract {
    */
   proposer() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('proposer', [], []));
-      return bufferToAddress(returnValue);
+      const returnValueNew = await this.storageLoader.loadStorageSlot(StorageLoader.indexToSlotIndex(new BN(10)));
+      return Address.fromString(StorageLoader.decode(returnValueNew, 'address') as string);
     });
   }
 
@@ -190,8 +195,11 @@ export class StakeManager extends Contract {
       if (index !== -1) {
         return new BN(index);
       }
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('validators', ['address'], [address.toString()]));
-      return new BN(returnValue.slice(0, 32));
+      const slot = StorageLoader.indexToSlotIndex(new BN(5));
+      const elemtSlot = this.storageLoader.getMappingStorageIndex(slot, toBuffer(address));
+      const idSlot = this.storageLoader.getStructStorageIndex(elemtSlot, new BN(0));
+      const returnValueNew = await this.storageLoader.loadStorageSlot(idSlot);
+      return new BN(returnValueNew);
     });
   }
 
@@ -201,8 +209,8 @@ export class StakeManager extends Contract {
    */
   activeValidatorsLength() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('activeValidatorsLength', [], []));
-      return new BN(returnValue);
+      const returnValueNew = await this.storageLoader.loadStorageSlot(StorageLoader.indexToSlotIndex(new BN(9)));
+      return new BN(returnValueNew);
     });
   }
 
@@ -213,14 +221,16 @@ export class StakeManager extends Contract {
    */
   activeValidators(index: BN): Promise<ActiveValidator> {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('activeValidators', ['uint256'], [index.toString()]));
-      if (returnValue.length !== 2 * 32) {
+      const slotIndex = StorageLoader.indexToSlotIndex(new BN(9));
+      const elementSlotIndex = this.storageLoader.getArrayStorageIndex(slotIndex, index, new BN(2));
+      const validator = await this.storageLoader.loadStorageSlot(this.storageLoader.getStructStorageIndex(elementSlotIndex, new BN(0)));
+      const priority = await this.storageLoader.loadStorageSlot(this.storageLoader.getStructStorageIndex(elementSlotIndex, new BN(1)));
+      if (validator.equals(setLengthLeft(Buffer.alloc(0), 32))) {
         throw new Error('invalid return value length');
       }
-      let i = 0;
       return {
-        validator: bufferToAddress(returnValue.slice(i++ * 32, i * 32)),
-        priority: decodeInt256(returnValue.slice(i++ * 32, i * 32))
+        validator: Address.fromString(StorageLoader.decode(validator, 'address') as string),
+        priority: decodeInt256(priority)
       };
     });
   }
@@ -232,8 +242,9 @@ export class StakeManager extends Contract {
   allActiveValidators(): Promise<ActiveValidator[]> {
     return this.runWithLogger(async () => {
       const gvs = getGenesisValidators(this.common);
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('getActiveValidatorInfos', [], []));
-      const { ids, priorities } = validatorsDecode(toBuffer(decodeBytes(returnValue)));
+      const slotIndex = StorageLoader.indexToSlotIndex(new BN(11));
+      const returnValueNew = await this.storageLoader.loadBytesOrString(slotIndex);
+      const { ids, priorities } = validatorsDecode(returnValueNew);
       const validators: { validator: Address; priority: BN }[] = [];
       for (let i = 0; i < ids.length; i++) {
         let validator: Address;
@@ -323,8 +334,10 @@ export class StakeManager extends Contract {
    */
   isUsedEvidence(hash: Buffer) {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('usedEvidence', ['bytes32'], [bufferToHex(hash)]));
-      return new BN(returnValue).eqn(1);
+      const slotIndex = StorageLoader.indexToSlotIndex(new BN(12));
+      const elementSlotIndex = this.storageLoader.getMappingStorageIndex(slotIndex, hash);
+      const returnValueNew = await this.storageLoader.loadStorageSlot(elementSlotIndex);
+      return StorageLoader.decode(returnValueNew, 'bool') as boolean;
     });
   }
 

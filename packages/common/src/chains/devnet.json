@@ -91,6 +91,10 @@
       "block": 0
     },
     {
+      "name": "devnet-hf-3",
+      "block": 50
+    },
+    {
       "name": "rei-dao",
       "block": 50
     }

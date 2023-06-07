@@ -17,7 +17,7 @@ import { isEnableFreeStaking, loadInitData, isEnableHardfork2, isEnableBetterPOS
 import { SignatureType } from './enum';
 import { IProcessBlockResult } from './types';
 import { Worker } from './worker';
-import { StakeManager, Contract, Fee, FeePool, ValidatorBLS } from './contracts';
+import { StakeManager, Contract, Fee, FeePool, ValidatorBLS, Config } from './contracts';
 import { StateMachine } from './state';
 import { Evidence, EvidencePool, EvidenceDatabase } from './evpool';
 import { Reimint } from './reimint';
@@ -354,6 +354,18 @@ export class ReimintEngine {
   getFeePool(vm: VM, block: Block, common?: Common) {
     const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
     return new FeePool(evm, common ?? block._common);
+  }
+
+  /**
+   * Get config contract object
+   * @param vm - Target vm instance
+   * @param block - Target block
+   * @param common - Common instance
+   * @return Config contract object
+   */
+  getConfig(vm: VM, block: Block, common?: Common) {
+    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), block);
+    return new Config(evm, common ?? block._common);
   }
 
   /**

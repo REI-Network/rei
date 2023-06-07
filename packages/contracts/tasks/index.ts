@@ -1,4 +1,70 @@
+import type { ethers as HardhatEthers } from 'hardhat';
 import { task } from 'hardhat/config';
+
+function parseFuncArg(value: string, ethers: typeof HardhatEthers) {
+  if (value.startsWith('[') && value.endsWith(']')) {
+    return value.slice(1, value.length - 2).split(',');
+  } else if (value === 'true') {
+    return true;
+  } else if (value === 'false') {
+    return false;
+  } else if (value === 'max') {
+    return ethers.constants.MaxUint256;
+  } else {
+    return value;
+  }
+}
+
+task('call', 'Call contract view function')
+  .addParam('contract', 'Contract name')
+  .addParam('address', 'Contract address')
+  .addParam('func', 'Function name')
+  .addOptionalParam('arg0', 'Function argument')
+  .addOptionalParam('arg1', 'Function argument')
+  .addOptionalParam('arg2', 'Function argument')
+  .addOptionalParam('arg3', 'Function argument')
+  .addOptionalParam('arg4', 'Function argument')
+  .addOptionalParam('arg5', 'Function argument')
+  .addOptionalParam('arg6', 'Function argument')
+  .addOptionalParam('tag', 'Block tag')
+  .setAction(async function (args, { ethers }) {
+    const contract: any = await ethers.getContractAt(args.contract, args.address);
+    const funcArgs: any[] = [];
+    for (let i = 0; i < 7; i++) {
+      const value = args[`arg${i}`];
+      if (value === undefined) {
+        break;
+      }
+      funcArgs.push(parseFuncArg(value, ethers));
+    }
+    console.log(await contract[args.func](...funcArgs, { blockTag: args.tag }));
+  });
+
+task('send-tx', 'Send a transaction to call a contract')
+  .addParam('contract', 'Contract name')
+  .addParam('address', 'Contract address')
+  .addParam('func', 'Function name')
+  .addOptionalParam('arg0', 'Function argument')
+  .addOptionalParam('arg1', 'Function argument')
+  .addOptionalParam('arg2', 'Function argument')
+  .addOptionalParam('arg3', 'Function argument')
+  .addOptionalParam('arg4', 'Function argument')
+  .addOptionalParam('arg5', 'Function argument')
+  .addOptionalParam('arg6', 'Function argument')
+  .setAction(async function (args, { ethers }) {
+    const contract: any = await ethers.getContractAt(args.contract, args.address);
+    const funcArgs: any[] = [];
+    for (let i = 0; i < 7; i++) {
+      const value = args[`arg${i}`];
+      if (value === undefined) {
+        break;
+      }
+      funcArgs.push(parseFuncArg(value, ethers));
+    }
+    const tx = await contract[args.func](...funcArgs);
+    const receipt = await tx.wait();
+    console.log(receipt.events);
+  });
 
 task('deploy-bls', 'Deploy validator bls contract')
   .addParam('genesisInfo', 'Genesis validator address and public key, format: address1:pk1,address2:pk2,...')
@@ -27,7 +93,7 @@ task('deploy-bls', 'Deploy validator bls contract')
 
 task('register', 'Register bls public key')
   .addParam('validatorInfo', 'format: address1:pk1,address2:pk2,...')
-  .addParam('contractAddr', 'ValidatorBLS contract address')
+  .addParam('contractAddr', 'ValidatorBLS contract address', '0x0000000000000000000000000000000000001009')
   .setAction(async function (args, { ethers }) {
     const signers = await ethers.getSigners();
     const ValidatorBLS = await ethers.getContractFactory('ValidatorBLS');

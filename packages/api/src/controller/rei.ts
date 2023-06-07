@@ -1,4 +1,4 @@
-import { bnToHex, Address, intToHex } from 'ethereumjs-util';
+import { bnToHex, Address, intToHex, BN } from 'ethereumjs-util';
 import { hexStringToBN } from '@rei-network/utils';
 import { isEnableDAO } from '@rei-network/core';
 import { Controller } from './base';
@@ -24,16 +24,31 @@ export class ReiController extends Controller {
   async getCrude([address, tag]: [string, string]) {
     const block = await this.getBlockByTag(tag);
     const common = block._common;
-    const strDailyFee = common.param('vm', 'dailyFee');
-    if (typeof strDailyFee !== 'string') {
-      return null;
-    }
-
     const state = await this.node.getStateManager(block.header.stateRoot, common);
     const faddr = Address.fromString(common.param('vm', 'faddr'));
     const totalAmount = (await state.getAccount(faddr)).balance;
     const timestamp = block.header.timestamp.toNumber();
-    const dailyFee = hexStringToBN(strDailyFee);
+
+    let dailyFee: BN | undefined = undefined;
+    if (block.header.number.gten(1)) {
+      const parent = await this.node.db.getHeader(block.header.parentHash, block.header.number.subn(1));
+      const parentCommon = parent._common;
+      if (isEnableDAO(parentCommon)) {
+        // load dailyFee from contract
+        const parentVM = await this.node.getVM(parent.stateRoot, parentCommon);
+        const config = await this.node.reimint.getConfig(parentVM, block, parentCommon);
+        dailyFee = await config.dailyFee();
+      }
+    }
+
+    // load dailyFee from common
+    if (dailyFee === undefined) {
+      const strDailyFee = common.param('vm', 'dailyFee');
+      if (typeof strDailyFee !== 'string') {
+        return null;
+      }
+      dailyFee = hexStringToBN(strDailyFee);
+    }
 
     const account = await state.getAccount(Address.fromString(address));
     const stakeInfo = account.getStakeInfo();
@@ -74,13 +89,30 @@ export class ReiController extends Controller {
    * @returns Daily fee
    */
   async getDailyFee([tag]: [string]) {
-    const num = await this.getBlockNumberByTag(tag);
-    const common = this.node.getCommon(num);
-    const strDailyFee = common.param('vm', 'dailyFee');
-    if (typeof strDailyFee !== 'string') {
-      return null;
+    const block = await this.getBlockByTag(tag);
+
+    let dailyFee: BN | undefined = undefined;
+    if (block.header.number.gten(1)) {
+      const parent = await this.node.db.getHeader(block.header.parentHash, block.header.number.subn(1));
+      const parentCommon = parent._common;
+      if (isEnableDAO(parentCommon)) {
+        // load dailyFee from contract
+        const parentVM = await this.node.getVM(parent.stateRoot, parentCommon);
+        const config = await this.node.reimint.getConfig(parentVM, block, parentCommon);
+        dailyFee = await config.dailyFee();
+      }
     }
-    return bnToHex(hexStringToBN(strDailyFee));
+
+    // load dailyFee from common
+    if (dailyFee === undefined) {
+      const strDailyFee = block._common.param('vm', 'dailyFee');
+      if (typeof strDailyFee !== 'string') {
+        return null;
+      }
+      dailyFee = hexStringToBN(strDailyFee);
+    }
+
+    return bnToHex(dailyFee);
   }
 
   /**
@@ -89,12 +121,28 @@ export class ReiController extends Controller {
    * @returns Miner reward factor
    */
   async getMinerRewardFactor([tag]: [string]) {
-    const num = await this.getBlockNumberByTag(tag);
-    const common = this.node.getCommon(num);
-    const factor = common.param('vm', 'minerRewardFactor');
-    if (typeof factor !== 'number' || factor < 0 || factor > 100) {
-      return null;
+    const block = await this.getBlockByTag(tag);
+
+    let factor: number | undefined = undefined;
+    if (block.header.number.gten(1)) {
+      const parent = await this.node.db.getHeader(block.header.parentHash, block.header.number.subn(1));
+      const parentCommon = parent._common;
+      if (isEnableDAO(parentCommon)) {
+        // load minerRewardFactor from contract
+        const parentVM = await this.node.getVM(parent.stateRoot, parentCommon);
+        const config = await this.node.reimint.getConfig(parentVM, block, parentCommon);
+        factor = (await config.minerRewardFactor()).toNumber();
+      }
     }
+
+    // load minerRewardFactor from common
+    if (factor === undefined) {
+      factor = block._common.param('vm', 'minerRewardFactor');
+      if (typeof factor !== 'number' || factor < 0 || factor > 100) {
+        return null;
+      }
+    }
+
     return intToHex(factor);
   }
 

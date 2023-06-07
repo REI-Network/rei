@@ -59,3 +59,12 @@ export interface IDebug {
   precommitForEmptyWhenFirstRound?: boolean;
   conflictVotes?: boolean;
 }
+
+export type ConfigValues = {
+  maxValidatorsCount: BN;
+  minValidatorsCount: BN;
+  minTotalLockedAmount: BN;
+  minerReward: BN;
+  dailyFee: BN;
+  minerRewardFactor: BN;
+};

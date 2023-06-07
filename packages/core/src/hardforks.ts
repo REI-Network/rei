@@ -1,7 +1,7 @@
 import { rlphash, Address, BN, setLengthRight, setLengthLeft } from 'ethereumjs-util';
 import { addPrecompile, PrecompileAvailabilityCheck } from '@rei-network/vm/dist/evm/precompiles';
 import { OOGResult } from '@rei-network/vm/dist/evm/evm';
-import { hexStringToBN } from '@rei-network/utils';
+import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { BlockHeader, setCustomHashFunction, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
 import { StateManager } from './stateManager';
@@ -41,7 +41,15 @@ addPrecompile(
 
     const state = opts._VM.stateManager as StateManager;
     const totalAmount = await Fee.getTotalAmount(state);
-    const dailyFee = hexStringToBN(state._common.param('vm', 'dailyFee'));
+
+    // load daily fee
+    let dailyFee: BN;
+    if (isEnableDAO(state._common)) {
+      dailyFee = new BN(await state.getContractStorage(Address.fromString('0x0000000000000000000000000000000000001000'), setLengthLeft(hexStringToBuffer('0x15'), 32)));
+    } else {
+      dailyFee = hexStringToBN(state._common.param('vm', 'dailyFee'));
+    }
+
     const stakeInfo = (await state.getAccount(address)).getStakeInfo();
     const fee = stakeInfo.estimateFee(timestamp.toNumber(), totalAmount, dailyFee);
 
@@ -91,7 +99,7 @@ export function isEnableFreeStaking(common: Common) {
 }
 
 /**
- * Check whether better POS is enabled
+ * Check whether hardfork2 logic is enabled
  * @param common - Common instance
  * @returns Enable if `true`
  */
@@ -169,6 +177,23 @@ export function isEnableBetterPOS(common: Common) {
     return common.gteHardfork('better-pos');
   } else if (common.chainName() === 'rei-devnet') {
     return common.gteHardfork('better-pos');
+  } else {
+    throw new Error('unknown chain');
+  }
+}
+
+/**
+ * Check whether hardfork3 logic is enabled
+ * @param common - Common instance
+ * @returns Enable if `true`
+ */
+export function isEnableHardfork3(common: Common) {
+  if (common.chainName() === 'rei-testnet') {
+    return common.gteHardfork('testnet-hf-3');
+  } else if (common.chainName() === 'rei-mainnet') {
+    return common.gteHardfork('mainnet-hf-3');
+  } else if (common.chainName() === 'rei-devnet') {
+    return common.gteHardfork('devnet-hf-3');
   } else {
     throw new Error('unknown chain');
   }

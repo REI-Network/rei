@@ -2,6 +2,8 @@ import { Address, BN, toBuffer } from 'ethereumjs-util';
 import EVM from '@rei-network/vm/dist/evm/evm';
 import { Common } from '@rei-network/common';
 import { Contract } from './contract';
+import { StateManager } from '../../stateManager/stateManager';
+import { StorageLoader } from './storageLoader';
 
 const methods = {
   maxValidatorsCount: toBuffer('0xf589b79e'),
@@ -13,8 +15,11 @@ const methods = {
 };
 
 export class Config extends Contract {
+  private storageLoader: StorageLoader;
+
   constructor(evm: EVM, common: Common) {
     super(evm, common, methods, Address.fromString(common.param('vm', 'cfgaddr')));
+    this.storageLoader = new StorageLoader(evm._state as StateManager, Address.fromString(common.param('vm', 'cfgaddr')));
   }
 
   /**
@@ -22,7 +27,7 @@ export class Config extends Contract {
    */
   maxValidatorsCount() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('maxValidatorsCount', [], []));
+      const returnValue = await this.storageLoader.loadStorageSlot(StorageLoader.indexToSlotIndex(new BN(17)));
       return new BN(returnValue);
     });
   }
@@ -32,7 +37,7 @@ export class Config extends Contract {
    */
   minValidatorsCount() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('minValidatorsCount', [], []));
+      const returnValue = await this.storageLoader.loadStorageSlot(StorageLoader.indexToSlotIndex(new BN(18)));
       return new BN(returnValue);
     });
   }
@@ -42,7 +47,7 @@ export class Config extends Contract {
    */
   minTotalLockedAmount() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('minTotalLockedAmount', [], []));
+      const returnValue = await this.storageLoader.loadStorageSlot(StorageLoader.indexToSlotIndex(new BN(19)));
       return new BN(returnValue);
     });
   }
@@ -52,7 +57,7 @@ export class Config extends Contract {
    */
   minerReward() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('minerReward', [], []));
+      const returnValue = await this.storageLoader.loadStorageSlot(StorageLoader.indexToSlotIndex(new BN(20)));
       return new BN(returnValue);
     });
   }
@@ -62,7 +67,7 @@ export class Config extends Contract {
    */
   dailyFee() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('dailyFee', [], []));
+      const returnValue = await this.storageLoader.loadStorageSlot(StorageLoader.indexToSlotIndex(new BN(21)));
       return new BN(returnValue);
     });
   }
@@ -72,7 +77,7 @@ export class Config extends Contract {
    */
   minerRewardFactor() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('minerRewardFactor', [], []));
+      const returnValue = await this.storageLoader.loadStorageSlot(StorageLoader.indexToSlotIndex(new BN(22)));
       return new BN(returnValue);
     });
   }

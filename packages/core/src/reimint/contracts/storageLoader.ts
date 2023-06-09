@@ -28,7 +28,7 @@ export class StorageLoader {
    * @param key The key of the mapping
    * @returns The storage index
    */
-  public getMappingStorageIndex(slotIndex: Buffer, key: Buffer) {
+  static getMappingStorageIndex(slotIndex: Buffer, key: Buffer) {
     return keccak256(Buffer.concat([setLengthLeft(key, 32), slotIndex]));
   }
 
@@ -39,7 +39,7 @@ export class StorageLoader {
    * @param step The step of the element, it can be understood as how many storage slots the element occupies
    * @returns The storage index
    */
-  public getArrayStorageIndex(slotIndex: Buffer, index: BN, step: BN = new BN(1)) {
+  static getArrayStorageIndex(slotIndex: Buffer, index: BN, step: BN = new BN(1)) {
     return setLengthLeft(new BN(keccak256(slotIndex)).add(index.mul(step)).toBuffer(), 32);
   }
 
@@ -49,7 +49,7 @@ export class StorageLoader {
    * @param index The index of the struct
    * @returns The storage index
    */
-  public getStructStorageIndex(slotIndex: Buffer, index: BN) {
+  static getStructStorageIndex(slotIndex: Buffer, index: BN) {
     return setLengthLeft(new BN(slotIndex).add(index).toBuffer(), 32);
   }
 

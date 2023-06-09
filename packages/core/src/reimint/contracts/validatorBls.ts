@@ -1,10 +1,12 @@
-import { Address, toBuffer } from 'ethereumjs-util';
+import { Address, BN, toBuffer } from 'ethereumjs-util';
 import EVM from '@rei-network/vm/dist/evm/evm';
 import { Common } from '@rei-network/common';
 import { Receipt } from '@rei-network/structure';
 import { ValidatorChanges } from '../validatorSet';
 import { Contract } from './contract';
-import { decodeBytes, bufferToAddress } from './utils';
+import { bufferToAddress } from './utils';
+import { StateManager } from '../../stateManager/stateManager';
+import { StorageLoader } from './storageLoader';
 
 const methods = {
   getBlsPublicKey: toBuffer('0x647e0e98')
@@ -15,8 +17,11 @@ const event = {
 };
 
 export class ValidatorBls extends Contract {
+  private storageLoader: StorageLoader;
+
   constructor(evm: EVM, common: Common) {
     super(evm, common, methods, Address.fromString(common.param('vm', 'postaddr')));
+    this.storageLoader = new StorageLoader(evm._state as StateManager, Address.fromString(common.param('vm', 'postaddr')));
   }
 
   /**
@@ -46,8 +51,8 @@ export class ValidatorBls extends Contract {
    */
   async getBlsPublicKey(validator: Address) {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('getBlsPublicKey', ['address'], [validator.toString()]));
-      const pk = toBuffer(decodeBytes(returnValue));
+      const slot = StorageLoader.getMappingStorageIndex(StorageLoader.indexToSlotIndex(new BN(0)), toBuffer(validator.toString()));
+      const pk = await this.storageLoader.loadBytesOrString(slot);
       return pk.length === 0 ? undefined : pk;
     });
   }

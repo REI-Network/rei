@@ -223,19 +223,19 @@ describe('StorageLoader', () => {
   it('should load struct type storage', async () => {
     await contractCall(Buffer.concat([selectors.get('setStruct')!, encode(['address', 'int256'], ['0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde', 123])]));
     const slot = StorageLoader.indexToSlotIndex(new BN(5));
-    const propertySlot = storageLoader.getStructStorageIndex(slot, new BN(0));
+    const propertySlot = StorageLoader.getStructStorageIndex(slot, new BN(0));
     const storage = await storageLoader.loadStorageSlot(propertySlot);
     expect(StorageLoader.decode(storage, 'address')).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
-    const propertySlot1 = storageLoader.getStructStorageIndex(slot, new BN(1));
+    const propertySlot1 = StorageLoader.getStructStorageIndex(slot, new BN(1));
     const storage1 = await storageLoader.loadStorageSlot(propertySlot1);
     expect(StorageLoader.decode(storage1, 'int256').toString()).to.equals('123');
 
     await contractCall(Buffer.concat([selectors.get('setStruct')!, encode(['address', 'int256'], ['0xdcad3a6d3569df655070ded06cb7a1b2ccd1d3af', -123])]));
     const slot1 = StorageLoader.indexToSlotIndex(new BN(5));
-    const propertySlot2 = storageLoader.getStructStorageIndex(slot1, new BN(0));
+    const propertySlot2 = StorageLoader.getStructStorageIndex(slot1, new BN(0));
     const storage2 = await storageLoader.loadStorageSlot(propertySlot2);
     expect(StorageLoader.decode(storage2, 'address')).to.equals('0xdcad3a6d3569df655070ded06cb7a1b2ccd1d3af');
-    const propertySlot3 = storageLoader.getStructStorageIndex(slot1, new BN(1));
+    const propertySlot3 = StorageLoader.getStructStorageIndex(slot1, new BN(1));
     const storage3 = await storageLoader.loadStorageSlot(propertySlot3);
     expect(StorageLoader.decode(storage3, 'int256').toString()).to.equals('-123');
   });
@@ -250,9 +250,9 @@ describe('StorageLoader', () => {
     expect(new BN(await storageLoader.loadStorageSlot(slot)).toString()).to.equals('10');
     const propertyCount = 2;
     for (let i = 0; i < 10; i++) {
-      const elementSlot = storageLoader.getArrayStorageIndex(slot, new BN(i), new BN(propertyCount));
+      const elementSlot = StorageLoader.getArrayStorageIndex(slot, new BN(i), new BN(propertyCount));
       for (let j = 0; j < propertyCount; j++) {
-        const propertySlot = storageLoader.getStructStorageIndex(elementSlot, new BN(j));
+        const propertySlot = StorageLoader.getStructStorageIndex(elementSlot, new BN(j));
         const storage = await storageLoader.loadStorageSlot(propertySlot);
         if (j === 0) {
           expect(StorageLoader.decode(storage, 'address')).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
@@ -266,9 +266,9 @@ describe('StorageLoader', () => {
   it('should load mapping(address => struct) type storage', async () => {
     const slot = StorageLoader.indexToSlotIndex(new BN(8));
     await contractCall(Buffer.concat([selectors.get('setMapping1')!, encode(['address', 'address', 'int256'], ['0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde', '0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde', 123])]));
-    const elementSlot = storageLoader.getMappingStorageIndex(slot, toBuffer('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde'));
-    const propertySlot = storageLoader.getStructStorageIndex(elementSlot, new BN(0));
-    const propertySlot1 = storageLoader.getStructStorageIndex(elementSlot, new BN(1));
+    const elementSlot = StorageLoader.getMappingStorageIndex(slot, toBuffer('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde'));
+    const propertySlot = StorageLoader.getStructStorageIndex(elementSlot, new BN(0));
+    const propertySlot1 = StorageLoader.getStructStorageIndex(elementSlot, new BN(1));
     const storage = await storageLoader.loadStorageSlot(propertySlot);
     expect(StorageLoader.decode(storage, 'address')).to.equals('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde');
     const storage1 = await storageLoader.loadStorageSlot(propertySlot1);
@@ -276,9 +276,9 @@ describe('StorageLoader', () => {
     // reset mapping value
     expect(StorageLoader.decode(storage1, 'int256').toString()).to.equals('123');
     await contractCall(Buffer.concat([selectors.get('setMapping1')!, encode(['address', 'address', 'int256'], ['0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde', '0xdcad3a6d3569df655070ded06cb7a1b2ccd1d3af', -123])]));
-    const elementSlot1 = storageLoader.getMappingStorageIndex(slot, toBuffer('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde'));
-    const propertySlot2 = storageLoader.getStructStorageIndex(elementSlot1, new BN(0));
-    const propertySlot3 = storageLoader.getStructStorageIndex(elementSlot1, new BN(1));
+    const elementSlot1 = StorageLoader.getMappingStorageIndex(slot, toBuffer('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde'));
+    const propertySlot2 = StorageLoader.getStructStorageIndex(elementSlot1, new BN(0));
+    const propertySlot3 = StorageLoader.getStructStorageIndex(elementSlot1, new BN(1));
     const storage2 = await storageLoader.loadStorageSlot(propertySlot2);
     expect(StorageLoader.decode(storage2, 'address')).to.equals('0xdcad3a6d3569df655070ded06cb7a1b2ccd1d3af');
     const storage3 = await storageLoader.loadStorageSlot(propertySlot3);
@@ -289,12 +289,12 @@ describe('StorageLoader', () => {
     const slot = StorageLoader.indexToSlotIndex(new BN(9));
     const key1 = toBuffer('0x0000000000000000000000000000000000000000000000000000000000000001');
     await contractCall(Buffer.concat([selectors.get('setMapping2')!, encode(['bytes32', 'bool'], [key1, true])]));
-    const elementSlot = storageLoader.getMappingStorageIndex(slot, key1);
+    const elementSlot = StorageLoader.getMappingStorageIndex(slot, key1);
     const storage = await storageLoader.loadStorageSlot(elementSlot);
     expect(StorageLoader.decode(storage, 'bool')).to.equals(true);
 
     await contractCall(Buffer.concat([selectors.get('setMapping2')!, encode(['bytes32', 'bool'], [key1, false])]));
-    const elementSlot1 = storageLoader.getMappingStorageIndex(slot, key1);
+    const elementSlot1 = StorageLoader.getMappingStorageIndex(slot, key1);
     const storage1 = await storageLoader.loadStorageSlot(elementSlot1);
     expect(StorageLoader.decode(storage1, 'bool')).to.equals(false);
   });

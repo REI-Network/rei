@@ -145,4 +145,35 @@ export class ReiController extends Controller {
 
     return intToHex(factor);
   }
+
+  /**
+   * Get miner info
+   * @param tag - Block tag
+   * @returns Miner info
+   */
+  async getMinerInfo([tag]: [string]) {
+    const coinbase = this.node.reimint.coinbase.toString();
+    const unlockAccount = this.node.accMngr.totalUnlockedAccounts();
+    const unlockBLSPublicKey = this.node.blsMngr.getPublicKey();
+    const block = await this.getBlockByTag(tag);
+    const result: {
+      coinbase: string;
+      unlockAccount: string[];
+      unlockBLSPublicKey: string | null;
+      registerBLSPublicKey: string | null;
+    } = {
+      coinbase,
+      unlockAccount: unlockAccount.map((account) => account.toString('hex')),
+      unlockBLSPublicKey: unlockBLSPublicKey?.toHex() ?? null,
+      registerBLSPublicKey: null
+    };
+    if (!isEnableDAO(block._common)) {
+      return result;
+    }
+    const vm = await this.node.getVM(block.header.stateRoot, block._common);
+    const bls = this.node.reimint.getValidatorBLS(vm, block);
+    const blsPublicKey = await bls.getBLSPublicKey(Address.fromString(coinbase));
+    result.registerBLSPublicKey = blsPublicKey?.toString('hex') ?? null;
+    return result;
+  }
 }

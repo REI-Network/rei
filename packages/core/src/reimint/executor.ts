@@ -16,7 +16,7 @@ import { postByzantiumTxReceiptsToReceipts, EMPTY_ADDRESS } from '../utils';
 import { isEnableFreeStaking, isEnableHardfork1, isEnableHardfork2, isEnableHardfork3, isEnableBetterPOS, isEnableDAO } from '../hardforks';
 import { StateManager } from '../stateManager';
 import { ValidatorSet, ValidatorChanges, isGenesis, IndexedValidatorSet, ActiveValidatorSet } from './validatorSet';
-import { StakeManager, SlashReason, Fee, Contract, ValidatorBls } from './contracts';
+import { StakeManager, SlashReason, Fee, Contract, ValidatorBLS } from './contracts';
 import { Reimint } from './reimint';
 import { Evidence, DuplicateVoteEvidence } from './evpool';
 import { ExtraData } from './extraData';
@@ -276,10 +276,10 @@ export class ReimintExecutor {
 
     // 7. filter all receipts to collect changes
     if (isEnableDAO(pendingCommon)) {
-      ValidatorBls.filterReceiptsChanges(changes, receipts, pendingCommon);
-      await indexedValidatorSet.merge(changes, this.engine.getValidatorBls(vm, pendingBlock, pendingCommon));
+      ValidatorBLS.filterReceiptsChanges(changes, receipts, pendingCommon);
+      await indexedValidatorSet.merge(changes, this.engine.getValidatorBLS(vm, pendingBlock, pendingCommon));
     } else if (!isEnableDAO(pendingCommon) && isEnableDAO(nextCommon)) {
-      // modify validatorBls contract address
+      // modify validatorBLS contract address
       const fallbackAddr = nextCommon.param('vm', 'fallbackaddr');
       const postAddr = nextCommon.param('vm', 'postaddr');
       if (fallbackAddr === undefined || postAddr === undefined) {
@@ -291,7 +291,7 @@ export class ReimintExecutor {
       post.stateRoot = fallback.stateRoot;
       post.codeHash = fallback.codeHash;
       await vm.stateManager.putAccount(addr, post);
-      const validatorBls = this.engine.getValidatorBls(vm, pendingBlock, nextCommon);
+      const validatorBls = this.engine.getValidatorBLS(vm, pendingBlock, nextCommon);
       indexedValidatorSet = await IndexedValidatorSet.fromStakeManager(parentStakeManager, validatorBls);
       // deploy DAO contracts
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
@@ -324,7 +324,7 @@ export class ReimintExecutor {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, create a new genesis validator set');
         // if the parent validator set isn't a genesis validator set, we create a new one
         if (isEnableDAO(nextCommon)) {
-          validatorSet = new ValidatorSet(indexedValidatorSet, await ActiveValidatorSet.genesis(nextCommon, this.engine.getValidatorBls(vm, pendingBlock, nextCommon)));
+          validatorSet = new ValidatorSet(indexedValidatorSet, await ActiveValidatorSet.genesis(nextCommon, this.engine.getValidatorBLS(vm, pendingBlock, nextCommon)));
         } else {
           validatorSet = new ValidatorSet(indexedValidatorSet, await ActiveValidatorSet.genesis(nextCommon));
         }
@@ -332,7 +332,7 @@ export class ReimintExecutor {
         logger.debug('Reimint::afterApply, EnableGenesisValidators, copy from parent');
         // if the parent validator set is a genesis validator set, we copy the set from the parent
         if (!isEnableDAO(pendingCommon) && isEnableDAO(nextCommon)) {
-          validatorSet = new ValidatorSet(indexedValidatorSet, await ActiveValidatorSet.genesis(nextCommon, this.engine.getValidatorBls(vm, pendingBlock, nextCommon)));
+          validatorSet = new ValidatorSet(indexedValidatorSet, await ActiveValidatorSet.genesis(nextCommon, this.engine.getValidatorBLS(vm, pendingBlock, nextCommon)));
         } else {
           const active = parentValidatorSet.active.copy();
           if (isEnableDAO(pendingCommon)) {
@@ -440,7 +440,7 @@ export class ReimintExecutor {
     let parentValidatorSet: ValidatorSet;
     if (isEnableDAO(parentCommon)) {
       minerReward = await this.engine.getConfig(parentVM, block, parentCommon).minerReward();
-      const bls = this.engine.getValidatorBls(vm, block, pendingCommon);
+      const bls = this.engine.getValidatorBLS(vm, block, pendingCommon);
       parentValidatorSet = (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager, bls)).copy();
     } else {
       minerReward = new BN(pendingCommon.param('pow', 'minerReward'));
@@ -521,7 +521,7 @@ export class ReimintExecutor {
     const systemCaller = Address.fromString(pendingCommon.param('vm', 'scaddr'));
     const parentStakeManager = this.engine.getStakeManager(vm, block);
 
-    let parentValidatorSet: ValidatorSet = isEnableDAO(pendingCommon) ? (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager, this.engine.getValidatorBls(vm, block, pendingCommon))).copy() : (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager)).copy();
+    let parentValidatorSet: ValidatorSet = isEnableDAO(pendingCommon) ? (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager, this.engine.getValidatorBLS(vm, block, pendingCommon))).copy() : (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager)).copy();
 
     const extraData = ExtraData.fromBlockHeader(pendingHeader, { valSet: parentValidatorSet.active });
     const miner = extraData.proposal.getProposer();

@@ -1,6 +1,6 @@
 import { Address, BN } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
-import { StakeManager, ValidatorBls } from '../contracts';
+import { StakeManager, ValidatorBLS } from '../contracts';
 import { IndexedValidator } from './indexedValidatorSet';
 import { getGenesisValidators, genesisValidatorPriority, genesisValidatorVotingPower, isGenesis } from './genesis';
 import { isEnableBetterPOS } from '../../hardforks';
@@ -49,7 +49,7 @@ export class ActiveValidatorSet {
    * @param bls - Bls contract instance
    * @returns ActiveValidatorSet instance
    */
-  static async fromStakeManager(sm: StakeManager, bls?: ValidatorBls) {
+  static async fromStakeManager(sm: StakeManager, bls?: ValidatorBLS) {
     // load proposer address
     const proposer = await sm.proposer();
 
@@ -81,7 +81,7 @@ export class ActiveValidatorSet {
       // load bls public key(if exists)
       let blsPublicKey: Buffer | undefined = undefined;
       if (bls) {
-        blsPublicKey = await bls.getBlsPublicKey(v.validator);
+        blsPublicKey = await bls.getBLSPublicKey(v.validator);
       }
 
       active.push({
@@ -116,14 +116,14 @@ export class ActiveValidatorSet {
    * @param bls - Bls contract instance
    * @returns ActiveValidatorSet instance
    */
-  static async genesis(common: Common, bls?: ValidatorBls) {
+  static async genesis(common: Common, bls?: ValidatorBLS) {
     const active: ActiveValidator[] = [];
     for (const gv of getGenesisValidators(common)) {
       const av: ActiveValidator = {
         validator: gv,
         priority: genesisValidatorPriority.clone(),
         votingPower: genesisValidatorVotingPower.clone(),
-        blsPublicKey: bls ? await bls.getBlsPublicKey(gv) : undefined
+        blsPublicKey: bls ? await bls.getBLSPublicKey(gv) : undefined
       };
 
       active.push(av);

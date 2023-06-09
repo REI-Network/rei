@@ -1,7 +1,7 @@
 import Heap from 'qheap';
 import { Address, BN } from 'ethereumjs-util';
 import { FunctionalAddressMap, FunctionalAddressSet } from '@rei-network/utils';
-import { StakeManager, ValidatorBls } from '../contracts';
+import { StakeManager, ValidatorBLS } from '../contracts';
 import { ValidatorChanges } from './validatorChanges';
 import { isGenesis } from './genesis';
 
@@ -33,7 +33,7 @@ export class IndexedValidatorSet {
    * @param bls - `ValidatorBls` instance
    * @returns IndexedValidatorSet instance
    */
-  static async fromStakeManager(sm: StakeManager, bls?: ValidatorBls) {
+  static async fromStakeManager(sm: StakeManager, bls?: ValidatorBLS) {
     const indexed = new FunctionalAddressMap<IndexedValidator>();
     const length = await sm.indexedValidatorsLength();
     for (const i = new BN(0); i.lt(length); i.iaddn(1)) {
@@ -48,7 +48,7 @@ export class IndexedValidatorSet {
       if (votingPower.gtn(0)) {
         const indexValidator: IndexedValidator = { validator, votingPower };
         if (bls) {
-          indexValidator.blsPublicKey = await bls.getBlsPublicKey(validator);
+          indexValidator.blsPublicKey = await bls.getBLSPublicKey(validator);
         }
         indexed.set(validator, indexValidator);
       }
@@ -108,7 +108,7 @@ export class IndexedValidatorSet {
    * @param changes - `ValidatorChanges` instance
    * @param bls - `ValidatorBls` instance
    */
-  async merge(changes: ValidatorChanges, bls?: ValidatorBls) {
+  async merge(changes: ValidatorChanges, bls?: ValidatorBLS) {
     for (const uv of changes.unindexedValidators) {
       this.indexed.delete(uv);
     }
@@ -135,7 +135,7 @@ export class IndexedValidatorSet {
 
     for (const addr of newValidators) {
       if (!changes.blsValidators.has(addr) && bls) {
-        const blsPublicKey = await bls.getBlsPublicKey(addr);
+        const blsPublicKey = await bls.getBLSPublicKey(addr);
         if (blsPublicKey) {
           changes.blsValidators.set(addr, blsPublicKey);
         }

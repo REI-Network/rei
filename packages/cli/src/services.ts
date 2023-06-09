@@ -34,7 +34,7 @@ export async function startServices(opts: { [option: string]: string }): Promise
   const node = await NodeFactory.createNode({
     unlock: addresses.map((address, i): [string, string] => [address, passphrase[i]]),
     blsFileName: opts.blsFile,
-    blsPassword: (await getPassphrase(opts.blsPassword))[0],
+    blsPassword: opts.blsPassword && (await getPassphrase(opts.blsPassword))[0],
     databasePath: opts.datadir,
     chain: opts.chain,
     receiptsCacheSize: opts.receiptsCacheSize ? Number(opts.receiptsCacheSize) : undefined,

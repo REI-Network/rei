@@ -9,16 +9,15 @@ import { StateManager } from '../../stateManager/stateManager';
 import { StorageLoader } from './storageLoader';
 
 const methods = {
-  getBlsPublicKey: toBuffer('0x647e0e98')
+  getBLSPublicKey: toBuffer('0xc2e7cbdd')
 };
 
 const event = {
-  SetBlsPublicKey: toBuffer('0x675abc7506819cff3ebcd1a0d961f09a373b8b5233bc2740c1f153fd4d79a980')
+  SetBLSPublicKey: toBuffer('0x4861c1796b9ac9313a6c9d77539ee86af148464a0b9bfd9e7bcd50baae5ca9b2')
 };
 
-export class ValidatorBls extends Contract {
+export class ValidatorBLS extends Contract {
   private storageLoader: StorageLoader;
-
   constructor(evm: EVM, common: Common) {
     super(evm, common, methods, Address.fromString(common.param('vm', 'postaddr')));
     this.storageLoader = new StorageLoader(evm._state as StateManager, Address.fromString(common.param('vm', 'postaddr')));
@@ -35,7 +34,7 @@ export class ValidatorBls extends Contract {
     for (const receipt of receipts) {
       if (receipt.logs.length > 0) {
         for (const log of receipt.logs) {
-          if (log.address.equals(blsAddr.buf) && log.topics.length === 2 && log.topics[0].equals(event['SetBlsPublicKey'])) {
+          if (log.address.equals(blsAddr.buf) && log.topics.length === 2 && log.topics[0].equals(event['SetBLSPublicKey'])) {
             //get validator address and bls public key
             changes.setBlsPublicKey(bufferToAddress(log.topics[1]), log.data.slice(64, 112));
           }
@@ -49,7 +48,7 @@ export class ValidatorBls extends Contract {
    * @param validator - Validator address
    * @returns - BLS public key
    */
-  async getBlsPublicKey(validator: Address) {
+  async getBLSPublicKey(validator: Address) {
     return this.runWithLogger(async () => {
       const slot = StorageLoader.getMappingStorageIndex(StorageLoader.indexToSlotIndex(new BN(0)), toBuffer(validator.toString()));
       const pk = await this.storageLoader.loadBytesOrString(slot);

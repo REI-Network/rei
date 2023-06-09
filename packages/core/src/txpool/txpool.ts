@@ -11,11 +11,10 @@ import { TxSortedMap } from './txmap';
 import { PendingTxMap } from './pendingMap';
 import { TxPricedList } from './txPricedList';
 import { Journal } from './journal';
-import { TxPoolAccount, TxPoolOptions } from './types';
 import { txSlots, checkTxIntrinsicGas } from './utils';
-import { isEnableFreeStaking } from '../hardforks';
+import { isEnableDAO, isEnableFreeStaking } from '../hardforks';
 import { validateTx } from '../validation';
-import { Fee } from '../consensus/reimint/contracts';
+import { Fee } from '../reimint/contracts';
 
 const defaultTxMaxSize = 32768 * 4;
 const defaultPriceLimit = new BN(1);
@@ -27,6 +26,87 @@ const defaultGlobalQueue = 1024;
 const defaultLifeTime = 1000 * 60 * 60 * 3; // 3 hours
 const defaultTimeoutInterval = 1000 * 60; // 1 minutes
 const defaultRejournalInterval = 1000 * 60 * 60; // 1 hours
+
+/**
+ * TxPoolAccount contains pending, queued transaction and pending nonce of each account
+ */
+export class TxPoolAccount {
+  private readonly getNonce: () => Promise<BN>;
+  private _pending?: TxSortedMap;
+  private _queue?: TxSortedMap;
+  private _pendingNonce?: BN;
+  timestamp: number = 0;
+
+  constructor(getNonce: () => Promise<BN>) {
+    this.getNonce = getNonce;
+  }
+
+  /**
+   * Get pending tx map(create if it doesn't exist)
+   */
+  get pending() {
+    return this._pending ? this._pending : (this._pending = new TxSortedMap(true));
+  }
+
+  /**
+   * Get queued tx map(create if it doesn't exist)
+   */
+  get queue() {
+    return this._queue ? this._queue : (this._queue = new TxSortedMap(false));
+  }
+
+  /**
+   * Check if pending tx map exists
+   */
+  hasPending() {
+    return this._pending && this._pending.size > 0;
+  }
+
+  /**
+   * Check if queued tx map exists
+   */
+  hasQueue() {
+    return this._queue && this._queue.size > 0;
+  }
+
+  /**
+   * Get pending nonce
+   */
+  async getPendingNonce() {
+    if (!this._pendingNonce) {
+      this._pendingNonce = await this.getNonce();
+    }
+    return this._pendingNonce.clone();
+  }
+
+  /**
+   * Update pending nonce
+   */
+  updatePendingNonce(nonce: BN, lower: boolean = false) {
+    if (!this._pendingNonce || (lower ? this._pendingNonce.gt(nonce) : this._pendingNonce.lt(nonce))) {
+      this._pendingNonce = nonce.clone();
+    }
+  }
+}
+
+export interface TxPoolOptions {
+  txMaxSize?: number;
+
+  priceLimit?: BN;
+  priceBump?: number;
+
+  accountSlots?: number;
+  globalSlots?: number;
+  accountQueue?: number;
+  globalQueue?: number;
+
+  node: Node;
+
+  journal?: string;
+  lifetime?: number;
+  timeoutInterval?: number;
+  rejournalInterval?: number;
+}
 
 export declare interface TxPool {
   on(event: 'readies', listener: (readies: Transaction[]) => void): this;
@@ -72,6 +152,7 @@ export class TxPool extends EventEmitter {
   private rejournalInterval: number;
 
   private totalAmount?: BN;
+  private dailyFee?: BN;
 
   constructor(options: TxPoolOptions) {
     super();
@@ -190,6 +271,15 @@ export class TxPool extends EventEmitter {
         this.totalAmount = await Fee.getTotalAmount(this.currentStateManager);
       } else {
         this.totalAmount = undefined;
+      }
+
+      if (isEnableDAO(this.currentHeader._common)) {
+        const parent = await this.node.db.getHeader(this.currentHeader.parentHash, this.currentHeader.number.subn(1));
+        const parentVM = await this.node.getVM(parent.stateRoot, parent._common);
+        const config = await this.node.reimint.getConfig(parentVM, block);
+        this.dailyFee = await config.dailyFee();
+      } else {
+        this.dailyFee = undefined;
       }
 
       if (this.journal) {
@@ -533,7 +623,7 @@ export class TxPool extends EventEmitter {
       const currentTimestamp = this.currentHeader.timestamp.toNumber();
 
       // validate transaction
-      await validateTx(tx as Transaction, currentTimestamp + period, this.currentStateManager, this.totalAmount);
+      await validateTx(tx as Transaction, currentTimestamp + period, this.currentStateManager, this.totalAmount, this.dailyFee);
 
       if (!checkTxIntrinsicGas(tx)) {
         throw new Error('checkTxIntrinsicGas failed');
@@ -749,26 +839,6 @@ export class TxPool extends EventEmitter {
         break;
       }
       account = heap.remove();
-    }
-  }
-
-  /**
-   * List the state of the tx-pool
-   */
-  async ls() {
-    const info = (map: TxSortedMap, description: string) => {
-      logger.info(`${description} size:`, map.size, '| slots:', map.slots);
-      map.ls();
-    };
-    for (const [sender, account] of this.accounts) {
-      logger.info('==========');
-      logger.info('address: 0x' + sender.toString('hex'), '| timestamp:', account.timestamp, '| pendingNonce:', (await account.getPendingNonce()).toString());
-      if (account.hasPending()) {
-        info(account.pending, 'pending');
-      }
-      if (account.hasQueue()) {
-        info(account.queue, 'queue');
-      }
     }
   }
 }

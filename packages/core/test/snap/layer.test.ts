@@ -97,7 +97,7 @@ describe('Layer', () => {
       }
     });
 
-    it('should get account succeed(when account exsits in this diff layer)', async () => {
+    it('should get account succeed(when account exists in this diff layer)', async () => {
       const { layer, accounts } = layers[2];
       const expectAccount = accounts[getRandomIntInclusive(0, accounts.length - 1)];
       const accountHash = keccak256(expectAccount.address);
@@ -106,7 +106,7 @@ describe('Layer', () => {
       expect(account?.serialize()?.equals(expectAccount.account.serialize()), 'should be equal').be.true;
     });
 
-    it('should get storage data succeed(when storage data exsits in this diff layer)', async () => {
+    it('should get storage data succeed(when storage data exists in this diff layer)', async () => {
       const { layer, accounts } = layers[2];
       const expectAccount = accounts[getRandomIntInclusive(0, accounts.length - 1)];
       const accountHash = keccak256(expectAccount.address);
@@ -117,7 +117,7 @@ describe('Layer', () => {
       expect(storageData?.equals(expectAccount.storageData.get(storageHash)!.val), 'should be equal').be.true;
     });
 
-    it('should get account succeed(when account does not exsit in this diff layer but exsit in parent diff layer)', async () => {
+    it('should get account succeed(when account does not exist in this diff layer but exist in parent diff layer)', async () => {
       const { layer, accounts } = layers[2];
       const { accounts: _accounts } = layers[1];
       const index = _accounts.findIndex(({ address }) => accounts.findIndex(({ address: _address }) => address.equals(_address)) === -1);
@@ -128,7 +128,7 @@ describe('Layer', () => {
       expect(account?.serialize()?.equals(expectAccount.account.serialize()), 'should be equal').be.true;
     });
 
-    it('should get storage data succeed(when storage data does not exsit in this diff layer but exsit in parent diff layer)', async () => {
+    it('should get storage data succeed(when storage data does not exist in this diff layer but exist in parent diff layer)', async () => {
       const { layer, accounts } = layers[2];
       const { accounts: _accounts } = layers[1];
       const index = _accounts.findIndex(({ address }) => accounts.findIndex(({ address: _address }) => address.equals(_address)) === -1);
@@ -141,7 +141,7 @@ describe('Layer', () => {
       expect(storageData?.equals(expectAccount.storageData.get(storageHash)!.val), 'should be equal').be.true;
     });
 
-    it('should get account succeed(when account does not exsit in this layer and only exist in disk layer)', async () => {
+    it('should get account succeed(when account does not exist in this layer and only exist in disk layer)', async () => {
       const { layer, accounts } = layers[1];
       let { accounts: _accounts } = layers[0];
       _accounts = [..._accounts];
@@ -162,7 +162,7 @@ describe('Layer', () => {
       expect(hit, 'should not hit diff layer bloom').be.false;
     });
 
-    it('should get storage data succeed(when storage data does not exsit in this layer and only exist in disk layer)', async () => {
+    it('should get storage data succeed(when storage data does not exist in this layer and only exist in disk layer)', async () => {
       const { layer, accounts } = layers[1];
       let { accounts: _accounts } = layers[0];
       _accounts = [..._accounts];

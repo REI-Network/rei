@@ -29,11 +29,11 @@ export function installAccountCommand(program: any) {
     .description('New a account')
     .action(async () => {
       try {
-        const passphrase = (await getPassphrase(program.opts(), { repeat: true, message: 'Your new account is locked with a password. Please give a password. Do not forget this password.' }))[0];
+        const passphrase = (await getPassphrase(program.opts().password, { repeat: true, message: 'Your new account is locked with a password. Please give a password. Do not forget this password.' }))[0];
         const manager = new AccountManager(getKeyStorePath(program.opts()));
         const { address, path } = await manager.newAccount(passphrase);
         console.log('\nYour new key was generated\n');
-        console.log('Public address of the key :', toChecksumAddress(address.toString()));
+        console.log('Public address of the key:', toChecksumAddress(address.toString()));
         console.log('Path of the secret key file:', path, '\n');
         console.log('- You can share your public address with anyone. Others need it to interact with you.');
         console.log('- You must NEVER share the secret key with anyone! The key controls access to your funds!');
@@ -49,7 +49,7 @@ export function installAccountCommand(program: any) {
     .description('Update the account')
     .action(async (address) => {
       try {
-        const passphrase = (await getPassphrase(program.opts(), { addresses: [address] }))[0];
+        const passphrase = (await getPassphrase(program.opts().password, { addresses: [address] }))[0];
         const manager = new AccountManager(getKeyStorePath(program.opts()));
         const newPassphrase = (await getPassphrase(program.opts(), { repeat: true, message: 'Please give a new password. Do not forget this password.', forceInput: true }))[0];
         await manager.update(address, passphrase, newPassphrase);
@@ -69,7 +69,7 @@ export function installAccountCommand(program: any) {
         if (manager.hasAccount(address)) {
           throw new Error('Could not create the account: account alreaady exists');
         }
-        const passphrase = (await getPassphrase(program.opts(), { repeat: true, message: 'Your new account is locked with a password. Please give a password. Do not forget this password.' }))[0];
+        const passphrase = (await getPassphrase(program.opts().password, { repeat: true, message: 'Your new account is locked with a password. Please give a password. Do not forget this password.' }))[0];
         console.log(`Address: ${toChecksumAddress(await manager.importKeyByPrivateKey(privateKey, passphrase))}`);
       } catch (err) {
         logger.error('Account, import, error:', err);

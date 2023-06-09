@@ -7,7 +7,7 @@ import { Database, DBSetBlockOrHeader, DBOp, DBSaveLookups } from '@rei-network/
 import { setLevel } from '@rei-network/utils';
 import { HeaderSyncPeer, IHeaderSyncBackend, HeaderSync, HeaderSyncOptions } from '../../src/sync/snap';
 import { preValidateHeader } from '../../src/validation';
-import { HandlerPool } from '../../src/protocols/handlerPool';
+import { HandlerPool } from '../../src/protocols/wire/handlerPool';
 const level = require('level-mem');
 
 setLevel('silent');

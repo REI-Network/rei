@@ -4,7 +4,7 @@ import { logger, Channel, FunctionalBufferSet } from '@rei-network/utils';
 import { ProtocolHandler, Peer, ProtocolStream } from '@rei-network/network';
 import { Node } from '../../node';
 import { NodeStatus } from '../../types';
-import { HandlerPool } from '../handlerPool';
+import { HandlerPool } from './handlerPool';
 import { HandlerFunc } from './wireFunctions';
 import * as c from './config';
 

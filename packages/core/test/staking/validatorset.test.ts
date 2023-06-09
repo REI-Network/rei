@@ -2,7 +2,7 @@ import { expect, assert } from 'chai';
 import { Address, BN, MAX_INTEGER } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { FunctionalAddressMap } from '@rei-network/utils';
-import { ValidatorSet, IndexedValidatorSet, IndexedValidator, ActiveValidatorSet } from '../../src/consensus/reimint/validatorSet';
+import { ValidatorSet, IndexedValidatorSet, IndexedValidator, ActiveValidatorSet } from '../../src/reimint/validatorSet';
 import { MockAccountManager } from '../util';
 
 const common = new Common({ chain: 'rei-testnet' });
@@ -44,11 +44,10 @@ function createValidatorSet(validators: { [name: string]: number | BN }) {
 }
 
 describe('ValidatorSet', () => {
-  it('should fill genesis validators', () => {
-    const vs = ValidatorSet.genesis(common);
+  it('should fill genesis validators', async () => {
+    const active = (await ActiveValidatorSet.genesis(common)).activeValidators();
     const genesisValidators = common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr)) as Address[];
     genesisValidators.sort((a, b) => a.buf.compare(b.buf) as 1 | -1 | 0);
-    const active = vs.active.activeValidators();
     for (let i = 0; i < genesisValidators.length; i++) {
       expect(active[i].validator.equals(genesisValidators[i]), 'genesis validator address should be equal');
     }

@@ -54,7 +54,7 @@ class BlockSyncBackend implements IBlockSyncBackend, IBlockSyncValidateBackend {
    */
   async processAndCommitBlock(block: Block) {
     try {
-      const result = await this.node.getExecutor(block._common).processBlock({ block });
+      const result = await this.node.reimint.executor.processBlock({ block });
       return await this.node.commitBlock({
         ...result,
         block,
@@ -71,7 +71,7 @@ class BlockSyncBackend implements IBlockSyncBackend, IBlockSyncValidateBackend {
 
   /**
    * Validate headers
-   * @param parent - Parent block header(if it exsits)
+   * @param parent - Parent block header(if it exists)
    * @param headers - A list of headers that need to be validated
    * @returns Latest header
    */
@@ -226,7 +226,7 @@ export class FullSyncScheduler extends EventEmitter {
 
     // add check for reimint consensus engine
     const reimint = this.node.reimint;
-    if (reimint.isStarted && reimint.state.hasMaj23Precommit(bestHeight)) {
+    if (reimint.state.hasMaj23Precommit(bestHeight)) {
       // our consensus engine has collected enough votes for this height,
       // so we ignore this best block
       logger.debug('FullSync::syncOnce, we collected enough votes for this height');

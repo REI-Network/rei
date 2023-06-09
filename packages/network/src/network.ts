@@ -521,7 +521,7 @@ export class NetworkManager extends EventEmitter {
       return false;
     }
 
-    // if the peer doesn't exsit in `installing` or `installed`,
+    // if the peer doesn't exist in `installing` or `installed`,
     // create a new one
     let peer = this._peers.get(peerId);
     if (!peer) {

@@ -173,7 +173,7 @@ export class RpcServer {
       try {
         this.reqQueue.reset();
         const app = express();
-        this.server = http.createServer(app);
+        this.server = http.createServer(app)!;
         expressws(app, this.server);
         app.use(bodyParse.json({ type: '*/*', limit: '5mb' }));
 

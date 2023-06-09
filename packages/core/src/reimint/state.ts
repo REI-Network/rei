@@ -1,0 +1,1311 @@
+import crypto from 'crypto';
+import { BN, bufferToHex } from 'ethereumjs-util';
+import Semaphore from 'semaphore-async-await';
+import { Channel, logger } from '@rei-network/utils';
+import { Block, BlockHeader } from '@rei-network/structure';
+import { isEmptyHash, EMPTY_HASH } from '../utils';
+import { preValidateBlock, preValidateHeader } from '../validation';
+import { isEnableDAO } from '../hardforks';
+import { ConsensusMessage, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from '../protocols/consensus/messages';
+import { PendingBlock } from './pendingBlock';
+import { Reimint } from './reimint';
+import { RoundStepType, VoteType, SignatureType } from './enum';
+import { IProcessBlockResult, IStateMachineBackend, IStateMachineP2PBackend, ISigner, IConfig, IEvidencePool, IWAL, IDebug } from './types';
+import { StateMachineMessage, StateMachineTimeout, StateMachineEndHeight, StateMachineMsg } from './messages/index';
+import { HeightVoteSet, Vote, ConflictingVotesError, DuplicateVotesError } from './vote';
+import { Proposal } from './proposal';
+import { Evidence, DuplicateVoteEvidence } from './evpool';
+import { TimeoutTicker } from './timeoutTicker';
+import { ExtraData } from './extraData';
+import { ActiveValidatorSet } from './validatorSet';
+
+const SkipTimeoutCommit = true;
+const WaitForTxs = true;
+const CreateEmptyBlocksInterval = 0;
+const StateMachineMsgQueueMaxSize = 1000;
+
+export class StateMachine {
+  private readonly chainId: number;
+  private readonly timeoutTicker = new TimeoutTicker((ti) => {
+    this._newMessage(ti);
+  });
+
+  private readonly backend: IStateMachineBackend;
+  private readonly p2p: IStateMachineP2PBackend;
+  private readonly signer: ISigner;
+  private readonly config: IConfig;
+  private readonly evpool: IEvidencePool;
+  private readonly wal: IWAL;
+  private readonly debug?: IDebug;
+
+  private readonly lock = new Semaphore(1);
+  private msgLoopPromise?: Promise<void>;
+  private readonly msgQueue = new Channel<StateMachineMsg>({
+    max: StateMachineMsgQueueMaxSize,
+    drop: (message) => {
+      logger.detail('StateMachine::drop, too many messages, drop:', message);
+    }
+  });
+
+  private parent!: BlockHeader;
+  private parentHash!: Buffer;
+  private triggeredTimeoutPrecommit: boolean = false;
+  private replaying: boolean = false;
+
+  /////////////// RoundState ///////////////
+  private height: BN = new BN(0);
+  private round: number = 0;
+  private step: RoundStepType = RoundStepType.NewHeight;
+  private startTime!: number;
+
+  private commitTime?: number;
+  private validators!: ActiveValidatorSet;
+  private pendingBlock?: PendingBlock;
+
+  private proposal?: Proposal;
+  private proposalBlockHash?: Buffer;
+  private proposalBlock?: Block;
+  private proposalEvidence?: Evidence[];
+  private proposalBlockResult?: IProcessBlockResult;
+
+  private lockedRound: number = -1;
+  private lockedBlock?: Block;
+  private lockedEvidence?: Evidence[];
+  private lockedBlockResult?: IProcessBlockResult;
+
+  private validRound: number = -1;
+  private validBlock?: Block;
+
+  private votes!: HeightVoteSet;
+  private commitRound: number = -1;
+  /////////////// RoundState ///////////////
+
+  constructor(backend: IStateMachineBackend, p2p: IStateMachineP2PBackend, evpool: IEvidencePool, wal: IWAL, chainId: number, config: IConfig, signer: ISigner, debug?: IDebug) {
+    this.backend = backend;
+    this.p2p = p2p;
+    this.chainId = chainId;
+    this.evpool = evpool;
+    this.wal = wal;
+    this.config = config;
+    this.signer = signer;
+    this.debug = debug;
+  }
+
+  private newStep() {
+    this.p2p.broadcastMessage(this.genNewRoundStepMessage()!, { broadcast: true });
+  }
+
+  async msgLoop() {
+    for await (const msg of this.msgQueue) {
+      await this.lock.acquire();
+      try {
+        if (msg instanceof StateMachineMessage) {
+          const internal = msg.peerId === '';
+          const result = await this.wal.write(msg, internal);
+          if (internal && !result) {
+            throw new Error('internal message write failed');
+          }
+
+          await this.handleMsg(msg);
+        } else if (msg instanceof StateMachineTimeout) {
+          await this.wal.write(msg);
+          await this.handleTimeout(msg);
+        }
+      } catch (err) {
+        logger.error('State::msgLoop, catch error:', err);
+      } finally {
+        this.lock.release();
+      }
+    }
+  }
+
+  private async handleMsg(mi: StateMachineMessage) {
+    const { msg, peerId } = mi;
+
+    if (msg instanceof ProposalMessage) {
+      this.setProposal(msg.proposal, peerId);
+    } else if (msg instanceof ProposalBlockMessage) {
+      await this.addProposalBlock(msg.toBlock({ common: this.backend.getCommon(0), hardforkByBlockNumber: true }));
+    } else if (msg instanceof VoteMessage) {
+      await this.tryAddVote(msg.vote, peerId);
+    } else {
+      throw new Error('unknown msg type');
+    }
+  }
+
+  private async handleTimeout(ti: StateMachineTimeout) {
+    if (!ti.height.eq(this.height) || ti.round < this.round || (ti.round === this.round && ti.step < this.step)) {
+      logger.debug('StateMachine::handleTimeout, ignoring tock because we are ahead(h,r,s):', ti.height.toString(), ti.round, ti.step, 'local(h,r,s):', this.height.toString(), this.round, this.step);
+      return;
+    }
+    logger.debug('StateMachine::handleTimeout, timeout info:', ti.height.toString(), ti.round, ti.step);
+
+    switch (ti.step) {
+      case RoundStepType.NewHeight:
+        await this.enterNewRound(ti.height, 0);
+        break;
+      case RoundStepType.NewRound:
+        await this.enterPropose(ti.height, 0);
+        break;
+      case RoundStepType.Propose:
+        await this.enterPrevote(ti.height, ti.round);
+        break;
+      case RoundStepType.PrevoteWait:
+        this.enterPrecommit(ti.height, ti.round);
+        break;
+      case RoundStepType.PrecommitWait:
+        this.enterPrecommit(ti.height, ti.round);
+        await this.enterNewRound(ti.height, ti.round + 1);
+        break;
+      default:
+        throw new Error('invalid timeout step');
+    }
+  }
+
+  private setProposal(proposal: Proposal, peerId: string) {
+    // logger.debug('StateMachine::setProposal');
+
+    const requestProposalBlock = () => {
+      if (this.proposalBlock === undefined && peerId !== '') {
+        this.p2p.broadcastMessage(new GetProposalBlockMessage(proposal.hash), { to: peerId });
+        logger.debug('StateMachine::setProposal, request proposal block to', peerId);
+      }
+    };
+
+    if (this.proposal) {
+      logger.debug('StateMachine::setProposal, proposal already exists');
+
+      // if we still don’t have the proposal block, request the remote peer
+      if (this.proposal.hash.equals(proposal.hash)) {
+        requestProposalBlock();
+      }
+      return;
+    }
+
+    if (!this.height.eq(proposal.height) || this.round !== proposal.round) {
+      logger.debug('StateMachine::setProposal, invalid proposal(h,r):', proposal.height.toString(), proposal.round, 'local(h,r):', this.height.toString(), this.round);
+      return;
+    }
+
+    if (proposal.POLRound < -1 || (proposal.POLRound >= 0 && proposal.POLRound >= proposal.round)) {
+      throw new Error('invalid proposal POL round');
+    }
+
+    proposal.validateSignature(this.validators);
+
+    this.proposal = proposal;
+    this.proposalBlockHash = proposal.hash;
+    requestProposalBlock();
+  }
+
+  private isProposalComplete() {
+    if (this.proposal === undefined || this.proposalBlock === undefined || this.proposalEvidence === undefined) {
+      return false;
+    }
+
+    if (this.proposal.POLRound < 0) {
+      return true;
+    }
+
+    return !!this.votes.prevotes(this.proposal.POLRound)?.hasTwoThirdsMajority();
+  }
+
+  private async addProposalBlock(block: Block) {
+    // logger.debug('StateMachine::addProposalBlock');
+    if (this.proposalBlock) {
+      logger.debug('StateMachine::setProposal, proposal block already exists');
+      return;
+    }
+
+    if (this.proposal === undefined) {
+      // logger.debug('StateMachine::setProposal, add proposal block when proposal is undefined');
+      return;
+    }
+
+    if (this.proposalBlockHash === undefined) {
+      // logger.debug('StateMachine::setProposal, add proposal block when hash is undefined');
+      return;
+    }
+
+    const extraData = ExtraData.fromBlockHeader(block.header);
+    const hash = extraData.proposal.hash;
+    const proposer = extraData.proposal.getProposer();
+    const evidence = extraData.evidence;
+
+    /**
+     * NOTE: the block proposer may be different from this.proposal.proposer,
+     *       we just make sure that the block proposer is one of the validators
+     */
+    // if (!this.proposal.proposer().equals(proposer) || extraData.round !== this.proposal.round || extraData.POLRound !== this.proposal.POLRound) {
+    //   throw new Error('invalid proposal block');
+    // }
+    if (!this.validators.isActive(proposer)) {
+      throw new Error('invalid proposal block');
+    }
+
+    if (!this.proposalBlockHash.equals(hash)) {
+      throw new Error('invalid proposal block');
+    }
+
+    logger.debug('StateMachine::addProposalBlock');
+    this.proposalBlock = block;
+    this.proposalEvidence = evidence;
+
+    const prevotes = this.votes.prevotes(this.round);
+    const maj23Hash = prevotes?.maj23;
+    if (maj23Hash && !isEmptyHash(maj23Hash) && this.validRound < this.round) {
+      if (this.proposalBlockHash.equals(maj23Hash)) {
+        this.validRound = this.round;
+        this.validBlock = this.proposalBlock;
+        logger.debug('StateMachine::addProposalBlock, update valid block, round:', this.round, 'hash:', bufferToHex(maj23Hash));
+      }
+    }
+
+    if (this.step <= RoundStepType.Propose && this.isProposalComplete()) {
+      await this.enterPrevote(this.height, this.round);
+      if (maj23Hash) {
+        this.enterPrecommit(this.height, this.round);
+      }
+    } else if (this.step === RoundStepType.Commit) {
+      await this.finalizeCommit(this.height);
+    }
+  }
+
+  private async addVote(vote: Vote, peerId: string) {
+    if (!vote.height.eq(this.height)) {
+      logger.debug('StateMachine::addVote, unequal height, ignore, height:', vote.height.toString(), 'local:', this.height.toString());
+      return;
+    }
+
+    this.votes.addVote(vote, peerId);
+    logger.debug('StateMachine::addVote, vote(h,r,h,t,v):', vote.height.toString(), vote.round, bufferToHex(vote.hash), vote.type, vote.getValidator().toString(), 'from:', peerId);
+
+    if (peerId === '' && this.signer && vote.getValidator().equals(this.signer.address())) {
+      this.p2p.broadcastVote(vote);
+      logger.debug('StateMachine::addVote, broadcastVote');
+    } else {
+      this.p2p.broadcastMessage(new HasVoteMessage(vote.height, vote.round, vote.type, vote.index), { exclude: [peerId] });
+    }
+
+    switch (vote.type) {
+      case VoteType.Prevote:
+        {
+          const prevotes = this.votes.prevotes(vote.round);
+          const maj23Hash = prevotes?.maj23;
+          if (maj23Hash) {
+            // try to unlock ourself
+            if (this.lockedBlock !== undefined && this.lockedRound < vote.round && vote.round <= this.round && !this.lockedBlock.hash().equals(maj23Hash)) {
+              this.lockedRound = -1;
+              this.lockedBlock = undefined;
+              this.lockedEvidence = undefined;
+              this.lockedBlockResult = undefined;
+            }
+
+            // try to update valid block
+            if (!isEmptyHash(maj23Hash) && this.validRound < vote.round && vote.round === this.round) {
+              if (this.proposalBlockHash && this.proposalBlockHash.equals(maj23Hash)) {
+                logger.debug('StateMachine::addVote, update valid block, round:', this.round, 'hash:', bufferToHex(maj23Hash));
+
+                this.validRound = vote.round;
+                this.validBlock = this.proposalBlock;
+              } else {
+                this.proposalBlock = undefined;
+                this.proposalEvidence = undefined;
+                this.proposalBlockResult = undefined;
+              }
+
+              if (!this.proposalBlockHash || !this.proposalBlockHash.equals(maj23Hash)) {
+                this.proposalBlockHash = maj23Hash;
+              }
+
+              this.p2p.broadcastMessage(new NewValidBlockMessage(this.height, this.round, this.proposalBlockHash, this.step === RoundStepType.Commit), { broadcast: true });
+            }
+          }
+
+          if (this.round < vote.round && prevotes?.hasTwoThirdsAny()) {
+            await this.enterNewRound(this.height, vote.round);
+          } else if (this.round === vote.round && RoundStepType.Prevote <= this.step) {
+            if (maj23Hash && (this.isProposalComplete() || isEmptyHash(maj23Hash))) {
+              this.enterPrecommit(this.height, vote.round);
+            } else if (prevotes?.hasTwoThirdsAny()) {
+              this.enterPrevoteWait(this.height, vote.round);
+            }
+          } else if (this.proposal !== undefined && 0 <= this.proposal.POLRound && this.proposal.POLRound === vote.round) {
+            if (this.isProposalComplete()) {
+              await this.enterPrevote(this.height, this.round);
+            }
+          }
+        }
+        break;
+      case VoteType.Precommit:
+        {
+          const precommits = this.votes.precommits(vote.round);
+          const maj23Hash = precommits?.maj23;
+          if (maj23Hash) {
+            await this.enterNewRound(this.height, vote.round);
+            this.enterPrecommit(this.height, vote.round);
+
+            if (!isEmptyHash(maj23Hash)) {
+              await this.enterCommit(this.height, vote.round);
+              if (SkipTimeoutCommit) {
+                await this.enterNewRound(this.height, 0);
+              }
+            } else {
+              this.enterPrecommitWait(this.height, vote.round);
+            }
+          } else if (this.round <= vote.round && precommits?.hasTwoThirdsAny()) {
+            await this.enterNewRound(this.height, vote.round);
+            this.enterPrecommitWait(this.height, vote.round);
+          }
+        }
+        break;
+      default:
+        throw new Error('unexpected vote type');
+    }
+  }
+
+  private async tryAddVote(vote: Vote, peerId: string) {
+    try {
+      await this.addVote(vote, peerId);
+    } catch (err) {
+      if (err instanceof ConflictingVotesError) {
+        const { voteA, voteB } = err;
+        if (!this.debug?.conflictVotes && vote.getValidator().equals(this.signer.address())) {
+          // found conflicting vote from ourselves
+          logger.warn('local conflicting(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.getValidator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
+          return;
+        }
+
+        logger.debug('StateMachine::tryAddVote, catch duplicate vote evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.getValidator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
+        this.evpool.addEvidence(DuplicateVoteEvidence.fromVotes(voteA, voteB));
+      } else if (err instanceof DuplicateVotesError) {
+        logger.detail('StateMachine::tryAddVote, duplicate votes from:', peerId);
+      } else {
+        logger.error('StateMachine::tryAddVote, catch error:', err);
+      }
+    }
+  }
+
+  private async enterNewRound(height: BN, round: number) {
+    if (!this.height.eq(height) || round < this.round || (this.round === round && this.step !== RoundStepType.NewHeight)) {
+      // logger.debug('StateMachine::enterNewRound, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
+      return;
+    }
+
+    logger.debug('StateMachine::enterNewRound, height:', height.toString(), 'round:', round);
+
+    let validators = this.validators;
+    if (this.round < round) {
+      validators = validators.copy();
+      validators.incrementProposerPriority(round - this.round);
+    }
+
+    this.round = round;
+    this.step = RoundStepType.NewRound;
+    this.validators = validators;
+    if (round === 0) {
+      // do nothing
+    } else {
+      this.proposal = undefined;
+      this.proposalBlockHash = undefined;
+      this.proposalBlock = undefined;
+      this.proposalEvidence = undefined;
+      this.proposalBlockResult = undefined;
+    }
+
+    this.votes.setRound(round + 1);
+    this.triggeredTimeoutPrecommit = false;
+
+    const waitForTxs = WaitForTxs && round === 0;
+    if (waitForTxs) {
+      if (CreateEmptyBlocksInterval > 0) {
+        this._schedule(CreateEmptyBlocksInterval, height, round, RoundStepType.NewRound);
+      } else {
+        await this.enterPropose(height, 0);
+      }
+    } else {
+      await this.enterPropose(height, round);
+    }
+  }
+
+  private async createBlockAndProposal(signatureType: SignatureType) {
+    if (!this.pendingBlock || !this.pendingBlock.parentHash.equals(this.parentHash)) {
+      throw new Error('missing pending block');
+    }
+
+    const common = this.pendingBlock.common;
+    const maxEvidenceCount = common.param('vm', 'maxEvidenceCount');
+    if (typeof maxEvidenceCount !== 'number') {
+      throw new Error('invalid maxEvidenceCount');
+    }
+
+    logger.debug('StateMachine::createBlockAndProposal');
+
+    // save all parameters, because the parameters may change
+    const round = this.round;
+    const POLRound = this.validRound;
+    const validatorSetSize = this.validators.length;
+    const height = this.height.clone();
+    const evpool = this.evpool;
+    const pendingBlock = this.pendingBlock;
+    const signer = this.signer;
+
+    const evidence = await evpool.pickEvidence(height, maxEvidenceCount);
+    pendingBlock.stop();
+    const blockData = await pendingBlock.finalize({ round, evidence });
+
+    return Reimint.generateBlockAndProposal(
+      blockData.header,
+      blockData.transactions,
+      {
+        round,
+        POLRound,
+        evidence,
+        validatorSetSize,
+        common
+      },
+      {
+        signer,
+        signatureType
+      }
+    );
+  }
+
+  private decideSignatureTypeAndIndex(): { signatureType: SignatureType; index: number } | undefined {
+    const index = this.validators.getIndexByAddress(this.signer.address());
+    if (index === undefined) {
+      logger.debug('StateMachine::decideSignatureTypeAndIndex, undefined index');
+      return;
+    }
+
+    const signatureType = isEnableDAO(this.pendingBlock!.common) ? SignatureType.BLS : SignatureType.ECDSA;
+    if (signatureType === SignatureType.BLS) {
+      const publicKey = this.signer.blsPublicKey();
+      if (!publicKey || !this.validators.getBlsPublicKey(this.signer.address()).equals(publicKey)) {
+        logger.debug('StateMachine::decideSignatureTypeAndIndex, empty bls public key or bls public key mismatch');
+        return;
+      }
+    } else {
+      if (!this.signer.ecdsaUnlocked()) {
+        logger.debug('StateMachine::decideSignatureTypeAndIndex, empty ecdsa signer');
+        return;
+      }
+    }
+
+    return { signatureType, index };
+  }
+
+  private decideProposal(height: BN, round: number) {
+    const result = this.decideSignatureTypeAndIndex();
+    if (!result) {
+      return;
+    }
+
+    const signatureType = result.signatureType;
+
+    if (this.validBlock) {
+      const proposal = new Proposal(
+        {
+          type: VoteType.Proposal,
+          height: this.validBlock.header.number,
+          round,
+          POLRound: this.validRound,
+          hash: this.validBlock.hash(),
+          proposer: signatureType === SignatureType.BLS ? this.signer.address() : undefined
+        },
+        signatureType
+      );
+      if (signatureType === SignatureType.BLS) {
+        proposal.signature = this.signer.blsSign(proposal.getMessageToSign());
+      } else {
+        proposal.signature = this.signer.ecdsaSign(proposal.getMessageToSign());
+      }
+
+      this._newMessage(new StateMachineMessage('', new ProposalMessage(proposal)));
+      this._newMessage(new StateMachineMessage('', new ProposalBlockMessage(this.validBlock)));
+    } else {
+      this.createBlockAndProposal(signatureType)
+        .then(({ block, proposal }) => {
+          this._newMessage(new StateMachineMessage('', new ProposalMessage(proposal)));
+          this._newMessage(new StateMachineMessage('', new ProposalBlockMessage(block)));
+        })
+        .catch((err) => {
+          logger.error('StateMachine::decideProposal, catch error:', err);
+        });
+    }
+  }
+
+  private signVote(type: VoteType, hash: Buffer) {
+    const result = this.decideSignatureTypeAndIndex();
+    if (!result) {
+      return;
+    }
+
+    const { signatureType, index } = result;
+
+    const vote = new Vote(
+      {
+        chainId: this.chainId,
+        type,
+        height: this.height,
+        round: this.round,
+        hash,
+        index,
+        validator: signatureType === SignatureType.BLS ? this.signer.address() : undefined
+      },
+      signatureType
+    );
+    if (signatureType === SignatureType.BLS) {
+      vote.signature = this.signer.blsSign(vote.getMessageToSign());
+    } else {
+      vote.signature = this.signer.ecdsaSign(vote.getMessageToSign());
+    }
+
+    this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
+
+    if (this.debug?.conflictVotes) {
+      const vote = new Vote(
+        {
+          chainId: this.chainId,
+          type,
+          height: this.height,
+          round: this.round,
+          hash: crypto.randomBytes(32),
+          index,
+          validator: signatureType === SignatureType.BLS ? this.signer.address() : undefined
+        },
+        signatureType
+      );
+      if (signatureType === SignatureType.BLS) {
+        vote.signature = this.signer.blsSign(vote.getMessageToSign());
+      } else {
+        vote.signature = this.signer.ecdsaSign(vote.getMessageToSign());
+      }
+
+      this._newMessage(new StateMachineMessage('', new VoteMessage(vote)));
+    }
+  }
+
+  private async enterPropose(height: BN, round: number) {
+    if (!this.height.eq(height) || round < this.round || (this.round === round && RoundStepType.Propose <= this.step)) {
+      // logger.debug('StateMachine::enterPropose, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
+      return;
+    }
+
+    logger.debug('StateMachine::enterPropose, height:', height.toString(), 'round:', round);
+
+    const update = async () => {
+      this.round = round;
+      this.step = RoundStepType.Propose;
+      this.newStep();
+
+      if (this.isProposalComplete()) {
+        await this.enterPrevote(height, round);
+      }
+    };
+
+    this._schedule(this.config.proposeDuration(round), height, round, RoundStepType.Propose);
+
+    if (!this.validators.proposer.equals(this.signer.address())) {
+      logger.debug('StateMachine::enterPropose, invalid proposer');
+      return await update();
+    }
+
+    this.decideProposal(height, round);
+    return await update();
+  }
+
+  private async enterPrevote(height: BN, round: number) {
+    if (!this.height.eq(height) || round < this.round || (this.round === round && RoundStepType.Prevote <= this.step)) {
+      // logger.debug('StateMachine::enterPrevote, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
+      return;
+    }
+
+    logger.debug('StateMachine::enterPrevote, height:', height.toString(), 'round:', round);
+
+    const update = () => {
+      this.round = round;
+      this.step = RoundStepType.Prevote;
+      this.newStep();
+    };
+
+    if (this.lockedBlock) {
+      this.signVote(VoteType.Prevote, this.lockedBlock.hash());
+      return update();
+    }
+
+    if (this.proposalBlock === undefined) {
+      this.signVote(VoteType.Prevote, EMPTY_HASH);
+      return update();
+    }
+
+    logger.debug('StateMachine::enterPrevote, pre process block start, height:', height.toString(), 'round:', round);
+    const startAt = Date.now();
+
+    let validateResult = false;
+    try {
+      preValidateHeader.call(this.proposalBlock.header, this.parent);
+      await preValidateBlock.call(this.proposalBlock);
+      this.proposalBlockResult = await this.backend.preprocessBlock(this.proposalBlock);
+      validateResult = true;
+    } catch (err: any) {
+      if (err.message === 'committed') {
+        return;
+      } else {
+        logger.warn('StateMachine::enterPrevote, preValidateHeaderAndBlock or process block failed:', err);
+      }
+    }
+
+    logger.debug('StateMachine::enterPrevote, pre process block over, height:', height.toString(), 'round:', round, 'usage:', Date.now() - startAt);
+
+    if (validateResult) {
+      this.signVote(VoteType.Prevote, this.proposalBlock.hash());
+    } else {
+      this.signVote(VoteType.Prevote, EMPTY_HASH);
+    }
+    return update();
+  }
+
+  private enterPrevoteWait(height: BN, round: number) {
+    if (!this.height.eq(height) || round < this.round || (this.round === round && RoundStepType.PrevoteWait <= this.step)) {
+      // logger.debug('StateMachine::enterPrevoteWait, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
+      return;
+    }
+
+    if (!this.votes.prevotes(round)?.hasTwoThirdsAny()) {
+      throw new Error("enterPrevoteWait doesn't have any +2/3 votes");
+    }
+
+    logger.debug('StateMachine::enterPrevoteWait, height:', height.toString(), 'round:', round);
+
+    const update = () => {
+      this.round = round;
+      this.step = RoundStepType.PrevoteWait;
+      this.newStep();
+    };
+
+    this._schedule(this.config.prevoteDuration(round), height, round, RoundStepType.PrevoteWait);
+    return update();
+  }
+
+  private enterPrecommit(height: BN, round: number) {
+    if (!this.height.eq(height) || round < this.round || (this.round === round && RoundStepType.Precommit <= this.step)) {
+      // logger.debug('StateMachine::enterPrecommit, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
+      return;
+    }
+
+    logger.debug('StateMachine::enterPrecommit, height:', height.toString(), 'round:', round);
+
+    const update = () => {
+      this.round = round;
+      this.step = RoundStepType.Precommit;
+      this.newStep();
+    };
+
+    if (this.debug?.precommitForEmptyWhenFirstRound && round === 0) {
+      this.signVote(VoteType.Precommit, EMPTY_HASH);
+      return update();
+    }
+
+    const maj23Hash = this.votes.prevotes(round)?.maj23;
+
+    if (!maj23Hash) {
+      this.signVote(VoteType.Precommit, EMPTY_HASH);
+      return update();
+    }
+
+    const polInfo = this.votes.POLInfo();
+    if (polInfo && polInfo[0] < round) {
+      throw new Error('invalid pol round');
+    }
+
+    if (isEmptyHash(maj23Hash)) {
+      if (this.lockedBlock === undefined) {
+        // do nothing
+      } else {
+        this.lockedRound = -1;
+        this.lockedBlock = undefined;
+        this.lockedEvidence = undefined;
+        this.lockedBlockResult = undefined;
+      }
+
+      this.signVote(VoteType.Precommit, EMPTY_HASH);
+      return update();
+    }
+
+    if (this.lockedBlock && this.lockedBlock.hash().equals(maj23Hash)) {
+      this.lockedRound = round;
+
+      this.signVote(VoteType.Precommit, maj23Hash);
+      return update();
+    }
+
+    if (this.proposalBlock && this.proposalBlock.hash().equals(maj23Hash)) {
+      this.lockedRound = round;
+      this.lockedBlock = this.proposalBlock;
+      this.lockedEvidence = this.proposalEvidence;
+      this.lockedBlockResult = this.proposalBlockResult;
+
+      this.signVote(VoteType.Precommit, maj23Hash);
+      return update();
+    }
+
+    this.lockedRound = -1;
+    this.lockedBlock = undefined;
+    this.lockedEvidence = undefined;
+    this.lockedBlockResult = undefined;
+
+    if (!this.proposalBlock || !this.proposalBlock.hash().equals(maj23Hash)) {
+      this.proposalBlock = undefined;
+      this.proposalEvidence = undefined;
+      this.proposalBlockHash = maj23Hash;
+      this.proposalBlockResult = undefined;
+    }
+
+    this.signVote(VoteType.Precommit, EMPTY_HASH);
+    return update();
+  }
+
+  private enterPrecommitWait(height: BN, round: number) {
+    if (!this.height.eq(height) || round < this.round || (this.round === round && this.triggeredTimeoutPrecommit)) {
+      // logger.debug('StateMachine::enterPrecommitWait, invalid args(h,r):', height.toString(), round, 'local(h,r,s):', this.height.toString(), this.round, this.step);
+      return;
+    }
+
+    logger.debug('StateMachine::enterPrecommitWait, height:', height.toString(), 'round:', round);
+
+    if (!this.votes.precommits(round)?.hasTwoThirdsAny()) {
+      throw new Error("enterPrecommitWait doesn't have any +2/3 votes");
+    }
+
+    const update = () => {
+      this.triggeredTimeoutPrecommit = true;
+      this.newStep();
+    };
+
+    this._schedule(this.config.precommitDutaion(round), height, round, RoundStepType.PrecommitWait);
+    return update();
+  }
+
+  private async enterCommit(height: BN, commitRound: number) {
+    if (!this.height.eq(height) || RoundStepType.Commit <= this.step) {
+      // logger.debug('StateMachine::enterCommit, invalid args(h,r):', height.toString(), commitRound, 'local(h,r,s):', this.height.toString(), this.round, this.step);
+      return;
+    }
+
+    logger.debug('StateMachine::enterCommit, height:', height.toString(), 'commitRound:', commitRound);
+
+    const update = async () => {
+      this.step = RoundStepType.Commit;
+      this.commitRound = commitRound;
+      this.commitTime = Date.now();
+      this.newStep();
+
+      await this.finalizeCommit(height);
+    };
+
+    const maj23Hash = this.votes.precommits(commitRound)?.maj23;
+    if (!maj23Hash) {
+      throw new Error('enterCommit expected +2/3 precommits');
+    }
+
+    if (this.lockedBlock) {
+      const lockedHash = this.lockedBlock.hash();
+      if (lockedHash.equals(maj23Hash)) {
+        this.proposalBlockHash = this.lockedBlock.hash();
+        this.proposalBlock = this.lockedBlock;
+        this.proposalEvidence = this.lockedEvidence;
+        this.proposalBlockResult = this.lockedBlockResult;
+      }
+    }
+
+    if (!this.proposalBlock || !this.proposalBlock.hash().equals(maj23Hash)) {
+      this.proposalBlock = undefined;
+      this.proposalEvidence = undefined;
+      this.proposalBlockHash = maj23Hash;
+      this.proposalBlockResult = undefined;
+    }
+
+    return await update();
+  }
+
+  private async finalizeCommit(height: BN) {
+    logger.debug('StateMachine::tryFinalizeCommit, height:', height.toString());
+
+    if (!this.height.eq(height) || this.step !== RoundStepType.Commit) {
+      throw new Error('finalizeCommit invalid args');
+    }
+
+    if (this.commitRound === -1) {
+      logger.debug('StateMachine::finalizeCommit, invalid commitRound');
+      return;
+    }
+
+    const precommits = this.votes.precommits(this.commitRound);
+    const maj23Hash = precommits?.maj23;
+    if (!precommits || !maj23Hash || isEmptyHash(maj23Hash)) {
+      logger.debug('StateMachine::finalizeCommit, empty maj23 hash');
+      return;
+    }
+
+    if (!this.proposal || !this.proposal.hash.equals(maj23Hash)) {
+      logger.debug('StateMachine::finalizeCommit, invalid proposal');
+      return;
+    }
+
+    if (!this.proposalBlock || !this.proposalBlock.hash().equals(maj23Hash)) {
+      logger.debug('StateMachine::finalizeCommit, invalid proposal block');
+      return;
+    }
+
+    if (this.proposalEvidence === undefined) {
+      logger.debug('StateMachine::finalizeCommit, invalid proposal evidence');
+      return;
+    }
+
+    /**
+     * Maybe we skip the prevote and go directly to precommit,
+     * so we need to execute the block again here
+     */
+    if (this.proposalBlockResult === undefined) {
+      try {
+        preValidateHeader.call(this.proposalBlock.header, this.parent);
+        await preValidateBlock.call(this.proposalBlock);
+        this.proposalBlockResult = await this.backend.preprocessBlock(this.proposalBlock);
+      } catch (err: any) {
+        if (err.message !== 'committed') {
+          logger.warn('StateMachine::finalizeCommit, preValidateHeaderAndBlock or process block failed:', err);
+        }
+        return;
+      }
+    }
+
+    const extraData = ExtraData.fromBlockHeader(this.proposalBlock.header);
+    const proposalInBlock = extraData.proposal;
+
+    const finalizedBlock = Reimint.generateFinalizedBlock({ ...this.proposalBlock.header }, [...this.proposalBlock.transactions], [...this.proposalEvidence], proposalInBlock, this.commitRound, precommits, { common: this.proposalBlock._common });
+    if (!finalizedBlock.hash().equals(maj23Hash)) {
+      logger.error('StateMachine::finalizeCommit, finalizedBlock hash not equal, something is wrong');
+      return;
+    }
+
+    /**
+     * If we are replaying messages,
+     * commit block asynchronously to prevent message queues from getting stuck
+     */
+    if (this.replaying) {
+      this.backend.commitBlock(finalizedBlock, this.proposalBlockResult!);
+    } else {
+      const succeed = await this.wal.write(new StateMachineEndHeight(height), true);
+      if (!succeed) {
+        logger.error('StateMachine::finalizeCommit, write ahead log failed');
+        return;
+      }
+
+      /**
+       * NOTE: here, we will directly submit the block that has not executed `validateConsensus`,
+       *       but it's ok, because the `precommits` already contains +2/3 pre-commit votes
+       */
+      await this.backend.commitBlock(finalizedBlock, this.proposalBlockResult!);
+    }
+  }
+
+  //////////////////////////////////////
+
+  private async replay() {
+    if (this.height === undefined) {
+      throw new Error('height is undefined');
+    }
+
+    logger.info('♻️  Start replay, local height:', this.height.subn(1).toString());
+
+    /**
+     * TODO: There is room for optimization, we should start replay from height - 1
+     */
+    const result = await this.wal.searchForLatestEndHeight();
+    if (result === undefined) {
+      logger.debug('StateMachine::replay, has nothing to replay');
+      return;
+    }
+
+    const { reader, height: readerHeight } = result;
+    if (readerHeight.gte(this.height)) {
+      logger.debug('StateMachine::replay, future message');
+      return;
+    }
+
+    // set replaying to true
+    this.replaying = true;
+
+    try {
+      let message: StateMachineMsg | undefined;
+      while ((message = await reader.read())) {
+        if (message instanceof StateMachineMessage) {
+          const msg = message.msg;
+
+          if (msg instanceof VoteMessage) {
+            if (!msg.vote.height.eq(this.height)) {
+              continue;
+            }
+
+            const vote = msg.vote;
+            logger.debug('StateMachine::replay, vote, height:', vote.height.toString(), 'round:', vote.round, 'type:', vote.type, 'hash:', bufferToHex(vote.hash), 'validator:', vote.getValidator().toString(), 'from:', message.peerId);
+          } else if (msg instanceof ProposalBlockMessage) {
+            // create block instance from block buffer
+            const block = msg.toBlock({ common: this.backend.getCommon(0), hardforkByBlockNumber: true });
+            if (!block.header.number.eq(this.height)) {
+              continue;
+            }
+
+            logger.debug('StateMachine::replay, block, height:', block.header.number.toString(), 'from:', (message as StateMachineMessage).peerId);
+          } else if (msg instanceof ProposalMessage) {
+            if (!msg.proposal.height.eq(this.height)) {
+              continue;
+            }
+
+            const proposal = msg.proposal;
+            logger.debug('StateMachine::replay, proposal, height:', proposal.height.toString(), 'round:', proposal.round, 'hash:', bufferToHex(proposal.hash), 'proposer:', proposal.getProposer().toString(), 'from:', message.peerId);
+          } else {
+            logger.warn('StateMachine::replay, something is wrong, invalid message:', message);
+            continue;
+          }
+
+          await this.handleMsg(message as StateMachineMessage);
+        } else if (message instanceof StateMachineTimeout) {
+          if (!message.height.eq(this.height)) {
+            continue;
+          }
+
+          logger.debug('StateMachine::replay, timeout, height:', message.height.toString(), 'round:', message.round, 'step:', message.step);
+          await this.handleTimeout(message);
+        } else if (message instanceof StateMachineEndHeight) {
+          logger.warn('StateMachine::replay, something is wrong, read end height message of:', message.height.toString());
+          continue;
+        } else {
+          logger.error('StateMachine::replay, unknown message:', message);
+          continue;
+        }
+      }
+      await reader.close();
+    } catch (err: any) {
+      await reader.close();
+      // clear WAL files and reopen
+      await this.wal.clear();
+      await this.wal.open();
+      logger.error('StateMachine::replay, catch error:', err);
+    } finally {
+      logger.info('♻️  Replay, over');
+      this.replaying = false;
+    }
+  }
+
+  //////////////////////////////////////
+  get isStarted() {
+    return !!this.msgLoopPromise;
+  }
+
+  async init() {
+    // open WAL
+    await this.wal.open();
+    // replay from WAL files
+    await this.replay();
+  }
+
+  start() {
+    if (!this.msgLoopPromise) {
+      this.msgLoopPromise = this.msgLoop();
+    }
+  }
+
+  async abort() {
+    if (this.msgLoopPromise) {
+      this.msgQueue.abort();
+      await this.msgLoopPromise;
+      this.msgQueue.reset();
+      this.msgLoopPromise = undefined;
+      await this.wal.close();
+    }
+  }
+
+  private _schedule(duration: number, height: BN, round: number, step: RoundStepType) {
+    this.timeoutTicker.schedule(new StateMachineTimeout(duration, height, round, step));
+  }
+
+  private _newMessage(message: StateMachineMsg) {
+    this.msgQueue.push(message);
+  }
+
+  isNewBlockHeader(header: BlockHeader) {
+    if (this.parent && this.parent.hash().equals(header.hash())) {
+      // ignore same header
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Notify new block header to state machine
+   * @param header - New block header
+   * @param validators - Active validator set of next block
+   * @param pendingBlock - Pending block instance
+   */
+  async newBlockHeader(header: BlockHeader, validators: ActiveValidatorSet, pendingBlock: PendingBlock) {
+    await this.lock.acquire();
+    try {
+      const timestamp = Date.now();
+      this.parent = header;
+      this.parentHash = header.hash();
+      this.height = header.number.addn(1);
+      this.round = 0;
+      this.step = RoundStepType.NewHeight;
+      const pendingBlockTimestamp = pendingBlock.timestamp * 1e3;
+      this.startTime = timestamp > pendingBlockTimestamp ? timestamp : pendingBlockTimestamp;
+      this.validators = validators;
+      this.proposal = undefined;
+      this.proposalBlock = undefined;
+      this.proposalEvidence = undefined;
+      this.proposalBlockResult = undefined;
+      this.pendingBlock = pendingBlock;
+      this.lockedRound = -1;
+      this.lockedBlock = undefined;
+      this.lockedEvidence = undefined;
+      this.lockedBlockResult = undefined;
+      this.validRound = -1;
+      this.validBlock = undefined;
+      const signType = isEnableDAO(pendingBlock.common) ? SignatureType.BLS : SignatureType.ECDSA;
+      this.votes = new HeightVoteSet(this.chainId, this.height, this.validators, signType);
+      this.commitRound = -1;
+      this.triggeredTimeoutPrecommit = false;
+      this.msgQueue.clear();
+
+      this.newStep();
+
+      const duration = this.startTime - timestamp;
+      this._schedule(duration, this.height, 0, RoundStepType.NewHeight);
+
+      // let pending block stop appending transactions before enter new height
+      const stopAppendDuration = Math.max(Math.floor((duration * 9) / 10), 1);
+      setTimeout(() => {
+        if (pendingBlock === this.pendingBlock) {
+          pendingBlock.stop();
+        }
+      }, stopAppendDuration);
+
+      logger.debug('StateMachine::newBlockHeader, lastest height:', header.number.toString(), 'next round should start at:', this.startTime);
+    } finally {
+      this.lock.release();
+    }
+  }
+
+  /**
+   * Notify new message to state machine
+   * @param peerId - Remote peer id, if the message comes from local, the peer id is ''
+   * @param msg - Message
+   */
+  newMessage(peerId: string, msg: ConsensusMessage) {
+    if (this.isStarted) {
+      this._newMessage(new StateMachineMessage(peerId, msg));
+    }
+  }
+
+  /**
+   * Get proposal block by hash
+   * @param hash - Proposal block hash
+   * @returns Return undefined if the target block doesn't exist
+   */
+  getProposalBlock(hash: Buffer) {
+    if (this.proposalBlockHash && this.proposalBlockHash.equals(hash) && this.proposalBlock) {
+      return this.proposalBlock;
+    }
+  }
+
+  /**
+   * Get active validator set length
+   * @returns Active validator set length
+   */
+  getValSetSize() {
+    return this.validators.length;
+  }
+
+  /**
+   * Get handshake info
+   * @returns Handshake info
+   */
+  getHandshakeInfo() {
+    return {
+      height: this.height,
+      round: this.round,
+      step: this.step,
+      prevotes: this.votes?.prevotes(this.round)?.votesBitArray,
+      precommits: this.votes?.precommits(this.round)?.votesBitArray
+    };
+  }
+
+  /**
+   * Mark target hash as maj23
+   * @param height - Height
+   * @param round - Round
+   * @param type - Vote type
+   * @param peerId - Remote peer id
+   * @param hash - Proposal block hash
+   */
+  setVoteMaj23(height: BN, round: number, type: VoteType, peerId: string, hash: Buffer) {
+    if (height.eq(this.height)) {
+      return;
+    }
+
+    this.votes.setPeerMaj23(round, type, peerId, hash);
+  }
+
+  /**
+   * Check whether the state machine reaches a consensus at the specified height
+   * @param height - Height
+   */
+  hasMaj23Precommit(height: BN) {
+    if (height.eq(this.height)) {
+      const maj23 = this.votes.precommits(this.round)?.maj23;
+      if (maj23 && !isEmptyHash(maj23)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Generate new round step message for remote peer
+   * @returns Return undefined if the local state machine is not ready
+   */
+  genNewRoundStepMessage() {
+    return this.startTime !== undefined ? new NewRoundStepMessage(this.height, this.round, this.step) : undefined;
+  }
+
+  /**
+   * Generate vote set bits message for remote peer
+   * @param height - Heigth
+   * @param round - Round
+   * @param type - Vote type
+   * @param hash - Proposal block hash
+   * @returns Return undefined if the local state machine is not ready
+   */
+  genVoteSetBitsMessage(height: BN, round: number, type: VoteType, hash: Buffer) {
+    if (height.eq(this.height)) {
+      return;
+    }
+
+    if (type !== VoteType.Prevote && type !== VoteType.Precommit) {
+      throw new Error('invalid vote type');
+    }
+
+    const bitArray = type === VoteType.Prevote ? this.votes.prevotes(round)?.bitArrayByBlockID(hash) : this.votes.precommits(round)?.bitArrayByBlockID(hash);
+    if (!bitArray) {
+      throw new Error('missing bit array');
+    }
+
+    return new VoteSetBitsMessage(height, round, type, hash, bitArray);
+  }
+
+  /**
+   * Generate proposal message for remote peer
+   * @param height - Heigth
+   * @param round - Round
+   * @returns Return undefined if the local state machine is not ready
+   */
+  genProposalMessage(height: BN, round: number) {
+    if (!height.eq(this.height) || round !== this.round) {
+      return;
+    }
+
+    if (!this.proposal) {
+      return;
+    }
+
+    // only gossip proposal after get the proposalBlock,
+    // because the remote peer will request for the proposalBlock immediately
+    // if he doesn't have proposalBlock
+    if (!this.proposalBlock) {
+      return;
+    }
+
+    return new ProposalMessage(this.proposal);
+  }
+
+  /**
+   * Pick a vote for remote peer
+   * @param height - Height
+   * @param round - Round
+   * @param proposalPOLRound - Proposal POL Round
+   * @param step - Round step
+   * @returns Return undefined if the local state machine is not ready
+   */
+  pickVoteSetToSend(height: BN, round: number, proposalPOLRound: number, step: RoundStepType) {
+    if (!height.eq(this.height) || this.votes === undefined) {
+      return;
+    }
+
+    if (step === RoundStepType.NewHeight) {
+      return;
+    }
+
+    if (step <= RoundStepType.Propose && round !== -1 && round <= this.round && proposalPOLRound !== -1) {
+      return this.votes.prevotes(proposalPOLRound);
+    }
+
+    if (step <= RoundStepType.PrevoteWait && round !== -1 && round <= this.round) {
+      return this.votes.prevotes(round);
+    }
+
+    if (step <= RoundStepType.PrecommitWait && round !== -1 && round <= this.round) {
+      return this.votes.precommits(round);
+    }
+
+    if (round !== -1 && round <= this.round) {
+      return this.votes.prevotes(round);
+    }
+
+    if (proposalPOLRound !== -1) {
+      return this.votes.prevotes(proposalPOLRound);
+    }
+  }
+
+  /**
+   * Pre validate vote
+   * @param vote - Vote
+   * @returns Is the vote valid
+   */
+  preValidateVote(vote: Vote) {
+    const votes = this.votes.getVoteSet(vote.round, vote.type);
+    if (votes) {
+      return votes.preValidate(vote);
+    } else {
+      return vote.height.eq(this.height);
+    }
+  }
+
+  /**
+   * Pre validate proposal
+   * @param proposal - Proposal
+   * @returns Is the proposal valid
+   */
+  preValidateProposal(proposal: Proposal) {
+    if (this.proposal) {
+      return false;
+    }
+
+    if (!this.height.eq(proposal.height) || this.round !== proposal.round) {
+      return false;
+    }
+
+    if (proposal.POLRound < -1 || (proposal.POLRound >= 0 && proposal.POLRound >= proposal.round)) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Pre validate do we need the proposal block message
+   * @returns Do we need the proposal block message
+   */
+  preValidateProposalBlock() {
+    return !this.proposalBlock && !!this.proposal && !!this.proposalBlockHash;
+  }
+}

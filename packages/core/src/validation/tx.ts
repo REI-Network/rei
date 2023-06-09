@@ -4,7 +4,7 @@ import { Transaction } from '@rei-network/structure';
 import { StateManager } from '../stateManager';
 import { isEnableFreeStaking } from '../hardforks';
 
-export async function validateTx(tx: Transaction, timestamp: number, state: StateManager, totalAmount?: BN) {
+export async function validateTx(tx: Transaction, timestamp: number, state: StateManager, totalAmount?: BN, dailyFee?: BN) {
   const senderAddr = tx.getSenderAddress();
   const account = await state.getAccount(senderAddr);
 
@@ -24,11 +24,13 @@ export async function validateTx(tx: Transaction, timestamp: number, state: Stat
     }
 
     // load daily fee from common instance
-    const strDailyFee = tx.common.param('vm', 'dailyFee');
-    if (typeof strDailyFee !== 'string') {
-      throw new Error('missing param, dailyFee');
+    if (dailyFee === undefined) {
+      const strDailyFee = tx.common.param('vm', 'dailyFee');
+      if (typeof strDailyFee !== 'string') {
+        throw new Error('missing param, dailyFee');
+      }
+      dailyFee = hexStringToBN(strDailyFee);
     }
-    const dailyFee = hexStringToBN(strDailyFee);
 
     // estimate available fee
     const stakeInfo = account.getStakeInfo();

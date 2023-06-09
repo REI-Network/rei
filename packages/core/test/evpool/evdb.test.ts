@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import { BN } from 'ethereumjs-util';
 import { LevelUp } from 'levelup';
 import { createLevelDB } from '@rei-network/database';
-import { EvidenceDatabase, Evidence } from '../../src/consensus/reimint/evpool';
+import { EvidenceDatabase, Evidence } from '../../src/reimint/evpool';
 import { MockEvidence } from './mockEvidence';
 
 describe('EvidenceDatabase', () => {

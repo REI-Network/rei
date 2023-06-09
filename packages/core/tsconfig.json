@@ -1,19 +1,40 @@
 {
   "extends": "../../tsconfig.json",
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts"
+  ],
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist",
     "composite": true
   },
   "references": [
-    { "path": "../vm/tsconfig.json" },
-    { "path": "../blockchain/tsconfig.json" },
-    { "path": "../common/tsconfig.json" },
-    { "path": "../database/tsconfig.json" },
-    { "path": "../network/tsconfig.json" },
-    { "path": "../structure/tsconfig.json" },
-    { "path": "../utils/tsconfig.json" },
-    { "path": "../wallet/tsconfig.json" }
+    {
+      "path": "../vm/tsconfig.json"
+    },
+    {
+      "path": "../blockchain/tsconfig.json"
+    },
+    {
+      "path": "../common/tsconfig.json"
+    },
+    {
+      "path": "../database/tsconfig.json"
+    },
+    {
+      "path": "../network/tsconfig.json"
+    },
+    {
+      "path": "../structure/tsconfig.json"
+    },
+    {
+      "path": "../utils/tsconfig.json"
+    },
+    {
+      "path": "../wallet/tsconfig.json"
+    },
+    {
+      "path": "../bls/tsconfig.json"
+    },
   ]
 }

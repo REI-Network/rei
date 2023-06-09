@@ -3,19 +3,19 @@ import path from 'path';
 import inquirer from 'inquirer';
 
 /**
- * Get account passphrase, if the user specifies the file, read from the file, if not, let the user input
- * @param opts - Commander options
+ * Get passphrase, if the user specifies the file, read from the file, if not, let the user input
+ * @param password - Password
  * @param options.address - Address that requires passphrase
  * @param options.repeat - Does the user need to enter the passphrase twice
  * @param options.message - Message displayed when the user enters the passphrase
  * @param options.forceInput - Whether to force the user to enter the passphrase
  * @returns
  */
-export async function getPassphrase(opts: { [option: string]: string }, options?: { addresses?: string[]; repeat?: boolean; message?: string; forceInput?: boolean }) {
+export async function getPassphrase(password?: string, options?: { addresses?: string[]; repeat?: boolean; message?: string; forceInput?: boolean }) {
   let passphrase: string[];
-  if (!options?.forceInput && opts.password) {
-    const password = fs.readFileSync(opts.password).toString();
-    passphrase = password.split('\n').map((p) => p.trim());
+  if (!options?.forceInput && password) {
+    const realPassword = fs.readFileSync(password).toString();
+    passphrase = realPassword.split('\n').map((p) => p.trim());
     if (options?.addresses && passphrase.length < options.addresses.length) {
       throw new Error('Passphrase length is less than addresses length');
     }
@@ -62,6 +62,10 @@ export async function getPassphrase(opts: { [option: string]: string }, options?
 
 export function getKeyStorePath(opts: { [option: string]: string }) {
   return path.join(opts.datadir, opts.keystore);
+}
+
+export function getBlsPath(opts: { [option: string]: string }) {
+  return path.join(opts.datadir, opts.bls);
 }
 
 export function loadVersion() {

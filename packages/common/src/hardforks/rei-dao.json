@@ -1,0 +1,18 @@
+{
+  "name": "rei-dao",
+  "comment": "rei-dao bls hardfork",
+  "gasConfig": {},
+  "gasPrices": {},
+  "vm": {
+    "fallbackaddr": {
+      "v": "0x094319890280E2c6430091FEc44822540229ca62"
+    },
+    "postaddr": {
+      "v": "0x0000000000000000000000000000000000001009"
+    },
+    "fallbackcode": {
+      "v": "0x6080604052348015600f57600080fd5b50604b80601d6000396000f3fe6080604052348015600f57600080fd5b50600080fdfea264697066735822122041c522a6987cbb3a91ce869a3dd8c6fe1a6dc51731758b5df72bed9cbb70f92864736f6c63430006020033"
+    }
+  },
+  "pow": {}
+}

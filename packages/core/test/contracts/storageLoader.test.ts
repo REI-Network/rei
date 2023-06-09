@@ -14,8 +14,8 @@ import { Blockchain } from '@rei-network/blockchain';
 import { Block } from '@rei-network/structure';
 import { createEncodingLevelDB, Database } from '@rei-network/database';
 import { StateManager } from '../../src/stateManager';
-import { StorageLoader } from '../../src/consensus/reimint/contracts/storageLoader';
-import { encode } from '../../src/consensus/reimint/contracts/utils';
+import { StorageLoader } from '../../src/reimint/contracts/storageLoader';
+import { encode } from '../../src/reimint/contracts/utils';
 
 /**
  * This contract is used to test the storage loader.

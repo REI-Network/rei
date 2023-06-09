@@ -499,7 +499,7 @@ export class SnapSync {
         }
       }
 
-      // if the large state task doesn't exsit, schedule pending state
+      // if the large state task doesn't exist, schedule pending state
       if (!largeStateTask) {
         for (const [accountHash, root] of task.pendingState) {
           task.pendingState.delete(accountHash);

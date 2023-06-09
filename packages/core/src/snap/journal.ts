@@ -238,7 +238,7 @@ async function loadAndParseJournal(
 
   const serializedJournal = await db.getSnapJournal();
   if (serializedJournal === null) {
-    // the journal doesn't exsit, ignore
+    // the journal doesn't exist, ignore
     return { generator, snapshot: base };
   }
 

@@ -5,7 +5,7 @@ import path from 'path';
 import process from 'process';
 import { program } from 'commander';
 import { loadVersion } from './utils';
-import { installStartAction, installAccountCommand, installAttachCommand, installConsoleCommand } from './commands';
+import { installStartAction, installAccountCommand, installAttachCommand, installConsoleCommand, installBlsCommand } from './commands';
 
 // set version
 program.version(loadVersion());
@@ -36,12 +36,16 @@ program.option('--coinbase <address>', 'miner address');
 program.option('--verbosity <verbosity>', 'logging verbosity: silent, error, warn, info, debug, detail', 'info');
 program.option('--receipts-cache-size <receiptsCacheSize>', 'receipts cache size');
 program.option('--evm <evm>', 'evm implementation type, "js" or "binding"');
+program.option('--bls <bls>', 'the datadir for bls', 'bls');
+program.option('--bls-password <blsPassword>', 'bls password file to use for non-interactive password input');
+program.option('--bls-file <blsFile>', 'bls file name');
 
 // install commands
 installStartAction(program);
 installAccountCommand(program);
 installAttachCommand(program);
 installConsoleCommand(program);
+installBlsCommand(program);
 
 // parse args
 program.parse(process.argv);

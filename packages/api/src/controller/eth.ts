@@ -69,7 +69,7 @@ export class ETHController extends Controller {
    * @returns The coinbase address
    */
   coinbase() {
-    return this.node.getCurrentEngine().coinbase.toString();
+    return this.node.reimint.coinbase.toString();
   }
 
   /**
@@ -77,7 +77,7 @@ export class ETHController extends Controller {
    * @returns True if the node is currently mining, otherwise false
    */
   mining() {
-    return this.node.getCurrentEngine().enable;
+    return true;
   }
 
   /**

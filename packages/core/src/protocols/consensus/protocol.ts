@@ -1,8 +1,9 @@
 import { Protocol, Peer, ProtocolStream } from '@rei-network/network';
 import { Node } from '../../node';
-import { Message, Vote } from '../../consensus/reimint';
-import { NetworkProtocol } from '../types';
+import { Vote } from '../../reimint';
+import { NetworkProtocol } from '../enum';
 import { BaseProtocol } from '../baseProtocol';
+import { ConsensusMessage } from './messages';
 import { ConsensusProtocolHandler } from './handler';
 
 export interface SendMessageOptions {
@@ -67,7 +68,7 @@ export class ConsensusProtocol extends BaseProtocol<ConsensusProtocolHandler> im
    * @param msg - Message
    * @param options - Send options {@link SendMessageOptions}
    */
-  broadcastMessage(msg: Message, options: SendMessageOptions) {
+  broadcastMessage(msg: ConsensusMessage, options: SendMessageOptions) {
     if (options.broadcast) {
       for (const handler of this.handlers) {
         try {

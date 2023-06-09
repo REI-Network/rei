@@ -1,6 +1,6 @@
 import { expect, assert } from 'chai';
 import { BN } from 'ethereumjs-util';
-import { Evidence, EvidencePool, EvidencePoolBackend } from '../../src/consensus/reimint/evpool';
+import { Evidence, EvidencePool, EvidencePoolBackend } from '../../src/reimint/evpool';
 import { MockEvidence } from './mockEvidence';
 
 const MAX_UINT64 = new BN('ffffffffffffffff', 'hex');

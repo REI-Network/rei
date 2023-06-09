@@ -71,7 +71,7 @@ export class Tracer {
       throw new Error('invalid block number, 0');
     }
 
-    const executor = this.node.getExecutor(block._common);
+    const executor = this.node.reimint.executor;
     return new Promise<any>(async (resolve, reject) => {
       try {
         block = block as Block;

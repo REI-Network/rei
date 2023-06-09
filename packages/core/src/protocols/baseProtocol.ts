@@ -1,6 +1,6 @@
 import { ProtocolHandler, Protocol, Peer, ProtocolStream } from '@rei-network/network';
 import { Node } from '../node';
-import { NetworkProtocol } from './types';
+import { NetworkProtocol } from './enum';
 
 export abstract class BaseProtocol<T extends ProtocolHandler> implements Protocol {
   readonly node: Node;

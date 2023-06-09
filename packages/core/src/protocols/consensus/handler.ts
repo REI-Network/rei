@@ -1,8 +1,9 @@
 import { BN } from 'ethereumjs-util';
 import { Channel, FunctionalBufferSet, logger } from '@rei-network/utils';
 import { Peer, ProtocolStream, ProtocolHandler } from '@rei-network/network';
-import { RoundStepType, Proposal, Vote, BitArray, VoteType, VoteSet, MessageFactory, Evidence, DuplicateVoteEvidence } from '../../consensus/reimint';
-import * as m from '../../consensus/reimint/messages';
+import { RoundStepType, Proposal, Vote, BitArray, VoteType, VoteSet, Evidence, DuplicateVoteEvidence } from '../../reimint';
+import { ConsensusMessageFactory } from './messages';
+import * as m from './messages';
 import { ConsensusProtocol } from './protocol';
 
 const peerGossipSleepDuration = 100;
@@ -52,12 +53,15 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
       if (result) {
         this.protocol.addHandler(this);
 
-        // start gossip loop
-        if (this.reimint.isStarted) {
-          this.onEngineStart();
-        } else {
-          this.reimint.on('start', this.onEngineStart);
+        // broadcast all cached evidence
+        for (const ev of this.node.reimint.evpool.pendingEvidence) {
+          this.evidenceQueue.push(ev);
         }
+
+        // start gossip loops
+        this.gossipDataLoop();
+        this.gossipVotesLoop();
+        this.gossipEvidenceLoop();
 
         // send round step message
         const newRoundMsg = this.reimint.state.genNewRoundStepMessage();
@@ -73,17 +77,6 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
   get reimint() {
     return this.protocol.node.reimint;
   }
-
-  private onEngineStart = () => {
-    // broadcast all cached evidence
-    for (const ev of this.node.reimint.evpool.pendingEvidence) {
-      this.evidenceQueue.push(ev);
-    }
-
-    this.gossipDataLoop();
-    this.gossipVotesLoop();
-    this.gossipEvidenceLoop();
-  };
 
   private async gossipDataLoop() {
     while (!this.aborted) {
@@ -210,7 +203,6 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
    */
   abort() {
     this.aborted = true;
-    this.reimint.off('start', this.onEngineStart);
     this.protocol.removeHandler(this);
     this.evidenceQueue.abort();
   }
@@ -219,9 +211,9 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
    * Send message to the remote peer
    * @param msg - Messsage
    */
-  send(msg: m.Message) {
+  send(msg: m.ConsensusMessage) {
     try {
-      this.stream.send(MessageFactory.serializeMessage(msg));
+      this.stream.send(ConsensusMessageFactory.serializeMessage(msg));
     } catch (err) {
       // ignore errors...
     }
@@ -252,7 +244,7 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
    */
   async handle(data: Buffer) {
     try {
-      const msg = MessageFactory.fromSerializedMessage(data);
+      const msg = ConsensusMessageFactory.fromSerializedMessage(data);
       if (msg instanceof m.HandshakeMessage) {
         this.applyHandshakeMessage(msg);
       } else if (msg instanceof m.NewRoundStepMessage) {

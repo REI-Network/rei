@@ -3,3 +3,4 @@ cache
 deployments
 docs
 types
+.env

@@ -1,32 +1,33 @@
 {
-    "name": "@rei-network/cli",
-    "version": "2.0.2",
-    "main": "dist/index.js",
-    "types": "dist/index.d.ts",
-    "license": "GPL-3.0-or-later",
-    "bin": {
-        "rei": "dist/index.js"
-    },
-    "scripts": {
-        "preinstall": "npm run binWorkaround",
-        "binWorkaround": "test -f dist/index.js || echo 'install fails if bin script does not exist (https://github.com/npm/cli/issues/2632), creating placeholder file at \"dist/index.js\"' && mkdir -p 'dist' && touch dist/index.js",
-        "build": "tsc --build tsconfig.json",
-        "test": "echo @rei-network/cli has no test cases"
-    },
-    "devDependencies": {
-        "@types/node": "^14.14.9",
-        "prompts": "^2.4.1",
-        "typescript": "^4.1.2"
-    },
-    "dependencies": {
-        "@rei-network/api": "^1.0.0",
-        "@rei-network/core": "^2.0.2",
-        "@rei-network/rpc": "^2.0.0",
-        "@rei-network/ipc": "^1.0.0",
-        "@rei-network/utils": "^0.1.1",
-        "@rei-network/wallet": "^0.1.1",
-        "commander": "^6.2.1",
-        "ethereumjs-util": "^7.1.4",
-        "inquirer": "^8.0.0"
-    }
+  "name": "@rei-network/cli",
+  "version": "2.0.2",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "license": "GPL-3.0-or-later",
+  "bin": {
+    "rei": "dist/index.js"
+  },
+  "scripts": {
+    "preinstall": "npm run binWorkaround",
+    "binWorkaround": "test -f dist/index.js || echo 'install fails if bin script does not exist (https://github.com/npm/cli/issues/2632), creating placeholder file at \"dist/index.js\"' && mkdir -p 'dist' && touch dist/index.js",
+    "build": "tsc --build tsconfig.json",
+    "test": "echo @rei-network/cli has no test cases"
+  },
+  "devDependencies": {
+    "@types/node": "^14.14.9",
+    "prompts": "^2.4.1",
+    "typescript": "^4.1.2"
+  },
+  "dependencies": {
+    "@rei-network/api": "^1.0.0",
+    "@rei-network/bls": "^0.0.1",
+    "@rei-network/core": "^2.0.0",
+    "@rei-network/ipc": "^1.0.0",
+    "@rei-network/rpc": "^2.0.0",
+    "@rei-network/utils": "^0.1.1",
+    "@rei-network/wallet": "^0.1.1",
+    "commander": "^6.2.1",
+    "ethereumjs-util": "^7.1.4",
+    "inquirer": "^8.0.0"
+  }
 }

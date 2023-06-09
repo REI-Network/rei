@@ -2,12 +2,12 @@ import { BaseTrie as Trie } from '@rei-network/trie';
 import { keccak256, KECCAK256_NULL } from 'ethereumjs-util';
 import { logger } from '@rei-network/utils';
 import { ProtocolHandler, Peer, ProtocolStream } from '@rei-network/network';
-import { SnapProtocol } from './protocol';
-import * as s from '../../consensus/reimint/snapMessages';
 import { EMPTY_HASH, MAX_HASH } from '../../utils';
 import { StakingAccount } from '../../stateManager';
 import { mergeProof } from '../../snap/utils';
 import { AccountRequest, AccountResponse, StorageRequst, StorageResponse } from '../../sync/snap/types';
+import { SnapProtocol } from './protocol';
+import * as m from './messages';
 
 const defaultSoftResponseLimit = 512 * 1024;
 const maxCodeLookups = 1024;
@@ -81,7 +81,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
    * Send request message to peer and wait for response
    * @param msg - Request message
    */
-  request(msg: s.SnapMessage) {
+  request(msg: m.SnapMessage) {
     if (this.waitingRequests.has(msg.reqID)) {
       throw new Error('request already in progress');
     }
@@ -115,21 +115,21 @@ export class SnapProtocolHandler implements ProtocolHandler {
    */
   async handle(data: Buffer) {
     try {
-      const msg = s.SnapMessageFactory.fromSerializedMessage(data);
+      const msg = m.SnapMessageFactory.fromSerializedMessage(data);
       const reqID = msg.reqID;
       const request = this.waitingRequests.get(reqID);
-      if (request && (msg instanceof s.AccountRange || msg instanceof s.StorageRange || msg instanceof s.ByteCode || msg instanceof s.TrieNode)) {
+      if (request && (msg instanceof m.AccountRange || msg instanceof m.StorageRange || msg instanceof m.ByteCode || msg instanceof m.TrieNode)) {
         clearTimeout(request.timeout);
         this.waitingRequests.delete(reqID);
         request.resolve(msg);
       } else {
-        if (msg instanceof s.GetAccountRange) {
+        if (msg instanceof m.GetAccountRange) {
           await this.applyGetAccountRange(msg);
-        } else if (msg instanceof s.GetStorageRange) {
+        } else if (msg instanceof m.GetStorageRange) {
           await this.applyGetStorageRange(msg);
-        } else if (msg instanceof s.GetByteCode) {
+        } else if (msg instanceof m.GetByteCode) {
           await this.applyGetByteCode(msg);
-        } else if (msg instanceof s.GetTrieNode) {
+        } else if (msg instanceof m.GetTrieNode) {
           await this.applyGetTrieNode(msg);
         } else {
           logger.warn('SnapProtocolHandler::handle, unknown message');
@@ -145,7 +145,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
    * from snapshot and send the response to the remote peer
    * @param msg - GetAccountRange Message
    */
-  private async applyGetAccountRange(msg: s.GetAccountRange) {
+  private async applyGetAccountRange(msg: m.GetAccountRange) {
     const responseLimit = msg.responseLimit > this.softResponseLimit ? this.softResponseLimit : msg.responseLimit;
     const accountData: Buffer[][] = [];
     let proof: Buffer[] = [];
@@ -170,10 +170,10 @@ export class SnapProtocolHandler implements ProtocolHandler {
       if (last) {
         proof = mergeProof(proof, await Trie.createProof(accTrie, last));
       }
-      this.send(new s.AccountRange(msg.reqID, accountData, proof));
+      this.send(new m.AccountRange(msg.reqID, accountData, proof));
     } catch (err) {
       logger.debug('SnapProtocolHandler::applyGetAccountRange', err);
-      this.send(new s.AccountRange(msg.reqID, [], []));
+      this.send(new m.AccountRange(msg.reqID, [], []));
     }
   }
 
@@ -182,7 +182,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
    * from snapshot and send the response to the remote peer
    * @param msg - GetStorageRange Message
    */
-  private async applyGetStorageRange(msg: s.GetStorageRange) {
+  private async applyGetStorageRange(msg: m.GetStorageRange) {
     const responseLimit = msg.responseLimit > this.softResponseLimit ? this.softResponseLimit : msg.responseLimit;
     const hardLimit = responseLimit * (1 + stateLookupSlack);
     let startHash: Buffer | undefined = msg.startHash;
@@ -242,10 +242,10 @@ export class SnapProtocolHandler implements ProtocolHandler {
           break;
         }
       }
-      this.send(new s.StorageRange(msg.reqID, slots, proof));
+      this.send(new m.StorageRange(msg.reqID, slots, proof));
     } catch (err) {
       logger.debug('SnapProtocolHandler::applyGetStorageRange', err);
-      this.send(new s.StorageRange(msg.reqID, [], []));
+      this.send(new m.StorageRange(msg.reqID, [], []));
     }
   }
 
@@ -254,7 +254,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
    * from database and send the response to the remote peer
    * @param msg - GetByteCode Message
    */
-  private async applyGetByteCode(msg: s.GetByteCode) {
+  private async applyGetByteCode(msg: m.GetByteCode) {
     const codes: Buffer[] = [];
     const responseLimit = msg.responseLimit > this.softResponseLimit ? this.softResponseLimit : msg.responseLimit;
     const hashes = msg.hashes.length > maxCodeLookups ? msg.hashes.splice(maxCodeLookups) : msg.hashes;
@@ -275,7 +275,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
         break;
       }
     }
-    this.send(new s.ByteCode(msg.reqID, codes));
+    this.send(new m.ByteCode(msg.reqID, codes));
   }
 
   /**
@@ -283,7 +283,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
    * from database and send the response to the remote peer
    * @param msg - GetTrieNode Message
    */
-  private async applyGetTrieNode(msg: s.GetTrieNode) {
+  private async applyGetTrieNode(msg: m.GetTrieNode) {
     const hashes = msg.hashes.length > maxTrieNodeLookups ? msg.hashes.splice(maxTrieNodeLookups) : msg.hashes;
     const responseLimit = msg.responseLimit > this.softResponseLimit ? this.softResponseLimit : msg.responseLimit;
     const nodes: Buffer[] = [];
@@ -300,7 +300,7 @@ export class SnapProtocolHandler implements ProtocolHandler {
         break;
       }
     }
-    this.send(new s.TrieNode(msg.reqID, nodes));
+    this.send(new m.TrieNode(msg.reqID, nodes));
   }
 
   /**
@@ -319,9 +319,9 @@ export class SnapProtocolHandler implements ProtocolHandler {
    */
   async getAccountRange(root: Buffer, req: AccountRequest): Promise<AccountResponse | null> {
     try {
-      const msg = new s.GetAccountRange(this.generateReqID(), root, req.origin, req.limit, this.softResponseLimit);
+      const msg = new m.GetAccountRange(this.generateReqID(), root, req.origin, req.limit, this.softResponseLimit);
       const response = await this.request(msg);
-      if (!(response instanceof s.AccountRange)) {
+      if (!(response instanceof m.AccountRange)) {
         logger.warn('SnapProtocolHandler::getAccountRange, received wrong message type');
         return null;
       }
@@ -365,9 +365,9 @@ export class SnapProtocolHandler implements ProtocolHandler {
    */
   async getStorageRanges(root: Buffer, req: StorageRequst): Promise<StorageResponse | null> {
     try {
-      const msg = new s.GetStorageRange(this.generateReqID(), root, req.accounts, req.origin, req.limit, this.softResponseLimit);
+      const msg = new m.GetStorageRange(this.generateReqID(), root, req.accounts, req.origin, req.limit, this.softResponseLimit);
       const response = await this.request(msg);
-      if (!(response instanceof s.StorageRange)) {
+      if (!(response instanceof m.StorageRange)) {
         logger.warn('SnapProtocolHandler::getStorageRange, received wrong message type');
         return null;
       }
@@ -420,9 +420,9 @@ export class SnapProtocolHandler implements ProtocolHandler {
    */
   async getByteCodes(hashes: Buffer[]): Promise<(Buffer | undefined)[] | null> {
     try {
-      const msg = new s.GetByteCode(this.generateReqID(), hashes, this.softResponseLimit);
+      const msg = new m.GetByteCode(this.generateReqID(), hashes, this.softResponseLimit);
       const response = await this.request(msg);
-      if (!(response instanceof s.ByteCode)) {
+      if (!(response instanceof m.ByteCode)) {
         logger.warn('SnapProtocolHandler::getByteCode, received wrong message type');
         return null;
       }
@@ -460,9 +460,9 @@ export class SnapProtocolHandler implements ProtocolHandler {
    */
   async getTrieNodes(hashes: Buffer[]): Promise<(Buffer | undefined)[] | null> {
     try {
-      const msg = new s.GetTrieNode(this.generateReqID(), hashes, defaultSoftResponseLimit);
+      const msg = new m.GetTrieNode(this.generateReqID(), hashes, defaultSoftResponseLimit);
       const response = await this.request(msg);
-      if (!(response instanceof s.TrieNode)) {
+      if (!(response instanceof m.TrieNode)) {
         logger.warn('SnapProtocolHandler::getTrieNode, received wrong message type');
         return null;
       }
@@ -497,9 +497,9 @@ export class SnapProtocolHandler implements ProtocolHandler {
    * Send message to the remote peer
    * @param msg - Message
    */
-  send(msg: s.SnapMessage) {
+  send(msg: m.SnapMessage) {
     try {
-      this.stream.send(s.SnapMessageFactory.serializeMessage(msg));
+      this.stream.send(m.SnapMessageFactory.serializeMessage(msg));
     } catch (err) {
       // ignore errors...
     }

@@ -98,6 +98,14 @@
     {
       "name": "better-pos",
       "block": 7216473
+    },
+    {
+      "name": "testnet-hf-3",
+      "block": null
+    },
+    {
+      "name": "rei-dao",
+      "block": null
     }
   ],
   "bootstrapNodes": ["enr:-Iu4QPz90koLNexxVzdKmRNG9vFvaGCKdRKyctdBPapvFbxYeC5dwUtVeTsbALuRbepkXo6DxMQvbEymzZDfJQe9PuUEgmlkgnY0gmlwhC_zLSmJc2VjcDI1NmsxoQIjWqiet9ed_EiGiTXjrfjKejYSqhjr-_yOntO9v9c_4IN0Y3CCoJuDdWRwgqCc", "enr:-Iu4QMb_n75rjvLgLvzxRg5STOD3ePq2Li42oDF6K0Pjp4YhN4fbIm87LyuQQC0hNO0cNYmTP9YlKlFQGOXgOlDHkIIEgmlkgnY0gmlwhC_zLSmJc2VjcDI1NmsxoQOE57Rt7uLtJtf8BciAUlQJxU3BKlvmPYxHSRC6DpEgbYN0Y3CCoJ6DdWRwgqCd", "enr:-Iu4QNrfueeR7P12rqCqMQdAM-SsMdYKpOlgEklDdEGPWrA3Q-bidTIcmXENZgGnafgS04sBtCvVXMmk3iRlFaIcIS4EgmlkgnY0gmlwhC_zLSmJc2VjcDI1NmsxoQO_-dh99y3NaRsW9a9c9JtLn8XensNkFLvEBoWZG6JV3oN0Y3CCoJ-DdWRwgqCg"]

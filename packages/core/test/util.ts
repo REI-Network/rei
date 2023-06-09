@@ -1,21 +1,26 @@
 import { Address } from 'ethereumjs-util';
 import { FunctionalMap } from '@rei-network/utils';
+import { SecretKey } from '@rei-network/bls';
 
 export class MockAccountManager {
   readonly nameToAddress = new Map<string, Address>();
   readonly nameToPrivKey = new Map<string, Buffer>();
   readonly addressToName = new FunctionalMap<Address, string>((a: Address, b: Address) => a.buf.compare(b.buf));
+  readonly nameToBlsKey = new Map<string, SecretKey>();
 
-  constructor(addresses: [string, Address][] | [string, Address, Buffer][]) {
+  constructor(addresses: [string, Address][] | [string, Address, Buffer][] | [string, Address, Buffer, SecretKey][]) {
     this.add(addresses);
   }
 
-  add(addresses: [string, Address][] | [string, Address, Buffer][]) {
-    for (const [name, address, privKey] of addresses) {
+  add(addresses: [string, Address][] | [string, Address, Buffer][] | [string, Address, Buffer, SecretKey][]) {
+    for (const [name, address, privKey, blsSecretKey] of addresses) {
       this.nameToAddress.set(name, address);
       this.addressToName.set(address, name);
       if (privKey) {
         this.nameToPrivKey.set(name, privKey);
+      }
+      if (blsSecretKey) {
+        this.nameToBlsKey.set(name, blsSecretKey);
       }
     }
   }
@@ -46,5 +51,17 @@ export class MockAccountManager {
 
   a2p(address: Address) {
     return this.n2p(this.a2n(address));
+  }
+
+  n2b(name: string) {
+    const blsSecretKey = this.nameToBlsKey.get(name);
+    if (!blsSecretKey) {
+      throw new Error('missing name' + name);
+    }
+    return blsSecretKey;
+  }
+
+  a2b(address: Address) {
+    return this.n2b(this.a2n(address));
   }
 }

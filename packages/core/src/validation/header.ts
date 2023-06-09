@@ -2,8 +2,6 @@ import { BN } from 'ethereumjs-util';
 import { ConsensusAlgorithm, ConsensusType as EthereumConsensusType } from '@rei-network/common';
 import { nowTimestamp } from '@rei-network/utils';
 import { BlockHeader, CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL } from '@rei-network/structure';
-import { ConsensusType } from '../consensus/types';
-import { getConsensusTypeByCommon } from '../hardforks';
 import { getGasLimitByCommon, EMPTY_NONCE, EMPTY_ADDRESS, EMPTY_MIX_HASH } from '../utils';
 
 const allowedFutureBlockTimeSeconds = 15;
@@ -97,14 +95,7 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
     }
   }
 
-  const currentConsensusType = getConsensusTypeByCommon(this._common);
-  // const parentConsensusType = getConsensusTypeByCommon(parentHeader._common);
-
-  if (currentConsensusType === ConsensusType.Reimint || currentConsensusType === ConsensusType.Clique) {
-    if (!this.gasLimit.eq(getGasLimitByCommon(this._common))) {
-      throw new Error('invalid gas limit');
-    }
-  } else if (!this.validateGasLimit(parentHeader)) {
+  if (!this.gasLimit.eq(getGasLimitByCommon(this._common))) {
     throw new Error('invalid gas limit');
   }
 

@@ -48,7 +48,7 @@ export enum SyncMode {
 
 export interface SynchronizerOptions {
   node: Node;
-  mode: string;
+  mode: SyncMode;
   snapSyncMinTD?: number;
   trustedHeight?: BN;
   trustedHash?: Buffer;
@@ -84,9 +84,6 @@ export class Synchronizer extends EventEmitter {
   constructor(options: SynchronizerOptions) {
     super();
     this.node = options.node;
-    if (options.mode !== SyncMode.Full && options.mode !== SyncMode.Snap) {
-      throw new Error('invalid sync mode: ' + options.mode);
-    }
     this.mode = options.mode;
     this.snapSyncMinTD = options.snapSyncMinTD ?? defaultSnapSyncMinTD;
     this.trustedHash = options.trustedHash;

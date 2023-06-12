@@ -49,7 +49,7 @@ struct ActiveValidator {
  * @dev see {StakeManager}
  */
 interface IStakeManager is IOnly {
-    function freezed(address validator) external view returns (bool);
+    function frozen(address validator) external view returns (bool);
 
     function proposer() external view returns (address);
 

@@ -16,5 +16,5 @@ interface IValidatorRewardPool is IOnly {
 
     function slash(address validator, uint8 factor) external returns (uint256 amount);
 
-    function slashV2(address validator, uint256 fine) external returns (uint256 amount);
+    function slashByAmount(address validator, uint256 amount) external;
 }

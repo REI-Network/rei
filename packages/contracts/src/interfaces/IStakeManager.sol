@@ -57,11 +57,27 @@ interface IStakeManager is IOnly {
 
     function validatorId() external view returns (uint256);
 
-    function validators(address validator) external view returns (uint256, address, uint256, uint256);
+    function validators(address validator)
+        external
+        view
+        returns (
+            uint256,
+            address,
+            uint256,
+            uint256
+        );
 
     function unstakeId() external view returns (uint256);
 
-    function unstakeQueue(uint256 id) external view returns (address, address payable, uint256, uint256);
+    function unstakeQueue(uint256 id)
+        external
+        view
+        returns (
+            address,
+            address payable,
+            uint256,
+            uint256
+        );
 
     function totalLockedAmount() external view returns (uint256);
 
@@ -93,17 +109,17 @@ interface IStakeManager is IOnly {
 
     function stake(address validator, address to) external payable returns (uint256);
 
-    function startUnstake(address validator, address payable to, uint256 shares) external returns (uint256);
+    function startUnstake(
+        address validator,
+        address payable to,
+        uint256 shares
+    ) external returns (uint256);
 
     function startClaim(address payable to, uint256 amount) external returns (uint256);
 
     function setCommissionRate(uint256 rate) external;
 
     function unstake(uint256 id) external returns (uint256);
-
-    function removeIndexedValidator(address validator) external;
-
-    function addIndexedValidator(address validator) external;
 
     function reward(address validator) external payable;
 

@@ -49,4 +49,16 @@ contract ValidatorRewardPool is ReentrancyGuard, Only, IValidatorRewardPool {
             Address.sendValue(address(0), amount);
         }
     }
+
+    /**
+     * Slash validator by fixed amount.
+     * @param validator     Validator address.
+     * @param amount        Slash amount.
+     */
+    function slashByAmount(address validator, uint256 amount) external override nonReentrant onlyStakeManager {
+        balanceOf[validator] = balanceOf[validator].sub(amount, "ValidatorRewardPool: insufficient balance");
+        if (amount > 0) {
+            Address.sendValue(address(0), amount);
+        }
+    }
 }

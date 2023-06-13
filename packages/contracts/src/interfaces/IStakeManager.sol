@@ -49,6 +49,8 @@ struct ActiveValidator {
  * @dev see {StakeManager}
  */
 interface IStakeManager is IOnly {
+    function frozen(address validator) external view returns (bool);
+
     function proposer() external view returns (address);
 
     function usedEvidence(bytes32 hash) external view returns (bool);
@@ -119,17 +121,7 @@ interface IStakeManager is IOnly {
 
     function unstake(uint256 id) external returns (uint256);
 
-    function removeIndexedValidator(address validator) external;
-
-    function addIndexedValidator(address validator) external;
-
     function reward(address validator) external payable;
-
-    function slash(
-        address validator,
-        uint8 reason,
-        bytes32 hash
-    ) external returns (uint256);
 
     function onAfterBlock(address _proposer, bytes calldata _activeValidatorsInfos) external;
 
@@ -140,4 +132,8 @@ interface IStakeManager is IOnly {
     function addMissRecord(MissRecord[] calldata record) external;
 
     function unjail() external payable;
+
+    function freeze(address validator, bytes32 hash) external;
+
+    function unfreeze(address validator, uint256 factor) external returns (uint256 amount);
 }

@@ -192,7 +192,10 @@ export class ReimintExecutor {
         logger.debug('Reimint::afterApply, find evidence(h,r,v,ha,hb):', voteA.height.toString(), voteA.round, voteA.getValidator().toString(), bufferToHex(voteA.hash), bufferToHex(voteB.hash));
 
         let ethLogs: any[] | undefined;
-        if (isEnableBetterPOS(pendingCommon)) {
+
+        if (isEnableDAO(pendingCommon)) {
+          ethLogs = await parentStakeManager.freeze(ev.voteA.getValidator(), ev.hash());
+        } else if (isEnableBetterPOS(pendingCommon)) {
           // if the contract has been upgraded, call the new slashing function
           ethLogs = await parentStakeManager.slashV2(ev.voteA.getValidator(), SlashReason.DuplicateVote, ev.hash());
         } else {

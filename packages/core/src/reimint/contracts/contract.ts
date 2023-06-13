@@ -111,6 +111,10 @@ export abstract class Contract {
   static async deployHardfork3Contracts(evm: EVM, common: Common) {
     // deploy config contract
     await Contract.deployContract(evm, common, 'cfg', undefined, true);
+    // upgrade stake manager contract
+    await Contract.deployContract(evm, common, 'sm');
+    // upgrade validator reward pool contract
+    await Contract.deployContract(evm, common, 'vrp');
   }
 
   /**

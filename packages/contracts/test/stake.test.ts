@@ -82,7 +82,6 @@ describe('StakeManger', () => {
     minIndexVotingPower = await config.minIndexVotingPower();
     prison = await prisonFactory.connect(deployer).deploy(config.address);
     await config.setPrison(prison.address);
-    await config.setCommunityAddress(await deployer.getAddress());
   });
 
   it('should initialize succeed', async () => {

@@ -325,8 +325,10 @@ task('check-validator-info')
     const validator = args.validator as string;
     const StakeManager = await ethers.getContractFactory('StakeManager');
     const stakeManager = StakeManager.attach('0x0000000000000000000000000000000000001001');
+    const prison = await ethers.getContractAt('Prison', '0x0000000000000000000000000000000000001008');
     console.log('totalLockAmount : ', (await stakeManager.totalLockedAmount()).toString());
     const v = await stakeManager.validators(validator);
+    console.log('is jailed', (await prison.miners(validator))[1]);
     console.log('is indexedValidator', await stakeManager.indexedValidatorsExists(v.id));
     console.log('is frozen', await stakeManager.frozen(validator));
     console.log('votingPower ', (await stakeManager.getVotingPowerByAddress(validator)).toString());

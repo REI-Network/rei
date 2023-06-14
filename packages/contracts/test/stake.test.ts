@@ -454,97 +454,71 @@ describe('StakeManger', () => {
 
   it('should freeze validator and unfreeze with percentage penalty', async () => {
     const deployerAddr = await deployer.getAddress();
-    //0 penalty unfreeze
-    let validator = validator5;
-    let validatorAddr = await validator.getAddress();
-    await stakeManager.stake(validatorAddr, deployerAddr, { value: minIndexVotingPower });
-    let validatorInfo = await stakeManager.validators(validatorAddr);
-    expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should in indexedValidators').to.equal(true);
-    const totalLockedAmount1 = await stakeManager.totalLockedAmount();
-    const votingPower1 = await stakeManager.getVotingPowerByAddress(validatorAddr);
-    await stakeManager.connect(deployer).freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
-    expect(await stakeManager.frozen(validator), 'validator should fronzen').be.equal(true);
-    expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should not in indexedValidators').to.equal(false);
-    assert(totalLockedAmount1.eq(await stakeManager.totalLockedAmount()).add(votingPower1), 'totalLockedAmount should be equal');
-    await stakeManager.connect(await deployer.getAddress()).unfreeze(validator, 0);
-    expect(await stakeManager.frozen(validator), 'validator should not fronzen').be.equal(false);
-    assert(totalLockedAmount1.eq(await stakeManager.totalLockedAmount()), 'totalLockedAmount should be equal');
-    assert(votingPower1.eq(await stakeManager.getVotingPowerByAddress(validator)), 'validator voting power should be equal');
-    expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should in indexedValidators').to.equal(true);
+    const testLogic = async (validator: Signer, penalty: number) => {
+      const validatorAddr = await validator.getAddress();
+      await stakeManager.stake(validatorAddr, deployerAddr, { value: minIndexVotingPower });
+      const validatorInfo = await stakeManager.validators(validatorAddr);
+      expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should in indexedValidators').to.equal(true);
+      const totalLockedAmount = await stakeManager.totalLockedAmount();
+      const votingPower = await stakeManager.getVotingPowerByAddress(validatorAddr);
+      await stakeManager.connect(deployer).freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
+      expect(await stakeManager.frozen(validatorAddr), 'validator should fronzen').be.equal(true);
+      expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should not in indexedValidators').to.equal(false);
+      assert(totalLockedAmount.eq((await stakeManager.totalLockedAmount()).add(votingPower)), 'totalLockedAmount should be equal');
+      await stakeManager.connect(deployer).unfreeze(validatorAddr, penalty);
+      expect(await stakeManager.frozen(validatorAddr), 'validator should not fronzen').be.equal(false);
+      if (penalty == 0) {
+        //0 penalty unfreeze
+        assert(totalLockedAmount.eq(await stakeManager.totalLockedAmount()), 'totalLockedAmount should be equal');
+        assert(votingPower.eq(await stakeManager.getVotingPowerByAddress(validatorAddr)), 'validator voting power should be equal');
+        expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should in indexedValidators').to.equal(true);
+      } else if (penalty == 50) {
+        //50% penalty unfreeze
+        assert(totalLockedAmount.eq((await stakeManager.totalLockedAmount()).add(votingPower.div(2))), 'totalLockedAmount should be equal');
+        assert(votingPower.sub(votingPower.div(2)).eq(await stakeManager.getVotingPowerByAddress(validatorAddr)), 'validator voting power should be equal');
+        expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should not in indexedValidators').to.equal(false);
+      } else if (penalty == 100) {
+        //100% penalty unfreeze
+        assert(totalLockedAmount.eq((await stakeManager.totalLockedAmount()).add(votingPower)), 'totalLockedAmount should be equal');
+        assert(BigNumber.from(0).eq(await stakeManager.getVotingPowerByAddress(validatorAddr)), 'validator voting power should be equal');
+        expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should not in indexedValidators').to.equal(false);
+      }
+    };
 
-    //50% penalty unfreeze
-    validator = validator6;
-    validatorAddr = await validator.getAddress();
-    await stakeManager.stake(validatorAddr, deployerAddr, { value: minIndexVotingPower });
-    validatorInfo = await stakeManager.validators(validatorAddr);
-    expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should in indexedValidators').to.equal(true);
-    const totalLockedAmount2 = await stakeManager.totalLockedAmount();
-    const votingPower2 = await stakeManager.getVotingPowerByAddress(validatorAddr);
-    await stakeManager.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
-    expect(await stakeManager.frozen(validatorAddr), 'validator should be frozen').be.equal(true);
-    expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should not in indexedValidators').to.equal(false);
-    assert(totalLockedAmount2.eq(await stakeManager.totalLockedAmount().add(votingPower2)), 'totalLockedAmount should be equal');
-    await stakeManager.connect(deployer).unfreeze(validatorAddr, 50);
-    expect(await stakeManager.frozen(validatorAddr), 'validator should not fronzen').be.equal(false);
-    assert(totalLockedAmount2.eq(new BN(await stakeManager.totalLockedAmount()).add(votingPower2.divn(2))), 'totalLockedAmount should be equal');
-    assert(votingPower2.sub(votingPower2.divn(2)).eq(new BN(await stakeManager.getVotingPowerByAddress(validatorAddr))), 'validator voting power should be equal');
-    expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should in indexedValidators').to.equal(false);
-
-    //100% penalty unfreeze
-    validator = validator7;
-    validatorAddr = await validator.getAddress();
-    await stakeManager.stake(validatorAddr, deployerAddr, { value: minIndexVotingPower });
-    validatorInfo = await stakeManager.validators(validatorAddr);
-    expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should in indexedValidators').to.equal(true);
-    const totalLockedAmount3 = new BN(await stakeManager.totalLockedAmount());
-    const votingPower3 = new BN(await stakeManager.getVotingPowerByAddress(validatorAddr));
-    await stakeManager.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
-    expect(await stakeManager.frozen(validatorAddr), 'validator should be frozen').be.equal(true);
-    expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should not in indexedValidators').to.equal(false);
-    assert(totalLockedAmount3.eq(new BN(await stakeManager.totalLockedAmount()).add(votingPower3)), 'totalLockedAmount should be equal');
-    await stakeManager.connect(deployer).unfreeze(validatorAddr, 100);
-    expect(await stakeManager.frozen(validatorAddr), 'validator should not fronzen').be.equal(false);
-    assert(totalLockedAmount3.eq(new BN(await stakeManager.totalLockedAmount()).add(votingPower3)), 'totalLockedAmount should be equal');
-    assert(new BN(0).eq(new BN(await stakeManager.getVotingPowerByAddress(validatorAddr))), 'validator voting power should be equal');
-    expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should not in indexedValidators').to.equal(false);
+    await testLogic(validator5, 0);
+    await testLogic(validator6, 50);
+    await testLogic(validator7, 100);
   });
 
   it('should freeze validator and unfreeze with reward penalty', async () => {
-    // unfreeze penalty for the amount of minIndexVotingPower
-    let validator = validator5;
-    let validatorAddr = await validator.getAddress();
-    await stakeManager.reward(validatorAddr, { value: minIndexVotingPower.mul(2) });
-    let validatorInfo = await stakeManager.validators(validatorAddr);
-    expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should in indexedValidators').to.equal(true);
-    const totalLockedAmount1 = new BN(await stakeManager.totalLockedAmount());
-    const votingPower1 = new BN(await stakeManager.getVotingPowerByAddress(validatorAddr));
-    await stakeManager.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
-    expect(await stakeManager.frozen(validatorAddr), 'validator should be frozen').be.equal(true);
-    expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should not in indexedValidators').to.equal(false);
-    assert(totalLockedAmount1.eq(new BN(await stakeManager.totalLockedAmount()).add(votingPower1)), 'totalLockedAmount should be equal');
-    await stakeManager.connect(deployer).unfreeze(validatorAddr, minIndexVotingPower);
-    expect(await stakeManager.frozen(validatorAddr), 'validator should not fronzen').be.equal(false);
-    assert(totalLockedAmount1.sub(new BN(minIndexVotingPower.toString())).eq(new BN(await stakeManager.totalLockedAmount())), 'totalLockedAmount should be equal');
-    assert(votingPower1.sub(new BN(minIndexVotingPower.toString())).eq(new BN(await stakeManager.getVotingPowerByAddress(validatorAddr))), 'validator voting power should be equal');
-    expect(await stakeManager.indexedValidatorsExists(validatorInfo.id).call(), 'validator should in indexedValidators').to.equal(true);
+    const testLogic = async function (validator: Signer, amount: BigNumber) {
+      const validatorAddr = await validator.getAddress();
+      await stakeManager.reward(validatorAddr, { value: minIndexVotingPower.mul(2) });
+      const validatorInfo = await stakeManager.validators(validatorAddr);
+      expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should in indexedValidators').to.equal(true);
+      const totalLockedAmount = await stakeManager.totalLockedAmount();
+      const votingPower = await stakeManager.getVotingPowerByAddress(validatorAddr);
+      await stakeManager.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
+      expect(await stakeManager.frozen(validatorAddr), 'validator should be frozen').be.equal(true);
+      expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should not in indexedValidators').to.equal(false);
+      assert(totalLockedAmount.eq((await stakeManager.totalLockedAmount()).add(votingPower)), 'totalLockedAmount should be equal');
+      await stakeManager.connect(deployer).unfreeze(validatorAddr, amount);
+      expect(await stakeManager.frozen(validatorAddr), 'validator should not fronzen').be.equal(false);
+      if (amount.eq(minIndexVotingPower)) {
+        //unfreeze penalty for the amount of minIndexVotingPower
+        assert(totalLockedAmount.sub(minIndexVotingPower.toString()).eq(await stakeManager.totalLockedAmount()), 'totalLockedAmount should be equal');
+        assert(votingPower.sub(minIndexVotingPower.toString()).eq(await stakeManager.getVotingPowerByAddress(validatorAddr)), 'validator voting power should be equal');
+        expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should in indexedValidators').to.equal(true);
+      } else if (amount.eq(minIndexVotingPower.mul(2))) {
+        //unfreeze penalty for the amount of minIndexVotingPower * 2
+        assert(totalLockedAmount.sub(minIndexVotingPower.mul(2)).eq(await stakeManager.totalLockedAmount()), 'totalLockedAmount should be equal');
+        assert(votingPower.sub(minIndexVotingPower.mul(2)).eq(await stakeManager.getVotingPowerByAddress(validatorAddr)), 'validator voting power should be equal');
+        expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should not in indexedValidators').to.equal(false);
+      }
+    };
 
-    // unfreeze penalty for the amount of minIndexVotingPower * 2
-    validator = validator6;
-    validatorAddr = await validator.getAddress();
-    await stakeManager.reward(validatorAddr, { value: minIndexVotingPower.mul(2) });
-    validatorInfo = await stakeManager.validators(validatorAddr);
-    expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should in indexedValidators').to.equal(true);
-    const totalLockedAmount2 = new BN(await stakeManager.totalLockedAmount());
-    const votingPower2 = new BN(await stakeManager.getVotingPowerByAddress(validatorAddr));
-    await stakeManager.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
-    expect(await stakeManager.frozen(validator), 'validator should be frozen').be.equal(true);
-    expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should not in indexedValidators').to.equal(false);
-    assert(totalLockedAmount2.eq(new BN(await stakeManager.totalLockedAmount()).add(votingPower2)), 'totalLockedAmount should be equal');
-    await stakeManager.connect(deployer).unfreeze(validatorAddr, minIndexVotingPower.mul(2));
-    expect(await stakeManager.frozen(validatorAddr), 'validator should not fronzen').be.equal(false);
-    assert(totalLockedAmount2.sub(new BN(minIndexVotingPower.mul(2).toString())).eq(new BN(await stakeManager.totalLockedAmount())), 'totalLockedAmount should be equal');
-    assert(votingPower2.sub(new BN(minIndexVotingPower.mul(2).toString())).eq(new BN(await stakeManager.getVotingPowerByAddress(validatorAddr))), 'validator voting power should be equal');
-    expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should not in indexedValidators').to.equal(false);
+    await testLogic(validator5, minIndexVotingPower);
+    await testLogic(validator6, minIndexVotingPower.mul(2));
   });
 
   it('should can not call some function with the validator freezed', async () => {
@@ -555,7 +529,7 @@ describe('StakeManger', () => {
     const commissionShare = await createCommissionShareContract(validatorAddr);
     await commissionShare.connect(validator).approve(stakeManager.address, MAX_INTEGER.toString());
     await stakeManager.connect(validator).startUnstake(validatorAddr, validatorAddr, minIndexVotingPower);
-    const id = new BN(await stakeManager.unstakeId()).subn(1);
+    const id = (await stakeManager.unstakeId()).sub(1);
     await stakeManager.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
     let failed = false;
     try {
@@ -590,14 +564,15 @@ describe('StakeManger', () => {
     }
 
     try {
-      await stakeManager.connect(validator).startClaim(validator, 1);
+      await stakeManager.connect(validator).startClaim(validatorAddr, 1);
     } catch (e) {
       assert.fail('should not be able to claim');
     }
 
     try {
-      await stakeManager.connect(validator).unstake(id).send({ from: validator });
+      await stakeManager.connect(validator).unstake(id);
     } catch (e) {
+      console.log('eeeee', e);
       assert.fail('should not be able to unstake');
     }
   });
@@ -605,68 +580,51 @@ describe('StakeManger', () => {
   it('should freeze and jail logic are compatible with each other', async () => {
     const validator = validator9;
     const validatorAddr = await validator.getAddress();
-    const jailThreshold = await config.methods.jailThreshold().call();
-    const forfeit = await config.methods.forfeit().call();
+    const jailThreshold = await config.jailThreshold();
+    const forfeit = await config.forfeit();
+    const missedRecord: MissRecord[] = [[validatorAddr, jailThreshold]];
 
-    //case1
     await stakeManager.stake(validatorAddr, validatorAddr, { value: minIndexVotingPower });
     await stakeManager.reward(validatorAddr, { value: minIndexVotingPower });
-    let totalLockedAmount = new BN(await stakeManager.totalLockedAmount());
-    let votingPower = new BN(await stakeManager.getVotingPowerByAddress(validatorAddr));
-    await stakeManager.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
-    let totalLockedAmount1 = new BN(await stakeManager.totalLockedAmount());
-    let missedRecord: MissRecord[] = [[validatorAddr, jailThreshold]];
-    await stakeManager.addMissRecord(missedRecord);
-    let totalLockedAmount2 = new BN(await stakeManager.totalLockedAmount());
-    assert(totalLockedAmount.sub(votingPower).eq(totalLockedAmount1), 'totalLockedAmount should be equal');
-    assert(totalLockedAmount1.eq(totalLockedAmount2), 'totalLockedAmount should be equal');
-    await stakeManager.connect(deployer).unfreeze(validatorAddr, 0);
-    let totalLockedAmount3 = new BN(await stakeManager.totalLockedAmount());
-    assert(totalLockedAmount3.eq(totalLockedAmount2), 'totalLockedAmount should be equal');
-    await stakeManager.connect(validator).unjail({ value: forfeit });
-    let totalLockedAmount4 = new BN(await stakeManager.totalLockedAmount());
-    assert(totalLockedAmount4.eq(totalLockedAmount), 'totalLockedAmount should be equal');
+    let totalLockedAmount = await stakeManager.totalLockedAmount();
+    let votingPower = await stakeManager.getVotingPowerByAddress(validatorAddr);
 
-    //case2
-    await stakeManager.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
-    totalLockedAmount1 = new BN(await stakeManager.totalLockedAmount());
-    await stakeManager.addMissRecord(missedRecord);
-    totalLockedAmount2 = new BN(await stakeManager.methods.totalLockedAmount().call());
-    assert(totalLockedAmount.sub(votingPower).eq(totalLockedAmount1), 'totalLockedAmount should be equal');
-    assert(totalLockedAmount1.eq(totalLockedAmount2), 'totalLockedAmount should be equal');
-    await stakeManager.connect(validator).unjail({ value: forfeit });
-    totalLockedAmount3 = new BN(await stakeManager.totalLockedAmount());
-    assert(totalLockedAmount3.eq(totalLockedAmount2), 'totalLockedAmount should be equal');
-    await stakeManager.connect(deployer).unfreeze(validator, 0);
-    totalLockedAmount4 = new BN(await stakeManager.methods.totalLockedAmount().call());
-    assert(totalLockedAmount4.eq(totalLockedAmount), 'totalLockedAmount should be equal');
+    const testLogic = async function (firstLock: 'freeze' | 'addMissRecord', firstUnlock: 'unfreeze' | 'unjail') {
+      let totalLockedAmount1: BigNumber;
+      let totalLockedAmount2: BigNumber;
+      let totalLockedAmount3: BigNumber;
+      let totalLockedAmount4: BigNumber;
+      if (firstLock == 'freeze') {
+        await stakeManager.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
+        totalLockedAmount1 = await stakeManager.totalLockedAmount();
+        await stakeManager.addMissRecord(missedRecord);
+      } else if (firstLock == 'addMissRecord') {
+        await stakeManager.addMissRecord(missedRecord);
+        totalLockedAmount1 = await stakeManager.totalLockedAmount();
+        await stakeManager.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
+      }
+      totalLockedAmount2 = await stakeManager.totalLockedAmount();
+      assert(totalLockedAmount.sub(votingPower).eq(totalLockedAmount1!), 'totalLockedAmount should be equal');
+      assert(totalLockedAmount1!.eq(totalLockedAmount2), 'totalLockedAmount should be equal');
 
-    //case3
-    await stakeManager.addMissRecord(missedRecord);
-    totalLockedAmount1 = new BN(await stakeManager.totalLockedAmount());
-    await stakeManager.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
-    totalLockedAmount2 = new BN(await stakeManager.totalLockedAmount());
-    assert(totalLockedAmount.sub(votingPower).eq(totalLockedAmount1), 'totalLockedAmount should be equal');
-    assert(totalLockedAmount1.eq(totalLockedAmount2), 'totalLockedAmount should be equal');
-    await stakeManager.connect(validator).unjail({ value: forfeit });
-    totalLockedAmount3 = new BN(await stakeManager.totalLockedAmount());
-    assert(totalLockedAmount3.eq(totalLockedAmount2), 'totalLockedAmount should be equal');
-    await stakeManager.connect(deployer).unfreeze(validator, 0);
-    totalLockedAmount4 = new BN(await stakeManager.totalLockedAmount());
-    assert(totalLockedAmount4.eq(totalLockedAmount), 'totalLockedAmount should be equal');
+      if (firstUnlock == 'unfreeze') {
+        await stakeManager.connect(deployer).unfreeze(validatorAddr, 0);
+        totalLockedAmount3 = await stakeManager.totalLockedAmount();
+        await stakeManager.connect(validator).unjail({ value: forfeit });
+        totalLockedAmount4 = await stakeManager.totalLockedAmount();
+      } else if (firstUnlock == 'unjail') {
+        await stakeManager.connect(validator).unjail({ value: forfeit });
+        totalLockedAmount3 = await stakeManager.totalLockedAmount();
+        await stakeManager.connect(deployer).unfreeze(validatorAddr, 0);
+        totalLockedAmount4 = await stakeManager.totalLockedAmount();
+      }
+      assert(totalLockedAmount3!.eq(totalLockedAmount2), 'totalLockedAmount should be equal');
+      assert(totalLockedAmount4!.eq(totalLockedAmount), 'totalLockedAmount should be equal');
+    };
 
-    //case4
-    await stakeManager.addMissRecord(missedRecord);
-    totalLockedAmount1 = new BN(await stakeManager.totalLockedAmount());
-    await stakeManager.methods.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
-    totalLockedAmount2 = new BN(await stakeManager.totalLockedAmount());
-    assert(totalLockedAmount.sub(votingPower).eq(totalLockedAmount1), 'totalLockedAmount should be equal');
-    assert(totalLockedAmount1.eq(totalLockedAmount2), 'totalLockedAmount should be equal');
-    await stakeManager.connect(deployer).unfreeze(validator, 0);
-    totalLockedAmount3 = new BN(await stakeManager.totalLockedAmount());
-    assert(totalLockedAmount3.eq(totalLockedAmount2), 'totalLockedAmount should be equal');
-    await stakeManager.connect(validator).unjail({ value: forfeit });
-    totalLockedAmount4 = new BN(await stakeManager.totalLockedAmount());
-    assert(totalLockedAmount4.eq(totalLockedAmount), 'totalLockedAmount should be equal');
+    await testLogic('freeze', 'unfreeze');
+    await testLogic('freeze', 'unjail');
+    await testLogic('addMissRecord', 'unfreeze');
+    await testLogic('addMissRecord', 'unjail');
   });
 });

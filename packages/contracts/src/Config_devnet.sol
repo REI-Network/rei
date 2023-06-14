@@ -129,8 +129,48 @@ contract Config_devnet is Ownable, IConfig {
         }
     }
 
+    /////// debug function ///////
+
     // a simple function to get blockchain timestamp for test
     function blockTimestamp() external view returns (uint256) {
         return block.timestamp;
     }
+
+    function setStakeManager(address addr) external onlyOwner {
+        stakeManager = addr;
+    }
+
+    function setSystemCaller(address addr) external onlyOwner {
+        systemCaller = addr;
+    }
+
+    function setUnstakePool(address addr) external onlyOwner {
+        unstakePool = addr;
+    }
+
+    function setValidatorRewardPool(address addr) external onlyOwner {
+        validatorRewardPool = addr;
+    }
+
+    function setFee(address addr) external onlyOwner {
+        fee = addr;
+    }
+
+    function setFeePool(address addr) external onlyOwner {
+        feePool = addr;
+    }
+
+    function setFeeToken(address addr) external onlyOwner {
+        feeToken = addr;
+    }
+
+    function setPrison(address addr) external onlyOwner {
+        prison = addr;
+    }
+
+    function setRecordsAmountPeriod(uint256 value) external onlyOwner {
+        recordsAmountPeriod = value;
+    }
+
+    /////// debug function ///////
 }

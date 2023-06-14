@@ -210,7 +210,8 @@ describe('StakeManger', () => {
 
     stakeId++;
     await stakeManager.stake(validatorAddr, deployerAddr, { value: estimateStake });
-    await stakeManager.slash(validatorAddr, 1, bufferToHex(crypto.randomBytes(32)));
+    await stakeManager.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
+    await stakeManager.unfreeze(validatorAddr, 100);
     await stakeManager.reward(validatorAddr, { value: 2000 });
     const estimateMinStake1 = await stakeManager.estimateSharesToAmount(validatorAddr, 1);
     expect(estimateMinStake1.toString(), 'mininual stake amount should be equal').be.equal('11');
@@ -218,15 +219,18 @@ describe('StakeManger', () => {
     await stakeManager.startUnstake(validatorAddr, deployerAddr, wantedShares);
     const estimateAmount = await stakeManager.estimateUnstakeAmount(validatorAddr, wantedShares);
     expect(estimateAmount.toString(), 'estimateAmount should be equal').be.equal('97');
-    await stakeManager.slash(validatorAddr, 0, bufferToHex(crypto.randomBytes(32)));
+    await stakeManager.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
+    await stakeManager.unfreeze(validatorAddr, 40);
     const estimateAmount1 = await stakeManager.estimateUnstakeAmount(validatorAddr, wantedShares);
     expect(estimateAmount1.toString(), 'estimateAmount should be equal').be.equal('58');
 
-    await stakeManager.slash(validatorAddr, 1, bufferToHex(crypto.randomBytes(32)));
+    await stakeManager.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
+    await stakeManager.unfreeze(validatorAddr, 100);
     const wantedAmount = '97';
     stakeId++;
     await stakeManager.stake(validatorAddr, deployerAddr, { value: wantedAmount });
-    await stakeManager.slash(validatorAddr, 1, bufferToHex(crypto.randomBytes(32)));
+    await stakeManager.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
+    await stakeManager.unfreeze(validatorAddr, 100);
     await stakeManager.reward(validatorAddr, { value: 1000 });
     const estimateUnstakeShare = await stakeManager.estimateAmountToShares(validatorAddr, 1);
     expect(estimateUnstakeShare.toString(), 'estimateUnstakeShare should be equal').be.equal('1');
@@ -423,7 +427,8 @@ describe('StakeManger', () => {
   it('totalLockedAmount should not change when validator is jailed', async () => {
     const validatorAddr = await validator4.getAddress();
     const totalLockedAmount = await stakeManager.totalLockedAmount();
-    await stakeManager.slash(validatorAddr, 0, bufferToHex(crypto.randomBytes(32)));
+    await stakeManager.freeze(validatorAddr, bufferToHex(crypto.randomBytes(32)));
+    await stakeManager.unfreeze(validatorAddr, 40);
     expect(await stakeManager.totalLockedAmount(), 'totalLockedAmount should be equal').be.equal(totalLockedAmount);
     const commissionShare = await createCommissionShareContract(validatorAddr);
     await commissionShare.approve(stakeManager.address, MAX_INTEGER.toString());
@@ -509,7 +514,7 @@ describe('StakeManger', () => {
     // unfreeze penalty for the amount of minIndexVotingPower
     let validator = validator5;
     let validatorAddr = await validator.getAddress();
-    await stakeManager.reward(validatorAddr).send({ value: minIndexVotingPower.mul(2) });
+    await stakeManager.reward(validatorAddr, { value: minIndexVotingPower.mul(2) });
     let validatorInfo = await stakeManager.validators(validatorAddr);
     expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should in indexedValidators').to.equal(true);
     const totalLockedAmount1 = new BN(await stakeManager.totalLockedAmount());
@@ -527,7 +532,7 @@ describe('StakeManger', () => {
     // unfreeze penalty for the amount of minIndexVotingPower * 2
     validator = validator6;
     validatorAddr = await validator.getAddress();
-    await stakeManager.reward(validatorAddr).send({ value: minIndexVotingPower.mul(2) });
+    await stakeManager.reward(validatorAddr, { value: minIndexVotingPower.mul(2) });
     validatorInfo = await stakeManager.validators(validatorAddr);
     expect(await stakeManager.indexedValidatorsExists(validatorInfo.id), 'validator should in indexedValidators').to.equal(true);
     const totalLockedAmount2 = new BN(await stakeManager.totalLockedAmount());

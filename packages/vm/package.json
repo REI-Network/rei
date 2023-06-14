@@ -10,7 +10,7 @@
     "test": "mocha -r ts-node/register 'test/**/*.test.ts' --timeout 100000 --exit"
   },
   "dependencies": {
-    "@rei-network/binding": "1.0.0-beta.3",
+    "@rei-network/binding": "2.0.0-beta.0",
     "@rei-network/blockchain": "^2.0.1",
     "@rei-network/common": "^2.0.1",
     "@rei-network/structure": "^1.0.0",

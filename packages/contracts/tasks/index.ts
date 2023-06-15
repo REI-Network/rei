@@ -140,10 +140,14 @@ task('stake', 'Stake for validators')
       if (!address.startsWith('0x') || address.length !== 42) {
         throw new Error('invalid validator info');
       }
-      const tx = await stakeManger.stake(address, signer.address, { value: ethers.utils.parseEther(value) });
-      console.log('stake', value, 'ethers for', address, 'tx sent:', tx.hash);
-      await tx.wait();
-      console.log('stake', value, 'ethers for', address, 'finished');
+      try {
+        const tx = await stakeManger.stake(address, signer.address, { value: ethers.utils.parseEther(value) });
+        console.log('stake', value, 'ethers for', address, 'tx sent:', tx.hash);
+        await tx.wait();
+        console.log('stake', value, 'ethers for', address, 'finished');
+      } catch (error) {
+        console.log('stake failed, error:', error);
+      }
     }
   });
 
@@ -172,10 +176,14 @@ task('unstake', 'Unstake for validators')
         await tx.wait();
         console.log('approved');
       }
-      const tx = await stakeManger.startUnstake(address, signer.address, balance);
-      console.log('unstake for', address, 'tx sent:', tx.hash);
-      await tx.wait();
-      console.log('unstake for', address, 'finished');
+      try {
+        const tx = await stakeManger.startUnstake(address, signer.address, balance);
+        console.log('unstake for', address, 'tx sent:', tx.hash);
+        await tx.wait();
+        console.log('unstake for', address, 'finished');
+      } catch (error) {
+        console.log('unstake failed, error:', error);
+      }
     }
   });
 
@@ -204,10 +212,14 @@ task('claim', 'Claim rewards for validators')
       if (ethBalance.eq(0)) {
         throw new Error(`zero eth balance: ${validator.address}`);
       }
-      const tx = await stakeManger.connect(validator).startClaim(validator.address, balance);
-      console.log('claim', ethers.utils.formatEther(balance), 'ethers for', validator.address, 'tx sent:', tx.hash);
-      await tx.wait();
-      console.log('claim', ethers.utils.formatEther(balance), 'ethers for', validator.address, 'finished');
+      try {
+        const tx = await stakeManger.connect(validator).startClaim(validator.address, balance);
+        console.log('claim', ethers.utils.formatEther(balance), 'ethers for', validator.address, 'tx sent:', tx.hash);
+        await tx.wait();
+        console.log('claim', ethers.utils.formatEther(balance), 'ethers for', validator.address, 'finished');
+      } catch (error) {
+        console.log('claim failed, error:', error);
+      }
     }
   });
 
@@ -305,4 +317,34 @@ task('get-balance', 'Get stake info')
       console.log(`validator ${address}  reward : `, ethers.utils.formatEther(reward));
       console.log(`validator ${address}  unstake : `, ethers.utils.formatEther(unstake));
     }
+  });
+
+task('check-validator-info')
+  .addParam('validator', 'Validator address')
+  .setAction(async function (args, { ethers }) {
+    const validator = args.validator as string;
+    const StakeManager = await ethers.getContractFactory('StakeManager');
+    const stakeManager = StakeManager.attach('0x0000000000000000000000000000000000001001');
+    const prison = await ethers.getContractAt('Prison', '0x0000000000000000000000000000000000001008');
+    console.log('totalLockAmount : ', (await stakeManager.totalLockedAmount()).toString());
+    const v = await stakeManager.validators(validator);
+    console.log('is jailed', (await prison.miners(validator))[1]);
+    console.log('is indexedValidator', await stakeManager.indexedValidatorsExists(v.id));
+    console.log('is frozen', await stakeManager.frozen(validator));
+    console.log('votingPower ', (await stakeManager.getVotingPowerByAddress(validator)).toString());
+  });
+
+task('unfreeze', 'Unfreeze for validators')
+  .addParam('validator', 'Validator address')
+  .addParam('factorOrAmount', 'Unfreeze factor or amount')
+  .setAction(async function (args, { ethers }) {
+    const validator = args.validator as string;
+    const factorOrAmount = args.factorOrAmount as string;
+    const configOwner = new ethers.Wallet('ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80', ethers.provider);
+    const StakeManager = await ethers.getContractFactory('StakeManager');
+    const stakeManager = StakeManager.attach('0x0000000000000000000000000000000000001001');
+    const tx = await stakeManager.connect(configOwner).unfreeze(validator, factorOrAmount);
+    console.log('unfreeze for', validator, 'tx sent:', tx.hash);
+    await tx.wait();
+    console.log('unfreeze for', validator, 'finished');
   });

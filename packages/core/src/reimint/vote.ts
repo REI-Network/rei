@@ -498,9 +498,25 @@ export class VoteSet {
       throw new Error('Not enough votes to aggregate signature');
     }
     if (!this.aggregatedSignature) {
-      this.aggregatedSignature = Buffer.from(importBls().aggregateSignatures(this.votes.filter((v) => !!v).map((v) => v!.signature!)));
+      this.aggregatedSignature = Buffer.from(importBls().aggregateSignatures(this.votes.filter((v) => !!v && v.hash.equals(this.maj23!)).map((v) => v!.signature!)));
     }
     return this.aggregatedSignature;
+  }
+
+  /**
+   * Get aggregated bit array,
+   * this function will ignore all invalid vote
+   * @returns Aggregated bit array
+   */
+  getAggregatedBitArray() {
+    const bitArray = this.votesBitArray.copy();
+    for (let i = 0; i < bitArray.length; i++) {
+      const vote = this.votes[i];
+      if (!vote || !vote.hash.equals(this.maj23!)) {
+        bitArray.setIndex(i, false);
+      }
+    }
+    return bitArray;
   }
 
   /**

@@ -369,7 +369,7 @@ export class ExtraData {
       raw.push([toBuffer(this.proposal.getProposer()), this.proposal.signature!]);
       if (this.voteSet) {
         raw.push(this.voteSet.getAggregatedSignature());
-        raw.push(this.voteSet.votesBitArray.raw());
+        raw.push(this.voteSet.getAggregatedBitArray().raw());
       } else {
         raw.push(Buffer.alloc(0));
         if (validaterOptions?.validaterSetSize === undefined) {

@@ -100,11 +100,11 @@
     },
     {
       "name": "testnet-hf-3",
-      "block": null
+      "block": 13284988
     },
     {
       "name": "rei-dao",
-      "block": null
+      "block": 13284988
     }
   ],
   "bootstrapNodes": [

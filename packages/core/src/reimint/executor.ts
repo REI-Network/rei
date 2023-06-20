@@ -463,7 +463,7 @@ export class ReimintExecutor {
     const parentStakeManager = this.engine.getStakeManager(vm, block);
     let minerReward: BN;
     let parentValidatorSet: ValidatorSet;
-    if (isEnableDAO(parentCommon)) {
+    if (isEnableDAO(pendingCommon)) {
       minerReward = await this.engine.getConfig(parentVM, block, parentCommon).minerReward();
       const bls = this.engine.getValidatorBLS(vm, block, pendingCommon);
       parentValidatorSet = (await this.engine.validatorSets.getValSet(parentStateRoot, parentStakeManager, bls)).copy();

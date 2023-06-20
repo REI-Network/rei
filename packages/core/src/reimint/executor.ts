@@ -134,6 +134,26 @@ export class ReimintExecutor {
    * @returns New validator set
    */
   async afterApply(vm: VM, pendingBlock: Block, receipts: Receipt[], evidence: Evidence[], miner: Address, totalReward: BN, parentStateRoot: Buffer, parentValidatorSet: ValidatorSet, parentStakeManager: StakeManager) {
+    console.log('---afterApply---');
+    console.log(
+      'transactions:',
+      pendingBlock.transactions.map((tx) => JSON.stringify(tx.toRPCJSON())),
+      'receipts:',
+      receipts.map((r) => JSON.stringify(r.toRPCJSON())),
+      'evidence:',
+      evidence.length,
+      'miner:',
+      miner.toString(),
+      'totalReward:',
+      totalReward.toString(),
+      'parentStateRoot:',
+      parentStateRoot.toString('hex'),
+      'active parentValidatorSet:',
+      parentValidatorSet.active.activeValidators().map((av) => `validator: ${av.validator.toString()}, priority: ${av.priority.toString()}, votingPower: ${av.votingPower.toString()}, pk: ${av.blsPublicKey?.toString('hex')}`),
+      'indexed parentValidatorSet',
+      Array.from(parentValidatorSet.indexed.indexed.entries()).map(([, iv]) => `validator: ${iv.validator.toString()}, votingPower: ${iv.votingPower.toString()}, pk: ${iv.blsPublicKey?.toString('hex')}`)
+    );
+
     const parentCommon = this.engine.node.getCommon(pendingBlock.header.number.subn(1));
     const parentVM = await this.engine.node.getVM(parentStateRoot, parentCommon);
     const pendingCommon = pendingBlock._common;
@@ -426,6 +446,8 @@ export class ReimintExecutor {
    * @return FinalizeResult
    */
   async finalize(options: FinalizeOpts) {
+    console.log('---finalize---');
+
     let { block, receipts, stateRoot, parentStateRoot, round, evidence } = options;
     if (round === undefined || evidence === undefined || !parentStateRoot) {
       throw new Error('missing state root or round or evidence');
@@ -477,6 +499,8 @@ export class ReimintExecutor {
     } catch (err) {
       await vm.stateManager.revert();
       throw err;
+    } finally {
+      console.log('===finalize===');
     }
   }
 
@@ -486,6 +510,8 @@ export class ReimintExecutor {
    * @returns ProcessBlockResult or undefined
    */
   async processBlock(options: ProcessBlockOpts) {
+    console.log('---processBlock---');
+
     const startAt = Date.now();
 
     const { debug, block, force, skipConsensusValidation, skipConsensusVerify } = options;
@@ -628,6 +654,8 @@ export class ReimintExecutor {
     this.engine.validatorSets.set(result.stateRoot, validatorSet);
 
     logger.debug('Reimint::processBlock, mode:', vm.mode ?? EVMWorkMode.JS, 'tx:', block.transactions.length, 'usage:', Date.now() - startAt);
+
+    console.log('===processBlock===');
 
     return { receipts: postByzantiumTxReceiptsToReceipts(result.receipts) };
   }

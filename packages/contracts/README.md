@@ -14,6 +14,7 @@ REI-Network genesis contracts
 - `FeePool` A smart contract for distributing miner fee rewards, deployed at `0x0000000000000000000000000000000000001006`
 - `FeeToken` A smart contract for querying the user's remaining Crude quantity, deployed at `0x0000000000000000000000000000000000001007`
 - `Prison` A smart contract for jailing validator which not mint blocks on time, deployed at `0x0000000000000000000000000000000000001008`
+- `ValidatorBLS` A smart contract that manages the validator's BLS public key, deployed at `0x0000000000000000000000000000000000001009`
 
 ## Install
 

@@ -49,12 +49,16 @@ Options:
   --verbosity <verbosity>                    logging verbosity: silent, error, warn, info, debug, detail (default: "info")
   --receipts-cache-size <receiptsCacheSize>  receipts cache size
   --evm <evm>                                evm implementation type, "js" or "binding"
+  --bls <bls>                                the datadir for bls (default: "bls")
+  --bls-password <blsPassword>               bls password file to use for non-interactive password input
+  --bls-file <blsFile>                       bls file name
   -h, --help                                 display help for command
 
 Commands:
   account                                    Manage accounts
   attach [ipcpath]                           Start an interactive JavaScript environment (connect to node)
   console                                    Start an interactive JavaScript environment
+  bls                                        Manage bls signature key
 ```
 
 ## Example

@@ -572,7 +572,6 @@ describe('StakeManger', () => {
     try {
       await stakeManager.connect(validator).unstake(id);
     } catch (e) {
-      console.log('eeeee', e);
       assert.fail('should not be able to unstake');
     }
   });

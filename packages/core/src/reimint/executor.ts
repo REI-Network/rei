@@ -307,6 +307,19 @@ export class ReimintExecutor {
     if (!isEnableHardfork3(pendingCommon) && isEnableHardfork3(nextCommon)) {
       const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), pendingBlock);
       await Contract.deployHardfork3Contracts(evm, nextCommon);
+
+      // transfer slash amount to config owner
+      if (pendingCommon.chainName() === 'rei-mainnet') {
+        const slashAmount = new BN('562242606590993517579365');
+        const blackhole = Address.fromString('0x0000000000000000000000000000000000000000');
+        const configOwner = await this.engine.getConfig(vm, pendingBlock).owner();
+        const blackholeAccount = await vm.stateManager.getAccount(blackhole);
+        const configOwnerAccount = await vm.stateManager.getAccount(configOwner);
+        configOwnerAccount.balance = configOwnerAccount.balance.add(slashAmount);
+        blackholeAccount.balance = blackholeAccount.balance.sub(slashAmount);
+        await vm.stateManager.putAccount(blackhole, blackholeAccount);
+        await vm.stateManager.putAccount(configOwner, configOwnerAccount);
+      }
     }
 
     // 9. get totalLockedAmount and validatorCount by the merged validatorSet,

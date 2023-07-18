@@ -25,7 +25,7 @@ Nodejs implementation of REI-Network protocols
 
 ## Requirements
 
-- node >= `14.16.1`
+- node >= `16.0.0`
 - npm >= `7.0.0`
 - supported system:
   - MacOS 12+
@@ -131,7 +131,7 @@ Build:
 npm run build -ws
 ```
 
-### ℹ️ Note for Windows users:
+### ℹ️ Note for Windows users
 
 Windows users might run into the following error when trying to install the repo: `'.' is not recognized as an internal or external command`. To remediate for this, you can force Windows to use Git bash to run scripts (you'll need to install [Git for Windows](https://git-scm.com/download/win) for this) with the following command:
 

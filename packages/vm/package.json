@@ -1,6 +1,6 @@
 {
   "name": "@rei-network/vm",
-  "version": "3.0.0",
+  "version": "3.0.1-beta.2",
   "description": "An Ethereum VM implementation",
   "license": "MPL-2.0",
   "author": "mjbecze <mjbecze@gmail.com>",
@@ -10,8 +10,8 @@
     "test": "mocha -r ts-node/register 'test/**/*.test.ts' --timeout 100000 --exit"
   },
   "dependencies": {
-    "@rei-network/binding": "2.0.0-beta.1",
-    "@rei-network/blockchain": "^3.0.0",
+    "@rei-network/binding": "2.0.1",
+    "@rei-network/blockchain": "^3.0.1-beta.2",
     "@rei-network/common": "^3.0.0",
     "@rei-network/structure": "^2.0.0",
     "@rei-network/trie": "^4.3.0",

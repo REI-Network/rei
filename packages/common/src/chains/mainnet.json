@@ -100,11 +100,11 @@
     },
     {
       "name": "mainnet-hf-3",
-      "block": 15084585
+      "block": 15774234
     },
     {
       "name": "rei-dao",
-      "block": 15084585
+      "block": 15774234
     }
   ],
   "bootstrapNodes": [

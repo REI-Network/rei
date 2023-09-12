@@ -161,11 +161,13 @@ export class ReiController extends Controller {
       unlockAccount: string[];
       unlockBLSPublicKey: string | null;
       registerBLSPublicKey: string | null;
+      version:string
     } = {
       coinbase,
       unlockAccount: unlockAccount.map((account) => account.toString('hex')),
       unlockBLSPublicKey: unlockBLSPublicKey?.toHex() ?? null,
-      registerBLSPublicKey: null
+      registerBLSPublicKey: null,
+      version: this.server.version
     };
     if (!isEnableDAO(block._common)) {
       return result;

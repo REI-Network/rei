@@ -161,7 +161,7 @@ export class ReiController extends Controller {
       unlockAccount: string[];
       unlockBLSPublicKey: string | null;
       registerBLSPublicKey: string | null;
-      version:string
+      version: string;
     } = {
       coinbase,
       unlockAccount: unlockAccount.map((account) => account.toString('hex')),

@@ -26,7 +26,7 @@
     "@rei-network/trie": "^4.3.0",
     "@rei-network/utils": "^0.1.1",
     "@rei-network/wallet": "^0.1.1",
-    "@rei-network/bls": "^0.0.1",
+    "@rei-network/bls": "^0.0.2",
     "big-integer": "^1.6.48",
     "datastore-level": "^5.0.1",
     "ethereumjs-util": "^7.1.4",

@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@rei-network/api": "^2.0.2",
-    "@rei-network/bls": "^0.0.1",
+    "@rei-network/bls": "^0.0.2",
     "@rei-network/core": "^3.0.2",
     "@rei-network/ipc": "^2.0.2",
     "@rei-network/rpc": "^3.0.2",

@@ -197,13 +197,15 @@ export class ExtraData {
           throw new Error('invalid values length');
         }
       } else {
-        if (isEnableHardfork4(header._common) && values.length !== 6) {
-          throw new Error('invalid values length');
-        }
-
-        // 1(evidence list) + 1(round and POLRound list) + 1(proposal) + 1(aggregatedSignature) + 1(bitArray)
-        if (values.length !== 5) {
-          throw new Error('invalid values length');
+        if (isEnableHardfork4(header._common)) {
+          if (values.length !== 6) {
+            throw new Error('invalid values length');
+          }
+        } else {
+          // 1(evidence list) + 1(round and POLRound list) + 1(proposal) + 1(aggregatedSignature) + 1(bitArray)
+          if (values.length !== 5) {
+            throw new Error('invalid values length');
+          }
         }
       }
     }

@@ -12,6 +12,7 @@ describe('extraData', () => {
   let accMngr: MockAccountManager;
   const activeValidators: ActiveValidator[] = [];
   const accountAmount = 21;
+  const height = new BN(2);
 
   before(async () => {
     await initBls();
@@ -34,7 +35,6 @@ describe('extraData', () => {
   });
 
   it('should raw and fromSerializedVote successfully for bls signature', async () => {
-    const height = new BN(2);
     const common = new Common({ chain: 'rei-devnet', hardfork: 'rei-dao' });
     const validatorSet = new ActiveValidatorSet(activeValidators);
     const evidence = getEvidence(accMngr, common);
@@ -53,6 +53,7 @@ describe('extraData', () => {
     expect(extraData2.proposal?.POLRound === extraData.proposal?.POLRound, 'proposal should be equal').to.be.true;
     expect(extraData2.proposal?.type === extraData.proposal?.type, 'proposal should be equal').to.be.true;
     expect(extraData2.proposal?.signature!.equals(extraData.proposal?.signature!), 'proposal should be equal').to.be.true;
+    expect(extraData2.cliVersion === undefined, 'cliVersion should be equal').to.be.true;
     extraData.evidence.forEach((evidence, index) => {
       expect(evidence.hash().equals(extraData2.evidence[index].hash()), 'evidence should be equal').to.be.true;
     });
@@ -60,17 +61,49 @@ describe('extraData', () => {
   });
 
   it('should extraData encode and decode successful when before hardfork 4', async () => {
-    //todo before hardfork 4
     const common = new Common({ chain: 'rei-devnet', hardfork: 'rei-dao' });
     const enable = isEnableHardfork4(common);
     expect(enable).to.be.false;
+    const validatorSet = new ActiveValidatorSet(activeValidators);
+    const evidence = getEvidence(accMngr, common);
+    const { voteSet, proposal } = getVoteSetAndProposal(accMngr, height, common, evidence, validatorSet);
+    let cliVersion: string | undefined = '3.0.2';
+    const extraData = new ExtraData(0, 0, 0, [evidence], proposal, SignatureType.BLS, cliVersion, voteSet);
+    const serialized = extraData.serialize();
+    try {
+      BlockHeader.fromHeaderData({ extraData: Buffer.concat([Buffer.alloc(32), serialized]), number: height }, { common: common });
+    } catch (error) {
+      expect((error as any).message === 'invalid values').to.be.true;
+    }
+    cliVersion = undefined;
+    const extraData1 = new ExtraData(0, 0, 0, [evidence], proposal, SignatureType.BLS, cliVersion, voteSet);
+    const serialized1 = extraData1.serialize();
+    const finalHeader = BlockHeader.fromHeaderData({ extraData: Buffer.concat([Buffer.alloc(32), serialized1]), number: height }, { common: common });
+    const extraData2 = ExtraData.fromBlockHeader(finalHeader, { valSet: validatorSet });
+    expect(extraData2.cliVersion === cliVersion, 'cliVersion should be equal').to.be.true;
   });
 
   it('should extraData encode and decode successful when after hardfork 4', async () => {
-    //todo after hardfork 4
     const common = new Common({ chain: 'rei-devnet', hardfork: 'devnet-hf-4' });
     const enable = isEnableHardfork4(common);
     expect(enable).to.be.true;
+    const validatorSet = new ActiveValidatorSet(activeValidators);
+    const evidence = getEvidence(accMngr, common);
+    const { voteSet, proposal } = getVoteSetAndProposal(accMngr, height, common, evidence, validatorSet);
+    let cliVersion: string | undefined = undefined;
+    const extraData = new ExtraData(0, 0, 0, [evidence], proposal, SignatureType.BLS, cliVersion, voteSet);
+    const serialized = extraData.serialize();
+    try {
+      BlockHeader.fromHeaderData({ extraData: Buffer.concat([Buffer.alloc(32), serialized]), number: height }, { common: common });
+    } catch (error) {
+      expect((error as any).message === 'invalid cli version').to.be.true;
+    }
+    cliVersion = '3.0.2';
+    const extraData1 = new ExtraData(0, 0, 0, [evidence], proposal, SignatureType.BLS, cliVersion, voteSet);
+    const serialized1 = extraData1.serialize();
+    const finalHeader = BlockHeader.fromHeaderData({ extraData: Buffer.concat([Buffer.alloc(32), serialized1]), number: height }, { common: common });
+    const extraData2 = ExtraData.fromBlockHeader(finalHeader, { valSet: validatorSet });
+    expect(extraData2.cliVersion === cliVersion, 'cliVersion should be equal').to.be.true;
   });
 });
 

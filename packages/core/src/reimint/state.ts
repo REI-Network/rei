@@ -5,7 +5,7 @@ import { Channel, logger } from '@rei-network/utils';
 import { Block, BlockHeader } from '@rei-network/structure';
 import { isEmptyHash, EMPTY_HASH } from '../utils';
 import { preValidateBlock, preValidateHeader } from '../validation';
-import { isEnableDAO } from '../hardforks';
+import { isEnableDAO, isEnableHardfork4 } from '../hardforks';
 import { ConsensusMessage, NewRoundStepMessage, NewValidBlockMessage, VoteMessage, ProposalBlockMessage, GetProposalBlockMessage, ProposalMessage, HasVoteMessage, VoteSetBitsMessage } from '../protocols/consensus/messages';
 import { PendingBlock } from './pendingBlock';
 import { Reimint } from './reimint';
@@ -26,6 +26,7 @@ const StateMachineMsgQueueMaxSize = 1000;
 
 export class StateMachine {
   private readonly chainId: number;
+  private readonly cliVersion: string;
   private readonly timeoutTicker = new TimeoutTicker((ti) => {
     this._newMessage(ti);
   });
@@ -80,7 +81,7 @@ export class StateMachine {
   private commitRound: number = -1;
   /////////////// RoundState ///////////////
 
-  constructor(backend: IStateMachineBackend, p2p: IStateMachineP2PBackend, evpool: IEvidencePool, wal: IWAL, chainId: number, config: IConfig, signer: ISigner, debug?: IDebug) {
+  constructor(backend: IStateMachineBackend, p2p: IStateMachineP2PBackend, evpool: IEvidencePool, wal: IWAL, chainId: number, config: IConfig, signer: ISigner, cliVersion: string, debug?: IDebug) {
     this.backend = backend;
     this.p2p = p2p;
     this.chainId = chainId;
@@ -89,6 +90,7 @@ export class StateMachine {
     this.config = config;
     this.signer = signer;
     this.debug = debug;
+    this.cliVersion = cliVersion;
   }
 
   private newStep() {
@@ -453,6 +455,7 @@ export class StateMachine {
     const evidence = await evpool.pickEvidence(height, maxEvidenceCount);
     pendingBlock.stop();
     const blockData = await pendingBlock.finalize({ round, evidence });
+    const cliVersion = isEnableHardfork4(common) ? this.cliVersion : undefined;
 
     return Reimint.generateBlockAndProposal(
       blockData.header,
@@ -462,7 +465,8 @@ export class StateMachine {
         POLRound,
         evidence,
         validatorSetSize,
-        common
+        common,
+        cliVersion
       },
       {
         signer,
@@ -883,7 +887,8 @@ export class StateMachine {
     const extraData = ExtraData.fromBlockHeader(this.proposalBlock.header);
     const proposalInBlock = extraData.proposal;
 
-    const finalizedBlock = Reimint.generateFinalizedBlock({ ...this.proposalBlock.header }, [...this.proposalBlock.transactions], [...this.proposalEvidence], proposalInBlock, this.commitRound, precommits, { common: this.proposalBlock._common });
+    const cliVersion = isEnableHardfork4(this.proposalBlock._common) ? this.cliVersion : undefined;
+    const finalizedBlock = Reimint.generateFinalizedBlock({ ...this.proposalBlock.header }, [...this.proposalBlock.transactions], [...this.proposalEvidence], proposalInBlock, this.commitRound, precommits, cliVersion, { common: this.proposalBlock._common });
     if (!finalizedBlock.hash().equals(maj23Hash)) {
       logger.error('StateMachine::finalizeCommit, finalizedBlock hash not equal, something is wrong');
       return;

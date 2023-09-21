@@ -81,6 +81,8 @@ export interface CreateNodeOptions {
    * Trusted block hash
    */
   trustedHash?: string;
+
+  cliVerion: string;
 }
 
 async function loadPeerId(databasePath: string) {
@@ -123,7 +125,8 @@ export abstract class NodeFactory {
         return options.syncMode;
       })(),
       trustedHeight: options.trustedHeight ? new BN(options.trustedHeight) : undefined,
-      trustedHash: options.trustedHash ? hexStringToBuffer(options.trustedHash) : undefined
+      trustedHash: options.trustedHash ? hexStringToBuffer(options.trustedHash) : undefined,
+      cliVersion: options.cliVerion
     });
 
     // unlock ECDSA private keys

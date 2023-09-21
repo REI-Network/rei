@@ -97,7 +97,8 @@
     {
       "name": "rei-dao",
       "block": 50
-    }
+    },
+    { "name": "devnet-hf-4", "block": 60 }
   ],
   "bootstrapNodes": []
 }

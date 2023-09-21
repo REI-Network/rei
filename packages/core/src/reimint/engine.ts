@@ -13,7 +13,7 @@ import { Node } from '../node';
 import { StateManager } from '../stateManager';
 import { ActiveValidatorSet, ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../utils';
-import { isEnableFreeStaking, loadInitData, isEnableHardfork2, isEnableBetterPOS, isEnableDAO } from '../hardforks';
+import { isEnableFreeStaking, loadInitData, isEnableHardfork2, isEnableBetterPOS, isEnableDAO, isEnableHardfork4 } from '../hardforks';
 import { SignatureType } from './enum';
 import { IProcessBlockResult } from './types';
 import { Worker } from './worker';
@@ -173,7 +173,7 @@ export class ReimintEngine {
     const db = new EvidenceDatabase(this.node.evidencedb);
     this.evpool = new EvidencePool({ backend: db });
     const wal = new WAL({ path: path.join(this.node.datadir, 'WAL') });
-    this.state = new StateMachine(this.backend, this.node.consensus, this.evpool, wal, this.node.chainId, this.config, this.signer);
+    this.state = new StateMachine(this.backend, this.node.consensus, this.evpool, wal, this.node.chainId, this.config, this.signer, this.node.cliVersion);
     this.executor = new ReimintExecutor(this.node, this);
   }
 
@@ -420,8 +420,9 @@ export class ReimintEngine {
    */
   generatePendingBlock(headerData: HeaderData, common: Common) {
     const signatureType = isEnableDAO(common) ? SignatureType.BLS : SignatureType.ECDSA;
+    const cliVersion = isEnableHardfork4(common) ? this.node.cliVersion : undefined;
     if ((signatureType === SignatureType.ECDSA && this.signer.ecdsaUnlocked()) || (signatureType === SignatureType.BLS && this.signer.blsPublicKey())) {
-      const { block } = Reimint.generateBlockAndProposal(headerData, [], { common }, { signer: this.signer, signatureType });
+      const { block } = Reimint.generateBlockAndProposal(headerData, [], { common, cliVersion }, { signer: this.signer, signatureType });
       return block;
     }
     // return empty block

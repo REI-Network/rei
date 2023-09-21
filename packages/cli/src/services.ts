@@ -49,7 +49,8 @@ export async function startServices(opts: { [option: string]: string }): Promise
     syncMode: opts.sync,
     snapSyncMinTD: opts.snapMinTd ? Number(opts.snapMinTd) : undefined,
     trustedHeight: opts.snapTrustedHeight,
-    trustedHash: opts.snapTrustedHash
+    trustedHash: opts.snapTrustedHash,
+    cliVerion: loadVersion()
   });
 
   // create API server instance

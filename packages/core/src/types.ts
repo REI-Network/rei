@@ -68,6 +68,8 @@ export interface NodeOptions {
    * Trusted block hash
    */
   trustedHash?: Buffer;
+
+  cliVersion: string;
 }
 
 export type NodeStatus = {

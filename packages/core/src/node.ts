@@ -79,6 +79,7 @@ export class Node {
   readonly evmWorkMode: EVMWorkMode;
   readonly blsMngr: BlsManager;
   readonly skipVerifySnap?: boolean;
+  readonly cliVersion: string;
 
   private initPromise?: Promise<void>;
   private pendingTxsLoopPromise?: Promise<void>;
@@ -118,6 +119,7 @@ export class Node {
     this.db = new Database(this.chaindb, common);
     this.networkId = common.networkIdBN().toNumber();
     this.chainId = common.chainIdBN().toNumber();
+    this.cliVersion = options.cliVersion;
     this.reimint = new ReimintEngine({
       node: this,
       coinbase: options.coinbase

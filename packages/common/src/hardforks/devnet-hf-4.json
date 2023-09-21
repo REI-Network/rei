@@ -1,0 +1,8 @@
+{
+  "name": "devnet-hf-4",
+  "comment": "rei-devnet hardfork 4",
+  "gasConfig": {},
+  "gasPrices": {},
+  "vm": {},
+  "pow": {}
+}

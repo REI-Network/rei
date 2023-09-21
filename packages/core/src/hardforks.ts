@@ -233,3 +233,15 @@ export function blockNumber2TotalDifficulty(number: BN, common: Common) {
     throw new Error('unknown chain');
   }
 }
+
+export function isEnableHardfork4(common: Common) {
+  if (common.chainName() === 'rei-testnet') {
+    return common.gteHardfork('testnet-hf-4');
+  } else if (common.chainName() === 'rei-mainnet') {
+    return common.gteHardfork('mainnet-hf-4');
+  } else if (common.chainName() === 'rei-devnet') {
+    return common.gteHardfork('devnet-hf-4');
+  } else {
+    throw new Error('unknown chain');
+  }
+}

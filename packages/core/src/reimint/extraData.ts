@@ -3,7 +3,7 @@ import { VM } from '@rei-network/vm';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
 import { BlockHeader, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
-import { isEnableDAO } from '../hardforks';
+import { isEnableDAO, isEnableHardfork4 } from '../hardforks';
 import * as v from './validate';
 import { ActiveValidatorSet } from './validatorSet';
 import { VoteType, SignatureType } from './enum';
@@ -29,7 +29,8 @@ type EXEvidenceList = (Buffer | Buffer[])[];
 type EXVoteSetBitArray = (Buffer | Buffer[])[];
 type EXProposalList = [Buffer, Buffer];
 type EXAggregatedSignature = Buffer;
-type EXElement = EXEmptyVote | EXVote | EXRoundAndPOLRound | EXEvidenceList | EXVoteSetBitArray | EXProposalList;
+type EXCliVersion = string;
+type EXElement = EXEmptyVote | EXVote | EXRoundAndPOLRound | EXEvidenceList | EXVoteSetBitArray | EXProposalList | EXCliVersion;
 type EXElements = EXElement[];
 
 function isEXVote(ele: EXElement): ele is EXVote {
@@ -76,6 +77,10 @@ function isEXAggregatedSignature(ele: EXElement): ele is EXAggregatedSignature {
   return ele instanceof Buffer;
 }
 
+function isCliVersion(ele: EXElement): ele is EXCliVersion {
+  return ele instanceof Buffer;
+}
+
 export interface ExtraDataValidateBackend {
   readonly db: Database;
   getCommon(num: BNLike): Common;
@@ -100,6 +105,7 @@ export class ExtraData {
   readonly POLRound: number;
   readonly proposal: Proposal;
   readonly version: SignatureType;
+  readonly cliVersion?: string;
   readonly voteSet?: VoteSet;
 
   /**
@@ -147,6 +153,7 @@ export class ExtraData {
     let headerHash!: Buffer;
     let proposal!: Proposal;
     let evidence!: Evidence[];
+    let cliVersion: string | undefined;
     let voteSet: VoteSet | undefined;
     let aggregatedSignature: Buffer | undefined;
 
@@ -190,11 +197,23 @@ export class ExtraData {
           throw new Error('invalid values length');
         }
       } else {
+        if (isEnableHardfork4(header._common) && values.length !== 6) {
+          throw new Error('invalid values length');
+        }
+
         // 1(evidence list) + 1(round and POLRound list) + 1(proposal) + 1(aggregatedSignature) + 1(bitArray)
         if (values.length !== 5) {
           throw new Error('invalid values length');
         }
       }
+    }
+
+    if (isEnableHardfork4(header._common)) {
+      if (!isCliVersion(values[0])) {
+        throw new Error('invalid cli version');
+      }
+      cliVersion = values[0].toString();
+      values.shift();
     }
 
     for (let i = 0; i < values.length; i++) {
@@ -315,10 +334,10 @@ export class ExtraData {
         }
       }
     }
-    return new ExtraData(round, commitRound, POLRound, evidence, proposal, signatureType, voteSet);
+    return new ExtraData(round, commitRound, POLRound, evidence, proposal, signatureType, cliVersion, voteSet);
   }
 
-  constructor(round: number, commitRound: number, POLRound: number, evidence: Evidence[], proposal: Proposal, version: SignatureType, voteSet?: VoteSet) {
+  constructor(round: number, commitRound: number, POLRound: number, evidence: Evidence[], proposal: Proposal, version: SignatureType, cliVersion?: string, voteSet?: VoteSet) {
     if (voteSet && voteSet.signedMsgType !== VoteType.Precommit) {
       throw new Error('invalid vote set type');
     }
@@ -330,6 +349,7 @@ export class ExtraData {
     this.evidence = evidence;
     this.voteSet = voteSet;
     this.version = version;
+    this.cliVersion = cliVersion;
     this.validateBasic();
   }
 
@@ -340,6 +360,9 @@ export class ExtraData {
    */
   raw(validaterOptions?: ExtraDataValidateOptions) {
     const raw: rlp.Input = [];
+    if (this.cliVersion) {
+      raw.push(this.cliVersion);
+    }
     raw.push(this.evidence.map((ev) => EvidenceFactory.rawEvidence(ev)));
     if (this.round === this.commitRound) {
       raw.push([intToBuffer(this.round), intToBuffer(this.POLRound + 1)]);

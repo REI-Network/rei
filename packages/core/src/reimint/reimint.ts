@@ -62,6 +62,8 @@ export interface ReimintBlockOptions extends BlockOptions {
   // validatorSetSize must be passed in,
   // it will be used to determine the size of the validator set
   validatorSetSize?: number;
+
+  cliVersion?: string;
 }
 
 export interface ReimintSignOptions {
@@ -163,6 +165,7 @@ export abstract class Reimint {
     const POLRound = blockOptions.POLRound ?? defaultPOLRound;
     const validaterSetSize = blockOptions.validatorSetSize ?? defaultValidaterSetSize;
     const evidence = blockOptions.evidence ?? defaultEvidence;
+    const cliVersion = blockOptions.cliVersion ?? undefined;
 
     // calculate block hash
     const headerHash = Reimint.calcBlockHeaderRawHash(header, evidence);
@@ -185,7 +188,7 @@ export abstract class Reimint {
       proposal.signature = signer.ecdsaSign(proposal.getMessageToSign());
     }
     // create extra data object
-    const extraData = new ExtraData(round, commitRound, POLRound, evidence, proposal, signatureType, blockOptions?.voteSet);
+    const extraData = new ExtraData(round, commitRound, POLRound, evidence, proposal, signatureType, cliVersion, blockOptions?.voteSet);
     return {
       header: BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize({ validaterSetSize })]) }, blockOptions),
       proposal
@@ -216,9 +219,9 @@ export abstract class Reimint {
    * @param options - Block options
    * @returns Complete block
    */
-  static generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], evidence: Evidence[], proposal: Proposal, commitRound: number, votes: VoteSet, options?: BlockOptions) {
+  static generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], evidence: Evidence[], proposal: Proposal, commitRound: number, votes: VoteSet, cliVersion?: string, options?: BlockOptions) {
     const version = isEnableDAO(options?.common!) ? SignatureType.BLS : SignatureType.ECDSA;
-    const extraData = new ExtraData(proposal.round, commitRound, proposal.POLRound, evidence, proposal, version, votes);
+    const extraData = new ExtraData(proposal.round, commitRound, proposal.POLRound, evidence, proposal, version, cliVersion, votes);
     data = formatHeaderData(data);
     const header = BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize()]) }, options);
     return new Block(header, transactions, undefined, options);

@@ -3,6 +3,9 @@
   "include": ["types/**/*.ts"],
   "compilerOptions": {
     "rootDir": "./types",
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "esModuleInterop": true,
+    "module": "Node16",
+    "strict": true,
   },
 }

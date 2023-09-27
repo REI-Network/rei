@@ -887,7 +887,7 @@ export class StateMachine {
     const extraData = ExtraData.fromBlockHeader(this.proposalBlock.header);
     const proposalInBlock = extraData.proposal;
 
-    const cliVersion = isEnableHardfork4(this.proposalBlock._common) ? this.cliVersion : undefined;
+    const cliVersion = isEnableHardfork4(this.proposalBlock._common) ? extraData.cliVersion : undefined;
     const finalizedBlock = Reimint.generateFinalizedBlock({ ...this.proposalBlock.header }, [...this.proposalBlock.transactions], [...this.proposalEvidence], proposalInBlock, this.commitRound, precommits, cliVersion, { common: this.proposalBlock._common });
     if (!finalizedBlock.hash().equals(maj23Hash)) {
       logger.error('StateMachine::finalizeCommit, finalizedBlock hash not equal, something is wrong');

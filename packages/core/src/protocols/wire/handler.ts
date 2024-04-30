@@ -1,6 +1,6 @@
 import { bufferToInt, rlp, BN, intToBuffer, bufferToHex } from 'ethereumjs-util';
 import { Transaction, Block, BlockHeader } from '@rei-network/structure';
-import { logger, Channel, FunctionalBufferSet } from '@rei-network/utils';
+import { logger, Channel, FunctionalBufferSet, FunctionalBufferMap } from '@rei-network/utils';
 import { ProtocolHandler, Peer, ProtocolStream } from '@rei-network/network';
 import { Node } from '../../node';
 import { NodeStatus } from '../../types';
@@ -26,8 +26,10 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
 
   private _status?: NodeStatus;
   private _knowTxs = new FunctionalBufferSet();
+  private _knowTxsV2 = new FunctionalBufferMap<Number>();
   private _knowBlocks = new FunctionalBufferSet();
   private funcs: HandlerFunc[];
+  private _reboradcastThreshold = 100;
 
   protected handshakeResolve?: (result: boolean) => void;
   protected handshakeTimeout?: NodeJS.Timeout;
@@ -305,13 +307,36 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
   }
 
   /**
+   * Filter known data for tx hash
+   */
+  private filterHashV2<T>(know: Set<Buffer>, data: T[], toHash?: (t: T) => Buffer) {
+    const filtered: T[] = [];
+    for (const t of data) {
+      const hash = Buffer.isBuffer(t) ? t : toHash!(t);
+      if (!know.has(hash)) {
+        filtered.push(t);
+      } else {
+        const count = this._knowTxsV2.get(hash) as number;
+        const newCount = count + 1;
+        this._knowTxsV2.set(hash, newCount);
+        if (newCount >= this._reboradcastThreshold) {
+          know.delete(hash);
+          this._knowTxsV2.delete(hash);
+          filtered.push(t);
+        }
+      }
+    }
+    return filtered;
+  }
+
+  /**
    * filter out known transactions
    * @param data - All transactions
    * @param toHash - Convert data to hash
    * @returns Filtered transactions
    */
   private filterTxs<T>(data: T[], toHash?: (t: T) => Buffer) {
-    return this.filterHash(this._knowTxs, data, toHash);
+    return this.filterHashV2(this._knowTxs, data, toHash);
   }
 
   /**
@@ -344,11 +369,29 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
   }
 
   /**
+   * Add known data information for tx hash
+   */
+  private knowHashV2(know: Set<Buffer>, max: number, hashs: Buffer[]) {
+    if (hashs.length >= max) {
+      throw new Error(`WireProtocolHandler invalid hash length: ${hashs.length}`);
+    }
+    while (know.size + hashs.length >= max) {
+      const { value } = know.keys().next();
+      know.delete(value);
+      this._knowTxsV2.delete(value);
+    }
+    for (const h of hashs) {
+      know.add(h);
+      this._knowTxsV2.set(h, 1);
+    }
+  }
+
+  /**
    * Call knowHash, add known transactions
    * @param hashs - Transactions to be added
    */
   knowTxs(hashs: Buffer[]) {
-    this.knowHash(this._knowTxs, c.maxKnownTxs, hashs);
+    this.knowHashV2(this._knowTxs, c.maxKnownTxs, hashs);
   }
 
   /**

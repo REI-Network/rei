@@ -165,7 +165,8 @@ export class Node {
       .on('failed', this.onSyncOver);
     this.txPool = new TxPool({
       node: this,
-      journal: this.datadir
+      journal: this.datadir,
+      rebroadcast: options.txpoolRebroadcast
     });
     this.txSync = new TxFetcher(this);
     this.bcMonitor = new BlockchainMonitor(this.db);

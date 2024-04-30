@@ -39,6 +39,7 @@ program.option('--evm <evm>', 'evm implementation type, "js" or "binding"');
 program.option('--bls <bls>', 'the datadir for bls', 'bls');
 program.option('--bls-password <blsPassword>', 'bls password file to use for non-interactive password input');
 program.option('--bls-file <blsFile>', 'bls file name');
+program.option('--txpool-rebroadcast <txpoolRebroadcast>', 'txpool pending tx is need to rebroadcast');
 
 // install commands
 installStartAction(program);

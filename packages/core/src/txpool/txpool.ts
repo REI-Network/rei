@@ -26,6 +26,7 @@ const defaultGlobalQueue = 1024;
 const defaultLifeTime = 1000 * 60 * 60 * 3; // 3 hours
 const defaultTimeoutInterval = 1000 * 60; // 1 minutes
 const defaultRejournalInterval = 1000 * 60 * 60; // 1 hours
+const defaultRebroadcast = false;
 
 /**
  * TxPoolAccount contains pending, queued transaction and pending nonce of each account
@@ -106,6 +107,7 @@ export interface TxPoolOptions {
   lifetime?: number;
   timeoutInterval?: number;
   rejournalInterval?: number;
+  rebroadcast?: boolean;
 }
 
 export declare interface TxPool {
@@ -153,6 +155,7 @@ export class TxPool extends EventEmitter {
 
   private totalAmount?: BN;
   private dailyFee?: BN;
+  private rebroadcast: boolean;
 
   constructor(options: TxPoolOptions) {
     super();
@@ -167,6 +170,7 @@ export class TxPool extends EventEmitter {
     this.lifetime = options.lifetime ?? defaultLifeTime;
     this.timeoutInterval = options.timeoutInterval ?? defaultTimeoutInterval;
     this.rejournalInterval = options.rejournalInterval ?? defaultRejournalInterval;
+    this.rebroadcast = options.rebroadcast ?? defaultRebroadcast;
 
     this.node = options.node;
     this.priced = new TxPricedList(this.txs);
@@ -409,6 +413,14 @@ export class TxPool extends EventEmitter {
             reinject = reinject.concat(requeue);
           }
         }
+
+        if (this.rebroadcast) {
+          const reAnnonceTxs = this.getPooledTransactionHashes();
+          for (const handler of this.node.wire.pool.handlers) {
+            handler.announceTx(reAnnonceTxs);
+          }
+        }
+
         this.emitReadies((await this._addTxs(reinject, true)).readies);
         await this.demoteUnexecutables();
         this.truncatePending();
@@ -670,7 +682,7 @@ export class TxPool extends EventEmitter {
       }
       const queue = account.queue;
       const accountInDB = await this.currentStateManager.getAccount(new Address(sender));
-      const forwards = queue.forward(accountInDB.nonce);
+      const forwards = queue.forward(accountInDB.nonce); //todo check
       this.removeTxFromGlobal(forwards);
       let dropsLength = 0;
       if (!isEnableFreeStaking(this.currentHeader._common)) {
@@ -783,6 +795,7 @@ export class TxPool extends EventEmitter {
       const offender: TxPoolAccount = heap.remove();
       offenders.push(offender);
       if (offenders.length > 1) {
+        console.log('truncatePending logic --------------->  ');
         const threshold = offender.pending.slots;
         while (pendingSlots > this.globalSlots && offenders[offenders.length - 2].pending.slots > threshold) {
           for (let i = 0; i < offenders.length - 1; i++) {
@@ -821,6 +834,7 @@ export class TxPool extends EventEmitter {
 
     let account: TxPoolAccount = heap.remove();
     while (queueSlots > this.globalQueue && account) {
+      console.log('trucateQueue logic  ------------>    ');
       const queue = account.queue;
       if (queueSlots - queue.slots >= this.globalQueue) {
         queueSlots -= queue.slots;

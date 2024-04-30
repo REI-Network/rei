@@ -68,6 +68,10 @@ export interface NodeOptions {
    * Trusted block hash
    */
   trustedHash?: Buffer;
+  /**
+   *  Txpool Rebroadcast pending tx
+   */
+  txpoolRebroadcast?: boolean;
 }
 
 export type NodeStatus = {

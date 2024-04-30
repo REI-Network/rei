@@ -81,6 +81,10 @@ export interface CreateNodeOptions {
    * Trusted block hash
    */
   trustedHash?: string;
+  /**
+   * Txpool Rebroadcast pending tx
+   */
+  txpoolRebroadcast?: boolean;
 }
 
 async function loadPeerId(databasePath: string) {

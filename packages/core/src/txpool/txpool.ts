@@ -416,6 +416,7 @@ export class TxPool extends EventEmitter {
 
         if (this.rebroadcast) {
           const reAnnonceTxs = this.getPooledTransactionHashes();
+          logger.debug('TxPool::newBlock, reAnnonceTxs:', reAnnonceTxs.length);
           for (const handler of this.node.wire.pool.handlers) {
             handler.announceTx(reAnnonceTxs);
           }

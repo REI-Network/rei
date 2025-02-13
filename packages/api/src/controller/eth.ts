@@ -1,4 +1,5 @@
 import { Address, intToHex, bnToHex, bufferToHex, hashPersonalMessage, toRpcSig, ecsign, BN, setLengthLeft } from 'ethereumjs-util';
+import { EC } from 'elliptic';
 import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Block, Log, Transaction, TransactionFactory } from '@rei-network/structure';
 import { Common } from '@rei-network/common';
@@ -259,6 +260,11 @@ export class ETHController extends Controller {
     if (!(tx instanceof Transaction)) {
       return null;
     }
+
+    if (!this.checkPublicKeyOnCurve(tx.getSenderPublicKey())) {
+      return null;
+    }
+
     const results = await this.node.addPendingTxs([tx]);
     return results.length > 0 && results[0] ? bufferToHex(tx.hash()) : null;
   }
@@ -273,6 +279,11 @@ export class ETHController extends Controller {
     if (!(tx instanceof Transaction)) {
       return null;
     }
+
+    if (!this.checkPublicKeyOnCurve(tx.getSenderPublicKey())) {
+      return null;
+    }
+
     const results = await this.node.addPendingTxs([tx]);
     return results.length > 0 && results[0] ? bufferToHex(tx.hash()) : null;
   }
@@ -643,5 +654,17 @@ export class ETHController extends Controller {
     } else {
       return this.filterSystem.subscribe(client, type);
     }
+  }
+
+  /**
+   * Checks if the public key is on the secp256k1 curve
+   * @param publicKey  - public key
+   * @returns `true` if the public key is on the curve
+   */
+  private async checkPublicKeyOnCurve(publicKey: Buffer) {
+    const publicKeyHex = publicKey.toString('hex');
+    const ec = new EC('secp256k1');
+    const key = ec.keyFromPublic('04' + publicKeyHex, 'hex'); //Add "04" to form the complete uncompressed public key
+    return ec.curve.validate(key.getPublic());
   }
 }

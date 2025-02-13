@@ -1,5 +1,5 @@
 import { Address, intToHex, bnToHex, bufferToHex, hashPersonalMessage, toRpcSig, ecsign, BN, setLengthLeft } from 'ethereumjs-util';
-import { EC } from 'elliptic';
+import { ec as EC } from 'elliptic';
 import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Block, Log, Transaction, TransactionFactory } from '@rei-network/structure';
 import { Common } from '@rei-network/common';

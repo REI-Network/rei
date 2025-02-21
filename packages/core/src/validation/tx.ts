@@ -1,4 +1,5 @@
 import { BN } from 'ethereumjs-util';
+import { ec as EC } from 'elliptic';
 import { hexStringToBN } from '@rei-network/utils';
 import { Transaction } from '@rei-network/structure';
 import { StateManager } from '../stateManager';
@@ -7,6 +8,14 @@ import { isEnableFreeStaking } from '../hardforks';
 export async function validateTx(tx: Transaction, timestamp: number, state: StateManager, totalAmount?: BN, dailyFee?: BN) {
   const senderAddr = tx.getSenderAddress();
   const account = await state.getAccount(senderAddr);
+
+  const publicKey = tx.getSenderPublicKey();
+  const publicKeyHex = publicKey.toString('hex');
+  const ec = new EC('secp256k1');
+  const key = ec.keyFromPublic('04' + publicKeyHex, 'hex'); //Add "04" to form the complete uncompressed public key
+  if (!ec.curve.validate(key.getPublic())) {
+    throw new Error(`public key is not on secp256k1 curve , public key : ${tx.getSenderPublicKey().toString('hex')}`);
+  }
 
   if (account.nonce.gt(tx.nonce)) {
     throw new Error(`nonce too low: ${tx.nonce.toString()} account: ${account.nonce.toString()}`);

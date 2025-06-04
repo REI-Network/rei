@@ -73,6 +73,6 @@ describe('Database', () => {
 
   after(async () => {
     await testdb.close();
-    fs.rmdirSync(testdir, { recursive: true });
+    fs.rmSync(testdir, { recursive: true, force: true });
   });
 });

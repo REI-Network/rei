@@ -19,9 +19,9 @@ describe('AccountManager', () => {
   before(async () => {
     testdir = path.join(__dirname, './test-dir');
     testdir2 = path.join(__dirname, './test-dir2');
-    fs.rmdirSync(testdir, { recursive: true });
-    fs.rmdirSync(testdir2, { recursive: true });
+    fs.rmSync(testdir, { recursive: true, force: true });
     fs.mkdirSync(testdir, { recursive: true });
+    fs.rmSync(testdir2, { recursive: true, force: true });
     fs.mkdirSync(testdir2, { recursive: true });
     accountManager = new AccountManager(testdir);
     keystore = new KeyStore(testdir2);
@@ -100,7 +100,7 @@ describe('AccountManager', () => {
   });
 
   after(() => {
-    fs.rmdirSync(testdir, { recursive: true });
-    fs.rmdirSync(testdir2, { recursive: true });
+    fs.rmSync(testdir, { recursive: true, force: true });
+    fs.rmSync(testdir2, { recursive: true, force: true });
   });
 });

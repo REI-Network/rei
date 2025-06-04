@@ -18,7 +18,7 @@ describe('Keystore', () => {
     address = wallet.getAddressString();
     privateKey = wallet.getPrivateKeyString();
     testdir = path.join(__dirname, './test-dir');
-    fs.rmdirSync(testdir, { recursive: true });
+    fs.rmSync(testdir, { recursive: true, force: true });
     fs.mkdirSync(testdir, { recursive: true });
     keystore = new KeyStore(testdir);
     localPath = keystore.joinPath(keyStoreFileName(address));
@@ -39,6 +39,6 @@ describe('Keystore', () => {
   });
 
   after(() => {
-    fs.rmdirSync(testdir, { recursive: true });
+    fs.rmSync(testdir, { recursive: true, force: true });
   });
 });

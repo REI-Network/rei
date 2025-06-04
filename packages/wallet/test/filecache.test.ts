@@ -11,9 +11,9 @@ describe('FileCache', () => {
   const remove = ['blue', 'yellow'].sort();
   const change = ['white', 'red', 'purple'].sort();
 
-  before(() => {
+  before(async () => {
     testdir = path.join(__dirname, './test-dir');
-    fs.rmdirSync(testdir, { recursive: true });
+    fs.rmSync(testdir, { recursive: true, force: true });
     fs.mkdirSync(testdir, { recursive: true });
     filesname.forEach((color) => {
       const filename = path.join(testdir, color);
@@ -61,6 +61,6 @@ describe('FileCache', () => {
   });
 
   after(() => {
-    fs.rmdirSync(testdir, { recursive: true });
+    fs.rmSync(testdir, { recursive: true, force: true });
   });
 });

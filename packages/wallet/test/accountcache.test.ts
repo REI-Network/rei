@@ -16,7 +16,7 @@ describe('Accountcache', () => {
 
   before(async () => {
     testdir = path.join(__dirname, './test-dir');
-    fs.rmdirSync(testdir, { recursive: true });
+    fs.rmSync(testdir, { recursive: true, force: true });
     fs.mkdirSync(testdir, { recursive: true });
     keystore = new KeyStore(testdir);
     let i = 3;
@@ -63,6 +63,6 @@ describe('Accountcache', () => {
   });
 
   after(() => {
-    fs.rmdirSync(testdir, { recursive: true });
+    fs.rmSync(testdir, { recursive: true, force: true });
   });
 });

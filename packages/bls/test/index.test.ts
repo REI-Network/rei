@@ -15,7 +15,7 @@ describe('BlsManager', () => {
   let bls: Bls;
   before(async () => {
     testdir = path.join(__dirname, './test-dir');
-    fs.rmdirSync(testdir, { recursive: true });
+    fs.rmSync(testdir, { recursive: true, force: true });
     fs.mkdirSync(testdir, { recursive: true });
     blsManager = new BlsManager(testdir);
     bls = (await import('@chainsafe/bls')).default;

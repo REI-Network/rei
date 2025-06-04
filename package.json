@@ -13,6 +13,7 @@
     "npm": ">=7"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.4",
     "@types/mocha": "^10.0.1",
     "@typescript-eslint/eslint-plugin": "^4.27.0",
     "@typescript-eslint/parser": "^4.27.0",
@@ -22,8 +23,8 @@
     "husky": "^7.0.4",
     "prettier": "^2.0.5",
     "prettier-plugin-solidity": "1.0.0-beta.6",
-    "typescript": "^4.1.2",
-    "ts-node": "^10.8.1"
+    "ts-node": "^10.8.1",
+    "typescript": "^4.1.2"
   },
   "scripts": {
     "preinstall": "npm run checkNpmVersion",

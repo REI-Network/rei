@@ -1,9 +1,22 @@
-import { rlphash, Address, BN, setLengthRight, setLengthLeft } from 'ethereumjs-util';
-import { addPrecompile, PrecompileAvailabilityCheck } from '@rei-network/vm/dist/evm/precompiles';
+import {
+  rlphash,
+  Address,
+  BN,
+  setLengthRight,
+  setLengthLeft
+} from 'ethereumjs-util';
+import {
+  addPrecompile,
+  PrecompileAvailabilityCheck
+} from '@rei-network/vm/dist/evm/precompiles';
 import { OOGResult } from '@rei-network/vm/dist/evm/evm';
 import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
-import { BlockHeader, setCustomHashFunction, CLIQUE_EXTRA_VANITY } from '@rei-network/structure';
+import {
+  BlockHeader,
+  setCustomHashFunction,
+  CLIQUE_EXTRA_VANITY
+} from '@rei-network/structure';
 import { StateManager } from './stateManager';
 import { Reimint } from './reimint';
 import { Fee } from './reimint/contracts';
@@ -45,13 +58,22 @@ addPrecompile(
     // load daily fee
     let dailyFee: BN;
     if (isEnableDAO(state._common)) {
-      dailyFee = new BN(await state.getContractStorage(Address.fromString('0x0000000000000000000000000000000000001000'), setLengthLeft(hexStringToBuffer('0x15'), 32)));
+      dailyFee = new BN(
+        await state.getContractStorage(
+          Address.fromString('0x0000000000000000000000000000000000001000'),
+          setLengthLeft(hexStringToBuffer('0x15'), 32)
+        )
+      );
     } else {
       dailyFee = hexStringToBN(state._common.param('vm', 'dailyFee'));
     }
 
     const stakeInfo = (await state.getAccount(address)).getStakeInfo();
-    const fee = stakeInfo.estimateFee(timestamp.toNumber(), totalAmount, dailyFee);
+    const fee = stakeInfo.estimateFee(
+      timestamp.toNumber(),
+      totalAmount,
+      dailyFee
+    );
 
     return {
       gasUsed,
@@ -120,7 +142,9 @@ export function isEnableHardfork2(common: Common) {
  * @param common - Common instance
  * @returns Init data
  */
-export function loadInitData(common: Common): undefined | { initHeight: number; initHashes: string[] } {
+export function loadInitData(
+  common: Common
+): undefined | { initHeight: number; initHashes: string[] } {
   common = common.copy();
   if (isEnableHardfork2(common)) {
     // it looks like hf2 is enabled,

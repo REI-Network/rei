@@ -1,5 +1,10 @@
 import { bufferToHex } from 'ethereumjs-util';
-import { FunctionalBufferMap, FunctionalBufferSet, Channel, logger } from '@rei-network/utils';
+import {
+  FunctionalBufferMap,
+  FunctionalBufferSet,
+  Channel,
+  logger
+} from '@rei-network/utils';
 import { Transaction } from '@rei-network/structure';
 import { maxTxRetrievals } from './protocols';
 import { Node } from './node';
@@ -20,10 +25,15 @@ type EnqueuePooledTransactionMessage = {
  * @param key - Key
  * @param value - Set value
  */
-function forceAdd<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer | string) {
+function forceAdd<K>(
+  map: Map<K, Set<Buffer | string>>,
+  key: K,
+  value: Buffer | string
+) {
   let set = map.get(key);
   if (!set) {
-    set = typeof value === 'string' ? new Set<string>() : new FunctionalBufferSet();
+    set =
+      typeof value === 'string' ? new Set<string>() : new FunctionalBufferSet();
     map.set(key, set);
   }
   set.add(value);
@@ -35,8 +45,12 @@ function forceAdd<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer | 
  * @param key - Key
  * @param value - Delete value
  */
-function autoDelete<K>(map: Map<K, Set<Buffer | string>>, key: K, value: Buffer | string) {
-  let set = map.get(key);
+function autoDelete<K>(
+  map: Map<K, Set<Buffer | string>>,
+  key: K,
+  value: Buffer | string
+) {
+  const set = map.get(key);
   if (set) {
     set.delete(value);
     if (set.size === 0) {
@@ -81,7 +95,8 @@ export class TxFetcher {
   constructor(node: Node) {
     this.node = node;
     this.newPooledTransactionQueue = new Channel<NewPooledTransactionMessage>();
-    this.enqueueTransactionQueue = new Channel<EnqueuePooledTransactionMessage>();
+    this.enqueueTransactionQueue =
+      new Channel<EnqueuePooledTransactionMessage>();
   }
 
   start() {
@@ -100,13 +115,17 @@ export class TxFetcher {
   private async newPooledTransactionLoop() {
     try {
       for await (const message of this.newPooledTransactionQueue) {
-        const used = (this.watingSlots.get(message.origin)?.size || 0) + (this.announces.get(message.origin)?.size || 0);
+        const used =
+          (this.watingSlots.get(message.origin)?.size || 0) +
+          (this.announces.get(message.origin)?.size || 0);
         if (used > maxTxAnnounces) {
           continue;
         }
         const want = used + message.hashes.length;
         if (want > maxTxAnnounces) {
-          message.hashes.splice(message.hashes.length - (want - maxTxAnnounces));
+          message.hashes.splice(
+            message.hashes.length - (want - maxTxAnnounces)
+          );
         }
         const idleWait = this.waitingTime.size === 0;
         const oldPeer = this.announces.has(message.origin);
@@ -164,7 +183,9 @@ export class TxFetcher {
     try {
       for await (const message of this.enqueueTransactionQueue) {
         // TODO: check underpriced and duplicate and etc.
-        const added = (await this.node.addPendingTxs(message.txs)).map((result, i) => (result ? message.txs[i] : null)).filter((ele) => ele !== null) as Transaction[];
+        const added = (await this.node.addPendingTxs(message.txs))
+          .map((result, i) => (result ? message.txs[i] : null))
+          .filter((ele) => ele !== null) as Transaction[];
         for (const tx of added) {
           const hash = tx.hash();
           const set = this.waitingList.get(hash);
@@ -191,7 +212,9 @@ export class TxFetcher {
             if (origin !== undefined && origin !== message.origin) {
               const req = this.requests.get(origin);
               if (req) {
-                req.stolen = req.stolen ? req.stolen.add(hash) : new FunctionalBufferSet().add(hash);
+                req.stolen = req.stolen
+                  ? req.stolen.add(hash)
+                  : new FunctionalBufferSet().add(hash);
               }
             }
             this.fetching.delete(hash);
@@ -200,7 +223,10 @@ export class TxFetcher {
 
         const req = this.requests.get(message.origin);
         if (!req) {
-          logger.warn('TxFetcher::enqueueTransactionLoop, unexpected transaction delivery, peer:', message.origin);
+          logger.warn(
+            'TxFetcher::enqueueTransactionLoop, unexpected transaction delivery, peer:',
+            message.origin
+          );
           continue;
         }
         this.requests.delete(message.origin);
@@ -225,7 +251,10 @@ export class TxFetcher {
             }
             if (this.alternates.size > 0) {
               if (this.announced.has(hash)) {
-                panicError('enqueueTransactionLoop, announced hash existed', bufferToHex(hash));
+                panicError(
+                  'enqueueTransactionLoop, announced hash existed',
+                  bufferToHex(hash)
+                );
               }
               this.announced.set(hash, this.alternates.get(hash)!);
             }
@@ -261,7 +290,10 @@ export class TxFetcher {
       for (const [hash, instance] of this.waitingTime) {
         if (now - instance + txGatherSlack > txArriveTimeout) {
           if (this.announced.has(hash)) {
-            panicError('rescheduleWait, announced hash existed', bufferToHex(hash));
+            panicError(
+              'rescheduleWait, announced hash existed',
+              bufferToHex(hash)
+            );
           }
           const set = this.waitingList.get(hash)!;
           this.announced.set(hash, set);
@@ -284,7 +316,9 @@ export class TxFetcher {
   }
 
   private scheduleFetches(whiteList?: Set<string>) {
-    const actives = whiteList ? new Set<string>(whiteList) : new Set<string>(this.announces.keys());
+    const actives = whiteList
+      ? new Set<string>(whiteList)
+      : new Set<string>(this.announces.keys());
     if (actives.size === 0) {
       return;
     }
@@ -303,7 +337,10 @@ export class TxFetcher {
         if (!this.fetching.has(hash)) {
           this.fetching.set(hash, peer);
           if (this.alternates.has(hash)) {
-            panicError('scheduleFetches, alternates hash existed', bufferToHex(hash));
+            panicError(
+              'scheduleFetches, alternates hash existed',
+              bufferToHex(hash)
+            );
           }
           const alters = this.announced.get(hash);
           if (alters) {
@@ -334,12 +371,18 @@ export class TxFetcher {
                 this.enqueueTransaction(peer, txs);
               })
               .catch((err: any) => {
-                if (typeof err.message === 'string' && err.message.startsWith('timeout')) {
+                if (
+                  typeof err.message === 'string' &&
+                  err.message.startsWith('timeout')
+                ) {
                   this.requestTimeout(peer);
                 } else {
                   this.dropPeer(peer);
                 }
-                logger.error('TxFetcher::getPooledTransactions, catch error:', err);
+                logger.error(
+                  'TxFetcher::getPooledTransactions, catch error:',
+                  err
+                );
               });
           }
         }

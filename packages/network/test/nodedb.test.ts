@@ -48,13 +48,20 @@ describe('NodeDB', async () => {
     for (let i = 0; i < 100; i++) {
       const enr = await newEnr();
       await nodedb.persist(enr);
-      await nodedb.updatePongMessage(enr.nodeId, enr.ip!, Date.now() - i * 1000);
+      await nodedb.updatePongMessage(
+        enr.nodeId,
+        enr.ip!,
+        Date.now() - i * 1000
+      );
       enrList.push(enr);
     }
     const now = Date.now();
     const result = await nodedb.querySeeds(10, maxAge);
     for (let i = 0; i < result.length; i++) {
-      const time = await nodedb.lastPongReceived(result[i].nodeId, result[i].ip!);
+      const time = await nodedb.lastPongReceived(
+        result[i].nodeId,
+        result[i].ip!
+      );
       if (now - time > maxAge) {
         assert('should not be in the result');
       }
@@ -72,7 +79,11 @@ describe('NodeDB', async () => {
     for (let i = 0; i < 100; i++) {
       const enr = await newEnr();
       await nodedb.persist(enr);
-      await nodedb.updatePongMessage(enr.nodeId, enr.ip!, Date.now() - 10 * 1000);
+      await nodedb.updatePongMessage(
+        enr.nodeId,
+        enr.ip!,
+        Date.now() - 10 * 1000
+      );
       enrList.push(enr);
     }
     await nodedb.checkTimeout(5 * 1000);
@@ -92,7 +103,9 @@ describe('NodeDB', async () => {
 });
 
 async function newEnr() {
-  const keypair = createKeypairFromPeerId(await PeerId.create({ keyType: 'secp256k1' }));
+  const keypair = createKeypairFromPeerId(
+    await PeerId.create({ keyType: 'secp256k1' })
+  );
   const enr = ENR.createV4(keypair.publicKey);
   enr.ip = '127.0.0.1';
   enr.tcp = 4191;

@@ -4,7 +4,10 @@ import PeerId from 'peer-id';
 import { AbstractLevelDOWN, AbstractIterator } from 'abstract-leveldown';
 import { ENR } from '@gxchain2/discv5';
 
-type DB = LevelUp<AbstractLevelDOWN<Buffer, Buffer>, AbstractIterator<Buffer, Buffer>>;
+type DB = LevelUp<
+  AbstractLevelDOWN<Buffer, Buffer>,
+  AbstractIterator<Buffer, Buffer>
+>;
 
 // These fields are stored per ID and IP, the full key is "n:<ID>:v5:<IP>:findfail".
 // Use nodeItemKey to create those keys.
@@ -16,7 +19,10 @@ const dbNodePong = 'lastPong';
 // Use localItemKey to create those keys.
 const dbLocalSeq = 'seq';
 
-async function* iteratorToAsyncGenerator<K, V>(itr: AbstractIterator<K, V>, release: boolean) {
+async function* iteratorToAsyncGenerator<K, V>(
+  itr: AbstractIterator<K, V>,
+  release: boolean
+) {
   while (true) {
     const result = await new Promise<[K, V] | void>((resolve, reject) => {
       itr.next((err, key, val) => {
@@ -78,7 +84,11 @@ export class NodeDB {
     const now = Date.now();
     const itr = this.db.iterator({ keys: true, values: true });
     let id: Buffer = Buffer.alloc(32);
-    for (let seeks = 0; enrs.length < numNodes && seeks < numNodes * 5; seeks++) {
+    for (
+      let seeks = 0;
+      enrs.length < numNodes && seeks < numNodes * 5;
+      seeks++
+    ) {
       // Seek to a random entry. The first byte is incremented by a
       // random amount each time in order to increase the likelihood
       // of hitting all existing nodes in very small databases.
@@ -94,7 +104,7 @@ export class NodeDB {
       if (now - (await this.lastPongReceived(enr.nodeId, enr.ip!)) > maxAge) {
         continue;
       }
-      let include: boolean = false;
+      let include = false;
       for (const e of enrs) {
         if (e.nodeId === enr.nodeId) {
           include = true;
@@ -122,7 +132,10 @@ export class NodeDB {
    * @param ip - the node ip
    */
   updatePongMessage(nodeId: string, ip: string, timestamp = Date.now()) {
-    return this.db.put(Buffer.from(this._nodeItemKey(nodeId, ip, dbNodePong)), Buffer.from(timestamp.toString()));
+    return this.db.put(
+      Buffer.from(this._nodeItemKey(nodeId, ip, dbNodePong)),
+      Buffer.from(timestamp.toString())
+    );
   }
 
   /**
@@ -220,7 +233,10 @@ export class NodeDB {
    * @param {bigint} seq - the local enr sequence counter
    */
   storeLocalSeq(nodeId: string, seq: bigint) {
-    return this.db.put(Buffer.from(this.localItemKey(nodeId, dbLocalSeq)), Buffer.from(seq.toString()));
+    return this.db.put(
+      Buffer.from(this.localItemKey(nodeId, dbLocalSeq)),
+      Buffer.from(seq.toString())
+    );
   }
 
   /**
@@ -230,7 +246,9 @@ export class NodeDB {
    */
   async localSeq(nodeId: string) {
     try {
-      const value = await this.db.get(Buffer.from(this.localItemKey(nodeId, dbLocalSeq)));
+      const value = await this.db.get(
+        Buffer.from(this.localItemKey(nodeId, dbLocalSeq))
+      );
       return BigInt(value.toString());
     } catch (e) {
       if ((e as any).type === 'NotFoundError') {
@@ -281,7 +299,9 @@ export class NodeDB {
    * @returns true if the key begins with prefix
    */
   private _hasPrefix(key: Buffer, prefix: Buffer) {
-    return key.length >= prefix.length && key.slice(0, prefix.length).equals(prefix);
+    return (
+      key.length >= prefix.length && key.slice(0, prefix.length).equals(prefix)
+    );
   }
 
   /**
@@ -291,7 +311,12 @@ export class NodeDB {
   private async _deleteRange(prefix: string) {
     let enr: ENR | undefined;
     const range = this._bytesPrefix(prefix);
-    const itr = this.db.iterator({ keys: true, values: true, gte: range.prefixBuffer, lte: range.limit });
+    const itr = this.db.iterator({
+      keys: true,
+      values: true,
+      gte: range.prefixBuffer,
+      lte: range.limit
+    });
     for await (const [key, val] of iteratorToAsyncGenerator(itr, true)) {
       const { rest } = this.splitNodeKey(key);
       if (rest.toString() === dbDiscv5Root) {
@@ -309,9 +334,9 @@ export class NodeDB {
    */
   private _bytesPrefix(prefix: string) {
     let limit: Buffer = Buffer.alloc(prefix.length);
-    let prefixBuffer = Buffer.from(prefix);
+    const prefixBuffer = Buffer.from(prefix);
     for (let i = prefixBuffer.length - 1; i >= 0; i--) {
-      let c = prefixBuffer[i];
+      const c = prefixBuffer[i];
       if (c < 0xff) {
         limit = Buffer.alloc(i + 1);
         prefixBuffer.copy(limit);

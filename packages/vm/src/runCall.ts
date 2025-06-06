@@ -34,14 +34,21 @@ export interface RunCallOpts {
 /**
  * @ignore
  */
-export default async function runCall(this: VM, opts: RunCallOpts): Promise<EVMResult> {
+export default async function runCall(
+  this: VM,
+  opts: RunCallOpts
+): Promise<EVMResult> {
   const block = opts.block ?? Block.fromBlockData({}, { common: this._common });
 
   // load recent hashes
   const recentHashes: Buffer[] = [];
   const number = block.header.number;
   const db = this.blockchain.database;
-  for (let i = number.subn(1); i.gten(0) && i.gte(number.subn(256)); i.isubn(1)) {
+  for (
+    let i = number.subn(1);
+    i.gten(0) && i.gte(number.subn(256));
+    i.isubn(1)
+  ) {
     recentHashes.push(await db.numberToHash(i));
   }
 
@@ -51,7 +58,14 @@ export default async function runCall(this: VM, opts: RunCallOpts): Promise<EVMR
     author = this._getMiner(block.header);
   }
 
-  const txContext = new TxContext(opts.gasPrice ?? new BN(0), opts.origin ?? opts.caller ?? Address.zero(), author, undefined, undefined, recentHashes);
+  const txContext = new TxContext(
+    opts.gasPrice ?? new BN(0),
+    opts.origin ?? opts.caller ?? Address.zero(),
+    author,
+    undefined,
+    undefined,
+    recentHashes
+  );
 
   const message = new Message({
     caller: opts.caller,
@@ -78,14 +92,29 @@ export default async function runCall(this: VM, opts: RunCallOpts): Promise<EVMR
   if (opts.debug) {
     time = Date.now();
     const from = message?.caller?.buf;
-    const to = message?.to?.buf ?? generateAddress(message.caller.buf, fromAccount.nonce.subn(1).toArrayLike(Buffer));
+    const to =
+      message?.to?.buf ??
+      generateAddress(
+        message.caller.buf,
+        fromAccount.nonce.subn(1).toArrayLike(Buffer)
+      );
     const create = message.to === undefined;
     const input = message.data;
     const gas = message.gasLimit;
     const gasPrice = new BN(0);
     const value = message.value;
     const number = block.header.number;
-    await opts.debug!.captureStart(from, to, create, input, gas, gasPrice, value, number, this.stateManager);
+    await opts.debug!.captureStart(
+      from,
+      to,
+      create,
+      input,
+      gas,
+      gasPrice,
+      value,
+      number,
+      this.stateManager
+    );
   }
 
   let result: undefined | EVMResult;
@@ -100,9 +129,17 @@ export default async function runCall(this: VM, opts: RunCallOpts): Promise<EVMR
   // Call tx exec over
   if (opts.debug) {
     if (result) {
-      await opts.debug.captureEnd(result.execResult.returnValue, result.gasUsed, Date.now() - time!);
+      await opts.debug.captureEnd(
+        result.execResult.returnValue,
+        result.gasUsed,
+        Date.now() - time!
+      );
     } else {
-      await opts.debug.captureEnd(Buffer.alloc(0), new BN(0), Date.now() - time!);
+      await opts.debug.captureEnd(
+        Buffer.alloc(0),
+        new BN(0),
+        Date.now() - time!
+      );
     }
   }
 

@@ -9,7 +9,10 @@ const level = require('level-mem');
 
 const common = new Common({ chain: 'rei-devnet' });
 common.setHardforkByBlockNumber(0);
-const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
+const genesisBlock = Block.fromBlockData(
+  { header: common.genesis() },
+  { common }
+);
 const database = new Database(level(), common);
 
 describe('Blockchain', () => {
@@ -82,7 +85,10 @@ describe('Blockchain', () => {
 
     const reorg = await blockchain.forcePutBlock(block, { td: new BN(100) });
     const header = await blockchain.getLatestHeader();
-    const td = await blockchain.getTotalDifficulty(block.hash(), block.header.number);
+    const td = await blockchain.getTotalDifficulty(
+      block.hash(),
+      block.header.number
+    );
     expect(reorg).be.true;
     expect(header.number.toNumber()).equal(100);
     expect(td.toNumber()).equal(100);

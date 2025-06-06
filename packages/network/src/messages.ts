@@ -12,7 +12,13 @@ export class InstallMessage extends Message {
   readonly stream?: Stream;
   readonly resolve?: (success: boolean) => void;
 
-  constructor(peerId: string, protocol: Protocol, connection: Connection, stream?: Stream, resolve?: (success: boolean) => void) {
+  constructor(
+    peerId: string,
+    protocol: Protocol,
+    connection: Connection,
+    stream?: Stream,
+    resolve?: (success: boolean) => void
+  ) {
     super();
     this.peerId = peerId;
     this.protocol = protocol;

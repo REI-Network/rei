@@ -44,7 +44,7 @@ export class BlockchainMonitor extends EventEmitter {
    * @param block - New Block data
    * @param force - Force set header
    */
-  async newBlock(block: Block, force: boolean = false) {
+  async newBlock(block: Block, force = false) {
     try {
       const originalNewBlock = block;
       const newHeads: BlockHeader[] = [];
@@ -52,39 +52,74 @@ export class BlockchainMonitor extends EventEmitter {
       const included = new FunctionalBufferMap<TransactionInfo>();
 
       if (!force) {
-        let oldBlock = await this.db.getBlockByHashAndNumber(this.currentHeader.hash(), this.currentHeader.number);
+        let oldBlock = await this.db.getBlockByHashAndNumber(
+          this.currentHeader.hash(),
+          this.currentHeader.number
+        );
         while (oldBlock.header.number.gt(block.header.number)) {
           const blockHash = oldBlock.hash();
           for (const tx of oldBlock.transactions as Transaction[]) {
-            discarded.set(tx.hash(), { tx, blockHash, blockNumber: oldBlock.header.number });
+            discarded.set(tx.hash(), {
+              tx,
+              blockHash,
+              blockNumber: oldBlock.header.number
+            });
           }
-          oldBlock = await this.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
+          oldBlock = await this.db.getBlockByHashAndNumber(
+            oldBlock.header.parentHash,
+            oldBlock.header.number.subn(1)
+          );
         }
         while (block.header.number.gt(oldBlock.header.number)) {
           newHeads.push(block.header);
           const blockHash = block.hash();
           for (const tx of block.transactions as Transaction[]) {
-            included.set(tx.hash(), { tx, blockHash, blockNumber: block.header.number });
+            included.set(tx.hash(), {
+              tx,
+              blockHash,
+              blockNumber: block.header.number
+            });
           }
-          block = await this.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
+          block = await this.db.getBlockByHashAndNumber(
+            block.header.parentHash,
+            block.header.number.subn(1)
+          );
         }
-        while (!oldBlock.hash().equals(block.hash()) && oldBlock.header.number.gtn(0) && block.header.number.gtn(0)) {
+        while (
+          !oldBlock.hash().equals(block.hash()) &&
+          oldBlock.header.number.gtn(0) &&
+          block.header.number.gtn(0)
+        ) {
           {
             const blockHash = oldBlock.hash();
             for (const tx of oldBlock.transactions as Transaction[]) {
-              discarded.set(tx.hash(), { tx, blockHash, blockNumber: oldBlock.header.number });
+              discarded.set(tx.hash(), {
+                tx,
+                blockHash,
+                blockNumber: oldBlock.header.number
+              });
             }
           }
-          oldBlock = await this.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
+          oldBlock = await this.db.getBlockByHashAndNumber(
+            oldBlock.header.parentHash,
+            oldBlock.header.number.subn(1)
+          );
 
           {
             newHeads.push(block.header);
             const blockHash = block.hash();
             for (const tx of block.transactions as Transaction[]) {
-              included.set(tx.hash(), { tx, blockHash, blockNumber: block.header.number });
+              included.set(tx.hash(), {
+                tx,
+                blockHash,
+                blockNumber: block.header.number
+              });
             }
           }
-          block = await this.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
+          block = await this.db.getBlockByHashAndNumber(
+            block.header.parentHash,
+            block.header.number.subn(1)
+          );
         }
         if (!oldBlock.hash().equals(block.hash())) {
           throw new Error('reorg failed');
@@ -110,7 +145,11 @@ export class BlockchainMonitor extends EventEmitter {
         let removedLogs: Log[] = [];
         for (const txInfo of removed) {
           try {
-            const receipt = await this.db.getReceiptByHashAndNumber(txInfo.tx.hash(), txInfo.blockHash, txInfo.blockNumber);
+            const receipt = await this.db.getReceiptByHashAndNumber(
+              txInfo.tx.hash(),
+              txInfo.blockHash,
+              txInfo.blockNumber
+            );
             receipt.logs.forEach((log) => (log.removed = true));
             removedLogs = removedLogs.concat(receipt.logs);
           } catch (err: any) {

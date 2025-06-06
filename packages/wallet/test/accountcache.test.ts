@@ -39,7 +39,10 @@ describe('Accountcache', () => {
     });
     const accounts = accountcache.accounts();
     accounts.forEach((element, i) => {
-      expect(element.addrBuf.equals(addressSorted[i]), 'address should be equal').be.true;
+      expect(
+        element.addrBuf.equals(addressSorted[i]),
+        'address should be equal'
+      ).be.true;
     });
   });
 
@@ -50,7 +53,9 @@ describe('Accountcache', () => {
   });
 
   it('should get address information', () => {
-    expect(accountcache.get(addressArr[0]), 'path should be equal').be.equal(pathArr[0]);
+    expect(accountcache.get(addressArr[0]), 'path should be equal').be.equal(
+      pathArr[0]
+    );
   });
 
   it('should add address correctly', () => {
@@ -58,8 +63,12 @@ describe('Accountcache', () => {
     const address = wallet.getAddressString();
     const localPath = keystore.joinPath(keyStoreFileName(address));
     accountcache.add(hexStringToBuffer(address), localPath);
-    expect(accountcache.has(hexStringToBuffer(address)), 'should has address').be.true;
-    expect(accountcache.get(hexStringToBuffer(address)), 'path should be equal').be.equal(localPath);
+    expect(accountcache.has(hexStringToBuffer(address)), 'should has address')
+      .be.true;
+    expect(
+      accountcache.get(hexStringToBuffer(address)),
+      'path should be equal'
+    ).be.equal(localPath);
   });
 
   after(() => {

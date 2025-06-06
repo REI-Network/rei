@@ -7,7 +7,7 @@ import { Bls } from '../src/types';
 describe('BlsManager', () => {
   let testdir: string;
   let blsManager: BlsManager;
-  let password = '123456';
+  const password = '123456';
   let blsPath1: string;
   let blsPath2: string;
   let publickey1: string;
@@ -26,7 +26,10 @@ describe('BlsManager', () => {
     blsPath1 = result.path;
     publickey1 = result.publickey;
     await blsManager.unlock(blsPath1, password);
-    expect(blsManager.getPublicKey()!.toHex()).to.equal(publickey1, 'public key should be equal');
+    expect(blsManager.getPublicKey()!.toHex()).to.equal(
+      publickey1,
+      'public key should be equal'
+    );
   });
 
   it('should update bls key successfully', async () => {
@@ -42,30 +45,50 @@ describe('BlsManager', () => {
     }
 
     await blsManager.unlock(blsPath1, newPassword);
-    expect(blsManager.getPublicKey()!.toHex()).to.equal(publickey1, 'public key should be equal');
+    expect(blsManager.getPublicKey()!.toHex()).to.equal(
+      publickey1,
+      'public key should be equal'
+    );
   });
 
   it('should import bls key successfully', async () => {
     const anotherPassword = 'anotherPassword';
-    const secretKey = '0x4e51871f2256fcd0fc10f86fb378573fc56923362943ee5fc4a8c752af244610';
-    const result = await blsManager.importSignerBySecretKey(secretKey, anotherPassword);
+    const secretKey =
+      '0x4e51871f2256fcd0fc10f86fb378573fc56923362943ee5fc4a8c752af244610';
+    const result = await blsManager.importSignerBySecretKey(
+      secretKey,
+      anotherPassword
+    );
     blsPath2 = result.path;
     publickey2 = result.publickey;
     await blsManager.unlock(blsPath2, anotherPassword);
-    expect(blsManager.getPublicKey()!.toHex()).to.equal(publickey2, 'public key should be equal');
+    expect(blsManager.getPublicKey()!.toHex()).to.equal(
+      publickey2,
+      'public key should be equal'
+    );
   });
 
   it('should signMessage and verifySignature successfully', async () => {
     const message = 'reireirei';
     const signature = blsManager.signMessage(Buffer.from(message));
-    const verifyResult = blsManager.verifyMessage(blsManager.getPublicKey()!.toBytes(), Buffer.from(message), signature.toBytes());
+    const verifyResult = blsManager.verifyMessage(
+      blsManager.getPublicKey()!.toBytes(),
+      Buffer.from(message),
+      signature.toBytes()
+    );
     expect(verifyResult).to.equal(true, 'verify result should be true');
   });
 
   it('should aggregateSignatures and verifyAggregateSignature successfully', async () => {
-    const messages = Array.from({ length: 10 }, () => Buffer.from('reireirei' + Math.random()));
-    const secretkeys = Array.from({ length: 10 }, () => bls.SecretKey.fromKeygen());
-    const signatures = messages.map((m, index) => secretkeys[index].sign(m).toBytes());
+    const messages = Array.from({ length: 10 }, () =>
+      Buffer.from('reireirei' + Math.random())
+    );
+    const secretkeys = Array.from({ length: 10 }, () =>
+      bls.SecretKey.fromKeygen()
+    );
+    const signatures = messages.map((m, index) =>
+      secretkeys[index].sign(m).toBytes()
+    );
     const aggregatedSignature = blsManager.aggregateSignatures(signatures);
     const verifyResult = blsManager.verifyMultiple(
       aggregatedSignature,

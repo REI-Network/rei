@@ -62,7 +62,10 @@ export class AccountManager {
     if (!path) {
       throw new Error('unknown account');
     }
-    return { ...(await this.storage.getKey(path, passphrase, addrToString(addr))), path };
+    return {
+      ...(await this.storage.getKey(path, passphrase, addrToString(addr))),
+      path
+    };
   }
 
   /**
@@ -161,7 +164,9 @@ export class AccountManager {
    * @returns Account address
    */
   async importKeyByPrivateKey(privateKey: string, passphrase: string) {
-    const address = Address.fromPrivateKey(hexStringToBuffer(privateKey)).toString();
+    const address = Address.fromPrivateKey(
+      hexStringToBuffer(privateKey)
+    ).toString();
     const localPath = this.storage.joinPath(keyStoreFileName(address));
     await this.storage.storeKey(localPath, privateKey, passphrase);
     this.cache.add(addrToBuffer(address), localPath);

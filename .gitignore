@@ -10,7 +10,6 @@ test-dir
 # Hardhat files
 packages/contracts/artifacts
 packages/contracts/cache
-packages/contracts/deployments
 
 # Solidity doc gen files
 packages/contracts/docs

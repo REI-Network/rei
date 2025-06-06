@@ -5,13 +5,28 @@ import { LevelUp } from 'levelup';
 import { v4, v6 } from 'is-ip';
 import { ENR } from '@gxchain2/discv5';
 import { createKeypairFromPeerId } from '@gxchain2/discv5/lib/keypair';
-import { Message as Discv5Message, MessageType } from '@gxchain2/discv5/lib/message';
-import { logger, ignoreError, Channel, AbortableTimer } from '@rei-network/utils';
+import {
+  Message as Discv5Message,
+  MessageType
+} from '@gxchain2/discv5/lib/message';
+import {
+  logger,
+  ignoreError,
+  Channel,
+  AbortableTimer
+} from '@rei-network/utils';
 import { ExpHeap } from './expheap';
 import { NodeDB } from './nodedb';
 import { Peer } from './peer';
 import { createDefaultImpl } from './libp2pImpl';
-import { Protocol, ProtocolHandler, ILibp2p, IDiscv5, Connection, Stream } from './types';
+import {
+  Protocol,
+  ProtocolHandler,
+  ILibp2p,
+  IDiscv5,
+  Connection,
+  Stream
+} from './types';
 import * as m from './messages';
 import * as c from './config';
 
@@ -77,12 +92,24 @@ export interface NetworkManagerOptions {
 }
 
 export declare interface NetworkManager {
-  on(event: 'installed', listener: (peer: Peer, handler: ProtocolHandler) => void): this;
-  on(event: 'uninstalled', listener: (peer: Peer, protocolString: string) => void): this;
+  on(
+    event: 'installed',
+    listener: (peer: Peer, handler: ProtocolHandler) => void
+  ): this;
+  on(
+    event: 'uninstalled',
+    listener: (peer: Peer, protocolString: string) => void
+  ): this;
   on(event: 'removed', listener: (peer: Peer) => void): this;
 
-  off(event: 'installed', listener: (peer: Peer, handler: ProtocolHandler) => void): this;
-  off(event: 'uninstalled', listener: (peer: Peer, protocolString: string) => void): this;
+  off(
+    event: 'installed',
+    listener: (peer: Peer, handler: ProtocolHandler) => void
+  ): this;
+  off(
+    event: 'uninstalled',
+    listener: (peer: Peer, protocolString: string) => void
+  ): this;
   off(event: 'removed', listener: (peer: Peer) => void): this;
 }
 
@@ -126,7 +153,7 @@ export class NetworkManager extends EventEmitter {
   private discv5!: IDiscv5;
   private privateKey!: Buffer;
   private options: NetworkManagerOptions;
-  private aborted: boolean = false;
+  private aborted = false;
 
   // static peers
   private staticPeers = new Set<string>();
@@ -219,7 +246,7 @@ export class NetworkManager extends EventEmitter {
    */
   private async loadLocalENR() {
     const keypair = createKeypairFromPeerId(this.options.peerId);
-    let enr = ENR.createV4(keypair.publicKey);
+    const enr = ENR.createV4(keypair.publicKey);
     if (this.options.nat === undefined || v4(this.options.nat)) {
       enr.ip = this.options.nat ?? c.defaultNat;
       enr.tcp = this.options.libp2pOptions?.tcpPort ?? c.defaultTcpPort;
@@ -255,16 +282,21 @@ export class NetworkManager extends EventEmitter {
       const { enr, keypair } = await this.loadLocalENR();
       const strEnr = enr.encodeTxt(keypair.privateKey);
       this.privateKey = keypair.privateKey;
-      logger.info('NetworkManager::init, peerId:', this.options.peerId.toB58String());
+      logger.info(
+        'NetworkManager::init, peerId:',
+        this.options.peerId.toB58String()
+      );
       logger.info('NetworkManager::init, nodeId', enr.nodeId);
       logger.info('NetworkManager::init,', strEnr);
 
       // create default impl instance
       const { libp2p, discv5 } = createDefaultImpl({
         ...this.options.libp2pOptions,
-        bootnodes: (this.options.libp2pOptions.bootnodes ?? []).filter((value) => {
-          return ENR.decodeTxt(value).nodeId !== enr.nodeId;
-        }),
+        bootnodes: (this.options.libp2pOptions.bootnodes ?? []).filter(
+          (value) => {
+            return ENR.decodeTxt(value).nodeId !== enr.nodeId;
+          }
+        ),
         peerId: this.options.peerId,
         enr
       });
@@ -280,11 +312,18 @@ export class NetworkManager extends EventEmitter {
   async start() {
     // register all supported protocols to libp2p
     for (const protocols of this.protocols) {
-      for (const protocol of Array.isArray(protocols) ? protocols : [protocols]) {
-        this.libp2p.handle(protocol.protocolString, ({ connection, stream }) => {
-          const peerId = connection.remotePeer.toB58String();
-          this.pushMessage(new m.InstallMessage(peerId, protocol, connection, stream));
-        });
+      for (const protocol of Array.isArray(protocols)
+        ? protocols
+        : [protocols]) {
+        this.libp2p.handle(
+          protocol.protocolString,
+          ({ connection, stream }) => {
+            const peerId = connection.remotePeer.toB58String();
+            this.pushMessage(
+              new m.InstallMessage(peerId, protocol, connection, stream)
+            );
+          }
+        );
       }
     }
 
@@ -324,7 +363,9 @@ export class NetworkManager extends EventEmitter {
       }
       // unregister all protocols
       for (const protocols of this.protocols) {
-        for (const protocol of Array.isArray(protocols) ? protocols : [protocols]) {
+        for (const protocol of Array.isArray(protocols)
+          ? protocols
+          : [protocols]) {
           this.libp2p.unhandle(protocol.protocolString);
         }
       }
@@ -335,7 +376,11 @@ export class NetworkManager extends EventEmitter {
       this.discv5.off('message', this.onMessage);
       this.discv5.off('multiaddrUpdated', this.onMultiaddrUpdated);
       // remove all peers
-      await Promise.all(Array.from(this._peers.values()).map((peer) => this.removePeer(peer.peerId)));
+      await Promise.all(
+        Array.from(this._peers.values()).map((peer) =>
+          this.removePeer(peer.peerId)
+        )
+      );
       this._peers.clear();
       // stop libp2p and discv5
       this.discv5.stop();
@@ -371,7 +416,11 @@ export class NetworkManager extends EventEmitter {
     this.pushMessage(new m.DiscoveredMessage(peerId));
   };
 
-  private onMessage = (srcId: string, src: Multiaddr, message: Discv5Message) => {
+  private onMessage = (
+    srcId: string,
+    src: Multiaddr,
+    message: Discv5Message
+  ) => {
     this.pushMessage(new m.ReceivedMessage(srcId, src, message));
   };
 
@@ -390,7 +439,12 @@ export class NetworkManager extends EventEmitter {
     for await (const message of this.channel) {
       try {
         if (message instanceof m.InstallMessage) {
-          const result = await this.install(message.peerId, message.protocol, message.connection, message.stream);
+          const result = await this.install(
+            message.peerId,
+            message.protocol,
+            message.connection,
+            message.stream
+          );
           message.resolve && message.resolve(result);
         } else if (message instanceof m.ConnectedMessage) {
           await this.connected(message.connection);
@@ -401,7 +455,11 @@ export class NetworkManager extends EventEmitter {
         } else if (message instanceof m.MultiaddrUpdatedMessage) {
           await this.multiaddrUpdated();
         } else if (message instanceof m.ReceivedMessage) {
-          await this.receivedMessage(message.srcId, message.src, message.message);
+          await this.receivedMessage(
+            message.srcId,
+            message.src,
+            message.message
+          );
         } else if (message instanceof m.RemovePeerMessage) {
           await this.doRemovePeer(message.peedId);
           message.resolve && message.resolve();
@@ -429,30 +487,54 @@ export class NetworkManager extends EventEmitter {
     while (!this.aborted) {
       // remove all invalid peers from discovered peer list
       for (const peerId of this.discoveredPeers) {
-        if (this.isBanned(peerId) || this._peers.has(peerId) || peerId === this.peerId) {
+        if (
+          this.isBanned(peerId) ||
+          this._peers.has(peerId) ||
+          peerId === this.peerId
+        ) {
           maybeRemoveFromDiscovered(peerId);
         }
       }
 
       if (this._peers.size < this.libp2p.maxConnections) {
         // filter all available static peers
-        const staticPeers = Array.from(this.staticPeers).filter((peerId) => !this._peers.has(peerId) && !this.isBanned(peerId));
+        const staticPeers = Array.from(this.staticPeers).filter(
+          (peerId) => !this._peers.has(peerId) && !this.isBanned(peerId)
+        );
 
         // filter all peers in address book
-        const addressBookPeers = this.libp2p.peers.filter((peerId) => !this._peers.has(peerId) && !this.isBanned(peerId));
+        const addressBookPeers = this.libp2p.peers.filter(
+          (peerId) => !this._peers.has(peerId) && !this.isBanned(peerId)
+        );
 
         // filter all nodes that can be dialed
-        const dialablePeers = [...staticPeers, ...this.discoveredPeers, ...addressBookPeers].filter((peerId) => this.checkOutbound(peerId));
+        const dialablePeers = [
+          ...staticPeers,
+          ...this.discoveredPeers,
+          ...addressBookPeers
+        ].filter((peerId) => this.checkOutbound(peerId));
 
         // pick the first one and dial
         const peerId = dialablePeers.shift();
         if (peerId) {
           if (staticPeers.indexOf(peerId) !== -1) {
-            logger.debug('Network::dial, try to dial peer:', peerId, 'load from static peer list');
+            logger.debug(
+              'Network::dial, try to dial peer:',
+              peerId,
+              'load from static peer list'
+            );
           } else if (this.discoveredPeers.indexOf(peerId) !== -1) {
-            logger.debug('Network::dial, try to dial peer:', peerId, 'load from discovered peer list');
+            logger.debug(
+              'Network::dial, try to dial peer:',
+              peerId,
+              'load from discovered peer list'
+            );
           } else {
-            logger.debug('Network::dial, try to dial peer:', peerId, 'load from address book peer list');
+            logger.debug(
+              'Network::dial, try to dial peer:',
+              peerId,
+              'load from address book peer list'
+            );
           }
           maybeRemoveFromDiscovered(peerId);
           await this.dial(peerId);
@@ -471,7 +553,10 @@ export class NetworkManager extends EventEmitter {
     while (!this.aborted) {
       try {
         await this.nodedb.checkTimeout(c.seedMaxAge, (peerId) => {
-          logger.debug('NetworkManager::checkTimeoutLoop, deleting timeout node:', peerId.toB58String());
+          logger.debug(
+            'NetworkManager::checkTimeoutLoop, deleting timeout node:',
+            peerId.toB58String()
+          );
           this.libp2p.removeAddress(peerId);
         });
       } catch (err) {
@@ -509,10 +594,19 @@ export class NetworkManager extends EventEmitter {
    * @param stream - `libp2p` stream, if it doesn't exist, it will be created automatically
    * @returns Whether succeed
    */
-  private async install(peerId: string, protocol: Protocol, connection: Connection, stream?: Stream) {
+  private async install(
+    peerId: string,
+    protocol: Protocol,
+    connection: Connection,
+    stream?: Stream
+  ) {
     const connections = this.libp2p.getConnections(peerId);
     if (!connections || connections.length === 0) {
-      logger.debug('Network::install, peerId:', peerId, 'failed due to disconnected');
+      logger.debug(
+        'Network::install, peerId:',
+        peerId,
+        'failed due to disconnected'
+      );
       return false;
     }
 
@@ -541,20 +635,42 @@ export class NetworkManager extends EventEmitter {
         const result = await connection.newStream(protocol.protocolString);
         stream = result.stream;
       } catch (err: any) {
-        logger.detail('Network::install, peerId:', peerId, 'new stream failed, error:', err);
+        logger.detail(
+          'Network::install, peerId:',
+          peerId,
+          'new stream failed, error:',
+          err
+        );
         return false;
       }
     }
 
-    const { success } = await peer.installProtocol(protocol, connection, stream);
+    const { success } = await peer.installProtocol(
+      protocol,
+      connection,
+      stream
+    );
     if (success) {
       // if at least one protocol is installed, we think the handshake is successful
-      const peerValue = this.trustedPeers.has(peerId) ? Libp2pPeerValue.trusted : Libp2pPeerValue.installed;
+      const peerValue = this.trustedPeers.has(peerId)
+        ? Libp2pPeerValue.trusted
+        : Libp2pPeerValue.installed;
       this.libp2p.setPeerValue(PeerId.createFromB58String(peerId), peerValue);
-      logger.info('💬 Peer installed:', peerId, 'protocol:', protocol.protocolString);
+      logger.info(
+        '💬 Peer installed:',
+        peerId,
+        'protocol:',
+        protocol.protocolString
+      );
     } else {
       stream.close();
-      logger.debug('Network::install, install protocol:', protocol.protocolString, 'for peerId:', peerId, 'failed');
+      logger.debug(
+        'Network::install, install protocol:',
+        protocol.protocolString,
+        'for peerId:',
+        peerId,
+        'failed'
+      );
     }
     return success;
   }
@@ -573,7 +689,12 @@ export class NetworkManager extends EventEmitter {
     try {
       connection = await this.libp2p.dial(PeerId.createFromB58String(peerId));
     } catch (err) {
-      logger.detail('Network::dial, failed to dial peerId:', peerId, 'error:', err);
+      logger.detail(
+        'Network::dial, failed to dial peerId:',
+        peerId,
+        'error:',
+        err
+      );
       return;
     }
 
@@ -586,7 +707,15 @@ export class NetworkManager extends EventEmitter {
             return;
           }
           new Promise<boolean>((resolve) => {
-            this.pushMessage(new m.InstallMessage(peerId, protocols[index], connection, undefined, resolve));
+            this.pushMessage(
+              new m.InstallMessage(
+                peerId,
+                protocols[index],
+                connection,
+                undefined,
+                resolve
+              )
+            );
           }).then((result) => {
             if (!result) {
               dial(index + 1);
@@ -614,16 +743,28 @@ export class NetworkManager extends EventEmitter {
 
     if (!this.checkInbound(peerId)) {
       await connection.close();
-      logger.debug('Network::connected, peerId:', peerId, 'too many connection attempts');
+      logger.debug(
+        'Network::connected, peerId:',
+        peerId,
+        'too many connection attempts'
+      );
       return;
     }
 
-    if (this.libp2p.connectionSize < this.libp2p.maxConnections || this.trustedPeers.has(peerId)) {
+    if (
+      this.libp2p.connectionSize < this.libp2p.maxConnections ||
+      this.trustedPeers.has(peerId)
+    ) {
       logger.info('💬 Peer connect:', peerId);
-      const peerValue = this.trustedPeers.has(peerId) ? Libp2pPeerValue.trusted : Libp2pPeerValue.connected;
+      const peerValue = this.trustedPeers.has(peerId)
+        ? Libp2pPeerValue.trusted
+        : Libp2pPeerValue.connected;
       this.libp2p.setPeerValue(PeerId.createFromB58String(peerId), peerValue);
     } else {
-      this.libp2p.setPeerValue(PeerId.createFromB58String(peerId), Libp2pPeerValue.incoming);
+      this.libp2p.setPeerValue(
+        PeerId.createFromB58String(peerId),
+        Libp2pPeerValue.incoming
+      );
       logger.debug('Network::connected, too many incoming connections');
     }
   }
@@ -660,7 +801,10 @@ export class NetworkManager extends EventEmitter {
 
     // add peerId to memory list
     const strPeerId = peerId.toB58String();
-    if (!this.discoveredPeers.includes(strPeerId) || !this._peers.has(strPeerId)) {
+    if (
+      !this.discoveredPeers.includes(strPeerId) ||
+      !this._peers.has(strPeerId)
+    ) {
       this.discoveredPeers.push(strPeerId);
       if (this.discoveredPeers.length > this.libp2p.maxConnections * 2) {
         this.discoveredPeers.shift();
@@ -677,7 +821,11 @@ export class NetworkManager extends EventEmitter {
    * @param src - Remove address
    * @param message - Discv5 message
    */
-  private async receivedMessage(srcId: string, src: Multiaddr, message: Discv5Message) {
+  private async receivedMessage(
+    srcId: string,
+    src: Multiaddr,
+    message: Discv5Message
+  ) {
     if (message.type === MessageType.PONG) {
       await this.nodedb.updatePongMessage(srcId, src.nodeAddress().address);
     }
@@ -723,7 +871,10 @@ export class NetworkManager extends EventEmitter {
     if (this.inboundHistory.contains(peerId)) {
       return false;
     }
-    this.inboundHistory.add(peerId, now + (this.options.inboundThrottleTime ?? c.inboundThrottleTime));
+    this.inboundHistory.add(
+      peerId,
+      now + (this.options.inboundThrottleTime ?? c.inboundThrottleTime)
+    );
     return true;
   }
 
@@ -752,7 +903,10 @@ export class NetworkManager extends EventEmitter {
 
   private updateOutbound(peerId: string) {
     const now = Date.now();
-    this.outboundHistory.add(peerId, now + (this.options.outboundThrottleTime ?? c.outboundThrottleTime));
+    this.outboundHistory.add(
+      peerId,
+      now + (this.options.outboundThrottleTime ?? c.outboundThrottleTime)
+    );
     this.setupOutboundTimer(now);
   }
 
@@ -878,7 +1032,7 @@ export class NetworkManager extends EventEmitter {
    * @param peerId - Peer id
    * @param maxAge - Ban time
    */
-  ban(peerId: string, maxAge: number = 60000) {
+  ban(peerId: string, maxAge = 60000) {
     this.banned.set(peerId, Date.now() + maxAge);
     this.staticPeers.delete(peerId);
     return this.removePeer(peerId);

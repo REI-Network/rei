@@ -23,7 +23,8 @@ export function DBSetTD(TD: BN, blockNumber: BN, blockHash: Buffer): DBOp {
  * (if there is a header but no block saved the DB will implicitly assume the block to be empty)
  */
 export function DBSetBlockOrHeader(blockBody: Block | BlockHeader): DBOp[] {
-  const header: BlockHeader = blockBody instanceof Block ? blockBody.header : blockBody;
+  const header: BlockHeader =
+    blockBody instanceof Block ? blockBody.header : blockBody;
   const dbOps: DBOp[] = [];
 
   const blockNumber = header.number;
@@ -39,7 +40,11 @@ export function DBSetBlockOrHeader(blockBody: Block | BlockHeader): DBOp[] {
 
   const isGenesis = header.number.eqn(0);
 
-  if (isGenesis || (blockBody instanceof Block && (blockBody.transactions.length || blockBody.uncleHeaders.length))) {
+  if (
+    isGenesis ||
+    (blockBody instanceof Block &&
+      (blockBody.transactions.length || blockBody.uncleHeaders.length))
+  ) {
     const bodyValue = rlp.encode(blockBody.raw().slice(1));
     dbOps.push(
       DBOp.set(DBTarget.Body, bodyValue, {
@@ -79,7 +84,11 @@ export function DBSaveLookups(blockHash: Buffer, blockNumber: BN): DBOp[] {
  * @param blockNumber - Block number
  * @returns New operation
  */
-export function DBSaveReceipts(receipts: Receipt[], blockHash: Buffer, blockNumber: BN) {
+export function DBSaveReceipts(
+  receipts: Receipt[],
+  blockHash: Buffer,
+  blockNumber: BN
+) {
   return DBOp.set(DBTarget.Receipts, rlp.encode(receipts.map((r) => r.raw())), {
     blockHash,
     blockNumber
@@ -114,7 +123,12 @@ export function DBSaveTxLookup(block: Block): DBOp[] {
  * @param bits - Bloom bits data
  * @returns New operation
  */
-export function DBSaveBloomBits(bit: number, section: BN, hash: Buffer, bits: Buffer) {
+export function DBSaveBloomBits(
+  bit: number,
+  section: BN,
+  hash: Buffer,
+  bits: Buffer
+) {
   return DBOp.set(DBTarget.BloomBits, bits, { bit, section, hash });
 }
 
@@ -141,7 +155,10 @@ export function DBDeleteBloomBitsSectionCount() {
  * @param serializedAccount - Serialized account
  * @returns New operation
  */
-export function DBSaveSerializedSnapAccount(accountHash: Buffer, serializedAccount: Buffer) {
+export function DBSaveSerializedSnapAccount(
+  accountHash: Buffer,
+  serializedAccount: Buffer
+) {
   return DBOp.set(DBTarget.SnapAccount, serializedAccount, { accountHash });
 }
 
@@ -161,8 +178,15 @@ export function DBDeleteSnapAccount(accountHash: Buffer) {
  * @param storageValue - Storage value
  * @returns New operation
  */
-export function DBSaveSnapStorage(accountHash: Buffer, storageHash: Buffer, storageValue: Buffer) {
-  return DBOp.set(DBTarget.SnapStorage, storageValue, { accountHash, storageHash });
+export function DBSaveSnapStorage(
+  accountHash: Buffer,
+  storageHash: Buffer,
+  storageValue: Buffer
+) {
+  return DBOp.set(DBTarget.SnapStorage, storageValue, {
+    accountHash,
+    storageHash
+  });
 }
 
 /**
@@ -230,7 +254,10 @@ export function DBDeleteSnapGenerator() {
  * @returns New operation
  */
 export function DBSaveSnapDisabled() {
-  return DBOp.set(DBTarget.SnapDisabled, ['42'.charCodeAt(0), '42'.charCodeAt(1)]);
+  return DBOp.set(DBTarget.SnapDisabled, [
+    '42'.charCodeAt(0),
+    '42'.charCodeAt(1)
+  ]);
 }
 
 /**

@@ -121,19 +121,26 @@ export const SNAP_SYNC_PROGRESS_KEY = Buffer.from('SnapshotSyncProgress');
  */
 export const bufBE8 = (n: BN) => n.toArrayLike(Buffer, 'be', 8);
 
-export const tdKey = (n: BN, hash: Buffer) => Buffer.concat([HEADER_PREFIX, bufBE8(n), hash, TD_SUFFIX]);
+export const tdKey = (n: BN, hash: Buffer) =>
+  Buffer.concat([HEADER_PREFIX, bufBE8(n), hash, TD_SUFFIX]);
 
-export const headerKey = (n: BN, hash: Buffer) => Buffer.concat([HEADER_PREFIX, bufBE8(n), hash]);
+export const headerKey = (n: BN, hash: Buffer) =>
+  Buffer.concat([HEADER_PREFIX, bufBE8(n), hash]);
 
-export const bodyKey = (n: BN, hash: Buffer) => Buffer.concat([BODY_PREFIX, bufBE8(n), hash]);
+export const bodyKey = (n: BN, hash: Buffer) =>
+  Buffer.concat([BODY_PREFIX, bufBE8(n), hash]);
 
-export const numberToHashKey = (n: BN) => Buffer.concat([HEADER_PREFIX, bufBE8(n), NUM_SUFFIX]);
+export const numberToHashKey = (n: BN) =>
+  Buffer.concat([HEADER_PREFIX, bufBE8(n), NUM_SUFFIX]);
 
-export const hashToNumberKey = (hash: Buffer) => Buffer.concat([BLOCK_HASH_PEFIX, hash]);
+export const hashToNumberKey = (hash: Buffer) =>
+  Buffer.concat([BLOCK_HASH_PEFIX, hash]);
 
-export const receiptsKey = (n: BN, hash: Buffer) => Buffer.concat([RECEIPTS_PREFIX, bufBE8(n), hash]);
+export const receiptsKey = (n: BN, hash: Buffer) =>
+  Buffer.concat([RECEIPTS_PREFIX, bufBE8(n), hash]);
 
-export const txLookupKey = (hash: Buffer) => Buffer.concat([TX_LOOKUP_PREFIX, hash]);
+export const txLookupKey = (hash: Buffer) =>
+  Buffer.concat([TX_LOOKUP_PREFIX, hash]);
 
 export const bloomBitsKey = (bit: number, section: BN, hash: Buffer) => {
   const buf = Buffer.alloc(10);
@@ -142,6 +149,8 @@ export const bloomBitsKey = (bit: number, section: BN, hash: Buffer) => {
   return Buffer.concat([BLOOM_BITS_PREFIX, buf, hash]);
 };
 
-export const snapAccountKey = (accHash: Buffer) => Buffer.concat([SNAP_ACCOUNT_PREFIX, accHash]);
+export const snapAccountKey = (accHash: Buffer) =>
+  Buffer.concat([SNAP_ACCOUNT_PREFIX, accHash]);
 
-export const snapStorageKey = (accHash: Buffer, storageHash: Buffer) => Buffer.concat([SNAP_STORAGE_PREFIX, accHash, storageHash]);
+export const snapStorageKey = (accHash: Buffer, storageHash: Buffer) =>
+  Buffer.concat([SNAP_STORAGE_PREFIX, accHash, storageHash]);

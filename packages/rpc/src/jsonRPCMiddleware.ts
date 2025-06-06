@@ -18,7 +18,10 @@ export class JsonRPCMiddleware {
    * @param client Websoket client
    * @returns Handled result
    */
-  private async handleSingleReq(body: JsonRPCBody, client?: WebsocketClient): Promise<any> {
+  private async handleSingleReq(
+    body: JsonRPCBody,
+    client?: WebsocketClient
+  ): Promise<any> {
     const { id, method, jsonrpc, params } = body;
     try {
       helper.validateJsonRpcVersion(jsonrpc);
@@ -56,7 +59,10 @@ export class JsonRPCMiddleware {
    * @param client Websocket client
    * @returns Array of Handled results
    */
-  private handleBatchReq(batchBody: any[], client?: WebsocketClient): Promise<any[]> {
+  private handleBatchReq(
+    batchBody: any[],
+    client?: WebsocketClient
+  ): Promise<any[]> {
     return Promise.all(
       batchBody.reduce((memo, body) => {
         memo.push(this.handleSingleReq(body, client));
@@ -77,7 +83,11 @@ export class JsonRPCMiddleware {
     };
   }
 
-  private async handleReq(req: any, send: (res: any) => void, client?: WebsocketClient) {
+  private async handleReq(
+    req: any,
+    send: (res: any) => void,
+    client?: WebsocketClient
+  ) {
     if (Array.isArray(req)) {
       send(await this.handleBatchReq(req, client));
     } else if (typeof req === 'object') {

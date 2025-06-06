@@ -29,7 +29,12 @@ export class IpcClient {
   async run() {
     await new Promise<void>((resolve) => {
       ipc.connectTo(ipcId, this.ipcPath, () => {
-        this.replServer = repl.start({ prompt: '> ', useColors: true, ignoreUndefined: true, preview: false });
+        this.replServer = repl.start({
+          prompt: '> ',
+          useColors: true,
+          ignoreUndefined: true,
+          preview: false
+        });
         this.replServer.context.admin = modules.admin;
         this.replServer.context.debug = modules.debug;
         this.replServer.context.eth = modules.eth;

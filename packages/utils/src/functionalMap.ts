@@ -58,9 +58,13 @@ class FunctionalMapValueIterator<V> extends FunctionalMapIterator<V> {
   }
 }
 
-class FunctionalMapKeyValueIterator<K, V> extends FunctionalMapIterator<[K, V]> {
+class FunctionalMapKeyValueIterator<K, V> extends FunctionalMapIterator<
+  [K, V]
+> {
   protected value(): [K, V] | undefined {
-    return !this.rbtreeIt.key || !this.rbtreeIt.value ? undefined : [this.rbtreeIt.key, this.rbtreeIt.value];
+    return !this.rbtreeIt.key || !this.rbtreeIt.value
+      ? undefined
+      : [this.rbtreeIt.key, this.rbtreeIt.value];
   }
 }
 
@@ -76,9 +80,14 @@ export class FunctionalMap<K, V> implements Map<K, V> {
     this.tree = createRBTree(this.compare);
   }
 
-  forEach(callbackfn: (value: V, key: K, map: Map<K, V>) => void, thisArg?: any): void {
+  forEach(
+    callbackfn: (value: V, key: K, map: Map<K, V>) => void,
+    thisArg?: any
+  ): void {
     for (const [key, value] of this) {
-      thisArg ? callbackfn.call(thisArg, value, key, this) : callbackfn(value, key, this);
+      thisArg
+        ? callbackfn.call(thisArg, value, key, this)
+        : callbackfn(value, key, this);
     }
   }
 

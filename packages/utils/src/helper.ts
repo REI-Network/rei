@@ -10,13 +10,20 @@ interface Constructor<T = {}> {
  * @param mix2 - The second  parameter to be inherited
  * @returns The result after multiple inheritance
  */
-export function mixin<T1 extends Constructor, T2 extends Constructor>(mix1: T1, mix2: T2): new (...args: any[]) => InstanceType<T1> & InstanceType<T2> {
+export function mixin<T1 extends Constructor, T2 extends Constructor>(
+  mix1: T1,
+  mix2: T2
+): new (...args: any[]) => InstanceType<T1> & InstanceType<T2> {
   const mixinProps = (target, source) => {
     Object.getOwnPropertyNames(source).forEach((prop) => {
       if (/^constructor$/.test(prop)) {
         return;
       }
-      Object.defineProperty(target, prop, Object.getOwnPropertyDescriptor(source, prop)!);
+      Object.defineProperty(
+        target,
+        prop,
+        Object.getOwnPropertyDescriptor(source, prop)!
+      );
     });
   };
 
@@ -44,7 +51,9 @@ export function getRandomIntInclusive(min: number, max: number): number {
   min = Math.ceil(min);
   max = Math.floor(max);
   if (max < min) {
-    throw new Error('The maximum value should be greater than the minimum value');
+    throw new Error(
+      'The maximum value should be greater than the minimum value'
+    );
   }
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -73,7 +82,9 @@ export function hexStringToBuffer(hex: string): Buffer {
  * @returns BN
  */
 export function hexStringToBN(hex: string): BN {
-  return hex.startsWith('0x') ? new BN(hex.substr(2), 'hex') : new BN(hex, 'hex');
+  return hex.startsWith('0x')
+    ? new BN(hex.substr(2), 'hex')
+    : new BN(hex, 'hex');
 }
 
 /**

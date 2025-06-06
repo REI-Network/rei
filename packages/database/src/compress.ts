@@ -34,7 +34,9 @@ function bitsetEncodeBytes(data: Buffer): Buffer | undefined {
     return data;
   }
 
-  const nonZeroBitset: Buffer = Buffer.alloc(Math.ceil(data.length / 8)).fill(0);
+  const nonZeroBitset: Buffer = Buffer.alloc(Math.ceil(data.length / 8)).fill(
+    0
+  );
   const nonZeroBytes: number[] = [];
 
   for (let i = 0; i < data.length; i++) {
@@ -91,7 +93,10 @@ function bitsetDecodeBytes(data: Buffer, target: number) {
  * @param target - The length that the data should have after decompression
  * @returns Decompressed data
  */
-function bitsetDecodePartialBytes(data: Buffer, target: number): [Buffer, number] {
+function bitsetDecodePartialBytes(
+  data: Buffer,
+  target: number
+): [Buffer, number] {
   if (target === 0) {
     return [Buffer.alloc(0), 0];
   }
@@ -109,7 +114,10 @@ function bitsetDecodePartialBytes(data: Buffer, target: number): [Buffer, number
     return [decomp, 0];
   }
 
-  let [nonZeroBitset, ptr] = bitsetDecodePartialBytes(data, Math.ceil(target / 8));
+  let [nonZeroBitset, ptr] = bitsetDecodePartialBytes(
+    data,
+    Math.ceil(target / 8)
+  );
 
   for (let i = 0; i < 8 * nonZeroBitset.length; i++) {
     const judement = nonZeroBitset[Math.floor(i / 8)] & (1 << (7 - (i % 8)));

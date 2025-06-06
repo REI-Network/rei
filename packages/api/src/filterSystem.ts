@@ -69,7 +69,7 @@ export class FilterSystem {
   private readonly taskQueue = new Channel<Task>();
   private readonly timer = new AbortableTimer();
 
-  private aborted: boolean = false;
+  private aborted = false;
 
   private readonly subscribeHeads = new Map<string, Filter>();
   private readonly subscribeLogs = new Map<string, Filter>();
@@ -411,14 +411,18 @@ export class FilterSystem {
       if (filter.client!.isClosed) {
         this.subscribeLogs.delete(id);
       } else {
-        const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filter.query!));
+        const filteredLogs = logs.filter((log) =>
+          BloomBitsFilter.checkLogMatches(log, filter.query!)
+        );
         if (filteredLogs.length > 0) {
           filter.client!.notifyLogs(id, filteredLogs);
         }
       }
     }
     for (const [id, filter] of this.filterLogs) {
-      const filteredLogs = logs.filter((log) => BloomBitsFilter.checkLogMatches(log, filter.query!));
+      const filteredLogs = logs.filter((log) =>
+        BloomBitsFilter.checkLogMatches(log, filter.query!)
+      );
       if (filteredLogs.length > 0) {
         filter.logs = filter.logs.concat(filteredLogs);
       }

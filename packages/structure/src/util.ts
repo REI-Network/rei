@@ -7,7 +7,9 @@ import { TxOptions, Transaction } from './tx';
  * @param transactions - Transactions
  * @returns Transaction trie
  */
-export async function calcTransactionTrie(transactions: Transaction[]): Promise<Buffer> {
+export async function calcTransactionTrie(
+  transactions: Transaction[]
+): Promise<Buffer> {
   const trie = new Trie();
   for (const [i, tx] of transactions.entries()) {
     await trie.put(rlp.encode(i), tx.serialize());

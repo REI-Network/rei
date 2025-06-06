@@ -6,7 +6,11 @@ import expressws from 'express-ws';
 import bodyParse from 'body-parser';
 import { BN, bufferToHex } from 'ethereumjs-util';
 import { logger, Channel } from '@rei-network/utils';
-import { ApiServer, OutOfGasError as ApiOutOfGasError, RevertError as ApiRevertError } from '@rei-network/api';
+import {
+  ApiServer,
+  OutOfGasError as ApiOutOfGasError,
+  RevertError as ApiRevertError
+} from '@rei-network/api';
 import { JsonRPCMiddleware } from './jsonRPCMiddleware';
 import { WebsocketClient } from './client';
 import { Request } from './types';
@@ -18,16 +22,31 @@ const defaultHost = '127.0.0.1';
 const defaultApis = 'eth,net,web3,rei';
 
 // long time-consuming requests that need to be queued for processing
-const queuedMethods = new Set<string>(['eth_getLogs', 'eth_getFilterLogs', 'debug_traceBlock', 'debug_traceBlockByNumber', 'debug_traceBlockByHash', 'debug_traceTransaction', 'debug_traceCall']);
+const queuedMethods = new Set<string>([
+  'eth_getLogs',
+  'eth_getFilterLogs',
+  'debug_traceBlock',
+  'debug_traceBlockByNumber',
+  'debug_traceBlockByHash',
+  'debug_traceTransaction',
+  'debug_traceCall'
+]);
 
 export class RevertError {
   readonly code = errors.REVERT_ERROR.code;
   readonly rpcMessage: string;
   readonly data?: string;
 
-  constructor(returnValue: string | Buffer, decodedReturnValue: string | undefined) {
-    this.rpcMessage = decodedReturnValue ? 'execution reverted: ' + decodedReturnValue : (returnValue as string);
-    this.data = decodedReturnValue && 'execution reverted: ' + bufferToHex(returnValue as Buffer);
+  constructor(
+    returnValue: string | Buffer,
+    decodedReturnValue: string | undefined
+  ) {
+    this.rpcMessage = decodedReturnValue
+      ? 'execution reverted: ' + decodedReturnValue
+      : (returnValue as string);
+    this.data =
+      decodedReturnValue &&
+      'execution reverted: ' + bufferToHex(returnValue as Buffer);
   }
 }
 
@@ -99,7 +118,13 @@ export class RpcServer {
    * Handle client request
    * @param param0 - Request instance
    */
-  private async handleReq({ method, params, client, resolve, reject }: Request) {
+  private async handleReq({
+    method,
+    params,
+    client,
+    resolve,
+    reject
+  }: Request) {
     try {
       const startAt = Date.now();
       logger.detail('📦 Rpc served', method, 'params:', params);
@@ -128,7 +153,12 @@ export class RpcServer {
 
       logger.debug('📦 Rpc served', method, 'usage:', Date.now() - startAt);
     } catch (err) {
-      logger.debug('JsonRPCMiddleware::handleSingleReq, method:', method, 'catch error:', err);
+      logger.debug(
+        'JsonRPCMiddleware::handleSingleReq, method:',
+        method,
+        'catch error:',
+        err
+      );
 
       reject(err);
     }
@@ -196,7 +226,11 @@ export class RpcServer {
           reject(err);
         });
         this.server.listen(this.port, this.host, () => {
-          logger.info(`Rpc server listening on ${this.host.indexOf('.') === -1 ? '[' + this.host + ']' : this.host}:${this.port}`);
+          logger.info(
+            `Rpc server listening on ${
+              this.host.indexOf('.') === -1 ? '[' + this.host + ']' : this.host
+            }:${this.port}`
+          );
           this.server!.removeAllListeners('error');
           this.server!.on('error', (err) => {
             logger.error('RpcServer, error:', err);

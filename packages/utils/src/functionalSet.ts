@@ -10,7 +10,9 @@ class FunctionalSetValueIterator<T> extends FunctionalMapIterator<T> {
 
 class FunctionalSetKeyValueIterator<T> extends FunctionalMapIterator<[T, T]> {
   protected value(): [T, T] | undefined {
-    return !this.rbtreeIt.key || !this.rbtreeIt.value ? undefined : [this.rbtreeIt.key, this.rbtreeIt.key];
+    return !this.rbtreeIt.key || !this.rbtreeIt.value
+      ? undefined
+      : [this.rbtreeIt.key, this.rbtreeIt.key];
   }
 }
 
@@ -53,9 +55,14 @@ export class FunctionalSet<T> implements Set<T> {
     return this;
   }
 
-  forEach(callbackfn: (value: T, value2: T, set: Set<T>) => void, thisArg?: any): void {
+  forEach(
+    callbackfn: (value: T, value2: T, set: Set<T>) => void,
+    thisArg?: any
+  ): void {
     for (const value of this) {
-      thisArg ? callbackfn.call(thisArg, value, value, this) : callbackfn(value, value, this);
+      thisArg
+        ? callbackfn.call(thisArg, value, value, this)
+        : callbackfn(value, value, this);
     }
   }
 

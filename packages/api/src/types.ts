@@ -1,6 +1,15 @@
 import type { BlockHeader, Log } from '@rei-network/structure';
 
-export type SyncingStatus = { syncing: true; status: { startingBlock: string; currentBlock: string; highestBlock: string } } | false;
+export type SyncingStatus =
+  | {
+      syncing: true;
+      status: {
+        startingBlock: string;
+        currentBlock: string;
+        highestBlock: string;
+      };
+    }
+  | false;
 
 export type TopicsData = (string | null | (string | null)[])[];
 

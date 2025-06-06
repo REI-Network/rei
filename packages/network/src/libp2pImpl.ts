@@ -4,7 +4,13 @@ import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import TCP from 'libp2p-tcp';
 import secio from 'libp2p-secio';
-import { Discv5Discovery, ENR, IKeypair, KademliaRoutingTable, SessionService } from '@gxchain2/discv5';
+import {
+  Discv5Discovery,
+  ENR,
+  IKeypair,
+  KademliaRoutingTable,
+  SessionService
+} from '@gxchain2/discv5';
 import { Connection, IDiscv5, ILibp2p, Stream } from './types';
 import * as c from './config';
 const Libp2p = require('libp2p');
@@ -27,7 +33,9 @@ class Libp2pNode extends Libp2p {
       peerId: options.peerId,
       addresses: {
         listen: [`/ip4/0.0.0.0/tcp/${options.tcpPort ?? c.defaultTcpPort}`],
-        noAnnounce: [`/ip4/127.0.0.1/tcp/${options.tcpPort ?? c.defaultTcpPort}`]
+        noAnnounce: [
+          `/ip4/127.0.0.1/tcp/${options.tcpPort ?? c.defaultTcpPort}`
+        ]
       },
       modules: {
         transport: [TCP],
@@ -104,7 +112,10 @@ class Libp2pImpl extends EventEmitter implements ILibp2p {
     return this.libp2pNode.connectionManager.size;
   }
 
-  handle(protocols: string | string[], callback: (input: { connection: Connection; stream: Stream }) => void) {
+  handle(
+    protocols: string | string[],
+    callback: (input: { connection: Connection; stream: Stream }) => void
+  ) {
     this.libp2pNode.handle(protocols, callback);
   }
 
@@ -137,7 +148,9 @@ class Libp2pImpl extends EventEmitter implements ILibp2p {
   }
 
   setAnnounce(addresses: Multiaddr[]) {
-    this.libp2pNode.addressManager.announce = new Set<string>(addresses.map((addr) => addr.toString()));
+    this.libp2pNode.addressManager.announce = new Set<string>(
+      addresses.map((addr) => addr.toString())
+    );
   }
 
   getConnections(peerId: string): Connection[] | undefined {
@@ -145,9 +158,15 @@ class Libp2pImpl extends EventEmitter implements ILibp2p {
   }
 
   start(): Promise<void> {
-    this.libp2pNode.on('peer:discovery', (...args: any[]) => this.emit('discovery', ...args));
-    this.libp2pNode.connectionManager.on('peer:connect', (...args: any[]) => this.emit('connect', ...args));
-    this.libp2pNode.connectionManager.on('peer:disconnect', (...args: any[]) => this.emit('disconnect', ...args));
+    this.libp2pNode.on('peer:discovery', (...args: any[]) =>
+      this.emit('discovery', ...args)
+    );
+    this.libp2pNode.connectionManager.on('peer:connect', (...args: any[]) =>
+      this.emit('connect', ...args)
+    );
+    this.libp2pNode.connectionManager.on('peer:disconnect', (...args: any[]) =>
+      this.emit('disconnect', ...args)
+    );
     return this.libp2pNode.start();
   }
 
@@ -187,8 +206,12 @@ class Discv5Impl extends EventEmitter implements IDiscv5 {
   }
 
   start() {
-    this.libp2pNode.sessionService.on('message', (...args: any[]) => this.emit('message', ...args));
-    this.libp2pNode.discv5.discv5.on('multiaddrUpdated', (...args: any[]) => this.emit('multiaddrUpdated', ...args));
+    this.libp2pNode.sessionService.on('message', (...args: any[]) =>
+      this.emit('message', ...args)
+    );
+    this.libp2pNode.discv5.discv5.on('multiaddrUpdated', (...args: any[]) =>
+      this.emit('multiaddrUpdated', ...args)
+    );
   }
 
   stop() {

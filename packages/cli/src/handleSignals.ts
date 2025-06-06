@@ -17,7 +17,9 @@ export function handleSIGINT(onExit: () => Promise<void>) {
       SIGINTLock = true;
       await onExit();
     } else {
-      logger.warn('Please wait for graceful exit, or you can kill this process');
+      logger.warn(
+        'Please wait for graceful exit, or you can kill this process'
+      );
     }
   });
 }

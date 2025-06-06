@@ -1,0 +1,15 @@
+{
+  "extends": "solhint:recommended",
+  "rules": {
+    "compiler-version": ["error", "^0.6.0"],
+    "no-global-import": "off",
+    "reason-string": "off",
+    "no-empty-blocks": "off",
+    "contract-name-capwords": "off",
+    "max-states-count": "off",
+    "one-contract-per-file": "off",
+    "var-name-mixedcase": "off",
+    "no-inline-assembly": "off",
+    "payable-fallback": "off"
+  }
+}

@@ -5,16 +5,28 @@ import { RpcServer } from '@rei-network/rpc';
 import { setLevel, logger } from '@rei-network/utils';
 import { ApiServer } from '@rei-network/api';
 import { IpcServer } from '@rei-network/ipc';
-import { getPassphrase, getKeyStorePath, getBlsPath, loadVersion } from './utils';
+import {
+  getPassphrase,
+  getKeyStorePath,
+  getBlsPath,
+  loadVersion
+} from './utils';
 
-type Services = { node: Node; apiServer: ApiServer; rpcServer: RpcServer; ipcServer: IpcServer };
+type Services = {
+  node: Node;
+  apiServer: ApiServer;
+  rpcServer: RpcServer;
+  ipcServer: IpcServer;
+};
 
 /**
  * Start services
  * @param opts - Commander options
  * @returns Services instance
  */
-export async function startServices(opts: { [option: string]: string }): Promise<Services> {
+export async function startServices(opts: {
+  [option: string]: string;
+}): Promise<Services> {
   // set logger verbosity
   setLevel(opts.verbosity);
 
@@ -26,24 +38,33 @@ export async function startServices(opts: { [option: string]: string }): Promise
   let addresses: string[] = [];
   let passphrase: string[] = [];
   if (opts.unlock) {
-    addresses = (opts.unlock as string).split(',').map((address) => address.trim());
+    addresses = (opts.unlock as string)
+      .split(',')
+      .map((address) => address.trim());
     passphrase = await getPassphrase(opts.password, { addresses });
   }
 
   // create node instance
   const node = await NodeFactory.createNode({
-    unlock: addresses.map((address, i): [string, string] => [address, passphrase[i]]),
+    unlock: addresses.map((address, i): [string, string] => [
+      address,
+      passphrase[i]
+    ]),
     blsFileName: opts.blsFile,
     blsPassword: opts.blsPassword && (await getPassphrase(opts.blsPassword))[0],
     databasePath: opts.datadir,
     chain: opts.chain,
-    receiptsCacheSize: opts.receiptsCacheSize ? Number(opts.receiptsCacheSize) : undefined,
+    receiptsCacheSize: opts.receiptsCacheSize
+      ? Number(opts.receiptsCacheSize)
+      : undefined,
     evmWorkMode: opts.evm,
     skipVerifySnap: opts.skipVerifySnap as unknown as boolean,
     coinbase: opts.coinbase,
     tcpPort: opts.p2pTcpPort ? Number(opts.p2pTcpPort) : undefined,
     udpPort: opts.p2pUdpPort ? Number(opts.p2pUdpPort) : undefined,
-    bootnodes: opts.bootnodes ? (opts.bootnodes as unknown as string[]) : undefined,
+    bootnodes: opts.bootnodes
+      ? (opts.bootnodes as unknown as string[])
+      : undefined,
     keyStorePath: getKeyStorePath(opts),
     blsPath: getBlsPath(opts),
     syncMode: opts.sync,
@@ -86,14 +107,24 @@ export async function startServices(opts: { [option: string]: string }): Promise
  * Stop services
  * @param param0 - Services instance
  */
-export async function stopServices({ node, apiServer, ipcServer, rpcServer }: Services) {
+export async function stopServices({
+  node,
+  apiServer,
+  ipcServer,
+  rpcServer
+}: Services) {
   try {
     logger.info('exit...');
     setTimeout(() => {
       logger.warn('exit timeout');
       process.exit(1);
     }, 30000);
-    await Promise.all([node.abort(), apiServer.abort(), ipcServer.abort(), rpcServer.abort()]);
+    await Promise.all([
+      node.abort(),
+      apiServer.abort(),
+      ipcServer.abort(),
+      rpcServer.abort()
+    ]);
     logger.info('exit complete');
     process.exit(0);
   } catch (err) {

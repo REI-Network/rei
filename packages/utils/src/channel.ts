@@ -161,7 +161,9 @@ export class HChannel<T = any> {
   constructor(options?: HChannelOption<T>) {
     this.max = options?.max;
     this.drop = options?.drop;
-    this._heap = new Heap(options?.compare ? { comparBefore: options.compare } : undefined);
+    this._heap = new Heap(
+      options?.compare ? { comparBefore: options.compare } : undefined
+    );
   }
 
   /**
@@ -261,8 +263,11 @@ export class HChannel<T = any> {
 /**
  * An asynchronous queue, order by element index(grow from 0) and index must be continuous
  */
-export class PChannel<U = any, T extends { data: U; index: number } = { data: U; index: number }> {
-  private processed: number = 0;
+export class PChannel<
+  U = any,
+  T extends { data: U; index: number } = { data: U; index: number }
+> {
+  private processed = 0;
   private aborted = false;
   private _array: T[] = [];
   private _heap: Heap;
@@ -405,7 +410,11 @@ export class PChannel<U = any, T extends { data: U; index: number } = { data: U;
   private readies() {
     let d: T | undefined;
     const q: T[] = [];
-    while ((d = this._heap.peek()) && d !== undefined && d.index === this.processed) {
+    while (
+      (d = this._heap.peek()) &&
+      d !== undefined &&
+      d.index === this.processed
+    ) {
       this.processed++;
       q.push(d);
       this._heap.remove();

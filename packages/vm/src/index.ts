@@ -15,7 +15,9 @@ const AsyncEventEmitter = require('async-eventemitter');
 const promisify = require('util.promisify');
 
 // very ugly way to detect if we are running in a browser
-const isBrowser = new Function('try {return this===window;}catch(e){ return false;}');
+const isBrowser = new Function(
+  'try {return this===window;}catch(e){ return false;}'
+);
 let mcl: any;
 let mclInitPromise: any;
 
@@ -156,7 +158,7 @@ export class VM extends AsyncEventEmitter {
   readonly _getMiner?: (header: BlockHeader) => Address;
 
   protected readonly _opts: VMOpts;
-  protected _isInitialized: boolean = false;
+  protected _isInitialized = false;
   protected readonly _allowUnlimitedContractSize: boolean;
   protected _opcodes: OpcodeList;
   protected readonly _hardforkByBlockNumber: boolean;
@@ -208,12 +210,16 @@ export class VM extends AsyncEventEmitter {
     // Throw on chain or hardfork options removed in latest major release
     // to prevent implicit chain setup on a wrong chain
     if ('chain' in opts || 'hardfork' in opts) {
-      throw new Error('Chain/hardfork options are not allowed any more on initialization');
+      throw new Error(
+        'Chain/hardfork options are not allowed any more on initialization'
+      );
     }
 
     if (opts.common) {
       //EIPs
-      const supportedEIPs = [1559, 2315, 2537, 2565, 2718, 2929, 2930, 3198, 3529, 3541];
+      const supportedEIPs = [
+        1559, 2315, 2537, 2565, 2718, 2929, 2930, 3198, 3529, 3541
+      ];
       for (const eip of opts.common.eips()) {
         if (!supportedEIPs.includes(eip) && eip < 100000) {
           throw new Error(`${eip} is not supported by the VM`);
@@ -223,7 +229,19 @@ export class VM extends AsyncEventEmitter {
       this._common = opts.common;
     } else {
       const DEFAULT_CHAIN = Chain.Mainnet;
-      const supportedHardforks = ['chainstart', 'homestead', 'dao', 'tangerineWhistle', 'spuriousDragon', 'byzantium', 'constantinople', 'petersburg', 'istanbul', 'muirGlacier', 'berlin'];
+      const supportedHardforks = [
+        'chainstart',
+        'homestead',
+        'dao',
+        'tangerineWhistle',
+        'spuriousDragon',
+        'byzantium',
+        'constantinople',
+        'petersburg',
+        'istanbul',
+        'muirGlacier',
+        'berlin'
+      ];
 
       this._common = new Common({
         chain: DEFAULT_CHAIN,

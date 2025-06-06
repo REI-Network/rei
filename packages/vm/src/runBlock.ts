@@ -1,8 +1,19 @@
 import { debug as createDebugLogger } from 'debug';
 import { encode } from 'rlp';
 import { BaseTrie as Trie } from '@rei-network/trie';
-import { Account, Address, BN, intToBuffer, generateAddress } from 'ethereumjs-util';
-import { Block, Capability, TypedTransaction, FeeMarketEIP1559Transaction } from '@rei-network/structure';
+import {
+  Account,
+  Address,
+  BN,
+  intToBuffer,
+  generateAddress
+} from 'ethereumjs-util';
+import {
+  Block,
+  Capability,
+  TypedTransaction,
+  FeeMarketEIP1559Transaction
+} from '@rei-network/structure';
 import { ConsensusType } from '@rei-network/common';
 import { VM } from './index';
 import Bloom from './bloom';
@@ -18,7 +29,11 @@ type PromisResultType<T> = T extends PromiseLike<infer U> ? U : T;
 // TxReceipts are exported. These exports are
 // deprecated and may be removed soon, please
 // update your imports to the new types file.
-import { PreByzantiumTxReceipt, PostByzantiumTxReceipt, EIP2930Receipt } from './types';
+import {
+  PreByzantiumTxReceipt,
+  PostByzantiumTxReceipt,
+  EIP2930Receipt
+} from './types';
 export { PreByzantiumTxReceipt, PostByzantiumTxReceipt, EIP2930Receipt };
 
 const debug = createDebugLogger('vm:block');
@@ -67,11 +82,17 @@ export interface RunBlockOpts {
   /**
    * Generate receipt root callback
    */
-  genReceiptTrie?: (transactions: TypedTransaction[], receipts: TxReceipt[]) => Promise<Buffer>;
+  genReceiptTrie?: (
+    transactions: TypedTransaction[],
+    receipts: TxReceipt[]
+  ) => Promise<Buffer>;
   /**
    * After apply block callback
    */
-  afterApply?: (stateManager: StateManager, result: PromisResultType<ReturnType<typeof applyBlock>>) => Promise<void>;
+  afterApply?: (
+    stateManager: StateManager,
+    result: PromisResultType<ReturnType<typeof applyBlock>>
+  ) => Promise<void>;
   /**
    * Run tx options
    */
@@ -120,7 +141,10 @@ export interface AfterBlockEvent extends RunBlockResult {
 /**
  * @ignore
  */
-export default async function runBlock(this: VM, opts: RunBlockOpts): Promise<RunBlockResult> {
+export default async function runBlock(
+  this: VM,
+  opts: RunBlockOpts
+): Promise<RunBlockResult> {
   const state = this.stateManager;
   const { root } = opts;
   let { block } = opts;
@@ -140,7 +164,13 @@ export default async function runBlock(this: VM, opts: RunBlockOpts): Promise<Ru
   }
   if (this.DEBUG) {
     debug('-'.repeat(100));
-    debug(`Running block hash=${block.hash().toString('hex')} number=${block.header.number.toNumber()} hardfork=${this._common.hardfork()}`);
+    debug(
+      `Running block hash=${block
+        .hash()
+        .toString(
+          'hex'
+        )} number=${block.header.number.toNumber()} hardfork=${this._common.hardfork()}`
+    );
   }
 
   // Set state root if provided
@@ -152,7 +182,10 @@ export default async function runBlock(this: VM, opts: RunBlockOpts): Promise<Ru
   }
 
   // check for DAO support and if we should apply the DAO fork
-  if (this._common.hardforkIsActiveOnChain('dao') && block.header.number.eq(this._common.hardforkBlockBN('dao')!)) {
+  if (
+    this._common.hardforkIsActiveOnChain('dao') &&
+    block.header.number.eq(this._common.hardforkBlockBN('dao')!)
+  ) {
     if (this.DEBUG) {
       debug('Apply DAO hardfork');
     }
@@ -169,7 +202,15 @@ export default async function runBlock(this: VM, opts: RunBlockOpts): Promise<Ru
   try {
     result = await applyBlock.bind(this)(block, opts);
     if (this.DEBUG) {
-      debug(`Received block results gasUsed=${result.gasUsed} bloom=${short(result.bloom.bitvector)} (${result.bloom.bitvector.length} bytes) receiptRoot=${result.receiptRoot.toString('hex')} receipts=${result.receipts.length} txResults=${result.results.length}`);
+      debug(
+        `Received block results gasUsed=${result.gasUsed} bloom=${short(
+          result.bloom.bitvector
+        )} (${
+          result.bloom.bitvector.length
+        } bytes) receiptRoot=${result.receiptRoot.toString('hex')} receipts=${
+          result.receipts.length
+        } txResults=${result.results.length}`
+      );
     }
     // Call after apply if exists
     opts.afterApply && (await opts.afterApply(state, result));
@@ -197,7 +238,13 @@ export default async function runBlock(this: VM, opts: RunBlockOpts): Promise<Ru
     const gasUsed = result.gasUsed;
     const receiptTrie = result.receiptRoot;
     const transactionsTrie = await _genTxTrie(block);
-    const generatedFields = { stateRoot, bloom, gasUsed, receiptTrie, transactionsTrie };
+    const generatedFields = {
+      stateRoot,
+      bloom,
+      gasUsed,
+      receiptTrie,
+      transactionsTrie
+    };
     const blockData = {
       ...block,
       header: { ...block.header, ...generatedFields }
@@ -207,27 +254,44 @@ export default async function runBlock(this: VM, opts: RunBlockOpts): Promise<Ru
       cliqueSigner: opts.cliqueSigner
     });
   } else {
-    if (result.receiptRoot && !result.receiptRoot.equals(block.header.receiptTrie)) {
+    if (
+      result.receiptRoot &&
+      !result.receiptRoot.equals(block.header.receiptTrie)
+    ) {
       if (this.DEBUG) {
-        debug(`Invalid receiptTrie received=${result.receiptRoot.toString('hex')} expected=${block.header.receiptTrie.toString('hex')}`);
+        debug(
+          `Invalid receiptTrie received=${result.receiptRoot.toString(
+            'hex'
+          )} expected=${block.header.receiptTrie.toString('hex')}`
+        );
       }
       throw new Error('invalid receiptTrie');
     }
     if (!result.bloom.bitvector.equals(block.header.bloom)) {
       if (this.DEBUG) {
-        debug(`Invalid bloom received=${result.bloom.bitvector.toString('hex')} expected=${block.header.bloom.toString('hex')}`);
+        debug(
+          `Invalid bloom received=${result.bloom.bitvector.toString(
+            'hex'
+          )} expected=${block.header.bloom.toString('hex')}`
+        );
       }
       throw new Error('invalid bloom');
     }
     if (!result.gasUsed.eq(block.header.gasUsed)) {
       if (this.DEBUG) {
-        debug(`Invalid gasUsed received=${result.gasUsed} expected=${block.header.gasUsed}`);
+        debug(
+          `Invalid gasUsed received=${result.gasUsed} expected=${block.header.gasUsed}`
+        );
       }
       throw new Error('invalid gasUsed');
     }
     if (!stateRoot.equals(block.header.stateRoot)) {
       if (this.DEBUG) {
-        debug(`Invalid stateRoot received=${stateRoot.toString('hex')} expected=${block.header.stateRoot.toString('hex')}`);
+        debug(
+          `Invalid stateRoot received=${stateRoot.toString(
+            'hex'
+          )} expected=${block.header.stateRoot.toString('hex')}`
+        );
       }
       throw new Error('invalid block stateRoot');
     }
@@ -254,7 +318,13 @@ export default async function runBlock(this: VM, opts: RunBlockOpts): Promise<Ru
    */
   await this._emit('afterBlock', afterBlockEvent);
   if (this.DEBUG) {
-    debug(`Running block finished hash=${block.hash().toString('hex')} number=${block.header.number.toNumber()} hardfork=${this._common.hardfork()}`);
+    debug(
+      `Running block finished hash=${block
+        .hash()
+        .toString(
+          'hex'
+        )} number=${block.header.number.toNumber()} hardfork=${this._common.hardfork()}`
+    );
   }
 
   return results;
@@ -306,7 +376,11 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
   const recentHashes: Buffer[] = [];
   const number = block.header.number;
   const db = this.blockchain.database;
-  for (let i = number.subn(1); i.gten(0) && i.gte(number.subn(256)); i.isubn(1)) {
+  for (
+    let i = number.subn(1);
+    i.gten(0) && i.gte(number.subn(256));
+    i.isubn(1)
+  ) {
     recentHashes.push(await db.numberToHash(i));
   }
 
@@ -319,7 +393,9 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
 
     let maxGasLimit;
     if (this._common.isActivatedEIP(1559)) {
-      maxGasLimit = block.header.gasLimit.muln(this._common.param('gasConfig', 'elasticityMultiplier'));
+      maxGasLimit = block.header.gasLimit.muln(
+        this._common.param('gasConfig', 'elasticityMultiplier')
+      );
     } else {
       maxGasLimit = block.header.gasLimit;
     }
@@ -331,18 +407,35 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
 
     // Call tx exec start
     let time: undefined | number;
-    const _debug = opts.debug && (!opts.debug.hash || opts.debug.hash.equals(tx.hash()));
+    const _debug =
+      opts.debug && (!opts.debug.hash || opts.debug.hash.equals(tx.hash()));
     if (_debug) {
       time = Date.now();
       const from = tx.getSenderAddress().buf;
-      const to = tx?.to?.buf ?? generateAddress(tx.getSenderAddress().buf, tx.nonce.toArrayLike(Buffer));
+      const to =
+        tx?.to?.buf ??
+        generateAddress(
+          tx.getSenderAddress().buf,
+          tx.nonce.toArrayLike(Buffer)
+        );
       const create = tx.toCreationAddress();
       const input = tx.data;
       const gas = tx.gasLimit;
-      const gasPrice = tx instanceof FeeMarketEIP1559Transaction ? new BN(0) : tx.gasPrice;
+      const gasPrice =
+        tx instanceof FeeMarketEIP1559Transaction ? new BN(0) : tx.gasPrice;
       const value = tx.value;
       const number = block.header.number;
-      await opts.debug!.captureStart(from, to, create, input, gas, gasPrice, value, number, this.stateManager);
+      await opts.debug!.captureStart(
+        from,
+        to,
+        create,
+        input,
+        gas,
+        gasPrice,
+        value,
+        number,
+        this.stateManager
+      );
     }
 
     let txRes: undefined | RunTxResult;
@@ -368,7 +461,9 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
       // Add to total block gas usage
       gasUsed = gasUsed.add(txRes.gasUsed);
       if (this.DEBUG) {
-        debug(`Add tx gas used (${txRes.gasUsed}) to total block gas usage (-> ${gasUsed})`);
+        debug(
+          `Add tx gas used (${txRes.gasUsed}) to total block gas usage (-> ${gasUsed})`
+        );
       }
 
       // Combine blooms via bitwise OR
@@ -381,9 +476,17 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
     // Call tx exec over
     if (_debug) {
       if (txRes) {
-        await opts.debug!.captureEnd(txRes.execResult.returnValue, txRes.gasUsed, Date.now() - time!);
+        await opts.debug!.captureEnd(
+          txRes.execResult.returnValue,
+          txRes.gasUsed,
+          Date.now() - time!
+        );
       } else {
-        await opts.debug!.captureEnd(Buffer.alloc(0), new BN(0), Date.now() - time!);
+        await opts.debug!.captureEnd(
+          Buffer.alloc(0),
+          new BN(0),
+          Date.now() - time!
+        );
       }
     }
 
@@ -399,7 +502,10 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
   return {
     bloom,
     gasUsed,
-    receiptRoot: await (opts.genReceiptTrie ?? _genReceiptTrie)(block.transactions, receipts),
+    receiptRoot: await (opts.genReceiptTrie ?? _genReceiptTrie)(
+      block.transactions,
+      receipts
+    ),
     receipts,
     results: txResults
   };
@@ -409,7 +515,11 @@ async function applyTransactions(this: VM, block: Block, opts: RunBlockOpts) {
  * Calculates block rewards for miner and ommers and puts
  * the updated balances of their accounts to state.
  */
-async function assignBlockRewards(this: VM, block: Block, opts: RunBlockOpts): Promise<void> {
+async function assignBlockRewards(
+  this: VM,
+  block: Block,
+  opts: RunBlockOpts
+): Promise<void> {
   if (this.DEBUG) {
     debug('Assign block rewards');
   }
@@ -418,10 +528,16 @@ async function assignBlockRewards(this: VM, block: Block, opts: RunBlockOpts): P
   const ommers = block.uncleHeaders;
   // Reward ommers
   for (const ommer of ommers) {
-    const reward = calculateOmmerReward(ommer.number, block.header.number, minerReward);
+    const reward = calculateOmmerReward(
+      ommer.number,
+      block.header.number,
+      minerReward
+    );
     const account = await rewardAccount(state, ommer.coinbase, reward);
     if (this.DEBUG) {
-      debug(`Add uncle reward ${reward} to account ${ommer.coinbase} (-> ${account.balance})`);
+      debug(
+        `Add uncle reward ${reward} to account ${ommer.coinbase} (-> ${account.balance})`
+      );
     }
   }
   // Reward miner
@@ -447,7 +563,11 @@ async function assignBlockRewards(this: VM, block: Block, opts: RunBlockOpts): P
   }
 }
 
-function calculateOmmerReward(ommerBlockNumber: BN, blockNumber: BN, minerReward: BN): BN {
+function calculateOmmerReward(
+  ommerBlockNumber: BN,
+  blockNumber: BN,
+  minerReward: BN
+): BN {
   const heightDiff = blockNumber.sub(ommerBlockNumber);
   let reward = new BN(8).sub(heightDiff).mul(minerReward.divn(8));
   if (reward.ltn(0)) {
@@ -464,7 +584,11 @@ export function calculateMinerReward(minerReward: BN, ommersNum: number): BN {
   return reward;
 }
 
-export async function rewardAccount(state: StateManager, address: Address, reward: BN): Promise<Account> {
+export async function rewardAccount(
+  state: StateManager,
+  address: Address,
+  reward: BN
+): Promise<Account> {
   const account = await state.getAccount(address);
   account.balance.iadd(reward);
   await state.putAccount(address, account);
@@ -489,7 +613,12 @@ export function encodeReceipt(tx: TypedTransaction, receipt: TxReceipt) {
  * Generates the tx receipt and returns { txReceipt, encodedReceipt, receiptLog }
  * @deprecated Please use the new `generateTxReceipt` located in runTx.
  */
-export async function generateTxReceipt(this: VM, tx: TypedTransaction, txRes: RunTxResult, blockGasUsed: BN) {
+export async function generateTxReceipt(
+  this: VM,
+  tx: TypedTransaction,
+  txRes: RunTxResult,
+  blockGasUsed: BN
+) {
   const abstractTxReceipt = {
     gasUsed: blockGasUsed.toArrayLike(Buffer),
     bitvector: txRes.bloom.bitvector,
@@ -499,7 +628,13 @@ export async function generateTxReceipt(this: VM, tx: TypedTransaction, txRes: R
   let txReceipt;
   let encodedReceipt;
 
-  let receiptLog = `Generate tx receipt transactionType=${tx.type} gasUsed=${blockGasUsed.toString()} bitvector=${short(abstractTxReceipt.bitvector)} (${abstractTxReceipt.bitvector.length} bytes) logs=${abstractTxReceipt.logs.length}`;
+  let receiptLog = `Generate tx receipt transactionType=${
+    tx.type
+  } gasUsed=${blockGasUsed.toString()} bitvector=${short(
+    abstractTxReceipt.bitvector
+  )} (${abstractTxReceipt.bitvector.length} bytes) logs=${
+    abstractTxReceipt.logs.length
+  }`;
 
   if (!tx.supports(999)) {
     // Legacy transaction
@@ -518,7 +653,9 @@ export async function generateTxReceipt(this: VM, tx: TypedTransaction, txRes: R
         stateRoot: stateRoot,
         ...abstractTxReceipt
       } as PreByzantiumTxReceipt;
-      receiptLog += ` stateRoot=${txReceipt.stateRoot.toString('hex')} (< Byzantium)`;
+      receiptLog += ` stateRoot=${txReceipt.stateRoot.toString(
+        'hex'
+      )} (< Byzantium)`;
     }
     encodedReceipt = encode(Object.values(txReceipt));
   } else {
@@ -527,7 +664,10 @@ export async function generateTxReceipt(this: VM, tx: TypedTransaction, txRes: R
       status: txRes.execResult.exceptionError ? 0 : 1,
       ...abstractTxReceipt
     } as PostByzantiumTxReceipt;
-    encodedReceipt = Buffer.concat([intToBuffer(tx.type), encode(Object.values(txReceipt))]);
+    encodedReceipt = Buffer.concat([
+      intToBuffer(tx.type),
+      encode(Object.values(txReceipt))
+    ]);
   }
   return {
     txReceipt,
@@ -538,7 +678,9 @@ export async function generateTxReceipt(this: VM, tx: TypedTransaction, txRes: R
 
 // apply the DAO fork changes to the VM
 async function _applyDAOHardfork(state: StateManager) {
-  const DAORefundContractAddress = new Address(Buffer.from(DAORefundContract, 'hex'));
+  const DAORefundContractAddress = new Address(
+    Buffer.from(DAORefundContract, 'hex')
+  );
   if (!state.accountExists(DAORefundContractAddress)) {
     await state.putAccount(DAORefundContractAddress, new Account());
   }
@@ -558,7 +700,10 @@ async function _applyDAOHardfork(state: StateManager) {
   await state.putAccount(DAORefundContractAddress, DAORefundAccount);
 }
 
-async function _genReceiptTrie(transactions: TypedTransaction[], receipts: TxReceipt[]) {
+async function _genReceiptTrie(
+  transactions: TypedTransaction[],
+  receipts: TxReceipt[]
+) {
   const trie = new Trie();
   for (let i = 0; i < receipts.length; i++) {
     await trie.put(encode(i), encodeReceipt(transactions[i], receipts[i]));

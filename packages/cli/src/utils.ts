@@ -11,7 +11,15 @@ import inquirer from 'inquirer';
  * @param options.forceInput - Whether to force the user to enter the passphrase
  * @returns
  */
-export async function getPassphrase(password?: string, options?: { addresses?: string[]; repeat?: boolean; message?: string; forceInput?: boolean }) {
+export async function getPassphrase(
+  password?: string,
+  options?: {
+    addresses?: string[];
+    repeat?: boolean;
+    message?: string;
+    forceInput?: boolean;
+  }
+) {
   let passphrase: string[];
   if (!options?.forceInput && password) {
     const realPassword = fs.readFileSync(password).toString();
@@ -22,7 +30,11 @@ export async function getPassphrase(password?: string, options?: { addresses?: s
   } else {
     async function getSinglePassphrase(address?: string): Promise<string> {
       if (address) {
-        console.log(`Please input the password of account ${address.startsWith('0x') ? address.substr(2) : address}`);
+        console.log(
+          `Please input the password of account ${
+            address.startsWith('0x') ? address.substr(2) : address
+          }`
+        );
       } else if (options?.message) {
         console.log(options.message);
       }
@@ -72,7 +84,9 @@ export function loadVersion() {
   // load version from package.json
   let version = 'unknown';
   try {
-    version = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json')).toString()).version;
+    version = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '../package.json')).toString()
+    ).version;
     version = version ?? 'unknown';
   } catch (err) {
     // ignore errors...

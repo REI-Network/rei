@@ -29,7 +29,9 @@ export class IpcServer {
           const ethController = this.controllers.get('eth')!;
           const coinbase = ethController.coinbase();
           const block = await ethController.getBlockByNumber(['latest', true]);
-          const time = new Date(hexStringToBN(block?.timestamp!).toNumber() * 1000).toUTCString();
+          const time = new Date(
+            hexStringToBN(block?.timestamp!).toNumber() * 1000
+          ).toUTCString();
           const protocolVersion = ethController.protocolVersion();
           ipc.server.emit(
             socket,
@@ -48,7 +50,9 @@ To exit, press ctrl-d or type .exit
         ipc.server.on('message', async (data: string, socket: any) => {
           try {
             const { method, params } = JSON.parse(data);
-            const controller = Array.from(this.controllers.values()).find((c) => method in c);
+            const controller = Array.from(this.controllers.values()).find(
+              (c) => method in c
+            );
             if (!controller) {
               throw new Error(`Unknown method ${method}`);
             }
@@ -64,7 +68,11 @@ To exit, press ctrl-d or type .exit
       });
 
       ipc.server.start();
-      logger.info(`IPC server started on path ${ipc.config.socketRoot + ipc.config.appspace + ipc.config.id}`);
+      logger.info(
+        `IPC server started on path ${
+          ipc.config.socketRoot + ipc.config.appspace + ipc.config.id
+        }`
+      );
     });
   }
 

@@ -11,9 +11,21 @@ export interface Bls {
   sign(secretKey: Uint8Array, message: Uint8Array): Uint8Array;
   aggregatePublicKeys(publicKeys: Uint8Array[]): Uint8Array;
   aggregateSignatures(signatures: Uint8Array[]): Uint8Array;
-  verify(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array): boolean;
-  verifyAggregate(publicKeys: Uint8Array[], message: Uint8Array, signature: Uint8Array): boolean;
-  verifyMultiple(publicKeys: Uint8Array[], messages: Uint8Array[], signature: Uint8Array): boolean;
+  verify(
+    publicKey: Uint8Array,
+    message: Uint8Array,
+    signature: Uint8Array
+  ): boolean;
+  verifyAggregate(
+    publicKeys: Uint8Array[],
+    message: Uint8Array,
+    signature: Uint8Array
+  ): boolean;
+  verifyMultiple(
+    publicKeys: Uint8Array[],
+    messages: Uint8Array[],
+    signature: Uint8Array
+  ): boolean;
   verifyMultipleSignatures(
     sets: {
       publicKey: Uint8Array;
@@ -37,7 +49,11 @@ export declare class SecretKey {
 export declare class PublicKey {
   private constructor();
   /** @param type Only for impl `blst-native`. Defaults to `CoordType.jacobian` */
-  static fromBytes(bytes: Uint8Array, type?: CoordType, validate?: boolean): PublicKey;
+  static fromBytes(
+    bytes: Uint8Array,
+    type?: CoordType,
+    validate?: boolean
+  ): PublicKey;
   static fromHex(hex: string): PublicKey;
   static aggregate(publicKeys: PublicKey[]): PublicKey;
   /** @param format Defaults to `PointFormat.compressed` */
@@ -48,7 +64,11 @@ export declare class Signature {
   private constructor();
   /** @param type Only for impl `blst-native`. Defaults to `CoordType.affine`
    *  @param validate When using `herumi` implementation, signature validation is always on regardless of this flag. */
-  static fromBytes(bytes: Uint8Array, type?: CoordType, validate?: boolean): Signature;
+  static fromBytes(
+    bytes: Uint8Array,
+    type?: CoordType,
+    validate?: boolean
+  ): Signature;
   static fromHex(hex: string): Signature;
   static aggregate(signatures: Signature[]): Signature;
   static verifyMultipleSignatures(

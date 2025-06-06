@@ -1,9 +1,21 @@
 import * as rlp from 'rlp';
 import { Address, BN } from 'ethereumjs-util';
 import type { LevelUp } from 'levelup';
-import { Block, BlockHeader, BlockBuffer, BlockHeaderBuffer, BlockBodyBuffer, Transaction, Receipt } from '@rei-network/structure';
+import {
+  Block,
+  BlockHeader,
+  BlockBuffer,
+  BlockHeaderBuffer,
+  BlockBodyBuffer,
+  Transaction,
+  Receipt
+} from '@rei-network/structure';
 import { Common } from '@rei-network/common';
-import { CliqueLatestSignerStates, CliqueLatestVotes, CliqueLatestBlockSigners } from './clique';
+import {
+  CliqueLatestSignerStates,
+  CliqueLatestVotes,
+  CliqueLatestBlockSigners
+} from './clique';
 import Cache from './cache';
 import { DatabaseKey, DBOp, DBTarget, DBOpData } from './operation';
 import { decompressBytes } from './compress';
@@ -101,7 +113,10 @@ export class DBManager {
   async getCliqueLatestVotes(): Promise<CliqueLatestVotes> {
     try {
       const signerVotes = await this.get(DBTarget.CliqueVotes);
-      const votes = (<any>rlp.decode(signerVotes)) as [Buffer, [Buffer, Buffer, Buffer]];
+      const votes = (<any>rlp.decode(signerVotes)) as [
+        Buffer,
+        [Buffer, Buffer, Buffer]
+      ];
       return votes.map((vote) => {
         const blockNum = new BN(vote[0]);
         const signer = new Address((vote[1] as any)[0]);
@@ -158,7 +173,9 @@ export class DBManager {
       throw new Error('Unknown blockId type');
     }
 
-    const header: BlockHeaderBuffer = (await this.getHeader(hash, number)).raw();
+    const header: BlockHeaderBuffer = (
+      await this.getHeader(hash, number)
+    ).raw();
     let body: BlockBodyBuffer = [[], []];
     try {
       body = await this.getBody(hash, number);
@@ -184,7 +201,10 @@ export class DBManager {
    * Fetches header of a block given its hash and number.
    */
   async getHeader(blockHash: Buffer, blockNumber: BN) {
-    const encodedHeader = await this.get(DBTarget.Header, { blockHash, blockNumber });
+    const encodedHeader = await this.get(DBTarget.Header, {
+      blockHash,
+      blockNumber
+    });
     const opts = { common: this._common, hardforkByBlockNumber: true };
     return BlockHeader.fromRLPSerializedHeader(encodedHeader, opts);
   }
@@ -193,7 +213,10 @@ export class DBManager {
    * Fetches total difficulty for a block given its hash and number.
    */
   async getTotalDifficulty(blockHash: Buffer, blockNumber: BN): Promise<BN> {
-    const td = await this.get(DBTarget.TotalDifficulty, { blockHash, blockNumber });
+    const td = await this.get(DBTarget.TotalDifficulty, {
+      blockHash,
+      blockNumber
+    });
     return new BN(rlp.decode(td));
   }
 
@@ -287,7 +310,12 @@ export class DBManager {
     const blockHeightBuffer = await this.get(DBTarget.TxLookup, { txHash });
     const blockHeihgt = new BN(blockHeightBuffer);
     const block = await this.getBlock(blockHeihgt);
-    const rawArr = rlp.decode(await this.get(DBTarget.Receipts, { blockHash: block.hash(), blockNumber: blockHeihgt })) as unknown as Buffer[][];
+    const rawArr = rlp.decode(
+      await this.get(DBTarget.Receipts, {
+        blockHash: block.hash(),
+        blockNumber: blockHeihgt
+      })
+    ) as unknown as Buffer[][];
     let lastCumulativeGasUsed = new BN(0);
     for (let i = 0; i < block.transactions.length; i++) {
       const tx = block.transactions[i] as Transaction;
@@ -308,15 +336,30 @@ export class DBManager {
    * @param hash - Block hash
    * @returns Receipts
    */
-  async getReceipts(number: BN, hash: Buffer, block?: Block): Promise<Receipt[]> {
-    const rawArr = rlp.decode(await this.get(DBTarget.Receipts, { blockHash: hash, blockNumber: number })) as unknown as Buffer[][];
+  async getReceipts(
+    number: BN,
+    hash: Buffer,
+    block?: Block
+  ): Promise<Receipt[]> {
+    const rawArr = rlp.decode(
+      await this.get(DBTarget.Receipts, {
+        blockHash: hash,
+        blockNumber: number
+      })
+    ) as unknown as Buffer[][];
     const receipts: Receipt[] = [];
     let lastCumulativeGasUsed = new BN(0);
     for (let i = 0; i < rawArr.length; i++) {
       const raw = rawArr[i];
       const receipt = Receipt.fromValuesArray(raw);
       const gasUsed = receipt.bnCumulativeGasUsed.sub(lastCumulativeGasUsed);
-      block && receipt.initExtension(block, block.transactions[i] as Transaction, gasUsed, i);
+      block &&
+        receipt.initExtension(
+          block,
+          block.transactions[i] as Transaction,
+          gasUsed,
+          i
+        );
       lastCumulativeGasUsed = receipt.bnCumulativeGasUsed;
       receipts.push(receipt);
     }
@@ -330,11 +373,22 @@ export class DBManager {
    * @param blockNumber - Block number
    * @returns Transaction
    */
-  async getReceiptByHashAndNumber(txHash: Buffer, blockHash: Buffer, blockNumber: BN): Promise<Receipt> {
-    const header = rlp.decode(await this.get(DBTarget.Header, { blockHash, blockNumber })) as unknown as BlockHeaderBuffer;
+  async getReceiptByHashAndNumber(
+    txHash: Buffer,
+    blockHash: Buffer,
+    blockNumber: BN
+  ): Promise<Receipt> {
+    const header = rlp.decode(
+      await this.get(DBTarget.Header, { blockHash, blockNumber })
+    ) as unknown as BlockHeaderBuffer;
     const body = await this.getBody(blockHash, blockNumber);
-    const block = Block.fromValuesArray([header, ...body], { common: this._common, hardforkByBlockNumber: true });
-    const rawArr = rlp.decode(await this.get(DBTarget.Receipts, { blockHash, blockNumber })) as unknown as Buffer[][];
+    const block = Block.fromValuesArray([header, ...body], {
+      common: this._common,
+      hardforkByBlockNumber: true
+    });
+    const rawArr = rlp.decode(
+      await this.get(DBTarget.Receipts, { blockHash, blockNumber })
+    ) as unknown as Buffer[][];
     let lastCumulativeGasUsed = new BN(0);
     for (let i = 0; i < block.transactions.length; i++) {
       const tx = block.transactions[i] as Transaction;
@@ -355,8 +409,13 @@ export class DBManager {
    * @param blockNumber - Block number
    * @returns Block
    */
-  async getBlockByHashAndNumber(blockHash: Buffer, blockNumber: BN): Promise<Block> {
-    const header = rlp.decode(await this.get(DBTarget.Header, { blockHash, blockNumber })) as unknown as BlockHeaderBuffer;
+  async getBlockByHashAndNumber(
+    blockHash: Buffer,
+    blockNumber: BN
+  ): Promise<Block> {
+    const header = rlp.decode(
+      await this.get(DBTarget.Header, { blockHash, blockNumber })
+    ) as unknown as BlockHeaderBuffer;
     let body: BlockBodyBuffer = [[], []];
     try {
       body = await this.getBody(blockHash, blockNumber);
@@ -365,7 +424,10 @@ export class DBManager {
         throw err;
       }
     }
-    return Block.fromValuesArray([header, ...body], { common: this._common, hardforkByBlockNumber: true });
+    return Block.fromValuesArray([header, ...body], {
+      common: this._common,
+      hardforkByBlockNumber: true
+    });
   }
 
   /**
@@ -376,8 +438,16 @@ export class DBManager {
    * @param length - Used for decompressing
    * @returns Decompressed bloom bits data
    */
-  async getBloomBits(bit: number, section: BN, hash: Buffer, length: number): Promise<Buffer> {
-    return decompressBytes(await this.get(DBTarget.BloomBits, { bit, section, hash }), length);
+  async getBloomBits(
+    bit: number,
+    section: BN,
+    hash: Buffer,
+    length: number
+  ): Promise<Buffer> {
+    return decompressBytes(
+      await this.get(DBTarget.BloomBits, { bit, section, hash }),
+      length
+    );
   }
 
   /**
@@ -499,7 +569,10 @@ export class DBManager {
    * @param codeHash - Code hash
    */
   getCode(codeHash: Buffer): Promise<Buffer> {
-    return this._db.get(codeHash, { keyEncoding: 'binary', valueEncoding: 'binary' });
+    return this._db.get(codeHash, {
+      keyEncoding: 'binary',
+      valueEncoding: 'binary'
+    });
   }
 
   /**
@@ -507,7 +580,10 @@ export class DBManager {
    * @param hash - Node hash
    */
   getTrieNode(hash: Buffer): Promise<Buffer> {
-    return this._db.get(hash, { keyEncoding: 'binary', valueEncoding: 'binary' });
+    return this._db.get(hash, {
+      keyEncoding: 'binary',
+      valueEncoding: 'binary'
+    });
   }
 
   /**
@@ -516,7 +592,10 @@ export class DBManager {
    */
   async hasCode(codeHash: Buffer): Promise<boolean> {
     try {
-      await this._db.get(codeHash, { keyEncoding: 'binary', valueEncoding: 'binary' });
+      await this._db.get(codeHash, {
+        keyEncoding: 'binary',
+        valueEncoding: 'binary'
+      });
       return true;
     } catch (err: any) {
       if (err.type === 'NotFoundError') {
@@ -532,7 +611,10 @@ export class DBManager {
    */
   async hasTrieNode(hash: Buffer) {
     try {
-      await this._db.get(hash, { keyEncoding: 'binary', valueEncoding: 'binary' });
+      await this._db.get(hash, {
+        keyEncoding: 'binary',
+        valueEncoding: 'binary'
+      });
       return true;
     } catch (err: any) {
       if (err.type === 'NotFoundError') {

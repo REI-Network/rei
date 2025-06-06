@@ -2,7 +2,7 @@ import error from './errorCodes';
 import { JSONRPC_VERSION } from './types';
 
 class Errexpand extends Error {
-  code: number = 0;
+  code = 0;
   rpcMessage?: string;
 }
 
@@ -23,7 +23,10 @@ export function makeRpcErr(message = 'JSON-RPC error', code = 500) {
  * @param method - Not found method
  */
 export function makeNotFoundErr(method: string) {
-  return makeRpcErr(`${error.METHOD_NOT_FOUND.message} - ${method}`, error.METHOD_NOT_FOUND.code);
+  return makeRpcErr(
+    `${error.METHOD_NOT_FOUND.message} - ${method}`,
+    error.METHOD_NOT_FOUND.code
+  );
 }
 
 /**
@@ -32,7 +35,10 @@ export function makeNotFoundErr(method: string) {
  */
 export function validateJsonRpcVersion(version: string) {
   if (version !== JSONRPC_VERSION) {
-    throw makeRpcErr(`${error.INVALID_REQUEST.message}, wrong version - ${version}`, error.INVALID_REQUEST.code);
+    throw makeRpcErr(
+      `${error.INVALID_REQUEST.message}, wrong version - ${version}`,
+      error.INVALID_REQUEST.code
+    );
   }
 }
 
@@ -42,6 +48,9 @@ export function validateJsonRpcVersion(version: string) {
  */
 export function validateJsonRpcMethod(method: string) {
   if (!method || typeof method !== 'string' || method.indexOf('_') === -1) {
-    throw makeRpcErr(`${error.INVALID_REQUEST.message}, wrong method - ${method}`, error.INVALID_REQUEST.code);
+    throw makeRpcErr(
+      `${error.INVALID_REQUEST.message}, wrong method - ${method}`,
+      error.INVALID_REQUEST.code
+    );
   }
 }

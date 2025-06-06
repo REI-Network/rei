@@ -1,12 +1,12 @@
 {
   "compilerOptions": {
     "target": "es2018",
-    "module": "commonjs",
+    "module": "nodenext",
     "declaration": true,
     "sourceMap": true,
     "downlevelIteration": true,
     "strict": true,
-    "moduleResolution": "node16",
+    "moduleResolution": "nodenext",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noImplicitAny": false,

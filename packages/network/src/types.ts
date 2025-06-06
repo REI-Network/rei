@@ -16,7 +16,10 @@ export interface Protocol {
    * @param peer - Peer instance
    * @param stream - Stream instance
    */
-  makeHandler(peer: Peer, stream: ProtocolStream): Promise<ProtocolHandler | null>;
+  makeHandler(
+    peer: Peer,
+    stream: ProtocolStream
+  ): Promise<ProtocolHandler | null>;
 }
 
 export interface ProtocolHandler {
@@ -107,7 +110,10 @@ export interface ILibp2p extends EventEmitter {
    * @param protocols - Protocols
    * @param callback - A callback that will be called when the protocol is received
    */
-  handle(protocols: string | string[], callback: (input: { connection: Connection; stream: Stream }) => void): void;
+  handle(
+    protocols: string | string[],
+    callback: (input: { connection: Connection; stream: Stream }) => void
+  ): void;
 
   /**
    * Unregister protocols
@@ -178,10 +184,16 @@ export interface ILibp2p extends EventEmitter {
 }
 
 export interface IDiscv5 extends EventEmitter {
-  on(event: 'message', listener: (srcId: string, src: Multiaddr, message: Message) => void): this;
+  on(
+    event: 'message',
+    listener: (srcId: string, src: Multiaddr, message: Message) => void
+  ): this;
   on(event: 'multiaddrUpdated', listener: () => void): this;
 
-  off(event: 'message', listener: (srcId: string, src: Multiaddr, message: Message) => void): this;
+  off(
+    event: 'message',
+    listener: (srcId: string, src: Multiaddr, message: Message) => void
+  ): this;
   off(event: 'multiaddrUpdated', listener: () => void): this;
 
   // Get local enr address

@@ -1,2 +1,4 @@
 packages/*/dist
-packages/binding
+packages/contracts/artifacts
+packages/contracts/cache
+packages/contracts/types

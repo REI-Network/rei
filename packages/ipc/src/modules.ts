@@ -178,8 +178,18 @@ export const eth = {
   compileSerpent() {
     passMessageToJsonAndEmit('compileSerpent');
   },
-  newFilter(fromBlock?: string, toBlock?: string, _addresses?: string | string[], topics?: TopicsData) {
-    passMessageToJsonAndEmit('newFilter', { fromBlock, toBlock, address: _addresses, topics: topics });
+  newFilter(
+    fromBlock?: string,
+    toBlock?: string,
+    _addresses?: string | string[],
+    topics?: TopicsData
+  ) {
+    passMessageToJsonAndEmit('newFilter', {
+      fromBlock,
+      toBlock,
+      address: _addresses,
+      topics: topics
+    });
   },
   newBlockFilter() {
     passMessageToJsonAndEmit('eth_newBlockFilter');
@@ -196,8 +206,20 @@ export const eth = {
   getFilterLogs(id: string) {
     passMessageToJsonAndEmit('eth_getFilterLogs', id);
   },
-  getLogs(fromBlock?: string, toBlock?: string, address?: string | string[], topics?: TopicsData, blockhash?: string) {
-    passMessageToJsonAndEmit('eth_getLogs', { fromBlock, toBlock, address: address, topics: topics, blockhash });
+  getLogs(
+    fromBlock?: string,
+    toBlock?: string,
+    address?: string | string[],
+    topics?: TopicsData,
+    blockhash?: string
+  ) {
+    passMessageToJsonAndEmit('eth_getLogs', {
+      fromBlock,
+      toBlock,
+      address: address,
+      topics: topics,
+      blockhash
+    });
   },
   getWork() {
     passMessageToJsonAndEmit('eth_getWork');

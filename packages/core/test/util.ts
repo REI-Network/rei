@@ -5,14 +5,26 @@ import { SecretKey } from '@rei-network/bls';
 export class MockAccountManager {
   readonly nameToAddress = new Map<string, Address>();
   readonly nameToPrivKey = new Map<string, Buffer>();
-  readonly addressToName = new FunctionalMap<Address, string>((a: Address, b: Address) => a.buf.compare(b.buf));
+  readonly addressToName = new FunctionalMap<Address, string>(
+    (a: Address, b: Address) => a.buf.compare(b.buf)
+  );
   readonly nameToBlsKey = new Map<string, SecretKey>();
 
-  constructor(addresses: [string, Address][] | [string, Address, Buffer][] | [string, Address, Buffer, SecretKey][]) {
+  constructor(
+    addresses:
+      | [string, Address][]
+      | [string, Address, Buffer][]
+      | [string, Address, Buffer, SecretKey][]
+  ) {
     this.add(addresses);
   }
 
-  add(addresses: [string, Address][] | [string, Address, Buffer][] | [string, Address, Buffer, SecretKey][]) {
+  add(
+    addresses:
+      | [string, Address][]
+      | [string, Address, Buffer][]
+      | [string, Address, Buffer, SecretKey][]
+  ) {
     for (const [name, address, privKey, blsSecretKey] of addresses) {
       this.nameToAddress.set(name, address);
       this.addressToName.set(address, name);

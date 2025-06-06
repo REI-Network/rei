@@ -28,16 +28,24 @@ describe('Fee', () => {
 
     fee = await feeFactory.connect(deployer).deploy(config.address);
     await config.setFee(fee.address);
-    expect(await config.fee(), 'fee address should be equal').be.equal(fee.address);
+    expect(await config.fee(), 'fee address should be equal').be.equal(
+      fee.address
+    );
 
     withdrawDelay = 3;
     await config.connect(deployer).setWithdrawDelay(withdrawDelay);
-    expect(await config.withdrawDelay(), 'withdraw delay should be equal').be.equal(withdrawDelay.toString());
+    expect(
+      await config.withdrawDelay(),
+      'withdraw delay should be equal'
+    ).be.equal(withdrawDelay.toString());
   });
 
   it('should deposit succeed', async () => {
     await fee.deposit(deployerAddr, { value: '100' });
-    expect((await fee.userDeposit(deployerAddr, deployerAddr)).amount, 'amount should be equal').be.equal('100');
+    expect(
+      (await fee.userDeposit(deployerAddr, deployerAddr)).amount,
+      'amount should be equal'
+    ).be.equal('100');
   });
 
   it('should withdraw failed', async () => {
@@ -50,12 +58,18 @@ describe('Fee', () => {
   it('should withdraw succeed', async () => {
     await upTimestamp(deployerAddr, withdrawDelay);
     await fee.withdraw(deployerAddr, 100);
-    expect((await fee.userDeposit(deployerAddr, deployerAddr)).amount, 'amount should be equal').be.equal('0');
+    expect(
+      (await fee.userDeposit(deployerAddr, deployerAddr)).amount,
+      'amount should be equal'
+    ).be.equal('0');
   });
 
   it('should deposit succeed(depositTo)', async () => {
     await fee.deposit(user1Addr, { value: 100 });
-    expect((await fee.userDeposit(user1Addr, deployerAddr)).amount, 'amount should be equal').be.equal('100');
+    expect(
+      (await fee.userDeposit(user1Addr, deployerAddr)).amount,
+      'amount should be equal'
+    ).be.equal('100');
   });
 
   it('should withdraw failed(withdrawFrom)', async () => {
@@ -68,6 +82,9 @@ describe('Fee', () => {
   it('should withdraw succeed(withdrawFrom)', async () => {
     await upTimestamp(deployerAddr, withdrawDelay);
     await fee.withdraw(user1Addr, 100);
-    expect((await fee.userDeposit(user1Addr, deployerAddr)).amount, 'amount should be equal').be.equal('0');
+    expect(
+      (await fee.userDeposit(user1Addr, deployerAddr)).amount,
+      'amount should be equal'
+    ).be.equal('0');
   });
 });

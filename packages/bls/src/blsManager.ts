@@ -44,10 +44,18 @@ export class BlsManager {
   }
 
   private getSecrectKey(fileName: string, passphrase: string) {
-    const fullPath = path.isAbsolute(fileName) ? fileName : path.join(this.datadir, fileName);
+    const fullPath = path.isAbsolute(fileName)
+      ? fileName
+      : path.join(this.datadir, fileName);
     const blsStruct = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
-    const secretkey = decrypt({ encryptedSecretKey: blsStruct.encryptedSecretKey, iv: blsStruct.iv }, passphrase);
-    if (this.bls.SecretKey.fromBytes(secretkey).toPublicKey().toHex() !== blsStruct.publicKey) {
+    const secretkey = decrypt(
+      { encryptedSecretKey: blsStruct.encryptedSecretKey, iv: blsStruct.iv },
+      passphrase
+    );
+    if (
+      this.bls.SecretKey.fromBytes(secretkey).toPublicKey().toHex() !==
+      blsStruct.publicKey
+    ) {
       throw new Error('Invalid passphrase');
     } else {
       return { secretkey, publickey: blsStruct.publicKey };
@@ -66,7 +74,10 @@ export class BlsManager {
     const fullPath = path.join(this.datadir, signerFileName(publickey.toHex()));
     fs.mkdirSync(path.dirname(fullPath), { mode: 0o700, recursive: true });
     const blsStruct = encrypt(secretkey.toBytes(), passphrase);
-    fs.writeFileSync(fullPath, JSON.stringify({ ...blsStruct, publicKey: publickey.toHex() }));
+    fs.writeFileSync(
+      fullPath,
+      JSON.stringify({ ...blsStruct, publicKey: publickey.toHex() })
+    );
     return { publickey: publickey.toHex(), path: fullPath };
   }
 
@@ -76,12 +87,21 @@ export class BlsManager {
    * @param passphrase - old AES password
    * @param newPassphrase - new AES password
    */
-  async updateSigner(fileName: string, passphrase: string, newPassphrase: string) {
+  async updateSigner(
+    fileName: string,
+    passphrase: string,
+    newPassphrase: string
+  ) {
     await this.init();
     const { secretkey, publickey } = this.getSecrectKey(fileName, passphrase);
     const blsStruct = encrypt(secretkey, newPassphrase);
-    const fullPath = path.isAbsolute(fileName) ? fileName : path.join(this.datadir, fileName);
-    fs.writeFileSync(fullPath, JSON.stringify({ ...blsStruct, publicKey: publickey }));
+    const fullPath = path.isAbsolute(fileName)
+      ? fileName
+      : path.join(this.datadir, fileName);
+    fs.writeFileSync(
+      fullPath,
+      JSON.stringify({ ...blsStruct, publicKey: publickey })
+    );
   }
 
   /**
@@ -96,7 +116,10 @@ export class BlsManager {
     const publickey = this.bls.SecretKey.fromHex(secretKey).toPublicKey();
     const fullPath = path.join(this.datadir, signerFileName(publickey.toHex()));
     fs.mkdirSync(path.dirname(fullPath), { mode: 0o700, recursive: true });
-    fs.writeFileSync(fullPath, JSON.stringify({ ...blsStruct, publicKey: publickey.toHex() }));
+    fs.writeFileSync(
+      fullPath,
+      JSON.stringify({ ...blsStruct, publicKey: publickey.toHex() })
+    );
     return { publickey: publickey.toHex(), path: fullPath };
   }
 
@@ -115,7 +138,11 @@ export class BlsManager {
    * @param message - message
    * @returns true if signature is valid
    */
-  verifyMessage(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array) {
+  verifyMessage(
+    publicKey: Uint8Array,
+    message: Uint8Array,
+    signature: Uint8Array
+  ) {
     return this.bls.verify(publicKey, message, signature);
   }
 
@@ -135,7 +162,11 @@ export class BlsManager {
    * @param publicKeys - public keys
    * @returns true if aggregated signature is valid
    */
-  verifyMultiple(aggregatedSignature: Uint8Array, messages: Uint8Array[], publicKeys: Uint8Array[]) {
+  verifyMultiple(
+    aggregatedSignature: Uint8Array,
+    messages: Uint8Array[],
+    publicKeys: Uint8Array[]
+  ) {
     return this.bls.verifyMultiple(publicKeys, messages, aggregatedSignature);
   }
 }

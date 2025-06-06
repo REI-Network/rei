@@ -2,7 +2,11 @@ import path from 'path';
 import type { LevelUp } from 'levelup';
 import { bufferToHex, BN, BNLike } from 'ethereumjs-util';
 import { SecureTrie as Trie } from '@rei-network/trie';
-import { Database, createLevelDB, createEncodingLevelDB } from '@rei-network/database';
+import {
+  Database,
+  createLevelDB,
+  createEncodingLevelDB
+} from '@rei-network/database';
 import { NetworkManager, Peer, Protocol } from '@rei-network/network';
 import { Common } from '@rei-network/common';
 import { Blockchain } from '@rei-network/blockchain';
@@ -19,7 +23,13 @@ import { BloomBitsIndexer, ChainIndexer } from './indexer';
 import { BloomBitsFilter, ReceiptsCache } from './bloomBits';
 import { Tracer } from './tracer';
 import { BlockchainMonitor } from './blockchainMonitor';
-import { Wire, ConsensusProtocol, WireProtocolHandler, SnapProtocol, SnapProtocolHandler } from './protocols';
+import {
+  Wire,
+  ConsensusProtocol,
+  WireProtocolHandler,
+  SnapProtocol,
+  SnapProtocolHandler
+} from './protocols';
 import { ReimintEngine, Reimint } from './reimint';
 import { NodeOptions, NodeStatus } from './types';
 import { StateManager } from './stateManager';
@@ -97,7 +107,9 @@ export class Node {
 
   constructor(options: NodeOptions) {
     this.datadir = options.databasePath;
-    [this.chaindb, this.chaindbDown] = createEncodingLevelDB(path.join(this.datadir, 'chaindb'));
+    [this.chaindb, this.chaindbDown] = createEncodingLevelDB(
+      path.join(this.datadir, 'chaindb')
+    );
     [this.nodedb] = createLevelDB(path.join(this.datadir, 'nodes'));
     [this.evidencedb] = createLevelDB(path.join(this.datadir, 'evidence'));
     this.wire = new Wire(this);
@@ -123,7 +135,10 @@ export class Node {
       coinbase: options.coinbase
     });
 
-    const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
+    const genesisBlock = Block.fromBlockData(
+      { header: common.genesis() },
+      { common }
+    );
     this.genesisHash = genesisBlock.hash();
     logger.info('Read genesis block from file', bufferToHex(this.genesisHash));
 
@@ -136,7 +151,10 @@ export class Node {
       hardforkByHeadBlockNumber: true
     });
 
-    const protocols: (Protocol | Protocol[])[] = [[this.wire.v2, this.wire.v1], this.consensus];
+    const protocols: (Protocol | Protocol[])[] = [
+      [this.wire.v2, this.wire.v1],
+      this.consensus
+    ];
     // enable the snapshot protocol only when the snapshot is synchronized
     if (options.syncMode === SyncMode.Snap) {
       protocols.push(this.snap);
@@ -227,7 +245,11 @@ export class Node {
         await this.reimint.generateGenesis();
       }
 
-      if (this.snapTree && (await this.snapTree.init(latest.stateRoot, false, true)) && !this.skipVerifySnap) {
+      if (
+        this.snapTree &&
+        (await this.snapTree.init(latest.stateRoot, false, true)) &&
+        !this.skipVerifySnap
+      ) {
         logger.info('📷 Verifing snaphot...');
         if (!(await this.snapTree.verify(latest.stateRoot))) {
           logger.warn('Node::init, verify snapshot failed, rebuilding...');
@@ -277,7 +299,15 @@ export class Node {
     this.commitBlockQueue.abort();
     this.txSync.abort();
 
-    const promises = [this.reimint.abort(), this.networkMngr.abort(), this.sync.abort(), this.txPool.abort(), this.bloomBitsIndexer.abort(), this.pendingTxsLoopPromise, this.commitBlockLoopPromise];
+    const promises = [
+      this.reimint.abort(),
+      this.networkMngr.abort(),
+      this.sync.abort(),
+      this.txPool.abort(),
+      this.bloomBitsIndexer.abort(),
+      this.pendingTxsLoopPromise,
+      this.commitBlockLoopPromise
+    ];
     if (this.snapTree) {
       promises.push(this.snapTree.abort(this.latestBlock.header.stateRoot));
     }
@@ -290,7 +320,10 @@ export class Node {
   }
 
   private onPeerInstalled = (peer, handler) => {
-    if (handler instanceof WireProtocolHandler || handler instanceof SnapProtocolHandler) {
+    if (
+      handler instanceof WireProtocolHandler ||
+      handler instanceof SnapProtocolHandler
+    ) {
       this.sync.announceNewPeer(handler);
     }
   };
@@ -354,7 +387,7 @@ export class Node {
    * @param snap - Need snapshot or not
    * @returns State manager object
    */
-  async getStateManager(root: Buffer, num: BNLike | Common, snap: boolean = false) {
+  async getStateManager(root: Buffer, num: BNLike | Common, snap = false) {
     const stateManager = new StateManager({
       common: num instanceof Common ? num : this.getCommon(num),
       trie: new Trie(this.chaindb),
@@ -372,7 +405,12 @@ export class Node {
    * @param mode - EVM work mode
    * @returns VM object
    */
-  async getVM(root: Buffer, num: BNLike | Common, snap: boolean = false, mode?: EVMWorkMode) {
+  async getVM(
+    root: Buffer,
+    num: BNLike | Common,
+    snap = false,
+    mode?: EVMWorkMode
+  ) {
     const stateManager = await this.getStateManager(root, num, snap);
     const common = stateManager._common;
     return new VM({
@@ -435,7 +473,10 @@ export class Node {
   getPendingStateManager() {
     const pendingBlock = this.reimint.worker.getPendingBlock();
     if (pendingBlock) {
-      return this.getStateManager(pendingBlock.pendingStateRoot, pendingBlock.common);
+      return this.getStateManager(
+        pendingBlock.pendingStateRoot,
+        pendingBlock.common
+      );
     } else {
       const latest = this.latestBlock;
       return this.getStateManager(latest.header.stateRoot, latest._common);
@@ -479,7 +520,10 @@ export class Node {
         saveTxLookup: true
       });
     } else {
-      reorged = await this.blockchain.putBlock(block, { receipts, saveTxLookup: true });
+      reorged = await this.blockchain.putBlock(block, {
+        receipts,
+        saveTxLookup: true
+      });
     }
 
     if (this.snapTree) {
@@ -497,14 +541,24 @@ export class Node {
     for (let i = 0; i < receipts.length; i++) {
       const receipt = receipts[i];
       const gasUsed = receipt.bnCumulativeGasUsed.sub(lastCumulativeGasUsed);
-      receipt.initExtension(block, block.transactions[i] as Transaction, gasUsed, i);
+      receipt.initExtension(
+        block,
+        block.transactions[i] as Transaction,
+        gasUsed,
+        i
+      );
       lastCumulativeGasUsed = receipt.bnCumulativeGasUsed;
     }
 
     // add receipts to cache
     this.receiptsCache.add(hash, receipts);
 
-    logger.info('✨ Commit block, height:', number.toString(), 'hash:', bufferToHex(hash));
+    logger.info(
+      '✨ Commit block, height:',
+      number.toString(),
+      'hash:',
+      bufferToHex(hash)
+    );
 
     return { reorged };
   }
@@ -525,7 +579,12 @@ export class Node {
             this.wire.broadcastNewBlock(block, this.totalDifficulty);
           }
 
-          const promises = [this.txPool.newBlock(block, force), this.bcMonitor.newBlock(block, force), this.bloomBitsIndexer.newBlockHeader(block.header, force), this.reimint.newBlock(block)];
+          const promises = [
+            this.txPool.newBlock(block, force),
+            this.bcMonitor.newBlock(block, force),
+            this.bloomBitsIndexer.newBlockHeader(block.header, force),
+            this.reimint.newBlock(block)
+          ];
           await Promise.all(promises);
         }
 

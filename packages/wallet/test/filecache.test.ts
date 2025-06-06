@@ -28,7 +28,9 @@ describe('FileCache', () => {
     expect(result[0].length, 'created length should be equal').be.equal(1);
     expect(result[1].length, 'deletes length should be equal').be.equal(0);
     expect(result[2].length, 'updates length should be equal').be.equal(0);
-    expect(result[0][0], 'created file name should be euqal').be.equal(path.join(testdir, newcreate));
+    expect(result[0][0], 'created file name should be euqal').be.equal(
+      path.join(testdir, newcreate)
+    );
   });
 
   it('should scan deleted files correctly', () => {
@@ -40,7 +42,10 @@ describe('FileCache', () => {
     expect(result[1].length, 'deletes length should be equal').be.equal(2);
     expect(result[2].length, 'updates length should be equal').be.equal(0);
     remove.forEach((color, i) => {
-      expect(path.join(testdir, color), 'deleted file name should be equal').be.equal(result[1][i]);
+      expect(
+        path.join(testdir, color),
+        'deleted file name should be equal'
+      ).be.equal(result[1][i]);
     });
   });
 
@@ -56,7 +61,10 @@ describe('FileCache', () => {
     expect(result[1].length, 'deletes length should be equal').be.equal(0);
     expect(result[2].length, 'updates length should be equal').be.equal(3);
     change.forEach((color, i) => {
-      expect(path.join(testdir, color), 'updated file name should be equal').be.equal(result[2][i]);
+      expect(
+        path.join(testdir, color),
+        'updated file name should be equal'
+      ).be.equal(result[2][i]);
     });
   });
 

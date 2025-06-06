@@ -1,8 +1,18 @@
 import { expect } from 'chai';
-import { Address, toBuffer, BN, keccak256, intToHex, bufferToHex } from 'ethereumjs-util';
+import {
+  Address,
+  toBuffer,
+  BN,
+  keccak256,
+  intToHex,
+  bufferToHex
+} from 'ethereumjs-util';
 import { SecureTrie as Trie } from '@rei-network/trie';
 import { AbiCoder } from '@ethersproject/abi';
-import { StateManager, StakingAccount } from '@rei-network/core/dist/stateManager';
+import {
+  StateManager,
+  StakingAccount
+} from '@rei-network/core/dist/stateManager';
 import { JSDebug } from '@rei-network/core/dist/tracer/debug/jsDebug';
 import { tracers } from '@rei-network/core/dist/tracer/tracers';
 import { toAsync } from '@rei-network/core/dist/tracer/toAsync';
@@ -17,12 +27,17 @@ const level = require('level-mem');
 const coder = new AbiCoder();
 const common = new Common({ chain: 'rei-devnet' });
 common.setHardforkByBlockNumber(0);
-const privateKey = toBuffer('0xd8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0');
+const privateKey = toBuffer(
+  '0xd8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0'
+);
 const sender = Address.fromPrivateKey(privateKey);
 
 const database = new Database(level(), common);
 const blockchain = new Blockchain({ database, common });
-const stateManager = new StateManager({ common, trie: new Trie(database.rawdb) });
+const stateManager = new StateManager({
+  common,
+  trie: new Trie(database.rawdb)
+});
 const vm = new VM({
   common,
   blockchain,
@@ -35,7 +50,14 @@ const vm = new VM({
 
 async function runTx(tx: Transaction, root: Buffer, debug?: IDebug) {
   const block = Block.fromBlockData({ transactions: [tx] }, { common });
-  const result = await vm.runBlock({ block, root, debug, generate: true, skipBlockValidation: true, runTxOpts: { skipNonce: true, skipBlockGasLimitValidation: true } });
+  const result = await vm.runBlock({
+    block,
+    root,
+    debug,
+    generate: true,
+    skipBlockValidation: true,
+    runTxOpts: { skipNonce: true, skipBlockGasLimitValidation: true }
+  });
   return result;
 }
 
@@ -43,7 +65,15 @@ async function debugTx(tx: Transaction, root: Buffer) {
   let newRoot: Buffer | undefined;
   const result = await new Promise<any>(async (resolve, reject) => {
     try {
-      const jsDebug = new JSDebug(common, { toAsync: true, tracer: toAsync(`const obj = ${tracers.get('replayTracer')}`) }, reject, tx.hash());
+      const jsDebug = new JSDebug(
+        common,
+        {
+          toAsync: true,
+          tracer: toAsync(`const obj = ${tracers.get('replayTracer')}`)
+        },
+        reject,
+        tx.hash()
+      );
       const runResult = await runTx(tx, root, jsDebug);
       const error = runResult.results[0].execResult.exceptionError;
       if (!error) {
@@ -60,8 +90,11 @@ async function debugTx(tx: Transaction, root: Buffer) {
 }
 
 function encodeCallData(name: string, types?: string[], values?: any[]) {
-  const data = types && values ? toBuffer(coder.encode(types, values)) : Buffer.alloc(0);
-  const selector = keccak256(Buffer.from(`${name}(${types ? types.join(',') : ''})`)).slice(0, 4);
+  const data =
+    types && values ? toBuffer(coder.encode(types, values)) : Buffer.alloc(0);
+  const selector = keccak256(
+    Buffer.from(`${name}(${types ? types.join(',') : ''})`)
+  ).slice(0, 4);
   return Buffer.concat([selector, data]);
 }
 
@@ -105,7 +138,10 @@ describe('JSDebug', () => {
   let obj2Addr!: Address;
 
   before(async () => {
-    await stateManager.putAccount(sender, new StakingAccount(undefined, new BN(100)));
+    await stateManager.putAccount(
+      sender,
+      new StakingAccount(undefined, new BN(100))
+    );
     lastRoot = await stateManager.getStateRoot();
   });
 
@@ -131,14 +167,22 @@ describe('JSDebug', () => {
     {
       const {
         execResult: { returnValue }
-      } = await vm.runCall({ caller: sender, to: c2Addr, data: encodeCallData('obj1') });
+      } = await vm.runCall({
+        caller: sender,
+        to: c2Addr,
+        data: encodeCallData('obj1')
+      });
       obj1Addr = new Address(returnValue.slice(12));
     }
 
     {
       const {
         execResult: { returnValue }
-      } = await vm.runCall({ caller: sender, to: c2Addr, data: encodeCallData('obj2') });
+      } = await vm.runCall({
+        caller: sender,
+        to: c2Addr,
+        data: encodeCallData('obj2')
+      });
       obj2Addr = new Address(returnValue.slice(12));
     }
   });
@@ -169,13 +213,18 @@ describe('JSDebug', () => {
      * 5. c2 call obj2.transferTo(c2, amount)
      * 6. obj2 call c2.transfer(amount)
      */
-    expect(Array.isArray(result) && result.length === 6, 'debug result should be an array').be.true;
+    expect(
+      Array.isArray(result) && result.length === 6,
+      'debug result should be an array'
+    ).be.true;
 
     const call0 = result[0].action;
     expect(call0.callType).be.equal('call');
     expect(call0.from).be.equal(sender.toString());
     expect(call0.to).be.equal(c2Addr.toString());
-    expect(call0.input).be.equal(bufferToHex(encodeCallData('transferTo', ['uint256'], [1])));
+    expect(call0.input).be.equal(
+      bufferToHex(encodeCallData('transferTo', ['uint256'], [1]))
+    );
     expect(call0.value).be.equal(intToHex(0));
 
     const call1 = result[1].action;
@@ -189,7 +238,15 @@ describe('JSDebug', () => {
     expect(call2.callType).be.equal('call');
     expect(call2.from).be.equal(c2Addr.toString());
     expect(call2.to).be.equal(obj1Addr.toString());
-    expect(call2.input).be.equal(bufferToHex(encodeCallData('transferTo', ['address', 'uint256'], [obj2Addr.toString(), 1])));
+    expect(call2.input).be.equal(
+      bufferToHex(
+        encodeCallData(
+          'transferTo',
+          ['address', 'uint256'],
+          [obj2Addr.toString(), 1]
+        )
+      )
+    );
     expect(call2.value).be.equal(intToHex(0));
 
     const call3 = result[3].action;
@@ -203,7 +260,15 @@ describe('JSDebug', () => {
     expect(call4.callType).be.equal('call');
     expect(call4.from).be.equal(c2Addr.toString());
     expect(call4.to).be.equal(obj2Addr.toString());
-    expect(call4.input).be.equal(bufferToHex(encodeCallData('transferTo', ['address', 'uint256'], [c2Addr.toString(), 1])));
+    expect(call4.input).be.equal(
+      bufferToHex(
+        encodeCallData(
+          'transferTo',
+          ['address', 'uint256'],
+          [c2Addr.toString(), 1]
+        )
+      )
+    );
     expect(call4.value).be.equal(intToHex(0));
 
     const call5 = result[5].action;
@@ -229,7 +294,10 @@ describe('JSDebug', () => {
     const { result, root } = await debugTx(tx, lastRoot);
     expect(root === undefined, 'should call contract failed').be.true;
 
-    expect(Array.isArray(result) && result.length === 1, 'debug result should be an array').be.true;
+    expect(
+      Array.isArray(result) && result.length === 1,
+      'debug result should be an array'
+    ).be.true;
     expect(result[0].error, 'should be out of gas').be.equal('out of gas');
   });
 });

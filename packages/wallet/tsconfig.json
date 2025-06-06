@@ -6,7 +6,5 @@
     "outDir": "./dist",
     "composite": true
   },
-  "references": [
-    { "path": "../utils/tsconfig.json" }
-  ]
+  "references": [{ "path": "../utils/tsconfig.json" }]
 }

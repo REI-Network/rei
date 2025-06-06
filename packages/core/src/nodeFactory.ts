@@ -103,12 +103,17 @@ export abstract class NodeFactory {
     const node = new Node({
       ...options,
       peerId: await loadPeerId(options.databasePath),
-      coinbase: options.coinbase ? Address.fromString(options.coinbase) : undefined,
+      coinbase: options.coinbase
+        ? Address.fromString(options.coinbase)
+        : undefined,
       evmWorkMode: (() => {
         if (options.evmWorkMode === undefined) {
           return undefined;
         }
-        if (options.evmWorkMode !== EVMWorkMode.JS && options.evmWorkMode !== EVMWorkMode.Binding) {
+        if (
+          options.evmWorkMode !== EVMWorkMode.JS &&
+          options.evmWorkMode !== EVMWorkMode.Binding
+        ) {
           throw new Error(`invalid EVM work mode: ${options.evmWorkMode}`);
         }
         return options.evmWorkMode;
@@ -117,19 +122,30 @@ export abstract class NodeFactory {
         if (options.syncMode === undefined) {
           return undefined;
         }
-        if (options.syncMode !== SyncMode.Full && options.syncMode !== SyncMode.Snap) {
+        if (
+          options.syncMode !== SyncMode.Full &&
+          options.syncMode !== SyncMode.Snap
+        ) {
           throw new Error(`invalid sync mode: ${options.syncMode}`);
         }
         return options.syncMode;
       })(),
-      trustedHeight: options.trustedHeight ? new BN(options.trustedHeight) : undefined,
-      trustedHash: options.trustedHash ? hexStringToBuffer(options.trustedHash) : undefined
+      trustedHeight: options.trustedHeight
+        ? new BN(options.trustedHeight)
+        : undefined,
+      trustedHash: options.trustedHash
+        ? hexStringToBuffer(options.trustedHash)
+        : undefined
     });
 
     // unlock ECDSA private keys
     const unlock = options.unlock;
     if (unlock.length > 0) {
-      const result = await Promise.all(unlock.map(([address, passphrase]) => node.accMngr.unlock(address, passphrase)));
+      const result = await Promise.all(
+        unlock.map(([address, passphrase]) =>
+          node.accMngr.unlock(address, passphrase)
+        )
+      );
       for (let i = 0; i < result.length; i++) {
         if (!result[i]) {
           throw new Error(`unlock account ${unlock[i][0]} failed!`);

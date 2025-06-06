@@ -3,9 +3,19 @@ import levelup from 'levelup';
 import PeerId from 'peer-id';
 import Multiaddr from 'multiaddr';
 import { ENR, IKeypair, createKeypairFromPeerId } from '@gxchain2/discv5';
-import { Channel, AbortableTimer, getRandomIntInclusive } from '@rei-network/utils';
+import {
+  Channel,
+  AbortableTimer,
+  getRandomIntInclusive
+} from '@rei-network/utils';
 import { Connection, Stream, ILibp2p, IDiscv5 } from '../src/types';
-import { NetworkManager, Peer, Protocol, ProtocolHandler, ProtocolStream } from '../src';
+import {
+  NetworkManager,
+  Peer,
+  Protocol,
+  ProtocolHandler,
+  ProtocolStream
+} from '../src';
 
 const memdown = require('memdown');
 
@@ -160,7 +170,10 @@ export class MockProtocol implements Protocol {
    * @param stream - Stream object
    * @returns New handler object
    */
-  async makeHandler(peer: Peer, stream: ProtocolStream): Promise<ProtocolHandler | null> {
+  async makeHandler(
+    peer: Peer,
+    stream: ProtocolStream
+  ): Promise<ProtocolHandler | null> {
     return new MockHandler(this, peer, stream);
   }
 
@@ -174,7 +187,7 @@ export class MockProtocol implements Protocol {
 }
 
 class MockStream implements Stream {
-  private aborted: boolean = false;
+  private aborted = false;
   private conn: MockConn;
   private protocol: string;
   private output = new Channel<Buffer>();
@@ -211,7 +224,9 @@ class MockStream implements Stream {
    * and send them to remote
    * @param source - Source stream
    */
-  sink = async (source: AsyncGenerator<Buffer, any, unknown>): Promise<void> => {
+  sink = async (
+    source: AsyncGenerator<Buffer, any, unknown>
+  ): Promise<void> => {
     for await (const data of source) {
       if (this.aborted) {
         break;
@@ -234,7 +249,7 @@ class MockConn implements Connection {
   readonly id: number;
   readonly remotePeer: PeerId;
 
-  private aborted: boolean = false;
+  private aborted = false;
   private libp2p: MockLibp2p;
   private streams = new Map<string, MockStream>();
 
@@ -253,7 +268,12 @@ class MockConn implements Connection {
     if (this.aborted) {
       return;
     }
-    this.libp2p.sendData(this.remotePeer.toB58String(), this.id, protocol, data);
+    this.libp2p.sendData(
+      this.remotePeer.toB58String(),
+      this.id,
+      protocol,
+      data
+    );
   }
 
   /**
@@ -351,7 +371,12 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
   private conns = new Map<string, MockConn[]>();
   private handlers = new Map<string, Handler>();
 
-  constructor(service: Service, discv5: MockDiscv5, peerId: PeerId, config: MockLibp2pConfig) {
+  constructor(
+    service: Service,
+    discv5: MockDiscv5,
+    peerId: PeerId,
+    config: MockLibp2pConfig
+  ) {
     super();
     this.peerId = peerId;
     this.discv5 = discv5;
@@ -368,7 +393,10 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
   }
 
   get connectionSize(): number {
-    return Array.from(this.conns.values()).reduce((accumulator, value) => accumulator + value.length, 0);
+    return Array.from(this.conns.values()).reduce(
+      (accumulator, value) => accumulator + value.length,
+      0
+    );
   }
 
   /**
@@ -499,7 +527,11 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
     if (!addresses) {
       throw new Error('missing address');
     }
-    const id = await this.service.dial(this.peerId.toB58String(), peer, addresses);
+    const id = await this.service.dial(
+      this.peerId.toB58String(),
+      peer,
+      addresses
+    );
     return await this._newConn(peer, id);
   }
 
@@ -623,7 +655,13 @@ class MockLibp2p extends EventEmitter implements ILibp2p {
   }
 
   // handle discv5 `peer` event
-  private onPeer = ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
+  private onPeer = ({
+    id,
+    multiaddrs
+  }: {
+    id: PeerId;
+    multiaddrs: Multiaddr[];
+  }) => {
     if (this.aborted) {
       return;
     }
@@ -669,7 +707,12 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
   private findNodesPromise?: Promise<void>;
   private pingPromise?: Promise<void>;
 
-  constructor(service: Service, enr: ENR, keyPair: IKeypair, config: MockDiscv5Config) {
+  constructor(
+    service: Service,
+    enr: ENR,
+    keyPair: IKeypair,
+    config: MockDiscv5Config
+  ) {
     super();
     this.enr = enr;
     this.keyPair = keyPair;
@@ -737,7 +780,9 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
     if (!oldENR) {
       // the remote peer doesn't exist,
       // add the new peer to pending list
-      const index = this.pending.findIndex(({ nodeId }) => nodeId === from.nodeId);
+      const index = this.pending.findIndex(
+        ({ nodeId }) => nodeId === from.nodeId
+      );
       if (index !== -1) {
         this.pending.splice(index, 1);
       }
@@ -756,7 +801,9 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
    * @param realIP - Real ip of local node
    */
   onPong(from: ENR, realIP: string) {
-    const index = this.pending.findIndex(({ nodeId }) => nodeId === from.nodeId);
+    const index = this.pending.findIndex(
+      ({ nodeId }) => nodeId === from.nodeId
+    );
     if (index !== -1) {
       // remove peer from pending list
       this.pending.splice(index, 1);
@@ -781,7 +828,12 @@ class MockDiscv5 extends EventEmitter implements IDiscv5 {
    * @returns Nodes
    */
   onFindNodes(from: string) {
-    const enrs = [this.enr, ...Array.from(this.kbucket.values()).filter(({ nodeId }) => nodeId !== from)];
+    const enrs = [
+      this.enr,
+      ...Array.from(this.kbucket.values()).filter(
+        ({ nodeId }) => nodeId !== from
+      )
+    ];
     if (enrs.length <= this.config.maxFindNodes) {
       return enrs.map(copyENR);
     }
@@ -924,7 +976,11 @@ export class Service {
    * @param local - Whether to use the localhost address instead of the real address
    * @returns New endpoint
    */
-  async createEndpoint(protocols: (Protocol | Protocol[])[] = [], bootnodes: string[] = [], local: boolean = false) {
+  async createEndpoint(
+    protocols: (Protocol | Protocol[])[] = [],
+    bootnodes: string[] = [],
+    local = false
+  ) {
     // create peer id
     const peerId = await PeerId.create({ keyType: 'secp256k1' });
     // create keypaire
@@ -938,8 +994,18 @@ export class Service {
     enr.udp = udpPort;
     enr.encode(keypair.privateKey);
     // create network manager instance
-    const discv5 = new MockDiscv5(this, enr, keypair, defaultMockDiscv5Config());
-    const libp2p = new MockLibp2p(this, discv5, peerId, defaultMockLibp2pConfig());
+    const discv5 = new MockDiscv5(
+      this,
+      enr,
+      keypair,
+      defaultMockDiscv5Config()
+    );
+    const libp2p = new MockLibp2p(
+      this,
+      discv5,
+      peerId,
+      defaultMockLibp2pConfig()
+    );
     const network = new NetworkManager({
       peerId,
       protocols,
@@ -972,7 +1038,13 @@ export class Service {
    * @param protocol - Protocol name
    * @param data - Data
    */
-  sendData(from: string, to: string, id: number, protocol: string, data: Buffer) {
+  sendData(
+    from: string,
+    to: string,
+    id: number,
+    protocol: string,
+    data: Buffer
+  ) {
     const ep = this.peers.get(to);
     if (!ep) {
       return;
@@ -1010,7 +1082,12 @@ export class Service {
     if (
       !addresses.find((addr) => {
         const nodeAddr = addr.nodeAddress();
-        return (nodeAddr.family === 'IPv4' || (nodeAddr.family as any) === 4) && nodeAddr.address === this.peersRealIP.get(to) && (nodeAddr.port === tcpPort.toString() || (nodeAddr.port as any) === tcpPort);
+        return (
+          (nodeAddr.family === 'IPv4' || (nodeAddr.family as any) === 4) &&
+          nodeAddr.address === this.peersRealIP.get(to) &&
+          (nodeAddr.port === tcpPort.toString() ||
+            (nodeAddr.port as any) === tcpPort)
+        );
       })
     ) {
       throw new Error('invalid multi address');

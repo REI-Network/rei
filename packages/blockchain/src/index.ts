@@ -2,9 +2,34 @@ import { debug as createDebugLogger } from 'debug';
 import Semaphore from 'semaphore-async-await';
 import { Address, BN, rlp } from 'ethereumjs-util';
 import { Block, BlockData, BlockHeader, Receipt } from '@rei-network/structure';
-import { Common, Chain, ConsensusAlgorithm, ConsensusType, Hardfork } from '@rei-network/common';
-import { Database, DBTarget, DBOp, DBSetBlockOrHeader, DBSetTD, DBSetHashToNumber, DBSaveLookups, DBSaveReceipts, DBSaveTxLookup } from '@rei-network/database';
-import { CliqueSignerState, CliqueLatestSignerStates, CliqueVote, CliqueLatestVotes, CliqueBlockSigner, CliqueLatestBlockSigners, CLIQUE_NONCE_AUTH, CLIQUE_NONCE_DROP } from './clique';
+import {
+  Common,
+  Chain,
+  ConsensusAlgorithm,
+  ConsensusType,
+  Hardfork
+} from '@rei-network/common';
+import {
+  Database,
+  DBTarget,
+  DBOp,
+  DBSetBlockOrHeader,
+  DBSetTD,
+  DBSetHashToNumber,
+  DBSaveLookups,
+  DBSaveReceipts,
+  DBSaveTxLookup
+} from '@rei-network/database';
+import {
+  CliqueSignerState,
+  CliqueLatestSignerStates,
+  CliqueVote,
+  CliqueLatestVotes,
+  CliqueBlockSigner,
+  CliqueLatestBlockSigners,
+  CLIQUE_NONCE_AUTH,
+  CLIQUE_NONCE_DROP
+} from './clique';
 
 const debug = createDebugLogger('blockchain:clique');
 
@@ -203,7 +228,10 @@ export class Blockchain implements BlockchainInterface {
    * @param blockData List of block objects
    * @param opts Constructor options, see {@link BlockchainOptions}
    */
-  public static async fromBlocksData(blocksData: BlockData[], opts: BlockchainOptions) {
+  public static async fromBlocksData(
+    blocksData: BlockData[],
+    opts: BlockchainOptions
+  ) {
     const blockchain = await Blockchain.create(opts);
     for (const blockData of blocksData) {
       const block = Block.fromBlockData(blockData, {
@@ -229,7 +257,9 @@ export class Blockchain implements BlockchainInterface {
     // Throw on chain or hardfork options removed in latest major release to
     // prevent implicit chain setup on a wrong chain
     if ('chain' in opts || 'hardfork' in opts) {
-      throw new Error('Chain/hardfork options are not allowed any more on initialization');
+      throw new Error(
+        'Chain/hardfork options are not allowed any more on initialization'
+      );
     }
 
     if (opts.common) {
@@ -255,7 +285,9 @@ export class Blockchain implements BlockchainInterface {
       }
       if (this._common.consensusType() === ConsensusType.ProofOfAuthority) {
         if (this._common.consensusAlgorithm() !== ConsensusAlgorithm.Clique) {
-          throw new Error('consensus (signature) validation only supported for poa clique algorithm');
+          throw new Error(
+            'consensus (signature) validation only supported for poa clique algorithm'
+          );
         }
       }
     }
@@ -310,7 +342,9 @@ export class Blockchain implements BlockchainInterface {
     // If the DB has a genesis block, then verify that the genesis block in the
     // DB is indeed the Genesis block generated or assigned.
     if (dbGenesisBlock && !genesisBlock.hash().equals(dbGenesisBlock.hash())) {
-      throw new Error('The genesis block in the DB has a different hash than the provided genesis block.');
+      throw new Error(
+        'The genesis block in the DB has a different hash than the provided genesis block.'
+      );
     }
 
     const genesisHash = genesisBlock.hash();
@@ -319,7 +353,9 @@ export class Blockchain implements BlockchainInterface {
       // If there is no genesis block put the genesis block in the DB.
       // For that TD, the BlockOrHeader, and the Lookups have to be saved.
       const dbOps: DBOp[] = [];
-      dbOps.push(DBSetTD(genesisBlock.header.difficulty.clone(), new BN(0), genesisHash));
+      dbOps.push(
+        DBSetTD(genesisBlock.header.difficulty.clone(), new BN(0), genesisHash)
+      );
       DBSetBlockOrHeader(genesisBlock).map((op) => dbOps.push(op));
       DBSaveLookups(genesisHash, new BN(0)).map((op) => dbOps.push(op));
 
@@ -332,9 +368,11 @@ export class Blockchain implements BlockchainInterface {
 
     // Clique: read current signer states, signer votes, and block signers
     if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique) {
-      this._cliqueLatestSignerStates = await this.database.getCliqueLatestSignerStates();
+      this._cliqueLatestSignerStates =
+        await this.database.getCliqueLatestSignerStates();
       this._cliqueLatestVotes = await this.database.getCliqueLatestVotes();
-      this._cliqueLatestBlockSigners = await this.database.getCliqueLatestBlockSigners();
+      this._cliqueLatestBlockSigners =
+        await this.database.getCliqueLatestBlockSigners();
     }
 
     // At this point, we can safely set genesisHash as the _genesis hash in this
@@ -433,7 +471,9 @@ export class Blockchain implements BlockchainInterface {
     let signers = this._cliqueLatestBlockSigners;
     signers = signers.slice(signers.length < limit ? 0 : 1);
     signers.push([header.number, header.cliqueSigner()]);
-    const seen = signers.filter((s) => s[1].equals(header.cliqueSigner())).length;
+    const seen = signers.filter((s) =>
+      s[1].equals(header.cliqueSigner())
+    ).length;
     return seen > 1;
   }
 
@@ -443,7 +483,10 @@ export class Blockchain implements BlockchainInterface {
    * @hidden
    */
   private async cliqueSaveGenesisSigners(genesisBlock: Block) {
-    const genesisSignerState: CliqueSignerState = [new BN(0), genesisBlock.header.cliqueEpochTransitionSigners()];
+    const genesisSignerState: CliqueSignerState = [
+      new BN(0),
+      genesisBlock.header.cliqueEpochTransitionSigners()
+    ];
     await this.cliqueUpdateSignerStates(genesisSignerState);
     debug('[Block 0] Genesis block -> update signer states');
     await this.cliqueUpdateVotes();
@@ -469,7 +512,9 @@ export class Blockchain implements BlockchainInterface {
       const blockLimit = lastBlockNumber.subn(limit);
       const states = this._cliqueLatestSignerStates;
       const lastItem = states[states.length - 1];
-      this._cliqueLatestSignerStates = states.filter((state) => state[0].gte(blockLimit));
+      this._cliqueLatestSignerStates = states.filter((state) =>
+        state[0].gte(blockLimit)
+      );
       if (this._cliqueLatestSignerStates.length === 0) {
         // always keep at least one item on the stack
         this._cliqueLatestSignerStates.push(lastItem);
@@ -477,7 +522,10 @@ export class Blockchain implements BlockchainInterface {
     }
 
     // save to db
-    const formatted = this._cliqueLatestSignerStates.map((state) => [state[0].toBuffer(), state[1].map((a) => a.toBuffer())]);
+    const formatted = this._cliqueLatestSignerStates.map((state) => [
+      state[0].toBuffer(),
+      state[1].map((a) => a.toBuffer())
+    ]);
     dbOps.push(DBOp.set(DBTarget.CliqueSignerStates, rlp.encode(formatted)));
 
     await this.database.batch(dbOps);
@@ -500,20 +548,30 @@ export class Blockchain implements BlockchainInterface {
       const signer = header.cliqueSigner();
       const beneficiary = header.coinbase;
       const nonce = header.nonce;
-      const latestVote: CliqueVote = [header.number, [signer, beneficiary, nonce]];
+      const latestVote: CliqueVote = [
+        header.number,
+        [signer, beneficiary, nonce]
+      ];
 
       // Do two rounds here, one to execute on a potential previously reached consensus
       // on the newly touched beneficiary, one with the added new vote
       for (let round = 1; round <= 2; round++) {
         // See if there is a new majority consensus to update the signer list
-        const lastEpochBlockNumber = header.number.sub(header.number.mod(new BN(this._common.consensusConfig().epoch)));
+        const lastEpochBlockNumber = header.number.sub(
+          header.number.mod(new BN(this._common.consensusConfig().epoch))
+        );
         const limit = this.cliqueSignerLimit();
         let activeSigners = this.cliqueActiveSigners();
         let consensus = false;
 
         // AUTH vote analysis
         let votes = this._cliqueLatestVotes.filter((vote) => {
-          return vote[0].gte(lastEpochBlockNumber) && !vote[1][0].equals(signer) && vote[1][1].equals(beneficiary) && vote[1][2].equals(CLIQUE_NONCE_AUTH);
+          return (
+            vote[0].gte(lastEpochBlockNumber) &&
+            !vote[1][0].equals(signer) &&
+            vote[1][1].equals(beneficiary) &&
+            vote[1][2].equals(CLIQUE_NONCE_AUTH)
+          );
         });
         const beneficiaryVotesAUTH: Address[] = [];
         for (const vote of votes) {
@@ -538,12 +596,21 @@ export class Blockchain implements BlockchainInterface {
             return a.toBuffer().compare(b.toBuffer());
           });
           // Discard votes for added signer
-          this._cliqueLatestVotes = this._cliqueLatestVotes.filter((vote) => !vote[1][1].equals(beneficiary));
-          debug(`[Block ${header.number.toNumber()}] Clique majority consensus (AUTH ${beneficiary})`);
+          this._cliqueLatestVotes = this._cliqueLatestVotes.filter(
+            (vote) => !vote[1][1].equals(beneficiary)
+          );
+          debug(
+            `[Block ${header.number.toNumber()}] Clique majority consensus (AUTH ${beneficiary})`
+          );
         }
         // DROP vote
         votes = this._cliqueLatestVotes.filter((vote) => {
-          return vote[0].gte(lastEpochBlockNumber) && !vote[1][0].equals(signer) && vote[1][1].equals(beneficiary) && vote[1][2].equals(CLIQUE_NONCE_DROP);
+          return (
+            vote[0].gte(lastEpochBlockNumber) &&
+            !vote[1][0].equals(signer) &&
+            vote[1][1].equals(beneficiary) &&
+            vote[1][2].equals(CLIQUE_NONCE_DROP)
+          );
         });
         const beneficiaryVotesDROP: Address[] = [];
         for (const vote of votes) {
@@ -563,26 +630,42 @@ export class Blockchain implements BlockchainInterface {
         if (numBeneficiaryVotesDROP >= limit) {
           consensus = true;
           // Drop signer
-          activeSigners = activeSigners.filter((signer) => !signer.equals(beneficiary));
+          activeSigners = activeSigners.filter(
+            (signer) => !signer.equals(beneficiary)
+          );
           this._cliqueLatestVotes = this._cliqueLatestVotes.filter(
             // Discard votes from removed signer and for removed signer
-            (vote) => !vote[1][0].equals(beneficiary) && !vote[1][1].equals(beneficiary)
+            (vote) =>
+              !vote[1][0].equals(beneficiary) && !vote[1][1].equals(beneficiary)
           );
-          debug(`[Block ${header.number.toNumber()}] Clique majority consensus (DROP ${beneficiary})`);
+          debug(
+            `[Block ${header.number.toNumber()}] Clique majority consensus (DROP ${beneficiary})`
+          );
         }
         if (round === 1) {
           // Always add the latest vote to the history no matter if already voted
           // the same vote or not
           this._cliqueLatestVotes.push(latestVote);
-          debug(`[Block ${header.number.toNumber()}] New clique vote: ${signer} -> ${beneficiary} ${nonce.equals(CLIQUE_NONCE_AUTH) ? 'AUTH' : 'DROP'}`);
+          debug(
+            `[Block ${header.number.toNumber()}] New clique vote: ${signer} -> ${beneficiary} ${
+              nonce.equals(CLIQUE_NONCE_AUTH) ? 'AUTH' : 'DROP'
+            }`
+          );
         }
         if (consensus) {
           if (round === 1) {
-            debug(`[Block ${header.number.toNumber()}] Clique majority consensus on existing votes -> update signer states`);
+            debug(
+              `[Block ${header.number.toNumber()}] Clique majority consensus on existing votes -> update signer states`
+            );
           } else {
-            debug(`[Block ${header.number.toNumber()}] Clique majority consensus on new vote -> update signer states`);
+            debug(
+              `[Block ${header.number.toNumber()}] Clique majority consensus on new vote -> update signer states`
+            );
           }
-          const newSignerState: CliqueSignerState = [header.number, activeSigners];
+          const newSignerState: CliqueSignerState = [
+            header.number,
+            activeSigners
+          ];
           await this.cliqueUpdateSignerStates(newSignerState);
           return;
         }
@@ -594,14 +677,21 @@ export class Blockchain implements BlockchainInterface {
     const blockSigners = this._cliqueLatestBlockSigners;
     const lastBlockNumber = blockSigners[blockSigners.length - 1]?.[0];
     if (lastBlockNumber) {
-      const lastEpochBlockNumber = lastBlockNumber.sub(lastBlockNumber.mod(new BN(this._common.consensusConfig().epoch)));
+      const lastEpochBlockNumber = lastBlockNumber.sub(
+        lastBlockNumber.mod(new BN(this._common.consensusConfig().epoch))
+      );
       const blockLimit = lastEpochBlockNumber.subn(limit);
-      this._cliqueLatestVotes = this._cliqueLatestVotes.filter((state) => state[0].gte(blockLimit));
+      this._cliqueLatestVotes = this._cliqueLatestVotes.filter((state) =>
+        state[0].gte(blockLimit)
+      );
     }
 
     // save votes to db
     const dbOps: DBOp[] = [];
-    const formatted = this._cliqueLatestVotes.map((v) => [v[0].toBuffer(), [v[1][0].toBuffer(), v[1][1].toBuffer(), v[1][2]]]);
+    const formatted = this._cliqueLatestVotes.map((v) => [
+      v[0].toBuffer(),
+      [v[1][0].toBuffer(), v[1][1].toBuffer(), v[1][2]]
+    ]);
     dbOps.push(DBOp.set(DBTarget.CliqueVotes, rlp.encode(formatted)));
 
     await this.database.batch(dbOps);
@@ -630,12 +720,18 @@ export class Blockchain implements BlockchainInterface {
       const length = this._cliqueLatestBlockSigners.length;
       const limit = this.cliqueSignerLimit();
       if (length > limit) {
-        this._cliqueLatestBlockSigners = this._cliqueLatestBlockSigners.slice(length - limit, length);
+        this._cliqueLatestBlockSigners = this._cliqueLatestBlockSigners.slice(
+          length - limit,
+          length
+        );
       }
     }
 
     // save to db
-    const formatted = this._cliqueLatestBlockSigners.map((b) => [b[0].toBuffer(), b[1].toBuffer()]);
+    const formatted = this._cliqueLatestBlockSigners.map((b) => [
+      b[0].toBuffer(),
+      b[1].toBuffer()
+    ]);
     dbOps.push(DBOp.set(DBTarget.CliqueBlockSigners, rlp.encode(formatted)));
 
     await this.database.batch(dbOps);
@@ -807,7 +903,10 @@ export class Blockchain implements BlockchainInterface {
    * header using the iterator method.
    * @hidden
    */
-  private async _putBlockOrHeader(item: Block | BlockHeader, options?: PutBlockOptions) {
+  private async _putBlockOrHeader(
+    item: Block | BlockHeader,
+    options?: PutBlockOptions
+  ) {
     return await this.runWithLock<boolean>(async () => {
       const block =
         item instanceof BlockHeader
@@ -846,7 +945,9 @@ export class Blockchain implements BlockchainInterface {
         }
 
         if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique) {
-          const valid = header.cliqueVerifySignature(this.cliqueActiveSigners());
+          const valid = header.cliqueVerifySignature(
+            this.cliqueActiveSigners()
+          );
           if (!valid) {
             throw new Error('invalid PoA block signature (clique)');
           }
@@ -864,7 +965,9 @@ export class Blockchain implements BlockchainInterface {
             const activeSigners = this.cliqueActiveSigners();
             for (const [i, cSigner] of checkpointSigners.entries()) {
               if (!activeSigners[i] || !activeSigners[i].equals(cSigner)) {
-                throw new Error(`checkpoint signer not found in active signers list at index ${i}: ${cSigner.toString()}`);
+                throw new Error(
+                  `checkpoint signer not found in active signers list at index ${i}: ${cSigner.toString()}`
+                );
               }
             }
           }
@@ -874,7 +977,9 @@ export class Blockchain implements BlockchainInterface {
       if (block._common.consensusType() !== ConsensusType.ProofOfStake) {
         // set total difficulty in the current context scope
         if (this._headHeaderHash) {
-          currentTd.header = await this.getTotalDifficulty(this._headHeaderHash);
+          currentTd.header = await this.getTotalDifficulty(
+            this._headHeaderHash
+          );
         }
         if (this._headBlockHash) {
           currentTd.block = await this.getTotalDifficulty(this._headBlockHash);
@@ -883,7 +988,10 @@ export class Blockchain implements BlockchainInterface {
         // calculate the total difficulty of the new block
         let parentTd = new BN(0);
         if (!block.isGenesis()) {
-          parentTd = await this.getTotalDifficulty(header.parentHash, blockNumber.subn(1));
+          parentTd = await this.getTotalDifficulty(
+            header.parentHash,
+            blockNumber.subn(1)
+          );
         }
         td.iadd(parentTd);
 
@@ -894,12 +1002,19 @@ export class Blockchain implements BlockchainInterface {
       // save header/block to the database
       dbOps = dbOps.concat(DBSetBlockOrHeader(block));
       // save receipts to the database
-      options?.receipts && (dbOps = dbOps.concat(DBSaveReceipts(options.receipts, blockHash, blockNumber)));
+      options?.receipts &&
+        (dbOps = dbOps.concat(
+          DBSaveReceipts(options.receipts, blockHash, blockNumber)
+        ));
       // save tx lookup to the database
       options?.saveTxLookup && (dbOps = dbOps.concat(DBSaveTxLookup(block)));
 
       let ancientHeaderNumber: undefined | BN;
-      const reorg = block.isGenesis() || (block._common.consensusType() !== ConsensusType.ProofOfStake && td.gt(currentTd.header)) || block._common.consensusType() === ConsensusType.ProofOfStake;
+      const reorg =
+        block.isGenesis() ||
+        (block._common.consensusType() !== ConsensusType.ProofOfStake &&
+          td.gt(currentTd.header)) ||
+        block._common.consensusType() === ConsensusType.ProofOfStake;
       // if total difficulty is higher than current, add it to canonical chain
       if (reorg) {
         if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique) {
@@ -920,7 +1035,11 @@ export class Blockchain implements BlockchainInterface {
         }
 
         // delete higher number assignments and overwrite stale canonical chain
-        await this._deleteCanonicalChainReferences(blockNumber.addn(1), blockHash, dbOps);
+        await this._deleteCanonicalChainReferences(
+          blockNumber.addn(1),
+          blockHash,
+          dbOps
+        );
         // from the current header block, check the blockchain in reverse (i.e.
         // traverse `parentHash`) until `numberToHash` matches the current
         // number/hash in the canonical chain also: overwrite any heads if these
@@ -940,9 +1059,16 @@ export class Blockchain implements BlockchainInterface {
       await this.database.batch(ops);
 
       // Clique: update signer votes and state
-      if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique && ancientHeaderNumber) {
+      if (
+        this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique &&
+        ancientHeaderNumber
+      ) {
         await this._cliqueDeleteSnapshots(ancientHeaderNumber.addn(1));
-        for (const number = ancientHeaderNumber.addn(1); number.lte(header.number); number.iaddn(1)) {
+        for (
+          const number = ancientHeaderNumber.addn(1);
+          number.lte(header.number);
+          number.iaddn(1)
+        ) {
           const canonicalHeader = await this._getCanonicalHeader(number);
           await this._cliqueBuildSnapshots(canonicalHeader);
         }
@@ -959,7 +1085,10 @@ export class Blockchain implements BlockchainInterface {
   /**
    * Force update current header
    */
-  async forcePutBlock(item: Block | BlockHeader, options: ForcePutBlockOptions) {
+  async forcePutBlock(
+    item: Block | BlockHeader,
+    options: ForcePutBlockOptions
+  ) {
     return await this.runWithLock<boolean>(async () => {
       const block =
         item instanceof BlockHeader
@@ -996,7 +1125,9 @@ export class Blockchain implements BlockchainInterface {
         }
 
         if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique) {
-          const valid = header.cliqueVerifySignature(this.cliqueActiveSigners());
+          const valid = header.cliqueVerifySignature(
+            this.cliqueActiveSigners()
+          );
           if (!valid) {
             throw new Error('invalid PoA block signature (clique)');
           }
@@ -1014,7 +1145,9 @@ export class Blockchain implements BlockchainInterface {
             const activeSigners = this.cliqueActiveSigners();
             for (const [i, cSigner] of checkpointSigners.entries()) {
               if (!activeSigners[i] || !activeSigners[i].equals(cSigner)) {
-                throw new Error(`checkpoint signer not found in active signers list at index ${i}: ${cSigner.toString()}`);
+                throw new Error(
+                  `checkpoint signer not found in active signers list at index ${i}: ${cSigner.toString()}`
+                );
               }
             }
           }
@@ -1032,7 +1165,10 @@ export class Blockchain implements BlockchainInterface {
       // save header/block to the database
       dbOps = dbOps.concat(DBSetBlockOrHeader(block));
       // save receipts to the database
-      options?.receipts && (dbOps = dbOps.concat(DBSaveReceipts(options.receipts, blockHash, blockNumber)));
+      options?.receipts &&
+        (dbOps = dbOps.concat(
+          DBSaveReceipts(options.receipts, blockHash, blockNumber)
+        ));
       // save tx lookup to the database
       options?.saveTxLookup && (dbOps = dbOps.concat(DBSaveTxLookup(block)));
 
@@ -1059,7 +1195,11 @@ export class Blockchain implements BlockchainInterface {
         }
 
         // delete higher number assignments and overwrite stale canonical chain
-        await this._deleteCanonicalChainReferences(blockNumber.addn(1), blockHash, dbOps);
+        await this._deleteCanonicalChainReferences(
+          blockNumber.addn(1),
+          blockHash,
+          dbOps
+        );
         // from the current header block, check the blockchain in reverse (i.e.
         // traverse `parentHash`) until `numberToHash` matches the current
         // number/hash in the canonical chain also: overwrite any heads if these
@@ -1071,9 +1211,16 @@ export class Blockchain implements BlockchainInterface {
       await this.database.batch(ops);
 
       // Clique: update signer votes and state
-      if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique && ancientHeaderNumber) {
+      if (
+        this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique &&
+        ancientHeaderNumber
+      ) {
         await this._cliqueDeleteSnapshots(ancientHeaderNumber.addn(1));
-        for (const number = ancientHeaderNumber.addn(1); number.lte(header.number); number.iaddn(1)) {
+        for (
+          const number = ancientHeaderNumber.addn(1);
+          number.lte(header.number);
+          number.iaddn(1)
+        ) {
           const canonicalHeader = await this._getCanonicalHeader(number);
           await this._cliqueBuildSnapshots(canonicalHeader);
         }
@@ -1129,7 +1276,12 @@ export class Blockchain implements BlockchainInterface {
    * @param skip - Number of blocks to skip apart
    * @param reverse - Fetch blocks in reverse
    */
-  async getBlocks(blockId: Buffer | BN | number, maxBlocks: number, skip: number, reverse: boolean): Promise<Block[]> {
+  async getBlocks(
+    blockId: Buffer | BN | number,
+    maxBlocks: number,
+    skip: number,
+    reverse: boolean
+  ): Promise<Block[]> {
     return await this.initAndLock<Block[]>(async () => {
       const blocks: Block[] = [];
       let i = -1;
@@ -1236,11 +1388,20 @@ export class Blockchain implements BlockchainInterface {
 
     // delete the block, and if block is in the canonical chain, delete all
     // children as well
-    await this._delChild(blockHash, blockNumber, inCanonical ? parentHash : null, dbOps);
+    await this._delChild(
+      blockHash,
+      blockNumber,
+      inCanonical ? parentHash : null,
+      dbOps
+    );
 
     // delete all number to hash mappings for deleted block number and above
     if (inCanonical) {
-      await this._deleteCanonicalChainReferences(blockNumber, parentHash, dbOps);
+      await this._deleteCanonicalChainReferences(
+        blockNumber,
+        parentHash,
+        dbOps
+      );
     }
 
     await this.database.batch(dbOps);
@@ -1261,7 +1422,12 @@ export class Blockchain implements BlockchainInterface {
    * @param ops - the `DatabaseOperation` list to add the delete operations to
    * @hidden
    */
-  private async _delChild(blockHash: Buffer, blockNumber: BN, headHash: Buffer | null, ops: DBOp[]) {
+  private async _delChild(
+    blockHash: Buffer,
+    blockNumber: BN,
+    headHash: Buffer | null,
+    ops: DBOp[]
+  ) {
     // delete header, body, hash to number mapping and td
     ops.push(DBOp.del(DBTarget.Header, { blockHash, blockNumber }));
     ops.push(DBOp.del(DBTarget.Body, { blockHash, blockNumber }));
@@ -1282,7 +1448,12 @@ export class Blockchain implements BlockchainInterface {
 
     try {
       const childHeader = await this._getCanonicalHeader(blockNumber.addn(1));
-      await this._delChild(childHeader.hash(), childHeader.number, headHash, ops);
+      await this._delChild(
+        childHeader.hash(),
+        childHeader.number,
+        headHash,
+        ops
+      );
     } catch (error: any) {
       if (error.type !== 'NotFoundError') {
         throw error;
@@ -1300,14 +1471,22 @@ export class Blockchain implements BlockchainInterface {
    * @param maxBlocks - How many blocks to run. By default, run all unprocessed blocks in the canonical chain.
    * @returns number of blocks actually iterated
    */
-  async iterator(name: string, onBlock: OnBlock, maxBlocks?: number): Promise<number> {
+  async iterator(
+    name: string,
+    onBlock: OnBlock,
+    maxBlocks?: number
+  ): Promise<number> {
     return this._iterator(name, onBlock, maxBlocks);
   }
 
   /**
    * @hidden
    */
-  private async _iterator(name: string, onBlock: OnBlock, maxBlocks?: number): Promise<number> {
+  private async _iterator(
+    name: string,
+    onBlock: OnBlock,
+    maxBlocks?: number
+  ): Promise<number> {
     return await this.initAndLock<number>(async (): Promise<number> => {
       const headHash = this._heads[name] || this._genesis;
       let lastBlock: Block | undefined;
@@ -1328,7 +1507,9 @@ export class Blockchain implements BlockchainInterface {
         try {
           const nextBlock = await this._getBlock(nextBlockNumber);
           this._heads[name] = nextBlock.hash();
-          const reorg = lastBlock ? lastBlock.hash().equals(nextBlock.header.parentHash) : false;
+          const reorg = lastBlock
+            ? lastBlock.hash().equals(nextBlock.header.parentHash)
+            : false;
           lastBlock = nextBlock;
           await onBlock(nextBlock, reorg);
           nextBlockNumber.iaddn(1);
@@ -1388,7 +1569,10 @@ export class Blockchain implements BlockchainInterface {
       header = await this._getCanonicalHeader(newHeader.number);
     } else {
       while (!header.number.eq(newHeader.number) && newHeader.number.gtn(0)) {
-        newHeader = await this._getHeader(newHeader.parentHash, newHeader.number.subn(1));
+        newHeader = await this._getHeader(
+          newHeader.parentHash,
+          newHeader.number.subn(1)
+        );
       }
     }
     if (!header.number.eq(newHeader.number)) {
@@ -1396,7 +1580,10 @@ export class Blockchain implements BlockchainInterface {
     }
     while (!header.hash().equals(newHeader.hash()) && header.number.gtn(0)) {
       header = await this._getCanonicalHeader(header.number.subn(1));
-      newHeader = await this._getHeader(newHeader.parentHash, newHeader.number.subn(1));
+      newHeader = await this._getHeader(
+        newHeader.parentHash,
+        newHeader.number.subn(1)
+      );
     }
     if (!header.hash().equals(newHeader.hash())) {
       throw new Error('Failed to find ancient header');
@@ -1422,13 +1609,19 @@ export class Blockchain implements BlockchainInterface {
   private async _cliqueDeleteSnapshots(blockNumber: BN) {
     // remove blockNumber from clique snapshots
     // (latest signer states, latest votes, latest block signers)
-    this._cliqueLatestSignerStates = this._cliqueLatestSignerStates.filter((s) => s[0].lte(blockNumber));
+    this._cliqueLatestSignerStates = this._cliqueLatestSignerStates.filter(
+      (s) => s[0].lte(blockNumber)
+    );
     await this.cliqueUpdateSignerStates();
 
-    this._cliqueLatestVotes = this._cliqueLatestVotes.filter((v) => v[0].lte(blockNumber));
+    this._cliqueLatestVotes = this._cliqueLatestVotes.filter((v) =>
+      v[0].lte(blockNumber)
+    );
     await this.cliqueUpdateVotes();
 
-    this._cliqueLatestBlockSigners = this._cliqueLatestBlockSigners.filter((s) => s[0].lte(blockNumber));
+    this._cliqueLatestBlockSigners = this._cliqueLatestBlockSigners.filter(
+      (s) => s[0].lte(blockNumber)
+    );
     await this.cliqueUpdateLatestBlockSigners();
   }
 
@@ -1445,7 +1638,11 @@ export class Blockchain implements BlockchainInterface {
    * @param ops - the DatabaseOperation list to write DatabaseOperations to
    * @hidden
    */
-  private async _deleteCanonicalChainReferences(blockNumber: BN, headHash: Buffer, ops: DBOp[]) {
+  private async _deleteCanonicalChainReferences(
+    blockNumber: BN,
+    headHash: Buffer,
+    ops: DBOp[]
+  ) {
     blockNumber = blockNumber.clone();
     let hash: Buffer | false;
 
@@ -1562,7 +1759,11 @@ export class Blockchain implements BlockchainInterface {
    * @hidden
    */
   private _saveHeadOps(): DBOp[] {
-    return [DBOp.set(DBTarget.Heads, this._heads), DBOp.set(DBTarget.HeadHeader, this._headHeaderHash!), DBOp.set(DBTarget.HeadBlock, this._headBlockHash!)];
+    return [
+      DBOp.set(DBTarget.Heads, this._heads),
+      DBOp.set(DBTarget.HeadHeader, this._headHeaderHash!),
+      DBOp.set(DBTarget.HeadBlock, this._headBlockHash!)
+    ];
   }
 
   /**
@@ -1652,9 +1853,15 @@ export class Blockchain implements BlockchainInterface {
     }
 
     const latestBlock = await this._getBlock(this._headBlockHash);
-    if (!this._latestBlock || !this._headBlockHash.equals(this._latestBlock.hash())) {
+    if (
+      !this._latestBlock ||
+      !this._headBlockHash.equals(this._latestBlock.hash())
+    ) {
       this._latestBlock = latestBlock;
-      this._totalDifficulty = await this.getTotalDifficulty(this._headBlockHash, latestBlock.header.number);
+      this._totalDifficulty = await this.getTotalDifficulty(
+        this._headBlockHash,
+        latestBlock.header.number
+      );
     }
   }
 
@@ -1680,7 +1887,10 @@ export class Blockchain implements BlockchainInterface {
    * @param signer - the signer of next block
    * @returns
    */
-  cliqueCheckNextRecentlySigned(currentHeader: BlockHeader, signer: Address): boolean {
+  cliqueCheckNextRecentlySigned(
+    currentHeader: BlockHeader,
+    signer: Address
+  ): boolean {
     if (currentHeader.isGenesis()) {
       return false;
     }

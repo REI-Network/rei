@@ -11,7 +11,7 @@ export class ProtocolStream {
   private readonly queue: Channel<Buffer>;
   private readonly protocolString: string;
   private handle!: (data: Buffer) => void | Promise<void>;
-  private aborted: boolean = false;
+  private aborted = false;
   private stream?: Stream;
   private streamPromise?: Promise<void>;
 
@@ -22,7 +22,14 @@ export class ProtocolStream {
       drop: async (data) => {
         if (!this.aborted) {
           await this.peer.uninstallProtocol(protocolString);
-          logger.warn('ProtocolStream::drop, peer:', this.peer.peerId, 'protocol:', protocolString, 'message queue too large, droped:', data.toString('hex'));
+          logger.warn(
+            'ProtocolStream::drop, peer:',
+            this.peer.peerId,
+            'protocol:',
+            protocolString,
+            'message queue too large, droped:',
+            data.toString('hex')
+          );
         }
       },
       max: 50
@@ -81,10 +88,16 @@ export class ProtocolStream {
               if (this.aborted) {
                 break;
               }
-              const buffer = data._bufs.reduce((buf1, buf2) => Buffer.concat([buf1, buf2]), Buffer.alloc(0));
+              const buffer = data._bufs.reduce(
+                (buf1, buf2) => Buffer.concat([buf1, buf2]),
+                Buffer.alloc(0)
+              );
               await this.handle(buffer);
             } catch (err) {
-              logger.error('ProtocolStream::pipeStream, handle message error:', err);
+              logger.error(
+                'ProtocolStream::pipeStream, handle message error:',
+                err
+              );
               await this.abort();
             }
           }
@@ -112,7 +125,12 @@ export class ProtocolStream {
         await this.streamPromise;
         this.streamPromise = undefined;
       }
-      logger.info('🤐 Peer uninstalled:', this.peer.peerId, 'protocol:', this.protocolString);
+      logger.info(
+        '🤐 Peer uninstalled:',
+        this.peer.peerId,
+        'protocol:',
+        this.protocolString
+      );
       this.peer.uninstalledHook(this.protocolString);
     }
   }
@@ -200,7 +218,11 @@ export class Peer extends EventEmitter {
    * @param libp2pStream - `libp2p` stream
    * @returns Whether the handshake was successful and handler instance
    */
-  async installProtocol(protocol: Protocol, connection: Connection, libp2pStream: Stream): Promise<{ success: boolean; handler: ProtocolHandler | null }> {
+  async installProtocol(
+    protocol: Protocol,
+    connection: Connection,
+    libp2pStream: Stream
+  ): Promise<{ success: boolean; handler: ProtocolHandler | null }> {
     const stream = new ProtocolStream(this, protocol.protocolString);
     const handler = await protocol.makeHandler(this, stream);
     if (!handler) {
@@ -211,7 +233,10 @@ export class Peer extends EventEmitter {
     if (old) {
       old.handler.abort();
       await old.stream.abort();
-      if (old.connection !== connection && old.connection._getStreams().length === 0) {
+      if (
+        old.connection !== connection &&
+        old.connection._getStreams().length === 0
+      ) {
         // disconnect the old connection if no protocol exists
         await old.connection.close();
       }
@@ -224,13 +249,24 @@ export class Peer extends EventEmitter {
     // handshake
     try {
       if (!(await handler.handshake())) {
-        throw new Error(`protocol ${protocol.protocolString}, handshake failed`);
+        throw new Error(
+          `protocol ${protocol.protocolString}, handshake failed`
+        );
       }
-      this.protocols.set(protocol.protocolString, { handler, stream, connection });
+      this.protocols.set(protocol.protocolString, {
+        handler,
+        stream,
+        connection
+      });
       this.installedHook(protocol.protocolString);
       return { success: true, handler };
     } catch (err) {
-      logger.warn('Peer::installProtocol, handshake failed with remote peer:', this.peerId, 'err:', err);
+      logger.warn(
+        'Peer::installProtocol, handshake failed with remote peer:',
+        this.peerId,
+        'err:',
+        err
+      );
       handler.abort();
       await stream.abort();
       return { success: false, handler: null };

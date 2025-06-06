@@ -25,23 +25,36 @@ export class Client {
   feePool!: Contract;
   feeToken!: Contract;
 
-  constructor(provider = 'ws://127.0.0.1:11451', configAddress = '0x0000000000000000000000000000000000001000') {
+  constructor(
+    provider = 'ws://127.0.0.1:11451',
+    configAddress = '0x0000000000000000000000000000000000001000'
+  ) {
     this.web3 = new Web3(provider);
     this.configAddress = configAddress;
     this.accMngr = new MockAccountManager([]);
   }
 
   private loadABI(contract: string, file?: string) {
-    return require(path.join(__dirname, `../../contracts/artifacts/src/${contract}.sol/${file ?? contract}.json`)).abi;
+    return require(path.join(
+      __dirname,
+      `../../contracts/artifacts/src/${contract}.sol/${file ?? contract}.json`
+    )).abi;
   }
 
   async init() {
-    this.config = new this.web3.eth.Contract(this.loadABI('Config_devnet'), this.configAddress);
+    this.config = new this.web3.eth.Contract(
+      this.loadABI('Config_devnet'),
+      this.configAddress
+    );
 
     const initContract = async (contract: string) => {
-      const contractName = contract.substr(0, 1).toUpperCase() + contract.substr(1);
+      const contractName =
+        contract.substr(0, 1).toUpperCase() + contract.substr(1);
       const address = await this.config.methods[contract]().call();
-      this[contract] = new this.web3.eth.Contract(this.loadABI(contractName), address);
+      this[contract] = new this.web3.eth.Contract(
+        this.loadABI(contractName),
+        address
+      );
     };
     await initContract('stakeManager');
     await initContract('unstakePool');
@@ -52,8 +65,22 @@ export class Client {
 
     // add accounts
     this.accMngr.add([
-      ['genesis1', Address.fromString('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde'), Buffer.from('225a70405aa06a0dc0451fb51a9284a0dab949257f8a2df90192b5238e76936a', 'hex')],
-      ['admin', Address.fromString('0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266'), Buffer.from('ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80', 'hex')]
+      [
+        'genesis1',
+        Address.fromString('0xff96a3bff24da3d686fea7bd4beb5ccfd7868dde'),
+        Buffer.from(
+          '225a70405aa06a0dc0451fb51a9284a0dab949257f8a2df90192b5238e76936a',
+          'hex'
+        )
+      ],
+      [
+        'admin',
+        Address.fromString('0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266'),
+        Buffer.from(
+          'ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
+          'hex'
+        )
+      ]
     ]);
 
     // create random accounts
@@ -97,7 +124,10 @@ export class Client {
         throw new Error('invalid log');
       }
 
-      if (log.topics[0] !== '0x873c82cd37aaacdcf736cbb6beefc8da36d474b65ad23aaa1b1c6fbd875f7076') {
+      if (
+        log.topics[0] !==
+        '0x873c82cd37aaacdcf736cbb6beefc8da36d474b65ad23aaa1b1c6fbd875f7076'
+      ) {
         throw new Error('invalid log');
       }
 

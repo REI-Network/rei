@@ -18,7 +18,10 @@ describe('NetworkManager', () => {
    * @param protocols - Protocol list
    * @returns Nodes
    */
-  async function batchCreateNodes(count: number, protocols: (Protocol | Protocol[])[] = [new MockProtocol(1)]) {
+  async function batchCreateNodes(
+    count: number,
+    protocols: (Protocol | Protocol[])[] = [new MockProtocol(1)]
+  ) {
     if (count <= 1) {
       throw new Error('invalid count');
     }
@@ -52,10 +55,15 @@ describe('NetworkManager', () => {
    * @param duration - Timeout duration
    * @returns Whether succeed
    */
-  function check<T extends EventEmitter>(emitter: T, event: string, condition: (emitter: T) => boolean, duration: number = 5000): Promise<boolean> {
+  function check<T extends EventEmitter>(
+    emitter: T,
+    event: string,
+    condition: (emitter: T) => boolean,
+    duration = 5000
+  ): Promise<boolean> {
     let timeout: NodeJS.Timeout;
     let callback: () => void;
-    let pending: ((value: boolean) => void)[] = [];
+    const pending: ((value: boolean) => void)[] = [];
     const p1 = new Promise<boolean>((resolve) => {
       callback = () => {
         if (condition(emitter)) {
@@ -85,11 +93,16 @@ describe('NetworkManager', () => {
    * @param duration - Timeout duration
    * @returns Whether succeed
    */
-  function multiCheck<T extends EventEmitter>(emitters: T[], event: string, condition: (emitter: T) => boolean, duration: number = 5000) {
+  function multiCheck<T extends EventEmitter>(
+    emitters: T[],
+    event: string,
+    condition: (emitter: T) => boolean,
+    duration = 5000
+  ) {
     let timeout: NodeJS.Timeout;
-    let callbacks: (() => void)[] = [];
-    let results = new Array<boolean>(emitters.length).fill(false);
-    let pending: ((value: boolean) => void)[] = [];
+    const callbacks: (() => void)[] = [];
+    const results = new Array<boolean>(emitters.length).fill(false);
+    const pending: ((value: boolean) => void)[] = [];
     const p1 = new Promise<boolean>((resolve) => {
       emitters.forEach((emitter, i) => {
         const callback = () => {
@@ -140,13 +153,19 @@ describe('NetworkManager', () => {
       for (const { network, discv5, libp2p } of nodes) {
         expect(network.peers.length).be.equal(4);
         expect(network.connectionSize).be.equal(4);
-        expect(discv5.localEnr.ip, 'enr address should be updated').be.equal(service.getRealIPByNodeId(discv5.localEnr.nodeId));
-        const otherNodes = nodes.filter((node) => !node.libp2p.peerId.equals(libp2p.peerId));
+        expect(discv5.localEnr.ip, 'enr address should be updated').be.equal(
+          service.getRealIPByNodeId(discv5.localEnr.nodeId)
+        );
+        const otherNodes = nodes.filter(
+          (node) => !node.libp2p.peerId.equals(libp2p.peerId)
+        );
         for (const otherNode of otherNodes) {
           const addrs = libp2p.getAddress(otherNode.libp2p.peerId);
           expect(addrs !== undefined && addrs.length === 1).be.true;
           const addr = addrs![0].nodeAddress();
-          expect(addr.address, 'address book should be correct').be.equal(service.getRealIPByPeerId(otherNode.libp2p.peerId.toB58String()));
+          expect(addr.address, 'address book should be correct').be.equal(
+            service.getRealIPByPeerId(otherNode.libp2p.peerId.toB58String())
+          );
         }
       }
     });
@@ -160,7 +179,11 @@ describe('NetworkManager', () => {
     it('should update multi address when ip address changed', async () => {
       const endpoint = randomPick(nodes);
       const newIP = service.generateIP();
-      service.setRealIP(endpoint.network.peerId, endpoint.discv5.localEnr.nodeId, newIP);
+      service.setRealIP(
+        endpoint.network.peerId,
+        endpoint.discv5.localEnr.nodeId,
+        newIP
+      );
       expect(
         await check(endpoint.discv5, 'multiaddrUpdated', () => {
           return true;
@@ -198,7 +221,11 @@ describe('NetworkManager', () => {
 
     it('should create nodes succeed', async () => {
       service = new Service();
-      nodes = await batchCreateNodes(3, [protocol1, [protocol2, protocol3], protocol4]);
+      nodes = await batchCreateNodes(3, [
+        protocol1,
+        [protocol2, protocol3],
+        protocol4
+      ]);
     });
 
     it('should discover and connect succeed', async () => {

@@ -3,7 +3,10 @@ import { Log } from './evm/types';
 import { InterpreterStep } from './evm/interpreter';
 import { StateManager } from './state';
 
-export type TxReceipt = PreByzantiumTxReceipt | PostByzantiumTxReceipt | EIP2930Receipt;
+export type TxReceipt =
+  | PreByzantiumTxReceipt
+  | PostByzantiumTxReceipt
+  | EIP2930Receipt;
 
 /**
  * Abstract interface with common transaction receipt fields
@@ -50,14 +53,14 @@ export interface PostByzantiumTxReceipt extends BaseTxReceipt {
  *
  * @deprecated Please use PostByzantiumTxReceipt instead
  */
-export interface EIP2930Receipt extends PostByzantiumTxReceipt {}
+export type EIP2930Receipt = PostByzantiumTxReceipt;
 
 /**
  * EIP1559Receipt, which has the same fields as PostByzantiumTxReceipt
  *
  * @deprecated Please use PostByzantiumTxReceipt instead
  */
-export interface EIP1559Receipt extends PostByzantiumTxReceipt {}
+export type EIP1559Receipt = PostByzantiumTxReceipt;
 
 /**
  * Options for debugging.
@@ -71,7 +74,17 @@ export interface IDebug {
   /**
    * Called when the transaction starts processing
    */
-  captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, gasPrice: BN, value: BN, number: BN, stateManager: StateManager): Promise<void>;
+  captureStart(
+    from: undefined | Buffer,
+    to: undefined | Buffer,
+    create: boolean,
+    input: Buffer,
+    gas: BN,
+    gasPrice: BN,
+    value: BN,
+    number: BN,
+    stateManager: StateManager
+  ): Promise<void>;
   /**
    * Called at every step of processing a transaction
    */

@@ -15,7 +15,9 @@ export class FileCache {
    */
   scan(keydir: string): [string[], string[], string[]] {
     try {
-      const files = fs.readdirSync(keydir).filter((item) => !/(^|\/)\.[^\/\.]/g.test(item));
+      const files = fs
+        .readdirSync(keydir)
+        .filter((item) => !/(^|\/)\.[^\/\.]/g.test(item));
       if (files.length === 0) {
         return [[], [], []];
       }
@@ -23,7 +25,7 @@ export class FileCache {
       const mods: string[] = [];
       let newLastmode = Date.now();
       for (const fi of files) {
-        let fullPath = path.join(keydir, fi);
+        const fullPath = path.join(keydir, fi);
         all.push(fullPath);
         const modified = fs.statSync(fullPath).mtime.getTime();
         if (modified > this.lastMod) {

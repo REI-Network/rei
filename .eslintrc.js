@@ -8,6 +8,12 @@ module.exports = {
   ],
   overrides: [
     {
+      files: ['*.js'],
+      rules: {
+        'no-undef': 'off'
+      }
+    },
+    {
       files: ['*.ts'],
       parserOptions: {
         ecmaVersion: 2020,

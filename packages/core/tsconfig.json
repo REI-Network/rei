@@ -1,8 +1,6 @@
 {
   "extends": "../../tsconfig.json",
-  "include": [
-    "src/**/*.ts"
-  ],
+  "include": ["src/**/*.ts"],
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist",
@@ -35,6 +33,6 @@
     },
     {
       "path": "../bls/tsconfig.json"
-    },
+    }
   ]
 }

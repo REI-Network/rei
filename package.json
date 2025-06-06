@@ -23,6 +23,7 @@
     "husky": "^7.0.4",
     "jsonc-eslint-parser": "^2.4.0",
     "prettier": "^2.8.8",
+    "solhint": "^5.1.0",
     "ts-node": "^10.8.1",
     "typescript": "^4.1.2"
   },
@@ -49,7 +50,7 @@
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/package-lock.json && npm run clean:build",
     "clean:build": "rm -rf packages/*/dist && rm -rf packages/*/*.tsbuildinfo && cd packages/contracts && npm run clean:build",
     "clean:buildinfo": "rm -rf packages/*/*.tsbuildinfo",
-    "lint": "eslint packages/*/src/**.ts packages/*/test/**.ts",
-    "lint:fix": "eslint packages/*/src/**.ts packages/*/test/**.ts --fix"
+    "lint": "eslint packages/**/*.ts packages/**/*.js packages/**/*.json && solhint packages/**/*.sol",
+    "lint:fix": "eslint packages/**/*.ts packages/**/*.js packages/**/*.json --fix && solhint packages/**/*.sol --fix"
   }
 }

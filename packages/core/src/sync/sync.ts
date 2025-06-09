@@ -1,6 +1,11 @@
 import { EventEmitter } from 'events';
 import { BN } from 'ethereumjs-util';
-import { Channel, getRandomIntInclusive, logger, AbortableTimer } from '@rei-network/utils';
+import {
+  Channel,
+  getRandomIntInclusive,
+  logger,
+  AbortableTimer
+} from '@rei-network/utils';
 import { Block } from '@rei-network/structure';
 import { Node } from '../node';
 import { preValidateBlock, validateReceipts } from '../validation';
@@ -72,7 +77,7 @@ export class Synchronizer extends EventEmitter {
   private full: FullSyncScheduler;
   private snap: SnapSyncScheduler;
   private channel = new Channel<Announcement>();
-  private aborted: boolean = false;
+  private aborted = false;
   private delay = new AbortableTimer();
   private timer = new AbortableTimer();
   private syncLoopPromise?: Promise<void>;
@@ -119,13 +124,29 @@ export class Synchronizer extends EventEmitter {
   private listenSyncer(sync: FullSyncScheduler | SnapSyncScheduler) {
     sync
       .on('start', (info) => {
-        logger.info('💡 Get best height from:', info.remotePeerId, 'best height:', info.bestHeight.toString(), 'local height:', this.node.latestBlock.header.number.toString());
+        logger.info(
+          '💡 Get best height from:',
+          info.remotePeerId,
+          'best height:',
+          info.bestHeight.toString(),
+          'local height:',
+          this.node.latestBlock.header.number.toString()
+        );
         this.emit('start');
       })
       .on('finished', (info) => {
         const localHeight = this.node.latestBlock.header.number.toString();
         const localTD = this.node.getTotalDifficulty().toString();
-        logger.info('💫 Sync over, local height:', localHeight, 'local td:', localTD, 'best height:', info.bestHeight.toString(), 'best td:', info.bestTD.toString());
+        logger.info(
+          '💫 Sync over, local height:',
+          localHeight,
+          'local td:',
+          localTD,
+          'best height:',
+          info.bestHeight.toString(),
+          'best td:',
+          info.bestTD.toString()
+        );
         this.emit('finished');
       })
       .on('synchronized', () => {
@@ -145,7 +166,9 @@ export class Synchronizer extends EventEmitter {
    * @param ann - Wire announcement
    * @returns If the download failed, return null
    */
-  private downloadBlockDataFromAnn(ann: WireAnnouncement): Promise<BlockData | null> {
+  private downloadBlockDataFromAnn(
+    ann: WireAnnouncement
+  ): Promise<BlockData | null> {
     return this.downloadBlockData(ann.height, ann.handler, ann.block);
   }
 
@@ -156,10 +179,17 @@ export class Synchronizer extends EventEmitter {
    * @param block - Block(if exists)
    * @returns If the download failed, return null
    */
-  private async downloadBlockData(height: BN, handler: WireProtocolHandler, block?: Block): Promise<BlockData | null> {
+  private async downloadBlockData(
+    height: BN,
+    handler: WireProtocolHandler,
+    block?: Block
+  ): Promise<BlockData | null> {
     if (!isV2(handler)) {
       // the remote peer must support wire v2 protocol
-      logger.debug('Synchronizer::downloadBlockData, unsupported wire v2 protocol:', handler.id);
+      logger.debug(
+        'Synchronizer::downloadBlockData, unsupported wire v2 protocol:',
+        handler.id
+      );
       return null;
     }
 
@@ -170,7 +200,12 @@ export class Synchronizer extends EventEmitter {
         .then((headers) => (headers.length === 1 ? headers[0] : null))
         .catch(() => null);
       if (header === null) {
-        logger.warn('Synchronizer::downloadBlockData, download header failed:', handler.id, 'number:', height.toString());
+        logger.warn(
+          'Synchronizer::downloadBlockData, download header failed:',
+          handler.id,
+          'number:',
+          height.toString()
+        );
         return null;
       }
 
@@ -180,11 +215,19 @@ export class Synchronizer extends EventEmitter {
         .then((body) => (body.length === 1 ? body[0] : null))
         .catch(() => null);
       if (body === null) {
-        logger.warn('Synchronizer::downloadBlockData, download body failed:', handler.id, 'number:', height.toString());
+        logger.warn(
+          'Synchronizer::downloadBlockData, download body failed:',
+          handler.id,
+          'number:',
+          height.toString()
+        );
         return null;
       }
 
-      block = Block.fromBlockData({ header, transactions: body }, { common: this.node.getCommon(0), hardforkByBlockNumber: true });
+      block = Block.fromBlockData(
+        { header, transactions: body },
+        { common: this.node.getCommon(0), hardforkByBlockNumber: true }
+      );
     }
 
     // validate block
@@ -192,7 +235,12 @@ export class Synchronizer extends EventEmitter {
       await preValidateBlock.call(block);
     } catch (err) {
       // maybe we should ban remote peer
-      logger.warn('Synchronizer::downloadBlockData, validate block failed:', handler.id, 'err:', err);
+      logger.warn(
+        'Synchronizer::downloadBlockData, validate block failed:',
+        handler.id,
+        'err:',
+        err
+      );
       return null;
     }
 
@@ -202,7 +250,12 @@ export class Synchronizer extends EventEmitter {
       .then((receipts) => (receipts.length === 1 ? receipts[0] : null))
       .catch(() => null);
     if (receipts === null) {
-      logger.warn('Synchronizer::downloadBlockData, download receipts failed:', handler.id, 'number:', height.toString());
+      logger.warn(
+        'Synchronizer::downloadBlockData, download receipts failed:',
+        handler.id,
+        'number:',
+        height.toString()
+      );
       return null;
     }
 
@@ -211,7 +264,12 @@ export class Synchronizer extends EventEmitter {
       await validateReceipts(block, receipts);
     } catch (err) {
       // maybe we should ban remote peer
-      logger.warn('Synchronizer::downloadBlockData, validate receipts failed:', handler.id, 'err:', err);
+      logger.warn(
+        'Synchronizer::downloadBlockData, validate receipts failed:',
+        handler.id,
+        'err:',
+        err
+      );
       return null;
     }
 
@@ -315,8 +373,14 @@ export class Synchronizer extends EventEmitter {
         const remoteHeight = ann.height.toNumber();
         const localHeight = this.snap.status.highestBlock;
         const staleNumber = remoteHeight - localHeight;
-        const trustedMode = this.trustedHeight && this.trustedHash && this.trustedHeight.eqn(localHeight);
-        if ((trustedMode && staleNumber >= snapSyncTrustedStaleBlockNumber) || (!trustedMode && staleNumber >= snapSyncStaleBlockNumber)) {
+        const trustedMode =
+          this.trustedHeight &&
+          this.trustedHash &&
+          this.trustedHeight.eqn(localHeight);
+        if (
+          (trustedMode && staleNumber >= snapSyncTrustedStaleBlockNumber) ||
+          (!trustedMode && staleNumber >= snapSyncStaleBlockNumber)
+        ) {
           // confirm the latest block data, then reset the stateRoot of the snap
           const result = await this.confirmAnn(ann);
           if (result === null) {
@@ -324,14 +388,18 @@ export class Synchronizer extends EventEmitter {
           }
           const { confirmed, data } = result;
           if (confirmed >= snapSyncMinConfirmed) {
-            logger.info('Synchronizer::syncLoop, current block is stale, try to sync new block:', remoteHeight);
+            logger.info(
+              'Synchronizer::syncLoop, current block is stale, try to sync new block:',
+              remoteHeight
+            );
             const root = data.block.header.stateRoot;
             const info: SyncInfo = {
               bestHeight: ann.height,
               bestTD: ann.height.addn(1),
               remotePeerId: ann.handler.peer.peerId
             };
-            const startingBlock = this.node.latestBlock.header.number.toNumber();
+            const startingBlock =
+              this.node.latestBlock.header.number.toNumber();
             await this.snap.resetRoot(root, startingBlock, info, data);
             continue;
           }
@@ -346,7 +414,10 @@ export class Synchronizer extends EventEmitter {
           continue;
         }
 
-        if (this.mode === SyncMode.Snap && ann.td.sub(td).gten(this.snapSyncMinTD)) {
+        if (
+          this.mode === SyncMode.Snap &&
+          ann.td.sub(td).gten(this.snapSyncMinTD)
+        ) {
           if (!isV2(ann.handler)) {
             // the remote node does not support downloading receipts, ignore it
             continue;
@@ -355,14 +426,22 @@ export class Synchronizer extends EventEmitter {
           logger.debug('Synchronizer::syncLoop, try to start a new snap sync');
 
           let data: BlockData;
-          if (this.trustedHeight && this.trustedHash && this.node.latestBlock.header.number.lt(this.trustedHeight)) {
+          if (
+            this.trustedHeight &&
+            this.trustedHash &&
+            this.node.latestBlock.header.number.lt(this.trustedHeight)
+          ) {
             const result = await this.confirmTrusted(ann.handler);
             if (!result.confirmed || result.data === null) {
-              logger.debug('Synchronizer::syncLoop, trusted block confirmed failed');
+              logger.debug(
+                'Synchronizer::syncLoop, trusted block confirmed failed'
+              );
               continue;
             }
 
-            logger.debug('Synchronizer::syncLoop, trusted block confirmed succeed');
+            logger.debug(
+              'Synchronizer::syncLoop, trusted block confirmed succeed'
+            );
 
             data = result.data;
           } else {
@@ -374,7 +453,10 @@ export class Synchronizer extends EventEmitter {
 
             // if we have collected enough confirmations, start snap sync
             if (result.confirmed < snapSyncMinConfirmed) {
-              logger.debug('Synchronizer::syncLoop, confirmed failed:', result.confirmed);
+              logger.debug(
+                'Synchronizer::syncLoop, confirmed failed:',
+                result.confirmed
+              );
               continue;
             }
 
@@ -410,15 +492,23 @@ export class Synchronizer extends EventEmitter {
       }
 
       // if we are not working, and there are no events that are not handled
-      if (!this.full.isSyncing && !this.snap.isSyncing && this.channel.array.length === 0) {
+      if (
+        !this.full.isSyncing &&
+        !this.snap.isSyncing &&
+        this.channel.array.length === 0
+      ) {
         const td = this.node.getTotalDifficulty();
-        const handlers = this.node.wire.pool.handlers.filter((handler) => new BN(handler.status!.totalDifficulty).gt(td));
+        const handlers = this.node.wire.pool.handlers.filter((handler) =>
+          new BN(handler.status!.totalDifficulty).gt(td)
+        );
         if (handlers.length === 0) {
           continue;
         }
 
         // randomly pick a peer to start sync
-        this.announceNewBlock(handlers[getRandomIntInclusive(0, handlers.length - 1)]);
+        this.announceNewBlock(
+          handlers[getRandomIntInclusive(0, handlers.length - 1)]
+        );
       }
     }
   }

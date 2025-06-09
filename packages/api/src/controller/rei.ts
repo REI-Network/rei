@@ -24,19 +24,29 @@ export class ReiController extends Controller {
   async getCrude([address, tag]: [string, string]) {
     const block = await this.getBlockByTag(tag);
     const common = block._common;
-    const state = await this.node.getStateManager(block.header.stateRoot, common);
+    const state = await this.node.getStateManager(
+      block.header.stateRoot,
+      common
+    );
     const faddr = Address.fromString(common.param('vm', 'faddr'));
     const totalAmount = (await state.getAccount(faddr)).balance;
     const timestamp = block.header.timestamp.toNumber();
 
     let dailyFee: BN | undefined = undefined;
     if (block.header.number.gten(1)) {
-      const parent = await this.node.db.getHeader(block.header.parentHash, block.header.number.subn(1));
+      const parent = await this.node.db.getHeader(
+        block.header.parentHash,
+        block.header.number.subn(1)
+      );
       const parentCommon = parent._common;
       if (isEnableDAO(parentCommon)) {
         // load dailyFee from contract
         const parentVM = await this.node.getVM(parent.stateRoot, parentCommon);
-        const config = await this.node.reimint.getConfig(parentVM, block, parentCommon);
+        const config = await this.node.reimint.getConfig(
+          parentVM,
+          block,
+          parentCommon
+        );
         dailyFee = await config.dailyFee();
       }
     }
@@ -64,7 +74,10 @@ export class ReiController extends Controller {
   async getUsedCrude([address, tag]: [string, string]) {
     const block = await this.getBlockByTag(tag);
     const timestamp = block.header.timestamp.toNumber();
-    const state = await this.node.getStateManager(block.header.stateRoot, block._common);
+    const state = await this.node.getStateManager(
+      block.header.stateRoot,
+      block._common
+    );
     const account = await state.getAccount(Address.fromString(address));
     const stakeInfo = account.getStakeInfo();
     return bnToHex(stakeInfo.estimateUsage(timestamp));
@@ -93,12 +106,19 @@ export class ReiController extends Controller {
 
     let dailyFee: BN | undefined = undefined;
     if (block.header.number.gten(1)) {
-      const parent = await this.node.db.getHeader(block.header.parentHash, block.header.number.subn(1));
+      const parent = await this.node.db.getHeader(
+        block.header.parentHash,
+        block.header.number.subn(1)
+      );
       const parentCommon = parent._common;
       if (isEnableDAO(parentCommon)) {
         // load dailyFee from contract
         const parentVM = await this.node.getVM(parent.stateRoot, parentCommon);
-        const config = await this.node.reimint.getConfig(parentVM, block, parentCommon);
+        const config = await this.node.reimint.getConfig(
+          parentVM,
+          block,
+          parentCommon
+        );
         dailyFee = await config.dailyFee();
       }
     }
@@ -125,12 +145,19 @@ export class ReiController extends Controller {
 
     let factor: number | undefined = undefined;
     if (block.header.number.gten(1)) {
-      const parent = await this.node.db.getHeader(block.header.parentHash, block.header.number.subn(1));
+      const parent = await this.node.db.getHeader(
+        block.header.parentHash,
+        block.header.number.subn(1)
+      );
       const parentCommon = parent._common;
       if (isEnableDAO(parentCommon)) {
         // load minerRewardFactor from contract
         const parentVM = await this.node.getVM(parent.stateRoot, parentCommon);
-        const config = await this.node.reimint.getConfig(parentVM, block, parentCommon);
+        const config = await this.node.reimint.getConfig(
+          parentVM,
+          block,
+          parentCommon
+        );
         factor = (await config.minerRewardFactor()).toNumber();
       }
     }
@@ -174,7 +201,9 @@ export class ReiController extends Controller {
     }
     const vm = await this.node.getVM(block.header.stateRoot, block._common);
     const bls = this.node.reimint.getValidatorBLS(vm, block);
-    const blsPublicKey = await bls.getBLSPublicKey(Address.fromString(coinbase));
+    const blsPublicKey = await bls.getBLSPublicKey(
+      Address.fromString(coinbase)
+    );
     result.registerBLSPublicKey = blsPublicKey?.toString('hex') ?? null;
     return result;
   }

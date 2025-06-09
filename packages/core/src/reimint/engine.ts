@@ -1,11 +1,24 @@
 import path from 'path';
 import { encode } from 'rlp';
-import { Address, BN, BNLike, ecsign, intToBuffer, bufferToHex } from 'ethereumjs-util';
+import {
+  Address,
+  BN,
+  BNLike,
+  ecsign,
+  intToBuffer,
+  bufferToHex
+} from 'ethereumjs-util';
 import { BaseTrie, SecureTrie as Trie } from '@rei-network/trie';
 import { VM } from '@rei-network/vm';
 import EVM from '@rei-network/vm/dist/evm/evm';
 import TxContext from '@rei-network/vm/dist/evm/txContext';
-import { Block, HeaderData, BlockHeader, Transaction, Receipt } from '@rei-network/structure';
+import {
+  Block,
+  HeaderData,
+  BlockHeader,
+  Transaction,
+  Receipt
+} from '@rei-network/structure';
 import { Common } from '@rei-network/common';
 import { genesisStateByName } from '@rei-network/common/dist/genesisStates';
 import { logger, ignoreError, Channel } from '@rei-network/utils';
@@ -13,11 +26,24 @@ import { Node } from '../node';
 import { StateManager } from '../stateManager';
 import { ActiveValidatorSet, ValidatorSets } from './validatorSet';
 import { isEmptyAddress, getGasLimitByCommon, EMPTY_ADDRESS } from '../utils';
-import { isEnableFreeStaking, loadInitData, isEnableHardfork2, isEnableBetterPOS, isEnableDAO } from '../hardforks';
+import {
+  isEnableFreeStaking,
+  loadInitData,
+  isEnableHardfork2,
+  isEnableBetterPOS,
+  isEnableDAO
+} from '../hardforks';
 import { SignatureType } from './enum';
 import { IProcessBlockResult } from './types';
 import { Worker } from './worker';
-import { StakeManager, Contract, Fee, FeePool, ValidatorBLS, Config } from './contracts';
+import {
+  StakeManager,
+  Contract,
+  Fee,
+  FeePool,
+  ValidatorBLS,
+  Config
+} from './contracts';
 import { StateMachine } from './state';
 import { Evidence, EvidencePool, EvidenceDatabase } from './evpool';
 import { Reimint } from './reimint';
@@ -53,8 +79,15 @@ export class SimpleNodeSigner {
    * @returns ECDSA signature
    */
   ecdsaSign(msg: Buffer): Buffer {
-    const signature = ecsign(msg, this.node.accMngr.getPrivateKey(this.node.reimint.coinbase));
-    return Buffer.concat([signature.r, signature.s, intToBuffer(signature.v - 27)]);
+    const signature = ecsign(
+      msg,
+      this.node.accMngr.getPrivateKey(this.node.reimint.coinbase)
+    );
+    return Buffer.concat([
+      signature.r,
+      signature.s,
+      intToBuffer(signature.v - 27)
+    ]);
   }
 
   /**
@@ -112,7 +145,10 @@ export class SimpleBackend {
    * @returns Pre process block result
    */
   preprocessBlock(block: Block) {
-    return this.engine.executor.processBlock({ block, skipConsensusValidation: true });
+    return this.engine.executor.processBlock({
+      block,
+      skipConsensusValidation: true
+    });
   }
 
   /**
@@ -127,7 +163,12 @@ export class SimpleBackend {
         broadcast: true
       });
       if (reorged) {
-        logger.info('⛏️  Mint block, height:', block.header.number.toString(), 'hash:', bufferToHex(block.hash()));
+        logger.info(
+          '⛏️  Mint block, height:',
+          block.header.number.toString(),
+          'hash:',
+          bufferToHex(block.hash())
+        );
         // try to continue minting
         this.engine.node.tryToMintNextBlock();
       }
@@ -173,7 +214,15 @@ export class ReimintEngine {
     const db = new EvidenceDatabase(this.node.evidencedb);
     this.evpool = new EvidencePool({ backend: db });
     const wal = new WAL({ path: path.join(this.node.datadir, 'WAL') });
-    this.state = new StateMachine(this.backend, this.node.consensus, this.evpool, wal, this.node.chainId, this.config, this.signer);
+    this.state = new StateMachine(
+      this.backend,
+      this.node.consensus,
+      this.evpool,
+      wal,
+      this.node.chainId,
+      this.config,
+      this.signer
+    );
     this.executor = new ReimintExecutor(this.node, this);
   }
 
@@ -202,7 +251,9 @@ export class ReimintEngine {
       await this.collector.init(block.header.number, async (height: BN) => {
         // load evidence from canonical header
         const header = await this.node.db.getCanonicalHeader(height);
-        return ExtraData.fromBlockHeader(header).evidence.map((ev) => ev.hash());
+        return ExtraData.fromBlockHeader(header).evidence.map((ev) =>
+          ev.hash()
+        );
       });
     }
   }
@@ -278,7 +329,11 @@ export class ReimintEngine {
     const sm = this.getStakeManager(vm, block, header._common);
     let valSet: ActiveValidatorSet;
     if (isEnableDAO(pendingBlock.common)) {
-      valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm, this.getValidatorBLS(vm, block, pendingBlock.common));
+      valSet = await this.validatorSets.getActiveValSet(
+        header.stateRoot,
+        sm,
+        this.getValidatorBLS(vm, block, pendingBlock.common)
+      );
     } else {
       valSet = await this.validatorSets.getActiveValSet(header.stateRoot, sm);
     }
@@ -384,14 +439,24 @@ export class ReimintEngine {
    */
   async generateGenesis() {
     const common = this.node.getCommon(0);
-    const genesisBlock = Block.fromBlockData({ header: common.genesis() }, { common });
-    const stateManager = new StateManager({ common, trie: new Trie(this.node.chaindb) });
+    const genesisBlock = Block.fromBlockData(
+      { header: common.genesis() },
+      { common }
+    );
+    const stateManager = new StateManager({
+      common,
+      trie: new Trie(this.node.chaindb)
+    });
     await stateManager.generateGenesis(genesisStateByName(this.node.chain));
     let root = await stateManager.getStateRoot();
 
     // deploy system contracts
     const vm = await this.node.getVM(root, common);
-    const evm = new EVM(vm, new TxContext(new BN(0), EMPTY_ADDRESS), genesisBlock);
+    const evm = new EVM(
+      vm,
+      new TxContext(new BN(0), EMPTY_ADDRESS),
+      genesisBlock
+    );
     await Contract.deployReimintContracts(evm, common);
     if (isEnableFreeStaking(common)) {
       await Contract.deployFreeStakingContracts(evm, common);
@@ -403,7 +468,11 @@ export class ReimintEngine {
     root = await vm.stateManager.getStateRoot();
 
     if (!root.equals(genesisBlock.header.stateRoot)) {
-      logger.error('State root not equal', bufferToHex(root), bufferToHex(genesisBlock.header.stateRoot));
+      logger.error(
+        'State root not equal',
+        bufferToHex(root),
+        bufferToHex(genesisBlock.header.stateRoot)
+      );
       throw new Error('state root not equal');
     }
   }
@@ -419,9 +488,19 @@ export class ReimintEngine {
    * @returns Block
    */
   generatePendingBlock(headerData: HeaderData, common: Common) {
-    const signatureType = isEnableDAO(common) ? SignatureType.BLS : SignatureType.ECDSA;
-    if ((signatureType === SignatureType.ECDSA && this.signer.ecdsaUnlocked()) || (signatureType === SignatureType.BLS && this.signer.blsPublicKey())) {
-      const { block } = Reimint.generateBlockAndProposal(headerData, [], { common }, { signer: this.signer, signatureType });
+    const signatureType = isEnableDAO(common)
+      ? SignatureType.BLS
+      : SignatureType.ECDSA;
+    if (
+      (signatureType === SignatureType.ECDSA && this.signer.ecdsaUnlocked()) ||
+      (signatureType === SignatureType.BLS && this.signer.blsPublicKey())
+    ) {
+      const { block } = Reimint.generateBlockAndProposal(
+        headerData,
+        [],
+        { common },
+        { signer: this.signer, signatureType }
+      );
       return block;
     }
     // return empty block
@@ -434,7 +513,10 @@ export class ReimintEngine {
    * @param transactions - Transactions
    * @param receipts - Receipts
    */
-  async generateReceiptTrie(transactions: Transaction[], receipts: Receipt[]): Promise<Buffer> {
+  async generateReceiptTrie(
+    transactions: Transaction[],
+    receipts: Receipt[]
+  ): Promise<Buffer> {
     const trie = new BaseTrie();
     for (let i = 0; i < receipts.length; i++) {
       await trie.put(encode(i), receipts[i].serialize());

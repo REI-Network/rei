@@ -1,4 +1,13 @@
-import { rlp, toBuffer, unpadBuffer, bufferToInt, BN, bufferToHex, bnToHex, intToHex } from 'ethereumjs-util';
+import {
+  rlp,
+  toBuffer,
+  unpadBuffer,
+  bufferToInt,
+  BN,
+  bufferToHex,
+  bnToHex,
+  intToHex
+} from 'ethereumjs-util';
 import { Block } from '../block';
 import { Transaction } from '../tx';
 import { LogRawValues, Log } from './log';
@@ -24,7 +33,12 @@ export class Receipt {
     return new BN(this.cumulativeGasUsed);
   }
 
-  constructor(cumulativeGasUsed: Buffer, bitvector: Buffer, logs: Log[], status: 0 | 1) {
+  constructor(
+    cumulativeGasUsed: Buffer,
+    bitvector: Buffer,
+    logs: Log[],
+    status: 0 | 1
+  ) {
     this.cumulativeGasUsed = cumulativeGasUsed;
     this.bitvector = bitvector;
     this.logs = logs;
@@ -53,7 +67,12 @@ export class Receipt {
     if (values.length !== 4) {
       throw new Error('Invalid receipt. Only expecting 4 values.');
     }
-    const [status, cumulativeGasUsed, bitvector, rawLogs] = values as [Buffer, Buffer, Buffer, LogRawValues[]];
+    const [status, cumulativeGasUsed, bitvector, rawLogs] = values as [
+      Buffer,
+      Buffer,
+      Buffer,
+      LogRawValues[]
+    ];
     return new Receipt(
       cumulativeGasUsed,
       bitvector,
@@ -67,7 +86,12 @@ export class Receipt {
    * @returns
    */
   raw(): ReceiptRawValue {
-    return [unpadBuffer(toBuffer(this.status)), this.cumulativeGasUsed, this.bitvector, this.logs.map((l) => l.raw())];
+    return [
+      unpadBuffer(toBuffer(this.status)),
+      this.cumulativeGasUsed,
+      this.bitvector,
+      this.logs.map((l) => l.raw())
+    ];
   }
 
   /**
@@ -94,18 +118,31 @@ export class Receipt {
    */
   toRPCJSON() {
     return {
-      blockHash: this.extension?.blockHash ? bufferToHex(this.extension.blockHash) : undefined,
-      blockNumber: this.extension?.blockNumber ? bnToHex(this.extension.blockNumber) : undefined,
-      contractAddress: this.extension?.contractAddress ? bufferToHex(this.extension.contractAddress) : null,
+      blockHash: this.extension?.blockHash
+        ? bufferToHex(this.extension.blockHash)
+        : undefined,
+      blockNumber: this.extension?.blockNumber
+        ? bnToHex(this.extension.blockNumber)
+        : undefined,
+      contractAddress: this.extension?.contractAddress
+        ? bufferToHex(this.extension.contractAddress)
+        : null,
       cumulativeGasUsed: bnToHex(this.bnCumulativeGasUsed),
       from: this.extension?.from ? bufferToHex(this.extension.from) : undefined,
-      gasUsed: this.extension?.gasUsed ? bnToHex(this.extension.gasUsed) : undefined,
+      gasUsed: this.extension?.gasUsed
+        ? bnToHex(this.extension.gasUsed)
+        : undefined,
       logs: this.logs.map((log) => log.toRPCJSON()),
       logsBloom: bufferToHex(this.bitvector),
       status: intToHex(this.status),
       to: this.extension?.to ? bufferToHex(this.extension.to) : undefined,
-      transactionHash: this.extension?.transactionHash ? bufferToHex(this.extension.transactionHash) : undefined,
-      transactionIndex: this.extension?.transactionIndex !== undefined ? intToHex(this.extension.transactionIndex) : undefined
+      transactionHash: this.extension?.transactionHash
+        ? bufferToHex(this.extension.transactionHash)
+        : undefined,
+      transactionIndex:
+        this.extension?.transactionIndex !== undefined
+          ? intToHex(this.extension.transactionIndex)
+          : undefined
     };
   }
 }

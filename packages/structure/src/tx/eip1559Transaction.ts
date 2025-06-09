@@ -1,11 +1,30 @@
-import { BN, bnToHex, bnToUnpaddedBuffer, ecrecover, keccak256, rlp, toBuffer } from 'ethereumjs-util';
+import {
+  BN,
+  bnToHex,
+  bnToUnpaddedBuffer,
+  ecrecover,
+  keccak256,
+  rlp,
+  toBuffer
+} from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { BaseTransaction } from './baseTransaction';
-import { AccessList, AccessListBuffer, FeeMarketEIP1559TxData, FeeMarketEIP1559ValuesArray, JsonTx, N_DIV_2, TxOptions } from './types';
+import {
+  AccessList,
+  AccessListBuffer,
+  FeeMarketEIP1559TxData,
+  FeeMarketEIP1559ValuesArray,
+  JsonTx,
+  N_DIV_2,
+  TxOptions
+} from './types';
 import { AccessLists } from './util';
 
 const TRANSACTION_TYPE = 2;
-const TRANSACTION_TYPE_BUFFER = Buffer.from(TRANSACTION_TYPE.toString(16).padStart(2, '0'), 'hex');
+const TRANSACTION_TYPE_BUFFER = Buffer.from(
+  TRANSACTION_TYPE.toString(16).padStart(2, '0'),
+  'hex'
+);
 
 /**
  * Typed transaction with a new gas fee market mechanism
@@ -67,7 +86,10 @@ export default class FeeMarketEIP1559Transaction extends BaseTransaction<FeeMark
    * - `chainId` will be set automatically if not provided
    * - All parameters are optional and have some basic default values
    */
-  public static fromTxData(txData: FeeMarketEIP1559TxData, opts: TxOptions = {}) {
+  public static fromTxData(
+    txData: FeeMarketEIP1559TxData,
+    opts: TxOptions = {}
+  ) {
     return new FeeMarketEIP1559Transaction(txData, opts);
   }
 
@@ -79,7 +101,11 @@ export default class FeeMarketEIP1559Transaction extends BaseTransaction<FeeMark
    */
   public static fromSerializedTx(serialized: Buffer, opts: TxOptions = {}) {
     if (!serialized.slice(0, 1).equals(TRANSACTION_TYPE_BUFFER)) {
-      throw new Error(`Invalid serialized tx input: not an EIP-1559 transaction (wrong tx type, expected: ${TRANSACTION_TYPE}, received: ${serialized.slice(0, 1).toString('hex')}`);
+      throw new Error(
+        `Invalid serialized tx input: not an EIP-1559 transaction (wrong tx type, expected: ${TRANSACTION_TYPE}, received: ${serialized
+          .slice(0, 1)
+          .toString('hex')}`
+      );
     }
 
     const values = rlp.decode(serialized.slice(1));
@@ -110,12 +136,30 @@ export default class FeeMarketEIP1559Transaction extends BaseTransaction<FeeMark
    * Format: `[chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data,
    * accessList, signatureYParity, signatureR, signatureS]`
    */
-  public static fromValuesArray(values: FeeMarketEIP1559ValuesArray, opts: TxOptions = {}) {
+  public static fromValuesArray(
+    values: FeeMarketEIP1559ValuesArray,
+    opts: TxOptions = {}
+  ) {
     if (values.length !== 9 && values.length !== 12) {
-      throw new Error('Invalid EIP-1559 transaction. Only expecting 9 values (for unsigned tx) or 12 values (for signed tx).');
+      throw new Error(
+        'Invalid EIP-1559 transaction. Only expecting 9 values (for unsigned tx) or 12 values (for signed tx).'
+      );
     }
 
-    const [chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data, accessList, v, r, s] = values;
+    const [
+      chainId,
+      nonce,
+      maxPriorityFeePerGas,
+      maxFeePerGas,
+      gasLimit,
+      to,
+      value,
+      data,
+      accessList,
+      v,
+      r,
+      s
+    ] = values;
 
     return new FeeMarketEIP1559Transaction(
       {
@@ -153,7 +197,9 @@ export default class FeeMarketEIP1559Transaction extends BaseTransaction<FeeMark
     if (!this.common.isActivatedEIP(1559)) {
       throw new Error('EIP-1559 not enabled on Common');
     }
-    this.activeCapabilities = this.activeCapabilities.concat([1559, 2718, 2930]);
+    this.activeCapabilities = this.activeCapabilities.concat([
+      1559, 2718, 2930
+    ]);
 
     // Populate the access list fields
     const accessListData = AccessLists.getAccessListData(accessList ?? []);
@@ -162,8 +208,12 @@ export default class FeeMarketEIP1559Transaction extends BaseTransaction<FeeMark
     // Verify the access list format.
     AccessLists.verifyAccessList(this.accessList);
 
-    this.maxFeePerGas = new BN(toBuffer(maxFeePerGas === '' ? '0x' : maxFeePerGas));
-    this.maxPriorityFeePerGas = new BN(toBuffer(maxPriorityFeePerGas === '' ? '0x' : maxPriorityFeePerGas));
+    this.maxFeePerGas = new BN(
+      toBuffer(maxFeePerGas === '' ? '0x' : maxFeePerGas)
+    );
+    this.maxPriorityFeePerGas = new BN(
+      toBuffer(maxPriorityFeePerGas === '' ? '0x' : maxPriorityFeePerGas)
+    );
 
     this._validateCannotExceedMaxInteger(
       {
@@ -174,15 +224,21 @@ export default class FeeMarketEIP1559Transaction extends BaseTransaction<FeeMark
     );
 
     if (this.maxFeePerGas.lt(this.maxPriorityFeePerGas)) {
-      throw new Error('maxFeePerGas cannot be less than maxPriorityFeePerGas (The total must be the larger of the two)');
+      throw new Error(
+        'maxFeePerGas cannot be less than maxPriorityFeePerGas (The total must be the larger of the two)'
+      );
     }
 
     if (this.v && !this.v.eqn(0) && !this.v.eqn(1)) {
-      throw new Error('The y-parity of the transaction should either be 0 or 1');
+      throw new Error(
+        'The y-parity of the transaction should either be 0 or 1'
+      );
     }
 
     if (this.common.gteHardfork('homestead') && this.s?.gt(N_DIV_2)) {
-      throw new Error('Invalid Signature: s-values greater than secp256k1n/2 are considered invalid');
+      throw new Error(
+        'Invalid Signature: s-values greater than secp256k1n/2 are considered invalid'
+      );
     }
   }
 
@@ -200,7 +256,10 @@ export default class FeeMarketEIP1559Transaction extends BaseTransaction<FeeMark
    * @param baseFee The base fee of the block (will be set to 0 if not provided)
    */
   getUpfrontCost(baseFee: BN = new BN(0)): BN {
-    const inclusionFeePerGas = BN.min(this.maxPriorityFeePerGas, this.maxFeePerGas.sub(baseFee));
+    const inclusionFeePerGas = BN.min(
+      this.maxPriorityFeePerGas,
+      this.maxFeePerGas.sub(baseFee)
+    );
     const gasPrice = inclusionFeePerGas.add(baseFee);
     return this.gasLimit.mul(gasPrice).add(this.value);
   }
@@ -265,7 +324,10 @@ export default class FeeMarketEIP1559Transaction extends BaseTransaction<FeeMark
    */
   getMessageToSign(hashMessage = true): Buffer {
     const base = this.raw().slice(0, 9);
-    const message = Buffer.concat([TRANSACTION_TYPE_BUFFER, rlp.encode(base as any)]);
+    const message = Buffer.concat([
+      TRANSACTION_TYPE_BUFFER,
+      rlp.encode(base as any)
+    ]);
     if (hashMessage) {
       return keccak256(message);
     } else {
@@ -307,7 +369,9 @@ export default class FeeMarketEIP1559Transaction extends BaseTransaction<FeeMark
     // EIP-2: All transaction signatures whose s-value is greater than secp256k1n/2 are considered invalid.
     // Reasoning: https://ethereum.stackexchange.com/a/55728
     if (this.common.gteHardfork('homestead') && this.s?.gt(N_DIV_2)) {
-      throw new Error('Invalid Signature: s-values greater than secp256k1n/2 are considered invalid');
+      throw new Error(
+        'Invalid Signature: s-values greater than secp256k1n/2 are considered invalid'
+      );
     }
 
     const { v, r, s } = this;

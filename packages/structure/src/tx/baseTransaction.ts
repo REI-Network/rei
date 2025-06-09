@@ -1,7 +1,26 @@
-import { Address, BN, toBuffer, MAX_INTEGER, TWO_POW256, unpadBuffer, ecsign, publicToAddress, BNLike } from 'ethereumjs-util';
+import {
+  Address,
+  BN,
+  toBuffer,
+  MAX_INTEGER,
+  TWO_POW256,
+  unpadBuffer,
+  ecsign,
+  publicToAddress,
+  BNLike
+} from 'ethereumjs-util';
 import { Common, Chain, Hardfork } from '@rei-network/common';
 import { Block } from '../block';
-import { TxData, JsonTx, AccessListEIP2930ValuesArray, AccessListEIP2930TxData, FeeMarketEIP1559ValuesArray, FeeMarketEIP1559TxData, TxValuesArray, Capability } from './types';
+import {
+  TxData,
+  JsonTx,
+  AccessListEIP2930ValuesArray,
+  AccessListEIP2930TxData,
+  FeeMarketEIP1559ValuesArray,
+  FeeMarketEIP1559TxData,
+  TxValuesArray,
+  Capability
+} from './types';
 import { TransactionExtension } from './extension';
 
 /**
@@ -51,7 +70,9 @@ export abstract class BaseTransaction<TransactionObject> {
    */
   protected DEFAULT_HARDFORK: string | Hardfork = Hardfork.Istanbul;
 
-  constructor(txData: TxData | AccessListEIP2930TxData | FeeMarketEIP1559TxData) {
+  constructor(
+    txData: TxData | AccessListEIP2930TxData | FeeMarketEIP1559TxData
+  ) {
     const { nonce, gasLimit, to, value, data, v, r, s, type } = txData;
     this._type = new BN(toBuffer(type)).toNumber();
 
@@ -124,11 +145,15 @@ export abstract class BaseTransaction<TransactionObject> {
   validate(): boolean;
   validate(stringError: false): boolean;
   validate(stringError: true): string[];
-  validate(stringError: boolean = false): boolean | string[] {
+  validate(stringError = false): boolean | string[] {
     const errors: string[] = [];
 
     if (this.getBaseFee().gt(this.gasLimit)) {
-      errors.push(`gasLimit is too low. given ${this.gasLimit}, need at least ${this.getBaseFee()}`);
+      errors.push(
+        `gasLimit is too low. given ${
+          this.gasLimit
+        }, need at least ${this.getBaseFee()}`
+      );
     }
 
     if (this.isSigned() && !this.verifySignature()) {
@@ -185,7 +210,10 @@ export abstract class BaseTransaction<TransactionObject> {
    * signature parameters `v`, `r` and `s` for encoding. For an EIP-155 compliant
    * representation for external signing use {@link BaseTransaction.getMessageToSign}.
    */
-  abstract raw(): TxValuesArray | AccessListEIP2930ValuesArray | FeeMarketEIP1559ValuesArray;
+  abstract raw():
+    | TxValuesArray
+    | AccessListEIP2930ValuesArray
+    | FeeMarketEIP1559ValuesArray;
 
   /**
    * Returns the encoding of the transaction.
@@ -264,7 +292,11 @@ export abstract class BaseTransaction<TransactionObject> {
     // Leaving this hack lets the legacy.spec.ts -> sign(), verifySignature() test fail
     // 2021-06-23
     let hackApplied = false;
-    if (this.type === 0 && this.common.gteHardfork('spuriousDragon') && !this.supports(Capability.EIP155ReplayProtection)) {
+    if (
+      this.type === 0 &&
+      this.common.gteHardfork('spuriousDragon') &&
+      !this.supports(Capability.EIP155ReplayProtection)
+    ) {
       this.activeCapabilities.push(Capability.EIP155ReplayProtection);
       hackApplied = true;
     }
@@ -275,7 +307,9 @@ export abstract class BaseTransaction<TransactionObject> {
 
     // Hack part 2
     if (hackApplied) {
-      const index = this.activeCapabilities.indexOf(Capability.EIP155ReplayProtection);
+      const index = this.activeCapabilities.indexOf(
+        Capability.EIP155ReplayProtection
+      );
       if (index > -1) {
         this.activeCapabilities.splice(index, 1);
       }
@@ -290,7 +324,11 @@ export abstract class BaseTransaction<TransactionObject> {
   abstract toJSON(): JsonTx;
 
   // Accept the v,r,s values from the `sign` method, and convert this into a TransactionObject
-  protected abstract _processSignature(v: number, r: Buffer, s: Buffer): TransactionObject;
+  protected abstract _processSignature(
+    v: number,
+    r: Buffer,
+    s: Buffer
+  ): TransactionObject;
 
   /**
    * Does chain ID checks on common and returns a common
@@ -315,19 +353,34 @@ export abstract class BaseTransaction<TransactionObject> {
         if (Common.isSupportedChainId(chainIdBN)) {
           // No Common, chain ID supported by Common
           // -> Instantiate Common with chain ID
-          return new Common({ chain: chainIdBN, hardfork: this.DEFAULT_HARDFORK });
+          return new Common({
+            chain: chainIdBN,
+            hardfork: this.DEFAULT_HARDFORK
+          });
         } else {
-          throw new Common({ chain: this.DEFAULT_CHAIN, hardfork: this.DEFAULT_HARDFORK });
+          throw new Common({
+            chain: this.DEFAULT_CHAIN,
+            hardfork: this.DEFAULT_HARDFORK
+          });
         }
       }
     } else {
       // No chain ID provided
       // -> return Common provided or create new default Common
-      return common?.copy() ?? new Common({ chain: this.DEFAULT_CHAIN, hardfork: this.DEFAULT_HARDFORK });
+      return (
+        common?.copy() ??
+        new Common({
+          chain: this.DEFAULT_CHAIN,
+          hardfork: this.DEFAULT_HARDFORK
+        })
+      );
     }
   }
 
-  protected _validateCannotExceedMaxInteger(values: { [key: string]: BN | undefined }, bits = 53) {
+  protected _validateCannotExceedMaxInteger(
+    values: { [key: string]: BN | undefined },
+    bits = 53
+  ) {
     for (const [key, value] of Object.entries(values)) {
       if (bits === 53) {
         if (value?.gt(MAX_INTEGER)) {
@@ -381,7 +434,9 @@ export abstract class BaseTransaction<TransactionObject> {
    * @param block
    */
   initExtension(block: Block) {
-    const index = block.transactions.findIndex((tx) => tx.hash().equals(this.hash()));
+    const index = block.transactions.findIndex((tx) =>
+      tx.hash().equals(this.hash())
+    );
     if (index === -1) {
       throw new Error('invalid index');
     }

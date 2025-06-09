@@ -71,7 +71,14 @@ export default class EEI {
   _gasLeft: BN;
   _getMiner?: (header: BlockHeader) => Address;
 
-  constructor(env: Env, state: StateManager, evm: EVM, common: Common, gasLeft: BN, _getMiner?: (header: BlockHeader) => Address) {
+  constructor(
+    env: Env,
+    state: StateManager,
+    evm: EVM,
+    common: Common,
+    gasLeft: BN,
+    _getMiner?: (header: BlockHeader) => Address
+  ) {
     this._env = env;
     this._state = state;
     this._evm = evm;
@@ -95,7 +102,11 @@ export default class EEI {
   useGas(amount: BN, context?: string): void {
     this._gasLeft.isub(amount);
     if (this._evm._vm.DEBUG) {
-      debugGas(`${context ? context + ': ' : ''}used ${amount} gas (-> ${this._gasLeft})`);
+      debugGas(
+        `${context ? context + ': ' : ''}used ${amount} gas (-> ${
+          this._gasLeft
+        })`
+      );
     }
     if (this._gasLeft.ltn(0)) {
       this._gasLeft = new BN(0);
@@ -110,7 +121,11 @@ export default class EEI {
    */
   refundGas(amount: BN, context?: string): void {
     if (this._evm._vm.DEBUG) {
-      debugGas(`${context ? context + ': ' : ''}refund ${amount} gas (-> ${this._evm._refund})`);
+      debugGas(
+        `${context ? context + ': ' : ''}refund ${amount} gas (-> ${
+          this._evm._refund
+        })`
+      );
     }
     this._evm._refund.iadd(amount);
   }
@@ -122,7 +137,11 @@ export default class EEI {
    */
   subRefund(amount: BN, context?: string): void {
     if (this._evm._vm.DEBUG) {
-      debugGas(`${context ? context + ': ' : ''}sub gas refund ${amount} (-> ${this._evm._refund})`);
+      debugGas(
+        `${context ? context + ': ' : ''}sub gas refund ${amount} (-> ${
+          this._evm._refund
+        })`
+      );
     }
     this._evm._refund.isub(amount);
     if (this._evm._refund.ltn(0)) {
@@ -418,10 +437,13 @@ export default class EEI {
   async _selfDestruct(toAddress: Address): Promise<void> {
     // only add to refund if this is the first selfdestruct for the address
     if (!this._result.selfdestruct[this._env.address.buf.toString('hex')]) {
-      this.refundGas(new BN(this._common.param('gasPrices', 'selfdestructRefund')));
+      this.refundGas(
+        new BN(this._common.param('gasPrices', 'selfdestructRefund'))
+      );
     }
 
-    this._result.selfdestruct[this._env.address.buf.toString('hex')] = toAddress.buf;
+    this._result.selfdestruct[this._env.address.buf.toString('hex')] =
+      toAddress.buf;
 
     // Add to beneficiary balance
     const toAccount = await this._state.getAccount(toAddress);
@@ -455,7 +477,12 @@ export default class EEI {
   /**
    * Sends a message with arbitrary data to a given address path.
    */
-  async call(gasLimit: BN, address: Address, value: BN, data: Buffer): Promise<BN> {
+  async call(
+    gasLimit: BN,
+    address: Address,
+    value: BN,
+    data: Buffer
+  ): Promise<BN> {
     const msg = new Message({
       caller: this._env.address,
       gasLimit,
@@ -472,7 +499,12 @@ export default class EEI {
   /**
    * Message-call into this account with an alternative account's code.
    */
-  async callCode(gasLimit: BN, address: Address, value: BN, data: Buffer): Promise<BN> {
+  async callCode(
+    gasLimit: BN,
+    address: Address,
+    value: BN,
+    data: Buffer
+  ): Promise<BN> {
     const msg = new Message({
       caller: this._env.address,
       gasLimit,
@@ -492,7 +524,12 @@ export default class EEI {
    * state modifications. This includes log, create, selfdestruct and call with
    * a non-zero value.
    */
-  async callStatic(gasLimit: BN, address: Address, value: BN, data: Buffer): Promise<BN> {
+  async callStatic(
+    gasLimit: BN,
+    address: Address,
+    value: BN,
+    data: Buffer
+  ): Promise<BN> {
     const msg = new Message({
       caller: this._env.address,
       gasLimit,
@@ -510,7 +547,12 @@ export default class EEI {
    * Message-call into this account with an alternative account’s code, but
    * persisting the current values for sender and value.
    */
-  async callDelegate(gasLimit: BN, address: Address, value: BN, data: Buffer): Promise<BN> {
+  async callDelegate(
+    gasLimit: BN,
+    address: Address,
+    value: BN,
+    data: Buffer
+  ): Promise<BN> {
     const msg = new Message({
       caller: this._env.caller,
       gasLimit,
@@ -534,7 +576,10 @@ export default class EEI {
     this._lastReturned = Buffer.alloc(0);
 
     // Check if account has enough ether and max depth not exceeded
-    if (this._env.depth >= this._common.param('vm', 'stackLimit') || (msg.delegatecall !== true && this._env.contract.balance.lt(msg.value))) {
+    if (
+      this._env.depth >= this._common.param('vm', 'stackLimit') ||
+      (msg.delegatecall !== true && this._env.contract.balance.lt(msg.value))
+    ) {
       return new BN(0);
     }
 
@@ -548,7 +593,11 @@ export default class EEI {
     this.useGas(results.gasUsed, 'CALL, STATICCALL, DELEGATECALL, CALLCODE');
 
     // Set return value
-    if (results.execResult.returnValue && (!results.execResult.exceptionError || results.execResult.exceptionError.error === ERROR.REVERT)) {
+    if (
+      results.execResult.returnValue &&
+      (!results.execResult.exceptionError ||
+        results.execResult.exceptionError.error === ERROR.REVERT)
+    ) {
       this._lastReturned = results.execResult.returnValue;
     }
 
@@ -565,7 +614,12 @@ export default class EEI {
   /**
    * Creates a new contract with a given value.
    */
-  async create(gasLimit: BN, value: BN, data: Buffer, salt: Buffer | null = null): Promise<BN> {
+  async create(
+    gasLimit: BN,
+    value: BN,
+    data: Buffer,
+    salt: Buffer | null = null
+  ): Promise<BN> {
     const selfdestruct = { ...this._result.selfdestruct };
     const msg = new Message({
       caller: this._env.address,
@@ -581,7 +635,10 @@ export default class EEI {
     this._lastReturned = Buffer.alloc(0);
 
     // Check if account has enough ether and max depth not exceeded
-    if (this._env.depth >= this._common.param('vm', 'stackLimit') || (msg.delegatecall !== true && this._env.contract.balance.lt(msg.value))) {
+    if (
+      this._env.depth >= this._common.param('vm', 'stackLimit') ||
+      (msg.delegatecall !== true && this._env.contract.balance.lt(msg.value))
+    ) {
       return new BN(0);
     }
 
@@ -598,11 +655,17 @@ export default class EEI {
     this.useGas(results.gasUsed, 'CREATE');
 
     // Set return buffer in case revert happened
-    if (results.execResult.exceptionError && results.execResult.exceptionError.error === ERROR.REVERT) {
+    if (
+      results.execResult.exceptionError &&
+      results.execResult.exceptionError.error === ERROR.REVERT
+    ) {
       this._lastReturned = results.execResult.returnValue;
     }
 
-    if (!results.execResult.exceptionError || results.execResult.exceptionError.error === ERROR.CODESTORE_OUT_OF_GAS) {
+    if (
+      !results.execResult.exceptionError ||
+      results.execResult.exceptionError.error === ERROR.CODESTORE_OUT_OF_GAS
+    ) {
       Object.assign(this._result.selfdestruct, selfdestruct);
       // update stateRoot on current contract
       const account = await this._state.getAccount(this._env.address);
@@ -620,7 +683,12 @@ export default class EEI {
    * Creates a new contract with a given value. Generates
    * a deterministic address via CREATE2 rules.
    */
-  async create2(gasLimit: BN, value: BN, data: Buffer, salt: Buffer): Promise<BN> {
+  async create2(
+    gasLimit: BN,
+    value: BN,
+    data: Buffer,
+    salt: Buffer
+  ): Promise<BN> {
     return this.create(gasLimit, value, data, salt);
   }
 

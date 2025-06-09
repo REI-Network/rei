@@ -19,7 +19,12 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
    * @returns A ChainIndexer object
    */
   static createBloomBitsIndexer(options: BloomBitsIndexerOptions) {
-    return new ChainIndexer({ ...options, confirmsBlockNumber: config.confirmsBlockNumber, sectionSize: config.bloomBitsSectionSize, backend: new BloomBitsIndexer(options) });
+    return new ChainIndexer({
+      ...options,
+      confirmsBlockNumber: config.confirmsBlockNumber,
+      sectionSize: config.bloomBitsSectionSize,
+      backend: new BloomBitsIndexer(options)
+    });
   }
 
   constructor(options: BloomBitsIndexerOptions) {
@@ -54,7 +59,10 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
 
   // TODO
   process(number: BN, bloom: Buffer, hash: Buffer) {
-    this.gen.addBloom(number.sub(this.section.muln(config.bloomBitsSectionSize)).toNumber(), bloom);
+    this.gen.addBloom(
+      number.sub(this.section.muln(config.bloomBitsSectionSize)).toNumber(),
+      bloom
+    );
     this.headerHash = hash;
   }
 
@@ -65,7 +73,9 @@ export class BloomBitsIndexer implements ChainIndexerBackend {
     const batch: DBOp[] = [];
     for (let i = 0; i < config.bloomBitLength; i++) {
       const bits = this.gen.bitset(i);
-      batch.push(DBSaveBloomBits(i, this.section, this.headerHash, Buffer.from(bits)));
+      batch.push(
+        DBSaveBloomBits(i, this.section, this.headerHash, Buffer.from(bits))
+      );
     }
     return batch;
   }

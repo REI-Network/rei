@@ -1,8 +1,28 @@
 import { rlp, BN, intToBuffer, bufferToHex } from 'ethereumjs-util';
 import { Database } from '@rei-network/database';
-import { FunctionalBufferMap, FunctionalBufferSet, logger } from '@rei-network/utils';
-import { snapStorageKey, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
-import { DBDeleteSnapRoot, DBDeleteSnapAccount, DBDeleteSnapStorage, DBSaveSerializedSnapAccount, DBSaveSnapStorage, DBSaveSnapRoot, DBDeleteSnapJournal, DBDeleteSnapGenerator, DBSaveSnapDisabled, DBDeleteSnapRecoveryNumber, DBDeleteSnapDisabled, DBSaveSnapJournal } from '@rei-network/database/dist/helpers';
+import {
+  FunctionalBufferMap,
+  FunctionalBufferSet,
+  logger
+} from '@rei-network/utils';
+import {
+  snapStorageKey,
+  SNAP_STORAGE_PREFIX
+} from '@rei-network/database/dist/constants';
+import {
+  DBDeleteSnapRoot,
+  DBDeleteSnapAccount,
+  DBDeleteSnapStorage,
+  DBSaveSerializedSnapAccount,
+  DBSaveSnapStorage,
+  DBSaveSnapRoot,
+  DBDeleteSnapJournal,
+  DBDeleteSnapGenerator,
+  DBSaveSnapDisabled,
+  DBDeleteSnapRecoveryNumber,
+  DBDeleteSnapDisabled,
+  DBSaveSnapJournal
+} from '@rei-network/database/dist/helpers';
 import { DBatch } from '../utils';
 import { StakingAccount } from '../stateManager';
 import { DiffLayer } from './diffLayer';
@@ -54,7 +74,11 @@ export class SnapTree {
 
     // TODO: recovery?
     try {
-      let head: Snapshot | undefined = await loadSnapshot(this.diskdb, root, true);
+      let head: Snapshot | undefined = await loadSnapshot(
+        this.diskdb,
+        root,
+        true
+      );
       // TODO: check disable?
       if (head && !head.root.equals(root)) {
         // Root mismatch, rebuild
@@ -102,7 +126,14 @@ export class SnapTree {
       await this.cap(root, 0);
 
       for (const [root, snap] of this.layers) {
-        logger.debug('SnapTree::abort, root:', root.toString('hex'), 'snap root:', snap.root.toString('hex'), 'parent:', !!snap.parent);
+        logger.debug(
+          'SnapTree::abort, root:',
+          root.toString('hex'),
+          'snap root:',
+          snap.root.toString('hex'),
+          'parent:',
+          !!snap.parent
+        );
       }
 
       await this.journal(root);
@@ -186,7 +217,13 @@ export class SnapTree {
    * @param destructs - Destruct accounts data
    * @param storage - Accounts storage data
    */
-  update(root: Buffer, parentRoot: Buffer, accounts: FunctionalBufferMap<Buffer>, destructs: FunctionalBufferSet, storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>) {
+  update(
+    root: Buffer,
+    parentRoot: Buffer,
+    accounts: FunctionalBufferMap<Buffer>,
+    destructs: FunctionalBufferSet,
+    storage: FunctionalBufferMap<FunctionalBufferMap<Buffer>>
+  ) {
     if (root.equals(parentRoot)) {
       throw new Error('snapshot cycle');
     }
@@ -232,7 +269,10 @@ export class SnapTree {
     // Retrieve the head snapshot to cap from
     const snap = this.layers.get(root);
     if (!snap) {
-      logger.warn('SnapTree::cap, snapshot is missing, root:', bufferToHex(root));
+      logger.warn(
+        'SnapTree::cap, snapshot is missing, root:',
+        bufferToHex(root)
+      );
       return;
     }
     if (!(snap instanceof DiffLayer)) {
@@ -394,7 +434,10 @@ export class SnapTree {
     // Retrieve the head snapshot to journal from var snap snapshot
     const snap = this.layers.get(root);
     if (snap === undefined) {
-      logger.warn('SnapTree::journal, snapshot is missing, root:', bufferToHex(root));
+      logger.warn(
+        'SnapTree::journal, snapshot is missing, root:',
+        bufferToHex(root)
+      );
       return;
     }
 
@@ -524,7 +567,12 @@ export class SnapTree {
     await trieSync.setRoot(root, async (paths, path, leaf, parent) => {
       if (paths.length === 1) {
         const serializedAccount = await snapshot.getSerializedAccount(paths[0]);
-        if (!serializedAccount || !serializedAccount.equals(StakingAccount.fromRlpSerializedAccount(leaf).slimSerialize())) {
+        if (
+          !serializedAccount ||
+          !serializedAccount.equals(
+            StakingAccount.fromRlpSerializedAccount(leaf).slimSerialize()
+          )
+        ) {
           throw Error('snap account not equal');
         }
       } else if (paths.length === 2) {
@@ -579,7 +627,10 @@ async function diffToDisk(bottom: DiffLayer): Promise<DiskLayer> {
 
   // Destroy all the destructed accounts from the database
   for (const accountHash of bottom.destructSet) {
-    if (base.genMarker !== undefined && accountHash.compare(base.genMarker) > 0) {
+    if (
+      base.genMarker !== undefined &&
+      accountHash.compare(base.genMarker) > 0
+    ) {
       continue;
     }
     batch.push(DBDeleteSnapAccount(accountHash));
@@ -591,7 +642,10 @@ async function diffToDisk(bottom: DiffLayer): Promise<DiskLayer> {
       (origin, limit) =>
         asyncTraverseRawDB(
           base.db.rawdb,
-          { gte: snapStorageKey(accountHash, origin), lte: snapStorageKey(accountHash, limit) },
+          {
+            gte: snapStorageKey(accountHash, origin),
+            lte: snapStorageKey(accountHash, limit)
+          },
           (key) => key.length !== SNAP_STORAGE_PREFIX.length + 32 + 32,
           (key) => key.slice(SNAP_STORAGE_PREFIX.length + 32),
           (value) => value
@@ -606,7 +660,10 @@ async function diffToDisk(bottom: DiffLayer): Promise<DiskLayer> {
 
   // Push all updated accounts into the database
   for (const [accountHash, data] of bottom.accountData) {
-    if (base.genMarker !== undefined && accountHash.compare(base.genMarker) > 0) {
+    if (
+      base.genMarker !== undefined &&
+      accountHash.compare(base.genMarker) > 0
+    ) {
       continue;
     }
     batch.push(DBSaveSerializedSnapAccount(accountHash, data));
@@ -618,11 +675,16 @@ async function diffToDisk(bottom: DiffLayer): Promise<DiskLayer> {
 
   // Push all the storage slots into the database
   for (const [accountHash, storage] of bottom.storageData) {
-    if (base.genMarker !== undefined && accountHash.compare(base.genMarker) > 0) {
+    if (
+      base.genMarker !== undefined &&
+      accountHash.compare(base.genMarker) > 0
+    ) {
       continue;
     }
 
-    const midAccount = base.genMarker !== undefined && accountHash.equals(base.genMarker.slice(0, 32));
+    const midAccount =
+      base.genMarker !== undefined &&
+      accountHash.equals(base.genMarker.slice(0, 32));
     for (const [storageHash, data] of storage) {
       if (midAccount && storageHash.compare(base.genMarker!.slice(32)) > 0) {
         continue;
@@ -662,7 +724,13 @@ async function diffToDisk(bottom: DiffLayer): Promise<DiskLayer> {
  */
 async function generateSnapshot(db: Database, root: Buffer) {
   // Create a new disk layer with an initialized state marker at zero
-  const stats: GeneratorStats = { origin: EMPTY_HASH, start: Date.now(), accounts: new BN(0), slots: new BN(0), storage: new BN(0) };
+  const stats: GeneratorStats = {
+    origin: EMPTY_HASH,
+    start: Date.now(),
+    accounts: new BN(0),
+    slots: new BN(0),
+    storage: new BN(0)
+  };
   const batch = new DBatch(db);
   const genMarker = undefined;
 

@@ -1,6 +1,13 @@
 import { toBuffer, setLengthLeft, Address, BN, rlphash } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
-import { Block, BlockHeader, HeaderData, CLIQUE_EXTRA_VANITY, TypedTransaction, BlockOptions } from '@rei-network/structure';
+import {
+  Block,
+  BlockHeader,
+  HeaderData,
+  CLIQUE_EXTRA_VANITY,
+  TypedTransaction,
+  BlockOptions
+} from '@rei-network/structure';
 import { EMPTY_EXTRA_DATA, EMPTY_ADDRESS } from '../utils';
 import { isEnableDAO } from '../hardforks';
 import { ISigner } from './types';
@@ -99,7 +106,10 @@ export abstract class Reimint {
    */
   static calcBlockHeaderRawHash(header: BlockHeader, evidence: Evidence[]) {
     const raw = header.raw();
-    raw[12] = Buffer.concat([raw[12].slice(0, CLIQUE_EXTRA_VANITY), ...evidence.map((ev) => ev.hash())]);
+    raw[12] = Buffer.concat([
+      raw[12].slice(0, CLIQUE_EXTRA_VANITY),
+      ...evidence.map((ev) => ev.hash())
+    ]);
     return rlphash(raw);
   }
 
@@ -127,7 +137,11 @@ export abstract class Reimint {
    * @param common - Common instance
    * @returns `true` if we should use the genesis validator set
    */
-  static isEnableGenesisValidators(totalLockedAmount: BN, validatorCount: number, common: Common) {
+  static isEnableGenesisValidators(
+    totalLockedAmount: BN,
+    validatorCount: number,
+    common: Common
+  ) {
     const minTotalLockedAmount = common.param('vm', 'minTotalLockedAmount');
     if (typeof minTotalLockedAmount !== 'string') {
       throw new Error('invalid minTotalLockedAmount');
@@ -154,14 +168,19 @@ export abstract class Reimint {
    * @param signOptions - Reimint sign options
    * @returns Header and proposal
    */
-  static generateBlockHeaderAndProposal(data: HeaderData, blockOptions: ReimintBlockOptions, { signer, signatureType }: ReimintSignOptions): { header: BlockHeader; proposal: Proposal } {
+  static generateBlockHeaderAndProposal(
+    data: HeaderData,
+    blockOptions: ReimintBlockOptions,
+    { signer, signatureType }: ReimintSignOptions
+  ): { header: BlockHeader; proposal: Proposal } {
     const header = BlockHeader.fromHeaderData(data, blockOptions);
     data = formatHeaderData(data);
 
     const round = blockOptions.round ?? defaultRound;
     const commitRound = blockOptions.commitRound ?? round;
     const POLRound = blockOptions.POLRound ?? defaultPOLRound;
-    const validaterSetSize = blockOptions.validatorSetSize ?? defaultValidaterSetSize;
+    const validaterSetSize =
+      blockOptions.validatorSetSize ?? defaultValidaterSetSize;
     const evidence = blockOptions.evidence ?? defaultEvidence;
 
     // calculate block hash
@@ -174,7 +193,8 @@ export abstract class Reimint {
         height: header.number,
         type: VoteType.Proposal,
         hash: headerHash,
-        proposer: signatureType === SignatureType.BLS ? signer.address() : undefined
+        proposer:
+          signatureType === SignatureType.BLS ? signer.address() : undefined
       },
       signatureType
     );
@@ -185,9 +205,26 @@ export abstract class Reimint {
       proposal.signature = signer.ecdsaSign(proposal.getMessageToSign());
     }
     // create extra data object
-    const extraData = new ExtraData(round, commitRound, POLRound, evidence, proposal, signatureType, blockOptions?.voteSet);
+    const extraData = new ExtraData(
+      round,
+      commitRound,
+      POLRound,
+      evidence,
+      proposal,
+      signatureType,
+      blockOptions?.voteSet
+    );
     return {
-      header: BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize({ validaterSetSize })]) }, blockOptions),
+      header: BlockHeader.fromHeaderData(
+        {
+          ...data,
+          extraData: Buffer.concat([
+            data.extraData as Buffer,
+            extraData.serialize({ validaterSetSize })
+          ])
+        },
+        blockOptions
+      ),
       proposal
     };
   }
@@ -200,9 +237,21 @@ export abstract class Reimint {
    * @param signOptions - Reimint sign options
    * @returns Block and proposal
    */
-  static generateBlockAndProposal(data: HeaderData, transactions: TypedTransaction[], blockOptions: ReimintBlockOptions, signOptions: ReimintSignOptions): { block: Block; proposal: Proposal } {
-    const { header, proposal } = Reimint.generateBlockHeaderAndProposal(data, blockOptions, signOptions);
-    return { block: new Block(header, transactions, undefined, blockOptions), proposal };
+  static generateBlockAndProposal(
+    data: HeaderData,
+    transactions: TypedTransaction[],
+    blockOptions: ReimintBlockOptions,
+    signOptions: ReimintSignOptions
+  ): { block: Block; proposal: Proposal } {
+    const { header, proposal } = Reimint.generateBlockHeaderAndProposal(
+      data,
+      blockOptions,
+      signOptions
+    );
+    return {
+      block: new Block(header, transactions, undefined, blockOptions),
+      proposal
+    };
   }
 
   /**
@@ -216,11 +265,38 @@ export abstract class Reimint {
    * @param options - Block options
    * @returns Complete block
    */
-  static generateFinalizedBlock(data: HeaderData, transactions: TypedTransaction[], evidence: Evidence[], proposal: Proposal, commitRound: number, votes: VoteSet, options?: BlockOptions) {
-    const version = isEnableDAO(options?.common!) ? SignatureType.BLS : SignatureType.ECDSA;
-    const extraData = new ExtraData(proposal.round, commitRound, proposal.POLRound, evidence, proposal, version, votes);
+  static generateFinalizedBlock(
+    data: HeaderData,
+    transactions: TypedTransaction[],
+    evidence: Evidence[],
+    proposal: Proposal,
+    commitRound: number,
+    votes: VoteSet,
+    options?: BlockOptions
+  ) {
+    const version = isEnableDAO(options?.common!)
+      ? SignatureType.BLS
+      : SignatureType.ECDSA;
+    const extraData = new ExtraData(
+      proposal.round,
+      commitRound,
+      proposal.POLRound,
+      evidence,
+      proposal,
+      version,
+      votes
+    );
     data = formatHeaderData(data);
-    const header = BlockHeader.fromHeaderData({ ...data, extraData: Buffer.concat([data.extraData as Buffer, extraData.serialize()]) }, options);
+    const header = BlockHeader.fromHeaderData(
+      {
+        ...data,
+        extraData: Buffer.concat([
+          data.extraData as Buffer,
+          extraData.serialize()
+        ])
+      },
+      options
+    );
     return new Block(header, transactions, undefined, options);
   }
 }

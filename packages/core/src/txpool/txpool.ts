@@ -2,7 +2,12 @@ import EventEmitter from 'events';
 import { BN, Address, bufferToHex } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
 import Heap from 'qheap';
-import { FunctionalBufferMap, FunctionalBufferSet, AbortableTimer, logger } from '@rei-network/utils';
+import {
+  FunctionalBufferMap,
+  FunctionalBufferSet,
+  AbortableTimer,
+  logger
+} from '@rei-network/utils';
 import { Transaction, BlockHeader, Block } from '@rei-network/structure';
 import { Node } from '../node';
 import { getGasLimitByCommon } from '../utils';
@@ -35,7 +40,7 @@ export class TxPoolAccount {
   private _pending?: TxSortedMap;
   private _queue?: TxSortedMap;
   private _pendingNonce?: BN;
-  timestamp: number = 0;
+  timestamp = 0;
 
   constructor(getNonce: () => Promise<BN>) {
     this.getNonce = getNonce;
@@ -45,7 +50,9 @@ export class TxPoolAccount {
    * Get pending tx map(create if it doesn't exist)
    */
   get pending() {
-    return this._pending ? this._pending : (this._pending = new TxSortedMap(true));
+    return this._pending
+      ? this._pending
+      : (this._pending = new TxSortedMap(true));
   }
 
   /**
@@ -82,8 +89,11 @@ export class TxPoolAccount {
   /**
    * Update pending nonce
    */
-  updatePendingNonce(nonce: BN, lower: boolean = false) {
-    if (!this._pendingNonce || (lower ? this._pendingNonce.gt(nonce) : this._pendingNonce.lt(nonce))) {
+  updatePendingNonce(nonce: BN, lower = false) {
+    if (
+      !this._pendingNonce ||
+      (lower ? this._pendingNonce.gt(nonce) : this._pendingNonce.lt(nonce))
+    ) {
       this._pendingNonce = nonce.clone();
     }
   }
@@ -126,7 +136,7 @@ export class TxPool extends EventEmitter {
   private readonly timeoutTimer = new AbortableTimer();
   private readonly rejournalTimer = new AbortableTimer();
 
-  private aborted: boolean = false;
+  private aborted = false;
 
   private initPromise?: Promise<void>;
   private rejournalLoopPromise?: Promise<void>;
@@ -166,7 +176,8 @@ export class TxPool extends EventEmitter {
     this.globalAllSlots = 0;
     this.lifetime = options.lifetime ?? defaultLifeTime;
     this.timeoutInterval = options.timeoutInterval ?? defaultTimeoutInterval;
-    this.rejournalInterval = options.rejournalInterval ?? defaultRejournalInterval;
+    this.rejournalInterval =
+      options.rejournalInterval ?? defaultRejournalInterval;
 
     this.node = options.node;
     this.priced = new TxPricedList(this.txs);
@@ -182,8 +193,6 @@ export class TxPool extends EventEmitter {
     try {
       await this.lock.acquire();
       return await fn();
-    } catch (err) {
-      throw err;
     } finally {
       this.lock.release();
     }
@@ -225,7 +234,10 @@ export class TxPool extends EventEmitter {
   private async timeoutLoop() {
     while (!this.aborted) {
       for (const [addr, account] of this.accounts) {
-        if (account.hasQueue() && Date.now() - account.timestamp > this.lifetime) {
+        if (
+          account.hasQueue() &&
+          Date.now() - account.timestamp > this.lifetime
+        ) {
           const queue = account.queue.clear();
           this.removeTxFromGlobal(queue);
         }
@@ -265,7 +277,10 @@ export class TxPool extends EventEmitter {
 
     return (this.initPromise = (async () => {
       this.currentHeader = block.header;
-      this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, this.currentHeader._common);
+      this.currentStateManager = await this.node.getStateManager(
+        this.currentHeader.stateRoot,
+        this.currentHeader._common
+      );
 
       if (isEnableFreeStaking(this.currentHeader._common)) {
         this.totalAmount = await Fee.getTotalAmount(this.currentStateManager);
@@ -274,8 +289,14 @@ export class TxPool extends EventEmitter {
       }
 
       if (isEnableDAO(this.currentHeader._common)) {
-        const parent = await this.node.db.getHeader(this.currentHeader.parentHash, this.currentHeader.number.subn(1));
-        const parentVM = await this.node.getVM(parent.stateRoot, parent._common);
+        const parent = await this.node.db.getHeader(
+          this.currentHeader.parentHash,
+          this.currentHeader.number.subn(1)
+        );
+        const parentVM = await this.node.getVM(
+          parent.stateRoot,
+          parent._common
+        );
         const config = await this.node.reimint.getConfig(parentVM, block);
         this.dailyFee = await config.dailyFee();
       } else {
@@ -341,7 +362,7 @@ export class TxPool extends EventEmitter {
    * @param newBlock - New block
    * @param force - Force set header
    */
-  async newBlock(newBlock: Block, force: boolean = false) {
+  async newBlock(newBlock: Block, force = false) {
     await this.initPromise;
     return await this.runWithLock(async () => {
       try {
@@ -350,24 +371,47 @@ export class TxPool extends EventEmitter {
         const originalNewBlock = newBlock;
 
         if (!force) {
-          let oldBlock = await this.node.db.getBlockByHashAndNumber(this.currentHeader.hash(), this.currentHeader.number);
+          let oldBlock = await this.node.db.getBlockByHashAndNumber(
+            this.currentHeader.hash(),
+            this.currentHeader.number
+          );
           while (oldBlock.header.number.gt(newBlock.header.number)) {
-            discarded = discarded.concat(oldBlock.transactions as Transaction[]);
-            oldBlock = await this.node.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
+            discarded = discarded.concat(
+              oldBlock.transactions as Transaction[]
+            );
+            oldBlock = await this.node.db.getBlockByHashAndNumber(
+              oldBlock.header.parentHash,
+              oldBlock.header.number.subn(1)
+            );
           }
           while (newBlock.header.number.gt(oldBlock.header.number)) {
             for (const tx of newBlock.transactions) {
               included.add(tx.hash());
             }
-            newBlock = await this.node.db.getBlockByHashAndNumber(newBlock.header.parentHash, newBlock.header.number.subn(1));
+            newBlock = await this.node.db.getBlockByHashAndNumber(
+              newBlock.header.parentHash,
+              newBlock.header.number.subn(1)
+            );
           }
-          while (!oldBlock.hash().equals(newBlock.hash()) && oldBlock.header.number.gtn(0) && newBlock.header.number.gtn(0)) {
-            discarded = discarded.concat(oldBlock.transactions as Transaction[]);
-            oldBlock = await this.node.db.getBlockByHashAndNumber(oldBlock.header.parentHash, oldBlock.header.number.subn(1));
+          while (
+            !oldBlock.hash().equals(newBlock.hash()) &&
+            oldBlock.header.number.gtn(0) &&
+            newBlock.header.number.gtn(0)
+          ) {
+            discarded = discarded.concat(
+              oldBlock.transactions as Transaction[]
+            );
+            oldBlock = await this.node.db.getBlockByHashAndNumber(
+              oldBlock.header.parentHash,
+              oldBlock.header.number.subn(1)
+            );
             for (const tx of newBlock.transactions) {
               included.add(tx.hash());
             }
-            newBlock = await this.node.db.getBlockByHashAndNumber(newBlock.header.parentHash, newBlock.header.number.subn(1));
+            newBlock = await this.node.db.getBlockByHashAndNumber(
+              newBlock.header.parentHash,
+              newBlock.header.number.subn(1)
+            );
           }
           if (!oldBlock.hash().equals(newBlock.hash())) {
             throw new Error('reorg failed');
@@ -381,7 +425,10 @@ export class TxPool extends EventEmitter {
           }
         }
         this.currentHeader = originalNewBlock.header;
-        this.currentStateManager = await this.node.getStateManager(this.currentHeader.stateRoot, this.currentHeader._common);
+        this.currentStateManager = await this.node.getStateManager(
+          this.currentHeader.stateRoot,
+          this.currentHeader._common
+        );
 
         if (isEnableFreeStaking(this.currentHeader._common)) {
           this.totalAmount = await Fee.getTotalAmount(this.currentStateManager);
@@ -404,7 +451,9 @@ export class TxPool extends EventEmitter {
         }
         for (const account of reinjectAccounts.values()) {
           if (account.hasPending()) {
-            const requeue = account.pending.back(await account.getPendingNonce());
+            const requeue = account.pending.back(
+              await account.getPendingNonce()
+            );
             requeue.forEach((tx) => this.removeTxFromGlobal(tx));
             reinject = reinject.concat(requeue);
           }
@@ -448,7 +497,10 @@ export class TxPool extends EventEmitter {
   async getPendingTxMap(number: BN, hash: Buffer) {
     await this.initPromise;
     return await this.runWithLock(async () => {
-      if (!number.eq(this.currentHeader.number) || !hash.equals(this.currentHeader.hash())) {
+      if (
+        !number.eq(this.currentHeader.number) ||
+        !hash.equals(this.currentHeader.hash())
+      ) {
         // TODO: fix this condition
         return undefined;
       }
@@ -492,7 +544,10 @@ export class TxPool extends EventEmitter {
    * @returns An object containing all transactions in the pool
    */
   getPoolContent() {
-    const result: { pending: { [address: string]: { [nonce: string]: any } }; queued: { [address: string]: { [nonce: string]: any } } } = { pending: {}, queued: {} };
+    const result: {
+      pending: { [address: string]: { [nonce: string]: any } };
+      queued: { [address: string]: { [nonce: string]: any } };
+    } = { pending: {}, queued: {} };
     function forceGet<T>(obj: { [name: string]: T }, name: string) {
       let val = obj[name];
       if (val === undefined) {
@@ -509,7 +564,10 @@ export class TxPool extends EventEmitter {
           const txObj = forceGet(pendingObj, nonce.toString());
           const txInfo = tx.toRPCJSON();
           for (const property in txInfo) {
-            Object.defineProperty(txObj, property, { value: txInfo[property], enumerable: true });
+            Object.defineProperty(txObj, property, {
+              value: txInfo[property],
+              enumerable: true
+            });
           }
         }
       }
@@ -519,7 +577,10 @@ export class TxPool extends EventEmitter {
           const txObj = forceGet(queuedObj, nonce.toString());
           const txInfo = tx.toRPCJSON();
           for (const property in txInfo) {
-            Object.defineProperty(txObj, property, { value: txInfo[property], enumerable: true });
+            Object.defineProperty(txObj, property, {
+              value: txInfo[property],
+              enumerable: true
+            });
           }
         }
       }
@@ -527,7 +588,10 @@ export class TxPool extends EventEmitter {
     return result;
   }
 
-  private async _addTxs(txs: Transaction[], force: boolean): Promise<{ results: boolean[]; readies?: Map<Buffer, Transaction[]> }> {
+  private async _addTxs(
+    txs: Transaction[],
+    force: boolean
+  ): Promise<{ results: boolean[]; readies?: Map<Buffer, Transaction[]> }> {
     const dirtyAddrs: Address[] = [];
     const results: boolean[] = [];
     for (const tx of txs) {
@@ -546,7 +610,10 @@ export class TxPool extends EventEmitter {
           results.push(false);
           continue;
         }
-        const [drop, success] = this.priced.discard(this.globalAllSlots - (this.globalSlots + this.globalQueue), true);
+        const [drop, success] = this.priced.discard(
+          this.globalAllSlots - (this.globalSlots + this.globalQueue),
+          true
+        );
         if (!success) {
           results.push(false);
           continue;
@@ -610,27 +677,43 @@ export class TxPool extends EventEmitter {
       }
       const limit = getGasLimitByCommon(this.node.getLatestCommon());
       if (limit.lt(tx.gasLimit)) {
-        throw new Error(`each block gasLimit: ${tx.gasLimit.toString()} limit: ${limit.toString()}`);
+        throw new Error(
+          `each block gasLimit: ${tx.gasLimit.toString()} limit: ${limit.toString()}`
+        );
       }
       const senderAddr = tx.getSenderAddress();
       const sender = senderAddr.buf;
       if (!this.locals.has(sender) && tx.gasPrice.lt(this.priceLimit)) {
-        throw new Error(`gasPrice too low: ${tx.gasPrice.toString()} limit: ${this.priceLimit.toString()}`);
+        throw new Error(
+          `gasPrice too low: ${tx.gasPrice.toString()} limit: ${this.priceLimit.toString()}`
+        );
       }
 
       // estimate next block's timestamp
-      const period: number = this.currentHeader._common.consensusConfig().period;
+      const period: number =
+        this.currentHeader._common.consensusConfig().period;
       const currentTimestamp = this.currentHeader.timestamp.toNumber();
 
       // validate transaction
-      await validateTx(tx as Transaction, currentTimestamp + period, this.currentStateManager, this.totalAmount, this.dailyFee);
+      await validateTx(
+        tx as Transaction,
+        currentTimestamp + period,
+        this.currentStateManager,
+        this.totalAmount,
+        this.dailyFee
+      );
 
       if (!checkTxIntrinsicGas(tx)) {
         throw new Error('checkTxIntrinsicGas failed');
       }
       return true;
     } catch (err) {
-      logger.warn('Txpool drop tx', bufferToHex(tx.hash()), 'validateTx failed:', err);
+      logger.warn(
+        'Txpool drop tx',
+        bufferToHex(tx.hash()),
+        'validateTx failed:',
+        err
+      );
       return false;
     }
   }
@@ -662,19 +745,29 @@ export class TxPool extends EventEmitter {
     return inserted;
   }
 
-  private async promoteExecutables(dirtyAddrs?: Address[]): Promise<Map<Buffer, Transaction[]>> {
-    const promoteAccount = async (sender: Buffer, account: TxPoolAccount): Promise<Transaction[]> => {
+  private async promoteExecutables(
+    dirtyAddrs?: Address[]
+  ): Promise<Map<Buffer, Transaction[]>> {
+    const promoteAccount = async (
+      sender: Buffer,
+      account: TxPoolAccount
+    ): Promise<Transaction[]> => {
       let readies: Transaction[] = [];
       if (!account.hasQueue()) {
         return readies;
       }
       const queue = account.queue;
-      const accountInDB = await this.currentStateManager.getAccount(new Address(sender));
+      const accountInDB = await this.currentStateManager.getAccount(
+        new Address(sender)
+      );
       const forwards = queue.forward(accountInDB.nonce);
       this.removeTxFromGlobal(forwards);
       let dropsLength = 0;
       if (!isEnableFreeStaking(this.currentHeader._common)) {
-        const { removed: drops } = queue.filter(accountInDB.balance, this.currentHeader.gasLimit);
+        const { removed: drops } = queue.filter(
+          accountInDB.balance,
+          this.currentHeader.gasLimit
+        );
         this.removeTxFromGlobal(drops);
         dropsLength = drops.length;
       }
@@ -724,12 +817,17 @@ export class TxPool extends EventEmitter {
         continue;
       }
       const pending = account.pending;
-      const accountInDB = await this.currentStateManager.getAccount(new Address(sender));
+      const accountInDB = await this.currentStateManager.getAccount(
+        new Address(sender)
+      );
       const forwards = pending.forward(accountInDB.nonce);
       this.removeTxFromGlobal(forwards);
       let dropsLength = 0;
       if (!isEnableFreeStaking(this.currentHeader._common)) {
-        const { removed: drops, invalids } = pending.filter(accountInDB.balance, this.currentHeader.gasLimit);
+        const { removed: drops, invalids } = pending.filter(
+          accountInDB.balance,
+          this.currentHeader.gasLimit
+        );
         this.removeTxFromGlobal(drops);
         dropsLength = drops.length;
         for (const tx of invalids) {
@@ -761,7 +859,10 @@ export class TxPool extends EventEmitter {
       return;
     }
 
-    const heap = new Heap({ comparBefore: (a: TxPoolAccount, b: TxPoolAccount) => a.pending.slots > b.pending.slots });
+    const heap = new Heap({
+      comparBefore: (a: TxPoolAccount, b: TxPoolAccount) =>
+        a.pending.slots > b.pending.slots
+    });
     for (const [sender, account] of this.accounts) {
       if (account.hasPending() && account.pending.slots > this.accountSlots) {
         heap.push(account);
@@ -784,7 +885,10 @@ export class TxPool extends EventEmitter {
       offenders.push(offender);
       if (offenders.length > 1) {
         const threshold = offender.pending.slots;
-        while (pendingSlots > this.globalSlots && offenders[offenders.length - 2].pending.slots > threshold) {
+        while (
+          pendingSlots > this.globalSlots &&
+          offenders[offenders.length - 2].pending.slots > threshold
+        ) {
           for (let i = 0; i < offenders.length - 1; i++) {
             removeSingleTx(offenders[i]);
           }
@@ -793,7 +897,10 @@ export class TxPool extends EventEmitter {
     }
 
     if (pendingSlots > this.globalSlots && offenders.length > 0) {
-      while (pendingSlots > this.globalSlots && offenders[offenders.length - 1].pending.slots > this.accountSlots) {
+      while (
+        pendingSlots > this.globalSlots &&
+        offenders[offenders.length - 1].pending.slots > this.accountSlots
+      ) {
         for (const offender of offenders) {
           removeSingleTx(offender);
         }
@@ -812,7 +919,10 @@ export class TxPool extends EventEmitter {
       return;
     }
 
-    const heap = new Heap({ comparBefore: (a: TxPoolAccount, b: TxPoolAccount) => a.timestamp < b.timestamp });
+    const heap = new Heap({
+      comparBefore: (a: TxPoolAccount, b: TxPoolAccount) =>
+        a.timestamp < b.timestamp
+    });
     for (const [sender, account] of this.accounts) {
       if (!this.locals.has(sender) && account.hasQueue()) {
         heap.push(account);

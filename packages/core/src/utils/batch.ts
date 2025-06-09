@@ -17,7 +17,7 @@ export class DBatch {
     this.batch.push(op);
   }
 
-  async write(reset: boolean = true) {
+  async write(reset = true) {
     try {
       if (this.length > 0) {
         await this.db.batch(this.batch);
@@ -50,7 +50,7 @@ export class BinaryRawDBatch {
     });
   }
 
-  async write(reset: boolean = true) {
+  async write(reset = true) {
     try {
       if (this.length > 0) {
         await this.db.batch(this.batch as any);

@@ -1,5 +1,8 @@
 import type { BN } from 'ethereumjs-util';
-import type { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
+import type {
+  FunctionalBufferMap,
+  FunctionalBufferSet
+} from '@rei-network/utils';
 import type { StakingAccount } from '../stateManager';
 import type { DiffLayer } from './diffLayer';
 import type { DiskLayer } from './diskLayer';
@@ -19,7 +22,10 @@ export interface ISnapshot {
 
   genAccountIterator(seek: Buffer): SnapIterator<StakingAccount | null>;
 
-  genStorageIterator(accountHash: Buffer, seek: Buffer): { iter: SnapIterator<Buffer>; destructed: boolean };
+  genStorageIterator(
+    accountHash: Buffer,
+    seek: Buffer
+  ): { iter: SnapIterator<Buffer>; destructed: boolean };
 
   journal(output: any[]): Promise<Buffer>;
 }
@@ -34,7 +40,10 @@ export type StorageData = FunctionalBufferMap<FunctionalBufferMap<Buffer>>;
 
 export type SnapIteratorReturnType<T> = { hash: Buffer; getValue: () => T };
 
-export type SnapIterator<T> = AsyncGenerator<SnapIteratorReturnType<T>, SnapIteratorReturnType<T> | void>;
+export type SnapIterator<T> = AsyncGenerator<
+  SnapIteratorReturnType<T>,
+  SnapIteratorReturnType<T> | void
+>;
 
 export type GeneratorStats = {
   origin: Buffer;

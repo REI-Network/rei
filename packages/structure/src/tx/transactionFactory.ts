@@ -1,6 +1,12 @@
 import { BN, toBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
-import { TxOptions, TypedTransaction, TxData, AccessListEIP2930TxData, FeeMarketEIP1559TxData } from './types';
+import {
+  TxOptions,
+  TypedTransaction,
+  TxData,
+  AccessListEIP2930TxData,
+  FeeMarketEIP1559TxData
+} from './types';
 import Transaction from './legacyTransaction';
 import AccessListEIP2930Transaction from './eip2930Transaction';
 import FeeMarketEIP1559Transaction from './eip1559Transaction';
@@ -15,7 +21,10 @@ export default class TransactionFactory {
    * @param txData - The transaction data. The `type` field will determine which transaction type is returned (if undefined, creates a legacy transaction)
    * @param txOptions - Options to pass on to the constructor of the transaction
    */
-  public static fromTxData(txData: TxData | AccessListEIP2930TxData | FeeMarketEIP1559TxData, txOptions: TxOptions = {}): TypedTransaction {
+  public static fromTxData(
+    txData: TxData | AccessListEIP2930TxData | FeeMarketEIP1559TxData,
+    txOptions: TxOptions = {}
+  ): TypedTransaction {
     if (!('type' in txData) || txData.type === undefined) {
       // Assume legacy transaction
       return Transaction.fromTxData(<TxData>txData, txOptions);
@@ -24,9 +33,15 @@ export default class TransactionFactory {
       if (txType === 0) {
         return Transaction.fromTxData(<TxData>txData, txOptions);
       } else if (txType === 1) {
-        return AccessListEIP2930Transaction.fromTxData(<AccessListEIP2930TxData>txData, txOptions);
+        return AccessListEIP2930Transaction.fromTxData(
+          <AccessListEIP2930TxData>txData,
+          txOptions
+        );
       } else if (txType === 2) {
-        return FeeMarketEIP1559Transaction.fromTxData(<FeeMarketEIP1559TxData>txData, txOptions);
+        return FeeMarketEIP1559Transaction.fromTxData(
+          <FeeMarketEIP1559TxData>txData,
+          txOptions
+        );
       } else {
         throw new Error(`Tx instantiation with type ${txType} not supported`);
       }
@@ -39,7 +54,10 @@ export default class TransactionFactory {
    * @param data - The data Buffer
    * @param txOptions - The transaction options
    */
-  public static fromSerializedData(data: Buffer, txOptions: TxOptions = {}): TypedTransaction {
+  public static fromSerializedData(
+    data: Buffer,
+    txOptions: TxOptions = {}
+  ): TypedTransaction {
     if (data[0] <= 0x7f) {
       // Determine the type.
       let EIP: number;
@@ -73,7 +91,10 @@ export default class TransactionFactory {
    * @param data - A Buffer or Buffer[]
    * @param txOptions - The transaction options
    */
-  public static fromBlockBodyData(data: Buffer | Buffer[], txOptions: TxOptions = {}) {
+  public static fromBlockBodyData(
+    data: Buffer | Buffer[],
+    txOptions: TxOptions = {}
+  ) {
     if (Buffer.isBuffer(data)) {
       return this.fromSerializedData(data, txOptions);
     } else if (Array.isArray(data)) {
@@ -91,8 +112,9 @@ export default class TransactionFactory {
    * @param transactionID
    * @param _common - This option is not used
    */
-  public static getTransactionClass(transactionID: number = 0, _common?: Common) {
-    const legacyTxn = transactionID == 0 || (transactionID >= 0x80 && transactionID <= 0xff);
+  public static getTransactionClass(transactionID = 0, _common?: Common) {
+    const legacyTxn =
+      transactionID == 0 || (transactionID >= 0x80 && transactionID <= 0xff);
 
     if (legacyTxn) {
       return Transaction;

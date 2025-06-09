@@ -47,7 +47,7 @@ export default class Stack {
    * in returned array.
    * @param num - Number of items to pop
    */
-  popN(num: number = 1): BN[] {
+  popN(num = 1): BN[] {
     if (this._store.length < num) {
       throw new VmError(ERROR.STACK_UNDERFLOW);
     }

@@ -1,6 +1,24 @@
-import { BN, bnToHex, bnToUnpaddedBuffer, ecrecover, rlp, rlphash, toBuffer, unpadBuffer, bufferToHex, intToHex } from 'ethereumjs-util';
+import {
+  BN,
+  bnToHex,
+  bnToUnpaddedBuffer,
+  ecrecover,
+  rlp,
+  rlphash,
+  toBuffer,
+  unpadBuffer,
+  bufferToHex,
+  intToHex
+} from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
-import { TxOptions, TxData, JsonTx, N_DIV_2, TxValuesArray, Capability } from './types';
+import {
+  TxOptions,
+  TxData,
+  JsonTx,
+  N_DIV_2,
+  TxValuesArray,
+  Capability
+} from './types';
 import { BaseTransaction } from './baseTransaction';
 
 const TRANSACTION_TYPE = 0;
@@ -60,7 +78,9 @@ export default class Transaction extends BaseTransaction<Transaction> {
     // If length is not 6, it has length 9. If v/r/s are empty Buffers, it is still an unsigned transaction
     // This happens if you get the RLP data from `raw()`
     if (values.length !== 6 && values.length !== 9) {
-      throw new Error('Invalid transaction. Only expecting 6 values (for unsigned tx) or 9 values (for signed tx).');
+      throw new Error(
+        'Invalid transaction. Only expecting 6 values (for unsigned tx) or 9 values (for signed tx).'
+      );
     }
 
     const [nonce, gasPrice, gasLimit, to, value, data, v, r, s] = values;
@@ -93,7 +113,9 @@ export default class Transaction extends BaseTransaction<Transaction> {
 
     this.common = this._validateTxV(this.v, opts.common);
 
-    this.gasPrice = new BN(toBuffer(txData.gasPrice === '' ? '0x' : txData.gasPrice));
+    this.gasPrice = new BN(
+      toBuffer(txData.gasPrice === '' ? '0x' : txData.gasPrice)
+    );
 
     this._validateCannotExceedMaxInteger({ gasPrice: this.gasPrice });
 
@@ -131,7 +153,17 @@ export default class Transaction extends BaseTransaction<Transaction> {
    * representation have a look at {@link Transaction.getMessageToSign}.
    */
   raw(): TxValuesArray {
-    return [bnToUnpaddedBuffer(this.nonce), bnToUnpaddedBuffer(this.gasPrice), bnToUnpaddedBuffer(this.gasLimit), this.to !== undefined ? this.to.buf : Buffer.from([]), bnToUnpaddedBuffer(this.value), this.data, this.v !== undefined ? bnToUnpaddedBuffer(this.v) : Buffer.from([]), this.r !== undefined ? bnToUnpaddedBuffer(this.r) : Buffer.from([]), this.s !== undefined ? bnToUnpaddedBuffer(this.s) : Buffer.from([])];
+    return [
+      bnToUnpaddedBuffer(this.nonce),
+      bnToUnpaddedBuffer(this.gasPrice),
+      bnToUnpaddedBuffer(this.gasLimit),
+      this.to !== undefined ? this.to.buf : Buffer.from([]),
+      bnToUnpaddedBuffer(this.value),
+      this.data,
+      this.v !== undefined ? bnToUnpaddedBuffer(this.v) : Buffer.from([]),
+      this.r !== undefined ? bnToUnpaddedBuffer(this.r) : Buffer.from([]),
+      this.s !== undefined ? bnToUnpaddedBuffer(this.s) : Buffer.from([])
+    ];
   }
 
   /**
@@ -148,7 +180,14 @@ export default class Transaction extends BaseTransaction<Transaction> {
   }
 
   private _getMessageToSign() {
-    const values = [bnToUnpaddedBuffer(this.nonce), bnToUnpaddedBuffer(this.gasPrice), bnToUnpaddedBuffer(this.gasLimit), this.to !== undefined ? this.to.buf : Buffer.from([]), bnToUnpaddedBuffer(this.value), this.data];
+    const values = [
+      bnToUnpaddedBuffer(this.nonce),
+      bnToUnpaddedBuffer(this.gasPrice),
+      bnToUnpaddedBuffer(this.gasLimit),
+      this.to !== undefined ? this.to.buf : Buffer.from([]),
+      bnToUnpaddedBuffer(this.value),
+      this.data
+    ];
 
     if (this.supports(Capability.EIP155ReplayProtection)) {
       values.push(toBuffer(this.common.chainIdBN()));
@@ -222,12 +261,22 @@ export default class Transaction extends BaseTransaction<Transaction> {
     // EIP-2: All transaction signatures whose s-value is greater than secp256k1n/2 are considered invalid.
     // Reasoning: https://ethereum.stackexchange.com/a/55728
     if (this.common.gteHardfork('homestead') && this.s?.gt(N_DIV_2)) {
-      throw new Error('Invalid Signature: s-values greater than secp256k1n/2 are considered invalid');
+      throw new Error(
+        'Invalid Signature: s-values greater than secp256k1n/2 are considered invalid'
+      );
     }
 
     const { v, r, s } = this;
     try {
-      return ecrecover(msgHash, v!, bnToUnpaddedBuffer(r!), bnToUnpaddedBuffer(s!), this.supports(Capability.EIP155ReplayProtection) ? this.common.chainIdBN() : undefined);
+      return ecrecover(
+        msgHash,
+        v!,
+        bnToUnpaddedBuffer(r!),
+        bnToUnpaddedBuffer(s!),
+        this.supports(Capability.EIP155ReplayProtection)
+          ? this.common.chainIdBN()
+          : undefined
+      );
     } catch (e) {
       throw new Error('Invalid Signature');
     }
@@ -285,13 +334,24 @@ export default class Transaction extends BaseTransaction<Transaction> {
   private _validateTxV(v?: BN, common?: Common): Common {
     let chainIdBN;
     // No unsigned tx and EIP-155 activated and chain ID included
-    if (v !== undefined && !v.eqn(0) && (!common || common.gteHardfork('spuriousDragon')) && !v.eqn(27) && !v.eqn(28)) {
+    if (
+      v !== undefined &&
+      !v.eqn(0) &&
+      (!common || common.gteHardfork('spuriousDragon')) &&
+      !v.eqn(27) &&
+      !v.eqn(28)
+    ) {
       if (common) {
         const chainIdDoubled = common.chainIdBN().muln(2);
-        const isValidEIP155V = v.eq(chainIdDoubled.addn(35)) || v.eq(chainIdDoubled.addn(36));
+        const isValidEIP155V =
+          v.eq(chainIdDoubled.addn(35)) || v.eq(chainIdDoubled.addn(36));
 
         if (!isValidEIP155V) {
-          throw new Error(`Incompatible EIP155-based V ${v.toString()} and chain id ${common.chainIdBN().toString()}. See the Common parameter of the Transaction constructor to set the chain id.`);
+          throw new Error(
+            `Incompatible EIP155-based V ${v.toString()} and chain id ${common
+              .chainIdBN()
+              .toString()}. See the Common parameter of the Transaction constructor to set the chain id.`
+          );
         }
       } else {
         // Derive the original chain ID
@@ -330,7 +390,8 @@ export default class Transaction extends BaseTransaction<Transaction> {
 
     const chainIdDoubled = this.common.chainIdBN().muln(2);
 
-    const vAndChainIdMeetEIP155Conditions = v.eq(chainIdDoubled.addn(35)) || v.eq(chainIdDoubled.addn(36));
+    const vAndChainIdMeetEIP155Conditions =
+      v.eq(chainIdDoubled.addn(35)) || v.eq(chainIdDoubled.addn(36));
 
     return vAndChainIdMeetEIP155Conditions && onEIP155BlockOrLater;
   }
@@ -342,8 +403,12 @@ export default class Transaction extends BaseTransaction<Transaction> {
    */
   toRPCJSON() {
     return {
-      blockHash: this.extension?.blockHash ? bufferToHex(this.extension.blockHash) : null,
-      blockNumber: this.extension?.blockNumber ? bnToHex(this.extension.blockNumber) : null,
+      blockHash: this.extension?.blockHash
+        ? bufferToHex(this.extension.blockHash)
+        : null,
+      blockNumber: this.extension?.blockNumber
+        ? bnToHex(this.extension.blockNumber)
+        : null,
       from: this.getSenderAddress().toString(),
       gas: bnToHex(this.gasLimit),
       gasPrice: bnToHex(this.gasPrice),
@@ -351,7 +416,10 @@ export default class Transaction extends BaseTransaction<Transaction> {
       input: bufferToHex(this.data),
       nonce: bnToHex(this.nonce),
       to: this.to ? this.to.toString() : null,
-      transactionIndex: this.extension?.transactionIndex !== undefined ? intToHex(this.extension.transactionIndex) : null,
+      transactionIndex:
+        this.extension?.transactionIndex !== undefined
+          ? intToHex(this.extension.transactionIndex)
+          : null,
       value: bnToHex(this.value),
       v: this.v ? bnToHex(this.v) : undefined,
       r: this.r ? bnToHex(this.r) : undefined,

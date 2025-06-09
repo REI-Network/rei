@@ -1,7 +1,38 @@
-import { Address, BN, bnToHex, bnToUnpaddedBuffer, ecrecover, ecsign, intToBuffer, KECCAK256_RLP_ARRAY, KECCAK256_RLP, rlp, rlphash, toBuffer, zeros } from 'ethereumjs-util';
-import { Common, Chain, ConsensusAlgorithm, ConsensusType, Hardfork } from '@rei-network/common';
-import { HeaderData, JsonHeader, BlockHeaderBuffer, Blockchain, BlockOptions } from './types';
-import { CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL, CLIQUE_DIFF_INTURN, CLIQUE_DIFF_NOTURN } from './clique';
+import {
+  Address,
+  BN,
+  bnToHex,
+  bnToUnpaddedBuffer,
+  ecrecover,
+  ecsign,
+  intToBuffer,
+  KECCAK256_RLP_ARRAY,
+  KECCAK256_RLP,
+  rlp,
+  rlphash,
+  toBuffer,
+  zeros
+} from 'ethereumjs-util';
+import {
+  Common,
+  Chain,
+  ConsensusAlgorithm,
+  ConsensusType,
+  Hardfork
+} from '@rei-network/common';
+import {
+  HeaderData,
+  JsonHeader,
+  BlockHeaderBuffer,
+  Blockchain,
+  BlockOptions
+} from './types';
+import {
+  CLIQUE_EXTRA_VANITY,
+  CLIQUE_EXTRA_SEAL,
+  CLIQUE_DIFF_INTURN,
+  CLIQUE_DIFF_NOTURN
+} from './clique';
 
 const DEFAULT_GAS_LIMIT = new BN(Buffer.from('ffffffffffffff', 'hex'));
 
@@ -43,8 +74,28 @@ export class BlockHeader {
    * @param headerData
    * @param opts
    */
-  public static fromHeaderData(headerData: HeaderData = {}, opts: BlockOptions = {}) {
-    const { parentHash, uncleHash, coinbase, stateRoot, transactionsTrie, receiptTrie, bloom, difficulty, number, gasLimit, gasUsed, timestamp, extraData, mixHash, nonce, baseFeePerGas } = headerData;
+  public static fromHeaderData(
+    headerData: HeaderData = {},
+    opts: BlockOptions = {}
+  ) {
+    const {
+      parentHash,
+      uncleHash,
+      coinbase,
+      stateRoot,
+      transactionsTrie,
+      receiptTrie,
+      bloom,
+      difficulty,
+      number,
+      gasLimit,
+      gasUsed,
+      timestamp,
+      extraData,
+      mixHash,
+      nonce,
+      baseFeePerGas
+    } = headerData;
 
     return new BlockHeader(
       parentHash ? toBuffer(parentHash) : zeros(32),
@@ -73,7 +124,10 @@ export class BlockHeader {
    * @param headerData
    * @param opts
    */
-  public static fromRLPSerializedHeader(serialized: Buffer, opts: BlockOptions = {}) {
+  public static fromRLPSerializedHeader(
+    serialized: Buffer,
+    opts: BlockOptions = {}
+  ) {
     const values = rlp.decode(serialized);
 
     if (!Array.isArray(values)) {
@@ -89,17 +143,59 @@ export class BlockHeader {
    * @param headerData
    * @param opts
    */
-  public static fromValuesArray(values: BlockHeaderBuffer, opts: BlockOptions = {}) {
-    const [parentHash, uncleHash, coinbase, stateRoot, transactionsTrie, receiptTrie, bloom, difficulty, number, gasLimit, gasUsed, timestamp, extraData, mixHash, nonce, baseFeePerGas] = values;
+  public static fromValuesArray(
+    values: BlockHeaderBuffer,
+    opts: BlockOptions = {}
+  ) {
+    const [
+      parentHash,
+      uncleHash,
+      coinbase,
+      stateRoot,
+      transactionsTrie,
+      receiptTrie,
+      bloom,
+      difficulty,
+      number,
+      gasLimit,
+      gasUsed,
+      timestamp,
+      extraData,
+      mixHash,
+      nonce,
+      baseFeePerGas
+    ] = values;
 
     if (values.length > 16) {
-      throw new Error('invalid header. More values than expected were received');
+      throw new Error(
+        'invalid header. More values than expected were received'
+      );
     }
     if (values.length < 15) {
-      throw new Error('invalid header. Less values than expected were received');
+      throw new Error(
+        'invalid header. Less values than expected were received'
+      );
     }
 
-    return new BlockHeader(toBuffer(parentHash), toBuffer(uncleHash), new Address(toBuffer(coinbase)), toBuffer(stateRoot), toBuffer(transactionsTrie), toBuffer(receiptTrie), toBuffer(bloom), new BN(toBuffer(difficulty)), new BN(toBuffer(number)), new BN(toBuffer(gasLimit)), new BN(toBuffer(gasUsed)), new BN(toBuffer(timestamp)), toBuffer(extraData), toBuffer(mixHash), toBuffer(nonce), opts, baseFeePerGas !== undefined ? new BN(toBuffer(baseFeePerGas)) : undefined);
+    return new BlockHeader(
+      toBuffer(parentHash),
+      toBuffer(uncleHash),
+      new Address(toBuffer(coinbase)),
+      toBuffer(stateRoot),
+      toBuffer(transactionsTrie),
+      toBuffer(receiptTrie),
+      toBuffer(bloom),
+      new BN(toBuffer(difficulty)),
+      new BN(toBuffer(number)),
+      new BN(toBuffer(gasLimit)),
+      new BN(toBuffer(gasUsed)),
+      new BN(toBuffer(timestamp)),
+      toBuffer(extraData),
+      toBuffer(mixHash),
+      toBuffer(nonce),
+      opts,
+      baseFeePerGas !== undefined ? new BN(toBuffer(baseFeePerGas)) : undefined
+    );
   }
 
   /**
@@ -117,7 +213,25 @@ export class BlockHeader {
    * varying data types. For a default empty header, use {@link BlockHeader.fromHeaderData}.
    *
    */
-  constructor(parentHash: Buffer, uncleHash: Buffer, coinbase: Address, stateRoot: Buffer, transactionsTrie: Buffer, receiptTrie: Buffer, bloom: Buffer, difficulty: BN, number: BN, gasLimit: BN, gasUsed: BN, timestamp: BN, extraData: Buffer, mixHash: Buffer, nonce: Buffer, options: BlockOptions = {}, baseFeePerGas?: BN) {
+  constructor(
+    parentHash: Buffer,
+    uncleHash: Buffer,
+    coinbase: Address,
+    stateRoot: Buffer,
+    transactionsTrie: Buffer,
+    receiptTrie: Buffer,
+    bloom: Buffer,
+    difficulty: BN,
+    number: BN,
+    gasLimit: BN,
+    gasUsed: BN,
+    timestamp: BN,
+    extraData: Buffer,
+    mixHash: Buffer,
+    nonce: Buffer,
+    options: BlockOptions = {},
+    baseFeePerGas?: BN
+  ) {
     if (options.common) {
       this._common = options.common.copy();
     } else {
@@ -140,7 +254,9 @@ export class BlockHeader {
       }
     } else {
       if (baseFeePerGas) {
-        throw new Error('A base fee for a block can only be set with EIP1559 being activated');
+        throw new Error(
+          'A base fee for a block can only be set with EIP1559 being activated'
+        );
       }
     }
 
@@ -189,8 +305,13 @@ export class BlockHeader {
     // Now we have set all the values of this Header, we possibly have set a dummy
     // `difficulty` value (defaults to 0). If we have a `calcDifficultyFromHeader`
     // block option parameter, we instead set difficulty to this value.
-    if (options.calcDifficultyFromHeader && this._common.consensusAlgorithm() === ConsensusAlgorithm.Ethash) {
-      this.difficulty = this.canonicalDifficulty(options.calcDifficultyFromHeader);
+    if (
+      options.calcDifficultyFromHeader &&
+      this._common.consensusAlgorithm() === ConsensusAlgorithm.Ethash
+    ) {
+      this.difficulty = this.canonicalDifficulty(
+        options.calcDifficultyFromHeader
+      );
     }
 
     // If cliqueSigner is provided, seal block with provided privateKey.
@@ -199,45 +320,74 @@ export class BlockHeader {
       const minExtraDataLength = CLIQUE_EXTRA_VANITY + CLIQUE_EXTRA_SEAL;
       if (this.extraData.length < minExtraDataLength) {
         const remainingLength = minExtraDataLength - this.extraData.length;
-        this.extraData = Buffer.concat([this.extraData, Buffer.alloc(remainingLength)]);
+        this.extraData = Buffer.concat([
+          this.extraData,
+          Buffer.alloc(remainingLength)
+        ]);
       }
 
       this.extraData = this.cliqueSealBlock(options.cliqueSigner);
     }
 
-    this._errorPostfix = `block number=${this.number.toNumber()} hash=${this.hash().toString('hex')}`;
+    this._errorPostfix = `block number=${this.number.toNumber()} hash=${this.hash().toString(
+      'hex'
+    )}`;
   }
 
   /**
    * Validates correct buffer lengths, throws if invalid.
    */
   _validateHeaderFields() {
-    const { parentHash, uncleHash, stateRoot, transactionsTrie, receiptTrie, difficulty, extraData, mixHash, nonce } = this;
+    const {
+      parentHash,
+      uncleHash,
+      stateRoot,
+      transactionsTrie,
+      receiptTrie,
+      difficulty,
+      extraData,
+      mixHash,
+      nonce
+    } = this;
 
     if (parentHash.length !== 32) {
-      throw new Error(`parentHash must be 32 bytes, received ${parentHash.length} bytes`);
+      throw new Error(
+        `parentHash must be 32 bytes, received ${parentHash.length} bytes`
+      );
     }
     if (stateRoot.length !== 32) {
-      throw new Error(`stateRoot must be 32 bytes, received ${stateRoot.length} bytes`);
+      throw new Error(
+        `stateRoot must be 32 bytes, received ${stateRoot.length} bytes`
+      );
     }
     if (transactionsTrie.length !== 32) {
-      throw new Error(`transactionsTrie must be 32 bytes, received ${transactionsTrie.length} bytes`);
+      throw new Error(
+        `transactionsTrie must be 32 bytes, received ${transactionsTrie.length} bytes`
+      );
     }
     if (receiptTrie.length !== 32) {
-      throw new Error(`receiptTrie must be 32 bytes, received ${receiptTrie.length} bytes`);
+      throw new Error(
+        `receiptTrie must be 32 bytes, received ${receiptTrie.length} bytes`
+      );
     }
     if (mixHash.length !== 32) {
-      throw new Error(`mixHash must be 32 bytes, received ${mixHash.length} bytes`);
+      throw new Error(
+        `mixHash must be 32 bytes, received ${mixHash.length} bytes`
+      );
     }
 
     if (nonce.length !== 8) {
       // Hack to check for Kovan due to non-standard nonce length (65 bytes)
       if (this._common.networkIdBN().eqn(42)) {
         if (nonce.length !== 65) {
-          throw new Error(`nonce must be 65 bytes on kovan, received ${nonce.length} bytes`);
+          throw new Error(
+            `nonce must be 65 bytes on kovan, received ${nonce.length} bytes`
+          );
         }
       } else {
-        throw new Error(`nonce must be 8 bytes, received ${nonce.length} bytes`);
+        throw new Error(
+          `nonce must be 8 bytes, received ${nonce.length} bytes`
+        );
       }
     }
 
@@ -247,7 +397,9 @@ export class BlockHeader {
       let errorMsg = '';
 
       if (!uncleHash.equals(KECCAK256_RLP_ARRAY)) {
-        errorMsg += `, uncleHash: ${uncleHash.toString('hex')} (expected: ${KECCAK256_RLP_ARRAY.toString('hex')})`;
+        errorMsg += `, uncleHash: ${uncleHash.toString(
+          'hex'
+        )} (expected: ${KECCAK256_RLP_ARRAY.toString('hex')})`;
         error = true;
       }
       if (!difficulty.eq(new BN(0))) {
@@ -259,11 +411,15 @@ export class BlockHeader {
         error = true;
       }
       if (!mixHash.equals(zeros(32))) {
-        errorMsg += `, mixHash: ${mixHash.toString('hex')} (expected: ${zeros(32).toString('hex')})`;
+        errorMsg += `, mixHash: ${mixHash.toString('hex')} (expected: ${zeros(
+          32
+        ).toString('hex')})`;
         error = true;
       }
       if (!nonce.equals(zeros(8))) {
-        errorMsg += `, nonce: ${nonce.toString('hex')} (expected: ${zeros(8).toString('hex')})`;
+        errorMsg += `, nonce: ${nonce.toString('hex')} (expected: ${zeros(
+          8
+        ).toString('hex')})`;
         error = true;
       }
       if (error) {
@@ -282,13 +438,21 @@ export class BlockHeader {
       throw new Error('difficulty calculation is only supported on PoW chains');
     }
     if (this._common.consensusAlgorithm() !== ConsensusAlgorithm.Ethash) {
-      throw new Error('difficulty calculation currently only supports the ethash algorithm');
+      throw new Error(
+        'difficulty calculation currently only supports the ethash algorithm'
+      );
     }
     const hardfork = this._getHardfork();
     const blockTs = this.timestamp;
     const { timestamp: parentTs, difficulty: parentDif } = parentBlockHeader;
-    const minimumDifficulty = new BN(this._common.paramByHardfork('pow', 'minimumDifficulty', hardfork));
-    const offset = parentDif.div(new BN(this._common.paramByHardfork('pow', 'difficultyBoundDivisor', hardfork)));
+    const minimumDifficulty = new BN(
+      this._common.paramByHardfork('pow', 'minimumDifficulty', hardfork)
+    );
+    const offset = parentDif.div(
+      new BN(
+        this._common.paramByHardfork('pow', 'difficultyBoundDivisor', hardfork)
+      )
+    );
     let num = this.number.clone();
 
     // We use a ! here as TS cannot follow this hardfork-dependent logic, but it always gets assigned
@@ -296,7 +460,11 @@ export class BlockHeader {
 
     if (this._common.hardforkGteHardfork(hardfork, 'byzantium')) {
       // max((2 if len(parent.uncles) else 1) - ((timestamp - parent.timestamp) // 9), -99) (EIP100)
-      const uncleAddend = parentBlockHeader.uncleHash.equals(KECCAK256_RLP_ARRAY) ? 1 : 2;
+      const uncleAddend = parentBlockHeader.uncleHash.equals(
+        KECCAK256_RLP_ARRAY
+      )
+        ? 1
+        : 2;
       let a = blockTs.sub(parentTs).idivn(9).ineg().iaddn(uncleAddend);
       const cutoff = new BN(-99);
       // MAX(cutoff, a)
@@ -323,7 +491,11 @@ export class BlockHeader {
       dif = parentDif.add(offset.mul(a));
     } else {
       // pre-homestead
-      if (parentTs.addn(this._common.paramByHardfork('pow', 'durationLimit', hardfork)).gt(blockTs)) {
+      if (
+        parentTs
+          .addn(this._common.paramByHardfork('pow', 'durationLimit', hardfork))
+          .gt(blockTs)
+      ) {
         dif = offset.add(parentDif);
       } else {
         dif = parentDif.sub(offset);
@@ -357,20 +529,32 @@ export class BlockHeader {
    */
   validateCliqueDifficulty(blockchain: Blockchain): boolean {
     this._requireClique('validateCliqueDifficulty');
-    if (!this.difficulty.eq(CLIQUE_DIFF_INTURN) && !this.difficulty.eq(CLIQUE_DIFF_NOTURN)) {
-      throw new Error(`difficulty for clique block must be INTURN (2) or NOTURN (1), received: ${this.difficulty.toString()}`);
+    if (
+      !this.difficulty.eq(CLIQUE_DIFF_INTURN) &&
+      !this.difficulty.eq(CLIQUE_DIFF_NOTURN)
+    ) {
+      throw new Error(
+        `difficulty for clique block must be INTURN (2) or NOTURN (1), received: ${this.difficulty.toString()}`
+      );
     }
     if ('cliqueActiveSigners' in blockchain === false) {
-      throw new Error('PoA blockchain requires method blockchain.cliqueActiveSigners() to validate clique difficulty');
+      throw new Error(
+        'PoA blockchain requires method blockchain.cliqueActiveSigners() to validate clique difficulty'
+      );
     }
     const signers = (blockchain as any).cliqueActiveSigners();
     if (signers.length === 0) {
       // abort if signers are unavailable
       return true;
     }
-    const signerIndex = signers.findIndex((address: Address) => address.equals(this.cliqueSigner()));
+    const signerIndex = signers.findIndex((address: Address) =>
+      address.equals(this.cliqueSigner())
+    );
     const inTurn = this.number.modn(signers.length) === signerIndex;
-    if ((inTurn && this.difficulty.eq(CLIQUE_DIFF_INTURN)) || (!inTurn && this.difficulty.eq(CLIQUE_DIFF_NOTURN))) {
+    if (
+      (inTurn && this.difficulty.eq(CLIQUE_DIFF_INTURN)) ||
+      (!inTurn && this.difficulty.eq(CLIQUE_DIFF_NOTURN))
+    ) {
       return true;
     }
     return false;
@@ -388,17 +572,32 @@ export class BlockHeader {
     // to adopt to the new gas target centered logic
     const londonHardforkBlock = this._common.hardforkBlockBN('london');
     if (londonHardforkBlock && this.number.eq(londonHardforkBlock)) {
-      const elasticity = new BN(this._common.param('gasConfig', 'elasticityMultiplier'));
+      const elasticity = new BN(
+        this._common.param('gasConfig', 'elasticityMultiplier')
+      );
       parentGasLimit = parentGasLimit.mul(elasticity);
     }
     const gasLimit = this.gasLimit;
     const hardfork = this._getHardfork();
 
-    const a = parentGasLimit.div(new BN(this._common.paramByHardfork('gasConfig', 'gasLimitBoundDivisor', hardfork)));
+    const a = parentGasLimit.div(
+      new BN(
+        this._common.paramByHardfork(
+          'gasConfig',
+          'gasLimitBoundDivisor',
+          hardfork
+        )
+      )
+    );
     const maxGasLimit = parentGasLimit.add(a);
     const minGasLimit = parentGasLimit.sub(a);
 
-    const result = gasLimit.lt(maxGasLimit) && gasLimit.gt(minGasLimit) && gasLimit.gte(this._common.paramByHardfork('gasConfig', 'minGasLimit', hardfork));
+    const result =
+      gasLimit.lt(maxGasLimit) &&
+      gasLimit.gt(minGasLimit) &&
+      gasLimit.gte(
+        this._common.paramByHardfork('gasConfig', 'minGasLimit', hardfork)
+      );
 
     return result;
   }
@@ -428,7 +627,10 @@ export class BlockHeader {
     // Consensus type dependent checks
     if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Ethash) {
       // PoW/Ethash
-      if (this.extraData.length > this._common.paramByHardfork('vm', 'maxExtraDataSize', hardfork)) {
+      if (
+        this.extraData.length >
+        this._common.paramByHardfork('vm', 'maxExtraDataSize', hardfork)
+      ) {
         const msg = 'invalid amount of extra data';
         throw this._error(msg);
       }
@@ -465,7 +667,10 @@ export class BlockHeader {
       }
     }
 
-    const parentHeader = await this._getHeaderByHash(blockchain, this.parentHash);
+    const parentHeader = await this._getHeaderByHash(
+      blockchain,
+      this.parentHash
+    );
 
     if (!parentHeader) {
       throw new Error('could not find parent header');
@@ -501,7 +706,9 @@ export class BlockHeader {
     if (height) {
       const dif = height.sub(parentHeader.number);
       if (!(dif.ltn(8) && dif.gtn(1))) {
-        throw new Error('uncle block has a parent that is too old or too young');
+        throw new Error(
+          'uncle block has a parent that is too old or too young'
+        );
       }
     }
 
@@ -517,9 +724,13 @@ export class BlockHeader {
       const block = this._common.hardforkBlockBN('london');
       const isInitialEIP1559Block = block && this.number.eq(block);
       if (isInitialEIP1559Block) {
-        const initialBaseFee = new BN(this._common.param('gasConfig', 'initialBaseFee'));
+        const initialBaseFee = new BN(
+          this._common.param('gasConfig', 'initialBaseFee')
+        );
         if (!this.baseFeePerGas!.eq(initialBaseFee)) {
-          throw new Error('Initial EIP1559 block does not have initial base fee');
+          throw new Error(
+            'Initial EIP1559 block does not have initial base fee'
+          );
         }
       } else {
         // check if the base fee is correct
@@ -537,23 +748,35 @@ export class BlockHeader {
    */
   public calcNextBaseFee(): BN {
     if (!this._common.isActivatedEIP(1559)) {
-      throw new Error('calcNextBaseFee() can only be called with EIP1559 being activated');
+      throw new Error(
+        'calcNextBaseFee() can only be called with EIP1559 being activated'
+      );
     }
     let nextBaseFee: BN;
-    const elasticity = new BN(this._common.param('gasConfig', 'elasticityMultiplier'));
+    const elasticity = new BN(
+      this._common.param('gasConfig', 'elasticityMultiplier')
+    );
     const parentGasTarget = this.gasLimit.div(elasticity);
 
     if (parentGasTarget.eq(this.gasUsed)) {
       nextBaseFee = this.baseFeePerGas!;
     } else if (this.gasUsed.gt(parentGasTarget)) {
       const gasUsedDelta = this.gasUsed.sub(parentGasTarget);
-      const baseFeeMaxChangeDenominator = new BN(this._common.param('gasConfig', 'baseFeeMaxChangeDenominator'));
-      const calculatedDelta = this.baseFeePerGas!.mul(gasUsedDelta).div(parentGasTarget).div(baseFeeMaxChangeDenominator);
+      const baseFeeMaxChangeDenominator = new BN(
+        this._common.param('gasConfig', 'baseFeeMaxChangeDenominator')
+      );
+      const calculatedDelta = this.baseFeePerGas!.mul(gasUsedDelta)
+        .div(parentGasTarget)
+        .div(baseFeeMaxChangeDenominator);
       nextBaseFee = BN.max(calculatedDelta, new BN(1)).add(this.baseFeePerGas!);
     } else {
       const gasUsedDelta = parentGasTarget.sub(this.gasUsed);
-      const baseFeeMaxChangeDenominator = new BN(this._common.param('gasConfig', 'baseFeeMaxChangeDenominator'));
-      const calculatedDelta = this.baseFeePerGas!.mul(gasUsedDelta).div(parentGasTarget).div(baseFeeMaxChangeDenominator);
+      const baseFeeMaxChangeDenominator = new BN(
+        this._common.param('gasConfig', 'baseFeeMaxChangeDenominator')
+      );
+      const calculatedDelta = this.baseFeePerGas!.mul(gasUsedDelta)
+        .div(parentGasTarget)
+        .div(baseFeeMaxChangeDenominator);
       nextBaseFee = BN.max(this.baseFeePerGas!.sub(calculatedDelta), new BN(0));
     }
     return nextBaseFee;
@@ -563,7 +786,23 @@ export class BlockHeader {
    * Returns a Buffer Array of the raw Buffers in this header, in order.
    */
   raw(): BlockHeaderBuffer {
-    const rawItems = [this.parentHash, this.uncleHash, this.coinbase.buf, this.stateRoot, this.transactionsTrie, this.receiptTrie, this.bloom, bnToUnpaddedBuffer(this.difficulty), bnToUnpaddedBuffer(this.number), bnToUnpaddedBuffer(this.gasLimit), bnToUnpaddedBuffer(this.gasUsed), bnToUnpaddedBuffer(this.timestamp), this.extraData, this.mixHash, this.nonce];
+    const rawItems = [
+      this.parentHash,
+      this.uncleHash,
+      this.coinbase.buf,
+      this.stateRoot,
+      this.transactionsTrie,
+      this.receiptTrie,
+      this.bloom,
+      bnToUnpaddedBuffer(this.difficulty),
+      bnToUnpaddedBuffer(this.number),
+      bnToUnpaddedBuffer(this.gasLimit),
+      bnToUnpaddedBuffer(this.gasUsed),
+      bnToUnpaddedBuffer(this.timestamp),
+      this.extraData,
+      this.mixHash,
+      this.nonce
+    ];
 
     if (this._common.isActivatedEIP(1559)) {
       rawItems.push(bnToUnpaddedBuffer(this.baseFeePerGas!));
@@ -588,7 +827,9 @@ export class BlockHeader {
 
   private _requireClique(name: string) {
     if (this._common.consensusAlgorithm() !== ConsensusAlgorithm.Clique) {
-      throw new Error(`BlockHeader.${name}() call only supported for clique PoA networks`);
+      throw new Error(
+        `BlockHeader.${name}() call only supported for clique PoA networks`
+      );
     }
   }
 
@@ -598,7 +839,10 @@ export class BlockHeader {
   cliqueSigHash() {
     this._requireClique('cliqueSigHash');
     const raw = this.raw();
-    raw[12] = this.extraData.slice(0, this.extraData.length - CLIQUE_EXTRA_SEAL);
+    raw[12] = this.extraData.slice(
+      0,
+      this.extraData.length - CLIQUE_EXTRA_SEAL
+    );
     return rlphash(raw);
   }
 
@@ -641,9 +885,16 @@ export class BlockHeader {
     this._requireClique('cliqueSealBlock');
 
     const signature = ecsign(this.cliqueSigHash(), privateKey);
-    const signatureB = Buffer.concat([signature.r, signature.s, intToBuffer(signature.v - 27)]);
+    const signatureB = Buffer.concat([
+      signature.r,
+      signature.s,
+      intToBuffer(signature.v - 27)
+    ]);
 
-    const extraDataWithoutSeal = this.extraData.slice(0, this.extraData.length - CLIQUE_EXTRA_SEAL);
+    const extraDataWithoutSeal = this.extraData.slice(
+      0,
+      this.extraData.length - CLIQUE_EXTRA_SEAL
+    );
     const extraData = Buffer.concat([extraDataWithoutSeal, signatureB]);
     return extraData;
   }
@@ -659,7 +910,9 @@ export class BlockHeader {
   cliqueEpochTransitionSigners(): Address[] {
     this._requireClique('cliqueEpochTransitionSigners');
     if (!this.cliqueIsEpochTransition()) {
-      throw new Error('Signers are only included in epoch transition blocks (clique)');
+      throw new Error(
+        'Signers are only included in epoch transition blocks (clique)'
+      );
     }
 
     const start = CLIQUE_EXTRA_VANITY;
@@ -668,7 +921,11 @@ export class BlockHeader {
 
     const signerList: Buffer[] = [];
     const signerLength = 20;
-    for (let start = 0; start <= signerBuffer.length - signerLength; start += signerLength) {
+    for (
+      let start = 0;
+      start <= signerBuffer.length - signerLength;
+      start += signerLength
+    ) {
       signerList.push(signerBuffer.slice(start, start + signerLength));
     }
     return signerList.map((buf) => new Address(buf));
@@ -754,10 +1011,16 @@ export class BlockHeader {
   }
 
   private _getHardfork(): string {
-    return this._common.hardfork() || this._common.activeHardfork(this.number.toNumber());
+    return (
+      this._common.hardfork() ||
+      this._common.activeHardfork(this.number.toNumber())
+    );
   }
 
-  private async _getHeaderByHash(blockchain: Blockchain, hash: Buffer): Promise<BlockHeader | undefined> {
+  private async _getHeaderByHash(
+    blockchain: Blockchain,
+    hash: Buffer
+  ): Promise<BlockHeader | undefined> {
     try {
       const header = (await blockchain.getBlock(hash)).header;
       return header;

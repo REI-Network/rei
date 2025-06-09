@@ -10,7 +10,10 @@ export class TxPricedList {
   constructor(all: Map<Buffer, Transaction>) {
     this.all = all;
     this.stales = 0;
-    this.remotes = new Heap({ comparBefore: (a: Transaction, b: Transaction) => b.gasPrice.gt(a.gasPrice) });
+    this.remotes = new Heap({
+      comparBefore: (a: Transaction, b: Transaction) =>
+        b.gasPrice.gt(a.gasPrice)
+    });
   }
 
   /**
@@ -117,7 +120,10 @@ export class TxPricedList {
    * Reset heap
    */
   reheap() {
-    const reheap = new Heap({ comparBefore: (a: Transaction, b: Transaction) => b.gasPrice.gt(a.gasPrice) });
+    const reheap = new Heap({
+      comparBefore: (a: Transaction, b: Transaction) =>
+        b.gasPrice.gt(a.gasPrice)
+    });
     this.stales = 0;
     this.all.forEach((val, key, map) => {
       reheap.push(val);

@@ -44,13 +44,21 @@ export class Tracer {
    * @param hash Transaction hash
    * @returns Debug instance
    */
-  private createDebugImpl(common: Common, reject: (reason?: any) => void, config?: TraceConfig, hash?: Buffer): IDebugImpl {
+  private createDebugImpl(
+    common: Common,
+    reject: (reason?: any) => void,
+    config?: TraceConfig,
+    hash?: Buffer
+  ): IDebugImpl {
     if (config?.tracer) {
       if (tracers.has(config.tracer)) {
         config.tracer = tracers.get(config.tracer)!;
         config.toAsync = true;
       }
-      config.tracer = config.toAsync === false ? `const obj = ${config.tracer}` : toAsync(`const obj = ${config.tracer}`);
+      config.tracer =
+        config.toAsync === false
+          ? `const obj = ${config.tracer}`
+          : toAsync(`const obj = ${config.tracer}`);
       return new JSDebug(common, config, reject, hash);
     } else {
       return new StructLogDebug(config, hash);
@@ -66,7 +74,13 @@ export class Tracer {
    * @returns Result of execution
    */
   traceBlock(block: Block | Buffer, config?: TraceConfig, hash?: Buffer) {
-    block = block instanceof Block ? block : Block.fromRLPSerializedBlock(block, { common: this.node.getCommon(0), hardforkByBlockNumber: true });
+    block =
+      block instanceof Block
+        ? block
+        : Block.fromRLPSerializedBlock(block, {
+            common: this.node.getCommon(0),
+            hardforkByBlockNumber: true
+          });
     if (block.header.number.eqn(0)) {
       throw new Error('invalid block number, 0');
     }
@@ -76,7 +90,13 @@ export class Tracer {
       try {
         block = block as Block;
         const debug = this.createDebugImpl(block._common, reject, config, hash);
-        await executor.processBlock({ debug, block, force: true, skipConsensusValidation: true, skipConsensusVerify: true });
+        await executor.processBlock({
+          debug,
+          block,
+          force: true,
+          skipConsensusValidation: true,
+          skipConsensusVerify: true
+        });
         const result = debug.result();
         resolve(util.types.isPromise(result) ? await result : result);
       } catch (err) {
@@ -104,7 +124,14 @@ export class Tracer {
    */
   async traceTx(hash: Buffer, config?: TraceConfig) {
     const tx = await this.node.db.getTransaction(hash);
-    return await this.traceBlock(await this.node.db.getBlockByHashAndNumber(tx.extension!.blockHash, tx.extension!.blockNumber), config, hash);
+    return await this.traceBlock(
+      await this.node.db.getBlockByHashAndNumber(
+        tx.extension!.blockHash,
+        tx.extension!.blockNumber
+      ),
+      config,
+      hash
+    );
   }
 
   /**
@@ -132,8 +159,14 @@ export class Tracer {
 
     return new Promise<any>(async (resolve, reject) => {
       try {
-        const parent = await this.node.db.getBlockByHashAndNumber(block.header.parentHash, block.header.number.subn(1));
-        const vm = await this.node.getVM(parent.header.stateRoot, block.header.number.subn(1));
+        const parent = await this.node.db.getBlockByHashAndNumber(
+          block.header.parentHash,
+          block.header.number.subn(1)
+        );
+        const vm = await this.node.getVM(
+          parent.header.stateRoot,
+          block.header.number.subn(1)
+        );
         const debug = this.createDebugImpl(block._common, reject, config);
         await vm.runCall({
           block,

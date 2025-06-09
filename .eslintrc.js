@@ -25,6 +25,7 @@ module.exports = {
         'prefer-const': 'off',
         'no-useless-escape': 'off',
         'no-inner-declarations': 'off',
+        'no-constant-condition': 'off',
         'no-async-promise-executor': 'off',
         '@typescript-eslint/ban-types': 'off',
         '@typescript-eslint/no-unused-vars': 'off',

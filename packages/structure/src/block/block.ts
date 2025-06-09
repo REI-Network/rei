@@ -1,9 +1,30 @@
 import { BaseTrie as Trie } from '@rei-network/trie';
-import { BN, rlp, keccak256, KECCAK256_RLP, bnToHex, intToHex, bufferToHex } from 'ethereumjs-util';
+import {
+  BN,
+  rlp,
+  keccak256,
+  KECCAK256_RLP,
+  bnToHex,
+  intToHex,
+  bufferToHex
+} from 'ethereumjs-util';
 import { Common, ConsensusType } from '@rei-network/common';
-import { TransactionFactory, TypedTransaction, TxOptions, FeeMarketEIP1559Transaction, Transaction, Capability } from '../tx';
+import {
+  TransactionFactory,
+  TypedTransaction,
+  TxOptions,
+  FeeMarketEIP1559Transaction,
+  Transaction,
+  Capability
+} from '../tx';
 import { BlockHeader } from './header';
-import { BlockData, BlockOptions, JsonBlock, BlockBuffer, Blockchain } from './types';
+import {
+  BlockData,
+  BlockOptions,
+  JsonBlock,
+  BlockBuffer,
+  Blockchain
+} from './types';
 
 /**
  * An object that represents the block.
@@ -22,7 +43,11 @@ export class Block {
    * @param opts
    */
   public static fromBlockData(blockData: BlockData = {}, opts?: BlockOptions) {
-    const { header: headerData, transactions: txsData, uncleHeaders: uhsData } = blockData;
+    const {
+      header: headerData,
+      transactions: txsData,
+      uncleHeaders: uhsData
+    } = blockData;
 
     const header = BlockHeader.fromHeaderData(headerData, opts);
 
@@ -61,7 +86,10 @@ export class Block {
    * @param serialized
    * @param opts
    */
-  public static fromRLPSerializedBlock(serialized: Buffer, opts?: BlockOptions) {
+  public static fromRLPSerializedBlock(
+    serialized: Buffer,
+    opts?: BlockOptions
+  ) {
     const values = rlp.decode(serialized) as any as BlockBuffer;
 
     if (!Array.isArray(values)) {
@@ -128,17 +156,26 @@ export class Block {
    * This constructor takes the values, validates them, assigns them and freezes the object.
    * Use the static factory methods to assist in creating a Block object from varying data types and options.
    */
-  constructor(header?: BlockHeader, transactions: TypedTransaction[] = [], uncleHeaders: BlockHeader[] = [], opts: BlockOptions = {}) {
+  constructor(
+    header?: BlockHeader,
+    transactions: TypedTransaction[] = [],
+    uncleHeaders: BlockHeader[] = [],
+    opts: BlockOptions = {}
+  ) {
     this.header = header ?? BlockHeader.fromHeaderData({}, opts);
     this.transactions = transactions;
     this.uncleHeaders = uncleHeaders;
     this._common = this.header._common;
     if (uncleHeaders.length > 0) {
       if (this._common.consensusType() === ConsensusType.ProofOfAuthority) {
-        throw new Error('Block initialization with uncleHeaders on a PoA network is not allowed');
+        throw new Error(
+          'Block initialization with uncleHeaders on a PoA network is not allowed'
+        );
       }
       if (this._common.consensusType() === ConsensusType.ProofOfStake) {
-        throw new Error('Block initialization with uncleHeaders on a PoS network is not allowed');
+        throw new Error(
+          'Block initialization with uncleHeaders on a PoS network is not allowed'
+        );
       }
     }
   }
@@ -147,7 +184,15 @@ export class Block {
    * Returns a Buffer Array of the raw Buffers of this block, in order.
    */
   raw(): BlockBuffer {
-    return [this.header.raw(), this.transactions.map((tx) => (tx.supports(Capability.EIP2718TypedTransaction) ? tx.serialize() : tx.raw())) as Buffer[], this.uncleHeaders.map((uh) => uh.raw())];
+    return [
+      this.header.raw(),
+      this.transactions.map((tx) =>
+        tx.supports(Capability.EIP2718TypedTransaction)
+          ? tx.serialize()
+          : tx.raw()
+      ) as Buffer[],
+      this.uncleHeaders.map((uh) => uh.raw())
+    ];
   }
 
   /**
@@ -248,7 +293,7 @@ export class Block {
    * @param blockchain - validate against an @ethereumjs/blockchain
    * @param onlyHeader - if should only validate the header (skips validating txTrie and unclesHash) (default: false)
    */
-  async validate(blockchain: Blockchain, onlyHeader: boolean = false): Promise<void> {
+  async validate(blockchain: Blockchain, onlyHeader = false): Promise<void> {
     await this.header.validate(blockchain);
     await this.validateUncles(blockchain);
     await this.validateData(onlyHeader);
@@ -262,7 +307,7 @@ export class Block {
    * - The uncle hash is valid
    * @param onlyHeader if only passed the header, skip validating txTrie and unclesHash (default: false)
    */
-  async validateData(onlyHeader: boolean = false): Promise<void> {
+  async validateData(onlyHeader = false): Promise<void> {
     const txErrors = this.validateTransactions(true);
     if (txErrors.length > 0) {
       const msg = `invalid transactions: ${txErrors.join(' ')}`;
@@ -316,7 +361,9 @@ export class Block {
     }
 
     // Header does not count an uncle twice.
-    const uncleHashes = this.uncleHeaders.map((header) => header.hash().toString('hex'));
+    const uncleHashes = this.uncleHeaders.map((header) =>
+      header.hash().toString('hex')
+    );
     if (!(new Set(uncleHashes).size === uncleHashes.length)) {
       throw new Error('duplicate uncles');
     }
@@ -382,13 +429,18 @@ export class Block {
    * @param uncleHeaders - list of uncleHeaders
    * @param blockchain - pointer to the blockchain
    */
-  private async _validateUncleHeaders(uncleHeaders: BlockHeader[], blockchain: Blockchain) {
+  private async _validateUncleHeaders(
+    uncleHeaders: BlockHeader[],
+    blockchain: Blockchain
+  ) {
     if (uncleHeaders.length == 0) {
       return;
     }
 
     // Each Uncle Header is a valid header
-    await Promise.all(uncleHeaders.map((uh) => uh.validate(blockchain, this.header.number)));
+    await Promise.all(
+      uncleHeaders.map((uh) => uh.validate(blockchain, this.header.number))
+    );
 
     // Check how many blocks we should get in order to validate the uncle.
     // In the worst case, we get 8 blocks, in the best case, we only get 1 block.
@@ -408,7 +460,11 @@ export class Block {
     const includedUncles: { [key: string]: boolean } = {};
 
     // Due to the header validation check above, we know that `getBlocks` is between 1 and 8 inclusive.
-    const getBlocks = this.header.number.clone().sub(lowestUncleNumber).addn(1).toNumber();
+    const getBlocks = this.header.number
+      .clone()
+      .sub(lowestUncleNumber)
+      .addn(1)
+      .toNumber();
 
     // See Geth: https://github.com/ethereum/go-ethereum/blob/b63bffe8202d46ea10ac8c4f441c582642193ac8/consensus/ethash/consensus.go#L207
     // Here we get the necessary blocks from the chain.
@@ -441,7 +497,9 @@ export class Block {
       const parentHash = uh.parentHash.toString('hex');
 
       if (!canonicalChainHashes[parentHash]) {
-        throw new Error('The parent hash of the uncle header is not part of the canonical chain');
+        throw new Error(
+          'The parent hash of the uncle header is not part of the canonical chain'
+        );
       }
 
       if (includedUncles[uncleHash]) {
@@ -454,7 +512,10 @@ export class Block {
     });
   }
 
-  private async _getBlockByHash(blockchain: Blockchain, hash: Buffer): Promise<Block | undefined> {
+  private async _getBlockByHash(
+    blockchain: Blockchain,
+    hash: Buffer
+  ): Promise<Block | undefined> {
     try {
       const block = await blockchain.getBlock(hash);
       return block;

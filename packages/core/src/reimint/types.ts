@@ -31,7 +31,9 @@ export interface IWAL {
   close(): Promise<void>;
   clear(): Promise<void>;
   write(message: StateMachineMsg, flush?: boolean): Promise<boolean>;
-  searchForLatestEndHeight(): Promise<{ reader: IWALReader; height: BN } | undefined>;
+  searchForLatestEndHeight(): Promise<
+    { reader: IWALReader; height: BN } | undefined
+  >;
   newReader(): IWALReader;
 }
 

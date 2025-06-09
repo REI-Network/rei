@@ -13,7 +13,7 @@ export class TxSortedMap {
   private readonly strict: boolean;
   private nonceHeap: Heap;
   private sortedTxCache?: Transaction[];
-  private _slots: number = 0;
+  private _slots = 0;
 
   constructor(strict: boolean) {
     this.strict = strict;
@@ -153,7 +153,10 @@ export class TxSortedMap {
     this.resetNonceHeap(keys);
     this.decreaseSlots(removed);
     if (this.sortedTxCache) {
-      this.sortedTxCache.splice(this.sortedTxCache.length - removed.length, removed.length);
+      this.sortedTxCache.splice(
+        this.sortedTxCache.length - removed.length,
+        removed.length
+      );
     }
     return removed;
   }
@@ -165,7 +168,10 @@ export class TxSortedMap {
    * the gasPrice of the new transaction should be greater or equal to `old.gasPrice * (1 + priceBump / 100)`
    * @returns Whether the insertion is successful and old transaction(if exsists)
    */
-  push(tx: Transaction, priceBump: number): { inserted: boolean; old?: Transaction } {
+  push(
+    tx: Transaction,
+    priceBump: number
+  ): { inserted: boolean; old?: Transaction } {
     const nonce = tx.nonce;
     const old = this.nonceToTx.get(nonce);
     if (old) {
@@ -218,12 +224,19 @@ export class TxSortedMap {
    * @param gasLimit - Gas limit threshold
    * @returns Removed transactions and invalid transactions
    */
-  filter(balance: BN, gasLimit: BN): { removed: Transaction[]; invalids: Transaction[] } {
+  filter(
+    balance: BN,
+    gasLimit: BN
+  ): { removed: Transaction[]; invalids: Transaction[] } {
     let lowestNonce: BN | undefined;
     const removed: Transaction[] = [];
     for (const [key, value] of this.nonceToTx) {
       if (txCost(value).gt(balance) || value.gasLimit.gt(gasLimit)) {
-        lowestNonce = lowestNonce ? (lowestNonce.gt(key) ? key : lowestNonce) : key;
+        lowestNonce = lowestNonce
+          ? lowestNonce.gt(key)
+            ? key
+            : lowestNonce
+          : key;
         removed.push(value);
         this.nonceToTx.delete(key);
       }

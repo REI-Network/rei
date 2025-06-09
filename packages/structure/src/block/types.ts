@@ -1,6 +1,11 @@
 import { AddressLike, BNLike, BufferLike } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
-import { TxData, JsonTx, AccessListEIP2930TxData, FeeMarketEIP1559TxData } from '../tx';
+import {
+  TxData,
+  JsonTx,
+  AccessListEIP2930TxData,
+  FeeMarketEIP1559TxData
+} from '../tx';
 import { Block } from './block';
 import { BlockHeader } from './header';
 
@@ -86,11 +91,17 @@ export interface BlockData {
    * Header data for the block
    */
   header?: HeaderData;
-  transactions?: Array<TxData | AccessListEIP2930TxData | FeeMarketEIP1559TxData>;
+  transactions?: Array<
+    TxData | AccessListEIP2930TxData | FeeMarketEIP1559TxData
+  >;
   uncleHeaders?: Array<HeaderData>;
 }
 
-export type BlockBuffer = [BlockHeaderBuffer, TransactionsBuffer, UncleHeadersBuffer];
+export type BlockBuffer = [
+  BlockHeaderBuffer,
+  TransactionsBuffer,
+  UncleHeadersBuffer
+];
 export type BlockHeaderBuffer = Buffer[];
 export type BlockBodyBuffer = [TransactionsBuffer, UncleHeadersBuffer];
 /**

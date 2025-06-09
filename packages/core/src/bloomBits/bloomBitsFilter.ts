@@ -44,7 +44,7 @@ function topicMatched(normalizedTopics: Topics, logTopics: Buffer[]): boolean {
       continue;
     }
 
-    let match: boolean = false;
+    let match = false;
     if (sub instanceof Buffer) {
       match = logTopics[i].equals(sub);
     } else {
@@ -104,14 +104,31 @@ export class BloomBitsFilter {
    * @param param1 Range parameter, inlcude address, topics, start block number, endb block number
    * @returns `true` if matched
    */
-  static checkLogMatches(log: Log, { addresses, topics, from, to }: { addresses: Address[]; topics: Topics; from?: BN; to?: BN }): boolean {
-    if (from && (!log.extension!.blockNumber || from.gt(log.extension!.blockNumber))) {
+  static checkLogMatches(
+    log: Log,
+    {
+      addresses,
+      topics,
+      from,
+      to
+    }: { addresses: Address[]; topics: Topics; from?: BN; to?: BN }
+  ): boolean {
+    if (
+      from &&
+      (!log.extension!.blockNumber || from.gt(log.extension!.blockNumber))
+    ) {
       return false;
     }
-    if (to && (!log.extension!.blockNumber || to.lt(log.extension!.blockNumber))) {
+    if (
+      to &&
+      (!log.extension!.blockNumber || to.lt(log.extension!.blockNumber))
+    ) {
       return false;
     }
-    if (addresses.length > 0 && addresses.findIndex((addr) => addr.buf.equals(log.address)) === -1) {
+    if (
+      addresses.length > 0 &&
+      addresses.findIndex((addr) => addr.buf.equals(log.address)) === -1
+    ) {
       return false;
     }
     if (!topicMatched(topics, log.topics)) {
@@ -127,7 +144,11 @@ export class BloomBitsFilter {
    * @param topics Given topics range
    * @returns The logs meet the conditions
    */
-  private async checkBlockMatches(receipts: Receipt[], addresses: Address[], topics: Topics) {
+  private async checkBlockMatches(
+    receipts: Receipt[],
+    addresses: Address[],
+    topics: Topics
+  ) {
     const logs: Log[] = [];
     for (const receipt of receipts) {
       for (const log of receipt.logs) {
@@ -156,7 +177,10 @@ export class BloomBitsFilter {
       }
     };
     const topicsBuf: Buffer[] = [];
-    for (const subTopics of topics.filter((val) => val !== null) as (Buffer | (Buffer | null)[])[]) {
+    for (const subTopics of topics.filter((val) => val !== null) as (
+      | Buffer
+      | (Buffer | null)[]
+    )[]) {
       if (subTopics instanceof Buffer) {
         topicsBuf.push(subTopics);
       } else {
@@ -179,7 +203,11 @@ export class BloomBitsFilter {
 
     // if addresses and topics is empty, return all logs between from and to.
     if (blooms.length === 0) {
-      for (const num = from.clone(); num.lte(to) && num.lte(latestHeader.number); num.iaddn(1)) {
+      for (
+        const num = from.clone();
+        num.lte(to) && num.lte(latestHeader.number);
+        num.iaddn(1)
+      ) {
         append(await this.filterBlock(num, addresses, topics));
       }
       return logs;
@@ -192,7 +220,11 @@ export class BloomBitsFilter {
       let toSection = to.divn(config.bloomBitsSectionSize);
       fromSection = fromSection.gt(maxSection) ? maxSection : fromSection;
       toSection = toSection.gt(maxSection) ? maxSection : toSection;
-      for (const section = fromSection.clone(); section.lte(toSection); section.iaddn(1)) {
+      for (
+        const section = fromSection.clone();
+        section.lte(toSection);
+        section.iaddn(1)
+      ) {
         // create a map to record checked block numbers.
         const checkedNums = new FunctionalBNSet();
         // create a map to cache the bit set of each bit.
@@ -203,7 +235,9 @@ export class BloomBitsFilter {
           let hash = headCache.get(section);
           if (!hash) {
             try {
-              hash = await this.backend.db.numberToHash(section.addn(1).muln(config.bloomBitsSectionSize).subn(1));
+              hash = await this.backend.db.numberToHash(
+                section.addn(1).muln(config.bloomBitsSectionSize).subn(1)
+              );
             } catch (err) {
               // ignore error
               // we may lose some blocks due to snapshot synchronization
@@ -218,7 +252,12 @@ export class BloomBitsFilter {
           for (const bit of bloom) {
             let bits = bitsCache.get(bit);
             if (!bits) {
-              bits = await this.backend.db.getBloomBits(bit, section, await getSenctionHash(section), Math.floor(config.bloomBitsSectionSize / 8));
+              bits = await this.backend.db.getBloomBits(
+                bit,
+                section,
+                await getSenctionHash(section),
+                Math.floor(config.bloomBitsSectionSize / 8)
+              );
               bitsCache.set(bit, bits);
             }
             bitsArray.push(bits);
@@ -244,7 +283,10 @@ export class BloomBitsFilter {
           // query the bits set of this bit of this section from database.
           const bits = await getBits(bloom, section);
           for (const num = fromBlock.clone(); num.lte(toBlock); num.iaddn(1)) {
-            if (!checkedNums.has(num) && checkSingleNumber(bits, sectionStart, num)) {
+            if (
+              !checkedNums.has(num) &&
+              checkSingleNumber(bits, sectionStart, num)
+            ) {
               checkedNums.add(num.clone());
               append(await this.filterBlock(num, addresses, topics));
             }
@@ -254,9 +296,15 @@ export class BloomBitsFilter {
     }
 
     // query unindexed logs.
-    const maxIndexedBlockNumber = maxSection ? maxSection.addn(1).muln(config.bloomBitsSectionSize).subn(1) : new BN(0);
+    const maxIndexedBlockNumber = maxSection
+      ? maxSection.addn(1).muln(config.bloomBitsSectionSize).subn(1)
+      : new BN(0);
     let startAt = maxIndexedBlockNumber.addn(1);
-    for (const num = from.gt(startAt) ? from.clone() : startAt; num.lte(to) && num.lte(latestHeader.number); num.iaddn(1)) {
+    for (
+      const num = from.gt(startAt) ? from.clone() : startAt;
+      num.lte(to) && num.lte(latestHeader.number);
+      num.iaddn(1)
+    ) {
       append(await this.filterBlock(num, addresses, topics));
     }
     return logs;
@@ -269,10 +317,17 @@ export class BloomBitsFilter {
    * @param topics Topics which meet the requirements
    * @returns All logs that meet the conditions
    */
-  async filterBlock(blockHashOrNumber: Buffer | BN | number, addresses: Address[], topics: Topics) {
+  async filterBlock(
+    blockHashOrNumber: Buffer | BN | number,
+    addresses: Address[],
+    topics: Topics
+  ) {
     let logs: Log[] = [];
     try {
-      const receipts = await this.backend.receiptsCache.get(blockHashOrNumber, this.backend.db);
+      const receipts = await this.backend.receiptsCache.get(
+        blockHashOrNumber,
+        this.backend.db
+      );
       logs = await this.checkBlockMatches(receipts, addresses, topics);
       logs.forEach((log) => (log.removed = false));
     } catch (err) {

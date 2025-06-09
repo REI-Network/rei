@@ -1,11 +1,30 @@
-import { BN, bnToHex, bnToUnpaddedBuffer, ecrecover, keccak256, rlp, toBuffer } from 'ethereumjs-util';
+import {
+  BN,
+  bnToHex,
+  bnToUnpaddedBuffer,
+  ecrecover,
+  keccak256,
+  rlp,
+  toBuffer
+} from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { BaseTransaction } from './baseTransaction';
-import { AccessList, AccessListBuffer, AccessListEIP2930TxData, AccessListEIP2930ValuesArray, JsonTx, TxOptions, N_DIV_2 } from './types';
+import {
+  AccessList,
+  AccessListBuffer,
+  AccessListEIP2930TxData,
+  AccessListEIP2930ValuesArray,
+  JsonTx,
+  TxOptions,
+  N_DIV_2
+} from './types';
 import { AccessLists } from './util';
 
 const TRANSACTION_TYPE = 1;
-const TRANSACTION_TYPE_BUFFER = Buffer.from(TRANSACTION_TYPE.toString(16).padStart(2, '0'), 'hex');
+const TRANSACTION_TYPE_BUFFER = Buffer.from(
+  TRANSACTION_TYPE.toString(16).padStart(2, '0'),
+  'hex'
+);
 
 /**
  * Typed transaction with optional access lists
@@ -66,7 +85,10 @@ export default class AccessListEIP2930Transaction extends BaseTransaction<Access
    * - `chainId` will be set automatically if not provided
    * - All parameters are optional and have some basic default values
    */
-  public static fromTxData(txData: AccessListEIP2930TxData, opts: TxOptions = {}) {
+  public static fromTxData(
+    txData: AccessListEIP2930TxData,
+    opts: TxOptions = {}
+  ) {
     return new AccessListEIP2930Transaction(txData, opts);
   }
 
@@ -78,7 +100,11 @@ export default class AccessListEIP2930Transaction extends BaseTransaction<Access
    */
   public static fromSerializedTx(serialized: Buffer, opts: TxOptions = {}) {
     if (!serialized.slice(0, 1).equals(TRANSACTION_TYPE_BUFFER)) {
-      throw new Error(`Invalid serialized tx input: not an EIP-2930 transaction (wrong tx type, expected: ${TRANSACTION_TYPE}, received: ${serialized.slice(0, 1).toString('hex')}`);
+      throw new Error(
+        `Invalid serialized tx input: not an EIP-2930 transaction (wrong tx type, expected: ${TRANSACTION_TYPE}, received: ${serialized
+          .slice(0, 1)
+          .toString('hex')}`
+      );
     }
 
     const values = rlp.decode(serialized.slice(1));
@@ -109,12 +135,29 @@ export default class AccessListEIP2930Transaction extends BaseTransaction<Access
    * Format: `[chainId, nonce, gasPrice, gasLimit, to, value, data, accessList,
    * signatureYParity (v), signatureR (r), signatureS (s)]`
    */
-  public static fromValuesArray(values: AccessListEIP2930ValuesArray, opts: TxOptions = {}) {
+  public static fromValuesArray(
+    values: AccessListEIP2930ValuesArray,
+    opts: TxOptions = {}
+  ) {
     if (values.length !== 8 && values.length !== 11) {
-      throw new Error('Invalid EIP-2930 transaction. Only expecting 8 values (for unsigned tx) or 11 values (for signed tx).');
+      throw new Error(
+        'Invalid EIP-2930 transaction. Only expecting 8 values (for unsigned tx) or 11 values (for signed tx).'
+      );
     }
 
-    const [chainId, nonce, gasPrice, gasLimit, to, value, data, accessList, v, r, s] = values;
+    const [
+      chainId,
+      nonce,
+      gasPrice,
+      gasLimit,
+      to,
+      value,
+      data,
+      accessList,
+      v,
+      r,
+      s
+    ] = values;
 
     const emptyAccessList: AccessList = [];
 
@@ -168,11 +211,15 @@ export default class AccessListEIP2930Transaction extends BaseTransaction<Access
     this._validateCannotExceedMaxInteger({ gasPrice: this.gasPrice });
 
     if (this.v && !this.v.eqn(0) && !this.v.eqn(1)) {
-      throw new Error('The y-parity of the transaction should either be 0 or 1');
+      throw new Error(
+        'The y-parity of the transaction should either be 0 or 1'
+      );
     }
 
     if (this.common.gteHardfork('homestead') && this.s?.gt(N_DIV_2)) {
-      throw new Error('Invalid Signature: s-values greater than secp256k1n/2 are considered invalid');
+      throw new Error(
+        'Invalid Signature: s-values greater than secp256k1n/2 are considered invalid'
+      );
     }
   }
 
@@ -206,7 +253,19 @@ export default class AccessListEIP2930Transaction extends BaseTransaction<Access
    * representation for external signing use {@link AccessListEIP2930Transaction.getMessageToSign}.
    */
   raw(): AccessListEIP2930ValuesArray {
-    return [bnToUnpaddedBuffer(this.chainId), bnToUnpaddedBuffer(this.nonce), bnToUnpaddedBuffer(this.gasPrice), bnToUnpaddedBuffer(this.gasLimit), this.to !== undefined ? this.to.buf : Buffer.from([]), bnToUnpaddedBuffer(this.value), this.data, this.accessList, this.v !== undefined ? bnToUnpaddedBuffer(this.v) : Buffer.from([]), this.r !== undefined ? bnToUnpaddedBuffer(this.r) : Buffer.from([]), this.s !== undefined ? bnToUnpaddedBuffer(this.s) : Buffer.from([])];
+    return [
+      bnToUnpaddedBuffer(this.chainId),
+      bnToUnpaddedBuffer(this.nonce),
+      bnToUnpaddedBuffer(this.gasPrice),
+      bnToUnpaddedBuffer(this.gasLimit),
+      this.to !== undefined ? this.to.buf : Buffer.from([]),
+      bnToUnpaddedBuffer(this.value),
+      this.data,
+      this.accessList,
+      this.v !== undefined ? bnToUnpaddedBuffer(this.v) : Buffer.from([]),
+      this.r !== undefined ? bnToUnpaddedBuffer(this.r) : Buffer.from([]),
+      this.s !== undefined ? bnToUnpaddedBuffer(this.s) : Buffer.from([])
+    ];
   }
 
   /**
@@ -239,7 +298,10 @@ export default class AccessListEIP2930Transaction extends BaseTransaction<Access
    */
   getMessageToSign(hashMessage = true): Buffer {
     const base = this.raw().slice(0, 8);
-    const message = Buffer.concat([TRANSACTION_TYPE_BUFFER, rlp.encode(base as any)]);
+    const message = Buffer.concat([
+      TRANSACTION_TYPE_BUFFER,
+      rlp.encode(base as any)
+    ]);
     if (hashMessage) {
       return keccak256(message);
     } else {
@@ -281,7 +343,9 @@ export default class AccessListEIP2930Transaction extends BaseTransaction<Access
     // EIP-2: All transaction signatures whose s-value is greater than secp256k1n/2 are considered invalid.
     // Reasoning: https://ethereum.stackexchange.com/a/55728
     if (this.common.gteHardfork('homestead') && this.s?.gt(N_DIV_2)) {
-      throw new Error('Invalid Signature: s-values greater than secp256k1n/2 are considered invalid');
+      throw new Error(
+        'Invalid Signature: s-values greater than secp256k1n/2 are considered invalid'
+      );
     }
 
     const { yParity, r, s } = this;

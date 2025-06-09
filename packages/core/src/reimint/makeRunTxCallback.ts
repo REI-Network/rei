@@ -1,5 +1,8 @@
 import { Address, BN, bufferToHex, toBuffer } from 'ethereumjs-util';
-import { RunTxResult, generateTxReceipt as EthereumGenerateTxReceipt } from '@rei-network/vm/dist/runTx';
+import {
+  RunTxResult,
+  generateTxReceipt as EthereumGenerateTxReceipt
+} from '@rei-network/vm/dist/runTx';
 import { TxReceipt } from '@rei-network/vm/dist/types';
 import { Log as EthereumLog } from '@rei-network/vm/dist/evm/types';
 import { TypedTransaction, Transaction } from '@rei-network/structure';
@@ -10,17 +13,35 @@ import { StateManager } from '../stateManager';
 import { validateTx } from '../validation';
 import { encode } from './contracts';
 
-const usageTopic = toBuffer('0x873c82cd37aaacdcf736cbb6beefc8da36d474b65ad23aaa1b1c6fbd875f7076');
+const usageTopic = toBuffer(
+  '0x873c82cd37aaacdcf736cbb6beefc8da36d474b65ad23aaa1b1c6fbd875f7076'
+);
 
-export function makeRunTxCallback(systemCaller: Address, feeAddr: Address, timestamp: number, totalAmount: BN, dailyFee?: BN) {
+export function makeRunTxCallback(
+  systemCaller: Address,
+  feeAddr: Address,
+  timestamp: number,
+  totalAmount: BN,
+  dailyFee?: BN
+) {
   let feeLeft!: BN;
   let balanceLeft!: BN;
   let logs!: EthereumLog[];
 
-  const beforeTx = async (state: IStateManager, tx: TypedTransaction, txCost: BN) => {
+  const beforeTx = async (
+    state: IStateManager,
+    tx: TypedTransaction,
+    txCost: BN
+  ) => {
     const caller = tx.getSenderAddress();
     const fromAccount = await state.getAccount(caller);
-    const { fee } = await validateTx(tx as Transaction, timestamp, state as StateManager, totalAmount, dailyFee);
+    const { fee } = await validateTx(
+      tx as Transaction,
+      timestamp,
+      state as StateManager,
+      totalAmount,
+      dailyFee
+    );
 
     feeLeft = fee!;
     balanceLeft = fromAccount.balance.sub(tx.value);
@@ -32,7 +53,11 @@ export function makeRunTxCallback(systemCaller: Address, feeAddr: Address, times
     await state.putAccount(caller, fromAccount);
   };
 
-  const afterTx = async (state: IStateManager, tx: TypedTransaction, _actualTxCost: BN) => {
+  const afterTx = async (
+    state: IStateManager,
+    tx: TypedTransaction,
+    _actualTxCost: BN
+  ) => {
     // calculate fee, free fee and balance usage
     let actualTxCost = _actualTxCost.clone();
     let feeUsage = new BN(0);
@@ -56,7 +81,16 @@ export function makeRunTxCallback(systemCaller: Address, feeAddr: Address, times
       actualTxCost = new BN(0);
     }
 
-    logger.debug('Reimint::processTx, makeRunTxCallback::afterTx, tx:', bufferToHex(tx.hash()), 'actualTxCost:', _actualTxCost.toString(), 'feeUsage:', feeUsage.toString(), 'balanceUsage:', balanceUsage.toString());
+    logger.debug(
+      'Reimint::processTx, makeRunTxCallback::afterTx, tx:',
+      bufferToHex(tx.hash()),
+      'actualTxCost:',
+      _actualTxCost.toString(),
+      'feeUsage:',
+      feeUsage.toString(),
+      'balanceUsage:',
+      balanceUsage.toString()
+    );
 
     const caller = tx.getSenderAddress();
     const fromAccount = await (state as StateManager).getAccount(caller);
@@ -70,7 +104,9 @@ export function makeRunTxCallback(systemCaller: Address, feeAddr: Address, times
     if (balanceUsage.gtn(0)) {
       if (balanceUsage.gt(fromAccount.balance)) {
         // this shouldn't happened
-        throw new Error('balance left is not enough for balanceUsage, revert tx');
+        throw new Error(
+          'balance left is not enough for balanceUsage, revert tx'
+        );
       }
       fromAccount.balance.isub(balanceUsage);
 
@@ -87,11 +123,30 @@ export function makeRunTxCallback(systemCaller: Address, feeAddr: Address, times
     // topic[0]: keccak256('Usage(uint256,uint256)')
     // topic[1]: abiencode(feeUsage)
     // topic[2]: abiencode(balanceUsage)
-    logs = [[feeAddr.buf, [usageTopic, encode(['uint256'], [feeUsage.toString()]), encode(['uint256'], [balanceUsage.toString()])], Buffer.alloc(0)]];
+    logs = [
+      [
+        feeAddr.buf,
+        [
+          usageTopic,
+          encode(['uint256'], [feeUsage.toString()]),
+          encode(['uint256'], [balanceUsage.toString()])
+        ],
+        Buffer.alloc(0)
+      ]
+    ];
   };
 
-  async function generateTxReceipt(this: VM, tx: TypedTransaction, txResult: RunTxResult, cumulativeGasUsed: BN): Promise<TxReceipt> {
-    const receipt = await EthereumGenerateTxReceipt.bind(this)(tx, txResult, cumulativeGasUsed);
+  async function generateTxReceipt(
+    this: VM,
+    tx: TypedTransaction,
+    txResult: RunTxResult,
+    cumulativeGasUsed: BN
+  ): Promise<TxReceipt> {
+    const receipt = await EthereumGenerateTxReceipt.bind(this)(
+      tx,
+      txResult,
+      cumulativeGasUsed
+    );
     // append `Usage` log to the receipt
     receipt.logs = receipt.logs.concat(logs);
     return receipt;

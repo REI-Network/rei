@@ -13,7 +13,9 @@ export class DebugController extends Controller {
    * @returns Result of execution block
    */
   traceBlock([blockRlp, options]: [string, any]) {
-    return this.node.getTracer().traceBlock(hexStringToBuffer(blockRlp), options);
+    return this.node
+      .getTracer()
+      .traceBlock(hexStringToBuffer(blockRlp), options);
   }
 
   /**
@@ -23,7 +25,9 @@ export class DebugController extends Controller {
    * @returns Result of execution block
    */
   async traceBlockByNumber([tag, options]: [string, any]) {
-    return this.node.getTracer().traceBlock(await this.getBlockByTag(tag), options);
+    return this.node
+      .getTracer()
+      .traceBlock(await this.getBlockByTag(tag), options);
   }
 
   /**
@@ -33,7 +37,9 @@ export class DebugController extends Controller {
    * @returns Result of execution block
    */
   traceBlockByHash([hash, options]: [string, any]) {
-    return this.node.getTracer().traceBlockByHash(hexStringToBuffer(hash), options);
+    return this.node
+      .getTracer()
+      .traceBlockByHash(hexStringToBuffer(hash), options);
   }
 
   /**
@@ -54,6 +60,8 @@ export class DebugController extends Controller {
    * @returns Result of execution transaction
    */
   async traceCall([data, tag, options]: [CallData, string, any]) {
-    return this.node.getTracer().traceCall(data, await this.getBlockByTag(tag), options);
+    return this.node
+      .getTracer()
+      .traceCall(data, await this.getBlockByTag(tag), options);
   }
 }

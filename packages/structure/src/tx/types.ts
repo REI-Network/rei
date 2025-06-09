@@ -1,4 +1,10 @@
-import { BN, AddressLike, BNLike, BufferLike, PrefixedHexString } from 'ethereumjs-util';
+import {
+  BN,
+  AddressLike,
+  BNLike,
+  BufferLike,
+  PrefixedHexString
+} from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { default as Transaction } from './legacyTransaction';
 import { default as AccessListEIP2930Transaction } from './eip2930Transaction';
@@ -67,7 +73,9 @@ export type AccessListBufferItem = [Buffer, Buffer[]];
 export type AccessListBuffer = AccessListBufferItem[];
 export type AccessList = AccessListItem[];
 
-export function isAccessListBuffer(input: AccessListBuffer | AccessList): input is AccessListBuffer {
+export function isAccessListBuffer(
+  input: AccessListBuffer | AccessList
+): input is AccessListBuffer {
   if (input.length === 0) {
     return true;
   }
@@ -78,7 +86,9 @@ export function isAccessListBuffer(input: AccessListBuffer | AccessList): input 
   return false;
 }
 
-export function isAccessList(input: AccessListBuffer | AccessList): input is AccessList {
+export function isAccessList(
+  input: AccessListBuffer | AccessList
+): input is AccessList {
   return !isAccessListBuffer(input); // This is exactly the same method, except the output is negated.
 }
 
@@ -88,7 +98,10 @@ export function isAccessList(input: AccessListBuffer | AccessList): input is Acc
  * Note that this also includes legacy txs which are
  * referenced as {@link Transaction} for compatibility reasons.
  */
-export type TypedTransaction = Transaction | AccessListEIP2930Transaction | FeeMarketEIP1559Transaction;
+export type TypedTransaction =
+  | Transaction
+  | AccessListEIP2930Transaction
+  | FeeMarketEIP1559Transaction;
 
 /**
  * Legacy {@link Transaction} Data
@@ -188,12 +201,37 @@ export type TxValuesArray = Buffer[];
 /**
  * Buffer values array for an {@link AccessListEIP2930Transaction}
  */
-export type AccessListEIP2930ValuesArray = [Buffer, Buffer, Buffer, Buffer, Buffer, Buffer, Buffer, AccessListBuffer, Buffer?, Buffer?, Buffer?];
+export type AccessListEIP2930ValuesArray = [
+  Buffer,
+  Buffer,
+  Buffer,
+  Buffer,
+  Buffer,
+  Buffer,
+  Buffer,
+  AccessListBuffer,
+  Buffer?,
+  Buffer?,
+  Buffer?
+];
 
 /**
  * Buffer values array for a {@link FeeMarketEIP1559Transaction}
  */
-export type FeeMarketEIP1559ValuesArray = [Buffer, Buffer, Buffer, Buffer, Buffer, Buffer, Buffer, Buffer, AccessListBuffer, Buffer?, Buffer?, Buffer?];
+export type FeeMarketEIP1559ValuesArray = [
+  Buffer,
+  Buffer,
+  Buffer,
+  Buffer,
+  Buffer,
+  Buffer,
+  Buffer,
+  Buffer,
+  AccessListBuffer,
+  Buffer?,
+  Buffer?,
+  Buffer?
+];
 
 type JsonAccessListItem = { address: string; storageKeys: string[] };
 
@@ -225,4 +263,7 @@ export interface JsonTx {
 /**
  * A const defining secp256k1n/2
  */
-export const N_DIV_2 = new BN('7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0', 16);
+export const N_DIV_2 = new BN(
+  '7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0',
+  16
+);

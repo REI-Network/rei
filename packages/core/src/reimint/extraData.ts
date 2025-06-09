@@ -1,4 +1,14 @@
-import { rlp, intToBuffer, bufferToInt, BNLike, Address, bnToUnpaddedBuffer, BN, rlphash, toBuffer } from 'ethereumjs-util';
+import {
+  rlp,
+  intToBuffer,
+  bufferToInt,
+  BNLike,
+  Address,
+  bnToUnpaddedBuffer,
+  BN,
+  rlphash,
+  toBuffer
+} from 'ethereumjs-util';
 import { VM } from '@rei-network/vm';
 import { Common } from '@rei-network/common';
 import { Database } from '@rei-network/database';
@@ -20,7 +30,10 @@ export interface ExtraDataOptions {
   valSet?: ActiveValidatorSet;
 }
 
-export interface ExtraDataFromBlockHeaderOptions extends Omit<ExtraDataOptions, 'header' | 'chainId'> {}
+export type ExtraDataFromBlockHeaderOptions = Omit<
+  ExtraDataOptions,
+  'header' | 'chainId'
+>;
 
 type EXVote = Buffer;
 type EXEmptyVote = [];
@@ -29,7 +42,13 @@ type EXEvidenceList = (Buffer | Buffer[])[];
 type EXVoteSetBitArray = (Buffer | Buffer[])[];
 type EXProposalList = [Buffer, Buffer];
 type EXAggregatedSignature = Buffer;
-type EXElement = EXEmptyVote | EXVote | EXRoundAndPOLRound | EXEvidenceList | EXVoteSetBitArray | EXProposalList;
+type EXElement =
+  | EXEmptyVote
+  | EXVote
+  | EXRoundAndPOLRound
+  | EXEvidenceList
+  | EXVoteSetBitArray
+  | EXProposalList;
 type EXElements = EXElement[];
 
 function isEXVote(ele: EXElement): ele is EXVote {
@@ -47,7 +66,11 @@ function isEXRoundAndPOLRound(ele: EXElement): ele is EXRoundAndPOLRound {
   if (!Array.isArray(ele) || (ele.length !== 2 && ele.length !== 3)) {
     return false;
   }
-  if (!(ele[0] instanceof Buffer) || !(ele[1] instanceof Buffer) || (ele.length === 3 && !(ele[2] instanceof Buffer))) {
+  if (
+    !(ele[0] instanceof Buffer) ||
+    !(ele[1] instanceof Buffer) ||
+    (ele.length === 3 && !(ele[2] instanceof Buffer))
+  ) {
     return false;
   }
   return true;
@@ -61,7 +84,12 @@ function isEXEvidenceList(ele: EXElement): ele is EXEvidenceList {
 }
 
 function isEXVoteSetBitArray(ele: EXElement): ele is EXVoteSetBitArray {
-  if (Array.isArray(ele) && ele.length === 2 && ele[0] instanceof Buffer && Array.isArray(ele[1])) {
+  if (
+    Array.isArray(ele) &&
+    ele.length === 2 &&
+    ele[0] instanceof Buffer &&
+    Array.isArray(ele[1])
+  ) {
     return ele[1].every((item) => item instanceof Buffer);
   } else {
     return false;
@@ -69,7 +97,12 @@ function isEXVoteSetBitArray(ele: EXElement): ele is EXVoteSetBitArray {
 }
 
 function isEXProposalList(ele: EXElement): ele is EXProposalList {
-  return Array.isArray(ele) && ele.length === 2 && ele[0] instanceof Buffer && ele[1] instanceof Buffer;
+  return (
+    Array.isArray(ele) &&
+    ele.length === 2 &&
+    ele[0] instanceof Buffer &&
+    ele[1] instanceof Buffer
+  );
 }
 
 function isEXAggregatedSignature(ele: EXElement): ele is EXAggregatedSignature {
@@ -108,11 +141,17 @@ export class ExtraData {
    * @param options - validator set
    * @returns ExtraData
    */
-  static fromBlockHeader(header: BlockHeader, options?: ExtraDataFromBlockHeaderOptions) {
+  static fromBlockHeader(
+    header: BlockHeader,
+    options?: ExtraDataFromBlockHeaderOptions
+  ) {
     if (header.extraData.length <= CLIQUE_EXTRA_VANITY) {
       throw new Error('invalid header');
     }
-    return ExtraData.fromSerializedData(header.extraData.slice(CLIQUE_EXTRA_VANITY), { ...options, header, chainId: header._common.chainIdBN().toNumber() });
+    return ExtraData.fromSerializedData(
+      header.extraData.slice(CLIQUE_EXTRA_VANITY),
+      { ...options, header, chainId: header._common.chainIdBN().toNumber() }
+    );
   }
 
   /**
@@ -135,7 +174,10 @@ export class ExtraData {
    * @param ExtraDataOptions
    * @returns ExtraData
    */
-  static fromValuesArray(values: EXElements, { header, valSet, chainId }: ExtraDataOptions) {
+  static fromValuesArray(
+    values: EXElements,
+    { header, valSet, chainId }: ExtraDataOptions
+  ) {
     // the additional extra data should include at lease 3 elements(EXEvidenceList + EXRoundAndPOLRound, EXVote(proposal))
     if (values.length < 3) {
       throw new Error('invalid values');
@@ -151,7 +193,9 @@ export class ExtraData {
     let aggregatedSignature: Buffer | undefined;
 
     // decide signature type by common object
-    const signatureType = isEnableDAO(header._common) ? SignatureType.BLS : SignatureType.ECDSA;
+    const signatureType = isEnableDAO(header._common)
+      ? SignatureType.BLS
+      : SignatureType.ECDSA;
 
     // add a ECDSA vote to vote set
     const addECDSAVote = (value: EXElement, index: number) => {
@@ -227,7 +271,9 @@ export class ExtraData {
         if (value.length === 3) {
           commitRound = bufferToInt(value[2]);
           if (commitRound === round) {
-            throw new Error('commitRound equals round, but round list length is 3');
+            throw new Error(
+              'commitRound equals round, but round list length is 3'
+            );
           }
         } else {
           commitRound = round;
@@ -244,7 +290,14 @@ export class ExtraData {
            * but it doesn't matter,
            * because the validator voting power is same
            */
-          voteSet = new VoteSet(chainId, header.number, commitRound, VoteType.Precommit, valSet, signatureType);
+          voteSet = new VoteSet(
+            chainId,
+            header.number,
+            commitRound,
+            VoteType.Precommit,
+            valSet,
+            signatureType
+          );
         }
       } else if (i === 2) {
         if (signatureType === SignatureType.ECDSA) {
@@ -303,8 +356,19 @@ export class ExtraData {
           }
 
           if (valSet) {
-            const msgHash = rlphash([intToBuffer(chainId), intToBuffer(VoteType.Precommit), bnToUnpaddedBuffer(header.number), intToBuffer(commitRound), headerHash]);
-            voteSet!.setAggregatedSignature(aggregatedSignature!, BitArray.fromValuesArray(value), msgHash, headerHash);
+            const msgHash = rlphash([
+              intToBuffer(chainId),
+              intToBuffer(VoteType.Precommit),
+              bnToUnpaddedBuffer(header.number),
+              intToBuffer(commitRound),
+              headerHash
+            ]);
+            voteSet!.setAggregatedSignature(
+              aggregatedSignature!,
+              BitArray.fromValuesArray(value),
+              msgHash,
+              headerHash
+            );
           }
         }
       } else {
@@ -315,10 +379,26 @@ export class ExtraData {
         }
       }
     }
-    return new ExtraData(round, commitRound, POLRound, evidence, proposal, signatureType, voteSet);
+    return new ExtraData(
+      round,
+      commitRound,
+      POLRound,
+      evidence,
+      proposal,
+      signatureType,
+      voteSet
+    );
   }
 
-  constructor(round: number, commitRound: number, POLRound: number, evidence: Evidence[], proposal: Proposal, version: SignatureType, voteSet?: VoteSet) {
+  constructor(
+    round: number,
+    commitRound: number,
+    POLRound: number,
+    evidence: Evidence[],
+    proposal: Proposal,
+    version: SignatureType,
+    voteSet?: VoteSet
+  ) {
     if (voteSet && voteSet.signedMsgType !== VoteType.Precommit) {
       throw new Error('invalid vote set type');
     }
@@ -344,7 +424,11 @@ export class ExtraData {
     if (this.round === this.commitRound) {
       raw.push([intToBuffer(this.round), intToBuffer(this.POLRound + 1)]);
     } else {
-      raw.push([intToBuffer(this.round), intToBuffer(this.POLRound + 1), intToBuffer(this.commitRound)]);
+      raw.push([
+        intToBuffer(this.round),
+        intToBuffer(this.POLRound + 1),
+        intToBuffer(this.commitRound)
+      ]);
     }
     if (this.version === SignatureType.ECDSA) {
       raw.push(this.proposal.signature!);
@@ -366,7 +450,10 @@ export class ExtraData {
         }
       }
     } else {
-      raw.push([toBuffer(this.proposal.getProposer()), this.proposal.signature!]);
+      raw.push([
+        toBuffer(this.proposal.getProposer()),
+        this.proposal.signature!
+      ]);
       if (this.voteSet) {
         raw.push(this.voteSet.getAggregatedSignature());
         raw.push(this.voteSet.getAggregatedBitArray().raw());
@@ -412,11 +499,20 @@ export class ExtraData {
    */
   validate() {
     if (this.version === SignatureType.ECDSA) {
-      if (!this.voteSet || this.voteSet.voteCount() === 0 || !this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash)) {
+      if (
+        !this.voteSet ||
+        this.voteSet.voteCount() === 0 ||
+        !this.voteSet.maj23 ||
+        !this.voteSet.maj23.equals(this.proposal.hash)
+      ) {
         throw new Error('invalid vote set');
       }
     } else if (this.version === SignatureType.BLS) {
-      if (!this.voteSet || !this.voteSet.maj23 || !this.voteSet.maj23.equals(this.proposal.hash)) {
+      if (
+        !this.voteSet ||
+        !this.voteSet.maj23 ||
+        !this.voteSet.maj23.equals(this.proposal.hash)
+      ) {
         throw new Error('invalid vote set');
       }
     } else {
@@ -429,7 +525,10 @@ export class ExtraData {
    * @param backend - backend
    * @param engine - consensus engine
    */
-  async verifyEvidence(backend: ExtraDataValidateBackend, engine: ReimintEngine) {
+  async verifyEvidence(
+    backend: ExtraDataValidateBackend,
+    engine: ReimintEngine
+  ) {
     for (const ev of this.evidence) {
       if (ev instanceof DuplicateVoteEvidence) {
         const parentBlock = await backend.db.getBlock(ev.height.subn(1));
@@ -440,8 +539,17 @@ export class ExtraData {
          * when the consensus algorithm is switched
          */
         const common = backend.getCommon(ev.height);
-        const stakeManager = engine.getStakeManager(await backend.getVM(parentHeader.stateRoot, common), parentBlock, common);
-        const validatorSet = (await engine.validatorSets.getActiveValSet(parentHeader.stateRoot, stakeManager)).copy();
+        const stakeManager = engine.getStakeManager(
+          await backend.getVM(parentHeader.stateRoot, common),
+          parentBlock,
+          common
+        );
+        const validatorSet = (
+          await engine.validatorSets.getActiveValSet(
+            parentHeader.stateRoot,
+            stakeManager
+          )
+        ).copy();
         validatorSet.incrementProposerPriority(ev.voteA.round);
         ev.verify(validatorSet);
       } else {

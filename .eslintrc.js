@@ -10,7 +10,8 @@ module.exports = {
     {
       files: ['*.js'],
       rules: {
-        'no-undef': 'off'
+        'no-undef': 'off',
+        '@typescript-eslint/no-var-requires': 'off'
       }
     },
     {

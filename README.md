@@ -131,6 +131,12 @@ Build:
 npm run build -ws
 ```
 
+## Build docker
+
+```
+npm run build:docker -- -t tag .
+```
+
 ### ℹ️ Note for Windows users:
 
 Windows users might run into the following error when trying to install the repo: `'.' is not recognized as an internal or external command`. To remediate for this, you can force Windows to use Git bash to run scripts (you'll need to install [Git for Windows](https://git-scm.com/download/win) for this) with the following command:
@@ -175,40 +181,53 @@ These scripts execute lint and lint:fix respectively, to all monorepo packages.
 
 ## FAQ
 
-- Q: Why do I get `EACCES: permission denied` or `node-gyp: Permission denied` when I install `@rei-network/cli`?
+- Q: Why do I get `ModuleNotFoundError: No module named 'distutils'` when I install `@rei-network/cli`?
 
   <details><summary> like this </summary>
 
   ```
-  > bigint-buffer@1.1.5 install /xxx/v14.16.1/lib/node_modules/@rei-network/cli/node_modules/bigint-buffer
-  > npm run rebuild || echo "Couldn't build bindings. Non-native version used."
-
-  Error: EACCES: permission denied, scandir '/xxx/v14.16.1/lib/node_modules/@rei-network/cli/node_modules/bigint-buffer'
-
-  > bcrypto@5.4.0 install /xxx/v14.16.1/lib/node_modules/@rei-network/cli/node_modules/bcrypto
-  > node-gyp rebuild
-
-  sh: 1: node-gyp: Permission denied
-  npm ERR! code ELIFECYCLE
-  npm ERR! syscall spawn
-  npm ERR! file sh
-  npm ERR! errno ENOENT
-  npm ERR! bcrypto@5.4.0 install: `node-gyp rebuild`
-  npm ERR! spawn ENOENT
-  npm ERR!
-  npm ERR! Failed at the bcrypto@5.4.0 install script.
-  npm ERR! This is probably not a problem with npm. There is likely additional logging output above.
-
-  npm ERR! A complete log of this run can be found in:
-  npm ERR!     /xxx/.npm/_logs/2021-07-14T02_24_45_172Z-debug.log
+  npm error gyp info spawn /usr/bin/python3
+  npm error gyp info spawn args [
+  npm error gyp info spawn args   '/app/node_modules/node-gyp/gyp/gyp_main.py',
+  npm error gyp info spawn args   'binding.gyp',
+  npm error gyp info spawn args   '-f',
+  npm error gyp info spawn args   'make',
+  npm error gyp info spawn args   '-I',
+  npm error gyp info spawn args   '/app/node_modules/@chainsafe/blst/blst/bindings/node.js/build/config.gypi',
+  npm error gyp info spawn args   '-I',
+  npm error gyp info spawn args   '/app/node_modules/node-gyp/addon.gypi',
+  npm error gyp info spawn args   '-I',
+  npm error gyp info spawn args   '/root/.cache/node-gyp/22.16.0/include/node/common.gypi',
+  npm error gyp info spawn args   '-Dlibrary=shared_library',
+  npm error gyp info spawn args   '-Dvisibility=default',
+  npm error gyp info spawn args   '-Dnode_root_dir=/root/.cache/node-gyp/22.16.0',
+  npm error gyp info spawn args   '-Dnode_gyp_dir=/app/node_modules/node-gyp',
+  npm error gyp info spawn args   '-Dnode_lib_file=/root/.cache/node-gyp/22.16.0/<(target_arch)/node.lib',
+  npm error gyp info spawn args   '-Dmodule_root_dir=/app/node_modules/@chainsafe/blst/blst/bindings/node.js',
+  npm error gyp info spawn args   '-Dnode_engine=v8',
+  npm error gyp info spawn args   '--depth=.',
+  npm error gyp info spawn args   '--no-parallel',
+  npm error gyp info spawn args   '--generator-output',
+  npm error gyp info spawn args   'build',
+  npm error gyp info spawn args   '-Goutput_dir=.'
+  npm error gyp info spawn args ]
+  npm error Traceback (most recent call last):
+  npm error   File "/app/node_modules/node-gyp/gyp/gyp_main.py", line 42, in <module>
+  npm error     import gyp  # noqa: E402
+  npm error     ^^^^^^^^^^
+  npm error   File "/app/node_modules/node-gyp/gyp/pylib/gyp/__init__.py", line 9, in <module>
+  npm error     import gyp.input
+  npm error   File "/app/node_modules/node-gyp/gyp/pylib/gyp/input.py", line 19, in <module>
+  npm error     from distutils.version import StrictVersion
+  npm error ModuleNotFoundError: No module named 'distutils'
   ```
 
   </details>
 
-  A: Please run
+  A: Please install python@3.11, then specify the python for `node-gyp`
 
   ```
-  npm install @rei-network/cli -g --unsafe-perm=true --allow-root
+  export PYTHON="/path/to/python3.11"
   ```
 
 - Q: Why do I get `SyntaxError: Unexpected token '?'` when I run `rei`?

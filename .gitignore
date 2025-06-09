@@ -1,11 +1,11 @@
-node_modules
-.idea
 .vscode
 .env
 .DS_Store
-lerna-debug.log
+
 dist
 test-dir
+test-dir2
+node_modules
 
 # Hardhat files
 packages/contracts/artifacts
@@ -19,3 +19,6 @@ packages/contracts/types
 
 # TypeScript cache
 *.tsbuildinfo
+
+# Docker build files
+exported-package-json

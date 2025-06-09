@@ -28,9 +28,9 @@
     "typescript": "^4.1.2"
   },
   "scripts": {
-    "preinstall": "npm run checkNpmVersion",
-    "postinstall": "npm run build -ws",
-    "prepare": "node node_modules/husky/lib/bin.js install",
+    "preinstall": "if [ \"$DOCKER_BUILDING\" != \"1\" ]; then npm run checkNpmVersion; fi",
+    "postinstall": "if [ \"$DOCKER_BUILDING\" != \"1\" ]; then npm run build -ws; fi",
+    "prepare": "if [ \"$DOCKER_BUILDING\" != \"1\" ]; then node node_modules/husky/lib/bin.js install; fi",
     "checkNpmVersion": "./scripts/check-npm-version.sh",
     "build:contracts": "npm run build -w @rei-network/contracts",
     "build:structure": "npm run build -w @rei-network/structure",
@@ -51,6 +51,8 @@
     "clean:build": "rm -rf packages/*/dist && rm -rf packages/*/*.tsbuildinfo && cd packages/contracts && npm run clean:build",
     "clean:buildinfo": "rm -rf packages/*/*.tsbuildinfo",
     "lint": "eslint packages/**/*.ts packages/**/*.js packages/**/*.json && solhint packages/**/*.sol",
-    "lint:fix": "eslint packages/**/*.ts packages/**/*.js packages/**/*.json --fix && solhint packages/**/*.sol --fix"
+    "lint:fix": "eslint packages/**/*.ts packages/**/*.js packages/**/*.json --fix && solhint packages/**/*.sol --fix",
+    "docker:export": "node scripts/export-package-json.js",
+    "docker:build": "npm run docker:export && docker build"
   }
 }

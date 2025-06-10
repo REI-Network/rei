@@ -1,14 +1,28 @@
 const Set = require('core-js-pure/es/set');
 import { debug as createDebugLogger } from 'debug';
 import { SecureTrie as Trie } from '@rei-network/trie';
-import { Address, BN, toBuffer, keccak256, KECCAK256_NULL, unpadBuffer } from 'ethereumjs-util';
+import {
+  Address,
+  BN,
+  toBuffer,
+  keccak256,
+  KECCAK256_NULL,
+  unpadBuffer
+} from 'ethereumjs-util';
 import { encode, decode } from 'rlp';
 import { Common, Chain, Hardfork } from '@rei-network/common';
-import { getActivePrecompiles, ripemdPrecompileAddress } from '@rei-network/vm/dist/evm/precompiles';
+import {
+  getActivePrecompiles,
+  ripemdPrecompileAddress
+} from '@rei-network/vm/dist/evm/precompiles';
 import { short } from '@rei-network/vm/dist/evm/opcodes';
 import { AccessList, AccessListItem } from '@rei-network/structure';
 import Cache from './cache';
-import { FunctionalBufferMap, FunctionalBufferSet, logger } from '@rei-network/utils';
+import {
+  FunctionalBufferMap,
+  FunctionalBufferSet,
+  logger
+} from '@rei-network/utils';
 import { StakingAccount as Account } from './account';
 import { ISnapshot } from '../snap/types';
 import { SnapTree } from '../snap/snapTree';
@@ -112,7 +126,10 @@ export class StateManager {
   constructor(opts: StateManagerOpts = {}) {
     let common = opts.common;
     if (!common) {
-      common = new Common({ chain: Chain.Mainnet, hardfork: Hardfork.Petersburg });
+      common = new Common({
+        chain: Chain.Mainnet,
+        hardfork: Hardfork.Petersburg
+      });
     }
     this._common = common;
 
@@ -164,7 +181,13 @@ export class StateManager {
    */
   async putAccount(address: Address, account: Account): Promise<void> {
     if (this.DEBUG) {
-      debug(`Save account address=${address} nonce=${account.nonce} balance=${account.balance} contract=${account.isContract() ? 'yes' : 'no'} empty=${account.isEmpty() ? 'yes' : 'no'}`);
+      debug(
+        `Save account address=${address} nonce=${account.nonce} balance=${
+          account.balance
+        } contract=${account.isContract() ? 'yes' : 'no'} empty=${
+          account.isEmpty() ? 'yes' : 'no'
+        }`
+      );
     }
     this._cache.put(address, account);
     this.touchAccount(address);
@@ -296,7 +319,10 @@ export class StateManager {
    * @param address - Address of the account to get the storage for
    * @param key - Key in the account's storage to get the value for. Must be 32 bytes long.
    */
-  async getOriginalContractStorage(address: Address, key: Buffer): Promise<Buffer> {
+  async getOriginalContractStorage(
+    address: Address,
+    key: Buffer
+  ): Promise<Buffer> {
     if (key.length !== 32) {
       throw new Error('Storage key must be 32 bytes long');
     }
@@ -343,7 +369,10 @@ export class StateManager {
    * @param address -  Address of the account whose storage is to be modified
    * @param modifyTrie - Function to modify the storage trie of the account
    */
-  async _modifyContractStorage(address: Address, modifyTrie: (storageTrie: Trie, done: Function) => void): Promise<void> {
+  async _modifyContractStorage(
+    address: Address,
+    modifyTrie: (storageTrie: Trie, done: Function) => void
+  ): Promise<void> {
     // eslint-disable-next-line no-async-promise-executor
     return new Promise(async (resolve) => {
       const storageTrie = await this._getStorageTrie(address);
@@ -371,7 +400,11 @@ export class StateManager {
    * @param key - Key to set the value at. Must be 32 bytes long.
    * @param value - Value to set at `key` for account corresponding to `address`. Cannot be more than 32 bytes. Leading zeros are stripped. If it is a empty or filled with zeros, deletes the value.
    */
-  async putContractStorage(address: Address, key: Buffer, value: Buffer): Promise<void> {
+  async putContractStorage(
+    address: Address,
+    key: Buffer,
+    value: Buffer
+  ): Promise<void> {
     if (key.length !== 32) {
       throw new Error('Storage key must be 32 bytes long');
     }
@@ -397,7 +430,9 @@ export class StateManager {
         // format input
         const encodedValue = encode(value);
         if (this.DEBUG) {
-          debug(`Update contract storage for account ${address} to ${short(value)}`);
+          debug(
+            `Update contract storage for account ${address} to ${short(value)}`
+          );
         }
         await storageTrie.put(key, encodedValue);
         storage?.set(keccak256(key), encodedValue);
@@ -450,7 +485,9 @@ export class StateManager {
 
     let snapAccounts: FunctionalBufferMap<Buffer> | undefined;
     let snapDestructs: FunctionalBufferSet | undefined;
-    let snapStroge: FunctionalBufferMap<FunctionalBufferMap<Buffer>> | undefined;
+    let snapStroge:
+      | FunctionalBufferMap<FunctionalBufferMap<Buffer>>
+      | undefined;
     if (this._snapAccounts) {
       snapAccounts = new FunctionalBufferMap<Buffer>();
       for (const [k, v] of this._snapAccounts) {
@@ -499,7 +536,9 @@ export class StateManager {
       if (this._snap) {
         this._snapAccounts = new FunctionalBufferMap<Buffer>();
         this._snapDestructs = new FunctionalBufferSet();
-        this._snapStorage = new FunctionalBufferMap<FunctionalBufferMap<Buffer>>();
+        this._snapStorage = new FunctionalBufferMap<
+          FunctionalBufferMap<Buffer>
+        >();
       }
     }
   }
@@ -507,7 +546,10 @@ export class StateManager {
   /**
    * Merges a storage map into the last item of the accessed storage stack
    */
-  private _accessedStorageMerge(storageList: Map<string, Set<string>>[], storageMap: Map<string, Set<string>>) {
+  private _accessedStorageMerge(
+    storageList: Map<string, Set<string>>[],
+    storageMap: Map<string, Set<string>>
+  ) {
     const mapTarget = storageList[storageList.length - 1];
 
     if (mapTarget) {
@@ -551,7 +593,13 @@ export class StateManager {
         const parent = this._snap.root;
         if (!parent.equals(this._trie.root)) {
           try {
-            await this._snapTree.update(this._trie.root, parent, this._snapAccounts!, this._snapDestructs!, this._snapStorage!);
+            await this._snapTree.update(
+              this._trie.root,
+              parent,
+              this._snapAccounts!,
+              this._snapDestructs!,
+              this._snapStorage!
+            );
             // We will cap the snapTree when committing blocks
             // await this._snapsTree.cap(this._trie.root, 128);
           } catch (err) {
@@ -689,7 +737,9 @@ export class StateManager {
    */
   async generateCanonicalGenesis(): Promise<void> {
     if (this._checkpointCount !== 0) {
-      throw new Error('Cannot create genesis state with uncommitted checkpoints');
+      throw new Error(
+        'Cannot create genesis state with uncommitted checkpoints'
+      );
     }
 
     const genesis = await this.hasGenesisState();
@@ -704,7 +754,9 @@ export class StateManager {
    */
   async generateGenesis(initState: any): Promise<void> {
     if (this._checkpointCount !== 0) {
-      throw new Error('Cannot create genesis state with uncommitted checkpoints');
+      throw new Error(
+        'Cannot create genesis state with uncommitted checkpoints'
+      );
     }
 
     if (this.DEBUG) {
@@ -770,10 +822,14 @@ export class StateManager {
    */
   addWarmedAddress(address: Buffer): void {
     const key = address.toString('hex');
-    const storageSet = this._accessedStorage[this._accessedStorage.length - 1].get(key);
+    const storageSet =
+      this._accessedStorage[this._accessedStorage.length - 1].get(key);
     if (!storageSet) {
       const emptyStorage = new Set();
-      this._accessedStorage[this._accessedStorage.length - 1].set(key, emptyStorage);
+      this._accessedStorage[this._accessedStorage.length - 1].set(
+        key,
+        emptyStorage
+      );
     }
   }
 
@@ -788,7 +844,10 @@ export class StateManager {
 
     for (let i = this._accessedStorage.length - 1; i >= 0; i--) {
       const currentMap = this._accessedStorage[i];
-      if (currentMap.has(addressKey) && currentMap.get(addressKey)!.has(storageKey)) {
+      if (
+        currentMap.has(addressKey) &&
+        currentMap.get(addressKey)!.has(storageKey)
+      ) {
         return true;
       }
     }
@@ -803,10 +862,14 @@ export class StateManager {
    */
   addWarmedStorage(address: Buffer, slot: Buffer): void {
     const addressKey = address.toString('hex');
-    let storageSet = this._accessedStorage[this._accessedStorage.length - 1].get(addressKey);
+    let storageSet =
+      this._accessedStorage[this._accessedStorage.length - 1].get(addressKey);
     if (!storageSet) {
       storageSet = new Set();
-      this._accessedStorage[this._accessedStorage.length - 1].set(addressKey, storageSet!);
+      this._accessedStorage[this._accessedStorage.length - 1].set(
+        addressKey,
+        storageSet!
+      );
     }
     storageSet!.add(slot.toString('hex'));
   }
@@ -837,9 +900,15 @@ export class StateManager {
    *
    * @returns - an [@ethereumjs/tx](https://github.com/ethereumjs/ethereumjs-monorepo/packages/tx) `AccessList`
    */
-  generateAccessList(addressesRemoved: Address[] = [], addressesOnlyStorage: Address[] = []): AccessList {
+  generateAccessList(
+    addressesRemoved: Address[] = [],
+    addressesOnlyStorage: Address[] = []
+  ): AccessList {
     // Merge with the reverted storage list
-    const mergedStorage = [...this._accessedStorage, ...this._accessedStorageReverted];
+    const mergedStorage = [
+      ...this._accessedStorage,
+      ...this._accessedStorageReverted
+    ];
 
     // Fold merged storage array into one Map
     while (mergedStorage.length >= 2) {
@@ -854,9 +923,13 @@ export class StateManager {
     const accessList: AccessList = [];
     folded.forEach((slots, addressStr) => {
       const address = Address.fromString(`0x${addressStr}`);
-      const check1 = getActivePrecompiles(this._common).find((a) => a.equals(address));
+      const check1 = getActivePrecompiles(this._common).find((a) =>
+        a.equals(address)
+      );
       const check2 = addressesRemoved.find((a) => a.equals(address));
-      const check3 = addressesOnlyStorage.find((a) => a.equals(address)) !== undefined && slots.size === 0;
+      const check3 =
+        addressesOnlyStorage.find((a) => a.equals(address)) !== undefined &&
+        slots.size === 0;
 
       if (!check1 && !check2 && !check3) {
         const storageSlots = Array.from(slots)
@@ -886,7 +959,9 @@ export class StateManager {
         if (empty) {
           this._cache.del(address);
           if (this.DEBUG) {
-            debug(`Cleanup touched account address=${address.toString()} (>= SpuriousDragon)`);
+            debug(
+              `Cleanup touched account address=${address.toString()} (>= SpuriousDragon)`
+            );
           }
         }
       }

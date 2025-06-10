@@ -1,4 +1,15 @@
-import { Address, BN, intToBuffer, ecsign, ecrecover, rlphash, bnToUnpaddedBuffer, rlp, bufferToInt, toBuffer } from 'ethereumjs-util';
+import {
+  Address,
+  BN,
+  intToBuffer,
+  ecsign,
+  ecrecover,
+  rlphash,
+  bnToUnpaddedBuffer,
+  rlp,
+  bufferToInt,
+  toBuffer
+} from 'ethereumjs-util';
 import { importBls } from '@rei-network/bls';
 import { ActiveValidatorSet } from './validatorSet';
 import { VoteType, SignatureType } from './enum';
@@ -75,7 +86,11 @@ export class Proposal {
     }
   }
 
-  constructor(data: ProposalData, signatureType: SignatureType, signature?: Buffer) {
+  constructor(
+    data: ProposalData,
+    signatureType: SignatureType,
+    signature?: Buffer
+  ) {
     this.type = data.type;
     this.height = data.height.clone();
     this.round = data.round;
@@ -113,7 +128,13 @@ export class Proposal {
    * @returns Message to sign
    */
   getMessageToSign() {
-    return rlphash([intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.POLRound + 1), this.hash]);
+    return rlphash([
+      intToBuffer(this.type),
+      bnToUnpaddedBuffer(this.height),
+      intToBuffer(this.round),
+      intToBuffer(this.POLRound + 1),
+      this.hash
+    ]);
   }
 
   /**
@@ -151,7 +172,9 @@ export class Proposal {
       const { r, s, v } = ecsign(this.getMessageToSign(), privateKey);
       this.signature = Buffer.concat([r, s, intToBuffer(v - 27)]);
     } else {
-      this.signature = Buffer.from(importBls().sign(privateKey, this.getMessageToSign()));
+      this.signature = Buffer.from(
+        importBls().sign(privateKey, this.getMessageToSign())
+      );
     }
   }
 
@@ -164,9 +187,24 @@ export class Proposal {
       throw new Error('missing signature');
     }
     if (this.signatureType === SignatureType.ECDSA) {
-      return [intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.POLRound + 1), this.hash, this._signature!];
+      return [
+        intToBuffer(this.type),
+        bnToUnpaddedBuffer(this.height),
+        intToBuffer(this.round),
+        intToBuffer(this.POLRound + 1),
+        this.hash,
+        this._signature!
+      ];
     } else {
-      return [intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.POLRound + 1), this.hash, toBuffer(this.proposer!), this._signature!];
+      return [
+        intToBuffer(this.type),
+        bnToUnpaddedBuffer(this.height),
+        intToBuffer(this.round),
+        intToBuffer(this.POLRound + 1),
+        this.hash,
+        toBuffer(this.proposer!),
+        this._signature!
+      ];
     }
   }
 
@@ -215,7 +253,13 @@ export class Proposal {
       throw new Error('invalid signature');
     }
     if (this.signatureType === SignatureType.BLS) {
-      if (!importBls().verify(valSet.getBlsPublicKey(valSet.proposer), this.getMessageToSign(), this.signature!)) {
+      if (
+        !importBls().verify(
+          valSet.getBlsPublicKey(valSet.proposer),
+          this.getMessageToSign(),
+          this.signature!
+        )
+      ) {
         throw new Error('invalid signature');
       }
     }

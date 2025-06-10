@@ -3,7 +3,11 @@ import path from 'path';
 import { expect } from 'chai';
 import { Common } from '@rei-network/common';
 import { Transaction } from '@rei-network/structure';
-import { FunctionalBufferMap, hexStringToBuffer, setLevel } from '@rei-network/utils';
+import {
+  FunctionalBufferMap,
+  hexStringToBuffer,
+  setLevel
+} from '@rei-network/utils';
 import { Journal } from '../../src/txpool/journal';
 
 setLevel('silent');
@@ -22,7 +26,9 @@ describe('Journal', () => {
   const node = new MockNode();
   const testTransactions: Transaction[] = [];
   before(async () => {
-    testdata = JSON.parse(fs.readFileSync(path.join(__dirname, '/test-data.json')).toString());
+    testdata = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '/test-data.json')).toString()
+    );
     testdata.transactions.forEach((element) => {
       testTransactions.push(Transaction.fromTxData(element));
     });
@@ -39,7 +45,10 @@ describe('Journal', () => {
   it('should load correctly', async () => {
     await journal.load(async (trxs: Transaction[]) => {
       trxs.forEach((trx, i) => {
-        expect(trx.serialize().equals(testTransactions[i].serialize()), 'transaction should be equal').be.true;
+        expect(
+          trx.serialize().equals(testTransactions[i].serialize()),
+          'transaction should be equal'
+        ).be.true;
       });
     });
   });
@@ -48,18 +57,26 @@ describe('Journal', () => {
     const another = Transaction.fromTxData(testdata.another);
     await journal.insert(another);
     await journal.load(async (trxs: Transaction[]) => {
-      expect(trxs[4].serialize().equals(another.serialize()), 'transaction should be equal').be.true;
+      expect(
+        trxs[4].serialize().equals(another.serialize()),
+        'transaction should be equal'
+      ).be.true;
     });
   });
 
   it('should rotate correctly', async () => {
-    const addr = hexStringToBuffer('0x2dd3cf3116858021c7a234ff470b21a8d3e547d4');
+    const addr = hexStringToBuffer(
+      '0x2dd3cf3116858021c7a234ff470b21a8d3e547d4'
+    );
     const remap = new FunctionalBufferMap<Transaction[]>();
     remap.set(addr, testTransactions);
     await journal.rotate(remap);
     await journal.load(async (trxs: Transaction[]) => {
       trxs.forEach((trx, i) => {
-        expect(trx.serialize().equals(testTransactions[i].serialize()), 'transaction should be equal').be.true;
+        expect(
+          trx.serialize().equals(testTransactions[i].serialize()),
+          'transaction should be equal'
+        ).be.true;
       });
       expect(trxs.length, 'transaction should be rotated').be.equal(4);
     });

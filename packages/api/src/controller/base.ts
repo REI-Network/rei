@@ -81,14 +81,20 @@ export class Controller {
       return this.node.getPendingStateManager();
     } else {
       const block = await this.getBlockByTag(tag);
-      return this.node.getStateManager(block.header.stateRoot, block.header.number);
+      return this.node.getStateManager(
+        block.header.stateRoot,
+        block.header.number
+      );
     }
   }
 
   protected async runCall(data: CallData, tag: any) {
     const block = tag instanceof Block ? tag : await this.getBlockByTag(tag);
     const gas = data.gas ? hexStringToBN(data.gas) : new BN(0xffffff);
-    const vm = await this.node.getVM(block.header.stateRoot, block.header.number);
+    const vm = await this.node.getVM(
+      block.header.stateRoot,
+      block.header.number
+    );
     await vm.stateManager.checkpoint();
     try {
       const result = await vm.runCall({
@@ -109,7 +115,10 @@ export class Controller {
           throw new OutOfGasError(gas);
         } else if (error.error === ERROR.REVERT) {
           const returnValue = result.execResult.returnValue;
-          if (returnValue.length > 4 && returnValue.slice(0, 4).equals(revertErrorSelector)) {
+          if (
+            returnValue.length > 4 &&
+            returnValue.slice(0, 4).equals(revertErrorSelector)
+          ) {
             throw new RevertError(returnValue);
           } else {
             throw new RevertError('unknown error');

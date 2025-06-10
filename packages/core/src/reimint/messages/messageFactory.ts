@@ -3,7 +3,8 @@ import { ContructorWithCode, Registry } from '../../utils';
 import * as m from './messages';
 import { StateMachineMsg } from './messages';
 
-export interface StateMachineMsgContrutor extends ContructorWithCode<StateMachineMsg> {
+export interface StateMachineMsgContrutor
+  extends ContructorWithCode<StateMachineMsg> {
   fromValuesArray(values: any[]): StateMachineMsg;
 }
 
@@ -17,11 +18,17 @@ export abstract class StateMachineMsgFactory {
     }
 
     const [codeBuffer, valuesArray] = values;
-    if (!(codeBuffer instanceof Buffer) || !Array.isArray(valuesArray) || valuesArray.length === 0) {
+    if (
+      !(codeBuffer instanceof Buffer) ||
+      !Array.isArray(valuesArray) ||
+      valuesArray.length === 0
+    ) {
       throw new Error('invalid values');
     }
 
-    return StateMachineMsgFactory.registry.getCtorByCode(bufferToInt(codeBuffer)).fromValuesArray(valuesArray);
+    return StateMachineMsgFactory.registry
+      .getCtorByCode(bufferToInt(codeBuffer))
+      .fromValuesArray(valuesArray);
   }
 
   static serializeMessage(msg: StateMachineMsg) {

@@ -3,8 +3,15 @@ import { expect, assert } from 'chai';
 import { Common } from '@rei-network/common';
 import { Block, BlockHeader, Transaction } from '@rei-network/structure';
 import { setLevel } from '@rei-network/utils';
-import { BlockSync, BlockSyncBackend, BlockSyncValidateBackend } from '../../src/sync/full/blockSync';
-import { HandlerPool, GetHandlerTimeoutError } from '../../src/protocols/wire/handlerPool';
+import {
+  BlockSync,
+  BlockSyncBackend,
+  BlockSyncValidateBackend
+} from '../../src/sync/full/blockSync';
+import {
+  HandlerPool,
+  GetHandlerTimeoutError
+} from '../../src/protocols/wire/handlerPool';
 
 setLevel('silent');
 const common = new Common({ chain: 'rei-testnet' });
@@ -15,7 +22,10 @@ class MockFetcherBackend implements BlockSyncBackend, BlockSyncValidateBackend {
   lastestNumber?: BN;
 
   async processAndCommitBlock(block: Block) {
-    if (this.lastestNumber !== undefined && !this.lastestNumber.addn(1).eq(block.header.number)) {
+    if (
+      this.lastestNumber !== undefined &&
+      !this.lastestNumber.addn(1).eq(block.header.number)
+    ) {
       throw new Error('process invalid block');
     }
     this.lastestNumber = block.header.number.clone();
@@ -31,7 +41,10 @@ class MockFetcherBackend implements BlockSyncBackend, BlockSyncValidateBackend {
 
   async handlePeerError(prefix: string, peerId: string, reason: string) {}
 
-  validateHeaders(parent: BlockHeader | undefined, headers: BlockHeader[]): BlockHeader {
+  validateHeaders(
+    parent: BlockHeader | undefined,
+    headers: BlockHeader[]
+  ): BlockHeader {
     return headers[headers.length - 1];
   }
 
@@ -107,7 +120,7 @@ class MockProtocolHandler {
 }
 
 class MockHandlerPool extends HandlerPool<MockProtocolHandler> {
-  timeout: number = 0;
+  timeout = 0;
 
   reset() {
     this.timeout = 0;
@@ -152,12 +165,20 @@ describe('Fetcher', () => {
   });
 
   it('should fetch successfully', async () => {
-    const fetcher = new BlockSync({ common, backend, validateBackend: backend, maxGetBlockHeaders: new BN(decl), downloadBodiesLimit: 5 });
+    const fetcher = new BlockSync({
+      common,
+      backend,
+      validateBackend: backend,
+      maxGetBlockHeaders: new BN(decl),
+      downloadBodiesLimit: 5
+    });
     const start = new BN(0);
     const totalCount = new BN(decl * 10);
     await fetcher.fetch(start, totalCount, targetHandler as any);
 
-    expect(backend.lastestNumber?.toString()).be.equal(totalCount.sub(start).subn(1).toString());
+    expect(backend.lastestNumber?.toString()).be.equal(
+      totalCount.sub(start).subn(1).toString()
+    );
 
     const downloadBodies = new Set<number>();
     for (const handler of protocol.pool.handlers) {
@@ -178,7 +199,13 @@ describe('Fetcher', () => {
   });
 
   it('should fetch failed(get peer timeout)', async () => {
-    const fetcher = new BlockSync({ common, backend, validateBackend: backend, maxGetBlockHeaders: new BN(decl), downloadBodiesLimit: 5 });
+    const fetcher = new BlockSync({
+      common,
+      backend,
+      validateBackend: backend,
+      maxGetBlockHeaders: new BN(decl),
+      downloadBodiesLimit: 5
+    });
     const start = new BN(0);
     const totalCount = new BN(decl * 10);
 
@@ -193,7 +220,13 @@ describe('Fetcher', () => {
   });
 
   it('should fetch successfully(retry get bodies)', async () => {
-    const fetcher = new BlockSync({ common, backend, validateBackend: backend, maxGetBlockHeaders: new BN(decl), downloadBodiesLimit: 5 });
+    const fetcher = new BlockSync({
+      common,
+      backend,
+      validateBackend: backend,
+      maxGetBlockHeaders: new BN(decl),
+      downloadBodiesLimit: 5
+    });
     const start = new BN(0);
     const totalCount = new BN(decl * 10);
 
@@ -203,7 +236,9 @@ describe('Fetcher', () => {
 
     await fetcher.fetch(start, totalCount, targetHandler as any);
 
-    expect(backend.lastestNumber?.toString()).be.equal(totalCount.sub(start).subn(1).toString());
+    expect(backend.lastestNumber?.toString()).be.equal(
+      totalCount.sub(start).subn(1).toString()
+    );
 
     let throwError = false;
     const downloadBodies = new Set<number>();

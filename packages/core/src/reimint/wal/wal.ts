@@ -1,6 +1,10 @@
 import { bufferToInt, intToBuffer, setLengthLeft, BN } from 'ethereumjs-util';
 import { logger } from '@rei-network/utils';
-import { StateMachineMsg, StateMachineEndHeight, StateMachineMsgFactory } from '../messages';
+import {
+  StateMachineMsg,
+  StateMachineEndHeight,
+  StateMachineMsgFactory
+} from '../messages';
 import { FileGroup, GroupFileReader } from './fileGroup';
 import { crc32 } from './crc32';
 
@@ -107,7 +111,10 @@ export class WAL {
     const lengthBuffer = setLengthLeft(intToBuffer(data.length), 4);
 
     return !!(await runAndIgnoreErrors(async () => {
-      await this.group.write(Buffer.concat([crcBuffer, lengthBuffer, data]), flush);
+      await this.group.write(
+        Buffer.concat([crcBuffer, lengthBuffer, data]),
+        flush
+      );
       return true;
     }));
   }

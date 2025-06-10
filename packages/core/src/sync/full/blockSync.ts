@@ -36,7 +36,10 @@ export interface BlockSyncBackend {
 }
 
 export interface BlockSyncValidateBackend {
-  validateHeaders(parent: BlockHeader | undefined, headers: BlockHeader[]): BlockHeader;
+  validateHeaders(
+    parent: BlockHeader | undefined,
+    headers: BlockHeader[]
+  ): BlockHeader;
   validateBodies(headers: BlockHeader[], bodies: Transaction[][]): void;
   validateBlocks(blocks): Promise<void>;
 }
@@ -72,7 +75,8 @@ export class BlockSync {
     this.validateBackend = options.validateBackend;
     this.common = options.common;
     this.maxGetBlockHeaders = options.maxGetBlockHeaders.clone();
-    this.downloadBodiesLimit = options.downloadBodiesLimit ?? defaultDownloadBodiesLimit;
+    this.downloadBodiesLimit =
+      options.downloadBodiesLimit ?? defaultDownloadBodiesLimit;
   }
 
   /**
@@ -118,7 +122,9 @@ export class BlockSync {
     // cumulativeTotalDifficulty records the total difficulty of the download headers
     const cumulativeTotalDifficulty = new BN(0);
 
-    const downloadBodiesLimit = new LimitedConcurrency(this.downloadBodiesLimit);
+    const downloadBodiesLimit = new LimitedConcurrency(
+      this.downloadBodiesLimit
+    );
 
     // start process blocks loop
     this.processBlocksPromise = this.processBlocksLoop();
@@ -131,11 +137,16 @@ export class BlockSync {
       });
       // try to add download bodies task by headers
       await downloadBodiesLimit.newConcurrency(
-        this.downloadBodies.bind(this, handler.protocol, headers, async (blocks) => {
-          // try to add process blocks task by blocks
-          // await processBlocksLimit.newConcurrency(this.processBlocks.bind(this, blocks));
-          await this.processBlocks(blocks);
-        })
+        this.downloadBodies.bind(
+          this,
+          handler.protocol,
+          headers,
+          async (blocks) => {
+            // try to add process blocks task by blocks
+            // await processBlocksLimit.newConcurrency(this.processBlocks.bind(this, blocks));
+            await this.processBlocks(blocks);
+          }
+        )
       );
     });
 
@@ -159,7 +170,11 @@ export class BlockSync {
 
     // handle errors, if an error occurs
     if (error) {
-      await this.backend.handlePeerError('BlockSync::fetch', handler.peer.peerId, error);
+      await this.backend.handlePeerError(
+        'BlockSync::fetch',
+        handler.peer.peerId,
+        error
+      );
     }
 
     return {
@@ -168,7 +183,12 @@ export class BlockSync {
     };
   }
 
-  private async downloadHeaders(start: BN, totalCount: BN, handler: WireProtocolHandler, onData: (headers: BlockHeader[]) => Promise<void>) {
+  private async downloadHeaders(
+    start: BN,
+    totalCount: BN,
+    handler: WireProtocolHandler,
+    onData: (headers: BlockHeader[]) => Promise<void>
+  ) {
     const reserveTotalCount = totalCount.clone();
     const startNumber = start.clone();
     let parent: BlockHeader | undefined;
@@ -181,7 +201,14 @@ export class BlockSync {
       }
 
       try {
-        logger.info('Download headers start:', startNumber.toString(), 'count:', count.toString(), 'from:', handler.peer.peerId);
+        logger.info(
+          'Download headers start:',
+          startNumber.toString(),
+          'count:',
+          count.toString(),
+          'from:',
+          handler.peer.peerId
+        );
         const headers = await handler.getBlockHeaders(startNumber, count);
         parent = this.validateBackend.validateHeaders(parent, headers);
         if (!count.eqn(headers.length)) {
@@ -191,7 +218,11 @@ export class BlockSync {
       } catch (err: any) {
         this._abort();
         if (err.message !== 'useless') {
-          await this.backend.handlePeerError('BlockSync::downloadHeaders', handler.peer.peerId, err);
+          await this.backend.handlePeerError(
+            'BlockSync::downloadHeaders',
+            handler.peer.peerId,
+            err
+          );
         }
         return;
       }
@@ -201,7 +232,11 @@ export class BlockSync {
     }
   }
 
-  private async downloadBodies(wire: WireProtocol, headers: BlockHeader[], onData: (blocks: Block[]) => Promise<void>) {
+  private async downloadBodies(
+    wire: WireProtocol,
+    headers: BlockHeader[],
+    onData: (blocks: Block[]) => Promise<void>
+  ) {
     while (!this.aborted) {
       let handler: WireProtocolHandler;
       try {
@@ -213,10 +248,22 @@ export class BlockSync {
       }
 
       try {
-        logger.info('Download bodies start:', headers[0].number.toNumber(), 'count:', headers.length, 'from:', handler.peer.peerId);
+        logger.info(
+          'Download bodies start:',
+          headers[0].number.toNumber(),
+          'count:',
+          headers.length,
+          'from:',
+          handler.peer.peerId
+        );
         const bodies = await handler.getBlockBodies(headers);
         this.validateBackend.validateBodies(headers, bodies);
-        const blocks = headers.map((header, i) => Block.fromBlockData({ header, transactions: bodies[i] }, { common: this.common.copy(), hardforkByBlockNumber: true }));
+        const blocks = headers.map((header, i) =>
+          Block.fromBlockData(
+            { header, transactions: bodies[i] },
+            { common: this.common.copy(), hardforkByBlockNumber: true }
+          )
+        );
         await this.validateBackend.validateBlocks(blocks);
         wire.pool.put(handler);
         await onData(blocks);
@@ -224,7 +271,11 @@ export class BlockSync {
       } catch (err: any) {
         this.useless.add(handler);
         if (err.message !== 'useless') {
-          await this.backend.handlePeerError('BlockSync::downloadBodies', handler.peer.peerId, err);
+          await this.backend.handlePeerError(
+            'BlockSync::downloadBodies',
+            handler.peer.peerId,
+            err
+          );
         }
       }
     }
@@ -236,7 +287,10 @@ export class BlockSync {
     }
 
     const first = blocks[0];
-    const index = first.header.number.sub(this.start).div(this.maxGetBlockHeaders).toNumber();
+    const index = first.header.number
+      .sub(this.start)
+      .div(this.maxGetBlockHeaders)
+      .toNumber();
 
     return new Promise<void>((resolve) => {
       this.processBlocksChannel.push({
@@ -257,7 +311,8 @@ export class BlockSync {
     } of this.processBlocksChannel) {
       try {
         for (const block of blocks) {
-          reorged = (await this.backend.processAndCommitBlock(block)) || reorged;
+          reorged =
+            (await this.backend.processAndCommitBlock(block)) || reorged;
 
           if (this.aborted) {
             resolve();

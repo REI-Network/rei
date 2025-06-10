@@ -12,7 +12,7 @@ export class Log {
   topics: Buffer[];
   data: Buffer;
 
-  removed: boolean = false;
+  removed = false;
   extension?: LogExtension;
 
   constructor(address: Buffer, topics: Buffer[], data: Buffer) {
@@ -77,14 +77,26 @@ export class Log {
   toRPCJSON() {
     return {
       address: bufferToHex(this.address),
-      blockHash: this.extension?.blockHash ? bufferToHex(this.extension.blockHash) : undefined,
-      blockNumber: this.extension?.blockNumber ? bnToHex(this.extension.blockNumber) : undefined,
+      blockHash: this.extension?.blockHash
+        ? bufferToHex(this.extension.blockHash)
+        : undefined,
+      blockNumber: this.extension?.blockNumber
+        ? bnToHex(this.extension.blockNumber)
+        : undefined,
       data: bufferToHex(this.data),
-      logIndex: this.extension?.logIndex !== undefined ? intToHex(this.extension.logIndex) : undefined,
+      logIndex:
+        this.extension?.logIndex !== undefined
+          ? intToHex(this.extension.logIndex)
+          : undefined,
       removed: this.removed,
       topics: this.topics.map((topic) => bufferToHex(topic)),
-      transactionHash: this.extension?.transactionHash ? bufferToHex(this.extension.transactionHash) : undefined,
-      transactionIndex: this.extension?.transactionIndex !== undefined ? intToHex(this.extension.transactionIndex) : undefined
+      transactionHash: this.extension?.transactionHash
+        ? bufferToHex(this.extension.transactionHash)
+        : undefined,
+      transactionIndex:
+        this.extension?.transactionIndex !== undefined
+          ? intToHex(this.extension.transactionIndex)
+          : undefined
     };
   }
 }

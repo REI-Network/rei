@@ -74,7 +74,10 @@ export class Journal {
             if (i === -1) {
               break;
             }
-            const tx = TransactionFactory.fromSerializedData(bufferInput.slice(0, i), { common: this.node.getLatestCommon() });
+            const tx = TransactionFactory.fromSerializedData(
+              bufferInput.slice(0, i),
+              { common: this.node.getLatestCommon() }
+            );
             if (tx instanceof Transaction) {
               batch.push(tx);
               if (batch.length > 1024) {
@@ -112,12 +115,15 @@ export class Journal {
     await this.lock.acquire();
     this.createWritterIfNotExists();
     await new Promise<void>((resolve) => {
-      this.writer!.write(Buffer.concat([tx.serialize(), bufferSplit]), (err) => {
-        if (err) {
-          logger.error('Jonunal::insert, write stream error:', err);
+      this.writer!.write(
+        Buffer.concat([tx.serialize(), bufferSplit]),
+        (err) => {
+          if (err) {
+            logger.error('Jonunal::insert, write stream error:', err);
+          }
+          resolve();
         }
-        resolve();
-      });
+      );
     });
     this.lock.release();
   }
@@ -139,14 +145,17 @@ export class Journal {
           .map(
             (tx) =>
               new Promise<void>((resolve) => {
-                output.write(Buffer.concat([tx.serialize(), bufferSplit]), (err) => {
-                  if (err) {
-                    logger.error('Jonunal::rotate, write stream error:', err);
-                  } else {
-                    journaled++;
+                output.write(
+                  Buffer.concat([tx.serialize(), bufferSplit]),
+                  (err) => {
+                    if (err) {
+                      logger.error('Jonunal::rotate, write stream error:', err);
+                    } else {
+                      journaled++;
+                    }
+                    resolve();
                   }
-                  resolve();
-                });
+                );
               })
           )
       );
@@ -156,7 +165,12 @@ export class Journal {
       });
 
       fs.renameSync(this.path + '.new', this.path);
-      logger.info('Regenerated local transaction journal, transactions', journaled, 'accounts', all.size);
+      logger.info(
+        'Regenerated local transaction journal, transactions',
+        journaled,
+        'accounts',
+        all.size
+      );
     } catch (err) {
       logger.error('Journal::rotate, catch error:', err);
     } finally {

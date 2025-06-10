@@ -1,6 +1,12 @@
 import { BaseTrie as Trie } from '@rei-network/trie';
 import { nibblesToBuffer } from '@rei-network/trie/dist/util/nibbles';
-import { BranchNode, ExtensionNode, LeafNode, Nibbles, TrieNode } from '@rei-network/trie/dist/trieNode';
+import {
+  BranchNode,
+  ExtensionNode,
+  LeafNode,
+  Nibbles,
+  TrieNode
+} from '@rei-network/trie/dist/trieNode';
 
 export type NodeEntry = { key: Buffer; val: Buffer };
 
@@ -13,7 +19,10 @@ export class KVIterator {
     this.root = root ?? trie.root;
   }
 
-  private async *traverse(node: TrieNode | null, key: Nibbles): AsyncGenerator<NodeEntry, NodeEntry | void> {
+  private async *traverse(
+    node: TrieNode | null,
+    key: Nibbles
+  ): AsyncGenerator<NodeEntry, NodeEntry | void> {
     if (node instanceof BranchNode) {
       if (node._value && node._value.length > 0) {
         yield {
@@ -24,10 +33,16 @@ export class KVIterator {
 
       for (let i = 0; i < 16; i++) {
         const next = node.getBranch(i);
-        yield* this.traverse(next && (await this.trie._lookupNode(next)), key.concat([i]));
+        yield* this.traverse(
+          next && (await this.trie._lookupNode(next)),
+          key.concat([i])
+        );
       }
     } else if (node instanceof ExtensionNode) {
-      yield* this.traverse(await this.trie._lookupNode(node._value), key.concat(node._nibbles));
+      yield* this.traverse(
+        await this.trie._lookupNode(node._value),
+        key.concat(node._nibbles)
+      );
     } else if (node instanceof LeafNode) {
       yield {
         key: nibblesToBuffer(key.concat(node._nibbles)),
@@ -50,7 +65,10 @@ export class TrieNodeIterator {
     this.root = root ?? trie.root;
   }
 
-  private async *traverse(node: TrieNode | null, key: Nibbles): AsyncGenerator<TrieNode, TrieNode | void> {
+  private async *traverse(
+    node: TrieNode | null,
+    key: Nibbles
+  ): AsyncGenerator<TrieNode, TrieNode | void> {
     if (node === null) {
       return;
     }
@@ -58,10 +76,16 @@ export class TrieNodeIterator {
     if (node instanceof BranchNode) {
       for (let i = 0; i < 16; i++) {
         const next = node.getBranch(i);
-        yield* this.traverse(next && (await this.trie._lookupNode(next)), key.concat([i]));
+        yield* this.traverse(
+          next && (await this.trie._lookupNode(next)),
+          key.concat([i])
+        );
       }
     } else if (node instanceof ExtensionNode) {
-      yield* this.traverse(await this.trie._lookupNode(node._value), key.concat(node._nibbles));
+      yield* this.traverse(
+        await this.trie._lookupNode(node._value),
+        key.concat(node._nibbles)
+      );
     }
 
     yield node;

@@ -51,7 +51,11 @@ export function validatorsEncode(ids: BN[], priorities: BN[]): Buffer {
     const priorityBytes = priority.toBuffer();
     const length = priorityBytes.length;
     const negativeFlag = priority.isNeg() ? 128 : 0;
-    buffer.push(Buffer.from(bytes), Buffer.from([negativeFlag + length]), priorityBytes);
+    buffer.push(
+      Buffer.from(bytes),
+      Buffer.from([negativeFlag + length]),
+      priorityBytes
+    );
   }
   return Buffer.concat(buffer);
 }

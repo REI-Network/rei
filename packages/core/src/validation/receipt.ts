@@ -4,7 +4,9 @@ import { Receipt, Block } from '@rei-network/structure';
 
 export async function validateReceipts(block: Block, receipts: Receipt[]) {
   if (block.transactions.length !== receipts.length) {
-    throw new Error('the length of the transaction and the length of the receipt are not equal');
+    throw new Error(
+      'the length of the transaction and the length of the receipt are not equal'
+    );
   }
 
   // TODO: For the sake of simplicity,

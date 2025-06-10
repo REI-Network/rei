@@ -26,11 +26,17 @@ export abstract class EvidenceFactory {
     }
 
     const [codeBuffer, valuesArray] = values;
-    if (!(codeBuffer instanceof Buffer) || !Array.isArray(valuesArray) || valuesArray.length === 0) {
+    if (
+      !(codeBuffer instanceof Buffer) ||
+      !Array.isArray(valuesArray) ||
+      valuesArray.length === 0
+    ) {
       throw new Error('invalid evidence values');
     }
 
-    return EvidenceFactory.registry.getCtorByCode(bufferToInt(codeBuffer)).fromValuesArray(valuesArray);
+    return EvidenceFactory.registry
+      .getCtorByCode(bufferToInt(codeBuffer))
+      .fromValuesArray(valuesArray);
   }
 
   static rawEvidence(ev: Evidence) {

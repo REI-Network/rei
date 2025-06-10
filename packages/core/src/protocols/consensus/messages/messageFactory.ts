@@ -3,12 +3,16 @@ import { ContructorWithCode, Registry } from '../../../utils';
 import * as m from './messages';
 import { ConsensusMessage } from './messages';
 
-export interface ConsensusMessageConstructor extends ContructorWithCode<ConsensusMessage> {
+export interface ConsensusMessageConstructor
+  extends ContructorWithCode<ConsensusMessage> {
   fromValuesArray(values: any[]): ConsensusMessage;
 }
 
 export abstract class ConsensusMessageFactory {
-  static registry = new Registry<ConsensusMessage, ConsensusMessageConstructor>();
+  static registry = new Registry<
+    ConsensusMessage,
+    ConsensusMessageConstructor
+  >();
 
   /**
    * Create a message instance from a serialized buffer
@@ -34,11 +38,17 @@ export abstract class ConsensusMessageFactory {
     }
 
     const [codeBuffer, valuesArray] = values;
-    if (!(codeBuffer instanceof Buffer) || !Array.isArray(valuesArray) || valuesArray.length === 0) {
+    if (
+      !(codeBuffer instanceof Buffer) ||
+      !Array.isArray(valuesArray) ||
+      valuesArray.length === 0
+    ) {
       throw new Error('invalid serialized');
     }
 
-    return ConsensusMessageFactory.registry.getCtorByCode(bufferToInt(codeBuffer)).fromValuesArray(valuesArray);
+    return ConsensusMessageFactory.registry
+      .getCtorByCode(bufferToInt(codeBuffer))
+      .fromValuesArray(valuesArray);
   }
 
   /**

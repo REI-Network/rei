@@ -1,4 +1,10 @@
-import { BN, bnToUnpaddedBuffer, bufferToInt, intToBuffer, rlp } from 'ethereumjs-util';
+import {
+  BN,
+  bnToUnpaddedBuffer,
+  bufferToInt,
+  intToBuffer,
+  rlp
+} from 'ethereumjs-util';
 
 const recoverInterval = 86400;
 
@@ -21,7 +27,11 @@ export class StakeInfo {
    * @returns Stake info instance
    */
   static fromStakeInfoData(data?: StakeInfoData) {
-    return new StakeInfo(data?.total ?? new BN(0), data?.usage ?? new BN(0), data?.timestamp ?? 0);
+    return new StakeInfo(
+      data?.total ?? new BN(0),
+      data?.usage ?? new BN(0),
+      data?.timestamp ?? 0
+    );
   }
 
   /**
@@ -62,7 +72,11 @@ export class StakeInfo {
    * @returns - Raw buffer
    */
   raw() {
-    return [bnToUnpaddedBuffer(this.total), bnToUnpaddedBuffer(this.usage), intToBuffer(this.timestamp)];
+    return [
+      bnToUnpaddedBuffer(this.total),
+      bnToUnpaddedBuffer(this.usage),
+      intToBuffer(this.timestamp)
+    ];
   }
 
   /**
@@ -101,7 +115,9 @@ export class StakeInfo {
    * @returns The total fee for this account(does not include used parts)
    */
   estimateTotalFee(totalAmount: BN, dailyFee: BN) {
-    return totalAmount.isZero() ? new BN(0) : this.total.mul(dailyFee).div(totalAmount);
+    return totalAmount.isZero()
+      ? new BN(0)
+      : this.total.mul(dailyFee).div(totalAmount);
   }
 
   /**

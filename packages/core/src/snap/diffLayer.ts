@@ -3,7 +3,13 @@ import Bloom from '@rei-network/vm/dist/bloom';
 import { StakingAccount } from '../stateManager';
 import { DiskLayer } from './diskLayer';
 import { asyncTraverseHashList } from './layerIterator';
-import { ISnapshot, Snapshot, DestructSet, AccountData, StorageData } from './types';
+import {
+  ISnapshot,
+  Snapshot,
+  DestructSet,
+  AccountData,
+  StorageData
+} from './types';
 
 /**
  * TODO: improve
@@ -25,7 +31,7 @@ export class DiffLayer implements ISnapshot {
   readonly accountData: AccountData;
   readonly storageData: StorageData;
 
-  stale: boolean = false;
+  stale = false;
 
   private accountList?: Buffer[];
   private storageList?: FunctionalBufferMap<Buffer[]>;
@@ -39,7 +45,13 @@ export class DiffLayer implements ISnapshot {
    * @param storageData - Modified storage data
    * @returns New diff layer
    */
-  static createDiffLayerFromParent(parent: Snapshot, root: Buffer, destructSet: DestructSet, accountData: AccountData, storageData: StorageData) {
+  static createDiffLayerFromParent(
+    parent: Snapshot,
+    root: Buffer,
+    destructSet: DestructSet,
+    accountData: AccountData,
+    storageData: StorageData
+  ) {
     let diffed: DiffBloom;
     if (parent instanceof DiffLayer) {
       // if the parent layer is a diff layer, copy the bloom from it
@@ -61,10 +73,26 @@ export class DiffLayer implements ISnapshot {
     }
     memory += destructSet.size * 32;
 
-    return new DiffLayer(parent, root, destructSet, accountData, storageData, diffed, memory);
+    return new DiffLayer(
+      parent,
+      root,
+      destructSet,
+      accountData,
+      storageData,
+      diffed,
+      memory
+    );
   }
 
-  constructor(parent: Snapshot, root: Buffer, destructSet: FunctionalBufferSet, accountData: AccountData, storageData: StorageData, diffed: DiffBloom, memory: number) {
+  constructor(
+    parent: Snapshot,
+    root: Buffer,
+    destructSet: FunctionalBufferSet,
+    accountData: AccountData,
+    storageData: StorageData,
+    diffed: DiffBloom,
+    memory: number
+  ) {
     this.parent = parent;
     this.root = root;
     this.origin = parent instanceof DiskLayer ? parent : parent.origin;
@@ -116,7 +144,10 @@ export class DiffLayer implements ISnapshot {
    */
   async getAccount(hash: Buffer): Promise<StakingAccount | null> {
     const serializedAccount = await this.getSerializedAccount(hash);
-    return serializedAccount && StakingAccount.fromRlpSerializedSlimAccount(serializedAccount);
+    return (
+      serializedAccount &&
+      StakingAccount.fromRlpSerializedSlimAccount(serializedAccount)
+    );
   }
 
   /**
@@ -184,7 +215,10 @@ export class DiffLayer implements ISnapshot {
    * @param storageHash - Storage hash
    * @returns storage data
    */
-  private _getStorage(accountHash: Buffer, storageHash: Buffer): Promise<Buffer> {
+  private _getStorage(
+    accountHash: Buffer,
+    storageHash: Buffer
+  ): Promise<Buffer> {
     if (this.stale) {
       throw new Error('stale diff layer');
     }
@@ -238,7 +272,15 @@ export class DiffLayer implements ISnapshot {
       }
     }
 
-    return new DiffLayer(parent.parent, this.root, parent.destructSet, parent.accountData, parent.storageData, this.diffed, parent.memory + this.memory);
+    return new DiffLayer(
+      parent.parent,
+      this.root,
+      parent.destructSet,
+      parent.accountData,
+      parent.storageData,
+      this.diffed,
+      parent.memory + this.memory
+    );
   }
 
   /**
@@ -299,8 +341,19 @@ export class DiffLayer implements ISnapshot {
    * @param storageData - Modified storage data
    * @returns New layer
    */
-  update(root: Buffer, destructSet: FunctionalBufferSet, accountData: AccountData, storageData: StorageData) {
-    return DiffLayer.createDiffLayerFromParent(this, root, destructSet, accountData, storageData);
+  update(
+    root: Buffer,
+    destructSet: FunctionalBufferSet,
+    accountData: AccountData,
+    storageData: StorageData
+  ) {
+    return DiffLayer.createDiffLayerFromParent(
+      this,
+      root,
+      destructSet,
+      accountData,
+      storageData
+    );
   }
 
   /**

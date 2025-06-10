@@ -1,14 +1,35 @@
-import { Address, intToHex, bnToHex, bufferToHex, hashPersonalMessage, toRpcSig, ecsign, BN, setLengthLeft } from 'ethereumjs-util';
+import {
+  Address,
+  intToHex,
+  bnToHex,
+  bufferToHex,
+  hashPersonalMessage,
+  toRpcSig,
+  ecsign,
+  BN,
+  setLengthLeft
+} from 'ethereumjs-util';
 import { ec as EC } from 'elliptic';
 import { hexStringToBN, hexStringToBuffer } from '@rei-network/utils';
-import { Block, Log, Transaction, TransactionFactory } from '@rei-network/structure';
+import {
+  Block,
+  Log,
+  Transaction,
+  TransactionFactory
+} from '@rei-network/structure';
 import { Common } from '@rei-network/common';
 import { CallData, Client, TopicsData } from '../types';
 import { Controller } from './base';
 import { OutOfGasError } from './errors';
 
-function parseAddressesAndTopics(_addresses?: string | string[], _topics?: TopicsData) {
-  const addresses: Address[] = typeof _addresses === 'string' ? [Address.fromString(_addresses)] : _addresses?.map((addr) => Address.fromString(addr)) ?? [];
+function parseAddressesAndTopics(
+  _addresses?: string | string[],
+  _topics?: TopicsData
+) {
+  const addresses: Address[] =
+    typeof _addresses === 'string'
+      ? [Address.fromString(_addresses)]
+      : _addresses?.map((addr) => Address.fromString(addr)) ?? [];
   const topics: (Buffer | null | (Buffer | null)[])[] = _topics
     ? _topics.map((topic) => {
         if (topic === null) {
@@ -102,7 +123,9 @@ export class ETHController extends Controller {
    * @returns Accounts list
    */
   accounts() {
-    return this.node.accMngr.totalUnlockedAccounts().map((addr) => bufferToHex(addr));
+    return this.node.accMngr
+      .totalUnlockedAccounts()
+      .map((addr) => bufferToHex(addr));
   }
 
   /**
@@ -133,7 +156,12 @@ export class ETHController extends Controller {
    */
   async getStorageAt([address, key, tag]: [string, string, any]) {
     const stateManager = await this.getStateManagerByTag(tag);
-    return bufferToHex(await stateManager.getContractStorage(Address.fromString(address), setLengthLeft(hexStringToBuffer(key), 32)));
+    return bufferToHex(
+      await stateManager.getContractStorage(
+        Address.fromString(address),
+        setLengthLeft(hexStringToBuffer(key), 32)
+      )
+    );
   }
 
   /**
@@ -155,7 +183,8 @@ export class ETHController extends Controller {
    */
   async getBlockTransactionCountByHash([hash]: [string]) {
     try {
-      const number = (await this.node.db.getBlock(hexStringToBuffer(hash))).transactions.length;
+      const number = (await this.node.db.getBlock(hexStringToBuffer(hash)))
+        .transactions.length;
       return intToHex(number);
     } catch (err) {
       return null;
@@ -202,7 +231,9 @@ export class ETHController extends Controller {
    */
   async getCode([address, tag]: [string, any]) {
     const stateManager = await this.getStateManagerByTag(tag);
-    const code = await stateManager.getContractCode(Address.fromString(address));
+    const code = await stateManager.getContractCode(
+      Address.fromString(address)
+    );
     return bufferToHex(code);
   }
 
@@ -213,7 +244,10 @@ export class ETHController extends Controller {
    * @returns Signature
    */
   sign([address, data]: [string, string]) {
-    const signature = ecsign(hashPersonalMessage(Buffer.from(data)), this.node.accMngr.getPrivateKey(address));
+    const signature = ecsign(
+      hashPersonalMessage(Buffer.from(data)),
+      this.node.accMngr.getPrivateKey(address)
+    );
     return toRpcSig(signature.v, signature.r, signature.s);
   }
 
@@ -223,7 +257,9 @@ export class ETHController extends Controller {
     }
     if (!data.nonce) {
       const stateManager = await this.getStateManagerByTag('latest');
-      const account = await stateManager.getAccount(Address.fromString(data.from));
+      const account = await stateManager.getAccount(
+        Address.fromString(data.from)
+      );
       data.nonce = bnToHex(account.nonce);
     }
     const unsignedTx = TransactionFactory.fromTxData(
@@ -275,7 +311,9 @@ export class ETHController extends Controller {
    * @returns Transaction hash
    */
   async sendRawTransaction([rawtx]: [string]) {
-    const tx = TransactionFactory.fromSerializedData(hexStringToBuffer(rawtx), { common: this.node.getLatestCommon() });
+    const tx = TransactionFactory.fromSerializedData(hexStringToBuffer(rawtx), {
+      common: this.node.getLatestCommon()
+    });
     if (!(tx instanceof Transaction)) {
       return null;
     }
@@ -311,7 +349,10 @@ export class ETHController extends Controller {
     }
 
     const fee = new BN(cost).addn(common.param('gasPrices', 'tx'));
-    if (common.gteHardfork('homestead') && (!data.to || hexStringToBuffer(data.to).length === 0)) {
+    if (
+      common.gteHardfork('homestead') &&
+      (!data.to || hexStringToBuffer(data.to).length === 0)
+    ) {
       fee.iaddn(common.param('gasPrices', 'txCreation'));
     }
     return fee;
@@ -376,7 +417,9 @@ export class ETHController extends Controller {
    */
   async getBlockByHash([hash, fullTransactions]: [string, boolean]) {
     try {
-      return ((await this.node.db.getBlock(hexStringToBuffer(hash))) as Block).toRPCJSON(false, fullTransactions);
+      return (
+        (await this.node.db.getBlock(hexStringToBuffer(hash))) as Block
+      ).toRPCJSON(false, fullTransactions);
     } catch (err) {
       return null;
     }
@@ -390,7 +433,10 @@ export class ETHController extends Controller {
    */
   async getBlockByNumber([tag, fullTransactions]: [any, boolean]) {
     try {
-      return (await this.getBlockByTag(tag)).toRPCJSON(tag === 'pending', fullTransactions);
+      return (await this.getBlockByTag(tag)).toRPCJSON(
+        tag === 'pending',
+        fullTransactions
+      );
     } catch (err) {
       return null;
     }
@@ -404,7 +450,9 @@ export class ETHController extends Controller {
   async getTransactionByHash([hash]: [string]) {
     const hashBuffer = hexStringToBuffer(hash);
     try {
-      return ((await this.node.db.getTransaction(hashBuffer)) as Transaction).toRPCJSON();
+      return (
+        (await this.node.db.getTransaction(hashBuffer)) as Transaction
+      ).toRPCJSON();
     } catch (err: any) {
       if (err.type !== 'NotFoundError') {
         throw err;
@@ -458,7 +506,9 @@ export class ETHController extends Controller {
    */
   async getTransactionReceipt([hash]: [string]) {
     try {
-      return (await this.node.db.getReceipt(hexStringToBuffer(hash))).toRPCJSON();
+      return (
+        await this.node.db.getReceipt(hexStringToBuffer(hash))
+      ).toRPCJSON();
     } catch (err) {
       return null;
     }
@@ -514,11 +564,28 @@ export class ETHController extends Controller {
    * @param param0 - filter parameters
    * @returns Filter id
    */
-  async newFilter([{ fromBlock, toBlock, address: _addresses, topics: _topics }]: [{ fromBlock?: string; toBlock?: string; address?: string | string[]; topics?: TopicsData; blockhash?: string }]) {
-    const from = await this.getBlockNumberByTag(fromBlock ? fromBlock : 'latest');
+  async newFilter([
+    { fromBlock, toBlock, address: _addresses, topics: _topics }
+  ]: [
+    {
+      fromBlock?: string;
+      toBlock?: string;
+      address?: string | string[];
+      topics?: TopicsData;
+      blockhash?: string;
+    }
+  ]) {
+    const from = await this.getBlockNumberByTag(
+      fromBlock ? fromBlock : 'latest'
+    );
     const to = await this.getBlockNumberByTag(toBlock ? toBlock : 'latest');
     const { addresses, topics } = parseAddressesAndTopics(_addresses, _topics);
-    return this.filterSystem.newFilter('logs', { fromBlock: from, toBlock: to, addresses, topics });
+    return this.filterSystem.newFilter('logs', {
+      fromBlock: from,
+      toBlock: to,
+      addresses,
+      topics
+    });
   }
 
   /**
@@ -590,7 +657,17 @@ export class ETHController extends Controller {
    * @param param0 - filter parameters
    * @returns Logs
    */
-  async getLogs([{ fromBlock, toBlock, address: _addresses, topics: _topics, blockhash }]: [{ fromBlock?: string; toBlock?: string; address?: string | string[]; topics?: TopicsData; blockhash?: string }]) {
+  async getLogs([
+    { fromBlock, toBlock, address: _addresses, topics: _topics, blockhash }
+  ]: [
+    {
+      fromBlock?: string;
+      toBlock?: string;
+      address?: string | string[];
+      topics?: TopicsData;
+      blockhash?: string;
+    }
+  ]) {
     const from = await this.getBlockNumberByTag(fromBlock ?? 'latest');
     const to = await this.getBlockNumberByTag(toBlock ?? 'latest');
     if (to.sub(from).gtn(5000)) {
@@ -599,7 +676,13 @@ export class ETHController extends Controller {
 
     const { addresses, topics } = parseAddressesAndTopics(_addresses, _topics);
     const filter = this.node.getFilter();
-    const logs = blockhash ? await filter.filterBlock(hexStringToBuffer(blockhash), addresses, topics) : await filter.filterRange(from, to, addresses, topics);
+    const logs = blockhash
+      ? await filter.filterBlock(
+          hexStringToBuffer(blockhash),
+          addresses,
+          topics
+        )
+      : await filter.filterRange(from, to, addresses, topics);
     return logs.map((log) => log.toRPCJSON());
   }
 
@@ -640,17 +723,32 @@ export class ETHController extends Controller {
    * @param client - subscription client
    * @returns Subscription id
    */
-  async subscribe([type, options]: [string, undefined | { address?: string | string[]; topics?: TopicsData }], client?: Client) {
+  async subscribe(
+    [type, options]: [
+      string,
+      undefined | { address?: string | string[]; topics?: TopicsData }
+    ],
+    client?: Client
+  ) {
     if (!client) {
       throw new Error('subscribe is only supported on websocket!');
     }
 
-    if (type !== 'newHeads' && type !== 'logs' && type !== 'newPendingTransactions' && type !== 'syncing') {
+    if (
+      type !== 'newHeads' &&
+      type !== 'logs' &&
+      type !== 'newPendingTransactions' &&
+      type !== 'syncing'
+    ) {
       throw new Error('subscribe, invalid subscription type!');
     }
 
     if (type === 'logs') {
-      return this.filterSystem.subscribe(client, type, parseAddressesAndTopics(options?.address, options?.topics));
+      return this.filterSystem.subscribe(
+        client,
+        type,
+        parseAddressesAndTopics(options?.address, options?.topics)
+      );
     } else {
       return this.filterSystem.subscribe(client, type);
     }

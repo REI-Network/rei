@@ -6,7 +6,9 @@ import { FunctionalBufferMap } from '@rei-network/utils';
  * PendingTxMap record pending transactions
  */
 export class PendingTxMap {
-  private heap = new Heap({ comparBefore: (a: Transaction, b: Transaction) => a.gasPrice.gt(b.gasPrice) });
+  private heap = new Heap({
+    comparBefore: (a: Transaction, b: Transaction) => a.gasPrice.gt(b.gasPrice)
+  });
   private txs = new FunctionalBufferMap<Transaction[]>();
 
   /**

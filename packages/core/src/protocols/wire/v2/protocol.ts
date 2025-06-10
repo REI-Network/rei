@@ -7,7 +7,10 @@ import { isV1 } from '../helper';
 import { WireProtocolHandler } from '../handler';
 import { WireProtocolHandlerV2 } from './handler';
 
-export class WireProtocolV2 extends BaseProtocol<WireProtocolHandlerV2> implements Protocol {
+export class WireProtocolV2
+  extends BaseProtocol<WireProtocolHandlerV2>
+  implements Protocol
+{
   readonly pool: HandlerPool<WireProtocolHandler>;
 
   constructor(node: Node, pool: HandlerPool<WireProtocolHandler>) {
@@ -20,7 +23,9 @@ export class WireProtocolV2 extends BaseProtocol<WireProtocolHandlerV2> implemen
    */
   async makeHandler(peer: Peer, stream: ProtocolStream) {
     // prefer to use the higher version of the wire protocol
-    const handler = this.pool.idlePool.get(peer.peerId) ?? this.pool.busyPool.get(peer.peerId);
+    const handler =
+      this.pool.idlePool.get(peer.peerId) ??
+      this.pool.busyPool.get(peer.peerId);
     if (handler && isV1(handler)) {
       // uninstall low version
       await handler.peer.uninstallProtocol(handler.protocol.protocolString);

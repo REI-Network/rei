@@ -18,7 +18,13 @@ export class GetAccountRange implements SnapMessage {
 
   static readonly code = 0;
 
-  constructor(reqID: number, rootHash: Buffer, startHash: Buffer, limitHash: Buffer, responseLimit: number) {
+  constructor(
+    reqID: number,
+    rootHash: Buffer,
+    startHash: Buffer,
+    limitHash: Buffer,
+    responseLimit: number
+  ) {
     this.reqID = reqID;
     this.rootHash = rootHash;
     this.startHash = startHash;
@@ -31,12 +37,25 @@ export class GetAccountRange implements SnapMessage {
     if (values.length !== 5) {
       throw new Error('invalid values');
     }
-    const [reqIDBuffer, rootHash, startHash, limitHash, responseLimitBuffer] = values;
-    return new GetAccountRange(bufferToInt(reqIDBuffer), rootHash, startHash, limitHash, bufferToInt(responseLimitBuffer));
+    const [reqIDBuffer, rootHash, startHash, limitHash, responseLimitBuffer] =
+      values;
+    return new GetAccountRange(
+      bufferToInt(reqIDBuffer),
+      rootHash,
+      startHash,
+      limitHash,
+      bufferToInt(responseLimitBuffer)
+    );
   }
 
   raw() {
-    return [intToBuffer(this.reqID), this.rootHash, this.startHash, this.limitHash, intToBuffer(this.responseLimit)];
+    return [
+      intToBuffer(this.reqID),
+      this.rootHash,
+      this.startHash,
+      this.limitHash,
+      intToBuffer(this.responseLimit)
+    ];
   }
 
   serialize() {
@@ -71,7 +90,11 @@ export class AccountRange implements SnapMessage {
       throw new Error('invalid values');
     }
     const [reqIDBuffer, accountData, proof] = values;
-    if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(accountData) || !Array.isArray(proof)) {
+    if (
+      !(reqIDBuffer instanceof Buffer) ||
+      !Array.isArray(accountData) ||
+      !Array.isArray(proof)
+    ) {
       throw new Error('invalid values');
     }
     for (const account of accountData) {
@@ -79,7 +102,11 @@ export class AccountRange implements SnapMessage {
         throw new Error('invalid values');
       }
     }
-    return new AccountRange(bufferToInt(reqIDBuffer), accountData as Buffer[][], proof as Buffer[]);
+    return new AccountRange(
+      bufferToInt(reqIDBuffer),
+      accountData as Buffer[][],
+      proof as Buffer[]
+    );
   }
 
   raw() {
@@ -105,7 +132,14 @@ export class GetStorageRange implements SnapMessage {
 
   static readonly code = 2;
 
-  constructor(reqID: number, rootHash: Buffer, accountHashes: Buffer[], startHash: Buffer, limitHash: Buffer, responseLimit: number) {
+  constructor(
+    reqID: number,
+    rootHash: Buffer,
+    accountHashes: Buffer[],
+    startHash: Buffer,
+    limitHash: Buffer,
+    responseLimit: number
+  ) {
     this.reqID = reqID;
     this.rootHash = rootHash;
     this.accountHashes = accountHashes;
@@ -119,15 +153,43 @@ export class GetStorageRange implements SnapMessage {
     if (values.length !== 6) {
       throw new Error('invalid values');
     }
-    const [reqIDBuffer, rootHash, accountHashes, startHash, limitHash, responseLimitBuffer] = values;
-    if (!(reqIDBuffer instanceof Buffer) || !(rootHash instanceof Buffer) || !Array.isArray(accountHashes) || !(startHash instanceof Buffer) || !(limitHash instanceof Buffer) || !(responseLimitBuffer instanceof Buffer)) {
+    const [
+      reqIDBuffer,
+      rootHash,
+      accountHashes,
+      startHash,
+      limitHash,
+      responseLimitBuffer
+    ] = values;
+    if (
+      !(reqIDBuffer instanceof Buffer) ||
+      !(rootHash instanceof Buffer) ||
+      !Array.isArray(accountHashes) ||
+      !(startHash instanceof Buffer) ||
+      !(limitHash instanceof Buffer) ||
+      !(responseLimitBuffer instanceof Buffer)
+    ) {
       throw new Error('invalid values');
     }
-    return new GetStorageRange(bufferToInt(reqIDBuffer), rootHash, accountHashes, startHash, limitHash, bufferToInt(responseLimitBuffer));
+    return new GetStorageRange(
+      bufferToInt(reqIDBuffer),
+      rootHash,
+      accountHashes,
+      startHash,
+      limitHash,
+      bufferToInt(responseLimitBuffer)
+    );
   }
 
   raw() {
-    return [intToBuffer(this.reqID), this.rootHash, this.accountHashes, this.startHash, this.limitHash, intToBuffer(this.responseLimit)];
+    return [
+      intToBuffer(this.reqID),
+      this.rootHash,
+      this.accountHashes,
+      this.startHash,
+      this.limitHash,
+      intToBuffer(this.responseLimit)
+    ];
   }
 
   serialize(): Buffer {
@@ -165,7 +227,11 @@ export class StorageRange implements SnapMessage {
       throw new Error('invalid values');
     }
     const [reqIDBuffer, storage, proof] = values;
-    if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(storage) || !Array.isArray(proof)) {
+    if (
+      !(reqIDBuffer instanceof Buffer) ||
+      !Array.isArray(storage) ||
+      !Array.isArray(proof)
+    ) {
       throw new Error('invalid values');
     }
     for (const slot of storage) {
@@ -179,7 +245,11 @@ export class StorageRange implements SnapMessage {
         }
       }
     }
-    return new StorageRange(bufferToInt(reqIDBuffer), storage as Buffer[][][], proof as Buffer[]);
+    return new StorageRange(
+      bufferToInt(reqIDBuffer),
+      storage as Buffer[][][],
+      proof as Buffer[]
+    );
   }
 
   raw() {
@@ -214,14 +284,26 @@ export class GetByteCode implements SnapMessage {
       throw new Error('invalid values');
     }
     const [reqIDBuffer, hashes, responseLimitBuffer] = values;
-    if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(hashes) || !(responseLimitBuffer instanceof Buffer)) {
+    if (
+      !(reqIDBuffer instanceof Buffer) ||
+      !Array.isArray(hashes) ||
+      !(responseLimitBuffer instanceof Buffer)
+    ) {
       throw new Error('invalid values');
     }
-    return new GetByteCode(bufferToInt(reqIDBuffer), hashes, bufferToInt(responseLimitBuffer));
+    return new GetByteCode(
+      bufferToInt(reqIDBuffer),
+      hashes,
+      bufferToInt(responseLimitBuffer)
+    );
   }
 
   raw() {
-    return [intToBuffer(this.reqID), this.hashes, intToBuffer(this.responseLimit)];
+    return [
+      intToBuffer(this.reqID),
+      this.hashes,
+      intToBuffer(this.responseLimit)
+    ];
   }
 
   serialize(): Buffer {
@@ -292,14 +374,26 @@ export class GetTrieNode implements SnapMessage {
       throw new Error('invalid values');
     }
     const [reqIDBuffer, hashes, responseLimitBuffer] = values;
-    if (!(reqIDBuffer instanceof Buffer) || !Array.isArray(hashes) || !(responseLimitBuffer instanceof Buffer)) {
+    if (
+      !(reqIDBuffer instanceof Buffer) ||
+      !Array.isArray(hashes) ||
+      !(responseLimitBuffer instanceof Buffer)
+    ) {
       throw new Error('invalid values');
     }
-    return new GetTrieNode(bufferToInt(reqIDBuffer), hashes, bufferToInt(responseLimitBuffer));
+    return new GetTrieNode(
+      bufferToInt(reqIDBuffer),
+      hashes,
+      bufferToInt(responseLimitBuffer)
+    );
   }
 
   raw() {
-    return [intToBuffer(this.reqID), this.hashes, intToBuffer(this.responseLimit)];
+    return [
+      intToBuffer(this.reqID),
+      this.hashes,
+      intToBuffer(this.responseLimit)
+    ];
   }
 
   serialize(): Buffer {

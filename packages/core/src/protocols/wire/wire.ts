@@ -25,10 +25,15 @@ export class Wire {
   getHandler(peer: Peer, throwError: true): WireProtocolHandler;
   getHandler(peer: Peer, throwError: false): WireProtocolHandler | undefined;
   getHandler(peer: Peer, throwError: boolean): WireProtocolHandler | undefined;
-  getHandler(peer: Peer, throwError: boolean = true) {
-    if (!peer.isSupport(this.v1.protocolString) && !peer.isSupport(this.v2.protocolString)) {
+  getHandler(peer: Peer, throwError = true) {
+    if (
+      !peer.isSupport(this.v1.protocolString) &&
+      !peer.isSupport(this.v2.protocolString)
+    ) {
       if (throwError) {
-        throw new Error(`peer doesn't support ${this.v1.protocolString} and ${this.v2.protocolString}`);
+        throw new Error(
+          `peer doesn't support ${this.v1.protocolString} and ${this.v2.protocolString}`
+        );
       }
     } else if (peer.isSupport(this.v1.protocolString)) {
       return peer.getHandler(this.v1.protocolString) as WireProtocolHandler;

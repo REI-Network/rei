@@ -42,7 +42,10 @@ export class Worker {
     const period: number = nextCommon.consensusConfig().period;
 
     // get pending transactions for txpool
-    const txs = await this.node.txPool.getPendingTxMap(header.number, parentHash);
+    const txs = await this.node.txPool.getPendingTxMap(
+      header.number,
+      parentHash
+    );
 
     // lock
     await this.lock.acquire();
@@ -51,9 +54,17 @@ export class Worker {
     const now = nowTimestamp();
     const nexTimestamp1 = now + period;
     const nexTimestamp2 = header.timestamp.toNumber() + period;
-    const nexTimestamp = nexTimestamp1 > nexTimestamp2 ? nexTimestamp1 : nexTimestamp2;
+    const nexTimestamp =
+      nexTimestamp1 > nexTimestamp2 ? nexTimestamp1 : nexTimestamp2;
 
-    this.pendingBlock = new PendingBlock(this.engine, parentHash, header.stateRoot, nextNumber, new BN(nexTimestamp), nextCommon);
+    this.pendingBlock = new PendingBlock(
+      this.engine,
+      parentHash,
+      header.stateRoot,
+      nextNumber,
+      new BN(nexTimestamp),
+      nextCommon
+    );
 
     // unlock
     this.lock.release();

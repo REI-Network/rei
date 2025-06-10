@@ -12,7 +12,9 @@ export class BloomBitsGenerator {
     this.nextSec = 0;
     this.blooms = [];
     for (let i = 0; i < config.bloomBitLength; i++) {
-      this.blooms.push(new Array<number>(Math.floor(config.bloomBitsSectionSize / 8)).fill(0));
+      this.blooms.push(
+        new Array<number>(Math.floor(config.bloomBitsSectionSize / 8)).fill(0)
+      );
     }
   }
 

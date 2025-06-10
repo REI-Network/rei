@@ -21,7 +21,7 @@ export default class Cache {
    * @param key - Address of account
    * @param val - Account
    */
-  put(key: Address, val: Account, fromTrie: boolean = false): void {
+  put(key: Address, val: Account, fromTrie = false): void {
     const modified = !fromTrie;
     this._update(key, val, modified, false);
   }
@@ -177,7 +177,12 @@ export default class Cache {
    * @param modified - Has the value been modfied or is it coming unchanged from the trie (also used for deleted accounts)
    * @param deleted - Delete operation on an account
    */
-  _update(key: Address, value: Account, modified: boolean, deleted: boolean): void {
+  _update(
+    key: Address,
+    value: Account,
+    modified: boolean,
+    deleted: boolean
+  ): void {
     const keyHex = key.buf.toString('hex');
     const it = this._cache.find(keyHex);
     const val = value.serialize();

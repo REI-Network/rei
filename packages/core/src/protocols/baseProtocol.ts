@@ -1,8 +1,15 @@
-import { ProtocolHandler, Protocol, Peer, ProtocolStream } from '@rei-network/network';
+import {
+  ProtocolHandler,
+  Protocol,
+  Peer,
+  ProtocolStream
+} from '@rei-network/network';
 import { Node } from '../node';
 import { NetworkProtocol } from './enum';
 
-export abstract class BaseProtocol<T extends ProtocolHandler> implements Protocol {
+export abstract class BaseProtocol<T extends ProtocolHandler>
+  implements Protocol
+{
   readonly node: Node;
   readonly name: NetworkProtocol;
   readonly version: string;
@@ -33,7 +40,7 @@ export abstract class BaseProtocol<T extends ProtocolHandler> implements Protoco
   getHandler(peer: Peer, throwError: true): T;
   getHandler(peer: Peer, throwError: false): T | undefined;
   getHandler(peer: Peer, throwError: boolean): T | undefined;
-  getHandler(peer: Peer, throwError: boolean = true) {
+  getHandler(peer: Peer, throwError = true) {
     if (!peer.isSupport(this.protocolString)) {
       if (throwError) {
         throw new Error(`peer doesn't support ${this.protocolString}`);

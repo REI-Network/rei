@@ -6,7 +6,12 @@ import { IDebug } from '../types';
 import Memory from './memory';
 import Stack from './stack';
 import EEI from './eei';
-import { Opcode, handlers as opHandlers, OpHandler, AsyncOpHandler } from './opcodes';
+import {
+  Opcode,
+  handlers as opHandlers,
+  OpHandler,
+  AsyncOpHandler
+} from './opcodes';
 
 export interface InterpreterOpts {
   pc?: number;
@@ -94,7 +99,10 @@ export default class Interpreter {
     };
   }
 
-  async run(code: Buffer, opts: InterpreterOpts = {}): Promise<InterpreterResult> {
+  async run(
+    code: Buffer,
+    opts: InterpreterOpts = {}
+  ): Promise<InterpreterResult> {
     this._runState.code = code;
     this._runState.programCounter = opts.pc ?? this._runState.programCounter;
 
@@ -158,7 +166,10 @@ export default class Interpreter {
     // Execute opcode handler
     const opFn = this.getOpHandler(opInfo);
     if (opInfo.isAsync) {
-      await (opFn as AsyncOpHandler).apply(null, [this._runState, this._vm._common]);
+      await (opFn as AsyncOpHandler).apply(null, [
+        this._runState,
+        this._vm._common
+      ]);
     } else {
       opFn.apply(null, [this._runState, this._vm._common]);
     }

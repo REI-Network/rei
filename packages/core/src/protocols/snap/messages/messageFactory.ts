@@ -26,11 +26,17 @@ export abstract class SnapMessageFactory {
     }
 
     const [codeBuffer, valuesArray] = values;
-    if (!(codeBuffer instanceof Buffer) || !Array.isArray(valuesArray) || valuesArray.length === 0) {
+    if (
+      !(codeBuffer instanceof Buffer) ||
+      !Array.isArray(valuesArray) ||
+      valuesArray.length === 0
+    ) {
       throw new Error('invalid evidence values');
     }
 
-    return SnapMessageFactory.registry.getCtorByCode(bufferToInt(codeBuffer)).fromValuesArray(valuesArray);
+    return SnapMessageFactory.registry
+      .getCtorByCode(bufferToInt(codeBuffer))
+      .fromValuesArray(valuesArray);
   }
 
   static rawMessage<T extends SnapMessage>(_snapmessage: T) {

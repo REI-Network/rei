@@ -1,4 +1,10 @@
-import { bufferToInt, rlp, BN, intToBuffer, bufferToHex } from 'ethereumjs-util';
+import {
+  bufferToInt,
+  rlp,
+  BN,
+  intToBuffer,
+  bufferToHex
+} from 'ethereumjs-util';
 import { Transaction, Block, BlockHeader } from '@rei-network/structure';
 import { logger, Channel, FunctionalBufferSet } from '@rei-network/utils';
 import { ProtocolHandler, Peer, ProtocolStream } from '@rei-network/network';
@@ -42,10 +48,17 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
     }
   >();
 
-  private newBlockAnnouncesQueue = new Channel<{ block: Block; td: BN }>({ max: c.maxQueuedBlocks });
+  private newBlockAnnouncesQueue = new Channel<{ block: Block; td: BN }>({
+    max: c.maxQueuedBlocks
+  });
   private txAnnouncesQueue = new Channel<Buffer>({ max: c.maxQueuedTxs });
 
-  constructor(protocol: WireProtocol, peer: Peer, stream: ProtocolStream, funcs: HandlerFunc[]) {
+  constructor(
+    protocol: WireProtocol,
+    peer: Peer,
+    stream: ProtocolStream,
+    funcs: HandlerFunc[]
+  ) {
     this.peer = peer;
     this.stream = stream;
     this.protocol = protocol;
@@ -91,7 +104,9 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
    * @returns Handler function
    */
   protected findHandler(method: string | number) {
-    const handler = this.funcs.find((h) => (typeof method === 'string' ? h.name === method : h.code === method));
+    const handler = this.funcs.find((h) =>
+      typeof method === 'string' ? h.name === method : h.code === method
+    );
     if (!handler) {
       throw new Error(`Missing handler, method: ${method}`);
     }
@@ -123,7 +138,9 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
   handshakeResponse(status: NodeStatus) {
     if (this.handshakeResolve) {
       const localStatus = this.node.status;
-      const result = localStatus.genesisHash.equals(status.genesisHash) && localStatus.networkId === status.networkId;
+      const result =
+        localStatus.genesisHash.equals(status.genesisHash) &&
+        localStatus.networkId === status.networkId;
       if (result) {
         this.updateStatus(status);
       }
@@ -144,7 +161,9 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
   send(method: string | number, data: any) {
     const handler = this.findHandler(method);
     try {
-      this.stream.send(rlp.encode([intToBuffer(handler.code), handler.encode.call(this, data)]));
+      this.stream.send(
+        rlp.encode([intToBuffer(handler.code), handler.encode.call(this, data)])
+      );
     } catch (err) {
       // ignore errors
     }
@@ -261,7 +280,10 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
       try {
         this.newBlock(block, td);
       } catch (err) {
-        logger.error('WireProtocolHandler::newBlockAnnouncesLoop, catch error:', err);
+        logger.error(
+          'WireProtocolHandler::newBlockAnnouncesLoop, catch error:',
+          err
+        );
       }
     }
   }
@@ -274,7 +296,10 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
     let hashesCache: Buffer[] = [];
     for await (const hash of this.txAnnouncesQueue) {
       hashesCache.push(hash);
-      if (hashesCache.length < c.maxTxPacketSize && this.txAnnouncesQueue.array.length > 0) {
+      if (
+        hashesCache.length < c.maxTxPacketSize &&
+        this.txAnnouncesQueue.array.length > 0
+      ) {
         continue;
       }
       try {
@@ -293,7 +318,11 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
    * @param toHash - Convert data to hash
    * @returns Filtered data
    */
-  private filterHash<T>(know: Set<Buffer>, data: T[], toHash?: (t: T) => Buffer) {
+  private filterHash<T>(
+    know: Set<Buffer>,
+    data: T[],
+    toHash?: (t: T) => Buffer
+  ) {
     const filtered: T[] = [];
     for (const t of data) {
       const hash = Buffer.isBuffer(t) ? t : toHash!(t);
@@ -332,7 +361,9 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
    */
   private knowHash(know: Set<Buffer>, max: number, hashs: Buffer[]) {
     if (hashs.length >= max) {
-      throw new Error(`WireProtocolHandler invalid hash length: ${hashs.length}`);
+      throw new Error(
+        `WireProtocolHandler invalid hash length: ${hashs.length}`
+      );
     }
     while (know.size + hashs.length >= max) {
       const { value } = know.keys().next();
@@ -447,7 +478,10 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
    * @returns Status
    */
   getRemoteStatus() {
-    const result = { name: this.protocol.name, version: Number(this.protocol.version) };
+    const result = {
+      name: this.protocol.name,
+      version: Number(this.protocol.version)
+    };
     if (!this.status) {
       return result;
     }

@@ -11,7 +11,17 @@ export interface EvidencePoolBackend {
   addPendingEvidence(ev: Evidence): Promise<void>;
   addCommittedEvidence(ev: Evidence): Promise<void>;
   removePendingEvidence(ev: Evidence): Promise<void>;
-  loadPendingEvidence({ from, to, reverse, onData }: { from?: BN; to?: BN; reverse?: boolean; onData: (data: Evidence) => Promise<boolean> }): Promise<void>;
+  loadPendingEvidence({
+    from,
+    to,
+    reverse,
+    onData
+  }: {
+    from?: BN;
+    to?: BN;
+    reverse?: boolean;
+    onData: (data: Evidence) => Promise<boolean>;
+  }): Promise<void>;
 }
 
 export interface EvidencePoolOptions {
@@ -46,15 +56,15 @@ export class EvidencePool {
     try {
       await this.lock.acquire();
       return await fn();
-    } catch (err) {
-      throw err;
     } finally {
       this.lock.release();
     }
   }
 
   private deleteFromCache(ev: Evidence) {
-    const index = this.cachedPendingEvidence.findIndex((_ev) => _ev.hash().equals(ev.hash()));
+    const index = this.cachedPendingEvidence.findIndex((_ev) =>
+      _ev.hash().equals(ev.hash())
+    );
     if (index !== -1) {
       this.cachedPendingEvidence.splice(index, 1);
     }
@@ -146,7 +156,9 @@ export class EvidencePool {
     await this.initPromise;
     return await this.runWithLock(async () => {
       const evList: Evidence[] = [];
-      const from = height.gt(this.maxAgeNumBlocks) ? height.sub(this.maxAgeNumBlocks) : new BN(0);
+      const from = height.gt(this.maxAgeNumBlocks)
+        ? height.sub(this.maxAgeNumBlocks)
+        : new BN(0);
       const to = height.subn(1);
       try {
         await this.backend.loadPendingEvidence({
@@ -205,7 +217,12 @@ export class EvidencePool {
    */
   async update(committedEvList: Evidence[], height: BN) {
     if (height.lte(this.height)) {
-      throw new Error('failed EvidencePool.Update new height is less than or equal to previous height: ' + height.toNumber() + '<=' + this.height.toNumber());
+      throw new Error(
+        'failed EvidencePool.Update new height is less than or equal to previous height: ' +
+          height.toNumber() +
+          '<=' +
+          this.height.toNumber()
+      );
     }
 
     await this.initPromise;

@@ -5,7 +5,9 @@ import { IpcClient } from '@rei-network/ipc';
 export function installAttachCommand(program: any) {
   program
     .command('attach [ipcpath]')
-    .description('Start an interactive JavaScript environment (connect to node)')
+    .description(
+      'Start an interactive JavaScript environment (connect to node)'
+    )
     .action(async (ipcPath) => {
       try {
         const client = new IpcClient({

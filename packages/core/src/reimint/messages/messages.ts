@@ -1,5 +1,14 @@
-import { BN, bnToUnpaddedBuffer, bufferToInt, intToBuffer, rlp } from 'ethereumjs-util';
-import { ConsensusMessage, ConsensusMessageFactory } from '../../protocols/consensus/messages';
+import {
+  BN,
+  bnToUnpaddedBuffer,
+  bufferToInt,
+  intToBuffer,
+  rlp
+} from 'ethereumjs-util';
+import {
+  ConsensusMessage,
+  ConsensusMessageFactory
+} from '../../protocols/consensus/messages';
 import * as v from '../validate';
 import { RoundStepType } from '../enum';
 
@@ -30,11 +39,17 @@ export class StateMachineMessage implements StateMachineMsg {
     if (!(peerIdBuffer instanceof Buffer) || !Array.isArray(messageValues)) {
       throw new Error('invalid values');
     }
-    return new StateMachineMessage(peerIdBuffer.toString(), ConsensusMessageFactory.fromValuesArray(messageValues));
+    return new StateMachineMessage(
+      peerIdBuffer.toString(),
+      ConsensusMessageFactory.fromValuesArray(messageValues)
+    );
   }
 
   raw() {
-    return [Buffer.from(this.peerId), ConsensusMessageFactory.rawMessage(this.msg)];
+    return [
+      Buffer.from(this.peerId),
+      ConsensusMessageFactory.rawMessage(this.msg)
+    ];
   }
 
   serialize() {
@@ -52,7 +67,12 @@ export class StateMachineTimeout implements StateMachineMsg {
   readonly round: number;
   readonly step: RoundStepType;
 
-  constructor(duration: number, height: BN, round: number, step: RoundStepType) {
+  constructor(
+    duration: number,
+    height: BN,
+    round: number,
+    step: RoundStepType
+  ) {
     this.duration = duration;
     this.height = height.clone();
     this.round = round;
@@ -68,11 +88,21 @@ export class StateMachineTimeout implements StateMachineMsg {
     }
 
     const [durationBuffer, heightBuffer, roundBuffer, stepBuffer] = values;
-    return new StateMachineTimeout(bufferToInt(durationBuffer), new BN(heightBuffer), bufferToInt(roundBuffer), bufferToInt(stepBuffer));
+    return new StateMachineTimeout(
+      bufferToInt(durationBuffer),
+      new BN(heightBuffer),
+      bufferToInt(roundBuffer),
+      bufferToInt(stepBuffer)
+    );
   }
 
   raw() {
-    return [intToBuffer(this.duration), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.step)];
+    return [
+      intToBuffer(this.duration),
+      bnToUnpaddedBuffer(this.height),
+      intToBuffer(this.round),
+      intToBuffer(this.step)
+    ];
   }
 
   serialize() {

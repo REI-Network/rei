@@ -20,7 +20,16 @@ export function validatePOLRound(POLRound: number) {
 }
 
 export function validateStep(step: RoundStepType) {
-  if (step !== RoundStepType.Propose && step !== RoundStepType.PrevoteWait && step !== RoundStepType.Prevote && step !== RoundStepType.PrecommitWait && step !== RoundStepType.Precommit && step !== RoundStepType.NewRound && step !== RoundStepType.NewHeight && step !== RoundStepType.Commit) {
+  if (
+    step !== RoundStepType.Propose &&
+    step !== RoundStepType.PrevoteWait &&
+    step !== RoundStepType.Prevote &&
+    step !== RoundStepType.PrecommitWait &&
+    step !== RoundStepType.Precommit &&
+    step !== RoundStepType.NewRound &&
+    step !== RoundStepType.NewHeight &&
+    step !== RoundStepType.Commit
+  ) {
     throw new Error('invalid step');
   }
 }

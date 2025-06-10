@@ -10,7 +10,10 @@ export class RevertError {
   constructor(returnValue: Buffer | string) {
     this.returnValue = returnValue;
     if (Buffer.isBuffer(returnValue)) {
-      this.decodedReturnValue = coder.decode(['string'], returnValue.slice(4))[0];
+      this.decodedReturnValue = coder.decode(
+        ['string'],
+        returnValue.slice(4)
+      )[0];
     }
   }
 }

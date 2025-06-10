@@ -6,7 +6,7 @@ import { FunctionalBufferSet, hexStringToBuffer } from '@rei-network/utils';
  * The collected hashes will be used for hard fork upgrades.
  */
 export class EvidenceCollector {
-  initHeight: number = 0;
+  initHeight = 0;
   currentHeight!: BN;
   hashes = new FunctionalBufferSet();
 

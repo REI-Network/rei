@@ -31,16 +31,21 @@ export class SnapSyncScheduler extends EventEmitter {
   private syncPromise?: Promise<void>;
 
   // sync state
-  private startingBlock: number = 0;
-  private highestBlock: number = 0;
+  private startingBlock = 0;
+  private highestBlock = 0;
 
-  private listener = (preRoot: Buffer) => this.snapSyncer.announcePreRoot(preRoot);
+  private listener = (preRoot: Buffer) =>
+    this.snapSyncer.announcePreRoot(preRoot);
 
   constructor(node: Node) {
     super();
     this.node = node;
     this.snapSyncer = new SnapSync(this.node.db, this.node.snap.pool);
-    this.headerSyncer = new HeaderSync({ db: this.node.db, backend: new HeaderSyncBackend(node), pool: this.node.wire.pool });
+    this.headerSyncer = new HeaderSync({
+      db: this.node.db,
+      backend: new HeaderSyncBackend(node),
+      pool: this.node.wire.pool
+    });
     this.headerSyncer.on('preRoot', this.listener);
   }
 
@@ -48,7 +53,10 @@ export class SnapSyncScheduler extends EventEmitter {
    * Get the sync state
    */
   get status() {
-    return { startingBlock: this.startingBlock, highestBlock: this.highestBlock };
+    return {
+      startingBlock: this.startingBlock,
+      highestBlock: this.highestBlock
+    };
   }
 
   /**
@@ -70,7 +78,10 @@ export class SnapSyncScheduler extends EventEmitter {
         ...data,
         broadcast: false,
         force: true,
-        td: blockNumber2TotalDifficulty(data.block.header.number, data.block._common)
+        td: blockNumber2TotalDifficulty(
+          data.block.header.number,
+          data.block._common
+        )
       });
     } catch (err) {
       logger.error('SnapSyncScheduler::saveBlockData, commit failed:', err);
@@ -84,8 +95,16 @@ export class SnapSyncScheduler extends EventEmitter {
    * @param info - Sync info
    * @param data - Sync block data
    */
-  async resetRoot(root: Buffer, startingBlock: number, info: SyncInfo, data: BlockData) {
-    if (this.snapSyncer.root !== undefined && !this.snapSyncer.root.equals(root)) {
+  async resetRoot(
+    root: Buffer,
+    startingBlock: number,
+    info: SyncInfo,
+    data: BlockData
+  ) {
+    if (
+      this.snapSyncer.root !== undefined &&
+      !this.snapSyncer.root.equals(root)
+    ) {
       // abort
       await this.abort();
       // reset sync info
@@ -97,7 +116,10 @@ export class SnapSyncScheduler extends EventEmitter {
       this.headerSyncer.headerSync(data.block.header);
       // wait until finished
       this.syncPromise = new Promise<void>(async (resolve) => {
-        const [finished, headers] = await Promise.all([this.snapSyncer.wait(), this.headerSyncer.wait()]);
+        const [finished, headers] = await Promise.all([
+          this.snapSyncer.wait(),
+          this.headerSyncer.wait()
+        ]);
         if (finished) {
           // save recent 256 headers
           await this.node.db.batch(
@@ -128,7 +150,12 @@ export class SnapSyncScheduler extends EventEmitter {
    * @param info - Sync info
    * @param data - Sync block data
    */
-  async snapSync(root: Buffer, startingBlock: number, info: SyncInfo, data: BlockData) {
+  async snapSync(
+    root: Buffer,
+    startingBlock: number,
+    info: SyncInfo,
+    data: BlockData
+  ) {
     if (this.isSyncing) {
       throw new Error('SnapSyncScheduler is working');
     }
@@ -143,7 +170,10 @@ export class SnapSyncScheduler extends EventEmitter {
     this.headerSyncer.headerSync(data.block.header);
     // wait until finished
     this.syncPromise = new Promise<void>(async (resolve) => {
-      const [finished, headers] = await Promise.all([this.snapSyncer.wait(), this.headerSyncer.wait()]);
+      const [finished, headers] = await Promise.all([
+        this.snapSyncer.wait(),
+        this.headerSyncer.wait()
+      ]);
       if (finished) {
         // save recent 256 headers
         await this.node.db.batch(

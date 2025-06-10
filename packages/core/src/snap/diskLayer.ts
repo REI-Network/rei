@@ -1,8 +1,18 @@
 import { BaseTrie as Trie } from '@rei-network/trie';
 import { BN, KECCAK256_NULL, KECCAK256_RLP } from 'ethereumjs-util';
 import { Database } from '@rei-network/database';
-import { DBDeleteSnapAccount, DBDeleteSnapStorage, DBSaveSerializedSnapAccount, DBSaveSnapStorage } from '@rei-network/database/dist/helpers';
-import { snapStorageKey, snapAccountKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
+import {
+  DBDeleteSnapAccount,
+  DBDeleteSnapStorage,
+  DBSaveSerializedSnapAccount,
+  DBSaveSnapStorage
+} from '@rei-network/database/dist/helpers';
+import {
+  snapStorageKey,
+  snapAccountKey,
+  SNAP_ACCOUNT_PREFIX,
+  SNAP_STORAGE_PREFIX
+} from '@rei-network/database/dist/constants';
 import { FunctionalBufferSet, logger } from '@rei-network/utils';
 import { StakingAccount } from '../stateManager';
 import { EMPTY_HASH, MAX_HASH, DBatch } from '../utils';
@@ -34,7 +44,12 @@ type ProofResult = {
   trie?: Trie;
 };
 
-type OnState = (key: Buffer, val: Buffer | null, isWrite: boolean, isDelete: boolean) => Promise<boolean>;
+type OnState = (
+  key: Buffer,
+  val: Buffer | null,
+  isWrite: boolean,
+  isDelete: boolean
+) => Promise<boolean>;
 
 type GenerateAborter = SimpleAborter<GeneratorStats | void>;
 
@@ -43,7 +58,7 @@ export class DiskLayer implements ISnapshot {
   readonly root: Buffer;
   readonly parent = undefined;
 
-  stale: boolean = false;
+  stale = false;
   genMarker?: Buffer;
 
   // An aborter to abort snapshot generation
@@ -60,7 +75,9 @@ export class DiskLayer implements ISnapshot {
    * @returns Account object
    */
   async getAccount(accountHash: Buffer) {
-    return StakingAccount.fromRlpSerializedSlimAccount(await this.getSerializedAccount(accountHash));
+    return StakingAccount.fromRlpSerializedSlimAccount(
+      await this.getSerializedAccount(accountHash)
+    );
   }
 
   /**
@@ -107,8 +124,19 @@ export class DiskLayer implements ISnapshot {
    * @param storageData - Modified storage data
    * @returns New layer
    */
-  update(root: Buffer, destructSet: FunctionalBufferSet, accountData: AccountData, storageData: StorageData) {
-    return DiffLayer.createDiffLayerFromParent(this, root, destructSet, accountData, storageData);
+  update(
+    root: Buffer,
+    destructSet: FunctionalBufferSet,
+    accountData: AccountData,
+    storageData: StorageData
+  ) {
+    return DiffLayer.createDiffLayerFromParent(
+      this,
+      root,
+      destructSet,
+      accountData,
+      storageData
+    );
   }
 
   /**
@@ -136,7 +164,10 @@ export class DiskLayer implements ISnapshot {
     return {
       iter: asyncTraverseRawDB(
         this.db.rawdb,
-        { gte: snapStorageKey(accountHash, seek), lte: snapStorageKey(accountHash, MAX_HASH) },
+        {
+          gte: snapStorageKey(accountHash, seek),
+          lte: snapStorageKey(accountHash, MAX_HASH)
+        },
         (key) => key.length !== SNAP_STORAGE_PREFIX.length + 32 + 32,
         (key) => key.slice(SNAP_STORAGE_PREFIX.length + 32),
         (value) => value
@@ -177,7 +208,13 @@ export class DiskLayer implements ISnapshot {
    *
    * return: {@link ProofResult}
    */
-  async proveRange(root: Buffer, prefix: Buffer, origin: Buffer, max: number, convertValue: (value: Buffer) => Buffer): Promise<ProofResult> {
+  async proveRange(
+    root: Buffer,
+    prefix: Buffer,
+    origin: Buffer,
+    max: number,
+    convertValue: (value: Buffer) => Buffer
+  ): Promise<ProofResult> {
     const keys: Buffer[] = [];
     const vals: Buffer[] = [];
     let diskMore = false;
@@ -185,7 +222,10 @@ export class DiskLayer implements ISnapshot {
 
     const iter = asyncTraverseRawDB(
       this.db.rawdb,
-      { gte: Buffer.concat([prefix, origin]), lte: Buffer.concat([prefix, MAX_HASH]) },
+      {
+        gte: Buffer.concat([prefix, origin]),
+        lte: Buffer.concat([prefix, MAX_HASH])
+      },
       (key) => key.length !== prefix.length + origin.length,
       (key) => key.slice(prefix.length),
       convertValue
@@ -243,7 +283,14 @@ export class DiskLayer implements ISnapshot {
 
     let proofed = false;
     try {
-      trieMore = await Trie.verifyRangeProof(root, origin, last, keys, vals, proof);
+      trieMore = await Trie.verifyRangeProof(
+        root,
+        origin,
+        last,
+        keys,
+        vals,
+        proof
+      );
       proofed = true;
     } catch (err) {
       // ignore error...
@@ -270,8 +317,22 @@ export class DiskLayer implements ISnapshot {
    * @param convertValue - A function to convert the value
    * @returns Whether there are still values that have not been generated, and the last key processed
    */
-  async generateRange(root: Buffer, prefix: Buffer, origin: Buffer, max: number, onState: OnState, convertValue: (value: Buffer) => Buffer) {
-    const { keys, vals, diskMore, trieMore: _trieMore, proofed, trie: _trie } = await this.proveRange(root, prefix, origin, max, convertValue);
+  async generateRange(
+    root: Buffer,
+    prefix: Buffer,
+    origin: Buffer,
+    max: number,
+    onState: OnState,
+    convertValue: (value: Buffer) => Buffer
+  ) {
+    const {
+      keys,
+      vals,
+      diskMore,
+      trieMore: _trieMore,
+      proofed,
+      trie: _trie
+    } = await this.proveRange(root, prefix, origin, max, convertValue);
     const last = keys.length > 0 ? keys[keys.length - 1] : null;
 
     // if the snapshot in the current disk is valid, no need to traverse the trie
@@ -389,7 +450,10 @@ export class DiskLayer implements ISnapshot {
         (origin, limit) =>
           asyncTraverseRawDB(
             this.db.rawdb,
-            { gte: snapStorageKey(accountHash, origin), lte: snapStorageKey(accountHash, limit) },
+            {
+              gte: snapStorageKey(accountHash, origin),
+              lte: snapStorageKey(accountHash, limit)
+            },
             (key) => key.length !== SNAP_STORAGE_PREFIX.length + 32 + 32,
             (key) => key.slice(SNAP_STORAGE_PREFIX.length + 32),
             (value) => value
@@ -438,7 +502,12 @@ export class DiskLayer implements ISnapshot {
        * then we need to ensure that the newly written marker is not smaller than the original marker
        */
       let marker = accountHash;
-      if (accMarker !== null && marker.equals(accMarker) && this.genMarker && this.genMarker.length > 32) {
+      if (
+        accMarker !== null &&
+        marker.equals(accMarker) &&
+        this.genMarker &&
+        this.genMarker.length > 32
+      ) {
         marker = this.genMarker;
       }
 
@@ -452,7 +521,12 @@ export class DiskLayer implements ISnapshot {
       } else {
         // account's trie is not empty, try to write all slots
         let storeMarker: Buffer | null = null;
-        if (accMarker !== null && accountHash.equals(accMarker) && this.genMarker && this.genMarker.length > 32) {
+        if (
+          accMarker !== null &&
+          accountHash.equals(accMarker) &&
+          this.genMarker &&
+          this.genMarker.length > 32
+        ) {
           storeMarker = this.genMarker.slice(32);
         }
 
@@ -475,7 +549,14 @@ export class DiskLayer implements ISnapshot {
 
         let storeOrigin = storeMarker ?? EMPTY_HASH;
         while (true) {
-          const { exhausted, last } = await this.generateRange(account.stateRoot, Buffer.concat([SNAP_STORAGE_PREFIX, accountHash]), storeOrigin, storageCheckRange, onStorage, (value) => value);
+          const { exhausted, last } = await this.generateRange(
+            account.stateRoot,
+            Buffer.concat([SNAP_STORAGE_PREFIX, accountHash]),
+            storeOrigin,
+            storageCheckRange,
+            onStorage,
+            (value) => value
+          );
           if (aborter.isAborted) {
             return true;
           }
@@ -502,7 +583,14 @@ export class DiskLayer implements ISnapshot {
 
     let accOrigin = accMarker ?? EMPTY_HASH;
     while (true) {
-      const { exhausted, last } = await this.generateRange(this.root, SNAP_ACCOUNT_PREFIX, accOrigin, accountRange, onAccount, (value) => value);
+      const { exhausted, last } = await this.generateRange(
+        this.root,
+        SNAP_ACCOUNT_PREFIX,
+        accOrigin,
+        accountRange,
+        onAccount,
+        (value) => value
+      );
       if (aborter.isAborted) {
         await batch.write();
 
@@ -524,7 +612,12 @@ export class DiskLayer implements ISnapshot {
       accOrigin = nextAccOrigin;
       accountRange = accountCheckRange;
 
-      logger.info(`📷 Generating snapshot, progress: ${new BN(nextAccOrigin).muln(100).div(new BN(MAX_HASH)).toNumber()}%`);
+      logger.info(
+        `📷 Generating snapshot, progress: ${new BN(nextAccOrigin)
+          .muln(100)
+          .div(new BN(MAX_HASH))
+          .toNumber()}%`
+      );
     }
 
     journalProgress(batch, undefined, stats);

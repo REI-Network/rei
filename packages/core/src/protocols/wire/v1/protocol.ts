@@ -7,7 +7,10 @@ import { isV2 } from '../helper';
 import { WireProtocolHandler } from '../handler';
 import { WireProtocolHandlerV1 } from './handler';
 
-export class WireProtocolV1 extends BaseProtocol<WireProtocolHandlerV1> implements Protocol {
+export class WireProtocolV1
+  extends BaseProtocol<WireProtocolHandlerV1>
+  implements Protocol
+{
   readonly pool: HandlerPool<WireProtocolHandler>;
 
   constructor(node: Node, pool: HandlerPool<WireProtocolHandler>) {
@@ -20,7 +23,9 @@ export class WireProtocolV1 extends BaseProtocol<WireProtocolHandlerV1> implemen
    */
   async makeHandler(peer: Peer, stream: ProtocolStream) {
     // prefer to use the higher version of the wire protocol
-    const handler = this.pool.idlePool.get(peer.peerId) ?? this.pool.busyPool.get(peer.peerId);
+    const handler =
+      this.pool.idlePool.get(peer.peerId) ??
+      this.pool.busyPool.get(peer.peerId);
     if (handler && isV2(handler)) {
       return null;
     }

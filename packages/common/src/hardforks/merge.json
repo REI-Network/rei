@@ -8,5 +8,5 @@
     "algorithm": "casper",
     "casper": {}
   },
-  "eips": [ 3675 ]
+  "eips": [3675]
 }

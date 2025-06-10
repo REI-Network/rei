@@ -16,7 +16,12 @@ const methods = {
 
 export class Config extends Contract {
   constructor(evm: EVM, common: Common) {
-    super(evm, common, methods, Address.fromString(common.param('vm', 'cfgaddr')));
+    super(
+      evm,
+      common,
+      methods,
+      Address.fromString(common.param('vm', 'cfgaddr'))
+    );
   }
 
   /**
@@ -24,7 +29,9 @@ export class Config extends Contract {
    */
   maxValidatorsCount() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('maxValidatorsCount', [], []));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage('maxValidatorsCount', [], [])
+      );
       return new BN(returnValue);
     });
   }
@@ -34,7 +41,9 @@ export class Config extends Contract {
    */
   minValidatorsCount() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('minValidatorsCount', [], []));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage('minValidatorsCount', [], [])
+      );
       return new BN(returnValue);
     });
   }
@@ -44,7 +53,9 @@ export class Config extends Contract {
    */
   minTotalLockedAmount() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('minTotalLockedAmount', [], []));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage('minTotalLockedAmount', [], [])
+      );
       return new BN(returnValue);
     });
   }
@@ -54,7 +65,9 @@ export class Config extends Contract {
    */
   minerReward() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('minerReward', [], []));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage('minerReward', [], [])
+      );
       return new BN(returnValue);
     });
   }
@@ -64,7 +77,9 @@ export class Config extends Contract {
    */
   dailyFee() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('dailyFee', [], []));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage('dailyFee', [], [])
+      );
       return new BN(returnValue);
     });
   }
@@ -74,7 +89,9 @@ export class Config extends Contract {
    */
   minerRewardFactor() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('minerRewardFactor', [], []));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage('minerRewardFactor', [], [])
+      );
       return new BN(returnValue);
     });
   }
@@ -84,7 +101,9 @@ export class Config extends Contract {
    */
   owner() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('owner', [], []));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage('owner', [], [])
+      );
       return bufferToAddress(returnValue);
     });
   }

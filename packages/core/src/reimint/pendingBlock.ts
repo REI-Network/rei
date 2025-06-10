@@ -1,16 +1,25 @@
 import { BN, KECCAK256_RLP_ARRAY } from 'ethereumjs-util';
 import Semaphore from 'semaphore-async-await';
 import Bloom from '@rei-network/vm/dist/bloom';
-import { Transaction, calcTransactionTrie, HeaderData } from '@rei-network/structure';
+import {
+  Transaction,
+  calcTransactionTrie,
+  HeaderData
+} from '@rei-network/structure';
 import { logger } from '@rei-network/utils';
 import { Common } from '@rei-network/common';
 import { PendingTxMap } from '../txpool';
-import { EMPTY_ADDRESS, EMPTY_NONCE, EMPTY_MIX_HASH, EMPTY_EXTRA_DATA } from '../utils';
+import {
+  EMPTY_ADDRESS,
+  EMPTY_NONCE,
+  EMPTY_MIX_HASH,
+  EMPTY_EXTRA_DATA
+} from '../utils';
 import { isEnableDAO, isEnableFreeStaking } from '../hardforks';
 import { FinalizeOpts, ProcessTxResult } from './executor';
 import { ReimintEngine } from './engine';
 
-export interface PendingBlockFinalizeOpts extends Pick<FinalizeOpts, 'round' | 'evidence'> {}
+export type PendingBlockFinalizeOpts = Pick<FinalizeOpts, 'round' | 'evidence'>;
 
 export class PendingBlock {
   private engine: ReimintEngine;
@@ -41,12 +50,20 @@ export class PendingBlock {
   private transactionsTrie?: Buffer;
   private finalizedStateRoot?: Buffer;
 
-  private stopped: boolean = false;
+  private stopped = false;
 
   private totalAmount?: BN;
   private dailyFee?: BN;
 
-  constructor(engine: ReimintEngine, parentHash: Buffer, parentStateRoot: Buffer, number: BN, timestamp: BN, common: Common, extraData?: Buffer) {
+  constructor(
+    engine: ReimintEngine,
+    parentHash: Buffer,
+    parentStateRoot: Buffer,
+    number: BN,
+    timestamp: BN,
+    common: Common,
+    extraData?: Buffer
+  ) {
     if (extraData && extraData.length !== 32) {
       throw new Error('invalid extra data length');
     }
@@ -76,7 +93,9 @@ export class PendingBlock {
   }
 
   get pendingStateRoot() {
-    return this.finalizedStateRoot ?? this.latestStateRoot ?? this._parentStateRoot;
+    return (
+      this.finalizedStateRoot ?? this.latestStateRoot ?? this._parentStateRoot
+    );
   }
 
   get isCompleted() {
@@ -134,8 +153,6 @@ export class PendingBlock {
     try {
       await this.lock.acquire();
       return await fn();
-    } catch (err) {
-      throw err;
     } finally {
       this.lock.release();
     }
@@ -174,21 +191,33 @@ export class PendingBlock {
       }
 
       // create a empty block for execute transaction
-      const pendingBlock = this.engine.generatePendingBlock(this.toHeaderData(), this._common);
+      const pendingBlock = this.engine.generatePendingBlock(
+        this.toHeaderData(),
+        this._common
+      );
       const gasLimit = pendingBlock.header.gasLimit;
 
       // if free staking is enable, initialize variables
       if (isEnableFreeStaking(this._common)) {
         if (this.totalAmount === undefined) {
-          this.totalAmount = await this.engine.getTotalAmount(this._parentStateRoot, this._common);
+          this.totalAmount = await this.engine.getTotalAmount(
+            this._parentStateRoot,
+            this._common
+          );
         }
       }
 
       // load parent block header
-      const parent = await this.engine.node.db.getHeader(this.parentHash, this.number.subn(1));
+      const parent = await this.engine.node.db.getHeader(
+        this.parentHash,
+        this.number.subn(1)
+      );
       const parentCommon = parent._common;
       // load parent vm
-      const parentVM = await this.engine.node.getVM(parent.stateRoot, parentCommon);
+      const parentVM = await this.engine.node.getVM(
+        parent.stateRoot,
+        parentCommon
+      );
 
       // if dao is enable, load daily fee from contract
       if (isEnableDAO(parentCommon)) {
@@ -282,14 +311,20 @@ export class PendingBlock {
       const { finalizedStateRoot } = await this.engine.executor.finalize({
         ...options,
         receipts,
-        block: this.engine.generatePendingBlock(this.toHeaderData(), this._common),
+        block: this.engine.generatePendingBlock(
+          this.toHeaderData(),
+          this._common
+        ),
         stateRoot: this.latestStateRoot ?? this._parentStateRoot,
         parentStateRoot: this._parentStateRoot
       });
       this.finalizedStateRoot = finalizedStateRoot;
 
       // calculate receipts trie
-      this.receiptTrie = await this.engine.generateReceiptTrie(this.transactions, receipts);
+      this.receiptTrie = await this.engine.generateReceiptTrie(
+        this.transactions,
+        receipts
+      );
 
       // calculate transactions trie
       this.transactionsTrie = await calcTransactionTrie(this.transactions);

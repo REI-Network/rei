@@ -34,7 +34,9 @@ export class DuplicateVoteEvidence implements Evidence {
   }
 
   static fromVotes(vote1: Vote, vote2: Vote) {
-    return new DuplicateVoteEvidence(...DuplicateVoteEvidence.sortVote(vote1, vote2));
+    return new DuplicateVoteEvidence(
+      ...DuplicateVoteEvidence.sortVote(vote1, vote2)
+    );
   }
 
   static fromValuesArray(values: Buffer[][]) {
@@ -47,7 +49,10 @@ export class DuplicateVoteEvidence implements Evidence {
       throw new Error('invalid evidence values');
     }
 
-    return new DuplicateVoteEvidence(Vote.fromValuesArray(voteABuf), Vote.fromValuesArray(voteBBuf));
+    return new DuplicateVoteEvidence(
+      Vote.fromValuesArray(voteABuf),
+      Vote.fromValuesArray(voteBBuf)
+    );
   }
 
   verify(valSet: ActiveValidatorSet) {
@@ -79,7 +84,13 @@ export class DuplicateVoteEvidence implements Evidence {
     if (this.voteA.signatureType !== this.voteB.signatureType) {
       throw new Error('invalid votes(version)');
     }
-    if (!this.voteA.height.eq(this.voteB.height) || this.voteA.round !== this.voteB.round || this.voteA.type !== this.voteB.type || this.voteA.chainId !== this.voteB.chainId || this.voteA.index !== this.voteB.index) {
+    if (
+      !this.voteA.height.eq(this.voteB.height) ||
+      this.voteA.round !== this.voteB.round ||
+      this.voteA.type !== this.voteB.type ||
+      this.voteA.chainId !== this.voteB.chainId ||
+      this.voteA.index !== this.voteB.index
+    ) {
       throw new Error('invalid votes(vote content)');
     }
     if (this.voteA.hash.equals(this.voteB.hash)) {
@@ -88,7 +99,10 @@ export class DuplicateVoteEvidence implements Evidence {
     if (!this.voteA.getValidator().equals(this.voteB.getValidator())) {
       throw new Error('invalid votes(unequal validator)');
     }
-    const [voteA, voteB] = DuplicateVoteEvidence.sortVote(this.voteA, this.voteB);
+    const [voteA, voteB] = DuplicateVoteEvidence.sortVote(
+      this.voteA,
+      this.voteB
+    );
     if (voteA !== this.voteA || voteB !== this.voteB) {
       throw new Error('invalid votes(sort)');
     }

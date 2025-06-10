@@ -18,7 +18,11 @@ export interface StateManager {
   getContractCode(address: Address): Promise<Buffer>;
   getContractStorage(address: Address, key: Buffer): Promise<Buffer>;
   getOriginalContractStorage(address: Address, key: Buffer): Promise<Buffer>;
-  putContractStorage(address: Address, key: Buffer, value: Buffer): Promise<void>;
+  putContractStorage(
+    address: Address,
+    key: Buffer,
+    value: Buffer
+  ): Promise<void>;
   clearContractStorage(address: Address): Promise<void>;
   checkpoint(): Promise<void>;
   commit(): Promise<void>;
@@ -44,5 +48,8 @@ export interface EIP2929StateManager extends StateManager {
   addWarmedStorage(address: Buffer, slot: Buffer): void;
   isWarmedStorage(address: Buffer, slot: Buffer): boolean;
   clearWarmedAccounts(): void;
-  generateAccessList?(addressesRemoved: Address[], addressesOnlyStorage: Address[]): AccessList;
+  generateAccessList?(
+    addressesRemoved: Address[],
+    addressesOnlyStorage: Address[]
+  ): AccessList;
 }

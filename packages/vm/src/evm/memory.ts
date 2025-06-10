@@ -48,7 +48,10 @@ export default class Memory {
     }
 
     assert(value.length === size, 'Invalid value size');
-    assert(offset + size <= this._store.length, 'Value exceeds memory capacity');
+    assert(
+      offset + size <= this._store.length,
+      'Value exceeds memory capacity'
+    );
     assert(Buffer.isBuffer(value), 'Invalid value type');
 
     for (let i = 0; i < size; i++) {

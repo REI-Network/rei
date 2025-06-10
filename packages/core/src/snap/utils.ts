@@ -64,7 +64,10 @@ export function increaseKey(key: Buffer) {
     return null;
   }
 
-  return Buffer.concat([key.slice(0, key.length - lastItem.length), Buffer.from(lastItem.reverse())]);
+  return Buffer.concat([
+    key.slice(0, key.length - lastItem.length),
+    Buffer.from(lastItem.reverse())
+  ]);
 }
 
 /**
@@ -96,7 +99,13 @@ export function mergeProof(proof1: Buffer[], proof2: Buffer[]) {
  * @param genItrator - A function that generates an iterator
  * @param genDBOp - A function that generates an operator for each value
  */
-export async function wipeKeyRange<T>(batch: DBatch, origin: Buffer, limit: Buffer, genItrator: (origin: Buffer, limit: Buffer) => SnapIterator<T>, genDBOp: (hash: Buffer) => DBOp) {
+export async function wipeKeyRange<T>(
+  batch: DBatch,
+  origin: Buffer,
+  limit: Buffer,
+  genItrator: (origin: Buffer, limit: Buffer) => SnapIterator<T>,
+  genDBOp: (hash: Buffer) => DBOp
+) {
   while (true) {
     let _continue = false;
     for await (const { hash } of genItrator(origin, limit)) {

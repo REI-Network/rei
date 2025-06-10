@@ -21,17 +21,29 @@ describe('stakingAccount', () => {
 
   it('should slimRaw and fromSlimValuesArray correctly', () => {
     const accountRaw = accounts.map((a) => a.slimRaw());
-    const accountsFromSlim = accountRaw.map((a) => StakingAccount.fromSlimValuesArray(a));
+    const accountsFromSlim = accountRaw.map((a) =>
+      StakingAccount.fromSlimValuesArray(a)
+    );
     for (let i = 0; i < accounts.length; i++) {
-      expect(accounts[i].serialize().equals(accountsFromSlim[i].serialize()), 'account should be equal').to.be.true;
+      expect(
+        accounts[i].serialize().equals(accountsFromSlim[i].serialize()),
+        'account should be equal'
+      ).to.be.true;
     }
   });
 
   it('should slimSerialize and fromRlpSerializedSlimAccount correctly', () => {
     const accountSlimSerialize = accounts.map((a) => a.slimSerialize());
-    const accountsFromSlimSerialize = accountSlimSerialize.map((a) => StakingAccount.fromRlpSerializedSlimAccount(a));
+    const accountsFromSlimSerialize = accountSlimSerialize.map((a) =>
+      StakingAccount.fromRlpSerializedSlimAccount(a)
+    );
     for (let i = 0; i < accounts.length; i++) {
-      expect(accounts[i].serialize().equals(accountsFromSlimSerialize[i].serialize()), 'account should be equal').to.be.true;
+      expect(
+        accounts[i]
+          .serialize()
+          .equals(accountsFromSlimSerialize[i].serialize()),
+        'account should be equal'
+      ).to.be.true;
     }
   });
 });

@@ -1,7 +1,21 @@
 import { debug as createDebugLogger } from 'debug';
-import { Account, Address, BN, toBuffer, bufferToHex, generateAddress, generateAddress2, KECCAK256_NULL, KECCAK256_RLP, MAX_INTEGER } from 'ethereumjs-util';
+import {
+  Account,
+  Address,
+  BN,
+  toBuffer,
+  bufferToHex,
+  generateAddress,
+  generateAddress2,
+  KECCAK256_NULL,
+  KECCAK256_RLP,
+  MAX_INTEGER
+} from 'ethereumjs-util';
 import { Block } from '@rei-network/structure';
-import type { JSEVMBinding, Message as EVMCMessage } from '@rei-network/binding';
+import type {
+  JSEVMBinding,
+  Message as EVMCMessage
+} from '@rei-network/binding';
 import { ERROR, VmError } from '../exceptions';
 import { StateManager } from '../state/index';
 import { IDebug } from '../types';
@@ -175,7 +189,13 @@ export default class EVM {
     const root = bufferToHex(await this._state.getStateRoot());
     let res: any;
     try {
-      res = binding.runMessage(root, this._block.header.serialize(), evmcMessage, this._tx.blockGasUsed.toString(), () => this._tx.recentHashes);
+      res = binding.runMessage(
+        root,
+        this._block.header.serialize(),
+        evmcMessage,
+        this._tx.blockGasUsed.toString(),
+        () => this._tx.recentHashes
+      );
       await this._state.setStateRoot(toBuffer(res.stateRoot));
     } finally {
       await this._state.batchCheckpoint(checkpoints);
@@ -184,14 +204,22 @@ export default class EVM {
     // convert result format
     const { result, logs } = res;
     const execResult: ExecResult = {
-      exceptionError: result.excepted ? ({ ...result.excepted, errorType: 'EvmError' } as any) : undefined,
+      exceptionError: result.excepted
+        ? ({ ...result.excepted, errorType: 'EvmError' } as any)
+        : undefined,
       gasUsed: new BN(result.gasUsed),
       returnValue: toBuffer(result.output),
       gasRefund: new BN(result.gasRefunded),
-      logs: logs.map(({ address, topics, data }) => [toBuffer(address), topics.map(toBuffer), toBuffer(data)])
+      logs: logs.map(({ address, topics, data }) => [
+        toBuffer(address),
+        topics.map(toBuffer),
+        toBuffer(data)
+      ])
     };
     const evmResult: EVMResult = {
-      createdAddress: result.newAddress ? Address.fromString(result.newAddress) : undefined,
+      createdAddress: result.newAddress
+        ? Address.fromString(result.newAddress)
+        : undefined,
       gasUsed: execResult.gasUsed,
       execResult
     };
@@ -212,7 +240,9 @@ export default class EVM {
 
     if (!message.to && this._vm._common.isActivatedEIP(2929)) {
       message.code = message.data;
-      (<any>this._state).addWarmedAddress((await this._generateAddress(message)).buf);
+      (<any>this._state).addWarmedAddress(
+        (await this._generateAddress(message)).buf
+      );
     }
 
     await this._state.checkpoint();
@@ -223,7 +253,13 @@ export default class EVM {
 
     let result;
     if (this._vm.DEBUG) {
-      debug(`New message caller=${message.caller.toString()} gasLimit=${message.gasLimit.toString()} to=${message.to ? message.to.toString() : ''} value=${message.value.toString()} delegatecall=${message.delegatecall ? 'yes' : 'no'}`);
+      debug(
+        `New message caller=${message.caller.toString()} gasLimit=${message.gasLimit.toString()} to=${
+          message.to ? message.to.toString() : ''
+        } value=${message.value.toString()} delegatecall=${
+          message.delegatecall ? 'yes' : 'no'
+        }`
+      );
     }
 
     // If receive `contractAddress` option, it must be a update message
@@ -241,7 +277,17 @@ export default class EVM {
       result = await this._executeCreate(message);
     }
     if (this._vm.DEBUG) {
-      debug(`Received message results gasUsed=${result.gasUsed} execResult: [ gasUsed=${result.gasUsed} exceptionError=${result.execResult.exceptionError ? result.execResult.exceptionError.toString() : ''} returnValue=${short(result.execResult.returnValue)} gasRefund=${result.execResult.gasRefund?.toString()} ]`);
+      debug(
+        `Received message results gasUsed=${
+          result.gasUsed
+        } execResult: [ gasUsed=${result.gasUsed} exceptionError=${
+          result.execResult.exceptionError
+            ? result.execResult.exceptionError.toString()
+            : ''
+        } returnValue=${short(
+          result.execResult.returnValue
+        )} gasRefund=${result.execResult.gasRefund?.toString()} ]`
+      );
     }
 
     // TODO: Move `gasRefund` to a tx-level result object
@@ -250,7 +296,10 @@ export default class EVM {
 
     const err = result.execResult.exceptionError;
     if (err) {
-      if (this._vm._common.gteHardfork('homestead') || err.error != ERROR.CODESTORE_OUT_OF_GAS) {
+      if (
+        this._vm._common.gteHardfork('homestead') ||
+        err.error != ERROR.CODESTORE_OUT_OF_GAS
+      ) {
         result.execResult.logs = [];
         await this._state.revert();
         if (this._vm.DEBUG) {
@@ -325,7 +374,11 @@ export default class EVM {
       if (this._vm.DEBUG) {
         debug('Run precompile');
       }
-      result = await this.runPrecompile(message.code as PrecompileFunc, message.data, message.gasLimit);
+      result = await this.runPrecompile(
+        message.code as PrecompileFunc,
+        message.data,
+        message.gasLimit
+      );
     } else {
       if (this._vm.DEBUG) {
         debug('Start bytecode processing...');
@@ -353,7 +406,10 @@ export default class EVM {
     let toAccount = await this._state.getAccount(message.to);
 
     // Check for collision
-    if ((toAccount.nonce && toAccount.nonce.gtn(0)) || !toAccount.codeHash.equals(KECCAK256_NULL)) {
+    if (
+      (toAccount.nonce && toAccount.nonce.gtn(0)) ||
+      !toAccount.codeHash.equals(KECCAK256_NULL)
+    ) {
       if (this._vm.DEBUG) {
         debug('Returning on address collision');
       }
@@ -425,23 +481,36 @@ export default class EVM {
     let totalGas = result.gasUsed;
     let returnFee = new BN(0);
     if (!result.exceptionError) {
-      returnFee = new BN(result.returnValue.length).imuln(this._vm._common.param('gasPrices', 'createData'));
+      returnFee = new BN(result.returnValue.length).imuln(
+        this._vm._common.param('gasPrices', 'createData')
+      );
       totalGas = totalGas.add(returnFee);
       if (this._vm.DEBUG) {
-        debugGas(`Add return value size fee (${returnFee} to gas used (-> ${totalGas}))`);
+        debugGas(
+          `Add return value size fee (${returnFee} to gas used (-> ${totalGas}))`
+        );
       }
     }
 
     // Check for SpuriousDragon EIP-170 code size limit
     let allowedCodeSize = true;
-    if (this._vm._common.gteHardfork('spuriousDragon') && result.returnValue.length > this._vm._common.param('vm', 'maxCodeSize')) {
+    if (
+      this._vm._common.gteHardfork('spuriousDragon') &&
+      result.returnValue.length > this._vm._common.param('vm', 'maxCodeSize')
+    ) {
       allowedCodeSize = false;
     }
 
     // If enough gas and allowed code size
     let CodestoreOOG = false;
-    if (totalGas.lte(message.gasLimit) && (this._vm._allowUnlimitedContractSize || allowedCodeSize)) {
-      if (this._vm._common.isActivatedEIP(3541) && result.returnValue.slice(0, 1).equals(Buffer.from('EF', 'hex'))) {
+    if (
+      totalGas.lte(message.gasLimit) &&
+      (this._vm._allowUnlimitedContractSize || allowedCodeSize)
+    ) {
+      if (
+        this._vm._common.isActivatedEIP(3541) &&
+        result.returnValue.slice(0, 1).equals(Buffer.from('EF', 'hex'))
+      ) {
         result = { ...result, ...INVALID_BYTECODE_RESULT(message.gasLimit) };
       } else {
         result.gasUsed = totalGas;
@@ -468,7 +537,11 @@ export default class EVM {
     }
 
     // Save code if a new contract was created
-    if (!result.exceptionError && result.returnValue && result.returnValue.toString() !== '') {
+    if (
+      !result.exceptionError &&
+      result.returnValue &&
+      result.returnValue.toString() !== ''
+    ) {
       await this._state.putContractCode(message.to, result.returnValue);
       if (this._vm.DEBUG) {
         debug('Code saved on new contract creation');
@@ -576,23 +649,36 @@ export default class EVM {
       let totalGas = result.gasUsed;
       let returnFee = new BN(0);
       if (!result.exceptionError) {
-        returnFee = new BN(result.returnValue.length).imuln(this._vm._common.param('gasPrices', 'createData'));
+        returnFee = new BN(result.returnValue.length).imuln(
+          this._vm._common.param('gasPrices', 'createData')
+        );
         totalGas = totalGas.add(returnFee);
         if (this._vm.DEBUG) {
-          debugGas(`Add return value size fee (${returnFee} to gas used (-> ${totalGas}))`);
+          debugGas(
+            `Add return value size fee (${returnFee} to gas used (-> ${totalGas}))`
+          );
         }
       }
 
       // Check for SpuriousDragon EIP-170 code size limit
       let allowedCodeSize = true;
-      if (this._vm._common.gteHardfork('spuriousDragon') && result.returnValue.length > this._vm._common.param('vm', 'maxCodeSize')) {
+      if (
+        this._vm._common.gteHardfork('spuriousDragon') &&
+        result.returnValue.length > this._vm._common.param('vm', 'maxCodeSize')
+      ) {
         allowedCodeSize = false;
       }
 
       // If enough gas and allowed code size
       let CodestoreOOG = false;
-      if (totalGas.lte(message.gasLimit) && (this._vm._allowUnlimitedContractSize || allowedCodeSize)) {
-        if (this._vm._common.isActivatedEIP(3541) && result.returnValue.slice(0, 1).equals(Buffer.from('EF', 'hex'))) {
+      if (
+        totalGas.lte(message.gasLimit) &&
+        (this._vm._allowUnlimitedContractSize || allowedCodeSize)
+      ) {
+        if (
+          this._vm._common.isActivatedEIP(3541) &&
+          result.returnValue.slice(0, 1).equals(Buffer.from('EF', 'hex'))
+        ) {
           result = { ...result, ...INVALID_BYTECODE_RESULT(message.gasLimit) };
         } else {
           result.gasUsed = totalGas;
@@ -619,7 +705,11 @@ export default class EVM {
       }
 
       // Save code if a new contract was created
-      if (!result.exceptionError && result.returnValue && result.returnValue.toString() !== '') {
+      if (
+        !result.exceptionError &&
+        result.returnValue &&
+        result.returnValue.toString() !== ''
+      ) {
         await this._state.putContractCode(message.to, result.returnValue);
         if (this._vm.DEBUG) {
           debug('Code saved on new contract creation');
@@ -644,7 +734,10 @@ export default class EVM {
       };
     } else {
       // Check for SpuriousDragon EIP-170 code size limit
-      if (this._vm._common.gteHardfork('spuriousDragon') && message.code.length > this._vm._common.param('vm', 'maxCodeSize')) {
+      if (
+        this._vm._common.gteHardfork('spuriousDragon') &&
+        message.code.length > this._vm._common.param('vm', 'maxCodeSize')
+      ) {
         return {
           ...OOGResult(message.gasLimit),
           execResult: {
@@ -688,14 +781,23 @@ export default class EVM {
       contract: await this._state.getAccount(message.to || Address.zero()),
       codeAddress: message.codeAddress
     };
-    const eei = new EEI(env, this._state, this, this._vm._common, message.gasLimit.clone(), this._vm._getMiner);
+    const eei = new EEI(
+      env,
+      this._state,
+      this,
+      this._vm._common,
+      message.gasLimit.clone(),
+      this._vm._getMiner
+    );
     if (message.selfdestruct) {
       eei._result.selfdestruct = message.selfdestruct;
     }
 
     const oldRefund = this._refund.clone();
     const interpreter = new Interpreter(this._vm, eei);
-    const interpreterRes = await interpreter.run(message.code as Buffer, { debug: this._debug });
+    const interpreterRes = await interpreter.run(message.code as Buffer, {
+      debug: this._debug
+    });
 
     let result = eei._result;
     let gasUsed = message.gasLimit.sub(eei._gasLeft);
@@ -739,7 +841,11 @@ export default class EVM {
   /**
    * Executes a precompiled contract with given data and gas limit.
    */
-  runPrecompile(code: PrecompileFunc, data: Buffer, gasLimit: BN): Promise<ExecResult> | ExecResult {
+  runPrecompile(
+    code: PrecompileFunc,
+    data: Buffer,
+    gasLimit: BN
+  ): Promise<ExecResult> | ExecResult {
     if (typeof code !== 'function') {
       throw new Error('Invalid precompile');
     }
@@ -770,7 +876,11 @@ export default class EVM {
   async _generateAddress(message: Message): Promise<Address> {
     let addr;
     if (message.salt) {
-      addr = generateAddress2(message.caller.buf, message.salt, message.code as Buffer);
+      addr = generateAddress2(
+        message.caller.buf,
+        message.salt,
+        message.code as Buffer
+      );
     } else {
       const acc = await this._state.getAccount(message.caller);
       const newNonce = acc.nonce.subn(1);
@@ -779,11 +889,16 @@ export default class EVM {
     return new Address(addr);
   }
 
-  async _reduceSenderBalance(account: Account, message: Message): Promise<void> {
+  async _reduceSenderBalance(
+    account: Account,
+    message: Message
+  ): Promise<void> {
     account.balance.isub(message.value);
     const result = this._state.putAccount(message.caller, account);
     if (this._vm.DEBUG) {
-      debug(`Reduced sender (${message.caller}) balance (-> ${account.balance})`);
+      debug(
+        `Reduced sender (${message.caller}) balance (-> ${account.balance})`
+      );
     }
     return result;
   }
@@ -797,7 +912,9 @@ export default class EVM {
     // putAccount as the nonce may have changed for contract creation
     const result = this._state.putAccount(message.to, toAccount);
     if (this._vm.DEBUG) {
-      debug(`Added toAccount (${message.to}) balance (-> ${toAccount.balance})`);
+      debug(
+        `Added toAccount (${message.to}) balance (-> ${toAccount.balance})`
+      );
     }
     return result;
   }

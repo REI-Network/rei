@@ -1,8 +1,16 @@
 import crypto from 'crypto';
 import { SecureTrie as Trie } from '@rei-network/trie';
 import { BN, keccak256 } from 'ethereumjs-util';
-import { FunctionalBufferMap, FunctionalBufferSet, getRandomIntInclusive } from '@rei-network/utils';
-import { Database, DBSaveSnapStorage, DBSaveSerializedSnapAccount } from '@rei-network/database';
+import {
+  FunctionalBufferMap,
+  FunctionalBufferSet,
+  getRandomIntInclusive
+} from '@rei-network/utils';
+import {
+  Database,
+  DBSaveSnapStorage,
+  DBSaveSerializedSnapAccount
+} from '@rei-network/database';
 import { Snapshot } from '../../src/snap/types';
 import { DiffLayer } from '../../src/snap/diffLayer';
 import { StakingAccount } from '../../src/stateManager';
@@ -15,7 +23,14 @@ export class AccountInfo {
   storageData: FunctionalBufferMap<{ key: Buffer; val: Buffer }>;
   lastestStorageHash: Buffer;
 
-  constructor(address: Buffer, code: Buffer, accountHash: Buffer, account: StakingAccount, storageData: FunctionalBufferMap<{ key: Buffer; val: Buffer }>, lastestStorageHash: Buffer) {
+  constructor(
+    address: Buffer,
+    code: Buffer,
+    accountHash: Buffer,
+    account: StakingAccount,
+    storageData: FunctionalBufferMap<{ key: Buffer; val: Buffer }>,
+    lastestStorageHash: Buffer
+  ) {
     this.address = address;
     this.code = code;
     this.accountHash = accountHash;
@@ -29,7 +44,18 @@ export class AccountInfo {
     for (const [k, v] of this.storageData) {
       storageData.set(k, { key: Buffer.from(v.key), val: Buffer.from(v.val) });
     }
-    return new AccountInfo(Buffer.from(this.address), Buffer.from(this.code), Buffer.from(this.accountHash), new StakingAccount(this.account.nonce.clone(), this.account.balance.clone(), Buffer.from(this.account.stateRoot)), storageData, Buffer.from(this.lastestStorageHash));
+    return new AccountInfo(
+      Buffer.from(this.address),
+      Buffer.from(this.code),
+      Buffer.from(this.accountHash),
+      new StakingAccount(
+        this.account.nonce.clone(),
+        this.account.balance.clone(),
+        Buffer.from(this.account.stateRoot)
+      ),
+      storageData,
+      Buffer.from(this.lastestStorageHash)
+    );
   }
 }
 
@@ -47,17 +73,33 @@ export type GenRandomAccountsResult = {
  * @param saveSnap - save the snapshot to the database or not
  * @returns
  */
-export async function addEmptyAccounts(db: Database, _emptyAccounts: number, rawData: GenRandomAccountsResult, saveSnap = true): Promise<GenRandomAccountsResult> {
+export async function addEmptyAccounts(
+  db: Database,
+  _emptyAccounts: number,
+  rawData: GenRandomAccountsResult,
+  saveSnap = true
+): Promise<GenRandomAccountsResult> {
   const stateTrie = new Trie(db.rawdb, rawData.root);
   for (let i = 0; i < _emptyAccounts; i++) {
     const address = crypto.randomBytes(20);
     const accountHash = keccak256(address);
     const account = new StakingAccount(new BN(1), new BN(1));
     if (saveSnap) {
-      await db.batch([DBSaveSerializedSnapAccount(accountHash, account.slimSerialize())]);
+      await db.batch([
+        DBSaveSerializedSnapAccount(accountHash, account.slimSerialize())
+      ]);
     }
     await stateTrie.put(address, account.serialize());
-    rawData.accounts.push(new AccountInfo(address, Buffer.alloc(0), accountHash, account, new FunctionalBufferMap<{ key: Buffer; val: Buffer }>(), Buffer.alloc(0)));
+    rawData.accounts.push(
+      new AccountInfo(
+        address,
+        Buffer.alloc(0),
+        accountHash,
+        account,
+        new FunctionalBufferMap<{ key: Buffer; val: Buffer }>(),
+        Buffer.alloc(0)
+      )
+    );
   }
   rawData.root = stateTrie.root;
   return rawData;
@@ -70,7 +112,12 @@ export async function addEmptyAccounts(db: Database, _emptyAccounts: number, raw
  * @param slots
  * @returns Account list and state root
  */
-export async function genRandomAccounts(db: Database, _accounts: number, slots: number, saveSnap = true): Promise<GenRandomAccountsResult> {
+export async function genRandomAccounts(
+  db: Database,
+  _accounts: number,
+  slots: number,
+  saveSnap = true
+): Promise<GenRandomAccountsResult> {
   const stateTrie = new Trie(db.rawdb);
   const accounts: AccountInfo[] = [];
   let lastestAccountHash: Buffer | undefined;
@@ -79,7 +126,10 @@ export async function genRandomAccounts(db: Database, _accounts: number, slots: 
     const address = crypto.randomBytes(20);
     const code = crypto.randomBytes(100);
     const codeHash = keccak256(code);
-    await db.rawdb.put(codeHash, code, { keyEncoding: 'binary', valueEncoding: 'binary' });
+    await db.rawdb.put(codeHash, code, {
+      keyEncoding: 'binary',
+      valueEncoding: 'binary'
+    });
     const accountHash = keccak256(address);
     const storageTrie = new Trie(db.rawdb);
     const storageData = new FunctionalBufferMap<{ key: Buffer; val: Buffer }>();
@@ -89,7 +139,9 @@ export async function genRandomAccounts(db: Database, _accounts: number, slots: 
       const storageValue = crypto.randomBytes(32);
       const storageHash = keccak256(storageKey);
       if (saveSnap) {
-        await db.batch([DBSaveSnapStorage(accountHash, storageHash, storageValue)]);
+        await db.batch([
+          DBSaveSnapStorage(accountHash, storageHash, storageValue)
+        ]);
       }
       await storageTrie.put(storageKey, storageValue);
       storageData.set(storageHash, {
@@ -97,18 +149,40 @@ export async function genRandomAccounts(db: Database, _accounts: number, slots: 
         val: storageValue
       });
 
-      if (lastestStorageHash === undefined || lastestStorageHash.compare(storageHash) < 0) {
+      if (
+        lastestStorageHash === undefined ||
+        lastestStorageHash.compare(storageHash) < 0
+      ) {
         lastestStorageHash = storageHash;
       }
     }
-    const account = new StakingAccount(new BN(1), new BN(1), storageTrie.root, codeHash);
+    const account = new StakingAccount(
+      new BN(1),
+      new BN(1),
+      storageTrie.root,
+      codeHash
+    );
     if (saveSnap) {
-      await db.batch([DBSaveSerializedSnapAccount(accountHash, account.slimSerialize())]);
+      await db.batch([
+        DBSaveSerializedSnapAccount(accountHash, account.slimSerialize())
+      ]);
     }
     await stateTrie.put(address, account.serialize());
-    accounts.push(new AccountInfo(address, code, accountHash, account, storageData, lastestStorageHash!));
+    accounts.push(
+      new AccountInfo(
+        address,
+        code,
+        accountHash,
+        account,
+        storageData,
+        lastestStorageHash!
+      )
+    );
 
-    if (lastestAccountHash === undefined || lastestAccountHash.compare(accountHash) < 0) {
+    if (
+      lastestAccountHash === undefined ||
+      lastestAccountHash.compare(accountHash) < 0
+    ) {
       lastestAccountHash = accountHash;
     }
   }
@@ -128,7 +202,12 @@ export async function genRandomAccounts(db: Database, _accounts: number, slots: 
  * @param modifyCount
  * @returns Next layer account list and new state root
  */
-export async function modifyRandomAccounts(db: Database, root: Buffer, lastLayerAccounts: AccountInfo[], modifyCount: number) {
+export async function modifyRandomAccounts(
+  db: Database,
+  root: Buffer,
+  lastLayerAccounts: AccountInfo[],
+  modifyCount: number
+) {
   lastLayerAccounts = [...lastLayerAccounts];
   const stateTrie = new Trie(db.rawdb, root);
   const accounts: AccountInfo[] = [];
@@ -187,7 +266,11 @@ export async function modifyRandomAccounts(db: Database, root: Buffer, lastLayer
  * @param accounts
  * @returns Diff layer
  */
-export function accountsToDiffLayer(parent: Snapshot, root: Buffer, accounts: AccountInfo[]) {
+export function accountsToDiffLayer(
+  parent: Snapshot,
+  root: Buffer,
+  accounts: AccountInfo[]
+) {
   const destructSet = new FunctionalBufferSet();
   const accountData = new FunctionalBufferMap<Buffer>();
   const storageData = new FunctionalBufferMap<FunctionalBufferMap<Buffer>>();
@@ -205,5 +288,11 @@ export function accountsToDiffLayer(parent: Snapshot, root: Buffer, accounts: Ac
     }
   }
 
-  return DiffLayer.createDiffLayerFromParent(parent, root, destructSet, accountData, storageData);
+  return DiffLayer.createDiffLayerFromParent(
+    parent,
+    root,
+    destructSet,
+    accountData,
+    storageData
+  );
 }

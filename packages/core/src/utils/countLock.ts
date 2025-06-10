@@ -5,13 +5,13 @@
 export class CountLock {
   private lock?: Promise<void>;
   private resolve?: () => void;
-  private count: number = 0;
+  private count = 0;
 
   /**
    * Increase count
    * @param count - Count number
    */
-  increase(count: number = 1) {
+  increase(count = 1) {
     if (this.count === 0) {
       this.lock = new Promise((r) => {
         this.resolve = r;
@@ -25,7 +25,7 @@ export class CountLock {
    * Decrease count
    * @param count - Count number
    */
-  decrease(count: number = 1) {
+  decrease(count = 1) {
     if (this.count - count < 0) {
       throw new Error('invalid decrease');
     }

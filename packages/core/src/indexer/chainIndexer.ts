@@ -30,14 +30,16 @@ export class ChainIndexer {
   private storedSections?: BN;
   private processHeaderLoopPromise?: Promise<void>;
   private initPromise?: Promise<void>;
-  private aborted: boolean = false;
+  private aborted = false;
 
   constructor(options: ChainIndexerOptions) {
     this.db = options.db;
     this.backend = options.backend;
     this.sectionSize = options.sectionSize;
     this.confirmsBlockNumber = options.confirmsBlockNumber;
-    this.headerQueue = new Channel<IndexTask>({ drop: ({ resolve }) => resolve && resolve() });
+    this.headerQueue = new Channel<IndexTask>({
+      drop: ({ resolve }) => resolve && resolve()
+    });
   }
 
   /**
@@ -74,7 +76,7 @@ export class ChainIndexer {
    * @param header - New block header
    * @param force - Force set header
    */
-  async newBlockHeader(header: BlockHeader, force: boolean = false) {
+  async newBlockHeader(header: BlockHeader, force = false) {
     await this.initPromise;
     if (!force) {
       this.headerQueue.push({ header, force });
@@ -107,24 +109,40 @@ export class ChainIndexer {
    * @param force - Whether to force index
    */
   async processNewHeader(number: BN, force: boolean) {
-    let confirmedSections: BN | undefined = number.gtn(this.confirmsBlockNumber) ? number.subn(this.confirmsBlockNumber).divn(this.sectionSize) : new BN(0);
-    confirmedSections = confirmedSections.gtn(0) ? confirmedSections.subn(1) : undefined;
-    if (confirmedSections !== undefined && (this.storedSections === undefined || confirmedSections.gt(this.storedSections))) {
+    let confirmedSections: BN | undefined = number.gtn(this.confirmsBlockNumber)
+      ? number.subn(this.confirmsBlockNumber).divn(this.sectionSize)
+      : new BN(0);
+    confirmedSections = confirmedSections.gtn(0)
+      ? confirmedSections.subn(1)
+      : undefined;
+    if (
+      confirmedSections !== undefined &&
+      (this.storedSections === undefined ||
+        confirmedSections.gt(this.storedSections))
+    ) {
       let latestProgress: number | undefined = undefined;
-      const currentSections = this.storedSections ? this.storedSections.clone() : new BN(0);
+      const currentSections = this.storedSections
+        ? this.storedSections.clone()
+        : new BN(0);
       while (confirmedSections.gte(currentSections)) {
         this.backend.reset(currentSections);
         let lastHeader: BlockHeader | undefined;
         if (currentSections.gtn(0)) {
           try {
-            lastHeader = await this.db.getCanonicalHeader(currentSections.muln(this.sectionSize).subn(1));
+            lastHeader = await this.db.getCanonicalHeader(
+              currentSections.muln(this.sectionSize).subn(1)
+            );
           } catch (err) {
             // ignore errors...
           }
         }
         // the first header number of the next section.
         const maxNum = currentSections.addn(1).muln(this.sectionSize);
-        for (const num = currentSections.muln(this.sectionSize); num.lt(maxNum); num.iaddn(1)) {
+        for (
+          const num = currentSections.muln(this.sectionSize);
+          num.lt(maxNum);
+          num.iaddn(1)
+        ) {
           let header: BlockHeader | undefined;
           try {
             header = await this.db.getCanonicalHeader(num);
@@ -132,8 +150,14 @@ export class ChainIndexer {
             // ignore errors...
             // we may lose some blocks due to snapshot synchronization
           }
-          if (lastHeader !== undefined && header !== undefined && !header.parentHash.equals(lastHeader.hash())) {
-            throw new Error(`parentHash is'not match, last: ${lastHeader.number.toString()}, current: ${header.number.toString()}`);
+          if (
+            lastHeader !== undefined &&
+            header !== undefined &&
+            !header.parentHash.equals(lastHeader.hash())
+          ) {
+            throw new Error(
+              `parentHash is'not match, last: ${lastHeader.number.toString()}, current: ${header.number.toString()}`
+            );
           }
           const bloom = header?.bloom ?? Buffer.alloc(256);
           const hash = header?.hash() ?? EMPTY_HASH;
@@ -142,7 +166,10 @@ export class ChainIndexer {
         }
         const batch = this.backend.commit();
         // save stored section count.
-        await this.db.batch([...batch, DBSaveBloomBitsSectionCount(currentSections)]);
+        await this.db.batch([
+          ...batch,
+          DBSaveBloomBitsSectionCount(currentSections)
+        ]);
         this.storedSections = currentSections.clone();
 
         // increase the sections
@@ -150,7 +177,10 @@ export class ChainIndexer {
 
         // log progress
         if (force) {
-          const progress = currentSections.muln(100).div(confirmedSections).toNumber();
+          const progress = currentSections
+            .muln(100)
+            .div(confirmedSections)
+            .toNumber();
           if (latestProgress !== progress) {
             logger.info(`📷 Indexing snapshot, progress: ${progress}%`);
             latestProgress = progress;

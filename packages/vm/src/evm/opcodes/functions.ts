@@ -1,6 +1,27 @@
 import { Common } from '@rei-network/common';
-import { Address, BN, keccak256, setLengthRight, TWO_POW256, MAX_INTEGER, KECCAK256_NULL } from 'ethereumjs-util';
-import { addressToBuffer, describeLocation, divCeil, getDataSlice, jumpIsValid, jumpSubIsValid, maxCallGas, setLengthLeftStorage, subMemUsage, trap, writeCallOutput, updateSstoreGas } from './util';
+import {
+  Address,
+  BN,
+  keccak256,
+  setLengthRight,
+  TWO_POW256,
+  MAX_INTEGER,
+  KECCAK256_NULL
+} from 'ethereumjs-util';
+import {
+  addressToBuffer,
+  describeLocation,
+  divCeil,
+  getDataSlice,
+  jumpIsValid,
+  jumpSubIsValid,
+  maxCallGas,
+  setLengthLeftStorage,
+  subMemUsage,
+  trap,
+  writeCallOutput,
+  updateSstoreGas
+} from './util';
 import { updateSstoreGasEIP1283 } from './EIP1283';
 import { updateSstoreGasEIP2200 } from './EIP2200';
 import { accessAddressEIP2929, accessStorageEIP2929 } from './EIP2929';
@@ -367,7 +388,12 @@ export const handlers: Map<number, OpHandler> = new Map([
         data = runState.memory.read(offset.toNumber(), length.toNumber());
       }
       // copy fee
-      runState.eei.useGas(new BN(common.param('gasPrices', 'sha3Word')).imul(divCeil(length, new BN(32))), 'SHA3 opcode');
+      runState.eei.useGas(
+        new BN(common.param('gasPrices', 'sha3Word')).imul(
+          divCeil(length, new BN(32))
+        ),
+        'SHA3 opcode'
+      );
       const r = new BN(keccak256(data));
       runState.stack.push(r);
     }
@@ -448,9 +474,18 @@ export const handlers: Map<number, OpHandler> = new Map([
       subMemUsage(runState, memOffset, dataLength, common);
 
       if (!dataLength.eqn(0)) {
-        runState.eei.useGas(new BN(common.param('gasPrices', 'copy')).imul(divCeil(dataLength, new BN(32))), 'CALLDATACOPY opcode');
+        runState.eei.useGas(
+          new BN(common.param('gasPrices', 'copy')).imul(
+            divCeil(dataLength, new BN(32))
+          ),
+          'CALLDATACOPY opcode'
+        );
 
-        const data = getDataSlice(runState.eei.getCallData(), dataOffset, dataLength);
+        const data = getDataSlice(
+          runState.eei.getCallData(),
+          dataOffset,
+          dataLength
+        );
         const memOffsetNum = memOffset.toNumber();
         const dataLengthNum = dataLength.toNumber();
         runState.memory.extend(memOffsetNum, dataLengthNum);
@@ -474,9 +509,18 @@ export const handlers: Map<number, OpHandler> = new Map([
       subMemUsage(runState, memOffset, dataLength, common);
 
       if (!dataLength.eqn(0)) {
-        runState.eei.useGas(new BN(common.param('gasPrices', 'copy')).imul(divCeil(dataLength, new BN(32))), 'CODECOPY opcode');
+        runState.eei.useGas(
+          new BN(common.param('gasPrices', 'copy')).imul(
+            divCeil(dataLength, new BN(32))
+          ),
+          'CODECOPY opcode'
+        );
 
-        const data = getDataSlice(runState.eei.getCode(), codeOffset, dataLength);
+        const data = getDataSlice(
+          runState.eei.getCode(),
+          codeOffset,
+          dataLength
+        );
         const memOffsetNum = memOffset.toNumber();
         const lengthNum = dataLength.toNumber();
         runState.memory.extend(memOffsetNum, lengthNum);
@@ -499,7 +543,8 @@ export const handlers: Map<number, OpHandler> = new Map([
   [
     0x3c,
     async function (runState, common) {
-      const [addressBN, memOffset, codeOffset, dataLength] = runState.stack.popN(4);
+      const [addressBN, memOffset, codeOffset, dataLength] =
+        runState.stack.popN(4);
 
       // FIXME: for some reason this must come before subGas
       subMemUsage(runState, memOffset, dataLength, common);
@@ -508,7 +553,12 @@ export const handlers: Map<number, OpHandler> = new Map([
 
       if (!dataLength.eqn(0)) {
         // copy fee
-        runState.eei.useGas(new BN(common.param('gasPrices', 'copy')).imul(divCeil(dataLength, new BN(32))), 'EXTCODECOPY opcode');
+        runState.eei.useGas(
+          new BN(common.param('gasPrices', 'copy')).imul(
+            divCeil(dataLength, new BN(32))
+          ),
+          'EXTCODECOPY opcode'
+        );
 
         const code = await runState.eei.getExternalCode(addressBN);
 
@@ -555,16 +605,27 @@ export const handlers: Map<number, OpHandler> = new Map([
     function (runState, common) {
       const [memOffset, returnDataOffset, dataLength] = runState.stack.popN(3);
 
-      if (returnDataOffset.add(dataLength).gt(runState.eei.getReturnDataSize())) {
+      if (
+        returnDataOffset.add(dataLength).gt(runState.eei.getReturnDataSize())
+      ) {
         trap(ERROR.OUT_OF_GAS);
       }
 
       subMemUsage(runState, memOffset, dataLength, common);
 
       if (!dataLength.eqn(0)) {
-        runState.eei.useGas(new BN(common.param('gasPrices', 'copy')).mul(divCeil(dataLength, new BN(32))), 'RETURNDATACOPY opcode');
+        runState.eei.useGas(
+          new BN(common.param('gasPrices', 'copy')).mul(
+            divCeil(dataLength, new BN(32))
+          ),
+          'RETURNDATACOPY opcode'
+        );
 
-        const data = getDataSlice(runState.eei.getReturnData(), returnDataOffset, dataLength);
+        const data = getDataSlice(
+          runState.eei.getReturnData(),
+          returnDataOffset,
+          dataLength
+        );
         const memOffsetNum = memOffset.toNumber();
         const lengthNum = dataLength.toNumber();
         runState.memory.extend(memOffsetNum, lengthNum);
@@ -731,16 +792,42 @@ export const handlers: Map<number, OpHandler> = new Map([
         value = val.toArrayLike(Buffer, 'be');
       }
 
-      const currentStorage = setLengthLeftStorage(await runState.eei.storageLoad(keyBuf));
-      if (common.hardfork() === 'constantinople' || common.gteHardfork('istanbul')) {
-        const originalStorage = setLengthLeftStorage(await runState.eei.storageLoad(keyBuf, true));
+      const currentStorage = setLengthLeftStorage(
+        await runState.eei.storageLoad(keyBuf)
+      );
+      if (
+        common.hardfork() === 'constantinople' ||
+        common.gteHardfork('istanbul')
+      ) {
+        const originalStorage = setLengthLeftStorage(
+          await runState.eei.storageLoad(keyBuf, true)
+        );
         if (common.hardfork() === 'constantinople') {
-          updateSstoreGasEIP1283(runState, currentStorage, originalStorage, setLengthLeftStorage(value), common);
+          updateSstoreGasEIP1283(
+            runState,
+            currentStorage,
+            originalStorage,
+            setLengthLeftStorage(value),
+            common
+          );
         } else {
-          updateSstoreGasEIP2200(runState, currentStorage, originalStorage, setLengthLeftStorage(value), keyBuf, common);
+          updateSstoreGasEIP2200(
+            runState,
+            currentStorage,
+            originalStorage,
+            setLengthLeftStorage(value),
+            keyBuf,
+            common
+          );
         }
       } else {
-        updateSstoreGas(runState, currentStorage, setLengthLeftStorage(value), keyBuf, common);
+        updateSstoreGas(
+          runState,
+          currentStorage,
+          setLengthLeftStorage(value),
+          keyBuf,
+          common
+        );
       }
 
       // We have to do this after the Istanbul (EIP2200) checks.
@@ -855,7 +942,11 @@ export const handlers: Map<number, OpHandler> = new Map([
     0x60,
     function (runState) {
       const numToPush = runState.opCode - 0x5f;
-      const loaded = new BN(runState.eei.getCode().slice(runState.programCounter, runState.programCounter + numToPush));
+      const loaded = new BN(
+        runState.eei
+          .getCode()
+          .slice(runState.programCounter, runState.programCounter + numToPush)
+      );
       runState.programCounter += numToPush;
       runState.stack.push(loaded);
     }
@@ -901,7 +992,12 @@ export const handlers: Map<number, OpHandler> = new Map([
       if (!memLength.isZero()) {
         mem = runState.memory.read(memOffset.toNumber(), memLength.toNumber());
       }
-      runState.eei.useGas(new BN(common.param('gasPrices', 'logTopic')).imuln(topicsCount).iadd(memLength.muln(common.param('gasPrices', 'logData'))), 'LOG opcode');
+      runState.eei.useGas(
+        new BN(common.param('gasPrices', 'logTopic'))
+          .imuln(topicsCount)
+          .iadd(memLength.muln(common.param('gasPrices', 'logData'))),
+        'LOG opcode'
+      );
 
       runState.eei.log(mem, topicsCount, topicsBuf);
     }
@@ -922,7 +1018,12 @@ export const handlers: Map<number, OpHandler> = new Map([
 
       subMemUsage(runState, offset, length, common);
       let gasLimit = new BN(runState.eei.getGasLeft());
-      gasLimit = maxCallGas(gasLimit, runState.eei.getGasLeft(), runState, common);
+      gasLimit = maxCallGas(
+        gasLimit,
+        runState.eei.getGasLeft(),
+        runState,
+        common
+      );
 
       let data = Buffer.alloc(0);
       if (!length.isZero()) {
@@ -947,16 +1048,31 @@ export const handlers: Map<number, OpHandler> = new Map([
       accessAddressEIP2929(runState, runState.eei.getAddress(), common, false);
 
       // Deduct gas costs for hashing
-      runState.eei.useGas(new BN(common.param('gasPrices', 'sha3Word')).imul(divCeil(length, new BN(32))), 'CREATE2 opcode');
+      runState.eei.useGas(
+        new BN(common.param('gasPrices', 'sha3Word')).imul(
+          divCeil(length, new BN(32))
+        ),
+        'CREATE2 opcode'
+      );
       let gasLimit = new BN(runState.eei.getGasLeft());
-      gasLimit = maxCallGas(gasLimit, runState.eei.getGasLeft(), runState, common); // CREATE2 is only available after TangerineWhistle (Constantinople introduced this opcode)
+      gasLimit = maxCallGas(
+        gasLimit,
+        runState.eei.getGasLeft(),
+        runState,
+        common
+      ); // CREATE2 is only available after TangerineWhistle (Constantinople introduced this opcode)
 
       let data = Buffer.alloc(0);
       if (!length.isZero()) {
         data = runState.memory.read(offset.toNumber(), length.toNumber());
       }
 
-      const ret = await runState.eei.create2(gasLimit, value, data, salt.toArrayLike(Buffer, 'be', 32));
+      const ret = await runState.eei.create2(
+        gasLimit,
+        value,
+        data,
+        salt.toArrayLike(Buffer, 'be', 32)
+      );
       runState.stack.push(ret);
     }
   ],
@@ -964,7 +1080,15 @@ export const handlers: Map<number, OpHandler> = new Map([
   [
     0xf1,
     async function (runState, common) {
-      const [currentGasLimit, toAddr, value, inOffset, inLength, outOffset, outLength] = runState.stack.popN(7);
+      const [
+        currentGasLimit,
+        toAddr,
+        value,
+        inOffset,
+        inLength,
+        outOffset,
+        outLength
+      ] = runState.stack.popN(7);
       const toAddress = new Address(addressToBuffer(toAddr));
 
       if (runState.eei.isStatic() && !value.isZero()) {
@@ -975,7 +1099,10 @@ export const handlers: Map<number, OpHandler> = new Map([
       accessAddressEIP2929(runState, toAddress, common);
 
       if (!value.isZero()) {
-        runState.eei.useGas(new BN(common.param('gasPrices', 'callValueTransfer')), 'CALL opcode -> callValueTransfer');
+        runState.eei.useGas(
+          new BN(common.param('gasPrices', 'callValueTransfer')),
+          'CALL opcode -> callValueTransfer'
+        );
       }
 
       let data = Buffer.alloc(0);
@@ -987,15 +1114,26 @@ export const handlers: Map<number, OpHandler> = new Map([
         // We are at or after Spurious Dragon
         // Call new account gas: account is DEAD and we transfer nonzero value
         if ((await runState.eei.isAccountEmpty(toAddress)) && !value.isZero()) {
-          runState.eei.useGas(new BN(common.param('gasPrices', 'callNewAccount')), 'CALL opcode -> callNewAccount (>= SpuriousDragon)');
+          runState.eei.useGas(
+            new BN(common.param('gasPrices', 'callNewAccount')),
+            'CALL opcode -> callNewAccount (>= SpuriousDragon)'
+          );
         }
       } else if (!(await runState.eei.accountExists(toAddress))) {
         // We are before Spurious Dragon and the account does not exist.
         // Call new account gas: account does not exist (it is not in the state trie, not even as an "empty" account)
-        runState.eei.useGas(new BN(common.param('gasPrices', 'callNewAccount')), 'CALL opcode -> callNewAccount (< SpuriousDragon)');
+        runState.eei.useGas(
+          new BN(common.param('gasPrices', 'callNewAccount')),
+          'CALL opcode -> callNewAccount (< SpuriousDragon)'
+        );
       }
 
-      const gasLimit = maxCallGas(currentGasLimit, runState.eei.getGasLeft(), runState, common);
+      const gasLimit = maxCallGas(
+        currentGasLimit,
+        runState.eei.getGasLeft(),
+        runState,
+        common
+      );
       // note that TangerineWhistle or later this cannot happen (it could have ran out of gas prior to getting here though)
       if (gasLimit.gt(runState.eei.getGasLeft())) {
         trap(ERROR.OUT_OF_GAS);
@@ -1017,7 +1155,15 @@ export const handlers: Map<number, OpHandler> = new Map([
   [
     0xf2,
     async function (runState, common) {
-      const [currentGasLimit, toAddr, value, inOffset, inLength, outOffset, outLength] = runState.stack.popN(7);
+      const [
+        currentGasLimit,
+        toAddr,
+        value,
+        inOffset,
+        inLength,
+        outOffset,
+        outLength
+      ] = runState.stack.popN(7);
       const toAddress = new Address(addressToBuffer(toAddr));
 
       subMemUsage(runState, inOffset, inLength, common);
@@ -1025,9 +1171,17 @@ export const handlers: Map<number, OpHandler> = new Map([
       accessAddressEIP2929(runState, toAddress, common);
 
       if (!value.isZero()) {
-        runState.eei.useGas(new BN(common.param('gasPrices', 'callValueTransfer')), 'CALLCODE opcode -> callValueTransfer');
+        runState.eei.useGas(
+          new BN(common.param('gasPrices', 'callValueTransfer')),
+          'CALLCODE opcode -> callValueTransfer'
+        );
       }
-      const gasLimit = maxCallGas(currentGasLimit, runState.eei.getGasLeft(), runState, common);
+      const gasLimit = maxCallGas(
+        currentGasLimit,
+        runState.eei.getGasLeft(),
+        runState,
+        common
+      );
       // note that TangerineWhistle or later this cannot happen (it could have ran out of gas prior to getting here though)
       if (gasLimit.gt(runState.eei.getGasLeft())) {
         trap(ERROR.OUT_OF_GAS);
@@ -1054,13 +1208,25 @@ export const handlers: Map<number, OpHandler> = new Map([
     0xf4,
     async function (runState, common) {
       const value = runState.eei.getCallValue();
-      const [currentGasLimit, toAddr, inOffset, inLength, outOffset, outLength] = runState.stack.popN(6);
+      const [
+        currentGasLimit,
+        toAddr,
+        inOffset,
+        inLength,
+        outOffset,
+        outLength
+      ] = runState.stack.popN(6);
       const toAddress = new Address(addressToBuffer(toAddr));
 
       subMemUsage(runState, inOffset, inLength, common);
       subMemUsage(runState, outOffset, outLength, common);
       accessAddressEIP2929(runState, toAddress, common);
-      const gasLimit = maxCallGas(currentGasLimit, runState.eei.getGasLeft(), runState, common);
+      const gasLimit = maxCallGas(
+        currentGasLimit,
+        runState.eei.getGasLeft(),
+        runState,
+        common
+      );
       // note that TangerineWhistle or later this cannot happen (it could have ran out of gas prior to getting here though)
       if (gasLimit.gt(runState.eei.getGasLeft())) {
         trap(ERROR.OUT_OF_GAS);
@@ -1071,7 +1237,12 @@ export const handlers: Map<number, OpHandler> = new Map([
         data = runState.memory.read(inOffset.toNumber(), inLength.toNumber());
       }
 
-      const ret = await runState.eei.callDelegate(gasLimit, toAddress, value, data);
+      const ret = await runState.eei.callDelegate(
+        gasLimit,
+        toAddress,
+        value,
+        data
+      );
       // Write return data to memory
       writeCallOutput(runState, outOffset, outLength);
       runState.stack.push(ret);
@@ -1082,20 +1253,37 @@ export const handlers: Map<number, OpHandler> = new Map([
     0xfa,
     async function (runState, common) {
       const value = new BN(0);
-      const [currentGasLimit, toAddr, inOffset, inLength, outOffset, outLength] = runState.stack.popN(6);
+      const [
+        currentGasLimit,
+        toAddr,
+        inOffset,
+        inLength,
+        outOffset,
+        outLength
+      ] = runState.stack.popN(6);
       const toAddress = new Address(addressToBuffer(toAddr));
 
       subMemUsage(runState, inOffset, inLength, common);
       subMemUsage(runState, outOffset, outLength, common);
       accessAddressEIP2929(runState, toAddress, common);
-      const gasLimit = maxCallGas(currentGasLimit, runState.eei.getGasLeft(), runState, common); // we set TangerineWhistle or later to true here, as STATICCALL was available from Byzantium (which is after TangerineWhistle)
+      const gasLimit = maxCallGas(
+        currentGasLimit,
+        runState.eei.getGasLeft(),
+        runState,
+        common
+      ); // we set TangerineWhistle or later to true here, as STATICCALL was available from Byzantium (which is after TangerineWhistle)
 
       let data = Buffer.alloc(0);
       if (!inLength.isZero()) {
         data = runState.memory.read(inOffset.toNumber(), inLength.toNumber());
       }
 
-      const ret = await runState.eei.callStatic(gasLimit, toAddress, value, data);
+      const ret = await runState.eei.callStatic(
+        gasLimit,
+        toAddress,
+        value,
+        data
+      );
       // Write return data to memory
       writeCallOutput(runState, outOffset, outLength);
       runState.stack.push(ret);
@@ -1137,28 +1325,39 @@ export const handlers: Map<number, OpHandler> = new Map([
         trap(ERROR.STATIC_STATE_CHANGE);
       }
 
-      const selfdestructToAddress = new Address(addressToBuffer(selfdestructToAddressBN));
+      const selfdestructToAddress = new Address(
+        addressToBuffer(selfdestructToAddressBN)
+      );
       let deductGas = false;
       if (common.gteHardfork('spuriousDragon')) {
         // EIP-161: State Trie Clearing
-        const balance = await runState.eei.getExternalBalance(runState.eei.getAddress());
+        const balance = await runState.eei.getExternalBalance(
+          runState.eei.getAddress()
+        );
         if (balance.gtn(0)) {
           // This technically checks if account is empty or non-existent
           // TODO: improve on the API here (EEI and StateManager)
-          const empty = await runState.eei.isAccountEmpty(selfdestructToAddress);
+          const empty = await runState.eei.isAccountEmpty(
+            selfdestructToAddress
+          );
           if (empty) {
             deductGas = true;
           }
         }
       } else if (common.gteHardfork('tangerineWhistle')) {
         // Pre EIP-150 (Tangerine Whistle) gas semantics
-        const exists = await runState.stateManager.accountExists(selfdestructToAddress);
+        const exists = await runState.stateManager.accountExists(
+          selfdestructToAddress
+        );
         if (!exists) {
           deductGas = true;
         }
       }
       if (deductGas) {
-        runState.eei.useGas(new BN(common.param('gasPrices', 'callNewAccount')), 'SELFDESTRUCT opcode -> callNewAccount');
+        runState.eei.useGas(
+          new BN(common.param('gasPrices', 'callNewAccount')),
+          'SELFDESTRUCT opcode -> callNewAccount'
+        );
       }
 
       accessAddressEIP2929(runState, selfdestructToAddress, common, true, true);

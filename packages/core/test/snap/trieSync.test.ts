@@ -59,7 +59,10 @@ describe('TrieSync', () => {
   let accounts!: AccountInfo[];
   let root!: Buffer;
 
-  async function syncAndCheck(rawdb2?: LevelUp, beforeSync?: () => Promise<void>) {
+  async function syncAndCheck(
+    rawdb2?: LevelUp,
+    beforeSync?: () => Promise<void>
+  ) {
     const backend = new MockTrieSyncBackend(rawdb2);
 
     const sync = new TrieSync(backend);
@@ -84,7 +87,10 @@ describe('TrieSync', () => {
     for (const { address, code, account, storageData } of accounts) {
       const trie = new SecureTrie(backend.rawdb, root);
       const account2 = await trie.get(address);
-      expect(account2 && account2.equals(account.serialize()), 'account should be equal').be.true;
+      expect(
+        account2 && account2.equals(account.serialize()),
+        'account should be equal'
+      ).be.true;
 
       const code2 = await backend.rawdb.get(account.codeHash, rawDBOpts);
       expect(code2 && code2.equals(code), 'code should be equal').be.true;
@@ -92,7 +98,8 @@ describe('TrieSync', () => {
       for (const [, { key, val }] of storageData) {
         const trie = new SecureTrie(backend.rawdb, account.stateRoot);
         const val2 = await trie.get(key);
-        expect(val2 && val2.equals(val), 'storage value should be equal').be.true;
+        expect(val2 && val2.equals(val), 'storage value should be equal').be
+          .true;
       }
     }
   }
@@ -112,14 +119,22 @@ describe('TrieSync', () => {
 
     await syncAndCheck(rawdb2, async () => {
       // copy whole tree
-      for await (const node of new TrieNodeIterator(new BaseTrie(rawdb, root))) {
+      for await (const node of new TrieNodeIterator(
+        new BaseTrie(rawdb, root)
+      )) {
         await rawdb2.put(node.hash(), node.serialize(), rawDBOpts);
 
         if (node instanceof LeafNode) {
           const account = StakingAccount.fromRlpSerializedAccount(node._value);
-          await rawdb2.put(account.codeHash, await rawdb.get(account.codeHash, rawDBOpts), rawDBOpts);
+          await rawdb2.put(
+            account.codeHash,
+            await rawdb.get(account.codeHash, rawDBOpts),
+            rawDBOpts
+          );
 
-          for await (const node of new TrieNodeIterator(new BaseTrie(rawdb, account.stateRoot))) {
+          for await (const node of new TrieNodeIterator(
+            new BaseTrie(rawdb, account.stateRoot)
+          )) {
             await rawdb2.put(node.hash(), node.serialize(), rawDBOpts);
           }
         }
@@ -129,7 +144,9 @@ describe('TrieSync', () => {
       const trie = new BaseTrie(rawdb, root);
       const node = await trie._lookupNode(root);
       if (!(node instanceof BranchNode)) {
-        throw new Error('the root node is not a branch node, please run test cases again');
+        throw new Error(
+          'the root node is not a branch node, please run test cases again'
+        );
       }
 
       const childNodes: (Buffer | Buffer[])[] = [];
@@ -141,11 +158,15 @@ describe('TrieSync', () => {
       }
 
       // randomly pick a child branch
-      const childNode = childNodes[getRandomIntInclusive(0, childNodes.length - 1)] as Buffer;
+      const childNode = childNodes[
+        getRandomIntInclusive(0, childNodes.length - 1)
+      ] as Buffer;
 
       // delete the whole child branch
       const deleteKey: Buffer[] = [];
-      for await (const node of new TrieNodeIterator(new BaseTrie(rawdb, childNode))) {
+      for await (const node of new TrieNodeIterator(
+        new BaseTrie(rawdb, childNode)
+      )) {
         deleteKey.push(node.hash());
         if (node instanceof LeafNode) {
           const account = StakingAccount.fromRlpSerializedAccount(node._value);
@@ -153,7 +174,9 @@ describe('TrieSync', () => {
           deleteKey.push(account.codeHash);
 
           // delete storage
-          for await (const node of new TrieNodeIterator(new BaseTrie(rawdb, account.stateRoot))) {
+          for await (const node of new TrieNodeIterator(
+            new BaseTrie(rawdb, account.stateRoot)
+          )) {
             deleteKey.push(node.hash());
           }
         }

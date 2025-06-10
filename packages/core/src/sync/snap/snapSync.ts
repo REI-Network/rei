@@ -1,12 +1,41 @@
-import { bufferToHex, toBuffer, BN, setLengthLeft, KECCAK256_NULL, KECCAK256_RLP } from 'ethereumjs-util';
+import {
+  bufferToHex,
+  toBuffer,
+  BN,
+  setLengthLeft,
+  KECCAK256_NULL,
+  KECCAK256_RLP
+} from 'ethereumjs-util';
 import { BaseTrie, CheckpointTrie } from '@rei-network/trie';
-import { logger, Channel, FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
-import { Database, DBSaveSerializedSnapAccount, DBSaveSnapStorage, DBSaveSnapSyncProgress } from '@rei-network/database';
+import {
+  logger,
+  Channel,
+  FunctionalBufferMap,
+  FunctionalBufferSet
+} from '@rei-network/utils';
+import {
+  Database,
+  DBSaveSerializedSnapAccount,
+  DBSaveSnapStorage,
+  DBSaveSnapSyncProgress
+} from '@rei-network/database';
 import { StakingAccount } from '../../stateManager';
-import { EMPTY_HASH, MAX_HASH, BinaryRawDBatch, DBatch, CountLock } from '../../utils';
+import {
+  EMPTY_HASH,
+  MAX_HASH,
+  BinaryRawDBatch,
+  DBatch,
+  CountLock
+} from '../../utils';
 import { increaseKey } from '../../snap/utils';
 import { TrieSync } from './trieSync';
-import { AccountRequest, AccountResponse, StorageRequst, StorageResponse, SnapSyncNetworkManager } from './types';
+import {
+  AccountRequest,
+  AccountResponse,
+  StorageRequst,
+  StorageResponse,
+  SnapSyncNetworkManager
+} from './types';
 
 const maxHashBN = new BN(MAX_HASH);
 
@@ -76,7 +105,7 @@ class AccountTask {
   needState: boolean[] = [];
   needHeal: boolean[] = [];
 
-  pending: number = 0;
+  pending = 0;
 
   pendingCode = new FunctionalBufferSet();
   pendingState = new FunctionalBufferMap<Buffer>();
@@ -85,9 +114,13 @@ class AccountTask {
 
   genTrie!: CheckpointTrie;
 
-  done: boolean = false;
+  done = false;
 
-  constructor(next: Buffer, last: Buffer, largeStateTasks: LargeStateTasks = new FunctionalBufferMap<StorageTask[]>()) {
+  constructor(
+    next: Buffer,
+    last: Buffer,
+    largeStateTasks: LargeStateTasks = new FunctionalBufferMap<StorageTask[]>()
+  ) {
     this.next = next;
     this.last = last;
     this.largeStateTasks = largeStateTasks;
@@ -96,10 +129,17 @@ class AccountTask {
   static fromJSON(json: AccountTaskJSON) {
     const largeStateTasks = new FunctionalBufferMap<StorageTask[]>();
     for (const [accountHash, tasks] of Object.entries(json.largeStateTasks)) {
-      largeStateTasks.set(toBuffer(accountHash), tasks.map(StorageTask.fromJSON));
+      largeStateTasks.set(
+        toBuffer(accountHash),
+        tasks.map(StorageTask.fromJSON)
+      );
     }
 
-    return new AccountTask(toBuffer(json.next), toBuffer(json.last), largeStateTasks);
+    return new AccountTask(
+      toBuffer(json.next),
+      toBuffer(json.last),
+      largeStateTasks
+    );
   }
 
   /**
@@ -131,7 +171,9 @@ class AccountTask {
   toJSON(): AccountTaskJSON {
     const largeStateTasks: { [accoutHash: string]: StorageTaskJSON[] } = {};
     for (const [accountHash, tasks] of this.largeStateTasks) {
-      largeStateTasks[bufferToHex(accountHash)] = tasks.map((task) => task.toJSON());
+      largeStateTasks[bufferToHex(accountHash)] = tasks.map((task) =>
+        task.toJSON()
+      );
     }
 
     return {
@@ -160,7 +202,7 @@ class StorageTask {
 
   genTrie!: CheckpointTrie;
 
-  done: boolean = false;
+  done = false;
 
   constructor(root: Buffer, next: Buffer, last: Buffer) {
     this.next = next;
@@ -169,7 +211,11 @@ class StorageTask {
   }
 
   static fromJSON(json: StorageTaskJSON) {
-    return new StorageTask(toBuffer(json.root), toBuffer(json.next), toBuffer(json.last));
+    return new StorageTask(
+      toBuffer(json.root),
+      toBuffer(json.next),
+      toBuffer(json.last)
+    );
   }
 
   /**
@@ -222,18 +268,24 @@ export class SnapSync {
   readonly healer: HealTask;
   readonly lock = new CountLock();
 
-  private readonly channel = new Channel<void | Buffer | (() => Promise<void>)>();
+  private readonly channel = new Channel<
+    void | Buffer | (() => Promise<void>)
+  >();
 
   root!: Buffer;
   tasks: AccountTask[] = [];
-  snapped: boolean = false;
-  healed: boolean = false;
-  finished: boolean = false;
+  snapped = false;
+  healed = false;
+  finished = false;
 
   private skipSecondHealPhase: boolean;
   private schedulePromise?: Promise<boolean>;
 
-  constructor(db: Database, network: SnapSyncNetworkManager, skipSecondHealPhase: boolean = false) {
+  constructor(
+    db: Database,
+    network: SnapSyncNetworkManager,
+    skipSecondHealPhase = false
+  ) {
     this.db = db;
     this.network = network;
     this.healer = new HealTask(db);
@@ -261,7 +313,11 @@ export class SnapSync {
       }
       return {
         phase: 'snap',
-        progress: new BN(MAX_HASH).sub(unfinished).muln(100).div(new BN(MAX_HASH)).toNumber()
+        progress: new BN(MAX_HASH)
+          .sub(unfinished)
+          .muln(100)
+          .div(new BN(MAX_HASH))
+          .toNumber()
       };
     } else if (!this.healed) {
       return {
@@ -296,7 +352,9 @@ export class SnapSync {
     const progress = await this.db.getSnapSyncProgress();
     if (progress) {
       try {
-        tasks = (JSON.parse(progress.toString()) as SnapSyncProgressJSON).tasks.map(AccountTask.fromJSON);
+        tasks = (
+          JSON.parse(progress.toString()) as SnapSyncProgressJSON
+        ).tasks.map(AccountTask.fromJSON);
       } catch (err) {
         logger.warn('SnapSync::loadSyncProgress, catch:', err);
       }
@@ -348,8 +406,12 @@ export class SnapSync {
       logger.warn('SnapSync::saveSyncProgress, catch:', err);
     }
 
-    const json: SnapSyncProgressJSON = { tasks: this.tasks.map((task) => task.toJSON()) };
-    await this.db.batch([DBSaveSnapSyncProgress(Buffer.from(JSON.stringify(json)))]);
+    const json: SnapSyncProgressJSON = {
+      tasks: this.tasks.map((task) => task.toJSON())
+    };
+    await this.db.batch([
+      DBSaveSnapSyncProgress(Buffer.from(JSON.stringify(json)))
+    ]);
   }
 
   /**
@@ -386,7 +448,10 @@ export class SnapSync {
    * @param task - Account task
    * @param res - Account response or null(if the request fails or times out)
    */
-  private async processAccountResponse(task: AccountTask, res: AccountResponse | null) {
+  private async processAccountResponse(
+    task: AccountTask,
+    res: AccountResponse | null
+  ) {
     // revert
     if (res === null) {
       task.req = undefined;
@@ -421,14 +486,20 @@ export class SnapSync {
       const account = res.accounts[i];
 
       // check if the account is a contract with an unknown code
-      if (!account.codeHash.equals(KECCAK256_NULL) && !(await this.db.hasCode(account.codeHash))) {
+      if (
+        !account.codeHash.equals(KECCAK256_NULL) &&
+        !(await this.db.hasCode(account.codeHash))
+      ) {
         task.needCode[i] = true;
         task.pendingCode.add(account.codeHash);
         task.pending++;
       }
 
       // check if the account is a contract with an unknown storage trie
-      if (!account.stateRoot.equals(KECCAK256_RLP) && !(await this.db.hasTrieNode(account.stateRoot))) {
+      if (
+        !account.stateRoot.equals(KECCAK256_RLP) &&
+        !(await this.db.hasTrieNode(account.stateRoot))
+      ) {
         const hash = res.hashes[i];
         // if the large state task exists, wake it up
         const largeStateTasks = task.largeStateTasks.get(hash);
@@ -528,7 +599,15 @@ export class SnapSync {
 
       this.runWithLock(
         peer.getStorageRanges(this.root, req).then((res) => {
-          this.channel.push(this.processStorageResponse.bind(this, task, largeStateTask, req, res));
+          this.channel.push(
+            this.processStorageResponse.bind(
+              this,
+              task,
+              largeStateTask,
+              req,
+              res
+            )
+          );
         })
       );
 
@@ -545,7 +624,12 @@ export class SnapSync {
    * @param req - Storage request
    * @param res - Storage response or null(if the request fails or times out)
    */
-  private async processStorageResponse(accountTask: AccountTask, stateTask: StorageTask | undefined, req: StorageRequst, res: StorageResponse | null) {
+  private async processStorageResponse(
+    accountTask: AccountTask,
+    stateTask: StorageTask | undefined,
+    req: StorageRequst,
+    res: StorageResponse | null
+  ) {
     // revert
     if (res === null) {
       if (stateTask) {
@@ -575,20 +659,34 @@ export class SnapSync {
         continue;
       }
 
-      const j = accountTask.res!.hashes.findIndex((hash) => hash.equals(account));
+      const j = accountTask.res!.hashes.findIndex((hash) =>
+        hash.equals(account)
+      );
       if (j === -1) {
-        logger.debug('SnapSync::processStorageResponse, missing account hash:', bufferToHex(account));
+        logger.debug(
+          'SnapSync::processStorageResponse, missing account hash:',
+          bufferToHex(account)
+        );
         continue;
       }
 
       // mark completed tasks
-      if (stateTask === undefined && accountTask.needState[j] && (i < res.hashes.length - 1 || !res.cont)) {
+      if (
+        stateTask === undefined &&
+        accountTask.needState[j] &&
+        (i < res.hashes.length - 1 || !res.cont)
+      ) {
         accountTask.needState[j] = false;
         accountTask.pending--;
       }
 
       // mark the task as needHeal
-      if (stateTask === undefined && !accountTask.needHeal[j] && i === res.hashes.length - 1 && res.cont) {
+      if (
+        stateTask === undefined &&
+        !accountTask.needHeal[j] &&
+        i === res.hashes.length - 1 &&
+        res.cont
+      ) {
         accountTask.needHeal[j] = true;
       }
 
@@ -656,7 +754,9 @@ export class SnapSync {
       // save snapshot
       const batch = new DBatch(this.db);
       for (let j = 0; j < res.hashes[i].length; j++) {
-        batch.push(DBSaveSnapStorage(account, res.hashes[i][j], res.slots[i][j]));
+        batch.push(
+          DBSaveSnapStorage(account, res.hashes[i][j], res.slots[i][j])
+        );
       }
       await batch.write();
     }
@@ -709,7 +809,9 @@ export class SnapSync {
 
       this.runWithLock(
         peer.getByteCodes(hashes).then((res) => {
-          this.channel.push(this.processBytecodeResponse.bind(this, task, hashes, res));
+          this.channel.push(
+            this.processBytecodeResponse.bind(this, task, hashes, res)
+          );
         })
       );
     }
@@ -721,7 +823,11 @@ export class SnapSync {
    * @param hashes - Code hash list
    * @param res - Codes or null(if the request fails or times out)
    */
-  private async processBytecodeResponse(task: AccountTask, hashes: Buffer[], res: (Buffer | undefined)[] | null) {
+  private async processBytecodeResponse(
+    task: AccountTask,
+    hashes: Buffer[],
+    res: (Buffer | undefined)[] | null
+  ) {
     // revert
     if (res === null) {
       hashes.forEach((hash) => task.pendingCode.add(hash));
@@ -760,10 +866,13 @@ export class SnapSync {
    * Load requests from trieSync to fill pending requests
    */
   private fillHealTask() {
-    const have = this.healer.pendingTrieNode.size + this.healer.pendingCode.size;
+    const have =
+      this.healer.pendingTrieNode.size + this.healer.pendingCode.size;
     const want = healTrieNodeRequestSize + healCodeRequestSize;
     if (have < want) {
-      const { nodeHashes, codeHashes } = this.healer.scheduler.missing(want - have);
+      const { nodeHashes, codeHashes } = this.healer.scheduler.missing(
+        want - have
+      );
       for (let i = 0; i < nodeHashes.length; i++) {
         this.healer.pendingTrieNode.add(nodeHashes[i]);
       }
@@ -777,7 +886,10 @@ export class SnapSync {
    * Assign trie node tasks to remote peers
    */
   private assignHealTrieNodeTasks() {
-    while (this.healer.pendingTrieNode.size > 0 || this.healer.scheduler.pending > 0) {
+    while (
+      this.healer.pendingTrieNode.size > 0 ||
+      this.healer.scheduler.pending > 0
+    ) {
       this.fillHealTask();
 
       if (this.healer.pendingTrieNode.size === 0) {
@@ -800,7 +912,9 @@ export class SnapSync {
 
       this.runWithLock(
         peer.getTrieNodes(hashes).then((res) => {
-          this.channel.push(this.processHealTrieNodeResponse.bind(this, hashes, res));
+          this.channel.push(
+            this.processHealTrieNodeResponse.bind(this, hashes, res)
+          );
         })
       );
     }
@@ -811,7 +925,10 @@ export class SnapSync {
    * @param hashes - Node hash list
    * @param res - Nodes or null(if the request fails or times out)
    */
-  private async processHealTrieNodeResponse(hashes: Buffer[], res: (Buffer | undefined)[] | null) {
+  private async processHealTrieNodeResponse(
+    hashes: Buffer[],
+    res: (Buffer | undefined)[] | null
+  ) {
     // revert
     if (res === null) {
       hashes.forEach((hash) => this.healer.pendingTrieNode.add(hash));
@@ -845,7 +962,10 @@ export class SnapSync {
    * Assign bytecode tasks to remote peers
    */
   private assignHealBytecodeTasks() {
-    while (this.healer.pendingCode.size > 0 || this.healer.scheduler.pending > 0) {
+    while (
+      this.healer.pendingCode.size > 0 ||
+      this.healer.scheduler.pending > 0
+    ) {
       this.fillHealTask();
 
       if (this.healer.pendingCode.size === 0) {
@@ -869,7 +989,9 @@ export class SnapSync {
 
       this.runWithLock(
         peer.getByteCodes(hashes).then((res) => {
-          this.channel.push(this.processHealBytecodeResponse.bind(this, hashes, res));
+          this.channel.push(
+            this.processHealBytecodeResponse.bind(this, hashes, res)
+          );
         })
       );
     }
@@ -880,7 +1002,10 @@ export class SnapSync {
    * @param hashes - Code hash list
    * @param res - Codes list or null(if the request fails or times out)
    */
-  private async processHealBytecodeResponse(hashes: Buffer[], res: (Buffer | undefined)[] | null) {
+  private async processHealBytecodeResponse(
+    hashes: Buffer[],
+    res: (Buffer | undefined)[] | null
+  ) {
     // revert
     if (res === null) {
       hashes.forEach((hash) => this.healer.pendingCode.add(hash));
@@ -1091,23 +1216,28 @@ export class SnapSync {
   async setRoot(root: Buffer) {
     this.root = root;
     await this.loadSyncProgress();
-    await this.healer.scheduler.setRoot(this.root, async (paths, path, leaf, parent) => {
-      // the leaf node is an account
-      if (paths.length === 1) {
-        try {
-          const account = StakingAccount.fromRlpSerializedAccount(leaf);
-          await this.db.batch([DBSaveSerializedSnapAccount(paths[0], account.slimSerialize())]);
-        } catch (err) {
-          // ignore invalid leaf node
+    await this.healer.scheduler.setRoot(
+      this.root,
+      async (paths, path, leaf, parent) => {
+        // the leaf node is an account
+        if (paths.length === 1) {
+          try {
+            const account = StakingAccount.fromRlpSerializedAccount(leaf);
+            await this.db.batch([
+              DBSaveSerializedSnapAccount(paths[0], account.slimSerialize())
+            ]);
+          } catch (err) {
+            // ignore invalid leaf node
+          }
+        }
+        // the leaf node is a slot
+        else if (paths.length === 2) {
+          await this.db.batch([DBSaveSnapStorage(paths[0], paths[1], leaf)]);
+        } else {
+          logger.warn('SnapSync::setRoot, unknown leaf node');
         }
       }
-      // the leaf node is a slot
-      else if (paths.length === 2) {
-        await this.db.batch([DBSaveSnapStorage(paths[0], paths[1], leaf)]);
-      } else {
-        logger.warn('SnapSync::setRoot, unknown leaf node');
-      }
-    });
+    );
   }
 
   /**

@@ -88,12 +88,24 @@ describe('SnapProtocol', function () {
     const genRandResult = await addEmptyAccounts(db, emptyAccountCount, result);
     root = genRandResult.root;
     accounts = genRandResult.accounts;
-    sortAccounts = [...genRandResult.accounts].sort((a, b) => a.accountHash.compare(b.accountHash));
+    sortAccounts = [...genRandResult.accounts].sort((a, b) =>
+      a.accountHash.compare(b.accountHash)
+    );
     await node.snapTree.init(root, false, true);
     const peer1 = new MockPeer();
     const peer2 = new MockPeer();
-    handler1 = new SnapProtocolHandler(protocol1 as any, peer1 as any, peer1.stream() as any, 20000);
-    handler2 = new SnapProtocolHandler(protocol2 as any, peer2 as any, peer2.stream() as any, 20000);
+    handler1 = new SnapProtocolHandler(
+      protocol1 as any,
+      peer1 as any,
+      peer1.stream() as any,
+      20000
+    );
+    handler2 = new SnapProtocolHandler(
+      protocol2 as any,
+      peer2 as any,
+      peer2.stream() as any,
+      20000
+    );
     peer1.setRemote(handler2);
     peer2.setRemote(handler1);
     const trie = new BaseTrie(db.rawdb, root);
@@ -110,11 +122,13 @@ describe('SnapProtocol', function () {
   });
 
   it('should handshake successfully', async () => {
-    expect(protocol1.pool.has(handler1), 'handler should not in the pool').to.be.false;
+    expect(protocol1.pool.has(handler1), 'handler should not in the pool').to.be
+      .false;
     await handler1.handshake();
     expect(protocol1.pool.has(handler1), 'handler should in the pool').be.true;
 
-    expect(protocol2.pool.has(handler2), 'handler should not in the pool').to.be.false;
+    expect(protocol2.pool.has(handler2), 'handler should not in the pool').to.be
+      .false;
     await handler2.handshake();
     expect(protocol2.pool.has(handler2), 'handler should in the pool').be.true;
   });
@@ -122,30 +136,65 @@ describe('SnapProtocol', function () {
   it('should getAccountRange successfully and continue is false', async () => {
     const startHash = sortAccounts[0].accountHash;
     const limitHash = sortAccounts[sortAccounts.length - 1].accountHash;
-    const accountData = sortAccounts.map((account) => [account.accountHash, account.account.slimSerialize()]);
-    const response = await handler2.getAccountRange(root, { origin: startHash, limit: limitHash });
+    const accountData = sortAccounts.map((account) => [
+      account.accountHash,
+      account.account.slimSerialize()
+    ]);
+    const response = await handler2.getAccountRange(root, {
+      origin: startHash,
+      limit: limitHash
+    });
     expect(response !== null, 'response should not be null').be.true;
-    expect(response!.accounts.length, 'accounts length should be equal').be.equal(response!.hashes.length);
+    expect(
+      response!.accounts.length,
+      'accounts length should be equal'
+    ).be.equal(response!.hashes.length);
     expect(response!.cont, 'continue should be false').be.equal(false);
-    expect(response!.accounts.length, 'accounts length should be equal').be.equal(accountData.length);
+    expect(
+      response!.accounts.length,
+      'accounts length should be equal'
+    ).be.equal(accountData.length);
     for (let i = 0; i < response!.accounts.length; i++) {
-      expect(response!.hashes[i].equals(accountData[i][0]), 'accountHashes should be equal').be.true;
-      expect(response!.accounts[i].slimSerialize().equals(accountData[i][1]), 'accountBody should be equal').be.true;
+      expect(
+        response!.hashes[i].equals(accountData[i][0]),
+        'accountHashes should be equal'
+      ).be.true;
+      expect(
+        response!.accounts[i].slimSerialize().equals(accountData[i][1]),
+        'accountBody should be equal'
+      ).be.true;
     }
   });
 
   it('should getAccountRange successfully and continue is true', async () => {
     const startHash = sortAccounts[0].accountHash;
     const limitHash = sortAccounts[sortAccounts.length - 2].accountHash;
-    const accountData = sortAccounts.slice(0, sortAccounts.length - 1).map((account) => [account.accountHash, account.account.slimSerialize()]);
-    const response = await handler2.getAccountRange(root, { origin: startHash, limit: limitHash });
+    const accountData = sortAccounts
+      .slice(0, sortAccounts.length - 1)
+      .map((account) => [account.accountHash, account.account.slimSerialize()]);
+    const response = await handler2.getAccountRange(root, {
+      origin: startHash,
+      limit: limitHash
+    });
     expect(response !== null, 'response should not be null').be.true;
-    expect(response!.accounts.length, 'accounts length should be equal').be.equal(response!.hashes.length);
+    expect(
+      response!.accounts.length,
+      'accounts length should be equal'
+    ).be.equal(response!.hashes.length);
     expect(response!.cont, 'continue should be true').be.equal(true);
-    expect(response!.accounts.length, 'accounts length should be equal').be.equal(accountData.length);
+    expect(
+      response!.accounts.length,
+      'accounts length should be equal'
+    ).be.equal(accountData.length);
     for (let i = 0; i < response!.accounts.length; i++) {
-      expect(response!.hashes[i].equals(accountData[i][0]), 'accountHashes should be equal').be.true;
-      expect(response!.accounts[i].slimSerialize().equals(accountData[i][1]), 'accountBody should be equal').be.true;
+      expect(
+        response!.hashes[i].equals(accountData[i][0]),
+        'accountHashes should be equal'
+      ).be.true;
+      expect(
+        response!.accounts[i].slimSerialize().equals(accountData[i][1]),
+        'accountBody should be equal'
+      ).be.true;
     }
   });
 
@@ -153,15 +202,33 @@ describe('SnapProtocol', function () {
     handler2.resetSoftResponseLimit(500);
     const startHash = sortAccounts[0].accountHash;
     const limitHash = sortAccounts[sortAccounts.length - 1].accountHash;
-    const accountData = sortAccounts.map((account) => [account.accountHash, account.account.slimSerialize()]);
-    const response = await handler1.getAccountRange(root, { origin: startHash, limit: limitHash });
+    const accountData = sortAccounts.map((account) => [
+      account.accountHash,
+      account.account.slimSerialize()
+    ]);
+    const response = await handler1.getAccountRange(root, {
+      origin: startHash,
+      limit: limitHash
+    });
     expect(response !== null, 'response should not be null').be.true;
-    expect(response!.accounts.length, 'accounts length should be equal').be.equal(response!.hashes.length);
+    expect(
+      response!.accounts.length,
+      'accounts length should be equal'
+    ).be.equal(response!.hashes.length);
     expect(response!.cont, 'continue should be true').be.equal(true);
-    expect(response!.accounts.length < accountData.length, 'accounts length should be less than accounts').be.true;
+    expect(
+      response!.accounts.length < accountData.length,
+      'accounts length should be less than accounts'
+    ).be.true;
     for (let i = 0; i < response!.accounts.length; i++) {
-      expect(response!.hashes[i].equals(accountData[i][0]), 'accountHashes should be equal').be.true;
-      expect(response!.accounts[i].slimSerialize().equals(accountData[i][1]), 'accountBody should be equal').be.true;
+      expect(
+        response!.hashes[i].equals(accountData[i][0]),
+        'accountHashes should be equal'
+      ).be.true;
+      expect(
+        response!.accounts[i].slimSerialize().equals(accountData[i][1]),
+        'accountBody should be equal'
+      ).be.true;
     }
     handler2.resetSoftResponseLimit(20000);
   });
@@ -171,17 +238,37 @@ describe('SnapProtocol', function () {
     const limitHash = MAX_HASH;
     const accountHashes = accounts.map((account) => account.accountHash);
     const roots = accounts.map((account) => account.account.stateRoot);
-    const storageHash = accounts.map((account) => Array.from(account.storageData.keys()));
-    const stotageData = accounts.map((account) => Array.from(account.storageData.values()).map((value) => value.val));
-    const response = await handler2.getStorageRanges(root, { origin: startHash, limit: limitHash, roots: roots, accounts: accountHashes });
+    const storageHash = accounts.map((account) =>
+      Array.from(account.storageData.keys())
+    );
+    const stotageData = accounts.map((account) =>
+      Array.from(account.storageData.values()).map((value) => value.val)
+    );
+    const response = await handler2.getStorageRanges(root, {
+      origin: startHash,
+      limit: limitHash,
+      roots: roots,
+      accounts: accountHashes
+    });
     expect(response !== null, 'response should not be null').be.true;
-    expect(response!.slots.length, 'slots length should be equal').be.equal(stotageData.length - emptyAccountCount);
-    expect(response!.slots.length, 'slots length should equal hashes length').be.equal(response!.hashes.length);
+    expect(response!.slots.length, 'slots length should be equal').be.equal(
+      stotageData.length - emptyAccountCount
+    );
+    expect(
+      response!.slots.length,
+      'slots length should equal hashes length'
+    ).be.equal(response!.hashes.length);
     expect(response!.cont, 'continue should be false').be.equal(false);
     for (let i = 0; i < response!.hashes.length; i++) {
       for (let j = 0; j < response!.slots[i].length; j++) {
-        expect(response!.hashes[i][j].equals(storageHash[i][j]), 'accountHashes should be equal').be.true;
-        expect(response!.slots[i][j].equals(stotageData[i][j]), 'storageData should be equal').be.true;
+        expect(
+          response!.hashes[i][j].equals(storageHash[i][j]),
+          'accountHashes should be equal'
+        ).be.true;
+        expect(
+          response!.slots[i][j].equals(stotageData[i][j]),
+          'storageData should be equal'
+        ).be.true;
       }
     }
   });
@@ -191,17 +278,35 @@ describe('SnapProtocol', function () {
     const limitHash = MAX_HASH;
     const accountHashes = accounts.map((account) => account.accountHash);
     const roots = accounts.map((account) => account.account.stateRoot);
-    const storageHash = accounts.map((account) => Array.from(account.storageData.keys()));
-    const stotageData = accounts.map((account) => Array.from(account.storageData.values()).map((value) => value.val));
-    const response = await handler2.getStorageRanges(root, { origin: startHash, limit: limitHash, roots: roots, accounts: accountHashes });
+    const storageHash = accounts.map((account) =>
+      Array.from(account.storageData.keys())
+    );
+    const stotageData = accounts.map((account) =>
+      Array.from(account.storageData.values()).map((value) => value.val)
+    );
+    const response = await handler2.getStorageRanges(root, {
+      origin: startHash,
+      limit: limitHash,
+      roots: roots,
+      accounts: accountHashes
+    });
     expect(response !== null, 'response should not be null').be.true;
     expect(response!.slots.length, 'slots length should be equal').be.equal(1);
-    expect(response!.slots.length, 'slots length should equal hashes length').be.equal(response!.hashes.length);
+    expect(
+      response!.slots.length,
+      'slots length should equal hashes length'
+    ).be.equal(response!.hashes.length);
     expect(response!.cont, 'continue should be false').be.equal(false);
     for (let i = 0; i < response!.hashes.length; i++) {
       for (let j = 0; j < response!.slots[i].length; j++) {
-        expect(response!.hashes[i][j].equals(storageHash[i][j]), 'accountHashes should be equal').be.true;
-        expect(response!.slots[i][j].equals(stotageData[i][j]), 'storageData should be equal').be.true;
+        expect(
+          response!.hashes[i][j].equals(storageHash[i][j]),
+          'accountHashes should be equal'
+        ).be.true;
+        expect(
+          response!.slots[i][j].equals(stotageData[i][j]),
+          'storageData should be equal'
+        ).be.true;
       }
     }
   });
@@ -212,17 +317,38 @@ describe('SnapProtocol', function () {
     const limitHash = MAX_HASH;
     const accountHashes = accounts.map((account) => account.accountHash);
     const roots = accounts.map((account) => account.account.stateRoot);
-    const storageHash = accounts.map((account) => Array.from(account.storageData.keys()));
-    const stotageData = accounts.map((account) => Array.from(account.storageData.values()).map((value) => value.val));
-    const response = await handler1.getStorageRanges(root, { origin: startHash, limit: limitHash, roots: roots, accounts: accountHashes });
+    const storageHash = accounts.map((account) =>
+      Array.from(account.storageData.keys())
+    );
+    const stotageData = accounts.map((account) =>
+      Array.from(account.storageData.values()).map((value) => value.val)
+    );
+    const response = await handler1.getStorageRanges(root, {
+      origin: startHash,
+      limit: limitHash,
+      roots: roots,
+      accounts: accountHashes
+    });
     expect(response !== null, 'response should not be null').be.true;
-    expect(response!.slots.length < stotageData.length, 'slots length should be less than request').be.true;
-    expect(response!.slots.length, 'slots length should equal hashes length').be.equal(response!.hashes.length);
+    expect(
+      response!.slots.length < stotageData.length,
+      'slots length should be less than request'
+    ).be.true;
+    expect(
+      response!.slots.length,
+      'slots length should equal hashes length'
+    ).be.equal(response!.hashes.length);
     expect(response!.cont, 'continue should be true').be.equal(true);
     for (let i = 0; i < response!.hashes.length; i++) {
       for (let j = 0; j < response!.slots[i].length; j++) {
-        expect(response!.hashes[i][j].equals(storageHash[i][j]), 'accountHashes should be equal').be.true;
-        expect(response!.slots[i][j].equals(stotageData[i][j]), 'storageData should be equal').be.true;
+        expect(
+          response!.hashes[i][j].equals(storageHash[i][j]),
+          'accountHashes should be equal'
+        ).be.true;
+        expect(
+          response!.slots[i][j].equals(stotageData[i][j]),
+          'storageData should be equal'
+        ).be.true;
       }
     }
     handler2.resetSoftResponseLimit(20000);
@@ -233,7 +359,9 @@ describe('SnapProtocol', function () {
     const code = accounts.map((account) => account.code);
     const response = await handler2.getByteCodes(codeHashes);
     expect(response !== null, 'response should not be null').be.true;
-    expect(response!.length, 'code length should be equal').be.equal(code.length);
+    expect(response!.length, 'code length should be equal').be.equal(
+      code.length
+    );
     for (let i = 0; i < code.length; i++) {
       expect(response![i]!.equals(code[i]), 'ByteCode should be equal').be.true;
     }
@@ -247,7 +375,10 @@ describe('SnapProtocol', function () {
     expect(response!.length, 'code length should equal').be.equal(code.length);
     for (let i = 0; i < code.length; i++) {
       const element = response![i];
-      expect(element === undefined || element.equals(code[i]), 'ByteCode should be equal or undifined').be.true;
+      expect(
+        element === undefined || element.equals(code[i]),
+        'ByteCode should be equal or undifined'
+      ).be.true;
     }
   });
 
@@ -255,13 +386,20 @@ describe('SnapProtocol', function () {
     const codeHashes = accounts.map((account) => keccak256(account.code));
     const code = accounts.map((account) => account.code);
     const deleteCount = 5;
-    await db.rawdb.del(codeHashes[deleteCount], { keyEncoding: 'binary', valueEncoding: 'binary' });
+    await db.rawdb.del(codeHashes[deleteCount], {
+      keyEncoding: 'binary',
+      valueEncoding: 'binary'
+    });
     const response = await handler2.getByteCodes(codeHashes);
     expect(response !== null, 'response should not be null').be.true;
-    expect(response!.length, 'code length should be equal').be.equal(code.length);
+    expect(response!.length, 'code length should be equal').be.equal(
+      code.length
+    );
     for (let i = 0; i < code.length; i++) {
       if (i === deleteCount) {
-        expect(response![i], 'ByteCode should be undefined').be.equal(undefined);
+        expect(response![i], 'ByteCode should be undefined').be.equal(
+          undefined
+        );
         continue;
       }
       expect(response![i]!.equals(code[i]), 'ByteCode should be equal').be.true;
@@ -270,7 +408,10 @@ describe('SnapProtocol', function () {
 
   it('should getCodeByte unsuccessfully', async () => {
     const codeHashes = accounts.map((account) => keccak256(account.code));
-    await db.rawdb.put(codeHashes[0], crypto.randomBytes(100), { keyEncoding: 'binary', valueEncoding: 'binary' });
+    await db.rawdb.put(codeHashes[0], crypto.randomBytes(100), {
+      keyEncoding: 'binary',
+      valueEncoding: 'binary'
+    });
     const response = await handler1.getByteCodes(codeHashes);
     expect(response, 'response should be null').be.equal(null);
   });
@@ -278,39 +419,62 @@ describe('SnapProtocol', function () {
   it('should getTrieNode successfully', async () => {
     const response = await handler2.getTrieNodes(trieNodeKeys);
     expect(response !== null, 'response should not be null').be.true;
-    expect(response!.length, 'trieNode length should be equal').be.equal(trieNodeValues.length);
+    expect(response!.length, 'trieNode length should be equal').be.equal(
+      trieNodeValues.length
+    );
     for (let i = 0; i < trieNodeValues.length; i++) {
-      expect(response![i]!.equals(trieNodeValues[i]), 'trieNode should be equal').be.true;
+      expect(
+        response![i]!.equals(trieNodeValues[i]),
+        'trieNode should be equal'
+      ).be.true;
     }
   });
 
   it('should getTrieNode successfully when responseLimit could not cover request', async () => {
     const response = await handler2.getTrieNodes(trieNodeKeys);
     expect(response !== null, 'response should not be null').be.true;
-    expect(response!.length, 'trieNode length should be equal').be.equal(trieNodeValues.length);
+    expect(response!.length, 'trieNode length should be equal').be.equal(
+      trieNodeValues.length
+    );
     for (let i = 0; i < trieNodeValues.length; i++) {
       const element = response![i];
-      expect(element === undefined || element.equals(trieNodeValues[i]), 'trieNode should be equal or undifined').be.true;
+      expect(
+        element === undefined || element.equals(trieNodeValues[i]),
+        'trieNode should be equal or undifined'
+      ).be.true;
     }
   });
 
   it('should getTrieNode successfully when some node missing', async () => {
     const deleteCount = 5;
-    await db.rawdb.del(trieNodeKeys[deleteCount], { keyEncoding: 'binary', valueEncoding: 'binary' });
+    await db.rawdb.del(trieNodeKeys[deleteCount], {
+      keyEncoding: 'binary',
+      valueEncoding: 'binary'
+    });
     const response = await handler2.getTrieNodes(trieNodeKeys);
     expect(response !== null, 'response should not be null').be.true;
-    expect(response!.length, 'trieNode length should be equal').be.equal(trieNodeValues.length);
+    expect(response!.length, 'trieNode length should be equal').be.equal(
+      trieNodeValues.length
+    );
     for (let i = 0; i < trieNodeValues.length; i++) {
       if (i === deleteCount) {
-        expect(response![i], 'trieNode should be undefined').be.equal(undefined);
+        expect(response![i], 'trieNode should be undefined').be.equal(
+          undefined
+        );
         continue;
       }
-      expect(response![i]!.equals(trieNodeValues[i]), 'trieNode should be equal').be.true;
+      expect(
+        response![i]!.equals(trieNodeValues[i]),
+        'trieNode should be equal'
+      ).be.true;
     }
   });
 
   it('should getTrieNode unsuccessfully', async () => {
-    await db.rawdb.put(trieNodeKeys[0], crypto.randomBytes(100), { keyEncoding: 'binary', valueEncoding: 'binary' });
+    await db.rawdb.put(trieNodeKeys[0], crypto.randomBytes(100), {
+      keyEncoding: 'binary',
+      valueEncoding: 'binary'
+    });
     const response = await handler1.getTrieNodes(trieNodeKeys);
     expect(response, 'response should be null').be.equal(null);
   });
@@ -318,10 +482,12 @@ describe('SnapProtocol', function () {
   it('should abort correctly', async () => {
     expect(protocol1.pool.has(handler1), 'handler should in the pool').be.true;
     handler1.abort();
-    expect(protocol1.pool.has(handler1), 'handler should not in the pool').to.be.false;
+    expect(protocol1.pool.has(handler1), 'handler should not in the pool').to.be
+      .false;
 
     expect(protocol2.pool.has(handler2), 'handler should in the pool').be.true;
     handler2.abort();
-    expect(protocol2.pool.has(handler2), 'handler should not in the pool').to.be.false;
+    expect(protocol2.pool.has(handler2), 'handler should not in the pool').to.be
+      .false;
   });
 });

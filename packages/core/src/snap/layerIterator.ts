@@ -1,5 +1,9 @@
 import { LevelUp } from 'levelup';
-import { AbstractLevelDOWN, AbstractIteratorOptions, AbstractIterator } from 'abstract-leveldown';
+import {
+  AbstractLevelDOWN,
+  AbstractIteratorOptions,
+  AbstractIterator
+} from 'abstract-leveldown';
 import { SnapIterator } from './types';
 
 /**
@@ -8,7 +12,11 @@ import { SnapIterator } from './types';
  * @param isStale - A function to check if a layer is stale
  * @param getValueByHash - A function to get value by hash
  */
-export async function* asyncTraverseHashList<T>(hashes: Buffer[], isStale: () => boolean, getValueByHash: (hash: Buffer) => T): SnapIterator<T> {
+export async function* asyncTraverseHashList<T>(
+  hashes: Buffer[],
+  isStale: () => boolean,
+  getValueByHash: (hash: Buffer) => T
+): SnapIterator<T> {
   while (hashes.length > 0) {
     if (isStale()) {
       break;
@@ -33,7 +41,13 @@ type IteratorOptions = Pick<AbstractIteratorOptions<Buffer>, 'gte' | 'lte'>;
  * @param convertKey - A function to convert key
  * @param convertValue - A function to convert value
  */
-export async function* asyncTraverseRawDB<T>(db: DB<Buffer, Buffer>, options: IteratorOptions, skip: (key: Buffer) => boolean, convertKey: (key: Buffer) => Buffer, convertValue: (value: Buffer) => T): SnapIterator<T> {
+export async function* asyncTraverseRawDB<T>(
+  db: DB<Buffer, Buffer>,
+  options: IteratorOptions,
+  skip: (key: Buffer) => boolean,
+  convertKey: (key: Buffer) => Buffer,
+  convertValue: (value: Buffer) => T
+): SnapIterator<T> {
   const itr = db.iterator({
     ...options,
     keys: true,
@@ -46,17 +60,19 @@ export async function* asyncTraverseRawDB<T>(db: DB<Buffer, Buffer>, options: It
 
   try {
     while (true) {
-      const result = await new Promise<[Buffer, Buffer] | void>((resolve, reject) => {
-        itr.next((err, key, val) => {
-          if (err) {
-            reject(err);
-          } else if (key === undefined || val === undefined) {
-            resolve();
-          } else {
-            resolve([key, val]);
-          }
-        });
-      });
+      const result = await new Promise<[Buffer, Buffer] | void>(
+        (resolve, reject) => {
+          itr.next((err, key, val) => {
+            if (err) {
+              reject(err);
+            } else if (key === undefined || val === undefined) {
+              resolve();
+            } else {
+              resolve([key, val]);
+            }
+          });
+        }
+      );
 
       if (!result) {
         break;

@@ -3,20 +3,42 @@ import { expect } from 'chai';
 import { Address, toBuffer, BN } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Block, Log, Receipt, Transaction } from '@rei-network/structure';
-import { Database, DBSaveReceipts, DBSetHashToNumber, DBSetBlockOrHeader, DBSaveLookups, DBOp } from '@rei-network/database';
+import {
+  Database,
+  DBSaveReceipts,
+  DBSetHashToNumber,
+  DBSetBlockOrHeader,
+  DBSaveLookups,
+  DBOp
+} from '@rei-network/database';
 import Bloom from '@rei-network/vm/dist/bloom';
 import { BloomBitsIndexer } from '../../src/indexer';
-import { BloomBitsFilter, BloomBitsFilterBackend, ReceiptsCache, bloomBitsConfig } from '../../src/bloomBits';
+import {
+  BloomBitsFilter,
+  BloomBitsFilterBackend,
+  ReceiptsCache,
+  bloomBitsConfig
+} from '../../src/bloomBits';
 const level = require('level-mem');
 
 const common = new Common({ chain: 'rei-devnet' });
 common.setHardforkByBlockNumber(0);
 
-const privateKey = toBuffer('0xd8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0');
+const privateKey = toBuffer(
+  '0xd8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0'
+);
 
-type BloomInfo = { address: Buffer; topic: Buffer; data: Buffer; bloom: Buffer };
+type BloomInfo = {
+  address: Buffer;
+  topic: Buffer;
+  data: Buffer;
+  bloom: Buffer;
+};
 
-async function genRandomBlock(db: Database, parentNumber?: BN): Promise<{ block: Block; info?: BloomInfo }> {
+async function genRandomBlock(
+  db: Database,
+  parentNumber?: BN
+): Promise<{ block: Block; info?: BloomInfo }> {
   if (!parentNumber) {
     const block = Block.fromBlockData(
       {
@@ -66,7 +88,9 @@ async function genRandomBlock(db: Database, parentNumber?: BN): Promise<{ block:
   batch = batch.concat(DBSetHashToNumber(block.hash(), block.header.number));
   batch = batch.concat(DBSaveLookups(block.hash(), block.header.number));
   batch = batch.concat(DBSetBlockOrHeader(block));
-  batch = batch.concat(DBSaveReceipts([receipt], block.hash(), block.header.number));
+  batch = batch.concat(
+    DBSaveReceipts([receipt], block.hash(), block.header.number)
+  );
   await db.batch(batch);
 
   return {
@@ -80,9 +104,15 @@ async function genRandomBlock(db: Database, parentNumber?: BN): Promise<{ block:
   };
 }
 
-function genMockBackend(db: Database, latestNumber: number): BloomBitsFilterBackend {
+function genMockBackend(
+  db: Database,
+  latestNumber: number
+): BloomBitsFilterBackend {
   const receiptsCache = new ReceiptsCache();
-  const latestBlock = Block.fromBlockData({ header: { number: new BN(latestNumber) } }, { common });
+  const latestBlock = Block.fromBlockData(
+    { header: { number: new BN(latestNumber) } },
+    { common }
+  );
   return {
     db,
     receiptsCache,
@@ -118,7 +148,12 @@ describe('BloomBits', () => {
     it('should filter succeed', async () => {
       const filter = new BloomBitsFilter(genMockBackend(db, to));
       for (const { address, topic, data } of blooms) {
-        const logs = await filter.filterRange(new BN(from), new BN(to), [new Address(address)], [topic]);
+        const logs = await filter.filterRange(
+          new BN(from),
+          new BN(to),
+          [new Address(address)],
+          [topic]
+        );
         expect(logs.length).be.equal(1);
         expect(logs[0].address.equals(address)).be.true;
         expect(logs[0].topics.length).be.equal(1);
@@ -175,7 +210,12 @@ describe('BloomBits', () => {
     it('should filter succeed', async () => {
       const filter = new BloomBitsFilter(genMockBackend(db, to));
       for (const { address, topic, data } of blooms) {
-        const logs = await filter.filterRange(new BN(from), new BN(to), [new Address(address)], [topic]);
+        const logs = await filter.filterRange(
+          new BN(from),
+          new BN(to),
+          [new Address(address)],
+          [topic]
+        );
         expect(logs.length).be.equal(1);
         expect(logs[0].address.equals(address)).be.true;
         expect(logs[0].topics.length).be.equal(1);

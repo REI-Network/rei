@@ -126,7 +126,17 @@ export class EvidenceDatabase {
    * @param reverse - Set to true if you want the stream to go in reverse order
    * @param onData - Data callback, return true to break the search loop
    */
-  async loadPendingEvidence({ from, to, reverse, onData }: { from?: BN; to?: BN; reverse?: boolean; onData: (data: Evidence) => Promise<boolean> }) {
+  async loadPendingEvidence({
+    from,
+    to,
+    reverse,
+    onData
+  }: {
+    from?: BN;
+    to?: BN;
+    reverse?: boolean;
+    onData: (data: Evidence) => Promise<boolean>;
+  }) {
     const itr: AbstractIterator<Buffer, Buffer> = this.db.iterator({
       gte: emptyKeyPending(from ?? new BN(0)),
       lte: maxKeyPending(to ?? MAX_UINT64),
@@ -157,9 +167,10 @@ export class EvidenceDatabase {
 
     try {
       let serialized: Buffer | undefined;
-      while ((serialized = await next()) && !(await onData(EvidenceFactory.fromSerializedEvidence(serialized)))) {}
-    } catch (err) {
-      throw err;
+      while (
+        (serialized = await next()) &&
+        !(await onData(EvidenceFactory.fromSerializedEvidence(serialized)))
+      ) {}
     } finally {
       await close();
     }

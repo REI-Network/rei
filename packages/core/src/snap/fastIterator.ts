@@ -29,15 +29,24 @@ class WeightedIterator<T> {
 
 export type FastSnapReturnType<T> = { hash: Buffer; value: T };
 
-export type FastSnapAsyncGenerator<T> = AsyncGenerator<FastSnapReturnType<T>, FastSnapReturnType<T> | void>;
+export type FastSnapAsyncGenerator<T> = AsyncGenerator<
+  FastSnapReturnType<T>,
+  FastSnapReturnType<T> | void
+>;
 
 export class FastSnapIterator<T> {
   readonly root: Buffer;
 
   private iterators: WeightedIterator<T | null>[] = [];
-  private initiated: boolean = false;
+  private initiated = false;
 
-  constructor(snap: ISnapshot, genSnapIterator: (snap: ISnapshot) => { iter: SnapIterator<T | null>; stop: boolean }) {
+  constructor(
+    snap: ISnapshot,
+    genSnapIterator: (snap: ISnapshot) => {
+      iter: SnapIterator<T | null>;
+      stop: boolean;
+    }
+  ) {
     this.root = snap.root;
     let _snap: undefined | ISnapshot = snap;
     for (let depth = 0; _snap !== undefined; depth++) {
@@ -188,7 +197,12 @@ export class FastSnapIterator<T> {
     });
 
     // move target element to the correct position
-    this.iterators = [...this.iterators.slice(0, index), ...this.iterators.slice(index + 1, _index + 1), this.iterators[index], ...this.iterators.slice(_index + 1)];
+    this.iterators = [
+      ...this.iterators.slice(0, index),
+      ...this.iterators.slice(index + 1, _index + 1),
+      this.iterators[index],
+      ...this.iterators.slice(_index + 1)
+    ];
 
     // continue to check the next iterator, if necessary
     if (clash !== -1) {

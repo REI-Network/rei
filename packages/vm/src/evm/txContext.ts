@@ -9,7 +9,14 @@ export default class TxContext {
   accessList?: EVMCAccessList;
   recentHashes: Buffer[];
 
-  constructor(gasPrice: BN, origin: Address, author?: Address, accessList?: EVMCAccessList, blockGasUsed?: BN, recentHashes?: Buffer[]) {
+  constructor(
+    gasPrice: BN,
+    origin: Address,
+    author?: Address,
+    accessList?: EVMCAccessList,
+    blockGasUsed?: BN,
+    recentHashes?: Buffer[]
+  ) {
     this.gasPrice = gasPrice;
     this.origin = origin;
     this.author = author;

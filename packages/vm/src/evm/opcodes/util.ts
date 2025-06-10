@@ -166,7 +166,12 @@ export function jumpSubIsValid(runState: RunState, dest: number): boolean {
  * @param {RunState} runState - the current runState
  * @param {Common} common - the common
  */
-export function maxCallGas(gasLimit: BN, gasLeft: BN, runState: RunState, common: Common): BN {
+export function maxCallGas(
+  gasLimit: BN,
+  gasLeft: BN,
+  runState: RunState,
+  common: Common
+): BN {
   const isTangerineWhistleOrLater = common.gteHardfork('tangerineWhistle');
   if (isTangerineWhistleOrLater) {
     const gasAllowed = gasLeft.sub(gasLeft.divn(64));
@@ -184,7 +189,12 @@ export function maxCallGas(gasLimit: BN, gasLeft: BN, runState: RunState, common
  * @param {BN} offset
  * @param {BN} length
  */
-export function subMemUsage(runState: RunState, offset: BN, length: BN, common: Common) {
+export function subMemUsage(
+  runState: RunState,
+  offset: BN,
+  length: BN,
+  common: Common
+) {
   // YP (225): access with zero length will not extend the memory
   if (length.isZero()) return;
 
@@ -212,7 +222,11 @@ export function subMemUsage(runState: RunState, offset: BN, length: BN, common: 
  * @param {BN}       outOffset
  * @param {BN}       outLength
  */
-export function writeCallOutput(runState: RunState, outOffset: BN, outLength: BN) {
+export function writeCallOutput(
+  runState: RunState,
+  outOffset: BN,
+  outLength: BN
+) {
   const returnData = runState.eei.getReturnData();
   if (returnData.length > 0) {
     const memOffset = outOffset.toNumber();
@@ -232,14 +246,51 @@ export function writeCallOutput(runState: RunState, outOffset: BN, outLength: BN
  * @param {Buffer}   value
  * @param {Buffer}   keyBuf
  */
-export function updateSstoreGas(runState: RunState, currentStorage: Buffer, value: Buffer, keyBuf: Buffer, common: Common) {
+export function updateSstoreGas(
+  runState: RunState,
+  currentStorage: Buffer,
+  value: Buffer,
+  keyBuf: Buffer,
+  common: Common
+) {
   const sstoreResetCost = common.param('gasPrices', 'sstoreReset');
-  if ((value.length === 0 && !currentStorage.length) || (value.length !== 0 && currentStorage.length)) {
-    runState.eei.useGas(new BN(adjustSstoreGasEIP2929(runState, keyBuf, sstoreResetCost, 'reset', common)), 'updateSstoreGas');
+  if (
+    (value.length === 0 && !currentStorage.length) ||
+    (value.length !== 0 && currentStorage.length)
+  ) {
+    runState.eei.useGas(
+      new BN(
+        adjustSstoreGasEIP2929(
+          runState,
+          keyBuf,
+          sstoreResetCost,
+          'reset',
+          common
+        )
+      ),
+      'updateSstoreGas'
+    );
   } else if (value.length === 0 && currentStorage.length) {
-    runState.eei.useGas(new BN(adjustSstoreGasEIP2929(runState, keyBuf, sstoreResetCost, 'reset', common)), 'updateSstoreGas');
-    runState.eei.refundGas(new BN(common.param('gasPrices', 'sstoreRefund')), 'updateSstoreGas');
+    runState.eei.useGas(
+      new BN(
+        adjustSstoreGasEIP2929(
+          runState,
+          keyBuf,
+          sstoreResetCost,
+          'reset',
+          common
+        )
+      ),
+      'updateSstoreGas'
+    );
+    runState.eei.refundGas(
+      new BN(common.param('gasPrices', 'sstoreRefund')),
+      'updateSstoreGas'
+    );
   } else if (value.length !== 0 && !currentStorage.length) {
-    runState.eei.useGas(new BN(common.param('gasPrices', 'sstoreSet')), 'updateSstoreGas');
+    runState.eei.useGas(
+      new BN(common.param('gasPrices', 'sstoreSet')),
+      'updateSstoreGas'
+    );
   }
 }

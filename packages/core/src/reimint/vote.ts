@@ -1,4 +1,15 @@
-import { Address, BN, ecsign, ecrecover, rlp, intToBuffer, bnToUnpaddedBuffer, rlphash, bufferToInt, toBuffer } from 'ethereumjs-util';
+import {
+  Address,
+  BN,
+  ecsign,
+  ecrecover,
+  rlp,
+  intToBuffer,
+  bnToUnpaddedBuffer,
+  rlphash,
+  bufferToInt,
+  toBuffer
+} from 'ethereumjs-util';
 import { FunctionalBufferMap, logger } from '@rei-network/utils';
 import { importBls } from '@rei-network/bls';
 import * as v from './validate';
@@ -75,7 +86,8 @@ export class Vote {
         signature
       );
     } else if (values.length === 8) {
-      const [chainId, type, height, round, hash, index, validator, signature] = values;
+      const [chainId, type, height, round, hash, index, validator, signature] =
+        values;
       return new Vote(
         {
           chainId: bufferToInt(chainId),
@@ -94,7 +106,11 @@ export class Vote {
     }
   }
 
-  constructor(data: VoteData, signatureType: SignatureType, signature?: Buffer) {
+  constructor(
+    data: VoteData,
+    signatureType: SignatureType,
+    signature?: Buffer
+  ) {
     this.chainId = data.chainId;
     this.type = data.type;
     this.height = data.height.clone();
@@ -134,9 +150,22 @@ export class Vote {
    */
   getMessageToSign() {
     if (this.signatureType === SignatureType.ECDSA) {
-      return rlphash([intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.index)]);
+      return rlphash([
+        intToBuffer(this.chainId),
+        intToBuffer(this.type),
+        bnToUnpaddedBuffer(this.height),
+        intToBuffer(this.round),
+        this.hash,
+        intToBuffer(this.index)
+      ]);
     } else {
-      return rlphash([intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash]);
+      return rlphash([
+        intToBuffer(this.chainId),
+        intToBuffer(this.type),
+        bnToUnpaddedBuffer(this.height),
+        intToBuffer(this.round),
+        this.hash
+      ]);
     }
   }
 
@@ -175,7 +204,9 @@ export class Vote {
       const { r, s, v } = ecsign(this.getMessageToSign(), privateKey);
       this.signature = Buffer.concat([r, s, intToBuffer(v - 27)]);
     } else {
-      this.signature = Buffer.from(importBls().sign(privateKey, this.getMessageToSign()));
+      this.signature = Buffer.from(
+        importBls().sign(privateKey, this.getMessageToSign())
+      );
     }
   }
 
@@ -188,9 +219,26 @@ export class Vote {
       throw new Error('missing signature');
     }
     if (this.signatureType === SignatureType.ECDSA) {
-      return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.index), this._signature!];
+      return [
+        intToBuffer(this.chainId),
+        intToBuffer(this.type),
+        bnToUnpaddedBuffer(this.height),
+        intToBuffer(this.round),
+        this.hash,
+        intToBuffer(this.index),
+        this._signature!
+      ];
     } else {
-      return [intToBuffer(this.chainId), intToBuffer(this.type), bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.index), toBuffer(this.validator!), this._signature!];
+      return [
+        intToBuffer(this.chainId),
+        intToBuffer(this.type),
+        bnToUnpaddedBuffer(this.height),
+        intToBuffer(this.round),
+        this.hash,
+        intToBuffer(this.index),
+        toBuffer(this.validator!),
+        this._signature!
+      ];
     }
   }
 
@@ -242,7 +290,13 @@ export class Vote {
       throw new Error('invalid signature');
     }
     if (this.signatureType === SignatureType.BLS) {
-      if (!importBls().verify(valSet.getBlsPublicKey(validator), this.getMessageToSign(), this.signature!)) {
+      if (
+        !importBls().verify(
+          valSet.getBlsPublicKey(validator),
+          this.getMessageToSign(),
+          this.signature!
+        )
+      ) {
         throw new Error('invalid signature');
       }
     }
@@ -296,7 +350,14 @@ export class VoteSet {
   votesByBlock = new FunctionalBufferMap<BlockVotes>();
   peerMaj23s = new Map<string, Buffer>();
 
-  constructor(chainId: number, height: BN, round: number, signedMsgType: VoteType, valSet: ActiveValidatorSet, version: SignatureType) {
+  constructor(
+    chainId: number,
+    height: BN,
+    round: number,
+    signedMsgType: VoteType,
+    valSet: ActiveValidatorSet,
+    version: SignatureType
+  ) {
     this.chainId = chainId;
     this.height = height.clone();
     this.round = round;
@@ -314,7 +375,12 @@ export class VoteSet {
    * @returns
    */
   preValidate(vote: Vote) {
-    if (!vote.height.eq(this.height) || vote.round !== this.round || vote.type !== this.signedMsgType || vote.signatureType !== this.version) {
+    if (
+      !vote.height.eq(this.height) ||
+      vote.round !== this.round ||
+      vote.type !== this.signedMsgType ||
+      vote.signatureType !== this.version
+    ) {
       return false;
     }
 
@@ -329,7 +395,12 @@ export class VoteSet {
    * @returns
    */
   addVote(vote: Vote) {
-    if (!vote.height.eq(this.height) || vote.round !== this.round || vote.type !== this.signedMsgType || vote.signatureType !== this.version) {
+    if (
+      !vote.height.eq(this.height) ||
+      vote.round !== this.round ||
+      vote.type !== this.signedMsgType ||
+      vote.signatureType !== this.version
+    ) {
       logger.detail('VoteSet::addVote, invalid vote');
       return;
     }
@@ -498,7 +569,13 @@ export class VoteSet {
       throw new Error('Not enough votes to aggregate signature');
     }
     if (!this.aggregatedSignature) {
-      this.aggregatedSignature = Buffer.from(importBls().aggregateSignatures(this.votes.filter((v) => !!v && v.hash.equals(this.maj23!)).map((v) => v!.signature!)));
+      this.aggregatedSignature = Buffer.from(
+        importBls().aggregateSignatures(
+          this.votes
+            .filter((v) => !!v && v.hash.equals(this.maj23!))
+            .map((v) => v!.signature!)
+        )
+      );
     }
     return this.aggregatedSignature;
   }
@@ -526,7 +603,12 @@ export class VoteSet {
    * @param msgHash - message hash
    * @param blockHash - block hash
    */
-  setAggregatedSignature(signature: Buffer, bitArray: BitArray, msgHash: Buffer, blockHash: Buffer) {
+  setAggregatedSignature(
+    signature: Buffer,
+    bitArray: BitArray,
+    msgHash: Buffer,
+    blockHash: Buffer
+  ) {
     const len = bitArray.length;
     const pubKeys: Buffer[] = [];
     let sum: BN = new BN(0);
@@ -537,11 +619,16 @@ export class VoteSet {
           throw new Error('missing validator public key');
         }
         pubKeys.push(pubKey);
-        sum.iadd(this.valSet.getVotingPower(this.valSet.getValidatorByIndex(i)));
+        sum.iadd(
+          this.valSet.getVotingPower(this.valSet.getValidatorByIndex(i))
+        );
       }
     }
 
-    if (!importBls().verifyAggregate(pubKeys, msgHash, signature) || sum.lte(this.valSet.totalVotingPower.muln(2).divn(3))) {
+    if (
+      !importBls().verifyAggregate(pubKeys, msgHash, signature) ||
+      sum.lte(this.valSet.totalVotingPower.muln(2).divn(3))
+    ) {
       return;
     }
 
@@ -566,7 +653,12 @@ export class HeightVoteSet {
   roundVoteSets = new Map<number, RoundVoteSet>();
   peerCatchupRounds = new Map<string, number[]>();
 
-  constructor(chainId: number, height: BN, valSet: ActiveValidatorSet, signatureType: SignatureType) {
+  constructor(
+    chainId: number,
+    height: BN,
+    valSet: ActiveValidatorSet,
+    signatureType: SignatureType
+  ) {
     this.chainId = chainId;
     this.height = height.clone();
     this.valSet = valSet;
@@ -602,13 +694,29 @@ export class HeightVoteSet {
       throw new Error('addRound for an existing round');
     }
     this.roundVoteSets.set(round, {
-      prevotes: new VoteSet(this.chainId, this.height, round, VoteType.Prevote, this.valSet, this.signatureType),
-      precommits: new VoteSet(this.chainId, this.height, round, VoteType.Precommit, this.valSet, this.signatureType)
+      prevotes: new VoteSet(
+        this.chainId,
+        this.height,
+        round,
+        VoteType.Prevote,
+        this.valSet,
+        this.signatureType
+      ),
+      precommits: new VoteSet(
+        this.chainId,
+        this.height,
+        round,
+        VoteType.Precommit,
+        this.valSet,
+        this.signatureType
+      )
     });
   }
 
   getVoteSet(round: number, voteType: VoteType) {
-    return this.roundVoteSets.get(round)?.[voteType === VoteType.Prevote ? 'prevotes' : 'precommits'];
+    return this.roundVoteSets.get(round)?.[
+      voteType === VoteType.Prevote ? 'prevotes' : 'precommits'
+    ];
   }
 
   addVote(vote: Vote, peerId: string) {

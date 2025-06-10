@@ -35,7 +35,9 @@ function getAdjustedExponentLength(data: Buffer): BN {
     expBytesStart = Number.MAX_SAFE_INTEGER - 32;
   }
   const expLen = new BN(data.slice(32, 64));
-  let firstExpBytes = Buffer.from(data.slice(expBytesStart, expBytesStart + 32)); // first word of the exponent data
+  let firstExpBytes = Buffer.from(
+    data.slice(expBytesStart, expBytesStart + 32)
+  ); // first word of the exponent data
   firstExpBytes = setLengthRight(firstExpBytes, 32); // reading past the data reads virtual zeros
   let firstExpBN = new BN(firstExpBytes);
   let max32expLen = 0;
@@ -102,7 +104,9 @@ export default function (opts: PrecompileInput): ExecResult {
   if (!opts._common.isActivatedEIP(2565)) {
     gasUsed = adjustedELen.mul(multComplexity(maxLen)).divn(Gquaddivisor);
   } else {
-    gasUsed = adjustedELen.mul(multComplexityEIP2565(maxLen)).divn(Gquaddivisor);
+    gasUsed = adjustedELen
+      .mul(multComplexityEIP2565(maxLen))
+      .divn(Gquaddivisor);
     if (gasUsed.ltn(200)) {
       gasUsed = new BN(200);
     }
@@ -133,9 +137,24 @@ export default function (opts: PrecompileInput): ExecResult {
     return OOGResult(opts.gasLimit);
   }
 
-  const B = new BN(setLengthRight(data.slice(bStart.toNumber(), bEnd.toNumber()), bLen.toNumber()));
-  const E = new BN(setLengthRight(data.slice(eStart.toNumber(), eEnd.toNumber()), eLen.toNumber()));
-  const M = new BN(setLengthRight(data.slice(mStart.toNumber(), mEnd.toNumber()), mLen.toNumber()));
+  const B = new BN(
+    setLengthRight(
+      data.slice(bStart.toNumber(), bEnd.toNumber()),
+      bLen.toNumber()
+    )
+  );
+  const E = new BN(
+    setLengthRight(
+      data.slice(eStart.toNumber(), eEnd.toNumber()),
+      eLen.toNumber()
+    )
+  );
+  const M = new BN(
+    setLengthRight(
+      data.slice(mStart.toNumber(), mEnd.toNumber()),
+      mLen.toNumber()
+    )
+  );
 
   if (mEnd.gt(maxInt)) {
     return OOGResult(opts.gasLimit);

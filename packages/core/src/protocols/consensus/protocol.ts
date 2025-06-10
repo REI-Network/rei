@@ -15,7 +15,10 @@ export interface SendMessageOptions {
   broadcast?: boolean;
 }
 
-export class ConsensusProtocol extends BaseProtocol<ConsensusProtocolHandler> implements Protocol {
+export class ConsensusProtocol
+  extends BaseProtocol<ConsensusProtocolHandler>
+  implements Protocol
+{
   private _handlers = new Set<ConsensusProtocolHandler>();
 
   constructor(node: Node) {

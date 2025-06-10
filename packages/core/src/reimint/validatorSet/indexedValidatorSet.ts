@@ -180,7 +180,11 @@ export class IndexedValidatorSet {
       }
     });
 
-    const indexed = flag ? Array.from(this.indexed.values()).filter((v) => v.blsPublicKey !== undefined) : this.indexed.values();
+    const indexed = flag
+      ? Array.from(this.indexed.values()).filter(
+          (v) => v.blsPublicKey !== undefined
+        )
+      : this.indexed.values();
     for (const v of indexed) {
       heap.push(v);
       // if the heap length is too large, remove the minimum one

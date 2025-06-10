@@ -1,7 +1,16 @@
 import { BN } from 'ethereumjs-util';
 import { Channel, FunctionalBufferSet, logger } from '@rei-network/utils';
 import { Peer, ProtocolStream, ProtocolHandler } from '@rei-network/network';
-import { RoundStepType, Proposal, Vote, BitArray, VoteType, VoteSet, Evidence, DuplicateVoteEvidence } from '../../reimint';
+import {
+  RoundStepType,
+  Proposal,
+  Vote,
+  BitArray,
+  VoteType,
+  VoteSet,
+  Evidence,
+  DuplicateVoteEvidence
+} from '../../reimint';
 import { ConsensusMessageFactory } from './messages';
 import * as m from './messages';
 import { ConsensusProtocol } from './protocol';
@@ -15,7 +24,7 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
   readonly stream: ProtocolStream;
   readonly protocol: ConsensusProtocol;
 
-  private aborted: boolean = false;
+  private aborted = false;
   private evidenceQueue = new Channel<Evidence>({ max: maxQueuedEvidence });
 
   private _knowEvidence = new FunctionalBufferSet();
@@ -26,18 +35,18 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
 
   /////////////// PeerRoundState ///////////////
   private height: BN = new BN(0);
-  private round: number = -1;
+  private round = -1;
   private step: RoundStepType = RoundStepType.NewHeight;
 
-  private proposal: boolean = false;
+  private proposal = false;
   private proposalBlockHash?: Buffer;
-  private proposalPOLRound: number = -1;
+  private proposalPOLRound = -1;
 
   private proposalPOL?: BitArray;
   private prevotes?: BitArray;
   private precommits?: BitArray;
 
-  private catchupCommitRound: number = -1;
+  private catchupCommitRound = -1;
   private catchupCommit?: BitArray;
   /////////////// PeerRoundState ///////////////
 
@@ -82,7 +91,10 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
     while (!this.aborted) {
       try {
         if (!this.proposal) {
-          const proposalMessage = this.reimint.state.genProposalMessage(this.height, this.round);
+          const proposalMessage = this.reimint.state.genProposalMessage(
+            this.height,
+            this.round
+          );
           if (proposalMessage) {
             // logger.debug('ConsensusProtocolHandler::gossipDataLoop, send proposal to:', this.peer.peerId);
             this.send(proposalMessage);
@@ -90,7 +102,10 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
           }
         }
       } catch (err) {
-        logger.error('ConsensusProtocolHandler::gossipDataLoop, catch error:', err);
+        logger.error(
+          'ConsensusProtocolHandler::gossipDataLoop, catch error:',
+          err
+        );
       }
 
       await new Promise((r) => setTimeout(r, peerGossipSleepDuration));
@@ -101,12 +116,20 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
     while (!this.aborted) {
       try {
         // pick vote from memory and send
-        const votes = this.reimint.state.pickVoteSetToSend(this.height, this.round, this.proposalPOLRound, this.step);
+        const votes = this.reimint.state.pickVoteSetToSend(
+          this.height,
+          this.round,
+          this.proposalPOLRound,
+          this.step
+        );
         if (votes && this.pickAndSend(votes)) {
           continue;
         }
       } catch (err) {
-        logger.error('ConsensusProtocolHandler::gossipVotesLoop, catch error:', err);
+        logger.error(
+          'ConsensusProtocolHandler::gossipVotesLoop, catch error:',
+          err
+        );
       }
 
       await new Promise((r) => setTimeout(r, peerGossipSleepDuration));
@@ -121,11 +144,17 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
             this.knowEvidence(evidence);
             this.send(new m.DuplicateVoteEvidenceMessage(evidence));
           } else {
-            logger.warn('ConsensusProtocolHandler::gossipEvidenceLoop, unknown evidence:', evidence);
+            logger.warn(
+              'ConsensusProtocolHandler::gossipEvidenceLoop, unknown evidence:',
+              evidence
+            );
           }
         }
       } catch (err) {
-        logger.error('ConsensusProtocolHandler::gossipEvidenceLoop, catch error:', err);
+        logger.error(
+          'ConsensusProtocolHandler::gossipEvidenceLoop, catch error:',
+          err
+        );
       } finally {
         await new Promise((r) => setTimeout(r, peerGossipSleepDuration));
       }
@@ -186,8 +215,19 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
       throw new Error('repeated handshake');
     }
     const status = this.protocol.node.status;
-    const { height, round, step, prevotes, precommits } = this.reimint.state.getHandshakeInfo();
-    this.send(new m.HandshakeMessage(status.networkId, status.genesisHash, height, round, step, prevotes, precommits));
+    const { height, round, step, prevotes, precommits } =
+      this.reimint.state.getHandshakeInfo();
+    this.send(
+      new m.HandshakeMessage(
+        status.networkId,
+        status.genesisHash,
+        height,
+        round,
+        step,
+        prevotes,
+        precommits
+      )
+    );
     this.handshakeTimeout = setTimeout(() => {
       this.handshakeTimeout = undefined;
       if (this.handshakeResolve) {
@@ -263,15 +303,29 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
         this.applyProposalPOLMessage(msg);
       } else if (msg instanceof m.VoteMessage) {
         const vote = msg.vote;
-        this.ensureVoteBitArrays(vote.height, this.reimint.state.getValSetSize());
+        this.ensureVoteBitArrays(
+          vote.height,
+          this.reimint.state.getValSetSize()
+        );
         this.setHasVote(vote.height, vote.round, vote.type, vote.index);
         // pre validate the vote message before adding it to the state machine message queue
         if (this.reimint.state.preValidateVote(msg.vote)) {
           this.reimint.state.newMessage(this.peer.peerId, msg);
         }
       } else if (msg instanceof m.VoteSetMaj23Message) {
-        this.reimint.state.setVoteMaj23(msg.height, msg.round, msg.type, this.peer.peerId, msg.hash);
-        const voteSetBitsMessage = this.reimint.state.genVoteSetBitsMessage(msg.height, msg.round, msg.type, msg.hash);
+        this.reimint.state.setVoteMaj23(
+          msg.height,
+          msg.round,
+          msg.type,
+          this.peer.peerId,
+          msg.hash
+        );
+        const voteSetBitsMessage = this.reimint.state.genVoteSetBitsMessage(
+          msg.height,
+          msg.round,
+          msg.type,
+          msg.hash
+        );
         voteSetBitsMessage && this.send(voteSetBitsMessage);
       } else if (msg instanceof m.VoteSetBitsMessage) {
         this.applyVoteSetBitsMessage(msg);
@@ -286,7 +340,10 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
       } else if (msg instanceof m.DuplicateVoteEvidenceMessage) {
         this.knowEvidence(msg.evidence);
         this.reimint.addEvidence(msg.evidence).catch((err) => {
-          logger.error('ConsensusProtocolHandler::handle, addEvidence, catch error:', err);
+          logger.error(
+            'ConsensusProtocolHandler::handle, addEvidence, catch error:',
+            err
+          );
         });
       } else {
         logger.warn('ConsensusProtocolHandler::handle, unknown message');
@@ -299,7 +356,9 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
   private applyHandshakeMessage(msg: m.HandshakeMessage) {
     if (this.handshakeResolve) {
       const localStatus = this.protocol.node.status;
-      const result = localStatus.genesisHash.equals(msg.genesisHash) && localStatus.networkId === msg.networkId;
+      const result =
+        localStatus.genesisHash.equals(msg.genesisHash) &&
+        localStatus.networkId === msg.networkId;
       this.handshakeResolve(result);
       this.handshakeResolve = undefined;
       if (this.handshakeTimeout) {
@@ -341,7 +400,11 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
       this.precommits = undefined;
     }
 
-    if (this.height.eq(msg.height) && this.round !== msg.round && this.catchupCommitRound === msg.round) {
+    if (
+      this.height.eq(msg.height) &&
+      this.round !== msg.round &&
+      this.catchupCommitRound === msg.round
+    ) {
       this.precommits = this.catchupCommit;
     }
 
@@ -427,7 +490,11 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
     this.proposalPOL = undefined;
   }
 
-  private ensureCatchupCommitRound(height: BN, round: number, valSetSize: number) {
+  private ensureCatchupCommitRound(
+    height: BN,
+    round: number,
+    valSetSize: number
+  ) {
     if (!this.height.eq(height)) {
       return;
     }
@@ -466,6 +533,12 @@ export class ConsensusProtocolHandler implements ProtocolHandler {
    * @returns Status
    */
   getRemoteStatus() {
-    return { name: this.protocol.name, version: Number(this.protocol.version), height: this.height.toNumber(), round: this.round, step: this.step };
+    return {
+      name: this.protocol.name,
+      version: Number(this.protocol.version),
+      height: this.height.toNumber(),
+      round: this.round,
+      step: this.step
+    };
   }
 }

@@ -1,21 +1,42 @@
 import { BN } from 'ethereumjs-util';
-import { ConsensusAlgorithm, ConsensusType as EthereumConsensusType } from '@rei-network/common';
+import {
+  ConsensusAlgorithm,
+  ConsensusType as EthereumConsensusType
+} from '@rei-network/common';
 import { nowTimestamp } from '@rei-network/utils';
-import { BlockHeader, CLIQUE_EXTRA_VANITY, CLIQUE_EXTRA_SEAL } from '@rei-network/structure';
-import { getGasLimitByCommon, EMPTY_NONCE, EMPTY_ADDRESS, EMPTY_MIX_HASH } from '../utils';
+import {
+  BlockHeader,
+  CLIQUE_EXTRA_VANITY,
+  CLIQUE_EXTRA_SEAL
+} from '@rei-network/structure';
+import {
+  getGasLimitByCommon,
+  EMPTY_NONCE,
+  EMPTY_ADDRESS,
+  EMPTY_MIX_HASH
+} from '../utils';
 
 const allowedFutureBlockTimeSeconds = 15;
 const maxGasLimit = new BN('8000000000000000', 16);
 
-export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) {
+export function preValidateHeader(
+  this: BlockHeader,
+  parentHeader: BlockHeader
+) {
   if (this.isGenesis()) {
     return;
   }
   const hardfork: string = (this as any)._getHardfork();
   // Consensus type dependent checks
-  if (this._common.consensusAlgorithm() !== ConsensusAlgorithm.Clique && this._common.consensusAlgorithm() !== ConsensusAlgorithm.Reimint) {
+  if (
+    this._common.consensusAlgorithm() !== ConsensusAlgorithm.Clique &&
+    this._common.consensusAlgorithm() !== ConsensusAlgorithm.Reimint
+  ) {
     // PoW/Ethash
-    if (this.extraData.length > this._common.paramByHardfork('vm', 'maxExtraDataSize', hardfork)) {
+    if (
+      this.extraData.length >
+      this._common.paramByHardfork('vm', 'maxExtraDataSize', hardfork)
+    ) {
       const msg = 'invalid amount of extra data';
       throw this._error(msg);
     }
@@ -57,8 +78,13 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
       throw this._error('invalid block with gas limit greater than (2^63 - 1)');
     }
     // additional check for beneficiary
-    if (!this.nonce.equals(EMPTY_NONCE) || !this.coinbase.equals(EMPTY_ADDRESS)) {
-      throw this._error('invalid header(nonce or coinbase), currently does not support beneficiary');
+    if (
+      !this.nonce.equals(EMPTY_NONCE) ||
+      !this.coinbase.equals(EMPTY_ADDRESS)
+    ) {
+      throw this._error(
+        'invalid header(nonce or coinbase), currently does not support beneficiary'
+      );
     }
     // additional check for timestamp
     if (!this.timestamp.gtn(nowTimestamp() + allowedFutureBlockTimeSeconds)) {
@@ -75,7 +101,10 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
     throw new Error('invalid timestamp');
   }
 
-  if (this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique || this._common.consensusAlgorithm() === ConsensusAlgorithm.Reimint) {
+  if (
+    this._common.consensusAlgorithm() === ConsensusAlgorithm.Clique ||
+    this._common.consensusAlgorithm() === ConsensusAlgorithm.Reimint
+  ) {
     const period = this._common.consensusConfig().period;
     // Timestamp diff between blocks is lower than PERIOD (clique)
     if (parentHeader.timestamp.addn(period).gt(this.timestamp)) {
@@ -119,7 +148,9 @@ export function preValidateHeader(this: BlockHeader, parentHeader: BlockHeader) 
     const block = this._common.hardforkBlockBN('london');
     const isInitialEIP1559Block = block && this.number.eq(block);
     if (isInitialEIP1559Block) {
-      const initialBaseFee = new BN(this._common.param('gasConfig', 'initialBaseFee'));
+      const initialBaseFee = new BN(
+        this._common.param('gasConfig', 'initialBaseFee')
+      );
       if (!this.baseFeePerGas!.eq(initialBaseFee)) {
         throw new Error('Initial EIP1559 block does not have initial base fee');
       }

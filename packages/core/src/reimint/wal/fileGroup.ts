@@ -17,7 +17,12 @@ const defaultMaxFilesToRemove = 40;
  * @param maxIndex - Group file max index
  * @returns Group file path
  */
-export function makeGroupFilePath(_path: string, base: string, index: number, maxIndex?: number) {
+export function makeGroupFilePath(
+  _path: string,
+  base: string,
+  index: number,
+  maxIndex?: number
+) {
   if (maxIndex !== undefined && index === maxIndex) {
     return path.join(_path, base);
   }
@@ -52,8 +57,8 @@ export class FileGroup {
   private headSizeLimit: number;
   private totalSizeLimit: number;
   private maxFilesToRemove: number;
-  private _minIndex: number = 0;
-  private _maxIndex: number = 0;
+  private _minIndex = 0;
+  private _maxIndex = 0;
   private _isClosed = true;
   private lock = new Semaphore(1);
   private head?: fs.FileHandle;
@@ -62,7 +67,8 @@ export class FileGroup {
   constructor(options: FileGroupOptions) {
     this.base = options.base;
     this.path = options.path;
-    this.groupCheckDuration = options.groupCheckDuration ?? defaultGroupCheckDuration;
+    this.groupCheckDuration =
+      options.groupCheckDuration ?? defaultGroupCheckDuration;
     this.headSizeLimit = options.headSizeLimit ?? defaultHeadSizeLimit;
     this.totalSizeLimit = options.totalSizeLimit ?? defaultTotalSizeLimit;
     this.maxFilesToRemove = options.maxFilesToRemove ?? defaultMaxFilesToRemove;
@@ -95,8 +101,6 @@ export class FileGroup {
     try {
       await this.lock.acquire();
       return await fn();
-    } catch (err) {
-      throw err;
     } finally {
       this.lock.release();
     }
@@ -119,7 +123,10 @@ export class FileGroup {
       const { minIndex, maxIndex } = await this.readGroupInfo();
       this._minIndex = minIndex;
       this._maxIndex = maxIndex;
-      this.head = await fs.open(makeGroupFilePath(this.path, this.base, 0, 0), 'a');
+      this.head = await fs.open(
+        makeGroupFilePath(this.path, this.base, 0, 0),
+        'a'
+      );
       this._isClosed = false;
       this.setTimeout();
     });
@@ -210,7 +217,9 @@ export class FileGroup {
     for (const file of files) {
       if (file === this.base) {
         // header
-        const stats = await fs.stat(makeGroupFilePath(this.path, this.base, 0, 0));
+        const stats = await fs.stat(
+          makeGroupFilePath(this.path, this.base, 0, 0)
+        );
         totalSize += stats.size;
         headSize = stats.size;
       } else if (file.startsWith(this.base)) {
@@ -295,7 +304,12 @@ export class FileGroup {
       await this.head!.sync();
       await this.head!.close();
       const oldPath = makeGroupFilePath(this.path, this.base, 0, 0);
-      const newPath = makeGroupFilePath(this.path, this.base, this._maxIndex, this._maxIndex + 1);
+      const newPath = makeGroupFilePath(
+        this.path,
+        this.base,
+        this._maxIndex,
+        this._maxIndex + 1
+      );
       await fs.rename(oldPath, newPath);
       this._maxIndex++;
       this.head = await fs.open(oldPath, 'a');
@@ -328,7 +342,7 @@ export class FileGroup {
 }
 
 export class GroupFileReader {
-  private index: number = 0;
+  private index = 0;
   private group: FileGroup;
   private lock = new Semaphore(1);
   private position = 0;
@@ -343,8 +357,6 @@ export class GroupFileReader {
     try {
       await this.lock.acquire();
       return await fn();
-    } catch (err) {
-      throw err;
     } finally {
       this.lock.release();
     }
@@ -352,7 +364,15 @@ export class GroupFileReader {
 
   private async tryOpenFile(index: number) {
     try {
-      return await fs.open(makeGroupFilePath(this.group.path, this.group.base, index, this.group.maxIndex), 'r');
+      return await fs.open(
+        makeGroupFilePath(
+          this.group.path,
+          this.group.base,
+          index,
+          this.group.maxIndex
+        ),
+        'r'
+      );
     } catch (err: any) {
       if (err.code !== 'ENOENT') {
         throw err;
@@ -395,7 +415,12 @@ export class GroupFileReader {
           return false;
         }
 
-        const { bytesRead } = await this.file!.read(buf, buf.length - readLength, readLength, this.position);
+        const { bytesRead } = await this.file!.read(
+          buf,
+          buf.length - readLength,
+          readLength,
+          this.position
+        );
         this.position += bytesRead;
         readLength -= bytesRead;
 

@@ -6,7 +6,11 @@ import { Node } from '../../node';
 import { preValidateBlock, preValidateHeader } from '../../validation';
 import { WireProtocolHandler, maxGetBlockHeaders } from '../../protocols';
 import { SyncInfo } from '../types';
-import { BlockSync, BlockSyncBackend as IBlockSyncBackend, BlockSyncValidateBackend as IBlockSyncValidateBackend } from './blockSync';
+import {
+  BlockSync,
+  BlockSyncBackend as IBlockSyncBackend,
+  BlockSyncValidateBackend as IBlockSyncValidateBackend
+} from './blockSync';
 
 const bnMaxGetBlockHeaders = new BN(maxGetBlockHeaders);
 
@@ -77,7 +81,10 @@ class BlockSyncBackend implements IBlockSyncBackend, IBlockSyncValidateBackend {
    */
   validateHeaders(parent: BlockHeader | undefined, headers: BlockHeader[]) {
     headers.forEach((header, i) => {
-      preValidateHeader.call(header, i === 0 ? parent ?? this.localHeader! : headers[i - 1]);
+      preValidateHeader.call(
+        header,
+        i === 0 ? parent ?? this.localHeader! : headers[i - 1]
+      );
     });
     return headers[headers.length - 1];
   }
@@ -92,7 +99,10 @@ class BlockSyncBackend implements IBlockSyncBackend, IBlockSyncValidateBackend {
       throw new Error('invalid bodies length');
     }
     headers.forEach((header, i) => {
-      if (bodies[i].length === 0 && !header.transactionsTrie.equals(KECCAK256_RLP)) {
+      if (
+        bodies[i].length === 0 &&
+        !header.transactionsTrie.equals(KECCAK256_RLP)
+      ) {
         throw new Error('useless');
       }
     });
@@ -127,8 +137,8 @@ export class FullSyncScheduler extends EventEmitter {
   private syncPromise?: Promise<void>;
 
   // sync state
-  private startingBlock: number = 0;
-  private highestBlock: number = 0;
+  private startingBlock = 0;
+  private highestBlock = 0;
 
   constructor(node: Node) {
     super();
@@ -146,7 +156,10 @@ export class FullSyncScheduler extends EventEmitter {
    * Get the sync state
    */
   get status() {
-    return { startingBlock: this.startingBlock, highestBlock: this.highestBlock };
+    return {
+      startingBlock: this.startingBlock,
+      highestBlock: this.highestBlock
+    };
   }
 
   /**
@@ -162,7 +175,9 @@ export class FullSyncScheduler extends EventEmitter {
   }
 
   // TODO: binary search.
-  private async findAncient(handler: WireProtocolHandler): Promise<{ header: BlockHeader; td: BN } | undefined> {
+  private async findAncient(
+    handler: WireProtocolHandler
+  ): Promise<{ header: BlockHeader; td: BN } | undefined> {
     const latest = this.node.getLatestBlock().header.number.clone();
     if (latest.eqn(0)) {
       return await this.genesis();
@@ -173,7 +188,9 @@ export class FullSyncScheduler extends EventEmitter {
         return await this.genesis();
       }
 
-      const count = latest.gt(bnMaxGetBlockHeaders) ? bnMaxGetBlockHeaders.clone() : latest.clone();
+      const count = latest.gt(bnMaxGetBlockHeaders)
+        ? bnMaxGetBlockHeaders.clone()
+        : latest.clone();
       latest.isub(count.subn(1));
 
       let headers!: BlockHeader[];
@@ -193,8 +210,14 @@ export class FullSyncScheduler extends EventEmitter {
         try {
           const remoteHeader = headers[i];
           const hash = remoteHeader.hash();
-          const header = await this.node.db.getHeader(hash, remoteHeader.number);
-          const td = await this.node.db.getTotalDifficulty(hash, remoteHeader.number);
+          const header = await this.node.db.getHeader(
+            hash,
+            remoteHeader.number
+          );
+          const td = await this.node.db.getTotalDifficulty(
+            hash,
+            remoteHeader.number
+          );
           return { header, td };
         } catch (err: any) {
           if (err.type === 'NotFoundError') {
@@ -229,7 +252,9 @@ export class FullSyncScheduler extends EventEmitter {
     if (reimint.state.hasMaj23Precommit(bestHeight)) {
       // our consensus engine has collected enough votes for this height,
       // so we ignore this best block
-      logger.debug('FullSync::syncOnce, we collected enough votes for this height');
+      logger.debug(
+        'FullSync::syncOnce, we collected enough votes for this height'
+      );
       return;
     }
 
@@ -251,13 +276,20 @@ export class FullSyncScheduler extends EventEmitter {
 
     // start block sync
     this.blockSync.reset();
-    const { reorged, cumulativeTotalDifficulty } = await this.blockSync.fetch(start, totalCount, handler);
+    const { reorged, cumulativeTotalDifficulty } = await this.blockSync.fetch(
+      start,
+      totalCount,
+      handler
+    );
 
     // check total difficulty
     if (!cumulativeTotalDifficulty.add(localTD).eq(bestTD)) {
       // maybe we should ban the remote peer?
       // await this.node.banPeer(peerId, 'invalid');
-      logger.warn('FullSync::syncOnce, total difficulty does not match:', peerId);
+      logger.warn(
+        'FullSync::syncOnce, total difficulty does not match:',
+        peerId
+      );
     }
 
     // send events

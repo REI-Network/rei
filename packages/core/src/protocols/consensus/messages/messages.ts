@@ -1,6 +1,20 @@
-import { rlp, BN, bnToUnpaddedBuffer, intToBuffer, bufferToInt } from 'ethereumjs-util';
+import {
+  rlp,
+  BN,
+  bnToUnpaddedBuffer,
+  intToBuffer,
+  bufferToInt
+} from 'ethereumjs-util';
 import { Block, BlockBuffer, BlockOptions } from '@rei-network/structure';
-import { RoundStepType, Proposal, BitArray, BitArrayRaw, Vote, VoteType, DuplicateVoteEvidence } from '../../../reimint';
+import {
+  RoundStepType,
+  Proposal,
+  BitArray,
+  BitArrayRaw,
+  Vote,
+  VoteType,
+  DuplicateVoteEvidence
+} from '../../../reimint';
 import * as v from '../../../reimint/validate';
 
 export interface ConsensusMessage {
@@ -29,11 +43,19 @@ export class NewRoundStepMessage implements ConsensusMessage {
     }
 
     const [heightBuffer, roundBuffer, stepBuffer] = values;
-    return new NewRoundStepMessage(new BN(heightBuffer), bufferToInt(roundBuffer), bufferToInt(stepBuffer));
+    return new NewRoundStepMessage(
+      new BN(heightBuffer),
+      bufferToInt(roundBuffer),
+      bufferToInt(stepBuffer)
+    );
   }
 
   raw() {
-    return [bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.step)];
+    return [
+      bnToUnpaddedBuffer(this.height),
+      intToBuffer(this.round),
+      intToBuffer(this.step)
+    ];
   }
 
   serialize() {
@@ -73,11 +95,21 @@ export class NewValidBlockMessage implements ConsensusMessage {
     if (numIsCommit !== 0 && numIsCommit !== 1) {
       throw new Error('invalid isCommit');
     }
-    return new NewValidBlockMessage(new BN(heightBuffer), bufferToInt(roundBuffer), hash, numIsCommit === 1);
+    return new NewValidBlockMessage(
+      new BN(heightBuffer),
+      bufferToInt(roundBuffer),
+      hash,
+      numIsCommit === 1
+    );
   }
 
   raw() {
-    return [bnToUnpaddedBuffer(this.height), intToBuffer(this.round), this.hash, intToBuffer(this.isCommit ? 1 : 0)];
+    return [
+      bnToUnpaddedBuffer(this.height),
+      intToBuffer(this.round),
+      this.hash,
+      intToBuffer(this.isCommit ? 1 : 0)
+    ];
   }
 
   serialize() {
@@ -140,14 +172,27 @@ export class ProposalPOLMessage implements ConsensusMessage {
     }
 
     const [heightBuffer, proposalPOLRoundBuffer, proposalPOLBuffer] = values;
-    if (!(heightBuffer instanceof Buffer) || !(proposalPOLRoundBuffer instanceof Buffer) || proposalPOLBuffer instanceof Buffer || !Array.isArray(proposalPOLBuffer)) {
+    if (
+      !(heightBuffer instanceof Buffer) ||
+      !(proposalPOLRoundBuffer instanceof Buffer) ||
+      proposalPOLBuffer instanceof Buffer ||
+      !Array.isArray(proposalPOLBuffer)
+    ) {
       throw new Error('invalid values');
     }
-    return new ProposalPOLMessage(new BN(heightBuffer), bufferToInt(proposalPOLRoundBuffer), BitArray.fromValuesArray(proposalPOLBuffer));
+    return new ProposalPOLMessage(
+      new BN(heightBuffer),
+      bufferToInt(proposalPOLRoundBuffer),
+      BitArray.fromValuesArray(proposalPOLBuffer)
+    );
   }
 
   raw() {
-    return [bnToUnpaddedBuffer(this.height), intToBuffer(this.proposalPOLRound), this.proposalPOL.raw()];
+    return [
+      bnToUnpaddedBuffer(this.height),
+      intToBuffer(this.proposalPOLRound),
+      this.proposalPOL.raw()
+    ];
   }
 
   serialize() {
@@ -183,7 +228,9 @@ export class ProposalBlockMessage implements ConsensusMessage {
   }
 
   toBlock(options?: BlockOptions) {
-    return this.block ?? (this.block = Block.fromValuesArray(this.rawBlock, options));
+    return (
+      this.block ?? (this.block = Block.fromValuesArray(this.rawBlock, options))
+    );
   }
 
   raw() {
@@ -250,11 +297,21 @@ export class HasVoteMessage implements ConsensusMessage {
     }
 
     const [heightBuffer, roundBuffer, typeBuffer, indexBuffer] = values;
-    return new HasVoteMessage(new BN(heightBuffer), bufferToInt(roundBuffer), bufferToInt(typeBuffer), bufferToInt(indexBuffer));
+    return new HasVoteMessage(
+      new BN(heightBuffer),
+      bufferToInt(roundBuffer),
+      bufferToInt(typeBuffer),
+      bufferToInt(indexBuffer)
+    );
   }
 
   raw() {
-    return [bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.type), intToBuffer(this.index)];
+    return [
+      bnToUnpaddedBuffer(this.height),
+      intToBuffer(this.round),
+      intToBuffer(this.type),
+      intToBuffer(this.index)
+    ];
   }
 
   serialize() {
@@ -291,11 +348,21 @@ export class VoteSetMaj23Message implements ConsensusMessage {
     }
 
     const [heightBuffer, roundBuffer, typeBuffer, hash] = values;
-    return new VoteSetMaj23Message(new BN(heightBuffer), bufferToInt(roundBuffer), bufferToInt(typeBuffer), hash);
+    return new VoteSetMaj23Message(
+      new BN(heightBuffer),
+      bufferToInt(roundBuffer),
+      bufferToInt(typeBuffer),
+      hash
+    );
   }
 
   raw() {
-    return [bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.type), this.hash];
+    return [
+      bnToUnpaddedBuffer(this.height),
+      intToBuffer(this.round),
+      intToBuffer(this.type),
+      this.hash
+    ];
   }
 
   serialize() {
@@ -317,7 +384,13 @@ export class VoteSetBitsMessage implements ConsensusMessage {
   readonly hash: Buffer;
   readonly votes: BitArray;
 
-  constructor(height: BN, round: number, type: VoteType, hash: Buffer, votes: BitArray) {
+  constructor(
+    height: BN,
+    round: number,
+    type: VoteType,
+    hash: Buffer,
+    votes: BitArray
+  ) {
     this.height = height.clone();
     this.round = round;
     this.type = type;
@@ -337,11 +410,23 @@ export class VoteSetBitsMessage implements ConsensusMessage {
     if (!Array.isArray(votesBuffer)) {
       throw new Error('invalid votes values length');
     }
-    return new VoteSetBitsMessage(new BN(heightBuffer), bufferToInt(roundBuffer), bufferToInt(typeBuffer), hash, BitArray.fromValuesArray(votesBuffer));
+    return new VoteSetBitsMessage(
+      new BN(heightBuffer),
+      bufferToInt(roundBuffer),
+      bufferToInt(typeBuffer),
+      hash,
+      BitArray.fromValuesArray(votesBuffer)
+    );
   }
 
   raw() {
-    return [bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.type), this.hash, this.votes.raw()];
+    return [
+      bnToUnpaddedBuffer(this.height),
+      intToBuffer(this.round),
+      intToBuffer(this.type),
+      this.hash,
+      this.votes.raw()
+    ];
   }
 
   serialize() {
@@ -399,7 +484,9 @@ export class DuplicateVoteEvidenceMessage implements ConsensusMessage {
   static readonly code = 10;
 
   static fromValuesArray(values: Buffer[][]) {
-    return new DuplicateVoteEvidenceMessage(DuplicateVoteEvidence.fromValuesArray(values));
+    return new DuplicateVoteEvidenceMessage(
+      DuplicateVoteEvidence.fromValuesArray(values)
+    );
   }
 
   hash() {
@@ -428,7 +515,15 @@ export class HandshakeMessage implements ConsensusMessage {
   readonly prevotes?: BitArray;
   readonly precommits?: BitArray;
 
-  constructor(networkId: number, genesisHash: Buffer, height: BN, round: number, step: RoundStepType, prevotes?: BitArray, precommits?: BitArray) {
+  constructor(
+    networkId: number,
+    genesisHash: Buffer,
+    height: BN,
+    round: number,
+    step: RoundStepType,
+    prevotes?: BitArray,
+    precommits?: BitArray
+  ) {
     this.networkId = networkId;
     this.genesisHash = genesisHash;
     this.height = height.clone();
@@ -446,11 +541,27 @@ export class HandshakeMessage implements ConsensusMessage {
       throw new Error('invalid values');
     }
 
-    return new HandshakeMessage(bufferToInt(values[0]), values[1], new BN(values[2]), bufferToInt(values[3]), bufferToInt(values[4]), values[5].length > 0 ? BitArray.fromValuesArray(values[5]) : undefined, values[6].length > 0 ? BitArray.fromValuesArray(values[6]) : undefined);
+    return new HandshakeMessage(
+      bufferToInt(values[0]),
+      values[1],
+      new BN(values[2]),
+      bufferToInt(values[3]),
+      bufferToInt(values[4]),
+      values[5].length > 0 ? BitArray.fromValuesArray(values[5]) : undefined,
+      values[6].length > 0 ? BitArray.fromValuesArray(values[6]) : undefined
+    );
   }
 
   raw() {
-    return [intToBuffer(this.networkId), this.genesisHash, bnToUnpaddedBuffer(this.height), intToBuffer(this.round), intToBuffer(this.step), this.prevotes?.raw() ?? [], this.precommits?.raw() ?? []];
+    return [
+      intToBuffer(this.networkId),
+      this.genesisHash,
+      bnToUnpaddedBuffer(this.height),
+      intToBuffer(this.round),
+      intToBuffer(this.step),
+      this.prevotes?.raw() ?? [],
+      this.precommits?.raw() ?? []
+    ];
   }
 
   serialize(): Buffer {

@@ -16,7 +16,12 @@ export abstract class Contract {
   methods: { [name: string]: Buffer };
   address: Address;
 
-  constructor(evm: EVM, common: Common, methods: { [name: string]: Buffer }, address: Address) {
+  constructor(
+    evm: EVM,
+    common: Common,
+    methods: { [name: string]: Buffer },
+    address: Address
+  ) {
     this.evm = evm;
     this.common = common;
     this.methods = methods;
@@ -37,7 +42,9 @@ export abstract class Contract {
     const genesisValidators = await ActiveValidatorSet.genesis(common);
     const proposer = genesisValidators.proposer.toString();
     const activeValidators = genesisValidators.activeValidators();
-    const activeSigners = activeValidators.map(({ validator }) => validator.toString());
+    const activeSigners = activeValidators.map(({ validator }) =>
+      validator.toString()
+    );
     const cfgaddr = common.param('vm', 'cfgaddr');
 
     // deploy config contract
@@ -53,8 +60,13 @@ export abstract class Contract {
         values: [cfgaddr, proposer, activeSigners, encoded]
       });
     } else {
-      const priorities = activeValidators.map(({ priority }) => priority.toString());
-      await Contract.deployContract(evm, common, 'sm', { types: ['address', 'address', 'address[]', 'int256[]'], values: [cfgaddr, proposer, activeSigners, priorities] });
+      const priorities = activeValidators.map(({ priority }) =>
+        priority.toString()
+      );
+      await Contract.deployContract(evm, common, 'sm', {
+        types: ['address', 'address', 'address[]', 'int256[]'],
+        values: [cfgaddr, proposer, activeSigners, priorities]
+      });
     }
 
     const defaultArgs = { types: ['address'], values: [cfgaddr] };
@@ -72,11 +84,20 @@ export abstract class Contract {
   static async deployFreeStakingContracts(evm: EVM, common: Common) {
     const cfgaddr = common.param('vm', 'cfgaddr');
     // deploy fee contract
-    await Contract.deployContract(evm, common, 'f', { types: ['address'], values: [cfgaddr] });
+    await Contract.deployContract(evm, common, 'f', {
+      types: ['address'],
+      values: [cfgaddr]
+    });
     // deploy fee pool contract
-    await Contract.deployContract(evm, common, 'fp', { types: ['address'], values: [cfgaddr] });
+    await Contract.deployContract(evm, common, 'fp', {
+      types: ['address'],
+      values: [cfgaddr]
+    });
     // deploy fee token contract
-    await Contract.deployContract(evm, common, 'ft', { types: ['address'], values: [cfgaddr] });
+    await Contract.deployContract(evm, common, 'ft', {
+      types: ['address'],
+      values: [cfgaddr]
+    });
   }
 
   /**
@@ -125,7 +146,10 @@ export abstract class Contract {
   static async deployBetterPOSContracts(evm: EVM, common: Common) {
     const cfgaddr = common.param('vm', 'cfgaddr');
     // deploy prison contract
-    await Contract.deployContract(evm, common, 'pr', { types: ['address'], values: [cfgaddr] });
+    await Contract.deployContract(evm, common, 'pr', {
+      types: ['address'],
+      values: [cfgaddr]
+    });
   }
 
   /**
@@ -145,7 +169,13 @@ export abstract class Contract {
    * @param args - Contract constructor args
    * @param clearup - Clear up contract storage before deploy
    */
-  private static async deployContract(evm: EVM, common: Common, prefix: string, args?: { types: string[]; values: any[] }, clearup?: boolean) {
+  private static async deployContract(
+    evm: EVM,
+    common: Common,
+    prefix: string,
+    args?: { types: string[]; values: any[] },
+    clearup?: boolean
+  ) {
     const code = hexStringToBuffer(common.param('vm', `${prefix}code`));
     const address = Address.fromString(common.param('vm', `${prefix}addr`));
     if (clearup) {
@@ -158,7 +188,9 @@ export abstract class Contract {
         contractAddress: address,
         to: address,
         gasLimit: MAX_GAS_LIMIT,
-        data: args ? Buffer.concat([code, encode(args.types, args.values)]) : code
+        data: args
+          ? Buffer.concat([code, encode(args.types, args.values)])
+          : code
       })
     );
   }
@@ -185,7 +217,12 @@ export abstract class Contract {
   }
 
   // make a system call message
-  protected makeSystemCallerMessage(method: string, types: string[], values: any[], amount?: BN) {
+  protected makeSystemCallerMessage(
+    method: string,
+    types: string[],
+    values: any[],
+    amount?: BN
+  ) {
     return new Message({
       caller: Address.fromString(this.common.param('vm', 'scaddr')),
       to: this.address,

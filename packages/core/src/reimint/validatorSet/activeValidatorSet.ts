@@ -2,13 +2,24 @@ import { Address, BN } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { StakeManager, ValidatorBLS } from '../contracts';
 import { IndexedValidator } from './indexedValidatorSet';
-import { getGenesisValidators, genesisValidatorPriority, genesisValidatorVotingPower, isGenesis } from './genesis';
+import {
+  getGenesisValidators,
+  genesisValidatorPriority,
+  genesisValidatorVotingPower,
+  isGenesis
+} from './genesis';
 import { isEnableBetterPOS } from '../../hardforks';
 import { ActiveValidator as ActiveValidatorInfo } from '../contracts/stakeManager';
 import { ValidatorChanges } from './validatorChanges';
 
-const maxInt256 = new BN('7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 'hex');
-const minInt256 = new BN('8000000000000000000000000000000000000000000000000000000000000000', 'hex').neg();
+const maxInt256 = new BN(
+  '7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+  'hex'
+);
+const minInt256 = new BN(
+  '8000000000000000000000000000000000000000000000000000000000000000',
+  'hex'
+).neg();
 const maxProposerPriority = maxInt256;
 const minProposerPriority = minInt256;
 
@@ -72,11 +83,15 @@ export class ActiveValidatorSet {
       if (genesis === undefined) {
         genesis = _genesis;
       } else if (genesis !== _genesis) {
-        throw new Error('invalid validator set, mix of genesis validators and common validators');
+        throw new Error(
+          'invalid validator set, mix of genesis validators and common validators'
+        );
       }
 
       // load voting power
-      const votingPower = _genesis ? genesisValidatorVotingPower.clone() : await sm.getVotingPowerByAddress(v.validator);
+      const votingPower = _genesis
+        ? genesisValidatorVotingPower.clone()
+        : await sm.getVotingPowerByAddress(v.validator);
 
       // load bls public key(if exists)
       let blsPublicKey: Buffer | undefined = undefined;
@@ -180,7 +195,9 @@ export class ActiveValidatorSet {
    * @returns Validator index
    */
   getIndexByAddress(address: Address) {
-    const index = this.active.findIndex(({ validator }) => validator.equals(address));
+    const index = this.active.findIndex(({ validator }) =>
+      validator.equals(address)
+    );
     if (index === -1) {
       return undefined;
     }
@@ -205,7 +222,9 @@ export class ActiveValidatorSet {
    * @returns Voting power
    */
   getVotingPower(validator: Address) {
-    const av = this.active.find(({ validator: _validator }) => _validator.equals(validator));
+    const av = this.active.find(({ validator: _validator }) =>
+      _validator.equals(validator)
+    );
     const vp = av?.votingPower;
     if (!vp) {
       throw new Error('unknown validator, ' + validator.toString());
@@ -219,7 +238,9 @@ export class ActiveValidatorSet {
    * @returns Bls public key
    */
   getBlsPublicKey(validator: Address) {
-    const av = this.active.find(({ validator: _validator }) => _validator.equals(validator));
+    const av = this.active.find(({ validator: _validator }) =>
+      _validator.equals(validator)
+    );
     const pk = av?.blsPublicKey;
     if (!pk) {
       throw new Error('unknown validator, ' + validator.toString());
@@ -261,13 +282,17 @@ export class ActiveValidatorSet {
    * @param parent - Parent active validator set
    */
   computeNewPriorities(parent?: ActiveValidatorSet) {
-    const tvpAfterUpdatesBeforeRemovals = this._totalVotingPower.add(parent ? this.compareRemovals(parent) : new BN(0));
+    const tvpAfterUpdatesBeforeRemovals = this._totalVotingPower.add(
+      parent ? this.compareRemovals(parent) : new BN(0)
+    );
     // - 1.25 * tvpAfterUpdatesBeforeRemovals
     const newPriority = tvpAfterUpdatesBeforeRemovals.muln(10).divn(8).neg();
 
     for (const av of this.active) {
       if (parent) {
-        const index = parent.active.findIndex(({ validator }) => validator.equals(av.validator));
+        const index = parent.active.findIndex(({ validator }) =>
+          validator.equals(av.validator)
+        );
         if (index !== -1) {
           av.priority = parent.active[index].priority.clone();
         } else {
@@ -301,7 +326,10 @@ export class ActiveValidatorSet {
    * @returns ActiveValidatorSet instance
    */
   copy() {
-    return new ActiveValidatorSet(this.active.map(copyActiveValidator), this._proposer);
+    return new ActiveValidatorSet(
+      this.active.map(copyActiveValidator),
+      this._proposer
+    );
   }
 
   /**
@@ -310,7 +338,9 @@ export class ActiveValidatorSet {
    * @returns `true` if it is actived
    */
   isActive(validator: Address) {
-    const index = this.active.findIndex(({ validator: _validator }) => _validator.equals(validator));
+    const index = this.active.findIndex(({ validator: _validator }) =>
+      _validator.equals(validator)
+    );
     return index !== -1;
   }
 
@@ -356,7 +386,11 @@ export class ActiveValidatorSet {
     const removedVotingPower = new BN(0);
     const { active } = parent;
     for (const { validator, votingPower } of active) {
-      if (this.active.filter(({ validator: _validator }) => _validator.equals(validator)).length === 0) {
+      if (
+        this.active.filter(({ validator: _validator }) =>
+          _validator.equals(validator)
+        ).length === 0
+      ) {
         removedVotingPower.iadd(votingPower);
       }
     }
@@ -369,7 +403,12 @@ export class ActiveValidatorSet {
     }
     let proposer: ActiveValidator | undefined;
     for (const av of this.active) {
-      if (proposer === undefined || proposer.priority.lt(av.priority) || (proposer.priority.eq(av.priority) && proposer.validator.buf.compare(av.validator.buf) === 1)) {
+      if (
+        proposer === undefined ||
+        proposer.priority.lt(av.priority) ||
+        (proposer.priority.eq(av.priority) &&
+          proposer.validator.buf.compare(av.validator.buf) === 1)
+      ) {
         proposer = av;
       }
     }

@@ -47,7 +47,11 @@ export class ValidatorSets {
    * @param sm - `StakeManager` instance
    * @param bls - `ValidatorBls` instance
    */
-  async getActiveValSet(stateRoot: Buffer, sm?: StakeManager, bls?: ValidatorBLS) {
+  async getActiveValSet(
+    stateRoot: Buffer,
+    sm?: StakeManager,
+    bls?: ValidatorBLS
+  ) {
     let active = this.activeSets.get(stateRoot);
     if (!active) {
       if (!sm) {
@@ -65,7 +69,10 @@ export class ValidatorSets {
    * @param stateRoot - Target state root
    * @param set - Validator set
    */
-  set(stateRoot: Buffer, value: ValidatorSet | IndexedValidatorSet | ActiveValidatorSet) {
+  set(
+    stateRoot: Buffer,
+    value: ValidatorSet | IndexedValidatorSet | ActiveValidatorSet
+  ) {
     if (value instanceof IndexedValidatorSet) {
       if (!this.indexedSets.has(stateRoot)) {
         this.indexedSets.set(stateRoot, value);

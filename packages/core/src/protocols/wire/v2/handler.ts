@@ -24,7 +24,10 @@ const wireHandlerFuncsV2: HandlerFunc[] = [
       const db = this.node.db;
       const results: Receipt[][] = [];
       for (const hash of hashes) {
-        const receipts = await db.getReceipts(await db.hashToNumber(hash), hash);
+        const receipts = await db.getReceipts(
+          await db.hashToNumber(hash),
+          hash
+        );
         results.push(receipts);
       }
       return ['Receipts', results];
@@ -33,7 +36,10 @@ const wireHandlerFuncsV2: HandlerFunc[] = [
   {
     name: 'Receipts',
     code: 10,
-    encode(this: WireProtocolHandlerV2, receipts: Receipt[][]): ReceiptRawValue[][] {
+    encode(
+      this: WireProtocolHandlerV2,
+      receipts: Receipt[][]
+    ): ReceiptRawValue[][] {
       return receipts.map((rs) => rs.map((r) => r.raw()));
     },
     decode(this: WireProtocolHandlerV2, raw: ReceiptRawValue[][]): Receipt[][] {

@@ -10,7 +10,9 @@ let genesisValidators: Address[] | undefined;
 export function getGenesisValidators(common: Common) {
   // get genesis validators from common
   if (!genesisValidators) {
-    genesisValidators = common.param('vm', 'genesisValidators').map((addr) => Address.fromString(addr)) as Address[];
+    genesisValidators = common
+      .param('vm', 'genesisValidators')
+      .map((addr) => Address.fromString(addr)) as Address[];
     // sort by address
     genesisValidators.sort((a, b) => a.buf.compare(b.buf) as 1 | -1 | 0);
   }

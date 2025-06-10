@@ -3,7 +3,11 @@ import { BN } from 'ethereumjs-util';
 import { BlockHeader } from '@rei-network/structure';
 import { Database } from '@rei-network/database';
 import { logger, AbortableTimer } from '@rei-network/utils';
-import { HeaderSyncNetworkManager, HeaderSyncPeer, IHeaderSyncBackend } from './types';
+import {
+  HeaderSyncNetworkManager,
+  HeaderSyncPeer,
+  IHeaderSyncBackend
+} from './types';
 
 const count: BN = new BN(256);
 const maxGetBlockHeaders: BN = new BN(128);
@@ -30,7 +34,7 @@ export class HeaderSync extends EventEmitter {
   readonly pool: HeaderSyncNetworkManager;
   readonly backend: IHeaderSyncBackend;
 
-  private aborted: boolean = false;
+  private aborted = false;
   private useless = new Set<HeaderSyncPeer>();
   private syncPromise: Promise<BlockHeader[]> | undefined;
   private throwError: boolean;
@@ -45,7 +49,8 @@ export class HeaderSync extends EventEmitter {
     this.backend = options.backend;
     this.throwError = options.throwError ?? false;
     this.retryInterval = options.retryInterval ?? defaultRetryInterval;
-    this.getHandlerTimeout = options.getHandlerTimeout ?? defaultGetHandlerTimeout;
+    this.getHandlerTimeout =
+      options.getHandlerTimeout ?? defaultGetHandlerTimeout;
   }
 
   /**
@@ -147,7 +152,12 @@ export class HeaderSync extends EventEmitter {
       }
 
       // download and retry
-      const { child: _child, headers: _headers } = await this.downloadHeaders(child, start, count, target);
+      const { child: _child, headers: _headers } = await this.downloadHeaders(
+        child,
+        start,
+        count,
+        target
+      );
 
       child = _child;
       headers = _headers.concat(headers);
@@ -167,7 +177,13 @@ export class HeaderSync extends EventEmitter {
    * @param retryLimit - retry download limit
    * @returns child block header
    */
-  private async downloadHeaders(child: BlockHeader, start: BN, count: BN, target: BN, retryLimit: number = 10) {
+  private async downloadHeaders(
+    child: BlockHeader,
+    start: BN,
+    count: BN,
+    target: BN,
+    retryLimit = 10
+  ) {
     let times = 0;
     let headers: BlockHeader[] = [];
     const retry = async () => {
@@ -199,7 +215,11 @@ export class HeaderSync extends EventEmitter {
       } catch (err: any) {
         this.useless.add(handler);
         if (err.message !== 'useless') {
-          await this.backend.handlePeerError('HeaderSync::downloadHeaders', handler!, err);
+          await this.backend.handlePeerError(
+            'HeaderSync::downloadHeaders',
+            handler!,
+            err
+          );
         }
         await retry();
         continue;

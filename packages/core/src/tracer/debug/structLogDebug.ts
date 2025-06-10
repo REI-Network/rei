@@ -25,7 +25,7 @@ export class StructLogDebug implements IDebugImpl {
   logs: StructLog[] = [];
   output!: Buffer;
   gasUsed!: BN;
-  failed: boolean = false;
+  failed = false;
   storage = new FunctionalBufferMap<{ [address: string]: string }>();
 
   constructor(config?: TraceConfig, hash?: Buffer) {
@@ -41,10 +41,16 @@ export class StructLogDebug implements IDebugImpl {
   private async captureLog(step: InterpreterStep, error?: string) {
     let memory: string[] = [];
     if (!this.config.disableMemory && step.memoryWordCount.gtn(0)) {
-      const memoryLength = new BN(step.memory.length).div(step.memoryWordCount).toNumber();
+      const memoryLength = new BN(step.memory.length)
+        .div(step.memoryWordCount)
+        .toNumber();
       memory = [];
       for (let i = 0; i < step.memoryWordCount.toNumber(); i++) {
-        memory.push(step.memory.slice(i * memoryLength, (i + 1) * memoryLength).toString('hex'));
+        memory.push(
+          step.memory
+            .slice(i * memoryLength, (i + 1) * memoryLength)
+            .toString('hex')
+        );
       }
     }
     let storage = this.storage.get(step.address.buf);
@@ -54,10 +60,16 @@ export class StructLogDebug implements IDebugImpl {
     }
     if (!this.config.disableStorage) {
       if (step.opcode.name === 'SLOAD' && step.stack.length >= 1) {
-        const address = setLengthLeft(step.stack[step.stack.length - 1].toBuffer(), 32);
+        const address = setLengthLeft(
+          step.stack[step.stack.length - 1].toBuffer(),
+          32
+        );
         const key = address.toString('hex');
         if (!(key in storage)) {
-          const value = setLengthLeft(await step.stateManager.getContractStorage(step.address, address), 32);
+          const value = setLengthLeft(
+            await step.stateManager.getContractStorage(step.address, address),
+            32
+          );
           Object.defineProperty(storage, address.toString('hex'), {
             value: value.toString('hex'),
             enumerable: true
@@ -65,10 +77,16 @@ export class StructLogDebug implements IDebugImpl {
         }
       }
       if (step.opcode.name === 'SSTORE' && step.stack.length >= 2) {
-        const address = setLengthLeft(step.stack[step.stack.length - 1].toBuffer(), 32);
+        const address = setLengthLeft(
+          step.stack[step.stack.length - 1].toBuffer(),
+          32
+        );
         const key = address.toString('hex');
         if (!(key in storage)) {
-          const value = setLengthLeft(step.stack[step.stack.length - 2].toBuffer(), 32);
+          const value = setLengthLeft(
+            step.stack[step.stack.length - 2].toBuffer(),
+            32
+          );
           Object.defineProperty(storage, address.toString('hex'), {
             value: value.toString('hex'),
             enumerable: true
@@ -92,7 +110,11 @@ export class StructLogDebug implements IDebugImpl {
       memory,
       op: step.opcode.name,
       pc: step.pc,
-      stack: !this.config.disableStack ? step.stack.map((bn) => setLengthLeft(bn.toBuffer(), 32).toString('hex')) : [],
+      stack: !this.config.disableStack
+        ? step.stack.map((bn) =>
+            setLengthLeft(bn.toBuffer(), 32).toString('hex')
+          )
+        : [],
       storage: storageObj
     };
     this.logs.push(log);
@@ -110,7 +132,17 @@ export class StructLogDebug implements IDebugImpl {
    * @param number Blocknumber
    * @param stateManager state trie manager
    */
-  async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, gasPrice: BN, value: BN, number: BN, stateManager: StateManager) {}
+  async captureStart(
+    from: undefined | Buffer,
+    to: undefined | Buffer,
+    create: boolean,
+    input: Buffer,
+    gas: BN,
+    gasPrice: BN,
+    value: BN,
+    number: BN,
+    stateManager: StateManager
+  ) {}
 
   /**
    * captureState call the captureLog function

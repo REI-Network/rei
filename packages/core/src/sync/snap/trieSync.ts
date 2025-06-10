@@ -1,12 +1,26 @@
 import Heap from 'qheap';
 import { KECCAK256_NULL, KECCAK256_RLP } from 'ethereumjs-util';
-import { BranchNode, ExtensionNode, LeafNode, Nibbles, TrieNode, isRawNode, decodeRawNode, decodeNode } from '@rei-network/trie/dist/trieNode';
+import {
+  BranchNode,
+  ExtensionNode,
+  LeafNode,
+  Nibbles,
+  TrieNode,
+  isRawNode,
+  decodeRawNode,
+  decodeNode
+} from '@rei-network/trie/dist/trieNode';
 import { nibblesToBuffer } from '@rei-network/trie/dist/util/nibbles';
 import { FunctionalBufferMap } from '@rei-network/utils';
 import { StakingAccount } from '../../stateManager';
 import { BinaryRawDBatch } from '../../utils';
 
-type LeafCallback = (paths: Buffer[], path: Nibbles, leaf: Buffer, parent: Buffer) => Promise<void>;
+type LeafCallback = (
+  paths: Buffer[],
+  path: Nibbles,
+  leaf: Buffer,
+  parent: Buffer
+) => Promise<void>;
 
 type SyncRequest = {
   path?: Nibbles;
@@ -84,17 +98,22 @@ export class TrieSync {
    * @param onLeaf - Leaf callback
    */
   setRoot(root: Buffer, onLeaf?: LeafCallback) {
-    return this.addSubTrie(root, undefined, undefined, async (paths, path, leaf, parent) => {
-      onLeaf && (await onLeaf(paths, path, leaf, parent));
+    return this.addSubTrie(
+      root,
+      undefined,
+      undefined,
+      async (paths, path, leaf, parent) => {
+        onLeaf && (await onLeaf(paths, path, leaf, parent));
 
-      try {
-        const account = StakingAccount.fromRlpSerializedAccount(leaf);
-        await this.addSubTrie(account.stateRoot, path, parent, onLeaf);
-        await this.addCodeEntry(account.codeHash, path, parent);
-      } catch (err) {
-        // ignore invalid leaf node
+        try {
+          const account = StakingAccount.fromRlpSerializedAccount(leaf);
+          await this.addSubTrie(account.stateRoot, path, parent, onLeaf);
+          await this.addCodeEntry(account.codeHash, path, parent);
+        } catch (err) {
+          // ignore invalid leaf node
+        }
       }
-    });
+    );
   }
 
   /**
@@ -114,7 +133,12 @@ export class TrieSync {
    * @param parent - Parent node
    * @param callback - Leaf callback
    */
-  async addSubTrie(hash: Buffer, path?: Nibbles, parent?: Buffer, callback?: LeafCallback) {
+  async addSubTrie(
+    hash: Buffer,
+    path?: Nibbles,
+    parent?: Buffer,
+    callback?: LeafCallback
+  ) {
     if (hash.equals(KECCAK256_RLP)) {
       return;
     }
@@ -194,7 +218,10 @@ export class TrieSync {
     const nodeHashes: Buffer[] = [];
     const codeHashes: Buffer[] = [];
 
-    while (this.queue.length > 0 && (max === 0 || nodeHashes.length + codeHashes.length < max)) {
+    while (
+      this.queue.length > 0 &&
+      (max === 0 || nodeHashes.length + codeHashes.length < max)
+    ) {
       const req: SyncRequest = this.queue.peek();
 
       if (req.code) {
@@ -275,8 +302,14 @@ export class TrieSync {
    * @param node - Parent node
    * @returns Requests
    */
-  private async children(req: SyncRequest, node: TrieNode): Promise<SyncRequest[]> {
-    const onChild = async (nibbles: Nibbles, value: Buffer | Buffer[]): Promise<SyncRequest[]> => {
+  private async children(
+    req: SyncRequest,
+    node: TrieNode
+  ): Promise<SyncRequest[]> {
+    const onChild = async (
+      nibbles: Nibbles,
+      value: Buffer | Buffer[]
+    ): Promise<SyncRequest[]> => {
       if (isRawNode(value)) {
         // the value is a raw node, decode it directly
         const child = decodeRawNode(value as Buffer[]);
@@ -312,7 +345,10 @@ export class TrieSync {
         if (childPath.length === 2 * 32) {
           paths = [nibblesToBuffer(childPath)];
         } else if (childPath.length === 4 * 32) {
-          paths = [nibblesToBuffer(childPath.slice(0, 64)), nibblesToBuffer(childPath.slice(64))];
+          paths = [
+            nibblesToBuffer(childPath.slice(0, 64)),
+            nibblesToBuffer(childPath.slice(64))
+          ];
         }
         await req.callback(paths, childPath, value, req.hash);
       }

@@ -1,5 +1,12 @@
 import { bufferToInt, BN, bnToUnpaddedBuffer } from 'ethereumjs-util';
-import { mustParseTransction, Transaction, Block, BlockHeader, BlockHeaderBuffer, TransactionsBuffer } from '@rei-network/structure';
+import {
+  mustParseTransction,
+  Transaction,
+  Block,
+  BlockHeader,
+  BlockHeaderBuffer,
+  TransactionsBuffer
+} from '@rei-network/structure';
 import { NodeStatus } from '../../types';
 import { WireProtocolHandler } from './handler';
 import * as c from './config';
@@ -10,7 +17,13 @@ export type HandlerFunc = {
   response?: number;
   encode(data: any): any;
   decode(data: any): any;
-  process?: (data: any) => Promise<[string, any]> | Promise<[string, any] | void> | [string, any] | void;
+  process?: (
+    data: any
+  ) =>
+    | Promise<[string, any]>
+    | Promise<[string, any] | void>
+    | [string, any]
+    | void;
 };
 
 export const wireHandlerBaseFuncs: HandlerFunc[] = [
@@ -42,13 +55,19 @@ export const wireHandlerBaseFuncs: HandlerFunc[] = [
     name: 'GetBlockHeaders',
     code: 1,
     response: 2,
-    encode(this: WireProtocolHandler, { start, count }: { start: BN; count: BN }) {
+    encode(
+      this: WireProtocolHandler,
+      { start, count }: { start: BN; count: BN }
+    ) {
       return [bnToUnpaddedBuffer(start), bnToUnpaddedBuffer(count)];
     },
     decode(this: WireProtocolHandler, [start, count]: Buffer[]) {
       return { start: new BN(start), count: new BN(count) };
     },
-    async process(this: WireProtocolHandler, { start, count }: { start: BN; count: BN }): Promise<[string, BlockHeader[]] | void> {
+    async process(
+      this: WireProtocolHandler,
+      { start, count }: { start: BN; count: BN }
+    ): Promise<[string, BlockHeader[]] | void> {
       if (count.gtn(c.maxGetBlockHeaders)) {
         this.node.banPeer(this.peer.peerId, 'invalid');
         return;
@@ -77,7 +96,12 @@ export const wireHandlerBaseFuncs: HandlerFunc[] = [
       return headers.map((h) => h.raw());
     },
     decode(this: WireProtocolHandler, headers: BlockHeaderBuffer[]) {
-      return headers.map((h) => BlockHeader.fromValuesArray(h, { common: this.node.getCommon(0), hardforkByBlockNumber: true }));
+      return headers.map((h) =>
+        BlockHeader.fromValuesArray(h, {
+          common: this.node.getCommon(0),
+          hardforkByBlockNumber: true
+        })
+      );
     }
   },
   {
@@ -90,7 +114,10 @@ export const wireHandlerBaseFuncs: HandlerFunc[] = [
     decode(this: WireProtocolHandler, headerHashs: Buffer[]) {
       return headerHashs;
     },
-    async process(this: WireProtocolHandler, headerHashs: Buffer[]): Promise<[string, Transaction[][]] | void> {
+    async process(
+      this: WireProtocolHandler,
+      headerHashs: Buffer[]
+    ): Promise<[string, Transaction[][]] | void> {
       if (headerHashs.length > c.maxGetBlockHeaders) {
         this.node.banPeer(this.peer.peerId, 'invalid');
         return;
@@ -118,9 +145,14 @@ export const wireHandlerBaseFuncs: HandlerFunc[] = [
         return txs.map((tx) => tx.raw() as Buffer[]);
       });
     },
-    decode(this: WireProtocolHandler, bodies: TransactionsBuffer[]): Transaction[][] {
+    decode(
+      this: WireProtocolHandler,
+      bodies: TransactionsBuffer[]
+    ): Transaction[][] {
       return bodies.map((txs) => {
-        return txs.map((tx) => mustParseTransction(tx, { common: this.node.getCommon(0) }));
+        return txs.map((tx) =>
+          mustParseTransction(tx, { common: this.node.getCommon(0) })
+        );
       });
     }
   },
@@ -128,15 +160,27 @@ export const wireHandlerBaseFuncs: HandlerFunc[] = [
     name: 'NewBlock',
     code: 5,
     encode(this: WireProtocolHandler, { block, td }: { block: Block; td: BN }) {
-      return [[block.header.raw(), block.transactions.map((tx) => tx.raw() as Buffer[])], td.toBuffer()];
+      return [
+        [
+          block.header.raw(),
+          block.transactions.map((tx) => tx.raw() as Buffer[])
+        ],
+        td.toBuffer()
+      ];
     },
     decode(this: WireProtocolHandler, raw): { block: Block; td: BN } {
       return {
-        block: Block.fromValuesArray(raw[0], { common: this.node.getCommon(0), hardforkByBlockNumber: true }),
+        block: Block.fromValuesArray(raw[0], {
+          common: this.node.getCommon(0),
+          hardforkByBlockNumber: true
+        }),
         td: new BN(raw[1])
       };
     },
-    process(this: WireProtocolHandler, { block, td }: { block: Block; td: BN }) {
+    process(
+      this: WireProtocolHandler,
+      { block, td }: { block: Block; td: BN }
+    ) {
       const height = block.header.number.toNumber();
       const bestHash = block.hash();
       this.knowBlocks([bestHash]);
@@ -178,7 +222,12 @@ export const wireHandlerBaseFuncs: HandlerFunc[] = [
         this.node.banPeer(this.peer.peerId, 'invalid');
         return;
       }
-      return ['PooledTransactions', hashes.map((hash) => this.node.txPool.getTransaction(hash)).filter((tx) => tx !== undefined)];
+      return [
+        'PooledTransactions',
+        hashes
+          .map((hash) => this.node.txPool.getTransaction(hash))
+          .filter((tx) => tx !== undefined)
+      ];
     }
   },
   {
@@ -188,7 +237,9 @@ export const wireHandlerBaseFuncs: HandlerFunc[] = [
       return txs.map((tx) => tx.raw() as Buffer[]);
     },
     decode(this: WireProtocolHandler, raws: TransactionsBuffer) {
-      return raws.map((raw) => mustParseTransction(raw, { common: this.node.getLatestCommon() }));
+      return raws.map((raw) =>
+        mustParseTransction(raw, { common: this.node.getLatestCommon() })
+      );
     }
   }
 ];

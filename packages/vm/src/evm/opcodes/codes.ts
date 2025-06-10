@@ -8,7 +8,19 @@ export class Opcode {
   readonly fee: number;
   readonly isAsync: boolean;
 
-  constructor({ code, name, fullName, fee, isAsync }: { code: number; name: string; fullName: string; fee: number; isAsync: boolean }) {
+  constructor({
+    code,
+    name,
+    fullName,
+    fee,
+    isAsync
+  }: {
+    code: number;
+    name: string;
+    fullName: string;
+    fee: number;
+    isAsync: boolean;
+  }) {
     this.code = code;
     this.name = name;
     this.fullName = fullName;
@@ -253,7 +265,9 @@ const eipOpcodes = [
  * @param opcodes {Object} Receive basic opcodes info dictionary.
  * @returns {OpcodeList} Complete Opcode list
  */
-function createOpcodes(opcodes: { [key: number]: { name: string; fee: number; isAsync: boolean } }): OpcodeList {
+function createOpcodes(opcodes: {
+  [key: number]: { name: string; fee: number; isAsync: boolean };
+}): OpcodeList {
   const result: OpcodeList = new Map();
   for (const [key, value] of Object.entries(opcodes)) {
     const code = parseInt(key, 10);
@@ -290,12 +304,18 @@ export function getOpcodesForHF(common: Common): OpcodeList {
   }
 
   for (const key in opcodeBuilder) {
-    const baseFee = common.param('gasPrices', opcodeBuilder[key].name.toLowerCase());
+    const baseFee = common.param(
+      'gasPrices',
+      opcodeBuilder[key].name.toLowerCase()
+    );
     // explicitly verify that we have defined a base fee
     if (baseFee === undefined) {
       throw new Error(`base fee not defined for: ${opcodeBuilder[key].name}`);
     }
-    opcodeBuilder[key].fee = common.param('gasPrices', opcodeBuilder[key].name.toLowerCase());
+    opcodeBuilder[key].fee = common.param(
+      'gasPrices',
+      opcodeBuilder[key].name.toLowerCase()
+    );
   }
 
   return createOpcodes(opcodeBuilder);

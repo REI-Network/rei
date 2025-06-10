@@ -5,7 +5,10 @@ import { BaseProtocol } from '../baseProtocol';
 import { SnapHandlerPool } from './snapHandlerPool';
 import { SnapProtocolHandler } from './handler';
 
-export class SnapProtocol extends BaseProtocol<SnapProtocolHandler> implements Protocol {
+export class SnapProtocol
+  extends BaseProtocol<SnapProtocolHandler>
+  implements Protocol
+{
   readonly pool = new SnapHandlerPool();
 
   constructor(node: Node) {

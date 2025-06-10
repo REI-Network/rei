@@ -1,3 +1,5 @@
+test-dir
+test-dir2
 packages/*/dist
 packages/contracts/artifacts
 packages/contracts/cache

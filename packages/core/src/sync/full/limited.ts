@@ -1,6 +1,6 @@
 export class LimitedConcurrency {
   readonly limit: number;
-  private _concurrency: number = 0;
+  private _concurrency = 0;
   private concurrencyPromise?: Promise<void>;
   private concurrencyResolve?: () => void;
   private finishedPromise?: Promise<void>;
@@ -54,7 +54,10 @@ export class LimitedConcurrency {
       });
     }
 
-    if (this._concurrency === this.limit - 1 && this.concurrencyPromise === undefined) {
+    if (
+      this._concurrency === this.limit - 1 &&
+      this.concurrencyPromise === undefined
+    ) {
       this.concurrencyPromise = new Promise<void>((resolve) => {
         this.concurrencyResolve = resolve;
       });

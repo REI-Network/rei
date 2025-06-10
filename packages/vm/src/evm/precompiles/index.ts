@@ -28,7 +28,9 @@ interface PrecompileAvailability {
   [key: string]: PrecompileAvailabilityCheckType;
 }
 
-type PrecompileAvailabilityCheckType = PrecompileAvailabilityCheckTypeHardfork | PrecompileAvailabilityCheckTypeEIP;
+type PrecompileAvailabilityCheckType =
+  | PrecompileAvailabilityCheckTypeHardfork
+  | PrecompileAvailabilityCheckTypeEIP;
 
 enum PrecompileAvailabilityCheck {
   EIP,
@@ -146,14 +148,23 @@ function getPrecompile(address: Address, common: Common): PrecompileFunc {
   const addr = address.buf.toString('hex');
   if (precompiles[addr]) {
     const availability = precompileAvailability[addr];
-    if ((availability.type == PrecompileAvailabilityCheck.Hardfork && common.gteHardfork(availability.param)) || (availability.type == PrecompileAvailabilityCheck.EIP && common.isActivatedEIP(availability.param))) {
+    if (
+      (availability.type == PrecompileAvailabilityCheck.Hardfork &&
+        common.gteHardfork(availability.param)) ||
+      (availability.type == PrecompileAvailabilityCheck.EIP &&
+        common.isActivatedEIP(availability.param))
+    ) {
       return precompiles[addr];
     }
   }
   return precompiles[''];
 }
 
-function addPrecompile(address: Address, func: PrecompileFunc, checkType: PrecompileAvailabilityCheckType) {
+function addPrecompile(
+  address: Address,
+  func: PrecompileFunc,
+  checkType: PrecompileAvailabilityCheckType
+) {
   const addr = address.buf.toString('hex');
   if (precompiles[addr] || precompileAvailability[addr]) {
     throw new Error('addr already exists');
@@ -174,4 +185,14 @@ function getActivePrecompiles(common: Common): Address[] {
   return activePrecompiles;
 }
 
-export { precompiles, getPrecompile, addPrecompile, PrecompileFunc, PrecompileInput, PrecompileAvailabilityCheck, PrecompileAvailabilityCheckType, ripemdPrecompileAddress, getActivePrecompiles };
+export {
+  precompiles,
+  getPrecompile,
+  addPrecompile,
+  PrecompileFunc,
+  PrecompileInput,
+  PrecompileAvailabilityCheck,
+  PrecompileAvailabilityCheckType,
+  ripemdPrecompileAddress,
+  getActivePrecompiles
+};

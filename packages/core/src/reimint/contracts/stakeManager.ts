@@ -3,7 +3,13 @@ import { Address, BN, bufferToHex, toBuffer } from 'ethereumjs-util';
 import { Common } from '@rei-network/common';
 import { Log, Receipt } from '@rei-network/structure';
 import { ValidatorChanges, getGenesisValidators } from '../validatorSet';
-import { bufferToAddress, decodeInt256, decodeBytes, validatorsEncode, validatorsDecode } from './utils';
+import {
+  bufferToAddress,
+  decodeInt256,
+  decodeBytes,
+  validatorsEncode,
+  validatorsDecode
+} from './utils';
 import { Contract } from './contract';
 
 // function selector of stake manager
@@ -32,12 +38,24 @@ const methods = {
 
 // event topic
 const events = {
-  Reward: toBuffer('0x619caafabdd75649b302ba8419e48cccf64f37f1983ac4727cfb38b57703ffc9'),
-  Slash: toBuffer('0xa69f22d963cb7981f842db8c1aafcc93d915ba2a95dcf26dcc333a9c2a09be26'),
-  Stake: toBuffer('0x1bd1eb6b4fd3f08e718d7a241c54c4641c9f36004b6949383f48d15a2fcc8f52'),
-  StartUnstake: toBuffer('0x020b3ba91672f551cfd1f7abf4794b3fb292f61fd70ffd5a34a60cdd04078e50'),
-  IndexedValidator: toBuffer('0x07c18d1e961213770ba59e4b4001fc312f17def9ba35867316edefe029c5dd18'),
-  UnindexedValidator: toBuffer('0xa37745de139b774fe502f6f6da1c791e290244eb016b146816e3bcd8b13bc999')
+  Reward: toBuffer(
+    '0x619caafabdd75649b302ba8419e48cccf64f37f1983ac4727cfb38b57703ffc9'
+  ),
+  Slash: toBuffer(
+    '0xa69f22d963cb7981f842db8c1aafcc93d915ba2a95dcf26dcc333a9c2a09be26'
+  ),
+  Stake: toBuffer(
+    '0x1bd1eb6b4fd3f08e718d7a241c54c4641c9f36004b6949383f48d15a2fcc8f52'
+  ),
+  StartUnstake: toBuffer(
+    '0x020b3ba91672f551cfd1f7abf4794b3fb292f61fd70ffd5a34a60cdd04078e50'
+  ),
+  IndexedValidator: toBuffer(
+    '0x07c18d1e961213770ba59e4b4001fc312f17def9ba35867316edefe029c5dd18'
+  ),
+  UnindexedValidator: toBuffer(
+    '0xa37745de139b774fe502f6f6da1c791e290244eb016b146816e3bcd8b13bc999'
+  )
 };
 
 export enum SlashReason {
@@ -60,7 +78,11 @@ export class StakeManager extends Contract {
    * @param receipts - List of receipt
    * @param common - Common instance
    */
-  static filterReceiptsChanges(changes: ValidatorChanges, receipts: Receipt[], common: Common) {
+  static filterReceiptsChanges(
+    changes: ValidatorChanges,
+    receipts: Receipt[],
+    common: Common
+  ) {
     for (const receipt of receipts) {
       if (receipt.logs.length > 0) {
         StakeManager.filterLogsChanges(changes, receipt.logs, common);
@@ -74,26 +96,51 @@ export class StakeManager extends Contract {
    * @param logs - List of log
    * @param common - Common instance
    */
-  static filterLogsChanges(changes: ValidatorChanges, logs: Log[], common: Common) {
+  static filterLogsChanges(
+    changes: ValidatorChanges,
+    logs: Log[],
+    common: Common
+  ) {
     const smaddr = Address.fromString(common.param('vm', 'smaddr'));
     for (const log of logs) {
       if (log.address.equals(smaddr.buf)) {
         if (log.topics.length === 3 && log.topics[0].equals(events['Reward'])) {
           // Reward event
           changes.stake(bufferToAddress(log.topics[1]), new BN(log.topics[2]));
-        } else if (log.topics.length === 3 && log.topics[0].equals(events['Slash'])) {
+        } else if (
+          log.topics.length === 3 &&
+          log.topics[0].equals(events['Slash'])
+        ) {
           // Slash event
-          changes.unstake(bufferToAddress(log.topics[1]), new BN(log.topics[2]));
-        } else if (log.topics.length === 3 && log.topics[0].equals(events['Stake'])) {
+          changes.unstake(
+            bufferToAddress(log.topics[1]),
+            new BN(log.topics[2])
+          );
+        } else if (
+          log.topics.length === 3 &&
+          log.topics[0].equals(events['Stake'])
+        ) {
           // Stake event
           changes.stake(bufferToAddress(log.topics[1]), new BN(log.topics[2]));
-        } else if (log.topics.length === 4 && log.topics[0].equals(events['StartUnstake'])) {
+        } else if (
+          log.topics.length === 4 &&
+          log.topics[0].equals(events['StartUnstake'])
+        ) {
           // StartUnstake event
-          changes.unstake(bufferToAddress(log.topics[2]), new BN(log.topics[3]));
-        } else if (log.topics.length === 3 && log.topics[0].equals(events['IndexedValidator'])) {
+          changes.unstake(
+            bufferToAddress(log.topics[2]),
+            new BN(log.topics[3])
+          );
+        } else if (
+          log.topics.length === 3 &&
+          log.topics[0].equals(events['IndexedValidator'])
+        ) {
           // IndexedValidator event
           changes.index(bufferToAddress(log.topics[1]), new BN(log.topics[2]));
-        } else if (log.topics.length === 2 && log.topics[0].equals(events['UnindexedValidator'])) {
+        } else if (
+          log.topics.length === 2 &&
+          log.topics[0].equals(events['UnindexedValidator'])
+        ) {
           // UnindexedValidator event
           changes.unindex(bufferToAddress(log.topics[1]));
         }
@@ -102,7 +149,12 @@ export class StakeManager extends Contract {
   }
 
   constructor(evm: EVM, common: Common) {
-    super(evm, common, methods, Address.fromString(common.param('vm', 'smaddr')));
+    super(
+      evm,
+      common,
+      methods,
+      Address.fromString(common.param('vm', 'smaddr'))
+    );
   }
 
   /**
@@ -111,7 +163,9 @@ export class StakeManager extends Contract {
    */
   proposer() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('proposer', [], []));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage('proposer', [], [])
+      );
       return bufferToAddress(returnValue);
     });
   }
@@ -123,7 +177,13 @@ export class StakeManager extends Contract {
   getTotalLockedAmountAndValidatorCount() {
     return this.runWithLogger(async () => {
       const gvs = getGenesisValidators(this.common);
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('getTotalLockedAmountAndValidatorCount', ['address[]'], [gvs.map((gv) => gv.toString())]));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage(
+          'getTotalLockedAmountAndValidatorCount',
+          ['address[]'],
+          [gvs.map((gv) => gv.toString())]
+        )
+      );
       let i = 0;
       return {
         totalLockedAmount: new BN(returnValue.slice(i++ * 32, i * 32)),
@@ -138,7 +198,9 @@ export class StakeManager extends Contract {
    */
   indexedValidatorsLength() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('indexedValidatorsLength', [], []));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage('indexedValidatorsLength', [], [])
+      );
       return new BN(returnValue);
     });
   }
@@ -150,7 +212,13 @@ export class StakeManager extends Contract {
    */
   indexedValidatorsByIndex(index: BN) {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('indexedValidatorsByIndex', ['uint256'], [index.toString()]));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage(
+          'indexedValidatorsByIndex',
+          ['uint256'],
+          [index.toString()]
+        )
+      );
       return bufferToAddress(returnValue);
     });
   }
@@ -162,7 +230,13 @@ export class StakeManager extends Contract {
    */
   getVotingPowerByIndex(index: BN) {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('getVotingPowerByIndex', ['uint256'], [index.toString()]));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage(
+          'getVotingPowerByIndex',
+          ['uint256'],
+          [index.toString()]
+        )
+      );
       return new BN(returnValue);
     });
   }
@@ -174,7 +248,13 @@ export class StakeManager extends Contract {
    */
   getVotingPowerByAddress(address: Address) {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('getVotingPowerByAddress', ['address'], [address.toString()]));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage(
+          'getVotingPowerByAddress',
+          ['address'],
+          [address.toString()]
+        )
+      );
       return new BN(returnValue);
     });
   }
@@ -191,7 +271,9 @@ export class StakeManager extends Contract {
       if (index !== -1) {
         return new BN(index);
       }
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('validators', ['address'], [address.toString()]));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage('validators', ['address'], [address.toString()])
+      );
       return new BN(returnValue.slice(0, 32));
     });
   }
@@ -202,7 +284,9 @@ export class StakeManager extends Contract {
    */
   activeValidatorsLength() {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('activeValidatorsLength', [], []));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage('activeValidatorsLength', [], [])
+      );
       return new BN(returnValue);
     });
   }
@@ -214,7 +298,13 @@ export class StakeManager extends Contract {
    */
   activeValidators(index: BN): Promise<ActiveValidator> {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('activeValidators', ['uint256'], [index.toString()]));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage(
+          'activeValidators',
+          ['uint256'],
+          [index.toString()]
+        )
+      );
       if (returnValue.length !== 2 * 32) {
         throw new Error('invalid return value length');
       }
@@ -233,15 +323,25 @@ export class StakeManager extends Contract {
   allActiveValidators(): Promise<ActiveValidator[]> {
     return this.runWithLogger(async () => {
       const gvs = getGenesisValidators(this.common);
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('getActiveValidatorInfos', [], []));
-      const { ids, priorities } = validatorsDecode(toBuffer(decodeBytes(returnValue)));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage('getActiveValidatorInfos', [], [])
+      );
+      const { ids, priorities } = validatorsDecode(
+        toBuffer(decodeBytes(returnValue))
+      );
       const validators: { validator: Address; priority: BN }[] = [];
       for (let i = 0; i < ids.length; i++) {
         let validator: Address;
         if (ids[i].ltn(gvs.length)) {
           validator = gvs[ids[i].toNumber()];
         } else {
-          const { returnValue } = await this.executeMessage(this.makeCallMessage('indexedValidatorsById', ['uint256'], [ids[i].toString()]));
+          const { returnValue } = await this.executeMessage(
+            this.makeCallMessage(
+              'indexedValidatorsById',
+              ['uint256'],
+              [ids[i].toString()]
+            )
+          );
           validator = bufferToAddress(returnValue);
         }
         validators.push({
@@ -260,7 +360,14 @@ export class StakeManager extends Contract {
    */
   reward(validator: Address, amount: BN) {
     return this.runWithLogger(async () => {
-      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('reward', ['address'], [validator.toString()], amount));
+      const { logs } = await this.executeMessage(
+        this.makeSystemCallerMessage(
+          'reward',
+          ['address'],
+          [validator.toString()],
+          amount
+        )
+      );
       return logs;
     });
   }
@@ -272,7 +379,13 @@ export class StakeManager extends Contract {
    */
   slash(validator: Address, reason: SlashReason) {
     return this.runWithLogger(async () => {
-      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('slash', ['address', 'uint8'], [validator.toString(), reason]));
+      const { logs } = await this.executeMessage(
+        this.makeSystemCallerMessage(
+          'slash',
+          ['address', 'uint8'],
+          [validator.toString(), reason]
+        )
+      );
       return logs;
     });
   }
@@ -285,7 +398,13 @@ export class StakeManager extends Contract {
    */
   slashV2(validator: Address, reason: SlashReason, hash: Buffer) {
     return this.runWithLogger(async () => {
-      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('slashV2', ['address', 'uint8', 'bytes32'], [validator.toString(), reason, bufferToHex(hash)]));
+      const { logs } = await this.executeMessage(
+        this.makeSystemCallerMessage(
+          'slashV2',
+          ['address', 'uint8', 'bytes32'],
+          [validator.toString(), reason, bufferToHex(hash)]
+        )
+      );
       return logs;
     });
   }
@@ -296,9 +415,23 @@ export class StakeManager extends Contract {
    * @param activeValidators - Address list of active validator
    * @param priorities - Priority list of active validator
    */
-  onAfterBlock(proposer: Address, activeValidators: Address[], priorities: BN[]) {
+  onAfterBlock(
+    proposer: Address,
+    activeValidators: Address[],
+    priorities: BN[]
+  ) {
     return this.runWithLogger(async () => {
-      await this.executeMessage(this.makeSystemCallerMessage('onAfterBlock', ['address', 'address[]', 'int256[]'], [proposer.toString(), activeValidators.map((addr) => addr.toString()), priorities.map((p) => p.toString())]));
+      await this.executeMessage(
+        this.makeSystemCallerMessage(
+          'onAfterBlock',
+          ['address', 'address[]', 'int256[]'],
+          [
+            proposer.toString(),
+            activeValidators.map((addr) => addr.toString()),
+            priorities.map((p) => p.toString())
+          ]
+        )
+      );
     });
   }
 
@@ -308,13 +441,23 @@ export class StakeManager extends Contract {
    * @param activeValidators - Address list of active validator
    * @param priorities - Priority list of active validator
    */
-  onAfterBlockV2(proposer: Address, activeValidators: Address[], priorities: BN[]) {
+  onAfterBlockV2(
+    proposer: Address,
+    activeValidators: Address[],
+    priorities: BN[]
+  ) {
     return this.runWithLogger(async () => {
       const ids: BN[] = [];
       for (const address of activeValidators) {
         ids.push(await this.getValidatorIdByAddress(address));
       }
-      await this.executeMessage(this.makeSystemCallerMessage('onAfterBlockV2', ['address', 'bytes'], [proposer.toString(), validatorsEncode(ids, priorities)]));
+      await this.executeMessage(
+        this.makeSystemCallerMessage(
+          'onAfterBlockV2',
+          ['address', 'bytes'],
+          [proposer.toString(), validatorsEncode(ids, priorities)]
+        )
+      );
     });
   }
 
@@ -324,7 +467,9 @@ export class StakeManager extends Contract {
    */
   isUsedEvidence(hash: Buffer) {
     return this.runWithLogger(async () => {
-      const { returnValue } = await this.executeMessage(this.makeCallMessage('usedEvidence', ['bytes32'], [bufferToHex(hash)]));
+      const { returnValue } = await this.executeMessage(
+        this.makeCallMessage('usedEvidence', ['bytes32'], [bufferToHex(hash)])
+      );
       return new BN(returnValue).eqn(1);
     });
   }
@@ -335,7 +480,13 @@ export class StakeManager extends Contract {
    */
   initEvidenceHash(hashes: Buffer[]) {
     return this.runWithLogger(async () => {
-      await this.executeMessage(this.makeSystemCallerMessage('initEvidenceHash', ['bytes32[]'], [hashes.map(bufferToHex)]));
+      await this.executeMessage(
+        this.makeSystemCallerMessage(
+          'initEvidenceHash',
+          ['bytes32[]'],
+          [hashes.map(bufferToHex)]
+        )
+      );
     });
   }
 
@@ -346,7 +497,13 @@ export class StakeManager extends Contract {
    */
   addMissRecord(missRecord: string[][]) {
     return this.runWithLogger(async () => {
-      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('addMissRecord', ['tuple(address,uint256)[]'], [missRecord]));
+      const { logs } = await this.executeMessage(
+        this.makeSystemCallerMessage(
+          'addMissRecord',
+          ['tuple(address,uint256)[]'],
+          [missRecord]
+        )
+      );
       return logs;
     });
   }
@@ -358,7 +515,13 @@ export class StakeManager extends Contract {
    */
   freeze(validator: Address, hash: Buffer) {
     return this.runWithLogger(async () => {
-      const { logs } = await this.executeMessage(this.makeSystemCallerMessage('freeze', ['address', 'bytes32'], [validator.toString(), bufferToHex(hash)]));
+      const { logs } = await this.executeMessage(
+        this.makeSystemCallerMessage(
+          'freeze',
+          ['address', 'bytes32'],
+          [validator.toString(), bufferToHex(hash)]
+        )
+      );
       return logs;
     });
   }

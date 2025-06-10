@@ -7,8 +7,12 @@ import { bufferToAddress } from './utils';
 
 // event topic
 const events = {
-  Deposit: toBuffer('0x5548c837ab068cf56a2c2479df0882a4922fd203edb7517321831d95078c5f62'),
-  Withdraw: toBuffer('0x9b1bfa7fa9ee420a16e124f794c35ac9f90472acc99140eb2f6447c714cad8eb')
+  Deposit: toBuffer(
+    '0x5548c837ab068cf56a2c2479df0882a4922fd203edb7517321831d95078c5f62'
+  ),
+  Withdraw: toBuffer(
+    '0x9b1bfa7fa9ee420a16e124f794c35ac9f90472acc99140eb2f6447c714cad8eb'
+  )
 };
 
 export abstract class Fee {
@@ -29,7 +33,11 @@ export abstract class Fee {
     return map;
   }
 
-  private static filterLogs(logs: Log[], faddr: Address, map: Map<Address, BN>) {
+  private static filterLogs(
+    logs: Log[],
+    faddr: Address,
+    map: Map<Address, BN>
+  ) {
     const getAmount = (addr: Address) => {
       let amount = map.get(addr);
       if (amount === undefined) {
@@ -41,11 +49,17 @@ export abstract class Fee {
 
     for (const log of logs) {
       if (log.address.equals(faddr.buf)) {
-        if (log.topics.length === 4 && log.topics[0].equals(events['Deposit'])) {
+        if (
+          log.topics.length === 4 &&
+          log.topics[0].equals(events['Deposit'])
+        ) {
           const addr = bufferToAddress(log.topics[2]);
           const amount = new BN(log.topics[3]);
           getAmount(addr).iadd(amount);
-        } else if (log.topics.length === 4 && log.topics[0].equals(events['Withdraw'])) {
+        } else if (
+          log.topics.length === 4 &&
+          log.topics[0].equals(events['Withdraw'])
+        ) {
           const addr = bufferToAddress(log.topics[2]);
           const amount = new BN(log.topics[3]);
           getAmount(addr).isub(amount);
@@ -60,7 +74,9 @@ export abstract class Fee {
    * @returns Total amount
    */
   static async getTotalAmount(state: StateManager) {
-    const faddr = Address.fromString((state as any)._common.param('vm', 'faddr'));
+    const faddr = Address.fromString(
+      (state as any)._common.param('vm', 'faddr')
+    );
     return (await state.getAccount(faddr)).balance;
   }
 }

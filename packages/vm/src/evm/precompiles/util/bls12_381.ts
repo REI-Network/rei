@@ -2,7 +2,10 @@ import { padToEven, BN } from 'ethereumjs-util';
 import { VmError, ERROR } from '../../../exceptions';
 
 // base field modulus as described in the EIP
-const fieldModulus = new BN('1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab', 16);
+const fieldModulus = new BN(
+  '1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab',
+  16
+);
 
 // convert an input Buffer to a mcl G1 point
 // this does /NOT/ do any input checks. the input Buffer needs to be of length 128
@@ -59,8 +62,14 @@ function BLS12_381_FromG1Point(input: any): Buffer {
 
   // convert to buffers.
 
-  const xBuffer = Buffer.concat([Buffer.alloc(64 - xval.length / 2, 0), Buffer.from(xval, 'hex')]);
-  const yBuffer = Buffer.concat([Buffer.alloc(64 - yval.length / 2, 0), Buffer.from(yval, 'hex')]);
+  const xBuffer = Buffer.concat([
+    Buffer.alloc(64 - xval.length / 2, 0),
+    Buffer.from(xval, 'hex')
+  ]);
+  const yBuffer = Buffer.concat([
+    Buffer.alloc(64 - yval.length / 2, 0),
+    Buffer.from(yval, 'hex')
+  ]);
 
   return Buffer.concat([xBuffer, yBuffer]);
 }
@@ -75,7 +84,12 @@ function BLS12_381_ToG2Point(input: Buffer, mcl: any): any {
 
   const ZeroBytes64 = Buffer.alloc(64, 0);
   // check if we have to do with a zero point
-  if (p_x_1.equals(p_x_2) && p_x_1.equals(p_y_1) && p_x_1.equals(p_y_2) && p_x_1.equals(ZeroBytes64)) {
+  if (
+    p_x_1.equals(p_x_2) &&
+    p_x_1.equals(p_y_1) &&
+    p_x_1.equals(p_y_2) &&
+    p_x_1.equals(ZeroBytes64)
+  ) {
     return new mcl.G2();
   }
 
@@ -128,10 +142,22 @@ function BLS12_381_FromG2Point(input: any): Buffer {
 
   // convert to buffers.
 
-  const xBuffer1 = Buffer.concat([Buffer.alloc(64 - x_1.length / 2, 0), Buffer.from(x_1, 'hex')]);
-  const xBuffer2 = Buffer.concat([Buffer.alloc(64 - x_2.length / 2, 0), Buffer.from(x_2, 'hex')]);
-  const yBuffer1 = Buffer.concat([Buffer.alloc(64 - y_1.length / 2, 0), Buffer.from(y_1, 'hex')]);
-  const yBuffer2 = Buffer.concat([Buffer.alloc(64 - y_2.length / 2, 0), Buffer.from(y_2, 'hex')]);
+  const xBuffer1 = Buffer.concat([
+    Buffer.alloc(64 - x_1.length / 2, 0),
+    Buffer.from(x_1, 'hex')
+  ]);
+  const xBuffer2 = Buffer.concat([
+    Buffer.alloc(64 - x_2.length / 2, 0),
+    Buffer.from(x_2, 'hex')
+  ]);
+  const yBuffer1 = Buffer.concat([
+    Buffer.alloc(64 - y_1.length / 2, 0),
+    Buffer.from(y_1, 'hex')
+  ]);
+  const yBuffer2 = Buffer.concat([
+    Buffer.alloc(64 - y_2.length / 2, 0),
+    Buffer.from(y_2, 'hex')
+  ]);
 
   return Buffer.concat([xBuffer1, xBuffer2, yBuffer1, yBuffer2]);
 }
@@ -165,7 +191,11 @@ function BLS12_381_ToFpPoint(fpCoordinate: Buffer, mcl: any): any {
 // input: two 64-byte buffers
 // output: a mcl Fp2 point
 
-function BLS12_381_ToFp2Point(fpXCoordinate: Buffer, fpYCoordinate: Buffer, mcl: any): any {
+function BLS12_381_ToFp2Point(
+  fpXCoordinate: Buffer,
+  fpYCoordinate: Buffer,
+  mcl: any
+): any {
   // check if the coordinates are in the field
   if (new BN(fpXCoordinate).gte(fieldModulus)) {
     throw new VmError(ERROR.BLS_12_381_FP_NOT_IN_FIELD);
@@ -187,4 +217,12 @@ function BLS12_381_ToFp2Point(fpXCoordinate: Buffer, fpYCoordinate: Buffer, mcl:
   return fp2;
 }
 
-export { BLS12_381_ToG1Point, BLS12_381_FromG1Point, BLS12_381_ToG2Point, BLS12_381_FromG2Point, BLS12_381_ToFrPoint, BLS12_381_ToFpPoint, BLS12_381_ToFp2Point };
+export {
+  BLS12_381_ToG1Point,
+  BLS12_381_FromG1Point,
+  BLS12_381_ToG2Point,
+  BLS12_381_FromG2Point,
+  BLS12_381_ToFrPoint,
+  BLS12_381_ToFpPoint,
+  BLS12_381_ToFp2Point
+};

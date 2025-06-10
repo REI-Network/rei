@@ -30,8 +30,14 @@ export type StorageResponse = {
 };
 
 export interface SnapSyncPeer {
-  getAccountRange(root: Buffer, req: AccountRequest): Promise<AccountResponse | null>;
-  getStorageRanges(root: Buffer, req: StorageRequst): Promise<StorageResponse | null>;
+  getAccountRange(
+    root: Buffer,
+    req: AccountRequest
+  ): Promise<AccountResponse | null>;
+  getStorageRanges(
+    root: Buffer,
+    req: StorageRequst
+  ): Promise<StorageResponse | null>;
   getByteCodes(hashes: Buffer[]): Promise<(Buffer | undefined)[] | null>;
   getTrieNodes(hashes: Buffer[]): Promise<(Buffer | undefined)[] | null>;
 }
@@ -55,6 +61,10 @@ export interface HeaderSyncNetworkManager {
 }
 
 export interface IHeaderSyncBackend {
-  handlePeerError(prefix: string, peer: HeaderSyncPeer, err: any): Promise<void>;
+  handlePeerError(
+    prefix: string,
+    peer: HeaderSyncPeer,
+    err: any
+  ): Promise<void>;
   validateHeaders(child: BlockHeader, headers: BlockHeader[]): BlockHeader;
 }

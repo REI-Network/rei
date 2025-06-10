@@ -35,7 +35,10 @@ export class HandlerPool<T extends IHandler> {
    * Get all hanlders
    */
   get handlers() {
-    return [...Array.from(this.idlePool.values()), ...Array.from(this.busyPool.values())];
+    return [
+      ...Array.from(this.idlePool.values()),
+      ...Array.from(this.busyPool.values())
+    ];
   }
 
   /**
@@ -70,7 +73,9 @@ export class HandlerPool<T extends IHandler> {
    */
   get(timeout: number = 3 * 1000) {
     if (this.idlePool.size > 0) {
-      const handler = Array.from(this.idlePool.values())[getRandomIntInclusive(0, this.idlePool.size - 1)];
+      const handler = Array.from(this.idlePool.values())[
+        getRandomIntInclusive(0, this.idlePool.size - 1)
+      ];
       this.idlePool.delete(handler.id);
       this.busyPool.set(handler.id, handler);
       return Promise.resolve(handler);
@@ -81,7 +86,9 @@ export class HandlerPool<T extends IHandler> {
         reject,
         timeout: setTimeout(() => {
           this.getterQueue.splice(this.getterQueue.indexOf(getter), 1);
-          reject(new GetHandlerTimeoutError('ProtocolPool get handler timeout'));
+          reject(
+            new GetHandlerTimeoutError('ProtocolPool get handler timeout')
+          );
         }, timeout)
       };
       this.getterQueue.push(getter);

@@ -49,7 +49,9 @@ export class SnapHandlerPool {
   getIdlePeer(type: PeerType) {
     const idlePool = this.idlePools.get(type)!;
     if (idlePool.size > 0) {
-      const handler = Array.from(idlePool.values())[getRandomIntInclusive(0, idlePool.size - 1)];
+      const handler = Array.from(idlePool.values())[
+        getRandomIntInclusive(0, idlePool.size - 1)
+      ];
       idlePool.delete(handler.id);
       this.busyPools.get(type)!.set(handler.id, handler);
       return handler;

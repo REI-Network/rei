@@ -2,7 +2,15 @@ import vm from 'vm';
 import bi, { BigInteger } from 'big-integer';
 import { StateManager } from '@rei-network/vm/dist/state';
 import { getPrecompile } from '@rei-network/vm/dist/evm/precompiles';
-import { Address, BN, bufferToHex, setLengthLeft, generateAddress, generateAddress2, keccak256 } from 'ethereumjs-util';
+import {
+  Address,
+  BN,
+  bufferToHex,
+  setLengthLeft,
+  generateAddress,
+  generateAddress2,
+  keccak256
+} from 'ethereumjs-util';
 import { InterpreterStep } from '@rei-network/vm/dist/evm/interpreter';
 import { VmError } from '@rei-network/vm/dist/exceptions';
 import { hexStringToBuffer, logger } from '@rei-network/utils';
@@ -57,7 +65,12 @@ function makeMemory(memory: Buffer) {
  * @param input
  * @returns
  */
-function makeContract(caller: Buffer, address: Buffer, value: BigInteger, input: Buffer) {
+function makeContract(
+  caller: Buffer,
+  address: Buffer,
+  value: BigInteger,
+  input: Buffer
+) {
   return {
     getCaller() {
       return caller;
@@ -82,10 +95,14 @@ function makeContract(caller: Buffer, address: Buffer, value: BigInteger, input:
 function makeDB(stateManager: StateManager) {
   return {
     async getBalance(address: Buffer) {
-      return bi((await stateManager.getAccount(new Address(address))).balance.toString());
+      return bi(
+        (await stateManager.getAccount(new Address(address))).balance.toString()
+      );
     },
     async getNonce(address: Buffer) {
-      return (await stateManager.getAccount(new Address(address))).nonce.toNumber();
+      return (
+        await stateManager.getAccount(new Address(address))
+      ).nonce.toNumber();
     },
     getCode(address: Buffer) {
       return stateManager.getContractCode(new Address(address));
@@ -122,7 +139,12 @@ function makeLog(step: InterpreterStep, error?: string) {
     op: makeOP(step.opcode.name, step.opcode.code),
     stack,
     memory: makeMemory(step.memory),
-    contract: makeContract(step.caller.buf, step.address.buf, bi(step.callValue.toString()), step.callData),
+    contract: makeContract(
+      step.caller.buf,
+      step.address.buf,
+      bi(step.callValue.toString()),
+      step.callData
+    ),
     getPC() {
       return step.pc;
     },
@@ -150,7 +172,10 @@ type LogInfo = {
 };
 
 function toAddress(data: Buffer | string) {
-  return setLengthLeft(data instanceof Buffer ? data : hexStringToBuffer(data), 20);
+  return setLengthLeft(
+    data instanceof Buffer ? data : hexStringToBuffer(data),
+    20
+  );
 }
 
 export class JSDebug implements IDebugImpl {
@@ -181,7 +206,10 @@ export class JSDebug implements IDebugImpl {
       return bufferToHex(buf);
     },
     toWord(data: Buffer | string) {
-      return setLengthLeft(data instanceof Buffer ? data : hexStringToBuffer(data), 32);
+      return setLengthLeft(
+        data instanceof Buffer ? data : hexStringToBuffer(data),
+        32
+      );
     },
     toAddress(data: Buffer | string) {
       return toAddress(data);
@@ -190,7 +218,11 @@ export class JSDebug implements IDebugImpl {
       return generateAddress(toAddress(data), new BN(nonce).toBuffer());
     },
     toContract2(data: Buffer | string, salt: string, code: Buffer) {
-      return generateAddress2(toAddress(data), hexStringToBuffer(salt), keccak256(code));
+      return generateAddress2(
+        toAddress(data),
+        hexStringToBuffer(salt),
+        keccak256(code)
+      );
     },
     isPrecompiled: (address: Buffer) => {
       return getPrecompile(new Address(address), this.common) !== undefined;
@@ -209,12 +241,19 @@ export class JSDebug implements IDebugImpl {
     }
   };
 
-  constructor(common: Common, config: TraceConfig, reject: (reason?: any) => void, hash?: Buffer) {
+  constructor(
+    common: Common,
+    config: TraceConfig,
+    reject: (reason?: any) => void,
+    hash?: Buffer
+  ) {
     this.common = common;
     this.config = config;
     this.reject = reject;
     this.hash = hash;
-    this.vmContext = vm.createContext(this.vmContextObj, { codeGeneration: { strings: false, wasm: false } });
+    this.vmContext = vm.createContext(this.vmContextObj, {
+      codeGeneration: { strings: false, wasm: false }
+    });
     new vm.Script(config.tracer!).runInContext(this.vmContext);
   }
 
@@ -237,14 +276,27 @@ export class JSDebug implements IDebugImpl {
    * @param number
    * @param stateManager
    */
-  async captureStart(from: undefined | Buffer, to: undefined | Buffer, create: boolean, input: Buffer, gas: BN, gasPrice: BN, value: BN, number: BN, stateManager: StateManager) {
+  async captureStart(
+    from: undefined | Buffer,
+    to: undefined | Buffer,
+    create: boolean,
+    input: Buffer,
+    gas: BN,
+    gasPrice: BN,
+    value: BN,
+    number: BN,
+    stateManager: StateManager
+  ) {
     this.debugContext['type'] = create ? 'CREATE' : 'CALL';
     this.debugContext['from'] = from;
     this.debugContext['to'] = to;
     this.debugContext['input'] = input;
     this.debugContext['gas'] = bi(gas.toString());
     this.debugContext['gasPrice'] = gasPrice.toNumber();
-    this.debugContext['intrinsicGas'] = calcIntrinsicGas(create, input).toNumber();
+    this.debugContext['intrinsicGas'] = calcIntrinsicGas(
+      create,
+      input
+    ).toNumber();
     this.debugContext['value'] = bi(value.toString());
     this.debugContext['block'] = number.toNumber();
     this.vmContextObj.globalDB = makeDB(stateManager);
@@ -254,15 +306,22 @@ export class JSDebug implements IDebugImpl {
    * Run vm scripts if cached logs reach limit or force is true
    * @param force Force run vm scripts
    */
-  private async batchRunScripts(force: boolean = false) {
-    if ((force && this.vmContextObj.globalLogs.length > 0) || this.vmContextObj.globalLogs.length > (this.config.vmScriptsBatchSize ?? 500)) {
+  private async batchRunScripts(force = false) {
+    if (
+      (force && this.vmContextObj.globalLogs.length > 0) ||
+      this.vmContextObj.globalLogs.length >
+        (this.config.vmScriptsBatchSize ?? 500)
+    ) {
       const script = new vm.Script(`
       globalPromise = (async () => {
         for (const { log, error } of globalLogs) {
           await (error ? obj.fault : obj.step).call(obj, log, globalDB);
         }
       })();`);
-      script.runInContext(this.vmContext, { timeout: this.config.timeout ? Number(this.config.timeout) : undefined, breakOnSigint: true });
+      script.runInContext(this.vmContext, {
+        timeout: this.config.timeout ? Number(this.config.timeout) : undefined,
+        breakOnSigint: true
+      });
     }
     if (this.vmContextObj.globalPromise) {
       await this.vmContextObj.globalPromise;
@@ -282,7 +341,10 @@ export class JSDebug implements IDebugImpl {
     }
 
     try {
-      this.vmContextObj.globalLogs.push({ log: makeLog(step, error), error: !!error });
+      this.vmContextObj.globalLogs.push({
+        log: makeLog(step, error),
+        error: !!error
+      });
       await this.batchRunScripts();
     } catch (err) {
       this.error(err);
@@ -340,8 +402,13 @@ export class JSDebug implements IDebugImpl {
 
     try {
       await this.batchRunScripts(true);
-      const script = new vm.Script('globalPromise = obj.result.call(obj, globalCtx, globalDB)');
-      script.runInContext(this.vmContext, { timeout: this.config.timeout ? Number(this.config.timeout) : undefined, breakOnSigint: true });
+      const script = new vm.Script(
+        'globalPromise = obj.result.call(obj, globalCtx, globalDB)'
+      );
+      script.runInContext(this.vmContext, {
+        timeout: this.config.timeout ? Number(this.config.timeout) : undefined,
+        breakOnSigint: true
+      });
       if (this.vmContextObj.globalPromise) {
         const result = await this.vmContextObj.globalPromise;
         this.vmContextObj.globalPromise = undefined;

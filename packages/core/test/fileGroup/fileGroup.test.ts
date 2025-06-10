@@ -2,7 +2,11 @@ import * as fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 import { expect } from 'chai';
-import { FileGroup, GroupFileReader, makeGroupFilePath } from '../../src/reimint/wal';
+import {
+  FileGroup,
+  GroupFileReader,
+  makeGroupFilePath
+} from '../../src/reimint/wal';
 
 class MockFileGroup {
   readonly path: string;
@@ -17,7 +21,7 @@ class MockFileGroup {
 }
 
 class MockBytes {
-  private content: string = '';
+  private content = '';
 
   append(str: string) {
     this.content += str;
@@ -46,12 +50,18 @@ const clearup = async () => {
 
 const writeData = async (index: number) => {
   const content = `${index}|0123456789`;
-  await fs.writeFile(makeGroupFilePath(testDir, testBase, index, testMaxIndex), content);
+  await fs.writeFile(
+    makeGroupFilePath(testDir, testBase, index, testMaxIndex),
+    content
+  );
   bytes.append(content);
 };
 
 describe('GroupFileReader', () => {
-  const reader = new GroupFileReader(new MockFileGroup(testDir, testBase, testMaxIndex) as any, 0);
+  const reader = new GroupFileReader(
+    new MockFileGroup(testDir, testBase, testMaxIndex) as any,
+    0
+  );
 
   before(async () => {
     await clearup();
@@ -66,31 +76,41 @@ describe('GroupFileReader', () => {
   it('should read successfully(1)', async () => {
     const buf = Buffer.alloc(5);
     expect(await reader.read(buf), 'should read successfully').be.true;
-    expect(buf.toString(), 'buffer content should be correct').be.equal(bytes.read(5));
+    expect(buf.toString(), 'buffer content should be correct').be.equal(
+      bytes.read(5)
+    );
   });
 
   it('should read successfully(2)', async () => {
     const buf = Buffer.alloc(5);
     expect(await reader.read(buf), 'should read successfully').be.true;
-    expect(buf.toString(), 'buffer content should be correct').be.equal(bytes.read(5));
+    expect(buf.toString(), 'buffer content should be correct').be.equal(
+      bytes.read(5)
+    );
   });
 
   it('should read successfully(3)', async () => {
     const buf = Buffer.alloc(5);
     expect(await reader.read(buf), 'should read successfully').be.true;
-    expect(buf.toString(), 'buffer content should be correct').be.equal(bytes.read(5));
+    expect(buf.toString(), 'buffer content should be correct').be.equal(
+      bytes.read(5)
+    );
   });
 
   it('should read successfully(4)', async () => {
     const buf = Buffer.alloc(24);
     expect(await reader.read(buf), 'should read successfully').be.true;
-    expect(buf.toString(), 'buffer content should be correct').be.equal(bytes.read(24));
+    expect(buf.toString(), 'buffer content should be correct').be.equal(
+      bytes.read(24)
+    );
   });
 
   it('should read successfully(5)', async () => {
     const buf = Buffer.alloc(57);
     expect(await reader.read(buf), 'should read successfully').be.true;
-    expect(buf.toString(), 'buffer content should be correct').be.equal(bytes.read(57));
+    expect(buf.toString(), 'buffer content should be correct').be.equal(
+      bytes.read(57)
+    );
   });
 
   it('should read faild', async () => {

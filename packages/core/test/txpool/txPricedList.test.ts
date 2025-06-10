@@ -13,10 +13,15 @@ describe('TxPricedList', () => {
   const trxmap = new FunctionalBufferMap<Transaction>();
 
   before(() => {
-    testdata = JSON.parse(fs.readFileSync(path.join(__dirname, '/test-data.json')).toString());
+    testdata = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '/test-data.json')).toString()
+    );
     testdata.transactions.forEach((trx) => {
       testTransactions.push(Transaction.fromTxData(trx));
-      trxmap.set(Transaction.fromTxData(trx).hash(), Transaction.fromTxData(trx));
+      trxmap.set(
+        Transaction.fromTxData(trx).hash(),
+        Transaction.fromTxData(trx)
+      );
     });
     another = Transaction.fromTxData(testdata.another);
     trxmap.set(another.hash(), another);
@@ -25,7 +30,10 @@ describe('TxPricedList', () => {
 
   it('should put correctly', () => {
     txList.put(another, false);
-    expect(txList.remotes.peek().serialize().equals(another.serialize()), 'transaction should be euqal').be.true;
+    expect(
+      txList.remotes.peek().serialize().equals(another.serialize()),
+      'transaction should be euqal'
+    ).be.true;
   });
 
   it('should reheap correctly', () => {

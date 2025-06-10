@@ -3,9 +3,19 @@ import { assert } from 'chai';
 import { randomBytes } from 'crypto';
 import { BlockHeader, HeaderData } from '@rei-network/structure';
 import { Common } from '@rei-network/common';
-import { Database, DBSetBlockOrHeader, DBOp, DBSaveLookups } from '@rei-network/database';
+import {
+  Database,
+  DBSetBlockOrHeader,
+  DBOp,
+  DBSaveLookups
+} from '@rei-network/database';
 import { setLevel } from '@rei-network/utils';
-import { HeaderSyncPeer, IHeaderSyncBackend, HeaderSync, HeaderSyncOptions } from '../../src/sync/snap';
+import {
+  HeaderSyncPeer,
+  IHeaderSyncBackend,
+  HeaderSync,
+  HeaderSyncOptions
+} from '../../src/sync/snap';
 import { preValidateHeader } from '../../src/validation';
 import { HandlerPool } from '../../src/protocols/wire/handlerPool';
 const level = require('level-mem');
@@ -13,7 +23,11 @@ const level = require('level-mem');
 setLevel('silent');
 
 class MockBackend implements IHeaderSyncBackend {
-  async handlePeerError(prefix: string, peer: HeaderSyncPeer, err: any): Promise<void> {
+  async handlePeerError(
+    prefix: string,
+    peer: HeaderSyncPeer,
+    err: any
+  ): Promise<void> {
     // do nothing
     console.log('handlePeerError', prefix, peer, err);
   }
@@ -97,7 +111,11 @@ describe('HeaderSync', () => {
   });
 
   it('should tries to download block headers 10 times and throws exception', async () => {
-    const { headerSync, headers } = await createHeaderSyncer(10, { throwError: true }, 0);
+    const { headerSync, headers } = await createHeaderSyncer(
+      10,
+      { throwError: true },
+      0
+    );
     let catched: any;
     try {
       headerSync.headerSync(headers[headers.length - 1]);
@@ -109,7 +127,7 @@ describe('HeaderSync', () => {
   });
 });
 
-function createBlockHeaders(num: number = 256, common: Common) {
+function createBlockHeaders(num = 256, common: Common) {
   const headers: BlockHeader[] = [];
   const time = new BN(Date.now());
   let parentHash = BlockHeader.genesis({}, { common }).hash();
@@ -129,7 +147,11 @@ function createBlockHeaders(num: number = 256, common: Common) {
   return headers;
 }
 
-async function createHeaderSyncer(count: number, options?: Omit<HeaderSyncOptions, 'db' | 'backend' | 'pool'>, peersCount: number = 3) {
+async function createHeaderSyncer(
+  count: number,
+  options?: Omit<HeaderSyncOptions, 'db' | 'backend' | 'pool'>,
+  peersCount = 3
+) {
   const levelDB = level();
   const common = new Common({ chain: 'rei-devnet' });
   common.setHardforkByBlockNumber(0);
@@ -140,7 +162,14 @@ async function createHeaderSyncer(count: number, options?: Omit<HeaderSyncOption
     const data = i % 2 === 0 ? headers : [];
     pool.add(new MockHeaderSyncPeer(data));
   }
-  const headerSync = new HeaderSync({ db, backend, pool, retryInterval: 1, getHandlerTimeout: 1, ...options });
+  const headerSync = new HeaderSync({
+    db,
+    backend,
+    pool,
+    retryInterval: 1,
+    getHandlerTimeout: 1,
+    ...options
+  });
   return {
     headerSync,
     headers
@@ -151,8 +180,14 @@ async function checkHeaders(headerSync: HeaderSync, headers: BlockHeader[]) {
   const limit = headers.length > 257 ? 257 : headers.length - 1;
   for (let i = 2; i <= limit; i++) {
     const header = headers[headers.length - i];
-    assert((await headerSync.db.getHeader(header.hash(), header.number)).stateRoot.equals(header.stateRoot));
-    assert((await headerSync.db.numberToHash(header.number)).equals(header.hash()));
+    assert(
+      (
+        await headerSync.db.getHeader(header.hash(), header.number)
+      ).stateRoot.equals(header.stateRoot)
+    );
+    assert(
+      (await headerSync.db.numberToHash(header.number)).equals(header.hash())
+    );
     assert((await headerSync.db.hashToNumber(header.hash())).eq(header.number));
   }
 }

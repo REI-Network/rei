@@ -45,7 +45,10 @@ describe('WipeKeyRange', () => {
       (origin, limit) =>
         asyncTraverseRawDB(
           db.rawdb,
-          { gte: Buffer.concat([prefix, origin]), lte: Buffer.concat([prefix, limit]) },
+          {
+            gte: Buffer.concat([prefix, origin]),
+            lte: Buffer.concat([prefix, limit])
+          },
           (key) => key.length !== prefix.length + 32,
           (key) => key.slice(prefix.length),
           (value) => value

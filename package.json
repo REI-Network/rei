@@ -50,8 +50,8 @@
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/package-lock.json && npm run clean:build",
     "clean:build": "rm -rf packages/*/dist && rm -rf packages/*/*.tsbuildinfo && cd packages/contracts && npm run clean:build",
     "clean:buildinfo": "rm -rf packages/*/*.tsbuildinfo",
-    "lint": "eslint packages/*/src/**/*.{ts,json} packages/**/*.{js,json} && solhint packages/**/*.sol",
-    "lint:fix": "eslint packages/*/src/**/*.{ts,json} packages/**/*.{js,json} --fix && solhint packages/**/*.sol --fix",
+    "lint": "eslint packages/*/src/**/*.{ts,json} packages/*/test/**/*.{ts,json} packages/**/*.{js,json} && solhint packages/**/*.sol",
+    "lint:fix": "eslint packages/*/src/**/*.{ts,json} packages/*/test/**/*.{ts,json} packages/**/*.{js,json} --fix && solhint packages/**/*.sol --fix",
     "docker:export": "node scripts/export-package-json.js",
     "docker:build": "npm run docker:export && docker build"
   }

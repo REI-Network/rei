@@ -1,6 +1,10 @@
 import { expect, assert } from 'chai';
 import { BN } from 'ethereumjs-util';
-import { Evidence, EvidencePool, EvidencePoolBackend } from '../../src/reimint/evpool';
+import {
+  Evidence,
+  EvidencePool,
+  EvidencePoolBackend
+} from '../../src/reimint/evpool';
 import { MockEvidence } from './mockEvidence';
 
 const MAX_UINT64 = new BN('ffffffffffffffff', 'hex');
@@ -34,16 +38,30 @@ class MockBackend implements EvidencePoolBackend {
   }
 
   async removePendingEvidence(ev: MockEvidence) {
-    const index = this.pendingEvidence.findIndex((x) => x.hash().equals(ev.hash()));
+    const index = this.pendingEvidence.findIndex((x) =>
+      x.hash().equals(ev.hash())
+    );
     if (index != -1) {
       this.pendingEvidence.splice(index, 1);
     }
   }
 
-  async loadPendingEvidence({ from, to, reverse, onData }: { from?: BN; to?: BN; reverse?: boolean; onData: (data: Evidence) => Promise<boolean> }): Promise<void> {
+  async loadPendingEvidence({
+    from,
+    to,
+    reverse,
+    onData
+  }: {
+    from?: BN;
+    to?: BN;
+    reverse?: boolean;
+    onData: (data: Evidence) => Promise<boolean>;
+  }): Promise<void> {
     from = from ?? new BN(0);
     to = to ?? MAX_UINT64;
-    const filtered = this.pendingEvidence.filter((ev) => ev.height.gte(from!) && ev.height.lte(to!));
+    const filtered = this.pendingEvidence.filter(
+      (ev) => ev.height.gte(from!) && ev.height.lte(to!)
+    );
     filtered.sort((a, b) => {
       const num = a.height.cmp(b.height);
       return reverse ? num * -1 : num;
@@ -55,7 +73,11 @@ class MockBackend implements EvidencePoolBackend {
 }
 
 const backend = new MockBackend();
-const evpool = new EvidencePool({ backend, maxCacheSize: 5, maxAgeNumBlocks: new BN(6) });
+const evpool = new EvidencePool({
+  backend,
+  maxCacheSize: 5,
+  maxAgeNumBlocks: new BN(6)
+});
 
 const getPoolInfo = (): {
   height: BN;
@@ -180,7 +202,10 @@ describe('EvidencePool', () => {
 
   it('should check failed(conflicts)', async () => {
     await shouldFailed(async () => {
-      await evpool.checkEvidence([new MockEvidence(new BN(10)), new MockEvidence(new BN(10))]);
+      await evpool.checkEvidence([
+        new MockEvidence(new BN(10)),
+        new MockEvidence(new BN(10))
+      ]);
     }, 'repeated evidence');
   });
 

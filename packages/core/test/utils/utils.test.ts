@@ -2,7 +2,10 @@ import { expect } from 'chai';
 import { assert } from 'console';
 import { randomBytes } from 'crypto';
 import { BN } from 'ethereumjs-util';
-import { validatorsDecode, validatorsEncode } from '../../src/reimint/contracts/utils';
+import {
+  validatorsDecode,
+  validatorsEncode
+} from '../../src/reimint/contracts/utils';
 
 describe('ValidatorsEncoder', () => {
   let length = 0;
@@ -25,8 +28,12 @@ describe('ValidatorsEncoder', () => {
   });
 
   it('should catch list length exception', () => {
-    expect(() => validatorsEncode(idList, [])).to.throw('validators length not equal priorities length');
-    expect(() => validatorsEncode([], priorityList)).to.throw('validators length not equal priorities length');
+    expect(() => validatorsEncode(idList, [])).to.throw(
+      'validators length not equal priorities length'
+    );
+    expect(() => validatorsEncode([], priorityList)).to.throw(
+      'validators length not equal priorities length'
+    );
   });
 
   it('should encode and decode validator random length data', async () => {
@@ -45,7 +52,9 @@ describe('ValidatorsEncoder', () => {
     const priorityList: BN[] = [];
     for (let i = 0; i <= 255; i++) {
       idList.push(new BN(i));
-      i % 2 === 0 ? priorityList.push(new BN(getRandomBytes(32)).neg()) : priorityList.push(new BN(getRandomBytes(32)));
+      i % 2 === 0
+        ? priorityList.push(new BN(getRandomBytes(32)).neg())
+        : priorityList.push(new BN(getRandomBytes(32)));
     }
     const buffer = validatorsEncode(idList, priorityList);
     const { ids, priorities } = validatorsDecode(buffer);
@@ -62,7 +71,9 @@ describe('ValidatorsEncoder', () => {
     const priorityList: BN[] = [];
     for (let i = 0; i <= 32; i++) {
       idList.push(new BN(getRandomBytes(i)));
-      i % 2 === 0 ? priorityList.push(new BN(getRandomBytes(i)).neg()) : priorityList.push(new BN(getRandomBytes(i)));
+      i % 2 === 0
+        ? priorityList.push(new BN(getRandomBytes(i)).neg())
+        : priorityList.push(new BN(getRandomBytes(i)));
     }
     const buffer = validatorsEncode(idList, priorityList);
     const { ids, priorities } = validatorsDecode(buffer);

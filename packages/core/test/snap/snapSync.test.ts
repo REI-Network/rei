@@ -1,13 +1,35 @@
 import crypto from 'crypto';
 import { expect } from 'chai';
-import { Database, DBSaveSerializedSnapAccount, DBSaveSnapStorage } from '@rei-network/database';
-import { snapAccountKey, snapStorageKey, SNAP_ACCOUNT_PREFIX, SNAP_STORAGE_PREFIX } from '@rei-network/database/dist/constants';
+import {
+  Database,
+  DBSaveSerializedSnapAccount,
+  DBSaveSnapStorage
+} from '@rei-network/database';
+import {
+  snapAccountKey,
+  snapStorageKey,
+  SNAP_ACCOUNT_PREFIX,
+  SNAP_STORAGE_PREFIX
+} from '@rei-network/database/dist/constants';
 import { Common } from '@rei-network/common';
 import { FunctionalBufferMap, getRandomIntInclusive } from '@rei-network/utils';
 import { StakingAccount } from '../../src/stateManager';
 import { asyncTraverseRawDB } from '../../src/snap/layerIterator';
-import { SnapSync, SnapSyncNetworkManager, SnapSyncPeer, AccountRequest, AccountResponse, StorageRequst, StorageResponse, PeerType } from '../../src/sync/snap';
-import { AccountInfo, genRandomAccounts, GenRandomAccountsResult } from './util';
+import {
+  SnapSync,
+  SnapSyncNetworkManager,
+  SnapSyncPeer,
+  AccountRequest,
+  AccountResponse,
+  StorageRequst,
+  StorageResponse,
+  PeerType
+} from '../../src/sync/snap';
+import {
+  AccountInfo,
+  genRandomAccounts,
+  GenRandomAccountsResult
+} from './util';
 import { BaseTrie } from '@rei-network/trie';
 import { keccak256 } from 'ethereumjs-util';
 import { TrieSync } from '../../src/sync/snap/trieSync';
@@ -60,7 +82,10 @@ class MockPeer implements SnapSyncPeer {
     this.manager = manager;
   }
 
-  getAccountRange(root: Buffer, req: AccountRequest): Promise<AccountResponse | null> {
+  getAccountRange(
+    root: Buffer,
+    req: AccountRequest
+  ): Promise<AccountResponse | null> {
     return this.runWithLock('account', async () => {
       if (!root.equals(this.result.root)) {
         return null;
@@ -90,7 +115,10 @@ class MockPeer implements SnapSyncPeer {
     });
   }
 
-  getStorageRanges(root: Buffer, req: StorageRequst): Promise<StorageResponse | null> {
+  getStorageRanges(
+    root: Buffer,
+    req: StorageRequst
+  ): Promise<StorageResponse | null> {
     return this.runWithLock('storage', async () => {
       if (!root.equals(this.result.root)) {
         return null;
@@ -108,7 +136,10 @@ class MockPeer implements SnapSyncPeer {
 
         for await (const { hash, getValue } of asyncTraverseRawDB(
           this.db.rawdb,
-          { gte: snapStorageKey(account, req.origin), lte: snapStorageKey(account, req.limit) },
+          {
+            gte: snapStorageKey(account, req.origin),
+            lte: snapStorageKey(account, req.limit)
+          },
           (key) => key.length !== SNAP_STORAGE_PREFIX.length + 32 + 32,
           (key) => key.slice(SNAP_STORAGE_PREFIX.length + 32),
           (val) => val
@@ -157,7 +188,10 @@ class PeerPool {
 
   pick() {
     const peers = Array.from(this.pool.values());
-    const peer = peers.length > 0 ? peers[getRandomIntInclusive(0, peers.length - 1)] : null;
+    const peer =
+      peers.length > 0
+        ? peers[getRandomIntInclusive(0, peers.length - 1)]
+        : null;
     peer && this.pool.delete(peer);
     return peer;
   }
@@ -198,24 +232,40 @@ describe('SnapSync', () => {
 
   async function checkSnap(dstDB: Database) {
     for (const info of result.accounts) {
-      const srcSnapAccount = await srcDB.getSerializedSnapAccount(info.accountHash);
-      const dstSnapAccount = await dstDB.getSerializedSnapAccount(info.accountHash);
-      expect(srcSnapAccount.equals(dstSnapAccount), 'account should be equal').be.true;
+      const srcSnapAccount = await srcDB.getSerializedSnapAccount(
+        info.accountHash
+      );
+      const dstSnapAccount = await dstDB.getSerializedSnapAccount(
+        info.accountHash
+      );
+      expect(srcSnapAccount.equals(dstSnapAccount), 'account should be equal')
+        .be.true;
 
       const srcCode = await srcDB.getCode(info.account.codeHash);
       const dstCode = await dstDB.getCode(info.account.codeHash);
       expect(srcCode.equals(dstCode), 'code should be equal').be.true;
 
       for (const [storageHash, { val }] of info.storageData.entries()) {
-        const srcSnapStorage = await srcDB.getSnapStorage(info.accountHash, storageHash);
-        const dstSnapStorage = await dstDB.getSnapStorage(info.accountHash, storageHash);
+        const srcSnapStorage = await srcDB.getSnapStorage(
+          info.accountHash,
+          storageHash
+        );
+        const dstSnapStorage = await dstDB.getSnapStorage(
+          info.accountHash,
+          storageHash
+        );
         expect(srcSnapStorage.equals(val), 'storage should be equal').be.true;
-        expect(srcSnapStorage.equals(dstSnapStorage), 'storage should be equal').be.true;
+        expect(srcSnapStorage.equals(dstSnapStorage), 'storage should be equal')
+          .be.true;
       }
     }
   }
 
-  async function modifySomeAccount(accountsToModify: AccountInfo[], db: Database, result: GenRandomAccountsResult) {
+  async function modifySomeAccount(
+    accountsToModify: AccountInfo[],
+    db: Database,
+    result: GenRandomAccountsResult
+  ) {
     const accounts = [...accountsToModify];
     const changedAccounts: AccountInfo[] = [];
     for (let i = 0; i < Math.ceil(accountsToModify.length / 2); i++) {
@@ -245,14 +295,19 @@ describe('SnapSync', () => {
         storage.val = crypto.randomBytes(32);
         const trie = new BaseTrie(db.rawdb, stateRoot);
         await trie.put(hash, storage.val);
-        await db.batch([DBSaveSnapStorage(account.accountHash, hash, storage.val)]);
+        await db.batch([
+          DBSaveSnapStorage(account.accountHash, hash, storage.val)
+        ]);
         stateRoot = trie.root;
       }
 
       // change code
       const code = crypto.randomBytes(100);
       const codeHash = keccak256(code);
-      await db.rawdb.put(codeHash, code, { keyEncoding: 'binary', valueEncoding: 'binary' });
+      await db.rawdb.put(codeHash, code, {
+        keyEncoding: 'binary',
+        valueEncoding: 'binary'
+      });
 
       // change account
       account.account.stateRoot = stateRoot;
@@ -260,7 +315,12 @@ describe('SnapSync', () => {
       account.account.balance.iaddn(1);
       const trie = new BaseTrie(db.rawdb, result.root);
       await trie.put(account.accountHash, account.account.serialize());
-      await db.batch([DBSaveSerializedSnapAccount(account.accountHash, account.account.serialize())]);
+      await db.batch([
+        DBSaveSerializedSnapAccount(
+          account.accountHash,
+          account.account.serialize()
+        )
+      ]);
       result.root = trie.root;
     }
   }

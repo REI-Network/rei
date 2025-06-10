@@ -26,7 +26,11 @@ class MockTask {
   }
 }
 
-const newConcurrency = async (limit: LimitedConcurrency, task: MockTask, wait = false) => {
+const newConcurrency = async (
+  limit: LimitedConcurrency,
+  task: MockTask,
+  wait = false
+) => {
   const { promise } = await limit.newConcurrency(async () => {
     await task.execute();
   });

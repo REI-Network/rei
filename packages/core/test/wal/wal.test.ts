@@ -3,8 +3,18 @@ import path from 'path';
 import crypto from 'crypto';
 import { BN } from 'ethereumjs-util';
 import { assert, expect } from 'chai';
-import { GetProposalBlockMessage, NewRoundStepMessage } from '../../src/protocols/consensus/messages';
-import { WAL, WALReader, StateMachineEndHeight, StateMachineMessage, StateMachineMsg, RoundStepType } from '../../src/reimint';
+import {
+  GetProposalBlockMessage,
+  NewRoundStepMessage
+} from '../../src/protocols/consensus/messages';
+import {
+  WAL,
+  WALReader,
+  StateMachineEndHeight,
+  StateMachineMessage,
+  StateMachineMsg,
+  RoundStepType
+} from '../../src/reimint';
 
 const testDir = path.join(__dirname, 'test-dir');
 const wal = new WAL({ path: testDir });
@@ -45,7 +55,13 @@ describe('WAL', () => {
   it('should write successfully(1)', async () => {
     await wal.write(new StateMachineEndHeight(new BN(100)), true);
     randomHash = crypto.randomBytes(32);
-    await wal.write(new StateMachineMessage('peerId1', new GetProposalBlockMessage(randomHash)), true);
+    await wal.write(
+      new StateMachineMessage(
+        'peerId1',
+        new GetProposalBlockMessage(randomHash)
+      ),
+      true
+    );
   });
 
   it('should read successfully', async () => {
@@ -53,7 +69,9 @@ describe('WAL', () => {
     expect(messages.length).be.equal(2);
 
     expect(messages[0] instanceof StateMachineEndHeight).be.true;
-    expect((messages[0] as StateMachineEndHeight).height.toString()).be.equal('100');
+    expect((messages[0] as StateMachineEndHeight).height.toString()).be.equal(
+      '100'
+    );
 
     expect(messages[1] instanceof StateMachineMessage).be.true;
     const message1 = messages[1] as StateMachineMessage;
@@ -65,7 +83,12 @@ describe('WAL', () => {
 
   it('should write successfully(2)', async () => {
     await wal.write(new StateMachineEndHeight(new BN(101)), true);
-    await wal.write(new StateMachineMessage('peerId2', new NewRoundStepMessage(new BN(101), 10, RoundStepType.NewHeight)));
+    await wal.write(
+      new StateMachineMessage(
+        'peerId2',
+        new NewRoundStepMessage(new BN(101), 10, RoundStepType.NewHeight)
+      )
+    );
   });
 
   it("shouldn't find end height message", async () => {

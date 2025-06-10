@@ -1,12 +1,31 @@
 import crypto from 'crypto';
 import { assert, expect } from 'chai';
 import { Address, BN } from 'ethereumjs-util';
-import { DuplicateVoteEvidence, Vote, VoteType, SignatureType } from '../../src/reimint';
+import {
+  DuplicateVoteEvidence,
+  Vote,
+  VoteType,
+  SignatureType
+} from '../../src/reimint';
 import { MockAccountManager } from '../util';
 
 const accMngr = new MockAccountManager([
-  ['foo', Address.fromString('0x3289621709f5b35d09b4335e129907ac367a0593'), Buffer.from('d8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0', 'hex')],
-  ['bar', Address.fromString('0xd1e52f6eacbb95f5f8512ff129cbd6360e549b0b'), Buffer.from('db0558cc5f24dd09c390a25c7958a678e7efa0f286053da5df53dcecdba2a13c', 'hex')]
+  [
+    'foo',
+    Address.fromString('0x3289621709f5b35d09b4335e129907ac367a0593'),
+    Buffer.from(
+      'd8ca4883bbf62202904e402750d593a297b5640dea80b6d5b239c5a9902662c0',
+      'hex'
+    )
+  ],
+  [
+    'bar',
+    Address.fromString('0xd1e52f6eacbb95f5f8512ff129cbd6360e549b0b'),
+    Buffer.from(
+      'db0558cc5f24dd09c390a25c7958a678e7efa0f286053da5df53dcecdba2a13c',
+      'hex'
+    )
+  ]
 ]);
 
 class MockValidatorSet {

@@ -1,6 +1,7 @@
 export * from './helper';
 export * from './logger';
 export * from './channel';
+export * from './rwLock';
 export * from './countLock';
 export * from './registry';
 export * from './functionalMap';

@@ -10,6 +10,7 @@ import { BaseTrie, CheckpointTrie } from '@rei-network/trie';
 import {
   logger,
   Channel,
+  CountLock,
   FunctionalBufferMap,
   FunctionalBufferSet
 } from '@rei-network/utils';
@@ -20,13 +21,7 @@ import {
   DBSaveSnapSyncProgress
 } from '@rei-network/database';
 import { StakingAccount } from '../../stateManager';
-import {
-  EMPTY_HASH,
-  MAX_HASH,
-  BinaryRawDBatch,
-  DBatch,
-  CountLock
-} from '../../utils';
+import { EMPTY_HASH, MAX_HASH, BinaryRawDBatch, DBatch } from '../../utils';
 import { increaseKey } from '../../snap/utils';
 import { TrieSync } from './trieSync';
 import {

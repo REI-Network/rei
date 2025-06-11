@@ -1,6 +1,9 @@
 {
   "name": "@rei-network/vm",
   "version": "3.0.4",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "An Ethereum VM implementation",
   "license": "MPL-2.0",
   "author": "mjbecze <mjbecze@gmail.com>",

@@ -4,3 +4,5 @@ docs
 types
 .env
 CHANGELOG.md
+hardhat.config.ts
+helper.js

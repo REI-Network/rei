@@ -1,6 +1,9 @@
 {
   "name": "@rei-network/api",
   "version": "3.0.4",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "GPL-3.0-or-later",

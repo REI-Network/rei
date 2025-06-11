@@ -1,6 +1,9 @@
 {
   "name": "@rei-network/contracts",
   "version": "3.0.4",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "license": "GPL-3.0-or-later",
   "scripts": {

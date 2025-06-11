@@ -38,6 +38,18 @@ export class AdminController extends Controller {
   }
 
   /**
+   * Get all snapshot roots
+   * @returns All snapshot roots and their parent root
+   */
+  snapshots() {
+    const snapshots: { [root: string]: string } = {};
+    for (const [root, snapshot] of this.node.snapTree?.layers ?? []) {
+      snapshots[bufferToHex(root)] = bufferToHex(snapshot.root);
+    }
+    return snapshots;
+  }
+
+  /**
    * Start rpc server on given options
    */
   async startRPC([host, port]: [string?, number?]) {
@@ -121,17 +133,5 @@ export class AdminController extends Controller {
     return (
       this.node.snapTree?.snapshot(hexStringToBuffer(root))?.toJSON() ?? null
     );
-  }
-
-  /**
-   * Get all snapshot roots
-   * @returns All snapshot roots and their parent root
-   */
-  snapshots() {
-    const snapshots: { [root: string]: string } = {};
-    for (const [root, snapshot] of this.node.snapTree?.layers ?? []) {
-      snapshots[bufferToHex(root)] = bufferToHex(snapshot.root);
-    }
-    return snapshots;
   }
 }

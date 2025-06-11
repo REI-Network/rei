@@ -175,7 +175,7 @@ export class SnapTree {
    * @param root - Target layer root
    * @returns - Snapshot
    */
-  snapShot(root: Buffer) {
+  snapshot(root: Buffer) {
     return this.layers.get(root);
   }
 
@@ -187,7 +187,7 @@ export class SnapTree {
    * @param nodisk - Disk layer excluded or not
    * @returns Layers
    */
-  snapShots(root: Buffer, limit: number, nodisk: boolean) {
+  snapshots(root: Buffer, limit: number, nodisk: boolean) {
     if (limit === 0) {
       return;
     }
@@ -577,7 +577,7 @@ export class SnapTree {
    * @returns Returns true if valid
    */
   async verify(root: Buffer) {
-    const snapshot = this.snapShot(root);
+    const snapshot = this.snapshot(root);
     if (!snapshot) {
       throw new Error('snapshot is missing');
     }

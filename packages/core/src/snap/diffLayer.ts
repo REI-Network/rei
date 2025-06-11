@@ -1,3 +1,4 @@
+import { bufferToHex } from 'ethereumjs-util';
 import { FunctionalBufferMap, FunctionalBufferSet } from '@rei-network/utils';
 import Bloom from '@rei-network/vm/dist/bloom';
 import { StakingAccount } from '../stateManager';
@@ -441,5 +442,42 @@ export class DiffLayer implements ISnapshot {
     output.push([this.root, destructSet, accountData, storageData]);
 
     return root;
+  }
+
+  /**
+   * Convert to JSON
+   * @returns JSON object
+   */
+  toJSON() {
+    const destructSet: string[] = Array.from(this.destructSet).map((a) =>
+      bufferToHex(a)
+    );
+
+    const accountData: { [account: string]: string } = {};
+    for (const [accountHash, accountData] of this.accountData) {
+      accountData[bufferToHex(accountHash)] = bufferToHex(accountData);
+    }
+
+    const storageData: { [account: string]: { [storage: string]: string } } =
+      {};
+    for (const [accountHash, storage] of this.storageData) {
+      const _storage: { [storage: string]: string } = {};
+      for (const [storageHash, storageValue] of storage) {
+        _storage[bufferToHex(storageHash)] = bufferToHex(storageValue);
+      }
+      storageData[bufferToHex(accountHash)] = _storage;
+    }
+
+    return {
+      type: 'diff',
+      root: bufferToHex(this.root),
+      memory: this.memory,
+      origin: bufferToHex(this.origin.root),
+      parent: bufferToHex(this.parent.root),
+      destructSet,
+      accountData,
+      storageData,
+      stale: this.stale
+    };
   }
 }

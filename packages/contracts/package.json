@@ -1,6 +1,6 @@
 {
   "name": "@rei-network/contracts",
-  "version": "1.0.1",
+  "version": "3.0.3",
   "main": "dist/index.js",
   "license": "GPL-3.0-or-later",
   "scripts": {

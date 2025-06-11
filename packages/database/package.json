@@ -1,6 +1,6 @@
 {
   "name": "@rei-network/database",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "GPL-3.0-or-later",
@@ -17,8 +17,8 @@
   },
   "dependencies": {
     "@rei-network/binding": "2.0.3",
-    "@rei-network/common": "^3.0.2",
-    "@rei-network/structure": "^2.0.2",
+    "@rei-network/common": "^3.0.3",
+    "@rei-network/structure": "^3.0.3",
     "crc-32": "^1.2.1",
     "encoding-down": "^6.3.0",
     "levelup": "^4.4.0",

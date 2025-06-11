@@ -1,6 +1,6 @@
 {
   "name": "@rei-network/bls",
-  "version": "3.0.3",
+  "version": "3.0.4",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "GPL-3.0-or-later",
@@ -15,6 +15,6 @@
   },
   "dependencies": {
     "@chainsafe/bls": "7.1.1",
-    "@rei-network/utils": "^3.0.3"
+    "@rei-network/utils": "^3.0.4"
   }
 }

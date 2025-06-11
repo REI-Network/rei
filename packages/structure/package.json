@@ -1,6 +1,6 @@
 {
   "name": "@rei-network/structure",
-  "version": "3.0.3",
+  "version": "3.0.4",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "GPL-3.0-or-later",
@@ -14,7 +14,7 @@
     "mocha": "^9.0.2"
   },
   "dependencies": {
-    "@rei-network/common": "^3.0.3",
+    "@rei-network/common": "^3.0.4",
     "@rei-network/trie": "^4.3.0",
     "ethereumjs-util": "^7.1.4"
   }

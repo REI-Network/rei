@@ -45,7 +45,8 @@ export class FastSnapIterator<T> {
     genSnapIterator: (snap: ISnapshot) => {
       iter: SnapIterator<T | null>;
       stop: boolean;
-    }
+    },
+    private onAbort?: () => void
   ) {
     this.root = snap.root;
     let _snap: undefined | ISnapshot = snap;
@@ -255,5 +256,6 @@ export class FastSnapIterator<T> {
   async abort() {
     await Promise.all(this.iterators.map(({ iter }) => iter.return()));
     this.iterators = [];
+    this.onAbort?.();
   }
 }

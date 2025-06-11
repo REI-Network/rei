@@ -3,7 +3,8 @@ import { Database } from '@rei-network/database';
 import {
   FunctionalBufferMap,
   FunctionalBufferSet,
-  logger
+  logger,
+  RWLock
 } from '@rei-network/utils';
 import {
   snapStorageKey,
@@ -42,6 +43,8 @@ export const journalVersion = 0;
 export class SnapTree {
   readonly diskdb: Database;
   readonly layers = new FunctionalBufferMap<Snapshot>();
+
+  private readonly rwLock = new RWLock();
 
   constructor(diskdb: Database) {
     this.diskdb = diskdb;
@@ -266,85 +269,85 @@ export class SnapTree {
    * @param layers - Number of layers to save
    */
   async cap(root: Buffer, layers: number) {
-    // Retrieve the head snapshot to cap from
-    const snap = this.layers.get(root);
-    if (!snap) {
-      logger.warn(
-        'SnapTree::cap, snapshot is missing, root:',
-        bufferToHex(root)
-      );
-      return;
-    }
-    if (!(snap instanceof DiffLayer)) {
-      return;
-    }
-    // If the generator is still running, use a more aggressive cap
-    if (snap.origin.genMarker !== undefined && layers > 8) {
-      layers = 8;
-    }
-    const diff = snap;
-    // Flattening the bottom-most diff layer requires special casing since there's
-    // no child to rewire to the grandparent. In that case we can fake a temporary
-    // child for the capping and then remove it.
-    if (layers === 0) {
-      const base = await diffToDisk(diff.flatten() as DiffLayer);
-      this.layers.clear();
-      // Replace the entire snapshot tree with the flat base
-      this.layers.set(base.root, base);
-      return;
-    }
-
-    const persisted = await this._cap(diff, layers);
-
-    // Get dependencies into memory
-    const children = new FunctionalBufferMap<Buffer[]>();
-    for (const [root, snap] of this.layers) {
-      if (snap instanceof DiffLayer) {
-        const parent = snap.parent.root;
-        const parentRoot = children.get(parent);
-        if (parentRoot) {
-          parentRoot.push(root);
-        } else {
-          children.set(parent, [root]);
-        }
+    await this.rwLock.runWithWriteLock(async () => {
+      // Retrieve the head snapshot to cap from
+      const snap = this.layers.get(root);
+      if (!snap) {
+        logger.warn(
+          'SnapTree::cap, snapshot is missing, root:',
+          bufferToHex(root)
+        );
+        return;
       }
-    }
-
-    // Remove any layer that is stale or links into a stale layer
-    const remove = (root: Buffer) => {
-      this.layers.delete(root);
-      const datas = children.get(root);
-      if (datas) {
-        for (const data of datas) {
-          remove(data);
-        }
+      if (!(snap instanceof DiffLayer)) {
+        return;
       }
-      children.delete(root);
-    };
-    for (const [root, snap] of this.layers) {
-      if (snap.stale) {
-        remove(root);
+      // If the generator is still running, use a more aggressive cap
+      if (snap.origin.genMarker !== undefined && layers > 8) {
+        layers = 8;
       }
-    }
+      const diff = snap;
+      // Flattening the bottom-most diff layer requires special casing since there's
+      // no child to rewire to the grandparent. In that case we can fake a temporary
+      // child for the capping and then remove it.
+      if (layers === 0) {
+        const base = await diffToDisk(diff.flatten() as DiffLayer);
+        this.layers.clear();
+        // Replace the entire snapshot tree with the flat base
+        this.layers.set(base.root, base);
+        return;
+      }
 
-    // If the disk layer was modified, regenerate all the cumulative blooms
-    if (persisted) {
-      const rebloom = (root: Buffer) => {
-        const diff = this.layers.get(root);
-        if (diff instanceof DiffLayer) {
-          diff.resetOrigin(persisted);
-        }
-        const childs = children.get(root);
-        if (childs) {
-          for (const child of childs) {
-            rebloom(child);
+      const persisted = await this._cap(diff, layers);
+
+      // Get dependencies into memory
+      const children = new FunctionalBufferMap<Buffer[]>();
+      for (const [root, snap] of this.layers) {
+        if (snap instanceof DiffLayer) {
+          const parent = snap.parent.root;
+          const parentRoot = children.get(parent);
+          if (parentRoot) {
+            parentRoot.push(root);
+          } else {
+            children.set(parent, [root]);
           }
         }
-      };
-      rebloom(persisted.root);
-    }
+      }
 
-    return;
+      // Remove any layer that is stale or links into a stale layer
+      const remove = (root: Buffer) => {
+        this.layers.delete(root);
+        const datas = children.get(root);
+        if (datas) {
+          for (const data of datas) {
+            remove(data);
+          }
+        }
+        children.delete(root);
+      };
+      for (const [root, snap] of this.layers) {
+        if (snap.stale) {
+          remove(root);
+        }
+      }
+
+      // If the disk layer was modified, regenerate all the cumulative blooms
+      if (persisted) {
+        const rebloom = (root: Buffer) => {
+          const diff = this.layers.get(root);
+          if (diff instanceof DiffLayer) {
+            diff.resetOrigin(persisted);
+          }
+          const childs = children.get(root);
+          if (childs) {
+            for (const child of childs) {
+              rebloom(child);
+            }
+          }
+        };
+        rebloom(persisted.root);
+      }
+    });
   }
 
   /**
@@ -357,7 +360,7 @@ export class SnapTree {
    * @param layers - Number of layers crossed
    * @returns New disk layer
    */
-  async _cap(diff: DiffLayer, layers: number) {
+  private async _cap(diff: DiffLayer, layers: number) {
     // Dive until we run out of layers or reach the persistent database
     for (let i = 0; i < layers - 1; i++) {
       if (diff.parent instanceof DiffLayer) {
@@ -507,22 +510,30 @@ export class SnapTree {
    * @param seek - Point to start traversing
    * @returns - Iterator
    */
-  accountIterator(root: Buffer, seek: Buffer) {
+  async accountIterator(root: Buffer, seek: Buffer) {
+    const readLock = await this.rwLock.acquireReadLock();
+
     const ok = this.generating();
     if (ok) {
+      readLock.release();
       throw new Error('snapshot is not constructed');
     }
     const layer = this.layers.get(root);
     if (layer === undefined) {
+      readLock.release();
       throw new Error(`unknown snapshot,root: ${bufferToHex(root)}`);
     }
 
-    return new FastSnapIterator(layer, (snap) => {
-      return {
-        iter: snap.genAccountIterator(seek),
-        stop: false
-      };
-    });
+    return new FastSnapIterator(
+      layer,
+      (snap) => {
+        return {
+          iter: snap.genAccountIterator(seek),
+          stop: false
+        };
+      },
+      () => readLock.release()
+    );
   }
 
   /**
@@ -533,23 +544,31 @@ export class SnapTree {
    * @param seek - Point to start traversing
    * @returns - Iterator
    */
-  storageIterator(root: Buffer, account: Buffer, seek: Buffer) {
+  async storageIterator(root: Buffer, account: Buffer, seek: Buffer) {
+    const readLock = await this.rwLock.acquireReadLock();
+
     const ok = this.generating();
     if (ok) {
+      readLock.release();
       throw new Error('snapshot is not constructed');
     }
     const layer = this.layers.get(root);
     if (layer === undefined) {
+      readLock.release();
       throw new Error(`unknown snapshot,root: ${bufferToHex(root)}`);
     }
 
-    return new FastSnapIterator(layer, (snap) => {
-      const { iter, destructed } = snap.genStorageIterator(account, seek);
-      return {
-        iter,
-        stop: destructed
-      };
-    });
+    return new FastSnapIterator(
+      layer,
+      (snap) => {
+        const { iter, destructed } = snap.genStorageIterator(account, seek);
+        return {
+          iter,
+          stop: destructed
+        };
+      },
+      () => readLock.release()
+    );
   }
 
   /**

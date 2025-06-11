@@ -172,7 +172,10 @@ export class SnapProtocolHandler implements ProtocolHandler {
     let last: Buffer | undefined = undefined;
 
     try {
-      for await (const { hash, value } of this.node.snapTree!.accountIterator(
+      for await (const {
+        hash,
+        value
+      } of await this.node.snapTree!.accountIterator(
         msg.rootHash,
         msg.startHash
       )) {
@@ -237,7 +240,10 @@ export class SnapProtocolHandler implements ProtocolHandler {
         let last: Buffer | undefined = undefined;
         let abort = false;
 
-        for await (const { hash, value } of this.node.snapTree!.storageIterator(
+        for await (const {
+          hash,
+          value
+        } of await this.node.snapTree!.storageIterator(
           msg.rootHash,
           msg.accountHashes[i],
           origin

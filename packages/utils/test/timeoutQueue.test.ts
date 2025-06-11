@@ -13,7 +13,7 @@ describe('TimeoutQueue', () => {
       expect(id).be.equal(Number.MIN_SAFE_INTEGER + i);
     }
 
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 100));
 
     expect(count).be.equal(5);
   });

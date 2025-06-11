@@ -261,7 +261,7 @@ export class Peer extends EventEmitter {
       this.installedHook(protocol.protocolString);
       return { success: true, handler };
     } catch (err) {
-      logger.warn(
+      logger.debug(
         'Peer::installProtocol, handshake failed with remote peer:',
         this.peerId,
         'err:',

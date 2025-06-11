@@ -1,3 +1,5 @@
+import { bufferToHex } from 'ethereumjs-util';
+import { hexStringToBuffer } from '@rei-network/utils';
 import { Controller } from './base';
 
 /**
@@ -33,6 +35,18 @@ export class AdminController extends Controller {
    */
   rpcRunning() {
     return this.rpcServer.isRunning;
+  }
+
+  /**
+   * Get all snapshot roots
+   * @returns All snapshot roots and their parent root
+   */
+  snapshots() {
+    const snapshots: { [root: string]: string } = {};
+    for (const [root, snapshot] of this.node.snapTree?.layers ?? []) {
+      snapshots[bufferToHex(root)] = bufferToHex(snapshot.root);
+    }
+    return snapshots;
   }
 
   /**
@@ -108,5 +122,16 @@ export class AdminController extends Controller {
    */
   isTrusted([enrTxt]: [string]) {
     return this.node.networkMngr.isTrusted(enrTxt);
+  }
+
+  /**
+   * Get snapshot by root
+   * @param root - Root hash
+   * @returns Snapshot
+   */
+  snapshot([root]: [string]) {
+    return (
+      this.node.snapTree?.snapshot(hexStringToBuffer(root))?.toJSON() ?? null
+    );
   }
 }

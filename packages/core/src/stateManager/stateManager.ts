@@ -532,7 +532,7 @@ export class StateManager {
    */
   private _resetSnap(root: Buffer): void {
     if (this._snapTree) {
-      this._snap = this._snapTree.snapShot(root);
+      this._snap = this._snapTree.snapshot(root);
       if (this._snap) {
         this._snapAccounts = new FunctionalBufferMap<Buffer>();
         this._snapDestructs = new FunctionalBufferSet();

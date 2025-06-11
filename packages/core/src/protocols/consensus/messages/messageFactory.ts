@@ -1,5 +1,5 @@
 import { rlp, intToBuffer, bufferToInt } from 'ethereumjs-util';
-import { ContructorWithCode, Registry } from '../../../utils';
+import { ContructorWithCode, Registry } from '@rei-network/utils';
 import * as m from './messages';
 import { ConsensusMessage } from './messages';
 

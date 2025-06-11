@@ -28,8 +28,11 @@ export const admin = {
   get datadir() {
     return passMessageToJsonAndEmit('datadir');
   },
-  rpcRunning() {
-    passMessageToJsonAndEmit('rpcRunning');
+  get rpcRunning() {
+    return passMessageToJsonAndEmit('rpcRunning');
+  },
+  get snapshots() {
+    return passMessageToJsonAndEmit('snapshots');
   },
   startRPC(host?: string, port?: number) {
     passMessageToJsonAndEmit('startRPC', host, port);
@@ -51,6 +54,9 @@ export const admin = {
   },
   isTrusted(enrTxt: string) {
     passMessageToJsonAndEmit('isTrusted', enrTxt);
+  },
+  snapshot(root: string) {
+    passMessageToJsonAndEmit('snapshot', root);
   }
 };
 

@@ -1,5 +1,10 @@
+import {
+  bufferToHex,
+  BN,
+  KECCAK256_NULL,
+  KECCAK256_RLP
+} from 'ethereumjs-util';
 import { BaseTrie as Trie } from '@rei-network/trie';
-import { BN, KECCAK256_NULL, KECCAK256_RLP } from 'ethereumjs-util';
 import { Database } from '@rei-network/database';
 import {
   DBDeleteSnapAccount,
@@ -657,5 +662,18 @@ export class DiskLayer implements ISnapshot {
    */
   abort() {
     return this.aborter?.abort() ?? Promise.resolve();
+  }
+
+  /**
+   * Convert to JSON
+   * @returns JSON object
+   */
+  toJSON() {
+    return {
+      type: 'disk',
+      root: bufferToHex(this.root),
+      stale: this.stale,
+      genMarker: this.genMarker ? bufferToHex(this.genMarker) : null
+    };
   }
 }

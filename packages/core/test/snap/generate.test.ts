@@ -102,7 +102,7 @@ describe('GenerateSnapshot', () => {
       slots: new BN(0),
       storage: new BN(0)
     });
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 50));
     await diskLayer.abort();
     expect(diskLayer.genMarker !== undefined, 'should not generate finished').be
       .true;

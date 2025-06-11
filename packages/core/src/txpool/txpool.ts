@@ -708,7 +708,7 @@ export class TxPool extends EventEmitter {
       }
       return true;
     } catch (err) {
-      logger.warn(
+      logger.debug(
         'Txpool drop tx',
         bufferToHex(tx.hash()),
         'validateTx failed:',

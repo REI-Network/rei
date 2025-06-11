@@ -110,7 +110,7 @@ describe('SnapshotTree', () => {
 
   it('should init snaptree and get snapshot correctly', async () => {
     await snaptree.init(root, false, true);
-    const disk = snaptree.snapShot(root);
+    const disk = snaptree.snapshot(root);
     expect(disk!.root.equals(diskLayer.root), 'Disklayer root should be equal')
       .be.true;
   });
@@ -138,7 +138,7 @@ describe('SnapshotTree', () => {
       );
     }
 
-    const rets = snaptree.snapShots(
+    const rets = snaptree.snapshots(
       layers[layers.length - 1].layer.root,
       layers.length,
       true
@@ -191,7 +191,7 @@ describe('SnapshotTree', () => {
   it('should generate accountIterator correctly', async () => {
     for (const { layer, accounts } of layers) {
       const _accounts = [...accounts];
-      for await (const { hash, value } of snaptree.accountIterator(
+      for await (const { hash, value } of await snaptree.accountIterator(
         layer.root,
         EMPTY_HASH
       )) {
@@ -225,7 +225,7 @@ describe('SnapshotTree', () => {
 
         const accountHash = keccak256(address);
         let totalCount = 0;
-        for await (const { hash, value } of snaptree.storageIterator(
+        for await (const { hash, value } of await snaptree.storageIterator(
           layer.root,
           accountHash,
           EMPTY_HASH
@@ -365,12 +365,26 @@ describe('SnapshotTree', () => {
       'layers number should be equal'
     ).be.true;
     let survivedLayer = layers[layers.length - difflayersNumber].layer;
+
+    let readOk = false;
+    (async () => {
+      for await (const _ of await snaptree.accountIterator(
+        layers[0].layer.root,
+        EMPTY_HASH
+      )) {
+        await new Promise((r) => setTimeout(r, 10));
+      }
+      readOk = true;
+    })();
+
     await snaptree.cap(bottomRoot, difflayersNumber);
+
+    expect(readOk, 'read should be ok').be.true;
     expect(
       snaptree.layers.size === difflayersNumber + 1,
       'all layers should be reserved'
     ).be.true;
-    let topLayer = snaptree.snapShot(survivedLayer.root);
+    let topLayer = snaptree.snapshot(survivedLayer.root);
     expect(
       topLayer!.parent!.root.equals(snaptree.diskroot()!),
       'parent root and diskroot should be equal'
@@ -386,7 +400,7 @@ describe('SnapshotTree', () => {
       snaptree.layers.size === difflayersNumber + 1,
       `${capNumber} layers should be capped`
     ).be.true;
-    topLayer = snaptree.snapShot(survivedLayer.root);
+    topLayer = snaptree.snapshot(survivedLayer.root);
     expect(
       topLayer!.parent!.root.equals(snaptree.diskroot()!),
       'parent root and diskroot should be equal'
@@ -401,7 +415,7 @@ describe('SnapshotTree', () => {
       snaptree.layers.size === difflayersNumber + 1,
       `${capNumber} layers should be reserved`
     ).be.true;
-    topLayer = snaptree.snapShot(survivedLayer.root);
+    topLayer = snaptree.snapshot(survivedLayer.root);
     expect(
       topLayer!.parent!.root.equals(snaptree.diskroot()!),
       'parent root and diskroot should be equal'

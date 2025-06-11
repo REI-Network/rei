@@ -128,7 +128,21 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
         this.handshakeResolve = undefined;
       }
     }, 2000);
-    return this.handshakePromise;
+    return this.handshakePromise.then((res) => {
+      if (!res) {
+        // ban nodes that failed the wire protocol handshake
+        setTimeout(() => {
+          logger.debug(
+            'WireProtocolHandler::handshake, ban wire protocol handshake failed peer:',
+            this.peer.peerId
+          );
+          this.node.banPeer(this.peer.peerId, 'invalid').catch(() => {
+            // ignore errors
+          });
+        }, 100);
+      }
+      return res;
+    });
   }
 
   /**
@@ -143,6 +157,19 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
         localStatus.networkId === status.networkId;
       if (result) {
         this.updateStatus(status);
+      } else {
+        logger.debug(
+          'WireProtocolHandler::handshakeResponse, handshake failed:',
+          this.peer.peerId,
+          'localStatus.genesisHash:',
+          bufferToHex(localStatus.genesisHash),
+          'status.genesisHash:',
+          bufferToHex(status.genesisHash),
+          'localStatus.networkId:',
+          localStatus.networkId,
+          'status.networkId:',
+          status.networkId
+        );
       }
       this.handshakeResolve(result);
       this.handshakeResolve = undefined;

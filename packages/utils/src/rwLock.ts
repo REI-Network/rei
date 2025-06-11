@@ -4,6 +4,21 @@ const defaultMaxReadQueue = 100;
 const defaultReadTimeout = 5000;
 
 /**
+ * Helper class for read-write lock
+ */
+export class RWLockHelper {
+  constructor(private resolve?: () => void) {}
+
+  /**
+   * Release the lock
+   */
+  release() {
+    this.resolve?.();
+    this.resolve = undefined;
+  }
+}
+
+/**
  * A read-write lock implementation
  */
 export class RWLock {
@@ -54,7 +69,7 @@ export class RWLock {
    *                  the read will be rejected
    * @returns the result of the function
    */
-  async read<T>(
+  async runWithReadLock<T>(
     fn: () => Promise<T>,
     timeout = defaultReadTimeout
   ): Promise<T> {
@@ -95,7 +110,7 @@ export class RWLock {
    * @param fn - the function to be executed
    * @returns the result of the function
    */
-  async write<T>(fn: () => Promise<T>): Promise<T> {
+  async runWithWriteLock<T>(fn: () => Promise<T>): Promise<T> {
     const promise = new Promise<T>((resolve, reject) => {
       this.writeQueue.push(() => {
         return fn().then(resolve).catch(reject);
@@ -106,5 +121,35 @@ export class RWLock {
     this.tick();
 
     return promise;
+  }
+
+  /**
+   * Acquire a read lock
+   * @param timeout - the timeout of the read,
+   *                  if the read is not executed within the timeout,
+   *                  the read will be rejected
+   * @returns the helper of the read lock
+   */
+  async acquireReadLock(timeout = defaultReadTimeout): Promise<RWLockHelper> {
+    return new Promise((resolve) => {
+      this.runWithReadLock(
+        () =>
+          new Promise<void>((_resolve) => resolve(new RWLockHelper(_resolve))),
+        timeout
+      );
+    });
+  }
+
+  /**
+   * Acquire a write lock
+   * @returns the helper of the write lock
+   */
+  async acquireWriteLock(): Promise<RWLockHelper> {
+    return new Promise((resolve) => {
+      this.runWithWriteLock(
+        () =>
+          new Promise<void>((_resolve) => resolve(new RWLockHelper(_resolve)))
+      );
+    });
   }
 }

@@ -13,32 +13,32 @@ describe('RWLock', () => {
 
     const lock = new RWLock();
 
-    lock.read(async () => {
+    lock.runWithReadLock(async () => {
       results.push('read 0 start');
       await new Promise((resolve) => setTimeout(resolve, 200));
       results.push('read 0 end');
     });
 
     setTimeout(() => {
-      lock.write(async () => {
+      lock.runWithWriteLock(async () => {
         results.push('write 1 start');
         await new Promise((resolve) => setTimeout(resolve, 400));
         results.push('write 1 end');
       });
 
-      lock.read(async () => {
+      lock.runWithReadLock(async () => {
         results.push('read 1 start');
         await new Promise((resolve) => setTimeout(resolve, 100));
         results.push('read 1 end');
       });
 
-      lock.read(async () => {
+      lock.runWithReadLock(async () => {
         results.push('read 2 start');
         await new Promise((resolve) => setTimeout(resolve, 100));
         results.push('read 2 end');
       });
 
-      lock.read(async () => {
+      lock.runWithReadLock(async () => {
         results.push('read 3 start');
         await new Promise((resolve) => setTimeout(resolve, 100));
         results.push('read 3 end');
@@ -66,13 +66,13 @@ describe('RWLock', () => {
 
     const lock = new RWLock();
 
-    lock.read(async () => {
+    lock.runWithReadLock(async () => {
       results.push('read 0 start');
       await new Promise((resolve) => setTimeout(resolve, 200));
       results.push('read 0 end');
     });
 
-    lock.read(async () => {
+    lock.runWithReadLock(async () => {
       results.push('read 1 start');
       await new Promise((resolve) => setTimeout(resolve, 200));
       results.push('read 1 end');
@@ -80,14 +80,14 @@ describe('RWLock', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    lock.write(async () => {
+    lock.runWithWriteLock(async () => {
       results.push('write 1 start');
       await new Promise((resolve) => setTimeout(resolve, 400));
       results.push('write 1 end');
     });
 
     const result = await lock
-      .read(async () => {
+      .runWithReadLock(async () => {
         results.push('read 2 start');
         await new Promise((resolve) => setTimeout(resolve, 200));
         results.push('read 2 end');

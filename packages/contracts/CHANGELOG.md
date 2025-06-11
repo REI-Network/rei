@@ -1,0 +1,11 @@
+# @rei-network/contracts
+
+## 3.0.4
+
+### Patch Changes
+
+- - fix `snapTree.cap`, add a read-write lock
+  - improving p2p behavior, ban nodes that fail handshake
+  - add `snapshot` and `snapshots` methods to admin api
+  - optimize log level
+  - fix old test cases

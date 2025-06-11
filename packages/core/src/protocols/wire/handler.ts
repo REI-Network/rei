@@ -136,7 +136,7 @@ export abstract class WireProtocolHandler implements ProtocolHandler {
             'WireProtocolHandler::handshake, ban wire protocol handshake failed peer:',
             this.peer.peerId
           );
-          this.node.networkMngr.ban(this.peer.peerId).catch(() => {
+          this.node.banPeer(this.peer.peerId, 'invalid').catch(() => {
             // ignore errors
           });
         }, 100);

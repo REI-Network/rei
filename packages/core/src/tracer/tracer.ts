@@ -9,6 +9,7 @@ import { EMPTY_ADDRESS } from '../utils';
 import { StructLogDebug, JSDebug } from './debug';
 import { toAsync } from './toAsync';
 import { tracers } from './tracers';
+import { CallDebug } from './debug/callDebug';
 
 export interface IDebugImpl extends IDebug {
   result(): any;
@@ -50,6 +51,9 @@ export class Tracer {
     config?: TraceConfig,
     hash?: Buffer
   ): IDebugImpl {
+    if (config?.tracer === 'call') {
+      return new CallDebug(common, config, reject, hash);
+    }
     if (config?.tracer) {
       if (tracers.has(config.tracer)) {
         config.tracer = tracers.get(config.tracer)!;

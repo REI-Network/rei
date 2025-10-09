@@ -93,6 +93,7 @@ class AccountTask {
   next: Buffer;
   last: Buffer;
 
+  failedCount = 0;
   req?: AccountRequest;
   res?: AccountResponse;
 
@@ -449,8 +450,17 @@ export class SnapSync {
   ) {
     // revert
     if (res === null) {
-      task.req = undefined;
-      return;
+      if (task.failedCount++ < 3) {
+        task.req = undefined;
+        return;
+      }
+
+      // if the account response fails 3 times, return an empty response
+      res = {
+        hashes: [],
+        accounts: [],
+        cont: false
+      };
     }
 
     task.req = undefined;
